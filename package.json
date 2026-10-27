@@ -1,0 +1,24 @@
+{
+  "name": "revisum-workspace",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "typecheck": "tsc --build",
+    "lint": "node tools/check-licences.ts && node tools/check-layout.ts && node tools/check-imports.ts",
+    "lint:names": "node tools/lint-names.ts --self-test && node tools/lint-names.ts",
+    "test": "node tools/run-test-folder.ts test/unit test/contract",
+    "proofs": "node tools/run-test-folder.ts test/proofs",
+    "replay": "node tools/run-test-folder.ts test/replay",
+    "check": "npm run typecheck && npm run lint && npm run lint:names && npm test && npm run proofs && npm run replay"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "typescript": "7.0.2"
+  }
+}

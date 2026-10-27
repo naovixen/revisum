@@ -1,0 +1,18 @@
+{
+  "licenceFiles": {
+    "Apache-2.0": "LICENSE-APACHE",
+    "FSL-1.1-ALv2": "LICENSE-FSL"
+  },
+  "packages": {
+    "contracts": "Apache-2.0",
+    "engine": "FSL-1.1-ALv2",
+    "driver-cdp": "Apache-2.0",
+    "driver-playwright": "Apache-2.0",
+    "auditor-axe": "Apache-2.0",
+    "auditor-act": "FSL-1.1-ALv2",
+    "runner": "FSL-1.1-ALv2",
+    "report": "Apache-2.0",
+    "cli": "FSL-1.1-ALv2",
+    "action": "Apache-2.0"
+  }
+}

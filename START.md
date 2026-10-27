@@ -12,7 +12,7 @@ This repo holds the approved design for Revisum and nothing else yet. Follow the
 - [x] 4. First commit and private GitHub repo
 - [x] 5. `main` protection: skipped on GitHub Free until the repo goes public at beta
 - [x] 6. Dev container open and locked
-- [ ] 7. Session 0a: skeleton
+- [ ] 7. Session 0a: skeleton (built; `npm run check` green; awaiting your review and commit)
 - [ ] 8. Session 0b: tests from the spikes
 - [ ] 9. Session 0c: code from the spikes
 - [ ] 10. Week 1: SPEC-27, then SPEC-01

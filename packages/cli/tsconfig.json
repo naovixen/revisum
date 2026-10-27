@@ -1,0 +1,36 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist"
+  },
+  "include": [
+    "src"
+  ],
+  "references": [
+    {
+      "path": "../contracts"
+    },
+    {
+      "path": "../engine"
+    },
+    {
+      "path": "../driver-cdp"
+    },
+    {
+      "path": "../driver-playwright"
+    },
+    {
+      "path": "../auditor-axe"
+    },
+    {
+      "path": "../auditor-act"
+    },
+    {
+      "path": "../runner"
+    },
+    {
+      "path": "../report"
+    }
+  ]
+}

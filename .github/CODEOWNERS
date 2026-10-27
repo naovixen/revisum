@@ -1,0 +1,6 @@
+# The test set and CI configuration belong to the founder, apart from the code they judge.
+/test/ @naovixen
+/proofs/ @naovixen
+/fixtures/ @naovixen
+/golden/ @naovixen
+/.github/ @naovixen

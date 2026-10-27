@@ -1,0 +1,38 @@
+{
+  "files": [],
+  "references": [
+    {
+      "path": "packages/contracts"
+    },
+    {
+      "path": "packages/engine"
+    },
+    {
+      "path": "packages/driver-cdp"
+    },
+    {
+      "path": "packages/driver-playwright"
+    },
+    {
+      "path": "packages/auditor-axe"
+    },
+    {
+      "path": "packages/auditor-act"
+    },
+    {
+      "path": "packages/runner"
+    },
+    {
+      "path": "packages/report"
+    },
+    {
+      "path": "packages/cli"
+    },
+    {
+      "path": "packages/action"
+    },
+    {
+      "path": "tools"
+    }
+  ]
+}
