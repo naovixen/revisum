@@ -1,0 +1,282 @@
+{
+ "schema": "app-run/v1",
+ "recordedAt": "2026-01-15T10:30:00.000Z",
+ "target": "cdp-chromium (CDP driver)",
+ "note": "Real runs of three plans against the sign-up fixture app (en-GB, UTC, light, 1280x800). The \"label\" plan is a seeded spec mismatch (demo): the spec says \"Email address\", the app says \"Email\".",
+ "runs": [
+  {
+   "id": "happy",
+   "title": "Sign-up happy path",
+   "featureId": "SIGNUP-1",
+   "specRef": "specs/signup.md#happy-path",
+   "state": "Passed",
+   "manifestHash": "4cbb581988b6bad2aa50c7cb761843b39ba2c3b066afe1d10343e515efa687f6",
+   "resultHash": "b49dc4abf860ea0ffc9599ef9a2be9df2a624ab4dab955676df89c5ac6db2da9",
+   "browser": "chromium 156.0.8078.47",
+   "steps": [
+    {
+     "index": 0,
+     "type": "navigate",
+     "text": "Opened `/`",
+     "outcome": "passed",
+     "code": null,
+     "observed": null,
+     "artifact": null,
+     "findings": []
+    },
+    {
+     "index": 1,
+     "type": "expect",
+     "text": "Checked that the \"Create your account\" heading is visible",
+     "outcome": "passed",
+     "code": null,
+     "observed": null,
+     "artifact": null,
+     "findings": []
+    },
+    {
+     "index": 2,
+     "type": "expectPage",
+     "text": "Checked the page title",
+     "outcome": "passed",
+     "code": null,
+     "observed": null,
+     "artifact": null,
+     "findings": []
+    },
+    {
+     "index": 3,
+     "type": "fill",
+     "text": "Filled in the \"Full name\" field",
+     "outcome": "passed",
+     "code": null,
+     "observed": null,
+     "artifact": null,
+     "findings": []
+    },
+    {
+     "index": 4,
+     "type": "fill",
+     "text": "Filled in the \"Email\" field",
+     "outcome": "passed",
+     "code": null,
+     "observed": null,
+     "artifact": null,
+     "findings": []
+    },
+    {
+     "index": 5,
+     "type": "expect",
+     "text": "Checked that the \"Email\" field has the expected value",
+     "outcome": "passed",
+     "code": null,
+     "observed": null,
+     "artifact": null,
+     "findings": []
+    },
+    {
+     "index": 6,
+     "type": "capture",
+     "text": "Captured screenshot \"form-filled\"",
+     "outcome": "passed",
+     "code": null,
+     "observed": null,
+     "artifact": "cdp-chromium/form-filled.png",
+     "findings": []
+    },
+    {
+     "index": 7,
+     "type": "click",
+     "text": "Clicked the \"I agree to the terms\" checkbox",
+     "outcome": "passed",
+     "code": null,
+     "observed": null,
+     "artifact": null,
+     "findings": []
+    },
+    {
+     "index": 8,
+     "type": "click",
+     "text": "Clicked the \"Create account\" button",
+     "outcome": "passed",
+     "code": null,
+     "observed": null,
+     "artifact": null,
+     "findings": []
+    },
+    {
+     "index": 9,
+     "type": "expect",
+     "text": "Checked that the `status` element contains the expected text",
+     "outcome": "passed",
+     "code": null,
+     "observed": null,
+     "artifact": null,
+     "findings": []
+    },
+    {
+     "index": 10,
+     "type": "expect",
+     "text": "Checked that the `echo` element contains the expected text",
+     "outcome": "passed",
+     "code": null,
+     "observed": null,
+     "artifact": null,
+     "findings": []
+    },
+    {
+     "index": 11,
+     "type": "capture",
+     "text": "Captured screenshot \"signed-up\"",
+     "outcome": "passed",
+     "code": null,
+     "observed": null,
+     "artifact": "cdp-chromium/signed-up.png",
+     "findings": []
+    }
+   ],
+   "artifacts": [
+    {
+     "name": "cdp-chromium/form-filled.png",
+     "file": "app-happy-form-filled.png",
+     "sha256": "c4f12a33c092f5d9929f1e0eae4d1e23c0ef474ac40cd1b8695f4a2b2cf91e5b",
+     "bytes": 25445
+    },
+    {
+     "name": "cdp-chromium/signed-up.png",
+     "file": "app-happy-signed-up.png",
+     "sha256": "2bd9767b3979cfcf3edf7cbca6e1c808c7d2b6936853fe52fabe9df3c600a6a1",
+     "bytes": 27629
+    }
+   ]
+  },
+  {
+   "id": "a11y",
+   "title": "Sign-up page passes the automated accessibility rules",
+   "featureId": "SIGNUP-1",
+   "specRef": "specs/signup.md#accessibility",
+   "state": "Failed",
+   "manifestHash": "8d370e81b65d7104cdd47c847557c40e953d30ba44f2f0dc48e6be65f3e38b93",
+   "resultHash": "9a56266a0a366a2e6d2a0dab7e5bac6078fce3e4874132714c86acb873630963",
+   "browser": "chromium 156.0.8078.47",
+   "steps": [
+    {
+     "index": 0,
+     "type": "navigate",
+     "text": "Opened `/`",
+     "outcome": "passed",
+     "code": null,
+     "observed": null,
+     "artifact": null,
+     "findings": []
+    },
+    {
+     "index": 1,
+     "type": "capture",
+     "text": "Captured screenshot \"a11y-gate\"",
+     "outcome": "passed",
+     "code": null,
+     "observed": null,
+     "artifact": "cdp-chromium/a11y-gate.png",
+     "findings": []
+    },
+    {
+     "index": 2,
+     "type": "a11yAudit",
+     "text": "Ran automated accessibility rules (gate mode)",
+     "outcome": "failed",
+     "code": "a11y-violations",
+     "observed": null,
+     "artifact": null,
+     "findings": [
+      {
+       "ruleId": "image-alt",
+       "impact": "critical",
+       "nodes": 1
+      }
+     ]
+    }
+   ],
+   "artifacts": [
+    {
+     "name": "cdp-chromium/a11y-gate.png",
+     "file": "app-a11y-a11y-gate.png",
+     "sha256": "fef03c626c6024dacc1b2d0e3db54ebc6abcf415d6d94bad4644503409d94749",
+     "bytes": 23665
+    }
+   ]
+  },
+  {
+   "id": "label",
+   "title": "Email field is labelled \"Email address\" (seeded spec mismatch)",
+   "featureId": "SIGNUP-1",
+   "specRef": "specs/signup.md#labels",
+   "state": "Failed",
+   "manifestHash": "e90589ff0a817869cb0f82e980de6ad998c295dbb13346a61f49045ad0a33d1e",
+   "resultHash": "5938a27a078ff339f80d9f3717ee11d47451f3cd9af57a09a0fdb9703b4ebd09",
+   "browser": "chromium 156.0.8078.47",
+   "steps": [
+    {
+     "index": 0,
+     "type": "navigate",
+     "text": "Opened `/`",
+     "outcome": "passed",
+     "code": null,
+     "observed": null,
+     "artifact": null,
+     "findings": []
+    },
+    {
+     "index": 1,
+     "type": "capture",
+     "text": "Captured screenshot \"label-mismatch\"",
+     "outcome": "passed",
+     "code": null,
+     "observed": null,
+     "artifact": "cdp-chromium/label-mismatch.png",
+     "findings": []
+    },
+    {
+     "index": 2,
+     "type": "fill",
+     "text": "Filled in the \"Email address\" field",
+     "outcome": "failed",
+     "code": "not-found",
+     "observed": null,
+     "artifact": null,
+     "findings": []
+    }
+   ],
+   "artifacts": [
+    {
+     "name": "cdp-chromium/label-mismatch.png",
+     "file": "app-label-label-mismatch.png",
+     "sha256": "fef03c626c6024dacc1b2d0e3db54ebc6abcf415d6d94bad4644503409d94749",
+     "bytes": 23665
+    }
+   ]
+  }
+ ],
+ "boxes": {
+  "imageAlt": {
+   "x": 24,
+   "y": 82.4375,
+   "width": 48,
+   "height": 48
+  },
+  "imageAltInfo": {
+   "selector": "html > body > main > img",
+   "snippet": "<img src=\"/logo.svg\" width=\"48\" height=\"48\">",
+   "actRule": "23a2a8",
+   "wcag": [
+    "1.1.1"
+   ]
+  },
+  "emailField": {
+   "x": 24,
+   "y": 256.44,
+   "width": 320,
+   "height": 30
+  }
+ }
+}

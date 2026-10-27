@@ -1,0 +1,4701 @@
+{
+ "schema": "revisum.report-input/v1",
+ "reportId": "a11y-mapping-pairs",
+ "kind": "a11y",
+ "title": "P1 fixture pages: accessibility run",
+ "subject": "51 fixture pages with a seeded WCAG failure and their 51 clean twins",
+ "note": "Pages the rules cannot judge are in the review queue, not passed. Severities P1 to P4 are provisional and not yet validated against real triage.",
+ "run": {
+  "runId": "a11y-6b565e75558d",
+  "recordedAt": "2026-10-26",
+  "target": "Chrome for Testing 156.0.8078.47 through the CDP driver",
+  "tool": "Own rules engine (23 ACT rules, 5 probes) on CDP driver screenshots",
+  "manifestHash": null,
+  "inputs": [
+   {
+    "name": "evidence/index.json",
+    "sha256": "c3ff7c93dbaf1b8a986bcc9d6f0e6439471c76975db65562fa14394e19d9a423"
+   },
+   {
+    "name": "accessibility-findings.json",
+    "sha256": "c1e68225b6dbdf1530da597a57ece915332d330115e14bef2aa55913463929b0"
+   },
+   {
+    "name": "derived/findings-1280.json",
+    "sha256": "df7be485e63bdc0d64efe5394775d74c54637d6eed365657068747257de9868b"
+   },
+   {
+    "name": "wcag22-success-criteria.json",
+    "sha256": "8240192a4371c8065e954bf8007c98760f59746b4cc0acd8edac8245cf0231de"
+   },
+   {
+    "name": "evidence/sc111-missing-alt.fail.png",
+    "sha256": "c75575d8ee247765763708f256c37a04fba7bf1758ab3535eeb58e7415773485"
+   },
+   {
+    "name": "evidence/sc131-bad-list.fail.png",
+    "sha256": "f9b6e77722e548b1955b0c9f7dc56cc76fd529b2624c4d2959c197627a49a238"
+   },
+   {
+    "name": "evidence/sc135-bad-autocomplete.fail.png",
+    "sha256": "e19fa24795e39037d5109e3b6ab7314127d8871d952df8b97bc892987ac0db91"
+   },
+   {
+    "name": "evidence/sc1410-no-reflow.fail.png",
+    "sha256": "2e70ddfe71eb2ddc9fe917d2a77532c080a971219b1a6642d35fe518f3274fbc"
+   },
+   {
+    "name": "evidence/sc1412-inline-letter-spacing.fail.png",
+    "sha256": "535e556150c800d93535f9bd7f9cb7086c5cfd05e61d87ac0a7fcb5587ec47ec"
+   },
+   {
+    "name": "evidence/sc143-gradient-bg.fail.png",
+    "sha256": "53142b126d1e47245ccf6bb62a281a11c6bddeccc946cc4a2ca5a403c8457b1c"
+   },
+   {
+    "name": "evidence/sc143-low-contrast.fail.png",
+    "sha256": "0f41fa82c427cdc8aaf1052d20b55d3d57ef729d6fef4258b2578ab7ca4795c4"
+   },
+   {
+    "name": "evidence/sc144-no-zoom.fail.png",
+    "sha256": "b2aa49de7d40299994f8226fb69ea5c45b1bd92b0edfb7c02d33282db4e1d3db"
+   },
+   {
+    "name": "evidence/sc211-click-div.fail.png",
+    "sha256": "8faaa926d0a37da0a348db42d8452f3317779dc907aad2f98f160df9d44b6cbf"
+   },
+   {
+    "name": "evidence/sc211-scroll-no-focus.fail.png",
+    "sha256": "72c7027f39a1288738d277ffa8d3ee2a0ba358598840905781554e2b60a6f1a8"
+   },
+   {
+    "name": "evidence/sc212-keyboard-trap.fail.png",
+    "sha256": "c3157ea98b8cbcb620ada3868e16842be0bdf8f08043baac94a4c08eb07510a3"
+   },
+   {
+    "name": "evidence/sc221-meta-refresh.fail.png",
+    "sha256": "b2aa49de7d40299994f8226fb69ea5c45b1bd92b0edfb7c02d33282db4e1d3db"
+   },
+   {
+    "name": "evidence/sc2411-focus-obscured.fail.png",
+    "sha256": "4281c17e50c076a30a8df9fc632ca5a5dfed083924de479a60e35b2765c53d2d"
+   },
+   {
+    "name": "evidence/sc242-empty-title.fail.png",
+    "sha256": "b2aa49de7d40299994f8226fb69ea5c45b1bd92b0edfb7c02d33282db4e1d3db"
+   },
+   {
+    "name": "evidence/sc243-focus-order.fail.png",
+    "sha256": "a9dc703fcc2c637ff1dc98fcc72e36986c7e5959c1e2eb61918bfe2fb10c26d9"
+   },
+   {
+    "name": "evidence/sc244-empty-link.fail.png",
+    "sha256": "d83babb7a26a6d3ea47a711d429f03f391830e30bf6a8fa8764756c8c9b02666"
+   },
+   {
+    "name": "evidence/sc247-focus-hidden.fail.png",
+    "sha256": "5014bbbb8aebf338e7ad51b9fd1df5a6e06f522a0003e1f6d944bd3ca784cba1"
+   },
+   {
+    "name": "evidence/sc253-label-mismatch.fail.png",
+    "sha256": "de42858c091612e4267b8a3ff123ac486d9736bff51c78cb43f83daa66dc874f"
+   },
+   {
+    "name": "evidence/sc258-small-targets.fail.png",
+    "sha256": "7c3c01118e801febee0ae985f7564bb570869af04c038f9269ffa8c71bd49950"
+   },
+   {
+    "name": "evidence/sc311-no-lang.fail.png",
+    "sha256": "b2aa49de7d40299994f8226fb69ea5c45b1bd92b0edfb7c02d33282db4e1d3db"
+   },
+   {
+    "name": "evidence/sc312-bad-lang-part.fail.png",
+    "sha256": "be1078637aab14d80a541972ca56a98b04d6642513647b6bd80d5efc6047f3fc"
+   },
+   {
+    "name": "evidence/sc332-no-label.fail.png",
+    "sha256": "25d46db5bd0a1613bc1a6e3ef6d00479caacdfc5d43979419d03cfa84f59fb67"
+   },
+   {
+    "name": "evidence/sc412-bad-role.fail.png",
+    "sha256": "0c12880bada9df64c99dc80c1a33b8f81b8f34edab0c4bf5384f308689fdf528"
+   },
+   {
+    "name": "evidence/sc412-button-no-name.fail.png",
+    "sha256": "ce558faa4d736823e0d9c1716e97eb65114f81eaf15c4ba0efb50c33d26c0859"
+   }
+  ]
+ },
+ "acceptance": [
+  {
+   "id": "sc111-missing-alt.clean",
+   "text": "SC 1.1.1 Non-text Content is met on sc111-missing-alt.clean.html.",
+   "status": "passed",
+   "stepIds": [
+    "scan.sc111-missing-alt.clean"
+   ],
+   "evidence": [
+    {
+     "kind": "step",
+     "id": "scan.sc111-missing-alt.clean",
+     "label": "scan result: no finding"
+    }
+   ]
+  },
+  {
+   "id": "sc111-missing-alt.fail",
+   "text": "SC 1.1.1 Non-text Content is met on sc111-missing-alt.fail.html.",
+   "status": "failed",
+   "stepIds": [
+    "scan.sc111-missing-alt.fail"
+   ],
+   "evidence": [
+    {
+     "kind": "finding",
+     "id": "sc111-missing-alt.fail.23a2a8.1",
+     "label": "finding 23a2a8"
+    },
+    {
+     "kind": "image",
+     "id": "img.sc111-missing-alt.fail",
+     "label": "screenshot"
+    }
+   ]
+  },
+  {
+   "id": "sc111-useless-alt.clean",
+   "text": "SC 1.1.1 Non-text Content is met on sc111-useless-alt.clean.html.",
+   "status": "passed",
+   "stepIds": [
+    "scan.sc111-useless-alt.clean"
+   ],
+   "evidence": [
+    {
+     "kind": "step",
+     "id": "scan.sc111-useless-alt.clean",
+     "label": "scan result: no finding"
+    }
+   ]
+  },
+  {
+   "id": "sc111-useless-alt.fail",
+   "text": "SC 1.1.1 Non-text Content is met on sc111-useless-alt.fail.html.",
+   "status": "needs-review",
+   "stepIds": [
+    "scan.sc111-useless-alt.fail"
+   ],
+   "evidence": [
+    {
+     "kind": "finding",
+     "id": "sc111-useless-alt.fail.review",
+     "label": "review item"
+    }
+   ]
+  },
+  {
+   "id": "sc121-audio-no-transcript.clean",
+   "text": "SC 1.2.1 Audio-only and Video-only (Prerecorded) is met on sc121-audio-no-transcript.clean.html.",
+   "status": "passed",
+   "stepIds": [
+    "scan.sc121-audio-no-transcript.clean"
+   ],
+   "evidence": [
+    {
+     "kind": "step",
+     "id": "scan.sc121-audio-no-transcript.clean",
+     "label": "scan result: no finding"
+    }
+   ]
+  },
+  {
+   "id": "sc121-audio-no-transcript.fail",
+   "text": "SC 1.2.1 Audio-only and Video-only (Prerecorded) is met on sc121-audio-no-transcript.fail.html.",
+   "status": "needs-review",
+   "stepIds": [
+    "scan.sc121-audio-no-transcript.fail"
+   ],
+   "evidence": [
+    {
+     "kind": "finding",
+     "id": "sc121-audio-no-transcript.fail.review",
+     "label": "review item"
+    }
+   ]
+  },
+  {
+   "id": "sc122-video-no-captions.clean",
+   "text": "SC 1.2.2 Captions (Prerecorded) is met on sc122-video-no-captions.clean.html.",
+   "status": "passed",
+   "stepIds": [
+    "scan.sc122-video-no-captions.clean"
+   ],
+   "evidence": [
+    {
+     "kind": "step",
+     "id": "scan.sc122-video-no-captions.clean",
+     "label": "scan result: no finding"
+    }
+   ]
+  },
+  {
+   "id": "sc122-video-no-captions.fail",
+   "text": "SC 1.2.2 Captions (Prerecorded) is met on sc122-video-no-captions.fail.html.",
+   "status": "needs-review",
+   "stepIds": [
+    "scan.sc122-video-no-captions.fail"
+   ],
+   "evidence": [
+    {
+     "kind": "finding",
+     "id": "sc122-video-no-captions.fail.review",
+     "label": "review item"
+    }
+   ]
+  },
+  {
+   "id": "sc122-wrong-captions.clean",
+   "text": "SC 1.2.2 Captions (Prerecorded) is met on sc122-wrong-captions.clean.html.",
+   "status": "passed",
+   "stepIds": [
+    "scan.sc122-wrong-captions.clean"
+   ],
+   "evidence": [
+    {
+     "kind": "step",
+     "id": "scan.sc122-wrong-captions.clean",
+     "label": "scan result: no finding"
+    }
+   ]
+  },
+  {
+   "id": "sc122-wrong-captions.fail",
+   "text": "SC 1.2.2 Captions (Prerecorded) is met on sc122-wrong-captions.fail.html.",
+   "status": "needs-review",
+   "stepIds": [
+    "scan.sc122-wrong-captions.fail"
+   ],
+   "evidence": [
+    {
+     "kind": "finding",
+     "id": "sc122-wrong-captions.fail.review",
+     "label": "review item"
+    }
+   ]
+  },
+  {
+   "id": "sc131-bad-list.clean",
+   "text": "SC 1.3.1 Info and Relationships is met on sc131-bad-list.clean.html.",
+   "status": "passed",
+   "stepIds": [
+    "scan.sc131-bad-list.clean"
+   ],
+   "evidence": [
+    {
+     "kind": "step",
+     "id": "scan.sc131-bad-list.clean",
+     "label": "scan result: no finding"
+    }
+   ]
+  },
+  {
+   "id": "sc131-bad-list.fail",
+   "text": "SC 1.3.1 Info and Relationships is met on sc131-bad-list.fail.html.",
+   "status": "failed",
+   "stepIds": [
+    "scan.sc131-bad-list.fail"
+   ],
+   "evidence": [
+    {
+     "kind": "finding",
+     "id": "sc131-bad-list.fail.bc4a75.1",
+     "label": "finding bc4a75"
+    },
+    {
+     "kind": "image",
+     "id": "img.sc131-bad-list.fail",
+     "label": "screenshot"
+    }
+   ]
+  },
+  {
+   "id": "sc131-fake-heading.clean",
+   "text": "SC 1.3.1 Info and Relationships is met on sc131-fake-heading.clean.html.",
+   "status": "passed",
+   "stepIds": [
+    "scan.sc131-fake-heading.clean"
+   ],
+   "evidence": [
+    {
+     "kind": "step",
+     "id": "scan.sc131-fake-heading.clean",
+     "label": "scan result: no finding"
+    }
+   ]
+  },
+  {
+   "id": "sc131-fake-heading.fail",
+   "text": "SC 1.3.1 Info and Relationships is met on sc131-fake-heading.fail.html.",
+   "status": "needs-review",
+   "stepIds": [
+    "scan.sc131-fake-heading.fail"
+   ],
+   "evidence": [
+    {
+     "kind": "finding",
+     "id": "sc131-fake-heading.fail.review",
+     "label": "review item"
+    }
+   ]
+  },
+  {
+   "id": "sc132-visual-order.clean",
+   "text": "SC 1.3.2 Meaningful Sequence is met on sc132-visual-order.clean.html.",
+   "status": "passed",
+   "stepIds": [
+    "scan.sc132-visual-order.clean"
+   ],
+   "evidence": [
+    {
+     "kind": "step",
+     "id": "scan.sc132-visual-order.clean",
+     "label": "scan result: no finding"
+    }
+   ]
+  },
+  {
+   "id": "sc132-visual-order.fail",
+   "text": "SC 1.3.2 Meaningful Sequence is met on sc132-visual-order.fail.html.",
+   "status": "needs-review",
+   "stepIds": [
+    "scan.sc132-visual-order.fail"
+   ],
+   "evidence": [
+    {
+     "kind": "finding",
+     "id": "sc132-visual-order.fail.review",
+     "label": "review item"
+    }
+   ]
+  },
+  {
+   "id": "sc133-sensory-instruction.clean",
+   "text": "SC 1.3.3 Sensory Characteristics is met on sc133-sensory-instruction.clean.html.",
+   "status": "passed",
+   "stepIds": [
+    "scan.sc133-sensory-instruction.clean"
+   ],
+   "evidence": [
+    {
+     "kind": "step",
+     "id": "scan.sc133-sensory-instruction.clean",
+     "label": "scan result: no finding"
+    }
+   ]
+  },
+  {
+   "id": "sc133-sensory-instruction.fail",
+   "text": "SC 1.3.3 Sensory Characteristics is met on sc133-sensory-instruction.fail.html.",
+   "status": "needs-review",
+   "stepIds": [
+    "scan.sc133-sensory-instruction.fail"
+   ],
+   "evidence": [
+    {
+     "kind": "finding",
+     "id": "sc133-sensory-instruction.fail.review",
+     "label": "review item"
+    }
+   ]
+  },
+  {
+   "id": "sc134-orientation-lock.clean",
+   "text": "SC 1.3.4 Orientation is met on sc134-orientation-lock.clean.html.",
+   "status": "passed",
+   "stepIds": [
+    "scan.sc134-orientation-lock.clean"
+   ],
+   "evidence": [
+    {
+     "kind": "step",
+     "id": "scan.sc134-orientation-lock.clean",
+     "label": "scan result: no finding"
+    }
+   ]
+  },
+  {
+   "id": "sc134-orientation-lock.fail",
+   "text": "SC 1.3.4 Orientation is met on sc134-orientation-lock.fail.html.",
+   "status": "needs-review",
+   "stepIds": [
+    "scan.sc134-orientation-lock.fail"
+   ],
+   "evidence": [
+    {
+     "kind": "finding",
+     "id": "sc134-orientation-lock.fail.review",
+     "label": "review item"
+    }
+   ]
+  },
+  {
+   "id": "sc135-bad-autocomplete.clean",
+   "text": "SC 1.3.5 Identify Input Purpose is met on sc135-bad-autocomplete.clean.html.",
+   "status": "passed",
+   "stepIds": [
+    "scan.sc135-bad-autocomplete.clean"
+   ],
+   "evidence": [
+    {
+     "kind": "step",
+     "id": "scan.sc135-bad-autocomplete.clean",
+     "label": "scan result: no finding"
+    }
+   ]
+  },
+  {
+   "id": "sc135-bad-autocomplete.fail",
+   "text": "SC 1.3.5 Identify Input Purpose is met on sc135-bad-autocomplete.fail.html.",
+   "status": "failed",
+   "stepIds": [
+    "scan.sc135-bad-autocomplete.fail"
+   ],
+   "evidence": [
+    {
+     "kind": "finding",
+     "id": "sc135-bad-autocomplete.fail.73f2c2.1",
+     "label": "finding 73f2c2"
+    },
+    {
+     "kind": "image",
+     "id": "img.sc135-bad-autocomplete.fail",
+     "label": "screenshot"
+    }
+   ]
+  },
+  {
+   "id": "sc141-colour-only-link.clean",
+   "text": "SC 1.4.1 Use of Color is met on sc141-colour-only-link.clean.html.",
+   "status": "passed",
+   "stepIds": [
+    "scan.sc141-colour-only-link.clean"
+   ],
+   "evidence": [
+    {
+     "kind": "step",
+     "id": "scan.sc141-colour-only-link.clean",
+     "label": "scan result: no finding"
+    }
+   ]
+  },
+  {
+   "id": "sc141-colour-only-link.fail",
+   "text": "SC 1.4.1 Use of Color is met on sc141-colour-only-link.fail.html.",
+   "status": "needs-review",
+   "stepIds": [
+    "scan.sc141-colour-only-link.fail"
+   ],
+   "evidence": [
+    {
+     "kind": "finding",
+     "id": "sc141-colour-only-link.fail.review",
+     "label": "review item"
+    }
+   ]
+  },
+  {
+   "id": "sc1410-no-reflow.clean",
+   "text": "SC 1.4.10 Reflow is met on sc1410-no-reflow.clean.html.",
+   "status": "passed",
+   "stepIds": [
+    "scan.sc1410-no-reflow.clean"
+   ],
+   "evidence": [
+    {
+     "kind": "step",
+     "id": "scan.sc1410-no-reflow.clean",
+     "label": "scan result: no finding"
+    }
+   ]
+  },
+  {
+   "id": "sc1410-no-reflow.fail",
+   "text": "SC 1.4.10 Reflow is met on sc1410-no-reflow.fail.html.",
+   "status": "failed",
+   "stepIds": [
+    "scan.sc1410-no-reflow.fail"
+   ],
+   "evidence": [
+    {
+     "kind": "finding",
+     "id": "sc1410-no-reflow.fail.page-reflow.1",
+     "label": "finding page-reflow"
+    },
+    {
+     "kind": "image",
+     "id": "img.sc1410-no-reflow.fail",
+     "label": "screenshot"
+    }
+   ]
+  },
+  {
+   "id": "sc1411-faint-border.clean",
+   "text": "SC 1.4.11 Non-text Contrast is met on sc1411-faint-border.clean.html.",
+   "status": "passed",
+   "stepIds": [
+    "scan.sc1411-faint-border.clean"
+   ],
+   "evidence": [
+    {
+     "kind": "step",
+     "id": "scan.sc1411-faint-border.clean",
+     "label": "scan result: no finding"
+    }
+   ]
+  },
+  {
+   "id": "sc1411-faint-border.fail",
+   "text": "SC 1.4.11 Non-text Contrast is met on sc1411-faint-border.fail.html.",
+   "status": "needs-review",
+   "stepIds": [
+    "scan.sc1411-faint-border.fail"
+   ],
+   "evidence": [
+    {
+     "kind": "finding",
+     "id": "sc1411-faint-border.fail.review",
+     "label": "review item"
+    }
+   ]
+  },
+  {
+   "id": "sc1412-inline-letter-spacing.clean",
+   "text": "SC 1.4.12 Text Spacing is met on sc1412-inline-letter-spacing.clean.html.",
+   "status": "passed",
+   "stepIds": [
+    "scan.sc1412-inline-letter-spacing.clean"
+   ],
+   "evidence": [
+    {
+     "kind": "step",
+     "id": "scan.sc1412-inline-letter-spacing.clean",
+     "label": "scan result: no finding"
+    }
+   ]
+  },
+  {
+   "id": "sc1412-inline-letter-spacing.fail",
+   "text": "SC 1.4.12 Text Spacing is met on sc1412-inline-letter-spacing.fail.html.",
+   "status": "failed",
+   "stepIds": [
+    "scan.sc1412-inline-letter-spacing.fail"
+   ],
+   "evidence": [
+    {
+     "kind": "finding",
+     "id": "sc1412-inline-letter-spacing.fail.24afc2.1",
+     "label": "finding 24afc2"
+    },
+    {
+     "kind": "image",
+     "id": "img.sc1412-inline-letter-spacing.fail",
+     "label": "screenshot"
+    }
+   ]
+  },
+  {
+   "id": "sc1412-inline-spacing.clean",
+   "text": "SC 1.4.12 Text Spacing is met on sc1412-inline-spacing.clean.html.",
+   "status": "passed",
+   "stepIds": [
+    "scan.sc1412-inline-spacing.clean"
+   ],
+   "evidence": [
+    {
+     "kind": "step",
+     "id": "scan.sc1412-inline-spacing.clean",
+     "label": "scan result: no finding"
+    }
+   ]
+  },
+  {
+   "id": "sc1412-inline-spacing.fail",
+   "text": "SC 1.4.12 Text Spacing is met on sc1412-inline-spacing.fail.html.",
+   "status": "needs-review",
+   "stepIds": [
+    "scan.sc1412-inline-spacing.fail"
+   ],
+   "evidence": [
+    {
+     "kind": "finding",
+     "id": "sc1412-inline-spacing.fail.review",
+     "label": "review item"
+    }
+   ]
+  },
+  {
+   "id": "sc1413-hover-content.clean",
+   "text": "SC 1.4.13 Content on Hover or Focus is met on sc1413-hover-content.clean.html.",
+   "status": "passed",
+   "stepIds": [
+    "scan.sc1413-hover-content.clean"
+   ],
+   "evidence": [
+    {
+     "kind": "step",
+     "id": "scan.sc1413-hover-content.clean",
+     "label": "scan result: no finding"
+    }
+   ]
+  },
+  {
+   "id": "sc1413-hover-content.fail",
+   "text": "SC 1.4.13 Content on Hover or Focus is met on sc1413-hover-content.fail.html.",
+   "status": "needs-review",
+   "stepIds": [
+    "scan.sc1413-hover-content.fail"
+   ],
+   "evidence": [
+    {
+     "kind": "finding",
+     "id": "sc1413-hover-content.fail.review",
+     "label": "review item"
+    }
+   ]
+  },
+  {
+   "id": "sc142-autoplay-audio.clean",
+   "text": "SC 1.4.2 Audio Control is met on sc142-autoplay-audio.clean.html.",
+   "status": "passed",
+   "stepIds": [
+    "scan.sc142-autoplay-audio.clean"
+   ],
+   "evidence": [
+    {
+     "kind": "step",
+     "id": "scan.sc142-autoplay-audio.clean",
+     "label": "scan result: no finding"
+    }
+   ]
+  },
+  {
+   "id": "sc142-autoplay-audio.fail",
+   "text": "SC 1.4.2 Audio Control is met on sc142-autoplay-audio.fail.html.",
+   "status": "needs-review",
+   "stepIds": [
+    "scan.sc142-autoplay-audio.fail"
+   ],
+   "evidence": [
+    {
+     "kind": "finding",
+     "id": "sc142-autoplay-audio.fail.review",
+     "label": "review item"
+    }
+   ]
+  },
+  {
+   "id": "sc143-gradient-bg.clean",
+   "text": "SC 1.4.3 Contrast (Minimum) is met on sc143-gradient-bg.clean.html.",
+   "status": "passed",
+   "stepIds": [
+    "scan.sc143-gradient-bg.clean"
+   ],
+   "evidence": [
+    {
+     "kind": "step",
+     "id": "scan.sc143-gradient-bg.clean",
+     "label": "scan result: no finding"
+    }
+   ]
+  },
+  {
+   "id": "sc143-gradient-bg.fail",
+   "text": "SC 1.4.3 Contrast (Minimum) is met on sc143-gradient-bg.fail.html.",
+   "status": "failed",
+   "stepIds": [
+    "scan.sc143-gradient-bg.fail"
+   ],
+   "evidence": [
+    {
+     "kind": "finding",
+     "id": "sc143-gradient-bg.fail.afw4f7.1",
+     "label": "finding afw4f7"
+    },
+    {
+     "kind": "image",
+     "id": "img.sc143-gradient-bg.fail",
+     "label": "screenshot"
+    }
+   ]
+  },
+  {
+   "id": "sc143-low-contrast.clean",
+   "text": "SC 1.4.3 Contrast (Minimum) is met on sc143-low-contrast.clean.html.",
+   "status": "passed",
+   "stepIds": [
+    "scan.sc143-low-contrast.clean"
+   ],
+   "evidence": [
+    {
+     "kind": "step",
+     "id": "scan.sc143-low-contrast.clean",
+     "label": "scan result: no finding"
+    }
+   ]
+  },
+  {
+   "id": "sc143-low-contrast.fail",
+   "text": "SC 1.4.3 Contrast (Minimum) is met on sc143-low-contrast.fail.html.",
+   "status": "failed",
+   "stepIds": [
+    "scan.sc143-low-contrast.fail"
+   ],
+   "evidence": [
+    {
+     "kind": "finding",
+     "id": "sc143-low-contrast.fail.afw4f7.1",
+     "label": "finding afw4f7"
+    },
+    {
+     "kind": "image",
+     "id": "img.sc143-low-contrast.fail",
+     "label": "screenshot"
+    }
+   ]
+  },
+  {
+   "id": "sc144-no-zoom.clean",
+   "text": "SC 1.4.4 Resize Text is met on sc144-no-zoom.clean.html.",
+   "status": "passed",
+   "stepIds": [
+    "scan.sc144-no-zoom.clean"
+   ],
+   "evidence": [
+    {
+     "kind": "step",
+     "id": "scan.sc144-no-zoom.clean",
+     "label": "scan result: no finding"
+    }
+   ]
+  },
+  {
+   "id": "sc144-no-zoom.fail",
+   "text": "SC 1.4.4 Resize Text is met on sc144-no-zoom.fail.html.",
+   "status": "failed",
+   "stepIds": [
+    "scan.sc144-no-zoom.fail"
+   ],
+   "evidence": [
+    {
+     "kind": "finding",
+     "id": "sc144-no-zoom.fail.b4f0c3.1",
+     "label": "finding b4f0c3"
+    },
+    {
+     "kind": "image",
+     "id": "img.sc144-no-zoom.fail",
+     "label": "screenshot"
+    }
+   ]
+  },
+  {
+   "id": "sc145-image-of-text.clean",
+   "text": "SC 1.4.5 Images of Text is met on sc145-image-of-text.clean.html.",
+   "status": "passed",
+   "stepIds": [
+    "scan.sc145-image-of-text.clean"
+   ],
+   "evidence": [
+    {
+     "kind": "step",
+     "id": "scan.sc145-image-of-text.clean",
+     "label": "scan result: no finding"
+    }
+   ]
+  },
+  {
+   "id": "sc145-image-of-text.fail",
+   "text": "SC 1.4.5 Images of Text is met on sc145-image-of-text.fail.html.",
+   "status": "needs-review",
+   "stepIds": [
+    "scan.sc145-image-of-text.fail"
+   ],
+   "evidence": [
+    {
+     "kind": "finding",
+     "id": "sc145-image-of-text.fail.review",
+     "label": "review item"
+    }
+   ]
+  },
+  {
+   "id": "sc211-click-div.clean",
+   "text": "SC 2.1.1 Keyboard is met on sc211-click-div.clean.html.",
+   "status": "passed",
+   "stepIds": [
+    "scan.sc211-click-div.clean"
+   ],
+   "evidence": [
+    {
+     "kind": "step",
+     "id": "scan.sc211-click-div.clean",
+     "label": "scan result: no finding"
+    }
+   ]
+  },
+  {
+   "id": "sc211-click-div.fail",
+   "text": "SC 2.1.1 Keyboard is met on sc211-click-div.fail.html.",
+   "status": "failed",
+   "stepIds": [
+    "scan.sc211-click-div.fail"
+   ],
+   "evidence": [
+    {
+     "kind": "finding",
+     "id": "sc211-click-div.fail.keyboard-reachable.1",
+     "label": "finding keyboard-reachable"
+    },
+    {
+     "kind": "image",
+     "id": "img.sc211-click-div.fail",
+     "label": "screenshot"
+    }
+   ]
+  },
+  {
+   "id": "sc211-scroll-no-focus.clean",
+   "text": "SC 2.1.1 Keyboard is met on sc211-scroll-no-focus.clean.html.",
+   "status": "passed",
+   "stepIds": [
+    "scan.sc211-scroll-no-focus.clean"
+   ],
+   "evidence": [
+    {
+     "kind": "step",
+     "id": "scan.sc211-scroll-no-focus.clean",
+     "label": "scan result: no finding"
+    }
+   ]
+  },
+  {
+   "id": "sc211-scroll-no-focus.fail",
+   "text": "SC 2.1.1 Keyboard is met on sc211-scroll-no-focus.fail.html.",
+   "status": "failed",
+   "stepIds": [
+    "scan.sc211-scroll-no-focus.fail"
+   ],
+   "evidence": [
+    {
+     "kind": "finding",
+     "id": "sc211-scroll-no-focus.fail.0ssw9k.1",
+     "label": "finding 0ssw9k"
+    },
+    {
+     "kind": "image",
+     "id": "img.sc211-scroll-no-focus.fail",
+     "label": "screenshot"
+    }
+   ]
+  },
+  {
+   "id": "sc212-keyboard-trap.clean",
+   "text": "SC 2.1.2 No Keyboard Trap is met on sc212-keyboard-trap.clean.html.",
+   "status": "passed",
+   "stepIds": [
+    "scan.sc212-keyboard-trap.clean"
+   ],
+   "evidence": [
+    {
+     "kind": "step",
+     "id": "scan.sc212-keyboard-trap.clean",
+     "label": "scan result: no finding"
+    }
+   ]
+  },
+  {
+   "id": "sc212-keyboard-trap.fail",
+   "text": "SC 2.1.2 No Keyboard Trap is met on sc212-keyboard-trap.fail.html.",
+   "status": "failed",
+   "stepIds": [
+    "scan.sc212-keyboard-trap.fail"
+   ],
+   "evidence": [
+    {
+     "kind": "finding",
+     "id": "sc212-keyboard-trap.fail.a1b64e.1",
+     "label": "finding a1b64e"
+    },
+    {
+     "kind": "finding",
+     "id": "sc212-keyboard-trap.fail.a1b64e.2",
+     "label": "finding a1b64e"
+    },
+    {
+     "kind": "finding",
+     "id": "sc212-keyboard-trap.fail.oj04fd.3",
+     "label": "finding oj04fd"
+    },
+    {
+     "kind": "finding",
+     "id": "sc212-keyboard-trap.fail.oj04fd.4",
+     "label": "finding oj04fd"
+    },
+    {
+     "kind": "image",
+     "id": "img.sc212-keyboard-trap.fail",
+     "label": "screenshot"
+    }
+   ]
+  },
+  {
+   "id": "sc221-meta-refresh.clean",
+   "text": "SC 2.2.1 Timing Adjustable is met on sc221-meta-refresh.clean.html.",
+   "status": "passed",
+   "stepIds": [
+    "scan.sc221-meta-refresh.clean"
+   ],
+   "evidence": [
+    {
+     "kind": "step",
+     "id": "scan.sc221-meta-refresh.clean",
+     "label": "scan result: no finding"
+    }
+   ]
+  },
+  {
+   "id": "sc221-meta-refresh.fail",
+   "text": "SC 2.2.1 Timing Adjustable is met on sc221-meta-refresh.fail.html.",
+   "status": "failed",
+   "stepIds": [
+    "scan.sc221-meta-refresh.fail"
+   ],
+   "evidence": [
+    {
+     "kind": "finding",
+     "id": "sc221-meta-refresh.fail.bc659a.1",
+     "label": "finding bc659a"
+    },
+    {
+     "kind": "image",
+     "id": "img.sc221-meta-refresh.fail",
+     "label": "screenshot"
+    }
+   ]
+  },
+  {
+   "id": "sc222-marquee.clean",
+   "text": "SC 2.2.2 Pause, Stop, Hide is met on sc222-marquee.clean.html.",
+   "status": "passed",
+   "stepIds": [
+    "scan.sc222-marquee.clean"
+   ],
+   "evidence": [
+    {
+     "kind": "step",
+     "id": "scan.sc222-marquee.clean",
+     "label": "scan result: no finding"
+    }
+   ]
+  },
+  {
+   "id": "sc222-marquee.fail",
+   "text": "SC 2.2.2 Pause, Stop, Hide is met on sc222-marquee.fail.html.",
+   "status": "needs-review",
+   "stepIds": [
+    "scan.sc222-marquee.fail"
+   ],
+   "evidence": [
+    {
+     "kind": "finding",
+     "id": "sc222-marquee.fail.review",
+     "label": "review item"
+    }
+   ]
+  },
+  {
+   "id": "sc231-flashing.clean",
+   "text": "SC 2.3.1 Three Flashes or Below Threshold is met on sc231-flashing.clean.html.",
+   "status": "passed",
+   "stepIds": [
+    "scan.sc231-flashing.clean"
+   ],
+   "evidence": [
+    {
+     "kind": "step",
+     "id": "scan.sc231-flashing.clean",
+     "label": "scan result: no finding"
+    }
+   ]
+  },
+  {
+   "id": "sc231-flashing.fail",
+   "text": "SC 2.3.1 Three Flashes or Below Threshold is met on sc231-flashing.fail.html.",
+   "status": "needs-review",
+   "stepIds": [
+    "scan.sc231-flashing.fail"
+   ],
+   "evidence": [
+    {
+     "kind": "finding",
+     "id": "sc231-flashing.fail.review",
+     "label": "review item"
+    }
+   ]
+  },
+  {
+   "id": "sc241-no-bypass.clean",
+   "text": "SC 2.4.1 Bypass Blocks is met on sc241-no-bypass.clean.html.",
+   "status": "passed",
+   "stepIds": [
+    "scan.sc241-no-bypass.clean"
+   ],
+   "evidence": [
+    {
+     "kind": "step",
+     "id": "scan.sc241-no-bypass.clean",
+     "label": "scan result: no finding"
+    }
+   ]
+  },
+  {
+   "id": "sc241-no-bypass.fail",
+   "text": "SC 2.4.1 Bypass Blocks is met on sc241-no-bypass.fail.html.",
+   "status": "needs-review",
+   "stepIds": [
+    "scan.sc241-no-bypass.fail"
+   ],
+   "evidence": [
+    {
+     "kind": "finding",
+     "id": "sc241-no-bypass.fail.review",
+     "label": "review item"
+    }
+   ]
+  },
+  {
+   "id": "sc2411-focus-obscured.clean",
+   "text": "SC 2.4.11 Focus Not Obscured (Minimum) is met on sc2411-focus-obscured.clean.html.",
+   "status": "passed",
+   "stepIds": [
+    "scan.sc2411-focus-obscured.clean"
+   ],
+   "evidence": [
+    {
+     "kind": "step",
+     "id": "scan.sc2411-focus-obscured.clean",
+     "label": "scan result: no finding"
+    }
+   ]
+  },
+  {
+   "id": "sc2411-focus-obscured.fail",
+   "text": "SC 2.4.11 Focus Not Obscured (Minimum) is met on sc2411-focus-obscured.fail.html.",
+   "status": "failed",
+   "stepIds": [
+    "scan.sc2411-focus-obscured.fail"
+   ],
+   "evidence": [
+    {
+     "kind": "finding",
+     "id": "sc2411-focus-obscured.fail.oj04fd.1",
+     "label": "finding oj04fd"
+    },
+    {
+     "kind": "finding",
+     "id": "sc2411-focus-obscured.fail.keyboard-focus-obscured.2",
+     "label": "finding keyboard-focus-obscured"
+    },
+    {
+     "kind": "image",
+     "id": "img.sc2411-focus-obscured.fail",
+     "label": "screenshot"
+    }
+   ]
+  },
+  {
+   "id": "sc242-empty-title.clean",
+   "text": "SC 2.4.2 Page Titled is met on sc242-empty-title.clean.html.",
+   "status": "passed",
+   "stepIds": [
+    "scan.sc242-empty-title.clean"
+   ],
+   "evidence": [
+    {
+     "kind": "step",
+     "id": "scan.sc242-empty-title.clean",
+     "label": "scan result: no finding"
+    }
+   ]
+  },
+  {
+   "id": "sc242-empty-title.fail",
+   "text": "SC 2.4.2 Page Titled is met on sc242-empty-title.fail.html.",
+   "status": "failed",
+   "stepIds": [
+    "scan.sc242-empty-title.fail"
+   ],
+   "evidence": [
+    {
+     "kind": "finding",
+     "id": "sc242-empty-title.fail.2779a5.1",
+     "label": "finding 2779a5"
+    },
+    {
+     "kind": "image",
+     "id": "img.sc242-empty-title.fail",
+     "label": "screenshot"
+    }
+   ]
+  },
+  {
+   "id": "sc242-vague-title.clean",
+   "text": "SC 2.4.2 Page Titled is met on sc242-vague-title.clean.html.",
+   "status": "passed",
+   "stepIds": [
+    "scan.sc242-vague-title.clean"
+   ],
+   "evidence": [
+    {
+     "kind": "step",
+     "id": "scan.sc242-vague-title.clean",
+     "label": "scan result: no finding"
+    }
+   ]
+  },
+  {
+   "id": "sc242-vague-title.fail",
+   "text": "SC 2.4.2 Page Titled is met on sc242-vague-title.fail.html.",
+   "status": "needs-review",
+   "stepIds": [
+    "scan.sc242-vague-title.fail"
+   ],
+   "evidence": [
+    {
+     "kind": "finding",
+     "id": "sc242-vague-title.fail.review",
+     "label": "review item"
+    }
+   ]
+  },
+  {
+   "id": "sc243-focus-order.clean",
+   "text": "SC 2.4.3 Focus Order is met on sc243-focus-order.clean.html.",
+   "status": "passed",
+   "stepIds": [
+    "scan.sc243-focus-order.clean"
+   ],
+   "evidence": [
+    {
+     "kind": "step",
+     "id": "scan.sc243-focus-order.clean",
+     "label": "scan result: no finding"
+    }
+   ]
+  },
+  {
+   "id": "sc243-focus-order.fail",
+   "text": "SC 2.4.3 Focus Order is met on sc243-focus-order.fail.html.",
+   "status": "failed",
+   "stepIds": [
+    "scan.sc243-focus-order.fail"
+   ],
+   "evidence": [
+    {
+     "kind": "finding",
+     "id": "sc243-focus-order.fail.keyboard-focus-order.1",
+     "label": "finding keyboard-focus-order"
+    },
+    {
+     "kind": "image",
+     "id": "img.sc243-focus-order.fail",
+     "label": "screenshot"
+    }
+   ]
+  },
+  {
+   "id": "sc244-click-here.clean",
+   "text": "SC 2.4.4 Link Purpose (In Context) is met on sc244-click-here.clean.html.",
+   "status": "passed",
+   "stepIds": [
+    "scan.sc244-click-here.clean"
+   ],
+   "evidence": [
+    {
+     "kind": "step",
+     "id": "scan.sc244-click-here.clean",
+     "label": "scan result: no finding"
+    }
+   ]
+  },
+  {
+   "id": "sc244-click-here.fail",
+   "text": "SC 2.4.4 Link Purpose (In Context) is met on sc244-click-here.fail.html.",
+   "status": "needs-review",
+   "stepIds": [
+    "scan.sc244-click-here.fail"
+   ],
+   "evidence": [
+    {
+     "kind": "finding",
+     "id": "sc244-click-here.fail.review",
+     "label": "review item"
+    }
+   ]
+  },
+  {
+   "id": "sc244-empty-link.clean",
+   "text": "SC 2.4.4 Link Purpose (In Context) is met on sc244-empty-link.clean.html.",
+   "status": "passed",
+   "stepIds": [
+    "scan.sc244-empty-link.clean"
+   ],
+   "evidence": [
+    {
+     "kind": "step",
+     "id": "scan.sc244-empty-link.clean",
+     "label": "scan result: no finding"
+    }
+   ]
+  },
+  {
+   "id": "sc244-empty-link.fail",
+   "text": "SC 2.4.4 Link Purpose (In Context) is met on sc244-empty-link.fail.html.",
+   "status": "failed",
+   "stepIds": [
+    "scan.sc244-empty-link.fail"
+   ],
+   "evidence": [
+    {
+     "kind": "finding",
+     "id": "sc244-empty-link.fail.c487ae.1",
+     "label": "finding c487ae"
+    },
+    {
+     "kind": "finding",
+     "id": "sc244-empty-link.fail.oj04fd.2",
+     "label": "finding oj04fd"
+    },
+    {
+     "kind": "finding",
+     "id": "sc244-empty-link.fail.keyboard-focus-obscured.3",
+     "label": "finding keyboard-focus-obscured"
+    },
+    {
+     "kind": "image",
+     "id": "img.sc244-empty-link.fail",
+     "label": "screenshot"
+    }
+   ]
+  },
+  {
+   "id": "sc246-vague-heading.clean",
+   "text": "SC 2.4.6 Headings and Labels is met on sc246-vague-heading.clean.html.",
+   "status": "passed",
+   "stepIds": [
+    "scan.sc246-vague-heading.clean"
+   ],
+   "evidence": [
+    {
+     "kind": "step",
+     "id": "scan.sc246-vague-heading.clean",
+     "label": "scan result: no finding"
+    }
+   ]
+  },
+  {
+   "id": "sc246-vague-heading.fail",
+   "text": "SC 2.4.6 Headings and Labels is met on sc246-vague-heading.fail.html.",
+   "status": "needs-review",
+   "stepIds": [
+    "scan.sc246-vague-heading.fail"
+   ],
+   "evidence": [
+    {
+     "kind": "finding",
+     "id": "sc246-vague-heading.fail.review",
+     "label": "review item"
+    }
+   ]
+  },
+  {
+   "id": "sc247-focus-hidden.clean",
+   "text": "SC 2.4.7 Focus Visible is met on sc247-focus-hidden.clean.html.",
+   "status": "passed",
+   "stepIds": [
+    "scan.sc247-focus-hidden.clean"
+   ],
+   "evidence": [
+    {
+     "kind": "step",
+     "id": "scan.sc247-focus-hidden.clean",
+     "label": "scan result: no finding"
+    }
+   ]
+  },
+  {
+   "id": "sc247-focus-hidden.fail",
+   "text": "SC 2.4.7 Focus Visible is met on sc247-focus-hidden.fail.html.",
+   "status": "failed",
+   "stepIds": [
+    "scan.sc247-focus-hidden.fail"
+   ],
+   "evidence": [
+    {
+     "kind": "finding",
+     "id": "sc247-focus-hidden.fail.oj04fd.1",
+     "label": "finding oj04fd"
+    },
+    {
+     "kind": "finding",
+     "id": "sc247-focus-hidden.fail.oj04fd.2",
+     "label": "finding oj04fd"
+    },
+    {
+     "kind": "image",
+     "id": "img.sc247-focus-hidden.fail",
+     "label": "screenshot"
+    }
+   ]
+  },
+  {
+   "id": "sc253-label-mismatch.clean",
+   "text": "SC 2.5.3 Label in Name is met on sc253-label-mismatch.clean.html.",
+   "status": "passed",
+   "stepIds": [
+    "scan.sc253-label-mismatch.clean"
+   ],
+   "evidence": [
+    {
+     "kind": "step",
+     "id": "scan.sc253-label-mismatch.clean",
+     "label": "scan result: no finding"
+    }
+   ]
+  },
+  {
+   "id": "sc253-label-mismatch.fail",
+   "text": "SC 2.5.3 Label in Name is met on sc253-label-mismatch.fail.html.",
+   "status": "failed",
+   "stepIds": [
+    "scan.sc253-label-mismatch.fail"
+   ],
+   "evidence": [
+    {
+     "kind": "finding",
+     "id": "sc253-label-mismatch.fail.2ee8b8.1",
+     "label": "finding 2ee8b8"
+    },
+    {
+     "kind": "image",
+     "id": "img.sc253-label-mismatch.fail",
+     "label": "screenshot"
+    }
+   ]
+  },
+  {
+   "id": "sc257-drag-only.clean",
+   "text": "SC 2.5.7 Dragging Movements is met on sc257-drag-only.clean.html.",
+   "status": "passed",
+   "stepIds": [
+    "scan.sc257-drag-only.clean"
+   ],
+   "evidence": [
+    {
+     "kind": "step",
+     "id": "scan.sc257-drag-only.clean",
+     "label": "scan result: no finding"
+    }
+   ]
+  },
+  {
+   "id": "sc257-drag-only.fail",
+   "text": "SC 2.5.7 Dragging Movements is met on sc257-drag-only.fail.html.",
+   "status": "needs-review",
+   "stepIds": [
+    "scan.sc257-drag-only.fail"
+   ],
+   "evidence": [
+    {
+     "kind": "finding",
+     "id": "sc257-drag-only.fail.review",
+     "label": "review item"
+    }
+   ]
+  },
+  {
+   "id": "sc258-small-targets.clean",
+   "text": "SC 2.5.8 Target Size (Minimum) is met on sc258-small-targets.clean.html.",
+   "status": "passed",
+   "stepIds": [
+    "scan.sc258-small-targets.clean"
+   ],
+   "evidence": [
+    {
+     "kind": "step",
+     "id": "scan.sc258-small-targets.clean",
+     "label": "scan result: no finding"
+    }
+   ]
+  },
+  {
+   "id": "sc258-small-targets.fail",
+   "text": "SC 2.5.8 Target Size (Minimum) is met on sc258-small-targets.fail.html.",
+   "status": "failed",
+   "stepIds": [
+    "scan.sc258-small-targets.fail"
+   ],
+   "evidence": [
+    {
+     "kind": "finding",
+     "id": "sc258-small-targets.fail.page-target-size.1",
+     "label": "finding page-target-size"
+    },
+    {
+     "kind": "finding",
+     "id": "sc258-small-targets.fail.page-target-size.2",
+     "label": "finding page-target-size"
+    },
+    {
+     "kind": "image",
+     "id": "img.sc258-small-targets.fail",
+     "label": "screenshot"
+    }
+   ]
+  },
+  {
+   "id": "sc311-no-lang.clean",
+   "text": "SC 3.1.1 Language of Page is met on sc311-no-lang.clean.html.",
+   "status": "passed",
+   "stepIds": [
+    "scan.sc311-no-lang.clean"
+   ],
+   "evidence": [
+    {
+     "kind": "step",
+     "id": "scan.sc311-no-lang.clean",
+     "label": "scan result: no finding"
+    }
+   ]
+  },
+  {
+   "id": "sc311-no-lang.fail",
+   "text": "SC 3.1.1 Language of Page is met on sc311-no-lang.fail.html.",
+   "status": "failed",
+   "stepIds": [
+    "scan.sc311-no-lang.fail"
+   ],
+   "evidence": [
+    {
+     "kind": "finding",
+     "id": "sc311-no-lang.fail.b5c3f8.1",
+     "label": "finding b5c3f8"
+    },
+    {
+     "kind": "image",
+     "id": "img.sc311-no-lang.fail",
+     "label": "screenshot"
+    }
+   ]
+  },
+  {
+   "id": "sc312-bad-lang-part.clean",
+   "text": "SC 3.1.2 Language of Parts is met on sc312-bad-lang-part.clean.html.",
+   "status": "passed",
+   "stepIds": [
+    "scan.sc312-bad-lang-part.clean"
+   ],
+   "evidence": [
+    {
+     "kind": "step",
+     "id": "scan.sc312-bad-lang-part.clean",
+     "label": "scan result: no finding"
+    }
+   ]
+  },
+  {
+   "id": "sc312-bad-lang-part.fail",
+   "text": "SC 3.1.2 Language of Parts is met on sc312-bad-lang-part.fail.html.",
+   "status": "failed",
+   "stepIds": [
+    "scan.sc312-bad-lang-part.fail"
+   ],
+   "evidence": [
+    {
+     "kind": "finding",
+     "id": "sc312-bad-lang-part.fail.de46e4.1",
+     "label": "finding de46e4"
+    },
+    {
+     "kind": "image",
+     "id": "img.sc312-bad-lang-part.fail",
+     "label": "screenshot"
+    }
+   ]
+  },
+  {
+   "id": "sc321-on-focus-change.clean",
+   "text": "SC 3.2.1 On Focus is met on sc321-on-focus-change.clean.html.",
+   "status": "passed",
+   "stepIds": [
+    "scan.sc321-on-focus-change.clean"
+   ],
+   "evidence": [
+    {
+     "kind": "step",
+     "id": "scan.sc321-on-focus-change.clean",
+     "label": "scan result: no finding"
+    }
+   ]
+  },
+  {
+   "id": "sc321-on-focus-change.fail",
+   "text": "SC 3.2.1 On Focus is met on sc321-on-focus-change.fail.html.",
+   "status": "needs-review",
+   "stepIds": [
+    "scan.sc321-on-focus-change.fail"
+   ],
+   "evidence": [
+    {
+     "kind": "finding",
+     "id": "sc321-on-focus-change.fail.review",
+     "label": "review item"
+    }
+   ]
+  },
+  {
+   "id": "sc331-colour-error.clean",
+   "text": "SC 3.3.1 Error Identification is met on sc331-colour-error.clean.html.",
+   "status": "passed",
+   "stepIds": [
+    "scan.sc331-colour-error.clean"
+   ],
+   "evidence": [
+    {
+     "kind": "step",
+     "id": "scan.sc331-colour-error.clean",
+     "label": "scan result: no finding"
+    }
+   ]
+  },
+  {
+   "id": "sc331-colour-error.fail",
+   "text": "SC 3.3.1 Error Identification is met on sc331-colour-error.fail.html.",
+   "status": "needs-review",
+   "stepIds": [
+    "scan.sc331-colour-error.fail"
+   ],
+   "evidence": [
+    {
+     "kind": "finding",
+     "id": "sc331-colour-error.fail.review",
+     "label": "review item"
+    }
+   ]
+  },
+  {
+   "id": "sc332-no-label.clean",
+   "text": "SC 3.3.2 Labels or Instructions is met on sc332-no-label.clean.html.",
+   "status": "passed",
+   "stepIds": [
+    "scan.sc332-no-label.clean"
+   ],
+   "evidence": [
+    {
+     "kind": "step",
+     "id": "scan.sc332-no-label.clean",
+     "label": "scan result: no finding"
+    }
+   ]
+  },
+  {
+   "id": "sc332-no-label.fail",
+   "text": "SC 3.3.2 Labels or Instructions is met on sc332-no-label.fail.html.",
+   "status": "failed",
+   "stepIds": [
+    "scan.sc332-no-label.fail"
+   ],
+   "evidence": [
+    {
+     "kind": "finding",
+     "id": "sc332-no-label.fail.e086e5.1",
+     "label": "finding e086e5"
+    },
+    {
+     "kind": "image",
+     "id": "img.sc332-no-label.fail",
+     "label": "screenshot"
+    }
+   ]
+  },
+  {
+   "id": "sc333-no-suggestion.clean",
+   "text": "SC 3.3.3 Error Suggestion is met on sc333-no-suggestion.clean.html.",
+   "status": "passed",
+   "stepIds": [
+    "scan.sc333-no-suggestion.clean"
+   ],
+   "evidence": [
+    {
+     "kind": "step",
+     "id": "scan.sc333-no-suggestion.clean",
+     "label": "scan result: no finding"
+    }
+   ]
+  },
+  {
+   "id": "sc333-no-suggestion.fail",
+   "text": "SC 3.3.3 Error Suggestion is met on sc333-no-suggestion.fail.html.",
+   "status": "needs-review",
+   "stepIds": [
+    "scan.sc333-no-suggestion.fail"
+   ],
+   "evidence": [
+    {
+     "kind": "finding",
+     "id": "sc333-no-suggestion.fail.review",
+     "label": "review item"
+    }
+   ]
+  },
+  {
+   "id": "sc334-no-confirm.clean",
+   "text": "SC 3.3.4 Error Prevention (Legal, Financial, Data) is met on sc334-no-confirm.clean.html.",
+   "status": "passed",
+   "stepIds": [
+    "scan.sc334-no-confirm.clean"
+   ],
+   "evidence": [
+    {
+     "kind": "step",
+     "id": "scan.sc334-no-confirm.clean",
+     "label": "scan result: no finding"
+    }
+   ]
+  },
+  {
+   "id": "sc334-no-confirm.fail",
+   "text": "SC 3.3.4 Error Prevention (Legal, Financial, Data) is met on sc334-no-confirm.fail.html.",
+   "status": "needs-review",
+   "stepIds": [
+    "scan.sc334-no-confirm.fail"
+   ],
+   "evidence": [
+    {
+     "kind": "finding",
+     "id": "sc334-no-confirm.fail.review",
+     "label": "review item"
+    }
+   ]
+  },
+  {
+   "id": "sc338-paste-blocked.clean",
+   "text": "SC 3.3.8 Accessible Authentication (Minimum) is met on sc338-paste-blocked.clean.html.",
+   "status": "passed",
+   "stepIds": [
+    "scan.sc338-paste-blocked.clean"
+   ],
+   "evidence": [
+    {
+     "kind": "step",
+     "id": "scan.sc338-paste-blocked.clean",
+     "label": "scan result: no finding"
+    }
+   ]
+  },
+  {
+   "id": "sc338-paste-blocked.fail",
+   "text": "SC 3.3.8 Accessible Authentication (Minimum) is met on sc338-paste-blocked.fail.html.",
+   "status": "needs-review",
+   "stepIds": [
+    "scan.sc338-paste-blocked.fail"
+   ],
+   "evidence": [
+    {
+     "kind": "finding",
+     "id": "sc338-paste-blocked.fail.review",
+     "label": "review item"
+    }
+   ]
+  },
+  {
+   "id": "sc412-bad-role.clean",
+   "text": "SC 4.1.2 Name, Role, Value is met on sc412-bad-role.clean.html.",
+   "status": "passed",
+   "stepIds": [
+    "scan.sc412-bad-role.clean"
+   ],
+   "evidence": [
+    {
+     "kind": "step",
+     "id": "scan.sc412-bad-role.clean",
+     "label": "scan result: no finding"
+    }
+   ]
+  },
+  {
+   "id": "sc412-bad-role.fail",
+   "text": "SC 4.1.2 Name, Role, Value is met on sc412-bad-role.fail.html.",
+   "status": "failed",
+   "stepIds": [
+    "scan.sc412-bad-role.fail"
+   ],
+   "evidence": [
+    {
+     "kind": "finding",
+     "id": "sc412-bad-role.fail.674b10.1",
+     "label": "finding 674b10"
+    },
+    {
+     "kind": "image",
+     "id": "img.sc412-bad-role.fail",
+     "label": "screenshot"
+    }
+   ]
+  },
+  {
+   "id": "sc412-button-no-name.clean",
+   "text": "SC 4.1.2 Name, Role, Value is met on sc412-button-no-name.clean.html.",
+   "status": "passed",
+   "stepIds": [
+    "scan.sc412-button-no-name.clean"
+   ],
+   "evidence": [
+    {
+     "kind": "step",
+     "id": "scan.sc412-button-no-name.clean",
+     "label": "scan result: no finding"
+    }
+   ]
+  },
+  {
+   "id": "sc412-button-no-name.fail",
+   "text": "SC 4.1.2 Name, Role, Value is met on sc412-button-no-name.fail.html.",
+   "status": "failed",
+   "stepIds": [
+    "scan.sc412-button-no-name.fail"
+   ],
+   "evidence": [
+    {
+     "kind": "finding",
+     "id": "sc412-button-no-name.fail.97a4e1.1",
+     "label": "finding 97a4e1"
+    },
+    {
+     "kind": "image",
+     "id": "img.sc412-button-no-name.fail",
+     "label": "screenshot"
+    }
+   ]
+  },
+  {
+   "id": "sc413-silent-status.clean",
+   "text": "SC 4.1.3 Status Messages is met on sc413-silent-status.clean.html.",
+   "status": "passed",
+   "stepIds": [
+    "scan.sc413-silent-status.clean"
+   ],
+   "evidence": [
+    {
+     "kind": "step",
+     "id": "scan.sc413-silent-status.clean",
+     "label": "scan result: no finding"
+    }
+   ]
+  },
+  {
+   "id": "sc413-silent-status.fail",
+   "text": "SC 4.1.3 Status Messages is met on sc413-silent-status.fail.html.",
+   "status": "needs-review",
+   "stepIds": [
+    "scan.sc413-silent-status.fail"
+   ],
+   "evidence": [
+    {
+     "kind": "finding",
+     "id": "sc413-silent-status.fail.review",
+     "label": "review item"
+    }
+   ]
+  }
+ ],
+ "steps": [
+  {
+   "id": "scan.sc111-missing-alt.clean",
+   "text": "Scan sc111-missing-alt.clean.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding"
+  },
+  {
+   "id": "scan.sc111-missing-alt.fail",
+   "text": "Scan sc111-missing-alt.fail.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "1 failed, 0 to review"
+  },
+  {
+   "id": "scan.sc111-useless-alt.clean",
+   "text": "Scan sc111-useless-alt.clean.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding"
+  },
+  {
+   "id": "scan.sc111-useless-alt.fail",
+   "text": "Scan sc111-useless-alt.fail.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding; needs a person"
+  },
+  {
+   "id": "scan.sc121-audio-no-transcript.clean",
+   "text": "Scan sc121-audio-no-transcript.clean.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding"
+  },
+  {
+   "id": "scan.sc121-audio-no-transcript.fail",
+   "text": "Scan sc121-audio-no-transcript.fail.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding; needs a person"
+  },
+  {
+   "id": "scan.sc122-video-no-captions.clean",
+   "text": "Scan sc122-video-no-captions.clean.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding"
+  },
+  {
+   "id": "scan.sc122-video-no-captions.fail",
+   "text": "Scan sc122-video-no-captions.fail.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding; needs a person"
+  },
+  {
+   "id": "scan.sc122-wrong-captions.clean",
+   "text": "Scan sc122-wrong-captions.clean.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding"
+  },
+  {
+   "id": "scan.sc122-wrong-captions.fail",
+   "text": "Scan sc122-wrong-captions.fail.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding; needs a person"
+  },
+  {
+   "id": "scan.sc131-bad-list.clean",
+   "text": "Scan sc131-bad-list.clean.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding"
+  },
+  {
+   "id": "scan.sc131-bad-list.fail",
+   "text": "Scan sc131-bad-list.fail.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "1 failed, 0 to review"
+  },
+  {
+   "id": "scan.sc131-fake-heading.clean",
+   "text": "Scan sc131-fake-heading.clean.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding"
+  },
+  {
+   "id": "scan.sc131-fake-heading.fail",
+   "text": "Scan sc131-fake-heading.fail.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding; needs a person"
+  },
+  {
+   "id": "scan.sc132-visual-order.clean",
+   "text": "Scan sc132-visual-order.clean.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding"
+  },
+  {
+   "id": "scan.sc132-visual-order.fail",
+   "text": "Scan sc132-visual-order.fail.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding; needs a person"
+  },
+  {
+   "id": "scan.sc133-sensory-instruction.clean",
+   "text": "Scan sc133-sensory-instruction.clean.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding"
+  },
+  {
+   "id": "scan.sc133-sensory-instruction.fail",
+   "text": "Scan sc133-sensory-instruction.fail.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding; needs a person"
+  },
+  {
+   "id": "scan.sc134-orientation-lock.clean",
+   "text": "Scan sc134-orientation-lock.clean.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding"
+  },
+  {
+   "id": "scan.sc134-orientation-lock.fail",
+   "text": "Scan sc134-orientation-lock.fail.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding; needs a person"
+  },
+  {
+   "id": "scan.sc135-bad-autocomplete.clean",
+   "text": "Scan sc135-bad-autocomplete.clean.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding"
+  },
+  {
+   "id": "scan.sc135-bad-autocomplete.fail",
+   "text": "Scan sc135-bad-autocomplete.fail.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "1 failed, 0 to review"
+  },
+  {
+   "id": "scan.sc141-colour-only-link.clean",
+   "text": "Scan sc141-colour-only-link.clean.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding"
+  },
+  {
+   "id": "scan.sc141-colour-only-link.fail",
+   "text": "Scan sc141-colour-only-link.fail.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding; needs a person"
+  },
+  {
+   "id": "scan.sc1410-no-reflow.clean",
+   "text": "Scan sc1410-no-reflow.clean.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding"
+  },
+  {
+   "id": "scan.sc1410-no-reflow.fail",
+   "text": "Scan sc1410-no-reflow.fail.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "1 failed, 0 to review"
+  },
+  {
+   "id": "scan.sc1411-faint-border.clean",
+   "text": "Scan sc1411-faint-border.clean.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding"
+  },
+  {
+   "id": "scan.sc1411-faint-border.fail",
+   "text": "Scan sc1411-faint-border.fail.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding; needs a person"
+  },
+  {
+   "id": "scan.sc1412-inline-letter-spacing.clean",
+   "text": "Scan sc1412-inline-letter-spacing.clean.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding"
+  },
+  {
+   "id": "scan.sc1412-inline-letter-spacing.fail",
+   "text": "Scan sc1412-inline-letter-spacing.fail.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "1 failed, 0 to review"
+  },
+  {
+   "id": "scan.sc1412-inline-spacing.clean",
+   "text": "Scan sc1412-inline-spacing.clean.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding"
+  },
+  {
+   "id": "scan.sc1412-inline-spacing.fail",
+   "text": "Scan sc1412-inline-spacing.fail.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding; needs a person"
+  },
+  {
+   "id": "scan.sc1413-hover-content.clean",
+   "text": "Scan sc1413-hover-content.clean.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding"
+  },
+  {
+   "id": "scan.sc1413-hover-content.fail",
+   "text": "Scan sc1413-hover-content.fail.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding; needs a person"
+  },
+  {
+   "id": "scan.sc142-autoplay-audio.clean",
+   "text": "Scan sc142-autoplay-audio.clean.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding"
+  },
+  {
+   "id": "scan.sc142-autoplay-audio.fail",
+   "text": "Scan sc142-autoplay-audio.fail.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding; needs a person"
+  },
+  {
+   "id": "scan.sc143-gradient-bg.clean",
+   "text": "Scan sc143-gradient-bg.clean.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding"
+  },
+  {
+   "id": "scan.sc143-gradient-bg.fail",
+   "text": "Scan sc143-gradient-bg.fail.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "1 failed, 0 to review"
+  },
+  {
+   "id": "scan.sc143-low-contrast.clean",
+   "text": "Scan sc143-low-contrast.clean.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding"
+  },
+  {
+   "id": "scan.sc143-low-contrast.fail",
+   "text": "Scan sc143-low-contrast.fail.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "1 failed, 0 to review"
+  },
+  {
+   "id": "scan.sc144-no-zoom.clean",
+   "text": "Scan sc144-no-zoom.clean.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding"
+  },
+  {
+   "id": "scan.sc144-no-zoom.fail",
+   "text": "Scan sc144-no-zoom.fail.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "1 failed, 0 to review"
+  },
+  {
+   "id": "scan.sc145-image-of-text.clean",
+   "text": "Scan sc145-image-of-text.clean.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding"
+  },
+  {
+   "id": "scan.sc145-image-of-text.fail",
+   "text": "Scan sc145-image-of-text.fail.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding; needs a person"
+  },
+  {
+   "id": "scan.sc211-click-div.clean",
+   "text": "Scan sc211-click-div.clean.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding"
+  },
+  {
+   "id": "scan.sc211-click-div.fail",
+   "text": "Scan sc211-click-div.fail.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "1 failed, 0 to review"
+  },
+  {
+   "id": "scan.sc211-scroll-no-focus.clean",
+   "text": "Scan sc211-scroll-no-focus.clean.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding"
+  },
+  {
+   "id": "scan.sc211-scroll-no-focus.fail",
+   "text": "Scan sc211-scroll-no-focus.fail.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "1 failed, 0 to review"
+  },
+  {
+   "id": "scan.sc212-keyboard-trap.clean",
+   "text": "Scan sc212-keyboard-trap.clean.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding"
+  },
+  {
+   "id": "scan.sc212-keyboard-trap.fail",
+   "text": "Scan sc212-keyboard-trap.fail.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "3 failed, 1 to review"
+  },
+  {
+   "id": "scan.sc221-meta-refresh.clean",
+   "text": "Scan sc221-meta-refresh.clean.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding"
+  },
+  {
+   "id": "scan.sc221-meta-refresh.fail",
+   "text": "Scan sc221-meta-refresh.fail.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "1 failed, 0 to review"
+  },
+  {
+   "id": "scan.sc222-marquee.clean",
+   "text": "Scan sc222-marquee.clean.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding"
+  },
+  {
+   "id": "scan.sc222-marquee.fail",
+   "text": "Scan sc222-marquee.fail.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding; needs a person"
+  },
+  {
+   "id": "scan.sc231-flashing.clean",
+   "text": "Scan sc231-flashing.clean.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding"
+  },
+  {
+   "id": "scan.sc231-flashing.fail",
+   "text": "Scan sc231-flashing.fail.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding; needs a person"
+  },
+  {
+   "id": "scan.sc241-no-bypass.clean",
+   "text": "Scan sc241-no-bypass.clean.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding"
+  },
+  {
+   "id": "scan.sc241-no-bypass.fail",
+   "text": "Scan sc241-no-bypass.fail.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding; needs a person"
+  },
+  {
+   "id": "scan.sc2411-focus-obscured.clean",
+   "text": "Scan sc2411-focus-obscured.clean.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding"
+  },
+  {
+   "id": "scan.sc2411-focus-obscured.fail",
+   "text": "Scan sc2411-focus-obscured.fail.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "2 failed, 0 to review"
+  },
+  {
+   "id": "scan.sc242-empty-title.clean",
+   "text": "Scan sc242-empty-title.clean.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding"
+  },
+  {
+   "id": "scan.sc242-empty-title.fail",
+   "text": "Scan sc242-empty-title.fail.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "1 failed, 0 to review"
+  },
+  {
+   "id": "scan.sc242-vague-title.clean",
+   "text": "Scan sc242-vague-title.clean.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding"
+  },
+  {
+   "id": "scan.sc242-vague-title.fail",
+   "text": "Scan sc242-vague-title.fail.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding; needs a person"
+  },
+  {
+   "id": "scan.sc243-focus-order.clean",
+   "text": "Scan sc243-focus-order.clean.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding"
+  },
+  {
+   "id": "scan.sc243-focus-order.fail",
+   "text": "Scan sc243-focus-order.fail.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "1 failed, 0 to review"
+  },
+  {
+   "id": "scan.sc244-click-here.clean",
+   "text": "Scan sc244-click-here.clean.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding"
+  },
+  {
+   "id": "scan.sc244-click-here.fail",
+   "text": "Scan sc244-click-here.fail.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding; needs a person"
+  },
+  {
+   "id": "scan.sc244-empty-link.clean",
+   "text": "Scan sc244-empty-link.clean.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding"
+  },
+  {
+   "id": "scan.sc244-empty-link.fail",
+   "text": "Scan sc244-empty-link.fail.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "2 failed, 1 to review"
+  },
+  {
+   "id": "scan.sc246-vague-heading.clean",
+   "text": "Scan sc246-vague-heading.clean.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding"
+  },
+  {
+   "id": "scan.sc246-vague-heading.fail",
+   "text": "Scan sc246-vague-heading.fail.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding; needs a person"
+  },
+  {
+   "id": "scan.sc247-focus-hidden.clean",
+   "text": "Scan sc247-focus-hidden.clean.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding"
+  },
+  {
+   "id": "scan.sc247-focus-hidden.fail",
+   "text": "Scan sc247-focus-hidden.fail.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "2 failed, 0 to review"
+  },
+  {
+   "id": "scan.sc253-label-mismatch.clean",
+   "text": "Scan sc253-label-mismatch.clean.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding"
+  },
+  {
+   "id": "scan.sc253-label-mismatch.fail",
+   "text": "Scan sc253-label-mismatch.fail.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "1 failed, 0 to review"
+  },
+  {
+   "id": "scan.sc257-drag-only.clean",
+   "text": "Scan sc257-drag-only.clean.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding"
+  },
+  {
+   "id": "scan.sc257-drag-only.fail",
+   "text": "Scan sc257-drag-only.fail.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding; needs a person"
+  },
+  {
+   "id": "scan.sc258-small-targets.clean",
+   "text": "Scan sc258-small-targets.clean.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding"
+  },
+  {
+   "id": "scan.sc258-small-targets.fail",
+   "text": "Scan sc258-small-targets.fail.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "2 failed, 0 to review"
+  },
+  {
+   "id": "scan.sc311-no-lang.clean",
+   "text": "Scan sc311-no-lang.clean.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding"
+  },
+  {
+   "id": "scan.sc311-no-lang.fail",
+   "text": "Scan sc311-no-lang.fail.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "1 failed, 0 to review"
+  },
+  {
+   "id": "scan.sc312-bad-lang-part.clean",
+   "text": "Scan sc312-bad-lang-part.clean.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding"
+  },
+  {
+   "id": "scan.sc312-bad-lang-part.fail",
+   "text": "Scan sc312-bad-lang-part.fail.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "1 failed, 0 to review"
+  },
+  {
+   "id": "scan.sc321-on-focus-change.clean",
+   "text": "Scan sc321-on-focus-change.clean.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding"
+  },
+  {
+   "id": "scan.sc321-on-focus-change.fail",
+   "text": "Scan sc321-on-focus-change.fail.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding; needs a person"
+  },
+  {
+   "id": "scan.sc331-colour-error.clean",
+   "text": "Scan sc331-colour-error.clean.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding"
+  },
+  {
+   "id": "scan.sc331-colour-error.fail",
+   "text": "Scan sc331-colour-error.fail.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding; needs a person"
+  },
+  {
+   "id": "scan.sc332-no-label.clean",
+   "text": "Scan sc332-no-label.clean.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding"
+  },
+  {
+   "id": "scan.sc332-no-label.fail",
+   "text": "Scan sc332-no-label.fail.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "1 failed, 0 to review"
+  },
+  {
+   "id": "scan.sc333-no-suggestion.clean",
+   "text": "Scan sc333-no-suggestion.clean.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding"
+  },
+  {
+   "id": "scan.sc333-no-suggestion.fail",
+   "text": "Scan sc333-no-suggestion.fail.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding; needs a person"
+  },
+  {
+   "id": "scan.sc334-no-confirm.clean",
+   "text": "Scan sc334-no-confirm.clean.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding"
+  },
+  {
+   "id": "scan.sc334-no-confirm.fail",
+   "text": "Scan sc334-no-confirm.fail.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding; needs a person"
+  },
+  {
+   "id": "scan.sc338-paste-blocked.clean",
+   "text": "Scan sc338-paste-blocked.clean.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding"
+  },
+  {
+   "id": "scan.sc338-paste-blocked.fail",
+   "text": "Scan sc338-paste-blocked.fail.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding; needs a person"
+  },
+  {
+   "id": "scan.sc412-bad-role.clean",
+   "text": "Scan sc412-bad-role.clean.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding"
+  },
+  {
+   "id": "scan.sc412-bad-role.fail",
+   "text": "Scan sc412-bad-role.fail.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "1 failed, 0 to review"
+  },
+  {
+   "id": "scan.sc412-button-no-name.clean",
+   "text": "Scan sc412-button-no-name.clean.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding"
+  },
+  {
+   "id": "scan.sc412-button-no-name.fail",
+   "text": "Scan sc412-button-no-name.fail.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "1 failed, 0 to review"
+  },
+  {
+   "id": "scan.sc413-silent-status.clean",
+   "text": "Scan sc413-silent-status.clean.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding"
+  },
+  {
+   "id": "scan.sc413-silent-status.fail",
+   "text": "Scan sc413-silent-status.fail.html at 1280 by 800 with the ACT rules and keyboard probes.",
+   "result": "no finding; needs a person"
+  }
+ ],
+ "findings": [
+  {
+   "id": "sc111-missing-alt.fail.23a2a8.1",
+   "status": "failed",
+   "severity": "P2",
+   "title": "Image has no accessible name",
+   "caption": "Image has no accessible name",
+   "rule": "ACT rule 23a2a8",
+   "criterion": {
+    "kind": "wcag",
+    "successCriterion": "1.1.1",
+    "title": "Non-text Content",
+    "level": "A"
+   },
+   "criterionIds": [
+    "sc111-missing-alt.fail"
+   ],
+   "stepIds": [
+    "scan.sc111-missing-alt.fail"
+   ],
+   "steps": [
+    "Open sc111-missing-alt.fail.html at 1280 by 800 pixels.",
+    "Run ACT rule 23a2a8 for SC 1.1.1.",
+    "Find the element html > body:nth-child(2) > main:nth-child(1) > img:nth-child(2).",
+    "Observed: Image has no accessible name."
+   ],
+   "image": {
+    "imageId": "img.sc111-missing-alt.fail",
+    "box": {
+     "x": 8,
+     "y": 79.88,
+     "width": 20,
+     "height": 20
+    }
+   },
+   "exchanges": [],
+   "log": [
+    "engine outcome: failed",
+    "box at 1280x800: x 8, y 79.88, width 20, height 20",
+    "box measured by the engine at 1024x768: x 8, y 79.88, width 20, height 20"
+   ],
+   "reason": null,
+   "action": null
+  },
+  {
+   "id": "sc111-useless-alt.fail.review",
+   "status": "needs-review",
+   "severity": null,
+   "title": "No automated rule decided SC 1.1.1 Non-text Content",
+   "caption": "sc111-useless-alt.fail.html: judge SC 1.1.1 Non-text Content by hand",
+   "rule": "none (no automated rule decided this)",
+   "criterion": {
+    "kind": "wcag",
+    "successCriterion": "1.1.1",
+    "title": "Non-text Content",
+    "level": "A"
+   },
+   "criterionIds": [
+    "sc111-useless-alt.fail"
+   ],
+   "stepIds": [
+    "scan.sc111-useless-alt.fail"
+   ],
+   "steps": [
+    "Open sc111-useless-alt.fail.html at 1280 by 800 pixels.",
+    "Judge SC 1.1.1 Non-text Content by hand."
+   ],
+   "image": null,
+   "exchanges": [],
+   "log": [
+    "fixture class: beyond what automated rules can judge"
+   ],
+   "reason": "Automated rules cannot judge this criterion; it needs a person.",
+   "action": "Open the page and judge SC 1.1.1 Non-text Content."
+  },
+  {
+   "id": "sc121-audio-no-transcript.fail.review",
+   "status": "needs-review",
+   "severity": null,
+   "title": "No automated rule decided SC 1.2.1 Audio-only and Video-only (Prerecorded)",
+   "caption": "sc121-audio-no-transcript.fail.html: judge SC 1.2.1 Audio-only and Video-only (Prerecorded) by hand",
+   "rule": "none (no automated rule decided this)",
+   "criterion": {
+    "kind": "wcag",
+    "successCriterion": "1.2.1",
+    "title": "Audio-only and Video-only (Prerecorded)",
+    "level": "A"
+   },
+   "criterionIds": [
+    "sc121-audio-no-transcript.fail"
+   ],
+   "stepIds": [
+    "scan.sc121-audio-no-transcript.fail"
+   ],
+   "steps": [
+    "Open sc121-audio-no-transcript.fail.html at 1280 by 800 pixels.",
+    "Judge SC 1.2.1 Audio-only and Video-only (Prerecorded) by hand."
+   ],
+   "image": null,
+   "exchanges": [],
+   "log": [
+    "fixture class: beyond what automated rules can judge"
+   ],
+   "reason": "Automated rules cannot judge this criterion; it needs a person.",
+   "action": "Open the page and judge SC 1.2.1 Audio-only and Video-only (Prerecorded)."
+  },
+  {
+   "id": "sc122-video-no-captions.fail.review",
+   "status": "needs-review",
+   "severity": null,
+   "title": "No automated rule decided SC 1.2.2 Captions (Prerecorded)",
+   "caption": "sc122-video-no-captions.fail.html: judge SC 1.2.2 Captions (Prerecorded) by hand",
+   "rule": "none (no automated rule decided this)",
+   "criterion": {
+    "kind": "wcag",
+    "successCriterion": "1.2.2",
+    "title": "Captions (Prerecorded)",
+    "level": "A"
+   },
+   "criterionIds": [
+    "sc122-video-no-captions.fail"
+   ],
+   "stepIds": [
+    "scan.sc122-video-no-captions.fail"
+   ],
+   "steps": [
+    "Open sc122-video-no-captions.fail.html at 1280 by 800 pixels.",
+    "Judge SC 1.2.2 Captions (Prerecorded) by hand."
+   ],
+   "image": null,
+   "exchanges": [],
+   "log": [
+    "fixture class: a rule could decide this, but none in the current set covers it"
+   ],
+   "reason": "No rule in the current set covers this case.",
+   "action": "Open the page and judge SC 1.2.2 Captions (Prerecorded)."
+  },
+  {
+   "id": "sc122-wrong-captions.fail.review",
+   "status": "needs-review",
+   "severity": null,
+   "title": "No automated rule decided SC 1.2.2 Captions (Prerecorded)",
+   "caption": "sc122-wrong-captions.fail.html: judge SC 1.2.2 Captions (Prerecorded) by hand",
+   "rule": "none (no automated rule decided this)",
+   "criterion": {
+    "kind": "wcag",
+    "successCriterion": "1.2.2",
+    "title": "Captions (Prerecorded)",
+    "level": "A"
+   },
+   "criterionIds": [
+    "sc122-wrong-captions.fail"
+   ],
+   "stepIds": [
+    "scan.sc122-wrong-captions.fail"
+   ],
+   "steps": [
+    "Open sc122-wrong-captions.fail.html at 1280 by 800 pixels.",
+    "Judge SC 1.2.2 Captions (Prerecorded) by hand."
+   ],
+   "image": null,
+   "exchanges": [],
+   "log": [
+    "fixture class: beyond what automated rules can judge"
+   ],
+   "reason": "Automated rules cannot judge this criterion; it needs a person.",
+   "action": "Open the page and judge SC 1.2.2 Captions (Prerecorded)."
+  },
+  {
+   "id": "sc131-bad-list.fail.bc4a75.1",
+   "status": "failed",
+   "severity": "P2",
+   "title": "list owns generic",
+   "caption": "List contains children that are not list items",
+   "rule": "ACT rule bc4a75",
+   "criterion": {
+    "kind": "wcag",
+    "successCriterion": "1.3.1",
+    "title": "Info and Relationships",
+    "level": "A"
+   },
+   "criterionIds": [
+    "sc131-bad-list.fail"
+   ],
+   "stepIds": [
+    "scan.sc131-bad-list.fail"
+   ],
+   "steps": [
+    "Open sc131-bad-list.fail.html at 1280 by 800 pixels.",
+    "Run ACT rule bc4a75 for SC 1.3.1.",
+    "Find the element html > body:nth-child(2) > main:nth-child(1) > ul:nth-child(2).",
+    "Observed: list owns generic."
+   ],
+   "image": {
+    "imageId": "img.sc131-bad-list.fail",
+    "box": {
+     "x": 8,
+     "y": 79.88,
+     "width": 1264,
+     "height": 36
+    }
+   },
+   "exchanges": [],
+   "log": [
+    "engine outcome: failed",
+    "box at 1280x800: x 8, y 79.88, width 1264, height 36",
+    "box measured by the engine at 1024x768: x 8, y 79.88, width 1008, height 36"
+   ],
+   "reason": null,
+   "action": null
+  },
+  {
+   "id": "sc131-fake-heading.fail.review",
+   "status": "needs-review",
+   "severity": null,
+   "title": "No automated rule decided SC 1.3.1 Info and Relationships",
+   "caption": "sc131-fake-heading.fail.html: judge SC 1.3.1 Info and Relationships by hand",
+   "rule": "none (no automated rule decided this)",
+   "criterion": {
+    "kind": "wcag",
+    "successCriterion": "1.3.1",
+    "title": "Info and Relationships",
+    "level": "A"
+   },
+   "criterionIds": [
+    "sc131-fake-heading.fail"
+   ],
+   "stepIds": [
+    "scan.sc131-fake-heading.fail"
+   ],
+   "steps": [
+    "Open sc131-fake-heading.fail.html at 1280 by 800 pixels.",
+    "Judge SC 1.3.1 Info and Relationships by hand."
+   ],
+   "image": null,
+   "exchanges": [],
+   "log": [
+    "fixture class: beyond what automated rules can judge"
+   ],
+   "reason": "Automated rules cannot judge this criterion; it needs a person.",
+   "action": "Open the page and judge SC 1.3.1 Info and Relationships."
+  },
+  {
+   "id": "sc132-visual-order.fail.review",
+   "status": "needs-review",
+   "severity": null,
+   "title": "No automated rule decided SC 1.3.2 Meaningful Sequence",
+   "caption": "sc132-visual-order.fail.html: judge SC 1.3.2 Meaningful Sequence by hand",
+   "rule": "none (no automated rule decided this)",
+   "criterion": {
+    "kind": "wcag",
+    "successCriterion": "1.3.2",
+    "title": "Meaningful Sequence",
+    "level": "A"
+   },
+   "criterionIds": [
+    "sc132-visual-order.fail"
+   ],
+   "stepIds": [
+    "scan.sc132-visual-order.fail"
+   ],
+   "steps": [
+    "Open sc132-visual-order.fail.html at 1280 by 800 pixels.",
+    "Judge SC 1.3.2 Meaningful Sequence by hand."
+   ],
+   "image": null,
+   "exchanges": [],
+   "log": [
+    "fixture class: beyond what automated rules can judge"
+   ],
+   "reason": "Automated rules cannot judge this criterion; it needs a person.",
+   "action": "Open the page and judge SC 1.3.2 Meaningful Sequence."
+  },
+  {
+   "id": "sc133-sensory-instruction.fail.review",
+   "status": "needs-review",
+   "severity": null,
+   "title": "No automated rule decided SC 1.3.3 Sensory Characteristics",
+   "caption": "sc133-sensory-instruction.fail.html: judge SC 1.3.3 Sensory Characteristics by hand",
+   "rule": "none (no automated rule decided this)",
+   "criterion": {
+    "kind": "wcag",
+    "successCriterion": "1.3.3",
+    "title": "Sensory Characteristics",
+    "level": "A"
+   },
+   "criterionIds": [
+    "sc133-sensory-instruction.fail"
+   ],
+   "stepIds": [
+    "scan.sc133-sensory-instruction.fail"
+   ],
+   "steps": [
+    "Open sc133-sensory-instruction.fail.html at 1280 by 800 pixels.",
+    "Judge SC 1.3.3 Sensory Characteristics by hand."
+   ],
+   "image": null,
+   "exchanges": [],
+   "log": [
+    "fixture class: beyond what automated rules can judge"
+   ],
+   "reason": "Automated rules cannot judge this criterion; it needs a person.",
+   "action": "Open the page and judge SC 1.3.3 Sensory Characteristics."
+  },
+  {
+   "id": "sc134-orientation-lock.fail.review",
+   "status": "needs-review",
+   "severity": null,
+   "title": "No automated rule decided SC 1.3.4 Orientation",
+   "caption": "sc134-orientation-lock.fail.html: judge SC 1.3.4 Orientation by hand",
+   "rule": "none (no automated rule decided this)",
+   "criterion": {
+    "kind": "wcag",
+    "successCriterion": "1.3.4",
+    "title": "Orientation",
+    "level": "AA"
+   },
+   "criterionIds": [
+    "sc134-orientation-lock.fail"
+   ],
+   "stepIds": [
+    "scan.sc134-orientation-lock.fail"
+   ],
+   "steps": [
+    "Open sc134-orientation-lock.fail.html at 1280 by 800 pixels.",
+    "Judge SC 1.3.4 Orientation by hand."
+   ],
+   "image": null,
+   "exchanges": [],
+   "log": [
+    "fixture class: a rule could decide this, but none in the current set covers it"
+   ],
+   "reason": "No rule in the current set covers this case.",
+   "action": "Open the page and judge SC 1.3.4 Orientation."
+  },
+  {
+   "id": "sc135-bad-autocomplete.fail.73f2c2.1",
+   "status": "failed",
+   "severity": "P3",
+   "title": "Invalid autocomplete value \"emial\"",
+   "caption": "Autocomplete value is not a valid token",
+   "rule": "ACT rule 73f2c2",
+   "criterion": {
+    "kind": "wcag",
+    "successCriterion": "1.3.5",
+    "title": "Identify Input Purpose",
+    "level": "AA"
+   },
+   "criterionIds": [
+    "sc135-bad-autocomplete.fail"
+   ],
+   "stepIds": [
+    "scan.sc135-bad-autocomplete.fail"
+   ],
+   "steps": [
+    "Open sc135-bad-autocomplete.fail.html at 1280 by 800 pixels.",
+    "Run ACT rule 73f2c2 for SC 1.3.5.",
+    "Find the element #e.",
+    "Observed: Invalid autocomplete value \"emial\"."
+   ],
+   "image": {
+    "imageId": "img.sc135-bad-autocomplete.fail",
+    "box": {
+     "x": 46.22,
+     "y": 79.88,
+     "width": 177,
+     "height": 21
+    }
+   },
+   "exchanges": [],
+   "log": [
+    "engine outcome: failed",
+    "box at 1280x800: x 46.22, y 79.88, width 177, height 21",
+    "box measured by the engine at 1024x768: x 46.22, y 79.88, width 177, height 21"
+   ],
+   "reason": null,
+   "action": null
+  },
+  {
+   "id": "sc141-colour-only-link.fail.review",
+   "status": "needs-review",
+   "severity": null,
+   "title": "No automated rule decided SC 1.4.1 Use of Color",
+   "caption": "sc141-colour-only-link.fail.html: judge SC 1.4.1 Use of Color by hand",
+   "rule": "none (no automated rule decided this)",
+   "criterion": {
+    "kind": "wcag",
+    "successCriterion": "1.4.1",
+    "title": "Use of Color",
+    "level": "A"
+   },
+   "criterionIds": [
+    "sc141-colour-only-link.fail"
+   ],
+   "stepIds": [
+    "scan.sc141-colour-only-link.fail"
+   ],
+   "steps": [
+    "Open sc141-colour-only-link.fail.html at 1280 by 800 pixels.",
+    "Judge SC 1.4.1 Use of Color by hand."
+   ],
+   "image": null,
+   "exchanges": [],
+   "log": [
+    "fixture class: a rule could decide this, but none in the current set covers it"
+   ],
+   "reason": "No rule in the current set covers this case.",
+   "action": "Open the page and judge SC 1.4.1 Use of Color."
+  },
+  {
+   "id": "sc1410-no-reflow.fail.page-reflow.1",
+   "status": "failed",
+   "severity": "P2",
+   "title": "<div> is 1000 px wide; at 320 px the page needs horizontal scrolling",
+   "caption": "Content needs horizontal scrolling at 320 px width",
+   "rule": "probe page-reflow",
+   "criterion": {
+    "kind": "wcag",
+    "successCriterion": "1.4.10",
+    "title": "Reflow",
+    "level": "AA"
+   },
+   "criterionIds": [
+    "sc1410-no-reflow.fail"
+   ],
+   "stepIds": [
+    "scan.sc1410-no-reflow.fail"
+   ],
+   "steps": [
+    "Open sc1410-no-reflow.fail.html at 1280 by 800 pixels.",
+    "Run probe page-reflow for SC 1.4.10.",
+    "Find the element html > body:nth-child(2) > main:nth-child(1) > div:nth-child(2).",
+    "Observed: <div> is 1000 px wide; at 320 px the page needs horizontal scrolling."
+   ],
+   "image": {
+    "imageId": "img.sc1410-no-reflow.fail",
+    "box": {
+     "x": 8,
+     "y": 79.88,
+     "width": 1000,
+     "height": 18
+    }
+   },
+   "exchanges": [],
+   "log": [
+    "engine outcome: failed",
+    "box at 1280x800: x 8, y 79.88, width 1000, height 18",
+    "box measured by the engine at 1024x768: x 8, y 79.88, width 1000, height 18"
+   ],
+   "reason": null,
+   "action": null
+  },
+  {
+   "id": "sc1411-faint-border.fail.review",
+   "status": "needs-review",
+   "severity": null,
+   "title": "No automated rule decided SC 1.4.11 Non-text Contrast",
+   "caption": "sc1411-faint-border.fail.html: judge SC 1.4.11 Non-text Contrast by hand",
+   "rule": "none (no automated rule decided this)",
+   "criterion": {
+    "kind": "wcag",
+    "successCriterion": "1.4.11",
+    "title": "Non-text Contrast",
+    "level": "AA"
+   },
+   "criterionIds": [
+    "sc1411-faint-border.fail"
+   ],
+   "stepIds": [
+    "scan.sc1411-faint-border.fail"
+   ],
+   "steps": [
+    "Open sc1411-faint-border.fail.html at 1280 by 800 pixels.",
+    "Judge SC 1.4.11 Non-text Contrast by hand."
+   ],
+   "image": null,
+   "exchanges": [],
+   "log": [
+    "fixture class: beyond what automated rules can judge"
+   ],
+   "reason": "Automated rules cannot judge this criterion; it needs a person.",
+   "action": "Open the page and judge SC 1.4.11 Non-text Contrast."
+  },
+  {
+   "id": "sc1412-inline-letter-spacing.fail.24afc2.1",
+   "status": "failed",
+   "severity": "P3",
+   "title": "letter-spacing 0px is below 0.12 x font-size 16px",
+   "caption": "Letter spacing is forced to zero and cannot be adjusted",
+   "rule": "ACT rule 24afc2",
+   "criterion": {
+    "kind": "wcag",
+    "successCriterion": "1.4.12",
+    "title": "Text Spacing",
+    "level": "AA"
+   },
+   "criterionIds": [
+    "sc1412-inline-letter-spacing.fail"
+   ],
+   "stepIds": [
+    "scan.sc1412-inline-letter-spacing.fail"
+   ],
+   "steps": [
+    "Open sc1412-inline-letter-spacing.fail.html at 1280 by 800 pixels.",
+    "Run ACT rule 24afc2 for SC 1.4.12.",
+    "Find the element html > body:nth-child(2) > main:nth-child(1) > p:nth-child(2).",
+    "Observed: letter-spacing 0px is below 0.12 x font-size 16px."
+   ],
+   "image": {
+    "imageId": "img.sc1412-inline-letter-spacing.fail",
+    "box": {
+     "x": 8,
+     "y": 79.88,
+     "width": 1264,
+     "height": 18
+    }
+   },
+   "exchanges": [],
+   "log": [
+    "engine outcome: failed",
+    "box at 1280x800: x 8, y 79.88, width 1264, height 18",
+    "box measured by the engine at 1024x768: x 8, y 79.88, width 1008, height 18"
+   ],
+   "reason": null,
+   "action": null
+  },
+  {
+   "id": "sc1412-inline-spacing.fail.review",
+   "status": "needs-review",
+   "severity": null,
+   "title": "No automated rule decided SC 1.4.12 Text Spacing",
+   "caption": "sc1412-inline-spacing.fail.html: judge SC 1.4.12 Text Spacing by hand",
+   "rule": "none (no automated rule decided this)",
+   "criterion": {
+    "kind": "wcag",
+    "successCriterion": "1.4.12",
+    "title": "Text Spacing",
+    "level": "AA"
+   },
+   "criterionIds": [
+    "sc1412-inline-spacing.fail"
+   ],
+   "stepIds": [
+    "scan.sc1412-inline-spacing.fail"
+   ],
+   "steps": [
+    "Open sc1412-inline-spacing.fail.html at 1280 by 800 pixels.",
+    "Judge SC 1.4.12 Text Spacing by hand."
+   ],
+   "image": null,
+   "exchanges": [],
+   "log": [
+    "fixture class: a rule could decide this, but none in the current set covers it"
+   ],
+   "reason": "No rule in the current set covers this case.",
+   "action": "Open the page and judge SC 1.4.12 Text Spacing."
+  },
+  {
+   "id": "sc1413-hover-content.fail.review",
+   "status": "needs-review",
+   "severity": null,
+   "title": "No automated rule decided SC 1.4.13 Content on Hover or Focus",
+   "caption": "sc1413-hover-content.fail.html: judge SC 1.4.13 Content on Hover or Focus by hand",
+   "rule": "none (no automated rule decided this)",
+   "criterion": {
+    "kind": "wcag",
+    "successCriterion": "1.4.13",
+    "title": "Content on Hover or Focus",
+    "level": "AA"
+   },
+   "criterionIds": [
+    "sc1413-hover-content.fail"
+   ],
+   "stepIds": [
+    "scan.sc1413-hover-content.fail"
+   ],
+   "steps": [
+    "Open sc1413-hover-content.fail.html at 1280 by 800 pixels.",
+    "Judge SC 1.4.13 Content on Hover or Focus by hand."
+   ],
+   "image": null,
+   "exchanges": [],
+   "log": [
+    "fixture class: beyond what automated rules can judge"
+   ],
+   "reason": "Automated rules cannot judge this criterion; it needs a person.",
+   "action": "Open the page and judge SC 1.4.13 Content on Hover or Focus."
+  },
+  {
+   "id": "sc142-autoplay-audio.fail.review",
+   "status": "needs-review",
+   "severity": null,
+   "title": "No automated rule decided SC 1.4.2 Audio Control",
+   "caption": "sc142-autoplay-audio.fail.html: judge SC 1.4.2 Audio Control by hand",
+   "rule": "none (no automated rule decided this)",
+   "criterion": {
+    "kind": "wcag",
+    "successCriterion": "1.4.2",
+    "title": "Audio Control",
+    "level": "A"
+   },
+   "criterionIds": [
+    "sc142-autoplay-audio.fail"
+   ],
+   "stepIds": [
+    "scan.sc142-autoplay-audio.fail"
+   ],
+   "steps": [
+    "Open sc142-autoplay-audio.fail.html at 1280 by 800 pixels.",
+    "Judge SC 1.4.2 Audio Control by hand."
+   ],
+   "image": null,
+   "exchanges": [],
+   "log": [
+    "fixture class: a rule could decide this, but none in the current set covers it"
+   ],
+   "reason": "No rule in the current set covers this case.",
+   "action": "Open the page and judge SC 1.4.2 Audio Control."
+  },
+  {
+   "id": "sc143-gradient-bg.fail.afw4f7.1",
+   "status": "failed",
+   "severity": "P2",
+   "title": "Highest possible contrast 2.82:1 (rendered background pixels) is below 4.5:1",
+   "caption": "Text contrast 2.82:1 is below the 4.5:1 minimum",
+   "rule": "ACT rule afw4f7",
+   "criterion": {
+    "kind": "wcag",
+    "successCriterion": "1.4.3",
+    "title": "Contrast (Minimum)",
+    "level": "AA"
+   },
+   "criterionIds": [
+    "sc143-gradient-bg.fail"
+   ],
+   "stepIds": [
+    "scan.sc143-gradient-bg.fail"
+   ],
+   "steps": [
+    "Open sc143-gradient-bg.fail.html at 1280 by 800 pixels.",
+    "Run ACT rule afw4f7 for SC 1.4.3.",
+    "Find the element html > body:nth-child(2) > main:nth-child(1) > div:nth-child(2) > p:nth-child(1).",
+    "Observed: Highest possible contrast 2.82:1 (rendered background pixels) is below 4.5:1."
+   ],
+   "image": {
+    "imageId": "img.sc143-gradient-bg.fail",
+    "box": {
+     "x": 24,
+     "y": 111.88,
+     "width": 1232,
+     "height": 18
+    }
+   },
+   "exchanges": [],
+   "log": [
+    "engine outcome: failed",
+    "box at 1280x800: x 24, y 111.88, width 1232, height 18",
+    "box measured by the engine at 1024x768: x 24, y 111.88, width 976, height 18"
+   ],
+   "reason": null,
+   "action": null
+  },
+  {
+   "id": "sc143-low-contrast.fail.afw4f7.1",
+   "status": "failed",
+   "severity": "P2",
+   "title": "Highest possible contrast 2.32:1 (solid background) is below 4.5:1",
+   "caption": "Text contrast 2.32:1 is below the 4.5:1 minimum",
+   "rule": "ACT rule afw4f7",
+   "criterion": {
+    "kind": "wcag",
+    "successCriterion": "1.4.3",
+    "title": "Contrast (Minimum)",
+    "level": "AA"
+   },
+   "criterionIds": [
+    "sc143-low-contrast.fail"
+   ],
+   "stepIds": [
+    "scan.sc143-low-contrast.fail"
+   ],
+   "steps": [
+    "Open sc143-low-contrast.fail.html at 1280 by 800 pixels.",
+    "Run ACT rule afw4f7 for SC 1.4.3.",
+    "Find the element html > body:nth-child(2) > main:nth-child(1) > p:nth-child(2).",
+    "Observed: Highest possible contrast 2.32:1 (solid background) is below 4.5:1."
+   ],
+   "image": {
+    "imageId": "img.sc143-low-contrast.fail",
+    "box": {
+     "x": 8,
+     "y": 79.88,
+     "width": 1264,
+     "height": 18
+    }
+   },
+   "exchanges": [],
+   "log": [
+    "engine outcome: failed",
+    "box at 1280x800: x 8, y 79.88, width 1264, height 18",
+    "box measured by the engine at 1024x768: x 8, y 79.88, width 1008, height 18"
+   ],
+   "reason": null,
+   "action": null
+  },
+  {
+   "id": "sc144-no-zoom.fail.b4f0c3.1",
+   "status": "failed",
+   "severity": "P2",
+   "title": "Viewport blocks zoom (user-scalable=no)",
+   "caption": "Page blocks zooming (user-scalable=no)",
+   "rule": "ACT rule b4f0c3",
+   "criterion": {
+    "kind": "wcag",
+    "successCriterion": "1.4.4",
+    "title": "Resize Text",
+    "level": "AA"
+   },
+   "criterionIds": [
+    "sc144-no-zoom.fail"
+   ],
+   "stepIds": [
+    "scan.sc144-no-zoom.fail"
+   ],
+   "steps": [
+    "Open sc144-no-zoom.fail.html at 1280 by 800 pixels.",
+    "Run ACT rule b4f0c3 for SC 1.4.4, 1.4.10.",
+    "Find the element html > head:nth-child(1) > meta:nth-child(3).",
+    "Observed: Viewport blocks zoom (user-scalable=no)."
+   ],
+   "image": {
+    "imageId": "img.sc144-no-zoom.fail",
+    "box": null
+   },
+   "exchanges": [],
+   "log": [
+    "engine outcome: failed",
+    "box: none (page-level finding, no area to draw)",
+    "box measured by the engine at 1024x768: x 0, y 0, width 1024, height 113.88",
+    "also relates to SC 1.4.10"
+   ],
+   "reason": null,
+   "action": null
+  },
+  {
+   "id": "sc145-image-of-text.fail.review",
+   "status": "needs-review",
+   "severity": null,
+   "title": "No automated rule decided SC 1.4.5 Images of Text",
+   "caption": "sc145-image-of-text.fail.html: judge SC 1.4.5 Images of Text by hand",
+   "rule": "none (no automated rule decided this)",
+   "criterion": {
+    "kind": "wcag",
+    "successCriterion": "1.4.5",
+    "title": "Images of Text",
+    "level": "AA"
+   },
+   "criterionIds": [
+    "sc145-image-of-text.fail"
+   ],
+   "stepIds": [
+    "scan.sc145-image-of-text.fail"
+   ],
+   "steps": [
+    "Open sc145-image-of-text.fail.html at 1280 by 800 pixels.",
+    "Judge SC 1.4.5 Images of Text by hand."
+   ],
+   "image": null,
+   "exchanges": [],
+   "log": [
+    "fixture class: beyond what automated rules can judge"
+   ],
+   "reason": "Automated rules cannot judge this criterion; it needs a person.",
+   "action": "Open the page and judge SC 1.4.5 Images of Text."
+  },
+  {
+   "id": "sc211-click-div.fail.keyboard-reachable.1",
+   "status": "failed",
+   "severity": "P1",
+   "title": "Clickable <div> cannot be reached with the Tab key",
+   "caption": "Clickable element cannot be reached with the Tab key",
+   "rule": "probe keyboard-reachable",
+   "criterion": {
+    "kind": "wcag",
+    "successCriterion": "2.1.1",
+    "title": "Keyboard",
+    "level": "A"
+   },
+   "criterionIds": [
+    "sc211-click-div.fail"
+   ],
+   "stepIds": [
+    "scan.sc211-click-div.fail"
+   ],
+   "steps": [
+    "Open sc211-click-div.fail.html at 1280 by 800 pixels.",
+    "Run probe keyboard-reachable for SC 2.1.1.",
+    "Find the element html > body:nth-child(2) > main:nth-child(1) > div:nth-child(2).",
+    "Observed: Clickable <div> cannot be reached with the Tab key."
+   ],
+   "image": {
+    "imageId": "img.sc211-click-div.fail",
+    "box": {
+     "x": 8,
+     "y": 79.88,
+     "width": 44.66,
+     "height": 28
+    }
+   },
+   "exchanges": [],
+   "log": [
+    "engine outcome: failed",
+    "box at 1280x800: x 8, y 79.88, width 44.66, height 28",
+    "box measured by the engine at 1024x768: x 8, y 79.88, width 44.66, height 28"
+   ],
+   "reason": null,
+   "action": null
+  },
+  {
+   "id": "sc211-scroll-no-focus.fail.0ssw9k.1",
+   "status": "failed",
+   "severity": "P2",
+   "title": "Scrollable region cannot be reached with the keyboard",
+   "caption": "Scrollable area cannot be reached with the keyboard",
+   "rule": "ACT rule 0ssw9k",
+   "criterion": {
+    "kind": "wcag",
+    "successCriterion": "2.1.1",
+    "title": "Keyboard",
+    "level": "A"
+   },
+   "criterionIds": [
+    "sc211-scroll-no-focus.fail"
+   ],
+   "stepIds": [
+    "scan.sc211-scroll-no-focus.fail"
+   ],
+   "steps": [
+    "Open sc211-scroll-no-focus.fail.html at 1280 by 800 pixels.",
+    "Run ACT rule 0ssw9k for SC 2.1.1.",
+    "Find the element html > body:nth-child(2) > main:nth-child(1) > div:nth-child(2).",
+    "Observed: Scrollable region cannot be reached with the keyboard."
+   ],
+   "image": {
+    "imageId": "img.sc211-scroll-no-focus.fail",
+    "box": {
+     "x": 8,
+     "y": 79.88,
+     "width": 1264,
+     "height": 48
+    }
+   },
+   "exchanges": [],
+   "log": [
+    "engine outcome: failed",
+    "box at 1280x800: x 8, y 79.88, width 1264, height 48",
+    "box measured by the engine at 1024x768: x 8, y 79.88, width 1008, height 48"
+   ],
+   "reason": null,
+   "action": null
+  },
+  {
+   "id": "sc212-keyboard-trap.fail.a1b64e.1",
+   "status": "failed",
+   "severity": "P1",
+   "title": "Keyboard focus cannot leave this element with Tab or Shift+Tab",
+   "caption": "Keyboard focus is trapped on this element",
+   "rule": "ACT rule a1b64e",
+   "criterion": {
+    "kind": "wcag",
+    "successCriterion": "2.1.2",
+    "title": "No Keyboard Trap",
+    "level": "A"
+   },
+   "criterionIds": [
+    "sc212-keyboard-trap.fail"
+   ],
+   "stepIds": [
+    "scan.sc212-keyboard-trap.fail"
+   ],
+   "steps": [
+    "Open sc212-keyboard-trap.fail.html at 1280 by 800 pixels.",
+    "Run ACT rule a1b64e for SC 2.1.2.",
+    "Find the element #t.",
+    "Observed: Keyboard focus cannot leave this element with Tab or Shift+Tab."
+   ],
+   "image": {
+    "imageId": "img.sc212-keyboard-trap.fail",
+    "box": {
+     "x": 37.64,
+     "y": 79.88,
+     "width": 177,
+     "height": 21
+    }
+   },
+   "exchanges": [],
+   "log": [
+    "engine outcome: failed",
+    "box at 1280x800: x 37.64, y 79.88, width 177, height 21",
+    "box measured by the engine at 1024x768: x 37.64, y 79.88, width 177, height 21"
+   ],
+   "reason": null,
+   "action": null
+  },
+  {
+   "id": "sc212-keyboard-trap.fail.a1b64e.2",
+   "status": "failed",
+   "severity": "P1",
+   "title": "Keyboard focus cannot leave this element with Tab or Shift+Tab",
+   "caption": "Keyboard focus is trapped on this element",
+   "rule": "ACT rule a1b64e",
+   "criterion": {
+    "kind": "wcag",
+    "successCriterion": "2.1.2",
+    "title": "No Keyboard Trap",
+    "level": "A"
+   },
+   "criterionIds": [
+    "sc212-keyboard-trap.fail"
+   ],
+   "stepIds": [
+    "scan.sc212-keyboard-trap.fail"
+   ],
+   "steps": [
+    "Open sc212-keyboard-trap.fail.html at 1280 by 800 pixels.",
+    "Run ACT rule a1b64e for SC 2.1.2.",
+    "Find the element html > body:nth-child(2) > main:nth-child(1) > button:nth-child(4).",
+    "Observed: Keyboard focus cannot leave this element with Tab or Shift+Tab."
+   ],
+   "image": {
+    "imageId": "img.sc212-keyboard-trap.fail",
+    "box": {
+     "x": 214.64,
+     "y": 79.88,
+     "width": 44.16,
+     "height": 21
+    }
+   },
+   "exchanges": [],
+   "log": [
+    "engine outcome: failed",
+    "box at 1280x800: x 214.64, y 79.88, width 44.16, height 21",
+    "box measured by the engine at 1024x768: x 214.64, y 79.88, width 44.16, height 21"
+   ],
+   "reason": null,
+   "action": null
+  },
+  {
+   "id": "sc212-keyboard-trap.fail.oj04fd.3",
+   "status": "failed",
+   "severity": "P2",
+   "title": "No pixel in the viewport changes when this element receives focus",
+   "caption": "No visible change when this element is focused",
+   "rule": "ACT rule oj04fd",
+   "criterion": {
+    "kind": "wcag",
+    "successCriterion": "2.4.7",
+    "title": "Focus Visible",
+    "level": "AA"
+   },
+   "criterionIds": [
+    "sc212-keyboard-trap.fail"
+   ],
+   "stepIds": [
+    "scan.sc212-keyboard-trap.fail"
+   ],
+   "steps": [
+    "Open sc212-keyboard-trap.fail.html at 1280 by 800 pixels.",
+    "Run ACT rule oj04fd for SC 2.4.7.",
+    "Find the element #t.",
+    "Observed: No pixel in the viewport changes when this element receives focus."
+   ],
+   "image": {
+    "imageId": "img.sc212-keyboard-trap.fail",
+    "box": {
+     "x": 37.64,
+     "y": 79.88,
+     "width": 177,
+     "height": 21
+    }
+   },
+   "exchanges": [],
+   "log": [
+    "engine outcome: failed",
+    "box at 1280x800: x 37.64, y 79.88, width 177, height 21",
+    "box measured by the engine at 1024x768: x 37.64, y 79.88, width 177, height 21"
+   ],
+   "reason": null,
+   "action": null
+  },
+  {
+   "id": "sc212-keyboard-trap.fail.oj04fd.4",
+   "status": "needs-review",
+   "severity": "P2",
+   "title": "Not reached by the Tab walk",
+   "caption": "Focus indicator not checked: element not reached by Tab",
+   "rule": "ACT rule oj04fd",
+   "criterion": {
+    "kind": "wcag",
+    "successCriterion": "2.4.7",
+    "title": "Focus Visible",
+    "level": "AA"
+   },
+   "criterionIds": [
+    "sc212-keyboard-trap.fail"
+   ],
+   "stepIds": [
+    "scan.sc212-keyboard-trap.fail"
+   ],
+   "steps": [
+    "Open sc212-keyboard-trap.fail.html at 1280 by 800 pixels.",
+    "Run ACT rule oj04fd for SC 2.4.7.",
+    "Find the element html > body:nth-child(2) > main:nth-child(1) > button:nth-child(4).",
+    "Observed: Not reached by the Tab walk."
+   ],
+   "image": {
+    "imageId": "img.sc212-keyboard-trap.fail",
+    "box": {
+     "x": 214.64,
+     "y": 79.88,
+     "width": 44.16,
+     "height": 21
+    }
+   },
+   "exchanges": [],
+   "log": [
+    "engine outcome: cantTell",
+    "box at 1280x800: x 214.64, y 79.88, width 44.16, height 21",
+    "box measured by the engine at 1024x768: x 214.64, y 79.88, width 44.16, height 21"
+   ],
+   "reason": "The engine could not decide this check on its own.",
+   "action": "Check the element by hand: Tab to it at 1280 by 800 and look at the screen."
+  },
+  {
+   "id": "sc221-meta-refresh.fail.bc659a.1",
+   "status": "failed",
+   "severity": "P2",
+   "title": "Page refreshes or redirects after 30 s",
+   "caption": "Page refreshes or redirects on its own",
+   "rule": "ACT rule bc659a",
+   "criterion": {
+    "kind": "wcag",
+    "successCriterion": "2.2.1",
+    "title": "Timing Adjustable",
+    "level": "A"
+   },
+   "criterionIds": [
+    "sc221-meta-refresh.fail"
+   ],
+   "stepIds": [
+    "scan.sc221-meta-refresh.fail"
+   ],
+   "steps": [
+    "Open sc221-meta-refresh.fail.html at 1280 by 800 pixels.",
+    "Run ACT rule bc659a for SC 2.2.1.",
+    "Find the element html > head:nth-child(1) > meta:nth-child(3).",
+    "Observed: Page refreshes or redirects after 30 s."
+   ],
+   "image": {
+    "imageId": "img.sc221-meta-refresh.fail",
+    "box": null
+   },
+   "exchanges": [],
+   "log": [
+    "engine outcome: failed",
+    "box: none (page-level finding, no area to draw)",
+    "box measured by the engine at 1024x768: x 0, y 0, width 1024, height 113.88"
+   ],
+   "reason": null,
+   "action": null
+  },
+  {
+   "id": "sc222-marquee.fail.review",
+   "status": "needs-review",
+   "severity": null,
+   "title": "No automated rule decided SC 2.2.2 Pause, Stop, Hide",
+   "caption": "sc222-marquee.fail.html: judge SC 2.2.2 Pause, Stop, Hide by hand",
+   "rule": "none (no automated rule decided this)",
+   "criterion": {
+    "kind": "wcag",
+    "successCriterion": "2.2.2",
+    "title": "Pause, Stop, Hide",
+    "level": "A"
+   },
+   "criterionIds": [
+    "sc222-marquee.fail"
+   ],
+   "stepIds": [
+    "scan.sc222-marquee.fail"
+   ],
+   "steps": [
+    "Open sc222-marquee.fail.html at 1280 by 800 pixels.",
+    "Judge SC 2.2.2 Pause, Stop, Hide by hand."
+   ],
+   "image": null,
+   "exchanges": [],
+   "log": [
+    "fixture class: a rule could decide this, but none in the current set covers it"
+   ],
+   "reason": "No rule in the current set covers this case.",
+   "action": "Open the page and judge SC 2.2.2 Pause, Stop, Hide."
+  },
+  {
+   "id": "sc231-flashing.fail.review",
+   "status": "needs-review",
+   "severity": null,
+   "title": "No automated rule decided SC 2.3.1 Three Flashes or Below Threshold",
+   "caption": "sc231-flashing.fail.html: judge SC 2.3.1 Three Flashes or Below Threshold by hand",
+   "rule": "none (no automated rule decided this)",
+   "criterion": {
+    "kind": "wcag",
+    "successCriterion": "2.3.1",
+    "title": "Three Flashes or Below Threshold",
+    "level": "A"
+   },
+   "criterionIds": [
+    "sc231-flashing.fail"
+   ],
+   "stepIds": [
+    "scan.sc231-flashing.fail"
+   ],
+   "steps": [
+    "Open sc231-flashing.fail.html at 1280 by 800 pixels.",
+    "Judge SC 2.3.1 Three Flashes or Below Threshold by hand."
+   ],
+   "image": null,
+   "exchanges": [],
+   "log": [
+    "fixture class: beyond what automated rules can judge"
+   ],
+   "reason": "Automated rules cannot judge this criterion; it needs a person.",
+   "action": "Open the page and judge SC 2.3.1 Three Flashes or Below Threshold."
+  },
+  {
+   "id": "sc241-no-bypass.fail.review",
+   "status": "needs-review",
+   "severity": null,
+   "title": "No automated rule decided SC 2.4.1 Bypass Blocks",
+   "caption": "sc241-no-bypass.fail.html: judge SC 2.4.1 Bypass Blocks by hand",
+   "rule": "none (no automated rule decided this)",
+   "criterion": {
+    "kind": "wcag",
+    "successCriterion": "2.4.1",
+    "title": "Bypass Blocks",
+    "level": "A"
+   },
+   "criterionIds": [
+    "sc241-no-bypass.fail"
+   ],
+   "stepIds": [
+    "scan.sc241-no-bypass.fail"
+   ],
+   "steps": [
+    "Open sc241-no-bypass.fail.html at 1280 by 800 pixels.",
+    "Judge SC 2.4.1 Bypass Blocks by hand."
+   ],
+   "image": null,
+   "exchanges": [],
+   "log": [
+    "fixture class: a rule could decide this, but none in the current set covers it"
+   ],
+   "reason": "No rule in the current set covers this case.",
+   "action": "Open the page and judge SC 2.4.1 Bypass Blocks."
+  },
+  {
+   "id": "sc2411-focus-obscured.fail.oj04fd.1",
+   "status": "failed",
+   "severity": "P2",
+   "title": "No pixel in the viewport changes when this element receives focus",
+   "caption": "No visible change when this element is focused",
+   "rule": "ACT rule oj04fd",
+   "criterion": {
+    "kind": "wcag",
+    "successCriterion": "2.4.7",
+    "title": "Focus Visible",
+    "level": "AA"
+   },
+   "criterionIds": [
+    "sc2411-focus-obscured.fail"
+   ],
+   "stepIds": [
+    "scan.sc2411-focus-obscured.fail"
+   ],
+   "steps": [
+    "Open sc2411-focus-obscured.fail.html at 1280 by 800 pixels.",
+    "Run ACT rule oj04fd for SC 2.4.7.",
+    "Find the element html > body:nth-child(2) > main:nth-child(1) > button:nth-child(4).",
+    "Observed: No pixel in the viewport changes when this element receives focus."
+   ],
+   "image": {
+    "imageId": "img.sc2411-focus-obscured.fail",
+    "box": {
+     "x": 8,
+     "y": 1279.88,
+     "width": 41.2,
+     "height": 21
+    }
+   },
+   "exchanges": [],
+   "log": [
+    "engine outcome: failed",
+    "box at 1280x800: x 8, y 1279.88, width 41.2, height 21",
+    "box measured by the engine at 1024x768: x 8, y 1279.88, width 41.2, height 21"
+   ],
+   "reason": null,
+   "action": null
+  },
+  {
+   "id": "sc2411-focus-obscured.fail.keyboard-focus-obscured.2",
+   "status": "failed",
+   "severity": "P2",
+   "title": "Focused element is entirely covered by other content (0 of 25 sample points visible)",
+   "caption": "Focused element is hidden behind other content",
+   "rule": "probe keyboard-focus-obscured",
+   "criterion": {
+    "kind": "wcag",
+    "successCriterion": "2.4.11",
+    "title": "Focus Not Obscured (Minimum)",
+    "level": "AA"
+   },
+   "criterionIds": [
+    "sc2411-focus-obscured.fail"
+   ],
+   "stepIds": [
+    "scan.sc2411-focus-obscured.fail"
+   ],
+   "steps": [
+    "Open sc2411-focus-obscured.fail.html at 1280 by 800 pixels.",
+    "Run probe keyboard-focus-obscured for SC 2.4.11.",
+    "Find the element html > body:nth-child(2) > main:nth-child(1) > button:nth-child(4).",
+    "Observed: Focused element is entirely covered by other content (0 of 25 sample points visible)."
+   ],
+   "image": {
+    "imageId": "img.sc2411-focus-obscured.fail",
+    "box": {
+     "x": 8,
+     "y": 1279.88,
+     "width": 41.2,
+     "height": 21
+    }
+   },
+   "exchanges": [],
+   "log": [
+    "engine outcome: failed",
+    "box at 1280x800: x 8, y 1279.88, width 41.2, height 21",
+    "box measured by the engine at 1024x768: x 8, y 1279.88, width 41.2, height 21"
+   ],
+   "reason": null,
+   "action": null
+  },
+  {
+   "id": "sc242-empty-title.fail.2779a5.1",
+   "status": "failed",
+   "severity": "P3",
+   "title": "Page title is empty",
+   "caption": "Page title is empty",
+   "rule": "ACT rule 2779a5",
+   "criterion": {
+    "kind": "wcag",
+    "successCriterion": "2.4.2",
+    "title": "Page Titled",
+    "level": "A"
+   },
+   "criterionIds": [
+    "sc242-empty-title.fail"
+   ],
+   "stepIds": [
+    "scan.sc242-empty-title.fail"
+   ],
+   "steps": [
+    "Open sc242-empty-title.fail.html at 1280 by 800 pixels.",
+    "Run ACT rule 2779a5 for SC 2.4.2.",
+    "Find the element html.",
+    "Observed: Page title is empty."
+   ],
+   "image": {
+    "imageId": "img.sc242-empty-title.fail",
+    "box": null
+   },
+   "exchanges": [],
+   "log": [
+    "engine outcome: failed",
+    "box: none (page-level finding, no area to draw)",
+    "box measured by the engine at 1024x768: x 0, y 0, width 1024, height 113.88"
+   ],
+   "reason": null,
+   "action": null
+  },
+  {
+   "id": "sc242-vague-title.fail.review",
+   "status": "needs-review",
+   "severity": null,
+   "title": "No automated rule decided SC 2.4.2 Page Titled",
+   "caption": "sc242-vague-title.fail.html: judge SC 2.4.2 Page Titled by hand",
+   "rule": "none (no automated rule decided this)",
+   "criterion": {
+    "kind": "wcag",
+    "successCriterion": "2.4.2",
+    "title": "Page Titled",
+    "level": "A"
+   },
+   "criterionIds": [
+    "sc242-vague-title.fail"
+   ],
+   "stepIds": [
+    "scan.sc242-vague-title.fail"
+   ],
+   "steps": [
+    "Open sc242-vague-title.fail.html at 1280 by 800 pixels.",
+    "Judge SC 2.4.2 Page Titled by hand."
+   ],
+   "image": null,
+   "exchanges": [],
+   "log": [
+    "fixture class: beyond what automated rules can judge"
+   ],
+   "reason": "Automated rules cannot judge this criterion; it needs a person.",
+   "action": "Open the page and judge SC 2.4.2 Page Titled."
+  },
+  {
+   "id": "sc243-focus-order.fail.keyboard-focus-order.1",
+   "status": "failed",
+   "severity": "P3",
+   "title": "Focus moves from \"Second\" back to \"Third\", which is visually before it on the same line (positive tabindex)",
+   "caption": "Tab order does not follow the visual order",
+   "rule": "probe keyboard-focus-order",
+   "criterion": {
+    "kind": "wcag",
+    "successCriterion": "2.4.3",
+    "title": "Focus Order",
+    "level": "A"
+   },
+   "criterionIds": [
+    "sc243-focus-order.fail"
+   ],
+   "stepIds": [
+    "scan.sc243-focus-order.fail"
+   ],
+   "steps": [
+    "Open sc243-focus-order.fail.html at 1280 by 800 pixels.",
+    "Run probe keyboard-focus-order for SC 2.4.3.",
+    "Find the element html > body:nth-child(2) > main:nth-child(1) > button:nth-child(2).",
+    "Observed: Focus moves from \"Second\" back to \"Third\", which is visually before it on the same line (positive tabindex)."
+   ],
+   "image": {
+    "imageId": "img.sc243-focus-order.fail",
+    "box": {
+     "x": 8,
+     "y": 79.88,
+     "width": 46.38,
+     "height": 21
+    }
+   },
+   "exchanges": [],
+   "log": [
+    "engine outcome: failed",
+    "box at 1280x800: x 8, y 79.88, width 46.38, height 21",
+    "box measured by the engine at 1024x768: x 8, y 79.88, width 46.38, height 21"
+   ],
+   "reason": null,
+   "action": null
+  },
+  {
+   "id": "sc244-click-here.fail.review",
+   "status": "needs-review",
+   "severity": null,
+   "title": "No automated rule decided SC 2.4.4 Link Purpose (In Context)",
+   "caption": "sc244-click-here.fail.html: judge SC 2.4.4 Link Purpose (In Context) by hand",
+   "rule": "none (no automated rule decided this)",
+   "criterion": {
+    "kind": "wcag",
+    "successCriterion": "2.4.4",
+    "title": "Link Purpose (In Context)",
+    "level": "A"
+   },
+   "criterionIds": [
+    "sc244-click-here.fail"
+   ],
+   "stepIds": [
+    "scan.sc244-click-here.fail"
+   ],
+   "steps": [
+    "Open sc244-click-here.fail.html at 1280 by 800 pixels.",
+    "Judge SC 2.4.4 Link Purpose (In Context) by hand."
+   ],
+   "image": null,
+   "exchanges": [],
+   "log": [
+    "fixture class: beyond what automated rules can judge"
+   ],
+   "reason": "Automated rules cannot judge this criterion; it needs a person.",
+   "action": "Open the page and judge SC 2.4.4 Link Purpose (In Context)."
+  },
+  {
+   "id": "sc244-empty-link.fail.c487ae.1",
+   "status": "failed",
+   "severity": "P1",
+   "title": "Link has no accessible name",
+   "caption": "Link has no accessible name",
+   "rule": "ACT rule c487ae",
+   "criterion": {
+    "kind": "wcag",
+    "successCriterion": "2.4.4",
+    "title": "Link Purpose (In Context)",
+    "level": "A"
+   },
+   "criterionIds": [
+    "sc244-empty-link.fail"
+   ],
+   "stepIds": [
+    "scan.sc244-empty-link.fail"
+   ],
+   "steps": [
+    "Open sc244-empty-link.fail.html at 1280 by 800 pixels.",
+    "Run ACT rule c487ae for SC 2.4.4, 4.1.2.",
+    "Find the element html > body:nth-child(2) > main:nth-child(1) > a:nth-child(2).",
+    "Observed: Link has no accessible name."
+   ],
+   "image": {
+    "imageId": "img.sc244-empty-link.fail",
+    "box": {
+     "x": 8,
+     "y": 79.88,
+     "width": 0,
+     "height": 0
+    }
+   },
+   "exchanges": [],
+   "log": [
+    "engine outcome: failed",
+    "box at 1280x800: x 8, y 79.88, width 0, height 0",
+    "box measured by the engine at 1024x768: x 8, y 21.44, width 1008, height 37",
+    "also relates to SC 4.1.2"
+   ],
+   "reason": null,
+   "action": null
+  },
+  {
+   "id": "sc244-empty-link.fail.oj04fd.2",
+   "status": "failed",
+   "severity": "P2",
+   "title": "No pixel in the viewport changes when this element receives focus",
+   "caption": "No visible change when this element is focused",
+   "rule": "ACT rule oj04fd",
+   "criterion": {
+    "kind": "wcag",
+    "successCriterion": "2.4.7",
+    "title": "Focus Visible",
+    "level": "AA"
+   },
+   "criterionIds": [
+    "sc244-empty-link.fail"
+   ],
+   "stepIds": [
+    "scan.sc244-empty-link.fail"
+   ],
+   "steps": [
+    "Open sc244-empty-link.fail.html at 1280 by 800 pixels.",
+    "Run ACT rule oj04fd for SC 2.4.7.",
+    "Find the element html > body:nth-child(2) > main:nth-child(1) > a:nth-child(2).",
+    "Observed: No pixel in the viewport changes when this element receives focus."
+   ],
+   "image": {
+    "imageId": "img.sc244-empty-link.fail",
+    "box": {
+     "x": 8,
+     "y": 79.88,
+     "width": 0,
+     "height": 0
+    }
+   },
+   "exchanges": [],
+   "log": [
+    "engine outcome: failed",
+    "box at 1280x800: x 8, y 79.88, width 0, height 0",
+    "box measured by the engine at 1024x768: x 8, y 79.88, width 0, height 0"
+   ],
+   "reason": null,
+   "action": null
+  },
+  {
+   "id": "sc244-empty-link.fail.keyboard-focus-obscured.3",
+   "status": "needs-review",
+   "severity": "P2",
+   "title": "Focused element is outside the viewport",
+   "caption": "Focus visibility not checked: element is off screen",
+   "rule": "probe keyboard-focus-obscured",
+   "criterion": {
+    "kind": "wcag",
+    "successCriterion": "2.4.11",
+    "title": "Focus Not Obscured (Minimum)",
+    "level": "AA"
+   },
+   "criterionIds": [
+    "sc244-empty-link.fail"
+   ],
+   "stepIds": [
+    "scan.sc244-empty-link.fail"
+   ],
+   "steps": [
+    "Open sc244-empty-link.fail.html at 1280 by 800 pixels.",
+    "Run probe keyboard-focus-obscured for SC 2.4.11.",
+    "Find the element html > body:nth-child(2) > main:nth-child(1) > a:nth-child(2).",
+    "Observed: Focused element is outside the viewport."
+   ],
+   "image": {
+    "imageId": "img.sc244-empty-link.fail",
+    "box": {
+     "x": 8,
+     "y": 79.88,
+     "width": 0,
+     "height": 0
+    }
+   },
+   "exchanges": [],
+   "log": [
+    "engine outcome: cantTell",
+    "box at 1280x800: x 8, y 79.88, width 0, height 0",
+    "box measured by the engine at 1024x768: x 8, y 79.88, width 0, height 0"
+   ],
+   "reason": "The engine could not decide this check on its own.",
+   "action": "Check the element by hand: Tab to it at 1280 by 800 and look at the screen."
+  },
+  {
+   "id": "sc246-vague-heading.fail.review",
+   "status": "needs-review",
+   "severity": null,
+   "title": "No automated rule decided SC 2.4.6 Headings and Labels",
+   "caption": "sc246-vague-heading.fail.html: judge SC 2.4.6 Headings and Labels by hand",
+   "rule": "none (no automated rule decided this)",
+   "criterion": {
+    "kind": "wcag",
+    "successCriterion": "2.4.6",
+    "title": "Headings and Labels",
+    "level": "AA"
+   },
+   "criterionIds": [
+    "sc246-vague-heading.fail"
+   ],
+   "stepIds": [
+    "scan.sc246-vague-heading.fail"
+   ],
+   "steps": [
+    "Open sc246-vague-heading.fail.html at 1280 by 800 pixels.",
+    "Judge SC 2.4.6 Headings and Labels by hand."
+   ],
+   "image": null,
+   "exchanges": [],
+   "log": [
+    "fixture class: beyond what automated rules can judge"
+   ],
+   "reason": "Automated rules cannot judge this criterion; it needs a person.",
+   "action": "Open the page and judge SC 2.4.6 Headings and Labels."
+  },
+  {
+   "id": "sc247-focus-hidden.fail.oj04fd.1",
+   "status": "failed",
+   "severity": "P2",
+   "title": "No pixel in the viewport changes when this element receives focus",
+   "caption": "No visible change when this element is focused",
+   "rule": "ACT rule oj04fd",
+   "criterion": {
+    "kind": "wcag",
+    "successCriterion": "2.4.7",
+    "title": "Focus Visible",
+    "level": "AA"
+   },
+   "criterionIds": [
+    "sc247-focus-hidden.fail"
+   ],
+   "stepIds": [
+    "scan.sc247-focus-hidden.fail"
+   ],
+   "steps": [
+    "Open sc247-focus-hidden.fail.html at 1280 by 800 pixels.",
+    "Run ACT rule oj04fd for SC 2.4.7.",
+    "Find the element html > body:nth-child(2) > main:nth-child(1) > button:nth-child(3).",
+    "Observed: No pixel in the viewport changes when this element receives focus."
+   ],
+   "image": {
+    "imageId": "img.sc247-focus-hidden.fail",
+    "box": {
+     "x": 8,
+     "y": 79.88,
+     "width": 46.39,
+     "height": 21
+    }
+   },
+   "exchanges": [],
+   "log": [
+    "engine outcome: failed",
+    "box at 1280x800: x 8, y 79.88, width 46.39, height 21",
+    "box measured by the engine at 1024x768: x 8, y 79.88, width 46.39, height 21"
+   ],
+   "reason": null,
+   "action": null
+  },
+  {
+   "id": "sc247-focus-hidden.fail.oj04fd.2",
+   "status": "failed",
+   "severity": "P2",
+   "title": "No pixel in the viewport changes when this element receives focus",
+   "caption": "No visible change when this element is focused",
+   "rule": "ACT rule oj04fd",
+   "criterion": {
+    "kind": "wcag",
+    "successCriterion": "2.4.7",
+    "title": "Focus Visible",
+    "level": "AA"
+   },
+   "criterionIds": [
+    "sc247-focus-hidden.fail"
+   ],
+   "stepIds": [
+    "scan.sc247-focus-hidden.fail"
+   ],
+   "steps": [
+    "Open sc247-focus-hidden.fail.html at 1280 by 800 pixels.",
+    "Run ACT rule oj04fd for SC 2.4.7.",
+    "Find the element html > body:nth-child(2) > main:nth-child(1) > a:nth-child(4).",
+    "Observed: No pixel in the viewport changes when this element receives focus."
+   ],
+   "image": {
+    "imageId": "img.sc247-focus-hidden.fail",
+    "box": {
+     "x": 54.39,
+     "y": 80.88,
+     "width": 30.22,
+     "height": 17
+    }
+   },
+   "exchanges": [],
+   "log": [
+    "engine outcome: failed",
+    "box at 1280x800: x 54.39, y 80.88, width 30.22, height 17",
+    "box measured by the engine at 1024x768: x 54.39, y 80.88, width 30.22, height 17"
+   ],
+   "reason": null,
+   "action": null
+  },
+  {
+   "id": "sc253-label-mismatch.fail.2ee8b8.1",
+   "status": "failed",
+   "severity": "P3",
+   "title": "Visible label \"Search\" is not part of the accessible name \"Go\"",
+   "caption": "Visible label is not part of the accessible name",
+   "rule": "ACT rule 2ee8b8",
+   "criterion": {
+    "kind": "wcag",
+    "successCriterion": "2.5.3",
+    "title": "Label in Name",
+    "level": "A"
+   },
+   "criterionIds": [
+    "sc253-label-mismatch.fail"
+   ],
+   "stepIds": [
+    "scan.sc253-label-mismatch.fail"
+   ],
+   "steps": [
+    "Open sc253-label-mismatch.fail.html at 1280 by 800 pixels.",
+    "Run ACT rule 2ee8b8 for SC 2.5.3.",
+    "Find the element html > body:nth-child(2) > main:nth-child(1) > button:nth-child(2).",
+    "Observed: Visible label \"Search\" is not part of the accessible name \"Go\"."
+   ],
+   "image": {
+    "imageId": "img.sc253-label-mismatch.fail",
+    "box": {
+     "x": 8,
+     "y": 79.88,
+     "width": 58.25,
+     "height": 21
+    }
+   },
+   "exchanges": [],
+   "log": [
+    "engine outcome: failed",
+    "box at 1280x800: x 8, y 79.88, width 58.25, height 21",
+    "box measured by the engine at 1024x768: x 8, y 79.88, width 58.25, height 21"
+   ],
+   "reason": null,
+   "action": null
+  },
+  {
+   "id": "sc257-drag-only.fail.review",
+   "status": "needs-review",
+   "severity": null,
+   "title": "No automated rule decided SC 2.5.7 Dragging Movements",
+   "caption": "sc257-drag-only.fail.html: judge SC 2.5.7 Dragging Movements by hand",
+   "rule": "none (no automated rule decided this)",
+   "criterion": {
+    "kind": "wcag",
+    "successCriterion": "2.5.7",
+    "title": "Dragging Movements",
+    "level": "AA"
+   },
+   "criterionIds": [
+    "sc257-drag-only.fail"
+   ],
+   "stepIds": [
+    "scan.sc257-drag-only.fail"
+   ],
+   "steps": [
+    "Open sc257-drag-only.fail.html at 1280 by 800 pixels.",
+    "Judge SC 2.5.7 Dragging Movements by hand."
+   ],
+   "image": null,
+   "exchanges": [],
+   "log": [
+    "fixture class: beyond what automated rules can judge"
+   ],
+   "reason": "Automated rules cannot judge this criterion; it needs a person.",
+   "action": "Open the page and judge SC 2.5.7 Dragging Movements."
+  },
+  {
+   "id": "sc258-small-targets.fail.page-target-size.1",
+   "status": "failed",
+   "severity": "P3",
+   "title": "Target is 10 x 10 CSS px and too close to another target",
+   "caption": "Click target is under 24 px and close to another",
+   "rule": "probe page-target-size",
+   "criterion": {
+    "kind": "wcag",
+    "successCriterion": "2.5.8",
+    "title": "Target Size (Minimum)",
+    "level": "AA"
+   },
+   "criterionIds": [
+    "sc258-small-targets.fail"
+   ],
+   "stepIds": [
+    "scan.sc258-small-targets.fail"
+   ],
+   "steps": [
+    "Open sc258-small-targets.fail.html at 1280 by 800 pixels.",
+    "Run probe page-target-size for SC 2.5.8.",
+    "Find the element html > body:nth-child(2) > main:nth-child(1) > button:nth-child(2).",
+    "Observed: Target is 10 x 10 CSS px and too close to another target."
+   ],
+   "image": {
+    "imageId": "img.sc258-small-targets.fail",
+    "box": {
+     "x": 8,
+     "y": 85.88,
+     "width": 10,
+     "height": 10
+    }
+   },
+   "exchanges": [],
+   "log": [
+    "engine outcome: failed",
+    "box at 1280x800: x 8, y 85.88, width 10, height 10",
+    "box measured by the engine at 1024x768: x 8, y 85.88, width 10, height 10"
+   ],
+   "reason": null,
+   "action": null
+  },
+  {
+   "id": "sc258-small-targets.fail.page-target-size.2",
+   "status": "failed",
+   "severity": "P3",
+   "title": "Target is 10 x 10 CSS px and too close to another target",
+   "caption": "Click target is under 24 px and close to another",
+   "rule": "probe page-target-size",
+   "criterion": {
+    "kind": "wcag",
+    "successCriterion": "2.5.8",
+    "title": "Target Size (Minimum)",
+    "level": "AA"
+   },
+   "criterionIds": [
+    "sc258-small-targets.fail"
+   ],
+   "stepIds": [
+    "scan.sc258-small-targets.fail"
+   ],
+   "steps": [
+    "Open sc258-small-targets.fail.html at 1280 by 800 pixels.",
+    "Run probe page-target-size for SC 2.5.8.",
+    "Find the element html > body:nth-child(2) > main:nth-child(1) > button:nth-child(3).",
+    "Observed: Target is 10 x 10 CSS px and too close to another target."
+   ],
+   "image": {
+    "imageId": "img.sc258-small-targets.fail",
+    "box": {
+     "x": 18,
+     "y": 85.88,
+     "width": 10,
+     "height": 10
+    }
+   },
+   "exchanges": [],
+   "log": [
+    "engine outcome: failed",
+    "box at 1280x800: x 18, y 85.88, width 10, height 10",
+    "box measured by the engine at 1024x768: x 18, y 85.88, width 10, height 10"
+   ],
+   "reason": null,
+   "action": null
+  },
+  {
+   "id": "sc311-no-lang.fail.b5c3f8.1",
+   "status": "failed",
+   "severity": "P3",
+   "title": "Page has no lang attribute",
+   "caption": "Page has no language set",
+   "rule": "ACT rule b5c3f8",
+   "criterion": {
+    "kind": "wcag",
+    "successCriterion": "3.1.1",
+    "title": "Language of Page",
+    "level": "A"
+   },
+   "criterionIds": [
+    "sc311-no-lang.fail"
+   ],
+   "stepIds": [
+    "scan.sc311-no-lang.fail"
+   ],
+   "steps": [
+    "Open sc311-no-lang.fail.html at 1280 by 800 pixels.",
+    "Run ACT rule b5c3f8 for SC 3.1.1.",
+    "Find the element html.",
+    "Observed: Page has no lang attribute."
+   ],
+   "image": {
+    "imageId": "img.sc311-no-lang.fail",
+    "box": null
+   },
+   "exchanges": [],
+   "log": [
+    "engine outcome: failed",
+    "box: none (page-level finding, no area to draw)",
+    "box measured by the engine at 1024x768: x 0, y 0, width 1024, height 113.88"
+   ],
+   "reason": null,
+   "action": null
+  },
+  {
+   "id": "sc312-bad-lang-part.fail.de46e4.1",
+   "status": "failed",
+   "severity": "P3",
+   "title": "Unknown primary language in lang=\"zz-invalid\"",
+   "caption": "Part of the page declares an unknown language",
+   "rule": "ACT rule de46e4",
+   "criterion": {
+    "kind": "wcag",
+    "successCriterion": "3.1.2",
+    "title": "Language of Parts",
+    "level": "AA"
+   },
+   "criterionIds": [
+    "sc312-bad-lang-part.fail"
+   ],
+   "stepIds": [
+    "scan.sc312-bad-lang-part.fail"
+   ],
+   "steps": [
+    "Open sc312-bad-lang-part.fail.html at 1280 by 800 pixels.",
+    "Run ACT rule de46e4 for SC 3.1.2.",
+    "Find the element html > body:nth-child(2) > main:nth-child(1) > p:nth-child(2).",
+    "Observed: Unknown primary language in lang=\"zz-invalid\"."
+   ],
+   "image": {
+    "imageId": "img.sc312-bad-lang-part.fail",
+    "box": {
+     "x": 8,
+     "y": 79.88,
+     "width": 1264,
+     "height": 18
+    }
+   },
+   "exchanges": [],
+   "log": [
+    "engine outcome: failed",
+    "box at 1280x800: x 8, y 79.88, width 1264, height 18",
+    "box measured by the engine at 1024x768: x 8, y 79.88, width 1008, height 18"
+   ],
+   "reason": null,
+   "action": null
+  },
+  {
+   "id": "sc321-on-focus-change.fail.review",
+   "status": "needs-review",
+   "severity": null,
+   "title": "No automated rule decided SC 3.2.1 On Focus",
+   "caption": "sc321-on-focus-change.fail.html: judge SC 3.2.1 On Focus by hand",
+   "rule": "none (no automated rule decided this)",
+   "criterion": {
+    "kind": "wcag",
+    "successCriterion": "3.2.1",
+    "title": "On Focus",
+    "level": "A"
+   },
+   "criterionIds": [
+    "sc321-on-focus-change.fail"
+   ],
+   "stepIds": [
+    "scan.sc321-on-focus-change.fail"
+   ],
+   "steps": [
+    "Open sc321-on-focus-change.fail.html at 1280 by 800 pixels.",
+    "Judge SC 3.2.1 On Focus by hand."
+   ],
+   "image": null,
+   "exchanges": [],
+   "log": [
+    "fixture class: beyond what automated rules can judge"
+   ],
+   "reason": "Automated rules cannot judge this criterion; it needs a person.",
+   "action": "Open the page and judge SC 3.2.1 On Focus."
+  },
+  {
+   "id": "sc331-colour-error.fail.review",
+   "status": "needs-review",
+   "severity": null,
+   "title": "No automated rule decided SC 3.3.1 Error Identification",
+   "caption": "sc331-colour-error.fail.html: judge SC 3.3.1 Error Identification by hand",
+   "rule": "none (no automated rule decided this)",
+   "criterion": {
+    "kind": "wcag",
+    "successCriterion": "3.3.1",
+    "title": "Error Identification",
+    "level": "A"
+   },
+   "criterionIds": [
+    "sc331-colour-error.fail"
+   ],
+   "stepIds": [
+    "scan.sc331-colour-error.fail"
+   ],
+   "steps": [
+    "Open sc331-colour-error.fail.html at 1280 by 800 pixels.",
+    "Judge SC 3.3.1 Error Identification by hand."
+   ],
+   "image": null,
+   "exchanges": [],
+   "log": [
+    "fixture class: beyond what automated rules can judge"
+   ],
+   "reason": "Automated rules cannot judge this criterion; it needs a person.",
+   "action": "Open the page and judge SC 3.3.1 Error Identification."
+  },
+  {
+   "id": "sc332-no-label.fail.e086e5.1",
+   "status": "failed",
+   "severity": "P1",
+   "title": "Form field has no accessible name",
+   "caption": "Form field has no accessible name",
+   "rule": "ACT rule e086e5",
+   "criterion": {
+    "kind": "wcag",
+    "successCriterion": "4.1.2",
+    "title": "Name, Role, Value",
+    "level": "A"
+   },
+   "criterionIds": [
+    "sc332-no-label.fail"
+   ],
+   "stepIds": [
+    "scan.sc332-no-label.fail"
+   ],
+   "steps": [
+    "Open sc332-no-label.fail.html at 1280 by 800 pixels.",
+    "Run ACT rule e086e5 for SC 4.1.2.",
+    "Find the element html > body:nth-child(2) > main:nth-child(1) > input:nth-child(2).",
+    "Observed: Form field has no accessible name."
+   ],
+   "image": {
+    "imageId": "img.sc332-no-label.fail",
+    "box": {
+     "x": 8,
+     "y": 79.88,
+     "width": 177,
+     "height": 21
+    }
+   },
+   "exchanges": [],
+   "log": [
+    "engine outcome: failed",
+    "box at 1280x800: x 8, y 79.88, width 177, height 21",
+    "box measured by the engine at 1024x768: x 8, y 79.88, width 177, height 21"
+   ],
+   "reason": null,
+   "action": null
+  },
+  {
+   "id": "sc333-no-suggestion.fail.review",
+   "status": "needs-review",
+   "severity": null,
+   "title": "No automated rule decided SC 3.3.3 Error Suggestion",
+   "caption": "sc333-no-suggestion.fail.html: judge SC 3.3.3 Error Suggestion by hand",
+   "rule": "none (no automated rule decided this)",
+   "criterion": {
+    "kind": "wcag",
+    "successCriterion": "3.3.3",
+    "title": "Error Suggestion",
+    "level": "AA"
+   },
+   "criterionIds": [
+    "sc333-no-suggestion.fail"
+   ],
+   "stepIds": [
+    "scan.sc333-no-suggestion.fail"
+   ],
+   "steps": [
+    "Open sc333-no-suggestion.fail.html at 1280 by 800 pixels.",
+    "Judge SC 3.3.3 Error Suggestion by hand."
+   ],
+   "image": null,
+   "exchanges": [],
+   "log": [
+    "fixture class: beyond what automated rules can judge"
+   ],
+   "reason": "Automated rules cannot judge this criterion; it needs a person.",
+   "action": "Open the page and judge SC 3.3.3 Error Suggestion."
+  },
+  {
+   "id": "sc334-no-confirm.fail.review",
+   "status": "needs-review",
+   "severity": null,
+   "title": "No automated rule decided SC 3.3.4 Error Prevention (Legal, Financial, Data)",
+   "caption": "sc334-no-confirm.fail.html: judge SC 3.3.4 Error Prevention (Legal, Financial, Data) by hand",
+   "rule": "none (no automated rule decided this)",
+   "criterion": {
+    "kind": "wcag",
+    "successCriterion": "3.3.4",
+    "title": "Error Prevention (Legal, Financial, Data)",
+    "level": "AA"
+   },
+   "criterionIds": [
+    "sc334-no-confirm.fail"
+   ],
+   "stepIds": [
+    "scan.sc334-no-confirm.fail"
+   ],
+   "steps": [
+    "Open sc334-no-confirm.fail.html at 1280 by 800 pixels.",
+    "Judge SC 3.3.4 Error Prevention (Legal, Financial, Data) by hand."
+   ],
+   "image": null,
+   "exchanges": [],
+   "log": [
+    "fixture class: beyond what automated rules can judge"
+   ],
+   "reason": "Automated rules cannot judge this criterion; it needs a person.",
+   "action": "Open the page and judge SC 3.3.4 Error Prevention (Legal, Financial, Data)."
+  },
+  {
+   "id": "sc338-paste-blocked.fail.review",
+   "status": "needs-review",
+   "severity": null,
+   "title": "No automated rule decided SC 3.3.8 Accessible Authentication (Minimum)",
+   "caption": "sc338-paste-blocked.fail.html: judge SC 3.3.8 Accessible Authentication (Minimum) by hand",
+   "rule": "none (no automated rule decided this)",
+   "criterion": {
+    "kind": "wcag",
+    "successCriterion": "3.3.8",
+    "title": "Accessible Authentication (Minimum)",
+    "level": "AA"
+   },
+   "criterionIds": [
+    "sc338-paste-blocked.fail"
+   ],
+   "stepIds": [
+    "scan.sc338-paste-blocked.fail"
+   ],
+   "steps": [
+    "Open sc338-paste-blocked.fail.html at 1280 by 800 pixels.",
+    "Judge SC 3.3.8 Accessible Authentication (Minimum) by hand."
+   ],
+   "image": null,
+   "exchanges": [],
+   "log": [
+    "fixture class: beyond what automated rules can judge"
+   ],
+   "reason": "Automated rules cannot judge this criterion; it needs a person.",
+   "action": "Open the page and judge SC 3.3.8 Accessible Authentication (Minimum)."
+  },
+  {
+   "id": "sc412-bad-role.fail.674b10.1",
+   "status": "failed",
+   "severity": "P2",
+   "title": "No valid WAI-ARIA role in \"buton\"",
+   "caption": "Element uses an invalid ARIA role",
+   "rule": "ACT rule 674b10",
+   "criterion": {
+    "kind": "wcag",
+    "successCriterion": "4.1.2",
+    "title": "Name, Role, Value",
+    "level": "A"
+   },
+   "criterionIds": [
+    "sc412-bad-role.fail"
+   ],
+   "stepIds": [
+    "scan.sc412-bad-role.fail"
+   ],
+   "steps": [
+    "Open sc412-bad-role.fail.html at 1280 by 800 pixels.",
+    "Run ACT rule 674b10 for SC 4.1.2, 1.3.1.",
+    "Find the element html > body:nth-child(2) > main:nth-child(1) > div:nth-child(2).",
+    "Observed: No valid WAI-ARIA role in \"buton\"."
+   ],
+   "image": {
+    "imageId": "img.sc412-bad-role.fail",
+    "box": {
+     "x": 8,
+     "y": 79.88,
+     "width": 1264,
+     "height": 18
+    }
+   },
+   "exchanges": [],
+   "log": [
+    "engine outcome: failed",
+    "box at 1280x800: x 8, y 79.88, width 1264, height 18",
+    "box measured by the engine at 1024x768: x 8, y 79.88, width 1008, height 18",
+    "also relates to SC 1.3.1"
+   ],
+   "reason": null,
+   "action": null
+  },
+  {
+   "id": "sc412-button-no-name.fail.97a4e1.1",
+   "status": "failed",
+   "severity": "P1",
+   "title": "Button has no accessible name",
+   "caption": "Button has no accessible name",
+   "rule": "ACT rule 97a4e1",
+   "criterion": {
+    "kind": "wcag",
+    "successCriterion": "4.1.2",
+    "title": "Name, Role, Value",
+    "level": "A"
+   },
+   "criterionIds": [
+    "sc412-button-no-name.fail"
+   ],
+   "stepIds": [
+    "scan.sc412-button-no-name.fail"
+   ],
+   "steps": [
+    "Open sc412-button-no-name.fail.html at 1280 by 800 pixels.",
+    "Run ACT rule 97a4e1 for SC 4.1.2.",
+    "Find the element html > body:nth-child(2) > main:nth-child(1) > button:nth-child(2).",
+    "Observed: Button has no accessible name."
+   ],
+   "image": {
+    "imageId": "img.sc412-button-no-name.fail",
+    "box": {
+     "x": 8,
+     "y": 90.88,
+     "width": 16,
+     "height": 6
+    }
+   },
+   "exchanges": [],
+   "log": [
+    "engine outcome: failed",
+    "box at 1280x800: x 8, y 90.88, width 16, height 6",
+    "box measured by the engine at 1024x768: x 8, y 90.88, width 16, height 6"
+   ],
+   "reason": null,
+   "action": null
+  },
+  {
+   "id": "sc413-silent-status.fail.review",
+   "status": "needs-review",
+   "severity": null,
+   "title": "No automated rule decided SC 4.1.3 Status Messages",
+   "caption": "sc413-silent-status.fail.html: judge SC 4.1.3 Status Messages by hand",
+   "rule": "none (no automated rule decided this)",
+   "criterion": {
+    "kind": "wcag",
+    "successCriterion": "4.1.3",
+    "title": "Status Messages",
+    "level": "AA"
+   },
+   "criterionIds": [
+    "sc413-silent-status.fail"
+   ],
+   "stepIds": [
+    "scan.sc413-silent-status.fail"
+   ],
+   "steps": [
+    "Open sc413-silent-status.fail.html at 1280 by 800 pixels.",
+    "Judge SC 4.1.3 Status Messages by hand."
+   ],
+   "image": null,
+   "exchanges": [],
+   "log": [
+    "fixture class: beyond what automated rules can judge"
+   ],
+   "reason": "Automated rules cannot judge this criterion; it needs a person.",
+   "action": "Open the page and judge SC 4.1.3 Status Messages."
+  }
+ ],
+ "images": [
+  {
+   "id": "img.sc111-missing-alt.fail",
+   "sha256": "c75575d8ee247765763708f256c37a04fba7bf1758ab3535eeb58e7415773485",
+   "width": 1280,
+   "height": 800,
+   "alt": "sc111-missing-alt.fail.html at 1280 by 800 pixels, drawn by the CDP driver"
+  },
+  {
+   "id": "img.sc131-bad-list.fail",
+   "sha256": "f9b6e77722e548b1955b0c9f7dc56cc76fd529b2624c4d2959c197627a49a238",
+   "width": 1280,
+   "height": 800,
+   "alt": "sc131-bad-list.fail.html at 1280 by 800 pixels, drawn by the CDP driver"
+  },
+  {
+   "id": "img.sc135-bad-autocomplete.fail",
+   "sha256": "e19fa24795e39037d5109e3b6ab7314127d8871d952df8b97bc892987ac0db91",
+   "width": 1280,
+   "height": 800,
+   "alt": "sc135-bad-autocomplete.fail.html at 1280 by 800 pixels, drawn by the CDP driver"
+  },
+  {
+   "id": "img.sc1410-no-reflow.fail",
+   "sha256": "2e70ddfe71eb2ddc9fe917d2a77532c080a971219b1a6642d35fe518f3274fbc",
+   "width": 1280,
+   "height": 800,
+   "alt": "sc1410-no-reflow.fail.html at 1280 by 800 pixels, drawn by the CDP driver"
+  },
+  {
+   "id": "img.sc1412-inline-letter-spacing.fail",
+   "sha256": "535e556150c800d93535f9bd7f9cb7086c5cfd05e61d87ac0a7fcb5587ec47ec",
+   "width": 1280,
+   "height": 800,
+   "alt": "sc1412-inline-letter-spacing.fail.html at 1280 by 800 pixels, drawn by the CDP driver"
+  },
+  {
+   "id": "img.sc143-gradient-bg.fail",
+   "sha256": "53142b126d1e47245ccf6bb62a281a11c6bddeccc946cc4a2ca5a403c8457b1c",
+   "width": 1280,
+   "height": 800,
+   "alt": "sc143-gradient-bg.fail.html at 1280 by 800 pixels, drawn by the CDP driver"
+  },
+  {
+   "id": "img.sc143-low-contrast.fail",
+   "sha256": "0f41fa82c427cdc8aaf1052d20b55d3d57ef729d6fef4258b2578ab7ca4795c4",
+   "width": 1280,
+   "height": 800,
+   "alt": "sc143-low-contrast.fail.html at 1280 by 800 pixels, drawn by the CDP driver"
+  },
+  {
+   "id": "img.sc144-no-zoom.fail",
+   "sha256": "b2aa49de7d40299994f8226fb69ea5c45b1bd92b0edfb7c02d33282db4e1d3db",
+   "width": 1280,
+   "height": 800,
+   "alt": "sc144-no-zoom.fail.html at 1280 by 800 pixels, drawn by the CDP driver"
+  },
+  {
+   "id": "img.sc211-click-div.fail",
+   "sha256": "8faaa926d0a37da0a348db42d8452f3317779dc907aad2f98f160df9d44b6cbf",
+   "width": 1280,
+   "height": 800,
+   "alt": "sc211-click-div.fail.html at 1280 by 800 pixels, drawn by the CDP driver"
+  },
+  {
+   "id": "img.sc211-scroll-no-focus.fail",
+   "sha256": "72c7027f39a1288738d277ffa8d3ee2a0ba358598840905781554e2b60a6f1a8",
+   "width": 1280,
+   "height": 800,
+   "alt": "sc211-scroll-no-focus.fail.html at 1280 by 800 pixels, drawn by the CDP driver"
+  },
+  {
+   "id": "img.sc212-keyboard-trap.fail",
+   "sha256": "c3157ea98b8cbcb620ada3868e16842be0bdf8f08043baac94a4c08eb07510a3",
+   "width": 1280,
+   "height": 800,
+   "alt": "sc212-keyboard-trap.fail.html at 1280 by 800 pixels, drawn by the CDP driver"
+  },
+  {
+   "id": "img.sc221-meta-refresh.fail",
+   "sha256": "b2aa49de7d40299994f8226fb69ea5c45b1bd92b0edfb7c02d33282db4e1d3db",
+   "width": 1280,
+   "height": 800,
+   "alt": "sc221-meta-refresh.fail.html at 1280 by 800 pixels, drawn by the CDP driver"
+  },
+  {
+   "id": "img.sc2411-focus-obscured.fail",
+   "sha256": "4281c17e50c076a30a8df9fc632ca5a5dfed083924de479a60e35b2765c53d2d",
+   "width": 1280,
+   "height": 800,
+   "alt": "sc2411-focus-obscured.fail.html at 1280 by 800 pixels, drawn by the CDP driver"
+  },
+  {
+   "id": "img.sc242-empty-title.fail",
+   "sha256": "b2aa49de7d40299994f8226fb69ea5c45b1bd92b0edfb7c02d33282db4e1d3db",
+   "width": 1280,
+   "height": 800,
+   "alt": "sc242-empty-title.fail.html at 1280 by 800 pixels, drawn by the CDP driver"
+  },
+  {
+   "id": "img.sc243-focus-order.fail",
+   "sha256": "a9dc703fcc2c637ff1dc98fcc72e36986c7e5959c1e2eb61918bfe2fb10c26d9",
+   "width": 1280,
+   "height": 800,
+   "alt": "sc243-focus-order.fail.html at 1280 by 800 pixels, drawn by the CDP driver"
+  },
+  {
+   "id": "img.sc244-empty-link.fail",
+   "sha256": "d83babb7a26a6d3ea47a711d429f03f391830e30bf6a8fa8764756c8c9b02666",
+   "width": 1280,
+   "height": 800,
+   "alt": "sc244-empty-link.fail.html at 1280 by 800 pixels, drawn by the CDP driver"
+  },
+  {
+   "id": "img.sc247-focus-hidden.fail",
+   "sha256": "5014bbbb8aebf338e7ad51b9fd1df5a6e06f522a0003e1f6d944bd3ca784cba1",
+   "width": 1280,
+   "height": 800,
+   "alt": "sc247-focus-hidden.fail.html at 1280 by 800 pixels, drawn by the CDP driver"
+  },
+  {
+   "id": "img.sc253-label-mismatch.fail",
+   "sha256": "de42858c091612e4267b8a3ff123ac486d9736bff51c78cb43f83daa66dc874f",
+   "width": 1280,
+   "height": 800,
+   "alt": "sc253-label-mismatch.fail.html at 1280 by 800 pixels, drawn by the CDP driver"
+  },
+  {
+   "id": "img.sc258-small-targets.fail",
+   "sha256": "7c3c01118e801febee0ae985f7564bb570869af04c038f9269ffa8c71bd49950",
+   "width": 1280,
+   "height": 800,
+   "alt": "sc258-small-targets.fail.html at 1280 by 800 pixels, drawn by the CDP driver"
+  },
+  {
+   "id": "img.sc311-no-lang.fail",
+   "sha256": "b2aa49de7d40299994f8226fb69ea5c45b1bd92b0edfb7c02d33282db4e1d3db",
+   "width": 1280,
+   "height": 800,
+   "alt": "sc311-no-lang.fail.html at 1280 by 800 pixels, drawn by the CDP driver"
+  },
+  {
+   "id": "img.sc312-bad-lang-part.fail",
+   "sha256": "be1078637aab14d80a541972ca56a98b04d6642513647b6bd80d5efc6047f3fc",
+   "width": 1280,
+   "height": 800,
+   "alt": "sc312-bad-lang-part.fail.html at 1280 by 800 pixels, drawn by the CDP driver"
+  },
+  {
+   "id": "img.sc332-no-label.fail",
+   "sha256": "25d46db5bd0a1613bc1a6e3ef6d00479caacdfc5d43979419d03cfa84f59fb67",
+   "width": 1280,
+   "height": 800,
+   "alt": "sc332-no-label.fail.html at 1280 by 800 pixels, drawn by the CDP driver"
+  },
+  {
+   "id": "img.sc412-bad-role.fail",
+   "sha256": "0c12880bada9df64c99dc80c1a33b8f81b8f34edab0c4bf5384f308689fdf528",
+   "width": 1280,
+   "height": 800,
+   "alt": "sc412-bad-role.fail.html at 1280 by 800 pixels, drawn by the CDP driver"
+  },
+  {
+   "id": "img.sc412-button-no-name.fail",
+   "sha256": "ce558faa4d736823e0d9c1716e97eb65114f81eaf15c4ba0efb50c33d26c0859",
+   "width": 1280,
+   "height": 800,
+   "alt": "sc412-button-no-name.fail.html at 1280 by 800 pixels, drawn by the CDP driver"
+  }
+ ]
+}

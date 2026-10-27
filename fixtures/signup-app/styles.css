@@ -1,0 +1,6 @@
+body { font-family: Arial, sans-serif; margin: 24px; background: #ffffff; color: #111111; }
+@media (prefers-color-scheme: dark) { body { background: #1e1e1e; color: #f0f0f0; } a { color: #8ab4f8; } }
+form { display: grid; gap: 8px; max-width: 320px; }
+input { font: inherit; padding: 4px; }
+.spinner { width: 24px; height: 24px; border: 4px solid #888; border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }

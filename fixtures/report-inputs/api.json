@@ -1,0 +1,1850 @@
+{
+ "schema": "revisum.report-input/v1",
+ "reportId": "api-identity-cases",
+ "kind": "api",
+ "title": "Notes API, sign-in and webhooks: API and identity run",
+ "subject": "60 plan cases on mock services; 14 cases run against deliberately broken services",
+ "note": "A failing mutant case is a defect found in a seeded broken service. A negative case that ends in a designed rejection counts as passed. Secrets and tokens are redacted at source.",
+ "run": {
+  "runId": "api-6e6f2d4261f9",
+  "recordedAt": "2026-10-26",
+  "target": "local mock services, virtual clock",
+  "tool": "Typed API, identity and webhook steps",
+  "manifestHash": null,
+  "inputs": [
+   {
+    "name": "api-evidence.json",
+    "sha256": "bddb18995e068163c275489a74841325c4a3dc323b979527d91a64cc31a4e497"
+   }
+  ]
+ },
+ "acceptance": [
+  {
+   "id": "API-01",
+   "text": "Sign-in with an authorization code and PKCE gives verified tokens, and the notes API serves the signed-in tenant.",
+   "status": "passed",
+   "stepIds": [
+    "case.pos-login-list"
+   ],
+   "evidence": [
+    {
+     "kind": "step",
+     "id": "case.pos-login-list",
+     "label": "pos-login-list"
+    }
+   ]
+  },
+  {
+   "id": "API-02",
+   "text": "Sign-in rejects invalid ID tokens: expired, bad signature, wrong audience, forbidden algorithm, unpinned key, wrong nonce or state.",
+   "status": "passed",
+   "stepIds": [
+    "case.neg-idp-expired-id-token",
+    "case.neg-idp-bad-id-token-signature",
+    "case.neg-idp-wrong-id-token-audience",
+    "case.neg-idp-alg-none-id-token",
+    "case.neg-idp-unpinned-key",
+    "case.neg-idp-nonce-mismatch",
+    "case.neg-idp-state-mismatch",
+    "case.neg-login-denied"
+   ],
+   "evidence": [
+    {
+     "kind": "step",
+     "id": "case.neg-idp-expired-id-token",
+     "label": "neg-idp-expired-id-token"
+    },
+    {
+     "kind": "step",
+     "id": "case.neg-idp-bad-id-token-signature",
+     "label": "neg-idp-bad-id-token-signature"
+    },
+    {
+     "kind": "step",
+     "id": "case.neg-idp-wrong-id-token-audience",
+     "label": "neg-idp-wrong-id-token-audience"
+    },
+    {
+     "kind": "step",
+     "id": "case.neg-idp-alg-none-id-token",
+     "label": "neg-idp-alg-none-id-token"
+    },
+    {
+     "kind": "step",
+     "id": "case.neg-idp-unpinned-key",
+     "label": "neg-idp-unpinned-key"
+    },
+    {
+     "kind": "step",
+     "id": "case.neg-idp-nonce-mismatch",
+     "label": "neg-idp-nonce-mismatch"
+    },
+    {
+     "kind": "step",
+     "id": "case.neg-idp-state-mismatch",
+     "label": "neg-idp-state-mismatch"
+    },
+    {
+     "kind": "step",
+     "id": "case.neg-login-denied",
+     "label": "neg-login-denied"
+    }
+   ]
+  },
+  {
+   "id": "API-03",
+   "text": "The notes API rejects expired, badly signed, wrong-audience and alg-none bearer tokens.",
+   "status": "failed",
+   "stepIds": [
+    "case.neg-api-token-expired",
+    "case.neg-api-token-badSignature",
+    "case.neg-api-token-wrongAudience",
+    "case.neg-api-token-algNone",
+    "case.mutant-api-accepts-expired"
+   ],
+   "evidence": [
+    {
+     "kind": "step",
+     "id": "case.neg-api-token-expired",
+     "label": "neg-api-token-expired"
+    },
+    {
+     "kind": "step",
+     "id": "case.neg-api-token-badSignature",
+     "label": "neg-api-token-badSignature"
+    },
+    {
+     "kind": "step",
+     "id": "case.neg-api-token-wrongAudience",
+     "label": "neg-api-token-wrongAudience"
+    },
+    {
+     "kind": "step",
+     "id": "case.neg-api-token-algNone",
+     "label": "neg-api-token-algNone"
+    },
+    {
+     "kind": "finding",
+     "id": "F-mutant-api-accepts-expired",
+     "label": "mutant-api-accepts-expired"
+    }
+   ]
+  },
+  {
+   "id": "API-04",
+   "text": "A tenant cannot list, read, create, update or delete another tenant's notes, and a read-only token cannot write.",
+   "status": "failed",
+   "stepIds": [
+    "case.iso-a-to-globex-list",
+    "case.iso-a-to-globex-read",
+    "case.iso-a-to-globex-read-by-id",
+    "case.iso-a-to-globex-create",
+    "case.iso-a-to-globex-update",
+    "case.iso-a-to-globex-delete",
+    "case.iso-b-to-acme-list",
+    "case.iso-b-to-acme-read",
+    "case.iso-b-to-acme-read-by-id",
+    "case.iso-b-to-acme-create",
+    "case.iso-b-to-acme-update",
+    "case.iso-b-to-acme-delete",
+    "case.iso-read-only-scope",
+    "case.mutant-iso-a-to-globex-list",
+    "case.mutant-iso-a-to-globex-read",
+    "case.mutant-iso-a-to-globex-read-by-id",
+    "case.mutant-iso-a-to-globex-create",
+    "case.mutant-iso-a-to-globex-update",
+    "case.mutant-iso-a-to-globex-delete",
+    "case.mutant-iso-b-to-acme-list",
+    "case.mutant-iso-b-to-acme-read",
+    "case.mutant-iso-b-to-acme-read-by-id",
+    "case.mutant-iso-b-to-acme-create",
+    "case.mutant-iso-b-to-acme-update",
+    "case.mutant-iso-b-to-acme-delete"
+   ],
+   "evidence": [
+    {
+     "kind": "step",
+     "id": "case.iso-a-to-globex-list",
+     "label": "iso-a-to-globex-list"
+    },
+    {
+     "kind": "step",
+     "id": "case.iso-a-to-globex-read",
+     "label": "iso-a-to-globex-read"
+    },
+    {
+     "kind": "step",
+     "id": "case.iso-a-to-globex-read-by-id",
+     "label": "iso-a-to-globex-read-by-id"
+    },
+    {
+     "kind": "step",
+     "id": "case.iso-a-to-globex-create",
+     "label": "iso-a-to-globex-create"
+    },
+    {
+     "kind": "step",
+     "id": "case.iso-a-to-globex-update",
+     "label": "iso-a-to-globex-update"
+    },
+    {
+     "kind": "step",
+     "id": "case.iso-a-to-globex-delete",
+     "label": "iso-a-to-globex-delete"
+    },
+    {
+     "kind": "step",
+     "id": "case.iso-b-to-acme-list",
+     "label": "iso-b-to-acme-list"
+    },
+    {
+     "kind": "step",
+     "id": "case.iso-b-to-acme-read",
+     "label": "iso-b-to-acme-read"
+    },
+    {
+     "kind": "step",
+     "id": "case.iso-b-to-acme-read-by-id",
+     "label": "iso-b-to-acme-read-by-id"
+    },
+    {
+     "kind": "step",
+     "id": "case.iso-b-to-acme-create",
+     "label": "iso-b-to-acme-create"
+    },
+    {
+     "kind": "step",
+     "id": "case.iso-b-to-acme-update",
+     "label": "iso-b-to-acme-update"
+    },
+    {
+     "kind": "step",
+     "id": "case.iso-b-to-acme-delete",
+     "label": "iso-b-to-acme-delete"
+    },
+    {
+     "kind": "step",
+     "id": "case.iso-read-only-scope",
+     "label": "iso-read-only-scope"
+    },
+    {
+     "kind": "finding",
+     "id": "F-mutant-iso-a-to-globex-list",
+     "label": "mutant-iso-a-to-globex-list"
+    },
+    {
+     "kind": "finding",
+     "id": "F-mutant-iso-a-to-globex-read",
+     "label": "mutant-iso-a-to-globex-read"
+    },
+    {
+     "kind": "finding",
+     "id": "F-mutant-iso-a-to-globex-read-by-id",
+     "label": "mutant-iso-a-to-globex-read-by-id"
+    },
+    {
+     "kind": "finding",
+     "id": "F-mutant-iso-a-to-globex-create",
+     "label": "mutant-iso-a-to-globex-create"
+    },
+    {
+     "kind": "finding",
+     "id": "F-mutant-iso-a-to-globex-update",
+     "label": "mutant-iso-a-to-globex-update"
+    },
+    {
+     "kind": "finding",
+     "id": "F-mutant-iso-a-to-globex-delete",
+     "label": "mutant-iso-a-to-globex-delete"
+    },
+    {
+     "kind": "finding",
+     "id": "F-mutant-iso-b-to-acme-list",
+     "label": "mutant-iso-b-to-acme-list"
+    },
+    {
+     "kind": "finding",
+     "id": "F-mutant-iso-b-to-acme-read",
+     "label": "mutant-iso-b-to-acme-read"
+    },
+    {
+     "kind": "finding",
+     "id": "F-mutant-iso-b-to-acme-read-by-id",
+     "label": "mutant-iso-b-to-acme-read-by-id"
+    },
+    {
+     "kind": "finding",
+     "id": "F-mutant-iso-b-to-acme-create",
+     "label": "mutant-iso-b-to-acme-create"
+    },
+    {
+     "kind": "finding",
+     "id": "F-mutant-iso-b-to-acme-update",
+     "label": "mutant-iso-b-to-acme-update"
+    },
+    {
+     "kind": "finding",
+     "id": "F-mutant-iso-b-to-acme-delete",
+     "label": "mutant-iso-b-to-acme-delete"
+    }
+   ]
+  },
+  {
+   "id": "API-05",
+   "text": "Webhooks are verified: valid signatures accepted, forged, stale and duplicate deliveries handled.",
+   "status": "passed",
+   "stepIds": [
+    "case.pos-webhook",
+    "case.neg-webhook-duplicate",
+    "case.neg-webhook-bad-signature",
+    "case.neg-webhook-stale"
+   ],
+   "evidence": [
+    {
+     "kind": "step",
+     "id": "case.pos-webhook",
+     "label": "pos-webhook"
+    },
+    {
+     "kind": "step",
+     "id": "case.neg-webhook-duplicate",
+     "label": "neg-webhook-duplicate"
+    },
+    {
+     "kind": "step",
+     "id": "case.neg-webhook-bad-signature",
+     "label": "neg-webhook-bad-signature"
+    },
+    {
+     "kind": "step",
+     "id": "case.neg-webhook-stale",
+     "label": "neg-webhook-stale"
+    }
+   ]
+  },
+  {
+   "id": "API-06",
+   "text": "LTI 1.3 launches are verified: tampered, replayed, unknown-deployment and mismatched-claim launches are rejected.",
+   "status": "failed",
+   "stepIds": [
+    "case.pos-lti-launch",
+    "case.neg-lti-bad-signature",
+    "case.neg-lti-replay",
+    "case.neg-lti-unknown-deployment",
+    "case.mutant-lti-accepts-replay",
+    "case.neg-lti-claims"
+   ],
+   "evidence": [
+    {
+     "kind": "step",
+     "id": "case.pos-lti-launch",
+     "label": "pos-lti-launch"
+    },
+    {
+     "kind": "step",
+     "id": "case.neg-lti-bad-signature",
+     "label": "neg-lti-bad-signature"
+    },
+    {
+     "kind": "step",
+     "id": "case.neg-lti-replay",
+     "label": "neg-lti-replay"
+    },
+    {
+     "kind": "step",
+     "id": "case.neg-lti-unknown-deployment",
+     "label": "neg-lti-unknown-deployment"
+    },
+    {
+     "kind": "finding",
+     "id": "F-mutant-lti-accepts-replay",
+     "label": "mutant-lti-accepts-replay"
+    },
+    {
+     "kind": "step",
+     "id": "case.neg-lti-claims",
+     "label": "neg-lti-claims"
+    }
+   ]
+  },
+  {
+   "id": "API-07",
+   "text": "The client copes with rate limits and timeouts: it waits as told, gives up within limits and tells the user.",
+   "status": "needs-review",
+   "stepIds": [
+    "case.pos-retry-429",
+    "case.neg-timeout",
+    "case.neg-429-exhausted",
+    "case.neg-429-too-long",
+    "case.neg-expiry-during-retry"
+   ],
+   "evidence": [
+    {
+     "kind": "step",
+     "id": "case.pos-retry-429",
+     "label": "pos-retry-429"
+    },
+    {
+     "kind": "finding",
+     "id": "F-neg-timeout",
+     "label": "neg-timeout"
+    },
+    {
+     "kind": "finding",
+     "id": "F-neg-429-exhausted",
+     "label": "neg-429-exhausted"
+    },
+    {
+     "kind": "finding",
+     "id": "F-neg-429-too-long",
+     "label": "neg-429-too-long"
+    },
+    {
+     "kind": "step",
+     "id": "case.neg-expiry-during-retry",
+     "label": "neg-expiry-during-retry"
+    }
+   ]
+  },
+  {
+   "id": "API-08",
+   "text": "Writes are idempotent and batch calls report each item's outcome.",
+   "status": "needs-review",
+   "stepIds": [
+    "case.pos-idempotency",
+    "case.pos-batch-partial",
+    "case.neg-partial-failure"
+   ],
+   "evidence": [
+    {
+     "kind": "step",
+     "id": "case.pos-idempotency",
+     "label": "pos-idempotency"
+    },
+    {
+     "kind": "step",
+     "id": "case.pos-batch-partial",
+     "label": "pos-batch-partial"
+    },
+    {
+     "kind": "finding",
+     "id": "F-neg-partial-failure",
+     "label": "neg-partial-failure"
+    }
+   ]
+  },
+  {
+   "id": "API-09",
+   "text": "Addresses taken from server responses stay on the allow-list; private and off-list redirects are refused.",
+   "status": "passed",
+   "stepIds": [
+    "case.neg-discovery-off-list",
+    "case.neg-lti-private-redirect"
+   ],
+   "evidence": [
+    {
+     "kind": "step",
+     "id": "case.neg-discovery-off-list",
+     "label": "neg-discovery-off-list"
+    },
+    {
+     "kind": "step",
+     "id": "case.neg-lti-private-redirect",
+     "label": "neg-lti-private-redirect"
+    }
+   ]
+  },
+  {
+   "id": "API-10",
+   "text": "A failing assertion is reported with the expected and observed values (seeded failing check).",
+   "status": "failed",
+   "stepIds": [
+    "case.oracle-assert-fails"
+   ],
+   "evidence": [
+    {
+     "kind": "finding",
+     "id": "F-oracle-assert-fails",
+     "label": "oracle-assert-fails"
+    }
+   ]
+  }
+ ],
+ "steps": [
+  {
+   "id": "case.pos-login-list",
+   "text": "Run case pos-login-list (positive): oidcLogin, http, expectHttp.",
+   "result": "passed: 3 of 3 steps passed"
+  },
+  {
+   "id": "case.oracle-assert-fails",
+   "text": "Run case oracle-assert-fails (oracle): oidcLogin, http, expectHttp.",
+   "result": "failed: assertion-failed (status 200, expected 404)"
+  },
+  {
+   "id": "case.pos-webhook",
+   "text": "Run case pos-webhook (positive): oidcLogin, http, expectHttp, webhookReceive.",
+   "result": "passed: 4 of 4 steps passed"
+  },
+  {
+   "id": "case.pos-idempotency",
+   "text": "Run case pos-idempotency (positive): oidcLogin, http, expectHttp, http, expectHttp, http, expectHttp.",
+   "result": "passed: 7 of 7 steps passed"
+  },
+  {
+   "id": "case.pos-retry-429",
+   "text": "Run case pos-retry-429 (positive): oidcLogin, http, expectHttp.",
+   "result": "passed: 3 of 3 steps passed"
+  },
+  {
+   "id": "case.pos-lti-launch",
+   "text": "Run case pos-lti-launch (positive): ltiLaunch.",
+   "result": "passed: 1 of 1 steps passed"
+  },
+  {
+   "id": "case.pos-batch-partial",
+   "text": "Run case pos-batch-partial (positive): oidcLogin, http, expectHttp, http, expectHttp.",
+   "result": "passed: 5 of 5 steps passed"
+  },
+  {
+   "id": "case.neg-idp-expired-id-token",
+   "text": "Run case neg-idp-expired-id-token (negative): oidcLogin, http.",
+   "result": "rejected as designed: oidcLogin token-expired"
+  },
+  {
+   "id": "case.neg-idp-bad-id-token-signature",
+   "text": "Run case neg-idp-bad-id-token-signature (negative): oidcLogin, http.",
+   "result": "rejected as designed: oidcLogin signature-invalid"
+  },
+  {
+   "id": "case.neg-idp-wrong-id-token-audience",
+   "text": "Run case neg-idp-wrong-id-token-audience (negative): oidcLogin, http.",
+   "result": "rejected as designed: oidcLogin audience-mismatch"
+  },
+  {
+   "id": "case.neg-idp-alg-none-id-token",
+   "text": "Run case neg-idp-alg-none-id-token (negative): oidcLogin, http.",
+   "result": "rejected as designed: oidcLogin alg-not-allowed"
+  },
+  {
+   "id": "case.neg-idp-unpinned-key",
+   "text": "Run case neg-idp-unpinned-key (negative): oidcLogin, http.",
+   "result": "rejected as designed: oidcLogin key-not-pinned"
+  },
+  {
+   "id": "case.neg-idp-nonce-mismatch",
+   "text": "Run case neg-idp-nonce-mismatch (negative): oidcLogin, http.",
+   "result": "rejected as designed: oidcLogin nonce-mismatch"
+  },
+  {
+   "id": "case.neg-idp-state-mismatch",
+   "text": "Run case neg-idp-state-mismatch (negative): oidcLogin, http.",
+   "result": "rejected as designed: oidcLogin state-mismatch"
+  },
+  {
+   "id": "case.neg-login-denied",
+   "text": "Run case neg-login-denied (negative): oidcLogin.",
+   "result": "passed: 1 of 1 steps passed"
+  },
+  {
+   "id": "case.neg-api-token-expired",
+   "text": "Run case neg-api-token-expired (negative): oidcLogin, http, expectHttp.",
+   "result": "passed: 3 of 3 steps passed"
+  },
+  {
+   "id": "case.neg-api-token-badSignature",
+   "text": "Run case neg-api-token-badSignature (negative): oidcLogin, http, expectHttp.",
+   "result": "passed: 3 of 3 steps passed"
+  },
+  {
+   "id": "case.neg-api-token-wrongAudience",
+   "text": "Run case neg-api-token-wrongAudience (negative): oidcLogin, http, expectHttp.",
+   "result": "passed: 3 of 3 steps passed"
+  },
+  {
+   "id": "case.neg-api-token-algNone",
+   "text": "Run case neg-api-token-algNone (negative): oidcLogin, http, expectHttp.",
+   "result": "passed: 3 of 3 steps passed"
+  },
+  {
+   "id": "case.mutant-api-accepts-expired",
+   "text": "Run case mutant-api-accepts-expired (mutant): oidcLogin, http, expectHttp.",
+   "result": "failed: assertion-failed (status 200, expected 401)"
+  },
+  {
+   "id": "case.neg-timeout",
+   "text": "Run case neg-timeout (negative): oidcLogin, http.",
+   "result": "failed: timeout"
+  },
+  {
+   "id": "case.neg-429-exhausted",
+   "text": "Run case neg-429-exhausted (negative): oidcLogin, http.",
+   "result": "failed: retries-exhausted (status 429 after 3 attempts)"
+  },
+  {
+   "id": "case.neg-429-too-long",
+   "text": "Run case neg-429-too-long (negative): oidcLogin, http.",
+   "result": "failed: retry-after-too-long (retry-after 3600 s)"
+  },
+  {
+   "id": "case.neg-expiry-during-retry",
+   "text": "Run case neg-expiry-during-retry (negative): oidcLogin, http, expectHttp.",
+   "result": "passed: 3 of 3 steps passed"
+  },
+  {
+   "id": "case.neg-partial-failure",
+   "text": "Run case neg-partial-failure (negative): oidcLogin, http, expectHttp, http, http.",
+   "result": "failed: timeout"
+  },
+  {
+   "id": "case.neg-webhook-duplicate",
+   "text": "Run case neg-webhook-duplicate (negative): oidcLogin, http, expectHttp, webhookReceive.",
+   "result": "passed: 4 of 4 steps passed"
+  },
+  {
+   "id": "case.neg-webhook-bad-signature",
+   "text": "Run case neg-webhook-bad-signature (negative): oidcLogin, http, expectHttp, webhookReceive.",
+   "result": "rejected as designed: webhookReceive signature-invalid"
+  },
+  {
+   "id": "case.neg-webhook-stale",
+   "text": "Run case neg-webhook-stale (negative): oidcLogin, http, expectHttp, webhookReceive.",
+   "result": "rejected as designed: webhookReceive timestamp-out-of-tolerance"
+  },
+  {
+   "id": "case.neg-lti-bad-signature",
+   "text": "Run case neg-lti-bad-signature (negative): ltiLaunch.",
+   "result": "passed: 1 of 1 steps passed"
+  },
+  {
+   "id": "case.neg-lti-replay",
+   "text": "Run case neg-lti-replay (negative): ltiLaunch.",
+   "result": "passed: 1 of 1 steps passed"
+  },
+  {
+   "id": "case.neg-lti-unknown-deployment",
+   "text": "Run case neg-lti-unknown-deployment (negative): ltiLaunch.",
+   "result": "passed: 1 of 1 steps passed"
+  },
+  {
+   "id": "case.mutant-lti-accepts-replay",
+   "text": "Run case mutant-lti-accepts-replay (mutant): ltiLaunch.",
+   "result": "failed: lti-replay-accepted"
+  },
+  {
+   "id": "case.neg-lti-claims",
+   "text": "Run case neg-lti-claims (negative): ltiLaunch.",
+   "result": "rejected as designed: ltiLaunch lti-claim-mismatch"
+  },
+  {
+   "id": "case.neg-discovery-off-list",
+   "text": "Run case neg-discovery-off-list (negative): oidcLogin.",
+   "result": "rejected as designed: oidcLogin origin-not-allowed"
+  },
+  {
+   "id": "case.neg-lti-private-redirect",
+   "text": "Run case neg-lti-private-redirect (negative): ltiLaunch.",
+   "result": "rejected as designed: ltiLaunch private-address"
+  },
+  {
+   "id": "case.iso-a-to-globex-list",
+   "text": "Run case iso-a-to-globex-list (isolation): oidcLogin, http, expectHttp.",
+   "result": "passed: 3 of 3 steps passed"
+  },
+  {
+   "id": "case.iso-a-to-globex-read",
+   "text": "Run case iso-a-to-globex-read (isolation): oidcLogin, http, expectHttp.",
+   "result": "passed: 3 of 3 steps passed"
+  },
+  {
+   "id": "case.iso-a-to-globex-read-by-id",
+   "text": "Run case iso-a-to-globex-read-by-id (isolation): oidcLogin, http, expectHttp.",
+   "result": "passed: 3 of 3 steps passed"
+  },
+  {
+   "id": "case.iso-a-to-globex-create",
+   "text": "Run case iso-a-to-globex-create (isolation): oidcLogin, http, expectHttp, oidcLogin, http, expectHttp.",
+   "result": "passed: 6 of 6 steps passed"
+  },
+  {
+   "id": "case.iso-a-to-globex-update",
+   "text": "Run case iso-a-to-globex-update (isolation): oidcLogin, http, expectHttp, oidcLogin, http, expectHttp.",
+   "result": "passed: 6 of 6 steps passed"
+  },
+  {
+   "id": "case.iso-a-to-globex-delete",
+   "text": "Run case iso-a-to-globex-delete (isolation): oidcLogin, http, expectHttp, oidcLogin, http, expectHttp.",
+   "result": "passed: 6 of 6 steps passed"
+  },
+  {
+   "id": "case.iso-b-to-acme-list",
+   "text": "Run case iso-b-to-acme-list (isolation): oidcLogin, http, expectHttp.",
+   "result": "passed: 3 of 3 steps passed"
+  },
+  {
+   "id": "case.iso-b-to-acme-read",
+   "text": "Run case iso-b-to-acme-read (isolation): oidcLogin, http, expectHttp.",
+   "result": "passed: 3 of 3 steps passed"
+  },
+  {
+   "id": "case.iso-b-to-acme-read-by-id",
+   "text": "Run case iso-b-to-acme-read-by-id (isolation): oidcLogin, http, expectHttp.",
+   "result": "passed: 3 of 3 steps passed"
+  },
+  {
+   "id": "case.iso-b-to-acme-create",
+   "text": "Run case iso-b-to-acme-create (isolation): oidcLogin, http, expectHttp, oidcLogin, http, expectHttp.",
+   "result": "passed: 6 of 6 steps passed"
+  },
+  {
+   "id": "case.iso-b-to-acme-update",
+   "text": "Run case iso-b-to-acme-update (isolation): oidcLogin, http, expectHttp, oidcLogin, http, expectHttp.",
+   "result": "passed: 6 of 6 steps passed"
+  },
+  {
+   "id": "case.iso-b-to-acme-delete",
+   "text": "Run case iso-b-to-acme-delete (isolation): oidcLogin, http, expectHttp, oidcLogin, http, expectHttp.",
+   "result": "passed: 6 of 6 steps passed"
+  },
+  {
+   "id": "case.iso-read-only-scope",
+   "text": "Run case iso-read-only-scope (isolation): oidcLogin, http, expectHttp.",
+   "result": "passed: 3 of 3 steps passed"
+  },
+  {
+   "id": "case.mutant-iso-a-to-globex-list",
+   "text": "Run case mutant-iso-a-to-globex-list (mutant): oidcLogin, http, expectHttp.",
+   "result": "failed: assertion-failed (status 200, expected 403)"
+  },
+  {
+   "id": "case.mutant-iso-a-to-globex-read",
+   "text": "Run case mutant-iso-a-to-globex-read (mutant): oidcLogin, http, expectHttp.",
+   "result": "failed: assertion-failed (status 200, expected 403)"
+  },
+  {
+   "id": "case.mutant-iso-a-to-globex-read-by-id",
+   "text": "Run case mutant-iso-a-to-globex-read-by-id (mutant): oidcLogin, http, expectHttp.",
+   "result": "failed: assertion-failed (status 200, expected 404)"
+  },
+  {
+   "id": "case.mutant-iso-a-to-globex-create",
+   "text": "Run case mutant-iso-a-to-globex-create (mutant): oidcLogin, http, expectHttp, oidcLogin, http, expectHttp.",
+   "result": "failed: assertion-failed (status 201, expected 403)"
+  },
+  {
+   "id": "case.mutant-iso-a-to-globex-update",
+   "text": "Run case mutant-iso-a-to-globex-update (mutant): oidcLogin, http, expectHttp, oidcLogin, http, expectHttp.",
+   "result": "failed: assertion-failed (status 200, expected 403)"
+  },
+  {
+   "id": "case.mutant-iso-a-to-globex-delete",
+   "text": "Run case mutant-iso-a-to-globex-delete (mutant): oidcLogin, http, expectHttp, oidcLogin, http, expectHttp.",
+   "result": "failed: assertion-failed (status 204, expected 403)"
+  },
+  {
+   "id": "case.mutant-iso-b-to-acme-list",
+   "text": "Run case mutant-iso-b-to-acme-list (mutant): oidcLogin, http, expectHttp.",
+   "result": "failed: assertion-failed (status 200, expected 403)"
+  },
+  {
+   "id": "case.mutant-iso-b-to-acme-read",
+   "text": "Run case mutant-iso-b-to-acme-read (mutant): oidcLogin, http, expectHttp.",
+   "result": "failed: assertion-failed (status 200, expected 403)"
+  },
+  {
+   "id": "case.mutant-iso-b-to-acme-read-by-id",
+   "text": "Run case mutant-iso-b-to-acme-read-by-id (mutant): oidcLogin, http, expectHttp.",
+   "result": "failed: assertion-failed (status 200, expected 404)"
+  },
+  {
+   "id": "case.mutant-iso-b-to-acme-create",
+   "text": "Run case mutant-iso-b-to-acme-create (mutant): oidcLogin, http, expectHttp, oidcLogin, http, expectHttp.",
+   "result": "failed: assertion-failed (status 201, expected 403)"
+  },
+  {
+   "id": "case.mutant-iso-b-to-acme-update",
+   "text": "Run case mutant-iso-b-to-acme-update (mutant): oidcLogin, http, expectHttp, oidcLogin, http, expectHttp.",
+   "result": "failed: assertion-failed (status 200, expected 403)"
+  },
+  {
+   "id": "case.mutant-iso-b-to-acme-delete",
+   "text": "Run case mutant-iso-b-to-acme-delete (mutant): oidcLogin, http, expectHttp, oidcLogin, http, expectHttp.",
+   "result": "failed: assertion-failed (status 204, expected 403)"
+  }
+ ],
+ "findings": [
+  {
+   "id": "F-oracle-assert-fails",
+   "status": "failed",
+   "severity": "P3",
+   "title": "Seeded failing assertion",
+   "caption": "Notes list answered 200 where the spec expects 404",
+   "rule": "case oracle-assert-fails",
+   "criterion": {
+    "kind": "assertion",
+    "text": "status 200, expected 404"
+   },
+   "criterionIds": [
+    "API-10"
+   ],
+   "stepIds": [
+    "case.oracle-assert-fails"
+   ],
+   "steps": [
+    "Run case oracle-assert-fails.",
+    "Step 1 oidcLogin: passed.",
+    "Step 2 http: passed.",
+    "Step 3 expectHttp: failed (assertion-failed)."
+   ],
+   "image": null,
+   "exchanges": [
+    {
+     "id": "oracle-assert-fails.1.1",
+     "method": "GET",
+     "path": "svc:api/tenants/acme/notes",
+     "status": 200,
+     "requestLines": [
+      "GET svc:api/tenants/acme/notes",
+      "authorization: [redacted]"
+     ],
+     "responseLines": [
+      "HTTP 200",
+      "content-type: application/json",
+      "{",
+      " \"tenant\": \"acme\",",
+      " \"items\": [",
+      "  {",
+      "   \"id\": \"acme-1\",",
+      "(4 more lines)"
+     ]
+    }
+   ],
+   "log": [
+    "step 0 oidcLogin passed",
+    "step 1 http passed",
+    "step 2 expectHttp failed assertion-failed: status 200, expected 404"
+   ],
+   "reason": null,
+   "action": null
+  },
+  {
+   "id": "F-mutant-api-accepts-expired",
+   "status": "failed",
+   "severity": "P1",
+   "title": "Expired bearer token accepted",
+   "caption": "API accepts an expired access token",
+   "rule": "case mutant-api-accepts-expired",
+   "criterion": {
+    "kind": "assertion",
+    "text": "status 200, expected 401"
+   },
+   "criterionIds": [
+    "API-03"
+   ],
+   "stepIds": [
+    "case.mutant-api-accepts-expired"
+   ],
+   "steps": [
+    "Run case mutant-api-accepts-expired with seeded fault api-accepts-expired.",
+    "Step 1 oidcLogin: passed.",
+    "Step 2 http: passed.",
+    "Step 3 expectHttp: failed (assertion-failed)."
+   ],
+   "image": null,
+   "exchanges": [
+    {
+     "id": "mutant-api-accepts-expired.1.1",
+     "method": "GET",
+     "path": "svc:api/tenants/acme/notes",
+     "status": 200,
+     "requestLines": [
+      "GET svc:api/tenants/acme/notes",
+      "authorization: [redacted]"
+     ],
+     "responseLines": [
+      "HTTP 200",
+      "content-type: application/json",
+      "{",
+      " \"tenant\": \"acme\",",
+      " \"items\": [",
+      "  {",
+      "   \"id\": \"acme-1\",",
+      "(4 more lines)"
+     ]
+    }
+   ],
+   "log": [
+    "step 0 oidcLogin passed",
+    "step 1 http passed",
+    "step 2 expectHttp failed assertion-failed: status 200, expected 401"
+   ],
+   "reason": null,
+   "action": null
+  },
+  {
+   "id": "F-neg-timeout",
+   "status": "needs-review",
+   "severity": null,
+   "title": "Resilience outcome without a spec statement (timeout)",
+   "caption": "Request timed out; the spec does not say what the client does next",
+   "rule": "case neg-timeout",
+   "criterion": {
+    "kind": "assertion",
+    "text": "http timeout"
+   },
+   "criterionIds": [
+    "API-07"
+   ],
+   "stepIds": [
+    "case.neg-timeout"
+   ],
+   "steps": [
+    "Run case neg-timeout.",
+    "Step 1 oidcLogin: passed.",
+    "Step 2 http: failed (timeout)."
+   ],
+   "image": null,
+   "exchanges": [
+    {
+     "id": "neg-timeout.1.1",
+     "method": "GET",
+     "path": "svc:api/tenants/acme/slow",
+     "status": null,
+     "requestLines": [
+      "GET svc:api/tenants/acme/slow",
+      "authorization: [redacted]"
+     ],
+     "responseLines": [
+      "no response: timeout"
+     ]
+    }
+   ],
+   "log": [
+    "step 0 oidcLogin passed",
+    "step 1 http failed timeout"
+   ],
+   "reason": "The plan ended in a resilience failure and the spec does not state the required behaviour.",
+   "action": "Decide whether the client should retry, give up or degrade, and add an acceptance criterion."
+  },
+  {
+   "id": "F-neg-429-exhausted",
+   "status": "needs-review",
+   "severity": null,
+   "title": "Resilience outcome without a spec statement (retries-exhausted)",
+   "caption": "Rate limit persisted after 3 attempts; no rule for giving up",
+   "rule": "case neg-429-exhausted",
+   "criterion": {
+    "kind": "assertion",
+    "text": "status 429 after 3 attempts"
+   },
+   "criterionIds": [
+    "API-07"
+   ],
+   "stepIds": [
+    "case.neg-429-exhausted"
+   ],
+   "steps": [
+    "Run case neg-429-exhausted with seeded fault rate-limit-always.",
+    "Step 1 oidcLogin: passed.",
+    "Step 2 http: failed (retries-exhausted)."
+   ],
+   "image": null,
+   "exchanges": [
+    {
+     "id": "neg-429-exhausted.1.2",
+     "method": "GET",
+     "path": "svc:api/tenants/acme/notes",
+     "status": 429,
+     "requestLines": [
+      "GET svc:api/tenants/acme/notes",
+      "authorization: [redacted]"
+     ],
+     "responseLines": [
+      "HTTP 429",
+      "content-type: application/json",
+      "retry-after: 1",
+      "{",
+      " \"error\": \"rate_limited\"",
+      "}"
+     ]
+    },
+    {
+     "id": "neg-429-exhausted.1.3",
+     "method": "GET",
+     "path": "svc:api/tenants/acme/notes",
+     "status": 429,
+     "requestLines": [
+      "GET svc:api/tenants/acme/notes",
+      "authorization: [redacted]"
+     ],
+     "responseLines": [
+      "HTTP 429",
+      "content-type: application/json",
+      "retry-after: 1",
+      "{",
+      " \"error\": \"rate_limited\"",
+      "}"
+     ]
+    }
+   ],
+   "log": [
+    "step 0 oidcLogin passed",
+    "step 1 http failed retries-exhausted: status 429 after 3 attempts"
+   ],
+   "reason": "The plan ended in a resilience failure and the spec does not state the required behaviour.",
+   "action": "Decide whether the client should retry, give up or degrade, and add an acceptance criterion."
+  },
+  {
+   "id": "F-neg-429-too-long",
+   "status": "needs-review",
+   "severity": null,
+   "title": "Resilience outcome without a spec statement (retry-after-too-long)",
+   "caption": "Server asked for a longer wait than the retry cap allows",
+   "rule": "case neg-429-too-long",
+   "criterion": {
+    "kind": "assertion",
+    "text": "retry-after 3600 s"
+   },
+   "criterionIds": [
+    "API-07"
+   ],
+   "stepIds": [
+    "case.neg-429-too-long"
+   ],
+   "steps": [
+    "Run case neg-429-too-long with seeded fault rate-limit-long.",
+    "Step 1 oidcLogin: passed.",
+    "Step 2 http: failed (retry-after-too-long)."
+   ],
+   "image": null,
+   "exchanges": [
+    {
+     "id": "neg-429-too-long.1.1",
+     "method": "GET",
+     "path": "svc:api/tenants/acme/notes",
+     "status": 429,
+     "requestLines": [
+      "GET svc:api/tenants/acme/notes",
+      "authorization: [redacted]"
+     ],
+     "responseLines": [
+      "HTTP 429",
+      "content-type: application/json",
+      "retry-after: 3600",
+      "{",
+      " \"error\": \"rate_limited\"",
+      "}"
+     ]
+    }
+   ],
+   "log": [
+    "step 0 oidcLogin passed",
+    "step 1 http failed retry-after-too-long: retry-after 3600 s"
+   ],
+   "reason": "The plan ended in a resilience failure and the spec does not state the required behaviour.",
+   "action": "Decide whether the client should retry, give up or degrade, and add an acceptance criterion."
+  },
+  {
+   "id": "F-neg-partial-failure",
+   "status": "needs-review",
+   "severity": null,
+   "title": "Resilience outcome without a spec statement (timeout)",
+   "caption": "One step timed out and the later steps were skipped",
+   "rule": "case neg-partial-failure",
+   "criterion": {
+    "kind": "assertion",
+    "text": "http timeout"
+   },
+   "criterionIds": [
+    "API-08"
+   ],
+   "stepIds": [
+    "case.neg-partial-failure"
+   ],
+   "steps": [
+    "Run case neg-partial-failure.",
+    "Step 1 oidcLogin: passed.",
+    "Step 2 http: passed.",
+    "Step 3 expectHttp: passed.",
+    "Step 4 http: failed (timeout).",
+    "Step 5 http: skipped."
+   ],
+   "image": null,
+   "exchanges": [
+    {
+     "id": "neg-partial-failure.3.1",
+     "method": "GET",
+     "path": "svc:api/tenants/acme/slow",
+     "status": null,
+     "requestLines": [
+      "GET svc:api/tenants/acme/slow",
+      "authorization: [redacted]"
+     ],
+     "responseLines": [
+      "no response: timeout"
+     ]
+    }
+   ],
+   "log": [
+    "step 0 oidcLogin passed",
+    "step 1 http passed",
+    "step 2 expectHttp passed",
+    "step 3 http failed timeout",
+    "step 4 http skipped"
+   ],
+   "reason": "The plan ended in a resilience failure and the spec does not state the required behaviour.",
+   "action": "Decide whether the client should retry, give up or degrade, and add an acceptance criterion."
+  },
+  {
+   "id": "F-mutant-lti-accepts-replay",
+   "status": "failed",
+   "severity": "P2",
+   "title": "Replayed LTI launch accepted",
+   "caption": "Tool accepts a replayed LTI launch",
+   "rule": "case mutant-lti-accepts-replay",
+   "criterion": {
+    "kind": "assertion",
+    "text": "replay status 200"
+   },
+   "criterionIds": [
+    "API-06"
+   ],
+   "stepIds": [
+    "case.mutant-lti-accepts-replay"
+   ],
+   "steps": [
+    "Run case mutant-lti-accepts-replay with seeded fault accept-replay.",
+    "Step 1 ltiLaunch: failed (lti-replay-accepted)."
+   ],
+   "image": null,
+   "exchanges": [
+    {
+     "id": "mutant-lti-accepts-replay.0.5",
+     "method": "POST",
+     "path": "svc:tool/lti/launch",
+     "status": 200,
+     "requestLines": [
+      "POST svc:tool/lti/launch",
+      "content-type: application/x-www-form-urlencoded",
+      "cookie: [redacted]",
+      "{",
+      " \"id_token\": \"[redacted]\",",
+      " \"state\": \"[redacted]\"",
+      "}"
+     ],
+     "responseLines": [
+      "HTTP 200",
+      "content-type: application/json",
+      "{",
+      " \"launched\": true,",
+      " \"resourceLinkId\": \"rl-42\",",
+      " \"roles\": [",
+      "  \"http://purl.imsglobal.org/vocab/lis/v2/membership#Learner\"",
+      "(2 more lines)"
+     ]
+    },
+    {
+     "id": "mutant-lti-accepts-replay.0.6",
+     "method": "POST",
+     "path": "svc:tool/lti/launch",
+     "status": 200,
+     "requestLines": [
+      "POST svc:tool/lti/launch",
+      "content-type: application/x-www-form-urlencoded",
+      "cookie: [redacted]",
+      "{",
+      " \"id_token\": \"[redacted]\",",
+      " \"state\": \"[redacted]\"",
+      "}"
+     ],
+     "responseLines": [
+      "HTTP 200",
+      "content-type: application/json",
+      "{",
+      " \"launched\": true,",
+      " \"resourceLinkId\": \"rl-42\",",
+      " \"roles\": [",
+      "  \"http://purl.imsglobal.org/vocab/lis/v2/membership#Learner\"",
+      "(2 more lines)"
+     ]
+    }
+   ],
+   "log": [
+    "step 0 ltiLaunch failed lti-replay-accepted: replay status 200"
+   ],
+   "reason": null,
+   "action": null
+  },
+  {
+   "id": "F-mutant-iso-a-to-globex-list",
+   "status": "failed",
+   "severity": "P1",
+   "title": "Tenant isolation broken: acme reaches globex (list)",
+   "caption": "Tenant acme can list tenant globex's notes",
+   "rule": "case mutant-iso-a-to-globex-list",
+   "criterion": {
+    "kind": "assertion",
+    "text": "status 200, expected 403"
+   },
+   "criterionIds": [
+    "API-04"
+   ],
+   "stepIds": [
+    "case.mutant-iso-a-to-globex-list"
+   ],
+   "steps": [
+    "Run case mutant-iso-a-to-globex-list with seeded fault leaky-tenant.",
+    "Step 1 oidcLogin: passed.",
+    "Step 2 http: passed.",
+    "Step 3 expectHttp: failed (assertion-failed)."
+   ],
+   "image": null,
+   "exchanges": [
+    {
+     "id": "mutant-iso-a-to-globex-list.1.1",
+     "method": "GET",
+     "path": "svc:api/tenants/globex/notes",
+     "status": 200,
+     "requestLines": [
+      "GET svc:api/tenants/globex/notes",
+      "authorization: [redacted]"
+     ],
+     "responseLines": [
+      "HTTP 200",
+      "content-type: application/json",
+      "{",
+      " \"tenant\": \"globex\",",
+      " \"items\": [",
+      "  {",
+      "   \"id\": \"globex-1\",",
+      "(4 more lines)"
+     ]
+    }
+   ],
+   "log": [
+    "step 0 oidcLogin passed",
+    "step 1 http passed",
+    "step 2 expectHttp failed assertion-failed: status 200, expected 403"
+   ],
+   "reason": null,
+   "action": null
+  },
+  {
+   "id": "F-mutant-iso-a-to-globex-read",
+   "status": "failed",
+   "severity": "P1",
+   "title": "Tenant isolation broken: acme reaches globex (read)",
+   "caption": "Tenant acme can read tenant globex's notes",
+   "rule": "case mutant-iso-a-to-globex-read",
+   "criterion": {
+    "kind": "assertion",
+    "text": "status 200, expected 403"
+   },
+   "criterionIds": [
+    "API-04"
+   ],
+   "stepIds": [
+    "case.mutant-iso-a-to-globex-read"
+   ],
+   "steps": [
+    "Run case mutant-iso-a-to-globex-read with seeded fault leaky-tenant.",
+    "Step 1 oidcLogin: passed.",
+    "Step 2 http: passed.",
+    "Step 3 expectHttp: failed (assertion-failed)."
+   ],
+   "image": null,
+   "exchanges": [
+    {
+     "id": "mutant-iso-a-to-globex-read.1.1",
+     "method": "GET",
+     "path": "svc:api/tenants/globex/notes/globex-1",
+     "status": 200,
+     "requestLines": [
+      "GET svc:api/tenants/globex/notes/globex-1",
+      "authorization: [redacted]"
+     ],
+     "responseLines": [
+      "HTTP 200",
+      "content-type: application/json",
+      "{",
+      " \"id\": \"globex-1\",",
+      " \"title\": \"Globex plan\"",
+      "}"
+     ]
+    }
+   ],
+   "log": [
+    "step 0 oidcLogin passed",
+    "step 1 http passed",
+    "step 2 expectHttp failed assertion-failed: status 200, expected 403"
+   ],
+   "reason": null,
+   "action": null
+  },
+  {
+   "id": "F-mutant-iso-a-to-globex-read-by-id",
+   "status": "failed",
+   "severity": "P1",
+   "title": "Tenant isolation broken: acme reaches globex (read-by-id)",
+   "caption": "Tenant acme can read by id tenant globex's notes",
+   "rule": "case mutant-iso-a-to-globex-read-by-id",
+   "criterion": {
+    "kind": "assertion",
+    "text": "status 200, expected 404"
+   },
+   "criterionIds": [
+    "API-04"
+   ],
+   "stepIds": [
+    "case.mutant-iso-a-to-globex-read-by-id"
+   ],
+   "steps": [
+    "Run case mutant-iso-a-to-globex-read-by-id with seeded fault leaky-tenant.",
+    "Step 1 oidcLogin: passed.",
+    "Step 2 http: passed.",
+    "Step 3 expectHttp: failed (assertion-failed)."
+   ],
+   "image": null,
+   "exchanges": [
+    {
+     "id": "mutant-iso-a-to-globex-read-by-id.1.1",
+     "method": "GET",
+     "path": "svc:api/tenants/acme/notes/globex-1",
+     "status": 200,
+     "requestLines": [
+      "GET svc:api/tenants/acme/notes/globex-1",
+      "authorization: [redacted]"
+     ],
+     "responseLines": [
+      "HTTP 200",
+      "content-type: application/json",
+      "{",
+      " \"id\": \"globex-1\",",
+      " \"title\": \"Globex plan\"",
+      "}"
+     ]
+    }
+   ],
+   "log": [
+    "step 0 oidcLogin passed",
+    "step 1 http passed",
+    "step 2 expectHttp failed assertion-failed: status 200, expected 404"
+   ],
+   "reason": null,
+   "action": null
+  },
+  {
+   "id": "F-mutant-iso-a-to-globex-create",
+   "status": "failed",
+   "severity": "P1",
+   "title": "Tenant isolation broken: acme reaches globex (create)",
+   "caption": "Tenant acme can create tenant globex's notes",
+   "rule": "case mutant-iso-a-to-globex-create",
+   "criterion": {
+    "kind": "assertion",
+    "text": "status 201, expected 403"
+   },
+   "criterionIds": [
+    "API-04"
+   ],
+   "stepIds": [
+    "case.mutant-iso-a-to-globex-create"
+   ],
+   "steps": [
+    "Run case mutant-iso-a-to-globex-create with seeded fault leaky-tenant.",
+    "Step 1 oidcLogin: passed.",
+    "Step 2 http: passed.",
+    "Step 3 expectHttp: failed (assertion-failed).",
+    "Step 4 oidcLogin: skipped.",
+    "Step 5 http: skipped.",
+    "Step 6 expectHttp: skipped."
+   ],
+   "image": null,
+   "exchanges": [
+    {
+     "id": "mutant-iso-a-to-globex-create.1.1",
+     "method": "POST",
+     "path": "svc:api/tenants/globex/notes",
+     "status": 201,
+     "requestLines": [
+      "POST svc:api/tenants/globex/notes",
+      "authorization: [redacted]",
+      "content-type: application/json",
+      "{",
+      " \"title\": \"intrusion\"",
+      "}"
+     ],
+     "responseLines": [
+      "HTTP 201",
+      "content-type: application/json",
+      "{",
+      " \"id\": \"globex-2\",",
+      " \"title\": \"intrusion\"",
+      "}"
+     ]
+    }
+   ],
+   "log": [
+    "step 0 oidcLogin passed",
+    "step 1 http passed",
+    "step 2 expectHttp failed assertion-failed: status 201, expected 403",
+    "step 3 oidcLogin skipped",
+    "step 4 http skipped",
+    "step 5 expectHttp skipped"
+   ],
+   "reason": null,
+   "action": null
+  },
+  {
+   "id": "F-mutant-iso-a-to-globex-update",
+   "status": "failed",
+   "severity": "P1",
+   "title": "Tenant isolation broken: acme reaches globex (update)",
+   "caption": "Tenant acme can update tenant globex's notes",
+   "rule": "case mutant-iso-a-to-globex-update",
+   "criterion": {
+    "kind": "assertion",
+    "text": "status 200, expected 403"
+   },
+   "criterionIds": [
+    "API-04"
+   ],
+   "stepIds": [
+    "case.mutant-iso-a-to-globex-update"
+   ],
+   "steps": [
+    "Run case mutant-iso-a-to-globex-update with seeded fault leaky-tenant.",
+    "Step 1 oidcLogin: passed.",
+    "Step 2 http: passed.",
+    "Step 3 expectHttp: failed (assertion-failed).",
+    "Step 4 oidcLogin: skipped.",
+    "Step 5 http: skipped.",
+    "Step 6 expectHttp: skipped."
+   ],
+   "image": null,
+   "exchanges": [
+    {
+     "id": "mutant-iso-a-to-globex-update.1.1",
+     "method": "PUT",
+     "path": "svc:api/tenants/globex/notes/globex-1",
+     "status": 200,
+     "requestLines": [
+      "PUT svc:api/tenants/globex/notes/globex-1",
+      "authorization: [redacted]",
+      "content-type: application/json",
+      "{",
+      " \"title\": \"changed\"",
+      "}"
+     ],
+     "responseLines": [
+      "HTTP 200",
+      "content-type: application/json",
+      "{",
+      " \"id\": \"globex-1\",",
+      " \"title\": \"changed\"",
+      "}"
+     ]
+    }
+   ],
+   "log": [
+    "step 0 oidcLogin passed",
+    "step 1 http passed",
+    "step 2 expectHttp failed assertion-failed: status 200, expected 403",
+    "step 3 oidcLogin skipped",
+    "step 4 http skipped",
+    "step 5 expectHttp skipped"
+   ],
+   "reason": null,
+   "action": null
+  },
+  {
+   "id": "F-mutant-iso-a-to-globex-delete",
+   "status": "failed",
+   "severity": "P1",
+   "title": "Tenant isolation broken: acme reaches globex (delete)",
+   "caption": "Tenant acme can delete tenant globex's notes",
+   "rule": "case mutant-iso-a-to-globex-delete",
+   "criterion": {
+    "kind": "assertion",
+    "text": "status 204, expected 403"
+   },
+   "criterionIds": [
+    "API-04"
+   ],
+   "stepIds": [
+    "case.mutant-iso-a-to-globex-delete"
+   ],
+   "steps": [
+    "Run case mutant-iso-a-to-globex-delete with seeded fault leaky-tenant.",
+    "Step 1 oidcLogin: passed.",
+    "Step 2 http: passed.",
+    "Step 3 expectHttp: failed (assertion-failed).",
+    "Step 4 oidcLogin: skipped.",
+    "Step 5 http: skipped.",
+    "Step 6 expectHttp: skipped."
+   ],
+   "image": null,
+   "exchanges": [
+    {
+     "id": "mutant-iso-a-to-globex-delete.1.1",
+     "method": "DELETE",
+     "path": "svc:api/tenants/globex/notes/globex-1",
+     "status": 204,
+     "requestLines": [
+      "DELETE svc:api/tenants/globex/notes/globex-1",
+      "authorization: [redacted]"
+     ],
+     "responseLines": [
+      "HTTP 204"
+     ]
+    }
+   ],
+   "log": [
+    "step 0 oidcLogin passed",
+    "step 1 http passed",
+    "step 2 expectHttp failed assertion-failed: status 204, expected 403",
+    "step 3 oidcLogin skipped",
+    "step 4 http skipped",
+    "step 5 expectHttp skipped"
+   ],
+   "reason": null,
+   "action": null
+  },
+  {
+   "id": "F-mutant-iso-b-to-acme-list",
+   "status": "failed",
+   "severity": "P1",
+   "title": "Tenant isolation broken: globex reaches acme (list)",
+   "caption": "Tenant globex can list tenant acme's notes",
+   "rule": "case mutant-iso-b-to-acme-list",
+   "criterion": {
+    "kind": "assertion",
+    "text": "status 200, expected 403"
+   },
+   "criterionIds": [
+    "API-04"
+   ],
+   "stepIds": [
+    "case.mutant-iso-b-to-acme-list"
+   ],
+   "steps": [
+    "Run case mutant-iso-b-to-acme-list with seeded fault leaky-tenant.",
+    "Step 1 oidcLogin: passed.",
+    "Step 2 http: passed.",
+    "Step 3 expectHttp: failed (assertion-failed)."
+   ],
+   "image": null,
+   "exchanges": [
+    {
+     "id": "mutant-iso-b-to-acme-list.1.1",
+     "method": "GET",
+     "path": "svc:api/tenants/acme/notes",
+     "status": 200,
+     "requestLines": [
+      "GET svc:api/tenants/acme/notes",
+      "authorization: [redacted]"
+     ],
+     "responseLines": [
+      "HTTP 200",
+      "content-type: application/json",
+      "{",
+      " \"tenant\": \"acme\",",
+      " \"items\": [",
+      "  {",
+      "   \"id\": \"acme-1\",",
+      "(4 more lines)"
+     ]
+    }
+   ],
+   "log": [
+    "step 0 oidcLogin passed",
+    "step 1 http passed",
+    "step 2 expectHttp failed assertion-failed: status 200, expected 403"
+   ],
+   "reason": null,
+   "action": null
+  },
+  {
+   "id": "F-mutant-iso-b-to-acme-read",
+   "status": "failed",
+   "severity": "P1",
+   "title": "Tenant isolation broken: globex reaches acme (read)",
+   "caption": "Tenant globex can read tenant acme's notes",
+   "rule": "case mutant-iso-b-to-acme-read",
+   "criterion": {
+    "kind": "assertion",
+    "text": "status 200, expected 403"
+   },
+   "criterionIds": [
+    "API-04"
+   ],
+   "stepIds": [
+    "case.mutant-iso-b-to-acme-read"
+   ],
+   "steps": [
+    "Run case mutant-iso-b-to-acme-read with seeded fault leaky-tenant.",
+    "Step 1 oidcLogin: passed.",
+    "Step 2 http: passed.",
+    "Step 3 expectHttp: failed (assertion-failed)."
+   ],
+   "image": null,
+   "exchanges": [
+    {
+     "id": "mutant-iso-b-to-acme-read.1.1",
+     "method": "GET",
+     "path": "svc:api/tenants/acme/notes/acme-1",
+     "status": 200,
+     "requestLines": [
+      "GET svc:api/tenants/acme/notes/acme-1",
+      "authorization: [redacted]"
+     ],
+     "responseLines": [
+      "HTTP 200",
+      "content-type: application/json",
+      "{",
+      " \"id\": \"acme-1\",",
+      " \"title\": \"Acme plan\"",
+      "}"
+     ]
+    }
+   ],
+   "log": [
+    "step 0 oidcLogin passed",
+    "step 1 http passed",
+    "step 2 expectHttp failed assertion-failed: status 200, expected 403"
+   ],
+   "reason": null,
+   "action": null
+  },
+  {
+   "id": "F-mutant-iso-b-to-acme-read-by-id",
+   "status": "failed",
+   "severity": "P1",
+   "title": "Tenant isolation broken: globex reaches acme (read-by-id)",
+   "caption": "Tenant globex can read by id tenant acme's notes",
+   "rule": "case mutant-iso-b-to-acme-read-by-id",
+   "criterion": {
+    "kind": "assertion",
+    "text": "status 200, expected 404"
+   },
+   "criterionIds": [
+    "API-04"
+   ],
+   "stepIds": [
+    "case.mutant-iso-b-to-acme-read-by-id"
+   ],
+   "steps": [
+    "Run case mutant-iso-b-to-acme-read-by-id with seeded fault leaky-tenant.",
+    "Step 1 oidcLogin: passed.",
+    "Step 2 http: passed.",
+    "Step 3 expectHttp: failed (assertion-failed)."
+   ],
+   "image": null,
+   "exchanges": [
+    {
+     "id": "mutant-iso-b-to-acme-read-by-id.1.1",
+     "method": "GET",
+     "path": "svc:api/tenants/globex/notes/acme-1",
+     "status": 200,
+     "requestLines": [
+      "GET svc:api/tenants/globex/notes/acme-1",
+      "authorization: [redacted]"
+     ],
+     "responseLines": [
+      "HTTP 200",
+      "content-type: application/json",
+      "{",
+      " \"id\": \"acme-1\",",
+      " \"title\": \"Acme plan\"",
+      "}"
+     ]
+    }
+   ],
+   "log": [
+    "step 0 oidcLogin passed",
+    "step 1 http passed",
+    "step 2 expectHttp failed assertion-failed: status 200, expected 404"
+   ],
+   "reason": null,
+   "action": null
+  },
+  {
+   "id": "F-mutant-iso-b-to-acme-create",
+   "status": "failed",
+   "severity": "P1",
+   "title": "Tenant isolation broken: globex reaches acme (create)",
+   "caption": "Tenant globex can create tenant acme's notes",
+   "rule": "case mutant-iso-b-to-acme-create",
+   "criterion": {
+    "kind": "assertion",
+    "text": "status 201, expected 403"
+   },
+   "criterionIds": [
+    "API-04"
+   ],
+   "stepIds": [
+    "case.mutant-iso-b-to-acme-create"
+   ],
+   "steps": [
+    "Run case mutant-iso-b-to-acme-create with seeded fault leaky-tenant.",
+    "Step 1 oidcLogin: passed.",
+    "Step 2 http: passed.",
+    "Step 3 expectHttp: failed (assertion-failed).",
+    "Step 4 oidcLogin: skipped.",
+    "Step 5 http: skipped.",
+    "Step 6 expectHttp: skipped."
+   ],
+   "image": null,
+   "exchanges": [
+    {
+     "id": "mutant-iso-b-to-acme-create.1.1",
+     "method": "POST",
+     "path": "svc:api/tenants/acme/notes",
+     "status": 201,
+     "requestLines": [
+      "POST svc:api/tenants/acme/notes",
+      "authorization: [redacted]",
+      "content-type: application/json",
+      "{",
+      " \"title\": \"intrusion\"",
+      "}"
+     ],
+     "responseLines": [
+      "HTTP 201",
+      "content-type: application/json",
+      "{",
+      " \"id\": \"acme-2\",",
+      " \"title\": \"intrusion\"",
+      "}"
+     ]
+    }
+   ],
+   "log": [
+    "step 0 oidcLogin passed",
+    "step 1 http passed",
+    "step 2 expectHttp failed assertion-failed: status 201, expected 403",
+    "step 3 oidcLogin skipped",
+    "step 4 http skipped",
+    "step 5 expectHttp skipped"
+   ],
+   "reason": null,
+   "action": null
+  },
+  {
+   "id": "F-mutant-iso-b-to-acme-update",
+   "status": "failed",
+   "severity": "P1",
+   "title": "Tenant isolation broken: globex reaches acme (update)",
+   "caption": "Tenant globex can update tenant acme's notes",
+   "rule": "case mutant-iso-b-to-acme-update",
+   "criterion": {
+    "kind": "assertion",
+    "text": "status 200, expected 403"
+   },
+   "criterionIds": [
+    "API-04"
+   ],
+   "stepIds": [
+    "case.mutant-iso-b-to-acme-update"
+   ],
+   "steps": [
+    "Run case mutant-iso-b-to-acme-update with seeded fault leaky-tenant.",
+    "Step 1 oidcLogin: passed.",
+    "Step 2 http: passed.",
+    "Step 3 expectHttp: failed (assertion-failed).",
+    "Step 4 oidcLogin: skipped.",
+    "Step 5 http: skipped.",
+    "Step 6 expectHttp: skipped."
+   ],
+   "image": null,
+   "exchanges": [
+    {
+     "id": "mutant-iso-b-to-acme-update.1.1",
+     "method": "PUT",
+     "path": "svc:api/tenants/acme/notes/acme-1",
+     "status": 200,
+     "requestLines": [
+      "PUT svc:api/tenants/acme/notes/acme-1",
+      "authorization: [redacted]",
+      "content-type: application/json",
+      "{",
+      " \"title\": \"changed\"",
+      "}"
+     ],
+     "responseLines": [
+      "HTTP 200",
+      "content-type: application/json",
+      "{",
+      " \"id\": \"acme-1\",",
+      " \"title\": \"changed\"",
+      "}"
+     ]
+    }
+   ],
+   "log": [
+    "step 0 oidcLogin passed",
+    "step 1 http passed",
+    "step 2 expectHttp failed assertion-failed: status 200, expected 403",
+    "step 3 oidcLogin skipped",
+    "step 4 http skipped",
+    "step 5 expectHttp skipped"
+   ],
+   "reason": null,
+   "action": null
+  },
+  {
+   "id": "F-mutant-iso-b-to-acme-delete",
+   "status": "failed",
+   "severity": "P1",
+   "title": "Tenant isolation broken: globex reaches acme (delete)",
+   "caption": "Tenant globex can delete tenant acme's notes",
+   "rule": "case mutant-iso-b-to-acme-delete",
+   "criterion": {
+    "kind": "assertion",
+    "text": "status 204, expected 403"
+   },
+   "criterionIds": [
+    "API-04"
+   ],
+   "stepIds": [
+    "case.mutant-iso-b-to-acme-delete"
+   ],
+   "steps": [
+    "Run case mutant-iso-b-to-acme-delete with seeded fault leaky-tenant.",
+    "Step 1 oidcLogin: passed.",
+    "Step 2 http: passed.",
+    "Step 3 expectHttp: failed (assertion-failed).",
+    "Step 4 oidcLogin: skipped.",
+    "Step 5 http: skipped.",
+    "Step 6 expectHttp: skipped."
+   ],
+   "image": null,
+   "exchanges": [
+    {
+     "id": "mutant-iso-b-to-acme-delete.1.1",
+     "method": "DELETE",
+     "path": "svc:api/tenants/acme/notes/acme-1",
+     "status": 204,
+     "requestLines": [
+      "DELETE svc:api/tenants/acme/notes/acme-1",
+      "authorization: [redacted]"
+     ],
+     "responseLines": [
+      "HTTP 204"
+     ]
+    }
+   ],
+   "log": [
+    "step 0 oidcLogin passed",
+    "step 1 http passed",
+    "step 2 expectHttp failed assertion-failed: status 204, expected 403",
+    "step 3 oidcLogin skipped",
+    "step 4 http skipped",
+    "step 5 expectHttp skipped"
+   ],
+   "reason": null,
+   "action": null
+  }
+ ],
+ "images": []
+}

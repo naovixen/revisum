@@ -1,0 +1,375 @@
+{
+ "schema": "revisum.report-input/v1",
+ "reportId": "functional-signup-app",
+ "kind": "functional",
+ "title": "Sign-up flow: functional run on the sign-up fixture app",
+ "subject": "Three plans run on the CDP driver against the sign-up fixture app (en-GB, UTC, light scheme)",
+ "note": "The spec behind SIGNUP-06 is a seeded mismatch for this demo; the fixture app is correct. Severity for the accessibility finding comes from the accessibility rule table.",
+ "run": {
+  "runId": "app-d5c07435d314",
+  "recordedAt": "2026-01-15T10:30:00.000Z",
+  "target": "cdp-chromium (CDP driver)",
+  "tool": "run() on the CDP driver",
+  "manifestHash": "4cbb581988b6bad2aa50c7cb761843b39ba2c3b066afe1d10343e515efa687f6",
+  "inputs": [
+   {
+    "name": "derived/app-run.json",
+    "sha256": "4c6f7e29a950e21e34dde073ae0c5a69006a5c5556e8a05c8df614b9cbb7d91d"
+   },
+   {
+    "name": "accessibility-findings.json",
+    "sha256": "c1e68225b6dbdf1530da597a57ece915332d330115e14bef2aa55913463929b0"
+   },
+   {
+    "name": "wcag22-success-criteria.json",
+    "sha256": "8240192a4371c8065e954bf8007c98760f59746b4cc0acd8edac8245cf0231de"
+   },
+   {
+    "name": "derived/app/app-happy-form-filled.png",
+    "sha256": "c4f12a33c092f5d9929f1e0eae4d1e23c0ef474ac40cd1b8695f4a2b2cf91e5b"
+   },
+   {
+    "name": "derived/app/app-happy-signed-up.png",
+    "sha256": "2bd9767b3979cfcf3edf7cbca6e1c808c7d2b6936853fe52fabe9df3c600a6a1"
+   },
+   {
+    "name": "derived/app/app-a11y-a11y-gate.png",
+    "sha256": "fef03c626c6024dacc1b2d0e3db54ebc6abcf415d6d94bad4644503409d94749"
+   },
+   {
+    "name": "derived/app/app-label-label-mismatch.png",
+    "sha256": "fef03c626c6024dacc1b2d0e3db54ebc6abcf415d6d94bad4644503409d94749"
+   }
+  ]
+ },
+ "acceptance": [
+  {
+   "id": "SIGNUP-01",
+   "text": "The sign-up page opens with the heading \"Create your account\" and the title \"Sign up - Fixture\".",
+   "status": "passed",
+   "stepIds": [
+    "happy.0",
+    "happy.1",
+    "happy.2"
+   ],
+   "evidence": [
+    {
+     "kind": "step",
+     "id": "happy.2",
+     "label": "last step passed"
+    }
+   ]
+  },
+  {
+   "id": "SIGNUP-02",
+   "text": "The form accepts a full name and an email address.",
+   "status": "passed",
+   "stepIds": [
+    "happy.3",
+    "happy.4",
+    "happy.5",
+    "happy.6"
+   ],
+   "evidence": [
+    {
+     "kind": "image",
+     "id": "app.happy.form-filled",
+     "label": "screenshot form-filled"
+    },
+    {
+     "kind": "step",
+     "id": "happy.6",
+     "label": "last step passed"
+    }
+   ]
+  },
+  {
+   "id": "SIGNUP-03",
+   "text": "Accepting the terms and submitting shows a welcome message.",
+   "status": "passed",
+   "stepIds": [
+    "happy.7",
+    "happy.8",
+    "happy.9"
+   ],
+   "evidence": [
+    {
+     "kind": "step",
+     "id": "happy.9",
+     "label": "last step passed"
+    }
+   ]
+  },
+  {
+   "id": "SIGNUP-04",
+   "text": "After submitting, the page echoes the signed-up email address.",
+   "status": "passed",
+   "stepIds": [
+    "happy.10",
+    "happy.11"
+   ],
+   "evidence": [
+    {
+     "kind": "image",
+     "id": "app.happy.signed-up",
+     "label": "screenshot signed-up"
+    },
+    {
+     "kind": "step",
+     "id": "happy.11",
+     "label": "last step passed"
+    }
+   ]
+  },
+  {
+   "id": "SIGNUP-05",
+   "text": "The sign-up page has no automated accessibility violations.",
+   "status": "failed",
+   "stepIds": [
+    "a11y.0",
+    "a11y.1",
+    "a11y.2"
+   ],
+   "evidence": [
+    {
+     "kind": "finding",
+     "id": "F-image-alt",
+     "label": "finding"
+    },
+    {
+     "kind": "image",
+     "id": "app.a11y.a11y-gate",
+     "label": "screenshot a11y-gate"
+    }
+   ]
+  },
+  {
+   "id": "SIGNUP-06",
+   "text": "The email field is labelled \"Email address\" (demo spec: a seeded mismatch).",
+   "status": "failed",
+   "stepIds": [
+    "label.0",
+    "label.1",
+    "label.2"
+   ],
+   "evidence": [
+    {
+     "kind": "finding",
+     "id": "F-label-mismatch",
+     "label": "finding"
+    },
+    {
+     "kind": "image",
+     "id": "app.label.label-mismatch",
+     "label": "screenshot label-mismatch"
+    }
+   ]
+  }
+ ],
+ "steps": [
+  {
+   "id": "happy.0",
+   "text": "Opened `/`",
+   "result": "passed"
+  },
+  {
+   "id": "happy.1",
+   "text": "Checked that the \"Create your account\" heading is visible",
+   "result": "passed"
+  },
+  {
+   "id": "happy.2",
+   "text": "Checked the page title",
+   "result": "passed"
+  },
+  {
+   "id": "happy.3",
+   "text": "Filled in the \"Full name\" field",
+   "result": "passed"
+  },
+  {
+   "id": "happy.4",
+   "text": "Filled in the \"Email\" field",
+   "result": "passed"
+  },
+  {
+   "id": "happy.5",
+   "text": "Checked that the \"Email\" field has the expected value",
+   "result": "passed"
+  },
+  {
+   "id": "happy.6",
+   "text": "Captured screenshot \"form-filled\"",
+   "result": "passed"
+  },
+  {
+   "id": "happy.7",
+   "text": "Clicked the \"I agree to the terms\" checkbox",
+   "result": "passed"
+  },
+  {
+   "id": "happy.8",
+   "text": "Clicked the \"Create account\" button",
+   "result": "passed"
+  },
+  {
+   "id": "happy.9",
+   "text": "Checked that the `status` element contains the expected text",
+   "result": "passed"
+  },
+  {
+   "id": "happy.10",
+   "text": "Checked that the `echo` element contains the expected text",
+   "result": "passed"
+  },
+  {
+   "id": "happy.11",
+   "text": "Captured screenshot \"signed-up\"",
+   "result": "passed"
+  },
+  {
+   "id": "a11y.0",
+   "text": "Opened `/`",
+   "result": "passed"
+  },
+  {
+   "id": "a11y.1",
+   "text": "Captured screenshot \"a11y-gate\"",
+   "result": "passed"
+  },
+  {
+   "id": "a11y.2",
+   "text": "Ran automated accessibility rules (gate mode)",
+   "result": "failed: a11y-violations"
+  },
+  {
+   "id": "label.0",
+   "text": "Opened `/`",
+   "result": "passed"
+  },
+  {
+   "id": "label.1",
+   "text": "Captured screenshot \"label-mismatch\"",
+   "result": "passed"
+  },
+  {
+   "id": "label.2",
+   "text": "Filled in the \"Email address\" field",
+   "result": "failed: not-found"
+  }
+ ],
+ "findings": [
+  {
+   "id": "F-image-alt",
+   "status": "failed",
+   "severity": "P2",
+   "title": "The logo image has no text alternative",
+   "caption": "Logo image has no text alternative",
+   "rule": "image-alt (ACT rule 23a2a8)",
+   "criterion": {
+    "kind": "wcag",
+    "successCriterion": "1.1.1",
+    "title": "Non-text Content",
+    "level": "A"
+   },
+   "criterionIds": [
+    "SIGNUP-05"
+   ],
+   "stepIds": [
+    "a11y.2"
+   ],
+   "steps": [
+    "Open the sign-up page at 1280 by 800 pixels.",
+    "Run the automated accessibility audit in gate mode.",
+    "Find html > body > main > img.",
+    "Observed: <img src=\"/logo.svg\" width=\"48\" height=\"48\"> has no alt attribute."
+   ],
+   "image": {
+    "imageId": "app.a11y.a11y-gate",
+    "box": {
+     "x": 24,
+     "y": 82.4375,
+     "width": 48,
+     "height": 48
+    }
+   },
+   "exchanges": [],
+   "log": [
+    "step 2 a11yAudit: failed (a11y-violations)",
+    "rules flagged: image-alt (critical, 1 element)",
+    "severity from the accessibility rule table for ACT rule 23a2a8"
+   ],
+   "reason": null,
+   "action": null
+  },
+  {
+   "id": "F-label-mismatch",
+   "status": "failed",
+   "severity": "P3",
+   "title": "No field is labelled \"Email address\"",
+   "caption": "No field labelled \"Email address\"; the page labels it \"Email\"",
+   "rule": "step fill (locator by label)",
+   "criterion": {
+    "kind": "assertion",
+    "text": "A field labelled \"Email address\" exists and accepts input"
+   },
+   "criterionIds": [
+    "SIGNUP-06"
+   ],
+   "stepIds": [
+    "label.2"
+   ],
+   "steps": [
+    "Open the sign-up page at 1280 by 800 pixels.",
+    "Fill in the field labelled \"Email address\".",
+    "Observed: the step failed with code not-found; the form has a field labelled \"Email\"."
+   ],
+   "image": {
+    "imageId": "app.label.label-mismatch",
+    "box": {
+     "x": 24,
+     "y": 256.44,
+     "width": 320,
+     "height": 30
+    }
+   },
+   "exchanges": [],
+   "log": [
+    "step 2 fill: failed (not-found)",
+    "the callout marks the closest field, chosen by the plan author (seeded demo mismatch)"
+   ],
+   "reason": null,
+   "action": null
+  }
+ ],
+ "images": [
+  {
+   "id": "app.happy.form-filled",
+   "sha256": "c4f12a33c092f5d9929f1e0eae4d1e23c0ef474ac40cd1b8695f4a2b2cf91e5b",
+   "width": 1280,
+   "height": 800,
+   "alt": "Sign-up page after step \"form-filled\", 1280 by 800 pixels, drawn by the CDP driver"
+  },
+  {
+   "id": "app.happy.signed-up",
+   "sha256": "2bd9767b3979cfcf3edf7cbca6e1c808c7d2b6936853fe52fabe9df3c600a6a1",
+   "width": 1280,
+   "height": 800,
+   "alt": "Sign-up page after step \"signed-up\", 1280 by 800 pixels, drawn by the CDP driver"
+  },
+  {
+   "id": "app.a11y.a11y-gate",
+   "sha256": "fef03c626c6024dacc1b2d0e3db54ebc6abcf415d6d94bad4644503409d94749",
+   "width": 1280,
+   "height": 800,
+   "alt": "Sign-up page after step \"a11y-gate\", 1280 by 800 pixels, drawn by the CDP driver"
+  },
+  {
+   "id": "app.label.label-mismatch",
+   "sha256": "fef03c626c6024dacc1b2d0e3db54ebc6abcf415d6d94bad4644503409d94749",
+   "width": 1280,
+   "height": 800,
+   "alt": "Sign-up page after step \"label-mismatch\", 1280 by 800 pixels, drawn by the CDP driver"
+  }
+ ]
+}

@@ -1,0 +1,742 @@
+{
+ "axe_version": "4.14.0",
+ "generated": "2026-10-27",
+ "mapping": [
+  {
+   "num": "1.1.1",
+   "title": "Non-text Content",
+   "level": "A",
+   "axe_rules": [
+    "aria-meter-name",
+    "aria-progressbar-name",
+    "image-alt",
+    "input-image-alt",
+    "object-alt",
+    "role-img-alt",
+    "svg-img-alt"
+   ],
+   "axe_rules_default_enabled": [
+    "aria-meter-name",
+    "aria-progressbar-name",
+    "image-alt",
+    "input-image-alt",
+    "object-alt",
+    "role-img-alt",
+    "svg-img-alt"
+   ],
+   "category": "partial",
+   "basis": "presence/validity decided, text quality not",
+   "ai_or_at_addition": "VLM alt-text proposals, human confirms (22.5% GPT-4o alt text rejected by experts)"
+  },
+  {
+   "num": "1.2.1",
+   "title": "Audio-only and Video-only (Prerecorded)",
+   "level": "A",
+   "axe_rules": [
+    "audio-caption"
+   ],
+   "axe_rules_default_enabled": [],
+   "category": "assisted",
+   "basis": "spike judgement: needs transcript/alternative to match media",
+   "ai_or_at_addition": "ASR transcript diff proposes a finding"
+  },
+  {
+   "num": "1.2.2",
+   "title": "Captions (Prerecorded)",
+   "level": "A",
+   "axe_rules": [
+    "video-caption"
+   ],
+   "axe_rules_default_enabled": [
+    "video-caption"
+   ],
+   "category": "partial",
+   "basis": "video-caption checks track existence only",
+   "ai_or_at_addition": "ASR vs caption text comparison proposes timing/accuracy findings"
+  },
+  {
+   "num": "1.2.3",
+   "title": "Audio Description or Media Alternative (Prerecorded)",
+   "level": "A",
+   "axe_rules": [],
+   "axe_rules_default_enabled": [],
+   "category": "manual",
+   "basis": "spike judgement: audio description adequacy is a judgement",
+   "ai_or_at_addition": "VLM scene description draft; human decides adequacy"
+  },
+  {
+   "num": "1.2.4",
+   "title": "Captions (Live)",
+   "level": "AA",
+   "axe_rules": [],
+   "axe_rules_default_enabled": [],
+   "category": "manual",
+   "basis": "spike judgement: live captions need a live event",
+   "ai_or_at_addition": "None practical"
+  },
+  {
+   "num": "1.2.5",
+   "title": "Audio Description (Prerecorded)",
+   "level": "AA",
+   "axe_rules": [],
+   "axe_rules_default_enabled": [],
+   "category": "manual",
+   "basis": "spike judgement: audio description adequacy",
+   "ai_or_at_addition": "VLM scene description draft; human decides"
+  },
+  {
+   "num": "1.3.1",
+   "title": "Info and Relationships",
+   "level": "A",
+   "axe_rules": [
+    "aria-hidden-body",
+    "aria-required-children",
+    "aria-required-parent",
+    "definition-list",
+    "dlitem",
+    "list",
+    "listitem",
+    "p-as-heading",
+    "table-fake-caption",
+    "td-has-header",
+    "td-headers-attr",
+    "th-has-data-cells"
+   ],
+   "axe_rules_default_enabled": [
+    "aria-hidden-body",
+    "aria-required-children",
+    "aria-required-parent",
+    "definition-list",
+    "dlitem",
+    "list",
+    "listitem",
+    "td-headers-attr",
+    "th-has-data-cells"
+   ],
+   "category": "partial",
+   "basis": "structure rules catch invalid markup, not missing semantics",
+   "ai_or_at_addition": "DOM+screenshot LLM proposes fake headings/lists"
+  },
+  {
+   "num": "1.3.2",
+   "title": "Meaningful Sequence",
+   "level": "A",
+   "axe_rules": [],
+   "axe_rules_default_enabled": [],
+   "category": "manual",
+   "basis": "(Deque audit data: 100% manual)",
+   "ai_or_at_addition": "Compare DOM order to rendered reading order by geometry; human confirms"
+  },
+  {
+   "num": "1.3.3",
+   "title": "Sensory Characteristics",
+   "level": "A",
+   "axe_rules": [],
+   "axe_rules_default_enabled": [],
+   "category": "assisted",
+   "basis": "spike judgement: text instruction analysis",
+   "ai_or_at_addition": "LLM flags colour/shape/position-only instructions"
+  },
+  {
+   "num": "1.3.4",
+   "title": "Orientation",
+   "level": "AA",
+   "axe_rules": [
+    "css-orientation-lock"
+   ],
+   "axe_rules_default_enabled": [],
+   "category": "partial",
+   "basis": "spike judgement: axe orientation rule is experimental/off by default; fixture measured",
+   "ai_or_at_addition": "Playwright rotates viewport and diffs layout"
+  },
+  {
+   "num": "1.3.5",
+   "title": "Identify Input Purpose",
+   "level": "AA",
+   "axe_rules": [
+    "autocomplete-valid"
+   ],
+   "axe_rules_default_enabled": [
+    "autocomplete-valid"
+   ],
+   "category": "partial",
+   "basis": "spike judgement: autocomplete-valid checks tokens, not whether a field needs one",
+   "ai_or_at_addition": "LLM maps field purpose to expected token"
+  },
+  {
+   "num": "1.4.1",
+   "title": "Use of Color",
+   "level": "A",
+   "axe_rules": [
+    "link-in-text-block"
+   ],
+   "axe_rules_default_enabled": [
+    "link-in-text-block"
+   ],
+   "category": "partial",
+   "basis": "spike judgement: link-in-text-block only; colour-only meaning elsewhere is open",
+   "ai_or_at_addition": "Greyscale screenshot diff plus VLM"
+  },
+  {
+   "num": "1.4.2",
+   "title": "Audio Control",
+   "level": "A",
+   "axe_rules": [
+    "no-autoplay-audio"
+   ],
+   "axe_rules_default_enabled": [
+    "no-autoplay-audio"
+   ],
+   "category": "partial",
+   "basis": "spike judgement: audio longer than 3 s autoplay rule",
+   "ai_or_at_addition": "Playwright media event capture"
+  },
+  {
+   "num": "1.4.3",
+   "title": "Contrast (Minimum)",
+   "level": "AA",
+   "axe_rules": [
+    "color-contrast"
+   ],
+   "axe_rules_default_enabled": [
+    "color-contrast"
+   ],
+   "category": "partial",
+   "basis": "incomplete on background images and gradients",
+   "ai_or_at_addition": "Pixel sampling of rendered screenshot decides contrast on images"
+  },
+  {
+   "num": "1.4.4",
+   "title": "Resize Text",
+   "level": "AA",
+   "axe_rules": [
+    "meta-viewport"
+   ],
+   "axe_rules_default_enabled": [
+    "meta-viewport"
+   ],
+   "category": "partial",
+   "basis": "spike judgement: viewport meta only",
+   "ai_or_at_addition": "Playwright 200% zoom screenshot diff for clipping"
+  },
+  {
+   "num": "1.4.5",
+   "title": "Images of Text",
+   "level": "AA",
+   "axe_rules": [],
+   "axe_rules_default_enabled": [],
+   "category": "assisted",
+   "basis": "spike judgement: needs OCR/vision to see images of text",
+   "ai_or_at_addition": "OCR/VLM proposes images of text"
+  },
+  {
+   "num": "1.4.10",
+   "title": "Reflow",
+   "level": "AA",
+   "axe_rules": [],
+   "axe_rules_default_enabled": [],
+   "category": "assisted",
+   "basis": "spike judgement: deterministic 320 px scroll probe is possible but outside axe",
+   "ai_or_at_addition": "Playwright 320 px viewport scrollWidth probe"
+  },
+  {
+   "num": "1.4.11",
+   "title": "Non-text Contrast",
+   "level": "AA",
+   "axe_rules": [],
+   "axe_rules_default_enabled": [],
+   "category": "assisted",
+   "basis": "(flagged 100% manual in Deque data)",
+   "ai_or_at_addition": "Pixel-contrast of component boundaries from screenshots"
+  },
+  {
+   "num": "1.4.12",
+   "title": "Text Spacing",
+   "level": "AA",
+   "axe_rules": [
+    "avoid-inline-spacing"
+   ],
+   "axe_rules_default_enabled": [
+    "avoid-inline-spacing"
+   ],
+   "category": "partial",
+   "basis": "spike judgement: avoid-inline-spacing catches blocking declarations only",
+   "ai_or_at_addition": "Playwright injects the spacing stylesheet and detects clipping"
+  },
+  {
+   "num": "1.4.13",
+   "title": "Content on Hover or Focus",
+   "level": "AA",
+   "axe_rules": [],
+   "axe_rules_default_enabled": [],
+   "category": "assisted",
+   "basis": "spike judgement: hover/focus content behaviour",
+   "ai_or_at_addition": "Playwright hover/Esc/hoverable-content script"
+  },
+  {
+   "num": "2.1.1",
+   "title": "Keyboard",
+   "level": "A",
+   "axe_rules": [
+    "frame-focusable-content",
+    "scrollable-region-focusable",
+    "server-side-image-map"
+   ],
+   "axe_rules_default_enabled": [
+    "frame-focusable-content",
+    "scrollable-region-focusable",
+    "server-side-image-map"
+   ],
+   "category": "partial",
+   "basis": "scrollable-region only, no general keyboard rule",
+   "ai_or_at_addition": "Playwright keyboard walk plus event-handler inventory proposes unreachable controls"
+  },
+  {
+   "num": "2.1.2",
+   "title": "No Keyboard Trap",
+   "level": "A",
+   "axe_rules": [],
+   "axe_rules_default_enabled": [],
+   "category": "assisted",
+   "basis": "(no keyboard-trap rule found)",
+   "ai_or_at_addition": "Playwright Tab-walk detects non-advancing focus"
+  },
+  {
+   "num": "2.1.4",
+   "title": "Character Key Shortcuts",
+   "level": "A",
+   "axe_rules": [],
+   "axe_rules_default_enabled": [],
+   "category": "manual",
+   "basis": "spike judgement: shortcut intent not visible to a rules engine",
+   "ai_or_at_addition": "Static scan of keydown handlers proposes candidates"
+  },
+  {
+   "num": "2.2.1",
+   "title": "Timing Adjustable",
+   "level": "A",
+   "axe_rules": [
+    "meta-refresh"
+   ],
+   "axe_rules_default_enabled": [
+    "meta-refresh"
+   ],
+   "category": "partial",
+   "basis": "spike judgement: meta-refresh only; JS timers invisible",
+   "ai_or_at_addition": "Playwright timer/navigation observation"
+  },
+  {
+   "num": "2.2.2",
+   "title": "Pause, Stop, Hide",
+   "level": "A",
+   "axe_rules": [
+    "blink",
+    "marquee"
+   ],
+   "axe_rules_default_enabled": [
+    "blink",
+    "marquee"
+   ],
+   "category": "partial",
+   "basis": "spike judgement: blink/marquee only; CSS/JS animation not covered",
+   "ai_or_at_addition": "Animation inventory (getAnimations) plus frame diffs"
+  },
+  {
+   "num": "2.3.1",
+   "title": "Three Flashes or Below Threshold",
+   "level": "A",
+   "axe_rules": [],
+   "axe_rules_default_enabled": [],
+   "category": "assisted",
+   "basis": "spike judgement: needs frame sequence analysis",
+   "ai_or_at_addition": "Video capture and flash-rate analysis (PEAT-style)"
+  },
+  {
+   "num": "2.4.1",
+   "title": "Bypass Blocks",
+   "level": "A",
+   "axe_rules": [
+    "bypass"
+   ],
+   "axe_rules_default_enabled": [
+    "bypass"
+   ],
+   "category": "partial",
+   "basis": "spike judgement: bypass rule accepts any landmark/heading/skip link",
+   "ai_or_at_addition": "Playwright checks skip link target and focus"
+  },
+  {
+   "num": "2.4.2",
+   "title": "Page Titled",
+   "level": "A",
+   "axe_rules": [
+    "document-title"
+   ],
+   "axe_rules_default_enabled": [
+    "document-title"
+   ],
+   "category": "partial",
+   "basis": "spike judgement: title existence, not descriptiveness",
+   "ai_or_at_addition": "LLM judges title vs content"
+  },
+  {
+   "num": "2.4.3",
+   "title": "Focus Order",
+   "level": "A",
+   "axe_rules": [],
+   "axe_rules_default_enabled": [],
+   "category": "assisted",
+   "basis": "(no focus-order rule found)",
+   "ai_or_at_addition": "Tab-walk order vs visual order geometry; human confirms"
+  },
+  {
+   "num": "2.4.4",
+   "title": "Link Purpose (In Context)",
+   "level": "A",
+   "axe_rules": [
+    "area-alt",
+    "link-name"
+   ],
+   "axe_rules_default_enabled": [
+    "area-alt",
+    "link-name"
+   ],
+   "category": "partial",
+   "basis": "spike judgement: link-name checks existence only",
+   "ai_or_at_addition": "LLM flags ambiguous link text in context"
+  },
+  {
+   "num": "2.4.5",
+   "title": "Multiple Ways",
+   "level": "AA",
+   "axe_rules": [],
+   "axe_rules_default_enabled": [],
+   "category": "manual",
+   "basis": "spike judgement: site-level navigation judgement",
+   "ai_or_at_addition": "Site crawl lists mechanisms; human decides"
+  },
+  {
+   "num": "2.4.6",
+   "title": "Headings and Labels",
+   "level": "AA",
+   "axe_rules": [],
+   "axe_rules_default_enabled": [],
+   "category": "assisted",
+   "basis": "spike judgement: descriptiveness judgement",
+   "ai_or_at_addition": "LLM judges heading/label vs section"
+  },
+  {
+   "num": "2.4.7",
+   "title": "Focus Visible",
+   "level": "AA",
+   "axe_rules": [],
+   "axe_rules_default_enabled": [],
+   "category": "assisted",
+   "basis": "(flagged 100% manual in Deque data)",
+   "ai_or_at_addition": "Focus-state screenshot diff per control"
+  },
+  {
+   "num": "2.4.11",
+   "title": "Focus Not Obscured (Minimum)",
+   "level": "AA",
+   "axe_rules": [],
+   "axe_rules_default_enabled": [],
+   "category": "assisted",
+   "basis": "spike judgement: geometry of focused element vs fixed overlays",
+   "ai_or_at_addition": "Playwright focus + elementFromPoint occlusion probe"
+  },
+  {
+   "num": "2.5.1",
+   "title": "Pointer Gestures",
+   "level": "A",
+   "axe_rules": [],
+   "axe_rules_default_enabled": [],
+   "category": "manual",
+   "basis": "spike judgement: gesture alternatives",
+   "ai_or_at_addition": "Static scan for pointer/touch gesture handlers proposes candidates"
+  },
+  {
+   "num": "2.5.2",
+   "title": "Pointer Cancellation",
+   "level": "A",
+   "axe_rules": [],
+   "axe_rules_default_enabled": [],
+   "category": "manual",
+   "basis": "spike judgement: pointer event semantics",
+   "ai_or_at_addition": "Event-handler inventory proposes candidates"
+  },
+  {
+   "num": "2.5.3",
+   "title": "Label in Name",
+   "level": "A",
+   "axe_rules": [
+    "label-content-name-mismatch"
+   ],
+   "axe_rules_default_enabled": [
+    "label-content-name-mismatch"
+   ],
+   "category": "partial",
+   "basis": "spike judgement: label-content-name-mismatch on text labels",
+   "ai_or_at_addition": "Voice-control name check"
+  },
+  {
+   "num": "2.5.4",
+   "title": "Motion Actuation",
+   "level": "A",
+   "axe_rules": [],
+   "axe_rules_default_enabled": [],
+   "category": "manual",
+   "basis": "spike judgement: motion APIs need device behaviour",
+   "ai_or_at_addition": "Static scan for devicemotion handlers"
+  },
+  {
+   "num": "2.5.7",
+   "title": "Dragging Movements",
+   "level": "AA",
+   "axe_rules": [],
+   "axe_rules_default_enabled": [],
+   "category": "assisted",
+   "basis": "spike judgement: draggable inventory possible, alternative judgement needed",
+   "ai_or_at_addition": "Draggable inventory plus LLM check for alternative control"
+  },
+  {
+   "num": "2.5.8",
+   "title": "Target Size (Minimum)",
+   "level": "AA",
+   "axe_rules": [
+    "target-size"
+   ],
+   "axe_rules_default_enabled": [
+    "target-size"
+   ],
+   "category": "partial",
+   "basis": "spike judgement: axe target-size decides geometry, exceptions need judgement",
+   "ai_or_at_addition": "Playwright bounding-box probe"
+  },
+  {
+   "num": "3.1.1",
+   "title": "Language of Page",
+   "level": "A",
+   "axe_rules": [
+    "html-has-lang",
+    "html-lang-valid",
+    "html-xml-lang-mismatch"
+   ],
+   "axe_rules_default_enabled": [
+    "html-has-lang",
+    "html-lang-valid",
+    "html-xml-lang-mismatch"
+   ],
+   "category": "automated",
+   "basis": "spike judgement: html-has-lang and html-lang-valid decide presence and validity",
+   "ai_or_at_addition": "Language-ID model could check lang matches text"
+  },
+  {
+   "num": "3.1.2",
+   "title": "Language of Parts",
+   "level": "AA",
+   "axe_rules": [
+    "valid-lang"
+   ],
+   "axe_rules_default_enabled": [
+    "valid-lang"
+   ],
+   "category": "partial",
+   "basis": "spike judgement: valid-lang checks code validity, not that passages are tagged",
+   "ai_or_at_addition": "Language-ID per passage proposes missing lang"
+  },
+  {
+   "num": "3.2.1",
+   "title": "On Focus",
+   "level": "A",
+   "axe_rules": [],
+   "axe_rules_default_enabled": [],
+   "category": "assisted",
+   "basis": "spike judgement: needs interaction and context-change detection",
+   "ai_or_at_addition": "Playwright focus walk watching navigation/DOM dialogs"
+  },
+  {
+   "num": "3.2.2",
+   "title": "On Input",
+   "level": "A",
+   "axe_rules": [],
+   "axe_rules_default_enabled": [],
+   "category": "assisted",
+   "basis": "spike judgement: needs interaction and context-change detection",
+   "ai_or_at_addition": "Playwright input walk watching navigation"
+  },
+  {
+   "num": "3.2.3",
+   "title": "Consistent Navigation",
+   "level": "AA",
+   "axe_rules": [],
+   "axe_rules_default_enabled": [],
+   "category": "assisted",
+   "basis": "spike judgement: cross-page comparison",
+   "ai_or_at_addition": "Crawl and diff navigation blocks"
+  },
+  {
+   "num": "3.2.4",
+   "title": "Consistent Identification",
+   "level": "AA",
+   "axe_rules": [],
+   "axe_rules_default_enabled": [],
+   "category": "assisted",
+   "basis": "spike judgement: cross-page comparison",
+   "ai_or_at_addition": "Crawl and compare labels of repeated components"
+  },
+  {
+   "num": "3.2.6",
+   "title": "Consistent Help",
+   "level": "A",
+   "axe_rules": [],
+   "axe_rules_default_enabled": [],
+   "category": "assisted",
+   "basis": "spike judgement: cross-page comparison",
+   "ai_or_at_addition": "Crawl and compare help-link position"
+  },
+  {
+   "num": "3.3.1",
+   "title": "Error Identification",
+   "level": "A",
+   "axe_rules": [],
+   "axe_rules_default_enabled": [],
+   "category": "assisted",
+   "basis": "spike judgement: needs error state triggering and text check",
+   "ai_or_at_addition": "Playwright submits invalid input; LLM checks error text"
+  },
+  {
+   "num": "3.3.2",
+   "title": "Labels or Instructions",
+   "level": "A",
+   "axe_rules": [
+    "form-field-multiple-labels"
+   ],
+   "axe_rules_default_enabled": [
+    "form-field-multiple-labels"
+   ],
+   "category": "partial",
+   "basis": "spike judgement: label rules decide existence, not adequacy of instructions",
+   "ai_or_at_addition": "LLM judges instruction adequacy"
+  },
+  {
+   "num": "3.3.3",
+   "title": "Error Suggestion",
+   "level": "AA",
+   "axe_rules": [],
+   "axe_rules_default_enabled": [],
+   "category": "assisted",
+   "basis": "spike judgement: suggestion quality judgement",
+   "ai_or_at_addition": "LLM judges whether messages suggest a fix"
+  },
+  {
+   "num": "3.3.4",
+   "title": "Error Prevention (Legal, Financial, Data)",
+   "level": "AA",
+   "axe_rules": [],
+   "axe_rules_default_enabled": [],
+   "category": "manual",
+   "basis": "spike judgement: transaction semantics",
+   "ai_or_at_addition": "LLM flags legal/financial forms for review"
+  },
+  {
+   "num": "3.3.7",
+   "title": "Redundant Entry",
+   "level": "A",
+   "axe_rules": [],
+   "axe_rules_default_enabled": [],
+   "category": "assisted",
+   "basis": "spike judgement: multi-step flow needed",
+   "ai_or_at_addition": "Flow recorder detects re-asked fields"
+  },
+  {
+   "num": "3.3.8",
+   "title": "Accessible Authentication (Minimum)",
+   "level": "AA",
+   "axe_rules": [],
+   "axe_rules_default_enabled": [],
+   "category": "assisted",
+   "basis": "spike judgement: paste/autofill blocking detectable by script",
+   "ai_or_at_addition": "Playwright paste/autofill probe on auth fields"
+  },
+  {
+   "num": "4.1.2",
+   "title": "Name, Role, Value",
+   "level": "A",
+   "axe_rules": [
+    "area-alt",
+    "aria-allowed-attr",
+    "aria-braille-equivalent",
+    "aria-command-name",
+    "aria-conditional-attr",
+    "aria-deprecated-role",
+    "aria-hidden-body",
+    "aria-hidden-focus",
+    "aria-input-field-name",
+    "aria-prohibited-attr",
+    "aria-required-attr",
+    "aria-roledescription",
+    "aria-roles",
+    "aria-tab-name",
+    "aria-toggle-field-name",
+    "aria-tooltip-name",
+    "aria-valid-attr",
+    "aria-valid-attr-value",
+    "button-name",
+    "duplicate-id-aria",
+    "frame-title",
+    "frame-title-unique",
+    "input-button-name",
+    "input-image-alt",
+    "label",
+    "link-name",
+    "nested-interactive",
+    "select-name",
+    "summary-name"
+   ],
+   "axe_rules_default_enabled": [
+    "area-alt",
+    "aria-allowed-attr",
+    "aria-braille-equivalent",
+    "aria-command-name",
+    "aria-conditional-attr",
+    "aria-deprecated-role",
+    "aria-hidden-body",
+    "aria-hidden-focus",
+    "aria-input-field-name",
+    "aria-prohibited-attr",
+    "aria-required-attr",
+    "aria-roles",
+    "aria-tab-name",
+    "aria-toggle-field-name",
+    "aria-tooltip-name",
+    "aria-valid-attr",
+    "aria-valid-attr-value",
+    "button-name",
+    "duplicate-id-aria",
+    "frame-title",
+    "frame-title-unique",
+    "input-button-name",
+    "input-image-alt",
+    "label",
+    "link-name",
+    "nested-interactive",
+    "select-name",
+    "summary-name"
+   ],
+   "category": "partial",
+   "basis": "spike judgement: ARIA validity and names are decidable; widget behaviour is not",
+   "ai_or_at_addition": "AT automation (Guidepup) checks announced name/role/state"
+  },
+  {
+   "num": "4.1.3",
+   "title": "Status Messages",
+   "level": "AA",
+   "axe_rules": [],
+   "axe_rules_default_enabled": [],
+   "category": "assisted",
+   "basis": "spike judgement: needs DOM mutation and live-region observation",
+   "ai_or_at_addition": "MutationObserver plus AT announcement capture"
+  }
+ ]
+}

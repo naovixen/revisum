@@ -1,0 +1,8 @@
+{
+  "about": "WCAG success criteria where axe-core detected a seeded failure in these pairs but the own accessibility engine has no rule, and why.",
+  "criteria": [
+    { "criterion": "1.4.1", "why": "Link distinguished only by colour: no W3C ACT rule exists." },
+    { "criterion": "2.2.2", "why": "Marquee: the only ACT rule (efbfc7) needs observation over time and a human judgement of the pause mechanism; out of scope." },
+    { "criterion": "3.3.2", "why": "Input without label: no ACT rule maps to 3.3.2; the failure is still caught under 4.1.2 by ACT e086e5. Counted as uncovered for 3.3.2." }
+  ]
+}

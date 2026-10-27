@@ -1,0 +1,187 @@
+{
+ "schema": "revisum.history/v1",
+ "synthetic": true,
+ "label": "Synthetic numbers invented for this demo; not measured from any team",
+ "periods": [
+  {
+   "id": "S01",
+   "changes": 40,
+   "changesVerifiedWithoutReview": 4,
+   "criteriaInScope": 60,
+   "criteriaTraced": 10,
+   "runs": 200,
+   "flakyRuns": 24,
+   "escaped": {
+    "P1": 1,
+    "P2": 3,
+    "P3": 4,
+    "P4": 2
+   }
+  },
+  {
+   "id": "S02",
+   "changes": 42,
+   "changesVerifiedWithoutReview": 6,
+   "criteriaInScope": 64,
+   "criteriaTraced": 16,
+   "runs": 210,
+   "flakyRuns": 25,
+   "escaped": {
+    "P1": 1,
+    "P2": 2,
+    "P3": 4,
+    "P4": 3
+   }
+  },
+  {
+   "id": "S03",
+   "changes": 38,
+   "changesVerifiedWithoutReview": 9,
+   "criteriaInScope": 70,
+   "criteriaTraced": 26,
+   "runs": 220,
+   "flakyRuns": 24,
+   "escaped": {
+    "P1": 1,
+    "P2": 2,
+    "P3": 3,
+    "P4": 3
+   }
+  },
+  {
+   "id": "S04",
+   "changes": 45,
+   "changesVerifiedWithoutReview": 15,
+   "criteriaInScope": 76,
+   "criteriaTraced": 38,
+   "runs": 230,
+   "flakyRuns": 23,
+   "escaped": {
+    "P1": 0,
+    "P2": 2,
+    "P3": 4,
+    "P4": 2
+   }
+  },
+  {
+   "id": "S05",
+   "changes": 44,
+   "changesVerifiedWithoutReview": 18,
+   "criteriaInScope": 82,
+   "criteriaTraced": 48,
+   "runs": 240,
+   "flakyRuns": 22,
+   "escaped": {
+    "P1": 0,
+    "P2": 2,
+    "P3": 3,
+    "P4": 2
+   }
+  },
+  {
+   "id": "S06",
+   "changes": 47,
+   "changesVerifiedWithoutReview": 24,
+   "criteriaInScope": 88,
+   "criteriaTraced": 60,
+   "runs": 250,
+   "flakyRuns": 20,
+   "escaped": {
+    "P1": 0,
+    "P2": 1,
+    "P3": 3,
+    "P4": 2
+   }
+  },
+  {
+   "id": "S07",
+   "changes": 50,
+   "changesVerifiedWithoutReview": 30,
+   "criteriaInScope": 92,
+   "criteriaTraced": 68,
+   "runs": 255,
+   "flakyRuns": 17,
+   "escaped": {
+    "P1": 0,
+    "P2": 1,
+    "P3": 2,
+    "P4": 2
+   }
+  },
+  {
+   "id": "S08",
+   "changes": 52,
+   "changesVerifiedWithoutReview": 33,
+   "criteriaInScope": 96,
+   "criteriaTraced": 78,
+   "runs": 260,
+   "flakyRuns": 14,
+   "escaped": {
+    "P1": 0,
+    "P2": 1,
+    "P3": 2,
+    "P4": 1
+   }
+  },
+  {
+   "id": "S09",
+   "changes": 55,
+   "changesVerifiedWithoutReview": 37,
+   "criteriaInScope": 100,
+   "criteriaTraced": 84,
+   "runs": 270,
+   "flakyRuns": 13,
+   "escaped": {
+    "P1": 0,
+    "P2": 0,
+    "P3": 2,
+    "P4": 1
+   }
+  },
+  {
+   "id": "S10",
+   "changes": 54,
+   "changesVerifiedWithoutReview": 38,
+   "criteriaInScope": 104,
+   "criteriaTraced": 90,
+   "runs": 275,
+   "flakyRuns": 12,
+   "escaped": {
+    "P1": 0,
+    "P2": 0,
+    "P3": 1,
+    "P4": 1
+   }
+  },
+  {
+   "id": "S11",
+   "changes": 58,
+   "changesVerifiedWithoutReview": 42,
+   "criteriaInScope": 108,
+   "criteriaTraced": 95,
+   "runs": 280,
+   "flakyRuns": 11,
+   "escaped": {
+    "P1": 0,
+    "P2": 0,
+    "P3": 1,
+    "P4": 1
+   }
+  },
+  {
+   "id": "S12",
+   "changes": 60,
+   "changesVerifiedWithoutReview": 45,
+   "criteriaInScope": 112,
+   "criteriaTraced": 100,
+   "runs": 285,
+   "flakyRuns": 10,
+   "escaped": {
+    "P1": 0,
+    "P2": 0,
+    "P3": 1,
+    "P4": 0
+   }
+  }
+ ]
+}

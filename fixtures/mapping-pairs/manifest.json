@@ -1,0 +1,308 @@
+[
+ {
+  "id": "sc111-missing-alt",
+  "sc": "1.1.1",
+  "engine_expected": true,
+  "note": "img without alt"
+ },
+ {
+  "id": "sc111-useless-alt",
+  "sc": "1.1.1",
+  "engine_expected": false,
+  "note": "alt present but meaningless filename text"
+ },
+ {
+  "id": "sc121-audio-no-transcript",
+  "sc": "1.2.1",
+  "engine_expected": false,
+  "note": "prerecorded audio with no transcript"
+ },
+ {
+  "id": "sc122-video-no-captions",
+  "sc": "1.2.2",
+  "engine_expected": true,
+  "note": "video with no captions track"
+ },
+ {
+  "id": "sc122-wrong-captions",
+  "sc": "1.2.2",
+  "engine_expected": false,
+  "note": "captions track present but wrong language and missing file"
+ },
+ {
+  "id": "sc131-bad-list",
+  "sc": "1.3.1",
+  "engine_expected": true,
+  "note": "ul with a div child"
+ },
+ {
+  "id": "sc131-fake-heading",
+  "sc": "1.3.1",
+  "engine_expected": false,
+  "note": "visual heading made from a styled paragraph"
+ },
+ {
+  "id": "sc132-visual-order",
+  "sc": "1.3.2",
+  "engine_expected": false,
+  "note": "CSS reorders content so reading order differs from DOM order"
+ },
+ {
+  "id": "sc133-sensory-instruction",
+  "sc": "1.3.3",
+  "engine_expected": false,
+  "note": "instruction relies on colour and position only"
+ },
+ {
+  "id": "sc134-orientation-lock",
+  "sc": "1.3.4",
+  "engine_expected": true,
+  "note": "CSS locks display to one orientation (axe rule is experimental, off by default)"
+ },
+ {
+  "id": "sc135-bad-autocomplete",
+  "sc": "1.3.5",
+  "engine_expected": true,
+  "note": "invalid autocomplete token on an email field"
+ },
+ {
+  "id": "sc141-colour-only-link",
+  "sc": "1.4.1",
+  "engine_expected": true,
+  "note": "inline link distinguished by colour only"
+ },
+ {
+  "id": "sc142-autoplay-audio",
+  "sc": "1.4.2",
+  "engine_expected": true,
+  "note": "audio autoplays for over 3 s with no controls"
+ },
+ {
+  "id": "sc143-low-contrast",
+  "sc": "1.4.3",
+  "engine_expected": true,
+  "note": "grey text on white, ratio about 2.3:1"
+ },
+ {
+  "id": "sc143-gradient-bg",
+  "sc": "1.4.3",
+  "engine_expected": false,
+  "note": "low contrast text over a gradient (axe returns incomplete, not a violation)"
+ },
+ {
+  "id": "sc144-no-zoom",
+  "sc": "1.4.4",
+  "engine_expected": true,
+  "note": "viewport meta disables zoom"
+ },
+ {
+  "id": "sc145-image-of-text",
+  "sc": "1.4.5",
+  "engine_expected": false,
+  "note": "heading rendered as an image of text"
+ },
+ {
+  "id": "sc1410-no-reflow",
+  "sc": "1.4.10",
+  "engine_expected": false,
+  "note": "fixed 1000 px layout forces two-dimensional scrolling at 320 px"
+ },
+ {
+  "id": "sc1411-faint-border",
+  "sc": "1.4.11",
+  "engine_expected": false,
+  "note": "text input border about 1.3:1 against the page"
+ },
+ {
+  "id": "sc1412-inline-spacing",
+  "sc": "1.4.12",
+  "engine_expected": true,
+  "note": "!important line-height in a style attribute blocks user text-spacing"
+ },
+ {
+  "id": "sc1412-inline-letter-spacing",
+  "sc": "1.4.12",
+  "engine_expected": true,
+  "note": "!important letter-spacing 0 in a style attribute blocks user text-spacing"
+ },
+ {
+  "id": "sc1413-hover-content",
+  "sc": "1.4.13",
+  "engine_expected": false,
+  "note": "hover tooltip that cannot be dismissed or hovered"
+ },
+ {
+  "id": "sc211-scroll-no-focus",
+  "sc": "2.1.1",
+  "engine_expected": true,
+  "note": "scrollable region not reachable by keyboard"
+ },
+ {
+  "id": "sc211-click-div",
+  "sc": "2.1.1",
+  "engine_expected": false,
+  "note": "div with click handler, no keyboard operation"
+ },
+ {
+  "id": "sc212-keyboard-trap",
+  "sc": "2.1.2",
+  "engine_expected": false,
+  "note": "focus returned to the field on blur"
+ },
+ {
+  "id": "sc221-meta-refresh",
+  "sc": "2.2.1",
+  "engine_expected": true,
+  "note": "timed meta refresh"
+ },
+ {
+  "id": "sc222-marquee",
+  "sc": "2.2.2",
+  "engine_expected": true,
+  "note": "marquee element"
+ },
+ {
+  "id": "sc231-flashing",
+  "sc": "2.3.1",
+  "engine_expected": false,
+  "note": "element flashing at 10 Hz"
+ },
+ {
+  "id": "sc241-no-bypass",
+  "sc": "2.4.1",
+  "engine_expected": true,
+  "note": "no skip link, landmark or heading"
+ },
+ {
+  "id": "sc242-empty-title",
+  "sc": "2.4.2",
+  "engine_expected": true,
+  "note": "empty title element"
+ },
+ {
+  "id": "sc242-vague-title",
+  "sc": "2.4.2",
+  "engine_expected": false,
+  "note": "title present but non-descriptive"
+ },
+ {
+  "id": "sc243-focus-order",
+  "sc": "2.4.3",
+  "engine_expected": false,
+  "note": "positive tabindex scrambles focus order"
+ },
+ {
+  "id": "sc244-empty-link",
+  "sc": "2.4.4",
+  "engine_expected": true,
+  "note": "link with no accessible name"
+ },
+ {
+  "id": "sc244-click-here",
+  "sc": "2.4.4",
+  "engine_expected": false,
+  "note": "link text does not describe purpose"
+ },
+ {
+  "id": "sc246-vague-heading",
+  "sc": "2.4.6",
+  "engine_expected": false,
+  "note": "heading does not describe its section"
+ },
+ {
+  "id": "sc247-focus-hidden",
+  "sc": "2.4.7",
+  "engine_expected": false,
+  "note": "focus outline removed"
+ },
+ {
+  "id": "sc2411-focus-obscured",
+  "sc": "2.4.11",
+  "engine_expected": false,
+  "note": "sticky footer covers focused control"
+ },
+ {
+  "id": "sc253-label-mismatch",
+  "sc": "2.5.3",
+  "engine_expected": true,
+  "note": "accessible name does not contain visible label"
+ },
+ {
+  "id": "sc257-drag-only",
+  "sc": "2.5.7",
+  "engine_expected": false,
+  "note": "sort order changeable only by dragging"
+ },
+ {
+  "id": "sc258-small-targets",
+  "sc": "2.5.8",
+  "engine_expected": true,
+  "note": "adjacent 10 px targets"
+ },
+ {
+  "id": "sc311-no-lang",
+  "sc": "3.1.1",
+  "engine_expected": true,
+  "note": "html without lang"
+ },
+ {
+  "id": "sc312-bad-lang-part",
+  "sc": "3.1.2",
+  "engine_expected": true,
+  "note": "invalid lang code on a passage"
+ },
+ {
+  "id": "sc321-on-focus-change",
+  "sc": "3.2.1",
+  "engine_expected": false,
+  "note": "focus opens an unexpected dialog"
+ },
+ {
+  "id": "sc331-colour-error",
+  "sc": "3.3.1",
+  "engine_expected": false,
+  "note": "error shown by red border only, no text"
+ },
+ {
+  "id": "sc332-no-label",
+  "sc": "3.3.2",
+  "engine_expected": true,
+  "note": "input without label"
+ },
+ {
+  "id": "sc333-no-suggestion",
+  "sc": "3.3.3",
+  "engine_expected": false,
+  "note": "error message does not suggest a fix"
+ },
+ {
+  "id": "sc334-no-confirm",
+  "sc": "3.3.4",
+  "engine_expected": false,
+  "note": "irreversible payment with no review or confirm step"
+ },
+ {
+  "id": "sc338-paste-blocked",
+  "sc": "3.3.8",
+  "engine_expected": false,
+  "note": "password field blocks paste and autofill"
+ },
+ {
+  "id": "sc412-button-no-name",
+  "sc": "4.1.2",
+  "engine_expected": true,
+  "note": "button without accessible name"
+ },
+ {
+  "id": "sc412-bad-role",
+  "sc": "4.1.2",
+  "engine_expected": true,
+  "note": "invalid ARIA role"
+ },
+ {
+  "id": "sc413-silent-status",
+  "sc": "4.1.3",
+  "engine_expected": false,
+  "note": "status message injected without live region"
+ }
+]

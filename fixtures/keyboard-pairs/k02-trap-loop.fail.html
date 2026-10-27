@@ -1,0 +1,7 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Keyboard fixture</title></head>
+<body><main><h1>Keyboard fixture</h1>
+<div id="box"><button id="a">Accept</button> <button id="b">Decline</button></div> <a href="#more">More</a>
+<script>for (const id of ["a","b"]) document.getElementById(id).addEventListener("keydown", (e) => { if (e.key === "Tab") { e.preventDefault(); document.getElementById(id === "a" ? "b" : "a").focus(); } });</script>
+</main></body></html>

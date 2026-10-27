@@ -1,0 +1,11 @@
+[
+ { "id": "k01-trap-keydown", "sc": "2.1.2", "rule": "a1b64e", "note": "keydown handler cancels Tab in a text field" },
+ { "id": "k02-trap-loop", "sc": "2.1.2", "rule": "a1b64e", "note": "two buttons pass focus to each other on Tab and Shift+Tab" },
+ { "id": "k03-focus-outline-none", "sc": "2.4.7", "rule": "oj04fd", "note": "outline removed on focus with no replacement" },
+ { "id": "k04-skip-link-offscreen", "sc": "2.4.7", "rule": "oj04fd", "note": "skip link stays off screen when focused" },
+ { "id": "k05-order-tabindex", "sc": "2.4.3", "rule": "keyboard-focus-order", "note": "positive tabindex sends focus to row two before row one" },
+ { "id": "k06-order-css-reverse", "sc": "2.4.3", "rule": "keyboard-focus-order", "note": "flex row-reverse makes focus run right to left" },
+ { "id": "k07-obscured-banner", "sc": "2.4.11", "rule": "keyboard-focus-obscured", "note": "fixed banner covers a focused link below the fold" },
+ { "id": "k08-reach-span-listener", "sc": "2.1.1", "rule": "keyboard-reachable", "note": "span with a click listener is not focusable" },
+ { "id": "k09-reach-tabindex-minus", "sc": "2.1.1", "rule": "keyboard-reachable", "note": "link removed from the tab order with tabindex=-1" }
+]

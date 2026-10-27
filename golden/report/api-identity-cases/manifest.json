@@ -1,0 +1,40 @@
+{
+  "schema": "revisum.report-manifest/v1",
+  "reportId": "api-identity-cases",
+  "generator": "revisum-report/0.1.0",
+  "run": {
+    "runId": "api-6e6f2d4261f9",
+    "recordedAt": "2026-10-26",
+    "manifestHash": null
+  },
+  "counts": {
+    "passed": 4,
+    "failed": 4,
+    "needsReview": 2,
+    "total": 10
+  },
+  "overall": "failed",
+  "highestSeverity": "P1",
+  "findings": 19,
+  "images": [],
+  "outputs": [
+    {
+      "name": "report.html",
+      "sha256": "d00ee434a16816f558853770237bbc61579eeb881292c68ce7c40f302e76e6ee",
+      "bytes": 84503,
+      "mediaType": "text/html"
+    },
+    {
+      "name": "pr-comment.md",
+      "sha256": "5d0fc0f5241e752882c725792c61b8f2c2cc83a24b5f9bfa0b78be4975380a0c",
+      "bytes": 784,
+      "mediaType": "text/markdown"
+    },
+    {
+      "name": "top-finding.svg",
+      "sha256": "f8ebb44435b99879052e14a483212a00b7e8d35594f0f33eaac605c4734b48ea",
+      "bytes": 2543,
+      "mediaType": "image/svg+xml"
+    }
+  ]
+}

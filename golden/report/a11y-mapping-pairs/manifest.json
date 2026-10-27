@@ -1,0 +1,209 @@
+{
+  "schema": "revisum.report-manifest/v1",
+  "reportId": "a11y-mapping-pairs",
+  "generator": "revisum-report/0.1.0",
+  "run": {
+    "runId": "a11y-6b565e75558d",
+    "recordedAt": "2026-10-26",
+    "manifestHash": null
+  },
+  "counts": {
+    "passed": 51,
+    "failed": 24,
+    "needsReview": 27,
+    "total": 102
+  },
+  "overall": "failed",
+  "highestSeverity": "P1",
+  "findings": 59,
+  "images": [
+    {
+      "id": "img.sc111-missing-alt.fail",
+      "sha256": "c75575d8ee247765763708f256c37a04fba7bf1758ab3535eeb58e7415773485",
+      "width": 1280,
+      "height": 800,
+      "embedded": "data-uri"
+    },
+    {
+      "id": "img.sc131-bad-list.fail",
+      "sha256": "f9b6e77722e548b1955b0c9f7dc56cc76fd529b2624c4d2959c197627a49a238",
+      "width": 1280,
+      "height": 800,
+      "embedded": "data-uri"
+    },
+    {
+      "id": "img.sc135-bad-autocomplete.fail",
+      "sha256": "e19fa24795e39037d5109e3b6ab7314127d8871d952df8b97bc892987ac0db91",
+      "width": 1280,
+      "height": 800,
+      "embedded": "data-uri"
+    },
+    {
+      "id": "img.sc1410-no-reflow.fail",
+      "sha256": "2e70ddfe71eb2ddc9fe917d2a77532c080a971219b1a6642d35fe518f3274fbc",
+      "width": 1280,
+      "height": 800,
+      "embedded": "data-uri"
+    },
+    {
+      "id": "img.sc1412-inline-letter-spacing.fail",
+      "sha256": "535e556150c800d93535f9bd7f9cb7086c5cfd05e61d87ac0a7fcb5587ec47ec",
+      "width": 1280,
+      "height": 800,
+      "embedded": "data-uri"
+    },
+    {
+      "id": "img.sc143-gradient-bg.fail",
+      "sha256": "53142b126d1e47245ccf6bb62a281a11c6bddeccc946cc4a2ca5a403c8457b1c",
+      "width": 1280,
+      "height": 800,
+      "embedded": "data-uri"
+    },
+    {
+      "id": "img.sc143-low-contrast.fail",
+      "sha256": "0f41fa82c427cdc8aaf1052d20b55d3d57ef729d6fef4258b2578ab7ca4795c4",
+      "width": 1280,
+      "height": 800,
+      "embedded": "data-uri"
+    },
+    {
+      "id": "img.sc144-no-zoom.fail",
+      "sha256": "b2aa49de7d40299994f8226fb69ea5c45b1bd92b0edfb7c02d33282db4e1d3db",
+      "width": 1280,
+      "height": 800,
+      "embedded": "data-uri"
+    },
+    {
+      "id": "img.sc211-click-div.fail",
+      "sha256": "8faaa926d0a37da0a348db42d8452f3317779dc907aad2f98f160df9d44b6cbf",
+      "width": 1280,
+      "height": 800,
+      "embedded": "data-uri"
+    },
+    {
+      "id": "img.sc211-scroll-no-focus.fail",
+      "sha256": "72c7027f39a1288738d277ffa8d3ee2a0ba358598840905781554e2b60a6f1a8",
+      "width": 1280,
+      "height": 800,
+      "embedded": "data-uri"
+    },
+    {
+      "id": "img.sc212-keyboard-trap.fail",
+      "sha256": "c3157ea98b8cbcb620ada3868e16842be0bdf8f08043baac94a4c08eb07510a3",
+      "width": 1280,
+      "height": 800,
+      "embedded": "data-uri"
+    },
+    {
+      "id": "img.sc221-meta-refresh.fail",
+      "sha256": "b2aa49de7d40299994f8226fb69ea5c45b1bd92b0edfb7c02d33282db4e1d3db",
+      "width": 1280,
+      "height": 800,
+      "embedded": "data-uri"
+    },
+    {
+      "id": "img.sc2411-focus-obscured.fail",
+      "sha256": "4281c17e50c076a30a8df9fc632ca5a5dfed083924de479a60e35b2765c53d2d",
+      "width": 1280,
+      "height": 800,
+      "embedded": "data-uri"
+    },
+    {
+      "id": "img.sc242-empty-title.fail",
+      "sha256": "b2aa49de7d40299994f8226fb69ea5c45b1bd92b0edfb7c02d33282db4e1d3db",
+      "width": 1280,
+      "height": 800,
+      "embedded": "data-uri"
+    },
+    {
+      "id": "img.sc243-focus-order.fail",
+      "sha256": "a9dc703fcc2c637ff1dc98fcc72e36986c7e5959c1e2eb61918bfe2fb10c26d9",
+      "width": 1280,
+      "height": 800,
+      "embedded": "data-uri"
+    },
+    {
+      "id": "img.sc244-empty-link.fail",
+      "sha256": "d83babb7a26a6d3ea47a711d429f03f391830e30bf6a8fa8764756c8c9b02666",
+      "width": 1280,
+      "height": 800,
+      "embedded": "data-uri"
+    },
+    {
+      "id": "img.sc247-focus-hidden.fail",
+      "sha256": "5014bbbb8aebf338e7ad51b9fd1df5a6e06f522a0003e1f6d944bd3ca784cba1",
+      "width": 1280,
+      "height": 800,
+      "embedded": "data-uri"
+    },
+    {
+      "id": "img.sc253-label-mismatch.fail",
+      "sha256": "de42858c091612e4267b8a3ff123ac486d9736bff51c78cb43f83daa66dc874f",
+      "width": 1280,
+      "height": 800,
+      "embedded": "data-uri"
+    },
+    {
+      "id": "img.sc258-small-targets.fail",
+      "sha256": "7c3c01118e801febee0ae985f7564bb570869af04c038f9269ffa8c71bd49950",
+      "width": 1280,
+      "height": 800,
+      "embedded": "data-uri"
+    },
+    {
+      "id": "img.sc311-no-lang.fail",
+      "sha256": "b2aa49de7d40299994f8226fb69ea5c45b1bd92b0edfb7c02d33282db4e1d3db",
+      "width": 1280,
+      "height": 800,
+      "embedded": "data-uri"
+    },
+    {
+      "id": "img.sc312-bad-lang-part.fail",
+      "sha256": "be1078637aab14d80a541972ca56a98b04d6642513647b6bd80d5efc6047f3fc",
+      "width": 1280,
+      "height": 800,
+      "embedded": "data-uri"
+    },
+    {
+      "id": "img.sc332-no-label.fail",
+      "sha256": "25d46db5bd0a1613bc1a6e3ef6d00479caacdfc5d43979419d03cfa84f59fb67",
+      "width": 1280,
+      "height": 800,
+      "embedded": "data-uri"
+    },
+    {
+      "id": "img.sc412-bad-role.fail",
+      "sha256": "0c12880bada9df64c99dc80c1a33b8f81b8f34edab0c4bf5384f308689fdf528",
+      "width": 1280,
+      "height": 800,
+      "embedded": "data-uri"
+    },
+    {
+      "id": "img.sc412-button-no-name.fail",
+      "sha256": "ce558faa4d736823e0d9c1716e97eb65114f81eaf15c4ba0efb50c33d26c0859",
+      "width": 1280,
+      "height": 800,
+      "embedded": "data-uri"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "report.html",
+      "sha256": "686cd532ff1a8ebee435b31b04c40fd359cb47f441db74ddb50d46139705efd1",
+      "bytes": 477728,
+      "mediaType": "text/html"
+    },
+    {
+      "name": "pr-comment.md",
+      "sha256": "dd3b1f11d855a4d2c46f37f91cfa052b681b98268a262df8c886fb8030243ca1",
+      "bytes": 757,
+      "mediaType": "text/markdown"
+    },
+    {
+      "name": "top-finding.svg",
+      "sha256": "a4019a931da3657cdb18406585b97211e89b5e7894ef4e47a71129bf114f8476",
+      "bytes": 13259,
+      "mediaType": "image/svg+xml"
+    }
+  ]
+}

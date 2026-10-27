@@ -1,0 +1,69 @@
+{
+  "schema": "revisum.report-manifest/v1",
+  "reportId": "functional-signup-app",
+  "generator": "revisum-report/0.1.0",
+  "run": {
+    "runId": "app-d5c07435d314",
+    "recordedAt": "2026-01-15T10:30:00.000Z",
+    "manifestHash": "4cbb581988b6bad2aa50c7cb761843b39ba2c3b066afe1d10343e515efa687f6"
+  },
+  "counts": {
+    "passed": 4,
+    "failed": 2,
+    "needsReview": 0,
+    "total": 6
+  },
+  "overall": "failed",
+  "highestSeverity": "P2",
+  "findings": 2,
+  "images": [
+    {
+      "id": "app.happy.form-filled",
+      "sha256": "c4f12a33c092f5d9929f1e0eae4d1e23c0ef474ac40cd1b8695f4a2b2cf91e5b",
+      "width": 1280,
+      "height": 800,
+      "embedded": "data-uri"
+    },
+    {
+      "id": "app.happy.signed-up",
+      "sha256": "2bd9767b3979cfcf3edf7cbca6e1c808c7d2b6936853fe52fabe9df3c600a6a1",
+      "width": 1280,
+      "height": 800,
+      "embedded": "data-uri"
+    },
+    {
+      "id": "app.a11y.a11y-gate",
+      "sha256": "fef03c626c6024dacc1b2d0e3db54ebc6abcf415d6d94bad4644503409d94749",
+      "width": 1280,
+      "height": 800,
+      "embedded": "data-uri"
+    },
+    {
+      "id": "app.label.label-mismatch",
+      "sha256": "fef03c626c6024dacc1b2d0e3db54ebc6abcf415d6d94bad4644503409d94749",
+      "width": 1280,
+      "height": 800,
+      "embedded": "data-uri"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "report.html",
+      "sha256": "e24a1d19c083c1aa9e74a8c376929b75a1985780f04846535959f3f01f9aac9d",
+      "bytes": 205277,
+      "mediaType": "text/html"
+    },
+    {
+      "name": "pr-comment.md",
+      "sha256": "240fd9b48d8449fbae753fbf8ae1d83b6cd4f36e9cc9db0ccb0ce955cd73f12b",
+      "bytes": 613,
+      "mediaType": "text/markdown"
+    },
+    {
+      "name": "top-finding.svg",
+      "sha256": "aa726407978102e5206e42999f340e80c9edf5d05a2c177fb2417fcb2117ff3c",
+      "bytes": 32603,
+      "mediaType": "image/svg+xml"
+    }
+  ]
+}
