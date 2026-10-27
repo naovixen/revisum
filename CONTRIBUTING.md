@@ -3,9 +3,9 @@
 ## In short
 
 - Every change starts from a spec in `docs/specs/`. Work from its acceptance criteria and nothing else.
-- Tests and code are written in **separate sessions and separate pull requests**. Tests merge first; the code is then written against them, frozen.
-- `npm run check` must be green in the pinned dev container before a pull request is opened.
-- Only the founder commits, pushes and merges. That merge is the approval, recorded as `declared`. An AI agent's approval never counts, and nothing waits on a second person.
+- Tests and code are written by **separate agents with fresh contexts, in separate commits**. Tests are committed first; the code is then written against them, frozen.
+- `npm run check` must be green before code is committed. `npm run check:linux` repeats it on CI's pinned Linux image.
+- The coding agent may commit. Only the founder pushes and merges. That push is the approval, recorded as `declared`. An AI agent's approval never counts, and nothing waits on a second person.
 
 ## The spec template
 
@@ -46,37 +46,41 @@ Rules for criteria:
   - **regression:** a golden file.
 - Criterion ids never change once merged. They are data: they appear in test metadata, commit trailers and the trace index, never in names.
 
-## The two-session workflow
+## The workflow
+
+The founder drives one Claude Code session. That session hands the tests and the code to separate helper agents, each starting from a fresh context with only its brief, and commits their work separately.
 
 | Step | Who | What | Allowed to change |
 |---|---|---|---|
 | 1. Spec | Founder | Writes or approves the spec | `docs/specs/` |
-| 2. Types | Code session | Adds the spec's types and ports, if they are new | `packages/`, `docs/` |
-| 3. Tests | Tests session (`docs/prompts/session-tests.md`) | Writes at least one test per criterion, tagged `{ criterion: 'AC-SPEC-nn-mm' }`. Tests are expected to fail | `test/`, `fixtures/`, `golden/` only |
-| 4. Founder | Founder | Reads the tests, commits them alone, merges | — |
-| 5. Code | Code session (`docs/prompts/session-code.md`) | Implements the spec until the frozen tests pass. Never edits a test: if one looks wrong, stops and explains | `packages/`, `tools/`, `docs/` only |
-| 6. Founder | Founder | Reads the diff, commits, merges | — |
+| 2. Types | Code helper | Adds the spec's types and ports, if they are new | `packages/`, `docs/` |
+| 3. Tests | Tests helper (`docs/prompts/session-tests.md`) | Writes at least one test per criterion, tagged `{ criterion: 'AC-SPEC-nn-mm' }`. Tests are expected to fail | `test/`, `proofs/`, `fixtures/`, `golden/` only |
+| 4. Commit | Main session | Checks the change is tests only, then commits it alone | — |
+| 5. Code | Code helper (`docs/prompts/session-code.md`) | Implements the spec until the frozen tests pass. Never edits a test: if one looks wrong, stops and explains | `packages/`, `tools/`, `docs/` only |
+| 6. Commit | Main session | Runs `npm run check`, then commits the code | — |
+| 7. Push | Founder | Reads the commits, then pushes to `main` | — |
 
-- An optional cold review uses `docs/prompts/session-review.md`.
-- The `tests-apart` check fails any pull request that changes the test set (`test/`, `proofs/`, `fixtures/`, `golden/`) together with anything else. This stops a change editing a test to make its own code pass.
+- An optional cold review uses `docs/prompts/session-review.md`, in a third fresh helper.
+- The test set is `test/`, `proofs/`, `fixtures/` and `golden/`. No commit may change it together with anything else; this stops a change editing a test to make its own code pass. Check staged files with `git diff --cached --name-only | node tools/check-tests-apart.ts`. CI runs the same check on pull requests.
 - `.github/CODEOWNERS` gives the test set and CI configuration to the founder.
 
 ## Definition of Done
 
 A spec is done when all of these hold:
 
-1. Every acceptance criterion has at least one test tagged with its id, merged before the code, in its own pull request.
-2. `npm run check` is green in the pinned dev container and in CI, with no retries and no skipped tests.
-3. The `tests-apart` check passed on both pull requests.
+1. Every acceptance criterion has at least one test tagged with its id, committed before the code, in its own commit.
+2. `npm run check` is green locally and in CI, on the pinned Linux image, with no retries and no skipped tests.
+3. The `tests-apart` check passed on the tests commit and on the code commit.
 4. No runtime dependency was added to `contracts` or `engine`. Any new third-party package elsewhere has a dependency review in `docs/decisions/`, written before it was added.
 5. Generated files are regenerated once they exist: the guarantee table, logging manifest, JSON Schema and changelog.
-6. The founder read the diff, including any change to assertions, and committed and merged it personally. That approval is recorded as `declared`.
+6. The founder read the commits, including any change to assertions, and pushed them personally. That approval is recorded as `declared`.
 
 ## Commands
 
 | Command | Does |
 |---|---|
 | `npm run check` | Everything below, in order. Must be green before you finish |
+| `npm run check:linux` | `npm run check` on CI's pinned Linux image, in Docker. Needs Docker Desktop running |
 | `npm run typecheck` | `tsc --build` over every package and `tools/`. A wrong-way import between packages fails here |
 | `npm run lint` | Licence map, folder layout, and the trusted-package import check |
 | `npm run lint:names` | The naming lint's self-test, then the naming lint over the repository |
@@ -108,7 +112,7 @@ The code must read without any other document.
 
 ## Commit trailers
 
-The founder adds these when committing; they feed the project's own metrics:
+Whoever commits adds these; they feed the project's own metrics:
 
 ```
 Agent: <tool>/<version>       when an agent wrote the change

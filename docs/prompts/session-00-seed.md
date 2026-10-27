@@ -1,6 +1,6 @@
 # Session 0: seed the product repo
 
-Paste everything below the line into a fresh Claude Code session inside the dev container. Before pasting, replace `<PART>` with 0a, 0b or 0c and `<COMMIT>` with the research commit hash. Run the parts in order, with a founder commit after each.
+The main session replaces `<PART>` with 0a, 0b or 0c and `<COMMIT>` with the research commit hash, and gives everything below the line, as its whole brief, to a helper agent with a fresh context. Run the parts in order; the main session commits each part separately.
 
 ---
 
@@ -8,7 +8,7 @@ You are seeding the product repository for Revisum. It's a tool that independent
 
 **Read first, in this order:** `CLAUDE.md`, `docs/system-design.md` (packages, folder structure, naming rules), `docs/glossary.md`, `docs/specs/SPEC-00-repo-seed-and-gates.md`, and `docs/specs/SPEC-27-shared-types-and-events.md`.
 
-**The research spikes** are mounted read-only at `/research-spikes` (research commit `<COMMIT>`). They're prototypes: take their logic and tests, not their names or layout.
+**The research spikes** are in `E:\core\docs\research\spikes`; treat them as read-only (research commit `<COMMIT>`). They're prototypes: take their logic and tests, not their names or layout.
 
 ## Part 0a: skeleton (no spike code)
 
@@ -66,7 +66,7 @@ You are seeding the product repository for Revisum. It's a tool that independent
 
 ## Every part
 
-- Never commit, push or merge; the founder does that.
+- Never commit, push or merge; the main session commits and the founder pushes.
 - Browsers run headless.
 - Add no new runtime dependency to `contracts` or `engine`.
 - Finish with:

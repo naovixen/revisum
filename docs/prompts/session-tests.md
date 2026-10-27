@@ -1,6 +1,6 @@
-# Session A: tests from a spec
+# Brief: tests from a spec
 
-Paste everything below the line into a fresh Claude Code session in the dev container. Replace `<NN>` with the spec number.
+The main session replaces `<NN>` with the spec number and gives everything below the line, as its whole brief, to a helper agent with a fresh context. The main session commits the result.
 
 ---
 
@@ -24,7 +24,7 @@ Write the tests for **SPEC-<NN>**, before any implementation exists.
 **Don't:**
 - write or change anything in `packages/`;
 - weaken an existing test;
-- commit.
+- commit; the main session does that.
 
 **Check:** the tests compile with `tsc`. They are expected to fail until the code exists; list them.
 

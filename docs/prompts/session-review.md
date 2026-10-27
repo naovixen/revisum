@@ -1,10 +1,10 @@
-# Session R: cold review (optional)
+# Brief: cold review (optional)
 
-Paste everything below the line into a fresh Claude Code session that has seen nothing of sessions A and B. Replace `<NN>` with the spec number.
+The main session replaces `<NN>` with the spec number and gives everything below the line, as its whole brief, to a helper agent with a fresh context, one that has seen neither the tests nor the code being written.
 
 ---
 
-Review the merged implementation of **SPEC-<NN>** as an independent reader. You get no notes from the authors.
+Review the committed implementation of **SPEC-<NN>** as an independent reader. You get no notes from the authors.
 
 **Read:** `docs/specs/SPEC-<NN>-*.md`, then the tests tagged `AC-SPEC-<NN>-*`, then the code they exercise.
 

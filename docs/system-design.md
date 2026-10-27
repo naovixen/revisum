@@ -3,7 +3,7 @@
 - **Serves:** the founder's approval of `09`. It shows what phase 1 implements and how, in one place, before any product code exists.
 - **As of:** 2026-10-27. It brings together `04` (architecture), `06` (stack), `11` (interface), `12` (drivers and engines) and the specs in `specs/`, and adds the package layout, folder structure and naming rules.
 - **Terms:** *engine* means the trusted core library (the "core" of `04`). *Package* means one npm workspace in the product repo. *Revisum* is the product name (chosen 2026-10-27; UK and EU trademark checks pending); `revisum` is the repo, package and CLI name.
-- **Research references:** two-digit doc numbers such as `04` or `09`, claim IDs `[C-…]` and `[calc:…]` markers point to the research repo `E:\core\docs` (read-only at `/research-docs` in the dev container). They are background, never names in code.
+- **Research references:** two-digit doc numbers such as `04` or `09`, claim IDs `[C-…]` and `[calc:…]` markers point to the research repo `E:\core\docs`. They are background, never names in code.
 
 ## In short
 
@@ -156,7 +156,7 @@ flowchart TD
 
 - **Lifecycle states** follow `04` Finding 4: Proposed, Rejected, Planned, Denied, TargetUnavailable, Authorised, Resolved, Running, Passed, Failed, Errored. Illegal transitions are compile errors.
 - **Approval routes** (SPEC-02, `13` FR-06). No gate sits behind a second person (founder, 2026-10-27):
-  - **Declared:** the owner's approval under the agent lock-down in `15`. The coding agent can't commit, push or merge, so a merge to the protected branch is the founder's. It suffices for every subject: plans, trusted files, review decisions, high-risk extra reviews and holdout plans. Anything built on it is labelled `declared`.
+  - **Declared:** the owner's approval under the agent lock-down in `15`. The coding agent can't push or merge, so a push or merge to the default branch is the founder's. In this repo the agent may commit locally (`docs/decisions/single-session-workflow.md`). It suffices for every subject: plans, trusted files, review decisions, high-risk extra reviews and holdout plans. Anything built on it is labelled `declared`.
   - **Verified (optional):** a code owner's review from an account other than the author's, for teams that have one. No feature, level or metric requires it.
   - An agent's own approval never gates.
 - **Replay** re-runs a plan from its manifest and compares result hashes (SPEC-08).
@@ -176,8 +176,8 @@ revisum/
 ├─ LICENSE-APACHE  LICENSE-FSL  licences.json   per-package licence map, checked in CI
 ├─ package.json            npm workspaces and scripts: check, test, lint, proofs, replay
 ├─ tsconfig.base.json      strict, erasable syntax only, project references
-├─ .devcontainer/          the pinned image used by CI; no GitHub credentials inside
-├─ .claude/settings.json   agent deny rules: no commit, push, merge or PR approval
+├─ .devcontainer/          the pinned image used by CI and `npm run check:linux`; no GitHub credentials inside
+├─ .claude/settings.json   agent deny rules: no push, merge, history rewrite or PR approval
 ├─ .github/
 │  ├─ workflows/ci.yml     tsc, lint, naming lint, contract, proofs, replay, a11y re-score, tests-apart
 │  └─ CODEOWNERS           test/, proofs/, fixtures/, golden/, .github/ owned by the founder
@@ -253,4 +253,4 @@ Allowed abbreviations: id, url, uri, html, css, json, http, api, cli, ci, pr, cd
 
 ## Sources
 
-Full source list: `E:/core/docs/research/references.md`, section 14-system-design (the research repo; read-only at `/research-docs/research/references.md` in the dev container).
+Full source list: `E:/core/docs/research/references.md`, section 14-system-design (the research repo).

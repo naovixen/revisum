@@ -1,8 +1,8 @@
 # Start here
 
-This repo holds the approved design for Revisum and nothing else yet. Follow the steps in order. Each step has a check, so you know it worked.
+The founder's checklist. Follow the steps in order. Each step has a check, so you know it worked.
 
-**Starting a Claude Code session here:** open a terminal in `E:\revisum`, run `claude`, and say: *"Read START.md and help me with the next unchecked step."* Claude can't run git commit, push, `gh repo` or `gh api` here: you run those yourself.
+**How you work:** open WebStorm's terminal in `E:\revisum`, run `claude`, and say *"Read START.md and do the next unchecked step."* That one session does the work and commits it. You read the commits and push. Claude can't push, merge, rebase or tag. See `docs/decisions/single-session-workflow.md`.
 
 ## Progress
 
@@ -11,48 +11,42 @@ This repo holds the approved design for Revisum and nothing else yet. Follow the
 - [x] 3. Image digest pinned
 - [x] 4. First commit and private GitHub repo
 - [x] 5. `main` protection: skipped on GitHub Free until the repo goes public at beta
-- [x] 6. Dev container open and locked
+- [x] 6. Dev container locked (now used only for CI and `npm run check:linux`)
 - [x] 7. Session 0a: skeleton
-- [ ] 8. Session 0b: tests from the spikes
+- [x] 8. Session 0b: tests from the spikes
 - [ ] 9. Session 0c: code from the spikes
 - [ ] 10. Week 1: SPEC-27, then SPEC-01
 
-## Setup
+## Setup (done)
 
 | # | Step | How | Check |
 |---|---|---|---|
 | 1 | Commit the research | In `E:\core`, run `git add -A` then `git commit -m "Research complete: decision docs, specs, spikes, build templates"` | `git status` is clean |
-| 2 | Record the research commit | `git -C E:/core rev-parse --short HEAD`. Put the hash in `CLAUDE.md` under Provenance; Claude can do this for you | No `<research-commit>` left in `CLAUDE.md` |
-| 3 | Pin the container image | `docker pull mcr.microsoft.com/devcontainers/typescript-node:24-bookworm`, then `docker inspect --format "{{index .RepoDigests 0}}" mcr.microsoft.com/devcontainers/typescript-node:24-bookworm`. Replace `<pin-at-M0>` in `.devcontainer/devcontainer.json` with the digest | The image line ends in `@sha256:` and 64 hex characters |
-| 4 | First commit and GitHub repo | `git add -A`, `git commit -m "Design, specs and setup for Revisum"`, then `gh repo create revisum --private --source=. --remote=origin --push` | The repo shows on GitHub with one commit on `main` |
-| 5 | Protect `main` | GitHub → Settings → Rules → new branch ruleset on `main`: require a pull request and block force pushes. After session 0a's first CI run, also require the `ci` and `tests-apart` checks | A direct `git push` to `main` is refused |
-| 6 | Open the dev container | In a terminal in `E:\revisum` (WebStorm's terminal works), run `npx @devcontainers/cli up --workspace-folder .`, then `npx @devcontainers/cli exec --workspace-folder . bash`. Inside, run `claude` and log in. Edit in WebStorm on Windows as usual: the repo folder is shared with the container. Run git on Windows, never inside | Inside the container, `gh auth status` **fails** and `git push --dry-run` **fails**. If either works, turn off Git credential forwarding before going on |
+| 2 | Record the research commit | `git -C E:/core rev-parse --short HEAD`. Put the hash in `CLAUDE.md` under Provenance | No `<research-commit>` left in `CLAUDE.md` |
+| 3 | Pin the container image | `docker pull`, then `docker inspect --format "{{index .RepoDigests 0}}"` on `mcr.microsoft.com/devcontainers/typescript-node:24-bookworm`. Put the digest in `.devcontainer/devcontainer.json` | The image line ends in `@sha256:` and 64 hex characters |
+| 4 | First commit and GitHub repo | `gh repo create revisum --private --source=. --remote=origin --push` | The repo shows on GitHub |
+| 5 | Protect `main` | GitHub → Settings → Rules → new branch ruleset on `main`: block force pushes, and require the `ci` check | A force push to `main` is refused |
+| 6 | Lock the container | `npx @devcontainers/cli@0.89.0 exec --workspace-folder . bash`, then `gh auth status` and `git push --dry-run` | Both **fail** |
 
-- **Rules on a private repo need a paid GitHub plan.** On GitHub Free, private repos have no branch rules, so step 5 is skipped until the repo goes public at beta. The deny rules and the credential-free container still lock the agent out.
-- **Don't use WebStorm's built-in Dev Containers.** It ignores the credential settings in `devcontainer.json` (those are VS Code only) and can forward your Git credentials into the container. The Dev Containers CLI forwards none.
-- Docker Desktop with WSL 2 must be running for steps 3 and 6.
-- Steps 1–5 can run in a session on Windows. From step 7 on, Claude runs **inside** the dev container.
+- **Rules on a private repo need a paid GitHub plan.** On GitHub Free, private repos have no branch rules, so step 5 waits until the repo goes public at beta.
+- **Don't use WebStorm's built-in Dev Containers.** It can forward your Git credentials into the container. Use `npm run check:linux`, which uses the Dev Containers CLI.
 
-## Build sessions
+## Building
 
-The prompts live in `docs/prompts/`. Each runs in a **fresh** session inside the dev container, and you commit after each session. Claude never commits.
+Tell the session what to build, for example *"Do session 0c"* or *"Build SPEC-27"*. It follows "How a spec is built" in `CLAUDE.md`:
 
-**In WebStorm, use the Run menu buttons** (from `.run/`). They run `tools/session.ps1`, which you can also run from WebStorm's terminal:
+1. A helper agent with a fresh context writes the tests. The session checks they are tests only and commits them.
+2. A second fresh helper writes the code against those tests. The session runs `npm run check` and commits the code.
+3. Optionally, a third fresh helper does a cold review.
+4. The session reports the commits. You read them (`git log -p`, or WebStorm's Git log) and push.
 
-| Button | Command | Does |
+| Step | What to say | Note |
 |---|---|---|
-| Start session | `.\tools\session.ps1 start` | Asks which session and spec, starts Docker and the container, and opens Claude with the prompt filled in |
-| Finish session | `.\tools\session.ps1 finish` | Refuses to commit if tests and code are mixed, runs `npm run check` in the container, then commits to `main` and asks before pushing |
-| Container shell | `.\tools\session.ps1 shell` | A bash shell in the container |
+| 9 | "Do session 0c" | The naming lint currently flags hashes in the 0b golden files; 0c fixes the lint, not the files |
+| 10+ | "Build SPEC-nn" | One spec at a time |
 
-The table below says what each session needs. The script fills in the placeholders for you.
-
-| Step | Prompt | Fill in | Then you |
-|---|---|---|---|
-| 7 | `session-00-seed.md` | `<PART>` = 0a, `<COMMIT>` = the research hash | Check that `npm run check` is green; Finish session |
-| 8 | `session-00-seed.md` | `<PART>` = 0b | Read the tests; Finish session (the check stays red until 0c) |
-| 9 | `session-00-seed.md` | `<PART>` = 0c | Read the diff; Finish session; remove the `/research-spikes` mount |
-| 10+ | `session-tests.md`, then `session-code.md` | `<NN>` = the spec number; `<TESTS-COMMIT>` for the code session | Finish the tests session before starting the code session. The optional review session gives a cold review |
+- **Before you push** anything with screenshots, fonts or replay hashes, ask for `npm run check:linux` (Docker Desktop must be running). It runs the check on CI's Linux image.
+- **After each push,** check that CI is green on GitHub.
 
 **Spec order:** SPEC-00 (session 0), then SPEC-27, SPEC-01, SPEC-02 and onwards, following the milestones in `docs/system-design.md` §7. Keep one spec in flight until M1 is done.
 
@@ -60,6 +54,7 @@ The table below says what each session needs. The script fills in the placeholde
 
 ## Still to do outside the code
 
+- **Decide before SPEC-02's tests:** how SPEC-02's agent lock-down route treats an agent that may commit (see the open question in `docs/decisions/single-session-workflow.md`).
 - **Secure the name:**
   - the `revisum` GitHub organisation and npm package;
   - `revisum.dev`, `revisum.ai` and `getrevisum.com`;

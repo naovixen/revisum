@@ -6,11 +6,12 @@ Revisum independently verifies AI-built web software. It runs human-approved, ty
 
 ## Quick start (development)
 
-Work inside the dev container (`.devcontainer/`), on Node 24:
+On Node 24:
 
 ```sh
 npm ci
 npm run check
+npm run check:linux   # the same check on CI's pinned Linux image; needs Docker
 ```
 
 See `CONTRIBUTING.md` for the workflow and `docs/system-design.md` for the design.

@@ -1,5 +1,6 @@
-// The coding agent runs in here. It must have no Git or GitHub credentials:
-// check that `gh auth status` and `git push --dry-run` both fail inside the container.
+// The pinned Linux image that CI runs. Locally it runs `npm run check:linux`, so a check can be
+// repeated on exactly CI's Linux, Node and fonts. Claude works on Windows, not in here
+// (see docs/decisions/single-session-workflow.md). It holds no Git or GitHub credentials.
 {
   "name": "revisum",
   // Pin by digest at M0 (docker pull, then docker inspect --format '{{index .RepoDigests 0}}').
@@ -9,14 +10,14 @@
     "MOZ_HEADLESS": "1",
     "GIT_TERMINAL_PROMPT": "0"
   },
-  // Read-only access to the research repo. The spikes are only for seeding (session 0); remove that mount after M0.
-  // The decision docs stay mounted so the doc numbers cited in specs (`04`, `09`, ...) resolve.
+  // Linux needs its own node_modules: some packages, TypeScript among them, install a different
+  // binary per operating system. A volume keeps it apart from the Windows install, and is faster.
   "mounts": [
-    "source=E:/core/docs/research/spikes,target=/research-spikes,type=bind,readonly",
-    "source=E:/core/docs,target=/research-docs,type=bind,readonly"
+    "source=revisum-node-modules,target=${containerWorkspaceFolder}/node_modules,type=volume"
   ],
-  // The repo folder is owned by the Windows user, so git needs safe.directory to read it. This grants no push access.
-  "postCreateCommand": "npm install -g @anthropic-ai/claude-code && git config --global --add safe.directory ${containerWorkspaceFolder} && (git config --global --unset-all credential.helper || true)",
+  // The volume starts owned by root. The repo folder is owned by the Windows user, so git needs
+  // safe.directory to read it; that grants no push access.
+  "postCreateCommand": "sudo chown node node_modules && npm ci && git config --global --add safe.directory ${containerWorkspaceFolder} && (git config --global --unset-all credential.helper || true)",
   "customizations": {
     "vscode": {
       "settings": {

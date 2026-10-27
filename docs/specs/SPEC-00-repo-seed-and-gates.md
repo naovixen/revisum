@@ -14,8 +14,8 @@ Create core's product repository, separate from the research repository, seeded 
   - `CONTRIBUTING.md` with the spec template, the Definition of Done and the naming rule.
   - **Tests apart from code.** CODEOWNERS on `test/` and a required `tests-apart` status check.
   - **Human approval for core's own build (solo, no hardware key).**
-    - The coding agent is locked out of commit, push, merge and pull-request approval: deny rules in its settings, and no GitHub credentials in its environment.
-    - The founder commits, pushes and merges personally. Only the protected default branch is trusted.
+    - The coding agent is locked out of push, merge, history rewriting and pull-request approval by deny rules in its settings. It may commit locally (founder decision, 2026-10-27; `docs/decisions/single-session-workflow.md`).
+    - The founder pushes and merges personally. Only the default branch is trusted.
     - Core records these approvals as `declared`, not `verified`, and says so (the agent lock-down route in SPEC-02).
     - Nothing is gated behind a second person (founder, 2026-10-27). If a second maintainer joins, code-owner review by their account becomes an optional verified route, never a required one.
   - CI with `tsc`, lints (including the naming lint), contract suites, proofs, replay and ACT re-score.

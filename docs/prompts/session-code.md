@@ -1,10 +1,10 @@
-# Session B: code against frozen tests
+# Brief: code against frozen tests
 
-Paste everything below the line into a fresh Claude Code session in the dev container. Replace `<NN>` with the spec number and `<TESTS-COMMIT>` with the merged tests commit.
+The main session replaces `<NN>` with the spec number and `<TESTS-COMMIT>` with the tests commit, and gives everything below the line, as its whole brief, to a helper agent with a fresh context. The main session commits the result.
 
 ---
 
-Implement **SPEC-<NN>** so the tests merged at `<TESTS-COMMIT>` pass.
+Implement **SPEC-<NN>** so the tests committed at `<TESTS-COMMIT>` pass.
 
 **Read:** `CLAUDE.md`, `docs/system-design.md`, `docs/glossary.md`, `docs/specs/SPEC-<NN>-*.md`, and the tests tagged `AC-SPEC-<NN>-*`.
 
@@ -16,9 +16,9 @@ Implement **SPEC-<NN>** so the tests merged at `<TESTS-COMMIT>` pass.
 - Run `npm run check` until it's green. No retries or skips.
 
 **Don't:**
-- change any file in `test/`, `fixtures/` or `golden/`. If a test looks wrong, stop and explain why with the criterion ID;
+- change any file in `test/`, `proofs/`, `fixtures/` or `golden/`. If a test looks wrong, stop and explain why with the criterion ID;
 - add a runtime dependency to `contracts` or `engine`;
-- commit.
+- commit; the main session does that.
 
 **Finish with:**
 1. the files changed;
