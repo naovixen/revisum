@@ -38,6 +38,8 @@
       "PowerShell(gh pr review *)",
       "PowerShell(gh api *)",
       "PowerShell(npm publish *)",
+      "Bash(*session.ps1 finish*)",
+      "PowerShell(*session.ps1 finish*)",
       "Read(~/.git-credentials)",
       "Read(~/.config/gh/**)",
       "Read(~/.ssh/**)",

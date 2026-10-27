@@ -12,7 +12,7 @@ This repo holds the approved design for Revisum and nothing else yet. Follow the
 - [x] 4. First commit and private GitHub repo
 - [x] 5. `main` protection: skipped on GitHub Free until the repo goes public at beta
 - [x] 6. Dev container open and locked
-- [ ] 7. Session 0a: skeleton (built; `npm run check` green; awaiting your review and commit)
+- [x] 7. Session 0a: skeleton
 - [ ] 8. Session 0b: tests from the spikes
 - [ ] 9. Session 0c: code from the spikes
 - [ ] 10. Week 1: SPEC-27, then SPEC-01
@@ -35,14 +35,24 @@ This repo holds the approved design for Revisum and nothing else yet. Follow the
 
 ## Build sessions
 
-The prompts live in `docs/prompts/`. Paste each one into a **fresh** session inside the dev container, fill in the placeholders, and commit after each session. Claude never commits.
+The prompts live in `docs/prompts/`. Each runs in a **fresh** session inside the dev container, and you commit after each session. Claude never commits.
+
+**In WebStorm, use the Run menu buttons** (from `.run/`). They run `tools/session.ps1`, which you can also run from WebStorm's terminal:
+
+| Button | Command | Does |
+|---|---|---|
+| Start session | `.\tools\session.ps1 start` | Asks which session and spec, starts Docker and the container, and opens Claude with the prompt filled in |
+| Finish session | `.\tools\session.ps1 finish` | Refuses to commit if tests and code are mixed, runs `npm run check` in the container, then commits to `main` and asks before pushing |
+| Container shell | `.\tools\session.ps1 shell` | A bash shell in the container |
+
+The table below says what each session needs. The script fills in the placeholders for you.
 
 | Step | Prompt | Fill in | Then you |
 |---|---|---|---|
-| 7 | `session-00-seed.md` | `<PART>` = 0a, `<COMMIT>` = the research hash | Check that `npm run check` is green; commit; open a PR; merge |
-| 8 | `session-00-seed.md` | `<PART>` = 0b | Read the tests; commit them alone; merge |
-| 9 | `session-00-seed.md` | `<PART>` = 0c | Read the diff; commit; merge; remove the `/research-spikes` mount |
-| 10+ | `session-tests.md`, then `session-code.md` | `<NN>` = the spec number; `<TESTS-COMMIT>` for the code session | Merge the tests first, then the code. The optional `session-review.md` gives a cold review |
+| 7 | `session-00-seed.md` | `<PART>` = 0a, `<COMMIT>` = the research hash | Check that `npm run check` is green; Finish session |
+| 8 | `session-00-seed.md` | `<PART>` = 0b | Read the tests; Finish session (the check stays red until 0c) |
+| 9 | `session-00-seed.md` | `<PART>` = 0c | Read the diff; Finish session; remove the `/research-spikes` mount |
+| 10+ | `session-tests.md`, then `session-code.md` | `<NN>` = the spec number; `<TESTS-COMMIT>` for the code session | Finish the tests session before starting the code session. The optional review session gives a cold review |
 
 **Spec order:** SPEC-00 (session 0), then SPEC-27, SPEC-01, SPEC-02 and onwards, following the milestones in `docs/system-design.md` §7. Keep one spec in flight until M1 is done.
 
