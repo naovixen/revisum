@@ -52,6 +52,39 @@ export function splitWords(name: string): string[] {
   return words;
 }
 
+// Separators between the parts of a file name, string or JSON key.
+const NAME_SEPARATORS = /[\s_\-./:@#]+/;
+
+// A WCAG success criterion number written into a file name, such as "sc2-4-2" in the W3C test
+// assets. It is a standard reference, not a research id.
+const WCAG_CRITERION_NUMBER = /\bsc\d[-.]\d{1,2}[-.]\d{1,2}(?![\d])/gi;
+
+// True for a part that is an opaque machine id rather than words. Splitting such a part into
+// words gives chance fragments such as "d00" or "f7" that look like research ids.
+//   - A hex digest or digest prefix: 7 or more lowercase hex characters with letters and digits,
+//     as in "d00ee434a168" or a Git hash.
+//   - A W3C ACT rule id: 6 lowercase letters and digits, as in "afw4f7" or "oj04fd". It counts
+//     as opaque when it has two or more separate runs of digits, or when its own words break no
+//     rule, so a lowercase name that starts with a banned id is still reported.
+// Names declared in code are never treated this way, and mixed-case or short parts are always
+// checked. The self-test below plants examples of both.
+function isOpaqueId(checker: Checker, part: string): boolean {
+  const hasLetter = /[a-z]/.test(part);
+  const hasDigit = /\d/.test(part);
+  if (!hasLetter || !hasDigit) return false;
+  if (/^[0-9a-f]{7,}$/.test(part)) return true;
+  if (!/^[a-z0-9]{6}$/.test(part)) return false;
+  if ((part.match(/\d+/g) ?? []).length >= 2) return true;
+  return splitWords(part).every((word) => firstMatch(checker.config.bannedWords, word) === undefined);
+}
+
+// The name with WCAG criterion numbers and opaque machine ids removed, keeping the remaining
+// parts apart so that no word is joined across a removed part.
+function withoutOpaqueIds(checker: Checker, name: string): string {
+  return name.replace(WCAG_CRITERION_NUMBER, ' ').split(NAME_SEPARATORS)
+    .map((part) => (isOpaqueId(checker, part) ? ' ' : part)).join('-');
+}
+
 type Checker = {
   readonly config: NamingLintConfig;
   readonly include: readonly RegExp[];
@@ -73,12 +106,14 @@ function firstMatch(rules: readonly NamingRule[], text: string): string | undefi
 }
 
 // Reasons a name breaks the rules. `spellOut` applies only to names declared in code: file
-// names, string values and JSON or YAML keys often follow outside formats (".md", "env:").
-function nameProblems(checker: Checker, name: string, checkAbbreviations: boolean): string[] {
+// names, string values and JSON or YAML keys often follow outside formats (".md", "env:"),
+// and may carry opaque machine ids, which are skipped (see isOpaqueId).
+function nameProblems(checker: Checker, name: string, isDeclaredInCode: boolean): string[] {
   const problems: string[] = [];
   const claim = firstMatch(checker.config.bannedText, name);
   if (claim !== undefined) problems.push(claim);
-  for (const word of splitWords(name)) {
+  const checkAbbreviations = isDeclaredInCode;
+  for (const word of splitWords(isDeclaredInCode ? name : withoutOpaqueIds(checker, name))) {
     if (checker.config.allowedWords.includes(word)) continue;
     const banned = firstMatch(checker.config.bannedWords, word);
     if (banned !== undefined) problems.push(`${banned} ("${word}")`);
@@ -232,7 +267,8 @@ function stripCommentMarkers(comment: string): string {
 
 function lintComment(checker: Checker, file: string, line: number, comment: string, violations: NamingViolation[]): void {
   const text = stripCommentMarkers(comment);
-  const why = firstMatch(checker.config.bannedInComments, text) ?? firstMatch(checker.config.bannedText, text);
+  // A claim id is the more specific reason, so it is reported before the research-id patterns.
+  const why = firstMatch(checker.config.bannedText, text) ?? firstMatch(checker.config.bannedInComments, text);
   if (why !== undefined) violations.push({ file, line, name: text.trim().slice(0, 80), why });
   if (checker.config.criterionIdPattern.test(text)) {
     violations.push({ file, line, name: text.trim().slice(0, 80), why: 'criterion id outside test metadata' });
@@ -416,29 +452,52 @@ export function lintRepository(root: string, config: NamingLintConfig = NAMING_L
 // Self-test: plant names the lint must reject, and a clean file it must accept.
 
 type PlantedCase = { readonly path: string; readonly source: string; readonly expectedWhy: string };
+type CleanFile = { readonly path: string; readonly source: string };
+
+// Built from parts so that this file does not itself contain a claim id.
+const PLANTED_CLAIM_ID = ['C', 'R' + '10', '001'].join('-');
 
 const PLANTED_CASES: readonly PlantedCase[] = [
   { path: 'packages/demo/src/planted-name.ts', source: 'export const R11Test = 1;\n', expectedWhy: 'research requirement id' },
   { path: 'packages/demo/src/planted-letter.ts', source: 'export const T = 1;\n', expectedWhy: 'single-letter exported name' },
   { path: 'packages/demo/src/planted-comment.ts', source: '// See 04 Finding 1.\nexport const value = 1;\n', expectedWhy: 'research doc citation' },
   { path: 'packages/demo/src/planted-abbreviation.ts', source: 'export const acId = 1;\n', expectedWhy: 'acceptance criterion: write "criterion"' },
+  { path: 'packages/demo/src/planted-spike.ts', source: 'export const p3Core = 1;\n', expectedWhy: 'spike name' },
+  { path: 'packages/demo/src/planted-job.ts', source: 'export function checkD14(): void {}\n', expectedWhy: 'research job id' },
+  { path: 'packages/demo/planted-key.json', source: '{ "RC-04": true }\n', expectedWhy: 'role criterion, requirement or user-problem id' },
+  { path: 'packages/demo/src/planted-error-code.ts', source: "export const failureCode = 'h12-failed';\n", expectedWhy: 'hypothesis id' },
+  { path: 'packages/demo/src/planted-claim.ts', source: `// Backed by ${PLANTED_CLAIM_ID}.\nexport const value = 1;\n`, expectedWhy: 'claim id' },
+  // A lowercase name that starts with a banned id is not mistaken for an opaque machine id.
+  { path: 'packages/demo/planted-lowercase.json', source: '{ "name": "p3core" }\n', expectedWhy: 'spike name' },
 ];
 
-const CLEAN_FILE = {
-  path: 'packages/demo/src/clean.ts',
-  source: [
-    '// Deny by default: an unknown action could be destructive. See docs/specs/SPEC-09-privacy-masking.md',
-    'export const dependencyReview = { criterionId: "", width: 0 };',
-    'for (let i = 0; i < 2; i++) dependencyReview.width += i;',
-    '',
-  ].join('\n'),
-};
+const CLEAN_FILES: readonly CleanFile[] = [
+  {
+    path: 'packages/demo/src/clean.ts',
+    source: [
+      '// Deny by default: an unknown action could be destructive. See docs/specs/SPEC-09-privacy-masking.md',
+      'export const dependencyReview = { criterionId: "", width: 0 };',
+      'for (let i = 0; i < 2; i++) dependencyReview.width += i;',
+      '',
+    ].join('\n'),
+  },
+  {
+    // Hex digests, W3C ACT rule ids and WCAG criterion numbers in data are not research ids.
+    path: 'packages/demo/clean-ids.json',
+    source: JSON.stringify({
+      sha256: 'd00ee434a16816f558853770237bbc61579eeb881292c68ce7c40f302e76e6ee',
+      rules: ['afw4f7', 'b4f0c3', 'oj04fd'],
+      finding: 'sc212-keyboard-trap.fail.oj04fd.3',
+      asset: 'test-assets/sc2-4-2-title-page-with-title.html',
+    }),
+  },
+];
 
 function runSelfTest(): boolean {
   const root = mkdtempSync(join(tmpdir(), 'naming-lint-'));
   let passed = true;
   try {
-    for (const file of [...PLANTED_CASES, CLEAN_FILE]) {
+    for (const file of [...PLANTED_CASES, ...CLEAN_FILES]) {
       mkdirSync(join(root, dirname(file.path)), { recursive: true });
       writeFileSync(join(root, file.path), file.source);
     }
@@ -449,10 +508,12 @@ function runSelfTest(): boolean {
       console.log(`${caught ? 'ok  ' : 'FAIL'} planted ${planted.path}: ${caught ? `rejected with "${planted.expectedWhy}"` : 'not rejected'}`);
       passed &&= caught;
     }
-    const cleanViolations = violations.filter((violation) => violation.file === CLEAN_FILE.path);
-    for (const violation of cleanViolations) console.log(`FAIL clean file rejected: ${format(violation)}`);
-    if (cleanViolations.length === 0) console.log(`ok   clean ${CLEAN_FILE.path}: accepted`);
-    passed &&= cleanViolations.length === 0;
+    for (const clean of CLEAN_FILES) {
+      const cleanViolations = violations.filter((violation) => violation.file === clean.path);
+      for (const violation of cleanViolations) console.log(`FAIL clean file rejected: ${format(violation)}`);
+      if (cleanViolations.length === 0) console.log(`ok   clean ${clean.path}: accepted`);
+      passed &&= cleanViolations.length === 0;
+    }
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

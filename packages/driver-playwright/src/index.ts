@@ -1,2 +1,2 @@
-// Public entry point. Nothing is exported until the first spec for this package lands.
-export {};
+// Public entry point: the Playwright fallback driver for Chromium, Firefox and WebKit.
+export { playwrightDriver } from './playwright-driver.ts';

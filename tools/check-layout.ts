@@ -11,7 +11,8 @@ const TEST_FILE = /\.test\.(ts|mts|js|mjs)$/;
 const SOURCE_FOLDERS = ['packages/*/src/**', 'tools/*.ts'];
 // Test sites and recorded runs may hold scripts of their own.
 const TEST_FOLDERS = ['test/**', 'proofs/**', 'fixtures/**', 'golden/**'];
-const SKIPPED_FOLDERS = new Set(['.git', 'node_modules', 'dist', '.idea', '.vscode', '.devcontainer', '.claude']);
+// Installed tools and browsers (.browsers holds the pinned Chrome for Testing build) are not ours to lay out.
+const SKIPPED_FOLDERS = new Set(['.git', 'node_modules', 'dist', '.idea', '.vscode', '.devcontainer', '.claude', '.browsers']);
 const REQUIRED_PACKAGE_FILES = ['src/index.ts', 'package.json', 'tsconfig.json', 'README.md'];
 
 function listFiles(root: string, folder = ''): string[] {

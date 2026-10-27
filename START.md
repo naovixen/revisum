@@ -14,7 +14,7 @@ The founder's checklist. Follow the steps in order. Each step has a check, so yo
 - [x] 6. Dev container locked (now used only for CI and `npm run check:linux`)
 - [x] 7. Session 0a: skeleton
 - [x] 8. Session 0b: tests from the spikes
-- [ ] 9. Session 0c: code from the spikes
+- [x] 9. Session 0c: code from the spikes
 - [ ] 10. Week 1: SPEC-27, then SPEC-01
 
 ## Setup (done)

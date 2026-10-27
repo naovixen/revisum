@@ -1,2 +1,10 @@
-// Public entry point: shared types, schemas and port interfaces.
+// Public entry point: shared types, the plan language's types and the port interfaces that the
+// engine, drivers, auditors and renderers agree on. No package logic lives here.
 export { PRODUCT } from './product.ts';
+export type { Brand } from './brand.ts';
+export { failure, success, type Failure, type Result, type Success } from './result.ts';
+export * from './target.ts';
+export * from './plan.ts';
+export * from './browser-driver.ts';
+export type * from './run-ports.ts';
+export { NO_MOTION_CSS, determinismScript } from './determinism.ts';

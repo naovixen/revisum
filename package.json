@@ -9,6 +9,7 @@
     "packages/*"
   ],
   "scripts": {
+    "browsers": "node tools/install-browsers.ts",
     "typecheck": "tsc --build",
     "lint": "node tools/check-licences.ts && node tools/check-layout.ts && node tools/check-imports.ts",
     "lint:names": "node tools/lint-names.ts --self-test && node tools/lint-names.ts",
@@ -19,6 +20,7 @@
     "check:linux": "npx -y @devcontainers/cli@0.89.0 up --workspace-folder . && npx -y @devcontainers/cli@0.89.0 exec --workspace-folder . npm run check"
   },
   "devDependencies": {
+    "@puppeteer/browsers": "3.2.6",
     "@types/node": "24.19.2",
     "typescript": "7.0.2"
   }
