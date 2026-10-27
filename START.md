@@ -8,10 +8,10 @@ This repo holds the approved design for Revisum and nothing else yet. Follow the
 
 - [x] 1. Research committed in `E:\core`
 - [x] 2. Research commit hash filled in
-- [ ] 3. Image digest pinned
+- [x] 3. Image digest pinned
 - [x] 4. First commit and private GitHub repo
-- [ ] 5. `main` protected
-- [ ] 6. Dev container open and locked
+- [x] 5. `main` protection: skipped on GitHub Free until the repo goes public at beta
+- [x] 6. Dev container open and locked
 - [ ] 7. Session 0a: skeleton
 - [ ] 8. Session 0b: tests from the spikes
 - [ ] 9. Session 0c: code from the spikes
@@ -26,9 +26,10 @@ This repo holds the approved design for Revisum and nothing else yet. Follow the
 | 3 | Pin the container image | `docker pull mcr.microsoft.com/devcontainers/typescript-node:24-bookworm`, then `docker inspect --format "{{index .RepoDigests 0}}" mcr.microsoft.com/devcontainers/typescript-node:24-bookworm`. Replace `<pin-at-M0>` in `.devcontainer/devcontainer.json` with the digest | The image line ends in `@sha256:` and 64 hex characters |
 | 4 | First commit and GitHub repo | `git add -A`, `git commit -m "Design, specs and setup for Revisum"`, then `gh repo create revisum --private --source=. --remote=origin --push` | The repo shows on GitHub with one commit on `main` |
 | 5 | Protect `main` | GitHub → Settings → Rules → new branch ruleset on `main`: require a pull request and block force pushes. After session 0a's first CI run, also require the `ci` and `tests-apart` checks | A direct `git push` to `main` is refused |
-| 6 | Open the dev container | VS Code with the Dev Containers extension: "Reopen in Container". Inside, run `claude` and log in | Inside the container, `gh auth status` **fails** and `git push --dry-run` **fails**. If either works, turn off Git credential forwarding before going on |
+| 6 | Open the dev container | In a terminal in `E:\revisum` (WebStorm's terminal works), run `npx @devcontainers/cli up --workspace-folder .`, then `npx @devcontainers/cli exec --workspace-folder . bash`. Inside, run `claude` and log in. Edit in WebStorm on Windows as usual: the repo folder is shared with the container. Run git on Windows, never inside | Inside the container, `gh auth status` **fails** and `git push --dry-run` **fails**. If either works, turn off Git credential forwarding before going on |
 
-- **Rules on a private repo need a paid GitHub plan.** On GitHub Free, private repos have no branch rules. Either take GitHub Pro (about $4 a month), or skip step 5 until the repo goes public at beta. The deny rules and the credential-free container still lock the agent out.
+- **Rules on a private repo need a paid GitHub plan.** On GitHub Free, private repos have no branch rules, so step 5 is skipped until the repo goes public at beta. The deny rules and the credential-free container still lock the agent out.
+- **Don't use WebStorm's built-in Dev Containers.** It ignores the credential settings in `devcontainer.json` (those are VS Code only) and can forward your Git credentials into the container. The Dev Containers CLI forwards none.
 - Docker Desktop with WSL 2 must be running for steps 3 and 6.
 - Steps 1–5 can run in a session on Windows. From step 7 on, Claude runs **inside** the dev container.
 
@@ -54,6 +55,7 @@ The prompts live in `docs/prompts/`. Paste each one into a **fresh** session ins
   - `revisum.dev`, `revisum.ai` and `getrevisum.com`;
   - a manual UKIPO and EUIPO search;
   - revisum.com is listed at $2,499. It's optional; wait.
+- When the repo goes public at beta, do step 5: protect `main`.
 - Before the beta, review these:
   - `holdouts.json` (SPEC-02, SPEC-22);
   - how a high-risk review record reaches `main` before the PR result;

@@ -4,7 +4,7 @@
   "name": "revisum",
   // Pin by digest at M0 (docker pull, then docker inspect --format '{{index .RepoDigests 0}}').
   // CI uses the same digest, so local and CI runs match.
-  "image": "mcr.microsoft.com/devcontainers/typescript-node:24-bookworm@sha256:<pin-at-M0>",
+  "image": "mcr.microsoft.com/devcontainers/typescript-node:24-bookworm@sha256:970eebf5b82d3800bdd9f46680e1c4c664d365d18603148540788356700ce301",
   "containerEnv": {
     "MOZ_HEADLESS": "1",
     "GIT_TERMINAL_PROMPT": "0"
@@ -15,7 +15,8 @@
     "source=E:/core/docs/research/spikes,target=/research-spikes,type=bind,readonly",
     "source=E:/core/docs,target=/research-docs,type=bind,readonly"
   ],
-  "postCreateCommand": "npm install -g @anthropic-ai/claude-code && git config --global --unset-all credential.helper || true",
+  // The repo folder is owned by the Windows user, so git needs safe.directory to read it. This grants no push access.
+  "postCreateCommand": "npm install -g @anthropic-ai/claude-code && git config --global --add safe.directory ${containerWorkspaceFolder} && (git config --global --unset-all credential.helper || true)",
   "customizations": {
     "vscode": {
       "settings": {
