@@ -1,0 +1,47 @@
+{
+  "env": {
+    "MOZ_HEADLESS": "1"
+  },
+  "permissions": {
+    "deny": [
+      "Bash(git commit)",
+      "Bash(git commit *)",
+      "Bash(git push)",
+      "Bash(git push *)",
+      "Bash(git merge *)",
+      "Bash(git rebase *)",
+      "Bash(git tag *)",
+      "Bash(git -C * commit*)",
+      "Bash(git -C * push*)",
+      "Bash(git -C * merge*)",
+      "Bash(git config --global *)",
+      "Bash(git credential *)",
+      "Bash(gh auth *)",
+      "Bash(gh pr merge *)",
+      "Bash(gh pr review *)",
+      "Bash(gh pr create *)",
+      "Bash(gh release *)",
+      "Bash(gh repo *)",
+      "Bash(gh api *)",
+      "Bash(npm publish *)",
+      "PowerShell(git commit)",
+      "PowerShell(git commit *)",
+      "PowerShell(git push)",
+      "PowerShell(git push *)",
+      "PowerShell(git merge *)",
+      "PowerShell(git rebase *)",
+      "PowerShell(git tag *)",
+      "PowerShell(git -C * commit*)",
+      "PowerShell(git -C * push*)",
+      "PowerShell(git -C * merge*)",
+      "PowerShell(gh pr merge *)",
+      "PowerShell(gh pr review *)",
+      "PowerShell(gh api *)",
+      "PowerShell(npm publish *)",
+      "Read(~/.git-credentials)",
+      "Read(~/.config/gh/**)",
+      "Read(~/.ssh/**)",
+      "Read(**/.npmrc)"
+    ]
+  }
+}

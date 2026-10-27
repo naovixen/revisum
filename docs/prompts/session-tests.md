@@ -1,0 +1,34 @@
+# Session A: tests from a spec
+
+Paste everything below the line into a fresh Claude Code session in the dev container. Replace `<NN>` with the spec number.
+
+---
+
+Write the tests for **SPEC-<NN>**, before any implementation exists.
+
+**Read:** `CLAUDE.md`, `docs/system-design.md`, `docs/glossary.md`, `docs/specs/SPEC-<NN>-*.md`, and the types it names in `packages/contracts`.
+
+**Do:**
+- Write one or more tests for every acceptance criterion in the spec. Each test asserts the criterion's observable behaviour, not a type, a constant or a tautology.
+- Tag each test with its criterion: `test('<plain description>', { criterion: 'AC-SPEC-<NN>-mm' }, …)`.
+- Name tests in plain words that say what behaviour they check.
+- Use the criterion's oracle class:
+  - **specified:** an exact expected value;
+  - **metamorphic:** a relation between two runs;
+  - **regression:** a golden file;
+  - **implicit:** no crash, no leak.
+- For negative criteria (denied, refused, absent), add a mutant or a counter-example that proves the test can fail.
+- Put files only in `test/unit/<package>/`, `test/contract/`, `test/proofs/`, `fixtures/` or `golden/`.
+- If a criterion is ambiguous or untestable as written, don't guess. List it under open questions.
+
+**Don't:**
+- write or change anything in `packages/`;
+- weaken an existing test;
+- commit.
+
+**Check:** the tests compile with `tsc`. They are expected to fail until the code exists; list them.
+
+**Finish with:**
+1. the files changed;
+2. a table mapping each criterion to its test titles;
+3. open questions.
