@@ -1,0 +1,5 @@
+# Keep LF everywhere: the dev container is Linux and golden runs are compared by hash.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.webp binary

@@ -9,7 +9,7 @@ This repo holds the approved design for Revisum and nothing else yet. Follow the
 - [x] 1. Research committed in `E:\core`
 - [x] 2. Research commit hash filled in
 - [ ] 3. Image digest pinned
-- [ ] 4. First commit and private GitHub repo
+- [x] 4. First commit and private GitHub repo
 - [ ] 5. `main` protected
 - [ ] 6. Dev container open and locked
 - [ ] 7. Session 0a: skeleton
