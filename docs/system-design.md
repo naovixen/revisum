@@ -156,7 +156,7 @@ flowchart TD
 
 - **Lifecycle states** follow `04` Finding 4: Proposed, Rejected, Planned, Denied, TargetUnavailable, Authorised, Resolved, Running, Passed, Failed, Errored. Illegal transitions are compile errors.
 - **Approval routes** (SPEC-02, `13` FR-06). No gate sits behind a second person (founder, 2026-10-27):
-  - **Declared:** the owner's approval under the agent lock-down in `15`. The coding agent can't push or merge, so a push or merge to the default branch is the founder's. In this repo the agent may commit locally (`docs/decisions/single-session-workflow.md`). It suffices for every subject: plans, trusted files, review decisions, high-risk extra reviews and holdout plans. Anything built on it is labelled `declared`.
+  - **Declared:** the owner's approval under the agent lock-down in `15`. The coding agent may commit but can't push or merge, so a push or merge to the default branch is the founder's (`docs/decisions/single-session-workflow.md`). It suffices for every subject: plans, trusted files, review decisions, high-risk extra reviews and holdout plans. Anything built on it is labelled `declared`.
   - **Verified (optional):** a code owner's review from an account other than the author's, for teams that have one. No feature, level or metric requires it.
   - An agent's own approval never gates.
 - **Replay** re-runs a plan from its manifest and compares result hashes (SPEC-08).

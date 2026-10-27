@@ -19,7 +19,7 @@
 | Test set | `TEST_SET` | `tools/check-tests-apart.ts`, exists | Tests, proofs, fixtures and golden files: the paths that must change apart from code |
 | Dependency review | `DependencyReview` with `DependencyCheck` items | planned, SPEC-00 | The keep-or-drop test every third-party component on the trust path must pass. Earlier name: R11 test |
 | Naming lint | `NamingLintConfig`, `NAMING_LINT`, `lintRepository` | `tools/`, exists | Enforces the naming rules in CI |
-| Declared approval | `declared` | planned, SPEC-02 | An approval resting on the founder's own commit or merge under the agent lock-down |
+| Declared approval | `declared` | planned, SPEC-02 | An approval resting on the founder's own push or merge under the agent lock-down |
 | Verified approval | `verified` | planned, SPEC-02 | An optional approval by a second account; never required |
 
 ## Metrics

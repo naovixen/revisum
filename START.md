@@ -54,7 +54,6 @@ Tell the session what to build, for example *"Do session 0c"* or *"Build SPEC-27
 
 ## Still to do outside the code
 
-- **Decide before SPEC-02's tests:** how SPEC-02's agent lock-down route treats an agent that may commit (see the open question in `docs/decisions/single-session-workflow.md`).
 - **Secure the name:**
   - the `revisum` GitHub organisation and npm package;
   - `revisum.dev`, `revisum.ai` and `getrevisum.com`;

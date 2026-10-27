@@ -15,10 +15,11 @@ Stop an AI change from editing its own judge, and stop an agent from approving i
        - The reviewer is a user account (not a bot or app) that the protected-branch code-owners file names for the subject's path.
        - The reviewer is neither the change's author nor the author of any commit in it that touches the subject.
     2. **Agent lock-down (declared; the owner's route, sufficient for every subject).**
-       - The project declares `AgentLockdown` in protected-branch `approvers.json`: the coding agent is denied commit, push, merge and pull-request approval by deny rules, and its environment holds no GitHub credentials.
-       - The named maintainer commits, pushes and merges personally, and only the protected default branch is trusted.
+       - The project declares `AgentLockdown` in protected-branch `approvers.json`: the coding agent is denied push, merge and pull-request approval by deny rules. It may commit: a commit is not an approval, because nothing is approved until the maintainer pushes or merges it (founder decision, 2026-10-27).
+       - The maintainer also declares whether the agent's environment holds GitHub credentials. Core records the answer in the declaration and can't check it.
+       - The named maintainer pushes and merges personally, and only the protected default branch is trusted.
        - A subject is approved when it reaches the protected default branch through a merge or push by that maintainer's user account.
-       - Core checks the parts it can see: the actor, the branch, and that the deny-rules file on the protected branch lists all four denials. It can't see the agent's environment, so it records the approval as `declared`, never `verified`, and every output resting on it says so.
+       - Core checks the parts it can see: the actor, the branch, and that the deny-rules file on the protected branch lists the push, merge and pull-request-approval denials. It can't see the agent's environment, so it records the approval as `declared`, never `verified`, and every output resting on it says so.
     3. **Signed key (verified; optional, not phase-1).**
        - `core approve` signs the subject hash with a key registered in protected-branch `approvers.json`.
        - Keys must be hardware-backed and require user presence; core rejects signatures without the user-presence flag.
@@ -58,10 +59,10 @@ export type ApprovalProof =
   | { kind: 'signature'; keyId: string; signature: string; flags: { userPresent: boolean } };   // optional route
 // The solo route, declared in protected-branch approvers.json. Core checks what it can see and records the rest as declared.
 export type AgentLockdown = {
-  readonly maintainer: string;              // GitHub login of the one person who commits, pushes and merges
+  readonly maintainer: string;              // GitHub login of the one person who pushes and merges
   readonly agentDenyRulesPath: string;      // the coding agent's deny-rules file, read from the protected branch
-  readonly deniedActions: readonly ('commit' | 'push' | 'merge' | 'approve-pull-request')[];   // must list all four
-  readonly agentHasGithubCredentials: false; // declared by the maintainer; core cannot check it
+  readonly deniedActions: readonly ('commit' | 'push' | 'merge' | 'approve-pull-request')[];   // must include push, merge and approve-pull-request; commit is optional
+  readonly agentHasGithubCredentials: boolean; // declared by the maintainer and recorded; core cannot check it
 };
 export type ApprovalStrength = 'verified' | 'declared';
 export type Approval = Brand<{
@@ -110,13 +111,13 @@ export type VersionControlReview = { id: string; state: 'approved' | 'changes-re
 - AC-SPEC-02-11: When a local decision has no proof, core shall record it as `unverified`. It shall never gate a merge or count toward `verifiedWithoutReviewShare`, `planApprovalsPerChange` or `unreviewedMergeShare` (oracle: specified).
 - AC-SPEC-02-12: When the code-owners file or `approvers.json` is changed in the change under test, core shall verify against the protected-branch version (oracle: specified).
 - AC-SPEC-02-13: When the GitHub API is unavailable, the approval shall be treated as absent with `version-control-unavailable`, never as verified or declared (oracle: specified).
-- AC-SPEC-02-14: When a subject reaches the protected default branch through a merge or push by the `maintainer` named in protected-branch `approvers.json`, with `AgentLockdown` declared there and its deny-rules file listing all four denials, core shall (oracle: specified):
+- AC-SPEC-02-14: When a subject reaches the protected default branch through a merge or push by the `maintainer` named in protected-branch `approvers.json`, with `AgentLockdown` declared there and its deny-rules file listing the push, merge and pull-request-approval denials, whether or not commits are also denied, core shall (oracle: specified):
   - record a `DeclaredApproval` with `actorType: 'person-declared'`;
   - append a `plan.approved` event with proof kind `agent-lockdown-merge`.
 - AC-SPEC-02-15: When the agent lock-down route is tried, it shall be refused (oracle: specified):
   - with `not-maintainer` when the merge or push actor is not the named maintainer, or is a bot, app or token;
   - with `not-protected-branch` when the subject is only on another branch;
-  - with `lockdown-not-declared` when `AgentLockdown` is missing, or its deny-rules file is absent or lists fewer than four denials.
+  - with `lockdown-not-declared` when `AgentLockdown` is missing, or its deny-rules file is absent or lacks any of the push, merge and pull-request-approval denials.
 - AC-SPEC-02-16: When a verdict, report, metric or level rests on a declared approval, it shall say "declared, not verified". The ladder label shall be `declared` (SPEC-21) (oracle: specified).
 - AC-SPEC-02-17: When an approval from an agent, MCP session, CI token, bot or app is offered by any route, it shall never gate a merge, whatever the project declares (oracle: specified; red-team fixture repository).
 - AC-SPEC-02-18: When a plan, trusted-file change, review decision, high-risk extra review or holdout plan has only the maintainer's `DeclaredApproval` under agent lock-down, core shall treat it as approved for every gate and metric exactly as a `VerifiedApproval`, differing only in the `declared` label (oracle: specified; one fixture per subject kind).
