@@ -6,7 +6,7 @@
 //     codes and no others: an unknown case label, or a code left over at `unreachable`, is an error;
 //   - one that leaves a code out. Its @ts-expect-error line must stay an error.
 // See docs/specs/SPEC-27-shared-types-and-events.md.
-import type { CliErrorCode, DriverErrorCode, RecorderError, RunnerError, SinkError } from '@revisum/contracts';
+import type { CliErrorCode, DriverErrorCode, RecorderError, RunnerError, ServiceCallErrorCode, SinkError } from '@revisum/contracts';
 import type { PlanErrorCode, StepErrorCode } from '@revisum/engine';
 
 // Only a value of type never may reach this, so every code must have been handled before it.
@@ -22,7 +22,7 @@ export function describePlanError(code: PlanErrorCode): string {
     case 'target_not_in_matrix': case 'unsafe_text': case 'too_large': case 'too_long': case 'duplicate':
     case 'version_unsupported': case 'empty': case 'vacuous':
     case 'no_criterion_id': case 'literal_secret': case 'undefined_value': case 'position_not_allowed':
-    case 'misplaced_step':
+    case 'misplaced_step': case 'unsafe_interpolation': case 'header_not_allowed':
       return 'plan rejected';
     default:
       return unreachable(code);
@@ -34,7 +34,8 @@ export function describePlanErrorForgettingOne(code: PlanErrorCode): string {
     case 'unknown_value': case 'invalid_url': case 'scheme_not_allowed': case 'origin_not_allowed':
     case 'target_not_in_matrix': case 'unsafe_text': case 'too_large': case 'too_long': case 'duplicate':
     case 'version_unsupported': case 'empty': case 'no_criterion_id': case 'literal_secret':
-    case 'undefined_value': case 'position_not_allowed': case 'misplaced_step':
+    case 'undefined_value': case 'position_not_allowed': case 'misplaced_step': case 'unsafe_interpolation':
+    case 'header_not_allowed':
       return 'plan rejected';
     default:
       // @ts-expect-error 'vacuous' is not handled, so the code does not narrow to never
@@ -78,6 +79,27 @@ export function describeDriverErrorForgettingOne(code: DriverErrorCode): string 
       return 'driver failed';
     default:
       // @ts-expect-error 'navigation-failed' is not handled, so the code does not narrow to never
+      return unreachable(code);
+  }
+}
+
+// ---- Service call errors (the ServiceCaller port's codes, and the engine's while it calls) --------
+export function describeServiceCallError(code: ServiceCallErrorCode): string {
+  switch (code) {
+    case 'response-not-json': case 'response-too-large': case 'field-missing': case 'service-unreachable':
+    case 'call-timeout': case 'unexpected-status': case 'egress-blocked': case 'parameter-invalid': case 'cleanup-failed':
+      return 'service call failed';
+    default:
+      return unreachable(code);
+  }
+}
+export function describeServiceCallErrorForgettingOne(code: ServiceCallErrorCode): string {
+  switch (code) {
+    case 'response-not-json': case 'response-too-large': case 'field-missing': case 'service-unreachable':
+    case 'call-timeout': case 'unexpected-status': case 'parameter-invalid': case 'cleanup-failed':
+      return 'service call failed';
+    default:
+      // @ts-expect-error 'egress-blocked' is not handled, so the code does not narrow to never
       return unreachable(code);
   }
 }

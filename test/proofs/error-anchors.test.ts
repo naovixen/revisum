@@ -18,9 +18,13 @@ const ERROR_CODES: Readonly<Record<string, readonly string[]>> = {
     'not_object', 'unknown_field', 'missing_field', 'wrong_type', 'unknown_step', 'unknown_value', 'invalid_url',
     'scheme_not_allowed', 'origin_not_allowed', 'target_not_in_matrix', 'unsafe_text', 'too_large', 'too_long',
     'duplicate', 'version_unsupported', 'empty', 'vacuous', 'no_criterion_id', 'literal_secret', 'undefined_value',
-    'position_not_allowed', 'misplaced_step',
+    'position_not_allowed', 'misplaced_step', 'unsafe_interpolation', 'header_not_allowed',
   ],
   step: ['value-empty', 'value-unsafe', 'value-too-long', 'state-not-exposed', 'download-not-text'],
+  serviceCall: [
+    'response-not-json', 'response-too-large', 'field-missing', 'service-unreachable', 'call-timeout', 'unexpected-status',
+    'egress-blocked', 'parameter-invalid', 'cleanup-failed',
+  ],
   driver: ['not-found', 'ambiguous', 'not-actionable', 'timeout', 'navigation-failed', 'policy-denied', 'no-download', 'download-too-large'],
   runner: ['image-missing', 'image-digest-mismatch', 'egress-unenforceable', 'start-failed'],
   recorder: ['no-reason', 'unknown-item', 'already-decided', 'sink-failed'],
@@ -34,9 +38,10 @@ const ERROR_CODES: Readonly<Record<string, readonly string[]>> = {
     'subject-mismatch', 'version-control-unavailable', 'not-maintainer', 'not-protected-branch', 'lockdown-not-declared',
   ],
   trust: ['untrusted-source', 'changed-with-code', 'no-approval'],
+  refusal: ['origin_not_allowed', 'secret-missing', 'services-unavailable'],
   policy: [
     'irreversible-action', 'irreversible-submit', 'destructive-navigation', 'irreversible-dialog', 'unnamed-control',
-    'no-locale-patterns', 'undeclared-origin', 'production-origin', 'over-limit',
+    'no-locale-patterns', 'undeclared-origin', 'production-origin', 'over-limit', 'side-effect-in-proposal',
   ],
 };
 
