@@ -55,6 +55,16 @@ function refusedBuild(name: string, callArguments: CallArguments, values: RunVal
   return outcome.ok ? '' : outcome.error;
 }
 
+// A request body is JSON text in parts, where a part may be a hidden secret. These tests read
+// bodies that hold no secret, so every part is text; a secret part fails the test.
+const bodyJson = (request: ServiceRequest): unknown => {
+  if (request.body === null) return null;
+  const parts = request.body.jsonParts.map((part) => {
+    assert.equal(typeof part, 'string', 'the body holds a secret part');
+    return String(part);
+  });
+  return JSON.parse(parts.join(''));
+};
 const pathOf = (request: ServiceRequest): string => request.pathAndQuery.split('?')[0] ?? '';
 const queryOf = (request: ServiceRequest): URLSearchParams => new URLSearchParams(request.pathAndQuery.split('?')[1] ?? '');
 const headerNames = (request: ServiceRequest): string[] => request.headers.map((header) => header.name.toLowerCase()).sort();
@@ -143,7 +153,7 @@ test('the body is valid JSON in which each text argument is exactly one string v
   for (const generated of GENERATED) {
     const request = built('addCustomerNote', argumentsFor('addCustomerNote', generated));
     assert.ok(request.body !== null, 'the declaration has a body');
-    const body: unknown = JSON.parse(request.body);
+    const body: unknown = bodyJson(request);
     const statement = `select * from notes where page = ${generated.page} and region = '${generated.region}'`;
     assert.deepEqual(body, {
       note: generated.note, author: { name: generated.author }, tags: [generated.tag, 'fixed'], vip: generated.vip, statement,
@@ -237,13 +247,13 @@ test('a run value of the right type fills the request as a literal would', { cri
 // ---- Types in the body ---------------------------------------------------------------------------------
 
 test('integers and booleans fill the body as JSON numbers and booleans, from literals or values', { criterion: 'AC-SPEC-32-03' }, () => {
-  const fromLiterals = JSON.parse(built('createOrder', argumentsFor('createOrder', orderArguments({ quantity: 3, giftWrap: true }))).body ?? 'null');
+  const fromLiterals = bodyJson(built('createOrder', argumentsFor('createOrder', orderArguments({ quantity: 3, giftWrap: true })))) as JsonRecord;
   assert.equal(fromLiterals.quantity, 3);
   assert.equal(fromLiterals.giftWrap, true);
   assert.equal(fromLiterals.reference, 'test-eu-3');
   const values = { count: { kind: 'uniqueNumber', digits: 4 } };
   const plan = accepted(parsePlan, callPlanOf([call('createOrder', orderArguments({ quantity: byName('count') }))], { values }));
-  const fromValue = JSON.parse(built('createOrder', parsedArguments(plan), valuesOf({ count: '42' })).body ?? 'null');
+  const fromValue = bodyJson(built('createOrder', parsedArguments(plan), valuesOf({ count: '42' }))) as JsonRecord;
   assert.equal(fromValue.quantity, 42);
   assert.equal(fromValue.reference, 'test-eu-42');
 });
@@ -305,7 +315,7 @@ test('the same declaration, arguments, values and secrets always build the same 
   const first = built('addCustomerNote', callArguments);
   const second = built('addCustomerNote', callArguments);
   assert.deepEqual({ ...first, headers: headerNames(first) }, { ...second, headers: headerNames(second) });
-  assert.equal(first.body, second.body);
+  assert.deepEqual(bodyJson(first), bodyJson(second));
 });
 
 test('a token header sends the secret\'s value as it is, inside an opaque secret', { criterion: 'AC-SPEC-32-11' }, () => {
