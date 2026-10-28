@@ -1,0 +1,17 @@
+{
+  "version": "1.2",
+  "meta": { "featureId": "ACCOUNT-2", "specReference": "specs/account.md#stay-signed-in", "title": "A second tab opened after signing in is still signed in" },
+  "targets": ["playwright-chromium"],
+  "steps": [
+    { "type": "navigate", "url": "/sign-in" },
+    { "type": "fill", "locator": { "by": "label", "label": "Email" }, "value": "reader@example.com" },
+    { "type": "click", "locator": { "by": "role", "role": "button", "name": "Continue" } },
+    {
+      "type": "newTab",
+      "url": "/account",
+      "steps": [
+        { "type": "expect", "locator": { "by": "role", "role": "heading", "name": "Your account" }, "assert": { "kind": "visible" }, "criterionId": "account.second-tab-signed-in" }
+      ]
+    }
+  ]
+}

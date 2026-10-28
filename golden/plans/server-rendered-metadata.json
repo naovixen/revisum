@@ -1,0 +1,10 @@
+{
+  "version": "1.2",
+  "meta": { "featureId": "EVENTS-1", "specReference": "specs/events.md#sharing", "title": "The event page sends its sharing title and canonical address from the server" },
+  "targets": ["playwright-chromium"],
+  "steps": [
+    { "type": "navigate", "url": "/events/team-meeting", "scripts": "disabled" },
+    { "type": "expectPage", "assert": { "kind": "metaContent", "name": "og:title", "value": "Team meeting" }, "criterionId": "events.sharing-title" },
+    { "type": "expectPage", "assert": { "kind": "canonicalUrl", "value": "http://127.0.0.1:4173/events/team-meeting" }, "criterionId": "events.canonical-address" }
+  ]
+}

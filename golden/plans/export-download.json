@@ -1,0 +1,15 @@
+{
+  "version": "1.2",
+  "meta": { "featureId": "PROJECTS-1", "specReference": "specs/projects.md#export", "title": "Exporting the visible projects downloads a CSV of them" },
+  "targets": ["playwright-chromium"],
+  "steps": [
+    { "type": "navigate", "url": "/projects" },
+    { "type": "download", "name": "project-list", "locator": { "by": "role", "role": "button", "name": "Export CSV" } },
+    { "type": "expectDownload", "download": "project-list", "assert": { "kind": "fileNameEquals", "value": "projects.csv" }, "criterionId": "projects.export-file-name" },
+    { "type": "expectDownload", "download": "project-list", "assert": { "kind": "mediaTypeEquals", "value": "text/csv" }, "criterionId": "projects.export-media-type" },
+    { "type": "expectDownload", "download": "project-list", "assert": { "kind": "sizeAtLeast", "value": 1 }, "criterionId": "projects.export-not-empty" },
+    { "type": "expectDownload", "download": "project-list", "assert": { "kind": "sizeAtMost", "value": 65536 }, "criterionId": "projects.export-small" },
+    { "type": "expectDownload", "download": "project-list", "assert": { "kind": "contentContains", "value": "Website relaunch" }, "criterionId": "projects.export-lists-visible" },
+    { "type": "expectDownload", "download": "project-list", "assert": { "kind": "contentExcludes", "value": "Archived pilot" }, "criterionId": "projects.export-leaves-out-archived" }
+  ]
+}

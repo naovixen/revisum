@@ -1,0 +1,9 @@
+{
+  "version": "1.2",
+  "meta": { "featureId": "SETTINGS-2", "specReference": "specs/settings.md#help-link", "title": "The billing help link points to the billing guide" },
+  "targets": ["playwright-chromium"],
+  "steps": [
+    { "type": "navigate", "url": "/settings/billing" },
+    { "type": "expect", "locator": { "by": "role", "role": "link", "name": "Billing guide" }, "assert": { "kind": "hrefEquals", "value": "http://127.0.0.1:4173/help/billing" }, "criterionId": "settings.help-link-target" }
+  ]
+}

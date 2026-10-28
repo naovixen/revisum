@@ -1,0 +1,18 @@
+{
+  "version": "1.2",
+  "meta": { "featureId": "SETTINGS-1", "specReference": "specs/settings.md#billing-tab", "title": "The billing tab, its plan details and its toggles show their states" },
+  "targets": ["playwright-chromium"],
+  "steps": [
+    { "type": "navigate", "url": "/settings" },
+    { "type": "click", "locator": { "by": "role", "role": "tab", "name": "Billing" } },
+    { "type": "expect", "locator": { "by": "role", "role": "tab", "name": "Billing" }, "assert": { "kind": "selected" }, "criterionId": "settings.billing-tab-selected" },
+    { "type": "expect", "locator": { "by": "role", "role": "tab", "name": "Profile" }, "assert": { "kind": "unselected" }, "criterionId": "settings.profile-tab-unselected" },
+    { "type": "expect", "locator": { "by": "role", "role": "button", "name": "Invoices" }, "assert": { "kind": "collapsed" }, "criterionId": "settings.invoices-start-collapsed" },
+    { "type": "click", "locator": { "by": "role", "role": "button", "name": "Invoices" } },
+    { "type": "expect", "locator": { "by": "role", "role": "button", "name": "Invoices" }, "assert": { "kind": "expanded" }, "criterionId": "settings.invoices-expand" },
+    { "type": "expect", "locator": { "by": "role", "role": "button", "name": "Paperless billing" }, "assert": { "kind": "unpressed" }, "criterionId": "settings.paperless-starts-off" },
+    { "type": "click", "locator": { "by": "role", "role": "button", "name": "Paperless billing" } },
+    { "type": "expect", "locator": { "by": "role", "role": "button", "name": "Paperless billing" }, "assert": { "kind": "pressed" }, "criterionId": "settings.paperless-turns-on" },
+    { "type": "expect", "locator": { "by": "role", "role": "link", "name": "Settings" }, "assert": { "kind": "current" }, "criterionId": "settings.navigation-marks-page" }
+  ]
+}

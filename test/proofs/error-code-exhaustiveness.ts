@@ -22,6 +22,7 @@ export function describePlanError(code: PlanErrorCode): string {
     case 'target_not_in_matrix': case 'unsafe_text': case 'too_large': case 'too_long': case 'duplicate':
     case 'version_unsupported': case 'empty': case 'vacuous':
     case 'no_criterion_id': case 'literal_secret': case 'undefined_value': case 'position_not_allowed':
+    case 'misplaced_step':
       return 'plan rejected';
     default:
       return unreachable(code);
@@ -33,7 +34,7 @@ export function describePlanErrorForgettingOne(code: PlanErrorCode): string {
     case 'unknown_value': case 'invalid_url': case 'scheme_not_allowed': case 'origin_not_allowed':
     case 'target_not_in_matrix': case 'unsafe_text': case 'too_large': case 'too_long': case 'duplicate':
     case 'version_unsupported': case 'empty': case 'no_criterion_id': case 'literal_secret':
-    case 'undefined_value': case 'position_not_allowed':
+    case 'undefined_value': case 'position_not_allowed': case 'misplaced_step':
       return 'plan rejected';
     default:
       // @ts-expect-error 'vacuous' is not handled, so the code does not narrow to never
@@ -44,7 +45,7 @@ export function describePlanErrorForgettingOne(code: PlanErrorCode): string {
 // ---- Step errors (decided by the engine at run time, declared beside the interpreter) -------------
 export function describeStepError(code: StepErrorCode): string {
   switch (code) {
-    case 'value-empty': case 'value-unsafe': case 'value-too-long':
+    case 'value-empty': case 'value-unsafe': case 'value-too-long': case 'state-not-exposed': case 'download-not-text':
       return 'step failed';
     default:
       return unreachable(code);
@@ -52,7 +53,7 @@ export function describeStepError(code: StepErrorCode): string {
 }
 export function describeStepErrorForgettingOne(code: StepErrorCode): string {
   switch (code) {
-    case 'value-empty': case 'value-too-long':
+    case 'value-empty': case 'value-too-long': case 'state-not-exposed': case 'download-not-text':
       return 'step failed';
     default:
       // @ts-expect-error 'value-unsafe' is not handled, so the code does not narrow to never
@@ -64,7 +65,7 @@ export function describeStepErrorForgettingOne(code: StepErrorCode): string {
 export function describeDriverError(code: DriverErrorCode): string {
   switch (code) {
     case 'not-found': case 'ambiguous': case 'not-actionable': case 'timeout': case 'navigation-failed':
-    case 'policy-denied':
+    case 'policy-denied': case 'no-download': case 'download-too-large':
       return 'driver failed';
     default:
       return unreachable(code);
@@ -73,6 +74,7 @@ export function describeDriverError(code: DriverErrorCode): string {
 export function describeDriverErrorForgettingOne(code: DriverErrorCode): string {
   switch (code) {
     case 'not-found': case 'ambiguous': case 'not-actionable': case 'timeout': case 'policy-denied':
+    case 'no-download': case 'download-too-large':
       return 'driver failed';
     default:
       // @ts-expect-error 'navigation-failed' is not handled, so the code does not narrow to never
