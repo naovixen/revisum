@@ -108,7 +108,7 @@ const OVER_TOTAL = [
   },
   {
     name: 'an advance inside a newTab',
-    steps: [OPEN_ORDERS, advanceClock(1, 'minutes'), newTab([advanceClock(30, 'seconds'), advanceClock(1, 'minutes')])],
+    steps: [OPEN_ORDERS, advanceClock(1, 'minutes'), newTab([advanceClock(31, 'seconds'), advanceClock(1, 'minutes')])],
     path: '$.steps[2].steps[1]',
   },
   {
