@@ -6,15 +6,18 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { CdpConnection, type ConnectOptions } from './cdp-connection.ts';
+import { PORT_RANDOMISATION_FEATURE } from './chrome-flags.ts';
 
 // Flags for an isolated, repeatable page: no network outside 127.0.0.1, no first-run UI or
-// background traffic, fixed scale factor and font hinting. Used by default.
+// background traffic, fixed scale factor and font hinting, and no random local ports (see
+// chrome-flags.ts). Used by default.
 export const ISOLATED_CHROMIUM_ARGUMENTS: readonly string[] = [
   '--headless=new', '--no-first-run', '--no-default-browser-check', '--disable-extensions', '--disable-sync',
   '--disable-background-networking', '--disable-component-update', '--disable-default-apps',
   '--mute-audio', '--autoplay-policy=no-user-gesture-required', '--hide-scrollbars',
   '--force-device-scale-factor=1', '--font-render-hinting=none',
   '--host-resolver-rules=MAP * ~NOTFOUND , EXCLUDE 127.0.0.1',
+  `--disable-features=${PORT_RANDOMISATION_FEATURE}`,
 ];
 
 export type LaunchOptions = ConnectOptions & {

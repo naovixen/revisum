@@ -15,6 +15,37 @@ import { accessibilitySnapshot, probeElement } from './in-page.ts';
 const requireFromHere = createRequire(import.meta.url);
 const PLAYWRIGHT_VERSION = (JSON.parse(readFileSync(requireFromHere.resolve('playwright-core/package.json'), 'utf8')) as { version: string }).version;
 const ENGINES = { chromium, firefox, webkit } as const;
+
+// Chromium's request for a random local port on every connection (SO_RANDOMIZE_PORT) makes
+// Windows fail about one connect in sixty with WSAENOBUFS, seen as net::ERR_NO_BUFFER_SPACE: a
+// page or one of its files fails to load even on 127.0.0.1. The driver turns that feature off.
+// The CDP driver does the same; see its chrome-flags.ts.
+const PORT_RANDOMISATION_FEATURE = 'TcpPortRandomizationWin';
+// Chromium reads only the last --disable-features flag, and Playwright passes its own list. So
+// the driver replaces Playwright's flag with one list: Playwright's features plus the one above.
+// The list is copied from the Playwright version below; with any other version Chromium is not
+// started, so a changed list can never be dropped without notice.
+const FEATURE_LIST_PLAYWRIGHT_VERSION = '1.64.1';
+const PLAYWRIGHT_DISABLED_FEATURES = '--disable-features=AvoidUnnecessaryBeforeUnloadCheckSync,DestroyProfileOnBrowserClose,'
+  + 'DialMediaRouteProvider,GlobalMediaControls,HttpsUpgrades,LensOverlay,MediaRouter,PaintHolding,ThirdPartyStoragePartitioning,'
+  + 'BlockOriginHeaderModificationOnRedirect,AvoidCorsURLLoaderRestartOnRedirect,Translate,AutoDeElevate,OptimizationHints,'
+  + 'NetworkTimeServiceQuerying,AimEnabled,msForceBrowserSignIn,msEdgeUpdateLaunchServicesPreferredVersion';
+
+type LaunchSettings = Result<Parameters<typeof chromium.launch>[0], string>;
+
+function launchSettings(engine: Target['engine']): LaunchSettings {
+  if (engine !== 'chromium') return success({ headless: true });
+  if (PLAYWRIGHT_VERSION !== FEATURE_LIST_PLAYWRIGHT_VERSION) {
+    return failure(`Playwright ${PLAYWRIGHT_VERSION} may pass other Chromium features than ${FEATURE_LIST_PLAYWRIGHT_VERSION}: `
+      + 'update the copied feature list in playwright-driver.ts');
+  }
+  return success({
+    headless: true,
+    ignoreDefaultArgs: [PLAYWRIGHT_DISABLED_FEATURES],
+    args: [`${PLAYWRIGHT_DISABLED_FEATURES},${PORT_RANDOMISATION_FEATURE}`],
+  });
+}
+
 // Every plan key is also a Playwright key name: named keys, letters, digits, the physical names of
 // punctuation keys (such as Backquote) and F1 to F12.
 const keyName = (key: Key): string => key;
@@ -32,9 +63,11 @@ export function playwrightDriver(): BrowserDriver {
       return success(true);
     },
     async open(target, environment) {
+      const settings = launchSettings(target.engine);
+      if (!settings.ok) return failure({ reason: 'launch-failed', detail: settings.error });
       let browser: Browser;
       try {
-        browser = await ENGINES[target.engine].launch({ headless: true });
+        browser = await ENGINES[target.engine].launch(settings.value);
       } catch (error) {
         return failure({ reason: 'launch-failed', detail: errorText(error) });
       }
