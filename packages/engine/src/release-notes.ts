@@ -1,7 +1,11 @@
 // Release notes from a run. The draft is deterministic and uses no AI: the same plan and results
 // always give the same bytes. An AI may only add a suggestion stored beside the draft, never
 // replace it, and never containing typed or expected values.
-import { literalText, referencedValueName, type AiWriter, type ArtifactReference, type ArtifactStore, type Locator, type Plan, type Step, type TextOrValue } from '@revisum/contracts';
+import {
+  literalText, referencedValueName,
+  type AiWriter, type ArtifactReference, type ArtifactStore, type Locator, type Plan, type RememberSource, type REQUEST_COUNT_KINDS, type RequestCount,
+  type ResponseAssertion, type Step, type StorageAssertion, type TextOrValue,
+} from '@revisum/contracts';
 import { parseAiText } from './ai-text.ts';
 import type { PlanErrorCode } from './plan/plan-decoders.ts';
 import type { RunResult } from './run.ts';
@@ -72,9 +76,42 @@ export function describeStep(step: Step): string {
     case 'capture': return `Captured screenshot "${step.name}"`;
     case 'call': return `Called the declared \`${codeSpanText(step.call)}\` service call`;
     case 'expectBackend': return `Checked that field "${markdownEscape(step.field)}" of \`${codeSpanText(step.call)}\` ${BACKEND_ASSERTION_TEXT[step.assert.kind]}`;
-    case 'remember': return `Remembered ${step.from.read === 'text' ? 'the text' : 'the value'} of ${describeLocator(step.from.element)} as {${step.name}}`;
+    case 'remember': return `Remembered ${describeRememberSource(step.from)} as {${step.name}}`;
+    case 'stub': return `${step.action === 'start' ? 'Started' : 'Stopped'} the declared \`${codeSpanText(step.stub)}\` stub`;
+    case 'resetRequests': return `Reset the count of \`${codeSpanText(step.request)}\` requests`;
+    case 'expectRequests': return `Checked ${REQUEST_COUNT_TEXT[requestCountKind(step.count)]} of \`${codeSpanText(step.request)}\` requests`;
+    case 'expectResponse': return `Checked that the latest \`${codeSpanText(step.request)}\` response ${describeResponseAssertion(step.assert)}`;
+    case 'setStorage': return `Wrote the declared \`${codeSpanText(step.entry)}\` storage entry`;
+    case 'removeStorage': return `Removed the declared \`${codeSpanText(step.entry)}\` storage entry`;
+    case 'expectStorage': return `Checked that the \`${codeSpanText(step.entry)}\` storage entry ${STORAGE_ASSERTION_TEXT[step.assert.kind]}`;
   }
 }
+
+function describeRememberSource(from: RememberSource): string {
+  if ('element' in from) return `${from.read === 'text' ? 'the text' : 'the value'} of ${describeLocator(from.element)}`;
+  const field = `field "${markdownEscape(from.field)}" of the latest \`${codeSpanText(from.response)}\` response`;
+  return from.read === 'text' ? field : `the length of ${field}`;
+}
+
+const REQUEST_COUNT_TEXT: { readonly [Kind in (typeof REQUEST_COUNT_KINDS)[number]]: string } = {
+  equals: 'the exact number', atLeast: 'the least number', atMost: 'the greatest number',
+};
+const requestCountKind = (count: RequestCount): (typeof REQUEST_COUNT_KINDS)[number] =>
+  ('equals' in count ? 'equals' : 'atLeast' in count ? 'atLeast' : 'atMost');
+
+function describeResponseAssertion(assertion: ResponseAssertion): string {
+  switch (assertion.kind) {
+    case 'statusEquals': return 'has the expected status';
+    case 'fieldPresent': return `has field "${markdownEscape(assertion.field)}"`;
+    case 'fieldAbsent': return `has no field "${markdownEscape(assertion.field)}"`;
+    case 'fieldEquals': return `has the expected text in field "${markdownEscape(assertion.field)}"`;
+    case 'fieldContains': return `contains the expected text in field "${markdownEscape(assertion.field)}"`;
+  }
+}
+
+const STORAGE_ASSERTION_TEXT: { readonly [Kind in StorageAssertion['kind']]: string } = {
+  present: 'is present', absent: 'is absent', equals: 'has the expected value',
+};
 
 export function releaseNoteDraft(plan: Plan, results: readonly RunResult[]): string {
   const lines: string[] = [

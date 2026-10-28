@@ -18,7 +18,11 @@ Some tests in the coverage study fake a failing endpoint, count the requests a p
     - The plan may write or remove a `readWrite` entry, and check that any declared entry is present, absent or equal to a value.
     - Writes go to the current page's storage through CDP's DOM storage domain, so they need no page script. The page must be on the declared origin.
     - Values read from storage are compared, never recorded.
-  - **Proposals.** A plan with no approval may not start a stub or write storage unless the declaration sets `allowInProposals` (SPEC-32's `side-effect-in-proposal`).
+  - **For SPEC-06.**
+  - `Session` gains its network and storage ports with the driver parts, not now, so today's drivers and fakes stay unchanged.
+  - Secrets passed as stub or storage arguments must join `secrets/secret-resolution.ts`, so they are resolved before the run and redacted.
+  - A stub `text` body is single-line safe text up to 64 KiB; multi-line bodies come from a fixture.
+- **Proposals.** A plan with no approval may not start a stub or write storage unless the declaration sets `allowInProposals` (SPEC-32's `side-effect-in-proposal`).
   - **Service workers.** While any stub or request check is active, the driver bypasses service workers, so every request is seen and stubbed the same way.
 - **Non-goals:**
   - arbitrary page scripts, and reading or writing an application's own in-memory state, such as an editor's data store. Both need code in the page, which breaks containment and ties tests to private internals;

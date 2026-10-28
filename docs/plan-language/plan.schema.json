@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "revisum.plan/v1",
   "title": "Plan language 1.2",
-  "description": "A closed, versioned test plan. Every assertion names the acceptance criterion it checks. A plan declaring \"1.1\" may use only what that version had. Fitting this schema is necessary, not sufficient: the plan parser also checks the project's allow-list, matrix, declared secrets, fixtures, test-id attributes and email domains, its limits, its text safety rules that every value and download is defined before it is used, that a second tab and a call stand only at the top level, and that each call, argument and field is one the project declares.",
+  "description": "A closed, versioned test plan. Every assertion names the acceptance criterion it checks. A plan declaring \"1.1\" may use only what that version had. Fitting this schema is necessary, not sufficient: the plan parser also checks the project's allow-list, matrix, declared secrets, fixtures, test-id attributes and email domains, its limits, its text safety rules that every value and download is defined before it is used, that a second tab and a call stand only at the top level, and that each call, stub, observed request, storage entry, argument and field is one the project declares.",
   "type": "object",
   "properties": {
     "version": {
@@ -256,6 +256,27 @@
         },
         {
           "$ref": "#/$defs/expectBackendStep"
+        },
+        {
+          "$ref": "#/$defs/stubStep"
+        },
+        {
+          "$ref": "#/$defs/resetRequestsStep"
+        },
+        {
+          "$ref": "#/$defs/expectRequestsStep"
+        },
+        {
+          "$ref": "#/$defs/expectResponseStep"
+        },
+        {
+          "$ref": "#/$defs/setStorageStep"
+        },
+        {
+          "$ref": "#/$defs/removeStorageStep"
+        },
+        {
+          "$ref": "#/$defs/expectStorageStep"
         }
       ]
     },
@@ -667,23 +688,52 @@
           "pattern": "^[a-z][A-Za-z0-9]{0,63}$"
         },
         "from": {
-          "type": "object",
-          "properties": {
-            "element": {
-              "$ref": "#/$defs/locator"
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "element": {
+                  "$ref": "#/$defs/locator"
+                },
+                "read": {
+                  "enum": [
+                    "text",
+                    "value"
+                  ]
+                }
+              },
+              "required": [
+                "element",
+                "read"
+              ],
+              "additionalProperties": false
             },
-            "read": {
-              "enum": [
-                "text",
-                "value"
-              ]
+            {
+              "type": "object",
+              "properties": {
+                "response": {
+                  "type": "string",
+                  "pattern": "^[a-z][A-Za-z0-9]{0,63}$"
+                },
+                "field": {
+                  "type": "string",
+                  "pattern": "^[a-z][A-Za-z0-9]{0,63}$"
+                },
+                "read": {
+                  "enum": [
+                    "text",
+                    "arrayLength"
+                  ]
+                }
+              },
+              "required": [
+                "response",
+                "field",
+                "read"
+              ],
+              "additionalProperties": false
             }
-          },
-          "required": [
-            "element",
-            "read"
-          ],
-          "additionalProperties": false
+          ]
         }
       },
       "required": [
@@ -896,6 +946,233 @@
         "call",
         "arguments",
         "field",
+        "assert",
+        "criterionId"
+      ],
+      "additionalProperties": false
+    },
+    "stubStep": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "stub"
+        },
+        "stub": {
+          "type": "string",
+          "pattern": "^[a-z][A-Za-z0-9]{0,63}$"
+        },
+        "action": {
+          "enum": [
+            "start",
+            "stop"
+          ]
+        },
+        "arguments": {
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^[a-z][A-Za-z0-9]{0,63}$"
+          },
+          "additionalProperties": {
+            "oneOf": [
+              {
+                "type": "string",
+                "minLength": 0,
+                "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "$ref": "#/$defs/valueReference"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "secretName": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "secretName"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        }
+      },
+      "required": [
+        "type",
+        "stub",
+        "action"
+      ],
+      "additionalProperties": false
+    },
+    "resetRequestsStep": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "resetRequests"
+        },
+        "request": {
+          "type": "string",
+          "pattern": "^[a-z][A-Za-z0-9]{0,63}$"
+        }
+      },
+      "required": [
+        "type",
+        "request"
+      ],
+      "additionalProperties": false
+    },
+    "expectRequestsStep": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "expectRequests"
+        },
+        "request": {
+          "type": "string",
+          "pattern": "^[a-z][A-Za-z0-9]{0,63}$"
+        },
+        "count": {
+          "$ref": "#/$defs/requestCount"
+        },
+        "criterionId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+        }
+      },
+      "required": [
+        "type",
+        "request",
+        "count",
+        "criterionId"
+      ],
+      "additionalProperties": false
+    },
+    "expectResponseStep": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "expectResponse"
+        },
+        "request": {
+          "type": "string",
+          "pattern": "^[a-z][A-Za-z0-9]{0,63}$"
+        },
+        "assert": {
+          "$ref": "#/$defs/responseAssertion"
+        },
+        "criterionId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+        }
+      },
+      "required": [
+        "type",
+        "request",
+        "assert",
+        "criterionId"
+      ],
+      "additionalProperties": false
+    },
+    "setStorageStep": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "setStorage"
+        },
+        "entry": {
+          "type": "string",
+          "pattern": "^[a-z][A-Za-z0-9]{0,63}$"
+        },
+        "arguments": {
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^[a-z][A-Za-z0-9]{0,63}$"
+          },
+          "additionalProperties": {
+            "oneOf": [
+              {
+                "type": "string",
+                "minLength": 0,
+                "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "$ref": "#/$defs/valueReference"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "secretName": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "secretName"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        }
+      },
+      "required": [
+        "type",
+        "entry"
+      ],
+      "additionalProperties": false
+    },
+    "removeStorageStep": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "removeStorage"
+        },
+        "entry": {
+          "type": "string",
+          "pattern": "^[a-z][A-Za-z0-9]{0,63}$"
+        }
+      },
+      "required": [
+        "type",
+        "entry"
+      ],
+      "additionalProperties": false
+    },
+    "expectStorageStep": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "expectStorage"
+        },
+        "entry": {
+          "type": "string",
+          "pattern": "^[a-z][A-Za-z0-9]{0,63}$"
+        },
+        "assert": {
+          "$ref": "#/$defs/storageAssertion"
+        },
+        "criterionId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+        }
+      },
+      "required": [
+        "type",
+        "entry",
         "assert",
         "criterionId"
       ],
@@ -1450,6 +1727,171 @@
             },
             "value": {
               "type": "number"
+            }
+          },
+          "required": [
+            "kind",
+            "value"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "requestCount": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "equals": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000
+            }
+          },
+          "required": [
+            "equals"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "atLeast": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10000
+            }
+          },
+          "required": [
+            "atLeast"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "atMost": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000
+            }
+          },
+          "required": [
+            "atMost"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "responseAssertion": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "statusEquals"
+            },
+            "value": {
+              "type": "integer",
+              "minimum": 100,
+              "maximum": 599
+            }
+          },
+          "required": [
+            "kind",
+            "value"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "enum": [
+                "fieldPresent",
+                "fieldAbsent"
+              ]
+            },
+            "field": {
+              "type": "string",
+              "pattern": "^[a-z][A-Za-z0-9]{0,63}$"
+            }
+          },
+          "required": [
+            "kind",
+            "field"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "enum": [
+                "fieldEquals",
+                "fieldContains"
+              ]
+            },
+            "field": {
+              "type": "string",
+              "pattern": "^[a-z][A-Za-z0-9]{0,63}$"
+            },
+            "value": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+                },
+                {
+                  "$ref": "#/$defs/valueReference"
+                }
+              ]
+            }
+          },
+          "required": [
+            "kind",
+            "field",
+            "value"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "storageAssertion": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "enum": [
+                "present",
+                "absent"
+              ]
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "equals"
+            },
+            "value": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+                },
+                {
+                  "$ref": "#/$defs/valueReference"
+                }
+              ]
             }
           },
           "required": [

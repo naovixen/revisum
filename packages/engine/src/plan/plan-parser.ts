@@ -6,19 +6,24 @@
 // The grammar is the one of the version the plan declares: a plan declaring "1.1" is read with
 // everything 1.2 added switched off, so it parses exactly as it always did.
 // Calls name a declaration of the trusted project, with arguments typed by it; nothing a plan
-// writes can name a URL, a method, a header or a body.
+// writes can name a URL, a method, a header or a body. Stubs, request checks and storage entries
+// likewise: a plan names a declaration and gives typed arguments, never a response, a matcher, a
+// storage key or a value to store.
 // See docs/specs/SPEC-01-plan-language-and-parser.md, docs/specs/SPEC-30-plan-values-positions-and-keys.md,
-// docs/specs/SPEC-31-page-states-metadata-downloads-and-tabs.md and docs/specs/SPEC-32-declared-service-calls.md.
+// docs/specs/SPEC-31-page-states-metadata-downloads-and-tabs.md, docs/specs/SPEC-32-declared-service-calls.md
+// and docs/specs/SPEC-33-network-stubs-request-checks-and-storage.md.
 import {
   AUDIT_MODES, BACKEND_ASSERTION_KINDS, DIALOG_ACTIONS, DOWNLOAD_SIZE_KINDS, literalText, ELEMENT_STATE_KINDS, LOCATOR_KINDS, MODIFIERS, PAGE_TEXT_KINDS,
-  POSITION_WORDS, REMEMBER_READS, ROLES, SCRIPT_MODES,
+  POSITION_WORDS, REMEMBER_READS, REQUEST_COUNT_KINDS, RESPONSE_ASSERTION_KINDS, RESPONSE_FIELD_PRESENCE_KINDS, RESPONSE_READS, ROLES, SCRIPT_MODES,
+  STORAGE_ASSERTION_KINDS, STUB_ACTIONS,
   failure, success,
-  type AllowedUrl, type BackendAssertion, type CallArgument, type CallArguments, type CallDeclaration, type CallName, type CallStep,
-  type CriterionId, type DownloadAssertion, type FieldName, type ParameterType, type ValueName, type DownloadName, type ElementAssertion, type EmailDomain,
-  type FixtureName, type Locator,
-  type Modifier, type MultiLineText, type Origin, type PageAssertion, type PathTemplate, type Plan, type PlanData,
-  type PlanMeta, type Position, type Result, type SafeText, type SecretName, type SecretReference, type Step, type TargetId,
-  type TestIdAttribute, type TextOrValue, type ValueReference,
+  type AllowedUrl, type BackendAssertion, type Brand, type CallArgument, type CallArguments, type CallDeclaration, type CallName, type CallStep,
+  type CriterionId, type DownloadAssertion, type FieldName, type ParameterName, type ParameterType, type ValueName, type DownloadName, type ElementAssertion, type EmailDomain,
+  type FixtureName, type JsonPointer, type Locator,
+  type Modifier, type MultiLineText, type NetworkAndStorageStep, type ObservedRequestDeclaration, type Origin, type PageAssertion, type PathTemplate,
+  type Plan, type PlanData, type PlanMeta, type Position, type RememberSource, type RequestCount, type RequestName, type ResponseAssertion,
+  type Result, type SafeText, type SecretName, type SecretReference, type Step, type StorageAssertion, type StorageEntryDeclaration,
+  type StorageEntryName, type StubDeclaration, type StubName, type TargetId, type TestIdAttribute, type TextOrValue, type ValueReference,
 } from '@revisum/contracts';
 import { brand } from '../brand.ts';
 import { DEFAULT_TEST_ID_ATTRIBUTES, readId, type Limits, type Project } from '../project/project-parser.ts';
@@ -30,7 +35,7 @@ import {
   ASSERTION_STEP_TYPES, CAPTURE_NAME, CLEANUP_STEP_TYPES, CRITERION_FIELD, SERVICE_CALL_STEP_TYPES, CRITERION_ID, CURRENT_GRAMMAR, DOWNLOAD_KINDS, DOWNLOAD_NAME, ELEMENT_KINDS, FEATURE_ID,
   FROM_FIELD, LARGEST_DOWNLOAD_BYTES, LOCATOR_FIELDS, MAXIMUM_EXPECTED_COUNT, MAXIMUM_META_NAME_LENGTH, MAXIMUM_MODIFIERS, MAXIMUM_PATH_SEGMENTS, MAXIMUM_POSITION, MAXIMUM_QUERY_VALUES,
   MAXIMUM_SPEC_REFERENCE_LENGTH, MAXIMUM_TEST_ID_LENGTH, MAXIMUM_TITLE_LENGTH, MAXIMUM_URL_LENGTH, META_FIELDS, PLAN_FIELDS,
-  QUERY_KEY, grammarFor, type Grammar,
+  QUERY_KEY, RESPONSE_STATUS, grammarFor, type Grammar,
 } from './plan-grammar.ts';
 import { readGeneratedValues, readPlanClock, readValueName, type ValueContext } from './plan-values.ts';
 import { looksLikeCredential, namesSensitiveField } from './literal-secrets.ts';
@@ -52,6 +57,10 @@ export type PlanRules = {
   readonly emailDomains: readonly EmailDomain[];
   // The calls a call step may name.
   readonly calls: Readonly<Record<CallName, CallDeclaration>>;
+  // The stubs, observed requests and storage entries the steps of SPEC-33 may name.
+  readonly stubs: Readonly<Record<StubName, StubDeclaration>>;
+  readonly observedRequests: Readonly<Record<RequestName, ObservedRequestDeclaration>>;
+  readonly storageEntries: Readonly<Record<StorageEntryName, StorageEntryDeclaration>>;
 };
 
 type ParseContext = {
@@ -67,12 +76,16 @@ type ParseContext = {
   readonly downloads: Set<string>;
   // True while reading the plan's own list of steps, not the steps inside a frame or a second tab.
   readonly topLevel: boolean;
+  // The stubs started so far, in document order, anywhere in the plan: a stub applies to the
+  // whole browser context, so a stop anywhere after its start is valid.
+  readonly startedStubs: Set<string>;
 };
 
 const rulesOf = (project: Project): PlanRules => ({
   origins: project.origins, targetIds: project.matrix.map((target) => target.id),
   secretNames: project.secretNames, fixtures: project.fixtures, limits: project.limits,
   testIdAttributes: project.testIdAttributes, emailDomains: project.generatedEmailDomains, calls: project.calls,
+  stubs: project.stubs, observedRequests: project.observedRequests, storageEntries: project.storageEntries,
 });
 
 const isPlainObject = (input: unknown): input is Readonly<Record<string, unknown>> =>
@@ -374,19 +387,37 @@ function readCaptureName(input: unknown, path: string, context: ParseContext): P
 // True when a run value or a download already has the name: the two share one namespace.
 const isNameTaken = (name: string, context: ParseContext): boolean => context.defined.has(name) || context.downloads.has(name);
 
+// Where a remember step reads: a field of the latest response a declared request check saw, when
+// the source names a response, or else one element of the page.
+function readRememberSource(input: unknown, path: string, context: ParseContext): Parsed<RememberSource> {
+  const { issues } = context;
+  if (isPlainObject(input) && Object.hasOwn(input, 'response')) {
+    const fields = readRecord(input, path, issues, ['response', 'field', 'read']);
+    if (fields === INVALID) return INVALID;
+    const named = readRequestName(fields['response'], `${path}.response`, context);
+    const read = readOneOf(fields['read'], `${path}.read`, issues, RESPONSE_READS);
+    // An undeclared request is refused alone: its fields are not read against nothing.
+    if (named === INVALID) return INVALID;
+    const field = readDeclaredField(fields['field'], `${path}.field`, named[1].fields, context);
+    return field === INVALID || read === INVALID ? INVALID : { response: named[0], field, read };
+  }
+  const fields = readRecord(input, path, issues, ['element', 'read']);
+  if (fields === INVALID) return INVALID;
+  const parts = [
+    readLocator(fields['element'], `${path}.element`, context), readOneOf(fields['read'], `${path}.read`, issues, REMEMBER_READS),
+  ] as const;
+  return allValid(parts) ? { element: parts[0], read: parts[1] } : INVALID;
+}
+
 // A remember step defines its name only once it has been read, so its own locator cannot use it,
 // and a name already defined is a duplicate.
 function readRemember(head: Readonly<Record<string, unknown>>, path: string, context: ParseContext): Parsed<Step> {
   const name = readValueName(head['name'], `${path}.name`, context.issues);
-  const from = readRecord(head[FROM_FIELD], `${path}.${FROM_FIELD}`, context.issues, ['element', 'read']);
-  const parts = from === INVALID ? [INVALID, INVALID] as const : [
-    readLocator(from['element'], `${path}.from.element`, context),
-    readOneOf(from['read'], `${path}.from.read`, context.issues, REMEMBER_READS),
-  ] as const;
+  const from = readRememberSource(head[FROM_FIELD], `${path}.${FROM_FIELD}`, context);
   if (name === INVALID) return INVALID;
   if (isNameTaken(name, context)) { context.issues.push({ code: 'duplicate', path: `${path}.name` }); return INVALID; }
   context.defined.add(name);
-  return allValid(parts) ? { type: 'remember', name, from: { element: parts[0], read: parts[1] } } : INVALID;
+  return from === INVALID ? INVALID : { type: 'remember', name, from };
 }
 
 // A download's name as plain text, never a value reference: it names the file for the plan, not
@@ -440,13 +471,29 @@ function readDownloadAssertion(input: unknown, path: string, context: ParseConte
 
 // ---- Calls ----------------------------------------------------------------------------------------
 
-// The declaration a call step names. An undeclared name is refused alone: nothing else in the step
-// is read against a declaration that does not exist.
-function readCallName(input: unknown, path: string, context: ParseContext): Parsed<readonly [CallName, CallDeclaration]> {
+// A name from one of the trusted project's sections of declarations, such as its calls or stubs,
+// with the declaration it names. An undeclared name is refused alone: nothing else in the step is
+// read against a declaration that does not exist. The error never repeats the name.
+function readDeclaredName<Kind extends string, Declaration>(
+  input: unknown, path: string, context: ParseContext, section: Readonly<Record<Brand<string, Kind>, Declaration>>,
+): Parsed<readonly [Brand<string, Kind>, Declaration]> {
   if (typeof input !== 'string') { context.issues.push({ code: 'wrong_type', path }); return INVALID; }
-  const found = Object.entries(context.rules.calls).find(([name]) => name === input);
+  const found = Object.entries<Declaration>(section).find(([name]) => name === input);
   if (found === undefined) { context.issues.push({ code: 'unknown_value', path }); return INVALID; }
-  return [brand<string, 'CallName'>(found[0]), found[1]];
+  return [brand<string, Kind>(found[0]), found[1]];
+}
+
+// The declaration a call step names.
+const readCallName = (input: unknown, path: string, context: ParseContext): Parsed<readonly [CallName, CallDeclaration]> =>
+  readDeclaredName<'CallName', CallDeclaration>(input, path, context, context.rules.calls);
+
+// A response field a call or an observed request declares, by its name.
+function readDeclaredField(
+  input: unknown, path: string, fields: Readonly<Record<FieldName, JsonPointer>> | undefined, context: ParseContext,
+): Parsed<FieldName> {
+  if (typeof input !== 'string') { context.issues.push({ code: 'wrong_type', path }); return INVALID; }
+  if (!Object.hasOwn(fields ?? {}, input)) { context.issues.push({ code: 'unknown_value', path }); return INVALID; }
+  return brand<string, 'FieldName'>(input);
 }
 
 // One argument, as its parameter's type allows: a secret only by name; anything else as a literal
@@ -486,10 +533,13 @@ function readCallArgument(input: unknown, path: string, type: ParameterType, con
   return value;
 }
 
-// Exactly the declaration's parameters: a missing one and an extra one are both refused.
-function readCallArguments(input: unknown, path: string, declaration: CallDeclaration, context: ParseContext): Parsed<CallArguments> {
+// Exactly the declaration's parameters: a missing one and an extra one are both refused. Calls,
+// stubs and storage entries all type their arguments this way.
+function readCallArguments(
+  input: unknown, path: string, declared: Readonly<Record<ParameterName, ParameterType>>, context: ParseContext,
+): Parsed<CallArguments> {
   if (!isPlainObject(input)) { context.issues.push({ code: 'wrong_type', path }); return INVALID; }
-  const parameters = Object.entries(declaration.parameters);
+  const parameters = Object.entries(declared);
   const names = parameters.map(([name]) => name);
   if (readRecord(input, path, context.issues, names) === INVALID) return INVALID;
   const entries = parameters.map(([name, type]): Parsed<readonly [string, CallArgument]> => {
@@ -526,7 +576,7 @@ function readCall(head: Readonly<Record<string, unknown>>, path: string, context
   const named = readCallName(head['call'], `${path}.call`, context);
   if (named === INVALID) return INVALID;
   const [call, declaration] = named;
-  const callArguments = readCallArguments(head['arguments'], `${path}.arguments`, declaration, context);
+  const callArguments = readCallArguments(head['arguments'], `${path}.arguments`, declaration.parameters, context);
   if (!Object.hasOwn(head, 'remember')) return callArguments === INVALID ? INVALID : { type: 'call', call, arguments: callArguments };
   const remember = readRememberedFields(head['remember'], `${path}.remember`, declaration, context);
   return callArguments === INVALID || remember === INVALID ? INVALID : { type: 'call', call, arguments: callArguments, remember };
@@ -555,19 +605,147 @@ function readExpectBackend(head: Readonly<Record<string, unknown>>, path: string
   if (named === INVALID) return INVALID;
   const [call, declaration] = named;
   if (declaration.effect !== 'read') { context.issues.push({ code: 'unknown_value', path: `${path}.call` }); return INVALID; }
-  const field = ((): Parsed<FieldName> => {
-    const raw = head['field'];
-    if (typeof raw !== 'string') { context.issues.push({ code: 'wrong_type', path: `${path}.field` }); return INVALID; }
-    if (!Object.hasOwn(declaration.fields ?? {}, raw)) { context.issues.push({ code: 'unknown_value', path: `${path}.field` }); return INVALID; }
-    return brand<string, 'FieldName'>(raw);
-  })();
   const parts = [
-    readCallArguments(head['arguments'], `${path}.arguments`, declaration, context), field,
+    readCallArguments(head['arguments'], `${path}.arguments`, declaration.parameters, context),
+    readDeclaredField(head['field'], `${path}.field`, declaration.fields, context),
     readBackendAssertion(head['assert'], `${path}.assert`, context), readCriterionId(head, path, context),
   ] as const;
   return allValid(parts)
     ? { type: 'expectBackend', call, arguments: parts[0], field: parts[1], assert: parts[2], criterionId: parts[3] }
     : INVALID;
+}
+
+// ---- Stubs, request checks and storage --------------------------------------------------------------
+
+const readRequestName = (input: unknown, path: string, context: ParseContext): Parsed<readonly [RequestName, ObservedRequestDeclaration]> =>
+  readDeclaredName<'RequestName', ObservedRequestDeclaration>(input, path, context, context.rules.observedRequests);
+const readStorageEntryName = (input: unknown, path: string, context: ParseContext): Parsed<readonly [StorageEntryName, StorageEntryDeclaration]> =>
+  readDeclaredName<'StorageEntryName', StorageEntryDeclaration>(input, path, context, context.rules.storageEntries);
+
+// Arguments for a stub start or a storage write. Left out of the step when the plan leaves them
+// out, and then read as none, so a declaration with parameters still has each one reported missing.
+function readOptionalArguments(
+  head: Readonly<Record<string, unknown>>, path: string, declared: Readonly<Record<ParameterName, ParameterType>>, context: ParseContext,
+): Parsed<{ readonly arguments?: CallArguments }> {
+  const given = Object.hasOwn(head, 'arguments');
+  const stepArguments = readCallArguments(given ? head['arguments'] : {}, `${path}.arguments`, declared, context);
+  if (stepArguments === INVALID) return INVALID;
+  return given ? { arguments: stepArguments } : {};
+}
+
+// A stub start, with arguments for the stub's parameters, or a stop, with none. A stop names a stub
+// an earlier step started, so a plan cannot stop what it never faked.
+function readStubStep(head: Readonly<Record<string, unknown>>, path: string, context: ParseContext): Parsed<Step> {
+  const named = readDeclaredName<'StubName', StubDeclaration>(head['stub'], `${path}.stub`, context, context.rules.stubs);
+  const action = readOneOf(head['action'], `${path}.action`, context.issues, STUB_ACTIONS);
+  if (named === INVALID || action === INVALID) return INVALID;
+  const [stub, declaration] = named;
+  if (action === 'stop') {
+    if (Object.hasOwn(head, 'arguments')) { context.issues.push({ code: 'unknown_field', path: `${path}.arguments` }); return INVALID; }
+    if (!context.startedStubs.has(stub)) { context.issues.push({ code: 'unknown_value', path: `${path}.stub` }); return INVALID; }
+    return { type: 'stub', stub, action };
+  }
+  context.startedStubs.add(stub);
+  const stubArguments = readOptionalArguments(head, path, declaration.parameters, context);
+  return stubArguments === INVALID ? INVALID : { type: 'stub', stub, action, ...stubArguments };
+}
+
+// How many matching requests a check expects: exactly one of equals, atLeast and atMost.
+function readRequestCount(input: unknown, path: string, context: ParseContext): Parsed<RequestCount> {
+  const head = readAssertionHead(input, path, context);
+  if (head === INVALID) return INVALID;
+  const kind = REQUEST_COUNT_KINDS.find((candidate) => Object.hasOwn(head, candidate));
+  if (readRecord(input, path, context.issues, kind === undefined ? [] : [kind]) === INVALID || kind === undefined) return INVALID;
+  const at = `${path}.${kind}`;
+  const count = readInteger(head[kind], at, context.issues, 0, MAXIMUM_EXPECTED_COUNT);
+  if (count === INVALID) return INVALID;
+  // Any page sends at least 0 requests, so that check would prove nothing.
+  if (kind === 'atLeast' && count === 0) { context.issues.push({ code: 'vacuous', path: at }); return INVALID; }
+  switch (kind) {
+    case 'equals': return { equals: count };
+    case 'atLeast': return { atLeast: count };
+    case 'atMost': return { atMost: count };
+  }
+}
+
+// A check on the latest matching exchange: its status, or a field the request declares.
+function readResponseAssertion(
+  input: unknown, path: string, declaration: ObservedRequestDeclaration, context: ParseContext,
+): Parsed<ResponseAssertion> {
+  const { issues } = context;
+  const head = readAssertionHead(input, path, context);
+  if (head === INVALID) return INVALID;
+  const kind = readOneOf(head['kind'], `${path}.kind`, issues, RESPONSE_ASSERTION_KINDS);
+  if (kind === INVALID) return INVALID;
+  if (kind === 'statusEquals') {
+    if (readRecord(input, path, issues, ['kind', 'value']) === INVALID) return INVALID;
+    const status = readInteger(head['value'], `${path}.value`, issues, RESPONSE_STATUS.lowest, RESPONSE_STATUS.highest);
+    return status === INVALID ? INVALID : { kind, value: status };
+  }
+  const field = (): Parsed<FieldName> => readDeclaredField(head['field'], `${path}.field`, declaration.fields, context);
+  if (isOneOf(RESPONSE_FIELD_PRESENCE_KINDS, kind)) {
+    if (readRecord(input, path, issues, ['kind', 'field']) === INVALID) return INVALID;
+    const checked = field();
+    return checked === INVALID ? INVALID : { kind, field: checked };
+  }
+  if (readRecord(input, path, issues, ['kind', 'field', 'value']) === INVALID) return INVALID;
+  const parts = [field(), readExpectedText(head['value'], `${path}.value`, context)] as const;
+  return allValid(parts) ? { kind, field: parts[0], value: parts[1] } : INVALID;
+}
+
+function readStorageAssertion(input: unknown, path: string, context: ParseContext): Parsed<StorageAssertion> {
+  const head = readAssertionHead(input, path, context);
+  if (head === INVALID) return INVALID;
+  const kind = readOneOf(head['kind'], `${path}.kind`, context.issues, STORAGE_ASSERTION_KINDS);
+  if (kind === INVALID) return INVALID;
+  if (kind !== 'equals') return readRecord(input, path, context.issues, ['kind']) === INVALID ? INVALID : { kind };
+  if (readRecord(input, path, context.issues, ['kind', 'value']) === INVALID) return INVALID;
+  const value = readExpectedText(head['value'], `${path}.value`, context);
+  return value === INVALID ? INVALID : { kind, value };
+}
+
+// A write or removal of a storage entry the project declares readWrite. An entry declared read may
+// only be checked, so writing it is refused as a name the plan may not use there.
+function readStorageWrite(
+  head: Readonly<Record<string, unknown>>, path: string, type: 'setStorage' | 'removeStorage', context: ParseContext,
+): Parsed<Step> {
+  const named = readStorageEntryName(head['entry'], `${path}.entry`, context);
+  if (named === INVALID) return INVALID;
+  const [entry, declaration] = named;
+  if (declaration.access !== 'readWrite') { context.issues.push({ code: 'unknown_value', path: `${path}.entry` }); return INVALID; }
+  if (type === 'removeStorage') return { type, entry };
+  const entryArguments = readOptionalArguments(head, path, declaration.parameters ?? {}, context);
+  return entryArguments === INVALID ? INVALID : { type, entry, ...entryArguments };
+}
+
+// The steps that name a stub, an observed request or a storage entry.
+function readNetworkOrStorageStep(
+  head: Readonly<Record<string, unknown>>, path: string, type: NetworkAndStorageStep['type'], context: ParseContext,
+): Parsed<Step> {
+  switch (type) {
+    case 'stub':
+      return readStubStep(head, path, context);
+    case 'setStorage': case 'removeStorage':
+      return readStorageWrite(head, path, type, context);
+    case 'expectStorage': {
+      const named = readStorageEntryName(head['entry'], `${path}.entry`, context);
+      if (named === INVALID) return INVALID;
+      const parts = [readStorageAssertion(head['assert'], `${path}.assert`, context), readCriterionId(head, path, context)] as const;
+      return allValid(parts) ? { type, entry: named[0], assert: parts[0], criterionId: parts[1] } : INVALID;
+    }
+    case 'resetRequests': case 'expectRequests': case 'expectResponse': {
+      const named = readRequestName(head['request'], `${path}.request`, context);
+      if (named === INVALID) return INVALID;
+      const [request, declaration] = named;
+      if (type === 'resetRequests') return { type, request };
+      if (type === 'expectRequests') {
+        const parts = [readRequestCount(head['count'], `${path}.count`, context), readCriterionId(head, path, context)] as const;
+        return allValid(parts) ? { type, request, count: parts[0], criterionId: parts[1] } : INVALID;
+      }
+      const parts = [readResponseAssertion(head['assert'], `${path}.assert`, declaration, context), readCriterionId(head, path, context)] as const;
+      return allValid(parts) ? { type, request, assert: parts[0], criterionId: parts[1] } : INVALID;
+    }
+  }
 }
 
 // The plan's cleanup: calls only, read after the steps, so they may use the values the steps remember.
@@ -699,6 +877,9 @@ function readStep(input: unknown, path: string, context: ParseContext): Parsed<S
       return readCall(head, path, context);
     case 'expectBackend':
       return readExpectBackend(head, path, context);
+    case 'stub': case 'resetRequests': case 'expectRequests': case 'expectResponse':
+    case 'setStorage': case 'removeStorage': case 'expectStorage':
+      return readNetworkOrStorageStep(head, path, type, context);
   }
 }
 
@@ -821,7 +1002,9 @@ export function readPlanData(input: unknown, rules: PlanRules): Result<PlanData,
   // below; the current grammar reads the rest so every other problem is reported too.
   const declaredGrammar = grammarFor(plainFields(input)?.['version']);
   const grammar = declaredGrammar ?? CURRENT_GRAMMAR;
-  const context: ParseContext = { rules, issues: [], grammar, defined: new Set(), downloads: new Set(), topLevel: true };
+  const context: ParseContext = {
+    rules, issues: [], grammar, defined: new Set(), downloads: new Set(), topLevel: true, startedStubs: new Set(),
+  };
   const fields = readRecord(input, '$', context.issues, [...PLAN_FIELDS, ...grammar.optionalPlanFields], PLAN_FIELDS);
   if (fields === INVALID) return failure(context.issues);
   // A plan for a newer language is refused outright: running it with the unknown parts skipped
@@ -881,7 +1064,7 @@ export function planParser(project: Project): (input: unknown) => Result<Plan, r
 // project-independent defaults. Version 1 had no secrets, fixtures, frames or run values.
 export const languageOnlyRules = (limits: Limits): PlanRules => ({
   origins: 'any', targetIds: 'any', secretNames: [], fixtures: [], limits, testIdAttributes: DEFAULT_TEST_ID_ATTRIBUTES, emailDomains: [],
-  calls: {},
+  calls: {}, stubs: {}, observedRequests: {}, storageEntries: {},
 });
 
 // The run-time half of the brand: the type system stops a forged Plan at compile time, but a cast

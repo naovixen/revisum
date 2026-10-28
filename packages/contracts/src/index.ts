@@ -9,6 +9,7 @@ export * from './plan.ts';
 export * from './literal-steps.ts';
 export * from './secret.ts';
 export * from './service-calls.ts';
+export * from './network-and-storage.ts';
 export * from './browser-driver.ts';
 export type * from './policy.ts';
 export type * from './run-ports.ts';

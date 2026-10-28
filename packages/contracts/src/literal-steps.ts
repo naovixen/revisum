@@ -45,9 +45,10 @@ const PAGE_CHECKS_NO_DRIVER_DECIDES: readonly PageAssertion['kind'][] = ['metaCo
 
 // True when the step needs what no driver performs yet: a locator feature above, a key chord,
 // multi-line text, a check the probes cannot decide, a page loaded with scripts off, a download,
-// a check of a download or a second tab. The run reports such a step as unsupported-step before
-// anything of it reaches the driver. Steps no driver performs at all (hover, select, upload,
-// frame, dialog and remember) are the run's to refuse whole.
+// a check of a download, a second tab, or the driver's network and storage ports: stubs, request
+// checks, response checks and reads, and web storage. The run reports such a step as
+// unsupported-step before anything of it reaches the driver. Steps no driver performs at all
+// (hover, select, upload, frame, dialog and remember) are the run's to refuse whole.
 export function needsDriverFeatures(step: Step): boolean {
   switch (step.type) {
     case 'click': case 'hover': case 'select': case 'upload': return needsLocatorFeatures(step.locator);
@@ -57,7 +58,12 @@ export function needsDriverFeatures(step: Step): boolean {
     case 'expectPage': return PAGE_CHECKS_NO_DRIVER_DECIDES.includes(step.assert.kind);
     case 'navigate': return step.scripts !== undefined;
     case 'download': case 'expectDownload': case 'newTab': return true;
-    case 'frame': case 'dialog': case 'remember': case 'a11yAudit': case 'capture': return false;
+    // The CDP driver's network and storage ports carry these out (docs/specs/SPEC-06-cdp-driver.md).
+    case 'stub': case 'resetRequests': case 'expectRequests': case 'expectResponse':
+    case 'setStorage': case 'removeStorage': case 'expectStorage': return true;
+    // Reading a response field needs the network port; reading an element only the prober.
+    case 'remember': return 'response' in step.from;
+    case 'frame': case 'dialog': case 'a11yAudit': case 'capture': return false;
     // Calls never reach a driver: the engine sends them through the run's service caller.
     case 'call': case 'expectBackend': return false;
   }

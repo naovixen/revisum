@@ -14,14 +14,14 @@ import { brand } from '../brand.ts';
 import {
   INVALID, allValid, peekRecord, readInteger, readList, readOneOf, readRecord, readText, type Issues, type Parsed,
 } from '../plan/plan-decoders.ts';
-import { CALL_NAME, QUERY_KEY } from '../plan/plan-grammar.ts';
+import { DECLARED_NAME, QUERY_KEY } from '../plan/plan-grammar.ts';
 import { isInterpolationSafe } from '../service-calls/parameter-values.ts';
 import { readOrigin } from './project-parser.ts';
 
 // A service's name: a lowercase letter, then up to 39 lowercase letters, digits or hyphens.
 const SERVICE_NAME = /^[a-z][a-z0-9-]{0,39}$/;
 // An HTTP header name: the characters RFC 9110 allows in a token.
-const HEADER_NAME = /^[A-Za-z0-9!#$%&'*+.^_`|~-]{1,64}$/;
+export const HEADER_NAME = /^[A-Za-z0-9!#$%&'*+.^_`|~-]{1,64}$/;
 // Headers that decide where or how a request travels, or carry the browser's session. A
 // declaration may never set them; any header starting with "proxy-" neither.
 const FORBIDDEN_HEADERS: readonly string[] = ['host', 'cookie', 'content-length', 'transfer-encoding', 'connection', 'upgrade', 'te', 'trailer'];
@@ -96,22 +96,33 @@ export type DeclarationContext = {
   readonly secretNames: readonly SecretName[];
 };
 
-// The calls a project declares, by name. Absent means none.
-export function readCallDeclarations(input: unknown, context: DeclarationContext): Parsed<Readonly<Record<CallName, CallDeclaration>>> {
+// A project section of named declarations, such as `calls` or `stubs`, read the same way for
+// every kind: absent means none, each name follows the declared-name pattern, and a name outside
+// it is refused alone, at the name, with nothing under it read.
+export function readDeclarationSection<Name extends string, Declaration>(
+  input: unknown, path: string, issues: Issues, maximumCount: number, read: (input: unknown, path: string) => Parsed<Declaration>,
+): Parsed<Readonly<Record<Brand<string, Name>, Declaration>>> {
   if (input === undefined) return {};
-  const fields = peekRecord(input, '$.calls', context.issues);
+  const fields = peekRecord(input, path, issues);
   if (fields === INVALID) return INVALID;
   const names = Object.keys(fields);
-  if (names.length > MAXIMUM_CALLS) { context.issues.push({ code: 'too_large', path: '$.calls' }); return INVALID; }
-  const entries = names.map((name): Parsed<readonly [CallName, CallDeclaration]> => {
-    const path = `$.calls.${name}`;
-    // A name outside the pattern is refused alone: nothing under it is read.
-    if (!CALL_NAME.test(name)) { context.issues.push({ code: 'unknown_value', path }); return INVALID; }
-    const declaration = readDeclaration(fields[name], path, context);
-    return declaration === INVALID ? INVALID : [brand<string, 'CallName'>(name), declaration];
+  if (names.length > maximumCount) { issues.push({ code: 'too_large', path }); return INVALID; }
+  const entries = names.map((name): Parsed<readonly [Brand<string, Name>, Declaration]> => {
+    const at = `${path}.${name}`;
+    const declaredName = readName<Name>(name, at, issues);
+    if (declaredName === INVALID) return INVALID;
+    const declaration = read(fields[name], at);
+    return declaration === INVALID ? INVALID : [declaredName, declaration];
   });
   if (!allValid(entries)) return INVALID;
   return Object.fromEntries(entries);
+}
+
+// The calls a project declares, by name. Absent means none.
+export function readCallDeclarations(input: unknown, context: DeclarationContext): Parsed<Readonly<Record<CallName, CallDeclaration>>> {
+  return readDeclarationSection<'CallName', CallDeclaration>(
+    input, '$.calls', context.issues, MAXIMUM_CALLS, (declaration, path) => readDeclaration(declaration, path, context),
+  );
 }
 
 function readDeclaration(input: unknown, path: string, context: DeclarationContext): Parsed<CallDeclaration> {
@@ -161,9 +172,9 @@ function readServiceName(input: unknown, path: string, context: DeclarationConte
   return found.name;
 }
 
-// A name that follows the call-name pattern, branded as `Name` once checked.
+// A name that follows the declared-name pattern, branded as `Name` once checked.
 function readName<Name extends string>(name: string, path: string, issues: Issues): Parsed<Brand<string, Name>> {
-  if (!CALL_NAME.test(name)) { issues.push({ code: 'unknown_value', path }); return INVALID; }
+  if (!DECLARED_NAME.test(name)) { issues.push({ code: 'unknown_value', path }); return INVALID; }
   return brand<string, Name>(name);
 }
 
@@ -176,7 +187,7 @@ function readSuccessStatuses(input: unknown, path: string, issues: Issues): Pars
   return statuses;
 }
 
-function readFields(input: unknown, path: string, issues: Issues): Parsed<Readonly<Record<FieldName, JsonPointer>>> {
+export function readFields(input: unknown, path: string, issues: Issues): Parsed<Readonly<Record<FieldName, JsonPointer>>> {
   const fields = peekRecord(input, path, issues);
   if (fields === INVALID) return INVALID;
   const entries = Object.entries(fields).map(([key, pointer]): Parsed<readonly [FieldName, JsonPointer]> => {
@@ -238,7 +249,7 @@ function readHeaderValue(input: unknown, path: string, context: DeclarationConte
 
 // ---- Parameters -------------------------------------------------------------------------------
 
-function readParameters(input: unknown, path: string, issues: Issues): Parsed<Readonly<Record<ParameterName, ParameterType>>> {
+export function readParameters(input: unknown, path: string, issues: Issues): Parsed<Readonly<Record<ParameterName, ParameterType>>> {
   const fields = peekRecord(input, path, issues);
   if (fields === INVALID) return INVALID;
   if (Object.keys(fields).length > MAXIMUM_PARAMETERS) { issues.push({ code: 'too_large', path }); return INVALID; }
@@ -331,6 +342,12 @@ function readQuery(input: unknown, path: string, context: TemplateContext): Pars
   });
   return allValid(entries) ? Object.fromEntries(entries) : INVALID;
 }
+
+// A whole JSON value as a template whose placeholders name `parameters`, such as a stub's JSON body
+// or a storage entry's value, read under the same rules as a call's body.
+export const readJsonTemplate = (
+  input: unknown, path: string, issues: Issues, parameters: Readonly<Record<ParameterName, ParameterType>>,
+): Parsed<JsonTemplate> => readTemplate(input, path, { issues, parameters }, 'body', 0);
 
 // A JSON template. In a query only scalars, placeholders and interpolated strings are allowed. A
 // literal object key starting with "$" is refused, so no operator key such as "$where" can pass

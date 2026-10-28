@@ -45,15 +45,31 @@ export const STEP_FIELDS: { readonly [Type in StepType]: StepFields } = {
   remember: { required: ['type', 'name', FROM_FIELD], optional: [] },
   call: { required: ['type', 'call', 'arguments'], optional: ['remember'] },
   expectBackend: { required: ['type', 'call', 'arguments', 'field', 'assert', CRITERION_FIELD], optional: [] },
+  // Arguments only with a start; the parser refuses them on a stop.
+  stub: { required: ['type', 'stub', 'action'], optional: ['arguments'] },
+  resetRequests: { required: ['type', 'request'], optional: [] },
+  expectRequests: { required: ['type', 'request', 'count', CRITERION_FIELD], optional: [] },
+  expectResponse: { required: ['type', 'request', 'assert', CRITERION_FIELD], optional: [] },
+  setStorage: { required: ['type', 'entry'], optional: ['arguments'] },
+  removeStorage: { required: ['type', 'entry'], optional: [] },
+  expectStorage: { required: ['type', 'entry', 'assert', CRITERION_FIELD], optional: [] },
 };
+// Stubs, request checks and web storage, which name what the trusted project declares.
+const NETWORK_AND_STORAGE_STEP_TYPES: readonly StepType[] = [
+  'stub', 'resetRequests', 'expectRequests', 'expectResponse', 'setStorage', 'removeStorage', 'expectStorage',
+];
 export const STEP_TYPES: readonly StepType[] = [
   'navigate', 'click', 'hover', 'fill', 'select', 'upload', 'press', 'frame', 'dialog', 'expect', 'expectPage', 'a11yAudit', 'capture',
-  'remember', 'download', 'expectDownload', 'newTab', 'call', 'expectBackend',
+  'remember', 'download', 'expectDownload', 'newTab', 'call', 'expectBackend', ...NETWORK_AND_STORAGE_STEP_TYPES,
 ];
 // The steps language 1.2 added, which a plan declaring "1.1" cannot use.
-const NEWER_STEP_TYPES: readonly StepType[] = ['remember', 'download', 'expectDownload', 'newTab', 'call', 'expectBackend'];
+const NEWER_STEP_TYPES: readonly StepType[] = [
+  'remember', 'download', 'expectDownload', 'newTab', 'call', 'expectBackend', ...NETWORK_AND_STORAGE_STEP_TYPES,
+];
 // The steps that check something. A plan needs at least one, or it would pass without proving anything.
-export const ASSERTION_STEP_TYPES: readonly StepType[] = ['expect', 'expectPage', 'expectDownload', 'expectBackend'];
+export const ASSERTION_STEP_TYPES: readonly StepType[] = [
+  'expect', 'expectPage', 'expectDownload', 'expectBackend', 'expectRequests', 'expectResponse', 'expectStorage',
+];
 // The steps that call a declared service. Only the plan's own list of steps may hold them, and a
 // plan's cleanup holds nothing else but calls.
 export const SERVICE_CALL_STEP_TYPES: readonly StepType[] = ['call', 'expectBackend'];
@@ -146,9 +162,10 @@ export const CRITERION_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 export const LOWERCASE_ID = /^[a-z0-9][a-z0-9-]{0,47}$/;
 // A run value's name: a lowercase letter, then up to 63 letters and digits.
 export const VALUE_NAME = /^[a-z][A-Za-z0-9]{0,63}$/;
-// A declared call's, parameter's or response field's name: a lowercase letter, then up to 63
-// letters and digits. The project parser owns these names; a plan only refers to them.
-export const CALL_NAME = /^[a-z][A-Za-z0-9]{0,63}$/;
+// A declared call's, parameter's, response field's, stub's, observed request's or storage entry's
+// name: a lowercase letter, then up to 63 letters and digits. The project parser owns these names;
+// a plan only refers to them.
+export const DECLARED_NAME = /^[a-z][A-Za-z0-9]{0,63}$/;
 // A query key in a path template.
 export const QUERY_KEY = /^[A-Za-z0-9_.-]{1,64}$/;
 // A plan clock's time of day, "HH:MM" on the 24-hour clock.
@@ -163,8 +180,10 @@ export const MAXIMUM_SPEC_REFERENCE_LENGTH = 200;
 export const MAXIMUM_TITLE_LENGTH = 120;
 // The prefix of a generated unique text.
 export const MAXIMUM_VALUE_PREFIX_LENGTH = 100;
-// The largest number a countEquals assertion may expect.
+// The largest number a countEquals assertion or a request count may expect.
 export const MAXIMUM_EXPECTED_COUNT = 10_000;
+// The statuses a response check may expect: any a browser's fetch can receive.
+export const RESPONSE_STATUS = { lowest: 100, highest: 599 } as const;
 // The highest 1-based position a locator may pick.
 export const MAXIMUM_POSITION = 1000;
 // How many days a date value or the plan clock may lie from its anchor, either way.

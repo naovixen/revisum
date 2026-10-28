@@ -3,7 +3,8 @@
 //
 //   - decide() is the static check, made before a run starts. It reads the plan's navigations and
 //     the locator names of its clicks, its size and number of calls against the trusted limits, its
-//     targets' locales, and what each declared call it makes may reach and change. Only an allow decision carries an Authorised plan, the only kind run() accepts.
+//     targets' locales, what each declared call it makes may reach and change, and whether a
+//     proposal starts a stub or writes storage its declaration keeps out of proposals. Only an allow decision carries an Authorised plan, the only kind run() accepts.
 //   - guardAction() is the runtime guard. The driver calls it just before every action, with the
 //     element the locator resolved to and any open dialog's text, so it sees what the plan alone
 //     cannot: the name behind a test id, the form a key press would submit, where a link leads.
@@ -14,8 +15,8 @@
 // See docs/specs/SPEC-03-policy-gate.md.
 import { literalText } from '@revisum/contracts';
 import type {
-  AllowedUrl, Authorised, EventSink, GuardVerdict, Locale, Locator, PathTemplate, Plan, PolicyDecision, PolicyRuleId, ResolvedElement,
-  ServiceCallStep, Step, Target, TargetId,
+  AllowedUrl, Authorised, EventSink, GuardVerdict, Locale, Locator, PathTemplate, Plan, PolicyDecision, PolicyRuleId, RemoveStorageStep,
+  ResolvedElement, ServiceCallStep, SetStorageStep, Step, StubStep, Target, TargetId,
 } from '@revisum/contracts';
 import { deriveActor, sourceActorId } from '../actor.ts';
 import type { PlanStanding } from '../approval/plan-standing.ts';
@@ -160,12 +161,12 @@ function serviceCallSteps(plan: Plan): { readonly step: ServiceCallStep; readonl
 // What a call may not do: reach a production service the plan's standing does not open, or, in a
 // proposal, change something unless its declaration allows it in proposals. A call the project
 // does not declare, or whose service it does not declare, reaches somewhere nobody declared.
-function callRule(step: ServiceCallStep, context: StaticContext, approved: boolean): PolicyRuleId | null {
+function callRule(step: ServiceCallStep, context: StaticContext): PolicyRuleId | null {
   const declaration = Object.entries(context.project.calls).find(([name]) => name === step.call)?.[1];
   const service = context.project.services.find((candidate) => candidate.name === declaration?.service);
   if (declaration === undefined || service === undefined) return 'undeclared-origin';
   if (!context.productionAllowed && context.project.productionOrigins.some((origin) => origin === service.origin)) return 'production-origin';
-  if (!approved && declaration.effect === 'write' && !declaration.allowInProposals) return 'side-effect-in-proposal';
+  if (!context.approved && declaration.effect === 'write' && !declaration.allowInProposals) return 'side-effect-in-proposal';
   return null;
 }
 
@@ -173,7 +174,22 @@ type StaticContext = {
   readonly project: Project | TrustedProject;
   readonly patterns: readonly string[];
   readonly productionAllowed: boolean;
+  // False for a proposal: a plan with no approval.
+  readonly approved: boolean;
 };
+
+// What a stub start or a storage write may not do: in a proposal, fake a response or change the
+// page's storage unless its declaration allows it in proposals. Removing an entry is a write too.
+// Stopping a stub undoes a side effect, so it is never one. A name the project does not declare
+// reaches something nobody declared.
+function sideEffectRule(step: StubStep | SetStorageStep | RemoveStorageStep, context: StaticContext): PolicyRuleId | null {
+  const declaration = step.type === 'stub'
+    ? Object.entries(context.project.stubs).find(([name]) => name === step.stub)?.[1]
+    : Object.entries(context.project.storageEntries).find(([name]) => name === step.entry)?.[1];
+  if (declaration === undefined) return 'undeclared-origin';
+  const sideEffect = step.type !== 'stub' || step.action === 'start';
+  return sideEffect && !context.approved && !declaration.allowInProposals ? 'side-effect-in-proposal' : null;
+}
 
 function navigationRule(url: string, context: StaticContext): PolicyRuleId | null {
   const read = readUrl(url);
@@ -198,6 +214,7 @@ function staticRule(step: Step, context: StaticContext): PolicyRuleId | null {
     const name = locatorName(step.locator);
     if (name !== null && isIrreversibleName(name, context.patterns, context.project.policy)) return 'irreversible-action';
   }
+  if (step.type === 'stub' || step.type === 'setStorage' || step.type === 'removeStorage') return sideEffectRule(step, context);
   return null;
 }
 
@@ -211,13 +228,13 @@ function staticDenial(plan: Plan, targets: readonly Target[], standing: PlanStan
   }
   // Production is closed to every plan unless the project opens it, and then only to approved plans.
   const productionAllowed = standing.mode === 'approved' && project.policy.allowProductionForApprovedPlans;
-  const context: StaticContext = { project, patterns, productionAllowed };
+  const context: StaticContext = { project, patterns, productionAllowed, approved: standing.mode === 'approved' };
   for (const { step, index } of everyStep(plan.steps)) {
     const rule = staticRule(step, context);
     if (rule !== null) return { rule, stepIndex: index };
   }
   for (const { step, index } of serviceCallSteps(plan)) {
-    const rule = callRule(step, context, standing.mode === 'approved');
+    const rule = callRule(step, context);
     if (rule !== null) return { rule, stepIndex: index };
   }
   return null;
@@ -267,8 +284,11 @@ function runtimeRule(
       return linkRule(element, policy) ?? (irreversible(element.formSubmitName) ? 'irreversible-submit' : null);
     }
     case 'frame': case 'expect': case 'expectPage': case 'expectDownload': case 'a11yAudit': case 'capture': case 'remember':
-    // Calls act on no page: the static check judged them, before the run started.
+    // Calls act on no page, and stubs, request checks and storage steps on no element: the static
+    // check judged them, before the run started.
     case 'call': case 'expectBackend':
+    case 'stub': case 'resetRequests': case 'expectRequests': case 'expectResponse':
+    case 'setStorage': case 'removeStorage': case 'expectStorage':
       return null;
   }
 }

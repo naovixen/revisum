@@ -4,23 +4,25 @@
 // allow-list, matrix, secret names, fixtures, test-id attributes and email domains, its limits,
 // the text safety rules, that values and downloads are defined before use, that a second tab
 // and a call open only at the top level, that a call and its arguments and fields fit the
-// project's declarations, and that a plan declaring "1.1" uses nothing 1.2 added. Passing the
+// project's declarations, that each stub, observed request, storage entry and field is one the
+// project declares, and that a plan declaring "1.1" uses nothing 1.2 added. Passing the
 // schema is never a reason to trust a plan.
 // `npm run lint` checks that docs/plan-language/plan.schema.json is exactly this schema.
 // See docs/specs/SPEC-01-plan-language-and-parser.md, docs/specs/SPEC-30-plan-values-positions-and-keys.md
 // docs/specs/SPEC-31-page-states-metadata-downloads-and-tabs.md and docs/specs/SPEC-32-declared-service-calls.md.
 import {
   AUDIT_MODES, BACKEND_ASSERTION_KINDS, DATE_ANCHORS, DATE_FORMATS, DIALOG_ACTIONS, DOWNLOAD_TEXT_KINDS, ELEMENT_STATE_KINDS, ELEMENT_TEXT_KINDS, KEYS,
-  LOCATOR_KINDS, MODIFIERS, PAGE_TEXT_KINDS, POSITION_WORDS, REMEMBER_READS, ROLES, SCRIPT_MODES,
+  LOCATOR_KINDS, MODIFIERS, PAGE_TEXT_KINDS, POSITION_WORDS, REMEMBER_READS, RESPONSE_FIELD_PRESENCE_KINDS, RESPONSE_FIELD_TEXT_KINDS,
+  RESPONSE_READS, ROLES, SCRIPT_MODES, STORAGE_ASSERTION_KINDS, STUB_ACTIONS,
   type StepType,
 } from '@revisum/contracts';
 import { schemaId } from '../version.ts';
 import {
-  CALL_NAME, CAPTURE_NAME, CLOCK_TIME, CRITERION_FIELD, CRITERION_ID, CURRENT_PLAN_VERSION, DOWNLOAD_NAME, EMAIL_LOCAL_PREFIX, FEATURE_ID, FROM_FIELD,
+  DECLARED_NAME, CAPTURE_NAME, CLOCK_TIME, CRITERION_FIELD, CRITERION_ID, CURRENT_PLAN_VERSION, DOWNLOAD_NAME, EMAIL_LOCAL_PREFIX, FEATURE_ID, FROM_FIELD,
   LARGEST_DOWNLOAD_BYTES, LOCATOR_FIELDS, LOWERCASE_ID, MAXIMUM_DAY_OFFSET, MAXIMUM_EXPECTED_COUNT, MAXIMUM_META_NAME_LENGTH,
   MAXIMUM_MODIFIERS, MAXIMUM_PATH_SEGMENTS, MAXIMUM_POSITION,
   MAXIMUM_SPEC_REFERENCE_LENGTH, MAXIMUM_TEST_ID_LENGTH, MAXIMUM_TITLE_LENGTH, MAXIMUM_URL_LENGTH, MAXIMUM_VALUE_PREFIX_LENGTH,
-  META_FIELDS, OPTIONAL_LOCATOR_FIELDS, PLAN_FIELDS, PREVIOUS_PLAN_VERSION, QUERY_KEY, STEP_FIELDS, STEP_TYPES, UNIQUE_NUMBER_DIGITS,
+  META_FIELDS, OPTIONAL_LOCATOR_FIELDS, PLAN_FIELDS, PREVIOUS_PLAN_VERSION, QUERY_KEY, RESPONSE_STATUS, STEP_FIELDS, STEP_TYPES, UNIQUE_NUMBER_DIGITS,
   VALUE_NAME,
 } from './plan-grammar.ts';
 
@@ -69,14 +71,28 @@ const STEP_FIELD_SCHEMAS: Readonly<Record<string, JsonSchema>> = {
   [CRITERION_FIELD]: { type: 'string', pattern: CRITERION_ID.source },
   mode: { enum: [...AUDIT_MODES] },
   name: { type: 'string', pattern: CAPTURE_NAME.source },
-  from: closedObject({ element: reference('locator'), read: { enum: [...REMEMBER_READS] } }, ['element', 'read']),
+  // An element of the page, or a field of the latest response a declared request check saw.
+  from: {
+    oneOf: [
+      closedObject({ element: reference('locator'), read: { enum: [...REMEMBER_READS] } }, ['element', 'read']),
+      closedObject({
+        response: { type: 'string', pattern: DECLARED_NAME.source }, field: { type: 'string', pattern: DECLARED_NAME.source },
+        read: { enum: [...RESPONSE_READS] },
+      }, ['response', 'field', 'read']),
+    ],
+  },
   scripts: { enum: [...SCRIPT_MODES] },
   download: { type: 'string', pattern: DOWNLOAD_NAME.source },
-  call: { type: 'string', pattern: CALL_NAME.source },
+  call: { type: 'string', pattern: DECLARED_NAME.source },
   // The project declares each call's parameters; the parser checks the arguments against them.
-  arguments: recordOf(CALL_NAME, { oneOf: [text(0), { type: 'number' }, { type: 'boolean' }, reference('valueReference'), SECRET_REFERENCE] }),
-  remember: recordOf(VALUE_NAME, { type: 'string', pattern: CALL_NAME.source }),
-  field: { type: 'string', pattern: CALL_NAME.source },
+  arguments: recordOf(DECLARED_NAME, { oneOf: [text(0), { type: 'number' }, { type: 'boolean' }, reference('valueReference'), SECRET_REFERENCE] }),
+  remember: recordOf(VALUE_NAME, { type: 'string', pattern: DECLARED_NAME.source }),
+  field: { type: 'string', pattern: DECLARED_NAME.source },
+  // The project declares each stub, observed request and storage entry; the parser checks the names.
+  stub: { type: 'string', pattern: DECLARED_NAME.source },
+  request: { type: 'string', pattern: DECLARED_NAME.source },
+  entry: { type: 'string', pattern: DECLARED_NAME.source },
+  count: reference('requestCount'),
 };
 
 // Step fields whose schema depends on the step type.
@@ -87,6 +103,9 @@ const STEP_TYPE_FIELD_SCHEMAS: { readonly [Type in StepType]?: Readonly<Record<s
   download: { name: { type: 'string', pattern: DOWNLOAD_NAME.source } },
   expectDownload: { assert: reference('downloadAssertion') },
   expectBackend: { assert: reference('backendAssertion') },
+  stub: { action: { enum: [...STUB_ACTIONS] } },
+  expectResponse: { assert: reference('responseAssertion') },
+  expectStorage: { assert: reference('storageAssertion') },
 };
 
 function stepSchema(type: StepType): JsonSchema {
@@ -146,7 +165,7 @@ export function planJsonSchema(): JsonSchema {
       + 'Fitting this schema is necessary, not sufficient: the plan parser also checks the project\'s allow-list, '
       + 'matrix, declared secrets, fixtures, test-id attributes and email domains, its limits, its text safety rules '
       + 'that every value and download is defined before it is used, that a second tab and a call stand only at the top level, '
-      + 'and that each call, argument and field is one the project declares.',
+      + 'and that each call, stub, observed request, storage entry, argument and field is one the project declares.',
     ...closedObject({
       version: { enum: [PREVIOUS_PLAN_VERSION, CURRENT_PLAN_VERSION] },
       meta: closedObject({
@@ -209,6 +228,31 @@ export function planJsonSchema(): JsonSchema {
             kind: { enum: BACKEND_ASSERTION_KINDS.filter((kind) => kind === 'equals' || kind === 'contains') }, value: textOrValue(1),
           }, ['kind', 'value']),
           closedObject({ kind: { const: 'numberEquals' }, value: { type: 'number' } }, ['kind', 'value']),
+        ],
+      },
+      // How many matching requests a check expects. atLeast 0 would hold for any page.
+      requestCount: {
+        oneOf: [
+          closedObject({ equals: integer(0, MAXIMUM_EXPECTED_COUNT) }, ['equals']),
+          closedObject({ atLeast: integer(1, MAXIMUM_EXPECTED_COUNT) }, ['atLeast']),
+          closedObject({ atMost: integer(0, MAXIMUM_EXPECTED_COUNT) }, ['atMost']),
+        ],
+      },
+      // A check on the latest exchange a declared request check saw: its status or a declared field.
+      responseAssertion: {
+        oneOf: [
+          closedObject({ kind: { const: 'statusEquals' }, value: integer(RESPONSE_STATUS.lowest, RESPONSE_STATUS.highest) }, ['kind', 'value']),
+          closedObject({ kind: { enum: [...RESPONSE_FIELD_PRESENCE_KINDS] }, field: { type: 'string', pattern: DECLARED_NAME.source } }, ['kind', 'field']),
+          closedObject({
+            kind: { enum: [...RESPONSE_FIELD_TEXT_KINDS] }, field: { type: 'string', pattern: DECLARED_NAME.source }, value: textOrValue(1),
+          }, ['kind', 'field', 'value']),
+        ],
+      },
+      // A check on a declared storage entry.
+      storageAssertion: {
+        oneOf: [
+          closedObject({ kind: { enum: STORAGE_ASSERTION_KINDS.filter((kind) => kind !== 'equals') } }, ['kind']),
+          closedObject({ kind: { const: 'equals' }, value: textOrValue(1) }, ['kind', 'value']),
         ],
       },
       // A URL a check compares and never visits: a path starting with "/", or an absolute http or

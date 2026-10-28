@@ -54,6 +54,11 @@ export const BRAND_OWNERS: Readonly<Record<string, readonly string[]>> = {
   ParameterName: [CALL_DECLARATIONS],
   FieldName: [CALL_DECLARATIONS, PLAN_PARSER],
   JsonPointer: [CALL_DECLARATIONS],
+  // Stubs, observed requests and storage entries are named by the same declaration-section reader
+  // as calls; a plan refers to them by those names.
+  StubName: [CALL_DECLARATIONS, PLAN_PARSER],
+  RequestName: [CALL_DECLARATIONS, PLAN_PARSER],
+  StorageEntryName: [CALL_DECLARATIONS, PLAN_PARSER],
   ValidReport: ['packages/report/src/model/report-parser.ts'],
   ActorId: [ACTOR_MODULE],
   DerivedActor: [ACTOR_MODULE, APPROVAL_VERIFIER],

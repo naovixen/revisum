@@ -10,9 +10,10 @@ import type { Target } from './target.ts';
 // policy-denied: the policy gate's runtime guard refused the action, so no input event was sent.
 // no-download: a download step's click started no download within the step timeout.
 // download-too-large: the file grew past the project's maximumDownloadBytes; its partial bytes are deleted.
+// storage-origin-mismatch: a storage write's page is not on the entry's declared origin, so nothing was written.
 export type DriverErrorCode =
   | 'not-found' | 'ambiguous' | 'not-actionable' | 'timeout' | 'navigation-failed' | 'policy-denied'
-  | 'no-download' | 'download-too-large';
+  | 'no-download' | 'download-too-large' | 'storage-origin-mismatch';
 export type DriverError = { readonly code: DriverErrorCode; readonly detail: string };
 
 // Why a declared target cannot run. A driver explains a "no"; it never substitutes another target.

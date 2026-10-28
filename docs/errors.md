@@ -43,7 +43,7 @@ Plan error. A URL uses a scheme other than `http` or `https`.
 
 ## origin_not_allowed
 
-Plan error. An absolute URL's origin is not on the project's allow-list. Use a path, or add the origin to the trusted project configuration.
+Plan error. An absolute URL's origin is not on the project's allow-list. Use a path, or add the origin to the trusted project configuration. In the project itself: a stub's or observed request's matcher names an origin that is neither allowed nor a declared service's, or a storage entry names an origin that is not allowed.
 
 As a run refusal, the run would reach one of the project's production origins, which only an approved plan may reach, and only when the project allows production for approved plans. No browser was opened.
 
@@ -77,7 +77,7 @@ Plan error. Required text or a required list is empty.
 
 ## vacuous
 
-Plan error. A check would pass on anything, or proves nothing traceable: a plan with no assertion, an empty assertion (`assert: {}`), a text or value assertion whose expected text is empty, or an assertion without a `criterionId`. Give each assertion its expected text and the id of the acceptance criterion it checks.
+Plan error. A check would pass on anything, or proves nothing traceable: a plan with no assertion, an empty assertion (`assert: {}`), a text or value assertion whose expected text is empty, a request count of `atLeast` 0, or an assertion without a `criterionId`. Give each assertion its expected text and the id of the acceptance criterion it checks.
 
 ## literal_secret
 
@@ -103,6 +103,8 @@ Project error. A call declaration writes a parameter where its type could change
 
 Project error. A call declaration sets a header that decides where or how a request travels, or carries a browser session: `host`, `cookie`, `content-length`, `transfer-encoding`, `connection`, `upgrade`, `te`, `trailer` or any `proxy-` header, in any case. Remove it: the caller sets these itself, and a test credential belongs in an `authorization` header from a declared secret.
 
+A stub response sets a header that changes how the browser treats the response: `set-cookie`, `location`, `refresh`, `content-type`, `content-length`, `transfer-encoding`, `link`, `clear-site-data`, `permissions-policy`, `strict-transport-security`, `service-worker-allowed`, `report-to`, `nel`, or any `content-security-policy`, `access-control-` or `cross-origin-` header, in any case. `x-content-type-options` is refused too: the engine always sends `nosniff` itself. Set the response's `mediaType` instead of `content-type`, and keep to plain response headers such as `cache-control` or `retry-after`.
+
 ## no_criterion_id
 
 Migration error. A version 1 plan has an assertion with no entry in the criterion mapping, so the migration cannot say which acceptance criterion it checks. Add the criterion id to the mapping, keyed by the assertion step's JSON path, such as `$.steps[3]`.
@@ -126,6 +128,10 @@ Step error. A state check (`selected`, `unselected`, `expanded`, `collapsed`, `p
 ## download-not-text
 
 Step error. A content check (`contentContains` or `contentExcludes`) reads a download that is not UTF-8 text, such as an image, an archive or a PDF. Only the file's name, media type and size can be checked for such a file; use `fileNameEquals`, `mediaTypeEquals`, `sizeAtLeast` or `sizeAtMost` instead.
+
+## request-not-seen
+
+Step error. An `expectResponse` check, or a `remember` that reads a response field, found no exchange matching the declared request within the step timeout. Nothing is compared or remembered. Check that the page sends the request, that the declaration's matcher (origin, method, path and match) names it, and that no `resetRequests` step cleared it first.
 
 ## response-not-json
 
@@ -194,6 +200,10 @@ Driver error. A `download` step's click started no download within the step time
 ## download-too-large
 
 Driver error. A download grew past the project's `limits.maximumDownloadBytes` (5 MiB unless the project sets it, at most 100 MiB). The driver stopped it and deleted its partial bytes. Raise the limit in the trusted project, or download a smaller file.
+
+## storage-origin-mismatch
+
+Driver error. A `setStorage` or `removeStorage` step ran while the page was on another origin than the storage entry's declared `origin`, so nothing was written or removed. Navigate to a page on the entry's origin first.
 
 ## image-missing
 
@@ -369,7 +379,7 @@ Policy error. The plan exceeds the trusted project's limits: more steps in one l
 
 ## side-effect-in-proposal
 
-Policy error. A plan with no approval makes a `write` call, in its steps or its cleanup, whose declaration does not set `allowInProposals`. A proposal may read and may make writes the project allows in proposals, such as seeding test data; any other write waits for approval. Approve the plan, or set `allowInProposals: true` on a declaration that only touches disposable test data.
+Policy error. A plan with no approval makes a `write` call, in its steps or its cleanup, whose declaration does not set `allowInProposals`; or it starts a stub, or writes or removes a storage entry, whose declaration does not set it. A proposal may read and may make writes the project allows in proposals, such as seeding test data; any other write waits for approval. Approve the plan, or set `allowInProposals: true` on a declaration that only touches disposable test data.
 
 ## secret-missing
 

@@ -26,8 +26,10 @@ export type RunValues = ReadonlyMap<ValueName, SafeText>;
 //   value-too-long     a value is longer than the project's maximumTextLength;
 //   state-not-exposed  a state check's element does not expose that state in the accessibility
 //                      tree, such as a tab whose selection is shown only by a CSS class;
-//   download-not-text  a content check's download is not UTF-8 text.
-export type StepErrorCode = 'value-empty' | 'value-unsafe' | 'value-too-long' | 'state-not-exposed' | 'download-not-text';
+//   download-not-text  a content check's download is not UTF-8 text;
+//   request-not-seen   a response check or a remember from a response found no matching exchange
+//                      within the step timeout.
+export type StepErrorCode = 'value-empty' | 'value-unsafe' | 'value-too-long' | 'state-not-exposed' | 'download-not-text' | 'request-not-seen';
 
 const UNIQUE_PART_LENGTH = 10;
 const BASE_36 = 36;
