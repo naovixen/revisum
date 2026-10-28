@@ -19,6 +19,8 @@ const ACTOR_MODULE = 'packages/engine/src/actor.ts';
 const APPROVAL_VERIFIER = 'packages/engine/src/approval/approval-verifier.ts';
 const TRUSTED_PROJECT_LOADER = 'packages/engine/src/project/trusted-project.ts';
 const CALL_DECLARATIONS = 'packages/engine/src/project/call-declarations.ts';
+const EVIDENCE_DECLARATIONS = 'packages/engine/src/project/evidence-declarations.ts';
+const EVIDENCE_RESULT = 'packages/engine/src/evidence/evidence-result.ts';
 
 // Each branded type, and the only files that may create a value of it. A branded type declared in
 // packages/ but missing here is still checked: it has no owner, so any cast to it fails until its
@@ -34,7 +36,8 @@ export const BRAND_OWNERS: Readonly<Record<string, readonly string[]>> = {
   DownloadName: [PLAN_PARSER],
   FeatureId: [PLAN_PARSER],
   Plan: [PLAN_PARSER],
-  CriterionId: [PLAN_PARSER],
+  // A suite's criterion annotations name criteria by the same rule as a plan.
+  CriterionId: [PLAN_PARSER, EVIDENCE_RESULT],
   ValueName: ['packages/engine/src/plan/plan-values.ts'],
   Project: [PROJECT_PARSER],
   SecretName: [PROJECT_PARSER],
@@ -59,6 +62,12 @@ export const BRAND_OWNERS: Readonly<Record<string, readonly string[]>> = {
   StubName: [CALL_DECLARATIONS, PLAN_PARSER],
   RequestName: [CALL_DECLARATIONS, PLAN_PARSER],
   StorageEntryName: [CALL_DECLARATIONS, PLAN_PARSER],
+  // Evidence mode: a suite and its image are named in the project file; a decoded report and a
+  // test's id come only from the report decoder and the result built from it.
+  SuiteName: [EVIDENCE_DECLARATIONS],
+  ImageDigest: [EVIDENCE_DECLARATIONS],
+  SuiteReport: ['packages/engine/src/evidence/suite-report.ts'],
+  SuiteTestId: [EVIDENCE_RESULT],
   ValidReport: ['packages/report/src/model/report-parser.ts'],
   ActorId: [ACTOR_MODULE],
   DerivedActor: [ACTOR_MODULE, APPROVAL_VERIFIER],

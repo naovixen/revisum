@@ -157,6 +157,10 @@ export type SuiteDecodeError = { readonly code: SuiteDecodeErrorCode; readonly p
 - **Exit codes.** When the runner's exit code and the report's outcome disagree, the run is `Errored` and `RunResult.evidence.exitCodeMismatch` is `true`. Turning a refused flaky report into an `Errored` run is M2.
 - **Guarantee level.** It is read at `guarantees.level`, as the types give it. "Linked by the suite" is shown beside each criterion id the suite's annotations supply.
 - **Error paths.** `.command`, `.environment.<NAME>`, `.environment.<NAME>.literal` and `.environment.<NAME>.secretName`.
+- **For the M2 suite runner.**
+  - A suite whose report holds no tests must not end `Passed`: it ends `Failed` as `vacuous`, with a test.
+  - A test marked expected to fail (Playwright's `expectedStatus: 'failed'`) that fails gets its own outcome and a review item, rather than ending the run `Errored`.
+- **Plan runs in M1.** Plan results also carry a guarantee statement. It is `host` until SPEC-07 enforces egress, because `egress-enforced`, `no-ambient-credentials` and `replay-identical` can't be claimed yet.
 - **Metrics and levels (AC-SPEC-35-17).** `RunRecord` gains `mode: 'plan' | 'evidence'`, and one function, `planRunsOnly(records)`, keeps the plan runs for metrics and levels. It is built and tested with SPEC-15 and SPEC-21.
 
 ## Acceptance criteria

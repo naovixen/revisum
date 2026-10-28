@@ -43,11 +43,18 @@ export type TargetUnavailableRun = Omit<Planned, 'state'> & { readonly state: 'T
 //   secret-missing: the plan names a secret, or makes a call that needs one, that the secret store
 //     cannot resolve. The refusal names the secret, never a value.
 //   services-unavailable: the plan calls a declared service, but the run was given no service caller.
-export type RefusalCode = 'origin_not_allowed' | 'secret-missing' | 'services-unavailable';
+// And why an evidence run (`run --suite`) was refused before any container started:
+//   evidence-mode-disabled: the trusted project has no evidenceMode section.
+//   suite-not-declared: the evidenceMode section declares no suite of that name.
+//   egress-unenforceable: egress cannot be enforced on this host, and suite code never runs without it.
+export type RefusalCode =
+  | 'origin_not_allowed' | 'secret-missing' | 'services-unavailable' | 'evidence-mode-disabled' | 'suite-not-declared' | 'egress-unenforceable';
 export type Refusal =
   | { readonly code: Extract<RefusalCode, 'origin_not_allowed'>; readonly origin: string }
   | { readonly code: Extract<RefusalCode, 'secret-missing'>; readonly secretName: SecretName }
-  | { readonly code: Extract<RefusalCode, 'services-unavailable'> };
+  | { readonly code: Extract<RefusalCode, 'services-unavailable'> }
+  | EvidenceRefusal;
+export type EvidenceRefusal = { readonly code: Extract<RefusalCode, 'evidence-mode-disabled' | 'suite-not-declared' | 'egress-unenforceable'> };
 export type RefusedRun = Omit<Planned, 'state'> & { readonly state: 'Refused'; readonly refusal: Refusal };
 
 // Which policy rule stopped the run, and at which step.

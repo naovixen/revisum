@@ -96,11 +96,17 @@ export type DeclarationContext = {
   readonly secretNames: readonly SecretName[];
 };
 
-// A project section of named declarations, such as `calls` or `stubs`, read the same way for
-// every kind: absent means none, each name follows the declared-name pattern, and a name outside
-// it is refused alone, at the name, with nothing under it read.
+// What a declared name must be: it matches `pattern` and, when given, passes `allowed`.
+export type DeclaredNameRule = { readonly pattern: RegExp; readonly allowed?: (name: string) => boolean };
+const DECLARED_NAME_RULE: DeclaredNameRule = { pattern: DECLARED_NAME };
+
+// A project section of named declarations, such as `calls`, `stubs` or a suite's `environment`,
+// read the same way for every kind: absent means none, each name follows the section's name rule
+// (the declared-name pattern unless another is given), and a name outside it is refused alone, as
+// unknown_value at the name, with nothing under it read.
 export function readDeclarationSection<Name extends string, Declaration>(
   input: unknown, path: string, issues: Issues, maximumCount: number, read: (input: unknown, path: string) => Parsed<Declaration>,
+  rule: DeclaredNameRule = DECLARED_NAME_RULE,
 ): Parsed<Readonly<Record<Brand<string, Name>, Declaration>>> {
   if (input === undefined) return {};
   const fields = peekRecord(input, path, issues);
@@ -109,7 +115,7 @@ export function readDeclarationSection<Name extends string, Declaration>(
   if (names.length > maximumCount) { issues.push({ code: 'too_large', path }); return INVALID; }
   const entries = names.map((name): Parsed<readonly [Brand<string, Name>, Declaration]> => {
     const at = `${path}.${name}`;
-    const declaredName = readName<Name>(name, at, issues);
+    const declaredName = readName<Name>(name, at, issues, rule);
     if (declaredName === INVALID) return INVALID;
     const declaration = read(fields[name], at);
     return declaration === INVALID ? INVALID : [declaredName, declaration];
@@ -172,9 +178,11 @@ function readServiceName(input: unknown, path: string, context: DeclarationConte
   return found.name;
 }
 
-// A name that follows the declared-name pattern, branded as `Name` once checked.
-function readName<Name extends string>(name: string, path: string, issues: Issues): Parsed<Brand<string, Name>> {
-  if (!DECLARED_NAME.test(name)) { issues.push({ code: 'unknown_value', path }); return INVALID; }
+// A name that follows `rule` (by default the declared-name pattern), branded as `Name` once checked.
+function readName<Name extends string>(
+  name: string, path: string, issues: Issues, rule: DeclaredNameRule = DECLARED_NAME_RULE,
+): Parsed<Brand<string, Name>> {
+  if (!rule.pattern.test(name) || rule.allowed?.(name) === false) { issues.push({ code: 'unknown_value', path }); return INVALID; }
   return brand<string, Name>(name);
 }
 

@@ -3,6 +3,7 @@
 // the offending value, so hostile or private text is never echoed back.
 import type { SafeText } from '@revisum/contracts';
 import { brand } from '../brand.ts';
+import { sha256 } from '../hashing.ts';
 
 export const PLAN_ERROR_CODES = [
   'not_object', 'unknown_field', 'missing_field', 'wrong_type', 'unknown_step',
@@ -28,6 +29,11 @@ export const PLAN_ERROR_CODES = [
   'unsafe_interpolation',
   // A call declaration that sets a header deciding where or how a request travels, such as host.
   'header_not_allowed',
+  // A suite declaration whose command does not invoke Playwright Test, or sets an argument Revisum
+  // sets itself.
+  'command_not_allowed',
+  // A suite declaration's path or working directory that is absolute or leaves the repository.
+  'path_not_allowed',
 ] as const;
 export type PlanErrorCode = (typeof PLAN_ERROR_CODES)[number];
 
@@ -107,6 +113,13 @@ export function readText(
 // rules and length limit as text in a plan. Undefined means it failed them.
 export function runTimeText(value: string, maximumLength: number): SafeText | undefined {
   return value.length <= maximumLength && !isUnsafeText(value) ? brand<string, 'SafeText'>(value) : undefined;
+}
+
+// Text from outside input that is kept whatever it holds, such as a test title in a suite's report:
+// the text itself when it passes the safety rules and length limit, otherwise "sha256:" and its
+// digest, which always does, so unsafe text is dropped without losing which text it was.
+export function runTimeTextOrDigest(value: string, maximumLength: number): SafeText {
+  return runTimeText(value, maximumLength) ?? brand<string, 'SafeText'>(`sha256:${sha256(value)}`);
 }
 
 export function readOneOf<Value extends string>(

@@ -44,3 +44,12 @@ export type { CallStepCode, CleanupResult, ServiceCallRecord } from './service-c
 export { generateValue, resolvePlanClock, type RunValues, type StepErrorCode } from './run-values.ts';
 export * from './ai-planning.ts';
 export * from './release-notes.ts';
+export { guaranteeStatement, type GuaranteeConditions } from './guarantees.ts';
+export { DEFAULT_EVIDENCE_LIMITS, isReservedEnvironmentName } from './project/evidence-declarations.ts';
+export { declaredSuite, isSuiteFile, suitePasses, type PlannedSuitePass } from './evidence/suite-choice.ts';
+export {
+  DEFAULT_REPORT_DEPTH, parseSuiteReport,
+  type SuiteAnnotation, type SuiteAttachment, type SuiteDecodeError, type SuiteDecodeErrorCode, type SuiteErrorLocation, type SuiteReport,
+  type SuiteReportError, type SuiteReportTest, type SuiteTrace,
+} from './evidence/suite-report.ts';
+export { evidenceMergeGateOpen, evidenceResult, type EvidenceContext } from './evidence/evidence-result.ts';

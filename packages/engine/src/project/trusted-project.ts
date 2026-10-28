@@ -8,7 +8,9 @@ import {
 } from '@revisum/contracts';
 import { deriveActor, sourceActorId } from '../actor.ts';
 import { brand } from '../brand.ts';
+import { isAnySuiteFile } from '../evidence/suite-choice.ts';
 import type { PlanError } from '../plan/plan-decoders.ts';
+import { repositoryPath } from '../relative-paths.ts';
 import { parseProject, type ProjectData } from './project-parser.ts';
 
 // Where a trusted project came from: the protected branch at a commit, or an approval of it.
@@ -38,11 +40,11 @@ export const CODE_OWNERS_PATHS: readonly string[] = ['.github/CODEOWNERS', 'CODE
 const TRUSTED_FILES: readonly string[] = ['project.json', 'approvers.json', 'holdouts.json', ...CODE_OWNERS_PATHS];
 const TRUSTED_FOLDERS: readonly string[] = ['plans/', 'baselines/'];
 
-// Forward slashes and no leading "./" or "/", so paths compare the same on every platform.
-export const repositoryPath = (path: string): string => path.replaceAll('\\', '/').replace(/^(\.?\/)+/, '');
+export { repositoryPath };
 
 // True for a trusted file: one whose edit could change what core trusts. Everything else in the
-// repository is application code.
+// repository is application code, apart from the files of a suite the protected project declares
+// (isAnySuiteFile), which are trusted too.
 export const isTrustedFile = (path: string): boolean => {
   const normal = repositoryPath(path);
   return TRUSTED_FILES.includes(normal) || TRUSTED_FOLDERS.some((folder) => normal.startsWith(folder));
@@ -68,7 +70,10 @@ export async function loadTrustedProject(
     ...parsed.value,
     provenance: { kind: 'protected-branch', branch: versionControl.protectedBranch, commit: protectedFile.value.commit },
   });
-  const edited = [...new Set(change.files.map(repositoryPath))].filter((file) => file === projectPath || isTrustedFile(file)).sort();
+  // The protected project's suites decide which suite files are trusted, so a change cannot widen
+  // or narrow them by editing its own project.json.
+  const edited = [...new Set(change.files.map(repositoryPath))]
+    .filter((file) => file === projectPath || isTrustedFile(file) || isAnySuiteFile(project.evidenceMode, file)).sort();
   const reviewItems = edited.map((file): TrustedFileReviewItem => ({ code: 'changed-with-code', path: file }));
   // The review items carry the finding whether or not the sink accepts the event.
   for (const item of reviewItems) change.events.append({ kind: 'trusted.changed-with-code', path: item.path }, CHANGE_AUTHOR);

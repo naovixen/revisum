@@ -9,9 +9,11 @@ import {
   type A11yFinding, type ActionGuard, type ApprovalLabel, type ArtifactReference, type ArtifactStore, type Authorised,
   type BrowserDriver, type Clock, type ElementProbe, type EventSink, type Plan, type PolicyRuleId, type Redactor,
   type ResolvedElement, type Result, type SafeText, type SecretStore, type ServiceCaller, type Session, type Step, type Target, type TargetId,
-  type Unavailable, type ValueName,
+  type Unavailable, type ValueName, type GuaranteeStatement, type RunMode, type SuiteFinding, type SuiteName, type SuitePass,
+  type SuiteTestId, type SuiteTestResult,
 } from '@revisum/contracts';
 import { approvalLabel, type PlanStanding } from './approval/plan-standing.ts';
+import { guaranteeStatement } from './guarantees.ts';
 import { canonicalJson, sha256 } from './hashing.ts';
 import * as lifecycle from './lifecycle.ts';
 import { manifestLogger, type Logger, type RunEventSink } from './logging.ts';
@@ -22,6 +24,7 @@ import { assertBranded } from './plan/plan-parser.ts';
 import { assertAuthorised, policyGate, type PolicyGate } from './policy/policy-gate.ts';
 import type { Project } from './project/project-parser.ts';
 import { SENSITIVE_PLACEHOLDER } from './redaction.ts';
+import { withResultHash } from './result-hash.ts';
 import {
   generateRunValues, resolveActionStep, resolveElementAssertion, resolveLocator, resolvePathTemplate, resolvePlanClock,
 } from './run-values.ts';
@@ -80,11 +83,35 @@ export type StepResult = {
 };
 
 // Something a run found that a person should look at, whatever the verdict: a cleanup call that
-// failed, so test data may be left behind.
-export type RunReviewItem = { readonly code: 'cleanup-failed'; readonly cleanupIndex: number };
+// failed, so test data may be left behind; or a suite test's criterion annotation whose
+// description is not a valid criterion id, so it was dropped (never echoed).
+export type RunReviewItem =
+  | { readonly code: 'cleanup-failed'; readonly cleanupIndex: number }
+  | { readonly code: 'spec-ambiguous'; readonly testId: SuiteTestId; readonly annotationIndex: number };
+
+// What only an evidence run records: which pass it was, the suite command's exit code, and whether
+// that code disagreed with the outcomes the report gives, which makes the run Errored.
+export type EvidenceRunRecord = { readonly pass: SuitePass; readonly exitCode: number; readonly exitCodeMismatch: boolean };
+
+// An evidence run's tests, one per test and project, and the findings its failed tests became.
+export type SuiteRunRecord = {
+  readonly name: SuiteName;
+  readonly tests: readonly SuiteTestResult[];
+  readonly findings: readonly SuiteFinding[];
+  // Present when the recorded pages were audited (SPEC-10).
+  readonly accessibilityFindings?: readonly A11yFinding[];
+};
 
 export type RunResult = {
   readonly state: lifecycle.TerminalState;
+  // How the run came about: a parsed plan, or a team's own suite in evidence mode.
+  readonly mode: RunMode;
+  // Which guarantees hold for this run, and why each lost one is lost.
+  readonly guarantees: GuaranteeStatement;
+  // Present for an evidence run.
+  readonly suite?: SuiteRunRecord;
+  readonly evidence?: EvidenceRunRecord;
+  // An evidence run has no plan target: it carries its suite's name.
   readonly targetId: string;
   readonly manifest: RunManifest | null;
   readonly manifestHash: string | null;
@@ -490,10 +517,13 @@ function unavailableResult(targetId: string, unavailable: Unavailable, context: 
   }, context.inputs);
 }
 
-// Adds the approval label (for an approved plan) and the result hash.
-function seal(outcome: Omit<RunResult, 'resultHash' | 'approvalLabel'>, inputs: RunInputs): RunResult {
+// What every plan run vouches for. Until the isolated runner (SPEC-07) runs plans behind its egress
+// proxy, a plan run runs on the host, so egress, credentials and replay are not claimed.
+const PLAN_RUN_GUARANTEES = guaranteeStatement({ mode: 'plan', egressEnforced: false, unmaskedScreenshotsKept: false });
+
+// Adds the run mode, the guarantee statement, the approval label (for an approved plan) and the result hash.
+function seal(outcome: Omit<RunResult, 'resultHash' | 'approvalLabel' | 'mode' | 'guarantees'>, inputs: RunInputs): RunResult {
   const standing = inputs.standing;
-  const result = standing?.mode === 'approved' ? { ...outcome, approvalLabel: approvalLabel(standing.approval) } : outcome;
-  const { timings: _excluded, manifest: _coveredByHash, ...hashed } = result;
-  return { ...result, resultHash: sha256(canonicalJson(hashed)) };
+  const labelled = { ...outcome, mode: 'plan' as const, guarantees: PLAN_RUN_GUARANTEES };
+  return withResultHash(standing?.mode === 'approved' ? { ...labelled, approvalLabel: approvalLabel(standing.approval) } : labelled);
 }

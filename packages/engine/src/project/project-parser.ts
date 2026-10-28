@@ -6,7 +6,7 @@
 import {
   COLOR_SCHEMES, DEFAULT_TEST_ID_ATTRIBUTE, DEVICE_PROFILES, ENGINES, MOTION_PREFERENCES, success, failure,
   type Brand, type CallDeclaration, type CallName, type DeclaredService, type DeviceProfileId, type FixtureName, type IrreversiblePatterns, type Locale, type Origin, type Result,
-  type EmailDomain, type SafeText, type SecretName, type Target, type TestIdAttribute, type TimeZone,
+  type EmailDomain, type EvidenceMode, type SafeText, type SecretName, type Target, type TestIdAttribute, type TimeZone,
   type ObservedRequestDeclaration, type RequestName, type StorageEntryDeclaration, type StorageEntryName, type StubDeclaration, type StubName,
 } from '@revisum/contracts';
 import { brand } from '../brand.ts';
@@ -15,6 +15,7 @@ import {
 } from '../plan/plan-decoders.ts';
 import { readCallDeclarations, readServices } from './call-declarations.ts';
 import { readObservedRequestDeclarations, readStorageEntryDeclarations, readStubDeclarations } from './network-and-storage-declarations.ts';
+import { readEvidenceMode } from './evidence-declarations.ts';
 import { LARGEST_DOWNLOAD_BYTES, LOWERCASE_ID, MAXIMUM_TEST_ID_LENGTH, MAXIMUM_URL_LENGTH } from '../plan/plan-grammar.ts';
 
 const DEVICE_IDS = Object.keys(DEVICE_PROFILES) as DeviceProfileId[];
@@ -118,6 +119,9 @@ export type ProjectData = {
   readonly stubs: Readonly<Record<StubName, StubDeclaration>>;
   readonly observedRequests: Readonly<Record<RequestName, ObservedRequestDeclaration>>;
   readonly storageEntries: Readonly<Record<StorageEntryName, StorageEntryDeclaration>>;
+  // The team's own Playwright suites Revisum may run, and the limits their outputs are decoded
+  // under. Absent means evidence mode is off: nothing else can turn it on.
+  readonly evidenceMode?: EvidenceMode;
 };
 export type Project = Brand<ProjectData, 'Project'>;
 
@@ -361,7 +365,7 @@ export function parseProject(input: unknown): Result<Project, readonly PlanError
     input, '$', issues,
     [
       'origins', 'productionOrigins', 'matrix', 'limits', 'secretNames', 'fixtures', 'policy', 'testIdAttributes', 'generatedEmailDomains',
-      'evidence', 'services', 'calls', 'stubs', 'observedRequests', 'storageEntries',
+      'evidence', 'services', 'calls', 'stubs', 'observedRequests', 'storageEntries', 'evidenceMode',
     ],
     ['origins', 'matrix'],
   );
@@ -398,6 +402,8 @@ export function parseProject(input: unknown): Result<Project, readonly PlanError
   const stubs = readStubDeclarations(fields['stubs'], network);
   const observedRequests = readObservedRequestDeclarations(fields['observedRequests'], network);
   const storageEntries = readStorageEntryDeclarations(fields['storageEntries'], network);
+  // A suite's environment names secrets, so those are read first.
+  const evidenceMode = readEvidenceMode(fields['evidenceMode'], issues, secretNames === INVALID ? [] : secretNames);
   const matrix = rawMatrix === INVALID ? [] : rawMatrix.map((target, index) => readTarget(target, `$.matrix[${index}]`, issues));
   const seen = new Set<string>();
   matrix.forEach((target, index) => {
@@ -408,10 +414,11 @@ export function parseProject(input: unknown): Result<Project, readonly PlanError
   if (issues.length > 0 || limits === INVALID || secretNames === INVALID || fixtures === INVALID
     || productionOrigins === INVALID || policy === INVALID || testIdAttributes === INVALID || generatedEmailDomains === INVALID
     || evidence === INVALID || services === INVALID || calls === INVALID
-    || stubs === INVALID || observedRequests === INVALID || storageEntries === INVALID
+    || stubs === INVALID || observedRequests === INVALID || storageEntries === INVALID || evidenceMode === INVALID
     || !allValid(origins) || !allValid(matrix)) return failure(issues);
+  // Left out when absent, so a project without evidence mode parses exactly as it did before.
   return success(brand<ProjectData, 'Project'>({
     origins, productionOrigins, matrix, limits, secretNames, fixtures, policy, testIdAttributes, generatedEmailDomains, evidence,
-    services, calls, stubs, observedRequests, storageEntries,
+    services, calls, stubs, observedRequests, storageEntries, ...(evidenceMode === undefined ? {} : { evidenceMode }),
   }));
 }

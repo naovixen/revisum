@@ -17,6 +17,7 @@ export const ERROR_CODE_UNIONS: readonly { readonly file: string; readonly name:
   { file: 'packages/engine/src/plan/plan-decoders.ts', name: 'PLAN_ERROR_CODES' },
   { file: 'packages/engine/src/plan/readable/text-syntax.ts', name: 'TextErrorCode' },
   { file: 'packages/engine/src/run-values.ts', name: 'StepErrorCode' },
+  { file: 'packages/engine/src/evidence/suite-report.ts', name: 'SuiteDecodeErrorCode' },
   { file: 'packages/contracts/src/browser-driver.ts', name: 'DriverErrorCode' },
   { file: 'packages/contracts/src/error-codes.ts', name: 'RunnerError' },
   { file: 'packages/contracts/src/error-codes.ts', name: 'RecorderError' },

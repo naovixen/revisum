@@ -7,7 +7,7 @@
 - Plan codes use underscores (`unknown_step`); every other union uses hyphens (`not-found`).
 - Each code says what was refused and what to do. Errors carry a code and a location, never the offending value, so private or hostile text is never echoed back.
 
-Plan errors (`PlanErrorCode`, from the plan parser in `engine`) come first, then readable plan errors (`TextErrorCode`, from the readable plan reader in `engine`), then step errors (`StepErrorCode`, decided by the engine at run time), then service call errors (`ServiceCallErrorCode`, from a declared call), then driver, runner, review recorder, event sink, command-line, approval, trust, policy and run refusal errors.
+Plan errors (`PlanErrorCode`, from the plan parser in `engine`) come first, then readable plan errors (`TextErrorCode`, from the readable plan reader in `engine`) and suite output errors (`SuiteDecodeErrorCode`, from the evidence-mode decoders in `engine`), then step errors (`StepErrorCode`, decided by the engine at run time), then service call errors (`ServiceCallErrorCode`, from a declared call), then driver, runner, review recorder, event sink, command-line, approval, trust, policy and run refusal errors.
 
 ## not_object
 
@@ -109,6 +109,14 @@ Project error. A call declaration sets a header that decides where or how a requ
 
 A stub response sets a header that changes how the browser treats the response: `set-cookie`, `location`, `refresh`, `content-type`, `content-length`, `transfer-encoding`, `link`, `clear-site-data`, `permissions-policy`, `strict-transport-security`, `service-worker-allowed`, `report-to`, `nel`, or any `content-security-policy`, `access-control-` or `cross-origin-` header, in any case. `x-content-type-options` is refused too: the engine always sends `nosniff` itself. Set the response's `mediaType` instead of `content-type`, and keep to plain response headers such as `cache-control` or `retry-after`.
 
+## command_not_allowed
+
+Project error. An evidence-mode suite's `command` does not invoke Playwright Test, or sets an argument Revisum appends itself. Write it as `["npx", "playwright", "test", …]` or `["playwright", "test", …]`, with no shell, and leave out `--reporter`, `--output`, `--trace`, `--retries`, `--project` and `--timeout`: Revisum sets the JSON reporter, traces, `--retries=0`, the declared `projects` and the declared timeout.
+
+## path_not_allowed
+
+Project error. An evidence-mode suite's `paths` entry or `workingDirectory` is absolute, names a drive or network share, uses a backslash, or climbs out of the repository with `..`. Write it relative to the repository root with forward slashes, such as `apps/web/e2e/**`.
+
 ## no_criterion_id
 
 Migration error. A version 1 plan has an assertion with no entry in the criterion mapping, so the migration cannot say which acceptance criterion it checks. Add the criterion id to the mapping, keyed by the assertion step's JSON path, such as `$.steps[3]`.
@@ -148,6 +156,28 @@ Readable plan error. A `Press` line names a key or modifier the plan language do
 ## too-large
 
 Readable plan error. The text is larger than any plan may be, so none of it is read. Split the plan.
+
+Suite output error. A suite's JSON report or trace is over one of the project's `evidenceMode.limits`: its size, its number of tests or entries, or how deeply it nests (`maximumReportDepth`, 64 unless set). Nothing in it is used. Raise the limit in the trusted project file, or split the suite.
+
+## suite-report-missing
+
+Suite output error. The suite command wrote no JSON report into Revisum's output directory, so there is nothing to decode. Check that the suite's config does not turn reporters off; Revisum adds the JSON reporter itself.
+
+## suite-report-invalid
+
+Suite output error. The suite's JSON report does not have the shape of a Playwright Test JSON report at the given path: a field of the wrong type, a status Playwright does not have, a test claiming to be `flaky` (impossible with `--retries=0`), more than one result for a test, a `__proto__`, `constructor` or `prototype` key, or an attachment path that leaves Revisum's output directory. Nothing in the report is used, and the run is never marked verified.
+
+## suite-report-unsupported
+
+Suite output error. The report comes from a reporter or Playwright version Revisum does not read. Revisum refuses it rather than guess at its meaning.
+
+## trace-invalid
+
+Suite output error. A trace archive the suite attached is not a readable Playwright trace: it is truncated, or an entry name holds `..` or an absolute path. Nothing is extracted from it.
+
+## trace-unsupported
+
+Suite output error. A trace archive records a trace version Revisum does not read, so it is refused rather than guessed at.
 
 ## duplicate-key
 
@@ -270,6 +300,8 @@ Runner error. The container image's digest differs from the pinned digest, so no
 ## egress-unenforceable
 
 Runner error. Network egress cannot be enforced on this host. The run is reported at the `host` guarantee level and claims no hermetic isolation.
+
+Run refusal, for an evidence run (`run --suite`): Revisum never runs a team's own suite code without egress control, so the run is refused before any suite code runs. Run it on a host where the isolated runner can enforce egress.
 
 ## start-failed
 
@@ -444,3 +476,11 @@ Run refusal. The plan names a secret, in a fill, in `storageState` or as a call'
 ## services-unavailable
 
 Run refusal. The plan makes a `call` or `expectBackend`, or has `cleanup` calls, but the run was given no service caller. The run ends `Refused` before any browser opens or any call is made. Run it where the service caller is wired in; until the isolated runner lands, only a caller a test supplies is available.
+
+## evidence-mode-disabled
+
+Run refusal. `run --suite` was asked for, but the trusted project file has no `evidenceMode` section, so no suite may run and no container starts. Evidence mode is turned on only in `project.json` on the protected branch: a change that adds the section runs without it until the change is approved and merged.
+
+## suite-not-declared
+
+Run refusal. The trusted project's `evidenceMode` section declares no suite of the name `run --suite` was given, so no container starts. Names are exact and lowercase; use one from `evidenceMode.suites[].name`.
