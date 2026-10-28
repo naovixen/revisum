@@ -67,6 +67,17 @@ export type AiText = Brand<string, 'AiText'>;                                   
 export function parseAiText(input: unknown, maximumCharacters: number): Result<AiText, PlanError>;
 ```
 
+**Build notes.** Points the criteria leave open, settled while building (2026-10-28; the first is the founder's decision, the rest are recorded in `docs/decisions/answers.md`):
+
+- **Envelope.** The plan keeps the seeded `meta` header (`featureId`, `specReference`, `title`) instead of `name`. A v1.1 plan declares `version: "1.1"`; a v1.0 plan is the seeded shape with `version: 1`. The shared test plans (`signupPlan`, the hostile-plan base) move to v1.1, with a `criterionId` on each assertion, in a tests commit of their own (founder, 2026-10-28).
+- **Vacuity.** No assertion, an empty assertion (`assert: {}`) or a missing `criterionId` is rejected as `vacuous`. `no_criterion_id` belongs to `migratePlan`.
+- **Criterion mapping.** Keys are the JSON path of the v1.0 `expect` or `expectPage` step, for example `$.steps[3]`.
+- **API-step hostile plans.** Their steps belong to protocol packs (SPEC-23), so the test asserts rejection with zero calls, not a specific code. A protocol-relative URL keeps the seeded code `origin_not_allowed`.
+- **Limits and references.** `maximumFrameDepth` joins the project's `limits`; a frame inside a frame has depth 2. The project file gains `secretNames` and `fixtures` lists (empty by default) so the parser can check `secretName` and `upload` references; SPEC-02 builds on them.
+- **AI text.** `parseAiText` uses the same codes as the parser's text rules and accepts line breaks.
+- **Coverage study (AC-SPEC-01-01).** The study is a data file, `docs/coverage-study/intents.json`: one entry per sampled test intent, with its suite, source URL, test name, verdict and reason, and for an expressible intent a v1.1 plan that must parse. Engine's `assessCoverage(input: unknown, parse)` decodes it and returns each intent's verdict and reason and the expressible share. An intent marked expressible whose plan does not parse counts as not expressible. `tools/coverage-study.ts` runs it and writes `docs/coverage-study/report.md`.
+- **Schema and changelog (AC-SPEC-01-10).** No release build exists before SPEC-17, so the check runs in `npm run lint`. Engine's `planJsonSchema()` builds the schema from the same tables the decoders use, with no new dependency. The check fails when `docs/plan-language/plan.schema.json` differs from it, when a golden plan in `golden/plans/` doesn't validate against it, or when its sha256 is missing from the newest entry in `docs/plan-language/CHANGELOG.md`.
+
 ## Acceptance criteria
 
 - AC-SPEC-01-01: When the coverage study runs over the sampled suites, core shall record each test intent as expressible or not, with the reason, and report the expressible share (oracle: specified; the MVP plan's kill criterion is 70%, research `09`).
