@@ -82,6 +82,17 @@
 
 The language-fit row in the kill-criterion table stays as it is, with a note that the response (this record) is under way.
 
+## Founder's answers (2026-10-28)
+
+All yes:
+1. Evidence mode's runner comes before the remaining plan-language driver parts in M2.
+2. `host` means "not every guarantee holds"; every output resting on it lists which guarantees hold and which don't.
+3. In phase 1, evidence mode audits recorded page snapshots, not live pages; keyboard and focus checks become review items.
+4. Evidence mode supports Playwright only; Cypress and others wait for a partner to ask.
+5. The measured re-run on plan 1.3 uses strict judging, without the projection's generous assumptions.
+
+The placement above is now the queue in `START.md`.
+
 ## Projected coverage with unsafe features
 
 **In short:** a **projection**, not a measurement. The parser can't check 1.3 plans yet. With every SPEC-36 feature enabled, judged by the same strict whole-test rule as `docs/coverage-study/rerun-1.2.md`, the shares would be:
