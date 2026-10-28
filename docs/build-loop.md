@@ -13,6 +13,7 @@ How the main session runs the plan on its own. Helpers never read this; their br
 0. **Align.** Where the spec's types or criteria contradict the seeded tests, the spec follows the tests and new rules become marked additions (SPEC-27 is the example). Commit as a docs change.
 1. **Tests.** A fresh helper gets `docs/prompts/session-tests.md` with `<NN>` filled in. Check its change is test-set only, then commit it alone.
 2. **Code.** A fresh helper gets `docs/prompts/session-code.md` with `<NN>` and `<TESTS-COMMIT>`. If it says a test looks wrong, stop and ask (never fix a committed test). When `npm run check` is green, commit.
+   - One standing exception (founder, 2026-10-28): when a spec adds an error code the design already declares, a tests commit adds it to the pinned lists in `test/proofs/error-code-exhaustiveness.ts` and `test/proofs/error-anchors.test.ts`. The lists only grow; no other test change is covered.
 3. **Linux.** If the spec touches browsers, screenshots, fonts or replay, run `npm run check:linux` (start Docker Desktop if needed).
 4. **Record.** Add a row to `docs/decisions/velocity.md`, tick the spec in `START.md`, and commit both.
 

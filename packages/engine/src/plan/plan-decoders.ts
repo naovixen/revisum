@@ -11,6 +11,8 @@ export const PLAN_ERROR_CODES = [
   'version_unsupported', 'empty',
   // A check that would pass on anything, such as an expected text that is empty.
   'vacuous',
+  // A version 1 assertion that the migration's mapping gives no criterion id.
+  'no_criterion_id',
 ] as const;
 export type PlanErrorCode = (typeof PLAN_ERROR_CODES)[number];
 

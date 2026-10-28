@@ -6,7 +6,7 @@
 // See docs/specs/SPEC-01-plan-language-and-parser.md.
 import { failure, type CriterionId, type PlanData, type Result } from '@revisum/contracts';
 import { DEFAULT_LIMITS } from '../project/project-parser.ts';
-import { INVALID, peekRecord, readList, readRecord, type Issues, type PlanErrorCode } from './plan-decoders.ts';
+import { INVALID, peekRecord, readList, readRecord, type Issues, type PlanError } from './plan-decoders.ts';
 import { ASSERTION_STEP_TYPES, CRITERION_FIELD, CURRENT_PLAN_VERSION, PLAN_FIELDS } from './plan-grammar.ts';
 import { readPlanData } from './plan-parser.ts';
 
@@ -18,14 +18,10 @@ const LEGACY_STEP_TYPES: readonly unknown[] = ['navigate', 'click', 'fill', 'pre
 // The author's criterion id for each version 1 assertion, keyed by the assertion step's JSON path.
 export type CriterionMapping = Readonly<Record<string, CriterionId>>;
 
-// The migration's own code, beside the parser's: an assertion the mapping gives no criterion id.
-export type MigrationErrorCode = PlanErrorCode | 'no_criterion_id';
-export type MigrationError = { readonly code: MigrationErrorCode; readonly path: string };
-
 // Checks the parts of a version 1 plan that version 1.1 reads differently: the version number,
 // the step types of the time, and that each assertion has a criterion id in the mapping.
 // Returns the plan in the current version, with each assertion's id added, still unparsed.
-function addCriterionIds(legacyPlan: unknown, mapping: CriterionMapping, issues: MigrationError[]): unknown {
+function addCriterionIds(legacyPlan: unknown, mapping: CriterionMapping, issues: PlanError[]): unknown {
   const planIssues: Issues = [];
   const fields = readRecord(legacyPlan, '$', planIssues, PLAN_FIELDS);
   if (fields === INVALID) { issues.push(...planIssues); return INVALID; }
@@ -51,8 +47,8 @@ function addCriterionIds(legacyPlan: unknown, mapping: CriterionMapping, issues:
 // Migrates a version 1 plan to the current language. Pure: the input and mapping are never
 // changed, and the same input always gives the same output. The output is PlanData checked
 // against the language only; it becomes a Plan only through the project's plan parser.
-export function migratePlan(legacyPlan: unknown, mapping: CriterionMapping): Result<PlanData, readonly MigrationError[]> {
-  const issues: MigrationError[] = [];
+export function migratePlan(legacyPlan: unknown, mapping: CriterionMapping): Result<PlanData, readonly PlanError[]> {
+  const issues: PlanError[] = [];
   const migrated = addCriterionIds(legacyPlan, mapping, issues);
   if (migrated === INVALID || issues.length > 0) return failure(issues);
   // Version 1 had no secrets, fixtures or frames, so none are declared here.

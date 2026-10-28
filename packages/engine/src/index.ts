@@ -6,7 +6,7 @@ export { ENGINE_VERSION, schemaId } from './version.ts';
 export * from './plan/plan-decoders.ts';
 export * from './project/project-parser.ts';
 export { assertBranded, planParser } from './plan/plan-parser.ts';
-export { migratePlan, type CriterionMapping, type MigrationError, type MigrationErrorCode } from './plan/plan-migration.ts';
+export { migratePlan, type CriterionMapping } from './plan/plan-migration.ts';
 export { planJsonSchema, type JsonSchema } from './plan/plan-schema.ts';
 export { parseAiText, type AiText } from './ai-text.ts';
 export * from './coverage-study.ts';
