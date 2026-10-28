@@ -76,6 +76,19 @@ export type DownloadedFile = { readonly fileName: string; readonly mediaType: st
 - The server's file name is data. It is compared by `fileNameEquals` but never used as a path.
 - `newTab` steps may contain `frame` blocks. Frame depth counts from the tab.
 
+**Build notes.** Points the criteria leave open, settled while building (2026-10-28; `docs/decisions/answers.md`):
+
+- **Paths and codes.**
+  - `misplaced_step` points at the step itself, `$.steps[i]`.
+  - `sizeAtLeast: 0` is `vacuous`, because it passes on anything.
+  - A download name that breaks the value-name rule is `unknown_value`.
+  - A `scripts` field that isn't text is `wrong_type`; any text other than `"disabled"` is `unknown_value`.
+- **Names.** Download names and run-value names share one plan-wide namespace, so a clash is `duplicate`. A download named inside a `newTab` or a frame stays visible after it; plans stay straight-line.
+- **`hrefEquals`.** It takes an absolute URL or a path starting with `/`, compared with the link's resolved URL against the base URL. It is never visited.
+- **`canonicalUrl`.** It may name another origin, because it is compared, never visited.
+- **Project settings in M1.** `limits.maximumDownloadBytes` (default 5 MiB, at most 100 MiB) and `evidence.keepDownloads` (default false) are parsed now and read by the driver parts later.
+- **Literal steps.** New steps and assertions go through `packages/contracts/src/literal-steps.ts`. That module decides what drivers can do yet, so runs report them as `unsupported-step` until SPEC-06, with nothing dispatched.
+
 ## Acceptance criteria
 
 - AC-SPEC-31-01: On a fixture page with an ARIA tab list, a disclosure button, a toggle button, a navigation link with `aria-current="page"`, a `<select>` and a `<details>`, each state check shall pass on the element in that state and its opposite shall fail (oracle: specified).
