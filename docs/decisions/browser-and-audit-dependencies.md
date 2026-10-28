@@ -41,6 +41,6 @@ Evidence:
 
 ## Risks
 
-- **CI needs the browsers.** The CI workflow must run `npm run browsers` before `npm run check`, and the Linux image needs Playwright's system libraries for Firefox and WebKit (`npx playwright-core install-deps`). Both are changes to `.github/`, which the founder owns.
+- **CI needs the browsers.** CI and `npm run check:linux` install Playwright's system libraries, then run `npm run browsers` before `npm run check`. Chrome's sandbox needs a seccomp profile there; see `docs/decisions/chrome-sandbox-in-containers.md`.
 - **The browser downloads are not hashed by us.** `@puppeteer/browsers` and Playwright fetch from their vendors' storage over HTTPS. The executable hash is not yet recorded in a lock file (SPEC-05).
 - **MPL-2.0 file-level copyleft.** If anyone edits `axe.min.js`, the edited file must be published under MPL-2.0. The rule is: never edit it, only pin a new release.

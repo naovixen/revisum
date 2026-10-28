@@ -17,7 +17,7 @@
     "proofs": "node tools/run-test-folder.ts test/proofs",
     "replay": "node tools/run-test-folder.ts test/replay",
     "check": "npm run typecheck && npm run lint && npm run lint:names && npm test && npm run proofs && npm run replay",
-    "check:linux": "npx -y @devcontainers/cli@0.89.0 up --workspace-folder . && npx -y @devcontainers/cli@0.89.0 exec --workspace-folder . npm run check"
+    "check:linux": "npx -y @devcontainers/cli@0.89.0 up --workspace-folder . && npx -y @devcontainers/cli@0.89.0 exec --workspace-folder . bash -c \"npm ci --no-audit --no-fund && npm run browsers && npm run check\""
   },
   "devDependencies": {
     "@puppeteer/browsers": "3.2.6",

@@ -12,16 +12,28 @@ permissions:
   contents: read
 
 jobs:
+  # The pinned image is started by hand rather than as a job container: it needs the seccomp
+  # profile in .devcontainer/, and a job container starts before the repository is checked out.
   ci:
     runs-on: ubuntu-24.04
-    container:
-      image: mcr.microsoft.com/devcontainers/typescript-node:24-bookworm@sha256:970eebf5b82d3800bdd9f46680e1c4c664d365d18603148540788356700ce301
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
-      - name: Require Node 24
-        run: node -e "if (process.versions.node.split('.')[0] !== '24') { console.error('Node 24 required, found ' + process.versions.node); process.exit(1); }"
-      - run: npm ci
-      - run: npm run check
+      - name: Run every gate in the pinned image
+        run: |
+          # The profile lets Chrome's sandbox create its namespaces, as in the dev container.
+          docker run --rm \
+            --security-opt seccomp=.devcontainer/seccomp-chrome-sandbox.json \
+            --volume "$GITHUB_WORKSPACE:/workspace" --workdir /workspace \
+            mcr.microsoft.com/devcontainers/typescript-node:24-bookworm@sha256:970eebf5b82d3800bdd9f46680e1c4c664d365d18603148540788356700ce301 \
+            bash -euo pipefail -c '
+              node --version | grep -q "^v24\." || { echo "Node 24 required, found $(node --version)"; exit 1; }
+              npm ci
+              # The system libraries the browsers need on Linux, installed as root.
+              node node_modules/playwright-core/cli.js install-deps chromium firefox webkit
+              # Chrome refuses to sandbox as root, so the browsers and the check run as "node".
+              chown -R node:node /workspace
+              su node -c "npm run browsers && npm run check"
+            '
 
   tests-apart:
     if: github.event_name == 'pull_request'
