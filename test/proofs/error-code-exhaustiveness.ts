@@ -21,7 +21,7 @@ export function describePlanError(code: PlanErrorCode): string {
     case 'unknown_value': case 'invalid_url': case 'scheme_not_allowed': case 'origin_not_allowed':
     case 'target_not_in_matrix': case 'unsafe_text': case 'too_large': case 'too_long': case 'duplicate':
     case 'version_unsupported': case 'empty': case 'vacuous':
-    case 'no_criterion_id':
+    case 'no_criterion_id': case 'literal_secret':
       return 'plan rejected';
     default:
       return unreachable(code);
@@ -32,7 +32,7 @@ export function describePlanErrorForgettingOne(code: PlanErrorCode): string {
     case 'not_object': case 'unknown_field': case 'missing_field': case 'wrong_type': case 'unknown_step':
     case 'unknown_value': case 'invalid_url': case 'scheme_not_allowed': case 'origin_not_allowed':
     case 'target_not_in_matrix': case 'unsafe_text': case 'too_large': case 'too_long': case 'duplicate':
-    case 'version_unsupported': case 'empty': case 'no_criterion_id':
+    case 'version_unsupported': case 'empty': case 'no_criterion_id': case 'literal_secret':
       return 'plan rejected';
     default:
       // @ts-expect-error 'vacuous' is not handled, so the code does not narrow to never
