@@ -15,6 +15,7 @@ export const ERRORS_PAGE = 'docs/errors.md';
 // literals in the declaration, whether a union type or a const list.
 export const ERROR_CODE_UNIONS: readonly { readonly file: string; readonly name: string }[] = [
   { file: 'packages/engine/src/plan/plan-decoders.ts', name: 'PLAN_ERROR_CODES' },
+  { file: 'packages/engine/src/plan/plan-migration.ts', name: 'MigrationErrorCode' },
   { file: 'packages/contracts/src/browser-driver.ts', name: 'DriverErrorCode' },
   { file: 'packages/contracts/src/error-codes.ts', name: 'RunnerError' },
   { file: 'packages/contracts/src/error-codes.ts', name: 'RecorderError' },

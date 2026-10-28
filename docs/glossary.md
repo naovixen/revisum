@@ -13,10 +13,16 @@
 | Product name | `PRODUCT` (`PRODUCT.name`, `PRODUCT.schemaNamespace`) | `contracts`, exists | The only place the product name is written; schema ids are built from it |
 | Engine | `engine` package | `packages/engine` | The trusted core: parsing, trust, policy, lifecycle, interpreter, oracle, hashing, redaction, audit log |
 | Package | npm workspace | `packages/*` | One unit of the monorepo, with its own licence and allowed imports |
-| Plan | `Plan`, made only by `planParser` | type in `contracts`, parser in `engine`, exists (seeded); SPEC-01 completes it | A human-approved, typed test plan; outside input until the engine parses it |
-| Step | `Step`, `ActionStep` | `contracts`, exists | One instruction in a plan, from a closed set: navigate, click, fill, press, expect, expectPage, a11yAudit, capture |
+| Plan | `Plan`, made only by `planParser`; `assertBranded` checks it at run time | type in `contracts`, parser in `engine`, exists | A human-approved, typed test plan in language version 1.1; outside input until the engine parses it |
+| Step | `Step`, `ActionStep` | `contracts`, exists | One instruction in a plan, from a closed set: navigate, click, hover, fill, select, upload, press, frame, dialog, expect, expectPage, a11yAudit, capture |
+| Plan migration | `migratePlan`, `CriterionMapping` | `engine`, exists | Turns a version 1 plan into version 1.1 by adding the criterion id the author gives for each assertion, keyed by its JSON path |
+| Plan schema | `planJsonSchema`, `docs/plan-language/plan.schema.json` | `engine`, exists | The published JSON Schema of the plan language, built from the parser's own tables; necessary, not sufficient |
+| Secret reference | `SecretReference` (`SecretName`) | `contracts`, exists | A fill value that names a secret the project declares, instead of holding it |
+| Upload fixture | `FixtureName` | `contracts`, exists | A file the project declares in its `fixtures` list, which an upload step may send. Not the app files a run serves (`FixtureReference`) |
+| AI text | `AiText`, made only by `parseAiText` | `engine`, exists | Text an AI writer returned that passed the text rules; stored only as a suggestion |
+| Coverage study | `assessCoverage`, `tools/coverage-study.ts` | `engine`, exists | Sampled test intents from public suites, each marked expressible in the plan language or not, with the expressible share |
 | Locator | `Locator` | `contracts`, exists | How a step finds an element: by role and name, label, text or test id. Never CSS or XPath |
-| Project | `Project`, made only by `parseProject` | `engine`, exists | The trusted, person-written configuration: allowed origins, the target matrix and limits |
+| Project | `Project`, made only by `parseProject` | `engine`, exists | The trusted, person-written configuration: allowed origins, the target matrix, limits, and the secret names and fixture files plans may refer to |
 | Target | `Target` (`TargetId`) | `contracts`, exists | One declared browser engine, device profile, locale and environment to test with. Never substituted |
 | Browser driver | `BrowserDriver`, `Session` | ports in `contracts`; `cdpDriver` in `driver-cdp`, `playwrightDriver` in `driver-playwright` | Opens a session for a target; a session navigates, acts, probes, captures and audits |
 | Run | `run`, `runUntrusted`, `RunResult` | `engine`, exists | Interprets a parsed plan on one target and returns a hashed result |
@@ -29,7 +35,7 @@
 | Tab walk | `tabWalk`, `TabWalk` | `auditor-act`, exists | Presses Tab through a page and records focus order, visible focus and occlusion |
 | Report input | `ReportInput`, `ValidReport`, made only by `parseReportInput` | `report`, exists | The data a visual evidence report is rendered from |
 | Seed provenance | `seed-provenance.json` (`SeedProvenance` shape) | repository root, exists | Where each seeded file came from: research commit, source path and SHA-256. The only file that names the research commit |
-| Acceptance criterion | `criterion` (`criterionId`, `criteriaInScope`) | test metadata, planned | One observable behaviour a spec promises. Earlier name: AC |
+| Acceptance criterion | `criterion` (`criterionId`, `CriterionId`, `criteriaInScope`) | test metadata; on every plan assertion, exists | One observable behaviour a spec promises. Earlier name: AC |
 | Change class | `changeClass` (`changeClassId`) | planned | The kind of change a pull request makes, which sets how much review it needs |
 | Test set | `TEST_SET` | `tools/check-tests-apart.ts`, exists | Tests, proofs, fixtures and golden files: the paths that must change apart from code |
 | Dependency review | `DependencyReview` with `DependencyCheck` items | planned, SPEC-00 | The keep-or-drop test every third-party component on the trust path must pass. Earlier name: R11 test |

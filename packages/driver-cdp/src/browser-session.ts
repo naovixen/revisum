@@ -100,11 +100,18 @@ export function buildSession<Handle>(operations: PageOperations<Handle>, environ
     }
   };
   const act = async (step: ActionStep): Promise<Result<void, DriverError>> => {
+    // The engine does not send these yet (it reports them as unsupported-step); refuse them here too.
+    if (step.type === 'hover' || step.type === 'select' || step.type === 'upload') {
+      return failure({ code: 'not-actionable', detail: `this driver does not perform ${step.type} steps yet` });
+    }
+    // A secret reference is resolved before a step reaches a driver; a driver only ever types text.
+    const typed = step.type === 'fill' ? step.value : '';
+    if (typeof typed !== 'string') return failure({ code: 'not-actionable', detail: 'a secret reference reached the driver unresolved' });
     try {
       if (step.type === 'click') return await click(step.locator);
       const waited = await waitUntilActionable(operations, step.locator, environment.timeoutMilliseconds);
       if (!waited.ok) return waited;
-      if (step.type === 'fill') await operations.fill(waited.value.element, step.value);
+      if (step.type === 'fill') await operations.fill(waited.value.element, typed);
       else await operations.press(waited.value.element, step.key);
       return success(undefined);
     } catch (error) {

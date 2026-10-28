@@ -1,0 +1,621 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "revisum.plan/v1",
+  "title": "Plan language 1.1",
+  "description": "A closed, versioned test plan. Every assertion names the acceptance criterion it checks. Fitting this schema is necessary, not sufficient: the plan parser also checks the project's allow-list, matrix, declared secrets and fixtures, its limits and its text safety rules.",
+  "type": "object",
+  "properties": {
+    "version": {
+      "const": "1.1"
+    },
+    "meta": {
+      "type": "object",
+      "properties": {
+        "featureId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
+        },
+        "specReference": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120,
+          "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+        }
+      },
+      "required": [
+        "featureId",
+        "specReference",
+        "title"
+      ],
+      "additionalProperties": false
+    },
+    "targets": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9][a-z0-9-]{0,47}$"
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "steps": {
+      "$ref": "#/$defs/steps"
+    }
+  },
+  "required": [
+    "version",
+    "meta",
+    "targets",
+    "steps"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "steps": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/step"
+      },
+      "minItems": 1
+    },
+    "step": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/navigateStep"
+        },
+        {
+          "$ref": "#/$defs/clickStep"
+        },
+        {
+          "$ref": "#/$defs/hoverStep"
+        },
+        {
+          "$ref": "#/$defs/fillStep"
+        },
+        {
+          "$ref": "#/$defs/selectStep"
+        },
+        {
+          "$ref": "#/$defs/uploadStep"
+        },
+        {
+          "$ref": "#/$defs/pressStep"
+        },
+        {
+          "$ref": "#/$defs/frameStep"
+        },
+        {
+          "$ref": "#/$defs/dialogStep"
+        },
+        {
+          "$ref": "#/$defs/expectStep"
+        },
+        {
+          "$ref": "#/$defs/expectPageStep"
+        },
+        {
+          "$ref": "#/$defs/a11yAuditStep"
+        },
+        {
+          "$ref": "#/$defs/captureStep"
+        }
+      ]
+    },
+    "navigateStep": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "navigate"
+        },
+        "url": {
+          "$ref": "#/$defs/url"
+        }
+      },
+      "required": [
+        "type",
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "clickStep": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "click"
+        },
+        "locator": {
+          "$ref": "#/$defs/locator"
+        }
+      },
+      "required": [
+        "type",
+        "locator"
+      ],
+      "additionalProperties": false
+    },
+    "hoverStep": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "hover"
+        },
+        "locator": {
+          "$ref": "#/$defs/locator"
+        }
+      },
+      "required": [
+        "type",
+        "locator"
+      ],
+      "additionalProperties": false
+    },
+    "fillStep": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "fill"
+        },
+        "locator": {
+          "$ref": "#/$defs/locator"
+        },
+        "value": {
+          "oneOf": [
+            {
+              "type": "string",
+              "minLength": 0,
+              "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "secretName": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "secretName"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        }
+      },
+      "required": [
+        "type",
+        "locator",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "selectStep": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "select"
+        },
+        "locator": {
+          "$ref": "#/$defs/locator"
+        },
+        "option": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+        }
+      },
+      "required": [
+        "type",
+        "locator",
+        "option"
+      ],
+      "additionalProperties": false
+    },
+    "uploadStep": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "upload"
+        },
+        "locator": {
+          "$ref": "#/$defs/locator"
+        },
+        "fixture": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "type",
+        "locator",
+        "fixture"
+      ],
+      "additionalProperties": false
+    },
+    "pressStep": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "press"
+        },
+        "locator": {
+          "$ref": "#/$defs/locator"
+        },
+        "key": {
+          "enum": [
+            "Enter",
+            "Space",
+            "Tab",
+            "Escape",
+            "Backspace",
+            "Delete",
+            "Home",
+            "End",
+            "PageUp",
+            "PageDown",
+            "ArrowUp",
+            "ArrowDown",
+            "ArrowLeft",
+            "ArrowRight"
+          ]
+        }
+      },
+      "required": [
+        "type",
+        "locator",
+        "key"
+      ],
+      "additionalProperties": false
+    },
+    "frameStep": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "frame"
+        },
+        "locator": {
+          "$ref": "#/$defs/locator"
+        },
+        "steps": {
+          "$ref": "#/$defs/steps"
+        }
+      },
+      "required": [
+        "type",
+        "locator",
+        "steps"
+      ],
+      "additionalProperties": false
+    },
+    "dialogStep": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "dialog"
+        },
+        "action": {
+          "enum": [
+            "accept",
+            "dismiss"
+          ]
+        },
+        "expectText": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+        }
+      },
+      "required": [
+        "type",
+        "action"
+      ],
+      "additionalProperties": false
+    },
+    "expectStep": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "expect"
+        },
+        "locator": {
+          "$ref": "#/$defs/locator"
+        },
+        "assert": {
+          "$ref": "#/$defs/elementAssertion"
+        },
+        "criterionId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+        }
+      },
+      "required": [
+        "type",
+        "locator",
+        "assert",
+        "criterionId"
+      ],
+      "additionalProperties": false
+    },
+    "expectPageStep": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "expectPage"
+        },
+        "assert": {
+          "$ref": "#/$defs/pageAssertion"
+        },
+        "criterionId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+        }
+      },
+      "required": [
+        "type",
+        "assert",
+        "criterionId"
+      ],
+      "additionalProperties": false
+    },
+    "a11yAuditStep": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "a11yAudit"
+        },
+        "mode": {
+          "enum": [
+            "report",
+            "gate"
+          ]
+        }
+      },
+      "required": [
+        "type",
+        "mode"
+      ],
+      "additionalProperties": false
+    },
+    "captureStep": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "capture"
+        },
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+        }
+      },
+      "required": [
+        "type",
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "locator": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "by": {
+              "const": "role"
+            },
+            "role": {
+              "enum": [
+                "alert",
+                "button",
+                "checkbox",
+                "combobox",
+                "dialog",
+                "heading",
+                "img",
+                "link",
+                "listitem",
+                "main",
+                "navigation",
+                "option",
+                "radio",
+                "region",
+                "searchbox",
+                "status",
+                "switch",
+                "tab",
+                "textbox",
+                "listbox",
+                "menuitem",
+                "table",
+                "row",
+                "cell",
+                "form"
+              ]
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+            }
+          },
+          "required": [
+            "by",
+            "role",
+            "name"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "by": {
+              "const": "label"
+            },
+            "label": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+            }
+          },
+          "required": [
+            "by",
+            "label"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "by": {
+              "const": "text"
+            },
+            "text": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+            }
+          },
+          "required": [
+            "by",
+            "text"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "by": {
+              "const": "testId"
+            },
+            "testId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+            }
+          },
+          "required": [
+            "by",
+            "testId"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "elementAssertion": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "enum": [
+                "visible",
+                "hidden",
+                "enabled",
+                "disabled",
+                "absent",
+                "checked",
+                "unchecked",
+                "focused"
+              ]
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "enum": [
+                "textEquals",
+                "textContains",
+                "valueEquals",
+                "valueContains"
+              ]
+            },
+            "value": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+            }
+          },
+          "required": [
+            "kind",
+            "value"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "countEquals"
+            },
+            "value": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000
+            }
+          },
+          "required": [
+            "kind",
+            "value"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "pageAssertion": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "enum": [
+                "urlPath",
+                "title"
+              ]
+            },
+            "value": {
+              "type": "string",
+              "minLength": 0,
+              "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+            }
+          },
+          "required": [
+            "kind",
+            "value"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "url"
+            },
+            "value": {
+              "$ref": "#/$defs/url"
+            }
+          },
+          "required": [
+            "kind",
+            "value"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "url": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2048,
+      "pattern": "^(/|https?://)"
+    }
+  }
+}

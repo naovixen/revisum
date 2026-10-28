@@ -31,7 +31,7 @@ Plan error. A step's `type` is not one of the plan language's steps. Use one of 
 
 ## unknown_value
 
-Plan error. A value is not one of those allowed, such as an unknown role, key or audit mode, a malformed feature id or capture name, or a number out of range.
+Plan error. A value is not one of those allowed, such as an unknown role, key or audit mode, a malformed feature id, criterion id or capture name, a number out of range, or a secret name or fixture file the project does not declare.
 
 ## invalid_url
 
@@ -55,7 +55,7 @@ Plan error. Text holds control or bidirectional-override characters, or somethin
 
 ## too_large
 
-Plan error. The plan is larger than the project's byte limit, or a list is longer than allowed.
+Plan error. The plan is larger than the project's byte limit, nests frame steps deeper than its `maximumFrameDepth`, or has a list longer than allowed. Size and depth are checked before the plan is read, so nothing else in it is reported.
 
 ## too_long
 
@@ -67,7 +67,7 @@ Plan error. A target is listed twice, or two capture steps share a name.
 
 ## version_unsupported
 
-Plan error. The plan's `version` is not one this engine reads.
+Plan error. The plan's `version` is not one this engine reads. A current plan declares `"1.1"`. A version 1 plan is accepted only through `migratePlan`, which adds a criterion id to each assertion; a plan for a newer version is refused rather than run with parts skipped.
 
 ## empty
 
@@ -75,7 +75,11 @@ Plan error. Required text or a required list is empty.
 
 ## vacuous
 
-Plan error. A check would pass on anything, such as a text or value assertion whose expected text is empty. Give the text the check should find.
+Plan error. A check would pass on anything, or proves nothing traceable: a plan with no assertion, an empty assertion (`assert: {}`), a text or value assertion whose expected text is empty, or an assertion without a `criterionId`. Give each assertion its expected text and the id of the acceptance criterion it checks.
+
+## no_criterion_id
+
+Migration error. A version 1 plan has an assertion with no entry in the criterion mapping, so the migration cannot say which acceptance criterion it checks. Add the criterion id to the mapping, keyed by the assertion step's JSON path, such as `$.steps[3]`.
 
 ## not-found
 

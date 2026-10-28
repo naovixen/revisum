@@ -13,6 +13,9 @@ const AMBIGUOUS: Verdict = { pass: false, code: 'ambiguous' };
 export const normalise = (text: string): string => text.replace(/\s+/g, ' ').trim();
 
 export function checkElement(assertion: ElementAssertion, probe: ElementProbe): Verdict {
+  // Checks on how many elements match come before the single-element rule below.
+  if (assertion.kind === 'absent') return probe.count === 0 ? PASSED : FAILED;
+  if (assertion.kind === 'countEquals') return probe.count === assertion.value ? PASSED : FAILED;
   if (assertion.kind === 'hidden') {
     if (probe.count === 0 || (probe.count === 1 && !probe.visible)) return PASSED;
     return probe.count > 1 ? AMBIGUOUS : FAILED;
@@ -27,6 +30,9 @@ export function checkElement(assertion: ElementAssertion, probe: ElementProbe): 
     case 'textContains': return normalise(probe.text).includes(normalise(assertion.value)) ? PASSED : FAILED;
     case 'valueEquals': return probe.value === assertion.value ? PASSED : FAILED;
     case 'valueContains': return probe.value !== null && probe.value.includes(assertion.value) ? PASSED : FAILED;
+    // The probe does not report checked or focused state yet, so these checks can never pass by
+    // accident. The run refuses them before probing; see UNSUPPORTED_ASSERTION_KINDS in run.ts.
+    case 'checked': case 'unchecked': case 'focused': return FAILED;
   }
 }
 
@@ -34,5 +40,7 @@ export function checkPage(assertion: PageAssertion, probe: PageProbe): Verdict {
   switch (assertion.kind) {
     case 'urlPath': return new URL(probe.url).pathname === assertion.value ? PASSED : FAILED;
     case 'title': return normalise(probe.title) === normalise(assertion.value) ? PASSED : FAILED;
+    // The expected URL may be a path; it is resolved against the page's URL before comparing.
+    case 'url': return new URL(assertion.value, probe.url).href === new URL(probe.url).href ? PASSED : FAILED;
   }
 }

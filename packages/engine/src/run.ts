@@ -11,6 +11,7 @@ import { manifestLogger, type Logger, type RunEventSink } from './logging.ts';
 import { buildManifest, manifestHash, type FixtureReference, type HostInfo, type RunManifest } from './manifest.ts';
 import { checkElement, checkPage, normalise, type Verdict } from './oracle.ts';
 import type { PlanError } from './plan/plan-decoders.ts';
+import { assertBranded } from './plan/plan-parser.ts';
 import type { Project } from './project/project-parser.ts';
 import { SENSITIVE_PLACEHOLDER } from './redaction.ts';
 
@@ -65,6 +66,8 @@ type RunContext = { readonly inputs: RunInputs; readonly ports: RunPorts; readon
 const POLL_INTERVAL_MILLISECONDS = 50;
 
 export async function run(inputs: RunInputs, ports: RunPorts): Promise<RunResult> {
+  // First, before any side effect: a plan the parser did not make is refused, whatever its type says.
+  assertBranded(inputs.plan);
   const startedAt = ports.clock.now();
   const target = inputs.project.matrix.find((candidate) => candidate.id === inputs.targetId);
   const declared = target !== undefined && inputs.plan.targets.includes(inputs.targetId);
@@ -157,8 +160,24 @@ async function openSession(planned: lifecycle.Planned, context: RunContext): Pro
   return opened.ok ? { ok: true, value: { session: opened.value, driver } } : opened;
 }
 
+// Assertion kinds the drivers' element probe cannot decide yet: it reports no checked or focused state.
+const UNSUPPORTED_ASSERTION_KINDS: readonly string[] = ['checked', 'unchecked', 'focused'];
+
+// Steps the plan language has but no driver performs yet. Each fails with unsupported-step, never
+// passes or is skipped, so a plan that relies on one cannot report a pass it did not earn.
+function isUnsupported(step: Step): boolean {
+  switch (step.type) {
+    case 'hover': case 'select': case 'upload': case 'frame': case 'dialog': return true;
+    // A secret reference needs the secret store, which the run does not have yet.
+    case 'fill': return typeof step.value !== 'string';
+    case 'expect': return UNSUPPORTED_ASSERTION_KINDS.includes(step.assert.kind);
+    default: return false;
+  }
+}
+
 async function executeStep(step: Step, index: number, session: Session, target: Target, context: RunContext): Promise<StepResult> {
   const base = { index, type: step.type } as const;
+  if (isUnsupported(step)) return { ...base, outcome: 'failed', code: 'unsupported-step' };
   switch (step.type) {
     case 'navigate': {
       const url = new URL(step.url, context.inputs.baseUrl);
@@ -167,11 +186,17 @@ async function executeStep(step: Step, index: number, session: Session, target: 
       return navigated.ok ? { ...base, outcome: 'passed' } : { ...base, outcome: 'failed', code: navigated.error.code };
     }
     case 'click':
+    case 'hover':
     case 'fill':
+    case 'select':
+    case 'upload':
     case 'press': {
       const acted = await session.act(step);
       return acted.ok ? { ...base, outcome: 'passed' } : { ...base, outcome: 'failed', code: acted.error.code };
     }
+    case 'frame':
+    case 'dialog':
+      return { ...base, outcome: 'failed', code: 'unsupported-step' };
     case 'expect': {
       let last: ElementProbe | null = null;
       const verdict = await poll(context, async () => {

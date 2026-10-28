@@ -2,6 +2,8 @@
 // always give the same bytes. An AI may only add a suggestion stored beside the draft, never
 // replace it, and never containing typed or expected values.
 import type { AiWriter, ArtifactReference, ArtifactStore, Locator, Plan, Step } from '@revisum/contracts';
+import { parseAiText } from './ai-text.ts';
+import type { PlanErrorCode } from './plan/plan-decoders.ts';
 import type { RunResult } from './run.ts';
 
 const MARKDOWN_SPECIAL = /[\\`*_[\]<>#|!()]/g;
@@ -13,7 +15,11 @@ const codeSpanText = (text: string): string => text.replace(/`/g, "'");
 const ASSERTION_TEXT: { readonly [Kind in Extract<Step, { type: 'expect' }>['assert']['kind']]: string } = {
   visible: 'is visible', hidden: 'is hidden', enabled: 'is enabled', disabled: 'is disabled',
   textEquals: 'has the expected text', textContains: 'contains the expected text', valueEquals: 'has the expected value',
-  valueContains: 'contains the expected value',
+  valueContains: 'contains the expected value', absent: 'is absent', checked: 'is checked', unchecked: 'is not checked',
+  focused: 'has focus', countEquals: 'matches the expected number of times',
+};
+const PAGE_ASSERTION_TEXT: { readonly [Kind in Extract<Step, { type: 'expectPage' }>['assert']['kind']]: string } = {
+  title: 'title', urlPath: 'URL path', url: 'URL',
 };
 
 function describeLocator(locator: Locator): string {
@@ -30,10 +36,15 @@ export function describeStep(step: Step): string {
   switch (step.type) {
     case 'navigate': return `Opened \`${codeSpanText(new URL(step.url, 'http://relative.invalid').pathname)}\``;
     case 'click': return `Clicked ${describeLocator(step.locator)}`;
+    case 'hover': return `Hovered over ${describeLocator(step.locator)}`;
     case 'fill': return `Filled in ${describeLocator(step.locator)}`;
+    case 'select': return `Chose an option in ${describeLocator(step.locator)}`;
+    case 'upload': return `Uploaded a fixture file to ${describeLocator(step.locator)}`;
     case 'press': return `Pressed ${step.key} on ${describeLocator(step.locator)}`;
+    case 'frame': return `Inside ${describeLocator(step.locator)}: ${step.steps.map(describeStep).join('; ')}`;
+    case 'dialog': return `${step.action === 'accept' ? 'Accepted' : 'Dismissed'} the next dialog`;
     case 'expect': return `Checked that ${describeLocator(step.locator)} ${ASSERTION_TEXT[step.assert.kind]}`;
-    case 'expectPage': return `Checked the page ${step.assert.kind === 'title' ? 'title' : 'URL'}`;
+    case 'expectPage': return `Checked the page ${PAGE_ASSERTION_TEXT[step.assert.kind]}`;
     case 'a11yAudit': return `Ran automated accessibility rules (${step.mode} mode)`;
     case 'capture': return `Captured screenshot "${step.name}"`;
   }
@@ -81,13 +92,11 @@ export function releaseNoteDraft(plan: Plan, results: readonly RunResult[]): str
   return lines.join('\n');
 }
 
-const UNSAFE_SUGGESTION = [
-  /<\s*\/?\s*(script|iframe|object|embed|style)\b/i,
-  /\b(javascript|vbscript)\s*:/i,
-  /\bon[a-z]+\s*=/i,
-  /[\u0000-\u0008\u000b\u000c\u000e-\u001f‪-‮⁦-⁩]/,
-];
 const MAXIMUM_SUGGESTION_LENGTH = 20_000;
+// Why a suggestion was refused, in the words the release artefacts have always used.
+const REJECTION_REASONS: Partial<Readonly<Record<PlanErrorCode, string>>> = {
+  wrong_type: 'not-text', empty: 'empty', too_long: 'too-long', unsafe_text: 'unsafe-text',
+};
 
 export type ReleaseArtefacts = {
   readonly draft: ArtifactReference;
@@ -104,10 +113,10 @@ export async function writeReleaseNotes(
   if (writer === undefined) return { draft, suggestion: null, suggestionRejected: null };
   let proposal: unknown;
   try { proposal = await writer.suggest(text); } catch { return { draft, suggestion: null, suggestionRejected: 'writer-error' }; }
-  if (typeof proposal !== 'string') return { draft, suggestion: null, suggestionRejected: 'not-text' };
-  if (proposal.length > MAXIMUM_SUGGESTION_LENGTH) return { draft, suggestion: null, suggestionRejected: 'too-long' };
-  if (UNSAFE_SUGGESTION.some((pattern) => pattern.test(proposal))) return { draft, suggestion: null, suggestionRejected: 'unsafe-text' };
+  // The suggestion is outside input: it is parsed before anything is stored, and stored only if it passes.
+  const parsed = parseAiText(proposal, MAXIMUM_SUGGESTION_LENGTH);
+  if (!parsed.ok) return { draft, suggestion: null, suggestionRejected: REJECTION_REASONS[parsed.error.code] ?? parsed.error.code };
   const banner = `<!-- AI suggestion, not reviewed. The source of truth is release-notes.md (sha256 ${draft.sha256}). -->\n`;
-  const suggestion = await store.put('release-notes.suggestion.md', new TextEncoder().encode(banner + proposal), 'text/markdown');
+  const suggestion = await store.put('release-notes.suggestion.md', new TextEncoder().encode(banner + parsed.value), 'text/markdown');
   return { draft, suggestion, suggestionRejected: null };
 }

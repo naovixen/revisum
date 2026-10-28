@@ -33,6 +33,17 @@ const SCRIPT_LIKE: readonly RegExp[] = [
 export const isUnsafeText = (value: string): boolean =>
   CONTROL_OR_BIDIRECTIONAL.test(value) || SCRIPT_LIKE.some((pattern) => pattern.test(value));
 
+// The same characters apart from tab and line breaks, which prose such as release notes needs.
+const CONTROL_OR_BIDIRECTIONAL_IN_PROSE = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f‪-‮⁦-⁩]/;
+
+// The rule for multi-line prose: as isUnsafeText, but tabs and line breaks are allowed.
+export const isUnsafeProse = (value: string): boolean =>
+  CONTROL_OR_BIDIRECTIONAL_IN_PROSE.test(value) || SCRIPT_LIKE.some((pattern) => pattern.test(value));
+
+// True when `input` is one of `values`, narrowing it to that union.
+export const isOneOf = <Value extends string>(values: readonly Value[], input: string): input is Value =>
+  values.some((value) => value === input);
+
 // A plain object whose keys are all in `allowed` and include every key in `required`.
 export function readRecord(
   input: unknown, path: string, issues: Issues,

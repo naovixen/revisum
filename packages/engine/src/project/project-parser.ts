@@ -1,13 +1,16 @@
-// The trusted project: allowed origins, the "test with" matrix and limits, written by a person.
-// AI output never reaches this type. The person declares every target; the engine never invents one.
+// The trusted project: allowed origins, the "test with" matrix, limits, and the secret names and
+// fixture files a plan may refer to, written by a person. AI output never reaches this type. The
+// person declares every target; the engine never invents one.
 import {
   COLOR_SCHEMES, DEVICE_PROFILES, ENGINES, MOTION_PREFERENCES, success, failure,
-  type Brand, type DeviceProfileId, type Locale, type Origin, type Result, type Target, type TimeZone,
+  type Brand, type DeviceProfileId, type FixtureName, type Locale, type Origin, type Result, type SecretName,
+  type Target, type TimeZone,
 } from '@revisum/contracts';
 import { brand } from '../brand.ts';
 import {
   INVALID, allValid, readInteger, readList, readOneOf, readRecord, type Issues, type Parsed, type PlanError,
 } from '../plan/plan-decoders.ts';
+import { LOWERCASE_ID } from '../plan/plan-grammar.ts';
 
 const DEVICE_IDS = Object.keys(DEVICE_PROFILES) as DeviceProfileId[];
 
@@ -16,22 +19,35 @@ export type Limits = {
   readonly maximumSteps: number;
   readonly maximumTextLength: number;
   readonly stepTimeoutMilliseconds: number;
+  // How deeply frame steps may nest: a frame inside a frame has depth 2.
+  readonly maximumFrameDepth: number;
 };
-export const DEFAULT_LIMITS: Limits = { maximumPlanBytes: 64 * 1024, maximumSteps: 100, maximumTextLength: 500, stepTimeoutMilliseconds: 5000 };
+export const DEFAULT_LIMITS: Limits = {
+  maximumPlanBytes: 64 * 1024, maximumSteps: 100, maximumTextLength: 500, stepTimeoutMilliseconds: 5000, maximumFrameDepth: 3,
+};
+// The limits the plan parser checks before it walks a plan, so an oversized plan costs nothing to reject.
+export type PlanLimits = Pick<Limits, 'maximumPlanBytes' | 'maximumSteps' | 'maximumFrameDepth'>;
 
 export type ProjectData = {
   readonly origins: readonly Origin[];
   readonly matrix: readonly Target[];
   readonly limits: Limits;
+  // Secrets a fill step may name. The values live in the secret store, never in the project or a plan.
+  readonly secretNames: readonly SecretName[];
+  // Files in the project's fixtures folder that an upload step may send, by file name.
+  readonly fixtures: readonly FixtureName[];
 };
 export type Project = Brand<ProjectData, 'Project'>;
 
-const ID = /^[a-z0-9][a-z0-9-]{0,47}$/;
+// An environment-variable style name, such as SIGNUP_PASSWORD.
+const SECRET_NAME = /^[A-Za-z_][A-Za-z0-9_]{0,127}$/;
+// A plain file name with no folder part, so an upload can never reach outside the fixtures folder.
+const FIXTURE_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 
 // A lowercase id such as a target or adapter id.
 export function readId<Name extends string>(input: unknown, path: string, issues: Issues): Parsed<Brand<string, Name>> {
   if (typeof input !== 'string') { issues.push({ code: 'wrong_type', path }); return INVALID; }
-  if (!ID.test(input)) { issues.push({ code: 'unknown_value', path }); return INVALID; }
+  if (!LOWERCASE_ID.test(input)) { issues.push({ code: 'unknown_value', path }); return INVALID; }
   return brand<string, Name>(input);
 }
 
@@ -81,7 +97,7 @@ function readTarget(input: unknown, path: string, issues: Issues): Parsed<Target
   return { id, adapter, engine, device, locale, timezone, colorScheme, reducedMotion };
 }
 
-const LIMIT_KEYS = ['maximumPlanBytes', 'maximumSteps', 'maximumTextLength', 'stepTimeoutMilliseconds'] as const;
+const LIMIT_KEYS = ['maximumPlanBytes', 'maximumSteps', 'maximumTextLength', 'stepTimeoutMilliseconds', 'maximumFrameDepth'] as const;
 
 function readLimits(input: unknown, path: string, issues: Issues): Parsed<Limits> {
   if (input === undefined) return DEFAULT_LIMITS;
@@ -89,19 +105,43 @@ function readLimits(input: unknown, path: string, issues: Issues): Parsed<Limits
   if (fields === INVALID) return INVALID;
   const pick = (key: (typeof LIMIT_KEYS)[number], highest: number): Parsed<number> =>
     fields[key] === undefined ? DEFAULT_LIMITS[key] : readInteger(fields[key], `${path}.${key}`, issues, 1, highest);
-  const parts = [pick('maximumPlanBytes', 1 << 20), pick('maximumSteps', 1000), pick('maximumTextLength', 4000), pick('stepTimeoutMilliseconds', 60_000)] as const;
+  const parts = [
+    pick('maximumPlanBytes', 1 << 20), pick('maximumSteps', 1000), pick('maximumTextLength', 4000),
+    pick('stepTimeoutMilliseconds', 60_000), pick('maximumFrameDepth', 16),
+  ] as const;
   if (!allValid(parts)) return INVALID;
-  const [maximumPlanBytes, maximumSteps, maximumTextLength, stepTimeoutMilliseconds] = parts;
-  return { maximumPlanBytes, maximumSteps, maximumTextLength, stepTimeoutMilliseconds };
+  const [maximumPlanBytes, maximumSteps, maximumTextLength, stepTimeoutMilliseconds, maximumFrameDepth] = parts;
+  return { maximumPlanBytes, maximumSteps, maximumTextLength, stepTimeoutMilliseconds, maximumFrameDepth };
+}
+
+// An optional list of distinct names that each match `pattern`. Absent means none are declared.
+function readNameList<Name extends string>(
+  input: unknown, path: string, issues: Issues, pattern: RegExp, extraRule: (name: string) => boolean = () => true,
+): Parsed<readonly Brand<string, Name>[]> {
+  if (input === undefined) return [];
+  const raw = readList(input, path, issues, 256, 0);
+  if (raw === INVALID) return INVALID;
+  const names = raw.map((value, index): Parsed<Brand<string, Name>> => {
+    const at = `${path}[${index}]`;
+    if (typeof value !== 'string') { issues.push({ code: 'wrong_type', path: at }); return INVALID; }
+    if (!pattern.test(value) || !extraRule(value)) { issues.push({ code: 'unknown_value', path: at }); return INVALID; }
+    return brand<string, Name>(value);
+  });
+  if (!allValid(names)) return INVALID;
+  if (new Set(names).size !== names.length) { issues.push({ code: 'duplicate', path }); return INVALID; }
+  return names;
 }
 
 export function parseProject(input: unknown): Result<Project, readonly PlanError[]> {
   const issues: Issues = [];
-  const fields = readRecord(input, '$', issues, ['origins', 'matrix', 'limits'], ['origins', 'matrix']);
+  const fields = readRecord(input, '$', issues, ['origins', 'matrix', 'limits', 'secretNames', 'fixtures'], ['origins', 'matrix']);
   if (fields === INVALID) return failure(issues);
   const rawOrigins = readList(fields['origins'], '$.origins', issues, 32);
   const rawMatrix = readList(fields['matrix'], '$.matrix', issues, 64);
   const limits = readLimits(fields['limits'], '$.limits', issues);
+  const secretNames = readNameList<'SecretName'>(fields['secretNames'], '$.secretNames', issues, SECRET_NAME);
+  // A name such as "a..b" matches the pattern but is refused anyway, so no fixture name looks like a way out.
+  const fixtures = readNameList<'FixtureName'>(fields['fixtures'], '$.fixtures', issues, FIXTURE_NAME, (name) => !name.includes('..'));
   const origins = rawOrigins === INVALID ? [] : rawOrigins.map((origin, index) => readOrigin(origin, `$.origins[${index}]`, issues));
   const matrix = rawMatrix === INVALID ? [] : rawMatrix.map((target, index) => readTarget(target, `$.matrix[${index}]`, issues));
   const seen = new Set<string>();
@@ -110,6 +150,7 @@ export function parseProject(input: unknown): Result<Project, readonly PlanError
     if (seen.has(target.id)) issues.push({ code: 'duplicate', path: `$.matrix[${index}].id` });
     seen.add(target.id);
   });
-  if (issues.length > 0 || limits === INVALID || !allValid(origins) || !allValid(matrix)) return failure(issues);
-  return success(brand<ProjectData, 'Project'>({ origins, matrix, limits }));
+  if (issues.length > 0 || limits === INVALID || secretNames === INVALID || fixtures === INVALID
+    || !allValid(origins) || !allValid(matrix)) return failure(issues);
+  return success(brand<ProjectData, 'Project'>({ origins, matrix, limits, secretNames, fixtures }));
 }

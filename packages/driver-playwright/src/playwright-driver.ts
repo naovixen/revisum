@@ -16,7 +16,8 @@ const requireFromHere = createRequire(import.meta.url);
 const PLAYWRIGHT_VERSION = (JSON.parse(readFileSync(requireFromHere.resolve('playwright-core/package.json'), 'utf8')) as { version: string }).version;
 const ENGINES = { chromium, firefox, webkit } as const;
 const KEY_NAMES: { readonly [Name in Key]: string } = {
-  Enter: 'Enter', Tab: 'Tab', Escape: 'Escape', Space: 'Space', Backspace: 'Backspace',
+  Enter: 'Enter', Tab: 'Tab', Escape: 'Escape', Space: 'Space', Backspace: 'Backspace', Delete: 'Delete',
+  Home: 'Home', End: 'End', PageUp: 'PageUp', PageDown: 'PageDown',
   ArrowUp: 'ArrowUp', ArrowDown: 'ArrowDown', ArrowLeft: 'ArrowLeft', ArrowRight: 'ArrowRight',
 };
 const NO_ELEMENT: ElementProbe = { count: 0, visible: false, enabled: false, text: '', value: null, sensitive: false, box: null };
@@ -133,11 +134,19 @@ function locate(page: Page, locator: Locator): PlaywrightLocator {
 }
 
 async function act(page: Page, step: ActionStep, timeout: number): Promise<Result<void, DriverError>> {
+  // The engine does not send these yet (it reports them as unsupported-step); refuse them here too.
+  if (step.type === 'hover' || step.type === 'select' || step.type === 'upload') {
+    return failure({ code: 'not-actionable', detail: `this driver does not perform ${step.type} steps yet` });
+  }
+  // A secret reference is resolved before a step reaches a driver; a driver only ever types text.
+  if (step.type === 'fill' && typeof step.value !== 'string') {
+    return failure({ code: 'not-actionable', detail: 'a secret reference reached the driver unresolved' });
+  }
   const found = locate(page, step.locator);
   try {
     switch (step.type) {
       case 'click': await found.click({ timeout }); break;
-      case 'fill': await found.fill(step.value, { timeout }); break;
+      case 'fill': if (typeof step.value === 'string') await found.fill(step.value, { timeout }); break;
       case 'press': await found.press(KEY_NAMES[step.key], { timeout }); break;
     }
     return success(undefined);

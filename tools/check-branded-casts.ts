@@ -28,7 +28,11 @@ export const BRAND_OWNERS: Readonly<Record<string, readonly string[]>> = {
   CaptureName: [PLAN_PARSER],
   FeatureId: [PLAN_PARSER],
   Plan: [PLAN_PARSER],
+  CriterionId: [PLAN_PARSER],
   Project: [PROJECT_PARSER],
+  SecretName: [PROJECT_PARSER],
+  FixtureName: [PROJECT_PARSER],
+  AiText: ['packages/engine/src/ai-text.ts'],
   TargetId: [PROJECT_PARSER],
   AdapterId: [PROJECT_PARSER],
   Locale: [PROJECT_PARSER],
@@ -89,7 +93,9 @@ function brandCreations(tokens: readonly Token[], brands: ReadonlySet<string>): 
     // `<Name>value`: an angle bracket where an expression starts, unlike the type argument in `Promise<Name>`.
     if (isPunctuator(token, '<') && isPunctuator(tokens[index + 2], '>')) {
       const target = tokens[index + 1];
-      const startsExpression = previous === undefined
+      // The tokenizer splits "=>" into "=" and ">"; after an arrow an expression starts.
+      const afterArrow = isPunctuator(previous, '>') && isPunctuator(tokens[index - 2], '=');
+      const startsExpression = previous === undefined || afterArrow
         || (previous.kind === 'punctuator' && ![')', ']', '>', '.'].includes(previous.text))
         || (previous.kind === 'identifier' && KEYWORDS_BEFORE_EXPRESSION.has(previous.text));
       if (startsExpression && target?.kind === 'identifier' && brands.has(target.text)) {
