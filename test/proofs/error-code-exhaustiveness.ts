@@ -7,7 +7,7 @@
 //   - one that leaves a code out. Its @ts-expect-error line must stay an error.
 // See docs/specs/SPEC-27-shared-types-and-events.md.
 import type { CliErrorCode, DriverErrorCode, RecorderError, RunnerError, ServiceCallErrorCode, SinkError } from '@revisum/contracts';
-import type { PlanErrorCode, StepErrorCode, TextErrorCode } from '@revisum/engine';
+import type { PlanErrorCode, StepErrorCode, SuiteDecodeErrorCode, TextErrorCode } from '@revisum/engine';
 
 // Only a value of type never may reach this, so every code must have been handled before it.
 const unreachable = (code: never): never => {
@@ -23,6 +23,7 @@ export function describePlanError(code: PlanErrorCode): string {
     case 'version_unsupported': case 'empty': case 'vacuous':
     case 'no_criterion_id': case 'literal_secret': case 'undefined_value': case 'position_not_allowed':
     case 'misplaced_step': case 'unsafe_interpolation': case 'header_not_allowed':
+    case 'command_not_allowed': case 'path_not_allowed':
       return 'plan rejected';
     default:
       return unreachable(code);
@@ -35,7 +36,7 @@ export function describePlanErrorForgettingOne(code: PlanErrorCode): string {
     case 'target_not_in_matrix': case 'unsafe_text': case 'too_large': case 'too_long': case 'duplicate':
     case 'version_unsupported': case 'empty': case 'no_criterion_id': case 'literal_secret':
     case 'undefined_value': case 'position_not_allowed': case 'misplaced_step': case 'unsafe_interpolation':
-    case 'header_not_allowed':
+    case 'header_not_allowed': case 'command_not_allowed': case 'path_not_allowed':
       return 'plan rejected';
     default:
       // @ts-expect-error 'vacuous' is not handled, so the code does not narrow to never
@@ -60,6 +61,27 @@ export function describeTextErrorForgettingOne(code: TextErrorCode): string {
       return 'text rejected';
     default:
       // @ts-expect-error 'unknown-key-name' is not handled, so the code does not narrow to never
+      return unreachable(code);
+  }
+}
+
+// ---- Suite report and trace errors (declared in engine beside the evidence-mode decoders) ---------
+export function describeSuiteDecodeError(code: SuiteDecodeErrorCode): string {
+  switch (code) {
+    case 'suite-report-missing': case 'suite-report-invalid': case 'suite-report-unsupported':
+    case 'trace-invalid': case 'trace-unsupported': case 'too-large':
+      return 'suite output refused';
+    default:
+      return unreachable(code);
+  }
+}
+export function describeSuiteDecodeErrorForgettingOne(code: SuiteDecodeErrorCode): string {
+  switch (code) {
+    case 'suite-report-missing': case 'suite-report-invalid': case 'suite-report-unsupported':
+    case 'trace-invalid': case 'too-large':
+      return 'suite output refused';
+    default:
+      // @ts-expect-error 'trace-unsupported' is not handled, so the code does not narrow to never
       return unreachable(code);
   }
 }

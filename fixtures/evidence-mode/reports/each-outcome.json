@@ -1,0 +1,240 @@
+{
+  "config": {
+    "configFile": "/work/apps/web/playwright.config.ts",
+    "rootDir": "/work/apps/web/e2e",
+    "forbidOnly": true,
+    "fullyParallel": false,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {},
+    "preserveOutput": "always",
+    "reporter": [["json", null]],
+    "reportSlowTests": { "max": 5, "threshold": 300000 },
+    "quiet": false,
+    "projects": [
+      {
+        "outputDir": "/work/apps/web/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {},
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "/work/apps/web/e2e",
+        "testIgnore": [],
+        "testMatch": ["**/*.@(spec|test).?(c|m)[jt]s?(x)"],
+        "timeout": 30000
+      }
+    ],
+    "shard": null,
+    "updateSnapshots": "missing",
+    "version": "1.56.1",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "checkout.spec.ts",
+      "file": "checkout.spec.ts",
+      "line": 0,
+      "column": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Checkout",
+          "file": "checkout.spec.ts",
+          "line": 3,
+          "column": 6,
+          "specs": [
+            {
+              "title": "adds an item to the cart",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [{ "type": "criterion", "description": "checkout.item-added" }],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 812,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-28T09:00:00.000Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "checkout-adds-an-item",
+              "file": "checkout.spec.ts",
+              "line": 4,
+              "column": 7
+            },
+            {
+              "title": "shows the order total",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [{ "type": "criterion", "description": "checkout.total-shown" }],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 5021,
+                      "error": {
+                        "message": "Error: expect(locator).toHaveText(expected) failed\n\nLocator: getByTestId('order-total')\nExpected: \"42.00\"\nReceived: \"40.00\"",
+                        "stack": "Error: expect(locator).toHaveText(expected) failed\n    at /work/apps/web/e2e/checkout.spec.ts:14:45",
+                        "location": { "file": "/work/apps/web/e2e/checkout.spec.ts", "line": 14, "column": 45 },
+                        "snippet": "  13 |   await page.getByRole('button', { name: 'Review order' }).click();\n> 14 |   await expect(page.getByTestId('order-total')).toHaveText('42.00');"
+                      },
+                      "errors": [
+                        {
+                          "message": "Error: expect(locator).toHaveText(expected) failed\n\nLocator: getByTestId('order-total')\nExpected: \"42.00\"\nReceived: \"40.00\"",
+                          "location": { "file": "/work/apps/web/e2e/checkout.spec.ts", "line": 14, "column": 45 }
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-28T09:00:01.000Z",
+                      "annotations": [],
+                      "attachments": [],
+                      "errorLocation": { "file": "/work/apps/web/e2e/checkout.spec.ts", "line": 14, "column": 45 }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "checkout-shows-the-order-total",
+              "file": "checkout.spec.ts",
+              "line": 10,
+              "column": 7
+            },
+            {
+              "title": "confirms the payment",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "timedOut",
+                      "duration": 30000,
+                      "error": { "message": "Test timeout of 30000ms exceeded." },
+                      "errors": [{ "message": "Test timeout of 30000ms exceeded." }],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-28T09:00:07.000Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "checkout-confirms-the-payment",
+              "file": "checkout.spec.ts",
+              "line": 18,
+              "column": 7
+            },
+            {
+              "title": "applies a gift card",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [{ "type": "skip", "description": "gift cards are switched off in this build" }],
+                  "expectedStatus": "skipped",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": -1,
+                      "parallelIndex": -1,
+                      "status": "skipped",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-28T09:00:37.000Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "checkout-applies-a-gift-card",
+              "file": "checkout.spec.ts",
+              "line": 26,
+              "column": 7
+            },
+            {
+              "title": "sends the receipt",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "interrupted",
+                      "duration": 1200,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-28T09:00:37.100Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "checkout-sends-the-receipt",
+              "file": "checkout.spec.ts",
+              "line": 31,
+              "column": 7
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": { "startTime": "2026-10-28T09:00:00.000Z", "duration": 38300.5, "expected": 1, "skipped": 2, "unexpected": 2, "flaky": 0 }
+}
