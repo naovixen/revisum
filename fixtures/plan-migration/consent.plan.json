@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "meta": { "featureId": "SIGNUP-2", "specReference": "specs/signup.md#consent", "title": "Terms must be accepted first" },
+  "targets": ["playwright-chromium"],
+  "steps": [
+    { "type": "navigate", "url": "/" },
+    { "type": "expect", "locator": { "by": "role", "role": "button", "name": "Create account" }, "assert": { "kind": "disabled" } },
+    { "type": "press", "locator": { "by": "role", "role": "checkbox", "name": "I agree to the terms" }, "key": "Space" },
+    { "type": "expect", "locator": { "by": "role", "role": "button", "name": "Create account" }, "assert": { "kind": "enabled" } },
+    { "type": "expect", "locator": { "by": "testId", "testId": "status" }, "assert": { "kind": "hidden" } },
+    { "type": "fill", "locator": { "by": "label", "label": "Email" }, "value": "ada@example.test" },
+    { "type": "expect", "locator": { "by": "label", "label": "Email" }, "assert": { "kind": "valueContains", "value": "@example.test" } },
+    { "type": "expectPage", "assert": { "kind": "urlPath", "value": "/" } },
+    { "type": "a11yAudit", "mode": "gate" },
+    { "type": "capture", "name": "consent-given" }
+  ]
+}

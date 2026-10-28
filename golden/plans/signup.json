@@ -1,0 +1,20 @@
+{
+  "version": "1.1",
+  "meta": { "featureId": "SIGNUP-1", "specReference": "specs/signup.md#happy-path", "title": "Sign-up happy path" },
+  "targets": ["playwright-chromium"],
+  "steps": [
+    { "type": "navigate", "url": "/" },
+    { "type": "expect", "locator": { "by": "role", "role": "heading", "name": "Create your account" }, "assert": { "kind": "visible" }, "criterionId": "signup.heading-shown" },
+    { "type": "expectPage", "assert": { "kind": "title", "value": "Sign up - Fixture" }, "criterionId": "signup.page-titled" },
+    { "type": "fill", "locator": { "by": "label", "label": "Full name" }, "value": "Ada Lovelace" },
+    { "type": "fill", "locator": { "by": "label", "label": "Email" }, "value": "ada@example.test" },
+    { "type": "expect", "locator": { "by": "label", "label": "Email" }, "assert": { "kind": "valueEquals", "value": "ada@example.test" }, "criterionId": "signup.email-kept" },
+    { "type": "capture", "name": "form-filled" },
+    { "type": "click", "locator": { "by": "role", "role": "checkbox", "name": "I agree to the terms" } },
+    { "type": "click", "locator": { "by": "role", "role": "button", "name": "Create account" } },
+    { "type": "expect", "locator": { "by": "testId", "testId": "status" }, "assert": { "kind": "textContains", "value": "Welcome" }, "criterionId": "signup.welcome-shown" },
+    { "type": "expect", "locator": { "by": "testId", "testId": "echo" }, "assert": { "kind": "textContains", "value": "Signed up as" }, "criterionId": "signup.address-echoed" },
+    { "type": "a11yAudit", "mode": "report" },
+    { "type": "capture", "name": "signed-up" }
+  ]
+}

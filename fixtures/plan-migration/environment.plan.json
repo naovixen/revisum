@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "meta": { "featureId": "SIGNUP-1", "specReference": "specs/signup.md#happy-path", "title": "Determinism controls are applied" },
+  "targets": ["playwright-chromium"],
+  "steps": [
+    { "type": "navigate", "url": "/" },
+    { "type": "expect", "locator": { "by": "testId", "testId": "env-lang" }, "assert": { "kind": "textEquals", "value": "de-DE" } },
+    { "type": "expect", "locator": { "by": "testId", "testId": "env-tz" }, "assert": { "kind": "textEquals", "value": "Asia/Tokyo" } }
+  ]
+}

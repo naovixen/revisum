@@ -1,0 +1,7 @@
+{
+  "$.steps[1]": "consent.submit-starts-disabled",
+  "$.steps[3]": "consent.submit-enabled-after-agreeing",
+  "$.steps[4]": "consent.no-status-before-submit",
+  "$.steps[6]": "consent.email-kept",
+  "$.steps[7]": "consent.stays-on-form"
+}

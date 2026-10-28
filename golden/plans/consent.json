@@ -1,0 +1,17 @@
+{
+  "version": "1.1",
+  "meta": { "featureId": "SIGNUP-2", "specReference": "specs/signup.md#consent", "title": "Terms must be accepted first" },
+  "targets": ["playwright-chromium"],
+  "steps": [
+    { "type": "navigate", "url": "/" },
+    { "type": "expect", "locator": { "by": "role", "role": "button", "name": "Create account" }, "assert": { "kind": "disabled" }, "criterionId": "consent.submit-starts-disabled" },
+    { "type": "press", "locator": { "by": "role", "role": "checkbox", "name": "I agree to the terms" }, "key": "Space" },
+    { "type": "expect", "locator": { "by": "role", "role": "button", "name": "Create account" }, "assert": { "kind": "enabled" }, "criterionId": "consent.submit-enabled-after-agreeing" },
+    { "type": "expect", "locator": { "by": "testId", "testId": "status" }, "assert": { "kind": "hidden" }, "criterionId": "consent.no-status-before-submit" },
+    { "type": "fill", "locator": { "by": "label", "label": "Email" }, "value": "ada@example.test" },
+    { "type": "expect", "locator": { "by": "label", "label": "Email" }, "assert": { "kind": "valueContains", "value": "@example.test" }, "criterionId": "consent.email-kept" },
+    { "type": "expectPage", "assert": { "kind": "urlPath", "value": "/" }, "criterionId": "consent.stays-on-form" },
+    { "type": "a11yAudit", "mode": "gate" },
+    { "type": "capture", "name": "consent-given" }
+  ]
+}

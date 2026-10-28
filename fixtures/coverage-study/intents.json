@@ -1,0 +1,88 @@
+{
+  "intents": [
+    {
+      "suite": "example-shop",
+      "sourceUrl": "https://github.com/example/shop/blob/main/tests/signup.spec.ts",
+      "testName": "shows a welcome message after sign-up",
+      "verdict": "expressible",
+      "reason": "Fill, click and a text check on a status region",
+      "plan": {
+        "version": "1.1",
+        "meta": { "featureId": "SHOP-1", "specReference": "tests/signup.spec.ts", "title": "Welcome after sign-up" },
+        "targets": ["playwright-chromium"],
+        "steps": [
+          { "type": "navigate", "url": "/" },
+          { "type": "fill", "locator": { "by": "label", "label": "Email" }, "value": "ada@example.test" },
+          { "type": "click", "locator": { "by": "role", "role": "button", "name": "Create account" } },
+          { "type": "expect", "locator": { "by": "testId", "testId": "status" }, "assert": { "kind": "textContains", "value": "Welcome" }, "criterionId": "shop.welcome-shown" }
+        ]
+      }
+    },
+    {
+      "suite": "example-shop",
+      "sourceUrl": "https://github.com/example/shop/blob/main/tests/cart.spec.ts",
+      "testName": "removing the last item empties the cart",
+      "verdict": "expressible",
+      "reason": "A click and an absent-element check",
+      "plan": {
+        "version": "1.1",
+        "meta": { "featureId": "SHOP-2", "specReference": "tests/cart.spec.ts", "title": "Empty cart" },
+        "targets": ["playwright-chromium"],
+        "steps": [
+          { "type": "navigate", "url": "/cart" },
+          { "type": "click", "locator": { "by": "role", "role": "button", "name": "Remove" } },
+          { "type": "expect", "locator": { "by": "testId", "testId": "cart-line" }, "assert": { "kind": "absent" }, "criterionId": "shop.cart-emptied" }
+        ]
+      }
+    },
+    {
+      "suite": "example-docs",
+      "sourceUrl": "https://github.com/example/docs/blob/main/e2e/search.test.ts",
+      "testName": "search opens the first result",
+      "verdict": "expressible",
+      "reason": "Fill, press Enter and a page path check",
+      "plan": {
+        "version": "1.1",
+        "meta": { "featureId": "DOCS-1", "specReference": "e2e/search.test.ts", "title": "Search result opens" },
+        "targets": ["playwright-chromium"],
+        "steps": [
+          { "type": "navigate", "url": "/" },
+          { "type": "fill", "locator": { "by": "role", "role": "searchbox", "name": "Search" }, "value": "install" },
+          { "type": "press", "locator": { "by": "role", "role": "searchbox", "name": "Search" }, "key": "Enter" },
+          { "type": "expectPage", "assert": { "kind": "urlPath", "value": "/install" }, "criterionId": "docs.result-opened" }
+        ]
+      }
+    },
+    {
+      "suite": "example-docs",
+      "sourceUrl": "https://github.com/example/docs/blob/main/e2e/theme.test.ts",
+      "testName": "theme toggle is remembered",
+      "verdict": "expressible",
+      "reason": "Wrongly marked: the plan needs a CSS selector, which the language does not have",
+      "plan": {
+        "version": "1.1",
+        "meta": { "featureId": "DOCS-2", "specReference": "e2e/theme.test.ts", "title": "Theme remembered" },
+        "targets": ["playwright-chromium"],
+        "steps": [
+          { "type": "navigate", "url": "/" },
+          { "type": "click", "locator": { "by": "css", "selector": ".theme-toggle" } },
+          { "type": "expect", "locator": { "by": "testId", "testId": "theme" }, "assert": { "kind": "textEquals", "value": "dark" }, "criterionId": "docs.theme-remembered" }
+        ]
+      }
+    },
+    {
+      "suite": "example-docs",
+      "sourceUrl": "https://github.com/example/docs/blob/main/e2e/download.test.ts",
+      "testName": "downloads the offline bundle",
+      "verdict": "not-expressible",
+      "reason": "Downloads are not plan steps until phase 2"
+    },
+    {
+      "suite": "example-shop",
+      "sourceUrl": "https://github.com/example/shop/blob/main/tests/visual.spec.ts",
+      "testName": "product page matches the stored screenshot",
+      "verdict": "not-expressible",
+      "reason": "Pixel comparison against a baseline is not an assertion kind"
+    }
+  ]
+}

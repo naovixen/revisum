@@ -1,0 +1,7 @@
+{
+  "$.steps[1]": "signup.heading-shown",
+  "$.steps[2]": "signup.page-titled",
+  "$.steps[5]": "signup.email-kept",
+  "$.steps[9]": "signup.welcome-shown",
+  "$.steps[10]": "signup.address-echoed"
+}
