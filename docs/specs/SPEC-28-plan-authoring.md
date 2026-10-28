@@ -75,6 +75,217 @@ Example:
   Expect heading "Dashboard" is visible
 ```
 
+### Readable syntax for plan 1.2 (addition, 2026-10-28)
+
+**In short.** Every construct of plan language 1.2 gets one readable form here. So do the 1.1 constructs the grammar above leaves out: the `urlPath` check, `storageState` and the meta headers. The reader only turns lines into plain JSON fields, and `parsePlan` alone decides what is allowed. So a 1.2 statement in a `Version: 1.1` plan is read as usual and then refused with the code a 1.1 parser gives. As in JSON, nothing in the text can express script, CSS, XPath, a pattern or a sleep. The rules below hold for the 1.1 statements too.
+
+**Writing text exactly.**
+
+- **Lines.** `writePlanText` writes LF line ends and a final newline. The reader also accepts CRLF and drops a byte-order mark at the start, because Windows editors may write both. Spaces at the end of a line are ignored. The writer puts one space between tokens; the reader accepts several.
+- **Blocks.** Only four statements open a block: `Values:`, `Clean up:`, `In frame …:` and `In new tab at …:`. Their lines follow, indented two spaces more. Indentation is spaces only; any other indentation is `bad-indent`. Blank lines and comment lines may stand anywhere, inside blocks too, and they neither open nor close a block.
+- **Case.** Grammar words are case-insensitive: statement words, roles, keys, modifiers, position words, states, units, anchors, formats, `secret`, `true` and `false`. The writer prints them as shown. Names, ids, URLs and quoted text are kept exactly as written.
+- **Quoted text** (`"…"`) holds page-facing text exactly.
+  - Inside the quotes these are ordinary characters: spaces at either end, `#`, braces, commas, colons, `/`, words the grammar uses, and letters outside ASCII.
+  - `\"` and `\\` are the only escapes. The writer escapes every `"` and `\`, and nothing else.
+  - Plan text never holds a line break or a tab, because the parser refuses control characters as `unsafe_text`. So quoted text always closes on its own line. Text of several lines is written with `lines`.
+  - An unclosed string, or any other escape, is `bad-string`.
+- **Value references.** `{name}` is a value name in braces, with no spaces. It may stand wherever quoted text stands in a step, and it reads as `{ "valueName": "name" }`. The parser decides where a reference is allowed: anywhere else it is `wrong_type`, and before its definition it is `undefined_value`. `"{name}"` inside quotes is literal text. A malformed reference is `bad-string`.
+- **Bare words.** Names a plan refers to are written without quotes:
+  - value names;
+  - the project's names for calls, parameters, fields, stubs, requests and storage entries;
+  - secret names, test-id attributes, email domains and query keys;
+  - criterion, feature and target ids.
+
+  A bare word is a run of characters other than space, `"`, `{`, `}` and `,`. The reader copies it as it is, and the parser checks it against its pattern or the project's declarations.
+- **Numbers** are written as JSON writes them, for example `2`, `-5`, `0.5` or `1e+21`. The reader accepts JSON number syntax, and the parser decides where only a whole number will do. Only positions are written differently, as words or ordinals (below).
+- **URLs.**
+  - The URL after `Go to` or `In new tab at` is a bare word. The parser keeps it percent-encoded, so it holds no space and no `"`.
+  - An `Origin:` header resolves a path in either statement, as the Build notes say for `Go to`. It never touches a path template.
+  - Every URL or path that a check compares is quoted text, because checks keep what they are given.
+- **Header text.** `Plan:` and `Spec:` take the rest of the line as it stands. If the text starts or ends with white space, or starts with `"`, it is written as quoted text instead. Headers hold no references, so `{` there is an ordinary character.
+- **Absent and empty.** Where JSON tells an absent field from an empty one, the text does too. Leaving the words out leaves the field out.
+
+  | Text | JSON |
+  |---|---|
+  | `Values:` with no definitions under it | `"values": {}` |
+  | `Clean up:` with nothing under it | `"cleanup": []` |
+  | `with no arguments` | `"arguments": {}` |
+  | `remembering nothing` | `"remember": {}` |
+  | `with empty query` | `"query": {}` |
+- **Names given twice.** JSON can't hold one key twice. So a name written twice in `Values:`, in one argument list, in one query or in one `remembering` list is the new text error `duplicate-key`, at the second one. Reusing a name elsewhere in the plan stays the parser's `duplicate`.
+- **Placement.**
+  - Headers other than `Criterion:` come before the first step, in any order. Such a header after the first step is `unknown-statement`.
+  - `Clean up:` comes last. Any statement after its block is `unknown-statement`.
+  - A step inside `Clean up:` other than `Call` still reads into `cleanup`, and the parser refuses it with `misplaced_step`. A `newTab` inside a frame is refused the same way.
+- **Criteria.**
+  - Every check statement starts with `Expect`, and only check statements do.
+  - `Criterion:` may stand wherever a step may. It sets the criterion id of every `Expect` line after it in reading order, inside or outside blocks, until the next `Criterion:`.
+  - The writer puts a `Criterion:` line directly before a check, at the check's own indentation, whenever the check's id differs from the one in force.
+  - A check's `criterionId` path maps to its `Criterion:` line, so a parser error about it is reported on that line.
+
+```
+Readable grammar v1: the plan 1.2 addition (it reads plans of version 1.1 too)
+
+Headers, written in this order
+Plan: <header text>                            meta.title
+Feature: <feature id>                          meta.featureId
+Spec: <header text>                            meta.specReference
+Version: 1.2                                   or 1.1
+Targets: <target>[, <target>]
+Saved session: secret <SECRET_NAME>            storageState (language 1.1)
+Clock: <day> at <HH:MM>                        clock
+Values:                                        values: one definition per line follows, indented two spaces
+  <name> is unique text starting "<prefix>"
+  <name> is unique email starting "<prefix>" [at <domain>]       without "at", domain is left out
+  <name> is unique number of <number> digits
+  <name> is date <day> as <format>
+
+<day>      = <anchor> | <n> day[s] after <anchor> | <n> day[s] before <anchor>   <n> is digits
+<anchor>   = today | start of week | start of month | start of next month
+             The writer writes addDays 0 as the anchor alone, 1 as "1 day" and others as "<n> days".
+<format>   = year-month-day | day of month | month and year | long date | weekday | timestamp | epoch milliseconds
+
+Locators and text
+<locator>  = [<position>] <role> <text> | [<position>] label <text> | [<position>] text <text>
+           | [<position>] test id <text> [in attribute <attribute>]
+<position> = first | last | <n>st | <n>nd | <n>rd | <n>th
+             "first" is "position": "first"; "1st" is "position": 1. The suffix must be the English one
+             (1st, 2nd, 3rd, 4th, 11th, 12th, 13th, 21st, 101st); any other suffix is bad-locator.
+<text>     = "<quoted text>" | {<value name>}
+In the 1.1 statements above, every "<text>" may also be a {reference} in a 1.2 plan, and every
+<locator> may take a position and an attribute. Without "in attribute", attribute is left out.
+
+Steps
+Go to <url> [without scripts]                  "scripts": "disabled"
+Go to <path template> [without scripts]
+<path template> = path <text>[ / <text>]... [with query <key> <text>[, <key> <text>]... | with empty query]
+Type lines <text>[, <text>]... into <locator>  "value": { "lines": [ … ] }
+Press [<modifier>+]...<key> in <locator>       e.g. Press Control+Shift+Backquote; modifiers in the order held
+Download "<name>" by clicking <locator>
+In new tab at <url | path template>:           the tab's steps follow, indented two spaces
+Remember text|value of <locator> as <name>     from an element: "read": "text" | "value"
+Remember text|length of field <field> in response <request> as <name>   "read": "text" | "arrayLength"
+Remember clipboard text as <name>
+Call <call> [with <arguments>] [remembering field <field> as <name>[, field <field> as <name>]... | remembering nothing]
+                                               without "with", arguments is {}
+Clean up:                                      cleanup: its calls follow, indented two spaces
+Start stub <stub> [with <arguments> | with no arguments]
+Stop stub <stub>
+Reset requests <request>
+Set storage entry <entry> [with <arguments> | with no arguments]
+Remove storage entry <entry>
+Advance clock by <number> <unit> [running timers | skipping ahead]      without either, mode is left out
+<unit>      = millisecond[s] | second[s] | minute[s] | hour[s] | day[s]   the writer uses the singular for 1
+<arguments> = <parameter> <argument>[, <parameter> <argument>]...       the writer keeps the declaration's order
+<argument>  = <text> | <number> | true | false | secret <SECRET_NAME>
+
+Checks, each with the criterion id of the Criterion: line before it
+Expect <locator> is selected|unselected|expanded|collapsed|pressed|unpressed|current
+Expect <locator> links to <text>               hrefEquals
+Expect page path is "<path>"                   urlPath (language 1.1)
+Expect page path starts with "<path>"          urlPathStartsWith
+Expect page meta "<name>" is <text>            metaContent
+Expect page canonical URL is "<url>"           canonicalUrl
+Expect download "<name>" file name is <text>
+Expect download "<name>" media type is "<media type>"
+Expect download "<name>" size is at least|at most <number> byte[s]
+Expect download "<name>" contains|does not contain <text>
+Expect backend <call> [with <arguments>] field <field> is present|absent
+Expect backend <call> [with <arguments>] field <field> is <text> | contains <text> | is number <number>
+Expect requests <request> count is [at least|at most] <number>
+Expect response <request> status is <number>
+Expect response <request> field <field> is present|absent | is <text> | contains <text>
+Expect storage entry <entry> is present|absent | is <text>
+Expect clipboard text is <text> | text is lines <text>[, <text>]...
+Expect clipboard contains|does not contain <text>
+```
+
+**Decisions.**
+
+- **One text per JSON value.** Every pair of JSON values that could look alike gets different words:
+  - text against a reference: `"x"` and `{x}`;
+  - one line against several: `"x"` and `lines "x"`;
+  - text against a number or a boolean: `"2"`, `2` and `true`;
+  - a text check against a number check: `is "42"` and `is number 42`;
+  - a URL against a path template: `/a/b` and `path "a" / "b"`;
+  - a position word against a number: `first` and `1st`;
+  - a mode, scripts setting, domain, attribute or modifier left out against one that is written.
+- **Quoted or bare.** Text the page shows is always quoted. Names whose pattern excludes spaces and quotes are bare.
+- **The two map-shaped forms.** Query values and arguments are written `<name> <value>`. A list of them ends at a word that can't be a value, such as `remembering`, `field` or `without`. So a parameter that happens to be named after a grammar word is still read correctly.
+- **The writer's choices** that the reader does not need:
+  - singular units for 1;
+  - `today` for addDays 0;
+  - arguments in the declaration's order, which is the parser's own order;
+  - query values and remembered fields in their JSON order.
+
+**Risks.**
+
+- Strings holding a lone surrogate (half of a UTF-16 pair) pass the parser and survive the round trip in memory, but not in a UTF-8 file. The parser could refuse them as `unsafe_text`.
+- `DraftRequest.grammarVersion` still says `v1`, although the grammar now covers 1.2.
+
+**Golden plans as text.** One line or more per 1.2 feature, from the golden plan that uses it (`golden/plans/`). The 1.1 golden plans need only the grammar above, the meta headers and `Expect page path is`; for example, `account-closure` has `Expect page path is "/goodbye"`.
+
+| Feature | Golden plan | Text |
+|---|---|---|
+| Generated values | `unique-sign-up` | `displayName is unique text starting "Tester"`, `contact is unique email starting "ada"`, `memberNumber is unique number of 8 digits` and `trialEnds is date 14 days after today as long date`, under `Values:` |
+| References in fills and checks | `unique-sign-up` | `Type {contact} into label "Email"`; `Expect test id "echo" has text containing {contact}` |
+| Reference in a locator | `remembered-order-number` | `Expect row {orderNumber} is visible` |
+| Path template | `order-page-by-path` | `Go to path "orders" / {orderCode} with query tab "items", highlight {orderCode}` |
+| Positions | `third-search-result` | `Expect first link "Install" is visible`; `Expect last listitem "Result" is visible`; `Click 3rd link "Install"` |
+| Test-id attribute | `declared-test-id-attribute` | `Click test id "save-settings" in attribute data-testid` |
+| Key chords | `keyboard-shortcuts` | `Press ControlOrMeta+k in main "Editor"`; `Press Control+Shift+Backquote in main "Editor"` |
+| Multi-line fill | `long-chat-message` | `Type lines "First line of the message", "Second line", "Third line" into textbox "Message"` |
+| URL prefix | `project-pages-prefix` | `Expect page path starts with "/projects/demo/"` |
+| Page states | `page-states` | `Expect tab "Billing" is selected`; `Expect button "Invoices" is collapsed`; `Expect button "Paperless billing" is pressed`; `Expect link "Settings" is current` |
+| Link target | `link-target` | `Expect link "Billing guide" links to "http://127.0.0.1:4173/help/billing"` |
+| Scripts-off load, metadata | `server-rendered-metadata` | `Go to /events/team-meeting without scripts`; `Expect page meta "og:title" is "Team meeting"`; `Expect page canonical URL is "http://127.0.0.1:4173/events/team-meeting"` |
+| Downloads | `export-download` | `Download "project-list" by clicking button "Export CSV"`; `Expect download "project-list" media type is "text/csv"`; `Expect download "project-list" size is at least 1 byte`; `Expect download "project-list" does not contain "Archived pilot"` |
+| Second tab | `second-tab-session` | `In new tab at /account:`, then indented `Criterion: account.second-tab-signed-in` and `Expect heading "Your account" is visible` |
+| Stubs | `login-code-stub` | `Start stub loginNeedsCode with reason "Enter the code from your app"`; `Stop stub loginNeedsCode` |
+| Request checks | `like-requests-and-response` | `Reset requests likes`; `Expect requests likes count is at least 1`; `Expect response likes status is 200`; `Expect response likes field errorCode is absent`; `Expect response likes field firstLiker contains "Ada"` |
+| Remember from a response | `like-requests-and-response` | `Remember length of field likeList in response likes as likeCount`; `Remember text of field firstLiker in response likes as firstLikerName` |
+| Storage | `pinned-menu-storage` | `Set storage entry pinnedMenu with docked true`; `Expect storage entry pinnedMenu is "true"`; `Expect storage entry privateKey is present`; `Remove storage entry pinnedMenu` |
+| Clock advance | `session-expiry-clock` | `Advance clock by 599 seconds`; `Advance clock by 1 second running timers`; `Advance clock by 45 minutes skipping ahead` |
+| Clipboard checks | `copied-invite-link` | `Expect clipboard contains "/invite/"`; `Expect clipboard does not contain "password"`; `Expect clipboard text is lines "Analytical Engines Ltd", "12 Babbage Row", "London"` |
+| Remember from the clipboard and the page | `remembered-copied-link`, `remembered-order-number` | `Remember clipboard text as shareLink`; `Remember text of test id "order-number" as orderNumber` |
+
+The plan clock and run values (`booking-next-month`), then service calls, `expectBackend` and `cleanup` (`order-backend-state`), in full:
+
+```
+Plan: The first slot of the month can be booked
+Feature: BOOKING-1
+Spec: specs/booking.md#first-slot
+Version: 1.2
+Targets: playwright-chromium
+Clock: start of next month at 09:00
+Values:
+  slotDay is date start of next month as day of month
+  slotMonth is date start of next month as month and year
+Go to /booking
+Criterion: booking.month-shown
+Expect heading {slotMonth} is visible
+Click button {slotDay}
+Criterion: booking.day-selected
+Expect test id "selected-day" has text {slotDay}
+```
+
+```
+Plan: A new order is paid in the backend and cleaned up
+Feature: ORDERS-3
+Spec: specs/orders.md#backend-state
+Version: 1.2
+Targets: playwright-chromium
+Call createOrder with customerName "Ada Lovelace", contactEmail "ada@example.com", quantity 2, region "eu", giftWrap false, deliveryDay "2026-11-02" remembering field orderId as orderId
+Go to path "orders" / {orderId}
+Click button "Confirm order"
+Criterion: orders.paid-in-backend
+Expect backend getOrder with orderId {orderId} field status is "paid"
+Clean up:
+  Call deleteOrder with orderId {orderId}
+```
+
+*End of the plan 1.2 addition. The types follow.*
+
 ```ts
 // Plan, PlanData, PlanError, PlanLimits and parseAiText: SPEC-01. Result, Brand, Origin, TargetId, Role,
 // EventSink and DerivedActor: SPEC-27. SecretName: SPEC-04. CriterionId: SPEC-01.
@@ -139,7 +350,7 @@ export interface ChatDrafter { reply(conversationId: string, message: string): P
 
 **Build notes.** Points the criteria leave open, settled while building (2026-10-28; `docs/decisions/answers.md`):
 
-- **Plan 1.2 in text (addition).** The readable grammar above covers plan 1.1. Every 1.2 feature (SPEC-30 to 34) gets a readable form, defined in "Readable syntax for plan 1.2" below. That way AC-SPEC-28-01's round trip holds for every golden plan.
+- **Plan 1.2 in text (addition).** The readable grammar above covers plan 1.1. Every 1.2 feature (SPEC-30 to 34) gets a readable form, defined in "Readable syntax for plan 1.2" above. That way AC-SPEC-28-01's round trip holds for every golden plan.
 - **Plan header.** `Plan:` fills `meta.title`. New headers `Feature:` and `Spec:` fill `meta.featureId` and `meta.specReference`; a plan needs both to parse. The founder's example has neither, so AC-SPEC-28-06 compares version, targets and steps only.
 - **URLs.** `Go to <url>` keeps exactly what it is given. With an `Origin:` header, a path is resolved against it to an absolute URL (AC-SPEC-28-06). Without one, a path stays a path, as JSON allows. The canonical writer never writes `Origin:`, so text and JSON round-trip byte for byte.
 - **Plan hash.** It stays the built formula, the sha256 of `canonicalJson` (`packages/engine/src/manifest.ts`), so existing hashes and the replay golden don't change. `writePlanJson` is the file form, not the hash input.
@@ -147,6 +358,9 @@ export interface ChatDrafter { reply(conversationId: string, message: string): P
 - **Declared sources (AC-SPEC-28-09).** `admitDraft` takes an optional declared source. Without one, provenance is `hand-written` with basis `declared`. Only core's recorder (phase 2b) can produce a `core-recorded` basis; a file or a caller that claims it is refused with `untrusted-source`.
 - **Malformed JSON drafts** are refused with `not_object` at `$`, before the parser.
 - **Criterion ids in data.** The naming lint skips the values of `criterionId` fields, because they are the user's own ids, such as `AC-3`.
+- **Codes.** `TextErrorCode` gains `duplicate-key`, for a name written twice where JSON needs a key once. `relative-url-without-origin` no longer arises, because a path without `Origin:` stays a path, so it leaves the union.
+- **Lone surrogates.** Text holding half of a UTF-16 pair is refused as `unsafe_text` by the one plan parser, because it can't survive being saved as UTF-8.
+- **Grammar version.** `grammarVersion` stays `"v1"` until the readable format's first release; the 1.2 forms are part of v1.
 - **Text errors.** A statement's own error is at column 1, and any other inside the faulty token. Comments are whole lines starting with `#`.
 
 ## Acceptance criteria
