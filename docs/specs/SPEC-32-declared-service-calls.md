@@ -124,6 +124,26 @@ export function buildServiceRequest(declaration: CallDeclaration, service: { ori
 - `runner`'s call module joins SPEC-04's `reveal` allow-list. No other new module does.
 - At the `host` guarantee level (no egress enforcement), the caller still connects only to the declared service's origin, checked before connecting, and the run is labelled `host`.
 
+**Build notes.** Points the criteria leave open, settled while building (2026-10-28; `docs/decisions/answers.md`):
+
+- **Services.** This spec brings the trusted `services` list forward from SPEC-23, in SPEC-02's shape `{ name, origin, private }`. A `ServiceName` is a lowercase letter, then up to 39 lowercase letters, digits or hyphens.
+- **Running against a fake caller in M1.** `RunPorts.services` carries the `ServiceCaller`. When a plan calls a service and no caller is given, the run is refused before any side effect with refusal code `services-unavailable`. The real caller, through runner and the egress proxy, comes with SPEC-07.
+- **Results.**
+  - `RunResult.cleanup` lists each cleanup call's `outcome` and `code`.
+  - `RunResult.reviewItems` holds `cleanup-failed` items.
+- **Header schemes.** Engine applies the scheme to the secret's value:
+  - `bearer`: `Bearer <value>`;
+  - `basic`: `Basic` and the base64 of the value, which holds `user:password`;
+  - `token`: the value as it is.
+- **Run values as arguments.**
+  - An integer must be decimal digits.
+  - A boolean is the text `true` or `false`.
+  - A path segment of `.` or `..` is `parameter-invalid`.
+- **Limits.** Each call or backend-check step counts once toward `maximumCalls`, whatever its polls. Polls are bounded by the step's timeout.
+- **Production.** A service whose origin is production follows SPEC-03's rule: only with `allowProductionForApprovedPlans`, and only for approved plans.
+- **Cleanup** holds call steps only. Any other step there is `misplaced_step`.
+- **Golden plan.** The shared test project gains the test service, its secret names and its declared calls, so the 1.2 golden plan for `call` parses (founder, 2026-10-28).
+
 ## Acceptance criteria
 
 - AC-SPEC-32-01: When `project.json` declares a call, the project parser shall reject it with a code and path when (oracle: specified; one fixture per case):
