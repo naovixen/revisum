@@ -48,7 +48,7 @@ Rules for criteria:
 
 ## The workflow
 
-The founder drives one Claude Code session. That session hands the tests and the code to separate helper agents, each starting from a fresh context with only its brief, and commits their work separately.
+The founder drives one Claude Code session, which works through the spec queue in `START.md` on its own (`docs/build-loop.md`). It hands the tests and the code to separate helper agents, each starting from a fresh context with only its brief, and commits their work separately.
 
 | Step | Who | What | Allowed to change |
 |---|---|---|---|

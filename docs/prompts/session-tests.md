@@ -20,6 +20,7 @@ Write the tests for **SPEC-<NN>**, before any implementation exists.
 - For negative criteria (denied, refused, absent), add a mutant or a counter-example that proves the test can fail.
 - Put files only in `test/unit/<package>/`, `test/contract/`, `test/proofs/`, `fixtures/` or `golden/`.
 - If a criterion is ambiguous or untestable as written, don't guess. List it under open questions.
+- For background, read only the sections of `E:\core\docs` that the spec cites, never whole research docs.
 
 **Don't:**
 - write or change anything in `packages/`;
@@ -28,7 +29,7 @@ Write the tests for **SPEC-<NN>**, before any implementation exists.
 
 **Check:** the tests compile with `tsc`. They are expected to fail until the code exists; list them.
 
-**Finish with:**
+**Finish with**, in at most 40 lines:
 1. the files changed;
 2. a table mapping each criterion to its test titles;
 3. open questions.

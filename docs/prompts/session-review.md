@@ -8,7 +8,7 @@ Review the committed implementation of **SPEC-<NN>** as an independent reader. Y
 
 **Read:** `docs/specs/SPEC-<NN>-*.md`, then the tests tagged `AC-SPEC-<NN>-*`, then the code they exercise.
 
-**Report** a table of findings. For each: the criterion ID, the file and line, what is wrong, and a concrete failing input. Look for:
+**Report** a table of findings, in at most 40 lines. For each: the criterion ID, the file and line, what is wrong, and a concrete failing input. Look for:
 - criteria whose test doesn't really check the observable: a tautology, or a mock that hides the behaviour;
 - paths where external or AI input reaches execution without the decoder;
 - names, comments or files that need the research or the spec to understand, which breaks the naming rules;

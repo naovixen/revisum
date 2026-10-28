@@ -4,14 +4,14 @@ Revisum independently verifies AI-built web software. It runs human-approved, ty
 
 The product name is Revisum (`revisum` for the repo, packages and CLI). It appears in code only in the `PRODUCT` constant, so a rename stays a one-line change.
 
-## Current phase: session 0
+## Current phase: building phase 1 (M1 to M4)
 
-- Setup is done. `START.md` is the founder's checklist and says which step runs next. Keep its "Progress" list up to date.
-- The design is approved: `docs/system-design.md` and `docs/specs/` are the source of truth. Don't redesign; raise a question instead.
+- `START.md` holds the spec queue and says what runs next. Keep its "Progress" list up to date.
+- The design is approved: `docs/system-design.md` and `docs/specs/` are the source of truth. Don't redesign; resolve questions as `docs/build-loop.md` says.
 - **Research repo:** the research behind this design lives in `E:\core`. Treat it as read-only. Doc numbers in the specs (`04`, `09`, `13`, …) refer to `E:\core\docs\NN-*.md`. Claim IDs `[C-…]` and `[calc:…]` markers are research references. Read them for background, but never copy them into code. Key ones:
   - `09-mvp-plan.md`: milestones, kill criteria, the 36-week plan;
   - `13-requirements-specs.md`: requirements;
-  - `15-build-start.md`: the setup and session workflow.
+  - `04-architecture.md`: architecture findings behind the design.
 
 ## Working with the founder
 
@@ -24,22 +24,15 @@ The product name is Revisum (`revisum` for the repo, packages and CLI). It appea
 ## Read first
 
 - `docs/system-design.md`: packages, run pipeline, folder structure, naming rules.
-- `docs/glossary.md` (created in session 0a): domain terms and their code names.
+- `docs/glossary.md`: domain terms and their code names.
 - `docs/specs/SPEC-nn-*.md`: the spec your session works on. Work from its acceptance criteria and nothing else.
-- `CONTRIBUTING.md` (created in session 0a): Definition of Done and the session workflow.
-- `docs/prompts/`: the briefs you give helper agents. Change them only when the founder agrees.
+- `CONTRIBUTING.md`: Definition of Done and commit trailers.
+- `docs/prompts/`: the briefs the main session gives helpers. Change them only when the founder agrees.
 
-## How a spec is built
+## Who you are
 
-One session runs the whole loop. See `docs/decisions/single-session-workflow.md` for why.
-
-0. **Align the spec.** Where the spec's types or criteria contradict the seeded tests, the spec follows the tests, and new rules become marked additions, as in SPEC-27 (founder decision, 2026-10-28). Commit that as its own docs change. If aligning would change what the spec promises, ask the founder first.
-1. **Tests.** Start a helper agent with a fresh context. Give it `docs/prompts/session-tests.md`, with `<NN>` filled in, as its whole brief. Check that it changed only the test set: `test/`, `proofs/`, `fixtures/` and `golden/`. Then commit the tests alone.
-2. **Code.** Start a second fresh helper with `docs/prompts/session-code.md`, with `<NN>` and `<TESTS-COMMIT>` filled in. It changes only `packages/`, `tools/` and `docs/`, never a test. If it says a test looks wrong, stop and take that to the founder; never fix the test yourself. When `npm run check` is green, commit the code.
-3. **Review (optional).** A third fresh helper with `docs/prompts/session-review.md` reports findings and changes nothing.
-4. **Report** to the founder (see "When you finish" below). The founder reviews and pushes.
-
-Write your own changes (docs, START.md, small fixes) as separate commits too, never mixed with test-set files.
+- **The main session** (the one the founder talks to) runs the plan with helper agents. Follow `docs/build-loop.md`: the spec loop, how to answer questions from the research and the web, when to stop and ask, and how to keep context small.
+- **A helper** does only its brief and reports in the brief's format. It never starts other agents, never commits and never reads `docs/build-loop.md`.
 
 ## Rules
 
@@ -85,13 +78,8 @@ Write your own changes (docs, START.md, small fixes) as separate commits too, ne
 
 ## When you finish
 
-Reply with:
-1. the commits made, with their hashes, and the files each changed;
-2. the acceptance criteria covered, by ID;
-3. the commands run and their results;
-4. any open questions or deviations from the spec.
-
-The founder reviews and pushes.
+- **A helper** reports in its brief's format, in at most 40 lines.
+- **The main session**, when it stops, reports the commits made (hashes), the criteria covered, the checks run, and the one question it needs answered, if any. The founder reviews and pushes.
 
 ## Provenance
 
