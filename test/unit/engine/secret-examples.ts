@@ -35,7 +35,8 @@ export const PREFIX_LENGTH = 20;
 // (so its base64 and base64url forms differ).
 export function fakeSecretValue(): string {
   for (;;) {
-    const candidate = `rv${randomBytes(12).toString('base64')}/${randomBytes(6).toString('hex')}`;
+    // The closing '~?' makes the base64 form hold '+' or '/', which plain ASCII letters and digits never produce.
+    const candidate = `rv${randomBytes(12).toString('base64')}/${randomBytes(6).toString('hex')}~?`;
     const base64 = Buffer.from(candidate).toString('base64');
     const changesUnderUriEncoding = encodeURIComponent(candidate) !== candidate;
     if (/[a-z]/.test(candidate) && changesUnderUriEncoding && /[+/]/.test(base64)) return candidate;

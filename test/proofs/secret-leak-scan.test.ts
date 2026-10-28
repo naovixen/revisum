@@ -55,13 +55,13 @@ after(async () => {
 
 // Types `value` into the token field, shows the echoes, keeps a screenshot, then checks one echo
 // against a text it can never equal, so the failed step keeps what it observed.
-const echoPlan = (targetId: string, echo: string, value: unknown) => ({
+const echoPlan = (targetId: string, echo: string, value: unknown, field = 'Access token') => ({
   version: '1.1',
   meta: { featureId: 'SECRETS-2', specReference: 'specs/secrets.md#echoes', title: `Token echo: ${echo}` },
   targets: [targetId],
   steps: [
     { type: 'navigate', url: '/' },
-    { type: 'fill', locator: { by: 'label', label: 'Access token' }, value },
+    { type: 'fill', locator: { by: 'label', label: field }, value },
     { type: 'capture', name: 'token-typed' },
     { type: 'click', locator: { by: 'role', role: 'button', name: 'Show echoes' } },
     { type: 'expect', locator: { by: 'testId', testId: `echo-${echo}` }, assert: { kind: 'textEquals', value: 'deliberately wrong' }, criterionId: 'secrets.echo-checked' },
@@ -74,11 +74,11 @@ function parsed(raw: unknown): Plan {
   return outcome.value;
 }
 
-async function runEcho(targetId: string, echo: string, value: unknown, secretValue: string): Promise<Ran> {
+async function runEcho(targetId: string, echo: string, value: unknown, secretValue: string, field?: string): Promise<Ran> {
   const events = memoryRunEventSink();
   const artifacts = memoryArtifactStore();
   const result = await run({
-    plan: authorise(parsed(echoPlan(targetId, echo, value)), trusted), project, targetId: targetId as TargetId,
+    plan: authorise(parsed(echoPlan(targetId, echo, value, field)), trusted), project, targetId: targetId as TargetId,
     baseUrl: server.origin, seed: SEED, fixedTimeMilliseconds: FIXED_TIME_MILLISECONDS, fixtures: server.fixtures,
     host: { platform: platform(), arch: arch() },
   }, {
@@ -138,9 +138,10 @@ describe('secret echoes never reach a run\'s outputs', () => {
       assert.ok(outputs.some((path) => path.endsWith('.png')), 'the scan covered at least one image');
     });
 
-    test(`${targetId}: control: a plain text typed in the same field does reach the kept observation`, { criterion: 'AC-SPEC-04-04', timeout: TIMEOUT }, async () => {
+    // Literal text in the token field is itself refused as literal_secret, so the control types into the plain note field.
+    test(`${targetId}: control: a plain text typed into a plain field does reach the kept observation`, { criterion: 'AC-SPEC-04-04', timeout: TIMEOUT }, async () => {
       const plainText = `plain${fakeSecretValue().replace(/[^A-Za-z0-9]/g, '')}`;
-      const ran = await runEcho(targetId, 'raw', plainText, fakeSecretValue());
+      const ran = await runEcho(targetId, 'raw', plainText, fakeSecretValue(), 'Note');
       const check = ran.result.steps[4];
       assert.equal(check?.outcome, 'failed');
       assert.ok(check?.observed?.includes(plainText), `the observation should echo the plain text: ${check?.observed ?? '(none)'}`);
