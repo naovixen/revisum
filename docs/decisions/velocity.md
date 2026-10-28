@@ -13,3 +13,4 @@ Actual time per spec, for the velocity kill criteria in `E:\core\docs\09-mvp-pla
 | SPEC-30 (M1 parts) | M1 | 2026-10-28 | 2026-10-28 | 1 | Founder asked for one literal-step module instead of scattered checks |
 | SPEC-31 (parser parts) | M1 | 2026-10-28 | 2026-10-28 | 1 | One contradictory test case fixed with founder approval |
 | SPEC-32 (M1 parts) | M1 | 2026-10-28 | 2026-10-28 | 1 | Founder: one body shape with opaque secrets; seven test faults fixed with approval |
+| SPEC-33 (grammar) | M1 | 2026-10-28 | 2026-10-28 | 1 | Full check flaked twice under load (ACT connection drop, CDP screenshot hash); green on third run |
