@@ -32,7 +32,7 @@ const insertAt = (plan: JsonRecord, index: number, step: JsonRecord): JsonRecord
 
 // ---- A newer declared version -------------------------------------------------------------------
 
-for (const version of ['1.2', '1.10', '2.0']) {
+for (const version of ['1.3', '1.10', '2.0']) {
   test(`rejects a plan that declares the newer version ${version} with version_unsupported`, { criterion: 'AC-SPEC-01-07' }, () => {
     const parsed = parsePlan({ ...signupPlan(), version });
     assert.deepEqual(parsed, { ok: false, error: [{ code: 'version_unsupported', path: '$.version' }] });

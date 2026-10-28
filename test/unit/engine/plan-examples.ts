@@ -1,7 +1,7 @@
 // The plan examples the plan-language tests share, read from disk so every test sees the same
 // bytes:
-//   - golden/plans/*.json: plans in the current language (version "1.1"), in which every
-//     assertion carries the id of the acceptance criterion it checks;
+//   - golden/plans/*.json: plans in versions "1.1" and "1.2", in which every assertion carries
+//     the id of the acceptance criterion it checks;
 //   - fixtures/plan-migration/<name>.plan.json: the same plans as first written in version 1,
 //     before assertions carried criterion ids, with <name>.mapping.json giving each assertion's
 //     criterion id, keyed by the assertion step's JSON path.
@@ -14,6 +14,7 @@ import { FIXTURES, GOLDEN } from '../../support/repository.ts';
 
 export const ORIGIN = 'http://127.0.0.1:4173';
 export const TARGET_ID = 'playwright-chromium';
+// The version the SPEC-01 examples are written in; version 1.2 still parses them unchanged.
 export const CURRENT_VERSION = '1.1';
 
 // A JSON object as read from disk, before any parsing.
