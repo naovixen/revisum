@@ -22,6 +22,23 @@ export interface LeakScanner { scan(files: readonly string[], secrets: readonly 
 export type Leak = { file: string; secret: SecretName; form: 'raw' | 'uri' | 'base64' | 'base64url' | 'prefix' | 'case' };
 ```
 
+**Build notes.** Points the criteria leave open, settled while building (2026-10-28; `docs/decisions/answers.md`):
+
+- **Secret fields (AC-SPEC-04-03).** Two rules, both rejected with `literal_secret`:
+  - a `fill` with literal text into a control whose locator names a sensitive field (password, passcode, token, secret, API key, and the `de` and `fr` equivalents);
+  - a token-shaped literal anywhere in plan text (JSON Web Token, `Bearer …`, and well-known key prefixes such as `ghp_`, `sk-` and `AKIA`), as the API-step spike did.
+
+  Plans log in with `{ secretName }`. The coverage-study re-run declares secret names in its stand-in project accordingly.
+- **Where `reveal` lives.** `Secret`, `SecretStore` and `reveal` live in `contracts`, so drivers and runner can use them without importing engine. The allow-list is one constant listing the modules that may import `reveal`: the drivers' input modules now, and runner's service caller with SPEC-32.
+- **The store.** `environmentSecretStore(variables)` maps a secret name to the variable of the same name. The run takes it as an optional `ports.secrets`; without one, every reference is missing. `leakScanner()` builds the scanner, and the caller plants the canary.
+- **Fills.** The seeded drivers fill a `{ secretName }` value now, revealing it only at the moment of input. The guard and every log see only the name.
+- **Missing secrets (AC-SPEC-04-07).** The run is refused before any driver opens, with refusal code `secret-missing` and the secret's name. The code gets a heading in `docs/errors.md`.
+- **Manifest (AC-SPEC-04-05, 06).** Secret fields appear only when a plan uses secrets, so runs without secrets keep today's manifest exactly:
+  - `secrets`: name and redaction mode per secret;
+  - `storageState`: name and sha256.
+- **Saved storage state (AC-SPEC-04-06).** A plan names it in an optional top-level `storageState: { secretName }`, added to plan 1.1 with a changelog entry. The secret's value is the storage-state JSON. The parser, store resolution, manifest record and leak scan land now. Loading it into the browser session comes with SPEC-06's `SessionEnvironment`.
+- **Leak scan scope.** "Image text layer" means the image bytes, PNG text chunks included; there is no text recognition. The visual report joins the scan when SPEC-11 and SPEC-12 produce it.
+
 ## Acceptance criteria
 
 - AC-SPEC-04-01: When `JSON.stringify`, `String()` or `util.inspect` is applied to a `Secret`, the output shall be `[secret]` (oracle: specified; reuses AC-p7-31).
