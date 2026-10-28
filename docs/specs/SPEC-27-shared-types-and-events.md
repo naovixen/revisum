@@ -8,7 +8,7 @@ Give every other spec one set of core types, closed error-code unions and a mini
 
 - **In:**
   - `Brand` and `Result`;
-  - the URL, locator, assertion, geometry and artefact types the plan, result and report specs share;
+  - the URL, safe-text, assertion, geometry, probe and artefact types the plan, result and report specs share;
   - the driver port interfaces and `Session`, their composition;
   - `TargetId`, `Locale`, `FixtureReference` and `DialogInfo`;
   - `ActorId`, `ActorType` and `AuditEventKind`;
@@ -20,46 +20,89 @@ Give every other spec one set of core types, closed error-code unions and a mini
 
 ## Interfaces and types
 
+The primitive, assertion, artefact, driver-port and plan- and driver-error shapes follow the seeded code and the frozen tests, except where marked "addition" (see the note after the block). Actors, events, run history, thresholds and the error unions with no code yet are new with this spec.
+
 ```ts
 // Primitives
 export type Brand<Value, Name extends string> = Value & { readonly __brand: Name };  // built only by the owning module's parser
-export type Result<Value, Failure> = { ok: true; value: Value } | { ok: false; error: Failure };
+export type Success<Value> = { readonly ok: true; readonly value: Value };
+export type Failure<Problem> = { readonly ok: false; readonly error: Problem };
+export type Result<Value, Problem> = Success<Value> | Failure<Problem>;
+export const success = <Value>(value: Value): Success<Value> => ({ ok: true, value });
+export const failure = <Problem>(error: Problem): Failure<Problem> => ({ ok: false, error });
 export type Origin = Brand<string, 'Origin'>;                                // scheme://host[:port], no path
-export type AllowedUrl = Brand<string, 'AllowedUrl'>;                        // absolute URL whose origin is in the trusted allow-list
-export type Role = 'button' | 'link' | 'textbox' | 'checkbox' | 'radio' | 'combobox' | 'listbox' | 'option' | 'tab'
-  | 'menuitem' | 'heading' | 'dialog' | 'img' | 'table' | 'row' | 'cell' | 'navigation' | 'main' | 'form' | 'region';
+export type AllowedUrl = Brand<string, 'AllowedUrl'>;                        // a URL path, or an absolute URL whose origin is on the allow-list
+// Text that passed the parser's safety rules: no control or bidirectional-override characters, nothing script-like.
+export type SafeText = Brand<string, 'SafeText'>;
+export const ROLES = [
+  'alert', 'button', 'checkbox', 'combobox', 'dialog', 'heading', 'img', 'link', 'listitem', 'main', 'navigation',
+  'option', 'radio', 'region', 'searchbox', 'status', 'switch', 'tab', 'textbox',
+  'listbox', 'menuitem', 'table', 'row', 'cell', 'form',                    // addition
+] as const;
+export type Role = (typeof ROLES)[number];
+// What "passed" means is decided by the engine's oracle, never by a driver or an AI.
+// The kind names the check; `value` is what it compares against.
 export type ElementAssertion =
-  | { kind: 'visible' | 'hidden' | 'absent' | 'enabled' | 'disabled' | 'checked' | 'unchecked' | 'focused' }
-  | { kind: 'text' | 'value'; equals?: string; contains?: string }               // exactly one of equals/contains, non-empty
-  | { kind: 'count'; equals: number };
-export type PageAssertion = { kind: 'url'; equals: AllowedUrl } | { kind: 'title'; equals: string };
+  | { readonly kind: 'visible' | 'hidden' | 'enabled' | 'disabled' }
+  | { readonly kind: 'textEquals' | 'textContains' | 'valueEquals'; readonly value: SafeText }
+  | { readonly kind: 'absent' | 'checked' | 'unchecked' | 'focused' }                              // addition
+  | { readonly kind: 'valueContains'; readonly value: SafeText }                                   // addition
+  | { readonly kind: 'countEquals'; readonly value: number };                                      // addition
+export type PageAssertion =
+  | { readonly kind: 'urlPath' | 'title'; readonly value: SafeText }
+  | { readonly kind: 'url'; readonly value: AllowedUrl };                                          // addition: the whole absolute URL
 export type Box = { readonly x: number; readonly y: number; readonly width: number; readonly height: number }; // CSS px, page coordinates
-export type ArtifactReference = { readonly path: string; readonly sha256: string;
-  readonly mediaType: 'image/png' | 'image/svg+xml' | 'application/json' | 'text/html' };
+// A stored artefact. mediaType is open: screenshots are image/png, release notes text/markdown.
+export type ArtifactReference = { readonly name: string; readonly mediaType: string; readonly sha256: string; readonly bytes: number };
 export type GuaranteeLevel = 'isolated' | 'host';                            // host: no egress enforcement, no replay claim
 export type TargetId = Brand<string, 'TargetId'>;                            // a target's id in the project's matrix
-export type Locale = Brand<string, 'Locale'>;                                // BCP 47 language tag, e.g. "fr"
-export type FixtureReference = { readonly name: FixtureName; readonly path: string; readonly sha256: string };
+export type Locale = Brand<string, 'Locale'>;                                // BCP 47 language tag in canonical form, e.g. "de-DE"
+// A fixture file the run served, pinned by hash in the manifest. Declared in engine, beside the manifest.
+export type FixtureReference = { readonly path: string; readonly sha256: string };
 
 // Driver ports, implemented by each browser and device adapter.
-export interface PageNavigator { goto(url: AllowedUrl): Promise<Result<void, DriverError>> }
-// Locator and ActionStep are plan types declared with the plan language in the same core package; see SPEC-01.
-export interface ActionRunner { act(step: ActionStep, locator: Locator): Promise<Result<void, DriverError>> }
-export interface Prober {
-  resolve(locator: Locator): Promise<Result<ResolvedElement, DriverError>>;
-  check(locator: Locator, assertion: ElementAssertion): Promise<Result<boolean, DriverError>>;
+// Locator and ActionStep are plan types declared with the plan language in contracts; see SPEC-01.
+export interface PageNavigator {
+  // An absolute URL: the engine resolves the plan's AllowedUrl against the base URL first. The session itself
+  // refuses origins off the allow-list and reports them in blockedOrigins().
+  navigate(url: string): Promise<Result<void, DriverError>>;
+  page(): Promise<PageProbe>;
 }
-// Returns the masked capture only, so personal data never reaches an image; see SPEC-09.
-export interface Camera { capture(region: Box | null): Promise<Result<ArtifactReference, DriverError>> }
-export type DialogInfo = { readonly kind: 'alert' | 'confirm' | 'prompt' | 'beforeunload'; readonly text: string };
-// One open browser or device session: every driver port together. Auditor is the accessibility port; see SPEC-10.
+export type PageProbe = { readonly url: string; readonly title: string };
+export interface ActionRunner { act(step: ActionStep): Promise<Result<void, DriverError>> }       // the step carries its locator
+// A read-only look at what a locator matches. A count other than 1 means not found or ambiguous.
+// The engine's oracle turns the probe into a verdict, so a driver never decides pass or fail.
+export interface Prober { probe(locator: Locator): Promise<ElementProbe> }
+export type ElementProbe = {
+  readonly count: number; readonly visible: boolean; readonly enabled: boolean;
+  readonly text: string; readonly value: string | null;
+  readonly sensitive: boolean;                       // the element, an ancestor or a descendant matches a personal-data selector
+  readonly box: Box | null;
+};
+// PNG bytes of the viewport, with every element matching `mask` painted solid black. The run always passes the
+// redactor's selectors, so personal data never reaches a stored image; the masking proof also takes an unmasked
+// shot to compare. The engine stores the bytes through the artefact store. See SPEC-09.
+export interface Camera { screenshot(mask: readonly string[]): Promise<Uint8Array> }
+// The session's accessibility port. The audit engines that build on it are in SPEC-10.
+export interface Auditor {
+  audit(): Promise<readonly A11yFinding[]>;
+  accessibilitySnapshot(): Promise<A11yNode>;
+}
+export type Impact = 'minor' | 'moderate' | 'serious' | 'critical' | 'unknown';
+export type A11yFinding = { readonly ruleId: string; readonly impact: Impact; readonly elementCount: number }; // one failed rule
+export type A11yNode = { readonly role: string; readonly name: string; readonly children: readonly A11yNode[] };
+export type DialogInfo = { readonly kind: 'alert' | 'confirm' | 'prompt' | 'beforeunload'; readonly text: string }; // addition
+// One open browser or device session: every driver port together.
 export interface Session extends PageNavigator, ActionRunner, Prober, Camera, Auditor {
-  frame(locator: Locator): Promise<Result<Session, DriverError>>;      // scoped to an iframe
-  onDialog(action: 'accept' | 'dismiss'): Promise<Result<DialogInfo, DriverError>>;
-  upload(locator: Locator, file: FixtureReference): Promise<Result<void, DriverError>>;
+  readonly browser: { readonly name: string; readonly version: string };
+  blockedOrigins(): readonly string[];                                 // origins refused, as evidence the run stayed hermetic
   close(): Promise<void>;                                              // every started process exits
+  frame(locator: Locator): Promise<Result<Session, DriverError>>;      // addition: scoped to an iframe
+  onDialog(action: 'accept' | 'dismiss'): Promise<Result<DialogInfo, DriverError>>;      // addition
+  upload(locator: Locator, file: FixtureReference): Promise<Result<void, DriverError>>;  // addition
 }
-// The page element a locator resolved to, as the policy gate sees it before an action.
+// Addition: the page element a locator resolved to, as the policy gate sees it before an action. The driver builds
+// it inside act() and passes it to guardAction (SPEC-03, SPEC-06); it is not a Session method.
 export type ResolvedElement = { role: Role | null; name: string | null; box: Box | null; formSubmitName: string | null; linkUrl: string | null };
 
 // Actors and events
@@ -74,6 +117,7 @@ export type AuditEventKind = 'plan.submitted' | 'plan.rejected' | 'plan.denied' 
 // planProvenance (PlanProvenance, SPEC-28) is set on plan.submitted and plan.rejected: which authoring route produced the draft.
 export type EventInput = { kind: AuditEventKind; subjectHash?: string; runId?: string; criterionIds?: readonly string[];
   planProvenance?: PlanProvenance };
+// The audit sink. The run's step log (RunEventSink in engine, written through the logging manifest) is separate.
 export interface EventSink { append(event: EventInput, actor: DerivedActor): Result<{ sequence: number }, SinkError> }
 // Only the approval verifier and core's runtime mint this, so a caller can't choose its own actor type.
 export type DerivedActor = Brand<{ actor: ActorId; actorType: ActorType }, 'DerivedActor'>;
@@ -86,17 +130,30 @@ export type ThresholdMetric = 'agentAuthoredShare' | 'specLinkedShare' | 'traced
   | 'verifiedWithoutReviewShare' | 'unreviewedMergeShare' | 'flakyRunRate';
 export type Thresholds = Readonly<Record<ThresholdMetric, number>> & { windows: number; minimumChangesPerWindow: number };
 
-// Closed error-code unions; each code has a docs anchor `errors#<code>`
-export type PlanErrorCode = 'not-object' | 'unknown-key' | 'unknown-step' | 'bad-value' | 'missing-field' | 'vacuous'
-  | 'no-criterion-id' | 'literal-secret' | 'pack-not-enabled' | 'version-unsupported' | 'too-large';
-export type DriverErrorCode = 'not-found' | 'ambiguous' | 'not-actionable' | 'timeout' | 'navigation-failed' | 'target-crashed' | 'unsupported-step' | 'policy-denied';
-export type DriverError = { code: DriverErrorCode; stepIndex: number };
+// Closed error-code unions; each code has a docs anchor `errors#<code>`.
+// Plan errors are declared in engine beside the parser, as PLAN_ERROR_CODES; PlanError is { code, path } (SPEC-01).
+export type PlanErrorCode = 'not_object' | 'unknown_field' | 'missing_field' | 'wrong_type' | 'unknown_step'
+  | 'unknown_value' | 'invalid_url' | 'scheme_not_allowed' | 'origin_not_allowed' | 'target_not_in_matrix'
+  | 'unsafe_text' | 'too_large' | 'too_long' | 'duplicate' | 'version_unsupported' | 'empty'
+  | 'vacuous' | 'no_criterion_id' | 'literal_secret' | 'pack_not_enabled';                         // addition
+export type DriverErrorCode = 'not-found' | 'ambiguous' | 'not-actionable' | 'timeout' | 'navigation-failed'
+  | 'target-crashed' | 'unsupported-step' | 'policy-denied';                                       // addition
+// A driver doesn't know the step's index; the run records the code against the step. detail is a short
+// diagnostic for whoever debugs the driver; the run keeps only the code.
+export type DriverError = { readonly code: DriverErrorCode; readonly detail: string };
 export type RunnerError = { code: 'image-missing' | 'image-digest-mismatch' | 'egress-unenforceable' | 'start-failed' };
 export type RecorderError = { code: 'no-reason' | 'unknown-item' | 'already-decided' | 'sink-failed' };
 export type SinkError = { code: 'not-append-only' | 'write-failed' };
 export type CliErrorCode = 'usage' | 'config-invalid' | 'untrusted-source' | 'plan-rejected' | 'target-unavailable'
   | 'lock-download-failed' | 'lock-offline' | 'approval-refused' | 'replay-mismatch' | 'internal';
 ```
+
+**Additions.** The seeded code lacks the shapes marked "addition", and later specs need them. Each is added with the spec that first uses it, on top of the seeded shapes, never by changing one:
+
+- `Role` values `listbox`, `menuitem`, `table`, `row`, `cell` and `form`; assertion kinds `absent`, `checked`, `unchecked`, `focused`, `valueContains` and `countEquals`, and page kind `url` (plan v1.1 and the readable grammar: SPEC-01, SPEC-28);
+- plan codes `vacuous` and `no_criterion_id` (SPEC-01), `literal_secret` (SPEC-04) and `pack_not_enabled` (SPEC-23);
+- driver codes `target-crashed`, `unsupported-step` and `policy-denied`, and `ResolvedElement` (SPEC-03, SPEC-06);
+- `Session.frame`, `onDialog` and `upload`, and `DialogInfo` (SPEC-01 v1.1 steps, SPEC-06). `FixtureReference` moves from engine to contracts when `upload` is added, because drivers import only contracts.
 
 ## Acceptance criteria
 
@@ -106,7 +163,7 @@ export type CliErrorCode = 'usage' | 'config-invalid' | 'untrusted-source' | 'pl
 - AC-SPEC-27-04: When code outside the approval verifier (SPEC-02) or core's runtime tries to build a `DerivedActor`, lint shall fail, so a caller can't declare its own actor type (oracle: specified).
 - AC-SPEC-27-05: When a value of a branded type is created by a cast outside its owning module, lint shall fail (oracle: specified; generalises AC-SPEC-01-06).
 - AC-SPEC-27-06: When the docs are built, every error code shall have an anchor, and a missing anchor shall fail the build (oracle: specified).
-- AC-SPEC-27-07: When an `ElementAssertion` of kind `text` or `value` has neither or both of `equals` and `contains`, or an empty string, the parser shall reject it as `vacuous` (oracle: specified).
+- AC-SPEC-27-07: When an `ElementAssertion` whose kind takes a text `value` (`textEquals`, `textContains`, `valueEquals`, `valueContains`) has no `value`, the parser shall reject it as `missing_field`; when the `value` is an empty string, it shall reject it as `vacuous` (oracle: specified).
 - AC-SPEC-27-08: When any gate, metric or level decides whether an actor is a person, it shall test membership of `PERSON_ACTOR_TYPES`, accepting `person-declared` exactly as `person-verified`; `agent`, `ci` and `unverified` shall never count. Lint shall fail a gating comparison against `'person-verified'` alone (oracle: specified).
 
 ## Dependencies
@@ -114,6 +171,7 @@ export type CliErrorCode = 'usage' | 'config-invalid' | 'untrusted-source' | 'pl
 - SPEC-00 (repo and projects).
 - The core skeleton's brand, plan and logging modules (spike P3 `brand.ts`, `plan.ts` and `logging.ts`), copied with source hashes.
 - The audit log (SPEC-14) wraps the sink with a hash chain at M3; the approval verifier (SPEC-02) mints `DerivedActor`.
+- Founder decision, 2026-10-28: the shared types follow the shapes the seeded tests use.
 
 ## Milestone
 

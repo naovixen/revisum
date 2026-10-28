@@ -12,7 +12,7 @@ Make AI output reach execution only as a validated, typed, closed plan (AI conta
   - vacuity rules, and an acceptance-criterion id (`criterionId`) on every assertion;
   - a per-project parser, a run-time brand check in `run()` and a lint banning casts to `Plan`;
   - JSON Schema, TypeScript types, golden examples and a changelog;
-  - v1.1 parsed directly; v1.0 (N-1) accepted for 12 months only through `migratePlan`, a documented, pure migration that requires a `criterionId` for every assertion and fails with `no-criterion-id` otherwise;
+  - v1.1 parsed directly; v1.0 (N-1) accepted for 12 months only through `migratePlan`, a documented, pure migration that requires a `criterionId` for every assertion and fails with `no_criterion_id` otherwise;
   - golden examples kept at v1.1 with criterion ids, plus the v1.0 originals and their criterion mappings as migration fixtures;
   - every AI text output typed `unknown` until parsed;
   - this parser as the only path to a `Plan` for every authoring route: hand-written JSON or readable text, the customer's own LLM, `core draft`, tickets, the builder, the recorder and the chatbot (SPEC-28). Readable text is first read into plain JSON, then parsed here.
@@ -60,7 +60,7 @@ export type PlanError = { readonly code: PlanErrorCode; readonly path: string };
 export function planParser(project: Project): (input: unknown) => Result<Plan, readonly PlanError[]>;
 export function assertBranded(plan: unknown): asserts plan is Plan;            // called first in run()
 // v1.0 assertions had no criterion id. The author supplies one per assertion, keyed by the assertion's JSON path;
-// a missing entry fails with 'no-criterion-id', so nothing migrates silently.
+// a missing entry fails with 'no_criterion_id', so nothing migrates silently.
 export type CriterionMapping = Readonly<Record<string, CriterionId>>;
 export function migratePlan(legacyPlan: unknown, mapping: CriterionMapping): Result<PlanData, readonly PlanError[]>; // pure
 export type AiText = Brand<string, 'AiText'>;                                     // stored as a suggestion only
@@ -80,10 +80,10 @@ export function parseAiText(input: unknown, maximumCharacters: number): Result<A
   - the output shall parse as v1.1 and equal the stored v1.1 golden example;
   - every step and assertion shall be unchanged apart from the added `criterionId`;
   - migrating twice shall give byte-identical output;
-  - an assertion with no mapping entry shall fail with `no-criterion-id` and its JSON path.
+  - an assertion with no mapping entry shall fail with `no_criterion_id` and its JSON path.
 - AC-SPEC-01-09: When an AI writer returns non-text, script-bearing or over-long output, `parseAiText` shall reject it and nothing shall be stored (oracle: specified; from the core skeleton's AI-text module).
 - AC-SPEC-01-10: When a release is built, the JSON Schema, types, golden examples and changelog shall be regenerated, the schema shall validate every golden example, and a schema change with no changelog entry shall fail the build (oracle: specified).
-- AC-SPEC-01-11: When a plan exceeds the size limit or nests frames beyond the depth limit, core shall reject it with `too-large` before walking it (oracle: specified).
+- AC-SPEC-01-11: When a plan exceeds the size limit or nests frames beyond the depth limit, core shall reject it with `too_large` before walking it (oracle: specified).
 
 ## Dependencies
 

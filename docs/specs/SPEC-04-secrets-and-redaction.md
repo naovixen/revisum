@@ -26,7 +26,7 @@ export type Leak = { file: string; secret: SecretName; form: 'raw' | 'uri' | 'ba
 
 - AC-SPEC-04-01: When `JSON.stringify`, `String()` or `util.inspect` is applied to a `Secret`, the output shall be `[secret]` (oracle: specified; reuses AC-p7-31).
 - AC-SPEC-04-02: When a module outside the allow-list imports `reveal`, the static check shall fail (oracle: specified; reuses AC-p7-31).
-- AC-SPEC-04-03: When a plan holds a literal value in a secret field, core shall reject it with `literal-secret` (oracle: specified; reuses AC-p7-06).
+- AC-SPEC-04-03: When a plan holds a literal value in a secret field, core shall reject it with `literal_secret` (oracle: specified; reuses AC-p7-06).
 - AC-SPEC-04-04: When the leak scan runs over every result, event, report, image text layer and log, it shall find zero echoes of planted secrets in raw, URI, base64, base64url, prefix and case-changed forms, and shall find its planted canary (oracle: specified; extends AC-p7-32 with the red-team probe cases).
 - AC-SPEC-04-05: When a declared secret is shorter than `MINIMUM_SECRET_LENGTH`, core shall redact by key and say so in the manifest (oracle: specified).
 - AC-SPEC-04-06: When a plan uses saved browser storage state, core shall resolve it through `SecretStore` like any secret, load it only into the session, and record only its name and file hash in the manifest; no cookie or token value from it shall appear in any artefact (oracle: specified; leak scan with planted storage-state values).
