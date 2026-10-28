@@ -21,6 +21,8 @@ const forwardSlashes = (path: string): string => path.replaceAll('\\', '/');
 export function compileFiles(files: readonly (string | { readonly name: string; readonly source: string })[]): CompileOutcome {
   const folder = mkdtempSync(join(tmpdir(), 'revisum-compile-'));
   try {
+    // Without a package.json saying "module", nodenext treats the scratch files as CommonJS.
+    writeFileSync(join(folder, 'package.json'), '{"type":"module"}');
     const paths = files.map((file) => {
       if (typeof file === 'string') return forwardSlashes(file);
       const path = join(folder, file.name);
