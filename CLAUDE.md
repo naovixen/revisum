@@ -33,6 +33,7 @@ The product name is Revisum (`revisum` for the repo, packages and CLI). It appea
 
 One session runs the whole loop. See `docs/decisions/single-session-workflow.md` for why.
 
+0. **Align the spec.** Where the spec's types or criteria contradict the seeded tests, the spec follows the tests, and new rules become marked additions, as in SPEC-27 (founder decision, 2026-10-28). Commit that as its own docs change. If aligning would change what the spec promises, ask the founder first.
 1. **Tests.** Start a helper agent with a fresh context. Give it `docs/prompts/session-tests.md`, with `<NN>` filled in, as its whole brief. Check that it changed only the test set: `test/`, `proofs/`, `fixtures/` and `golden/`. Then commit the tests alone.
 2. **Code.** Start a second fresh helper with `docs/prompts/session-code.md`, with `<NN>` and `<TESTS-COMMIT>` filled in. It changes only `packages/`, `tools/` and `docs/`, never a test. If it says a test looks wrong, stop and take that to the founder; never fix the test yourself. When `npm run check` is green, commit the code.
 3. **Review (optional).** A third fresh helper with `docs/prompts/session-review.md` reports findings and changes nothing.

@@ -172,6 +172,7 @@ export type CliErrorCode = 'usage' | 'config-invalid' | 'untrusted-source' | 'pl
 - The core skeleton's brand, plan and logging modules (spike P3 `brand.ts`, `plan.ts` and `logging.ts`), copied with source hashes.
 - The audit log (SPEC-14) wraps the sink with a hash chain at M3; the approval verifier (SPEC-02) mints `DerivedActor`.
 - Founder decision, 2026-10-28: the shared types follow the shapes the seeded tests use.
+- Founder decision, 2026-10-28: each error-code union keeps one spelling. The seeded plan and report codes use underscores (`unknown_step`); every other union uses hyphens (`not-found`).
 
 ## Milestone
 
