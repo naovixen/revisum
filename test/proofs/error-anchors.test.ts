@@ -17,7 +17,7 @@ const ERROR_CODES: Readonly<Record<string, readonly string[]>> = {
   plan: [
     'not_object', 'unknown_field', 'missing_field', 'wrong_type', 'unknown_step', 'unknown_value', 'invalid_url',
     'scheme_not_allowed', 'origin_not_allowed', 'target_not_in_matrix', 'unsafe_text', 'too_large', 'too_long',
-    'duplicate', 'version_unsupported', 'empty', 'vacuous',
+    'duplicate', 'version_unsupported', 'empty', 'vacuous', 'no_criterion_id',
   ],
   driver: ['not-found', 'ambiguous', 'not-actionable', 'timeout', 'navigation-failed'],
   runner: ['image-missing', 'image-digest-mismatch', 'egress-unenforceable', 'start-failed'],
