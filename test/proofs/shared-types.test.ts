@@ -10,6 +10,7 @@ import { compileFiles } from './scratch-compiler.ts';
 
 const EXHAUSTIVENESS_FILE = join(REPOSITORY_ROOT, 'test', 'proofs', 'error-code-exhaustiveness.ts');
 const EXPECTED_ERROR_LINE = /^\s*\/\/\s*@ts-expect-error\b/;
+const FORGETFUL_SWITCH_LINE = /^export function describe\w+ForgettingOne\(/;
 
 // ---- Closed error-code unions -------------------------------------------------------------------
 
@@ -24,7 +25,10 @@ test('removing the expected-error markers makes every switch that forgets a code
   const source = readFileSync(EXHAUSTIVENESS_FILE, 'utf8');
   const lines = source.split(/\r?\n/);
   const markers = lines.filter((line) => EXPECTED_ERROR_LINE.test(line)).length;
-  assert.equal(markers, 6, 'one forgetful switch per error-code union');
+  // One forgetful switch per error-code union, counted from the file so a new union needs no edit here.
+  const forgetfulSwitches = lines.filter((line) => FORGETFUL_SWITCH_LINE.test(line)).length;
+  assert.ok(forgetfulSwitches >= 6, 'the six SPEC-27 unions each keep a forgetful switch');
+  assert.equal(markers, forgetfulSwitches, 'one forgetful switch per error-code union');
   const mutant = lines.filter((line) => !EXPECTED_ERROR_LINE.test(line)).join('\n');
   const compiled = compileFiles([{ name: 'error-code-exhaustiveness-mutant.ts', source: mutant }]);
   assert.equal(compiled.passed, false, 'the mutant compiled, so a forgotten code would go unnoticed');

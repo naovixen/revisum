@@ -11,6 +11,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { policyGate, type Plan, type PolicyGate, type PolicyRuleId, type ResolvedElement, type Step, type TrustedProject } from '@revisum/engine';
+import { literalLocator } from '@revisum/contracts';
 import { FIXTURES } from '../../support/repository.ts';
 import {
   OPEN_ACCOUNT_PAGE, NO_ELEMENT, ORIGIN, PRODUCTION_ORIGIN, UNLISTED_ORIGIN,
@@ -52,7 +53,9 @@ function resolvedElement(step: Step, seen: PageView | undefined): ResolvedElemen
   if (seen?.element !== undefined) return element(seen.element);
   if (step.type === 'dialog') return NO_ELEMENT;
   if (!('locator' in step)) throw new Error(`a ${step.type} step resolves no element`);
-  const locator = step.locator;
+  // The red-team plans hold literal text only; literalLocator is the one place that says so.
+  const locator = literalLocator(step.locator);
+  if (locator === undefined) throw new Error(`the ${step.type} step's locator names a run value`);
   if (locator.by === 'role') return element({ role: locator.role, name: locator.name });
   if (locator.by === 'label') return element({ role: 'textbox', name: locator.label });
   if (locator.by === 'text') return element({ name: locator.text });
