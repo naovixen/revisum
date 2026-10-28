@@ -120,6 +120,22 @@ export type StepErrorCode = 'value-empty' | 'value-unsafe' | 'value-too-long';
 - **Positions.** With a position, the driver takes the matches in document order and picks one. A missing position gives a probe count of 0 (`not-found`). The oracle's rule that a count other than 1 is a failure stays unchanged. `countEquals` and `absent` on a positioned locator fail with `position_not_allowed`.
 - **Chords and the policy gate.** The runtime guard treats `press` of Enter or Space with any modifiers exactly as without them (`irreversible-submit`, SPEC-03).
 
+**Build notes.** Points the criteria leave open, settled while building (2026-10-28; `docs/decisions/answers.md`):
+
+- **Version test.** SPEC-01's future-version example moves from `1.2` to `1.3` (founder, 2026-10-28).
+- **Coverage study input (AC-SPEC-30-18).** `intents.json` gains `suites: { <suite name>: { project } }`. Each intent gains `sample: 'original' | 'fresh'`. `assessCoverage` reports one share per sample, plus the combined share.
+- **Manifest.** The plan clock is recorded in the existing `clock.fixedTimeMilliseconds`, not a new `clockStartMilliseconds`. The Intl data version (Node and ICU) joins the manifest with SPEC-08, which owns its fields. Until then AC-SPEC-30-20 checks only the dependency rule.
+- **Values.**
+  - A date's `timestamp` and `epochMilliseconds` name midnight at the start of that day in the plan clock's time zone.
+  - The unique part of a generated value is the first 10 base-36 characters of the sha256 of its inputs.
+  - `maximumFillCharacters` counts the line breaks between lines.
+- **Paths.**
+  - A path segment written literally as `.` or `..` is rejected as `invalid_url` at parse time.
+  - Error paths: `undefined_value` at the reference; `position_not_allowed` at `.locator.position`; a fill over its limits at the offending line.
+- **Capture names.** A capture name that isn't text is `wrong_type`, as every other field's is, not `unknown_value`.
+- **Function keys.** The naming lint allows the key names `F1` to `F12` as string values. They are keyboard keys, not research ids.
+- **Deferred to SPEC-06.** `remember` (AC-SPEC-30-09, 10) and the browser halves of AC-SPEC-30-06, 11 to 16.
+
 ## Acceptance criteria
 
 - AC-SPEC-30-01: When every 1.1 golden plan is parsed by the 1.2 parser, each shall give a `Plan` deep-equal to its 1.1 result. When a plan declaring `"1.1"` uses any 1.2 field or step, it shall be rejected with the code and path a 1.1 parser gives (oracle: regression).
