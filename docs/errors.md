@@ -7,7 +7,7 @@
 - Plan codes use underscores (`unknown_step`); every other union uses hyphens (`not-found`).
 - Each code says what was refused and what to do. Errors carry a code and a location, never the offending value, so private or hostile text is never echoed back.
 
-Plan errors (`PlanErrorCode`, from the plan parser in `engine`) come first, then step errors (`StepErrorCode`, decided by the engine at run time), then driver, runner, review recorder, event sink, command-line, approval, trust, policy and run refusal errors.
+Plan errors (`PlanErrorCode`, from the plan parser in `engine`) come first, then step errors (`StepErrorCode`, decided by the engine at run time), then service call errors (`ServiceCallErrorCode`, from a declared call), then driver, runner, review recorder, event sink, command-line, approval, trust, policy and run refusal errors.
 
 ## not_object
 
@@ -93,7 +93,15 @@ Plan error. A `countEquals` or `absent` check uses a locator with a `position`. 
 
 ## misplaced_step
 
-Plan error. A step stands where the language does not allow it: a `newTab` inside a `frame` or inside another `newTab`. A second tab opens only from the plan's own list of steps. The error sits on the step itself, and nothing inside it is read. Move the `newTab` to the top level of the plan; it may hold frames of its own.
+Plan error. A step stands where the language does not allow it: a `newTab` inside a `frame` or inside another `newTab`; a `call` or `expectBackend` inside a `frame` or a `newTab`; or any step other than `call` in the plan's `cleanup`. A second tab and a call stand only in the plan's own list of steps. The error sits on the step itself, and nothing inside it is read. Move the step to the top level of the plan.
+
+## unsafe_interpolation
+
+Project error. A call declaration writes a parameter where its type could change what the text says: a `text`, `email`, `boolean` or `secret` parameter, an `integer` that may be negative, or a `oneOf` with a value holding a space, a quote or a separator, inside an `$interpolate` string; or a `secret` parameter in the path or a query value, which would put it in the URL. Fill a whole JSON value with `{ "$parameter": … }` instead, or use a type that cannot hold quotes, spaces or separators (`identifier`, `integer` from 0, `yearMonthDay`, or `oneOf` of such values).
+
+## header_not_allowed
+
+Project error. A call declaration sets a header that decides where or how a request travels, or carries a browser session: `host`, `cookie`, `content-length`, `transfer-encoding`, `connection`, `upgrade`, `te`, `trailer` or any `proxy-` header, in any case. Remove it: the caller sets these itself, and a test credential belongs in an `authorization` header from a declared secret.
 
 ## no_criterion_id
 
@@ -118,6 +126,42 @@ Step error. A state check (`selected`, `unselected`, `expanded`, `collapsed`, `p
 ## download-not-text
 
 Step error. A content check (`contentContains` or `contentExcludes`) reads a download that is not UTF-8 text, such as an image, an archive or a PDF. Only the file's name, media type and size can be checked for such a file; use `fileNameEquals`, `mediaTypeEquals`, `sizeAtLeast` or `sizeAtMost` instead.
+
+## response-not-json
+
+Service call error. A call that remembers a field, or a backend check, got a response that is not JSON: its media type is not `application/json` (or a `+json` type), or its body does not parse. A call that remembers nothing never reads the body, so any declared status passes. Check that the declaration's path reaches the API rather than a page, or drop the field.
+
+## response-too-large
+
+Service call error. The response is larger than the declaration's `maximumResponseBytes` (default 1 MiB). Reading stops at the limit and the step fails. Ask the API for less, or raise the limit in the declaration.
+
+## field-missing
+
+Service call error. The response is JSON, but a field's JSON pointer names nothing in it, or names `null`, an object or a list where text, a number or a boolean is needed. Fix the pointer in the declaration's `fields`, or check the API's response shape.
+
+## service-unreachable
+
+Service call error. The caller could not connect to the declared service. A `call` that cannot connect ends the run `Errored`: it could not test, which is not a product failure. Cleanup still runs. Check that the service is up and its origin in `services` is right.
+
+## call-timeout
+
+Service call error. The service did not answer within the declaration's `timeoutMilliseconds` (default 10 s). A `write` call is never sent again. Raise the timeout in the declaration, or make the test API faster.
+
+## unexpected-status
+
+Service call error. The service answered with a status the declaration's `successStatuses` does not list. A redirect is never followed: it is judged like any other status. A `call` that gets one ends the run `Errored`. Add the status to `successStatuses` if it means success.
+
+## egress-blocked
+
+Service call error. The service's origin resolved to a private, loopback, link-local or metadata address and the service is not declared `private`, or the call names a service the run's project does not declare. Declare the service `private: true` in `services` if it really is a local test API.
+
+## parameter-invalid
+
+Service call error. A run value given to a call does not fit its parameter's type once its text is known: an integer that is not decimal digits or is out of range, a boolean other than `true` or `false`, an identifier, email address or day that does not match, a `oneOf` value not on the list, text over its `maximumLength`, or `""`, `.` or `..` for a path segment. No request is sent. Check the value the plan remembers or generates.
+
+## cleanup-failed
+
+Service call error. A cleanup call failed; its record keeps the cause. The verdict does not change, and the run raises a review item, since test data may be left behind. Clean the data up by hand, and fix the cleanup call.
 
 ## not-found
 
@@ -321,8 +365,16 @@ Policy error. The plan navigates to an origin the trusted project marks as produ
 
 ## over-limit
 
-Policy error. The plan exceeds the trusted project's limits: more steps in one list than `maximumSteps`, frames nested deeper than `maximumFrameDepth`, or more bytes than `maximumPlanBytes`. Split the plan, or raise the limit in the trusted project.
+Policy error. The plan exceeds the trusted project's limits: more steps in one list than `maximumSteps`, frames nested deeper than `maximumFrameDepth`, more bytes than `maximumPlanBytes`, or more `call` and `expectBackend` steps, cleanup included, than `maximumCalls` (default 20). A backend check counts once, however often it polls. Split the plan, or raise the limit in the trusted project.
+
+## side-effect-in-proposal
+
+Policy error. A plan with no approval makes a `write` call, in its steps or its cleanup, whose declaration does not set `allowInProposals`. A proposal may read and may make writes the project allows in proposals, such as seeding test data; any other write waits for approval. Approve the plan, or set `allowInProposals: true` on a declaration that only touches disposable test data.
 
 ## secret-missing
 
-Run refusal. The plan names a secret, in a fill or in `storageState`, that the secret store cannot resolve, or the run was given no secret store at all. The run ends `Refused` before any browser opens; the refusal names the secret, never a value. Set the CI secret or environment variable of that exact name (an empty value counts as missing).
+Run refusal. The plan names a secret, in a fill, in `storageState` or as a call's argument, or makes a call whose declaration sends one in a header, that the secret store cannot resolve, or the run was given no secret store at all. The run ends `Refused` before any browser opens or any call is made; the refusal names the secret, never a value. Set the CI secret or environment variable of that exact name (an empty value counts as missing).
+
+## services-unavailable
+
+Run refusal. The plan makes a `call` or `expectBackend`, or has `cleanup` calls, but the run was given no service caller. The run ends `Refused` before any browser opens or any call is made. Run it where the service caller is wired in; until the isolated runner lands, only a caller a test supplies is available.

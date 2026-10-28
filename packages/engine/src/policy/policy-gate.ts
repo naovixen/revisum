@@ -2,8 +2,8 @@
 // a mitigation, not the bound: the bound is non-production origins with disposable data.
 //
 //   - decide() is the static check, made before a run starts. It reads the plan's navigations and
-//     the locator names of its clicks, its size against the trusted limits, and its targets'
-//     locales. Only an allow decision carries an Authorised plan, the only kind run() accepts.
+//     the locator names of its clicks, its size and number of calls against the trusted limits, its
+//     targets' locales, and what each declared call it makes may reach and change. Only an allow decision carries an Authorised plan, the only kind run() accepts.
 //   - guardAction() is the runtime guard. The driver calls it just before every action, with the
 //     element the locator resolved to and any open dialog's text, so it sees what the plan alone
 //     cannot: the name behind a test id, the form a key press would submit, where a link leads.
@@ -15,7 +15,7 @@
 import { literalText } from '@revisum/contracts';
 import type {
   AllowedUrl, Authorised, EventSink, GuardVerdict, Locale, Locator, PathTemplate, Plan, PolicyDecision, PolicyRuleId, ResolvedElement,
-  Step, Target, TargetId,
+  ServiceCallStep, Step, Target, TargetId,
 } from '@revisum/contracts';
 import { deriveActor, sourceActorId } from '../actor.ts';
 import type { PlanStanding } from '../approval/plan-standing.ts';
@@ -146,7 +146,27 @@ function isOverLimit(plan: Plan, limits: Limits): boolean {
     || steps.some((step) => (step.type === 'frame' && (depth + 1 > limits.maximumFrameDepth || listTooLong(step.steps, depth + 1)))
       || (step.type === 'newTab' && listTooLong(step.steps, depth)));
   const bytes = new TextEncoder().encode(JSON.stringify(plan)).length;
-  return bytes > limits.maximumPlanBytes || listTooLong(plan.steps, 0);
+  return bytes > limits.maximumPlanBytes || listTooLong(plan.steps, 0) || serviceCallSteps(plan).length > limits.maximumCalls;
+}
+
+// Every step that calls a service, the plan's steps first and its cleanup after, each with its
+// step index, or null for a cleanup call, which no step index names. Calls stand only at the top
+// level, so frames and second tabs hold none. A backend check counts once, however often it polls.
+function serviceCallSteps(plan: Plan): { readonly step: ServiceCallStep; readonly index: number | null }[] {
+  const steps = plan.steps.flatMap((step, index) => (step.type === 'call' || step.type === 'expectBackend' ? [{ step, index }] : []));
+  return [...steps, ...(plan.cleanup ?? []).map((step) => ({ step, index: null }))];
+}
+
+// What a call may not do: reach a production service the plan's standing does not open, or, in a
+// proposal, change something unless its declaration allows it in proposals. A call the project
+// does not declare, or whose service it does not declare, reaches somewhere nobody declared.
+function callRule(step: ServiceCallStep, context: StaticContext, approved: boolean): PolicyRuleId | null {
+  const declaration = Object.entries(context.project.calls).find(([name]) => name === step.call)?.[1];
+  const service = context.project.services.find((candidate) => candidate.name === declaration?.service);
+  if (declaration === undefined || service === undefined) return 'undeclared-origin';
+  if (!context.productionAllowed && context.project.productionOrigins.some((origin) => origin === service.origin)) return 'production-origin';
+  if (!approved && declaration.effect === 'write' && !declaration.allowInProposals) return 'side-effect-in-proposal';
+  return null;
 }
 
 type StaticContext = {
@@ -196,6 +216,10 @@ function staticDenial(plan: Plan, targets: readonly Target[], standing: PlanStan
     const rule = staticRule(step, context);
     if (rule !== null) return { rule, stepIndex: index };
   }
+  for (const { step, index } of serviceCallSteps(plan)) {
+    const rule = callRule(step, context, standing.mode === 'approved');
+    if (rule !== null) return { rule, stepIndex: index };
+  }
   return null;
 }
 
@@ -243,6 +267,8 @@ function runtimeRule(
       return linkRule(element, policy) ?? (irreversible(element.formSubmitName) ? 'irreversible-submit' : null);
     }
     case 'frame': case 'expect': case 'expectPage': case 'expectDownload': case 'a11yAudit': case 'capture': case 'remember':
+    // Calls act on no page: the static check judged them, before the run started.
+    case 'call': case 'expectBackend':
       return null;
   }
 }

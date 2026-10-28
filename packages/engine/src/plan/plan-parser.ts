@@ -5,13 +5,16 @@
 // credential-shaped text anywhere. A plan it accepts is frozen and remembered, so run() can tell it from a look-alike.
 // The grammar is the one of the version the plan declares: a plan declaring "1.1" is read with
 // everything 1.2 added switched off, so it parses exactly as it always did.
-// See docs/specs/SPEC-01-plan-language-and-parser.md, docs/specs/SPEC-30-plan-values-positions-and-keys.md
-// and docs/specs/SPEC-31-page-states-metadata-downloads-and-tabs.md.
+// Calls name a declaration of the trusted project, with arguments typed by it; nothing a plan
+// writes can name a URL, a method, a header or a body.
+// See docs/specs/SPEC-01-plan-language-and-parser.md, docs/specs/SPEC-30-plan-values-positions-and-keys.md,
+// docs/specs/SPEC-31-page-states-metadata-downloads-and-tabs.md and docs/specs/SPEC-32-declared-service-calls.md.
 import {
-  AUDIT_MODES, DIALOG_ACTIONS, DOWNLOAD_SIZE_KINDS, literalText, ELEMENT_STATE_KINDS, LOCATOR_KINDS, MODIFIERS, PAGE_TEXT_KINDS,
+  AUDIT_MODES, BACKEND_ASSERTION_KINDS, DIALOG_ACTIONS, DOWNLOAD_SIZE_KINDS, literalText, ELEMENT_STATE_KINDS, LOCATOR_KINDS, MODIFIERS, PAGE_TEXT_KINDS,
   POSITION_WORDS, REMEMBER_READS, ROLES, SCRIPT_MODES,
   failure, success,
-  type AllowedUrl, type CriterionId, type DownloadAssertion, type DownloadName, type ElementAssertion, type EmailDomain,
+  type AllowedUrl, type BackendAssertion, type CallArgument, type CallArguments, type CallDeclaration, type CallName, type CallStep,
+  type CriterionId, type DownloadAssertion, type FieldName, type ParameterType, type ValueName, type DownloadName, type ElementAssertion, type EmailDomain,
   type FixtureName, type Locator,
   type Modifier, type MultiLineText, type Origin, type PageAssertion, type PathTemplate, type Plan, type PlanData,
   type PlanMeta, type Position, type Result, type SafeText, type SecretName, type SecretReference, type Step, type TargetId,
@@ -24,13 +27,14 @@ import {
   type Issues, type Parsed, type PlanError,
 } from './plan-decoders.ts';
 import {
-  ASSERTION_STEP_TYPES, CAPTURE_NAME, CRITERION_FIELD, CRITERION_ID, CURRENT_GRAMMAR, DOWNLOAD_KINDS, DOWNLOAD_NAME, ELEMENT_KINDS, FEATURE_ID,
+  ASSERTION_STEP_TYPES, CAPTURE_NAME, CLEANUP_STEP_TYPES, CRITERION_FIELD, SERVICE_CALL_STEP_TYPES, CRITERION_ID, CURRENT_GRAMMAR, DOWNLOAD_KINDS, DOWNLOAD_NAME, ELEMENT_KINDS, FEATURE_ID,
   FROM_FIELD, LARGEST_DOWNLOAD_BYTES, LOCATOR_FIELDS, MAXIMUM_EXPECTED_COUNT, MAXIMUM_META_NAME_LENGTH, MAXIMUM_MODIFIERS, MAXIMUM_PATH_SEGMENTS, MAXIMUM_POSITION, MAXIMUM_QUERY_VALUES,
   MAXIMUM_SPEC_REFERENCE_LENGTH, MAXIMUM_TEST_ID_LENGTH, MAXIMUM_TITLE_LENGTH, MAXIMUM_URL_LENGTH, META_FIELDS, PLAN_FIELDS,
   QUERY_KEY, grammarFor, type Grammar,
 } from './plan-grammar.ts';
 import { readGeneratedValues, readPlanClock, readValueName, type ValueContext } from './plan-values.ts';
 import { looksLikeCredential, namesSensitiveField } from './literal-secrets.ts';
+import { argumentProblem } from '../service-calls/parameter-values.ts';
 
 // A base used only to tell whether a URL is relative to the app under test.
 const RELATIVE_BASE = new URL('https://relative.invalid');
@@ -46,6 +50,8 @@ export type PlanRules = {
   readonly limits: Limits;
   readonly testIdAttributes: readonly TestIdAttribute[];
   readonly emailDomains: readonly EmailDomain[];
+  // The calls a call step may name.
+  readonly calls: Readonly<Record<CallName, CallDeclaration>>;
 };
 
 type ParseContext = {
@@ -66,7 +72,7 @@ type ParseContext = {
 const rulesOf = (project: Project): PlanRules => ({
   origins: project.origins, targetIds: project.matrix.map((target) => target.id),
   secretNames: project.secretNames, fixtures: project.fixtures, limits: project.limits,
-  testIdAttributes: project.testIdAttributes, emailDomains: project.generatedEmailDomains,
+  testIdAttributes: project.testIdAttributes, emailDomains: project.generatedEmailDomains, calls: project.calls,
 });
 
 const isPlainObject = (input: unknown): input is Readonly<Record<string, unknown>> =>
@@ -432,6 +438,156 @@ function readDownloadAssertion(input: unknown, path: string, context: ParseConte
   return value === INVALID ? INVALID : { kind, value };
 }
 
+// ---- Calls ----------------------------------------------------------------------------------------
+
+// The declaration a call step names. An undeclared name is refused alone: nothing else in the step
+// is read against a declaration that does not exist.
+function readCallName(input: unknown, path: string, context: ParseContext): Parsed<readonly [CallName, CallDeclaration]> {
+  if (typeof input !== 'string') { context.issues.push({ code: 'wrong_type', path }); return INVALID; }
+  const found = Object.entries(context.rules.calls).find(([name]) => name === input);
+  if (found === undefined) { context.issues.push({ code: 'unknown_value', path }); return INVALID; }
+  return [brand<string, 'CallName'>(found[0]), found[1]];
+}
+
+// One argument, as its parameter's type allows: a secret only by name; anything else as a literal
+// value or a run value by name. A literal's type is checked here; a run value's when its text is
+// known, by the request builder, under the same rules.
+function readCallArgument(input: unknown, path: string, type: ParameterType, context: ParseContext): Parsed<CallArgument> {
+  if (type.kind === 'secret') {
+    if (isPlainObject(input) && Object.hasOwn(input, 'secretName')) {
+      const fields = readRecord(input, path, context.issues, ['secretName']);
+      if (fields === INVALID) return INVALID;
+      const secretName = readDeclared(fields['secretName'], `${path}.secretName`, context, context.rules.secretNames);
+      return secretName === INVALID ? INVALID : { secretName };
+    }
+    // Literal text in a secret parameter would put the secret in the plan.
+    context.issues.push({ code: typeof input === 'string' ? 'literal_secret' : 'wrong_type', path });
+    return INVALID;
+  }
+  if (isPlainObject(input)) {
+    if (Object.hasOwn(input, 'valueName')) return readValueReference(input, path, context);
+    context.issues.push({ code: 'wrong_type', path });
+    return INVALID;
+  }
+  let value: SafeText | number | boolean;
+  if (typeof input === 'string') {
+    // The parameter's own length rule applies below, as too_long.
+    const text = readPlanText(input, path, context, Number.POSITIVE_INFINITY, 0);
+    if (text === INVALID) return INVALID;
+    value = text;
+  } else if (typeof input === 'number' || typeof input === 'boolean') {
+    value = input;
+  } else {
+    context.issues.push({ code: 'wrong_type', path });
+    return INVALID;
+  }
+  const problem = argumentProblem(type, value);
+  if (problem !== undefined) { context.issues.push({ code: problem, path }); return INVALID; }
+  return value;
+}
+
+// Exactly the declaration's parameters: a missing one and an extra one are both refused.
+function readCallArguments(input: unknown, path: string, declaration: CallDeclaration, context: ParseContext): Parsed<CallArguments> {
+  if (!isPlainObject(input)) { context.issues.push({ code: 'wrong_type', path }); return INVALID; }
+  const parameters = Object.entries(declaration.parameters);
+  const names = parameters.map(([name]) => name);
+  if (readRecord(input, path, context.issues, names) === INVALID) return INVALID;
+  const entries = parameters.map(([name, type]): Parsed<readonly [string, CallArgument]> => {
+    const argument = readCallArgument(input[name], `${path}.${name}`, type, context);
+    return argument === INVALID ? INVALID : [name, argument];
+  });
+  return allValid(entries) ? Object.fromEntries(entries) : INVALID;
+}
+
+// The response fields a call step remembers, as run values for the steps after it. Each field is
+// one the call declares; each name is new, as a remember step's would be.
+function readRememberedFields(
+  input: unknown, path: string, declaration: CallDeclaration, context: ParseContext,
+): Parsed<Readonly<Record<ValueName, FieldName>>> {
+  if (!isPlainObject(input)) { context.issues.push({ code: 'wrong_type', path }); return INVALID; }
+  const declared = Object.keys(declaration.fields ?? {});
+  const entries = Object.entries(input).map(([key, field]): Parsed<readonly [ValueName, FieldName]> => {
+    const at = `${path}.${key}`;
+    const name = readValueName(key, at, context.issues);
+    if (name === INVALID) return INVALID;
+    if (isNameTaken(name, context)) { context.issues.push({ code: 'duplicate', path: at }); return INVALID; }
+    if (typeof field !== 'string') { context.issues.push({ code: 'wrong_type', path: at }); return INVALID; }
+    if (!declared.includes(field)) { context.issues.push({ code: 'unknown_value', path: at }); return INVALID; }
+    return [name, brand<string, 'FieldName'>(field)];
+  });
+  if (!allValid(entries)) return INVALID;
+  for (const [name] of entries) context.defined.add(name);
+  return Object.fromEntries(entries);
+}
+
+// A call step. Its remembered values are defined only once its arguments have been read, so it
+// cannot use them itself.
+function readCall(head: Readonly<Record<string, unknown>>, path: string, context: ParseContext): Parsed<CallStep> {
+  const named = readCallName(head['call'], `${path}.call`, context);
+  if (named === INVALID) return INVALID;
+  const [call, declaration] = named;
+  const callArguments = readCallArguments(head['arguments'], `${path}.arguments`, declaration, context);
+  if (!Object.hasOwn(head, 'remember')) return callArguments === INVALID ? INVALID : { type: 'call', call, arguments: callArguments };
+  const remember = readRememberedFields(head['remember'], `${path}.remember`, declaration, context);
+  return callArguments === INVALID || remember === INVALID ? INVALID : { type: 'call', call, arguments: callArguments, remember };
+}
+
+function readBackendAssertion(input: unknown, path: string, context: ParseContext): Parsed<BackendAssertion> {
+  const head = readAssertionHead(input, path, context);
+  if (head === INVALID) return INVALID;
+  const kind = readOneOf(head['kind'], `${path}.kind`, context.issues, BACKEND_ASSERTION_KINDS);
+  if (kind === INVALID) return INVALID;
+  if (kind === 'present' || kind === 'absent') return readRecord(input, path, context.issues, ['kind']) === INVALID ? INVALID : { kind };
+  if (readRecord(input, path, context.issues, ['kind', 'value']) === INVALID) return INVALID;
+  if (kind === 'numberEquals') {
+    const value = head['value'];
+    if (typeof value !== 'number' || !Number.isFinite(value)) { context.issues.push({ code: 'wrong_type', path: `${path}.value` }); return INVALID; }
+    return { kind, value };
+  }
+  const value = readExpectedText(head['value'], `${path}.value`, context);
+  return value === INVALID ? INVALID : { kind, value };
+}
+
+// A backend check: a read call, one of its declared fields and a check on it. A write call is
+// refused as if it were not declared, since a check may repeat its call.
+function readExpectBackend(head: Readonly<Record<string, unknown>>, path: string, context: ParseContext): Parsed<Step> {
+  const named = readCallName(head['call'], `${path}.call`, context);
+  if (named === INVALID) return INVALID;
+  const [call, declaration] = named;
+  if (declaration.effect !== 'read') { context.issues.push({ code: 'unknown_value', path: `${path}.call` }); return INVALID; }
+  const field = ((): Parsed<FieldName> => {
+    const raw = head['field'];
+    if (typeof raw !== 'string') { context.issues.push({ code: 'wrong_type', path: `${path}.field` }); return INVALID; }
+    if (!Object.hasOwn(declaration.fields ?? {}, raw)) { context.issues.push({ code: 'unknown_value', path: `${path}.field` }); return INVALID; }
+    return brand<string, 'FieldName'>(raw);
+  })();
+  const parts = [
+    readCallArguments(head['arguments'], `${path}.arguments`, declaration, context), field,
+    readBackendAssertion(head['assert'], `${path}.assert`, context), readCriterionId(head, path, context),
+  ] as const;
+  return allValid(parts)
+    ? { type: 'expectBackend', call, arguments: parts[0], field: parts[1], assert: parts[2], criterionId: parts[3] }
+    : INVALID;
+}
+
+// The plan's cleanup: calls only, read after the steps, so they may use the values the steps remember.
+function readCleanup(input: unknown, context: ParseContext): Parsed<readonly CallStep[]> {
+  const raw = readList(input, '$.cleanup', context.issues, context.rules.limits.maximumSteps, 0);
+  if (raw === INVALID) return INVALID;
+  const calls = raw.map((entry, index): Parsed<CallStep> => {
+    const path = `$.cleanup[${index}]`;
+    const head = peekRecord(entry, path, context.issues);
+    if (head === INVALID) return INVALID;
+    const type = readOneOf(head['type'], `${path}.type`, context.issues, context.grammar.stepTypes, 'unknown_step');
+    if (type === INVALID) return INVALID;
+    // Nothing inside a misplaced step is read.
+    if (!CLEANUP_STEP_TYPES.includes(type)) { context.issues.push({ code: 'misplaced_step', path }); return INVALID; }
+    const step = readStep(entry, path, context);
+    return step !== INVALID && step.type === 'call' ? step : INVALID;
+  });
+  return allValid(calls) ? calls : INVALID;
+}
+
 function readStep(input: unknown, path: string, context: ParseContext): Parsed<Step> {
   const head = peekRecord(input, path, context.issues);
   if (head === INVALID) return INVALID;
@@ -440,6 +596,9 @@ function readStep(input: unknown, path: string, context: ParseContext): Parsed<S
   // A second tab opens only from the plan's own list of steps, so a tab never holds another tab
   // and a frame never opens one. Nothing inside a misplaced tab is read.
   if (type === 'newTab' && !context.topLevel) { context.issues.push({ code: 'misplaced_step', path }); return INVALID; }
+  // A call is setup or a check for the whole test, not an action in a page, so neither a frame
+  // nor a second tab may hold one.
+  if (SERVICE_CALL_STEP_TYPES.includes(type) && !context.topLevel) { context.issues.push({ code: 'misplaced_step', path }); return INVALID; }
   const fields = context.grammar.stepFields[type];
   // The criterion id is checked on its own below, so that a missing one is reported as vacuous.
   const required = fields.required.filter((field) => field !== CRITERION_FIELD);
@@ -536,6 +695,10 @@ function readStep(input: unknown, path: string, context: ParseContext): Parsed<S
       return readCaptureName(head['name'], `${path}.name`, context);
     case 'remember':
       return readRemember(head, path, context);
+    case 'call':
+      return readCall(head, path, context);
+    case 'expectBackend':
+      return readExpectBackend(head, path, context);
   }
 }
 
@@ -675,15 +838,17 @@ export function readPlanData(input: unknown, rules: PlanRules): Result<PlanData,
   const clock = Object.hasOwn(fields, 'clock') ? readPlanClock(fields['clock'], '$.clock', context.issues) : undefined;
   const steps = readStepList(fields['steps'], '$.steps', context);
   if (steps !== INVALID) checkWholePlan(steps, context);
+  const cleanup = Object.hasOwn(fields, 'cleanup') ? readCleanup(fields['cleanup'], context) : undefined;
   const storageState = Object.hasOwn(fields, 'storageState') ? readStorageState(fields['storageState'], context) : undefined;
   if (context.issues.length > 0 || meta === INVALID || targets === INVALID || steps === INVALID || storageState === INVALID
-    || values === INVALID || clock === INVALID) return failure(context.issues);
+    || values === INVALID || clock === INVALID || cleanup === INVALID) return failure(context.issues);
   // Optional fields are left out when absent, so a plan without them hashes as it always did.
   return success({
     version: grammar.version, meta, targets, steps,
     ...(storageState === undefined ? {} : { storageState }),
     ...(values === undefined ? {} : { values }),
     ...(clock === undefined ? {} : { clock }),
+    ...(cleanup === undefined ? {} : { cleanup }),
   });
 }
 
@@ -716,6 +881,7 @@ export function planParser(project: Project): (input: unknown) => Result<Plan, r
 // project-independent defaults. Version 1 had no secrets, fixtures, frames or run values.
 export const languageOnlyRules = (limits: Limits): PlanRules => ({
   origins: 'any', targetIds: 'any', secretNames: [], fixtures: [], limits, testIdAttributes: DEFAULT_TEST_ID_ATTRIBUTES, emailDomains: [],
+  calls: {},
 });
 
 // The run-time half of the brand: the type system stops a forged Plan at compile time, but a cast

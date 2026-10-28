@@ -4,6 +4,7 @@
 // See docs/specs/SPEC-01-plan-language-and-parser.md, docs/specs/SPEC-30-plan-values-positions-and-keys.md
 // and docs/specs/SPEC-31-page-states-metadata-downloads-and-tabs.md.
 import type { Brand } from './brand.ts';
+import type { BackendAssertion, CallArguments, CallName, FieldName } from './service-calls.ts';
 import type { TargetId } from './target.ts';
 
 // The language version the running engine parses. A plan declares it as text, "1.2" or "1.1":
@@ -212,7 +213,16 @@ export type Step =
   | { readonly type: 'a11yAudit'; readonly mode: 'report' | 'gate' }
   | { readonly type: 'capture'; readonly name: CaptureName }
   // Reads a value from the page under `name`, for the steps after it to use.
-  | { readonly type: 'remember'; readonly name: ValueName; readonly from: RememberSource };
+  | { readonly type: 'remember'; readonly name: ValueName; readonly from: RememberSource }
+  // Makes a call the trusted project declares, by name, and may remember response fields as run
+  // values for the steps after it. Only the plan's own list of steps, or its cleanup, may hold one.
+  | { readonly type: 'call'; readonly call: CallName; readonly arguments: CallArguments; readonly remember?: Readonly<Record<ValueName, FieldName>> }
+  // Makes a declared read call and checks one field of its response, repeating the call until the
+  // check passes or the project's backend check timeout runs out.
+  | {
+    readonly type: 'expectBackend'; readonly call: CallName; readonly arguments: CallArguments; readonly field: FieldName;
+    readonly assert: BackendAssertion; readonly criterionId: CriterionId;
+  };
 export type StepType = Step['type'];
 // The steps that act on an element; the driver's ActionRunner port performs them. The policy
 // gate judges a download as the click it is.
@@ -226,6 +236,9 @@ export type ResolvedActionStep =
   | { readonly type: 'select'; readonly locator: ResolvedLocator; readonly option: SafeText }
   | { readonly type: 'upload'; readonly locator: ResolvedLocator; readonly fixture: FixtureName }
   | { readonly type: 'press'; readonly locator: ResolvedLocator; readonly key: Key; readonly modifiers?: readonly Modifier[] };
+// A step that calls a declared service: what a plan's cleanup list holds.
+export type CallStep = Extract<Step, { type: 'call' }>;
+export type ServiceCallStep = Extract<Step, { type: 'call' | 'expectBackend' }>;
 export const DIALOG_ACTIONS = ['accept', 'dismiss'] as const;
 export const AUDIT_MODES = ['report', 'gate'] as const;
 
@@ -243,5 +256,8 @@ export type PlanData = {
   readonly values?: Readonly<Record<string, GeneratedValue>>;
   // The page's frozen clock, relative to the run's clock start. Absent: the run's clock start.
   readonly clock?: PlanClock;
+  // Calls run in order after the steps, whatever the outcome, such as deleting the test data the
+  // steps created.
+  readonly cleanup?: readonly CallStep[];
 };
 export type Plan = Brand<PlanData, 'Plan'>;

@@ -24,6 +24,10 @@ const PAGE_ASSERTION_TEXT: { readonly [Kind in Extract<Step, { type: 'expectPage
   title: 'title', urlPath: 'URL path', url: 'URL', urlPathStartsWith: 'URL path prefix',
   metaContent: 'meta tag', canonicalUrl: 'canonical URL',
 };
+const BACKEND_ASSERTION_TEXT: { readonly [Kind in Extract<Step, { type: 'expectBackend' }>['assert']['kind']]: string } = {
+  present: 'is present', absent: 'is absent', equals: 'has the expected text', contains: 'contains the expected text',
+  numberEquals: 'has the expected number',
+};
 const DOWNLOAD_ASSERTION_TEXT: { readonly [Kind in Extract<Step, { type: 'expectDownload' }>['assert']['kind']]: string } = {
   fileNameEquals: 'file name', mediaTypeEquals: 'media type', sizeAtMost: 'largest size', sizeAtLeast: 'smallest size',
   contentContains: 'expected content', contentExcludes: 'excluded content',
@@ -66,6 +70,8 @@ export function describeStep(step: Step): string {
     case 'newTab': return `In a new tab at \`${codeSpanText(describeNavigation(step.url))}\`: ${step.steps.map(describeStep).join('; ')}`;
     case 'a11yAudit': return `Ran automated accessibility rules (${step.mode} mode)`;
     case 'capture': return `Captured screenshot "${step.name}"`;
+    case 'call': return `Called the declared \`${codeSpanText(step.call)}\` service call`;
+    case 'expectBackend': return `Checked that field "${markdownEscape(step.field)}" of \`${codeSpanText(step.call)}\` ${BACKEND_ASSERTION_TEXT[step.assert.kind]}`;
     case 'remember': return `Remembered ${step.from.read === 'text' ? 'the text' : 'the value'} of ${describeLocator(step.from.element)} as {${step.name}}`;
   }
 }

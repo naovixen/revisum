@@ -43,15 +43,21 @@ export const STEP_FIELDS: { readonly [Type in StepType]: StepFields } = {
   a11yAudit: { required: ['type', 'mode'], optional: [] },
   capture: { required: ['type', 'name'], optional: [] },
   remember: { required: ['type', 'name', FROM_FIELD], optional: [] },
+  call: { required: ['type', 'call', 'arguments'], optional: ['remember'] },
+  expectBackend: { required: ['type', 'call', 'arguments', 'field', 'assert', CRITERION_FIELD], optional: [] },
 };
 export const STEP_TYPES: readonly StepType[] = [
   'navigate', 'click', 'hover', 'fill', 'select', 'upload', 'press', 'frame', 'dialog', 'expect', 'expectPage', 'a11yAudit', 'capture',
-  'remember', 'download', 'expectDownload', 'newTab',
+  'remember', 'download', 'expectDownload', 'newTab', 'call', 'expectBackend',
 ];
 // The steps language 1.2 added, which a plan declaring "1.1" cannot use.
-const NEWER_STEP_TYPES: readonly StepType[] = ['remember', 'download', 'expectDownload', 'newTab'];
+const NEWER_STEP_TYPES: readonly StepType[] = ['remember', 'download', 'expectDownload', 'newTab', 'call', 'expectBackend'];
 // The steps that check something. A plan needs at least one, or it would pass without proving anything.
-export const ASSERTION_STEP_TYPES: readonly StepType[] = ['expect', 'expectPage', 'expectDownload'];
+export const ASSERTION_STEP_TYPES: readonly StepType[] = ['expect', 'expectPage', 'expectDownload', 'expectBackend'];
+// The steps that call a declared service. Only the plan's own list of steps may hold them, and a
+// plan's cleanup holds nothing else but calls.
+export const SERVICE_CALL_STEP_TYPES: readonly StepType[] = ['call', 'expectBackend'];
+export const CLEANUP_STEP_TYPES: readonly StepType[] = ['call'];
 
 // The fields of each locator kind, in the order they are written. All are required.
 export const LOCATOR_FIELDS = {
@@ -70,8 +76,9 @@ export const OPTIONAL_LOCATOR_FIELDS = {
 
 export const PLAN_FIELDS = ['version', 'meta', 'targets', 'steps'] as const;
 // Top-level fields a plan may leave out: storageState names saved browser storage state, values
-// names the values generated for each run, and clock sets the page's frozen clock.
-export const OPTIONAL_PLAN_FIELDS = ['storageState', 'values', 'clock'] as const;
+// names the values generated for each run, clock sets the page's frozen clock, and cleanup lists
+// the calls that run after the steps, whatever the outcome.
+export const OPTIONAL_PLAN_FIELDS = ['storageState', 'values', 'clock', 'cleanup'] as const;
 export const META_FIELDS = ['featureId', 'specReference', 'title'] as const;
 export const PAGE_KINDS = [...PAGE_TEXT_KINDS, 'url', 'urlPathStartsWith', 'metaContent', 'canonicalUrl'] as const;
 export const ELEMENT_KINDS = [...ELEMENT_STATE_KINDS, ...ELEMENT_TEXT_KINDS, 'countEquals', 'hrefEquals'] as const;
@@ -139,6 +146,9 @@ export const CRITERION_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 export const LOWERCASE_ID = /^[a-z0-9][a-z0-9-]{0,47}$/;
 // A run value's name: a lowercase letter, then up to 63 letters and digits.
 export const VALUE_NAME = /^[a-z][A-Za-z0-9]{0,63}$/;
+// A declared call's, parameter's or response field's name: a lowercase letter, then up to 63
+// letters and digits. The project parser owns these names; a plan only refers to them.
+export const CALL_NAME = /^[a-z][A-Za-z0-9]{0,63}$/;
 // A query key in a path template.
 export const QUERY_KEY = /^[A-Za-z0-9_.-]{1,64}$/;
 // A plan clock's time of day, "HH:MM" on the 24-hour clock.

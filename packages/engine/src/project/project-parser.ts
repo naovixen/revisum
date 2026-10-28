@@ -1,15 +1,17 @@
 // The trusted project: allowed origins, the "test with" matrix, limits, the secret names and
-// fixture files a plan may refer to, and the policy the policy gate applies, written by a person. AI output never reaches this type. The
-// person declares every target; the engine never invents one.
+// fixture files a plan may refer to, the services and calls a plan may make, and the policy the
+// policy gate applies, written by a person. AI output never reaches this type. The person declares
+// every target; the engine never invents one.
 import {
   COLOR_SCHEMES, DEFAULT_TEST_ID_ATTRIBUTE, DEVICE_PROFILES, ENGINES, MOTION_PREFERENCES, success, failure,
-  type Brand, type DeviceProfileId, type FixtureName, type IrreversiblePatterns, type Locale, type Origin, type Result,
+  type Brand, type CallDeclaration, type CallName, type DeclaredService, type DeviceProfileId, type FixtureName, type IrreversiblePatterns, type Locale, type Origin, type Result,
   type EmailDomain, type SafeText, type SecretName, type Target, type TestIdAttribute, type TimeZone,
 } from '@revisum/contracts';
 import { brand } from '../brand.ts';
 import {
   INVALID, allValid, peekRecord, readInteger, readList, readOneOf, readRecord, readText, type Issues, type Parsed, type PlanError,
 } from '../plan/plan-decoders.ts';
+import { readCallDeclarations, readServices } from './call-declarations.ts';
 import { LARGEST_DOWNLOAD_BYTES, LOWERCASE_ID, MAXIMUM_TEST_ID_LENGTH, MAXIMUM_URL_LENGTH } from '../plan/plan-grammar.ts';
 
 const DEVICE_IDS = Object.keys(DEVICE_PROFILES) as DeviceProfileId[];
@@ -28,10 +30,16 @@ export type Limits = {
   // The largest file a download step may save, in bytes. The driver stops a larger one and deletes
   // its partial bytes.
   readonly maximumDownloadBytes: number;
+  // How many call and backend-check steps a plan may hold, its cleanup included. A backend check
+  // counts once, however often it polls.
+  readonly maximumCalls: number;
+  // How long a backend check repeats its read call before it fails.
+  readonly backendCheckTimeoutMilliseconds: number;
 };
 export const DEFAULT_LIMITS: Limits = {
   maximumPlanBytes: 64 * 1024, maximumSteps: 100, maximumTextLength: 500, stepTimeoutMilliseconds: 5000, maximumFrameDepth: 3,
-  maximumFillLines: 50, maximumFillCharacters: 4000, maximumDownloadBytes: 5 * 1024 * 1024,
+  maximumFillLines: 50, maximumFillCharacters: 4000, maximumDownloadBytes: 5 * 1024 * 1024, maximumCalls: 20,
+  backendCheckTimeoutMilliseconds: 10_000,
 };
 // The limits the plan parser checks before it walks a plan, so an oversized plan costs nothing to reject.
 export type PlanLimits = Pick<Limits, 'maximumPlanBytes' | 'maximumSteps' | 'maximumFrameDepth'>;
@@ -82,6 +90,10 @@ export type ProjectData = {
   // The domains a generated unique email address may use; the first is the default.
   readonly generatedEmailDomains: readonly EmailDomain[];
   readonly evidence: EvidenceSettings;
+  // The backends a call may reach, by name. Empty unless the project declares some.
+  readonly services: readonly DeclaredService[];
+  // The calls a plan may make, by name. Empty unless the project declares some.
+  readonly calls: Readonly<Record<CallName, CallDeclaration>>;
 };
 export type Project = Brand<ProjectData, 'Project'>;
 
@@ -154,7 +166,7 @@ function readTarget(input: unknown, path: string, issues: Issues): Parsed<Target
 
 const LIMIT_KEYS = [
   'maximumPlanBytes', 'maximumSteps', 'maximumTextLength', 'stepTimeoutMilliseconds', 'maximumFrameDepth',
-  'maximumFillLines', 'maximumFillCharacters', 'maximumDownloadBytes',
+  'maximumFillLines', 'maximumFillCharacters', 'maximumDownloadBytes', 'maximumCalls', 'backendCheckTimeoutMilliseconds',
 ] as const;
 
 function readLimits(input: unknown, path: string, issues: Issues): Parsed<Limits> {
@@ -166,16 +178,17 @@ function readLimits(input: unknown, path: string, issues: Issues): Parsed<Limits
   const parts = [
     pick('maximumPlanBytes', 1 << 20), pick('maximumSteps', 1000), pick('maximumTextLength', 4000),
     pick('stepTimeoutMilliseconds', 60_000), pick('maximumFrameDepth', 16), pick('maximumFillLines', 500),
-    pick('maximumFillCharacters', 20_000), pick('maximumDownloadBytes', LARGEST_DOWNLOAD_BYTES),
+    pick('maximumFillCharacters', 20_000), pick('maximumDownloadBytes', LARGEST_DOWNLOAD_BYTES), pick('maximumCalls', 200),
+    pick('backendCheckTimeoutMilliseconds', 120_000),
   ] as const;
   if (!allValid(parts)) return INVALID;
   const [
     maximumPlanBytes, maximumSteps, maximumTextLength, stepTimeoutMilliseconds, maximumFrameDepth, maximumFillLines, maximumFillCharacters,
-    maximumDownloadBytes,
+    maximumDownloadBytes, maximumCalls, backendCheckTimeoutMilliseconds,
   ] = parts;
   return {
     maximumPlanBytes, maximumSteps, maximumTextLength, stepTimeoutMilliseconds, maximumFrameDepth, maximumFillLines, maximumFillCharacters,
-    maximumDownloadBytes,
+    maximumDownloadBytes, maximumCalls, backendCheckTimeoutMilliseconds,
   };
 }
 
@@ -320,7 +333,7 @@ export function parseProject(input: unknown): Result<Project, readonly PlanError
     input, '$', issues,
     [
       'origins', 'productionOrigins', 'matrix', 'limits', 'secretNames', 'fixtures', 'policy', 'testIdAttributes', 'generatedEmailDomains',
-      'evidence',
+      'evidence', 'services', 'calls',
     ],
     ['origins', 'matrix'],
   );
@@ -341,6 +354,11 @@ export function parseProject(input: unknown): Result<Project, readonly PlanError
     fields['generatedEmailDomains'], '$.generatedEmailDomains', issues, EMAIL_DOMAIN, DEFAULT_EMAIL_DOMAIN,
   );
   const evidence = readEvidence(fields['evidence'], '$.evidence', issues);
+  // Calls name services and secrets, so those are read first.
+  const services = readServices(fields['services'], issues);
+  const calls = readCallDeclarations(fields['calls'], {
+    issues, services: services === INVALID ? [] : services, secretNames: secretNames === INVALID ? [] : secretNames,
+  });
   const matrix = rawMatrix === INVALID ? [] : rawMatrix.map((target, index) => readTarget(target, `$.matrix[${index}]`, issues));
   const seen = new Set<string>();
   matrix.forEach((target, index) => {
@@ -350,9 +368,10 @@ export function parseProject(input: unknown): Result<Project, readonly PlanError
   });
   if (issues.length > 0 || limits === INVALID || secretNames === INVALID || fixtures === INVALID
     || productionOrigins === INVALID || policy === INVALID || testIdAttributes === INVALID || generatedEmailDomains === INVALID
-    || evidence === INVALID
+    || evidence === INVALID || services === INVALID || calls === INVALID
     || !allValid(origins) || !allValid(matrix)) return failure(issues);
   return success(brand<ProjectData, 'Project'>({
     origins, productionOrigins, matrix, limits, secretNames, fixtures, policy, testIdAttributes, generatedEmailDomains, evidence,
+    services, calls,
   }));
 }

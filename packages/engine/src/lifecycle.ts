@@ -4,7 +4,8 @@
 //   Planned ──► Resolved ──► Running ──► Passed | Failed | Errored | Denied
 //      │            └──────────────────► Errored
 //      ├──► TargetUnavailable   (explicit; the engine never substitutes a target)
-//      └──► Refused             (production it may not reach, or a secret the store lacks; no driver is called)
+//      └──► Refused             (production it may not reach, a secret the store lacks, or service calls with no
+//                                caller; no driver is called and no call is made)
 //
 // A plan reaches Planned only once the policy gate has authorised it. Denied is the run the gate's
 // runtime guard stopped before an action; the denied action sent no input event.
@@ -39,12 +40,14 @@ export type TargetUnavailableRun = Omit<Planned, 'state'> & { readonly state: 'T
 // Why a run was refused before any driver call.
 //   origin_not_allowed: the run would reach one of the project's production origins, which only an
 //     approved plan may reach, and only when the project allows production for approved plans.
-//   secret-missing: the plan names a secret the secret store cannot resolve. The refusal names the
-//     secret, never a value.
-export type RefusalCode = 'origin_not_allowed' | 'secret-missing';
+//   secret-missing: the plan names a secret, or makes a call that needs one, that the secret store
+//     cannot resolve. The refusal names the secret, never a value.
+//   services-unavailable: the plan calls a declared service, but the run was given no service caller.
+export type RefusalCode = 'origin_not_allowed' | 'secret-missing' | 'services-unavailable';
 export type Refusal =
   | { readonly code: Extract<RefusalCode, 'origin_not_allowed'>; readonly origin: string }
-  | { readonly code: Extract<RefusalCode, 'secret-missing'>; readonly secretName: SecretName };
+  | { readonly code: Extract<RefusalCode, 'secret-missing'>; readonly secretName: SecretName }
+  | { readonly code: Extract<RefusalCode, 'services-unavailable'> };
 export type RefusedRun = Omit<Planned, 'state'> & { readonly state: 'Refused'; readonly refusal: Refusal };
 
 // Which policy rule stopped the run, and at which step.

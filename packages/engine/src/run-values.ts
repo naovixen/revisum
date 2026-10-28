@@ -97,33 +97,35 @@ export function resolvePlanClock(clock: PlanClock | undefined, clockStartMillise
 
 type Resolved<Value> = Result<Value, StepErrorCode>;
 
-// The text a plan writes or a value it names, held to the project's text length.
-function resolveText(text: TextOrValue, values: RunValues, project: Project): Resolved<SafeText> {
+// The one place a value reference is resolved: the text a plan writes, or the text of the value it
+// names, held to `maximumLength`. A value with no text yet, such as one a step that never ran
+// would have remembered, is value-empty.
+export function resolveText(text: TextOrValue, values: RunValues, maximumLength: number): Resolved<SafeText> {
   const literal = literalText(text);
   if (literal !== undefined) return success(literal);
   const name = referencedValueName(text);
   const value = name === undefined ? undefined : values.get(name);
   if (value === undefined) return failure('value-empty');
-  if (value.length > project.limits.maximumTextLength) return failure('value-too-long');
+  if (value.length > maximumLength) return failure('value-too-long');
   return success(value);
 }
 
 export function resolveLocator(locator: Locator, values: RunValues, project: Project): Resolved<ResolvedLocator> {
   switch (locator.by) {
     case 'role': {
-      const name = resolveText(locator.name, values, project);
+      const name = resolveText(locator.name, values, project.limits.maximumTextLength);
       return name.ok ? success({ ...locator, name: name.value }) : name;
     }
     case 'label': {
-      const label = resolveText(locator.label, values, project);
+      const label = resolveText(locator.label, values, project.limits.maximumTextLength);
       return label.ok ? success({ ...locator, label: label.value }) : label;
     }
     case 'text': {
-      const text = resolveText(locator.text, values, project);
+      const text = resolveText(locator.text, values, project.limits.maximumTextLength);
       return text.ok ? success({ ...locator, text: text.value }) : text;
     }
     case 'testId': {
-      const testId = resolveText(locator.testId, values, project);
+      const testId = resolveText(locator.testId, values, project.limits.maximumTextLength);
       return testId.ok ? success({ ...locator, testId: testId.value }) : testId;
     }
   }
@@ -131,7 +133,7 @@ export function resolveLocator(locator: Locator, values: RunValues, project: Pro
 
 export function resolveElementAssertion(assertion: ElementAssertion, values: RunValues, project: Project): Resolved<ResolvedElementAssertion> {
   if (assertion.kind === 'countEquals' || !('value' in assertion)) return success(assertion);
-  const value = resolveText(assertion.value, values, project);
+  const value = resolveText(assertion.value, values, project.limits.maximumTextLength);
   return value.ok ? success({ kind: assertion.kind, value: value.value }) : value;
 }
 
@@ -147,13 +149,13 @@ export function resolveActionStep(
     case 'upload': return success({ type: step.type, locator: locator.value, fixture: step.fixture });
     case 'press': return success({ ...step, locator: locator.value });
     case 'select': {
-      const option = resolveText(step.option, values, project);
+      const option = resolveText(step.option, values, project.limits.maximumTextLength);
       return option.ok ? success({ type: step.type, locator: locator.value, option: option.value }) : option;
     }
     case 'fill': {
       if (typeof step.value === 'object' && 'lines' in step.value) return failure('unsupported-step');
       if (typeof step.value === 'object' && 'secretName' in step.value) return success({ type: step.type, locator: locator.value, value: step.value });
-      const value = resolveText(step.value, values, project);
+      const value = resolveText(step.value, values, project.limits.maximumTextLength);
       return value.ok ? success({ type: step.type, locator: locator.value, value: value.value }) : value;
     }
   }
@@ -172,7 +174,7 @@ function encodeSegment(text: SafeText): Resolved<string> {
 export function resolvePathTemplate(template: PathTemplate, values: RunValues, project: Project): Resolved<AllowedUrl> {
   const segments: string[] = [];
   for (const segment of template.segments) {
-    const text = resolveText(segment, values, project);
+    const text = resolveText(segment, values, project.limits.maximumTextLength);
     if (!text.ok) return text;
     const encoded = encodeSegment(text.value);
     if (!encoded.ok) return encoded;
@@ -180,7 +182,7 @@ export function resolvePathTemplate(template: PathTemplate, values: RunValues, p
   }
   const query: string[] = [];
   for (const [key, value] of Object.entries(template.query ?? {})) {
-    const text = resolveText(value, values, project);
+    const text = resolveText(value, values, project.limits.maximumTextLength);
     if (!text.ok) return text;
     query.push(`${encodeURIComponent(key)}=${encodeURIComponent(text.value)}`);
   }

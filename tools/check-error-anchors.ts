@@ -25,6 +25,9 @@ export const ERROR_CODE_UNIONS: readonly { readonly file: string; readonly name:
   { file: 'packages/contracts/src/approval.ts', name: 'TrustError' },
   { file: 'packages/contracts/src/policy.ts', name: 'PolicyRuleId' },
   { file: 'packages/engine/src/lifecycle.ts', name: 'RefusalCode' },
+  // ServiceCallErrorCode adds its own codes to ResponseReadErrorCode's, so both are read.
+  { file: 'packages/contracts/src/service-calls.ts', name: 'ResponseReadErrorCode' },
+  { file: 'packages/contracts/src/service-calls.ts', name: 'ServiceCallErrorCode' },
 ];
 
 // The string literals from `type Name =` or `const Name =` up to the ";" that ends the declaration.

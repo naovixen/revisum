@@ -18,7 +18,7 @@ export const LOGGING_MANIFEST = {
   code: { type: 'string', why: 'Machine-readable failure code from a closed set.', retentionDays: 30 },
   detail: { type: 'string', why: 'Short diagnostic text. Always passed through the Redactor first.', retentionDays: 7 },
   artifact: { type: 'string', why: 'Name of an artefact produced by a capture step.', retentionDays: 30 },
-  sha256: { type: 'string', why: 'Content hash of an artefact, for replay proofs.', retentionDays: 30 },
+  sha256: { type: 'string', why: 'Content hash of an artefact or of a service call response body, for replay proofs. Never the body itself.', retentionDays: 30 },
   findings: { type: 'number', why: 'Count of accessibility findings (rule ids live in the run result).', retentionDays: 30 },
   origin: { type: 'string', why: 'Origin (scheme, host, port) of a blocked request. Never path or query.', retentionDays: 7 },
   durationMilliseconds: { type: 'number', why: 'Step timing for performance budgets. Excluded from the result hash.', retentionDays: 30 },
@@ -27,7 +27,8 @@ export const LOGGING_MANIFEST = {
 export type LogField = keyof typeof LOGGING_MANIFEST;
 type FieldValue<Field extends LogField> = (typeof LOGGING_MANIFEST)[Field]['type'] extends 'number' ? number : string;
 
-export const EVENT_KINDS = ['run.state', 'step.start', 'step.end', 'artifact', 'audit', 'network.blocked'] as const;
+// service.call: one request a declared call sent, by step, outcome, code, response sha256 and duration.
+export const EVENT_KINDS = ['run.state', 'step.start', 'step.end', 'artifact', 'audit', 'network.blocked', 'service.call'] as const;
 export type EventKind = (typeof EVENT_KINDS)[number];
 
 // What a caller may log: a kind plus any subset of the manifest fields.

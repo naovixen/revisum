@@ -1,9 +1,12 @@
 // The engine's one module that reads secret values. It is on the reveal allow-list because
 // redaction and leak scanning cannot work without the value: they look for it, and for each form
 // in which it can echo, in text a run keeps or wrote. Everything here returns redacted text, forms
-// found, a mode or a hash, never the value itself.
+// found, a mode or a hash, never the value itself. A declared call's header scheme is applied here
+// too, inside a new opaque Secret.
 // See docs/specs/SPEC-04-secrets-and-redaction.md.
-import { MINIMUM_SECRET_LENGTH, createSecret, reveal, type LeakForm, type RedactionMode, type Secret } from '@revisum/contracts';
+import {
+  MINIMUM_SECRET_LENGTH, createSecret, reveal, type HeaderScheme, type LeakForm, type RedactionMode, type Secret,
+} from '@revisum/contracts';
 import { sha256 } from '../hashing.ts';
 
 // What replaces an echo of a secret in kept text.
@@ -159,4 +162,17 @@ export function storageStateSecrets(storageState: Secret): readonly Secret[] {
     const value = isRecord(entry) ? entry['value'] : undefined;
     return typeof value === 'string' && value.length >= MINIMUM_SECRET_LENGTH ? [createSecret(storageState.name, value)] : [];
   });
+}
+
+// ---- Declared service calls -----------------------------------------------------------------------
+
+// The header value a scheme makes of a secret, as an opaque Secret under the same name: bearer is
+// "Bearer <value>", basic is "Basic " and the base64 of the value, which holds "user:password",
+// and token and raw are the value as it is.
+export function headerSecret(secret: Secret, scheme: HeaderScheme): Secret {
+  switch (scheme) {
+    case 'bearer': return createSecret(secret.name, `Bearer ${reveal(secret)}`);
+    case 'basic': return createSecret(secret.name, `Basic ${Buffer.from(reveal(secret), 'utf8').toString('base64')}`);
+    case 'token': case 'raw': return secret;
+  }
 }

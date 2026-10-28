@@ -4,7 +4,7 @@
 // See docs/specs/SPEC-30-plan-values-positions-and-keys.md.
 import {
   DATE_ANCHORS, DATE_FORMATS, GENERATED_VALUE_KINDS,
-  type EmailDomain, type GeneratedValue, type PlanClock, type RelativeDay, type SafeText, type ValueName,
+  type EmailDomain, type FieldName, type GeneratedValue, type PlanClock, type RelativeDay, type SafeText, type ValueName,
 } from '@revisum/contracts';
 import { brand } from '../brand.ts';
 import { INVALID, allValid, peekRecord, readInteger, readOneOf, readRecord, type Issues, type Parsed } from './plan-decoders.ts';
@@ -119,3 +119,8 @@ export function readGeneratedValues(
 // plain strings, but every key of a parsed plan's values passed readGeneratedValues.
 export const generatedValueEntries = (values: Readonly<Record<string, GeneratedValue>> | undefined): readonly (readonly [ValueName, GeneratedValue])[] =>
   Object.entries(values ?? {}).map(([name, value]) => [brand<string, 'ValueName'>(name), value] as const);
+
+// A parsed call step's remembered fields, each value name typed again, as above: every key passed
+// the plan parser's value-name rule.
+export const rememberedFieldEntries = (remember: Readonly<Record<string, FieldName>> | undefined): readonly (readonly [ValueName, FieldName])[] =>
+  Object.entries(remember ?? {}).map(([name, field]) => [brand<string, 'ValueName'>(name), field] as const);

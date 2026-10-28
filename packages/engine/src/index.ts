@@ -32,6 +32,8 @@ export * from './manifest.ts';
 export * from './oracle.ts';
 export * as lifecycle from './lifecycle.ts';
 export * from './run.ts';
+export { buildServiceRequest, DEFAULT_CALL_TIMEOUT_MILLISECONDS, DEFAULT_MAXIMUM_RESPONSE_BYTES, type RequestBuildError } from './service-calls/service-request.ts';
+export type { CallStepCode, CleanupResult, ServiceCallRecord } from './service-calls/call-steps.ts';
 export { generateValue, resolvePlanClock, type RunValues, type StepErrorCode } from './run-values.ts';
 export * from './ai-planning.ts';
 export * from './release-notes.ts';

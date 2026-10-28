@@ -58,6 +58,8 @@ export function needsDriverFeatures(step: Step): boolean {
     case 'navigate': return step.scripts !== undefined;
     case 'download': case 'expectDownload': case 'newTab': return true;
     case 'frame': case 'dialog': case 'remember': case 'a11yAudit': case 'capture': return false;
+    // Calls never reach a driver: the engine sends them through the run's service caller.
+    case 'call': case 'expectBackend': return false;
   }
 }
 

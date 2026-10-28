@@ -23,6 +23,11 @@ export const PLAN_ERROR_CODES = [
   'position_not_allowed',
   // A step where the language does not allow it, such as a newTab inside a frame or another newTab.
   'misplaced_step',
+  // A call declaration that writes a parameter into a string, when the parameter's type could
+  // hold a quote, a space or a separator and so change what the string says.
+  'unsafe_interpolation',
+  // A call declaration that sets a header deciding where or how a request travels, such as host.
+  'header_not_allowed',
 ] as const;
 export type PlanErrorCode = (typeof PLAN_ERROR_CODES)[number];
 

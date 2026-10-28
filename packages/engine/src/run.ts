@@ -1,11 +1,15 @@
 // The deterministic interpreter: (plan, target, ports) to RunResult. It accepts only a plan the
 // parser made and the policy gate authorised, walks the typed lifecycle, never substitutes a
-// target, and hashes everything except wall-clock timings.
+// target, and hashes everything except wall-clock timings. Declared service calls go through the
+// run's ServiceCaller port; a failed call ends the run Errored, since it could not test, and the
+// plan's cleanup calls run after the steps whatever the outcome.
+// See docs/specs/SPEC-32-declared-service-calls.md for calls.
 import {
   needsDriverFeatures, success,
   type A11yFinding, type ActionGuard, type ApprovalLabel, type ArtifactReference, type ArtifactStore, type Authorised,
   type BrowserDriver, type Clock, type ElementProbe, type EventSink, type Plan, type PolicyRuleId, type Redactor,
-  type ResolvedElement, type Result, type SecretStore, type Session, type Step, type Target, type TargetId, type Unavailable,
+  type ResolvedElement, type Result, type SafeText, type SecretStore, type ServiceCaller, type Session, type Step, type Target, type TargetId,
+  type Unavailable, type ValueName,
 } from '@revisum/contracts';
 import { approvalLabel, type PlanStanding } from './approval/plan-standing.ts';
 import { canonicalJson, sha256 } from './hashing.ts';
@@ -20,9 +24,13 @@ import type { Project } from './project/project-parser.ts';
 import { SENSITIVE_PLACEHOLDER } from './redaction.ts';
 import {
   generateRunValues, resolveActionStep, resolveElementAssertion, resolveLocator, resolvePathTemplate, resolvePlanClock,
-  type RunValues,
 } from './run-values.ts';
-import { NO_SECRETS, resolvePlanSecrets, secretRecords, withSecretRedaction, type ResolvedSecrets } from './secrets/secret-resolution.ts';
+import {
+  NO_SECRETS, resolvePlanSecrets, resolvedSecretStore, secretRecords, withSecretRedaction, type ResolvedSecrets,
+} from './secrets/secret-resolution.ts';
+import {
+  runBackendCheck, runCallStep, runCleanup, type CallStepContext, type CleanupResult, type ServiceCallRecord,
+} from './service-calls/call-steps.ts';
 
 export type RunInputs = {
   // Only the policy gate makes an Authorised plan, so a plan it has not cleared does not type-check.
@@ -52,6 +60,9 @@ export type RunPorts = {
   // Where the secrets the plan names are resolved, such as environmentSecretStore(process.env).
   // Without one, every secret reference is missing and such a plan is refused.
   readonly secrets?: SecretStore;
+  // Sends the requests of the plan's declared calls: runner's caller, through the egress proxy.
+  // Without one, a plan that calls a service is refused before any side effect.
+  readonly services?: ServiceCaller;
 };
 
 export type StepOutcome = 'passed' | 'failed' | 'skipped';
@@ -64,7 +75,13 @@ export type StepResult = {
   readonly observed?: string;
   readonly artifact?: ArtifactReference;
   readonly findings?: readonly A11yFinding[];
+  // A call or backend check's record: status and response sha256, never a header or the body.
+  readonly serviceCall?: ServiceCallRecord;
 };
+
+// Something a run found that a person should look at, whatever the verdict: a cleanup call that
+// failed, so test data may be left behind.
+export type RunReviewItem = { readonly code: 'cleanup-failed'; readonly cleanupIndex: number };
 
 export type RunResult = {
   readonly state: lifecycle.TerminalState;
@@ -80,6 +97,10 @@ export type RunResult = {
   readonly denial?: lifecycle.Denial;
   // Present when the plan is approved: what the result says about that approval.
   readonly approvalLabel?: ApprovalLabel;
+  // Present when the plan has cleanup calls and its steps ran: one record per call, in order.
+  readonly cleanup?: readonly CleanupResult[];
+  // Present when the run raised something for a person to look at.
+  readonly reviewItems?: readonly RunReviewItem[];
   // Hash of everything above except the manifest body, which its own hash covers. Timings are excluded.
   readonly resultHash: string;
   readonly timings: { readonly totalMilliseconds: number; readonly stepMilliseconds: readonly number[] };
@@ -99,8 +120,10 @@ type RunContext = {
   // The caller's redactor with the plan's secrets added: every kept text goes through it.
   readonly redactor: Redactor;
   readonly secrets: ResolvedSecrets;
-  // The plan's generated values for this run, by name.
-  readonly values: RunValues;
+  // The run's values by name: the plan's generated values, and the response fields calls remember.
+  readonly values: Map<ValueName, SafeText>;
+  // What the call steps use, when the run has a service caller.
+  readonly calls: CallStepContext | undefined;
 };
 
 // Keeps nothing, for callers with no audit sink: the run's log and result record the denial.
@@ -117,15 +140,18 @@ export async function run(inputs: RunInputs, ports: RunPorts): Promise<RunResult
   const runId = sha256(`${sha256(canonicalJson(inputs.plan))}:${inputs.targetId}:${inputs.seed}`).slice(0, 16);
   // Resolving reads only the store, so it can come first: the run's redactor needs the secrets
   // before anything is logged. A missing secret refuses the run below, before any driver call.
-  const resolution = resolvePlanSecrets(inputs.plan, ports.secrets);
+  const resolution = resolvePlanSecrets(inputs.plan, ports.secrets, inputs.project.calls);
   const secrets = resolution.ok ? resolution.value : NO_SECRETS;
   const redactor = withSecretRedaction(ports.redactor, secrets);
   const logger = manifestLogger(ports.events, redactor, runId);
   const gate = policyGate({ project: inputs.project, events: ports.audit ?? UNRECORDED_AUDIT });
   // Generation is pure, so values exist before anything runs; a run with no target has none.
-  const values: RunValues = target === undefined
-    ? new Map() : generateRunValues(inputs.plan, inputs.seed, inputs.fixedTimeMilliseconds, target, inputs.project);
-  const context: RunContext = { inputs, ports, logger, gate, denials: [], redactor, secrets, values };
+  const values = new Map<ValueName, SafeText>(target === undefined
+    ? [] : generateRunValues(inputs.plan, inputs.seed, inputs.fixedTimeMilliseconds, target, inputs.project));
+  const calls: CallStepContext | undefined = ports.services === undefined ? undefined : {
+    caller: ports.services, project: inputs.project, values, secrets: resolvedSecretStore(secrets), clock: ports.clock, logger,
+  };
+  const context: RunContext = { inputs, ports, logger, gate, denials: [], redactor, secrets, values, calls };
 
   if (target === undefined || !declared) {
     return unavailableResult(inputs.targetId, { reason: 'not-declared', detail: 'target is not in both the plan and the matrix' }, context, startedAt);
@@ -158,6 +184,16 @@ export async function run(inputs: RunInputs, ports: RunPorts): Promise<RunResult
     }, inputs);
   }
 
+  // Refused before any side effect when the plan calls a service and no caller was wired in.
+  if (callsServices(inputs.plan) && calls === undefined) {
+    const refused = lifecycle.refuse(planned, { code: 'services-unavailable' });
+    logger.log({ kind: 'run.state', state: refused.state, targetId: target.id, code: refused.refusal.code });
+    return seal({
+      state: refused.state, targetId: target.id, manifest: null, manifestHash: null, steps: [], blockedOrigins: [],
+      unavailable: null, refusal: refused.refusal, timings: { totalMilliseconds: ports.clock.now() - startedAt, stepMilliseconds: [] },
+    }, inputs);
+  }
+
   const opened = await openSession(planned, context);
   if (!opened.ok) {
     const unavailable = lifecycle.targetUnavailable(planned, opened.error);
@@ -167,7 +203,7 @@ export async function run(inputs: RunInputs, ports: RunPorts): Promise<RunResult
   const manifest = buildManifest({
     plan: inputs.plan, target, adapter: driver.info, browser: session.browser,
     seed: inputs.seed, fixedTimeMilliseconds: inputs.fixedTimeMilliseconds, fixtures: inputs.fixtures, host: inputs.host,
-    ...secretRecords(secrets),
+    ...secretRecords(secrets), callsServices: callsServices(inputs.plan),
   });
   const resolved = lifecycle.resolve(planned, session, manifest, manifestHash(manifest));
   logger.log({ kind: 'run.state', state: resolved.state, targetId: target.id, adapter: driver.info.id, sha256: resolved.manifestHash });
@@ -191,16 +227,23 @@ export async function run(inputs: RunInputs, ports: RunPorts): Promise<RunResult
       });
     }
     // A denied action failed its step, so every later step was skipped and nothing ran after it.
+    // A failed call could not set up or reach what the test needs, which is not a product failure.
     const denial = context.denials[0];
     finished = denial !== undefined && steps.some((done) => done.code === 'policy-denied')
       ? lifecycle.deny(running, denial)
-      : lifecycle.finish(running, steps.every((done) => done.outcome === 'passed') ? 'Passed' : 'Failed');
+      : steps.some((done) => done.type === 'call' && done.outcome === 'failed')
+        ? lifecycle.finish(running, 'Errored')
+        : lifecycle.finish(running, steps.every((done) => done.outcome === 'passed') ? 'Passed' : 'Failed');
   } catch (error) {
     logger.log({ kind: 'step.end', outcome: 'failed', code: 'adapter-error', detail: errorText(error) });
     finished = lifecycle.finish(running, 'Errored');
   } finally {
     await session.close();
   }
+  // Whatever the outcome. A failing cleanup call never changes the verdict; it raises a review item.
+  const cleanup = inputs.plan.cleanup === undefined || calls === undefined
+    ? undefined : await runCleanup(inputs.plan.cleanup, inputs.plan.steps.length, calls);
+  const reviewItems = (cleanup ?? []).flatMap((done): RunReviewItem[] => (done.outcome === 'failed' ? [{ code: 'cleanup-failed', cleanupIndex: done.index }] : []));
   const blocked = [...new Set(session.blockedOrigins())].sort();
   for (const origin of blocked) logger.log({ kind: 'network.blocked', origin });
   logger.log({
@@ -210,6 +253,7 @@ export async function run(inputs: RunInputs, ports: RunPorts): Promise<RunResult
   return seal({
     state: finished.state, targetId: target.id, manifest, manifestHash: finished.manifestHash,
     steps, blockedOrigins: blocked, unavailable: null, ...(finished.state === 'Denied' ? { denial: finished.denial } : {}),
+    ...(cleanup === undefined ? {} : { cleanup }), ...(reviewItems.length === 0 ? {} : { reviewItems }),
     timings: { totalMilliseconds: ports.clock.now() - startedAt, stepMilliseconds },
   }, inputs);
 }
@@ -239,8 +283,23 @@ export async function runUntrusted(
 const productionAllowed = (inputs: RunInputs): boolean =>
   inputs.standing?.mode === 'approved' && inputs.project.policy.allowProductionForApprovedPlans;
 
+// True when the plan calls a declared service, in its steps or its cleanup.
+const callsServices = (plan: Plan): boolean =>
+  (plan.cleanup ?? []).length > 0 || plan.steps.some((step) => step.type === 'call' || step.type === 'expectBackend');
+
+// The origins of the services the plan's calls reach, its cleanup included.
+function serviceOrigins(inputs: RunInputs): string[] {
+  const steps = [...inputs.plan.steps, ...(inputs.plan.cleanup ?? [])];
+  return steps.flatMap((step) => {
+    if (step.type !== 'call' && step.type !== 'expectBackend') return [];
+    const declaration = Object.entries(inputs.project.calls).find(([name]) => name === step.call)?.[1];
+    const service = inputs.project.services.find((candidate) => candidate.name === declaration?.service);
+    return service === undefined ? [] : [service.origin];
+  });
+}
+
 // The first production origin the run would reach: its base URL, a navigate step or a second tab's
-// URL, inside frames and second tabs too.
+// URL, inside frames and second tabs too, or a declared call's service.
 function productionOriginReached(inputs: RunInputs): string | undefined {
   const production = new Set<string>(inputs.project.productionOrigins);
   if (production.size === 0) return undefined;
@@ -253,6 +312,7 @@ function productionOriginReached(inputs: RunInputs): string | undefined {
     }
   };
   visit(inputs.plan.steps);
+  origins.push(...serviceOrigins(inputs));
   return origins.find((origin) => production.has(origin));
 }
 
@@ -369,6 +429,13 @@ async function executeStep(step: Step, index: number, session: Session, target: 
       context.logger.log({ kind: 'audit', stepIndex: index, findings: findings.length });
       const gateFails = step.mode === 'gate' && findings.length > 0;
       return { ...base, outcome: gateFails ? 'failed' : 'passed', findings, ...(gateFails ? { code: 'a11y-violations' } : {}) };
+    }
+    case 'call':
+    case 'expectBackend': {
+      // A run that calls services always has a caller: run() refused it before any step otherwise.
+      if (context.calls === undefined) return { ...base, outcome: 'failed', code: 'service-unreachable' };
+      const done = step.type === 'call' ? await runCallStep(step, index, context.calls) : await runBackendCheck(step, index, context.calls);
+      return { ...base, ...done };
     }
     case 'capture': {
       const png = await session.screenshot(context.ports.redactor.selectors);

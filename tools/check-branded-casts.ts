@@ -18,6 +18,7 @@ const PROJECT_PARSER = 'packages/engine/src/project/project-parser.ts';
 const ACTOR_MODULE = 'packages/engine/src/actor.ts';
 const APPROVAL_VERIFIER = 'packages/engine/src/approval/approval-verifier.ts';
 const TRUSTED_PROJECT_LOADER = 'packages/engine/src/project/trusted-project.ts';
+const CALL_DECLARATIONS = 'packages/engine/src/project/call-declarations.ts';
 
 // Each branded type, and the only files that may create a value of it. A branded type declared in
 // packages/ but missing here is still checked: it has no owner, so any cast to it fails until its
@@ -46,6 +47,13 @@ export const BRAND_OWNERS: Readonly<Record<string, readonly string[]>> = {
   Locale: [PROJECT_PARSER],
   TimeZone: [PROJECT_PARSER],
   Origin: [PROJECT_PARSER],
+  // Declared services and calls are read with the project; a plan names a call and its fields by
+  // the names the declarations gave them.
+  ServiceName: [CALL_DECLARATIONS],
+  CallName: [CALL_DECLARATIONS, PLAN_PARSER],
+  ParameterName: [CALL_DECLARATIONS],
+  FieldName: [CALL_DECLARATIONS, PLAN_PARSER],
+  JsonPointer: [CALL_DECLARATIONS],
   ValidReport: ['packages/report/src/model/report-parser.ts'],
   ActorId: [ACTOR_MODULE],
   DerivedActor: [ACTOR_MODULE, APPROVAL_VERIFIER],

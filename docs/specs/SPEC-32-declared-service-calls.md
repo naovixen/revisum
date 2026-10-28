@@ -142,6 +142,9 @@ export function buildServiceRequest(declaration: CallDeclaration, service: { ori
 - **Limits.** Each call or backend-check step counts once toward `maximumCalls`, whatever its polls. Polls are bounded by the step's timeout.
 - **Production.** A service whose origin is production follows SPEC-03's rule: only with `allowProductionForApprovedPlans`, and only for approved plans.
 - **Cleanup** holds call steps only. Any other step there is `misplaced_step`.
+- **Request bodies.** A body is always JSON text in parts, where a part may be an opaque `Secret` (founder, 2026-10-28: one shape). Engine builds it without reading any secret; runner's `bodyText()` is the only place that joins the parts and reveals a secret.
+- **Interpolation.** A secret parameter may fill a JSON body value only; in a path or query it is `unsafe_interpolation`. An integer may go inside a string only when its minimum is 0 or more, so a minus sign can't form `--`.
+- **Verdicts.** A failed `expectBackend` ends the run `Failed`; only a failed `call` gives `Errored`. A backend check is not retried after `parameter-invalid` or `egress-blocked`.
 - **Golden plan.** The shared test project gains the test service, its secret names and its declared calls, so the 1.2 golden plan for `call` parses (founder, 2026-10-28).
 
 ## Acceptance criteria

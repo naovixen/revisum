@@ -34,12 +34,17 @@ export type RunManifest = {
 
 export const planHash = (plan: Plan): string => sha256(canonicalJson(plan));
 
+// The non-hermetic input of a run that calls declared services: their responses.
+export const SERVICE_CALLS_INPUT = 'service-calls';
+
 export function buildManifest(inputs: {
   readonly plan: Plan; readonly target: Target; readonly adapter: AdapterInfo;
   readonly browser: { readonly name: string; readonly version: string };
   readonly seed: number; readonly fixedTimeMilliseconds: number;
   readonly fixtures: readonly FixtureReference[]; readonly host: HostInfo;
   readonly secrets?: readonly SecretRecord[]; readonly storageState?: StorageStateRecord;
+  // True when the plan calls declared services, whose responses the run cannot pin.
+  readonly callsServices?: boolean;
 }): RunManifest {
   const secrets = inputs.secrets === undefined || inputs.secrets.length === 0
     ? {}
@@ -55,7 +60,7 @@ export function buildManifest(inputs: {
     clock: { fixedTimeMilliseconds: inputs.fixedTimeMilliseconds },
     fixtures: [...inputs.fixtures].sort((left, right) => (left.path < right.path ? -1 : 1)),
     host: inputs.host,
-    nonHermeticInputs: [],
+    nonHermeticInputs: inputs.callsServices === true ? [SERVICE_CALLS_INPUT] : [],
     ...secrets,
     ...(inputs.storageState === undefined ? {} : { storageState: inputs.storageState }),
   };

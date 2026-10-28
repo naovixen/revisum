@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "revisum.plan/v1",
   "title": "Plan language 1.2",
-  "description": "A closed, versioned test plan. Every assertion names the acceptance criterion it checks. A plan declaring \"1.1\" may use only what that version had. Fitting this schema is necessary, not sufficient: the plan parser also checks the project's allow-list, matrix, declared secrets, fixtures, test-id attributes and email domains, its limits, its text safety rules that every value and download is defined before it is used, and that a second tab opens only at the top level.",
+  "description": "A closed, versioned test plan. Every assertion names the acceptance criterion it checks. A plan declaring \"1.1\" may use only what that version had. Fitting this schema is necessary, not sufficient: the plan parser also checks the project's allow-list, matrix, declared secrets, fixtures, test-id attributes and email domains, its limits, its text safety rules that every value and download is defined before it is used, that a second tab and a call stand only at the top level, and that each call, argument and field is one the project declares.",
   "type": "object",
   "properties": {
     "version": {
@@ -175,6 +175,12 @@
         "time"
       ],
       "additionalProperties": false
+    },
+    "cleanup": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/callStep"
+      }
     }
   },
   "required": [
@@ -244,6 +250,12 @@
         },
         {
           "$ref": "#/$defs/newTabStep"
+        },
+        {
+          "$ref": "#/$defs/callStep"
+        },
+        {
+          "$ref": "#/$defs/expectBackendStep"
         }
       ]
     },
@@ -755,6 +767,140 @@
       ],
       "additionalProperties": false
     },
+    "callStep": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "call"
+        },
+        "call": {
+          "type": "string",
+          "pattern": "^[a-z][A-Za-z0-9]{0,63}$"
+        },
+        "arguments": {
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^[a-z][A-Za-z0-9]{0,63}$"
+          },
+          "additionalProperties": {
+            "oneOf": [
+              {
+                "type": "string",
+                "minLength": 0,
+                "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "$ref": "#/$defs/valueReference"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "secretName": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "secretName"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "remember": {
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^[a-z][A-Za-z0-9]{0,63}$"
+          },
+          "additionalProperties": {
+            "type": "string",
+            "pattern": "^[a-z][A-Za-z0-9]{0,63}$"
+          }
+        }
+      },
+      "required": [
+        "type",
+        "call",
+        "arguments"
+      ],
+      "additionalProperties": false
+    },
+    "expectBackendStep": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "expectBackend"
+        },
+        "call": {
+          "type": "string",
+          "pattern": "^[a-z][A-Za-z0-9]{0,63}$"
+        },
+        "arguments": {
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^[a-z][A-Za-z0-9]{0,63}$"
+          },
+          "additionalProperties": {
+            "oneOf": [
+              {
+                "type": "string",
+                "minLength": 0,
+                "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "$ref": "#/$defs/valueReference"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "secretName": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "secretName"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "field": {
+          "type": "string",
+          "pattern": "^[a-z][A-Za-z0-9]{0,63}$"
+        },
+        "assert": {
+          "$ref": "#/$defs/backendAssertion"
+        },
+        "criterionId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+        }
+      },
+      "required": [
+        "type",
+        "call",
+        "arguments",
+        "field",
+        "assert",
+        "criterionId"
+      ],
+      "additionalProperties": false
+    },
     "locator": {
       "oneOf": [
         {
@@ -1241,6 +1387,69 @@
               "type": "integer",
               "minimum": 1,
               "maximum": 104857600
+            }
+          },
+          "required": [
+            "kind",
+            "value"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "backendAssertion": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "enum": [
+                "present",
+                "absent"
+              ]
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "enum": [
+                "equals",
+                "contains"
+              ]
+            },
+            "value": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+                },
+                {
+                  "$ref": "#/$defs/valueReference"
+                }
+              ]
+            }
+          },
+          "required": [
+            "kind",
+            "value"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "numberEquals"
+            },
+            "value": {
+              "type": "number"
             }
           },
           "required": [
