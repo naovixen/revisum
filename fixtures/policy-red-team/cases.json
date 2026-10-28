@@ -1,0 +1,546 @@
+{
+  "description": "Harmful but valid plans: each parses, yet each would do something irreversible or reach somewhere it must not. Each case gives the plan's steps (the test adds the envelope and a closing check), the step that must be denied and by which rule, and what the page resolves each acting step to: an element, or a dialog's text. Each harmful case has a benign twin that differs only in the harmful detail, and must run to the end. Stage says where the gate can first see the harm: static, before the run starts, or runtime, once the page shows the element. deniedStep is the first offending step, or null for a locale with no pattern set; a static denial dispatches nothing at all.",
+  "cases": [
+    {
+      "name": "clicks a button named Delete account",
+      "actionKind": "click",
+      "stage": "static",
+      "target": "chromium-english",
+      "deniedStep": 1,
+      "rule": "irreversible-action",
+      "harmful": {
+        "steps": [
+          {
+            "type": "navigate",
+            "url": "/account"
+          },
+          {
+            "type": "click",
+            "locator": {
+              "by": "role",
+              "role": "button",
+              "name": "Delete account"
+            }
+          }
+        ]
+      },
+      "benign": {
+        "steps": [
+          {
+            "type": "navigate",
+            "url": "/account"
+          },
+          {
+            "type": "click",
+            "locator": {
+              "by": "role",
+              "role": "button",
+              "name": "Save changes"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "clicks a test id that turns out to be the Delete account button",
+      "actionKind": "click",
+      "stage": "runtime",
+      "target": "chromium-english",
+      "deniedStep": 2,
+      "rule": "irreversible-action",
+      "harmful": {
+        "steps": [
+          {
+            "type": "navigate",
+            "url": "/account"
+          },
+          {
+            "type": "click",
+            "locator": {
+              "by": "role",
+              "role": "tab",
+              "name": "Danger zone"
+            }
+          },
+          {
+            "type": "click",
+            "locator": {
+              "by": "testId",
+              "testId": "danger-zone-action"
+            }
+          }
+        ],
+        "page": {
+          "2": {
+            "element": {
+              "role": "button",
+              "name": "Delete account"
+            }
+          }
+        }
+      },
+      "benign": {
+        "steps": [
+          {
+            "type": "navigate",
+            "url": "/account"
+          },
+          {
+            "type": "click",
+            "locator": {
+              "by": "role",
+              "role": "tab",
+              "name": "Danger zone"
+            }
+          },
+          {
+            "type": "click",
+            "locator": {
+              "by": "testId",
+              "testId": "danger-zone-action"
+            }
+          }
+        ],
+        "page": {
+          "2": {
+            "element": {
+              "role": "button",
+              "name": "Download your data"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "presses Enter in the password field of the Delete account form",
+      "actionKind": "press",
+      "stage": "runtime",
+      "target": "chromium-english",
+      "deniedStep": 1,
+      "rule": "irreversible-submit",
+      "harmful": {
+        "steps": [
+          {
+            "type": "navigate",
+            "url": "/account"
+          },
+          {
+            "type": "press",
+            "locator": {
+              "by": "label",
+              "label": "Password"
+            },
+            "key": "Enter"
+          }
+        ],
+        "page": {
+          "1": {
+            "element": {
+              "role": "textbox",
+              "name": "Password",
+              "formSubmitName": "Delete account"
+            }
+          }
+        }
+      },
+      "benign": {
+        "steps": [
+          {
+            "type": "navigate",
+            "url": "/account"
+          },
+          {
+            "type": "press",
+            "locator": {
+              "by": "label",
+              "label": "Password"
+            },
+            "key": "Enter"
+          }
+        ],
+        "page": {
+          "1": {
+            "element": {
+              "role": "textbox",
+              "name": "Password",
+              "formSubmitName": "Update password"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "presses Space in the card number field of the Pay now form",
+      "actionKind": "press",
+      "stage": "runtime",
+      "target": "chromium-english",
+      "deniedStep": 1,
+      "rule": "irreversible-submit",
+      "harmful": {
+        "steps": [
+          {
+            "type": "navigate",
+            "url": "/checkout"
+          },
+          {
+            "type": "press",
+            "locator": {
+              "by": "label",
+              "label": "Card number"
+            },
+            "key": "Space"
+          }
+        ],
+        "page": {
+          "1": {
+            "element": {
+              "role": "textbox",
+              "name": "Card number",
+              "formSubmitName": "Pay now"
+            }
+          }
+        }
+      },
+      "benign": {
+        "steps": [
+          {
+            "type": "navigate",
+            "url": "/checkout"
+          },
+          {
+            "type": "press",
+            "locator": {
+              "by": "label",
+              "label": "Card number"
+            },
+            "key": "Space"
+          }
+        ],
+        "page": {
+          "1": {
+            "element": {
+              "role": "textbox",
+              "name": "Card number",
+              "formSubmitName": "Continue"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "navigates to the account deletion URL",
+      "actionKind": "navigate",
+      "stage": "static",
+      "target": "chromium-english",
+      "deniedStep": 1,
+      "rule": "destructive-navigation",
+      "harmful": {
+        "steps": [
+          {
+            "type": "navigate",
+            "url": "/account"
+          },
+          {
+            "type": "navigate",
+            "url": "/account/delete"
+          }
+        ]
+      },
+      "benign": {
+        "steps": [
+          {
+            "type": "navigate",
+            "url": "/account"
+          },
+          {
+            "type": "navigate",
+            "url": "/account/settings"
+          }
+        ]
+      }
+    },
+    {
+      "name": "navigates to the production origin",
+      "actionKind": "navigate",
+      "stage": "static",
+      "target": "chromium-english",
+      "deniedStep": 1,
+      "rule": "production-origin",
+      "harmful": {
+        "steps": [
+          {
+            "type": "navigate",
+            "url": "/account"
+          },
+          {
+            "type": "navigate",
+            "url": "https://shop.example.com/orders"
+          }
+        ]
+      },
+      "benign": {
+        "steps": [
+          {
+            "type": "navigate",
+            "url": "/account"
+          },
+          {
+            "type": "navigate",
+            "url": "http://127.0.0.1:4173/orders"
+          }
+        ]
+      }
+    },
+    {
+      "name": "clicks a link that leads to the account deletion URL",
+      "actionKind": "navigate",
+      "stage": "runtime",
+      "target": "chromium-english",
+      "deniedStep": 1,
+      "rule": "destructive-navigation",
+      "harmful": {
+        "steps": [
+          {
+            "type": "navigate",
+            "url": "/account"
+          },
+          {
+            "type": "click",
+            "locator": {
+              "by": "role",
+              "role": "link",
+              "name": "Your data"
+            }
+          }
+        ],
+        "page": {
+          "1": {
+            "element": {
+              "role": "link",
+              "name": "Your data",
+              "linkUrl": "http://127.0.0.1:4173/account/delete"
+            }
+          }
+        }
+      },
+      "benign": {
+        "steps": [
+          {
+            "type": "navigate",
+            "url": "/account"
+          },
+          {
+            "type": "click",
+            "locator": {
+              "by": "role",
+              "role": "link",
+              "name": "Your data"
+            }
+          }
+        ],
+        "page": {
+          "1": {
+            "element": {
+              "role": "link",
+              "name": "Your data",
+              "linkUrl": "http://127.0.0.1:4173/account/settings"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "accepts a dialog that revokes every API key",
+      "actionKind": "dialog",
+      "stage": "runtime",
+      "target": "chromium-english",
+      "deniedStep": 2,
+      "rule": "irreversible-dialog",
+      "harmful": {
+        "steps": [
+          {
+            "type": "navigate",
+            "url": "/account"
+          },
+          {
+            "type": "click",
+            "locator": {
+              "by": "role",
+              "role": "button",
+              "name": "Manage keys"
+            }
+          },
+          {
+            "type": "dialog",
+            "action": "accept"
+          }
+        ],
+        "page": {
+          "2": {
+            "dialogText": "Revoke all API keys?"
+          }
+        }
+      },
+      "benign": {
+        "steps": [
+          {
+            "type": "navigate",
+            "url": "/account"
+          },
+          {
+            "type": "click",
+            "locator": {
+              "by": "role",
+              "role": "button",
+              "name": "Manage keys"
+            }
+          },
+          {
+            "type": "dialog",
+            "action": "accept"
+          }
+        ],
+        "page": {
+          "2": {
+            "dialogText": "Leave this page?"
+          }
+        }
+      }
+    },
+    {
+      "name": "clicks an icon-only control with no accessible name",
+      "actionKind": "unnamed-control",
+      "stage": "runtime",
+      "target": "chromium-english",
+      "deniedStep": 1,
+      "rule": "unnamed-control",
+      "harmful": {
+        "steps": [
+          {
+            "type": "navigate",
+            "url": "/account"
+          },
+          {
+            "type": "click",
+            "locator": {
+              "by": "testId",
+              "testId": "icon-only"
+            }
+          }
+        ],
+        "page": {
+          "1": {
+            "element": {
+              "role": "button",
+              "name": null
+            }
+          }
+        }
+      },
+      "benign": {
+        "steps": [
+          {
+            "type": "navigate",
+            "url": "/account"
+          },
+          {
+            "type": "click",
+            "locator": {
+              "by": "testId",
+              "testId": "menu-toggle"
+            }
+          }
+        ],
+        "page": {
+          "1": {
+            "element": {
+              "role": "button",
+              "name": null
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "clicks Supprimer le compte on an fr-FR target, which falls back to the French patterns",
+      "actionKind": "click",
+      "stage": "static",
+      "target": "chromium-french-france",
+      "deniedStep": 1,
+      "rule": "irreversible-action",
+      "harmful": {
+        "steps": [
+          {
+            "type": "navigate",
+            "url": "/account"
+          },
+          {
+            "type": "click",
+            "locator": {
+              "by": "role",
+              "role": "button",
+              "name": "Supprimer le compte"
+            }
+          }
+        ]
+      },
+      "benign": {
+        "steps": [
+          {
+            "type": "navigate",
+            "url": "/account"
+          },
+          {
+            "type": "click",
+            "locator": {
+              "by": "role",
+              "role": "button",
+              "name": "Modifier le profil"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "runs on a Japanese target, whose locale has no irreversible pattern set",
+      "actionKind": "click",
+      "stage": "static",
+      "target": "chromium-japanese",
+      "deniedStep": null,
+      "rule": "no-locale-patterns",
+      "harmful": {
+        "steps": [
+          {
+            "type": "navigate",
+            "url": "/account"
+          },
+          {
+            "type": "click",
+            "locator": {
+              "by": "role",
+              "role": "button",
+              "name": "Save changes"
+            }
+          }
+        ]
+      },
+      "benign": {
+        "target": "chromium-english",
+        "steps": [
+          {
+            "type": "navigate",
+            "url": "/account"
+          },
+          {
+            "type": "click",
+            "locator": {
+              "by": "role",
+              "role": "button",
+              "name": "Save changes"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

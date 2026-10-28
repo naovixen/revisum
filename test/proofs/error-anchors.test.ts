@@ -19,7 +19,7 @@ const ERROR_CODES: Readonly<Record<string, readonly string[]>> = {
     'scheme_not_allowed', 'origin_not_allowed', 'target_not_in_matrix', 'unsafe_text', 'too_large', 'too_long',
     'duplicate', 'version_unsupported', 'empty', 'vacuous', 'no_criterion_id',
   ],
-  driver: ['not-found', 'ambiguous', 'not-actionable', 'timeout', 'navigation-failed'],
+  driver: ['not-found', 'ambiguous', 'not-actionable', 'timeout', 'navigation-failed', 'policy-denied'],
   runner: ['image-missing', 'image-digest-mismatch', 'egress-unenforceable', 'start-failed'],
   recorder: ['no-reason', 'unknown-item', 'already-decided', 'sink-failed'],
   sink: ['not-append-only', 'write-failed'],
@@ -32,6 +32,10 @@ const ERROR_CODES: Readonly<Record<string, readonly string[]>> = {
     'subject-mismatch', 'version-control-unavailable', 'not-maintainer', 'not-protected-branch', 'lockdown-not-declared',
   ],
   trust: ['untrusted-source', 'changed-with-code', 'no-approval'],
+  policy: [
+    'irreversible-action', 'irreversible-submit', 'destructive-navigation', 'irreversible-dialog', 'unnamed-control',
+    'no-locale-patterns', 'undeclared-origin', 'production-origin', 'over-limit',
+  ],
 };
 
 const headingsIn = (text: string): Set<string> =>
