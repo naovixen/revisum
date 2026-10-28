@@ -155,6 +155,13 @@ export type CliErrorCode = 'usage' | 'config-invalid' | 'untrusted-source' | 'pl
 - driver codes `target-crashed`, `unsupported-step` and `policy-denied`, and `ResolvedElement` (SPEC-03, SPEC-06);
 - `Session.frame`, `onDialog` and `upload`, and `DialogInfo` (SPEC-01 v1.1 steps, SPEC-06). `FixtureReference` moves from engine to contracts when `upload` is added, because drivers import only contracts.
 
+**Build notes.** Points the criteria leave open, settled while building (`docs/decisions/answers.md`, 2026-10-28):
+
+- AC-SPEC-27-07 names `valueContains` and `vacuous`, so both arrive with this spec rather than SPEC-01.
+- The sink is built by `jsonLinesEventSink(path): EventSink`, exported from `@revisum/engine`. Each line holds the event's fields plus `actor` and `actorType`. A truncation or rewrite made outside the sink, including a same-length edit, is caught on the next append.
+- The error-code anchors live in `docs/errors.md`: one `## <code>` heading per code, so `errors#<code>` resolves. "The docs build" is a check run by `npm run lint`; it fails, naming the code, when a code in any union has no heading.
+- The cast lint (AC-SPEC-27-05) and the actor lint (AC-SPEC-27-04, 08) check `packages/` and `tools/`, not the test set, and name the file they reject. Only engine's actor module and the approval verifier (SPEC-02) may build a `DerivedActor`.
+
 ## Acceptance criteria
 
 - AC-SPEC-27-01: When a `switch` over any error-code union above omits a code, `tsc` shall fail through an exhaustiveness check (oracle: specified).
