@@ -21,7 +21,7 @@ M1, language and trust:
 - [x] SPEC-02 project trust and approval
 - [x] SPEC-03 policy gate (static check and guard logic)
 - [x] SPEC-04 secrets and redaction
-- [ ] SPEC-30 plan values, positions and keys: parser and engine parts; owns plan language 1.2
+- [x] SPEC-30 plan values, positions and keys: parser and engine parts; owns plan language 1.2
 - [ ] SPEC-31 page states, metadata, downloads and tabs: parser parts
 - [ ] SPEC-32 declared service calls: declarations and request building, against a fake caller
 - [ ] SPEC-33 network stubs, request checks and storage: grammar

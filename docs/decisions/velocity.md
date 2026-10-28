@@ -10,3 +10,4 @@ Actual time per spec, for the velocity kill criteria in `E:\core\docs\09-mvp-pla
 | SPEC-02 | M1 | 2026-10-28 | 2026-10-28 | 1 | Two safe-side gaps noted for the M1 exit review |
 | SPEC-03 | M1 | 2026-10-28 | 2026-10-28 | 1 | Founder decisions: delete allowance, production opt-in, gate step in test helpers |
 | SPEC-04 | M1 | 2026-10-28 | 2026-10-28 | 1 | Two test faults fixed with founder approval; Firefox replay flaked once under load |
+| SPEC-30 (M1 parts) | M1 | 2026-10-28 | 2026-10-28 | 1 | Founder asked for one literal-step module instead of scattered checks |
