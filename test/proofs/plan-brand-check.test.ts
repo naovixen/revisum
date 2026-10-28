@@ -7,10 +7,11 @@ import { arch, platform } from 'node:os';
 import { test } from 'node:test';
 import {
   assertBranded, defaultRedactor, failure, planParser, run,
-  type BrowserDriver, type Plan, type TargetId,
+  type Authorised, type BrowserDriver, type Plan, type TargetId,
 } from '@revisum/engine';
 import { memoryArtifactStore, memoryRunEventSink, systemClock } from '../support/memory-ports.ts';
-import { ORIGIN, TARGET_ID, signupPlan, testProject } from '../unit/engine/plan-examples.ts';
+import { authorise, trustedProjectFrom } from '../support/policy-clearance.ts';
+import { ORIGIN, TARGET_ID, signupPlan, testProject, testProjectInput } from '../unit/engine/plan-examples.ts';
 
 const project = testProject();
 const parsePlan = planParser(project);
@@ -55,7 +56,10 @@ function watchedPorts(): Watched {
   };
 }
 
-const inputs = (plan: Plan) => ({
+// The parser's own output, cleared through the policy gate as every run requires.
+const authorisedPlan = async (): Promise<Authorised> => authorise(genuinePlan(), await trustedProjectFrom(testProjectInput()));
+
+const inputs = (plan: Authorised) => ({
   plan, project, targetId: TARGET_ID as TargetId, baseUrl: ORIGIN, seed: 42, fixedTimeMilliseconds: 0,
   fixtures: [], host: { platform: platform(), arch: arch() },
 });
@@ -63,7 +67,8 @@ const inputs = (plan: Plan) => ({
 for (const [name, forge] of FORGERIES) {
   test(`run() refuses ${name} before any side effect`, { criterion: 'AC-SPEC-01-05' }, async () => {
     const watched = watchedPorts();
-    await assert.rejects(run(inputs(forge()), watched.ports));
+    // The forgery is cast past the gate too: the run-time check must catch it all the same.
+    await assert.rejects(run(inputs(forge() as Authorised), watched.ports));
     assert.equal(watched.driverCalls(), 0, 'no driver method was called');
     assert.equal(watched.ports.events.read().length, 0, 'nothing was logged');
     assert.equal(watched.storeWrites(), 0, 'nothing was stored');
@@ -86,14 +91,14 @@ test('assertBranded accepts a plan made by the parser', { criterion: 'AC-SPEC-01
 
 test('run() accepts a plan made by the parser and reaches the driver', { criterion: 'AC-SPEC-01-05' }, async () => {
   const watched = watchedPorts();
-  const result = await run(inputs(genuinePlan()), watched.ports);
+  const result = await run(inputs(await authorisedPlan()), watched.ports);
   assert.equal(result.state, 'TargetUnavailable', 'the spy driver cannot launch, so the target is unavailable');
   assert.ok(watched.driverCalls() > 0, 'the driver was asked to open a session');
   assert.ok(watched.ports.events.read().length > 0, 'the run was logged');
 });
 
 test('a parser-made plan passes the check each time it is run', { criterion: 'AC-SPEC-01-05' }, async () => {
-  const plan = genuinePlan();
+  const plan = await authorisedPlan();
   for (let attempt = 0; attempt < 2; attempt++) {
     const watched = watchedPorts();
     await run(inputs(plan), watched.ports);

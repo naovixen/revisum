@@ -10,6 +10,7 @@ import {
   type BrowserDriver, type Plan, type Project, type RunEventSink, type RunInputs, type RunResult, type TargetId,
 } from '@revisum/engine';
 import { BROWSERS } from './browsers.ts';
+import { authorise, trustedProjectFrom } from './policy-clearance.ts';
 import { startFixtureServer, type FixtureServer } from './fixture-server.ts';
 import { memoryArtifactStore, memoryRunEventSink, systemClock, type MemoryArtifactStore } from './memory-ports.ts';
 import { FIXTURES } from './repository.ts';
@@ -24,20 +25,24 @@ export const CONTRACT_TARGETS = ['playwright-chromium', 'playwright-firefox', 'p
 
 const desktop = { device: 'desktop-1280', locale: LOCALE, timezone: TIMEZONE, colorScheme: 'dark', reducedMotion: 'reduce' } as const;
 
+// The project file as a person writes it. Its targets' locale, de-DE, is covered by the engine's
+// built-in German irreversible patterns, so it needs no policy of its own.
+export const makeProjectFile = (origin: string) => ({
+  origins: [origin],
+  limits: { stepTimeoutMilliseconds: 2000 },
+  matrix: [
+    { id: 'playwright-chromium', adapter: 'playwright', engine: 'chromium', ...desktop },
+    { id: 'playwright-firefox', adapter: 'playwright', engine: 'firefox', ...desktop },
+    { id: 'playwright-webkit', adapter: 'playwright', engine: 'webkit', ...desktop },
+    { id: 'cdp-chromium', adapter: 'cdp', engine: 'chromium', ...desktop },
+    // Targets no registered driver can serve, to prove they are reported and never substituted.
+    { id: 'playwright-firefox-phone', adapter: 'playwright', engine: 'firefox', ...desktop, device: 'phone-390' },
+    { id: 'appium-android', adapter: 'appium', engine: 'chromium', ...desktop, device: 'phone-390' },
+  ],
+});
+
 export function makeProject(origin: string): Project {
-  const parsed = parseProject({
-    origins: [origin],
-    limits: { stepTimeoutMilliseconds: 2000 },
-    matrix: [
-      { id: 'playwright-chromium', adapter: 'playwright', engine: 'chromium', ...desktop },
-      { id: 'playwright-firefox', adapter: 'playwright', engine: 'firefox', ...desktop },
-      { id: 'playwright-webkit', adapter: 'playwright', engine: 'webkit', ...desktop },
-      { id: 'cdp-chromium', adapter: 'cdp', engine: 'chromium', ...desktop },
-      // Targets no registered driver can serve, to prove they are reported and never substituted.
-      { id: 'playwright-firefox-phone', adapter: 'playwright', engine: 'firefox', ...desktop, device: 'phone-390' },
-      { id: 'appium-android', adapter: 'appium', engine: 'chromium', ...desktop, device: 'phone-390' },
-    ],
-  });
+  const parsed = parseProject(makeProjectFile(origin));
   if (!parsed.ok) throw new Error(`bad test project: ${JSON.stringify(parsed.error)}`);
   return parsed.value;
 }
@@ -62,6 +67,7 @@ export type Harness = {
 export async function harness(): Promise<Harness> {
   const server = await startFixtureServer(join(FIXTURES, 'signup-app'));
   const project = makeProject(server.origin);
+  const trusted = await trustedProjectFrom(makeProjectFile(server.origin));
   const parse = planParser(project);
   const drivers = makeDrivers();
   const base = (): Omit<RunInputs, 'plan' | 'targetId'> => ({
@@ -79,7 +85,8 @@ export async function harness(): Promise<Harness> {
       const events = memoryRunEventSink();
       const store = memoryArtifactStore();
       // The target id comes from the trusted test project, so it is used as the branded value directly.
-      const result = await run({ ...base(), plan, targetId: targetId as TargetId }, {
+      // Every run takes a plan the policy gate authorised.
+      const result = await run({ ...base(), plan: authorise(plan, trusted), targetId: targetId as TargetId }, {
         drivers: chosenDrivers, clock: systemClock, artifacts: store, redactor: defaultRedactor(), events,
       });
       return { result, events, store };

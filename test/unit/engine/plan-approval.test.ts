@@ -15,8 +15,9 @@ import {
   type Approval, type BrowserDriver, type Plan, type Project, type TargetId,
 } from '@revisum/engine';
 import { memoryArtifactStore, memoryRunEventSink, systemClock } from '../../support/memory-ports.ts';
+import { authorise, trustedProjectFrom } from '../../support/policy-clearance.ts';
 import { memoryApprovalStore, parsedSignupPlan, withRepository, type TestRepository } from './approval-repositories.ts';
-import { ORIGIN, TARGET_ID, signupPlan, testProject, withValue, type JsonRecord } from './plan-examples.ts';
+import { ORIGIN, TARGET_ID, signupPlan, testProject, testProjectInput, withValue, type JsonRecord } from './plan-examples.ts';
 
 const PRODUCTION_ORIGIN = 'https://shop.example.com';
 
@@ -69,13 +70,17 @@ function countingDriver(): CountingDriver {
 }
 
 // A project whose allowed origins include a production one, declared as production.
-const projectWithProduction = (): Project =>
-  testProject({}, { origins: [ORIGIN, PRODUCTION_ORIGIN], productionOrigins: [PRODUCTION_ORIGIN] });
+// `policy` optionally adds the project's policy, such as the allowance for approved plans on production.
+const productionFields = (policy?: JsonRecord): JsonRecord =>
+  ({ origins: [ORIGIN, PRODUCTION_ORIGIN], productionOrigins: [PRODUCTION_ORIGIN], ...(policy === undefined ? {} : { policy }) });
+const projectWithProduction = (policy?: JsonRecord): Project => testProject({}, productionFields(policy));
 
-async function runPlan(plan: Plan, standing: ReturnType<typeof planStanding>, baseUrl: string) {
+async function runPlan(plan: Plan, standing: ReturnType<typeof planStanding>, baseUrl: string, policy?: JsonRecord) {
   const driver = countingDriver();
+  // Every run takes a plan the policy gate authorised, under the plan's standing.
+  const authorised = authorise(plan, await trustedProjectFrom(testProjectInput({}, productionFields(policy))), standing);
   const result = await run({
-    plan, project: projectWithProduction(), targetId: TARGET_ID as TargetId, baseUrl, seed: 7, fixedTimeMilliseconds: 0,
+    plan: authorised, project: projectWithProduction(policy), targetId: TARGET_ID as TargetId, baseUrl, seed: 7, fixedTimeMilliseconds: 0,
     fixtures: [], host: { platform: 'test', arch: 'test' }, standing,
   }, {
     drivers: new Map([['playwright', driver]]), clock: systemClock, artifacts: memoryArtifactStore(),
@@ -125,7 +130,8 @@ test('a proposal run on a non-production origin goes ahead', { criterion: 'AC-SP
 test('the same plan, approved, may run on the production origin', { criterion: 'AC-SPEC-02-03' }, async () => {
   // The counter-example: only the standing differs from the refused proposal above.
   const approval = await approvalIn('solo', declaredPlanApproval);
-  const { result, driverCalls } = await runPlan(parsedSignupPlan(), { mode: 'approved', approval }, PRODUCTION_ORIGIN);
+  // Production is denied to every plan unless the project allows it for approved plans.
+  const { result, driverCalls } = await runPlan(parsedSignupPlan(), { mode: 'approved', approval }, PRODUCTION_ORIGIN, { allowProductionForApprovedPlans: true });
   assert.ok(driverCalls > 0, 'an approved plan was not run');
   assert.ok(!JSON.stringify(result).includes('origin_not_allowed'), JSON.stringify(result));
 });
