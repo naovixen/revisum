@@ -1,0 +1,12 @@
+{
+  "version": "1.2",
+  "meta": { "featureId": "DOCS-2", "specReference": "specs/search.md#results", "title": "Results open in the order listed" },
+  "targets": ["playwright-chromium"],
+  "steps": [
+    { "type": "navigate", "url": "/search?q=install" },
+    { "type": "expect", "locator": { "by": "role", "role": "link", "name": "Install", "position": "first" }, "assert": { "kind": "visible" }, "criterionId": "search.first-result-shown" },
+    { "type": "expect", "locator": { "by": "role", "role": "listitem", "name": "Result", "position": "last" }, "assert": { "kind": "visible" }, "criterionId": "search.last-result-shown" },
+    { "type": "click", "locator": { "by": "role", "role": "link", "name": "Install", "position": 3 } },
+    { "type": "expectPage", "assert": { "kind": "urlPath", "value": "/install/linux" }, "criterionId": "search.third-result-opened" }
+  ]
+}

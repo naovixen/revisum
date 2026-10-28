@@ -1,0 +1,20 @@
+{
+  "version": "1.2",
+  "meta": { "featureId": "SIGNUP-2", "specReference": "specs/signup.md#unique-account", "title": "Sign-up with values unique to the run" },
+  "targets": ["playwright-chromium"],
+  "values": {
+    "displayName": { "kind": "uniqueText", "prefix": "Tester" },
+    "contact": { "kind": "uniqueEmail", "localPrefix": "ada" },
+    "memberNumber": { "kind": "uniqueNumber", "digits": 8 },
+    "trialEnds": { "kind": "date", "day": { "from": "today", "addDays": 14 }, "format": "longDate" }
+  },
+  "steps": [
+    { "type": "navigate", "url": "/" },
+    { "type": "fill", "locator": { "by": "label", "label": "Full name" }, "value": { "valueName": "displayName" } },
+    { "type": "fill", "locator": { "by": "label", "label": "Email" }, "value": { "valueName": "contact" } },
+    { "type": "fill", "locator": { "by": "label", "label": "Member number" }, "value": { "valueName": "memberNumber" } },
+    { "type": "click", "locator": { "by": "role", "role": "button", "name": "Create account" } },
+    { "type": "expect", "locator": { "by": "testId", "testId": "echo" }, "assert": { "kind": "textContains", "value": { "valueName": "contact" } }, "criterionId": "signup.address-echoed" },
+    { "type": "expect", "locator": { "by": "testId", "testId": "trial" }, "assert": { "kind": "textContains", "value": { "valueName": "trialEnds" } }, "criterionId": "signup.trial-end-shown" }
+  ]
+}

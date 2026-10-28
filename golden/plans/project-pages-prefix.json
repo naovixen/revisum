@@ -1,0 +1,10 @@
+{
+  "version": "1.2",
+  "meta": { "featureId": "PROJECTS-1", "specReference": "specs/projects.md#navigation", "title": "Project tabs stay under the project path" },
+  "targets": ["playwright-chromium"],
+  "steps": [
+    { "type": "navigate", "url": "/projects/demo" },
+    { "type": "click", "locator": { "by": "role", "role": "tab", "name": "Members" } },
+    { "type": "expectPage", "assert": { "kind": "urlPathStartsWith", "value": "/projects/demo/" }, "criterionId": "projects.tab-under-project" }
+  ]
+}

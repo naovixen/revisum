@@ -1,0 +1,123 @@
+{
+  "suites": {
+    "example-shop": {
+      "project": {
+        "origins": ["http://127.0.0.1:4173"],
+        "secretNames": ["SHOP_PASSWORD"],
+        "generatedEmailDomains": ["shop.test"],
+        "matrix": [{ "id": "playwright-chromium", "adapter": "playwright", "engine": "chromium", "device": "desktop-1280", "locale": "en-GB", "timezone": "UTC", "colorScheme": "light", "reducedMotion": "reduce" }]
+      }
+    },
+    "example-docs": {
+      "project": {
+        "origins": ["http://127.0.0.1:4173"],
+        "matrix": [{ "id": "playwright-chromium", "adapter": "playwright", "engine": "chromium", "device": "desktop-1280", "locale": "en-GB", "timezone": "UTC", "colorScheme": "light", "reducedMotion": "reduce" }]
+      }
+    }
+  },
+  "intents": [
+    {
+      "suite": "example-shop",
+      "sample": "original",
+      "sourceUrl": "https://github.com/example/shop/blob/main/tests/login.spec.ts",
+      "testName": "signs in with the shop account",
+      "verdict": "expressible",
+      "reason": "A secret the shop project declares, then a status check",
+      "plan": {
+        "version": "1.2",
+        "meta": { "featureId": "SHOP-3", "specReference": "tests/login.spec.ts", "title": "Sign in" },
+        "targets": ["playwright-chromium"],
+        "steps": [
+          { "type": "navigate", "url": "/login" },
+          { "type": "fill", "locator": { "by": "label", "label": "Password" }, "value": { "secretName": "SHOP_PASSWORD" } },
+          { "type": "click", "locator": { "by": "role", "role": "button", "name": "Sign in" } },
+          { "type": "expect", "locator": { "by": "testId", "testId": "status" }, "assert": { "kind": "textContains", "value": "Signed in" }, "criterionId": "shop.signed-in" }
+        ]
+      }
+    },
+    {
+      "suite": "example-docs",
+      "sample": "original",
+      "sourceUrl": "https://github.com/example/docs/blob/main/e2e/admin.test.ts",
+      "testName": "admin signs in",
+      "verdict": "expressible",
+      "reason": "Uses the shop's secret, which the docs project does not declare",
+      "plan": {
+        "version": "1.2",
+        "meta": { "featureId": "DOCS-3", "specReference": "e2e/admin.test.ts", "title": "Admin sign-in" },
+        "targets": ["playwright-chromium"],
+        "steps": [
+          { "type": "navigate", "url": "/admin" },
+          { "type": "fill", "locator": { "by": "label", "label": "Password" }, "value": { "secretName": "SHOP_PASSWORD" } },
+          { "type": "expect", "locator": { "by": "testId", "testId": "status" }, "assert": { "kind": "textContains", "value": "Welcome" }, "criterionId": "docs.admin-signed-in" }
+        ]
+      }
+    },
+    {
+      "suite": "example-docs",
+      "sample": "original",
+      "sourceUrl": "https://github.com/example/docs/blob/main/e2e/search.test.ts",
+      "testName": "search opens the first result",
+      "verdict": "expressible",
+      "reason": "Fill, press Enter and a page path check",
+      "plan": {
+        "version": "1.2",
+        "meta": { "featureId": "DOCS-1", "specReference": "e2e/search.test.ts", "title": "Search result opens" },
+        "targets": ["playwright-chromium"],
+        "steps": [
+          { "type": "navigate", "url": "/" },
+          { "type": "fill", "locator": { "by": "role", "role": "searchbox", "name": "Search" }, "value": "install" },
+          { "type": "press", "locator": { "by": "role", "role": "searchbox", "name": "Search" }, "key": "Enter" },
+          { "type": "expectPage", "assert": { "kind": "urlPath", "value": "/install" }, "criterionId": "docs.result-opened" }
+        ]
+      }
+    },
+    {
+      "suite": "example-shop",
+      "sample": "fresh",
+      "sourceUrl": "https://github.com/example/shop/blob/main/tests/newsletter.spec.ts",
+      "testName": "subscribes a new address to the newsletter",
+      "verdict": "expressible",
+      "reason": "A unique email on the domain the shop project declares",
+      "plan": {
+        "version": "1.2",
+        "meta": { "featureId": "SHOP-4", "specReference": "tests/newsletter.spec.ts", "title": "Newsletter sign-up" },
+        "targets": ["playwright-chromium"],
+        "values": { "subscriber": { "kind": "uniqueEmail", "localPrefix": "reader", "domain": "shop.test" } },
+        "steps": [
+          { "type": "navigate", "url": "/newsletter" },
+          { "type": "fill", "locator": { "by": "label", "label": "Email" }, "value": { "valueName": "subscriber" } },
+          { "type": "click", "locator": { "by": "role", "role": "button", "name": "Subscribe" } },
+          { "type": "expect", "locator": { "by": "testId", "testId": "status" }, "assert": { "kind": "textContains", "value": { "valueName": "subscriber" } }, "criterionId": "shop.subscribed" }
+        ]
+      }
+    },
+    {
+      "suite": "example-docs",
+      "sample": "fresh",
+      "sourceUrl": "https://github.com/example/docs/blob/main/e2e/feedback.test.ts",
+      "testName": "sends feedback from a new address",
+      "verdict": "expressible",
+      "reason": "Uses the shop's email domain, which the docs project does not declare",
+      "plan": {
+        "version": "1.2",
+        "meta": { "featureId": "DOCS-4", "specReference": "e2e/feedback.test.ts", "title": "Feedback form" },
+        "targets": ["playwright-chromium"],
+        "values": { "reader": { "kind": "uniqueEmail", "localPrefix": "reader", "domain": "shop.test" } },
+        "steps": [
+          { "type": "navigate", "url": "/feedback" },
+          { "type": "fill", "locator": { "by": "label", "label": "Email" }, "value": { "valueName": "reader" } },
+          { "type": "expect", "locator": { "by": "label", "label": "Email" }, "assert": { "kind": "valueEquals", "value": { "valueName": "reader" } }, "criterionId": "docs.feedback-address-kept" }
+        ]
+      }
+    },
+    {
+      "suite": "example-docs",
+      "sample": "fresh",
+      "sourceUrl": "https://github.com/example/docs/blob/main/e2e/offline.test.ts",
+      "testName": "downloads the offline bundle",
+      "verdict": "not-expressible",
+      "reason": "Downloads are not plan steps in this language"
+    }
+  ]
+}

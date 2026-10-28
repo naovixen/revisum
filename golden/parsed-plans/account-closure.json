@@ -1,0 +1,94 @@
+{
+  "version": "1.1",
+  "meta": {
+    "featureId": "ACCOUNT-3",
+    "specReference": "specs/account.md#closure",
+    "title": "Closing an account"
+  },
+  "targets": [
+    "playwright-chromium"
+  ],
+  "steps": [
+    {
+      "type": "navigate",
+      "url": "/account"
+    },
+    {
+      "type": "hover",
+      "locator": {
+        "by": "role",
+        "role": "button",
+        "name": "Help"
+      }
+    },
+    {
+      "type": "select",
+      "locator": {
+        "by": "label",
+        "label": "Reason for leaving"
+      },
+      "option": "Moving to another service"
+    },
+    {
+      "type": "frame",
+      "locator": {
+        "by": "testId",
+        "testId": "confirmation-frame"
+      },
+      "steps": [
+        {
+          "type": "fill",
+          "locator": {
+            "by": "label",
+            "label": "Type your name to confirm"
+          },
+          "value": "Ada Lovelace"
+        },
+        {
+          "type": "expect",
+          "locator": {
+            "by": "label",
+            "label": "Type your name to confirm"
+          },
+          "assert": {
+            "kind": "valueEquals",
+            "value": "Ada Lovelace"
+          },
+          "criterionId": "closure.name-confirmed"
+        }
+      ]
+    },
+    {
+      "type": "click",
+      "locator": {
+        "by": "role",
+        "role": "button",
+        "name": "Close account"
+      }
+    },
+    {
+      "type": "dialog",
+      "action": "accept",
+      "expectText": "Are you sure?"
+    },
+    {
+      "type": "expect",
+      "locator": {
+        "by": "testId",
+        "testId": "account-summary"
+      },
+      "assert": {
+        "kind": "absent"
+      },
+      "criterionId": "closure.summary-removed"
+    },
+    {
+      "type": "expectPage",
+      "assert": {
+        "kind": "urlPath",
+        "value": "/goodbye"
+      },
+      "criterionId": "closure.farewell-shown"
+    }
+  ]
+}

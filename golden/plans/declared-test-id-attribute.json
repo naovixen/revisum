@@ -1,0 +1,10 @@
+{
+  "version": "1.2",
+  "meta": { "featureId": "SETTINGS-1", "specReference": "specs/settings.md#save", "title": "Saving settings by declared test id" },
+  "targets": ["playwright-chromium"],
+  "steps": [
+    { "type": "navigate", "url": "/settings" },
+    { "type": "click", "locator": { "by": "testId", "testId": "save-settings", "attribute": "data-testid" } },
+    { "type": "expect", "locator": { "by": "testId", "testId": "saved-notice", "attribute": "data-testid" }, "assert": { "kind": "textContains", "value": "Saved" }, "criterionId": "settings.saved-shown" }
+  ]
+}

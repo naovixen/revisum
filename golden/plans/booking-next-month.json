@@ -1,0 +1,16 @@
+{
+  "version": "1.2",
+  "meta": { "featureId": "BOOKING-1", "specReference": "specs/booking.md#first-slot", "title": "The first slot of the month can be booked" },
+  "targets": ["playwright-chromium"],
+  "clock": { "day": { "from": "startOfNextMonth", "addDays": 0 }, "time": "09:00" },
+  "values": {
+    "slotDay": { "kind": "date", "day": { "from": "startOfNextMonth", "addDays": 0 }, "format": "dayOfMonth" },
+    "slotMonth": { "kind": "date", "day": { "from": "startOfNextMonth", "addDays": 0 }, "format": "monthAndYear" }
+  },
+  "steps": [
+    { "type": "navigate", "url": "/booking" },
+    { "type": "expect", "locator": { "by": "role", "role": "heading", "name": { "valueName": "slotMonth" } }, "assert": { "kind": "visible" }, "criterionId": "booking.month-shown" },
+    { "type": "click", "locator": { "by": "role", "role": "button", "name": { "valueName": "slotDay" } } },
+    { "type": "expect", "locator": { "by": "testId", "testId": "selected-day" }, "assert": { "kind": "textEquals", "value": { "valueName": "slotDay" } }, "criterionId": "booking.day-selected" }
+  ]
+}

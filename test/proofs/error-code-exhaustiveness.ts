@@ -7,7 +7,7 @@
 //   - one that leaves a code out. Its @ts-expect-error line must stay an error.
 // See docs/specs/SPEC-27-shared-types-and-events.md.
 import type { CliErrorCode, DriverErrorCode, RecorderError, RunnerError, SinkError } from '@revisum/contracts';
-import type { PlanErrorCode } from '@revisum/engine';
+import type { PlanErrorCode, StepErrorCode } from '@revisum/engine';
 
 // Only a value of type never may reach this, so every code must have been handled before it.
 const unreachable = (code: never): never => {
@@ -21,7 +21,7 @@ export function describePlanError(code: PlanErrorCode): string {
     case 'unknown_value': case 'invalid_url': case 'scheme_not_allowed': case 'origin_not_allowed':
     case 'target_not_in_matrix': case 'unsafe_text': case 'too_large': case 'too_long': case 'duplicate':
     case 'version_unsupported': case 'empty': case 'vacuous':
-    case 'no_criterion_id': case 'literal_secret':
+    case 'no_criterion_id': case 'literal_secret': case 'undefined_value': case 'position_not_allowed':
       return 'plan rejected';
     default:
       return unreachable(code);
@@ -33,9 +33,29 @@ export function describePlanErrorForgettingOne(code: PlanErrorCode): string {
     case 'unknown_value': case 'invalid_url': case 'scheme_not_allowed': case 'origin_not_allowed':
     case 'target_not_in_matrix': case 'unsafe_text': case 'too_large': case 'too_long': case 'duplicate':
     case 'version_unsupported': case 'empty': case 'no_criterion_id': case 'literal_secret':
+    case 'undefined_value': case 'position_not_allowed':
       return 'plan rejected';
     default:
       // @ts-expect-error 'vacuous' is not handled, so the code does not narrow to never
+      return unreachable(code);
+  }
+}
+
+// ---- Step errors (decided by the engine at run time, declared beside the interpreter) -------------
+export function describeStepError(code: StepErrorCode): string {
+  switch (code) {
+    case 'value-empty': case 'value-unsafe': case 'value-too-long':
+      return 'step failed';
+    default:
+      return unreachable(code);
+  }
+}
+export function describeStepErrorForgettingOne(code: StepErrorCode): string {
+  switch (code) {
+    case 'value-empty': case 'value-too-long':
+      return 'step failed';
+    default:
+      // @ts-expect-error 'value-unsafe' is not handled, so the code does not narrow to never
       return unreachable(code);
   }
 }

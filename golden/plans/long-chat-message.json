@@ -1,0 +1,10 @@
+{
+  "version": "1.2",
+  "meta": { "featureId": "CHAT-1", "specReference": "specs/chat.md#long-messages", "title": "A message of several lines is kept whole" },
+  "targets": ["playwright-chromium"],
+  "steps": [
+    { "type": "navigate", "url": "/chat" },
+    { "type": "fill", "locator": { "by": "role", "role": "textbox", "name": "Message" }, "value": { "lines": ["First line of the message", "Second line", "Third line"] } },
+    { "type": "expect", "locator": { "by": "role", "role": "textbox", "name": "Message" }, "assert": { "kind": "valueContains", "value": "Third line" }, "criterionId": "chat.lines-kept" }
+  ]
+}

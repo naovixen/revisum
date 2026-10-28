@@ -1,0 +1,12 @@
+{
+  "version": "1.2",
+  "meta": { "featureId": "ORDERS-3", "specReference": "specs/orders.md#order-page", "title": "An order opens at its own path" },
+  "targets": ["playwright-chromium"],
+  "values": {
+    "orderCode": { "kind": "uniqueText", "prefix": "order" }
+  },
+  "steps": [
+    { "type": "navigate", "url": { "segments": ["orders", { "valueName": "orderCode" }], "query": { "tab": "items", "highlight": { "valueName": "orderCode" } } } },
+    { "type": "expect", "locator": { "by": "role", "role": "heading", "name": { "valueName": "orderCode" } }, "assert": { "kind": "visible" }, "criterionId": "orders.page-opened" }
+  ]
+}

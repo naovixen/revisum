@@ -17,8 +17,10 @@ const ERROR_CODES: Readonly<Record<string, readonly string[]>> = {
   plan: [
     'not_object', 'unknown_field', 'missing_field', 'wrong_type', 'unknown_step', 'unknown_value', 'invalid_url',
     'scheme_not_allowed', 'origin_not_allowed', 'target_not_in_matrix', 'unsafe_text', 'too_large', 'too_long',
-    'duplicate', 'version_unsupported', 'empty', 'vacuous', 'no_criterion_id', 'literal_secret',
+    'duplicate', 'version_unsupported', 'empty', 'vacuous', 'no_criterion_id', 'literal_secret', 'undefined_value',
+    'position_not_allowed',
   ],
+  step: ['value-empty', 'value-unsafe', 'value-too-long'],
   driver: ['not-found', 'ambiguous', 'not-actionable', 'timeout', 'navigation-failed', 'policy-denied'],
   runner: ['image-missing', 'image-digest-mismatch', 'egress-unenforceable', 'start-failed'],
   recorder: ['no-reason', 'unknown-item', 'already-decided', 'sink-failed'],

@@ -1,0 +1,13 @@
+{
+  "version": "1.2",
+  "meta": { "featureId": "EDITOR-1", "specReference": "specs/editor.md#shortcuts", "title": "Keyboard shortcuts open the command palette and the terminal" },
+  "targets": ["playwright-chromium"],
+  "steps": [
+    { "type": "navigate", "url": "/editor" },
+    { "type": "press", "locator": { "by": "role", "role": "main", "name": "Editor" }, "key": "k", "modifiers": ["ControlOrMeta"] },
+    { "type": "expect", "locator": { "by": "role", "role": "dialog", "name": "Command palette" }, "assert": { "kind": "visible" }, "criterionId": "editor.palette-opened" },
+    { "type": "press", "locator": { "by": "role", "role": "dialog", "name": "Command palette" }, "key": "Escape" },
+    { "type": "press", "locator": { "by": "role", "role": "main", "name": "Editor" }, "key": "Backquote", "modifiers": ["Control", "Shift"] },
+    { "type": "expect", "locator": { "by": "role", "role": "region", "name": "Terminal" }, "assert": { "kind": "visible" }, "criterionId": "editor.terminal-opened" }
+  ]
+}

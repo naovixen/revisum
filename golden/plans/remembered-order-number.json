@@ -1,0 +1,13 @@
+{
+  "version": "1.2",
+  "meta": { "featureId": "ORDERS-2", "specReference": "specs/orders.md#order-number", "title": "The new order number is shown in the list" },
+  "targets": ["playwright-chromium"],
+  "steps": [
+    { "type": "navigate", "url": "/orders/new" },
+    { "type": "click", "locator": { "by": "role", "role": "button", "name": "Place order" } },
+    { "type": "remember", "name": "orderNumber", "from": { "element": { "by": "testId", "testId": "order-number" }, "read": "text" } },
+    { "type": "navigate", "url": "/orders" },
+    { "type": "fill", "locator": { "by": "role", "role": "searchbox", "name": "Search orders" }, "value": { "valueName": "orderNumber" } },
+    { "type": "expect", "locator": { "by": "role", "role": "row", "name": { "valueName": "orderNumber" } }, "assert": { "kind": "visible" }, "criterionId": "orders.number-listed" }
+  ]
+}
