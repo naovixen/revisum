@@ -1,0 +1,10 @@
+{
+  "version": "1.1",
+  "targets": ["chromium-stable"],
+  "steps": [
+    { "type": "navigate", "url": "https://staging.example.org/login" },
+    { "type": "fill", "locator": { "by": "role", "role": "textbox", "name": "Email" }, "value": { "secretName": "TEST_USER" } },
+    { "type": "click", "locator": { "by": "role", "role": "button", "name": "Sign in" } },
+    { "type": "expect", "locator": { "by": "role", "role": "heading", "name": "Dashboard" }, "assert": { "kind": "visible" }, "criterionId": "AC-3" }
+  ]
+}

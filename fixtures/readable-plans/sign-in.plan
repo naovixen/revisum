@@ -1,0 +1,9 @@
+Plan: Sign in
+Version: 1.1
+Targets: chromium-stable
+Origin: https://staging.example.org
+Go to /login
+Type secret TEST_USER into textbox "Email"
+Click button "Sign in"
+Criterion: AC-3
+Expect heading "Dashboard" is visible

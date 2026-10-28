@@ -7,7 +7,7 @@
 //   - one that leaves a code out. Its @ts-expect-error line must stay an error.
 // See docs/specs/SPEC-27-shared-types-and-events.md.
 import type { CliErrorCode, DriverErrorCode, RecorderError, RunnerError, ServiceCallErrorCode, SinkError } from '@revisum/contracts';
-import type { PlanErrorCode, StepErrorCode } from '@revisum/engine';
+import type { PlanErrorCode, StepErrorCode, TextErrorCode } from '@revisum/engine';
 
 // Only a value of type never may reach this, so every code must have been handled before it.
 const unreachable = (code: never): never => {
@@ -39,6 +39,27 @@ export function describePlanErrorForgettingOne(code: PlanErrorCode): string {
       return 'plan rejected';
     default:
       // @ts-expect-error 'vacuous' is not handled, so the code does not narrow to never
+      return unreachable(code);
+  }
+}
+
+// ---- Readable text errors (declared beside the readable plan reader) ------------------------------
+export function describeTextError(code: TextErrorCode): string {
+  switch (code) {
+    case 'unknown-statement': case 'bad-locator': case 'bad-string': case 'bad-indent': case 'missing-header':
+    case 'duplicate-header': case 'no-criterion': case 'unknown-key-name': case 'too-large': case 'duplicate-key':
+      return 'text rejected';
+    default:
+      return unreachable(code);
+  }
+}
+export function describeTextErrorForgettingOne(code: TextErrorCode): string {
+  switch (code) {
+    case 'unknown-statement': case 'bad-locator': case 'bad-string': case 'bad-indent': case 'missing-header':
+    case 'duplicate-header': case 'no-criterion': case 'too-large': case 'duplicate-key':
+      return 'text rejected';
+    default:
+      // @ts-expect-error 'unknown-key-name' is not handled, so the code does not narrow to never
       return unreachable(code);
   }
 }

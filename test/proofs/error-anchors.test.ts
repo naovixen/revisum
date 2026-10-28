@@ -20,6 +20,10 @@ const ERROR_CODES: Readonly<Record<string, readonly string[]>> = {
     'duplicate', 'version_unsupported', 'empty', 'vacuous', 'no_criterion_id', 'literal_secret', 'undefined_value',
     'position_not_allowed', 'misplaced_step', 'unsafe_interpolation', 'header_not_allowed',
   ],
+  text: [
+    'unknown-statement', 'bad-locator', 'bad-string', 'bad-indent', 'missing-header', 'duplicate-header', 'no-criterion',
+    'unknown-key-name', 'too-large', 'duplicate-key',
+  ],
   step: ['value-empty', 'value-unsafe', 'value-too-long', 'state-not-exposed', 'download-not-text', 'request-not-seen'],
   serviceCall: [
     'response-not-json', 'response-too-large', 'field-missing', 'service-unreachable', 'call-timeout', 'unexpected-status',
