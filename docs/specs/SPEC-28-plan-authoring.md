@@ -137,6 +137,18 @@ export interface PlanRecorder { record(target: TargetId): Promise<PlanDraft> }  
 export interface ChatDrafter { reply(conversationId: string, message: string): Promise<PlanDraft> } // hosted, paid
 ```
 
+**Build notes.** Points the criteria leave open, settled while building (2026-10-28; `docs/decisions/answers.md`):
+
+- **Plan 1.2 in text (addition).** The readable grammar above covers plan 1.1. Every 1.2 feature (SPEC-30 to 34) gets a readable form, defined in "Readable syntax for plan 1.2" below. That way AC-SPEC-28-01's round trip holds for every golden plan.
+- **Plan header.** `Plan:` fills `meta.title`. New headers `Feature:` and `Spec:` fill `meta.featureId` and `meta.specReference`; a plan needs both to parse. The founder's example has neither, so AC-SPEC-28-06 compares version, targets and steps only.
+- **URLs.** `Go to <url>` keeps exactly what it is given. With an `Origin:` header, a path is resolved against it to an absolute URL (AC-SPEC-28-06). Without one, a path stays a path, as JSON allows. The canonical writer never writes `Origin:`, so text and JSON round-trip byte for byte.
+- **Plan hash.** It stays the built formula, the sha256 of `canonicalJson` (`packages/engine/src/manifest.ts`), so existing hashes and the replay golden don't change. `writePlanJson` is the file form, not the hash input.
+- **Provenance.** `EventInput` gains `planProvenance`, and the JSON Lines sink writes it.
+- **Declared sources (AC-SPEC-28-09).** `admitDraft` takes an optional declared source. Without one, provenance is `hand-written` with basis `declared`. Only core's recorder (phase 2b) can produce a `core-recorded` basis; a file or a caller that claims it is refused with `untrusted-source`.
+- **Malformed JSON drafts** are refused with `not_object` at `$`, before the parser.
+- **Criterion ids in data.** The naming lint skips the values of `criterionId` fields, because they are the user's own ids, such as `AC-3`.
+- **Text errors.** A statement's own error is at column 1, and any other inside the faulty token. Comments are whole lines starting with `#`.
+
 ## Acceptance criteria
 
 - AC-SPEC-28-01: When any plan in canonical JSON form is converted to text with `writePlanText` and back through `readPlanText`, `parsePlan` and `writePlanJson`, the output shall be byte-identical to the input. This holds for every golden example and for generated plans covering every step, locator and assertion kind (oracle: metamorphic; property test).
