@@ -4,6 +4,7 @@
 // See docs/specs/SPEC-27-shared-types-and-events.md.
 import type { ApprovalErrorCode, ApprovalProof } from './approval.ts';
 import type { Brand } from './brand.ts';
+import type { PolicyRuleId } from './policy.ts';
 import type { Result } from './result.ts';
 
 // A keyed hash (HMAC) of the identity under the customer's key: pseudonymous, never the raw identity.
@@ -36,8 +37,8 @@ export type EventInput = {
   readonly criterionIds?: readonly string[];
   // On plan.approved and approval.refused: the route the approval was offered by.
   readonly proofKind?: ApprovalProof['kind'];
-  // On approval.refused: why the approval verifier refused it.
-  readonly code?: ApprovalErrorCode;
+  // On approval.refused: why the approval verifier refused it. On plan.denied: the policy rule.
+  readonly code?: ApprovalErrorCode | PolicyRuleId;
   // On trusted.changed-with-code: the trusted file the change edited, relative to the repository root.
   readonly path?: string;
 };

@@ -6,6 +6,7 @@ export { failure, success, type Failure, type Result, type Success } from './res
 export * from './target.ts';
 export * from './plan.ts';
 export * from './browser-driver.ts';
+export type * from './policy.ts';
 export type * from './run-ports.ts';
 export * from './audit-events.ts';
 export type * from './approval.ts';

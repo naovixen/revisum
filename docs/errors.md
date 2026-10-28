@@ -7,7 +7,7 @@
 - Plan codes use underscores (`unknown_step`); every other union uses hyphens (`not-found`).
 - Each code says what was refused and what to do. Errors carry a code and a location, never the offending value, so private or hostile text is never echoed back.
 
-Plan errors (`PlanErrorCode`, from the plan parser in `engine`) come first, then driver, runner, review recorder, event sink, command-line, approval and trust errors.
+Plan errors (`PlanErrorCode`, from the plan parser in `engine`) come first, then driver, runner, review recorder, event sink, command-line, approval, trust and policy errors.
 
 ## not_object
 
@@ -100,6 +100,10 @@ Driver error. The browser did not finish the operation within the session's time
 ## navigation-failed
 
 Driver error. The browser could not load the page.
+
+## policy-denied
+
+Driver error. The policy gate's runtime guard refused the action once the driver had resolved its element, so no input event was sent. The run ends `Denied`, naming the policy rule; see that rule below.
 
 ## image-missing
 
@@ -236,3 +240,39 @@ Trust error. The change under test edits a trusted file together with applicatio
 ## no-approval
 
 Trust error. A trusted file or plan has no approval of its exact hash, so it is not trusted. Get it approved; a plan with no approval runs only as a proposal.
+
+## irreversible-action
+
+Policy error. A click, or Enter or Space on a focused control, would press a control whose accessible name matches an irreversible pattern, such as "Delete account". The patterns are the engine's set for the target's language (delete, pay, send, revoke and their equivalents) plus the project's `policy.irreversiblePatterns`. To test such a feature, list the exact name in the trusted `policy.allowedIrreversibleNames` and get it approved.
+
+## irreversible-submit
+
+Policy error. Enter or Space in a field would submit a form whose submit control matches an irreversible pattern. Allow the submit control's exact name in `policy.allowedIrreversibleNames`, or change the plan.
+
+## destructive-navigation
+
+Policy error. A navigation, or a click on a link, would reach a URL path the project declares destructive in `policy.destructiveUrlPatterns`, or a path below it. Remove the step, or remove the path from the trusted policy if it is not destructive.
+
+## irreversible-dialog
+
+Policy error. The plan would accept a dialog whose text matches an irreversible pattern, such as "Revoke all API keys?". Dismiss it instead, or allow the exact text in `policy.allowedIrreversibleNames`.
+
+## unnamed-control
+
+Policy error. The plan would act on a control with no accessible name, which could be anything. Give the control an accessible name (its absence is an accessibility defect too), or allow its test id in `policy.unnamedControlsAllowedByTestId`.
+
+## no-locale-patterns
+
+Policy error. A target's locale has no irreversible pattern set: the engine ships English, German and French (a locale such as fr-FR uses French), and the project declares none for it. Add the locale's words to `policy.irreversiblePatterns` in the trusted project.
+
+## undeclared-origin
+
+Policy error. The plan navigates to an origin the trusted project does not list in `origins`, although the project it was parsed against did. Plans are held to the trusted project: add the origin there, with an approval, or change the plan.
+
+## production-origin
+
+Policy error. The plan navigates to an origin the trusted project marks as production. Production is denied to every plan unless the trusted `policy.allowProductionForApprovedPlans` is true, and then only to approved plans, never to a proposal.
+
+## over-limit
+
+Policy error. The plan exceeds the trusted project's limits: more steps in one list than `maximumSteps`, frames nested deeper than `maximumFrameDepth`, or more bytes than `maximumPlanBytes`. Split the plan, or raise the limit in the trusted project.

@@ -1,9 +1,11 @@
-// The deterministic interpreter: (plan, target, ports) to RunResult. It accepts only a parsed
-// Plan, walks the typed lifecycle, never substitutes a target, and hashes everything except
-// wall-clock timings.
-import type {
-  A11yFinding, ApprovalLabel, ArtifactReference, ArtifactStore, BrowserDriver, Clock, ElementProbe, Plan, Redactor, Result,
-  Session, Step, Target, TargetId, Unavailable,
+// The deterministic interpreter: (plan, target, ports) to RunResult. It accepts only a plan the
+// parser made and the policy gate authorised, walks the typed lifecycle, never substitutes a
+// target, and hashes everything except wall-clock timings.
+import {
+  success,
+  type A11yFinding, type ActionGuard, type ApprovalLabel, type ArtifactReference, type ArtifactStore, type Authorised,
+  type BrowserDriver, type Clock, type ElementProbe, type EventSink, type Plan, type PolicyRuleId, type Redactor, type Result,
+  type Session, type Step, type Target, type TargetId, type Unavailable,
 } from '@revisum/contracts';
 import { approvalLabel, type PlanStanding } from './approval/plan-standing.ts';
 import { canonicalJson, sha256 } from './hashing.ts';
@@ -13,11 +15,13 @@ import { buildManifest, manifestHash, type FixtureReference, type HostInfo, type
 import { checkElement, checkPage, normalise, type Verdict } from './oracle.ts';
 import type { PlanError } from './plan/plan-decoders.ts';
 import { assertBranded } from './plan/plan-parser.ts';
+import { assertAuthorised, policyGate, type PolicyGate } from './policy/policy-gate.ts';
 import type { Project } from './project/project-parser.ts';
 import { SENSITIVE_PLACEHOLDER } from './redaction.ts';
 
 export type RunInputs = {
-  readonly plan: Plan;
+  // Only the policy gate makes an Authorised plan, so a plan it has not cleared does not type-check.
+  readonly plan: Authorised;
   readonly project: Project;
   readonly targetId: TargetId;
   readonly baseUrl: string;
@@ -26,7 +30,8 @@ export type RunInputs = {
   readonly fixtures: readonly FixtureReference[];
   readonly host: HostInfo;
   // The plan's standing (planStanding). Absent means no approval was supplied, so the run is a
-  // proposal: it never reaches the project's production origins.
+  // proposal: it never reaches the project's production origins. An approved plan reaches them
+  // only when the project's policy allows production for approved plans.
   readonly standing?: PlanStanding;
 };
 
@@ -36,6 +41,9 @@ export type RunPorts = {
   readonly artifacts: ArtifactStore;
   readonly redactor: Redactor;
   readonly events: RunEventSink;
+  // The audit sink that policy denials are appended to. Without one, the run's own log and its
+  // result still record a denial.
+  readonly audit?: EventSink;
 };
 
 export type StepOutcome = 'passed' | 'failed' | 'skipped';
@@ -60,6 +68,8 @@ export type RunResult = {
   readonly unavailable: Unavailable | null;
   // Present when the run was refused before any driver call.
   readonly refusal?: lifecycle.Refusal;
+  // Present when the policy gate's runtime guard stopped the run before an action.
+  readonly denial?: lifecycle.Denial;
   // Present when the plan is approved: what the result says about that approval.
   readonly approvalLabel?: ApprovalLabel;
   // Hash of everything above except the manifest body, which its own hash covers. Timings are excluded.
@@ -68,8 +78,20 @@ export type RunResult = {
 };
 
 export type Rejected = { readonly state: 'Rejected'; readonly errors: readonly PlanError[] };
+// A parsed plan the policy gate's static check denied, so no run started.
+export type DeniedPlan = { readonly state: 'Denied'; readonly rule: PolicyRuleId; readonly stepIndex: number | null };
 
-type RunContext = { readonly inputs: RunInputs; readonly ports: RunPorts; readonly logger: Logger };
+type RunContext = {
+  readonly inputs: RunInputs;
+  readonly ports: RunPorts;
+  readonly logger: Logger;
+  readonly gate: PolicyGate;
+  // The runtime guard's denial, once it has stopped an action.
+  readonly denials: lifecycle.Denial[];
+};
+
+// Keeps nothing, for callers with no audit sink: the run's log and result record the denial.
+const UNRECORDED_AUDIT: EventSink = { append: () => success({ sequence: 0 }) };
 
 const POLL_INTERVAL_MILLISECONDS = 50;
 
@@ -81,16 +103,19 @@ export async function run(inputs: RunInputs, ports: RunPorts): Promise<RunResult
   const declared = target !== undefined && inputs.plan.targets.includes(inputs.targetId);
   const runId = sha256(`${sha256(canonicalJson(inputs.plan))}:${inputs.targetId}:${inputs.seed}`).slice(0, 16);
   const logger = manifestLogger(ports.events, ports.redactor, runId);
-  const context: RunContext = { inputs, ports, logger };
+  const gate = policyGate({ project: inputs.project, events: ports.audit ?? UNRECORDED_AUDIT });
+  const context: RunContext = { inputs, ports, logger, gate, denials: [] };
 
   if (target === undefined || !declared) {
     return unavailableResult(inputs.targetId, { reason: 'not-declared', detail: 'target is not in both the plan and the matrix' }, context, startedAt);
   }
+  // Before any side effect on the target: a plan the gate did not clear for it is refused.
+  assertAuthorised(inputs.plan, target.id);
   const planned = lifecycle.plan(inputs.plan, target);
   logger.log({ kind: 'run.state', state: planned.state, targetId: target.id });
 
-  // A proposal is refused before any driver call if it would reach a production origin.
-  const productionOrigin = inputs.standing?.mode === 'approved' ? undefined : productionOriginReached(inputs);
+  // Refused before any driver call if the run would reach a production origin it may not.
+  const productionOrigin = productionAllowed(inputs) ? undefined : productionOriginReached(inputs);
   if (productionOrigin !== undefined) {
     const refused = lifecycle.refuse(planned, { code: 'origin_not_allowed', origin: productionOrigin });
     logger.log({ kind: 'run.state', state: refused.state, targetId: target.id, code: refused.refusal.code, origin: productionOrigin });
@@ -117,7 +142,7 @@ export async function run(inputs: RunInputs, ports: RunPorts): Promise<RunResult
   logger.log({ kind: 'run.state', state: running.state, targetId: target.id });
   const steps: StepResult[] = [];
   const stepMilliseconds: number[] = [];
-  let finished: lifecycle.Finished<'Passed' | 'Failed' | 'Errored'>;
+  let finished: lifecycle.Finished<'Passed' | 'Failed' | 'Errored'> | lifecycle.DeniedRun;
   try {
     for (const [index, step] of inputs.plan.steps.entries()) {
       if (steps.some((done) => done.outcome === 'failed')) { steps.push({ index, type: step.type, outcome: 'skipped' }); continue; }
@@ -131,7 +156,11 @@ export async function run(inputs: RunInputs, ports: RunPorts): Promise<RunResult
         durationMilliseconds: stepMilliseconds[stepMilliseconds.length - 1] ?? 0, ...(result.code ? { code: result.code } : {}),
       });
     }
-    finished = lifecycle.finish(running, steps.every((done) => done.outcome === 'passed') ? 'Passed' : 'Failed');
+    // A denied action failed its step, so every later step was skipped and nothing ran after it.
+    const denial = context.denials[0];
+    finished = denial !== undefined && steps.some((done) => done.code === 'policy-denied')
+      ? lifecycle.deny(running, denial)
+      : lifecycle.finish(running, steps.every((done) => done.outcome === 'passed') ? 'Passed' : 'Failed');
   } catch (error) {
     logger.log({ kind: 'step.end', outcome: 'failed', code: 'adapter-error', detail: errorText(error) });
     finished = lifecycle.finish(running, 'Errored');
@@ -140,28 +169,41 @@ export async function run(inputs: RunInputs, ports: RunPorts): Promise<RunResult
   }
   const blocked = [...new Set(session.blockedOrigins())].sort();
   for (const origin of blocked) logger.log({ kind: 'network.blocked', origin });
-  logger.log({ kind: 'run.state', state: finished.state, targetId: target.id });
+  logger.log({
+    kind: 'run.state', state: finished.state, targetId: target.id,
+    ...(finished.state === 'Denied' ? { code: finished.denial.rule, stepIndex: finished.denial.stepIndex } : {}),
+  });
   return seal({
     state: finished.state, targetId: target.id, manifest, manifestHash: finished.manifestHash,
-    steps, blockedOrigins: blocked, unavailable: null,
+    steps, blockedOrigins: blocked, unavailable: null, ...(finished.state === 'Denied' ? { denial: finished.denial } : {}),
     timings: { totalMilliseconds: ports.clock.now() - startedAt, stepMilliseconds },
   }, inputs);
 }
 
-// The only entry point for untrusted input, such as a plan an AI proposed. Parsing happens first;
-// on any error no driver method is called.
+// The only entry point for untrusted input, such as a plan an AI proposed. Parsing happens first,
+// then the policy gate's static check against the project, for the plan's declared targets and
+// standing; on any error or denial no driver method is called.
 export async function runUntrusted(
   input: unknown,
   parsePlan: (input: unknown) => Result<Plan, readonly PlanError[]>,
   base: Omit<RunInputs, 'plan' | 'targetId'>,
   ports: RunPorts,
-): Promise<Rejected | readonly RunResult[]> {
+): Promise<Rejected | DeniedPlan | readonly RunResult[]> {
   const parsed = parsePlan(input);
   if (!parsed.ok) return { state: 'Rejected', errors: parsed.error };
+  const gate = policyGate({ project: base.project, events: ports.audit ?? UNRECORDED_AUDIT });
+  const targets = base.project.matrix.filter((target) => parsed.value.targets.includes(target.id));
+  const decision = gate.decide(parsed.value, targets, base.standing);
+  if (decision.kind === 'deny') return { state: 'Denied', rule: decision.rule, stepIndex: decision.stepIndex };
   const results: RunResult[] = [];
-  for (const targetId of parsed.value.targets) results.push(await run({ ...base, plan: parsed.value, targetId }, ports));
+  for (const targetId of decision.plan.targets) results.push(await run({ ...base, plan: decision.plan, targetId }, ports));
   return results;
 }
+
+// Production is closed to every run unless the plan is approved and the project's policy allows
+// production for approved plans.
+const productionAllowed = (inputs: RunInputs): boolean =>
+  inputs.standing?.mode === 'approved' && inputs.project.policy.allowProductionForApprovedPlans;
 
 // The first production origin the run would reach: its base URL or a navigate step, inside frames too.
 function productionOriginReached(inputs: RunInputs): string | undefined {
@@ -178,10 +220,10 @@ function productionOriginReached(inputs: RunInputs): string | undefined {
   return origins.find((origin) => production.has(origin));
 }
 
-// The origins the browser may reach. A proposal never reaches a production origin, so they are
-// left out of its allow-list as well, and any request the page makes to one is blocked.
+// The origins the browser may reach. A run that may not reach production has the production origins
+// left out of its allow-list as well, so any request the page makes to one is blocked.
 function reachableOrigins(inputs: RunInputs): readonly string[] {
-  if (inputs.standing?.mode === 'approved') return inputs.project.origins;
+  if (productionAllowed(inputs)) return inputs.project.origins;
   const production = new Set<string>(inputs.project.productionOrigins);
   return inputs.project.origins.filter((origin) => !production.has(origin));
 }
@@ -233,7 +275,7 @@ async function executeStep(step: Step, index: number, session: Session, target: 
     case 'select':
     case 'upload':
     case 'press': {
-      const acted = await session.act(step);
+      const acted = await session.act(step, guardFor(step, index, target, context));
       return acted.ok ? { ...base, outcome: 'passed' } : { ...base, outcome: 'failed', code: acted.error.code };
     }
     case 'frame':
@@ -273,6 +315,16 @@ async function executeStep(step: Step, index: number, session: Session, target: 
       return { ...base, outcome: 'passed', artifact: reference };
     }
   }
+}
+
+// The runtime guard the driver asks before the step's input event, with the element it resolved.
+// A denial is kept, so the run can end Denied naming the rule.
+function guardFor(step: Step, index: number, target: Target, context: RunContext): ActionGuard {
+  return (element) => {
+    const verdict = context.gate.guardAction(step, index, element, null, target.locale);
+    if (verdict.kind === 'deny') context.denials.push({ rule: verdict.rule, stepIndex: verdict.stepIndex });
+    return verdict;
+  };
 }
 
 // Repeats a check until it passes or the step timeout runs out.

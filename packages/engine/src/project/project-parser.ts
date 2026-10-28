@@ -1,16 +1,16 @@
-// The trusted project: allowed origins, the "test with" matrix, limits, and the secret names and
-// fixture files a plan may refer to, written by a person. AI output never reaches this type. The
+// The trusted project: allowed origins, the "test with" matrix, limits, the secret names and
+// fixture files a plan may refer to, and the policy the policy gate applies, written by a person. AI output never reaches this type. The
 // person declares every target; the engine never invents one.
 import {
   COLOR_SCHEMES, DEVICE_PROFILES, ENGINES, MOTION_PREFERENCES, success, failure,
-  type Brand, type DeviceProfileId, type FixtureName, type Locale, type Origin, type Result, type SecretName,
-  type Target, type TimeZone,
+  type Brand, type DeviceProfileId, type FixtureName, type IrreversiblePatterns, type Locale, type Origin, type Result,
+  type SafeText, type SecretName, type Target, type TimeZone,
 } from '@revisum/contracts';
 import { brand } from '../brand.ts';
 import {
-  INVALID, allValid, readInteger, readList, readOneOf, readRecord, type Issues, type Parsed, type PlanError,
+  INVALID, allValid, peekRecord, readInteger, readList, readOneOf, readRecord, readText, type Issues, type Parsed, type PlanError,
 } from '../plan/plan-decoders.ts';
-import { LOWERCASE_ID } from '../plan/plan-grammar.ts';
+import { LOWERCASE_ID, MAXIMUM_TEST_ID_LENGTH, MAXIMUM_URL_LENGTH } from '../plan/plan-grammar.ts';
 
 const DEVICE_IDS = Object.keys(DEVICE_PROFILES) as DeviceProfileId[];
 
@@ -28,6 +28,26 @@ export const DEFAULT_LIMITS: Limits = {
 // The limits the plan parser checks before it walks a plan, so an oversized plan costs nothing to reject.
 export type PlanLimits = Pick<Limits, 'maximumPlanBytes' | 'maximumSteps' | 'maximumFrameDepth'>;
 
+// What the policy gate allows beyond its defaults, and what it denies beyond its built-in rules.
+// See docs/specs/SPEC-03-policy-gate.md.
+export type ProjectPolicy = {
+  // Words the project adds, per locale, to the engine's irreversible patterns.
+  readonly irreversiblePatterns: IrreversiblePatterns;
+  // Exact accessible names (compared case-insensitively) the project lets through although they
+  // match an irreversible pattern, such as "Delete account" for a team testing its delete feature.
+  readonly allowedIrreversibleNames: readonly SafeText[];
+  // URL paths that destroy something when visited. A path matches itself and every path below it.
+  readonly destructiveUrlPatterns: readonly string[];
+  // Test ids of controls with no accessible name that a plan may still act on.
+  readonly unnamedControlsAllowedByTestId: readonly SafeText[];
+  // Production origins are denied to every plan unless this is true, and then only to approved plans.
+  readonly allowProductionForApprovedPlans: boolean;
+};
+export const DEFAULT_POLICY: ProjectPolicy = {
+  irreversiblePatterns: {}, allowedIrreversibleNames: [], destructiveUrlPatterns: [], unnamedControlsAllowedByTestId: [],
+  allowProductionForApprovedPlans: false,
+};
+
 export type ProjectData = {
   readonly origins: readonly Origin[];
   // Origins that serve real users. A plan with no approval runs only as a proposal, and a proposal
@@ -39,6 +59,7 @@ export type ProjectData = {
   readonly secretNames: readonly SecretName[];
   // Files in the project's fixtures folder that an upload step may send, by file name.
   readonly fixtures: readonly FixtureName[];
+  readonly policy: ProjectPolicy;
 };
 export type Project = Brand<ProjectData, 'Project'>;
 
@@ -64,7 +85,7 @@ export function readOrigin(input: unknown, path: string, issues: Issues): Parsed
   return brand<string, 'Origin'>(input);
 }
 
-function readLocale(input: unknown, path: string, issues: Issues): Parsed<Locale> {
+export function readLocale(input: unknown, path: string, issues: Issues): Parsed<Locale> {
   if (typeof input !== 'string') { issues.push({ code: 'wrong_type', path }); return INVALID; }
   try {
     if (Intl.getCanonicalLocales(input)[0] === input) return brand<string, 'Locale'>(input);
@@ -146,10 +167,94 @@ function readProductionOrigins(input: unknown, issues: Issues): Parsed<readonly 
   return origins;
 }
 
+const MAXIMUM_PATTERN_LENGTH = 100;
+const MAXIMUM_POLICY_LIST = 256;
+// Only ever used to read the path of a relative URL.
+const PATH_BASE = new URL('https://path.invalid');
+
+// An optional list of distinct, non-blank texts. Absent means none.
+function readTextList(input: unknown, path: string, issues: Issues, maximumLength: number, minimumCount = 0): Parsed<readonly SafeText[]> {
+  if (input === undefined) return [];
+  const raw = readList(input, path, issues, MAXIMUM_POLICY_LIST, minimumCount);
+  if (raw === INVALID) return INVALID;
+  const texts = raw.map((value, index): Parsed<SafeText> => {
+    const at = `${path}[${index}]`;
+    const text = readText(value, at, issues, maximumLength);
+    // A blank pattern or name would match the spaces in any text, so it is refused outright.
+    if (text !== INVALID && text.trim() === '') { issues.push({ code: 'empty', path: at }); return INVALID; }
+    return text;
+  });
+  if (!allValid(texts)) return INVALID;
+  if (new Set(texts).size !== texts.length) { issues.push({ code: 'duplicate', path }); return INVALID; }
+  return texts;
+}
+
+// Per locale, a non-empty list of words. A declared locale with no words would hide the fact
+// that nothing is denied there, so an empty list is refused.
+function readIrreversiblePatterns(input: unknown, path: string, issues: Issues): Parsed<IrreversiblePatterns> {
+  if (input === undefined) return {};
+  const fields = peekRecord(input, path, issues);
+  if (fields === INVALID) return INVALID;
+  const entries = Object.entries(fields).map(([key, value]): Parsed<readonly [Locale, readonly SafeText[]]> => {
+    const locale = readLocale(key, `${path}.${key}`, issues);
+    const words = readTextList(value, `${path}.${key}`, issues, MAXIMUM_PATTERN_LENGTH, 1);
+    return locale === INVALID || words === INVALID ? INVALID : [locale, words];
+  });
+  if (!allValid(entries)) return INVALID;
+  return Object.fromEntries(entries);
+}
+
+// URL paths such as /account/delete, with no query or fragment, kept as the URL standard writes them.
+function readDestructivePaths(input: unknown, path: string, issues: Issues): Parsed<readonly string[]> {
+  if (input === undefined) return [];
+  const raw = readList(input, path, issues, MAXIMUM_POLICY_LIST, 0);
+  if (raw === INVALID) return INVALID;
+  const paths = raw.map((value, index): Parsed<string> => {
+    const at = `${path}[${index}]`;
+    const text = readText(value, at, issues, MAXIMUM_URL_LENGTH);
+    if (text === INVALID) return INVALID;
+    let url: URL | undefined;
+    try { url = new URL(text, PATH_BASE); } catch { url = undefined; }
+    if (url === undefined || !text.startsWith('/') || url.origin !== PATH_BASE.origin || url.search !== '' || url.hash !== '') {
+      issues.push({ code: 'invalid_url', path: at });
+      return INVALID;
+    }
+    return url.pathname;
+  });
+  if (!allValid(paths)) return INVALID;
+  if (new Set(paths).size !== paths.length) { issues.push({ code: 'duplicate', path }); return INVALID; }
+  return paths;
+}
+
+const POLICY_KEYS = [
+  'irreversiblePatterns', 'allowedIrreversibleNames', 'destructiveUrlPatterns', 'unnamedControlsAllowedByTestId',
+  'allowProductionForApprovedPlans',
+] as const;
+
+// Every field is optional; a missing one keeps the strict default.
+function readPolicy(input: unknown, path: string, issues: Issues, limits: Parsed<Limits>): Parsed<ProjectPolicy> {
+  if (input === undefined) return DEFAULT_POLICY;
+  const fields = readRecord(input, path, issues, POLICY_KEYS, []);
+  if (fields === INVALID) return INVALID;
+  const longestName = limits === INVALID ? DEFAULT_LIMITS.maximumTextLength : limits.maximumTextLength;
+  const allowProduction = fields['allowProductionForApprovedPlans'] ?? false;
+  if (typeof allowProduction !== 'boolean') issues.push({ code: 'wrong_type', path: `${path}.allowProductionForApprovedPlans` });
+  const parts = [
+    readIrreversiblePatterns(fields['irreversiblePatterns'], `${path}.irreversiblePatterns`, issues),
+    readTextList(fields['allowedIrreversibleNames'], `${path}.allowedIrreversibleNames`, issues, longestName),
+    readDestructivePaths(fields['destructiveUrlPatterns'], `${path}.destructiveUrlPatterns`, issues),
+    readTextList(fields['unnamedControlsAllowedByTestId'], `${path}.unnamedControlsAllowedByTestId`, issues, MAXIMUM_TEST_ID_LENGTH),
+    typeof allowProduction === 'boolean' ? allowProduction : INVALID,
+  ] as const;
+  if (!allValid(parts)) return INVALID;
+  const [irreversiblePatterns, allowedIrreversibleNames, destructiveUrlPatterns, unnamedControlsAllowedByTestId, allowProductionForApprovedPlans] = parts;
+  return { irreversiblePatterns, allowedIrreversibleNames, destructiveUrlPatterns, unnamedControlsAllowedByTestId, allowProductionForApprovedPlans };
+}
+
 export function parseProject(input: unknown): Result<Project, readonly PlanError[]> {
   const issues: Issues = [];
   const fields = readRecord(
-    input, '$', issues, ['origins', 'productionOrigins', 'matrix', 'limits', 'secretNames', 'fixtures'], ['origins', 'matrix'],
+    input, '$', issues, ['origins', 'productionOrigins', 'matrix', 'limits', 'secretNames', 'fixtures', 'policy'], ['origins', 'matrix'],
   );
   if (fields === INVALID) return failure(issues);
   const rawOrigins = readList(fields['origins'], '$.origins', issues, 32);
@@ -160,6 +265,7 @@ export function parseProject(input: unknown): Result<Project, readonly PlanError
   const fixtures = readNameList<'FixtureName'>(fields['fixtures'], '$.fixtures', issues, FIXTURE_NAME, (name) => !name.includes('..'));
   const origins = rawOrigins === INVALID ? [] : rawOrigins.map((origin, index) => readOrigin(origin, `$.origins[${index}]`, issues));
   const productionOrigins = readProductionOrigins(fields['productionOrigins'], issues);
+  const policy = readPolicy(fields['policy'], '$.policy', issues, limits);
   const matrix = rawMatrix === INVALID ? [] : rawMatrix.map((target, index) => readTarget(target, `$.matrix[${index}]`, issues));
   const seen = new Set<string>();
   matrix.forEach((target, index) => {
@@ -168,6 +274,6 @@ export function parseProject(input: unknown): Result<Project, readonly PlanError
     seen.add(target.id);
   });
   if (issues.length > 0 || limits === INVALID || secretNames === INVALID || fixtures === INVALID
-    || productionOrigins === INVALID || !allValid(origins) || !allValid(matrix)) return failure(issues);
-  return success(brand<ProjectData, 'Project'>({ origins, productionOrigins, matrix, limits, secretNames, fixtures }));
+    || productionOrigins === INVALID || policy === INVALID || !allValid(origins) || !allValid(matrix)) return failure(issues);
+  return success(brand<ProjectData, 'Project'>({ origins, productionOrigins, matrix, limits, secretNames, fixtures, policy }));
 }

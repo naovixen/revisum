@@ -45,6 +45,8 @@ export const BRAND_OWNERS: Readonly<Record<string, readonly string[]>> = {
   DerivedActor: [ACTOR_MODULE, APPROVAL_VERIFIER],
   Approval: [APPROVAL_VERIFIER],
   TrustedProject: [TRUSTED_PROJECT_LOADER],
+  // Not declared with Brand (its own key keeps it a narrower Plan), so it is listed by name.
+  Authorised: ['packages/engine/src/policy/policy-gate.ts'],
 };
 const ACTOR_BRANDS = new Set(['ActorId', 'DerivedActor']);
 

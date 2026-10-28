@@ -43,6 +43,10 @@ export interface PolicyGate {
 - **Destructive URLs.** A pattern is a URL path. It matches the same path, or one that continues it after a `/`. A click on a link whose resolved URL matches is `destructive-navigation`.
 - **Step index.** The first offending step, or `null` for `no-locale-patterns` and `over-limit`.
 - **Scope of each check.** The static check reads `navigate` and the locator names of clicks. Presses, submits and dialogs need the page, so the runtime guard checks them. `unnamed-control` doesn't apply to dialog steps. A runtime denial ends the run `Denied`, with no input event for that step.
+- **For SPEC-06 and the M1 exit review.**
+  - `Session.act(step, guard?)` takes the guard as optional for now, because seeded driver tests call `act(step)`. SPEC-06 must make every driver, CDP and Playwright alike, call the guard before every action, and make the guard required.
+  - Denial events carry actor type `unverified`, because the gate can't know who wrote the plan.
+  - The driver contract test "accessibility snapshot exposes the heading…" failed once under load on Playwright Chromium and passed on rerun; watch it.
 - **Anchors.** Each rule id gets a `## <rule>` heading in `docs/errors.md` and joins the error-anchor list.
 
 ## Acceptance criteria

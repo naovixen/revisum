@@ -2,10 +2,12 @@
 // interfaces. Each driver package implements them; the engine never imports a driver.
 // See docs/specs/SPEC-06-cdp-driver.md and docs/specs/SPEC-27-shared-types-and-events.md.
 import type { ActionStep, Locator } from './plan.ts';
+import type { GuardVerdict } from './policy.ts';
 import type { Result } from './result.ts';
 import type { Target } from './target.ts';
 
-export type DriverErrorCode = 'not-found' | 'ambiguous' | 'not-actionable' | 'timeout' | 'navigation-failed';
+// policy-denied: the policy gate's runtime guard refused the action, so no input event was sent.
+export type DriverErrorCode = 'not-found' | 'ambiguous' | 'not-actionable' | 'timeout' | 'navigation-failed' | 'policy-denied';
 export type DriverError = { readonly code: DriverErrorCode; readonly detail: string };
 
 // Why a declared target cannot run. A driver explains a "no"; it never substitutes another target.
@@ -29,6 +31,25 @@ export type ElementProbe = {
 };
 export type PageProbe = { readonly url: string; readonly title: string };
 
+// The element a step's locator resolved to, as the policy gate's runtime guard sees it just before
+// the action. A null field is one the page does not show, such as a control with no accessible name.
+export type ResolvedElement = {
+  readonly role: string | null;
+  // The accessible name, as assistive technology would announce it.
+  readonly name: string | null;
+  readonly box: Box | null;
+  // The accessible name of the submit control of the form the element belongs to; null outside a form.
+  readonly formSubmitName: string | null;
+  // For a link, the absolute URL it leads to.
+  readonly linkUrl: string | null;
+  // The element's own test id, when it has one.
+  readonly testId?: string;
+};
+
+// Asked by a driver once it has resolved an action's element, before any input event. On a deny
+// the driver performs nothing and returns policy-denied.
+export type ActionGuard = (element: ResolvedElement) => GuardVerdict;
+
 export const IMPACTS = ['minor', 'moderate', 'serious', 'critical', 'unknown'] as const;
 export type Impact = (typeof IMPACTS)[number];
 // One accessibility rule that failed on the page, and on how many elements.
@@ -50,7 +71,9 @@ export interface PageNavigator {
   page(): Promise<PageProbe>;
 }
 export interface ActionRunner {
-  act(step: ActionStep): Promise<Result<void, DriverError>>;
+  // Given a guard, the driver asks it first and acts only on an allow. The CDP driver starts
+  // passing the resolved element with SPEC-06 (docs/specs/SPEC-06-cdp-driver.md).
+  act(step: ActionStep, guard?: ActionGuard): Promise<Result<void, DriverError>>;
 }
 export interface Prober {
   probe(locator: Locator): Promise<ElementProbe>;
