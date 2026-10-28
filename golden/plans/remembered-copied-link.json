@@ -1,0 +1,13 @@
+{
+  "version": "1.2",
+  "meta": { "featureId": "REPORTS-5", "specReference": "specs/reports.md#share-links", "title": "A copied share link can be sent in a message" },
+  "targets": ["playwright-chromium"],
+  "steps": [
+    { "type": "navigate", "url": "/reports/quarterly" },
+    { "type": "click", "locator": { "by": "role", "role": "button", "name": "Copy share link" } },
+    { "type": "remember", "name": "shareLink", "from": { "clipboard": "text" } },
+    { "type": "navigate", "url": "/messages/new" },
+    { "type": "fill", "locator": { "by": "label", "label": "Message" }, "value": { "valueName": "shareLink" } },
+    { "type": "expect", "locator": { "by": "label", "label": "Message" }, "assert": { "kind": "valueEquals", "value": { "valueName": "shareLink" } }, "criterionId": "messages.share-link-pasted" }
+  ]
+}

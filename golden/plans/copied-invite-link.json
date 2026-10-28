@@ -1,0 +1,16 @@
+{
+  "version": "1.2",
+  "meta": { "featureId": "TEAM-2", "specReference": "specs/team.md#invite-links", "title": "Copy buttons put the invite link and the address on the clipboard" },
+  "targets": ["playwright-chromium"],
+  "values": { "invitee": { "kind": "uniqueEmail", "localPrefix": "invitee" } },
+  "steps": [
+    { "type": "navigate", "url": "/team/invite" },
+    { "type": "fill", "locator": { "by": "label", "label": "Email address" }, "value": { "valueName": "invitee" } },
+    { "type": "click", "locator": { "by": "role", "role": "button", "name": "Create invite" } },
+    { "type": "click", "locator": { "by": "role", "role": "button", "name": "Copy invite link" } },
+    { "type": "expectClipboard", "assert": { "kind": "textContains", "value": "/invite/" }, "criterionId": "team.invite-link-copied" },
+    { "type": "expectClipboard", "assert": { "kind": "textExcludes", "value": "password" }, "criterionId": "team.invite-link-has-no-password" },
+    { "type": "click", "locator": { "by": "role", "role": "button", "name": "Copy address" } },
+    { "type": "expectClipboard", "assert": { "kind": "textEquals", "value": { "lines": ["Analytical Engines Ltd", "12 Babbage Row", "London"] } }, "criterionId": "team.address-copied" }
+  ]
+}

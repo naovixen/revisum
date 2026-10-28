@@ -1,0 +1,15 @@
+{
+  "version": "1.2",
+  "meta": { "featureId": "SESSION-3", "specReference": "specs/session.md#idle-timeout", "title": "An idle session expires after ten minutes" },
+  "targets": ["playwright-chromium"],
+  "steps": [
+    { "type": "navigate", "url": "/account" },
+    { "type": "advanceClock", "by": { "amount": 599, "unit": "seconds" } },
+    { "type": "expect", "locator": { "by": "text", "text": "Session expired" }, "assert": { "kind": "absent" }, "criterionId": "session.not-expired-early" },
+    { "type": "advanceClock", "by": { "amount": 1, "unit": "seconds" }, "mode": "runTimers" },
+    { "type": "expect", "locator": { "by": "text", "text": "Session expired" }, "assert": { "kind": "visible" }, "criterionId": "session.expired-after-ten-minutes" },
+    { "type": "navigate", "url": "/account" },
+    { "type": "advanceClock", "by": { "amount": 45, "unit": "minutes" }, "mode": "skipAhead" },
+    { "type": "expect", "locator": { "by": "text", "text": "Session expired" }, "assert": { "kind": "visible" }, "criterionId": "session.expired-after-sleep" }
+  ]
+}

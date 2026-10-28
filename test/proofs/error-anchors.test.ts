@@ -27,7 +27,7 @@ const ERROR_CODES: Readonly<Record<string, readonly string[]>> = {
   ],
   driver: [
     'not-found', 'ambiguous', 'not-actionable', 'timeout', 'navigation-failed', 'policy-denied', 'no-download', 'download-too-large',
-    'storage-origin-mismatch',
+    'storage-origin-mismatch', 'clock-runaway', 'clipboard-unavailable',
   ],
   runner: ['image-missing', 'image-digest-mismatch', 'egress-unenforceable', 'start-failed'],
   recorder: ['no-reason', 'unknown-item', 'already-decided', 'sink-failed'],
