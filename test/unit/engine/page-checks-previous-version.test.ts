@@ -53,9 +53,10 @@ const PREVIOUS_CASES: readonly PreviousCase[] = [
   },
   { feature: 'a download step', plan: () => previousPlanWith(DOWNLOAD), errors: ['unknown_step $.steps[1].type'] },
   {
+    // The check names a download, so the download comes first; without it a 1.2 plan is refused too.
     feature: 'a download check',
-    plan: () => previousPlanWith({ type: 'expectDownload', download: 'report', assert: { kind: 'sizeAtLeast', value: 1 }, criterionId: 'export.file' }),
-    errors: ['unknown_step $.steps[1].type'],
+    plan: () => previousPlanWith(DOWNLOAD, { type: 'expectDownload', download: 'report', assert: { kind: 'sizeAtLeast', value: 1 }, criterionId: 'export.file' }),
+    errors: ['unknown_step $.steps[1].type', 'unknown_step $.steps[2].type'],
   },
   {
     feature: 'a second tab',
