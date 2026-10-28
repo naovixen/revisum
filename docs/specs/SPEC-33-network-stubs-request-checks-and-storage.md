@@ -117,6 +117,23 @@ export interface StoragePort {
 - An `expectResponse` or response-sourced `remember` with no matching exchange, within the step timeout, fails with `request-not-seen`.
 - Field values, storage values and response bodies pass the redactor before any of them reaches a log. Storage values never appear in a result, even on failure: only "present", "absent" or "differs".
 
+**Build notes.** Points the criteria leave open, settled while building (2026-10-28; `docs/decisions/answers.md`):
+
+- **Shared test project.** It gains the test stub, the observed request and the storage entries, so the 1.2 golden plans parse (founder, 2026-10-28).
+- **Plan refusals.**
+  - Writing or removing a `read` storage entry: `unknown_value` at `.entry`.
+  - Arguments on a stub stop or a `removeStorage`: `unknown_field` at `.arguments`.
+  - Stopping a stub the plan never started: `unknown_value` at `.stub`.
+  - `atLeast: 0`: `vacuous`.
+- **Declaration refusals.**
+  - A storage entry on an origin that isn't allowed: `origin_not_allowed`.
+  - A value on a read entry: `unknown_field`.
+  - A response count or status that isn't a whole number: `wrong_type`.
+  - No responses: `empty`; more than 20: `too_large`.
+  - A status outside 200 to 599: `unknown_value`.
+  - A declaration that sets `x-content-type-options`: `header_not_allowed`, because engine always sends `nosniff` itself.
+- **Proposals.** `removeStorage` is a storage write, so a proposal using it is `side-effect-in-proposal`, as `setStorage` is.
+
 ## Acceptance criteria
 
 - AC-SPEC-33-01: When `project.json` declares a stub on an origin that is neither allowed nor a declared service, a denied header, a media type outside `STUB_MEDIA_TYPES` or an undeclared fixture, the project parser shall reject it with `origin_not_allowed`, `header_not_allowed` or `unknown_value` and its path (oracle: specified).
