@@ -155,6 +155,7 @@ A test can have several gaps, and it becomes expressible only when all of them c
 
 - Firm: 38 + 22 = 60%. With assumptions: 38 + 34 = 72%. With the 10 conditional intents as well: 82%.
 - Of the 62 inexpressible tests, 18 stay out whatever is built here.
+- SPEC-34 would add 2, both assumed and both also needing SPEC-32's seeding: Supabase "actions works as expected" (clipboard lines checked anywhere in the copied SQL, not only within the table's block) and Mattermost MM-T179 (the copied permalink remembered and posted). That gives 60 firm and 74 with assumptions. `advanceClock` closes none in the sample: Gutenberg "should save to sessionStorage" triggers autosave by script, and its storage key holds the post id.
 
 ### 3. What stays out, and why
 
