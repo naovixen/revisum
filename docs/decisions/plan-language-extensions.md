@@ -215,8 +215,8 @@ None of the driver parts is needed for the M2 alpha exit.
 - **Replay with calls and remembered values is decision replay.** The app's own behaviour stays non-hermetic, as `app-server` is today.
 - **Unique values assume a fresh seed or clock start per run.** A CI job that pins both repeats them by design, as replay does.
 
-## Open questions for the founder
+## Founder's answers (2026-10-28)
 
-1. May SPEC-30 to 33's parser parts move ahead of SPEC-28 in M1, so the study can be re-run, with a fresh sample, before the week-3 kill date?
-2. Do declared HTTP calls, stubs and storage count as "without an escape hatch" for the kill criterion?
-3. Should a later spec add `advanceClock` (moving the virtual clock forward, deterministically; no sleep) and clipboard checks? Each would close one or two more sampled intents.
+1. Yes: SPEC-30 to 33's parser parts go ahead of SPEC-28 in M1, and the study is re-run before the kill date (`START.md`).
+2. Yes: declared HTTP calls, stubs and storage count as expressible "without an escape hatch". An escape hatch means script or CSS in a plan.
+3. Yes: a later spec adds `advanceClock` and clipboard checks (SPEC-34).
