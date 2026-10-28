@@ -2,9 +2,14 @@
 // today from one it cannot. The engine replaces every value reference before a step reaches a
 // driver; drivers call literalActionStep and performableLocator once and refuse on undefined, so
 // no step is ever performed in part. Positions, test-id attributes other than data-testid, key
-// chords and multi-line text come with the CDP driver (docs/specs/SPEC-06-cdp-driver.md).
-// See docs/specs/SPEC-30-plan-values-positions-and-keys.md.
-import type { ActionStep, Locator, ResolvedActionStep, ResolvedLocator, SafeText, TextOrValue, ValueName } from './plan.ts';
+// chords, multi-line text, the accessibility states, link targets, head metadata, pages loaded
+// with scripts off, downloads and second tabs come with the CDP driver
+// (docs/specs/SPEC-06-cdp-driver.md).
+// See docs/specs/SPEC-30-plan-values-positions-and-keys.md and
+// docs/specs/SPEC-31-page-states-metadata-downloads-and-tabs.md.
+import type {
+  ActionStep, ElementAssertion, Locator, PageAssertion, ResolvedActionStep, ResolvedLocator, SafeText, Step, TextOrValue, ValueName,
+} from './plan.ts';
 
 // The test-id attribute a testId locator without `attribute` matches, and the project's default list.
 export const DEFAULT_TEST_ID_ATTRIBUTE = 'data-testid';
@@ -30,12 +35,30 @@ export const needsLocatorFeatures = (locator: Locator): boolean =>
   locator.position !== undefined
   || (locator.by === 'testId' && locator.attribute !== undefined && locator.attribute !== DEFAULT_TEST_ID_ATTRIBUTE);
 
-// True when the action needs what no driver performs yet: a locator feature above, a key chord or
-// multi-line text. The run reports such a step as unsupported-step before it acts.
-export function needsDriverFeatures(step: ActionStep): boolean {
-  if (needsLocatorFeatures(step.locator)) return true;
-  if (step.type === 'press') return step.modifiers !== undefined;
-  return step.type === 'fill' && typeof step.value === 'object' && 'lines' in step.value;
+// Element checks the drivers' probe cannot decide yet: it reports no checked, focused or
+// accessibility state and no link target, so these checks could never pass on their merits.
+const ELEMENT_CHECKS_NO_DRIVER_DECIDES: readonly ElementAssertion['kind'][] = [
+  'checked', 'unchecked', 'focused', 'selected', 'unselected', 'expanded', 'collapsed', 'pressed', 'unpressed', 'current', 'hrefEquals',
+];
+// Page checks the drivers' page probe cannot decide yet: it reads no part of the document head.
+const PAGE_CHECKS_NO_DRIVER_DECIDES: readonly PageAssertion['kind'][] = ['metaContent', 'canonicalUrl'];
+
+// True when the step needs what no driver performs yet: a locator feature above, a key chord,
+// multi-line text, a check the probes cannot decide, a page loaded with scripts off, a download,
+// a check of a download or a second tab. The run reports such a step as unsupported-step before
+// anything of it reaches the driver. Steps no driver performs at all (hover, select, upload,
+// frame, dialog and remember) are the run's to refuse whole.
+export function needsDriverFeatures(step: Step): boolean {
+  switch (step.type) {
+    case 'click': case 'hover': case 'select': case 'upload': return needsLocatorFeatures(step.locator);
+    case 'press': return needsLocatorFeatures(step.locator) || step.modifiers !== undefined;
+    case 'fill': return needsLocatorFeatures(step.locator) || (typeof step.value === 'object' && 'lines' in step.value);
+    case 'expect': return needsLocatorFeatures(step.locator) || ELEMENT_CHECKS_NO_DRIVER_DECIDES.includes(step.assert.kind);
+    case 'expectPage': return PAGE_CHECKS_NO_DRIVER_DECIDES.includes(step.assert.kind);
+    case 'navigate': return step.scripts !== undefined;
+    case 'download': case 'expectDownload': case 'newTab': return true;
+    case 'frame': case 'dialog': case 'remember': case 'a11yAudit': case 'capture': return false;
+  }
 }
 
 // The locator a driver can match today: literal, with no locator feature it lacks.
@@ -62,5 +85,7 @@ export function literalActionStep(step: ActionStep): ResolvedActionStep | undefi
       const value = typeof step.value === 'object' && 'lines' in step.value ? undefined : literalText(step.value);
       return value === undefined ? undefined : { type: step.type, locator, value };
     }
+    // Refused above: no driver performs a download yet.
+    case 'download': return undefined;
   }
 }

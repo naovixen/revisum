@@ -126,11 +126,12 @@ function literalPathOf(template: PathTemplate): string {
 // The URL a navigate step names, as far as the plan alone says it.
 const navigationUrl = (url: AllowedUrl | PathTemplate): string => (typeof url === 'string' ? url : literalPathOf(url));
 
-// The steps a plan holds, including those inside frames, each with the index of its top-level step.
+// The steps a plan holds, including those inside frames and second tabs, each with the index of
+// its top-level step. A second tab's steps are judged exactly as the first tab's would be.
 function everyStep(steps: readonly Step[], topIndex?: number): { readonly step: Step; readonly index: number }[] {
   return steps.flatMap((step, index) => {
     const own = { step, index: topIndex ?? index };
-    return step.type === 'frame' ? [own, ...everyStep(step.steps, own.index)] : [own];
+    return step.type === 'frame' || step.type === 'newTab' ? [own, ...everyStep(step.steps, own.index)] : [own];
   });
 }
 
@@ -139,9 +140,11 @@ function everyStep(steps: readonly Step[], topIndex?: number): { readonly step: 
 // The same limits the plan parser applies, checked again against the trusted project, so a plan
 // parsed under looser settings is still held to the trusted ones.
 function isOverLimit(plan: Plan, limits: Limits): boolean {
+  // Frame depth counts from the tab, so a second tab's steps start at the depth of its own list.
   const listTooLong = (steps: readonly Step[], depth: number): boolean =>
     steps.length > limits.maximumSteps
-    || steps.some((step) => step.type === 'frame' && (depth + 1 > limits.maximumFrameDepth || listTooLong(step.steps, depth + 1)));
+    || steps.some((step) => (step.type === 'frame' && (depth + 1 > limits.maximumFrameDepth || listTooLong(step.steps, depth + 1)))
+      || (step.type === 'newTab' && listTooLong(step.steps, depth)));
   const bytes = new TextEncoder().encode(JSON.stringify(plan)).length;
   return bytes > limits.maximumPlanBytes || listTooLong(plan.steps, 0);
 }
@@ -168,8 +171,10 @@ const isIrreversibleName = (name: string, patterns: readonly string[], policy: P
   matchesIrreversiblePattern(name, patterns) && !isAllowedName(name, policy.allowedIrreversibleNames);
 
 function staticRule(step: Step, context: StaticContext): PolicyRuleId | null {
-  if (step.type === 'navigate') return navigationRule(navigationUrl(step.url), context);
-  if (step.type === 'click') {
+  // A second tab opens its URL as a navigate step would.
+  if (step.type === 'navigate' || step.type === 'newTab') return navigationRule(navigationUrl(step.url), context);
+  // A download is a click that must start a download, so it is judged as the click it is.
+  if (step.type === 'click' || step.type === 'download') {
     const name = locatorName(step.locator);
     if (name !== null && isIrreversibleName(name, context.patterns, context.project.policy)) return 'irreversible-action';
   }
@@ -219,23 +224,25 @@ function runtimeRule(
   switch (step.type) {
     case 'dialog':
       return step.action === 'accept' && irreversible(dialogText) ? 'irreversible-dialog' : null;
-    case 'navigate': {
+    case 'navigate': case 'newTab': {
       // Production depends on the plan's standing, which only the static check has. The run
-      // passes a path template here with its values already in place.
+      // passes a path template here with its values already in place. A second tab opens its URL
+      // as a navigate step would.
       const read = readUrl(navigationUrl(step.url));
       if (read === null || (read.origin !== null && !project.origins.some((origin) => origin === read.origin))) return 'undeclared-origin';
       return isDestructivePath(read.path, policy) ? 'destructive-navigation' : null;
     }
-    case 'click': case 'hover': case 'fill': case 'select': case 'upload': case 'press': {
+    case 'click': case 'download': case 'hover': case 'fill': case 'select': case 'upload': case 'press': {
       if (isBlank(element.name) && !isAllowedUnnamed(step.locator, element, policy)) return 'unnamed-control';
-      if (step.type === 'click') return irreversible(element.name) ? 'irreversible-action' : linkRule(element, policy);
+      // A download is the click that starts it, so it is guarded exactly as a click.
+      if (step.type === 'click' || step.type === 'download') return irreversible(element.name) ? 'irreversible-action' : linkRule(element, policy);
       if (step.type !== 'press' || !ACTIVATING_KEYS.includes(step.key)) return null;
       // Enter or Space presses a focused button or link as a click would, and submits the form
       // around a focused field.
       if (irreversible(element.name)) return 'irreversible-action';
       return linkRule(element, policy) ?? (irreversible(element.formSubmitName) ? 'irreversible-submit' : null);
     }
-    case 'frame': case 'expect': case 'expectPage': case 'a11yAudit': case 'capture': case 'remember':
+    case 'frame': case 'expect': case 'expectPage': case 'expectDownload': case 'a11yAudit': case 'capture': case 'remember':
       return null;
   }
 }

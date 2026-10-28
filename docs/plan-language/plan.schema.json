@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "revisum.plan/v1",
   "title": "Plan language 1.2",
-  "description": "A closed, versioned test plan. Every assertion names the acceptance criterion it checks. A plan declaring \"1.1\" may use only what that version had. Fitting this schema is necessary, not sufficient: the plan parser also checks the project's allow-list, matrix, declared secrets, fixtures, test-id attributes and email domains, its limits, its text safety rules and that every value is defined before it is used.",
+  "description": "A closed, versioned test plan. Every assertion names the acceptance criterion it checks. A plan declaring \"1.1\" may use only what that version had. Fitting this schema is necessary, not sufficient: the plan parser also checks the project's allow-list, matrix, declared secrets, fixtures, test-id attributes and email domains, its limits, its text safety rules that every value and download is defined before it is used, and that a second tab opens only at the top level.",
   "type": "object",
   "properties": {
     "version": {
@@ -235,6 +235,15 @@
         },
         {
           "$ref": "#/$defs/rememberStep"
+        },
+        {
+          "$ref": "#/$defs/downloadStep"
+        },
+        {
+          "$ref": "#/$defs/expectDownloadStep"
+        },
+        {
+          "$ref": "#/$defs/newTabStep"
         }
       ]
     },
@@ -252,6 +261,11 @@
             {
               "$ref": "#/$defs/pathTemplate"
             }
+          ]
+        },
+        "scripts": {
+          "enum": [
+            "disabled"
           ]
         }
       },
@@ -667,6 +681,80 @@
       ],
       "additionalProperties": false
     },
+    "downloadStep": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "download"
+        },
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+        },
+        "locator": {
+          "$ref": "#/$defs/locator"
+        }
+      },
+      "required": [
+        "type",
+        "name",
+        "locator"
+      ],
+      "additionalProperties": false
+    },
+    "expectDownloadStep": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "expectDownload"
+        },
+        "download": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+        },
+        "assert": {
+          "$ref": "#/$defs/downloadAssertion"
+        },
+        "criterionId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+        }
+      },
+      "required": [
+        "type",
+        "download",
+        "assert",
+        "criterionId"
+      ],
+      "additionalProperties": false
+    },
+    "newTabStep": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "newTab"
+        },
+        "url": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/url"
+            },
+            {
+              "$ref": "#/$defs/pathTemplate"
+            }
+          ]
+        },
+        "steps": {
+          "$ref": "#/$defs/steps"
+        }
+      },
+      "required": [
+        "type",
+        "url",
+        "steps"
+      ],
+      "additionalProperties": false
+    },
     "locator": {
       "oneOf": [
         {
@@ -880,7 +968,14 @@
                 "absent",
                 "checked",
                 "unchecked",
-                "focused"
+                "focused",
+                "selected",
+                "unselected",
+                "expanded",
+                "collapsed",
+                "pressed",
+                "unpressed",
+                "current"
               ]
             }
           },
@@ -929,6 +1024,29 @@
               "type": "integer",
               "minimum": 0,
               "maximum": 10000
+            }
+          },
+          "required": [
+            "kind",
+            "value"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "hrefEquals"
+            },
+            "value": {
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/comparedUrl"
+                },
+                {
+                  "$ref": "#/$defs/valueReference"
+                }
+              ]
             }
           },
           "required": [
@@ -995,8 +1113,149 @@
             "value"
           ],
           "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "metaContent"
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+            },
+            "value": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+                },
+                {
+                  "$ref": "#/$defs/valueReference"
+                }
+              ]
+            }
+          },
+          "required": [
+            "kind",
+            "name",
+            "value"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "canonicalUrl"
+            },
+            "value": {
+              "$ref": "#/$defs/comparedUrl"
+            }
+          },
+          "required": [
+            "kind",
+            "value"
+          ],
+          "additionalProperties": false
         }
       ]
+    },
+    "downloadAssertion": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "enum": [
+                "fileNameEquals",
+                "contentContains",
+                "contentExcludes"
+              ]
+            },
+            "value": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+                },
+                {
+                  "$ref": "#/$defs/valueReference"
+                }
+              ]
+            }
+          },
+          "required": [
+            "kind",
+            "value"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "mediaTypeEquals"
+            },
+            "value": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+            }
+          },
+          "required": [
+            "kind",
+            "value"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "sizeAtMost"
+            },
+            "value": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 104857600
+            }
+          },
+          "required": [
+            "kind",
+            "value"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "sizeAtLeast"
+            },
+            "value": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 104857600
+            }
+          },
+          "required": [
+            "kind",
+            "value"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "comparedUrl": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2048,
+      "pattern": "^(/|https?://)"
     },
     "url": {
       "type": "string",

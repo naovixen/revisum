@@ -21,6 +21,8 @@ export const PLAN_ERROR_CODES = [
   // A position on the locator of a check that counts matches (countEquals or absent), where
   // picking one element would make the count meaningless.
   'position_not_allowed',
+  // A step where the language does not allow it, such as a newTab inside a frame or another newTab.
+  'misplaced_step',
 ] as const;
 export type PlanErrorCode = (typeof PLAN_ERROR_CODES)[number];
 

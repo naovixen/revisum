@@ -85,11 +85,15 @@ Plan error. The plan holds a secret instead of naming one: literal text filled i
 
 ## undefined_value
 
-Plan error. A value reference `{ "valueName": … }` names a value nothing defines before it: neither the plan's `values` nor a `remember` step earlier in the plan (inside or outside a frame). A `remember` step's own locator cannot use the name it defines. The error sits on the reference and never repeats the name. Define the value first, or fix the name.
+Plan error. A value reference `{ "valueName": … }` names a value nothing defines before it: neither the plan's `values` nor a `remember` step earlier in the plan (inside or outside a frame). A `remember` step's own locator cannot use the name it defines. The same goes for downloads: an `expectDownload` names a download no earlier `download` step defines (inside or outside a frame or a `newTab`). The error sits on the reference and never repeats the name. Define the value or the download first, or fix the name.
 
 ## position_not_allowed
 
 Plan error. A `countEquals` or `absent` check uses a locator with a `position`. A position picks one element of the matches, so a count of the matches would prove nothing. Remove the position, or check `visible` or `hidden` on the positioned element instead.
+
+## misplaced_step
+
+Plan error. A step stands where the language does not allow it: a `newTab` inside a `frame` or inside another `newTab`. A second tab opens only from the plan's own list of steps. The error sits on the step itself, and nothing inside it is read. Move the `newTab` to the top level of the plan; it may hold frames of its own.
 
 ## no_criterion_id
 
@@ -106,6 +110,14 @@ Step error. A run value used by the step breaks the safe-text rules, or is `""`,
 ## value-too-long
 
 Step error. A run value used by the step is longer than the project's `maximumTextLength`. The step fails before anything is sent to the page. Shorten the value's prefix, or raise the limit in the trusted project.
+
+## state-not-exposed
+
+Step error. A state check (`selected`, `unselected`, `expanded`, `collapsed`, `pressed`, `unpressed` or `current`) targets an element that does not expose that state in the accessibility tree, for example a tab whose selection is shown only by a CSS class. The check fails rather than passes. Give the element the matching ARIA attribute (`aria-selected`, `aria-expanded`, `aria-pressed` or `aria-current`) or its native equivalent, or check another state.
+
+## download-not-text
+
+Step error. A content check (`contentContains` or `contentExcludes`) reads a download that is not UTF-8 text, such as an image, an archive or a PDF. Only the file's name, media type and size can be checked for such a file; use `fileNameEquals`, `mediaTypeEquals`, `sizeAtLeast` or `sizeAtMost` instead.
 
 ## not-found
 
@@ -130,6 +142,14 @@ Driver error. The browser could not load the page.
 ## policy-denied
 
 Driver error. The policy gate's runtime guard refused the action once the driver had resolved its element, so no input event was sent. The run ends `Denied`, naming the policy rule; see that rule below.
+
+## no-download
+
+Driver error. A `download` step's click started no download within the step timeout. Check that the control starts a download, or raise `stepTimeoutMilliseconds` in the trusted project.
+
+## download-too-large
+
+Driver error. A download grew past the project's `limits.maximumDownloadBytes` (5 MiB unless the project sets it, at most 100 MiB). The driver stopped it and deleted its partial bytes. Raise the limit in the trusted project, or download a smaller file.
 
 ## image-missing
 

@@ -2,19 +2,22 @@
 // It is built from the same tables the plan parser decodes with, so the two describe one language.
 // A plan that fits the schema can still be refused: the parser also checks the project's
 // allow-list, matrix, secret names, fixtures, test-id attributes and email domains, its limits,
-// the text safety rules, that values are defined before use, and that a plan declaring "1.1"
-// uses nothing 1.2 added. Passing the schema is never a reason to trust a plan.
+// the text safety rules, that values and downloads are defined before use, that a second tab
+// opens only at the top level, and that a plan declaring "1.1" uses nothing 1.2 added. Passing
+// the schema is never a reason to trust a plan.
 // `npm run lint` checks that docs/plan-language/plan.schema.json is exactly this schema.
-// See docs/specs/SPEC-01-plan-language-and-parser.md and docs/specs/SPEC-30-plan-values-positions-and-keys.md.
+// See docs/specs/SPEC-01-plan-language-and-parser.md, docs/specs/SPEC-30-plan-values-positions-and-keys.md
+// and docs/specs/SPEC-31-page-states-metadata-downloads-and-tabs.md.
 import {
-  AUDIT_MODES, DATE_ANCHORS, DATE_FORMATS, DIALOG_ACTIONS, ELEMENT_STATE_KINDS, ELEMENT_TEXT_KINDS, KEYS, LOCATOR_KINDS, MODIFIERS,
-  PAGE_TEXT_KINDS, POSITION_WORDS, REMEMBER_READS, ROLES,
+  AUDIT_MODES, DATE_ANCHORS, DATE_FORMATS, DIALOG_ACTIONS, DOWNLOAD_TEXT_KINDS, ELEMENT_STATE_KINDS, ELEMENT_TEXT_KINDS, KEYS,
+  LOCATOR_KINDS, MODIFIERS, PAGE_TEXT_KINDS, POSITION_WORDS, REMEMBER_READS, ROLES, SCRIPT_MODES,
   type StepType,
 } from '@revisum/contracts';
 import { schemaId } from '../version.ts';
 import {
-  CAPTURE_NAME, CLOCK_TIME, CRITERION_FIELD, CRITERION_ID, CURRENT_PLAN_VERSION, EMAIL_LOCAL_PREFIX, FEATURE_ID, FROM_FIELD, LOCATOR_FIELDS,
-  LOWERCASE_ID, MAXIMUM_DAY_OFFSET, MAXIMUM_EXPECTED_COUNT, MAXIMUM_MODIFIERS, MAXIMUM_PATH_SEGMENTS, MAXIMUM_POSITION,
+  CAPTURE_NAME, CLOCK_TIME, CRITERION_FIELD, CRITERION_ID, CURRENT_PLAN_VERSION, DOWNLOAD_NAME, EMAIL_LOCAL_PREFIX, FEATURE_ID, FROM_FIELD,
+  LARGEST_DOWNLOAD_BYTES, LOCATOR_FIELDS, LOWERCASE_ID, MAXIMUM_DAY_OFFSET, MAXIMUM_EXPECTED_COUNT, MAXIMUM_META_NAME_LENGTH,
+  MAXIMUM_MODIFIERS, MAXIMUM_PATH_SEGMENTS, MAXIMUM_POSITION,
   MAXIMUM_SPEC_REFERENCE_LENGTH, MAXIMUM_TEST_ID_LENGTH, MAXIMUM_TITLE_LENGTH, MAXIMUM_URL_LENGTH, MAXIMUM_VALUE_PREFIX_LENGTH,
   META_FIELDS, OPTIONAL_LOCATOR_FIELDS, PLAN_FIELDS, PREVIOUS_PLAN_VERSION, QUERY_KEY, STEP_FIELDS, STEP_TYPES, UNIQUE_NUMBER_DIGITS,
   VALUE_NAME,
@@ -66,6 +69,8 @@ const STEP_FIELD_SCHEMAS: Readonly<Record<string, JsonSchema>> = {
   mode: { enum: [...AUDIT_MODES] },
   name: { type: 'string', pattern: CAPTURE_NAME.source },
   from: closedObject({ element: reference('locator'), read: { enum: [...REMEMBER_READS] } }, ['element', 'read']),
+  scripts: { enum: [...SCRIPT_MODES] },
+  download: { type: 'string', pattern: DOWNLOAD_NAME.source },
 };
 
 // Step fields whose schema depends on the step type.
@@ -73,6 +78,8 @@ const STEP_TYPE_FIELD_SCHEMAS: { readonly [Type in StepType]?: Readonly<Record<s
   expect: { assert: reference('elementAssertion') },
   expectPage: { assert: reference('pageAssertion') },
   remember: { name: { type: 'string', pattern: VALUE_NAME.source } },
+  download: { name: { type: 'string', pattern: DOWNLOAD_NAME.source } },
+  expectDownload: { assert: reference('downloadAssertion') },
 };
 
 function stepSchema(type: StepType): JsonSchema {
@@ -131,7 +138,7 @@ export function planJsonSchema(): JsonSchema {
       + `A plan declaring "${PREVIOUS_PLAN_VERSION}" may use only what that version had. `
       + 'Fitting this schema is necessary, not sufficient: the plan parser also checks the project\'s allow-list, '
       + 'matrix, declared secrets, fixtures, test-id attributes and email domains, its limits, its text safety rules '
-      + 'and that every value is defined before it is used.',
+      + 'that every value and download is defined before it is used, and that a second tab opens only at the top level.',
     ...closedObject({
       version: { enum: [PREVIOUS_PLAN_VERSION, CURRENT_PLAN_VERSION] },
       meta: closedObject({
@@ -158,6 +165,7 @@ export function planJsonSchema(): JsonSchema {
           closedObject({ kind: { enum: [...ELEMENT_STATE_KINDS] } }, ['kind']),
           closedObject({ kind: { enum: [...ELEMENT_TEXT_KINDS] }, value: textOrValue(1) }, ['kind', 'value']),
           closedObject({ kind: { const: 'countEquals' }, value: integer(0, MAXIMUM_EXPECTED_COUNT) }, ['kind', 'value']),
+          closedObject({ kind: { const: 'hrefEquals' }, value: { oneOf: [reference('comparedUrl'), reference('valueReference')] } }, ['kind', 'value']),
         ],
       },
       pageAssertion: {
@@ -168,8 +176,24 @@ export function planJsonSchema(): JsonSchema {
             kind: { const: 'urlPathStartsWith' },
             value: { type: 'string', 'maxLength': MAXIMUM_URL_LENGTH, pattern: `^/[^${UNSAFE_CHARACTERS}]*$` },
           }, ['kind', 'value']),
+          closedObject({
+            kind: { const: 'metaContent' }, name: text(1, MAXIMUM_META_NAME_LENGTH), value: textOrValue(1),
+          }, ['kind', 'name', 'value']),
+          closedObject({ kind: { const: 'canonicalUrl' }, value: reference('comparedUrl') }, ['kind', 'value']),
         ],
       },
+      // Checks on a downloaded file; sizes are in bytes.
+      downloadAssertion: {
+        oneOf: [
+          closedObject({ kind: { enum: [...DOWNLOAD_TEXT_KINDS] }, value: textOrValue(1) }, ['kind', 'value']),
+          closedObject({ kind: { const: 'mediaTypeEquals' }, value: text(1) }, ['kind', 'value']),
+          closedObject({ kind: { const: 'sizeAtMost' }, value: integer(0, LARGEST_DOWNLOAD_BYTES) }, ['kind', 'value']),
+          closedObject({ kind: { const: 'sizeAtLeast' }, value: integer(1, LARGEST_DOWNLOAD_BYTES) }, ['kind', 'value']),
+        ],
+      },
+      // A URL a check compares and never visits: a path starting with "/", or an absolute http or
+      // https URL of any origin.
+      comparedUrl: { type: 'string', 'minLength': 1, 'maxLength': MAXIMUM_URL_LENGTH, pattern: '^(/|https?://)' },
       // A path starting with "/", or an absolute http or https URL. The parser checks the origin.
       url: { type: 'string', 'minLength': 1, 'maxLength': MAXIMUM_URL_LENGTH, pattern: '^(/|https?://)' },
       // A path on the run's base URL. It has no origin field, so no value can change where it goes.

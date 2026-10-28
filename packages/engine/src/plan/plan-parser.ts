@@ -5,12 +5,14 @@
 // credential-shaped text anywhere. A plan it accepts is frozen and remembered, so run() can tell it from a look-alike.
 // The grammar is the one of the version the plan declares: a plan declaring "1.1" is read with
 // everything 1.2 added switched off, so it parses exactly as it always did.
-// See docs/specs/SPEC-01-plan-language-and-parser.md and docs/specs/SPEC-30-plan-values-positions-and-keys.md.
+// See docs/specs/SPEC-01-plan-language-and-parser.md, docs/specs/SPEC-30-plan-values-positions-and-keys.md
+// and docs/specs/SPEC-31-page-states-metadata-downloads-and-tabs.md.
 import {
-  AUDIT_MODES, DIALOG_ACTIONS, literalText, ELEMENT_STATE_KINDS, ELEMENT_TEXT_KINDS, LOCATOR_KINDS, MODIFIERS, PAGE_TEXT_KINDS, POSITION_WORDS,
-  REMEMBER_READS, ROLES,
+  AUDIT_MODES, DIALOG_ACTIONS, DOWNLOAD_SIZE_KINDS, literalText, ELEMENT_STATE_KINDS, LOCATOR_KINDS, MODIFIERS, PAGE_TEXT_KINDS,
+  POSITION_WORDS, REMEMBER_READS, ROLES, SCRIPT_MODES,
   failure, success,
-  type AllowedUrl, type CriterionId, type ElementAssertion, type EmailDomain, type FixtureName, type Locator,
+  type AllowedUrl, type CriterionId, type DownloadAssertion, type DownloadName, type ElementAssertion, type EmailDomain,
+  type FixtureName, type Locator,
   type Modifier, type MultiLineText, type Origin, type PageAssertion, type PathTemplate, type Plan, type PlanData,
   type PlanMeta, type Position, type Result, type SafeText, type SecretName, type SecretReference, type Step, type TargetId,
   type TestIdAttribute, type TextOrValue, type ValueReference,
@@ -22,8 +24,8 @@ import {
   type Issues, type Parsed, type PlanError,
 } from './plan-decoders.ts';
 import {
-  ASSERTION_STEP_TYPES, CAPTURE_NAME, CRITERION_FIELD, CRITERION_ID, CURRENT_GRAMMAR, FEATURE_ID, FROM_FIELD, LOCATOR_FIELDS,
-  MAXIMUM_EXPECTED_COUNT, MAXIMUM_MODIFIERS, MAXIMUM_PATH_SEGMENTS, MAXIMUM_POSITION, MAXIMUM_QUERY_VALUES,
+  ASSERTION_STEP_TYPES, CAPTURE_NAME, CRITERION_FIELD, CRITERION_ID, CURRENT_GRAMMAR, DOWNLOAD_KINDS, DOWNLOAD_NAME, ELEMENT_KINDS, FEATURE_ID,
+  FROM_FIELD, LARGEST_DOWNLOAD_BYTES, LOCATOR_FIELDS, MAXIMUM_EXPECTED_COUNT, MAXIMUM_META_NAME_LENGTH, MAXIMUM_MODIFIERS, MAXIMUM_PATH_SEGMENTS, MAXIMUM_POSITION, MAXIMUM_QUERY_VALUES,
   MAXIMUM_SPEC_REFERENCE_LENGTH, MAXIMUM_TEST_ID_LENGTH, MAXIMUM_TITLE_LENGTH, MAXIMUM_URL_LENGTH, META_FIELDS, PLAN_FIELDS,
   QUERY_KEY, grammarFor, type Grammar,
 } from './plan-grammar.ts';
@@ -54,6 +56,11 @@ type ParseContext = {
   // The run values defined so far, in document order: the plan's values, then each remember
   // step's name once that step has been read. A reference to any other name is undefined.
   readonly defined: Set<string>;
+  // The download names defined so far, in document order, each by its download step. They share
+  // one plan-wide namespace with the run values, so a name is defined once across both.
+  readonly downloads: Set<string>;
+  // True while reading the plan's own list of steps, not the steps inside a frame or a second tab.
+  readonly topLevel: boolean;
 };
 
 const rulesOf = (project: Project): PlanRules => ({
@@ -215,18 +222,41 @@ function readExpectedText(input: unknown, path: string, context: ParseContext): 
   return value;
 }
 
-const ELEMENT_KINDS = [...ELEMENT_STATE_KINDS, ...ELEMENT_TEXT_KINDS, 'countEquals'] as const;
+// A URL a check compares and never visits, such as a link's target or a canonical URL: an
+// absolute http or https URL of any origin, or a path starting with "/", which the check resolves
+// against the page's URL. Kept as written.
+function isComparedUrl(text: SafeText, path: string, context: ParseContext): boolean {
+  let url: URL;
+  try { url = new URL(text, RELATIVE_BASE); } catch { context.issues.push({ code: 'invalid_url', path }); return false; }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') { context.issues.push({ code: 'scheme_not_allowed', path }); return false; }
+  if (url.origin === RELATIVE_BASE.origin && !text.startsWith('/')) { context.issues.push({ code: 'invalid_url', path }); return false; }
+  return true;
+}
+
+// A link target for hrefEquals: a compared URL, or a value reference whose text is known only at run time.
+function readLinkTarget(input: unknown, path: string, context: ParseContext): Parsed<TextOrValue> {
+  const value = readTextOrValue(input, path, context, MAXIMUM_URL_LENGTH);
+  if (value === INVALID) return INVALID;
+  const literal = literalText(value);
+  return literal === undefined || isComparedUrl(literal, path, context) ? value : INVALID;
+}
 
 function readElementAssertion(input: unknown, path: string, context: ParseContext): Parsed<ElementAssertion> {
   const head = readAssertionHead(input, path, context);
   if (head === INVALID) return INVALID;
   const kind = readOneOf(head['kind'], `${path}.kind`, context.issues, ELEMENT_KINDS);
   if (kind === INVALID) return INVALID;
+  // A kind the declared version does not have is refused as that version's parser refuses it.
+  if (!context.grammar.elementKinds.includes(kind)) { context.issues.push({ code: 'unknown_value', path: `${path}.kind` }); return INVALID; }
   if (isOneOf(ELEMENT_STATE_KINDS, kind)) return readRecord(input, path, context.issues, ['kind']) === INVALID ? INVALID : { kind };
   if (readRecord(input, path, context.issues, ['kind', 'value']) === INVALID) return INVALID;
   if (kind === 'countEquals') {
     const count = readInteger(head['value'], `${path}.value`, context.issues, 0, MAXIMUM_EXPECTED_COUNT);
     return count === INVALID ? INVALID : { kind, value: count };
+  }
+  if (kind === 'hrefEquals') {
+    const target = readLinkTarget(head['value'], `${path}.value`, context);
+    return target === INVALID ? INVALID : { kind, value: target };
   }
   const value = readExpectedText(head['value'], `${path}.value`, context);
   return value === INVALID ? INVALID : { kind, value };
@@ -237,7 +267,19 @@ function readPageAssertion(input: unknown, path: string, context: ParseContext):
   if (head === INVALID) return INVALID;
   const kind = readOneOf(head['kind'], `${path}.kind`, context.issues, context.grammar.pageKinds);
   if (kind === INVALID) return INVALID;
+  if (kind === 'metaContent') {
+    if (readRecord(input, path, context.issues, ['kind', 'name', 'value']) === INVALID) return INVALID;
+    const parts = [
+      readPlanText(head['name'], `${path}.name`, context, MAXIMUM_META_NAME_LENGTH),
+      readExpectedText(head['value'], `${path}.value`, context),
+    ] as const;
+    return allValid(parts) ? { kind, name: parts[0], value: parts[1] } : INVALID;
+  }
   if (readRecord(input, path, context.issues, ['kind', 'value']) === INVALID) return INVALID;
+  if (kind === 'canonicalUrl') {
+    const canonical = readPlanText(head['value'], `${path}.value`, context, MAXIMUM_URL_LENGTH);
+    return canonical === INVALID || !isComparedUrl(canonical, `${path}.value`, context) ? INVALID : { kind, value: canonical };
+  }
   if (kind === 'url') {
     const url = readUrl(head['value'], `${path}.value`, context);
     return url === INVALID ? INVALID : { kind, value: url };
@@ -323,6 +365,9 @@ function readCaptureName(input: unknown, path: string, context: ParseContext): P
   return { type: 'capture', name: brand<string, 'CaptureName'>(input) };
 }
 
+// True when a run value or a download already has the name: the two share one namespace.
+const isNameTaken = (name: string, context: ParseContext): boolean => context.defined.has(name) || context.downloads.has(name);
+
 // A remember step defines its name only once it has been read, so its own locator cannot use it,
 // and a name already defined is a duplicate.
 function readRemember(head: Readonly<Record<string, unknown>>, path: string, context: ParseContext): Parsed<Step> {
@@ -333,9 +378,58 @@ function readRemember(head: Readonly<Record<string, unknown>>, path: string, con
     readOneOf(from['read'], `${path}.from.read`, context.issues, REMEMBER_READS),
   ] as const;
   if (name === INVALID) return INVALID;
-  if (context.defined.has(name)) { context.issues.push({ code: 'duplicate', path: `${path}.name` }); return INVALID; }
+  if (isNameTaken(name, context)) { context.issues.push({ code: 'duplicate', path: `${path}.name` }); return INVALID; }
   context.defined.add(name);
   return allValid(parts) ? { type: 'remember', name, from: { element: parts[0], read: parts[1] } } : INVALID;
+}
+
+// A download's name as plain text, never a value reference: it names the file for the plan, not
+// for the page. The error never repeats the name.
+function readDownloadName(input: unknown, path: string, context: ParseContext): Parsed<DownloadName> {
+  if (typeof input !== 'string') { context.issues.push({ code: 'wrong_type', path }); return INVALID; }
+  if (!DOWNLOAD_NAME.test(input)) { context.issues.push({ code: 'unknown_value', path }); return INVALID; }
+  return brand<string, 'DownloadName'>(input);
+}
+
+// A download step defines its name once its locator has been read; a name a run value or another
+// download already has is a duplicate. The name stays defined for every step after it, also
+// after the frame or second tab it was defined in.
+function readDownload(head: Readonly<Record<string, unknown>>, path: string, context: ParseContext): Parsed<Step> {
+  const locator = readLocator(head['locator'], `${path}.locator`, context);
+  const name = readDownloadName(head['name'], `${path}.name`, context);
+  if (name === INVALID) return INVALID;
+  if (isNameTaken(name, context)) { context.issues.push({ code: 'duplicate', path: `${path}.name` }); return INVALID; }
+  context.downloads.add(name);
+  return locator === INVALID ? INVALID : { type: 'download', name, locator };
+}
+
+// The download an expectDownload checks: one an earlier download step defined.
+function readDownloadReference(input: unknown, path: string, context: ParseContext): Parsed<DownloadName> {
+  const name = readDownloadName(input, path, context);
+  if (name === INVALID) return INVALID;
+  if (!context.downloads.has(name)) { context.issues.push({ code: 'undefined_value', path }); return INVALID; }
+  return name;
+}
+
+function readDownloadAssertion(input: unknown, path: string, context: ParseContext): Parsed<DownloadAssertion> {
+  const head = readAssertionHead(input, path, context);
+  if (head === INVALID) return INVALID;
+  const kind = readOneOf(head['kind'], `${path}.kind`, context.issues, DOWNLOAD_KINDS);
+  if (kind === INVALID) return INVALID;
+  if (readRecord(input, path, context.issues, ['kind', 'value']) === INVALID) return INVALID;
+  const valuePath = `${path}.value`;
+  if (isOneOf(DOWNLOAD_SIZE_KINDS, kind)) {
+    const size = readInteger(head['value'], valuePath, context.issues, 0, LARGEST_DOWNLOAD_BYTES);
+    // Every file is at least 0 bytes long, so that check would prove nothing.
+    if (kind === 'sizeAtLeast' && size === 0) { context.issues.push({ code: 'vacuous', path: valuePath }); return INVALID; }
+    return size === INVALID ? INVALID : { kind, value: size };
+  }
+  if (kind === 'mediaTypeEquals') {
+    const mediaType = readPlanText(head['value'], valuePath, context, context.rules.limits.maximumTextLength);
+    return mediaType === INVALID ? INVALID : { kind, value: mediaType };
+  }
+  const value = readExpectedText(head['value'], valuePath, context);
+  return value === INVALID ? INVALID : { kind, value };
 }
 
 function readStep(input: unknown, path: string, context: ParseContext): Parsed<Step> {
@@ -343,6 +437,9 @@ function readStep(input: unknown, path: string, context: ParseContext): Parsed<S
   if (head === INVALID) return INVALID;
   const type = readOneOf(head['type'], `${path}.type`, context.issues, context.grammar.stepTypes, 'unknown_step');
   if (type === INVALID) return INVALID;
+  // A second tab opens only from the plan's own list of steps, so a tab never holds another tab
+  // and a frame never opens one. Nothing inside a misplaced tab is read.
+  if (type === 'newTab' && !context.topLevel) { context.issues.push({ code: 'misplaced_step', path }); return INVALID; }
   const fields = context.grammar.stepFields[type];
   // The criterion id is checked on its own below, so that a missing one is reported as vacuous.
   const required = fields.required.filter((field) => field !== CRITERION_FIELD);
@@ -352,8 +449,13 @@ function readStep(input: unknown, path: string, context: ParseContext): Parsed<S
   switch (type) {
     case 'navigate': {
       const url = readNavigation(head['url'], `${path}.url`, context);
-      return url === INVALID ? INVALID : { type, url };
+      // Left out when absent, so a navigate without it stays exactly as it was.
+      if (!Object.hasOwn(head, 'scripts')) return url === INVALID ? INVALID : { type, url };
+      const scripts = readOneOf(head['scripts'], `${path}.scripts`, context.issues, SCRIPT_MODES);
+      return url === INVALID || scripts === INVALID ? INVALID : { type, url, scripts };
     }
+    case 'download':
+      return readDownload(head, path, context);
     case 'click':
     case 'hover': {
       const found = locator();
@@ -386,8 +488,15 @@ function readStep(input: unknown, path: string, context: ParseContext): Parsed<S
     }
     case 'frame': {
       // The depth was checked before the walk began, so this recursion is bounded.
-      const parts = [locator(), readStepList(head['steps'], `${path}.steps`, context)] as const;
+      const parts = [locator(), readStepList(head['steps'], `${path}.steps`, nested(context))] as const;
       return allValid(parts) ? { type, locator: parts[0], steps: parts[1] } : INVALID;
+    }
+    case 'newTab': {
+      // Frame depth inside a tab counts from the tab, and was checked before the walk began.
+      const parts = [
+        readNavigation(head['url'], `${path}.url`, context), readStepList(head['steps'], `${path}.steps`, nested(context)),
+      ] as const;
+      return allValid(parts) ? { type, url: parts[0], steps: parts[1] } : INVALID;
     }
     case 'dialog': {
       const action = readOneOf(head['action'], `${path}.action`, context.issues, DIALOG_ACTIONS);
@@ -411,6 +520,14 @@ function readStep(input: unknown, path: string, context: ParseContext): Parsed<S
       const parts = [readPageAssertion(head['assert'], `${path}.assert`, context), readCriterionId(head, path, context)] as const;
       return allValid(parts) ? { type, assert: parts[0], criterionId: parts[1] } : INVALID;
     }
+    case 'expectDownload': {
+      const parts = [
+        readDownloadReference(head['download'], `${path}.download`, context),
+        readDownloadAssertion(head['assert'], `${path}.assert`, context),
+        readCriterionId(head, path, context),
+      ] as const;
+      return allValid(parts) ? { type, download: parts[0], assert: parts[1], criterionId: parts[2] } : INVALID;
+    }
     case 'a11yAudit': {
       const mode = readOneOf(head['mode'], `${path}.mode`, context.issues, AUDIT_MODES);
       return mode === INVALID ? INVALID : { type, mode };
@@ -421,6 +538,9 @@ function readStep(input: unknown, path: string, context: ParseContext): Parsed<S
       return readRemember(head, path, context);
   }
 }
+
+// The context for the steps inside a frame or a second tab: the same plan, below its top level.
+const nested = (context: ParseContext): ParseContext => ({ ...context, topLevel: false });
 
 // A non-empty list of steps, every one read so that a rejection lists every problem.
 function readStepList(input: unknown, path: string, context: ParseContext): Parsed<readonly Step[]> {
@@ -482,9 +602,9 @@ function readStorageState(input: unknown, context: ParseContext): Parsed<SecretR
   return secretName === INVALID ? INVALID : { secretName };
 }
 
-// Every step, including the steps inside frames, depth first.
+// Every step, including the steps inside frames and second tabs, depth first.
 function everyStep(steps: readonly Step[]): Step[] {
-  return steps.flatMap((step) => (step.type === 'frame' ? [step, ...everyStep(step.steps)] : [step]));
+  return steps.flatMap((step) => (step.type === 'frame' || step.type === 'newTab' ? [step, ...everyStep(step.steps)] : [step]));
 }
 
 // Checks across the whole plan once every step has been read: capture names are unique, and the
@@ -505,19 +625,24 @@ const plainFields = (input: unknown): Readonly<Record<string, unknown>> | undefi
 
 // The path of the first frame step nested deeper than `maximumDepth`, or undefined. It looks only
 // at frame steps and their step lists, without recursion, so even a plan nested thousands deep is
-// measured cheaply and before the parser walks it.
+// measured cheaply and before the parser walks it. Depth counts from the tab, so a second tab at
+// the top level starts its frames at depth 0; the parser reads no tab anywhere else, so neither
+// does this.
 function tooDeepFrame(input: unknown, maximumDepth: number): string | undefined {
-  const pending: { readonly steps: unknown; readonly path: string; readonly depth: number }[] = [
-    { steps: plainFields(input)?.['steps'], path: '$.steps', depth: 0 },
+  const pending: { readonly steps: unknown; readonly path: string; readonly depth: number; readonly topLevel: boolean }[] = [
+    { steps: plainFields(input)?.['steps'], path: '$.steps', depth: 0, topLevel: true },
   ];
   for (let next = pending.pop(); next !== undefined; next = pending.pop()) {
     if (!Array.isArray(next.steps)) continue;
     for (const [index, step] of next.steps.entries()) {
       const fields = plainFields(step);
-      if (fields?.['type'] !== 'frame') continue;
       const path = `${next.path}[${index}]`;
+      if (fields?.['type'] === 'newTab' && next.topLevel) {
+        pending.push({ steps: fields['steps'], path: `${path}.steps`, depth: 0, topLevel: false });
+      }
+      if (fields?.['type'] !== 'frame') continue;
       if (next.depth + 1 > maximumDepth) return path;
-      pending.push({ steps: fields['steps'], path: `${path}.steps`, depth: next.depth + 1 });
+      pending.push({ steps: fields['steps'], path: `${path}.steps`, depth: next.depth + 1, topLevel: false });
     }
   }
   return undefined;
@@ -533,7 +658,7 @@ export function readPlanData(input: unknown, rules: PlanRules): Result<PlanData,
   // below; the current grammar reads the rest so every other problem is reported too.
   const declaredGrammar = grammarFor(plainFields(input)?.['version']);
   const grammar = declaredGrammar ?? CURRENT_GRAMMAR;
-  const context: ParseContext = { rules, issues: [], grammar, defined: new Set() };
+  const context: ParseContext = { rules, issues: [], grammar, defined: new Set(), downloads: new Set(), topLevel: true };
   const fields = readRecord(input, '$', context.issues, [...PLAN_FIELDS, ...grammar.optionalPlanFields], PLAN_FIELDS);
   if (fields === INVALID) return failure(context.issues);
   // A plan for a newer language is refused outright: running it with the unknown parts skipped

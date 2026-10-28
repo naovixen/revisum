@@ -1,8 +1,12 @@
 // The plan language's grammar as data: which fields each step and locator has, and the patterns
 // its ids follow. The plan parser reads these tables to decode a plan, and planJsonSchema() reads
 // the same tables to build the published JSON Schema, so the two cannot drift apart.
-// See docs/specs/SPEC-01-plan-language-and-parser.md and docs/specs/SPEC-30-plan-values-positions-and-keys.md.
-import { KEYS, PAGE_TEXT_KINDS, PLAN_VERSION, type Key, type StepType } from '@revisum/contracts';
+// See docs/specs/SPEC-01-plan-language-and-parser.md, docs/specs/SPEC-30-plan-values-positions-and-keys.md
+// and docs/specs/SPEC-31-page-states-metadata-downloads-and-tabs.md.
+import {
+  DOWNLOAD_SIZE_KINDS, DOWNLOAD_TEXT_KINDS, ELEMENT_STATE_KINDS, ELEMENT_TEXT_KINDS, KEYS, PAGE_TEXT_KINDS, PLAN_VERSION,
+  type Key, type StepType,
+} from '@revisum/contracts';
 
 // The version text a current plan declares, such as "1.2".
 export const CURRENT_PLAN_VERSION: `${number}.${number}` = `${PLAN_VERSION.major}.${PLAN_VERSION.minor}`;
@@ -22,8 +26,9 @@ export type StepFields = { readonly required: readonly string[]; readonly option
 
 // Every step's fields in the current language. `type` is always required; no other field is allowed.
 export const STEP_FIELDS: { readonly [Type in StepType]: StepFields } = {
-  navigate: { required: ['type', 'url'], optional: [] },
+  navigate: { required: ['type', 'url'], optional: ['scripts'] },
   click: { required: ['type', 'locator'], optional: [] },
+  download: { required: ['type', 'name', 'locator'], optional: [] },
   hover: { required: ['type', 'locator'], optional: [] },
   fill: { required: ['type', 'locator', 'value'], optional: [] },
   select: { required: ['type', 'locator', 'option'], optional: [] },
@@ -33,16 +38,20 @@ export const STEP_FIELDS: { readonly [Type in StepType]: StepFields } = {
   dialog: { required: ['type', 'action'], optional: ['expectText'] },
   expect: { required: ['type', 'locator', 'assert', CRITERION_FIELD], optional: [] },
   expectPage: { required: ['type', 'assert', CRITERION_FIELD], optional: [] },
+  expectDownload: { required: ['type', 'download', 'assert', CRITERION_FIELD], optional: [] },
+  newTab: { required: ['type', 'url', 'steps'], optional: [] },
   a11yAudit: { required: ['type', 'mode'], optional: [] },
   capture: { required: ['type', 'name'], optional: [] },
   remember: { required: ['type', 'name', FROM_FIELD], optional: [] },
 };
 export const STEP_TYPES: readonly StepType[] = [
   'navigate', 'click', 'hover', 'fill', 'select', 'upload', 'press', 'frame', 'dialog', 'expect', 'expectPage', 'a11yAudit', 'capture',
-  'remember',
+  'remember', 'download', 'expectDownload', 'newTab',
 ];
+// The steps language 1.2 added, which a plan declaring "1.1" cannot use.
+const NEWER_STEP_TYPES: readonly StepType[] = ['remember', 'download', 'expectDownload', 'newTab'];
 // The steps that check something. A plan needs at least one, or it would pass without proving anything.
-export const ASSERTION_STEP_TYPES: readonly StepType[] = ['expect', 'expectPage'];
+export const ASSERTION_STEP_TYPES: readonly StepType[] = ['expect', 'expectPage', 'expectDownload'];
 
 // The fields of each locator kind, in the order they are written. All are required.
 export const LOCATOR_FIELDS = {
@@ -64,7 +73,11 @@ export const PLAN_FIELDS = ['version', 'meta', 'targets', 'steps'] as const;
 // names the values generated for each run, and clock sets the page's frozen clock.
 export const OPTIONAL_PLAN_FIELDS = ['storageState', 'values', 'clock'] as const;
 export const META_FIELDS = ['featureId', 'specReference', 'title'] as const;
-export const PAGE_KINDS = [...PAGE_TEXT_KINDS, 'url', 'urlPathStartsWith'] as const;
+export const PAGE_KINDS = [...PAGE_TEXT_KINDS, 'url', 'urlPathStartsWith', 'metaContent', 'canonicalUrl'] as const;
+export const ELEMENT_KINDS = [...ELEMENT_STATE_KINDS, ...ELEMENT_TEXT_KINDS, 'countEquals', 'hrefEquals'] as const;
+export const DOWNLOAD_KINDS = [...DOWNLOAD_TEXT_KINDS, 'mediaTypeEquals', ...DOWNLOAD_SIZE_KINDS] as const;
+// The 8 state checks of language 1.1 lead the list of state checks.
+const PREVIOUS_STATE_COUNT = 8;
 
 // What one language version allows. Version 1.1 is a subset of 1.2: a plan declaring "1.1" is
 // read with everything 1.2 added switched off, so it is accepted or refused exactly as a 1.1
@@ -76,6 +89,7 @@ export type Grammar = {
   readonly optionalLocatorFields: { readonly [Kind in keyof typeof LOCATOR_FIELDS]: readonly string[] };
   readonly optionalPlanFields: readonly string[];
   readonly keys: readonly Key[];
+  readonly elementKinds: readonly string[];
   readonly pageKinds: readonly string[];
   // Value references, multi-line fills and path templates: the object forms text may take.
   readonly runValues: boolean;
@@ -91,17 +105,23 @@ export const CURRENT_GRAMMAR: Grammar = {
   optionalLocatorFields: OPTIONAL_LOCATOR_FIELDS,
   optionalPlanFields: OPTIONAL_PLAN_FIELDS,
   keys: KEYS,
+  elementKinds: ELEMENT_KINDS,
   pageKinds: PAGE_KINDS,
   runValues: true,
 };
 
 export const PREVIOUS_GRAMMAR: Grammar = {
   version: PREVIOUS_PLAN_VERSION,
-  stepTypes: STEP_TYPES.filter((type) => type !== 'remember'),
-  stepFields: { ...STEP_FIELDS, press: { required: STEP_FIELDS.press.required, optional: [] } },
+  stepTypes: STEP_TYPES.filter((type) => !NEWER_STEP_TYPES.includes(type)),
+  stepFields: {
+    ...STEP_FIELDS,
+    navigate: { required: STEP_FIELDS.navigate.required, optional: [] },
+    press: { required: STEP_FIELDS.press.required, optional: [] },
+  },
   optionalLocatorFields: { role: [], label: [], text: [], testId: [] },
   optionalPlanFields: ['storageState'],
   keys: KEYS.slice(0, PREVIOUS_KEY_COUNT),
+  elementKinds: [...ELEMENT_STATE_KINDS.slice(0, PREVIOUS_STATE_COUNT), ...ELEMENT_TEXT_KINDS, 'countEquals'],
   pageKinds: [...PAGE_TEXT_KINDS, 'url'],
   runValues: false,
 };
@@ -112,6 +132,8 @@ export const grammarFor = (version: unknown): Grammar | undefined =>
 
 export const FEATURE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 export const CAPTURE_NAME = /^[a-z0-9][a-z0-9-]{0,63}$/;
+// A download's name, such as "project-list": the plan's handle on the file, never a file name.
+export const DOWNLOAD_NAME = /^[a-z0-9][a-z0-9-]{0,63}$/;
 export const CRITERION_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 // A lowercase id such as a target id; the project parser owns ids and applies the same rule.
 export const LOWERCASE_ID = /^[a-z0-9][a-z0-9-]{0,47}$/;
@@ -145,3 +167,7 @@ export const MAXIMUM_MODIFIERS = 4;
 export const MAXIMUM_VALUES = 64;
 export const MAXIMUM_PATH_SEGMENTS = 32;
 export const MAXIMUM_QUERY_VALUES = 32;
+// The largest download a project may allow, and so the largest size a download check may name: 100 MiB.
+export const LARGEST_DOWNLOAD_BYTES = 100 * 1024 * 1024;
+// The name or property of a meta tag, such as "og:title".
+export const MAXIMUM_META_NAME_LENGTH = 128;

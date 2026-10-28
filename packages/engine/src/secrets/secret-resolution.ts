@@ -18,10 +18,10 @@ export type ResolvedSecrets = {
 
 export const NO_SECRETS: ResolvedSecrets = { fills: new Map(), storageState: null };
 
-// The secret names fill steps use, inside frames too, in plan order.
+// The secret names fill steps use, inside frames and second tabs too, in plan order.
 function fillSecretNames(steps: readonly Step[]): SecretName[] {
   return steps.flatMap((step) => {
-    if (step.type === 'frame') return fillSecretNames(step.steps);
+    if (step.type === 'frame' || step.type === 'newTab') return fillSecretNames(step.steps);
     return step.type === 'fill' && typeof step.value !== 'string' && 'secretName' in step.value ? [step.value.secretName] : [];
   });
 }

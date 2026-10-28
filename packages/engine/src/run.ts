@@ -2,7 +2,7 @@
 // parser made and the policy gate authorised, walks the typed lifecycle, never substitutes a
 // target, and hashes everything except wall-clock timings.
 import {
-  needsDriverFeatures, needsLocatorFeatures, success,
+  needsDriverFeatures, success,
   type A11yFinding, type ActionGuard, type ApprovalLabel, type ArtifactReference, type ArtifactStore, type Authorised,
   type BrowserDriver, type Clock, type ElementProbe, type EventSink, type Plan, type PolicyRuleId, type Redactor,
   type ResolvedElement, type Result, type SecretStore, type Session, type Step, type Target, type TargetId, type Unavailable,
@@ -239,7 +239,8 @@ export async function runUntrusted(
 const productionAllowed = (inputs: RunInputs): boolean =>
   inputs.standing?.mode === 'approved' && inputs.project.policy.allowProductionForApprovedPlans;
 
-// The first production origin the run would reach: its base URL or a navigate step, inside frames too.
+// The first production origin the run would reach: its base URL, a navigate step or a second tab's
+// URL, inside frames and second tabs too.
 function productionOriginReached(inputs: RunInputs): string | undefined {
   const production = new Set<string>(inputs.project.productionOrigins);
   if (production.size === 0) return undefined;
@@ -247,8 +248,8 @@ function productionOriginReached(inputs: RunInputs): string | undefined {
   const visit = (steps: readonly Step[]): void => {
     for (const step of steps) {
       // A path template always stays on the base URL's origin, already in the list.
-      if (step.type === 'navigate' && typeof step.url === 'string') origins.push(new URL(step.url, inputs.baseUrl).origin);
-      if (step.type === 'frame') visit(step.steps);
+      if ((step.type === 'navigate' || step.type === 'newTab') && typeof step.url === 'string') origins.push(new URL(step.url, inputs.baseUrl).origin);
+      if (step.type === 'frame' || step.type === 'newTab') visit(step.steps);
     }
   };
   visit(inputs.plan.steps);
@@ -280,19 +281,14 @@ async function openSession(planned: lifecycle.Planned, context: RunContext): Pro
   return opened.ok ? { ok: true, value: { session: opened.value, driver } } : opened;
 }
 
-// Assertion kinds the drivers' element probe cannot decide yet: it reports no checked or focused state.
-const UNSUPPORTED_ASSERTION_KINDS: readonly string[] = ['checked', 'unchecked', 'focused'];
-
 // Steps the plan language has but no driver performs yet. Each fails with unsupported-step, never
 // passes or is skipped, and nothing of it reaches the driver, so a plan that relies on one cannot
 // report a pass it did not earn or act in part.
 function isUnsupported(step: Step): boolean {
   switch (step.type) {
     case 'hover': case 'select': case 'upload': case 'frame': case 'dialog': case 'remember': return true;
-    // Positions, other test-id attributes, key chords and multi-line text come with the CDP driver.
-    case 'expect': return UNSUPPORTED_ASSERTION_KINDS.includes(step.assert.kind) || needsLocatorFeatures(step.locator);
-    case 'click': case 'press': case 'fill': return needsDriverFeatures(step);
-    case 'navigate': case 'expectPage': case 'a11yAudit': case 'capture': return false;
+    // The features a step may need that no driver has yet are decided in one place, in contracts.
+    default: return needsDriverFeatures(step);
   }
 }
 
@@ -339,6 +335,9 @@ async function executeStep(step: Step, index: number, session: Session, target: 
     case 'frame':
     case 'dialog':
     case 'remember':
+    case 'download':
+    case 'expectDownload':
+    case 'newTab':
       return { ...base, outcome: 'failed', code: 'unsupported-step' };
     case 'expect': {
       const locator = resolveLocator(step.locator, context.values, context.inputs.project);

@@ -10,7 +10,7 @@ import { brand } from '../brand.ts';
 import {
   INVALID, allValid, peekRecord, readInteger, readList, readOneOf, readRecord, readText, type Issues, type Parsed, type PlanError,
 } from '../plan/plan-decoders.ts';
-import { LOWERCASE_ID, MAXIMUM_TEST_ID_LENGTH, MAXIMUM_URL_LENGTH } from '../plan/plan-grammar.ts';
+import { LARGEST_DOWNLOAD_BYTES, LOWERCASE_ID, MAXIMUM_TEST_ID_LENGTH, MAXIMUM_URL_LENGTH } from '../plan/plan-grammar.ts';
 
 const DEVICE_IDS = Object.keys(DEVICE_PROFILES) as DeviceProfileId[];
 
@@ -25,10 +25,13 @@ export type Limits = {
   // line breaks between its lines.
   readonly maximumFillLines: number;
   readonly maximumFillCharacters: number;
+  // The largest file a download step may save, in bytes. The driver stops a larger one and deletes
+  // its partial bytes.
+  readonly maximumDownloadBytes: number;
 };
 export const DEFAULT_LIMITS: Limits = {
   maximumPlanBytes: 64 * 1024, maximumSteps: 100, maximumTextLength: 500, stepTimeoutMilliseconds: 5000, maximumFrameDepth: 3,
-  maximumFillLines: 50, maximumFillCharacters: 4000,
+  maximumFillLines: 50, maximumFillCharacters: 4000, maximumDownloadBytes: 5 * 1024 * 1024,
 };
 // The limits the plan parser checks before it walks a plan, so an oversized plan costs nothing to reject.
 export type PlanLimits = Pick<Limits, 'maximumPlanBytes' | 'maximumSteps' | 'maximumFrameDepth'>;
@@ -53,6 +56,14 @@ export const DEFAULT_POLICY: ProjectPolicy = {
   allowProductionForApprovedPlans: false,
 };
 
+// What a run keeps as evidence beyond its defaults. See docs/specs/SPEC-31-page-states-metadata-downloads-and-tabs.md.
+export type EvidenceSettings = {
+  // Whether a download's content is kept, as redacted text. Off unless the project turns it on;
+  // a download's name, media type, size and sha256 are always kept.
+  readonly keepDownloads: boolean;
+};
+export const DEFAULT_EVIDENCE: EvidenceSettings = { keepDownloads: false };
+
 export type ProjectData = {
   readonly origins: readonly Origin[];
   // Origins that serve real users. A plan with no approval runs only as a proposal, and a proposal
@@ -70,6 +81,7 @@ export type ProjectData = {
   readonly testIdAttributes: readonly TestIdAttribute[];
   // The domains a generated unique email address may use; the first is the default.
   readonly generatedEmailDomains: readonly EmailDomain[];
+  readonly evidence: EvidenceSettings;
 };
 export type Project = Brand<ProjectData, 'Project'>;
 
@@ -142,7 +154,7 @@ function readTarget(input: unknown, path: string, issues: Issues): Parsed<Target
 
 const LIMIT_KEYS = [
   'maximumPlanBytes', 'maximumSteps', 'maximumTextLength', 'stepTimeoutMilliseconds', 'maximumFrameDepth',
-  'maximumFillLines', 'maximumFillCharacters',
+  'maximumFillLines', 'maximumFillCharacters', 'maximumDownloadBytes',
 ] as const;
 
 function readLimits(input: unknown, path: string, issues: Issues): Parsed<Limits> {
@@ -154,14 +166,16 @@ function readLimits(input: unknown, path: string, issues: Issues): Parsed<Limits
   const parts = [
     pick('maximumPlanBytes', 1 << 20), pick('maximumSteps', 1000), pick('maximumTextLength', 4000),
     pick('stepTimeoutMilliseconds', 60_000), pick('maximumFrameDepth', 16), pick('maximumFillLines', 500),
-    pick('maximumFillCharacters', 20_000),
+    pick('maximumFillCharacters', 20_000), pick('maximumDownloadBytes', LARGEST_DOWNLOAD_BYTES),
   ] as const;
   if (!allValid(parts)) return INVALID;
   const [
     maximumPlanBytes, maximumSteps, maximumTextLength, stepTimeoutMilliseconds, maximumFrameDepth, maximumFillLines, maximumFillCharacters,
+    maximumDownloadBytes,
   ] = parts;
   return {
     maximumPlanBytes, maximumSteps, maximumTextLength, stepTimeoutMilliseconds, maximumFrameDepth, maximumFillLines, maximumFillCharacters,
+    maximumDownloadBytes,
   };
 }
 
@@ -289,11 +303,25 @@ function readPolicy(input: unknown, path: string, issues: Issues, limits: Parsed
   return { irreversiblePatterns, allowedIrreversibleNames, destructiveUrlPatterns, unnamedControlsAllowedByTestId, allowProductionForApprovedPlans };
 }
 
+// Every field is optional; a missing one keeps the default. The section is closed.
+function readEvidence(input: unknown, path: string, issues: Issues): Parsed<EvidenceSettings> {
+  if (input === undefined) return DEFAULT_EVIDENCE;
+  const fields = readRecord(input, path, issues, ['keepDownloads'], []);
+  if (fields === INVALID) return INVALID;
+  // Present but null is not "absent": only true or false is a setting.
+  const keepDownloads = Object.hasOwn(fields, 'keepDownloads') ? fields['keepDownloads'] : DEFAULT_EVIDENCE.keepDownloads;
+  if (typeof keepDownloads !== 'boolean') { issues.push({ code: 'wrong_type', path: `${path}.keepDownloads` }); return INVALID; }
+  return { keepDownloads };
+}
+
 export function parseProject(input: unknown): Result<Project, readonly PlanError[]> {
   const issues: Issues = [];
   const fields = readRecord(
     input, '$', issues,
-    ['origins', 'productionOrigins', 'matrix', 'limits', 'secretNames', 'fixtures', 'policy', 'testIdAttributes', 'generatedEmailDomains'],
+    [
+      'origins', 'productionOrigins', 'matrix', 'limits', 'secretNames', 'fixtures', 'policy', 'testIdAttributes', 'generatedEmailDomains',
+      'evidence',
+    ],
     ['origins', 'matrix'],
   );
   if (fields === INVALID) return failure(issues);
@@ -312,6 +340,7 @@ export function parseProject(input: unknown): Result<Project, readonly PlanError
   const generatedEmailDomains = readNameListOr<'EmailDomain'>(
     fields['generatedEmailDomains'], '$.generatedEmailDomains', issues, EMAIL_DOMAIN, DEFAULT_EMAIL_DOMAIN,
   );
+  const evidence = readEvidence(fields['evidence'], '$.evidence', issues);
   const matrix = rawMatrix === INVALID ? [] : rawMatrix.map((target, index) => readTarget(target, `$.matrix[${index}]`, issues));
   const seen = new Set<string>();
   matrix.forEach((target, index) => {
@@ -321,8 +350,9 @@ export function parseProject(input: unknown): Result<Project, readonly PlanError
   });
   if (issues.length > 0 || limits === INVALID || secretNames === INVALID || fixtures === INVALID
     || productionOrigins === INVALID || policy === INVALID || testIdAttributes === INVALID || generatedEmailDomains === INVALID
+    || evidence === INVALID
     || !allValid(origins) || !allValid(matrix)) return failure(issues);
   return success(brand<ProjectData, 'Project'>({
-    origins, productionOrigins, matrix, limits, secretNames, fixtures, policy, testIdAttributes, generatedEmailDomains,
+    origins, productionOrigins, matrix, limits, secretNames, fixtures, policy, testIdAttributes, generatedEmailDomains, evidence,
   }));
 }

@@ -8,7 +8,11 @@ import type { Result } from './result.ts';
 import type { Target } from './target.ts';
 
 // policy-denied: the policy gate's runtime guard refused the action, so no input event was sent.
-export type DriverErrorCode = 'not-found' | 'ambiguous' | 'not-actionable' | 'timeout' | 'navigation-failed' | 'policy-denied';
+// no-download: a download step's click started no download within the step timeout.
+// download-too-large: the file grew past the project's maximumDownloadBytes; its partial bytes are deleted.
+export type DriverErrorCode =
+  | 'not-found' | 'ambiguous' | 'not-actionable' | 'timeout' | 'navigation-failed' | 'policy-denied'
+  | 'no-download' | 'download-too-large';
 export type DriverError = { readonly code: DriverErrorCode; readonly detail: string };
 
 // Why a declared target cannot run. A driver explains a "no"; it never substitutes another target.

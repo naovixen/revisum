@@ -4,7 +4,7 @@ Newest entry first. Each entry names the sha256 of `plan.schema.json` as it stoo
 
 ## 1.2 (unreleased)
 
-Schema sha256: `2b903aa97d10d0d7dda76f97ce532bc940a58825b1eb2956c4e48f1ff1e75c55`
+Schema sha256: `7d2636db7e1f127b09fe8cca74067be2858bc15ee6b844808b395c042bbcda89`
 
 This is the one 1.2 entry: SPEC-31, SPEC-32 and SPEC-33 add their bullets here and replace the hash above with the schema's new one. It is dated when the last of their parser parts lands.
 
@@ -21,6 +21,13 @@ This is the one 1.2 entry: SPEC-31, SPEC-32 and SPEC-33 add their bullets here a
 - **URL prefix.** New page assertion `urlPathStartsWith`, whose value starts with `/`.
 - New run-time step errors decided by the engine: `value-empty`, `value-unsafe` and `value-too-long`.
 - Until the CDP driver supports them, runs report positions, test-id attributes other than `data-testid`, key chords, multi-line fills and `remember` as failed with `unsupported-step`, with nothing sent to the page.
+- **Accessibility states.** New element state checks `selected`, `unselected`, `expanded`, `collapsed`, `pressed`, `unpressed` and `current`, read from the accessibility tree (`aria-selected`, `aria-expanded`, `aria-pressed`, `aria-current` and their native equivalents). An element that does not expose the state fails with the new step error `state-not-exposed`.
+- **Link target.** New element assertion `hrefEquals`: literal text or a value reference, an absolute http or https URL or a path starting with `/`, compared with the link's resolved URL. The link is never followed.
+- **Page metadata.** New page assertions `metaContent` (`{ "name", "value" }`: the content of the `<meta>` whose `name` or `property` is `name`; script-like names are refused with `unsafe_text`) and `canonicalUrl` (the resolved `href` of `<link rel="canonical">`, any origin, since it is compared and never visited).
+- **Server-rendered view.** `navigate` takes optional `scripts`, whose only value is `"disabled"`: script execution stays off until the next `navigate`. Other text is refused with `unknown_value`, anything else with `wrong_type`.
+- **Downloads.** New step `download` (`{ "name", "locator" }`): a click that must start exactly one download, guarded by the policy gate as a click. New step `expectDownload` (`{ "download", "assert", "criterionId" }`), an assertion step, with checks `fileNameEquals`, `mediaTypeEquals`, `sizeAtLeast` (at least 1; 0 is `vacuous`), `sizeAtMost`, `contentContains` and `contentExcludes`. A download name is lowercase letters, digits and hyphens (1 to 64, else `unknown_value`), defined once in the plan-wide namespace it shares with run values (`duplicate`), and checked only after its `download` step (`undefined_value`). New project settings: `maximumDownloadBytes` in `limits` (default 5 MiB, at most 100 MiB) and `keepDownloads` in a new `evidence` section (default false; download content is never kept before redaction lands). New driver errors `no-download` and `download-too-large`, and step error `download-not-text`.
+- **A second tab.** New step `newTab` (`{ "url", "steps" }`): opens a URL on the allow-list, or a path template, in a new tab of the same browser context, runs its steps there and closes the tab. Only the top level of a plan may hold one; a `newTab` inside a `frame` or another `newTab` is refused with the new plan error `misplaced_step` at the step. Frame depth counts from the tab. The policy gate judges the tab's URL and steps exactly as in the first tab.
+- Until the CDP driver supports them, runs report the new state checks, `hrefEquals`, `metaContent`, `canonicalUrl`, `navigate` with `scripts`, `download`, `expectDownload` and `newTab` as failed with `unsupported-step`, with nothing sent to the page.
 
 ## 1.1 (2026-10-28, secrets)
 

@@ -31,9 +31,13 @@ export function checkElement(assertion: ResolvedElementAssertion, probe: Element
     case 'textContains': return normalise(probe.text).includes(normalise(assertion.value)) ? PASSED : FAILED;
     case 'valueEquals': return probe.value === assertion.value ? PASSED : FAILED;
     case 'valueContains': return probe.value !== null && probe.value.includes(assertion.value) ? PASSED : FAILED;
-    // The probe does not report checked or focused state yet, so these checks can never pass by
-    // accident. The run refuses them before probing; see UNSUPPORTED_ASSERTION_KINDS in run.ts.
-    case 'checked': case 'unchecked': case 'focused': return FAILED;
+    // The probe does not report checked, focused or accessibility state, or a link's target, yet,
+    // so these checks can never pass by accident. The run refuses them before probing; see
+    // needsDriverFeatures in the contracts package.
+    case 'checked': case 'unchecked': case 'focused':
+    case 'selected': case 'unselected': case 'expanded': case 'collapsed': case 'pressed': case 'unpressed': case 'current':
+    case 'hrefEquals':
+      return FAILED;
   }
 }
 
@@ -45,5 +49,7 @@ export function checkPage(assertion: PageAssertion, probe: PageProbe): Verdict {
     case 'url': return new URL(assertion.value, probe.url).href === new URL(probe.url).href ? PASSED : FAILED;
     // A plain text prefix of the path: the query and fragment are not part of it.
     case 'urlPathStartsWith': return new URL(probe.url).pathname.startsWith(assertion.value) ? PASSED : FAILED;
+    // The page probe reads no part of the document head yet; the run refuses these before probing.
+    case 'metaContent': case 'canonicalUrl': return FAILED;
   }
 }

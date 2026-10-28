@@ -1,7 +1,8 @@
 // The plan language: a closed, versioned union of steps. An AI or a person may propose a plan,
 // but only the engine's plan parser can produce the branded Plan that the interpreter accepts.
 // The types live here because drivers act on steps and locators; the parser lives in the engine.
-// See docs/specs/SPEC-01-plan-language-and-parser.md and docs/specs/SPEC-30-plan-values-positions-and-keys.md.
+// See docs/specs/SPEC-01-plan-language-and-parser.md, docs/specs/SPEC-30-plan-values-positions-and-keys.md
+// and docs/specs/SPEC-31-page-states-metadata-downloads-and-tabs.md.
 import type { Brand } from './brand.ts';
 import type { TargetId } from './target.ts';
 
@@ -105,14 +106,22 @@ export type Key = (typeof KEYS)[number];
 // A closed set of assertions. What "passed" means is decided by the engine's oracle, never by a
 // driver or an AI. The kind names the check; `value` is what it compares against.
 // State checks compare against nothing. `absent` means no element matches at all, unlike
-// `hidden`, which also passes for one element that is present but not shown.
-export const ELEMENT_STATE_KINDS = ['visible', 'hidden', 'enabled', 'disabled', 'absent', 'checked', 'unchecked', 'focused'] as const;
+// `hidden`, which also passes for one element that is present but not shown. From `selected` on,
+// the states are read from the accessibility tree (aria-selected, aria-expanded, aria-pressed,
+// aria-current and their native equivalents); an element that does not expose the state fails
+// the check, never passes it.
+export const ELEMENT_STATE_KINDS = [
+  'visible', 'hidden', 'enabled', 'disabled', 'absent', 'checked', 'unchecked', 'focused',
+  'selected', 'unselected', 'expanded', 'collapsed', 'pressed', 'unpressed', 'current',
+] as const;
 // Text checks compare against non-empty text: an empty expected text would match anything.
 export const ELEMENT_TEXT_KINDS = ['textEquals', 'textContains', 'valueEquals', 'valueContains'] as const;
 export type ElementAssertionWith<Text> =
   | { readonly kind: (typeof ELEMENT_STATE_KINDS)[number] }
   | { readonly kind: (typeof ELEMENT_TEXT_KINDS)[number]; readonly value: Text }
-  | { readonly kind: 'countEquals'; readonly value: number };
+  | { readonly kind: 'countEquals'; readonly value: number }
+  // A link's href, resolved to an absolute URL, compared as text. The link is never followed.
+  | { readonly kind: 'hrefEquals'; readonly value: Text };
 export type ElementAssertion = ElementAssertionWith<TextOrValue>;
 // An element assertion whose expected text is final: what the oracle compares against.
 export type ResolvedElementAssertion = ElementAssertionWith<SafeText>;
@@ -123,7 +132,27 @@ export type PageAssertion =
   // The whole URL, compared after resolving it against the page's own URL.
   | { readonly kind: 'url'; readonly value: AllowedUrl }
   // The page's path starts with this text, which starts with "/". A plain text prefix.
-  | { readonly kind: 'urlPathStartsWith'; readonly value: SafeText };
+  | { readonly kind: 'urlPathStartsWith'; readonly value: SafeText }
+  // The content of the <meta> whose name or property is `name`, such as "og:title".
+  | { readonly kind: 'metaContent'; readonly name: SafeText; readonly value: TextOrValue }
+  // The resolved href of <link rel="canonical">. It may name any origin: it is compared, never visited.
+  | { readonly kind: 'canonicalUrl'; readonly value: SafeText };
+
+// ---- Downloads ------------------------------------------------------------------------------
+
+// The name a download step gives the file it starts, such as "project-list": lowercase letters,
+// digits and hyphens. It is the plan's handle on the file, never a path: the driver stores the
+// file under a name it generates.
+export type DownloadName = Brand<string, 'DownloadName'>;
+// Checks on a downloaded file. Sizes are in bytes. The content checks read the file as UTF-8
+// text, and an empty file fails them, so contentExcludes cannot pass on nothing.
+export const DOWNLOAD_TEXT_KINDS = ['fileNameEquals', 'contentContains', 'contentExcludes'] as const;
+export const DOWNLOAD_SIZE_KINDS = ['sizeAtMost', 'sizeAtLeast'] as const;
+export type DownloadAssertion =
+  | { readonly kind: (typeof DOWNLOAD_TEXT_KINDS)[number]; readonly value: TextOrValue }
+  | { readonly kind: 'mediaTypeEquals'; readonly value: SafeText }
+  // sizeAtLeast is at least 1: a size of at least 0 holds for any file.
+  | { readonly kind: (typeof DOWNLOAD_SIZE_KINDS)[number]; readonly value: number };
 
 // A URL path, or an absolute URL whose origin is on the project's allow-list.
 export type AllowedUrl = Brand<string, 'AllowedUrl'>;
@@ -152,10 +181,17 @@ export type PathTemplate = {
 export const REMEMBER_READS = ['text', 'value'] as const;
 export type RememberSource = { readonly element: Locator; readonly read: (typeof REMEMBER_READS)[number] };
 
+// How a navigate step may load the page. "disabled" turns script execution off until the next
+// navigate, so the checks see what the server sent: nothing runs in the page, not even the
+// determinism script.
+export const SCRIPT_MODES = ['disabled'] as const;
+
 export type Step =
   // A URL, or a path template on the run's base URL.
-  | { readonly type: 'navigate'; readonly url: AllowedUrl | PathTemplate }
+  | { readonly type: 'navigate'; readonly url: AllowedUrl | PathTemplate; readonly scripts?: (typeof SCRIPT_MODES)[number] }
   | { readonly type: 'click'; readonly locator: Locator }
+  // A click that must start exactly one download, which later steps check by its name.
+  | { readonly type: 'download'; readonly name: DownloadName; readonly locator: Locator }
   | { readonly type: 'hover'; readonly locator: Locator }
   | { readonly type: 'fill'; readonly locator: Locator; readonly value: TextOrValue | SecretReference | MultiLineText }
   | { readonly type: 'select'; readonly locator: Locator; readonly option: TextOrValue }
@@ -168,13 +204,19 @@ export type Step =
   | { readonly type: 'dialog'; readonly action: 'accept' | 'dismiss'; readonly expectText?: TextOrValue }
   | { readonly type: 'expect'; readonly locator: Locator; readonly assert: ElementAssertion; readonly criterionId: CriterionId }
   | { readonly type: 'expectPage'; readonly assert: PageAssertion; readonly criterionId: CriterionId }
+  // Checks the file an earlier download step started.
+  | { readonly type: 'expectDownload'; readonly download: DownloadName; readonly assert: DownloadAssertion; readonly criterionId: CriterionId }
+  // Opens a URL in a new tab of the same browser context, so cookies and storage are shared, runs
+  // its steps there and closes the tab. Only the top level of a plan may hold one.
+  | { readonly type: 'newTab'; readonly url: AllowedUrl | PathTemplate; readonly steps: readonly Step[] }
   | { readonly type: 'a11yAudit'; readonly mode: 'report' | 'gate' }
   | { readonly type: 'capture'; readonly name: CaptureName }
   // Reads a value from the page under `name`, for the steps after it to use.
   | { readonly type: 'remember'; readonly name: ValueName; readonly from: RememberSource };
 export type StepType = Step['type'];
-// The steps that act on an element; the driver's ActionRunner port performs them.
-export type ActionStep = Extract<Step, { type: 'click' | 'hover' | 'fill' | 'select' | 'upload' | 'press' }>;
+// The steps that act on an element; the driver's ActionRunner port performs them. The policy
+// gate judges a download as the click it is.
+export type ActionStep = Extract<Step, { type: 'click' | 'hover' | 'fill' | 'select' | 'upload' | 'press' | 'download' }>;
 // An action step with every value reference replaced by its text, as the engine hands it to a
 // driver. A multi-line fill has no resolved form until the CDP driver inserts lines of text.
 export type ResolvedActionStep =

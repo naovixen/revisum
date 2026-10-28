@@ -17,9 +17,16 @@ const ASSERTION_TEXT: { readonly [Kind in Extract<Step, { type: 'expect' }>['ass
   textEquals: 'has the expected text', textContains: 'contains the expected text', valueEquals: 'has the expected value',
   valueContains: 'contains the expected value', absent: 'is absent', checked: 'is checked', unchecked: 'is not checked',
   focused: 'has focus', countEquals: 'matches the expected number of times',
+  selected: 'is selected', unselected: 'is not selected', expanded: 'is expanded', collapsed: 'is collapsed',
+  pressed: 'is pressed', unpressed: 'is not pressed', current: 'is marked as current', hrefEquals: 'links to the expected address',
 };
 const PAGE_ASSERTION_TEXT: { readonly [Kind in Extract<Step, { type: 'expectPage' }>['assert']['kind']]: string } = {
   title: 'title', urlPath: 'URL path', url: 'URL', urlPathStartsWith: 'URL path prefix',
+  metaContent: 'meta tag', canonicalUrl: 'canonical URL',
+};
+const DOWNLOAD_ASSERTION_TEXT: { readonly [Kind in Extract<Step, { type: 'expectDownload' }>['assert']['kind']]: string } = {
+  fileNameEquals: 'file name', mediaTypeEquals: 'media type', sizeAtMost: 'largest size', sizeAtLeast: 'smallest size',
+  contentContains: 'expected content', contentExcludes: 'excluded content',
 };
 
 // A value reference is shown by its name: the value itself is run data, not plan text.
@@ -43,8 +50,9 @@ function describeNavigation(url: Extract<Step, { type: 'navigate' }>['url']): st
 // One plain-English line per step. Values typed or expected are never included.
 export function describeStep(step: Step): string {
   switch (step.type) {
-    case 'navigate': return `Opened \`${codeSpanText(describeNavigation(step.url))}\``;
+    case 'navigate': return `Opened \`${codeSpanText(describeNavigation(step.url))}\`${step.scripts === 'disabled' ? ' with scripts off' : ''}`;
     case 'click': return `Clicked ${describeLocator(step.locator)}`;
+    case 'download': return `Downloaded a file from ${describeLocator(step.locator)} as "${step.name}"`;
     case 'hover': return `Hovered over ${describeLocator(step.locator)}`;
     case 'fill': return `Filled in ${describeLocator(step.locator)}`;
     case 'select': return `Chose an option in ${describeLocator(step.locator)}`;
@@ -54,6 +62,8 @@ export function describeStep(step: Step): string {
     case 'dialog': return `${step.action === 'accept' ? 'Accepted' : 'Dismissed'} the next dialog`;
     case 'expect': return `Checked that ${describeLocator(step.locator)} ${ASSERTION_TEXT[step.assert.kind]}`;
     case 'expectPage': return `Checked the page ${PAGE_ASSERTION_TEXT[step.assert.kind]}`;
+    case 'expectDownload': return `Checked the ${DOWNLOAD_ASSERTION_TEXT[step.assert.kind]} of download "${step.download}"`;
+    case 'newTab': return `In a new tab at \`${codeSpanText(describeNavigation(step.url))}\`: ${step.steps.map(describeStep).join('; ')}`;
     case 'a11yAudit': return `Ran automated accessibility rules (${step.mode} mode)`;
     case 'capture': return `Captured screenshot "${step.name}"`;
     case 'remember': return `Remembered ${step.from.read === 'text' ? 'the text' : 'the value'} of ${describeLocator(step.from.element)} as {${step.name}}`;

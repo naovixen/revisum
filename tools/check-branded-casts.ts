@@ -29,6 +29,8 @@ export const BRAND_OWNERS: Readonly<Record<string, readonly string[]>> = {
   // A path template resolves to a path on the run's base URL once its values are known.
   AllowedUrl: [PLAN_PARSER, 'packages/engine/src/run-values.ts'],
   CaptureName: [PLAN_PARSER],
+  // A download name is plain text the plan parser checks; it is never a path.
+  DownloadName: [PLAN_PARSER],
   FeatureId: [PLAN_PARSER],
   Plan: [PLAN_PARSER],
   CriterionId: [PLAN_PARSER],

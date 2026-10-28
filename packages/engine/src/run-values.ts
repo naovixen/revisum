@@ -21,10 +21,13 @@ import type { Project } from './project/project-parser.ts';
 export type RunValues = ReadonlyMap<ValueName, SafeText>;
 
 // Run-time step failures the engine decides, as opposed to driver errors:
-//   value-empty     a value is empty where text is needed, or has no text yet;
-//   value-unsafe    a value breaks the safe-text rules, or is "", "." or ".." as a path segment;
-//   value-too-long  a value is longer than the project's maximumTextLength.
-export type StepErrorCode = 'value-empty' | 'value-unsafe' | 'value-too-long';
+//   value-empty        a value is empty where text is needed, or has no text yet;
+//   value-unsafe       a value breaks the safe-text rules, or is "", "." or ".." as a path segment;
+//   value-too-long     a value is longer than the project's maximumTextLength;
+//   state-not-exposed  a state check's element does not expose that state in the accessibility
+//                      tree, such as a tab whose selection is shown only by a CSS class;
+//   download-not-text  a content check's download is not UTF-8 text.
+export type StepErrorCode = 'value-empty' | 'value-unsafe' | 'value-too-long' | 'state-not-exposed' | 'download-not-text';
 
 const UNIQUE_PART_LENGTH = 10;
 const BASE_36 = 36;
