@@ -27,12 +27,13 @@ M1, language and trust:
 - [x] SPEC-33 network stubs, request checks and storage: grammar
 - [x] SPEC-34 clock advance and clipboard checks: parser parts
 - [x] Re-run the coverage study on plan 1.2, plus a fresh sample of at least 50, before 2026-11-23: 45% overall, 36% fresh; not met. Founder chose evidence mode with opt-in unsafe features (`docs/decisions/language-fit-pivot.md`)
-- [ ] SPEC-28 plan authoring (readable format, conversion, `admitDraft`, provenance)
+- [x] SPEC-28 plan authoring (readable format, conversion, `admitDraft`, provenance)
 - [ ] SPEC-35 evidence mode: declaration, suite-file trust, report decoder, result mapping and labels (no containers)
 - [ ] SPEC-36 unsafe plan features: plan 1.3 parser parts, declarations, gate rules and labels
 - [ ] Measure coverage on plan 1.3 with unsafe features, with parsed plans and strict judging (no generous assumptions)
 - [ ] SPEC-00 remaining criteria (04, 07, 09, 10, 16, 19, 20; finish 05, 08, 11, 15, 17)
-- [ ] Fix the browser tests that fail under load: CDP Chromium screenshots that differ between identical runs, dropped browser connections, a Playwright Firefox replay. Seen four times on 2026-10-28; each passed alone
+- [x] Fix the intermittent browser failures: Chromium's Windows port randomisation refused about 1 local connection in 60; disabled in both launchers, and browser test files run one at a time (2026-10-28)
+- [ ] Add a contract test that Chromium's effective feature list disables port randomisation and keeps Playwright's defaults
 - [ ] M1 exit
 
 M2, driver and isolation (alpha):
