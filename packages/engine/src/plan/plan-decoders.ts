@@ -9,6 +9,8 @@ export const PLAN_ERROR_CODES = [
   'unknown_value', 'invalid_url', 'scheme_not_allowed', 'origin_not_allowed',
   'target_not_in_matrix', 'unsafe_text', 'too_large', 'too_long', 'duplicate',
   'version_unsupported', 'empty',
+  // A check that would pass on anything, such as an expected text that is empty.
+  'vacuous',
 ] as const;
 export type PlanErrorCode = (typeof PLAN_ERROR_CODES)[number];
 

@@ -7,4 +7,7 @@ export * from './target.ts';
 export * from './plan.ts';
 export * from './browser-driver.ts';
 export type * from './run-ports.ts';
+export * from './audit-events.ts';
+export type * from './error-codes.ts';
+export type * from './run-history.ts';
 export { NO_MOTION_CSS, determinismScript } from './determinism.ts';

@@ -36,7 +36,8 @@ export type ElementAssertion =
   | { readonly kind: 'disabled' }
   | { readonly kind: 'textEquals'; readonly value: SafeText }
   | { readonly kind: 'textContains'; readonly value: SafeText }
-  | { readonly kind: 'valueEquals'; readonly value: SafeText };
+  | { readonly kind: 'valueEquals'; readonly value: SafeText }
+  | { readonly kind: 'valueContains'; readonly value: SafeText };
 export type PageAssertion =
   | { readonly kind: 'urlPath'; readonly value: SafeText }
   | { readonly kind: 'title'; readonly value: SafeText };

@@ -26,6 +26,7 @@ export function checkElement(assertion: ElementAssertion, probe: ElementProbe): 
     case 'textEquals': return normalise(probe.text) === normalise(assertion.value) ? PASSED : FAILED;
     case 'textContains': return normalise(probe.text).includes(normalise(assertion.value)) ? PASSED : FAILED;
     case 'valueEquals': return probe.value === assertion.value ? PASSED : FAILED;
+    case 'valueContains': return probe.value !== null && probe.value.includes(assertion.value) ? PASSED : FAILED;
   }
 }
 

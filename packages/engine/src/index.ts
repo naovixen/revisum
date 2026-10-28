@@ -7,6 +7,7 @@ export * from './plan/plan-decoders.ts';
 export * from './project/project-parser.ts';
 export { planParser } from './plan/plan-parser.ts';
 export * from './logging.ts';
+export { jsonLinesEventSink } from './event-sink.ts';
 export * from './redaction.ts';
 export * from './random.ts';
 export * from './hashing.ts';

@@ -36,6 +36,11 @@
 | Naming lint | `NamingLintConfig`, `NAMING_LINT`, `lintRepository` | `tools/`, exists | Enforces the naming rules in CI |
 | Declared approval | `declared` | planned, SPEC-02 | An approval resting on the founder's own push or merge under the agent lock-down |
 | Verified approval | `verified` | planned, SPEC-02 | An optional approval by a second account; never required |
+| Actor | `DerivedActor` (`ActorId`, `ActorType`), `PERSON_ACTOR_TYPES` | types in `contracts`, built only in `engine/src/actor.ts`, exists | Who an audit event is recorded against, derived by core and never declared by the caller. A person is any actor type in `PERSON_ACTOR_TYPES`; declared and verified count alike |
+| Audit event sink | `EventSink`, `jsonLinesEventSink`, `EventInput`, `AuditEventKind` | port in `contracts`, sink in `engine`, exists | Append-only JSON Lines audit log; refuses to append once anything else truncated or rewrote the file. SPEC-14 adds the hash chain |
+| Error code | closed unions such as `PlanErrorCode`, `DriverErrorCode`, `CliErrorCode` | `contracts` and `engine`, exists; anchors in `docs/errors.md` | A machine-readable reason from a closed set; each has a `## <code>` heading, so `errors#<code>` resolves |
+| Guarantee level | `GuaranteeLevel` (`isolated`, `host`) | `contracts`, exists | How strongly a run is isolated; `host` claims no egress enforcement and no replay |
+| Run history, thresholds | `RunRecord`, `Thresholds`, `ThresholdMetric` | `contracts`, exists | Finished runs as metrics see them, and the levels the maturity ladder needs |
 
 ## Metrics
 

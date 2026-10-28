@@ -31,3 +31,7 @@ export interface AiPlanner {
 export interface AiWriter {
   suggest(draft: string): Promise<unknown>;
 }
+
+// How strongly a run is isolated. isolated: the run's network egress is enforced and it can be
+// replayed. host: it ran on the host, with no egress enforcement and no replay claim.
+export type GuaranteeLevel = 'isolated' | 'host';

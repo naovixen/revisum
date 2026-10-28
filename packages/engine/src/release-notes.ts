@@ -13,6 +13,7 @@ const codeSpanText = (text: string): string => text.replace(/`/g, "'");
 const ASSERTION_TEXT: { readonly [Kind in Extract<Step, { type: 'expect' }>['assert']['kind']]: string } = {
   visible: 'is visible', hidden: 'is hidden', enabled: 'is enabled', disabled: 'is disabled',
   textEquals: 'has the expected text', textContains: 'contains the expected text', valueEquals: 'has the expected value',
+  valueContains: 'contains the expected value',
 };
 
 function describeLocator(locator: Locator): string {

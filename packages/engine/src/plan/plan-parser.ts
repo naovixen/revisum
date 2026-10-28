@@ -24,9 +24,12 @@ const STEP_FIELDS: { readonly [Type in StepType]: readonly string[] } = {
   capture: ['type', 'name'],
 };
 const STEP_TYPES = Object.keys(STEP_FIELDS) as StepType[];
-const ELEMENT_KINDS = ['visible', 'hidden', 'enabled', 'disabled', 'textEquals', 'textContains', 'valueEquals'] as const;
+const ELEMENT_KINDS = ['visible', 'hidden', 'enabled', 'disabled', 'textEquals', 'textContains', 'valueEquals', 'valueContains'] as const;
 const PAGE_KINDS = ['urlPath', 'title'] as const;
-const KINDS_WITH_VALUE: readonly string[] = ['textEquals', 'textContains', 'valueEquals', 'urlPath', 'title'];
+const KINDS_WITH_VALUE: readonly string[] = ['textEquals', 'textContains', 'valueEquals', 'valueContains', 'urlPath', 'title'];
+// Element checks whose expected text must not be empty: an empty text would match any element,
+// so the check would prove nothing.
+const KINDS_NEEDING_TEXT: readonly string[] = ['textEquals', 'textContains', 'valueEquals', 'valueContains'];
 const FEATURE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 const CAPTURE_NAME = /^[a-z0-9][a-z0-9-]{0,63}$/;
 // A base used only to tell whether a URL is relative to the app under test.
@@ -95,7 +98,12 @@ function readAssertion<Kind extends string>(
   if (!KINDS_WITH_VALUE.includes(kind)) return readRecord(input, path, context.issues, ['kind']) === INVALID ? INVALID : { kind };
   if (readRecord(input, path, context.issues, ['kind', 'value']) === INVALID) return INVALID;
   const value = readText(head['value'], `${path}.value`, context.issues, context.project.limits.maximumTextLength, 0);
-  return value === INVALID ? INVALID : { kind, value };
+  if (value === INVALID) return INVALID;
+  if (value === '' && KINDS_NEEDING_TEXT.includes(kind)) {
+    context.issues.push({ code: 'vacuous', path: `${path}.value` });
+    return INVALID;
+  }
+  return { kind, value };
 }
 
 function readStep(input: unknown, path: string, context: ParseContext): Parsed<Step> {

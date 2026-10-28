@@ -21,8 +21,8 @@ export type NamingViolation = {
   readonly why: string;
 };
 
-type TokenKind = 'identifier' | 'string' | 'template' | 'comment' | 'regex' | 'number' | 'punctuator';
-type Token = { readonly kind: TokenKind; readonly text: string; readonly line: number };
+export type TokenKind = 'identifier' | 'string' | 'template' | 'comment' | 'regex' | 'number' | 'punctuator';
+export type Token = { readonly kind: TokenKind; readonly text: string; readonly line: number };
 
 const CODE_EXTENSIONS = ['.ts', '.mts', '.cts', '.js', '.mjs', '.cjs'];
 const HASH_COMMENT_EXTENSIONS = ['.yml', '.yaml'];
