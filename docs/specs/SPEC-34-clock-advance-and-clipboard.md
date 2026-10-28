@@ -79,6 +79,18 @@ export interface ClipboardPort {
 - **Server-rendered pages.** On a page loaded with `scripts: 'disabled'` (SPEC-31) nothing fires, but the advance still counts toward the run's virtual time.
 - **Adapters.** An adapter whose target lists the clock in `nonHermeticInputs` (SPEC-08), or that cannot track timers, fails `advanceClock` with `unsupported-step`. It never falls back to a real wait.
 
+**Build notes.** Points the criteria leave open, settled while building (2026-10-28; `docs/decisions/answers.md`):
+
+- **Clock limits.**
+  - A single advance over the step limit is `too_large` at `.by.amount`. A huge whole number such as `1e308` is `too_large` too.
+  - Going over the plan's total gives one `too_large`, at the first step that crosses it.
+  - Each project limit must be at least 1, and the step limit may not exceed the total; otherwise the project is refused with `too_large` at the step limit.
+- **Clipboard text.**
+  - Expected multi-line text follows SPEC-30's fill limits (`maximumFillLines`, `maximumFillCharacters`).
+  - `{ lines: [] }` is `empty`.
+  - `pattern`, `regex` and `script` are unknown fields at `.assert.<field>`. An extra field on a clipboard source is unknown at `.from.<field>`.
+- **Later specs.** When SPEC-08 adds manifest fields, AC-SPEC-34-11's pinned field list grows with them. When `Session` gains `clock` and `clipboard` (SPEC-06), the test helpers' recording driver gains them too.
+
 ## Acceptance criteria
 
 - AC-SPEC-34-01: When a plan declaring `"1.1"` uses `advanceClock`, `expectClipboard` or a clipboard `remember` source, it shall be rejected with the code and path a 1.1 parser gives. The schema shall validate one new 1.2 golden plan per feature, and the "1.2 (unreleased)" changelog entry shall list these features and the new schema sha256 (oracle: regression; extends AC-SPEC-30-01 and AC-SPEC-30-02).
