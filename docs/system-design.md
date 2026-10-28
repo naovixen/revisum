@@ -72,7 +72,7 @@ flowchart LR
 
 ### 3. Packages and how they depend on each other
 
-**Every arrow points towards `contracts`; the engine imports no adapter, and the CLI is the only place where parts are wired together.**
+**Every arrow points towards `contracts`; the engine imports no adapter, and the CLI is the only place where parts are wired together.** One exception: `auditor-act` reuses `driver-cdp`'s browser connection and launcher rather than keeping a second copy (founder decision, 2026-10-28).
 
 ```mermaid
 flowchart TB
@@ -91,6 +91,7 @@ flowchart TB
   pw --> contracts
   axe --> contracts
   act --> contracts
+  act --> cdp
   runner --> contracts
   report --> contracts
   cli --> engine & cdp & pw & axe & act & runner & report

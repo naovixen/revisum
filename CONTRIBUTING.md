@@ -92,7 +92,7 @@ A spec is done when all of these hold:
 ## Code rules
 
 - **TypeScript on Node 24**, strict, erasable syntax only: no enums, namespaces or parameter properties. Node runs the `.ts` files directly; `tsc` is the type check.
-- **Dependency direction.** Every package depends only on `contracts`, except `cli`, which wires the others together, and `action`, which wraps `cli`. Each package's `tsconfig.json` lists the packages it may import; importing any other fails the build.
+- **Dependency direction.** Every package depends only on `contracts`, except `cli`, which wires the others together, `action`, which wraps `cli`, and `auditor-act`, which reuses `driver-cdp`'s browser connection and launcher. Each package's `tsconfig.json` lists the packages it may import; importing any other fails the build.
 - **Outside input is `unknown`** until a hand-written decoder in `engine` parses it. No `as` casts to branded types outside their owning parser.
 - **Browsers run headless**, always.
 - **Licences.** `licences.json` maps each package to Apache-2.0 or FSL-1.1-ALv2; `npm run lint` checks every `package.json` against it.

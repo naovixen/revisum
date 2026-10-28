@@ -16,6 +16,7 @@ The founder's checklist. Follow the steps in order. Each step has a check, so yo
 - [x] 8. Session 0b: tests from the spikes
 - [x] 9. Session 0c: code from the spikes
 - [ ] 10. Week 1: SPEC-27, then SPEC-01
+- [ ] 11. SPEC-00's remaining criteria (04, 07, 09, 10, 16, 19, 20, and finishing 05, 08, 11, 15, 17): a tests-then-code round
 
 ## Setup (done)
 

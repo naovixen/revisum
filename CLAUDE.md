@@ -51,7 +51,7 @@ Write your own changes (docs, START.md, small fixes) as separate commits too, ne
   - A code commit changes only `packages/`, `tools/` and `docs/`, and never the test set.
   - Before each commit, run `git diff --cached --name-only | node tools/check-tests-apart.ts`. It must pass.
 - **Correct by construction.** AI output, and any input from outside, is `unknown` until a hand-written decoder in `engine` parses it. Never let unparsed data reach execution. No `as` casts to branded types outside their owning parser.
-- **Dependency direction.** `engine` imports only `contracts` and Node built-ins. Only `cli` wires packages together. A wrong-way import must fail `tsc`; never work round it.
+- **Dependency direction.** `engine` imports only `contracts` and Node built-ins. Only `cli` wires packages together; the one other cross-package import is `auditor-act` using `driver-cdp`'s browser connection. A wrong-way import must fail `tsc`; never work round it.
 - **No new runtime dependency** in `contracts` or `engine`. Any third-party package elsewhere needs a dependency review in `docs/decisions/` first.
 - **TypeScript:** strict, erasable syntax only (no enums, no namespaces, no parameter properties). Run on Node 24.
 - **Browsers run headless**, always.
@@ -94,4 +94,4 @@ The founder reviews and pushes.
 
 ## Provenance
 
-Seeded from the research repo `E:\core` at commit `367700e`. `seed-provenance.json` (written in session 0c) lists each seeded file and its source hash. The research itself is not part of this repo.
+Seeded from the research repo `E:\core`. `seed-provenance.json` records the research commit and each seeded file's source hash; it is the only file that names that commit. The research itself is not part of this repo.
