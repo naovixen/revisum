@@ -163,10 +163,11 @@ describe('(d) redaction by default', () => {
           { type: 'fill', locator: { by: 'label', label: 'Email' }, value: EMAIL },
         ]));
         assert.ok((await session.navigate(`${testHarness.server.origin}/`)).ok);
-        for (const step of plan.steps.slice(1) as Extract<Step, { type: 'fill' }>[]) {
+        // Steps 1 and 2 are the two fills; the probe plan adds a final check after them.
+        for (const step of plan.steps.slice(1, 3) as Extract<Step, { type: 'fill' }>[]) {
           assert.ok((await session.act(step)).ok);
         }
-        const boxes = await Promise.all(plan.steps.slice(1).map(async (step) => (await session.probe((step as Extract<Step, { type: 'fill' }>).locator)).box));
+        const boxes = await Promise.all(plan.steps.slice(1, 3).map(async (step) => (await session.probe((step as Extract<Step, { type: 'fill' }>).locator)).box));
         const masked = await session.screenshot(redactor.selectors);
         const unmasked = await session.screenshot([]);
         for (const box of boxes) {
