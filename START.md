@@ -17,7 +17,7 @@ Setup and seed (done):
 M1, language and trust:
 
 - [x] SPEC-27 shared types and event sink
-- [ ] SPEC-01 plan language and parser
+- [x] SPEC-01 plan language and parser
 - [ ] SPEC-02 project trust and approval
 - [ ] SPEC-03 policy gate (static check and guard logic)
 - [ ] SPEC-04 secrets and redaction
