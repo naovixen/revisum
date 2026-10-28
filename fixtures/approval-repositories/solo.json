@@ -1,0 +1,100 @@
+{
+  "description": "A solo project: one person, the maintainer, no code-owners file and no second account. The coding agent may commit but is denied push, merge and pull-request approval; the maintainer pushes and merges personally.",
+  "repository": "example/solo-shop",
+  "protectedBranch": "main",
+  "protectedCommit": "commit-main-head",
+  "protectedFiles": {
+    "project.json": {
+      "origins": [
+        "http://127.0.0.1:4173"
+      ],
+      "limits": {
+        "stepTimeoutMilliseconds": 2000
+      },
+      "matrix": [
+        {
+          "id": "playwright-chromium",
+          "adapter": "playwright",
+          "engine": "chromium",
+          "device": "desktop-1280",
+          "locale": "de-DE",
+          "timezone": "Asia/Tokyo",
+          "colorScheme": "dark",
+          "reducedMotion": "reduce"
+        }
+      ],
+      "secretNames": [
+        "SIGNUP_PASSWORD"
+      ]
+    },
+    "approvers.json": {
+      "agentLockdown": {
+        "maintainer": "maintainer-mia",
+        "agentDenyRulesPath": ".claude/settings.json",
+        "deniedActions": [
+          "push",
+          "merge",
+          "approve-pull-request"
+        ],
+        "agentHasGithubCredentials": true
+      }
+    },
+    ".claude/settings.json": {
+      "permissions": {
+        "allow": [
+          "Bash(git add *)",
+          "Bash(git commit *)",
+          "PowerShell(git add *)",
+          "PowerShell(git commit *)"
+        ],
+        "deny": [
+          "Bash(git push)",
+          "Bash(git push *)",
+          "Bash(git -C * push*)",
+          "Bash(git merge *)",
+          "Bash(git -C * merge*)",
+          "Bash(gh pr merge *)",
+          "Bash(gh pr review *)",
+          "PowerShell(git push)",
+          "PowerShell(git push *)",
+          "PowerShell(git merge *)",
+          "PowerShell(gh pr merge *)",
+          "PowerShell(gh pr review *)"
+        ]
+      }
+    },
+    "baselines/checkout.json": {
+      "page": "checkout",
+      "viewport": "desktop-1280",
+      "image": "baselines/checkout.png"
+    },
+    "reviews/decisions/checkout-contrast.json": {
+      "itemId": "checkout-contrast",
+      "decision": "accept",
+      "reason": "The brand colour was approved by design"
+    },
+    "reviews/extra/payments.json": {
+      "changeClassId": "payments",
+      "decision": "approve",
+      "reason": "Read the refund flow end to end"
+    }
+  },
+  "workingCopy": {},
+  "landings": [
+    {
+      "commit": "commit-main-head",
+      "branch": "main",
+      "login": "maintainer-mia",
+      "type": "user",
+      "at": "2026-10-21T09:00:00Z"
+    },
+    {
+      "commit": "commit-maintainer-draft",
+      "branch": "maintainer/draft",
+      "login": "maintainer-mia",
+      "type": "user",
+      "at": "2026-10-22T09:00:00Z"
+    }
+  ],
+  "pullRequests": {}
+}

@@ -1,0 +1,129 @@
+{
+  "description": "A hostile project: its trusted files name the coding agent's own accounts as maintainer and code owner, and every approval on offer comes from a bot, an app or a CI token. None of them may ever gate a merge, whatever the project declares.",
+  "repository": "example/red-team-shop",
+  "protectedBranch": "main",
+  "protectedCommit": "commit-main-head",
+  "protectedFiles": {
+    "project.json": {
+      "origins": [
+        "http://127.0.0.1:4173"
+      ],
+      "limits": {
+        "stepTimeoutMilliseconds": 2000
+      },
+      "matrix": [
+        {
+          "id": "playwright-chromium",
+          "adapter": "playwright",
+          "engine": "chromium",
+          "device": "desktop-1280",
+          "locale": "de-DE",
+          "timezone": "Asia/Tokyo",
+          "colorScheme": "dark",
+          "reducedMotion": "reduce"
+        }
+      ],
+      "secretNames": [
+        "SIGNUP_PASSWORD"
+      ]
+    },
+    "approvers.json": {
+      "agentLockdown": {
+        "maintainer": "revisum-agent[bot]",
+        "agentDenyRulesPath": ".claude/settings.json",
+        "deniedActions": [
+          "commit",
+          "push",
+          "merge",
+          "approve-pull-request"
+        ],
+        "agentHasGithubCredentials": false
+      }
+    },
+    ".claude/settings.json": {
+      "permissions": {
+        "deny": [
+          "Bash(git commit *)",
+          "Bash(git push *)",
+          "Bash(git merge *)",
+          "Bash(gh pr merge *)",
+          "Bash(gh pr review *)"
+        ]
+      }
+    },
+    ".github/CODEOWNERS": "# The agent's own accounts named as code owners.\n/plans/ @revisum-agent[bot] @revisum-agent @github-actions[bot]\n"
+  },
+  "workingCopy": {},
+  "landings": [
+    {
+      "commit": "commit-main-head",
+      "branch": "main",
+      "login": "revisum-agent[bot]",
+      "type": "bot",
+      "at": "2026-10-21T09:00:00Z"
+    },
+    {
+      "commit": "commit-app-merge",
+      "branch": "main",
+      "login": "revisum-agent",
+      "type": "app",
+      "at": "2026-10-22T09:00:00Z"
+    },
+    {
+      "commit": "commit-token-push",
+      "branch": "main",
+      "login": "github-actions[bot]",
+      "type": "bot",
+      "at": "2026-10-23T09:00:00Z"
+    }
+  ],
+  "pullRequests": {
+    "21": {
+      "author": "dev-ada",
+      "headCommit": "commit-pull-head",
+      "lastCommitTouching": {
+        "plans/signup.json": "commit-pull-head"
+      },
+      "changedFiles": [
+        {
+          "path": "plans/signup.json",
+          "authors": [
+            "dev-ada"
+          ]
+        }
+      ],
+      "reviews": [
+        {
+          "id": "review-agent-bot",
+          "state": "approved",
+          "commit": "commit-pull-head",
+          "reviewer": {
+            "login": "revisum-agent[bot]",
+            "type": "bot"
+          },
+          "submittedAt": "2026-10-20T10:30:00Z"
+        },
+        {
+          "id": "review-agent-app",
+          "state": "approved",
+          "commit": "commit-pull-head",
+          "reviewer": {
+            "login": "revisum-agent",
+            "type": "app"
+          },
+          "submittedAt": "2026-10-20T11:30:00Z"
+        },
+        {
+          "id": "review-ci-token",
+          "state": "approved",
+          "commit": "commit-pull-head",
+          "reviewer": {
+            "login": "github-actions[bot]",
+            "type": "bot"
+          },
+          "submittedAt": "2026-10-20T12:30:00Z"
+        }
+      ]
+    }
+  }
+}

@@ -27,6 +27,11 @@ const ERROR_CODES: Readonly<Record<string, readonly string[]>> = {
     'usage', 'config-invalid', 'untrusted-source', 'plan-rejected', 'target-unavailable', 'lock-download-failed',
     'lock-offline', 'approval-refused', 'replay-mismatch', 'internal',
   ],
+  approval: [
+    'self-approval', 'bot-or-app', 'not-code-owner', 'stale-commit', 'unknown-key', 'bad-signature', 'no-user-presence',
+    'subject-mismatch', 'version-control-unavailable', 'not-maintainer', 'not-protected-branch', 'lockdown-not-declared',
+  ],
+  trust: ['untrusted-source', 'changed-with-code', 'no-approval'],
 };
 
 const headingsIn = (text: string): Set<string> =>

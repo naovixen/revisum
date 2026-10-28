@@ -1,0 +1,144 @@
+{
+  "description": "A team project with a code-owners file. Pull request 12 changes the sign-up plan and the sign-up code; dev-ada wrote both. owner-grace owns plans and trusted files, reviewer-linus owns only the docs. The project also declares the agent lock-down, with owner-grace as maintainer.",
+  "repository": "example/team-shop",
+  "protectedBranch": "main",
+  "protectedCommit": "commit-main-head",
+  "protectedFiles": {
+    "project.json": {
+      "origins": [
+        "http://127.0.0.1:4173"
+      ],
+      "limits": {
+        "stepTimeoutMilliseconds": 2000
+      },
+      "matrix": [
+        {
+          "id": "playwright-chromium",
+          "adapter": "playwright",
+          "engine": "chromium",
+          "device": "desktop-1280",
+          "locale": "de-DE",
+          "timezone": "Asia/Tokyo",
+          "colorScheme": "dark",
+          "reducedMotion": "reduce"
+        }
+      ],
+      "secretNames": [
+        "SIGNUP_PASSWORD"
+      ]
+    },
+    "approvers.json": {
+      "agentLockdown": {
+        "maintainer": "owner-grace",
+        "agentDenyRulesPath": ".claude/settings.json",
+        "deniedActions": [
+          "push",
+          "merge",
+          "approve-pull-request"
+        ],
+        "agentHasGithubCredentials": false
+      }
+    },
+    ".claude/settings.json": {
+      "permissions": {
+        "deny": [
+          "Bash(git push *)",
+          "Bash(git merge *)",
+          "Bash(gh pr merge *)",
+          "Bash(gh pr review *)",
+          "PowerShell(git push *)",
+          "PowerShell(git merge *)",
+          "PowerShell(gh pr merge *)",
+          "PowerShell(gh pr review *)"
+        ]
+      }
+    },
+    ".github/CODEOWNERS": "# Trusted files need a code owner's review.\n/plans/ @owner-grace\n/baselines/ @owner-grace\n/project.json @owner-grace\n/approvers.json @owner-grace\n/.github/CODEOWNERS @owner-grace\n/docs/ @reviewer-linus\n"
+  },
+  "workingCopy": {},
+  "landings": [
+    {
+      "commit": "commit-main-head",
+      "branch": "main",
+      "login": "owner-grace",
+      "type": "user",
+      "at": "2026-10-21T09:00:00Z"
+    }
+  ],
+  "pullRequests": {
+    "12": {
+      "author": "dev-ada",
+      "headCommit": "commit-pull-head",
+      "lastCommitTouching": {
+        "plans/signup.json": "commit-pull-head",
+        "src/signup.ts": "commit-pull-head"
+      },
+      "changedFiles": [
+        {
+          "path": "plans/signup.json",
+          "authors": [
+            "dev-ada"
+          ]
+        },
+        {
+          "path": "src/signup.ts",
+          "authors": [
+            "dev-ada"
+          ]
+        }
+      ],
+      "reviews": [
+        {
+          "id": "review-grace",
+          "state": "approved",
+          "commit": "commit-pull-head",
+          "reviewer": {
+            "login": "owner-grace",
+            "type": "user"
+          },
+          "submittedAt": "2026-10-20T10:30:00Z"
+        },
+        {
+          "id": "review-grace-early",
+          "state": "approved",
+          "commit": "commit-pull-first",
+          "reviewer": {
+            "login": "owner-grace",
+            "type": "user"
+          },
+          "submittedAt": "2026-10-20T11:30:00Z"
+        },
+        {
+          "id": "review-linus",
+          "state": "approved",
+          "commit": "commit-pull-head",
+          "reviewer": {
+            "login": "reviewer-linus",
+            "type": "user"
+          },
+          "submittedAt": "2026-10-20T12:30:00Z"
+        },
+        {
+          "id": "review-helper-bot",
+          "state": "approved",
+          "commit": "commit-pull-head",
+          "reviewer": {
+            "login": "review-helper[bot]",
+            "type": "bot"
+          },
+          "submittedAt": "2026-10-20T13:30:00Z"
+        },
+        {
+          "id": "review-ci-app",
+          "state": "approved",
+          "commit": "commit-pull-head",
+          "reviewer": {
+            "login": "shop-ci",
+            "type": "app"
+          },
+          "submittedAt": "2026-10-20T14:30:00Z"
+        }
+      ]
+    }
+  }
+}
