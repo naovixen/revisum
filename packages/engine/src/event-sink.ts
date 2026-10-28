@@ -28,6 +28,9 @@ const entryFor = (event: EventInput, actor: DerivedActor): string => JSON.string
   subjectHash: event.subjectHash,
   runId: event.runId,
   criterionIds: event.criterionIds,
+  proofKind: event.proofKind,
+  code: event.code,
+  path: event.path,
   actor: actor.actor,
   actorType: actor.actorType,
 });

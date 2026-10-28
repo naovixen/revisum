@@ -11,7 +11,7 @@
   "scripts": {
     "browsers": "node tools/install-browsers.ts",
     "typecheck": "tsc --build",
-    "lint": "node tools/check-licences.ts && node tools/check-layout.ts && node tools/check-imports.ts && node tools/check-branded-casts.ts && node tools/check-person-gates.ts && node tools/check-error-anchors.ts && node tools/check-plan-schema.ts",
+    "lint": "node tools/check-licences.ts && node tools/check-layout.ts && node tools/check-imports.ts && node tools/check-branded-casts.ts && node tools/check-person-gates.ts && node tools/check-approval-strength.ts && node tools/check-error-anchors.ts && node tools/check-plan-schema.ts",
     "lint:names": "node tools/lint-names.ts --self-test && node tools/lint-names.ts",
     "test": "node tools/run-test-folder.ts test/unit test/contract",
     "proofs": "node tools/run-test-folder.ts test/proofs",

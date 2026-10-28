@@ -5,6 +5,14 @@ export * from '@revisum/contracts';
 export { ENGINE_VERSION, schemaId } from './version.ts';
 export * from './plan/plan-decoders.ts';
 export * from './project/project-parser.ts';
+export {
+  loadTrustedProject, isTrustedFile, CODE_OWNERS_PATHS,
+  type ChangeUnderTest, type LoadedProject, type ProjectLoadError, type Provenance, type TrustedFileReviewItem, type TrustedProject,
+} from './project/trusted-project.ts';
+export {
+  approvalVerifier, unverified, type ApprovalVerifier, type ApprovalVerifierOptions, type VerifiedOutcome, type VerifierResult,
+} from './approval/approval-verifier.ts';
+export * from './approval/plan-standing.ts';
 export { assertBranded, planParser } from './plan/plan-parser.ts';
 export { migratePlan, type CriterionMapping } from './plan/plan-migration.ts';
 export { planJsonSchema, type JsonSchema } from './plan/plan-schema.ts';

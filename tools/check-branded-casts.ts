@@ -4,8 +4,8 @@
 // `as unknown as SafeText`, `<SafeText>value`) or by the engine's brand() helper.
 //
 // The same rule keeps DerivedActor, the actor recorded on every audit event, out of callers' hands:
-// only the engine's actor module (and later the approval verifier) may build one, so no caller can
-// choose its own actor type.
+// only the engine's actor module and the approval verifier may build one, so no caller can choose
+// its own actor type. An Approval, likewise, comes only from the approval verifier.
 // See docs/specs/SPEC-27-shared-types-and-events.md.
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -16,6 +16,8 @@ import { reportProblems } from './workspace-packages.ts';
 const PLAN_PARSER = 'packages/engine/src/plan/plan-parser.ts';
 const PROJECT_PARSER = 'packages/engine/src/project/project-parser.ts';
 const ACTOR_MODULE = 'packages/engine/src/actor.ts';
+const APPROVAL_VERIFIER = 'packages/engine/src/approval/approval-verifier.ts';
+const TRUSTED_PROJECT_LOADER = 'packages/engine/src/project/trusted-project.ts';
 
 // Each branded type, and the only files that may create a value of it. A branded type declared in
 // packages/ but missing here is still checked: it has no owner, so any cast to it fails until its
@@ -40,7 +42,9 @@ export const BRAND_OWNERS: Readonly<Record<string, readonly string[]>> = {
   Origin: [PROJECT_PARSER],
   ValidReport: ['packages/report/src/model/report-parser.ts'],
   ActorId: [ACTOR_MODULE],
-  DerivedActor: [ACTOR_MODULE],
+  DerivedActor: [ACTOR_MODULE, APPROVAL_VERIFIER],
+  Approval: [APPROVAL_VERIFIER],
+  TrustedProject: [TRUSTED_PROJECT_LOADER],
 };
 const ACTOR_BRANDS = new Set(['ActorId', 'DerivedActor']);
 

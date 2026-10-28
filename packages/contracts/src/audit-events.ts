@@ -2,6 +2,7 @@
 // derived by core from the approval proof, never declared by the caller, so an agent cannot
 // label its own work as a person's.
 // See docs/specs/SPEC-27-shared-types-and-events.md.
+import type { ApprovalErrorCode, ApprovalProof } from './approval.ts';
 import type { Brand } from './brand.ts';
 import type { Result } from './result.ts';
 
@@ -33,6 +34,12 @@ export type EventInput = {
   readonly subjectHash?: string;
   readonly runId?: string;
   readonly criterionIds?: readonly string[];
+  // On plan.approved and approval.refused: the route the approval was offered by.
+  readonly proofKind?: ApprovalProof['kind'];
+  // On approval.refused: why the approval verifier refused it.
+  readonly code?: ApprovalErrorCode;
+  // On trusted.changed-with-code: the trusted file the change edited, relative to the repository root.
+  readonly path?: string;
 };
 
 // not-append-only: the file no longer holds exactly what the sink wrote, so something else

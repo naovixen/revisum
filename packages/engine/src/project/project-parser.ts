@@ -30,6 +30,9 @@ export type PlanLimits = Pick<Limits, 'maximumPlanBytes' | 'maximumSteps' | 'max
 
 export type ProjectData = {
   readonly origins: readonly Origin[];
+  // Origins that serve real users. A plan with no approval runs only as a proposal, and a proposal
+  // never reaches these. Empty unless the project declares some.
+  readonly productionOrigins: readonly Origin[];
   readonly matrix: readonly Target[];
   readonly limits: Limits;
   // Secrets a fill step may name. The values live in the secret store, never in the project or a plan.
@@ -132,9 +135,22 @@ function readNameList<Name extends string>(
   return names;
 }
 
+// An optional list of distinct origins; absent means the project declares none.
+function readProductionOrigins(input: unknown, issues: Issues): Parsed<readonly Origin[]> {
+  if (input === undefined) return [];
+  const raw = readList(input, '$.productionOrigins', issues, 32, 0);
+  if (raw === INVALID) return INVALID;
+  const origins = raw.map((origin, index) => readOrigin(origin, `$.productionOrigins[${index}]`, issues));
+  if (!allValid(origins)) return INVALID;
+  if (new Set(origins).size !== origins.length) { issues.push({ code: 'duplicate', path: '$.productionOrigins' }); return INVALID; }
+  return origins;
+}
+
 export function parseProject(input: unknown): Result<Project, readonly PlanError[]> {
   const issues: Issues = [];
-  const fields = readRecord(input, '$', issues, ['origins', 'matrix', 'limits', 'secretNames', 'fixtures'], ['origins', 'matrix']);
+  const fields = readRecord(
+    input, '$', issues, ['origins', 'productionOrigins', 'matrix', 'limits', 'secretNames', 'fixtures'], ['origins', 'matrix'],
+  );
   if (fields === INVALID) return failure(issues);
   const rawOrigins = readList(fields['origins'], '$.origins', issues, 32);
   const rawMatrix = readList(fields['matrix'], '$.matrix', issues, 64);
@@ -143,6 +159,7 @@ export function parseProject(input: unknown): Result<Project, readonly PlanError
   // A name such as "a..b" matches the pattern but is refused anyway, so no fixture name looks like a way out.
   const fixtures = readNameList<'FixtureName'>(fields['fixtures'], '$.fixtures', issues, FIXTURE_NAME, (name) => !name.includes('..'));
   const origins = rawOrigins === INVALID ? [] : rawOrigins.map((origin, index) => readOrigin(origin, `$.origins[${index}]`, issues));
+  const productionOrigins = readProductionOrigins(fields['productionOrigins'], issues);
   const matrix = rawMatrix === INVALID ? [] : rawMatrix.map((target, index) => readTarget(target, `$.matrix[${index}]`, issues));
   const seen = new Set<string>();
   matrix.forEach((target, index) => {
@@ -151,6 +168,6 @@ export function parseProject(input: unknown): Result<Project, readonly PlanError
     seen.add(target.id);
   });
   if (issues.length > 0 || limits === INVALID || secretNames === INVALID || fixtures === INVALID
-    || !allValid(origins) || !allValid(matrix)) return failure(issues);
-  return success(brand<ProjectData, 'Project'>({ origins, matrix, limits, secretNames, fixtures }));
+    || productionOrigins === INVALID || !allValid(origins) || !allValid(matrix)) return failure(issues);
+  return success(brand<ProjectData, 'Project'>({ origins, productionOrigins, matrix, limits, secretNames, fixtures }));
 }

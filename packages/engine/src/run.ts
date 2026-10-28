@@ -2,9 +2,10 @@
 // Plan, walks the typed lifecycle, never substitutes a target, and hashes everything except
 // wall-clock timings.
 import type {
-  A11yFinding, ArtifactReference, ArtifactStore, BrowserDriver, Clock, ElementProbe, Plan, Redactor, Result,
+  A11yFinding, ApprovalLabel, ArtifactReference, ArtifactStore, BrowserDriver, Clock, ElementProbe, Plan, Redactor, Result,
   Session, Step, Target, TargetId, Unavailable,
 } from '@revisum/contracts';
+import { approvalLabel, type PlanStanding } from './approval/plan-standing.ts';
 import { canonicalJson, sha256 } from './hashing.ts';
 import * as lifecycle from './lifecycle.ts';
 import { manifestLogger, type Logger, type RunEventSink } from './logging.ts';
@@ -24,6 +25,9 @@ export type RunInputs = {
   readonly fixedTimeMilliseconds: number;
   readonly fixtures: readonly FixtureReference[];
   readonly host: HostInfo;
+  // The plan's standing (planStanding). Absent means no approval was supplied, so the run is a
+  // proposal: it never reaches the project's production origins.
+  readonly standing?: PlanStanding;
 };
 
 export type RunPorts = {
@@ -54,6 +58,10 @@ export type RunResult = {
   readonly steps: readonly StepResult[];
   readonly blockedOrigins: readonly string[];
   readonly unavailable: Unavailable | null;
+  // Present when the run was refused before any driver call.
+  readonly refusal?: lifecycle.Refusal;
+  // Present when the plan is approved: what the result says about that approval.
+  readonly approvalLabel?: ApprovalLabel;
   // Hash of everything above except the manifest body, which its own hash covers. Timings are excluded.
   readonly resultHash: string;
   readonly timings: { readonly totalMilliseconds: number; readonly stepMilliseconds: readonly number[] };
@@ -80,6 +88,17 @@ export async function run(inputs: RunInputs, ports: RunPorts): Promise<RunResult
   }
   const planned = lifecycle.plan(inputs.plan, target);
   logger.log({ kind: 'run.state', state: planned.state, targetId: target.id });
+
+  // A proposal is refused before any driver call if it would reach a production origin.
+  const productionOrigin = inputs.standing?.mode === 'approved' ? undefined : productionOriginReached(inputs);
+  if (productionOrigin !== undefined) {
+    const refused = lifecycle.refuse(planned, { code: 'origin_not_allowed', origin: productionOrigin });
+    logger.log({ kind: 'run.state', state: refused.state, targetId: target.id, code: refused.refusal.code, origin: productionOrigin });
+    return seal({
+      state: refused.state, targetId: target.id, manifest: null, manifestHash: null, steps: [], blockedOrigins: [],
+      unavailable: null, refusal: refused.refusal, timings: { totalMilliseconds: ports.clock.now() - startedAt, stepMilliseconds: [] },
+    }, inputs);
+  }
 
   const opened = await openSession(planned, context);
   if (!opened.ok) {
@@ -126,7 +145,7 @@ export async function run(inputs: RunInputs, ports: RunPorts): Promise<RunResult
     state: finished.state, targetId: target.id, manifest, manifestHash: finished.manifestHash,
     steps, blockedOrigins: blocked, unavailable: null,
     timings: { totalMilliseconds: ports.clock.now() - startedAt, stepMilliseconds },
-  });
+  }, inputs);
 }
 
 // The only entry point for untrusted input, such as a plan an AI proposed. Parsing happens first;
@@ -144,6 +163,29 @@ export async function runUntrusted(
   return results;
 }
 
+// The first production origin the run would reach: its base URL or a navigate step, inside frames too.
+function productionOriginReached(inputs: RunInputs): string | undefined {
+  const production = new Set<string>(inputs.project.productionOrigins);
+  if (production.size === 0) return undefined;
+  const origins = [new URL(inputs.baseUrl).origin];
+  const visit = (steps: readonly Step[]): void => {
+    for (const step of steps) {
+      if (step.type === 'navigate') origins.push(new URL(step.url, inputs.baseUrl).origin);
+      if (step.type === 'frame') visit(step.steps);
+    }
+  };
+  visit(inputs.plan.steps);
+  return origins.find((origin) => production.has(origin));
+}
+
+// The origins the browser may reach. A proposal never reaches a production origin, so they are
+// left out of its allow-list as well, and any request the page makes to one is blocked.
+function reachableOrigins(inputs: RunInputs): readonly string[] {
+  if (inputs.standing?.mode === 'approved') return inputs.project.origins;
+  const production = new Set<string>(inputs.project.productionOrigins);
+  return inputs.project.origins.filter((origin) => !production.has(origin));
+}
+
 async function openSession(planned: lifecycle.Planned, context: RunContext): Promise<Result<{ session: Session; driver: BrowserDriver }, Unavailable>> {
   const driver = context.ports.drivers.get(planned.target.adapter);
   if (driver === undefined) return { ok: false, error: { reason: 'adapter-not-registered', detail: `no adapter '${planned.target.adapter}'` } };
@@ -151,7 +193,7 @@ async function openSession(planned: lifecycle.Planned, context: RunContext): Pro
   if (!supported.ok) return supported;
   const opened = await driver.open(planned.target, {
     baseUrl: context.inputs.baseUrl,
-    allowedOrigins: context.inputs.project.origins,
+    allowedOrigins: reachableOrigins(context.inputs),
     seed: context.inputs.seed,
     fixedTimeMilliseconds: context.inputs.fixedTimeMilliseconds,
     sensitiveSelectors: context.ports.redactor.selectors,
@@ -258,10 +300,13 @@ function unavailableResult(targetId: string, unavailable: Unavailable, context: 
   return seal({
     state: 'TargetUnavailable', targetId, manifest: null, manifestHash: null, steps: [], blockedOrigins: [],
     unavailable, timings: { totalMilliseconds: context.ports.clock.now() - startedAt, stepMilliseconds: [] },
-  });
+  }, context.inputs);
 }
 
-function seal(result: Omit<RunResult, 'resultHash'>): RunResult {
+// Adds the approval label (for an approved plan) and the result hash.
+function seal(outcome: Omit<RunResult, 'resultHash' | 'approvalLabel'>, inputs: RunInputs): RunResult {
+  const standing = inputs.standing;
+  const result = standing?.mode === 'approved' ? { ...outcome, approvalLabel: approvalLabel(standing.approval) } : outcome;
   const { timings: _excluded, manifest: _coveredByHash, ...hashed } = result;
   return { ...result, resultHash: sha256(canonicalJson(hashed)) };
 }

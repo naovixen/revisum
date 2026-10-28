@@ -22,11 +22,11 @@
 | AI text | `AiText`, made only by `parseAiText` | `engine`, exists | Text an AI writer returned that passed the text rules; stored only as a suggestion |
 | Coverage study | `assessCoverage`, `tools/coverage-study.ts` | `engine`, exists | Sampled test intents from public suites, each marked expressible in the plan language or not, with the expressible share |
 | Locator | `Locator` | `contracts`, exists | How a step finds an element: by role and name, label, text or test id. Never CSS or XPath |
-| Project | `Project`, made only by `parseProject` | `engine`, exists | The trusted, person-written configuration: allowed origins, the target matrix, limits, and the secret names and fixture files plans may refer to |
+| Project | `Project`, made only by `parseProject` | `engine`, exists | The trusted, person-written configuration: allowed origins (and which are production), the target matrix, limits, and the secret names and fixture files plans may refer to |
 | Target | `Target` (`TargetId`) | `contracts`, exists | One declared browser engine, device profile, locale and environment to test with. Never substituted |
 | Browser driver | `BrowserDriver`, `Session` | ports in `contracts`; `cdpDriver` in `driver-cdp`, `playwrightDriver` in `driver-playwright` | Opens a session for a target; a session navigates, acts, probes, captures and audits |
 | Run | `run`, `runUntrusted`, `RunResult` | `engine`, exists | Interprets a parsed plan on one target and returns a hashed result |
-| Run lifecycle | `lifecycle` (`Planned`, `Resolved`, `Running`, terminal states) | `engine`, exists | The typed state machine every run walks; illegal transitions do not compile |
+| Run lifecycle | `lifecycle` (`Planned`, `Resolved`, `Running`, terminal states including `Refused`) | `engine`, exists | The typed state machine every run walks; illegal transitions do not compile |
 | Run manifest | `RunManifest`, `manifestHash` | `engine`, exists | Every input that decides a run's result, hashed, so the run can be replayed. See SPEC-08 |
 | Logging manifest | `LOGGING_MANIFEST`, `manifestLogger`, `RunEventSink` | `engine`, exists | The only fields a run may log, with why and for how long; the sink a run's events go to. Not the audit `EventSink` of SPEC-27 |
 | Redaction | `Redactor`, `defaultRedactor`, `SENSITIVE_PLACEHOLDER` | port in `contracts`, default in `engine`, exists | Masks personal-data elements in screenshots and personal-data patterns in kept text |
@@ -40,8 +40,16 @@
 | Test set | `TEST_SET` | `tools/check-tests-apart.ts`, exists | Tests, proofs, fixtures and golden files: the paths that must change apart from code |
 | Dependency review | `DependencyReview` with `DependencyCheck` items | planned, SPEC-00 | The keep-or-drop test every third-party component on the trust path must pass. Earlier name: R11 test |
 | Naming lint | `NamingLintConfig`, `NAMING_LINT`, `lintRepository` | `tools/`, exists | Enforces the naming rules in CI |
-| Declared approval | `declared` | planned, SPEC-02 | An approval resting on the founder's own push or merge under the agent lock-down |
-| Verified approval | `verified` | planned, SPEC-02 | An optional approval by a second account; never required |
+| Declared approval | `DeclaredApproval`, strength `declared` | `contracts`, exists | An approval resting on the founder's own push or merge under the agent lock-down; labelled "declared, not verified" |
+| Verified approval | `VerifiedApproval`, strength `verified` | `contracts`, exists | An optional approval by a code owner's review; never required. No gate, metric or level takes it (`tools/check-approval-strength.ts`) |
+| Approval | `Approval`, made only by `approvalVerifier`; `approvalLabel` | type in `contracts`, verifier in `engine`, exists | A person's approval of a subject (plan, trusted file, review decision, extra review or holdout plan), keyed by its hash, with a pseudonymous approver and the proof kind |
+| Approval proof | `ApprovalProof` (`code-owner-review`, `agent-lockdown-merge`, `signature`) | `contracts`, exists | The evidence offered for an approval; the verifier checks it against GitHub and the protected branch |
+| Agent lock-down | `AgentLockdown`, in `approvers.json` | `contracts`, exists | The owner's route: the coding agent is denied push, merge and pull-request approval, and the named maintainer pushes and merges |
+| Unverified decision | `unverified` | `engine`, exists | A decision with no usable proof: an `unverified` actor (local) or an `agent` actor (MCP, token), never an Approval |
+| Version-control port | `VersionControlPort`, `VersionControlReview` | `contracts`, exists | Read-only access to GitHub: protected-branch files, reviews, pull requests and who landed a commit |
+| Trusted project | `TrustedProject` (`Provenance`), made only by `loadTrustedProject` | `engine`, exists | The project read from the protected branch, with where it came from. A trusted file the change edits raises a `changed-with-code` review item |
+| Trusted file | `isTrustedFile` | `engine`, exists | `project.json`, `approvers.json`, `holdouts.json`, `plans/**`, `baselines/**` and the code-owners file; everything else is application code |
+| Plan standing | `PlanStanding`, `planStanding`, `approvalFor`, `mergeGateOpen` | `engine`, exists | Approved when the plan's exact hash has an approval, otherwise a proposal. A proposal never reaches `productionOrigins` and never opens the merge gate |
 | Actor | `DerivedActor` (`ActorId`, `ActorType`), `PERSON_ACTOR_TYPES` | types in `contracts`, built only in `engine/src/actor.ts`, exists | Who an audit event is recorded against, derived by core and never declared by the caller. A person is any actor type in `PERSON_ACTOR_TYPES`; declared and verified count alike |
 | Audit event sink | `EventSink`, `jsonLinesEventSink`, `EventInput`, `AuditEventKind` | port in `contracts`, sink in `engine`, exists | Append-only JSON Lines audit log; refuses to append once anything else truncated or rewrote the file. SPEC-14 adds the hash chain |
 | Error code | closed unions such as `PlanErrorCode`, `DriverErrorCode`, `CliErrorCode` | `contracts` and `engine`, exists; anchors in `docs/errors.md` | A machine-readable reason from a closed set; each has a `## <code>` heading, so `errors#<code>` resolves |

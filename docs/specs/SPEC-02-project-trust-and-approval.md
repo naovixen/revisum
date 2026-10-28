@@ -106,6 +106,9 @@ export type VersionControlReview = { id: string; state: 'approved' | 'changes-re
 - **Labels (AC-SPEC-02-16).** `approvalLabel(approval)` returns `'declared, not verified'` or `'verified'`, and the run result carries it. The ladder label and metric wording are tested in SPEC-21 and SPEC-15, which call this function.
 - **Formats.** `approvers.json` holds `agentLockdown` (the `AgentLockdown` fields) and, for the optional route, `signingKeys`. `holdouts.json` lists holdout-plan hashes by change class. The deny-rules file has the shape of a Claude Code `settings.json` (`permissions.deny`, as in this repository's `.claude/settings.json`). Push, merge and pull-request approval count as denied when rules deny `git push`, `git merge` or `gh pr merge`, and `gh pr review`, in Bash or PowerShell.
 - **Signed route.** Not built in M1, per Milestone. AC-SPEC-02-10's two refusals (`unknown-key`, `no-user-presence`) are built and tested now. Checking a valid signature waits for customer demand, so no signature ever verifies until then.
+- **For the M1 exit review.** Two gaps remain, both on the safe side of the gate:
+  - If the audit sink can't record `plan.approved`, the approval counts as absent. It is reported as `version-control-unavailable`, because no closer code exists.
+  - Neither route proves that the reviewed or landed commit introduced the subject's bytes. The port can't read a file at a commit. The code-owner route relies on `lastCommitTouching`; the lock-down route checks the subject against the protected branch as it is now. A later file-at-commit port method would close this.
 - **Exhaustiveness.** SPEC-27's switch proof covers SPEC-27's own unions. This spec's codes join the error-anchor list in `docs/errors.md`.
 
 ## Acceptance criteria

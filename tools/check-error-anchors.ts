@@ -20,6 +20,8 @@ export const ERROR_CODE_UNIONS: readonly { readonly file: string; readonly name:
   { file: 'packages/contracts/src/error-codes.ts', name: 'RecorderError' },
   { file: 'packages/contracts/src/audit-events.ts', name: 'SinkError' },
   { file: 'packages/contracts/src/error-codes.ts', name: 'CliErrorCode' },
+  { file: 'packages/contracts/src/approval.ts', name: 'ApprovalErrorCode' },
+  { file: 'packages/contracts/src/approval.ts', name: 'TrustError' },
 ];
 
 // The string literals from `type Name =` or `const Name =` up to the ";" that ends the declaration.

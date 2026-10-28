@@ -7,7 +7,7 @@
 - Plan codes use underscores (`unknown_step`); every other union uses hyphens (`not-found`).
 - Each code says what was refused and what to do. Errors carry a code and a location, never the offending value, so private or hostile text is never echoed back.
 
-Plan errors (`PlanErrorCode`, from the plan parser in `engine`) come first, then driver, runner, review recorder, event sink and command-line errors.
+Plan errors (`PlanErrorCode`, from the plan parser in `engine`) come first, then driver, runner, review recorder, event sink, command-line, approval and trust errors.
 
 ## not_object
 
@@ -147,11 +147,11 @@ Command-line error. The command line is malformed: an unknown command or flag, o
 
 ## config-invalid
 
-Command-line error. The project configuration failed to parse.
+Command-line error, and trust error from the project loader. The project configuration failed to parse. When the loader returns it, the protected-branch `project.json` exists but is not a valid project; the error lists each problem and where it is.
 
 ## untrusted-source
 
-Command-line error. The project configuration came from a branch other than the protected branch and has no approval.
+Command-line error, and trust error. The project configuration came from a branch other than the protected branch and has no approval, or the protected branch could not be read. Merge `project.json` to the protected branch.
 
 ## plan-rejected
 
@@ -180,3 +180,59 @@ Command-line error. Replaying a recorded run gave a different result hash from t
 ## internal
 
 Command-line error. An unexpected failure inside the tool. Please report it with the command and the run's logs.
+
+## self-approval
+
+Approval error. On the code-owner route, the approving reviewer opened the change, or wrote a commit in it that touches the subject. Ask a code owner who did neither, or use the agent lock-down route.
+
+## bot-or-app
+
+Approval error. The approving review came from a bot or app account. Such an approval is recorded as an agent's and never gates. A person must approve.
+
+## not-code-owner
+
+Approval error. The protected-branch code-owners file does not name the reviewer for the subject's path. A code-owners file edited in the change does not count until it is on the protected branch.
+
+## stale-commit
+
+Approval error. The review is on a commit older than the last commit that changed the subject. Ask for a review of the latest commit.
+
+## unknown-key
+
+Approval error. The signature's key is not registered under `signingKeys` in protected-branch `approvers.json`.
+
+## bad-signature
+
+Approval error. The signature could not be shown to be valid. The signed route is not built yet, so no signature verifies until it is.
+
+## no-user-presence
+
+Approval error. The signature was made without the user-presence flag. Sign again with a key that requires a touch.
+
+## subject-mismatch
+
+Approval error. The proof does not match the subject: the review is not an approval, the subject has no path, or the change does not touch the subject.
+
+## version-control-unavailable
+
+Approval error. GitHub could not answer a question the approval needs, or the audit sink did not record the approval. The approval is treated as absent, never as verified or declared. Try again later.
+
+## not-maintainer
+
+Approval error. On the agent lock-down route, the account that landed the commit is not the maintainer named in protected-branch `approvers.json`, is a bot, app or token, or is not the account the proof names.
+
+## not-protected-branch
+
+Approval error. On the agent lock-down route, the commit did not land on the protected default branch, or the subject as it stands there has a different hash. Merge or push it to the protected branch.
+
+## lockdown-not-declared
+
+Approval error. Protected-branch `approvers.json` declares no `agentLockdown`, its denied actions leave out push, merge or pull-request approval, or the agent's deny-rules file on the protected branch is missing or does not deny `git push`, `git merge` or `gh pr merge`, and `gh pr review`.
+
+## changed-with-code
+
+Trust error. The change under test edits a trusted file together with application code. Core ran on the protected-branch version and raised the file for review. Land the trusted-file change on its own, with an approval.
+
+## no-approval
+
+Trust error. A trusted file or plan has no approval of its exact hash, so it is not trusted. Get it approved; a plan with no approval runs only as a proposal.
