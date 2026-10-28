@@ -96,6 +96,18 @@ export interface VersionControlPort {                              // read-only;
 export type VersionControlReview = { id: string; state: 'approved' | 'changes-requested' | 'commented'; commit: string; reviewer: { login: string; type: 'user' | 'bot' | 'app' } };
 ```
 
+**Build notes.** Points the criteria leave open, settled while building (2026-10-28; `docs/decisions/answers.md`):
+
+- **Project shape.** `project.json` keeps the built shape (`packages/engine/src/project/project-parser.ts`). The other fields above arrive with the spec that first reads them: `policy` (SPEC-03), `matrix` (SPEC-05), `redaction` (SPEC-09), `riskClasses` (SPEC-21), `services` and `packs` (SPEC-23). This spec adds only `productionOrigins`, a list of origins (empty by default), which proposal-only runs refuse.
+- **Building the verifier.** `approvalVerifier({ events, actorKey })` returns the `ApprovalVerifier`. `events` is the `EventSink`; `actorKey` is the key that turns a login into a pseudonymous `ActorId`. Events gain an optional `proofKind` field (an addition to SPEC-27's event shape). A refused attempt appends `approval.refused` with its code.
+- **Loading the trusted project.** `loadTrustedProject(path, versionControl, change)` is async because the port is. `path` is relative to the repository root. `change` lists the files the change edits. The result holds the project and the `changed-with-code` review items, each naming its file, and appends one `trusted.changed-with-code` event per file. SPEC-13 later queues the items.
+- **Port additions.** The port gains `protectedBranch` (the branch name recorded in provenance), `pullRequest(number)`, which returns its author and head commit, and `lastCommitTouching(path, pullRequest)`. A review gains `submittedAt`, and `landedBy` gains `at`. `Approval.at` comes from these, never from the run's clock. A review is stale when its commit is not the last commit touching the subject.
+- **Proposal runs and the merge gate (AC-SPEC-02-03).** `planStanding(plan, store)` returns `{ mode: 'approved', approval }` or `{ mode: 'proposal' }`. A proposal run refuses `productionOrigins` with `origin_not_allowed` before any driver call. `mergeGateOpen(standing)` is false for every proposal. SPEC-11 and SPEC-16 call it.
+- **Labels (AC-SPEC-02-16).** `approvalLabel(approval)` returns `'declared, not verified'` or `'verified'`, and the run result carries it. The ladder label and metric wording are tested in SPEC-21 and SPEC-15, which call this function.
+- **Formats.** `approvers.json` holds `agentLockdown` (the `AgentLockdown` fields) and, for the optional route, `signingKeys`. `holdouts.json` lists holdout-plan hashes by change class. The deny-rules file has the shape of a Claude Code `settings.json` (`permissions.deny`, as in this repository's `.claude/settings.json`). Push, merge and pull-request approval count as denied when rules deny `git push`, `git merge` or `gh pr merge`, and `gh pr review`, in Bash or PowerShell.
+- **Signed route.** Not built in M1, per Milestone. AC-SPEC-02-10's two refusals (`unknown-key`, `no-user-presence`) are built and tested now. Checking a valid signature waits for customer demand, so no signature ever verifies until then.
+- **Exhaustiveness.** SPEC-27's switch proof covers SPEC-27's own unions. This spec's codes join the error-anchor list in `docs/errors.md`.
+
 ## Acceptance criteria
 
 - AC-SPEC-02-01: When `project.json` is read from a branch other than the protected branch and has no approval, core shall refuse it with `untrusted-source` (oracle: specified).
