@@ -35,8 +35,11 @@ function parsedArguments(plan: Plan): CallArguments {
   return step.arguments;
 }
 
-const argumentsFor = (name: string, callArguments: JsonRecord): CallArguments =>
-  parsedArguments(accepted(parsePlan, callPlanOf([call(name, callArguments)])));
+// A run value the plan defines, so a reference to it parses; its text is set per test.
+const KEPT_VALUE = { kind: 'uniqueText', prefix: 'kept' };
+const argumentsFor = (name: string, callArguments: JsonRecord, definedValues: readonly string[] = []): CallArguments =>
+  parsedArguments(accepted(parsePlan, callPlanOf([call(name, callArguments)],
+    definedValues.length === 0 ? {} : { values: Object.fromEntries(definedValues.map((valueName) => [valueName, KEPT_VALUE])) })));
 
 function built(name: string, callArguments: CallArguments, values: RunValues = NO_VALUES): ServiceRequest {
   const declaration = declarationOf(project, name);
@@ -187,7 +190,7 @@ for (const lineBreak of ['\r', '\n', '\r\n']) {
 const byName = (name: string) => ({ valueName: name });
 
 test('a path segment of "", "." or ".." from a run value is refused with parameter-invalid', { criterion: 'AC-SPEC-32-03' }, () => {
-  const callArguments = argumentsFor('addCustomerNote', { ...GENERATED[0], customerId: byName('customerKey') });
+  const callArguments = argumentsFor('addCustomerNote', { ...GENERATED[0], customerId: byName('customerKey') }, ['customerKey']);
   for (const text of ['.', '..']) {
     assert.equal(refusedBuild('addCustomerNote', callArguments, valuesOf({ customerKey: text })), 'parameter-invalid', JSON.stringify(text));
   }
@@ -218,7 +221,7 @@ for (const runTime of RUN_TIME_CASES) {
 }
 
 test('an identifier parameter refuses a remembered value holding a hyphen, a space or a quote', { criterion: 'AC-SPEC-32-04' }, () => {
-  const callArguments = argumentsFor('getOrder', { orderId: byName('orderKey') });
+  const callArguments = argumentsFor('getOrder', { orderId: byName('orderKey') }, ['orderKey']);
   for (const text of ['order-17', 'ord 17', "ord_17'; DROP TABLE orders; --", '17abc', '']) {
     assert.equal(refusedBuild('getOrder', callArguments, valuesOf({ orderKey: text })), 'parameter-invalid', JSON.stringify(text));
   }
@@ -226,7 +229,7 @@ test('an identifier parameter refuses a remembered value holding a hyphen, a spa
 });
 
 test('a run value of the right type fills the request as a literal would', { criterion: 'AC-SPEC-32-04' }, () => {
-  const byValue = argumentsFor('getOrder', { orderId: byName('orderKey') });
+  const byValue = argumentsFor('getOrder', { orderId: byName('orderKey') }, ['orderKey']);
   const literal = argumentsFor('getOrder', { orderId: 'ord_17' });
   assert.deepEqual(built('getOrder', byValue, valuesOf({ orderKey: 'ord_17' })), built('getOrder', literal));
 });
@@ -238,7 +241,7 @@ test('integers and booleans fill the body as JSON numbers and booleans, from lit
   assert.equal(fromLiterals.quantity, 3);
   assert.equal(fromLiterals.giftWrap, true);
   assert.equal(fromLiterals.reference, 'test-eu-3');
-  const values = { count: { kind: 'uniqueNumber', digits: 2 } };
+  const values = { count: { kind: 'uniqueNumber', digits: 4 } };
   const plan = accepted(parsePlan, callPlanOf([call('createOrder', orderArguments({ quantity: byName('count') }))], { values }));
   const fromValue = JSON.parse(built('createOrder', parsedArguments(plan), valuesOf({ count: '42' })).body ?? 'null');
   assert.equal(fromValue.quantity, 42);

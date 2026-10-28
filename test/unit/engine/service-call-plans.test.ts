@@ -40,7 +40,7 @@ test('a call with literal arguments, remembering a response field, is accepted a
 test('a call may take run values by name for any parameter that is not a secret', { criterion: 'AC-SPEC-32-02' }, () => {
   const values = {
     buyer: { kind: 'uniqueText', prefix: 'buyer' }, buyerEmail: { kind: 'uniqueEmail', localPrefix: 'buyer' },
-    count: { kind: 'uniqueNumber', digits: 2 },
+    count: { kind: 'uniqueNumber', digits: 4 },
   };
   const step = call('createOrder', orderArguments({
     customerName: { valueName: 'buyer' }, contactEmail: { valueName: 'buyerEmail' }, quantity: { valueName: 'count' },

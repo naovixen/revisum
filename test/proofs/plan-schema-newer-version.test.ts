@@ -10,6 +10,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { after, before, test } from 'node:test';
 import { parseProject, planParser } from '@revisum/engine';
+import { testProjectInput } from '../unit/engine/plan-examples.ts';
 import { GOLDEN, REPOSITORY_ROOT } from '../support/repository.ts';
 import { copyRepository, type LintOutcome, type ScratchRepository } from './scratch-repository.ts';
 
@@ -88,13 +89,7 @@ test('the 1.1 golden plans are all still in golden/plans/', { criterion: 'AC-SPE
 });
 
 test('every 1.2 golden plan parses against the shared test project and keeps "1.2"', { criterion: 'AC-SPEC-30-02' }, () => {
-  const project = parseProject({
-    origins: ['http://127.0.0.1:4173'], limits: { stepTimeoutMilliseconds: 2000 },
-    matrix: [{
-      id: 'playwright-chromium', adapter: 'playwright', engine: 'chromium', device: 'desktop-1280',
-      locale: 'de-DE', timezone: 'Asia/Tokyo', colorScheme: 'dark', reducedMotion: 'reduce',
-    }],
-  });
+  const project = parseProject(testProjectInput());
   assert.ok(project.ok, JSON.stringify(project));
   const parse = planParser(project.value);
   assert.ok(newerGoldenPlans().length >= 9, 'there is a 1.2 golden plan per feature');
