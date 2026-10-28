@@ -140,7 +140,8 @@ describe('secret echoes never reach a run\'s outputs', () => {
 
     // Literal text in the token field is itself refused as literal_secret, so the control types into the plain note field.
     test(`${targetId}: control: a plain text typed into a plain field does reach the kept observation`, { criterion: 'AC-SPEC-04-04', timeout: TIMEOUT }, async () => {
-      const plainText = `plain${fakeSecretValue().replace(/[^A-Za-z0-9]/g, '')}`;
+      // Letters only, so the privacy masker never mistakes a run of digits for a phone number.
+      const plainText = `plain${fakeSecretValue().replace(/[^A-Za-z]/g, '')}`;
       const ran = await runEcho(targetId, 'raw', plainText, fakeSecretValue(), 'Note');
       const check = ran.result.steps[4];
       assert.equal(check?.outcome, 'failed');
