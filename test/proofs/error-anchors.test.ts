@@ -20,12 +20,15 @@ const ERROR_CODES: Readonly<Record<string, readonly string[]>> = {
     'duplicate', 'version_unsupported', 'empty', 'vacuous', 'no_criterion_id', 'literal_secret', 'undefined_value',
     'position_not_allowed', 'misplaced_step', 'unsafe_interpolation', 'header_not_allowed',
   ],
-  step: ['value-empty', 'value-unsafe', 'value-too-long', 'state-not-exposed', 'download-not-text'],
+  step: ['value-empty', 'value-unsafe', 'value-too-long', 'state-not-exposed', 'download-not-text', 'request-not-seen'],
   serviceCall: [
     'response-not-json', 'response-too-large', 'field-missing', 'service-unreachable', 'call-timeout', 'unexpected-status',
     'egress-blocked', 'parameter-invalid', 'cleanup-failed',
   ],
-  driver: ['not-found', 'ambiguous', 'not-actionable', 'timeout', 'navigation-failed', 'policy-denied', 'no-download', 'download-too-large'],
+  driver: [
+    'not-found', 'ambiguous', 'not-actionable', 'timeout', 'navigation-failed', 'policy-denied', 'no-download', 'download-too-large',
+    'storage-origin-mismatch',
+  ],
   runner: ['image-missing', 'image-digest-mismatch', 'egress-unenforceable', 'start-failed'],
   recorder: ['no-reason', 'unknown-item', 'already-decided', 'sink-failed'],
   sink: ['not-append-only', 'write-failed'],

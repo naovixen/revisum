@@ -1,0 +1,22 @@
+{
+  "version": "1.2",
+  "meta": { "featureId": "LIKES-2", "specReference": "specs/likes.md#like-a-transaction", "title": "Liking a transaction sends one request and shows the new like count" },
+  "targets": ["playwright-chromium"],
+  "steps": [
+    { "type": "navigate", "url": "/transactions/latest" },
+    { "type": "resetRequests", "request": "likes" },
+    { "type": "click", "locator": { "by": "role", "role": "button", "name": "Like" } },
+    { "type": "expectRequests", "request": "likes", "count": { "equals": 1 }, "criterionId": "likes.one-request" },
+    { "type": "expectRequests", "request": "likes", "count": { "atLeast": 1 }, "criterionId": "likes.request-sent" },
+    { "type": "expectRequests", "request": "likes", "count": { "atMost": 1 }, "criterionId": "likes.no-repeat" },
+    { "type": "expectResponse", "request": "likes", "assert": { "kind": "statusEquals", "value": 200 }, "criterionId": "likes.accepted" },
+    { "type": "expectResponse", "request": "likes", "assert": { "kind": "fieldPresent", "field": "likeList" }, "criterionId": "likes.list-returned" },
+    { "type": "expectResponse", "request": "likes", "assert": { "kind": "fieldAbsent", "field": "errorCode" }, "criterionId": "likes.no-error" },
+    { "type": "expectResponse", "request": "likes", "assert": { "kind": "fieldEquals", "field": "firstLiker", "value": "Ada Lovelace" }, "criterionId": "likes.first-liker" },
+    { "type": "expectResponse", "request": "likes", "assert": { "kind": "fieldContains", "field": "firstLiker", "value": "Ada" }, "criterionId": "likes.first-liker-named" },
+    { "type": "remember", "name": "likeCount", "from": { "response": "likes", "field": "likeList", "read": "arrayLength" } },
+    { "type": "remember", "name": "firstLikerName", "from": { "response": "likes", "field": "firstLiker", "read": "text" } },
+    { "type": "expect", "locator": { "by": "testId", "testId": "like-count" }, "assert": { "kind": "textEquals", "value": { "valueName": "likeCount" } }, "criterionId": "likes.count-matches-response" },
+    { "type": "expect", "locator": { "by": "testId", "testId": "first-liker" }, "assert": { "kind": "textContains", "value": { "valueName": "firstLikerName" } }, "criterionId": "likes.first-liker-shown" }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "version": "1.2",
+  "meta": { "featureId": "MENU-3", "specReference": "specs/navigation.md#docked-menu", "title": "A docked menu stays docked, and logging out clears the private key" },
+  "targets": ["playwright-chromium"],
+  "steps": [
+    { "type": "navigate", "url": "/dashboards" },
+    { "type": "setStorage", "entry": "pinnedMenu", "arguments": { "docked": true } },
+    { "type": "navigate", "url": "/dashboards" },
+    { "type": "expect", "locator": { "by": "role", "role": "navigation", "name": "Main menu" }, "assert": { "kind": "visible" }, "criterionId": "menu.docked-shown" },
+    { "type": "expectStorage", "entry": "pinnedMenu", "assert": { "kind": "equals", "value": "true" }, "criterionId": "menu.docking-kept" },
+    { "type": "expectStorage", "entry": "privateKey", "assert": { "kind": "present" }, "criterionId": "login.private-key-kept" },
+    { "type": "click", "locator": { "by": "role", "role": "button", "name": "Log out" } },
+    { "type": "expectStorage", "entry": "privateKey", "assert": { "kind": "absent" }, "criterionId": "login.private-key-cleared" },
+    { "type": "removeStorage", "entry": "pinnedMenu" },
+    { "type": "expectStorage", "entry": "pinnedMenu", "assert": { "kind": "absent" }, "criterionId": "menu.docking-removed" }
+  ]
+}

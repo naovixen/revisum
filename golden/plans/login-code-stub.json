@@ -1,0 +1,13 @@
+{
+  "version": "1.2",
+  "meta": { "featureId": "LOGIN-4", "specReference": "specs/login.md#one-time-code", "title": "A login that needs a one-time code opens the code dialog" },
+  "targets": ["playwright-chromium"],
+  "steps": [
+    { "type": "stub", "stub": "loginNeedsCode", "action": "start", "arguments": { "reason": "Enter the code from your app" } },
+    { "type": "navigate", "url": "/login" },
+    { "type": "fill", "locator": { "by": "label", "label": "Username" }, "value": "ada" },
+    { "type": "click", "locator": { "by": "role", "role": "button", "name": "Log in" } },
+    { "type": "expect", "locator": { "by": "role", "role": "dialog", "name": "Enter your code" }, "assert": { "kind": "visible" }, "criterionId": "login.code-dialog-shown" },
+    { "type": "stub", "stub": "loginNeedsCode", "action": "stop" }
+  ]
+}
