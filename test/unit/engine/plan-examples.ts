@@ -45,8 +45,50 @@ export const signupPlan = (): JsonRecord => goldenPlan('signup');
 //   0 navigate, 1 hover, 2 select, 3 frame (0 fill, 1 expect), 4 click, 5 dialog, 6 expect (absent), 7 expectPage.
 export const accountClosurePlan = (): JsonRecord => goldenPlan('account-closure');
 
-// A trusted project with one target, whose limits a test may tighten and to which a test may add
-// other project fields, such as declared secret names and fixtures.
+// The shop's test API, which the shared project declares as a service, with the secrets its calls
+// use and the calls a plan may make (docs/specs/SPEC-32-declared-service-calls.md). The shapes are
+// those of service-call-examples.ts, which adds authorization headers on top. The calls here name
+// no secret themselves (signInAsAdmin's password is a secret parameter), so a test that replaces
+// the secret names still gets a project that parses.
+export const TEST_SERVICE: JsonRecord = { name: 'shop', origin: 'http://127.0.0.1:4180', private: true };
+export const TEST_SERVICE_SECRET_NAMES = ['SHOP_API_TOKEN', 'SHOP_ADMIN_LOGIN', 'SHOP_ADMIN_PASSWORD'];
+export const TEST_SERVICE_CALLS: JsonRecord = {
+  createOrder: {
+    service: 'shop', method: 'POST', path: '/api/orders',
+    body: {
+      customer: { name: { $parameter: 'customerName' }, email: { $parameter: 'contactEmail' } },
+      quantity: { $parameter: 'quantity' }, region: { $parameter: 'region' }, giftWrap: { $parameter: 'giftWrap' },
+      deliveryDay: { $parameter: 'deliveryDay' },
+      reference: { $interpolate: 'test-{region}-{quantity}', parameters: ['region', 'quantity'] },
+    },
+    parameters: {
+      customerName: { kind: 'text', maximumLength: 40 }, contactEmail: { kind: 'email' },
+      quantity: { kind: 'integer', minimum: 1, maximum: 99 }, region: { kind: 'oneOf', values: ['eu', 'us'] },
+      giftWrap: { kind: 'boolean' }, deliveryDay: { kind: 'yearMonthDay' },
+    },
+    effect: 'write', successStatuses: [201], fields: { orderId: '/id', status: '/status' }, allowInProposals: true,
+  },
+  getOrder: {
+    service: 'shop', method: 'GET', path: '/api/orders/{orderId}', parameters: { orderId: { kind: 'identifier' } },
+    effect: 'read', successStatuses: [200], fields: { status: '/status', total: '/total' },
+  },
+  deleteOrder: {
+    service: 'shop', method: 'DELETE', path: '/api/orders/{orderId}', parameters: { orderId: { kind: 'identifier' } },
+    effect: 'write', successStatuses: [204, 404], allowInProposals: true,
+  },
+  resetShop: {
+    service: 'shop', method: 'POST', path: '/api/test/reset', parameters: {}, effect: 'write', successStatuses: [204], allowInProposals: true,
+  },
+  signInAsAdmin: {
+    service: 'shop', method: 'POST', path: '/api/test/sessions', body: { password: { $parameter: 'adminPassword' } },
+    parameters: { adminPassword: { kind: 'secret' } }, effect: 'write', successStatuses: [201], fields: { sessionId: '/session' },
+    allowInProposals: true,
+  },
+};
+
+// A trusted project with one target and the shop's test service, whose limits a test may tighten
+// and to which a test may add or replace other project fields, such as declared secret names and
+// fixtures.
 export const testProjectInput = (limits: Readonly<Record<string, number>> = {}, fields: JsonRecord = {}): JsonRecord => ({
   origins: [ORIGIN],
   limits: { stepTimeoutMilliseconds: 2000, ...limits },
@@ -54,6 +96,9 @@ export const testProjectInput = (limits: Readonly<Record<string, number>> = {}, 
     id: TARGET_ID, adapter: 'playwright', engine: 'chromium', device: 'desktop-1280',
     locale: 'de-DE', timezone: 'Asia/Tokyo', colorScheme: 'dark', reducedMotion: 'reduce',
   }],
+  services: [TEST_SERVICE],
+  secretNames: TEST_SERVICE_SECRET_NAMES,
+  calls: TEST_SERVICE_CALLS,
   ...fields,
 });
 
