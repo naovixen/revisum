@@ -144,6 +144,21 @@ export type SuiteDecodeError = { readonly code: SuiteDecodeErrorCode; readonly p
 - Attachment paths in the report must resolve inside Revisum's output directory. Any other path is `suite-report-invalid` at its JSON path.
 - Every free-text field from the report or a trace (titles, messages, stack lines, URLs) is `SafeText` after redaction, or it is dropped and replaced by its sha256.
 
+**Build notes.** Points the criteria leave open, settled while building (2026-10-28; `docs/decisions/answers.md`):
+
+- **M1 surface.** The tests' names are adopted:
+  - `declaredSuite(project, name)`;
+  - `suitePasses(suite, changedFiles)`, returning `{ pass, suiteFiles }`;
+  - `evidenceMergeGateOpen(result)`;
+  - `EvidenceContext = { suite, pass, exitCode, redactor }`.
+
+  The decoder takes the report as parsed JSON (`unknown`). Attachment paths are written relative to the suite's output directory.
+- **Limits.** `EvidenceLimits` gains `maximumReportDepth`, default 64; deeper nesting is `too-large`. There is no version gate on the report: the decoder's strict shape checks are the gate.
+- **Exit codes.** When the runner's exit code and the report's outcome disagree, the run is `Errored` and `RunResult.evidence.exitCodeMismatch` is `true`. Turning a refused flaky report into an `Errored` run is M2.
+- **Guarantee level.** It is read at `guarantees.level`, as the types give it. "Linked by the suite" is shown beside each criterion id the suite's annotations supply.
+- **Error paths.** `.command`, `.environment.<NAME>`, `.environment.<NAME>.literal` and `.environment.<NAME>.secretName`.
+- **Metrics and levels (AC-SPEC-35-17).** `RunRecord` gains `mode: 'plan' | 'evidence'`, and one function, `planRunsOnly(records)`, keeps the plan runs for metrics and levels. It is built and tested with SPEC-15 and SPEC-21.
+
 ## Acceptance criteria
 
 - AC-SPEC-35-01: When `project.json` declares a suite, the project parser shall refuse it with the code and JSON path, echoing no value, when (oracle: specified; one fixture per case):
