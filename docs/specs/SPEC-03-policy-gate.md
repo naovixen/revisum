@@ -32,6 +32,19 @@ export interface PolicyGate {
 }
 ```
 
+**Build notes.** Points the criteria leave open, settled while building (2026-10-28; the first three are the founder's decisions, the rest are in `docs/decisions/answers.md`):
+
+- **Testing a delete feature.** The project allows irreversible actions in the trusted `policy.allowedIrreversibleNames`: exact accessible names, case-insensitive, such as "Delete account". A person approves that list like any trusted file. An allowed name passes `irreversible-action`, `irreversible-submit` and `irreversible-dialog`. Runs stay automatic; the gate is a check inside every run.
+- **Production.** Denied by default for every plan. When the trusted `policy.allowProductionForApprovedPlans` is `true`, an approved plan may use production origins (SPEC-02's `planStanding`). A proposal never may.
+- **Test helpers.** Shared test helpers clear each plan through the gate before `run()`, in a tests commit of their own. SPEC-02's production test gains the explicit allowance (founder, 2026-10-28).
+- **Building the gate.** `policyGate({ project, events })` returns the `PolicyGate`. `decide(plan, targets, standing)` takes the plan's standing; a missing standing means a proposal. `guardAction` reads its patterns and allowances from the same project. Each denial appends one `plan.denied` event whose `code` is the rule.
+- **`Authorised`.** It is branded with its own key, so it stays a narrower `Plan` and doesn't collapse to `never` with SPEC-27's `Brand`.
+- **Patterns.** Engine ships base sets for `en`, `de` and `fr` (delete, pay, send and revoke, and their equivalents); the project adds to them per locale. A locale like `fr-FR` falls back to `fr`. A locale with neither a base set nor a project set is denied with `no-locale-patterns`.
+- **Destructive URLs.** A pattern is a URL path. It matches the same path, or one that continues it after a `/`. A click on a link whose resolved URL matches is `destructive-navigation`.
+- **Step index.** The first offending step, or `null` for `no-locale-patterns` and `over-limit`.
+- **Scope of each check.** The static check reads `navigate` and the locator names of clicks. Presses, submits and dialogs need the page, so the runtime guard checks them. `unnamed-control` doesn't apply to dialog steps. A runtime denial ends the run `Denied`, with no input event for that step.
+- **Anchors.** Each rule id gets a `## <rule>` heading in `docs/errors.md` and joins the error-anchor list.
+
 ## Acceptance criteria
 
 - AC-SPEC-03-01: When a parsed plan clicks a control whose accessible name matches an irreversible pattern and the project does not allow it, the gate shall deny it with `irreversible-action` and the step index (oracle: specified).
