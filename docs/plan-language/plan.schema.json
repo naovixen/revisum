@@ -1,12 +1,15 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "revisum.plan/v1",
-  "title": "Plan language 1.1",
-  "description": "A closed, versioned test plan. Every assertion names the acceptance criterion it checks. Fitting this schema is necessary, not sufficient: the plan parser also checks the project's allow-list, matrix, declared secrets and fixtures, its limits and its text safety rules.",
+  "title": "Plan language 1.2",
+  "description": "A closed, versioned test plan. Every assertion names the acceptance criterion it checks. A plan declaring \"1.1\" may use only what that version had. Fitting this schema is necessary, not sufficient: the plan parser also checks the project's allow-list, matrix, declared secrets, fixtures, test-id attributes and email domains, its limits, its text safety rules and that every value is defined before it is used.",
   "type": "object",
   "properties": {
     "version": {
-      "const": "1.1"
+      "enum": [
+        "1.1",
+        "1.2"
+      ]
     },
     "meta": {
       "type": "object",
@@ -57,6 +60,119 @@
       },
       "required": [
         "secretName"
+      ],
+      "additionalProperties": false
+    },
+    "values": {
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^[a-z][A-Za-z0-9]{0,63}$"
+      },
+      "additionalProperties": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "const": "uniqueText"
+              },
+              "prefix": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100,
+                "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+              }
+            },
+            "required": [
+              "kind",
+              "prefix"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "const": "uniqueEmail"
+              },
+              "localPrefix": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9._+-]{1,53}$"
+              },
+              "domain": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "kind",
+              "localPrefix"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "const": "uniqueNumber"
+              },
+              "digits": {
+                "type": "integer",
+                "minimum": 4,
+                "maximum": 12
+              }
+            },
+            "required": [
+              "kind",
+              "digits"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "const": "date"
+              },
+              "day": {
+                "$ref": "#/$defs/relativeDay"
+              },
+              "format": {
+                "enum": [
+                  "yearMonthDay",
+                  "dayOfMonth",
+                  "monthAndYear",
+                  "longDate",
+                  "weekday",
+                  "timestamp",
+                  "epochMilliseconds"
+                ]
+              }
+            },
+            "required": [
+              "kind",
+              "day",
+              "format"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    "clock": {
+      "type": "object",
+      "properties": {
+        "day": {
+          "$ref": "#/$defs/relativeDay"
+        },
+        "time": {
+          "type": "string",
+          "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+        }
+      },
+      "required": [
+        "day",
+        "time"
       ],
       "additionalProperties": false
     }
@@ -116,6 +232,9 @@
         },
         {
           "$ref": "#/$defs/captureStep"
+        },
+        {
+          "$ref": "#/$defs/rememberStep"
         }
       ]
     },
@@ -126,7 +245,14 @@
           "const": "navigate"
         },
         "url": {
-          "$ref": "#/$defs/url"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/url"
+            },
+            {
+              "$ref": "#/$defs/pathTemplate"
+            }
+          ]
         }
       },
       "required": [
@@ -195,6 +321,12 @@
                 "secretName"
               ],
               "additionalProperties": false
+            },
+            {
+              "$ref": "#/$defs/valueReference"
+            },
+            {
+              "$ref": "#/$defs/multiLineText"
             }
           ]
         }
@@ -216,9 +348,16 @@
           "$ref": "#/$defs/locator"
         },
         "option": {
-          "type": "string",
-          "minLength": 1,
-          "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+          "oneOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+            },
+            {
+              "$ref": "#/$defs/valueReference"
+            }
+          ]
         }
       },
       "required": [
@@ -273,8 +412,82 @@
             "ArrowUp",
             "ArrowDown",
             "ArrowLeft",
-            "ArrowRight"
+            "ArrowRight",
+            "a",
+            "b",
+            "c",
+            "d",
+            "e",
+            "f",
+            "g",
+            "h",
+            "i",
+            "j",
+            "k",
+            "l",
+            "m",
+            "n",
+            "o",
+            "p",
+            "q",
+            "r",
+            "s",
+            "t",
+            "u",
+            "v",
+            "w",
+            "x",
+            "y",
+            "z",
+            "0",
+            "1",
+            "2",
+            "3",
+            "4",
+            "5",
+            "6",
+            "7",
+            "8",
+            "9",
+            "Backquote",
+            "Minus",
+            "Equal",
+            "BracketLeft",
+            "BracketRight",
+            "Backslash",
+            "Semicolon",
+            "Quote",
+            "Comma",
+            "Period",
+            "Slash",
+            "F1",
+            "F2",
+            "F3",
+            "F4",
+            "F5",
+            "F6",
+            "F7",
+            "F8",
+            "F9",
+            "F10",
+            "F11",
+            "F12"
           ]
+        },
+        "modifiers": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "Alt",
+              "Control",
+              "Meta",
+              "Shift",
+              "ControlOrMeta"
+            ]
+          },
+          "minItems": 1,
+          "maxItems": 4,
+          "uniqueItems": true
         }
       },
       "required": [
@@ -317,9 +530,16 @@
           ]
         },
         "expectText": {
-          "type": "string",
-          "minLength": 1,
-          "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+          "oneOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+            },
+            {
+              "$ref": "#/$defs/valueReference"
+            }
+          ]
         }
       },
       "required": [
@@ -410,6 +630,43 @@
       ],
       "additionalProperties": false
     },
+    "rememberStep": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "remember"
+        },
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z][A-Za-z0-9]{0,63}$"
+        },
+        "from": {
+          "type": "object",
+          "properties": {
+            "element": {
+              "$ref": "#/$defs/locator"
+            },
+            "read": {
+              "enum": [
+                "text",
+                "value"
+              ]
+            }
+          },
+          "required": [
+            "element",
+            "read"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "type",
+        "name",
+        "from"
+      ],
+      "additionalProperties": false
+    },
     "locator": {
       "oneOf": [
         {
@@ -448,9 +705,31 @@
               ]
             },
             "name": {
-              "type": "string",
-              "minLength": 1,
-              "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+              "oneOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+                },
+                {
+                  "$ref": "#/$defs/valueReference"
+                }
+              ]
+            },
+            "position": {
+              "oneOf": [
+                {
+                  "enum": [
+                    "first",
+                    "last"
+                  ]
+                },
+                {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1000
+                }
+              ]
             }
           },
           "required": [
@@ -467,9 +746,31 @@
               "const": "label"
             },
             "label": {
-              "type": "string",
-              "minLength": 1,
-              "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+              "oneOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+                },
+                {
+                  "$ref": "#/$defs/valueReference"
+                }
+              ]
+            },
+            "position": {
+              "oneOf": [
+                {
+                  "enum": [
+                    "first",
+                    "last"
+                  ]
+                },
+                {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1000
+                }
+              ]
             }
           },
           "required": [
@@ -485,9 +786,31 @@
               "const": "text"
             },
             "text": {
-              "type": "string",
-              "minLength": 1,
-              "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+              "oneOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+                },
+                {
+                  "$ref": "#/$defs/valueReference"
+                }
+              ]
+            },
+            "position": {
+              "oneOf": [
+                {
+                  "enum": [
+                    "first",
+                    "last"
+                  ]
+                },
+                {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1000
+                }
+              ]
             }
           },
           "required": [
@@ -503,10 +826,36 @@
               "const": "testId"
             },
             "testId": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64,
+                  "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+                },
+                {
+                  "$ref": "#/$defs/valueReference"
+                }
+              ]
+            },
+            "attribute": {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 64,
-              "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+              "minLength": 1
+            },
+            "position": {
+              "oneOf": [
+                {
+                  "enum": [
+                    "first",
+                    "last"
+                  ]
+                },
+                {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1000
+                }
+              ]
             }
           },
           "required": [
@@ -552,9 +901,16 @@
               ]
             },
             "value": {
-              "type": "string",
-              "minLength": 1,
-              "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+              "oneOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+                },
+                {
+                  "$ref": "#/$defs/valueReference"
+                }
+              ]
             }
           },
           "required": [
@@ -621,6 +977,24 @@
             "value"
           ],
           "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "urlPathStartsWith"
+            },
+            "value": {
+              "type": "string",
+              "maxLength": 2048,
+              "pattern": "^/[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+            }
+          },
+          "required": [
+            "kind",
+            "value"
+          ],
+          "additionalProperties": false
         }
       ]
     },
@@ -629,6 +1003,111 @@
       "minLength": 1,
       "maxLength": 2048,
       "pattern": "^(/|https?://)"
+    },
+    "pathTemplate": {
+      "type": "object",
+      "properties": {
+        "segments": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "^[^/?#\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+              },
+              {
+                "$ref": "#/$defs/valueReference"
+              }
+            ]
+          },
+          "minItems": 1,
+          "maxItems": 32
+        },
+        "query": {
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^[A-Za-z0-9_.-]{1,64}$"
+          },
+          "additionalProperties": {
+            "oneOf": [
+              {
+                "type": "string",
+                "minLength": 0,
+                "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+              },
+              {
+                "$ref": "#/$defs/valueReference"
+              }
+            ]
+          }
+        }
+      },
+      "required": [
+        "segments"
+      ],
+      "additionalProperties": false
+    },
+    "valueReference": {
+      "type": "object",
+      "properties": {
+        "valueName": {
+          "type": "string",
+          "pattern": "^[a-z][A-Za-z0-9]{0,63}$"
+        }
+      },
+      "required": [
+        "valueName"
+      ],
+      "additionalProperties": false
+    },
+    "multiLineText": {
+      "type": "object",
+      "properties": {
+        "lines": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "type": "string",
+                "minLength": 0,
+                "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+              },
+              {
+                "$ref": "#/$defs/valueReference"
+              }
+            ]
+          },
+          "minItems": 1
+        }
+      },
+      "required": [
+        "lines"
+      ],
+      "additionalProperties": false
+    },
+    "relativeDay": {
+      "type": "object",
+      "properties": {
+        "from": {
+          "enum": [
+            "today",
+            "startOfWeek",
+            "startOfMonth",
+            "startOfNextMonth"
+          ]
+        },
+        "addDays": {
+          "type": "integer",
+          "minimum": -3660,
+          "maximum": 3660
+        }
+      },
+      "required": [
+        "from",
+        "addDays"
+      ],
+      "additionalProperties": false
     }
   }
 }

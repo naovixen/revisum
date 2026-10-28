@@ -1,9 +1,10 @@
 // Runs the coverage study: reads the sampled test intents in docs/coverage-study/intents.json,
 // checks each with the engine's assessCoverage (an intent marked expressible counts only if its
-// plan parses) and writes docs/coverage-study/report.md. It is run by hand when the study
-// changes, not by `npm run check`.
+// plan parses, with its suite's project when the file gives one) and writes
+// docs/coverage-study/report.md, with the expressible share of each sample and of both. It is run
+// by hand when the study changes, not by `npm run check`.
 //   node tools/coverage-study.ts
-// See docs/specs/SPEC-01-plan-language-and-parser.md.
+// See docs/specs/SPEC-01-plan-language-and-parser.md and docs/specs/SPEC-30-plan-values-positions-and-keys.md.
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { loadEngineFunction } from './engine-loader.ts';
@@ -13,7 +14,7 @@ const REPORT_PATH = 'docs/coverage-study/report.md';
 // The MVP plan stops the plan language if it expresses less than this share of sampled intents.
 const KILL_THRESHOLD = 0.7;
 
-// The stand-in project the study's plans are parsed against: one Chromium target, and paths
+// The stand-in project for suites the study file gives no project of their own: one Chromium target, and paths
 // relative to the app under test. A study plan names the target "playwright-chromium". Plans sign
 // in with the test account's password as a secret reference, since a plan never holds a secret.
 const STUDY_PROJECT = {
@@ -25,24 +26,40 @@ const STUDY_PROJECT = {
   }],
 };
 
-type ReportedIntent = { readonly suite: string; readonly sourceUrl: string; readonly testName: string; readonly verdict: string; readonly reason: string };
+type ReportedIntent = {
+  readonly suite: string; readonly sample: string; readonly sourceUrl: string; readonly testName: string; readonly verdict: string;
+  readonly reason: string;
+};
+// Each sample's share; null for a sample with no intents.
+type SampleShares = { readonly original: number | null; readonly fresh: number | null };
+type Report = { readonly intents: readonly ReportedIntent[]; readonly expressibleShare: number; readonly bySample: SampleShares };
 
 const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> => typeof value === 'object' && value !== null && !Array.isArray(value);
 const textField = (record: Readonly<Record<string, unknown>>, name: string): string => String(record[name] ?? '');
 
+const shareOrNull = (value: unknown): number | null => {
+  if (value === null || typeof value === 'number') return value;
+  throw new Error('assessCoverage returned an unexpected share');
+};
+
 // Reads the engine's report back into plain fields, refusing anything that is not its shape.
-function readReport(value: unknown): { readonly intents: readonly ReportedIntent[]; readonly expressibleShare: number } {
-  if (!isRecord(value) || !Array.isArray(value['intents']) || typeof value['expressibleShare'] !== 'number') {
+function readReport(value: unknown): Report {
+  if (!isRecord(value) || !Array.isArray(value['intents']) || typeof value['expressibleShare'] !== 'number' || !isRecord(value['expressibleShareBySample'])) {
     throw new Error('assessCoverage returned an unexpected shape');
   }
+  const bySample = value['expressibleShareBySample'];
   const intents = value['intents'].map((intent): ReportedIntent => {
     if (!isRecord(intent)) throw new Error('assessCoverage returned an unexpected intent');
     return {
-      suite: textField(intent, 'suite'), sourceUrl: textField(intent, 'sourceUrl'), testName: textField(intent, 'testName'),
+      suite: textField(intent, 'suite'), sample: textField(intent, 'sample'), sourceUrl: textField(intent, 'sourceUrl'),
+      testName: textField(intent, 'testName'),
       verdict: textField(intent, 'verdict'), reason: textField(intent, 'reason'),
     };
   });
-  return { intents, expressibleShare: value['expressibleShare'] };
+  return {
+    intents, expressibleShare: value['expressibleShare'],
+    bySample: { original: shareOrNull(bySample['original']), fresh: shareOrNull(bySample['fresh']) },
+  };
 }
 
 // A URL safe inside a Markdown link: brackets and spaces would end the link early.
@@ -52,25 +69,37 @@ const linkTarget = (url: string): string =>
 // Text for a Markdown table cell: pipes and line breaks would break the row.
 const cell = (text: string): string => text.replace(/\|/g, '\\|').replace(/\r?\n/g, ' ');
 
-function reportMarkdown(intents: readonly ReportedIntent[], expressibleShare: number): string {
+const percentOf = (share: number): string => `${(share * 100).toFixed(1)}%`;
+
+// One line per sample that has intents.
+function sampleLines(intents: readonly ReportedIntent[], bySample: SampleShares): string[] {
+  return (['original', 'fresh'] as const).flatMap((sample) => {
+    const share = bySample[sample];
+    const count = intents.filter((intent) => intent.sample === sample).length;
+    return share === null ? [] : [`- The ${sample} sample: ${count} intents, ${percentOf(share)} expressible.`];
+  });
+}
+
+function reportMarkdown({ intents, expressibleShare, bySample }: Report): string {
   const suites = new Set(intents.map((intent) => intent.suite)).size;
   const expressible = intents.filter((intent) => intent.verdict === 'expressible').length;
-  const percent = (expressibleShare * 100).toFixed(1);
+  const percent = percentOf(expressibleShare);
   return [
     '# Coverage study',
     '',
     '## In short',
     '',
-    `- ${intents.length} test intents from ${suites} suites; ${expressible} expressible in the plan language (${percent}%).`,
+    `- ${intents.length} test intents from ${suites} suites; ${expressible} expressible in the plan language (${percent}).`,
+    ...sampleLines(intents, bySample),
     `- The MVP plan's kill criterion is ${KILL_THRESHOLD * 100}% expressible: ${expressibleShare >= KILL_THRESHOLD ? 'met' : 'not met'}.`,
     '- An intent marked expressible counts only when its plan passes the plan parser.',
     `- Generated by \`node tools/coverage-study.ts\` from \`${STUDY_PATH}\`. Do not edit by hand.`,
     '',
     '## Intents',
     '',
-    '| Suite | Test | Verdict | Reason |',
-    '|---|---|---|---|',
-    ...intents.map((intent) => `| ${cell(intent.suite)} | [${cell(intent.testName)}](${linkTarget(intent.sourceUrl)}) | ${intent.verdict} | ${cell(intent.reason)} |`),
+    '| Suite | Sample | Test | Verdict | Reason |',
+    '|---|---|---|---|---|',
+    ...intents.map((intent) => `| ${cell(intent.suite)} | ${intent.sample} | [${cell(intent.testName)}](${linkTarget(intent.sourceUrl)}) | ${intent.verdict} | ${cell(intent.reason)} |`),
     '',
   ].join('\n');
 }
@@ -89,7 +118,7 @@ async function main(root: string): Promise<number> {
     return 1;
   }
   const report = readReport(outcome['value']);
-  writeFileSync(join(root, REPORT_PATH), reportMarkdown(report.intents, report.expressibleShare));
+  writeFileSync(join(root, REPORT_PATH), reportMarkdown(report));
   console.log(`coverage study: wrote ${REPORT_PATH}; ${(report.expressibleShare * 100).toFixed(1)}% expressible`);
   return 0;
 }

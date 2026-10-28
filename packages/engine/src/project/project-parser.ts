@@ -2,9 +2,9 @@
 // fixture files a plan may refer to, and the policy the policy gate applies, written by a person. AI output never reaches this type. The
 // person declares every target; the engine never invents one.
 import {
-  COLOR_SCHEMES, DEVICE_PROFILES, ENGINES, MOTION_PREFERENCES, success, failure,
+  COLOR_SCHEMES, DEFAULT_TEST_ID_ATTRIBUTE, DEVICE_PROFILES, ENGINES, MOTION_PREFERENCES, success, failure,
   type Brand, type DeviceProfileId, type FixtureName, type IrreversiblePatterns, type Locale, type Origin, type Result,
-  type SafeText, type SecretName, type Target, type TimeZone,
+  type EmailDomain, type SafeText, type SecretName, type Target, type TestIdAttribute, type TimeZone,
 } from '@revisum/contracts';
 import { brand } from '../brand.ts';
 import {
@@ -21,9 +21,14 @@ export type Limits = {
   readonly stepTimeoutMilliseconds: number;
   // How deeply frame steps may nest: a frame inside a frame has depth 2.
   readonly maximumFrameDepth: number;
+  // How many lines a multi-line fill may have, and how many characters in all, counting the
+  // line breaks between its lines.
+  readonly maximumFillLines: number;
+  readonly maximumFillCharacters: number;
 };
 export const DEFAULT_LIMITS: Limits = {
   maximumPlanBytes: 64 * 1024, maximumSteps: 100, maximumTextLength: 500, stepTimeoutMilliseconds: 5000, maximumFrameDepth: 3,
+  maximumFillLines: 50, maximumFillCharacters: 4000,
 };
 // The limits the plan parser checks before it walks a plan, so an oversized plan costs nothing to reject.
 export type PlanLimits = Pick<Limits, 'maximumPlanBytes' | 'maximumSteps' | 'maximumFrameDepth'>;
@@ -60,6 +65,11 @@ export type ProjectData = {
   // Files in the project's fixtures folder that an upload step may send, by file name.
   readonly fixtures: readonly FixtureName[];
   readonly policy: ProjectPolicy;
+  // The attributes a testId locator may match. A locator names one with `attribute`; without
+  // one it matches data-testid. The driver compares the attribute's value by exact equality.
+  readonly testIdAttributes: readonly TestIdAttribute[];
+  // The domains a generated unique email address may use; the first is the default.
+  readonly generatedEmailDomains: readonly EmailDomain[];
 };
 export type Project = Brand<ProjectData, 'Project'>;
 
@@ -67,6 +77,15 @@ export type Project = Brand<ProjectData, 'Project'>;
 const SECRET_NAME = /^[A-Za-z_][A-Za-z0-9_]{0,127}$/;
 // A plain file name with no folder part, so an upload can never reach outside the fixtures folder.
 const FIXTURE_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
+// "id", or a data- attribute of lowercase words joined by single hyphens, such as data-test-id.
+// Attributes with a meaning of their own (class, style, href, event handlers) are never test ids.
+const TEST_ID_ATTRIBUTE = /^(id|data-[a-z0-9]+(-[a-z0-9]+)*)$/;
+// A lowercase domain name of at least two labels, such as example.com.
+const EMAIL_DOMAIN = /^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]([a-z0-9-]{0,61}[a-z0-9])?$/;
+const DEFAULT_EMAIL_DOMAIN = 'example.com';
+// What a project that declares no test-id attributes allows, and what a testId locator without
+// an attribute matches.
+export const DEFAULT_TEST_ID_ATTRIBUTES: readonly TestIdAttribute[] = [brand<string, 'TestIdAttribute'>(DEFAULT_TEST_ID_ATTRIBUTE)];
 
 // A lowercase id such as a target or adapter id.
 export function readId<Name extends string>(input: unknown, path: string, issues: Issues): Parsed<Brand<string, Name>> {
@@ -121,7 +140,10 @@ function readTarget(input: unknown, path: string, issues: Issues): Parsed<Target
   return { id, adapter, engine, device, locale, timezone, colorScheme, reducedMotion };
 }
 
-const LIMIT_KEYS = ['maximumPlanBytes', 'maximumSteps', 'maximumTextLength', 'stepTimeoutMilliseconds', 'maximumFrameDepth'] as const;
+const LIMIT_KEYS = [
+  'maximumPlanBytes', 'maximumSteps', 'maximumTextLength', 'stepTimeoutMilliseconds', 'maximumFrameDepth',
+  'maximumFillLines', 'maximumFillCharacters',
+] as const;
 
 function readLimits(input: unknown, path: string, issues: Issues): Parsed<Limits> {
   if (input === undefined) return DEFAULT_LIMITS;
@@ -131,11 +153,16 @@ function readLimits(input: unknown, path: string, issues: Issues): Parsed<Limits
     fields[key] === undefined ? DEFAULT_LIMITS[key] : readInteger(fields[key], `${path}.${key}`, issues, 1, highest);
   const parts = [
     pick('maximumPlanBytes', 1 << 20), pick('maximumSteps', 1000), pick('maximumTextLength', 4000),
-    pick('stepTimeoutMilliseconds', 60_000), pick('maximumFrameDepth', 16),
+    pick('stepTimeoutMilliseconds', 60_000), pick('maximumFrameDepth', 16), pick('maximumFillLines', 500),
+    pick('maximumFillCharacters', 20_000),
   ] as const;
   if (!allValid(parts)) return INVALID;
-  const [maximumPlanBytes, maximumSteps, maximumTextLength, stepTimeoutMilliseconds, maximumFrameDepth] = parts;
-  return { maximumPlanBytes, maximumSteps, maximumTextLength, stepTimeoutMilliseconds, maximumFrameDepth };
+  const [
+    maximumPlanBytes, maximumSteps, maximumTextLength, stepTimeoutMilliseconds, maximumFrameDepth, maximumFillLines, maximumFillCharacters,
+  ] = parts;
+  return {
+    maximumPlanBytes, maximumSteps, maximumTextLength, stepTimeoutMilliseconds, maximumFrameDepth, maximumFillLines, maximumFillCharacters,
+  };
 }
 
 // An optional list of distinct names that each match `pattern`. Absent means none are declared.
@@ -153,6 +180,17 @@ function readNameList<Name extends string>(
   });
   if (!allValid(names)) return INVALID;
   if (new Set(names).size !== names.length) { issues.push({ code: 'duplicate', path }); return INVALID; }
+  return names;
+}
+
+// An optional, non-empty list of distinct names; absent means `fallback`. An empty list would
+// leave nothing to match, so it is refused rather than read as "the default".
+function readNameListOr<Name extends string>(
+  input: unknown, path: string, issues: Issues, pattern: RegExp, fallback: string,
+): Parsed<readonly Brand<string, Name>[]> {
+  if (input === undefined) return [brand<string, Name>(fallback)];
+  const names = readNameList<Name>(input, path, issues, pattern);
+  if (names !== INVALID && names.length === 0) { issues.push({ code: 'empty', path }); return INVALID; }
   return names;
 }
 
@@ -254,7 +292,9 @@ function readPolicy(input: unknown, path: string, issues: Issues, limits: Parsed
 export function parseProject(input: unknown): Result<Project, readonly PlanError[]> {
   const issues: Issues = [];
   const fields = readRecord(
-    input, '$', issues, ['origins', 'productionOrigins', 'matrix', 'limits', 'secretNames', 'fixtures', 'policy'], ['origins', 'matrix'],
+    input, '$', issues,
+    ['origins', 'productionOrigins', 'matrix', 'limits', 'secretNames', 'fixtures', 'policy', 'testIdAttributes', 'generatedEmailDomains'],
+    ['origins', 'matrix'],
   );
   if (fields === INVALID) return failure(issues);
   const rawOrigins = readList(fields['origins'], '$.origins', issues, 32);
@@ -266,6 +306,12 @@ export function parseProject(input: unknown): Result<Project, readonly PlanError
   const origins = rawOrigins === INVALID ? [] : rawOrigins.map((origin, index) => readOrigin(origin, `$.origins[${index}]`, issues));
   const productionOrigins = readProductionOrigins(fields['productionOrigins'], issues);
   const policy = readPolicy(fields['policy'], '$.policy', issues, limits);
+  const testIdAttributes = readNameListOr<'TestIdAttribute'>(
+    fields['testIdAttributes'], '$.testIdAttributes', issues, TEST_ID_ATTRIBUTE, DEFAULT_TEST_ID_ATTRIBUTE,
+  );
+  const generatedEmailDomains = readNameListOr<'EmailDomain'>(
+    fields['generatedEmailDomains'], '$.generatedEmailDomains', issues, EMAIL_DOMAIN, DEFAULT_EMAIL_DOMAIN,
+  );
   const matrix = rawMatrix === INVALID ? [] : rawMatrix.map((target, index) => readTarget(target, `$.matrix[${index}]`, issues));
   const seen = new Set<string>();
   matrix.forEach((target, index) => {
@@ -274,6 +320,9 @@ export function parseProject(input: unknown): Result<Project, readonly PlanError
     seen.add(target.id);
   });
   if (issues.length > 0 || limits === INVALID || secretNames === INVALID || fixtures === INVALID
-    || productionOrigins === INVALID || policy === INVALID || !allValid(origins) || !allValid(matrix)) return failure(issues);
-  return success(brand<ProjectData, 'Project'>({ origins, productionOrigins, matrix, limits, secretNames, fixtures, policy }));
+    || productionOrigins === INVALID || policy === INVALID || testIdAttributes === INVALID || generatedEmailDomains === INVALID
+    || !allValid(origins) || !allValid(matrix)) return failure(issues);
+  return success(brand<ProjectData, 'Project'>({
+    origins, productionOrigins, matrix, limits, secretNames, fixtures, policy, testIdAttributes, generatedEmailDomains,
+  }));
 }

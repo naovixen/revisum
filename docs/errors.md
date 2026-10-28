@@ -7,7 +7,7 @@
 - Plan codes use underscores (`unknown_step`); every other union uses hyphens (`not-found`).
 - Each code says what was refused and what to do. Errors carry a code and a location, never the offending value, so private or hostile text is never echoed back.
 
-Plan errors (`PlanErrorCode`, from the plan parser in `engine`) come first, then driver, runner, review recorder, event sink, command-line, approval, trust, policy and run refusal errors.
+Plan errors (`PlanErrorCode`, from the plan parser in `engine`) come first, then step errors (`StepErrorCode`, decided by the engine at run time), then driver, runner, review recorder, event sink, command-line, approval, trust, policy and run refusal errors.
 
 ## not_object
 
@@ -65,11 +65,11 @@ Plan error. A text value is longer than allowed.
 
 ## duplicate
 
-Plan error. A target is listed twice, or two capture steps share a name.
+Plan error. A target is listed twice, two capture steps share a name, a run value is defined twice (in `values` and by a `remember` step, or by two `remember` steps), or a `press` step holds the same modifier twice.
 
 ## version_unsupported
 
-Plan error. The plan's `version` is not one this engine reads. A current plan declares `"1.1"`. A version 1 plan is accepted only through `migratePlan`, which adds a criterion id to each assertion; a plan for a newer version is refused rather than run with parts skipped.
+Plan error. The plan's `version` is not one this engine reads. A current plan declares `"1.2"`, and a plan declaring `"1.1"` still parses exactly as it did. A version 1 plan is accepted only through `migratePlan`, which adds a criterion id to each assertion; a plan for a newer version is refused rather than run with parts skipped.
 
 ## empty
 
@@ -83,9 +83,29 @@ Plan error. A check would pass on anything, or proves nothing traceable: a plan 
 
 Plan error. The plan holds a secret instead of naming one: literal text filled into a field whose locator names a password, passcode, token, secret or API key (or the German or French word for one), text shaped like a credential anywhere in the plan (a JSON Web Token, a `Bearer` value, or a key with a known prefix such as `ghp_`, `sk-` or `AKIA`), or saved storage state written into `storageState` itself. The error gives the path, never the text. Declare the secret's name in the project's `secretNames`, put its value in the secret store (a CI secret of the same name), and write `{ "secretName": "…" }` in the plan.
 
+## undefined_value
+
+Plan error. A value reference `{ "valueName": … }` names a value nothing defines before it: neither the plan's `values` nor a `remember` step earlier in the plan (inside or outside a frame). A `remember` step's own locator cannot use the name it defines. The error sits on the reference and never repeats the name. Define the value first, or fix the name.
+
+## position_not_allowed
+
+Plan error. A `countEquals` or `absent` check uses a locator with a `position`. A position picks one element of the matches, so a count of the matches would prove nothing. Remove the position, or check `visible` or `hidden` on the positioned element instead.
+
 ## no_criterion_id
 
 Migration error. A version 1 plan has an assertion with no entry in the criterion mapping, so the migration cannot say which acceptance criterion it checks. Add the criterion id to the mapping, keyed by the assertion step's JSON path, such as `$.steps[3]`.
+
+## value-empty
+
+Step error. A run value used by the step is empty where text is needed, or has no text yet. The step fails at run time, before anything is sent to the page, and every later step is skipped.
+
+## value-unsafe
+
+Step error. A run value used by the step breaks the safe-text rules, or is `""`, `.` or `..` where a path template uses it as a segment, which would drop or climb a segment. The step fails before any navigation or input.
+
+## value-too-long
+
+Step error. A run value used by the step is longer than the project's `maximumTextLength`. The step fails before anything is sent to the page. Shorten the value's prefix, or raise the limit in the trusted project.
 
 ## not-found
 

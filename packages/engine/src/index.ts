@@ -32,5 +32,6 @@ export * from './manifest.ts';
 export * from './oracle.ts';
 export * as lifecycle from './lifecycle.ts';
 export * from './run.ts';
+export { generateValue, resolvePlanClock, type RunValues, type StepErrorCode } from './run-values.ts';
 export * from './ai-planning.ts';
 export * from './release-notes.ts';

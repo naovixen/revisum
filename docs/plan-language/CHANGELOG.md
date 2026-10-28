@@ -2,6 +2,26 @@
 
 Newest entry first. Each entry names the sha256 of `plan.schema.json` as it stood after the change, and `npm run lint` fails when the newest entry does not name the committed schema's hash, so the schema cannot change without an entry here. Regenerate the schema with `node tools/check-plan-schema.ts --write`, which prints the hash to record.
 
+## 1.2 (unreleased)
+
+Schema sha256: `2b903aa97d10d0d7dda76f97ce532bc940a58825b1eb2956c4e48f1ff1e75c55`
+
+This is the one 1.2 entry: SPEC-31, SPEC-32 and SPEC-33 add their bullets here and replace the hash above with the schema's new one. It is dated when the last of their parser parts lands.
+
+- A plan declares `"version": "1.2"` to use the features below. A plan declaring `"1.1"` parses exactly as before: 1.1 is a subset of 1.2, and a 1.2 field or step in a `"1.1"` plan is refused with the code a 1.1 parser gives (`unknown_field`, `unknown_step`, `unknown_value` or `wrong_type`). `migratePlan` still outputs a 1.1 plan.
+- **Run values.** New optional top-level `values`: named values generated for each run, from the run's seed and clock start: `uniqueText` (prefix, "-", 10 base-36 characters), `uniqueEmail` (on a domain the project declares in `generatedEmailDomains`, default `example.com`), `uniqueNumber` (4 to 12 digits) and `date` (a day relative to `today`, `startOfWeek`, `startOfMonth` or `startOfNextMonth`, in the target's time zone, written as `yearMonthDay`, `dayOfMonth`, `monthAndYear`, `longDate`, `weekday`, `timestamp` or `epochMilliseconds`).
+- **Remembered values.** New step `remember`: `{ "name", "from": { "element": <locator>, "read": "text" | "value" } }`. Runs report it as `unsupported-step` until the CDP driver reads it through the prober.
+- **Value references.** `{ "valueName": … }` may stand where a plan writes text for the page: fill values and lines, select options, locator names, labels, texts and test ids, text assertions' expected values, `dialog` expected text, and path-template segments and query values. Anywhere else it is refused. A reference to a value not yet defined is refused with the new plan error `undefined_value`; a name defined twice with `duplicate`.
+- **Path templates.** `navigate` may take `{ "segments": […], "query": {…} }`: a path on the run's base URL, each value percent-encoded as a whole segment or query value. Literal segments holding `/`, `?` or `#` are refused (`unknown_value`), and `.` or `..` too (`invalid_url`). At run time a value of `""`, `.` or `..` fails the step with `value-unsafe` before any navigation.
+- **Plan clock.** New optional top-level `clock`: `{ "day": <relative day>, "time": "HH:MM" }` sets the page's frozen clock in the target's time zone. The manifest keeps the run's own clock start.
+- **Positions.** Every locator takes an optional `position`: `first`, `last` or 1 to 1000, in document order. `countEquals` and `absent` on a positioned locator are refused with the new plan error `position_not_allowed`.
+- **Declared test-id attributes.** A `testId` locator may name `attribute`, one of the project's `testIdAttributes` (default `data-testid`; each `id` or `data-…`).
+- **Key chords and more keys.** `press` takes optional `modifiers` (1 to 4 distinct of `Alt`, `Control`, `Meta`, `Shift`, `ControlOrMeta`). New keys: `a` to `z`, `0` to `9`, `Backquote`, `Minus`, `Equal`, `BracketLeft`, `BracketRight`, `Backslash`, `Semicolon`, `Quote`, `Comma`, `Period`, `Slash` and `F1` to `F12`. The policy gate judges Enter or Space with modifiers as without them.
+- **Multi-line text.** A `fill` value may be `{ "lines": […] }`, joined with line feeds, within the project's new `limits.maximumFillLines` (default 50) and `limits.maximumFillCharacters` (default 4000, line breaks included).
+- **URL prefix.** New page assertion `urlPathStartsWith`, whose value starts with `/`.
+- New run-time step errors decided by the engine: `value-empty`, `value-unsafe` and `value-too-long`.
+- Until the CDP driver supports them, runs report positions, test-id attributes other than `data-testid`, key chords, multi-line fills and `remember` as failed with `unsupported-step`, with nothing sent to the page.
+
 ## 1.1 (2026-10-28, secrets)
 
 Schema sha256: `a8de4ce560a15ff02b1e6eaec657d2e4465efa825a956a5b8ef33bb15e07e6bc`

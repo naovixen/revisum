@@ -17,6 +17,13 @@ const COMMAND_TIMEOUT_MILLISECONDS = 30_000;
 const LOCAL_SCHEMES = ['data:', 'about:', 'blob:', 'chrome-error:'];
 
 type KeyDefinition = { readonly key: string; readonly code: string; readonly keyCode: number; readonly text?: string };
+// Letters, digits and function keys follow the US keyboard layout's key codes, as Chromium expects.
+const letterKey = (letter: string): KeyDefinition =>
+  ({ key: letter, code: `Key${letter.toUpperCase()}`, keyCode: letter.toUpperCase().charCodeAt(0), text: letter });
+const digitKey = (digit: string): KeyDefinition => ({ key: digit, code: `Digit${digit}`, keyCode: digit.charCodeAt(0), text: digit });
+const FIRST_FUNCTION_KEY_CODE = 112;
+const functionKey = (number: number): KeyDefinition =>
+  ({ key: `F${number}`, code: `F${number}`, keyCode: FIRST_FUNCTION_KEY_CODE + number - 1 });
 const KEY_DEFINITIONS: { readonly [Name in Key]: KeyDefinition } = {
   Enter: { key: 'Enter', code: 'Enter', keyCode: 13, text: '\r' },
   Tab: { key: 'Tab', code: 'Tab', keyCode: 9 },
@@ -32,6 +39,25 @@ const KEY_DEFINITIONS: { readonly [Name in Key]: KeyDefinition } = {
   ArrowDown: { key: 'ArrowDown', code: 'ArrowDown', keyCode: 40 },
   ArrowLeft: { key: 'ArrowLeft', code: 'ArrowLeft', keyCode: 37 },
   ArrowRight: { key: 'ArrowRight', code: 'ArrowRight', keyCode: 39 },
+  'a': letterKey('a'), 'b': letterKey('b'), 'c': letterKey('c'), 'd': letterKey('d'), 'e': letterKey('e'), 'f': letterKey('f'), 'g': letterKey('g'),
+  'h': letterKey('h'), 'i': letterKey('i'), 'j': letterKey('j'), 'k': letterKey('k'), 'l': letterKey('l'), 'm': letterKey('m'), 'n': letterKey('n'),
+  'o': letterKey('o'), 'p': letterKey('p'), 'q': letterKey('q'), 'r': letterKey('r'), 's': letterKey('s'), 't': letterKey('t'), 'u': letterKey('u'),
+  'v': letterKey('v'), 'w': letterKey('w'), 'x': letterKey('x'), 'y': letterKey('y'), 'z': letterKey('z'),
+  '0': digitKey('0'), '1': digitKey('1'), '2': digitKey('2'), '3': digitKey('3'), '4': digitKey('4'),
+  '5': digitKey('5'), '6': digitKey('6'), '7': digitKey('7'), '8': digitKey('8'), '9': digitKey('9'),
+  Backquote: { key: '`', code: 'Backquote', keyCode: 192, text: '`' },
+  Minus: { key: '-', code: 'Minus', keyCode: 189, text: '-' },
+  Equal: { key: '=', code: 'Equal', keyCode: 187, text: '=' },
+  BracketLeft: { key: '[', code: 'BracketLeft', keyCode: 219, text: '[' },
+  BracketRight: { key: ']', code: 'BracketRight', keyCode: 221, text: ']' },
+  Backslash: { key: '\\', code: 'Backslash', keyCode: 220, text: '\\' },
+  Semicolon: { key: ';', code: 'Semicolon', keyCode: 186, text: ';' },
+  Quote: { key: '\'', code: 'Quote', keyCode: 222, text: '\'' },
+  Comma: { key: ',', code: 'Comma', keyCode: 188, text: ',' },
+  Period: { key: '.', code: 'Period', keyCode: 190, text: '.' },
+  Slash: { key: '/', code: 'Slash', keyCode: 191, text: '/' },
+  'F1': functionKey(1), 'F2': functionKey(2), 'F3': functionKey(3), 'F4': functionKey(4), 'F5': functionKey(5), 'F6': functionKey(6),
+  'F7': functionKey(7), 'F8': functionKey(8), 'F9': functionKey(9), 'F10': functionKey(10), 'F11': functionKey(11), 'F12': functionKey(12),
 };
 // Chromium-internal roles mapped to ARIA roles, and structural roles left out of snapshots.
 const ROLE_NAMES: Readonly<Record<string, string>> = { RootWebArea: 'document', image: 'img', LabelText: 'label' };

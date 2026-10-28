@@ -2,8 +2,8 @@
 // stays until the own drivers pass the capability contract tests.
 // See docs/decisions/browser-and-audit-dependencies.md.
 import {
-  determinismScript, deviceProfile, failure, reveal, success,
-  type ActionStep, type BrowserDriver, type DriverError, type ElementProbe, type Key, type Locator,
+  determinismScript, deviceProfile, failure, literalActionStep, performableLocator, reveal, success,
+  type ActionStep, type BrowserDriver, type DriverError, type ElementProbe, type Key, type ResolvedLocator,
   type Result, type Secret, type Session, type SessionEnvironment, type Target,
 } from '@revisum/contracts';
 import { readFileSync } from 'node:fs';
@@ -15,11 +15,9 @@ import { accessibilitySnapshot, probeElement } from './in-page.ts';
 const requireFromHere = createRequire(import.meta.url);
 const PLAYWRIGHT_VERSION = (JSON.parse(readFileSync(requireFromHere.resolve('playwright-core/package.json'), 'utf8')) as { version: string }).version;
 const ENGINES = { chromium, firefox, webkit } as const;
-const KEY_NAMES: { readonly [Name in Key]: string } = {
-  Enter: 'Enter', Tab: 'Tab', Escape: 'Escape', Space: 'Space', Backspace: 'Backspace', Delete: 'Delete',
-  Home: 'Home', End: 'End', PageUp: 'PageUp', PageDown: 'PageDown',
-  ArrowUp: 'ArrowUp', ArrowDown: 'ArrowDown', ArrowLeft: 'ArrowLeft', ArrowRight: 'ArrowRight',
-};
+// Every plan key is also a Playwright key name: named keys, letters, digits, the physical names of
+// punctuation keys (such as Backquote) and F1 to F12.
+const keyName = (key: Key): string => key;
 const NO_ELEMENT: ElementProbe = { count: 0, visible: false, enabled: false, text: '', value: null, sensitive: false, box: null };
 
 const errorText = (error: unknown): string => (error instanceof Error ? error.message : String(error)).slice(0, 200);
@@ -93,7 +91,10 @@ async function createSession(browser: Browser, target: Target, environment: Sess
     async act(step, _guard, secret) {
       return act(page, step, timeout, secret);
     },
-    async probe(locator) {
+    async probe(planLocator) {
+      // A value reference, a position or another test-id attribute matches nothing here yet.
+      const locator = performableLocator(planLocator);
+      if (locator === undefined) return NO_ELEMENT;
       const found = locate(page, locator);
       try {
         const count = await found.count();
@@ -124,7 +125,7 @@ async function createSession(browser: Browser, target: Target, environment: Sess
   };
 }
 
-function locate(page: Page, locator: Locator): PlaywrightLocator {
+function locate(page: Page, locator: ResolvedLocator): PlaywrightLocator {
   switch (locator.by) {
     case 'role': return page.getByRole(locator.role, { name: locator.name, exact: true });
     case 'label': return page.getByLabel(locator.label, { exact: true });
@@ -138,18 +139,22 @@ async function act(page: Page, step: ActionStep, timeout: number, secret: Secret
   if (step.type === 'hover' || step.type === 'select' || step.type === 'upload') {
     return failure({ code: 'not-actionable', detail: `this driver does not perform ${step.type} steps yet` });
   }
+  // Anything this driver cannot perform in full is refused before it touches the page.
+  const action = literalActionStep(step);
+  if (action === undefined) return failure({ code: 'not-actionable', detail: `this driver does not perform this ${step.type} step yet` });
   // A secret reference arrives with the secret the engine resolved for it. Without that secret
   // there is nothing to type, and typing nothing could pass a step that should fail.
-  if (step.type === 'fill' && typeof step.value !== 'string' && secret?.name !== step.value.secretName) {
+  if (action.type === 'fill' && typeof action.value !== 'string' && secret?.name !== action.value.secretName) {
     return failure({ code: 'not-actionable', detail: 'a secret reference reached the driver without its secret' });
   }
-  const found = locate(page, step.locator);
+  const found = locate(page, action.locator);
   try {
-    switch (step.type) {
+    switch (action.type) {
       case 'click': await found.click({ timeout }); break;
       // The secret is revealed here, as it is typed, and nowhere else in this driver.
-      case 'fill': await found.fill(typeof step.value === 'string' ? step.value : reveal(secret ?? missingSecret()), { timeout }); break;
-      case 'press': await found.press(KEY_NAMES[step.key], { timeout }); break;
+      case 'fill': await found.fill(typeof action.value === 'string' ? action.value : reveal(secret ?? missingSecret()), { timeout }); break;
+      case 'press': await found.press(keyName(action.key), { timeout }); break;
+      case 'hover': case 'select': case 'upload': break;
     }
     return success(undefined);
   } catch (error) {

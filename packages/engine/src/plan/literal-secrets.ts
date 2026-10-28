@@ -5,7 +5,7 @@
 //   - text anywhere in the plan shaped like a credential: a JSON Web Token, a "Bearer" header
 //     value, or a key with a well-known issuer prefix.
 // See docs/specs/SPEC-04-secrets-and-redaction.md.
-import type { Locator } from '@revisum/contracts';
+import { literalText, type Locator } from '@revisum/contracts';
 
 // Words that name a field holding a credential.
 const SENSITIVE_FIELD_WORDS: readonly RegExp[] = [
@@ -36,14 +36,11 @@ const CREDENTIAL_SHAPES: readonly RegExp[] = [
 
 export const looksLikeCredential = (text: string): boolean => CREDENTIAL_SHAPES.some((shape) => shape.test(text));
 
-// The text a locator finds its element by.
+// The text a locator finds its element by, as the plan writes it: a value reference has no text
+// until the run, so it names no field here.
 function locatorText(locator: Locator): string {
-  switch (locator.by) {
-    case 'role': return locator.name;
-    case 'label': return locator.label;
-    case 'text': return locator.text;
-    case 'testId': return locator.testId;
-  }
+  const text = locator.by === 'role' ? locator.name : locator.by === 'label' ? locator.label : locator.by === 'text' ? locator.text : locator.testId;
+  return literalText(text) ?? '';
 }
 
 export const namesSensitiveField = (locator: Locator): boolean =>

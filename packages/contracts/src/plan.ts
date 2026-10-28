@@ -1,17 +1,59 @@
 // The plan language: a closed, versioned union of steps. An AI or a person may propose a plan,
 // but only the engine's plan parser can produce the branded Plan that the interpreter accepts.
 // The types live here because drivers act on steps and locators; the parser lives in the engine.
-// See docs/specs/SPEC-01-plan-language-and-parser.md.
+// See docs/specs/SPEC-01-plan-language-and-parser.md and docs/specs/SPEC-30-plan-values-positions-and-keys.md.
 import type { Brand } from './brand.ts';
 import type { TargetId } from './target.ts';
 
-// The language version the running engine parses. A plan declares it as the text "1.1"; plans of
+// The language version the running engine parses. A plan declares it as text, "1.2" or "1.1":
+// 1.1 is a subset of 1.2, so a plan declaring "1.1" parses exactly as it always did. Plans of
 // version 1 reach the engine only through its migration, which adds what version 1 lacked.
-export const PLAN_VERSION = { major: 1, minor: 1 } as const;
+export const PLAN_VERSION = { major: 1, minor: 2 } as const;
 
 // Text that passed the engine's safety rules: no control or bidirectional-override characters
 // and nothing that looks like script.
 export type SafeText = Brand<string, 'SafeText'>;
+
+// ---- Run values -----------------------------------------------------------------------------
+// A plan may name values and use them where it would write literal text for the page. A
+// generated value derives from the run's seed and clock start; a remembered value is read from
+// the page by a remember step. Plans stay straight-line: there is no arithmetic or branching.
+
+// A run value's name, such as "orderCode": a lowercase letter, then letters and digits.
+export type ValueName = Brand<string, 'ValueName'>;
+export type ValueReference = { readonly valueName: ValueName };
+// Literal text, or a reference to a run value that the run replaces with its text.
+export type TextOrValue = SafeText | ValueReference;
+
+// Days a date value counts from, in the target's time zone. Weeks start on Monday.
+export const DATE_ANCHORS = ['today', 'startOfWeek', 'startOfMonth', 'startOfNextMonth'] as const;
+export type DateAnchor = (typeof DATE_ANCHORS)[number];
+// How a date value is written: yearMonthDay "2026-11-02"; dayOfMonth "2"; monthAndYear
+// "November 2026", longDate "2 November 2026" and weekday "Monday" in the target's locale;
+// timestamp "2026-11-02T00:00:00.000Z" and epochMilliseconds "1793577600000" (for a target in UTC),
+// both naming midnight at the start of that day in the target's time zone.
+export const DATE_FORMATS = ['yearMonthDay', 'dayOfMonth', 'monthAndYear', 'longDate', 'weekday', 'timestamp', 'epochMilliseconds'] as const;
+export type DateFormat = (typeof DATE_FORMATS)[number];
+// A day relative to an anchor. addDays is a whole number from -3660 to 3660.
+export type RelativeDay = { readonly from: DateAnchor; readonly addDays: number };
+
+// An email domain the trusted project declares in generatedEmailDomains.
+export type EmailDomain = Brand<string, 'EmailDomain'>;
+export const GENERATED_VALUE_KINDS = ['uniqueText', 'uniqueEmail', 'uniqueNumber', 'date'] as const;
+export type GeneratedValue =
+  // prefix, "-" and 10 base-36 characters.
+  | { readonly kind: 'uniqueText'; readonly prefix: SafeText }
+  // localPrefix, "-", 10 base-36 characters, "@" and the domain (by default the first declared one).
+  | { readonly kind: 'uniqueEmail'; readonly localPrefix: SafeText; readonly domain?: EmailDomain }
+  // 4 to 12 digits, never starting with 0.
+  | { readonly kind: 'uniqueNumber'; readonly digits: number }
+  | { readonly kind: 'date'; readonly day: RelativeDay; readonly format: DateFormat };
+
+// The page's frozen clock, relative to the run's clock start, in the target's time zone.
+// `time` is "HH:MM" on the 24-hour clock.
+export type PlanClock = { readonly day: RelativeDay; readonly time: string };
+
+// ---- Locators -------------------------------------------------------------------------------
 
 export const ROLES = [
   'alert', 'button', 'checkbox', 'combobox', 'dialog', 'heading', 'img', 'link', 'listitem',
@@ -20,19 +62,45 @@ export const ROLES = [
 ] as const;
 export type Role = (typeof ROLES)[number];
 
+// Which of several matching elements a locator picks, in document order: the first, the last,
+// or the nth (1 to 1000). A positioned locator resolves to at most one element.
+export const POSITION_WORDS = ['first', 'last'] as const;
+export type Position = (typeof POSITION_WORDS)[number] | number;
+// An attribute a testId locator may match: "id" or a data- attribute the project declares.
+export type TestIdAttribute = Brand<string, 'TestIdAttribute'>;
+
+// Role-first and name-first locators. There is no CSS or XPath: both are brittle and can encode
+// logic. `Text` is what the locator's text fields hold: in a plan, literal text or a value
+// reference; once the run has replaced every reference, only text.
+export type LocatorWith<Text> =
+  | { readonly by: 'role'; readonly role: Role; readonly name: Text; readonly position?: Position }
+  | { readonly by: 'label'; readonly label: Text; readonly position?: Position }
+  | { readonly by: 'text'; readonly text: Text; readonly position?: Position }
+  | { readonly by: 'testId'; readonly testId: Text; readonly attribute?: TestIdAttribute; readonly position?: Position };
+export type Locator = LocatorWith<TextOrValue>;
+// A locator whose value references the run has replaced with their text: what a driver receives.
+export type ResolvedLocator = LocatorWith<SafeText>;
+export const LOCATOR_KINDS = ['role', 'label', 'text', 'testId'] as const;
+
+// ---- Keys -----------------------------------------------------------------------------------
+
+// Held down, in the order written, while a key is pressed. ControlOrMeta is Meta on macOS and
+// iOS targets and Control on every other target.
+export const MODIFIERS = ['Alt', 'Control', 'Meta', 'Shift', 'ControlOrMeta'] as const;
+export type Modifier = (typeof MODIFIERS)[number];
+// The keys a press step may name: the 14 of language 1.1 first, then letters, digits,
+// punctuation keys (by their physical key name) and the function keys.
 export const KEYS = [
   'Enter', 'Space', 'Tab', 'Escape', 'Backspace', 'Delete', 'Home', 'End', 'PageUp', 'PageDown',
   'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
+  'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
+  '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+  'Backquote', 'Minus', 'Equal', 'BracketLeft', 'BracketRight', 'Backslash', 'Semicolon', 'Quote', 'Comma', 'Period', 'Slash',
+  'F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9', 'F10', 'F11', 'F12',
 ] as const;
 export type Key = (typeof KEYS)[number];
 
-// Role-first and name-first locators. There is no CSS or XPath: both are brittle and can encode logic.
-export type Locator =
-  | { readonly by: 'role'; readonly role: Role; readonly name: SafeText }
-  | { readonly by: 'label'; readonly label: SafeText }
-  | { readonly by: 'text'; readonly text: SafeText }
-  | { readonly by: 'testId'; readonly testId: SafeText };
-export const LOCATOR_KINDS = ['role', 'label', 'text', 'testId'] as const;
+// ---- Assertions -----------------------------------------------------------------------------
 
 // A closed set of assertions. What "passed" means is decided by the engine's oracle, never by a
 // driver or an AI. The kind names the check; `value` is what it compares against.
@@ -41,16 +109,21 @@ export const LOCATOR_KINDS = ['role', 'label', 'text', 'testId'] as const;
 export const ELEMENT_STATE_KINDS = ['visible', 'hidden', 'enabled', 'disabled', 'absent', 'checked', 'unchecked', 'focused'] as const;
 // Text checks compare against non-empty text: an empty expected text would match anything.
 export const ELEMENT_TEXT_KINDS = ['textEquals', 'textContains', 'valueEquals', 'valueContains'] as const;
-export type ElementAssertion =
+export type ElementAssertionWith<Text> =
   | { readonly kind: (typeof ELEMENT_STATE_KINDS)[number] }
-  | { readonly kind: (typeof ELEMENT_TEXT_KINDS)[number]; readonly value: SafeText }
+  | { readonly kind: (typeof ELEMENT_TEXT_KINDS)[number]; readonly value: Text }
   | { readonly kind: 'countEquals'; readonly value: number };
+export type ElementAssertion = ElementAssertionWith<TextOrValue>;
+// An element assertion whose expected text is final: what the oracle compares against.
+export type ResolvedElementAssertion = ElementAssertionWith<SafeText>;
 
 export const PAGE_TEXT_KINDS = ['urlPath', 'title'] as const;
 export type PageAssertion =
   | { readonly kind: (typeof PAGE_TEXT_KINDS)[number]; readonly value: SafeText }
   // The whole URL, compared after resolving it against the page's own URL.
-  | { readonly kind: 'url'; readonly value: AllowedUrl };
+  | { readonly kind: 'url'; readonly value: AllowedUrl }
+  // The page's path starts with this text, which starts with "/". A plain text prefix.
+  | { readonly kind: 'urlPathStartsWith'; readonly value: SafeText };
 
 // A URL path, or an absolute URL whose origin is on the project's allow-list.
 export type AllowedUrl = Brand<string, 'AllowedUrl'>;
@@ -64,25 +137,53 @@ export type FixtureName = Brand<string, 'FixtureName'>;
 export type SecretName = Brand<string, 'SecretName'>;
 export type SecretReference = { readonly secretName: SecretName };
 
+// Text of several lines for a fill, joined with line feeds and inserted as text, with no Enter
+// key press, so a chat box does not send early.
+export type MultiLineText = { readonly lines: readonly TextOrValue[] };
+// A path on the run's base URL, built from literal and value segments plus query values. Each
+// value is percent-encoded as one whole segment or query value, so no value can change the
+// origin or the number of segments. Literal segments hold no "/", "?" or "#", and are never "."
+// or ".."; query keys are letters, digits, "_", "." and "-".
+export type PathTemplate = {
+  readonly segments: readonly TextOrValue[];
+  readonly query?: Readonly<Record<string, TextOrValue>>;
+};
+// Where a remember step reads its value: one element's visible text or its input value.
+export const REMEMBER_READS = ['text', 'value'] as const;
+export type RememberSource = { readonly element: Locator; readonly read: (typeof REMEMBER_READS)[number] };
+
 export type Step =
-  | { readonly type: 'navigate'; readonly url: AllowedUrl }
+  // A URL, or a path template on the run's base URL.
+  | { readonly type: 'navigate'; readonly url: AllowedUrl | PathTemplate }
   | { readonly type: 'click'; readonly locator: Locator }
   | { readonly type: 'hover'; readonly locator: Locator }
-  | { readonly type: 'fill'; readonly locator: Locator; readonly value: SafeText | SecretReference }
-  | { readonly type: 'select'; readonly locator: Locator; readonly option: SafeText }
+  | { readonly type: 'fill'; readonly locator: Locator; readonly value: TextOrValue | SecretReference | MultiLineText }
+  | { readonly type: 'select'; readonly locator: Locator; readonly option: TextOrValue }
   | { readonly type: 'upload'; readonly locator: Locator; readonly fixture: FixtureName }
-  | { readonly type: 'press'; readonly locator: Locator; readonly key: Key }
+  // Modifiers, when given, are 1 to 4 distinct keys held down while the key is pressed.
+  | { readonly type: 'press'; readonly locator: Locator; readonly key: Key; readonly modifiers?: readonly Modifier[] }
   // Runs its steps inside the iframe the locator finds.
   | { readonly type: 'frame'; readonly locator: Locator; readonly steps: readonly Step[] }
   // Answers the next dialog the page opens, optionally checking its text first.
-  | { readonly type: 'dialog'; readonly action: 'accept' | 'dismiss'; readonly expectText?: SafeText }
+  | { readonly type: 'dialog'; readonly action: 'accept' | 'dismiss'; readonly expectText?: TextOrValue }
   | { readonly type: 'expect'; readonly locator: Locator; readonly assert: ElementAssertion; readonly criterionId: CriterionId }
   | { readonly type: 'expectPage'; readonly assert: PageAssertion; readonly criterionId: CriterionId }
   | { readonly type: 'a11yAudit'; readonly mode: 'report' | 'gate' }
-  | { readonly type: 'capture'; readonly name: CaptureName };
+  | { readonly type: 'capture'; readonly name: CaptureName }
+  // Reads a value from the page under `name`, for the steps after it to use.
+  | { readonly type: 'remember'; readonly name: ValueName; readonly from: RememberSource };
 export type StepType = Step['type'];
 // The steps that act on an element; the driver's ActionRunner port performs them.
 export type ActionStep = Extract<Step, { type: 'click' | 'hover' | 'fill' | 'select' | 'upload' | 'press' }>;
+// An action step with every value reference replaced by its text, as the engine hands it to a
+// driver. A multi-line fill has no resolved form until the CDP driver inserts lines of text.
+export type ResolvedActionStep =
+  | { readonly type: 'click'; readonly locator: ResolvedLocator }
+  | { readonly type: 'hover'; readonly locator: ResolvedLocator }
+  | { readonly type: 'fill'; readonly locator: ResolvedLocator; readonly value: SafeText | SecretReference }
+  | { readonly type: 'select'; readonly locator: ResolvedLocator; readonly option: SafeText }
+  | { readonly type: 'upload'; readonly locator: ResolvedLocator; readonly fixture: FixtureName }
+  | { readonly type: 'press'; readonly locator: ResolvedLocator; readonly key: Key; readonly modifiers?: readonly Modifier[] };
 export const DIALOG_ACTIONS = ['accept', 'dismiss'] as const;
 export const AUDIT_MODES = ['report', 'gate'] as const;
 
@@ -96,5 +197,9 @@ export type PlanData = {
   // Saved browser storage state (cookies and local storage) to start the session with. It is a
   // secret a person exported, so the plan names it and the secret store holds the JSON.
   readonly storageState?: SecretReference;
+  // Values generated for each run, by name. Every step may use them.
+  readonly values?: Readonly<Record<string, GeneratedValue>>;
+  // The page's frozen clock, relative to the run's clock start. Absent: the run's clock start.
+  readonly clock?: PlanClock;
 };
 export type Plan = Brand<PlanData, 'Plan'>;

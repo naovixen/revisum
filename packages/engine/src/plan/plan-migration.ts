@@ -7,8 +7,8 @@
 import { failure, type CriterionId, type PlanData, type Result } from '@revisum/contracts';
 import { DEFAULT_LIMITS } from '../project/project-parser.ts';
 import { INVALID, peekRecord, readList, readRecord, type Issues, type PlanError } from './plan-decoders.ts';
-import { ASSERTION_STEP_TYPES, CRITERION_FIELD, CURRENT_PLAN_VERSION, PLAN_FIELDS } from './plan-grammar.ts';
-import { readPlanData } from './plan-parser.ts';
+import { ASSERTION_STEP_TYPES, CRITERION_FIELD, PLAN_FIELDS, PREVIOUS_PLAN_VERSION } from './plan-grammar.ts';
+import { languageOnlyRules, readPlanData } from './plan-parser.ts';
 
 // The version number a version 1 plan declares.
 const LEGACY_VERSION = 1;
@@ -20,7 +20,7 @@ export type CriterionMapping = Readonly<Record<string, CriterionId>>;
 
 // Checks the parts of a version 1 plan that version 1.1 reads differently: the version number,
 // the step types of the time, and that each assertion has a criterion id in the mapping.
-// Returns the plan in the current version, with each assertion's id added, still unparsed.
+// Returns the plan in version 1.1, with each assertion's id added, still unparsed.
 function addCriterionIds(legacyPlan: unknown, mapping: CriterionMapping, issues: PlanError[]): unknown {
   const planIssues: Issues = [];
   const fields = readRecord(legacyPlan, '$', planIssues, PLAN_FIELDS);
@@ -41,7 +41,8 @@ function addCriterionIds(legacyPlan: unknown, mapping: CriterionMapping, issues:
     if (!Object.hasOwn(mapping, path)) { issues.push({ code: 'no_criterion_id', path }); return step; }
     return { ...head, [CRITERION_FIELD]: mapping[path] };
   });
-  return { ...fields, version: CURRENT_PLAN_VERSION, steps: migratedSteps };
+  // Version 1.1 is the first with criterion ids, and still current: 1.2 only adds to it.
+  return { ...fields, version: PREVIOUS_PLAN_VERSION, steps: migratedSteps };
 }
 
 // Migrates a version 1 plan to the current language. Pure: the input and mapping are never
@@ -52,5 +53,5 @@ export function migratePlan(legacyPlan: unknown, mapping: CriterionMapping): Res
   const migrated = addCriterionIds(legacyPlan, mapping, issues);
   if (migrated === INVALID || issues.length > 0) return failure(issues);
   // Version 1 had no secrets, fixtures or frames, so none are declared here.
-  return readPlanData(migrated, { origins: 'any', targetIds: 'any', secretNames: [], fixtures: [], limits: DEFAULT_LIMITS });
+  return readPlanData(migrated, languageOnlyRules(DEFAULT_LIMITS));
 }

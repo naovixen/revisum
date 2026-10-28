@@ -1,7 +1,7 @@
 // Release notes from a run. The draft is deterministic and uses no AI: the same plan and results
 // always give the same bytes. An AI may only add a suggestion stored beside the draft, never
 // replace it, and never containing typed or expected values.
-import type { AiWriter, ArtifactReference, ArtifactStore, Locator, Plan, Step } from '@revisum/contracts';
+import { literalText, referencedValueName, type AiWriter, type ArtifactReference, type ArtifactStore, type Locator, type Plan, type Step, type TextOrValue } from '@revisum/contracts';
 import { parseAiText } from './ai-text.ts';
 import type { PlanErrorCode } from './plan/plan-decoders.ts';
 import type { RunResult } from './run.ts';
@@ -19,34 +19,44 @@ const ASSERTION_TEXT: { readonly [Kind in Extract<Step, { type: 'expect' }>['ass
   focused: 'has focus', countEquals: 'matches the expected number of times',
 };
 const PAGE_ASSERTION_TEXT: { readonly [Kind in Extract<Step, { type: 'expectPage' }>['assert']['kind']]: string } = {
-  title: 'title', urlPath: 'URL path', url: 'URL',
+  title: 'title', urlPath: 'URL path', url: 'URL', urlPathStartsWith: 'URL path prefix',
 };
+
+// A value reference is shown by its name: the value itself is run data, not plan text.
+const plainText = (text: TextOrValue): string => literalText(text) ?? `{${referencedValueName(text) ?? ''}}`;
 
 function describeLocator(locator: Locator): string {
   switch (locator.by) {
-    case 'role': return `the "${markdownEscape(locator.name)}" ${locator.role}`;
-    case 'label': return `the "${markdownEscape(locator.label)}" field`;
-    case 'text': return `the text "${markdownEscape(locator.text)}"`;
-    case 'testId': return `the \`${codeSpanText(locator.testId)}\` element`;
+    case 'role': return `the "${markdownEscape(plainText(locator.name))}" ${locator.role}`;
+    case 'label': return `the "${markdownEscape(plainText(locator.label))}" field`;
+    case 'text': return `the text "${markdownEscape(plainText(locator.text))}"`;
+    case 'testId': return `the \`${codeSpanText(plainText(locator.testId))}\` element`;
   }
+}
+
+// Where a navigate step goes: its path, or a path template's segments with values by name.
+function describeNavigation(url: Extract<Step, { type: 'navigate' }>['url']): string {
+  if (typeof url === 'string') return new URL(url, 'http://relative.invalid').pathname;
+  return `/${url.segments.map(plainText).join('/')}`;
 }
 
 // One plain-English line per step. Values typed or expected are never included.
 export function describeStep(step: Step): string {
   switch (step.type) {
-    case 'navigate': return `Opened \`${codeSpanText(new URL(step.url, 'http://relative.invalid').pathname)}\``;
+    case 'navigate': return `Opened \`${codeSpanText(describeNavigation(step.url))}\``;
     case 'click': return `Clicked ${describeLocator(step.locator)}`;
     case 'hover': return `Hovered over ${describeLocator(step.locator)}`;
     case 'fill': return `Filled in ${describeLocator(step.locator)}`;
     case 'select': return `Chose an option in ${describeLocator(step.locator)}`;
     case 'upload': return `Uploaded a fixture file to ${describeLocator(step.locator)}`;
-    case 'press': return `Pressed ${step.key} on ${describeLocator(step.locator)}`;
+    case 'press': return `Pressed ${[...(step.modifiers ?? []), step.key].join('+')} on ${describeLocator(step.locator)}`;
     case 'frame': return `Inside ${describeLocator(step.locator)}: ${step.steps.map(describeStep).join('; ')}`;
     case 'dialog': return `${step.action === 'accept' ? 'Accepted' : 'Dismissed'} the next dialog`;
     case 'expect': return `Checked that ${describeLocator(step.locator)} ${ASSERTION_TEXT[step.assert.kind]}`;
     case 'expectPage': return `Checked the page ${PAGE_ASSERTION_TEXT[step.assert.kind]}`;
     case 'a11yAudit': return `Ran automated accessibility rules (${step.mode} mode)`;
     case 'capture': return `Captured screenshot "${step.name}"`;
+    case 'remember': return `Remembered ${step.from.read === 'text' ? 'the text' : 'the value'} of ${describeLocator(step.from.element)} as {${step.name}}`;
   }
 }
 

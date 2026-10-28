@@ -12,8 +12,10 @@
 // one plan.denied audit event whose code is the rule, so a denial leaves a record even when
 // nothing ran.
 // See docs/specs/SPEC-03-policy-gate.md.
+import { literalText } from '@revisum/contracts';
 import type {
-  Authorised, EventSink, GuardVerdict, Locale, Locator, Plan, PolicyDecision, PolicyRuleId, ResolvedElement, Step, Target, TargetId,
+  AllowedUrl, Authorised, EventSink, GuardVerdict, Locale, Locator, PathTemplate, Plan, PolicyDecision, PolicyRuleId, ResolvedElement,
+  Step, Target, TargetId,
 } from '@revisum/contracts';
 import { deriveActor, sourceActorId } from '../actor.ts';
 import type { PlanStanding } from '../approval/plan-standing.ts';
@@ -41,7 +43,9 @@ type Denial = { readonly rule: PolicyRuleId; readonly stepIndex: number | null }
 // The gate does not know who wrote the plan it denies, so its events carry no person.
 const POLICY_GATE_ACTOR = deriveActor(sourceActorId('policy gate'), 'unverified');
 
-// Keys that press a focused control or submit the form around a focused field.
+// Keys that press a focused control or submit the form around a focused field. Held modifiers
+// do not change that: Control+Enter and Shift+Enter submit many forms, so a chord is judged by
+// its key alone.
 const ACTIVATING_KEYS: readonly string[] = ['Enter', 'Space'];
 
 // Only used to read the path of a URL that is relative to the app under test.
@@ -99,15 +103,28 @@ function readUrl(url: string): { readonly origin: string | null; readonly path: 
 
 const isBlank = (text: string | null): boolean => text === null || text.trim() === '';
 
-// The accessible name a locator asks for, when the plan itself says it. A test id names no text.
+// The accessible name a locator asks for, when the plan itself says it. A test id names no text,
+// and a value reference has none until the run; the runtime guard then sees the element's name.
 function locatorName(locator: Locator): string | null {
-  switch (locator.by) {
-    case 'role': return locator.name;
-    case 'label': return locator.label;
-    case 'text': return locator.text;
-    case 'testId': return null;
-  }
+  const name = locator.by === 'role' ? locator.name : locator.by === 'label' ? locator.label : locator.by === 'text' ? locator.text : null;
+  return name === null ? null : literalText(name) ?? null;
 }
+
+// The part of a path template the plan fixes: its literal segments up to the first value. A
+// destructive path there is destructive whatever the values are; the runtime guard checks the
+// whole URL once the values are known.
+function literalPathOf(template: PathTemplate): string {
+  const literal: string[] = [];
+  for (const segment of template.segments) {
+    const text = literalText(segment);
+    if (text === undefined) break;
+    literal.push(text);
+  }
+  return `/${literal.join('/')}`;
+}
+
+// The URL a navigate step names, as far as the plan alone says it.
+const navigationUrl = (url: AllowedUrl | PathTemplate): string => (typeof url === 'string' ? url : literalPathOf(url));
 
 // The steps a plan holds, including those inside frames, each with the index of its top-level step.
 function everyStep(steps: readonly Step[], topIndex?: number): { readonly step: Step; readonly index: number }[] {
@@ -151,7 +168,7 @@ const isIrreversibleName = (name: string, patterns: readonly string[], policy: P
   matchesIrreversiblePattern(name, patterns) && !isAllowedName(name, policy.allowedIrreversibleNames);
 
 function staticRule(step: Step, context: StaticContext): PolicyRuleId | null {
-  if (step.type === 'navigate') return navigationRule(step.url, context);
+  if (step.type === 'navigate') return navigationRule(navigationUrl(step.url), context);
   if (step.type === 'click') {
     const name = locatorName(step.locator);
     if (name !== null && isIrreversibleName(name, context.patterns, context.project.policy)) return 'irreversible-action';
@@ -183,7 +200,8 @@ function staticDenial(plan: Plan, targets: readonly Target[], standing: PlanStan
 // allows it by test id, either the one the locator used or the element's own.
 function isAllowedUnnamed(locator: Locator, element: ResolvedElement, policy: ProjectPolicy): boolean {
   const allowed = policy.unnamedControlsAllowedByTestId;
-  return (locator.by === 'testId' && allowed.includes(locator.testId))
+  const testId = locator.by === 'testId' ? literalText(locator.testId) : undefined;
+  return (testId !== undefined && allowed.includes(testId))
     || (element.testId !== undefined && allowed.some((testId) => testId === element.testId));
 }
 
@@ -202,8 +220,9 @@ function runtimeRule(
     case 'dialog':
       return step.action === 'accept' && irreversible(dialogText) ? 'irreversible-dialog' : null;
     case 'navigate': {
-      // Production depends on the plan's standing, which only the static check has.
-      const read = readUrl(step.url);
+      // Production depends on the plan's standing, which only the static check has. The run
+      // passes a path template here with its values already in place.
+      const read = readUrl(navigationUrl(step.url));
       if (read === null || (read.origin !== null && !project.origins.some((origin) => origin === read.origin))) return 'undeclared-origin';
       return isDestructivePath(read.path, policy) ? 'destructive-navigation' : null;
     }
@@ -216,7 +235,7 @@ function runtimeRule(
       if (irreversible(element.name)) return 'irreversible-action';
       return linkRule(element, policy) ?? (irreversible(element.formSubmitName) ? 'irreversible-submit' : null);
     }
-    case 'frame': case 'expect': case 'expectPage': case 'a11yAudit': case 'capture':
+    case 'frame': case 'expect': case 'expectPage': case 'a11yAudit': case 'capture': case 'remember':
       return null;
   }
 }

@@ -2,10 +2,10 @@
 // parser made and the policy gate authorised, walks the typed lifecycle, never substitutes a
 // target, and hashes everything except wall-clock timings.
 import {
-  success,
+  needsDriverFeatures, needsLocatorFeatures, success,
   type A11yFinding, type ActionGuard, type ApprovalLabel, type ArtifactReference, type ArtifactStore, type Authorised,
-  type BrowserDriver, type Clock, type ElementProbe, type EventSink, type Plan, type PolicyRuleId, type Redactor, type Result,
-  type SecretStore, type Session, type Step, type Target, type TargetId, type Unavailable,
+  type BrowserDriver, type Clock, type ElementProbe, type EventSink, type Plan, type PolicyRuleId, type Redactor,
+  type ResolvedElement, type Result, type SecretStore, type Session, type Step, type Target, type TargetId, type Unavailable,
 } from '@revisum/contracts';
 import { approvalLabel, type PlanStanding } from './approval/plan-standing.ts';
 import { canonicalJson, sha256 } from './hashing.ts';
@@ -18,6 +18,10 @@ import { assertBranded } from './plan/plan-parser.ts';
 import { assertAuthorised, policyGate, type PolicyGate } from './policy/policy-gate.ts';
 import type { Project } from './project/project-parser.ts';
 import { SENSITIVE_PLACEHOLDER } from './redaction.ts';
+import {
+  generateRunValues, resolveActionStep, resolveElementAssertion, resolveLocator, resolvePathTemplate, resolvePlanClock,
+  type RunValues,
+} from './run-values.ts';
 import { NO_SECRETS, resolvePlanSecrets, secretRecords, withSecretRedaction, type ResolvedSecrets } from './secrets/secret-resolution.ts';
 
 export type RunInputs = {
@@ -95,6 +99,8 @@ type RunContext = {
   // The caller's redactor with the plan's secrets added: every kept text goes through it.
   readonly redactor: Redactor;
   readonly secrets: ResolvedSecrets;
+  // The plan's generated values for this run, by name.
+  readonly values: RunValues;
 };
 
 // Keeps nothing, for callers with no audit sink: the run's log and result record the denial.
@@ -116,7 +122,10 @@ export async function run(inputs: RunInputs, ports: RunPorts): Promise<RunResult
   const redactor = withSecretRedaction(ports.redactor, secrets);
   const logger = manifestLogger(ports.events, redactor, runId);
   const gate = policyGate({ project: inputs.project, events: ports.audit ?? UNRECORDED_AUDIT });
-  const context: RunContext = { inputs, ports, logger, gate, denials: [], redactor, secrets };
+  // Generation is pure, so values exist before anything runs; a run with no target has none.
+  const values: RunValues = target === undefined
+    ? new Map() : generateRunValues(inputs.plan, inputs.seed, inputs.fixedTimeMilliseconds, target, inputs.project);
+  const context: RunContext = { inputs, ports, logger, gate, denials: [], redactor, secrets, values };
 
   if (target === undefined || !declared) {
     return unavailableResult(inputs.targetId, { reason: 'not-declared', detail: 'target is not in both the plan and the matrix' }, context, startedAt);
@@ -237,7 +246,8 @@ function productionOriginReached(inputs: RunInputs): string | undefined {
   const origins = [new URL(inputs.baseUrl).origin];
   const visit = (steps: readonly Step[]): void => {
     for (const step of steps) {
-      if (step.type === 'navigate') origins.push(new URL(step.url, inputs.baseUrl).origin);
+      // A path template always stays on the base URL's origin, already in the list.
+      if (step.type === 'navigate' && typeof step.url === 'string') origins.push(new URL(step.url, inputs.baseUrl).origin);
       if (step.type === 'frame') visit(step.steps);
     }
   };
@@ -262,7 +272,8 @@ async function openSession(planned: lifecycle.Planned, context: RunContext): Pro
     baseUrl: context.inputs.baseUrl,
     allowedOrigins: reachableOrigins(context.inputs),
     seed: context.inputs.seed,
-    fixedTimeMilliseconds: context.inputs.fixedTimeMilliseconds,
+    // The page sees the plan clock's time; the manifest keeps the run's own clock start.
+    fixedTimeMilliseconds: resolvePlanClock(context.inputs.plan.clock, context.inputs.fixedTimeMilliseconds, planned.target.timezone),
     sensitiveSelectors: context.ports.redactor.selectors,
     timeoutMilliseconds: context.inputs.project.limits.stepTimeoutMilliseconds,
   });
@@ -273,21 +284,39 @@ async function openSession(planned: lifecycle.Planned, context: RunContext): Pro
 const UNSUPPORTED_ASSERTION_KINDS: readonly string[] = ['checked', 'unchecked', 'focused'];
 
 // Steps the plan language has but no driver performs yet. Each fails with unsupported-step, never
-// passes or is skipped, so a plan that relies on one cannot report a pass it did not earn.
+// passes or is skipped, and nothing of it reaches the driver, so a plan that relies on one cannot
+// report a pass it did not earn or act in part.
 function isUnsupported(step: Step): boolean {
   switch (step.type) {
-    case 'hover': case 'select': case 'upload': case 'frame': case 'dialog': return true;
-    case 'expect': return UNSUPPORTED_ASSERTION_KINDS.includes(step.assert.kind);
-    default: return false;
+    case 'hover': case 'select': case 'upload': case 'frame': case 'dialog': case 'remember': return true;
+    // Positions, other test-id attributes, key chords and multi-line text come with the CDP driver.
+    case 'expect': return UNSUPPORTED_ASSERTION_KINDS.includes(step.assert.kind) || needsLocatorFeatures(step.locator);
+    case 'click': case 'press': case 'fill': return needsDriverFeatures(step);
+    case 'navigate': case 'expectPage': case 'a11yAudit': case 'capture': return false;
   }
 }
+
+// What the runtime guard is given for a step that acts on no element.
+const NO_ELEMENT: ResolvedElement = { role: null, name: null, box: null, formSubmitName: null, linkUrl: null };
 
 async function executeStep(step: Step, index: number, session: Session, target: Target, context: RunContext): Promise<StepResult> {
   const base = { index, type: step.type } as const;
   if (isUnsupported(step)) return { ...base, outcome: 'failed', code: 'unsupported-step' };
   switch (step.type) {
     case 'navigate': {
-      const url = new URL(step.url, context.inputs.baseUrl);
+      let path = step.url;
+      if (typeof path !== 'string') {
+        // A path template's values are only known now, so the runtime guard checks the final URL.
+        const resolved = resolvePathTemplate(path, context.values, context.inputs.project);
+        if (!resolved.ok) return { ...base, outcome: 'failed', code: resolved.error };
+        path = resolved.value;
+        const verdict = context.gate.guardAction({ type: 'navigate', url: path }, index, NO_ELEMENT, null, target.locale);
+        if (verdict.kind === 'deny') {
+          context.denials.push({ rule: verdict.rule, stepIndex: verdict.stepIndex });
+          return { ...base, outcome: 'failed', code: 'policy-denied' };
+        }
+      }
+      const url = new URL(path, context.inputs.baseUrl);
       if (!context.inputs.project.origins.some((origin) => origin === url.origin)) return { ...base, outcome: 'failed', code: 'origin-not-allowed' };
       const navigated = await session.navigate(url.href);
       return navigated.ok ? { ...base, outcome: 'passed' } : { ...base, outcome: 'failed', code: navigated.error.code };
@@ -298,19 +327,28 @@ async function executeStep(step: Step, index: number, session: Session, target: 
     case 'select':
     case 'upload':
     case 'press': {
+      // Values are substituted first, so the runtime guard and the driver see the final text.
+      const action = resolveActionStep(step, context.values, context.inputs.project);
+      if (!action.ok) return { ...base, outcome: 'failed', code: action.error };
+      const resolved = action.value;
       // A secret is handed to the driver opaque; it is revealed only as the driver types it.
-      const secret = step.type === 'fill' && typeof step.value !== 'string' ? context.secrets.fills.get(step.value.secretName) : undefined;
-      const acted = await session.act(step, guardFor(step, index, target, context), secret);
+      const secret = resolved.type === 'fill' && typeof resolved.value !== 'string' ? context.secrets.fills.get(resolved.value.secretName) : undefined;
+      const acted = await session.act(resolved, guardFor(resolved, index, target, context), secret);
       return acted.ok ? { ...base, outcome: 'passed' } : { ...base, outcome: 'failed', code: acted.error.code };
     }
     case 'frame':
     case 'dialog':
+    case 'remember':
       return { ...base, outcome: 'failed', code: 'unsupported-step' };
     case 'expect': {
+      const locator = resolveLocator(step.locator, context.values, context.inputs.project);
+      if (!locator.ok) return { ...base, outcome: 'failed', code: locator.error };
+      const assertion = resolveElementAssertion(step.assert, context.values, context.inputs.project);
+      if (!assertion.ok) return { ...base, outcome: 'failed', code: assertion.error };
       let last: ElementProbe | null = null;
       const verdict = await poll(context, async () => {
-        last = await session.probe(step.locator);
-        return checkElement(step.assert, last);
+        last = await session.probe(locator.value);
+        return checkElement(assertion.value, last);
       });
       return verdict.pass
         ? { ...base, outcome: 'passed' }

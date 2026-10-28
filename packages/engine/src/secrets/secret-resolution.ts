@@ -22,7 +22,7 @@ export const NO_SECRETS: ResolvedSecrets = { fills: new Map(), storageState: nul
 function fillSecretNames(steps: readonly Step[]): SecretName[] {
   return steps.flatMap((step) => {
     if (step.type === 'frame') return fillSecretNames(step.steps);
-    return step.type === 'fill' && typeof step.value !== 'string' ? [step.value.secretName] : [];
+    return step.type === 'fill' && typeof step.value !== 'string' && 'secretName' in step.value ? [step.value.secretName] : [];
   });
 }
 

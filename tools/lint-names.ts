@@ -311,7 +311,7 @@ function lintCode(checker: Checker, file: string, source: string, violations: Na
         }
         continue;
       }
-      const problems = token.kind === 'string' && isNameLike(token.text)
+      const problems = token.kind === 'string' && isNameLike(token.text) && !checker.config.allowedStringValues.includes(token.text)
         ? nameProblems(checker, token.text, false)
         : [firstMatch(checker.config.bannedText, token.text)].filter((why) => why !== undefined);
       for (const why of problems) violations.push({ file, line: token.line, name: token.text, why });
@@ -363,7 +363,7 @@ function lintJson(checker: Checker, file: string, source: string, violations: Na
       if (checker.config.criterionIdPattern.test(value)) {
         violations.push({ file, line: lineOf(value), name: value, why: 'criterion id outside test metadata' });
       }
-      const problems = isNameLike(value)
+      const problems = isNameLike(value) && !checker.config.allowedStringValues.includes(value)
         ? nameProblems(checker, value, false)
         : [firstMatch(checker.config.bannedText, value)].filter((why) => why !== undefined);
       for (const why of problems) violations.push({ file, line: lineOf(value), name: value, why });
@@ -464,6 +464,10 @@ const PLANTED_CASES: readonly PlantedCase[] = [
   { path: 'packages/demo/src/planted-abbreviation.ts', source: 'export const acId = 1;\n', expectedWhy: 'acceptance criterion: write "criterion"' },
   { path: 'packages/demo/src/planted-spike.ts', source: 'export const p3Core = 1;\n', expectedWhy: 'spike name' },
   { path: 'packages/demo/src/planted-job.ts', source: 'export function checkD14(): void {}\n', expectedWhy: 'research job id' },
+  // A function key is allowed as a string value only: as a name, or past F12, it is still a job id.
+  { path: 'packages/demo/src/planted-key-name.ts', source: 'export const F5 = 1;\n', expectedWhy: 'research job id' },
+  { path: 'packages/demo/src/planted-key-value.ts', source: "export const key = 'F13';\n", expectedWhy: 'research job id' },
+  { path: 'packages/demo/planted-key-in-json.json', source: '{ "F7": "Escape" }\n', expectedWhy: 'research job id' },
   { path: 'packages/demo/planted-key.json', source: '{ "RC-04": true }\n', expectedWhy: 'role criterion, requirement or user-problem id' },
   { path: 'packages/demo/src/planted-error-code.ts', source: "export const failureCode = 'h12-failed';\n", expectedWhy: 'hypothesis id' },
   { path: 'packages/demo/src/planted-claim.ts', source: `// Backed by ${PLANTED_CLAIM_ID}.\nexport const value = 1;\n`, expectedWhy: 'claim id' },
@@ -489,7 +493,13 @@ const CLEAN_FILES: readonly CleanFile[] = [
       rules: ['afw4f7', 'b4f0c3', 'oj04fd'],
       finding: 'sc212-keyboard-trap.fail.oj04fd.3',
       asset: 'test-assets/sc2-4-2-title-page-with-title.html',
+      keys: ['F1', 'F12'],
     }),
+  },
+  {
+    // The function keys F1 to F12 are keyboard keys when written as string values.
+    path: 'packages/demo/src/clean-keys.ts',
+    source: "export const functionKeys = ['F1', 'F5', 'F12'];\n",
   },
 ];
 

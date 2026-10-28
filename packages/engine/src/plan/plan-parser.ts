@@ -3,25 +3,31 @@
 // script-like text, vacuous checks and oversized or too deeply nested input, before any side
 // effect. Literal secrets are refused: a fill of literal text into a sensitive field, and
 // credential-shaped text anywhere. A plan it accepts is frozen and remembered, so run() can tell it from a look-alike.
-// See docs/specs/SPEC-01-plan-language-and-parser.md.
+// The grammar is the one of the version the plan declares: a plan declaring "1.1" is read with
+// everything 1.2 added switched off, so it parses exactly as it always did.
+// See docs/specs/SPEC-01-plan-language-and-parser.md and docs/specs/SPEC-30-plan-values-positions-and-keys.md.
 import {
-  AUDIT_MODES, DIALOG_ACTIONS, ELEMENT_STATE_KINDS, ELEMENT_TEXT_KINDS, KEYS, LOCATOR_KINDS, PAGE_TEXT_KINDS, ROLES,
+  AUDIT_MODES, DIALOG_ACTIONS, literalText, ELEMENT_STATE_KINDS, ELEMENT_TEXT_KINDS, LOCATOR_KINDS, MODIFIERS, PAGE_TEXT_KINDS, POSITION_WORDS,
+  REMEMBER_READS, ROLES,
   failure, success,
-  type AllowedUrl, type CriterionId, type ElementAssertion, type FixtureName, type Locator, type Origin, type PageAssertion,
-  type Plan, type PlanData, type PlanMeta, type Result, type SafeText, type SecretName, type SecretReference, type Step,
-  type TargetId,
+  type AllowedUrl, type CriterionId, type ElementAssertion, type EmailDomain, type FixtureName, type Locator,
+  type Modifier, type MultiLineText, type Origin, type PageAssertion, type PathTemplate, type Plan, type PlanData,
+  type PlanMeta, type Position, type Result, type SafeText, type SecretName, type SecretReference, type Step, type TargetId,
+  type TestIdAttribute, type TextOrValue, type ValueReference,
 } from '@revisum/contracts';
 import { brand } from '../brand.ts';
-import { readId, type Limits, type Project } from '../project/project-parser.ts';
+import { DEFAULT_TEST_ID_ATTRIBUTES, readId, type Limits, type Project } from '../project/project-parser.ts';
 import {
   INVALID, allValid, isOneOf, peekRecord, readInteger, readList, readOneOf, readRecord, readText,
   type Issues, type Parsed, type PlanError,
 } from './plan-decoders.ts';
 import {
-  ASSERTION_STEP_TYPES, CAPTURE_NAME, CRITERION_FIELD, CRITERION_ID, CURRENT_PLAN_VERSION, FEATURE_ID, LOCATOR_FIELDS,
-  MAXIMUM_EXPECTED_COUNT, MAXIMUM_SPEC_REFERENCE_LENGTH, MAXIMUM_TEST_ID_LENGTH, MAXIMUM_TITLE_LENGTH, MAXIMUM_URL_LENGTH,
-  META_FIELDS, OPTIONAL_PLAN_FIELDS, PLAN_FIELDS, STEP_FIELDS, STEP_TYPES,
+  ASSERTION_STEP_TYPES, CAPTURE_NAME, CRITERION_FIELD, CRITERION_ID, CURRENT_GRAMMAR, FEATURE_ID, FROM_FIELD, LOCATOR_FIELDS,
+  MAXIMUM_EXPECTED_COUNT, MAXIMUM_MODIFIERS, MAXIMUM_PATH_SEGMENTS, MAXIMUM_POSITION, MAXIMUM_QUERY_VALUES,
+  MAXIMUM_SPEC_REFERENCE_LENGTH, MAXIMUM_TEST_ID_LENGTH, MAXIMUM_TITLE_LENGTH, MAXIMUM_URL_LENGTH, META_FIELDS, PLAN_FIELDS,
+  QUERY_KEY, grammarFor, type Grammar,
 } from './plan-grammar.ts';
+import { readGeneratedValues, readPlanClock, readValueName, type ValueContext } from './plan-values.ts';
 import { looksLikeCredential, namesSensitiveField } from './literal-secrets.ts';
 
 // A base used only to tell whether a URL is relative to the app under test.
@@ -36,20 +42,51 @@ export type PlanRules = {
   readonly secretNames: readonly SecretName[];
   readonly fixtures: readonly FixtureName[];
   readonly limits: Limits;
+  readonly testIdAttributes: readonly TestIdAttribute[];
+  readonly emailDomains: readonly EmailDomain[];
 };
 
-type ParseContext = { readonly rules: PlanRules; readonly issues: Issues };
+type ParseContext = {
+  readonly rules: PlanRules;
+  readonly issues: Issues;
+  // The grammar of the version the plan declares.
+  readonly grammar: Grammar;
+  // The run values defined so far, in document order: the plan's values, then each remember
+  // step's name once that step has been read. A reference to any other name is undefined.
+  readonly defined: Set<string>;
+};
 
 const rulesOf = (project: Project): PlanRules => ({
   origins: project.origins, targetIds: project.matrix.map((target) => target.id),
   secretNames: project.secretNames, fixtures: project.fixtures, limits: project.limits,
+  testIdAttributes: project.testIdAttributes, emailDomains: project.generatedEmailDomains,
 });
+
+const isPlainObject = (input: unknown): input is Readonly<Record<string, unknown>> =>
+  typeof input === 'object' && input !== null && !Array.isArray(input);
 
 // Text from the plan, refused as literal_secret when it is shaped like a credential.
 function readPlanText(input: unknown, path: string, context: ParseContext, maximumLength: number, minimumLength = 1): Parsed<SafeText> {
   const text = readText(input, path, context.issues, maximumLength, minimumLength);
   if (text !== INVALID && looksLikeCredential(text)) { context.issues.push({ code: 'literal_secret', path }); return INVALID; }
   return text;
+}
+
+// A reference { "valueName": … } to a run value defined earlier in the plan. An undefined name is
+// reported at the reference itself.
+function readValueReference(input: unknown, path: string, context: ParseContext): Parsed<ValueReference> {
+  const fields = readRecord(input, path, context.issues, ['valueName']);
+  if (fields === INVALID) return INVALID;
+  const valueName = readValueName(fields['valueName'], `${path}.valueName`, context.issues);
+  if (valueName === INVALID) return INVALID;
+  if (!context.defined.has(valueName)) { context.issues.push({ code: 'undefined_value', path }); return INVALID; }
+  return { valueName };
+}
+
+// Text the plan writes for the page: literal text, or, from version 1.2, a value reference.
+function readTextOrValue(input: unknown, path: string, context: ParseContext, maximumLength: number, minimumLength = 1): Parsed<TextOrValue> {
+  if (context.grammar.runValues && isPlainObject(input)) return readValueReference(input, path, context);
+  return readPlanText(input, path, context, maximumLength, minimumLength);
 }
 
 function readUrl(input: unknown, path: string, context: ParseContext): Parsed<AllowedUrl> {
@@ -71,32 +108,94 @@ function readUrl(input: unknown, path: string, context: ParseContext): Parsed<Al
   return brand<string, 'AllowedUrl'>(url.href);
 }
 
+// One literal segment of a path template. A separator would add segments or start a query or
+// fragment; "." and ".." would climb the path. Both are refused here, before any run.
+function readLiteralSegment(input: unknown, path: string, context: ParseContext): Parsed<SafeText> {
+  const segment = readPlanText(input, path, context, context.rules.limits.maximumTextLength);
+  if (segment === INVALID) return INVALID;
+  if (/[/?#]/.test(segment)) { context.issues.push({ code: 'unknown_value', path }); return INVALID; }
+  if (segment === '.' || segment === '..') { context.issues.push({ code: 'invalid_url', path }); return INVALID; }
+  return segment;
+}
+
+// A path template: segments and query values on the run's base URL. It has no origin field, so
+// no value can choose where the browser goes. A malformed query key is reported at the query
+// itself, so the key is never echoed.
+function readPathTemplate(input: unknown, path: string, context: ParseContext): Parsed<PathTemplate> {
+  const fields = readRecord(input, path, context.issues, ['segments', 'query'], ['segments']);
+  if (fields === INVALID) return INVALID;
+  const rawSegments = readList(fields['segments'], `${path}.segments`, context.issues, MAXIMUM_PATH_SEGMENTS);
+  const segments = (rawSegments === INVALID ? [] : rawSegments).map((segment, index): Parsed<TextOrValue> => {
+    const at = `${path}.segments[${index}]`;
+    return isPlainObject(segment) ? readValueReference(segment, at, context) : readLiteralSegment(segment, at, context);
+  });
+  if (rawSegments === INVALID) return INVALID;
+  if (!Object.hasOwn(fields, 'query')) return allValid(segments) ? { segments } : INVALID;
+  const query = peekRecord(fields['query'], `${path}.query`, context.issues);
+  if (query === INVALID) return INVALID;
+  if (Object.keys(query).length > MAXIMUM_QUERY_VALUES) { context.issues.push({ code: 'too_large', path: `${path}.query` }); return INVALID; }
+  const entries = Object.entries(query).map(([key, value]): Parsed<readonly [string, TextOrValue]> => {
+    if (!QUERY_KEY.test(key)) { context.issues.push({ code: 'unknown_value', path: `${path}.query` }); return INVALID; }
+    const text = readTextOrValue(value, `${path}.query.${key}`, context, context.rules.limits.maximumTextLength, 0);
+    return text === INVALID ? INVALID : [key, text];
+  });
+  if (!allValid(segments) || !allValid(entries)) return INVALID;
+  return { segments, query: Object.fromEntries(entries) };
+}
+
+// Where a navigate step goes: a URL, or, from version 1.2, a path template.
+function readNavigation(input: unknown, path: string, context: ParseContext): Parsed<AllowedUrl | PathTemplate> {
+  if (context.grammar.runValues && isPlainObject(input)) return readPathTemplate(input, path, context);
+  return readUrl(input, path, context);
+}
+
+// first, last, or a 1-based index in document order.
+function readPosition(input: unknown, path: string, context: ParseContext): Parsed<Position> {
+  if (typeof input === 'string') return readOneOf(input, path, context.issues, POSITION_WORDS);
+  return readInteger(input, path, context.issues, 1, MAXIMUM_POSITION);
+}
+
+// A name from a list the trusted project declares. The error never repeats the name.
+function readDeclared<Name extends string>(input: unknown, path: string, context: ParseContext, declared: readonly Name[]): Parsed<Name> {
+  if (typeof input !== 'string') { context.issues.push({ code: 'wrong_type', path }); return INVALID; }
+  const found = declared.find((name) => name === input);
+  if (found === undefined) { context.issues.push({ code: 'unknown_value', path }); return INVALID; }
+  return found;
+}
+
 function readLocator(input: unknown, path: string, context: ParseContext): Parsed<Locator> {
   const longest = context.rules.limits.maximumTextLength;
   const head = peekRecord(input, path, context.issues);
   if (head === INVALID) return INVALID;
   const by = readOneOf(head['by'], `${path}.by`, context.issues, LOCATOR_KINDS);
   if (by === INVALID) return INVALID;
-  if (readRecord(input, path, context.issues, LOCATOR_FIELDS[by]) === INVALID) return INVALID;
+  const allowed = [...LOCATOR_FIELDS[by], ...context.grammar.optionalLocatorFields[by]];
+  if (readRecord(input, path, context.issues, allowed, LOCATOR_FIELDS[by]) === INVALID) return INVALID;
+  // Optional fields are left out when absent, so a 1.1 locator stays exactly as it was.
+  const position = Object.hasOwn(head, 'position') ? readPosition(head['position'], `${path}.position`, context) : undefined;
+  const positioned = position === undefined || position === INVALID ? {} : { position };
   switch (by) {
     case 'role': {
       const parts = [
         readOneOf(head['role'], `${path}.role`, context.issues, ROLES),
-        readPlanText(head['name'], `${path}.name`, context, longest),
+        readTextOrValue(head['name'], `${path}.name`, context, longest),
       ] as const;
-      return allValid(parts) ? { by, role: parts[0], name: parts[1] } : INVALID;
+      return allValid(parts) && position !== INVALID ? { by, role: parts[0], name: parts[1], ...positioned } : INVALID;
     }
     case 'label': {
-      const label = readPlanText(head['label'], `${path}.label`, context, longest);
-      return label === INVALID ? INVALID : { by, label };
+      const label = readTextOrValue(head['label'], `${path}.label`, context, longest);
+      return label === INVALID || position === INVALID ? INVALID : { by, label, ...positioned };
     }
     case 'text': {
-      const text = readPlanText(head['text'], `${path}.text`, context, longest);
-      return text === INVALID ? INVALID : { by, text };
+      const text = readTextOrValue(head['text'], `${path}.text`, context, longest);
+      return text === INVALID || position === INVALID ? INVALID : { by, text, ...positioned };
     }
     case 'testId': {
-      const testId = readPlanText(head['testId'], `${path}.testId`, context, MAXIMUM_TEST_ID_LENGTH);
-      return testId === INVALID ? INVALID : { by, testId };
+      const testId = readTextOrValue(head['testId'], `${path}.testId`, context, MAXIMUM_TEST_ID_LENGTH);
+      const attribute = Object.hasOwn(head, 'attribute')
+        ? readDeclared(head['attribute'], `${path}.attribute`, context, context.rules.testIdAttributes) : undefined;
+      if (testId === INVALID || attribute === INVALID || position === INVALID) return INVALID;
+      return { by, testId, ...(attribute === undefined ? {} : { attribute }), ...positioned };
     }
   }
 }
@@ -110,8 +209,8 @@ function readAssertionHead(input: unknown, path: string, context: ParseContext):
 }
 
 // Expected text for a text check. Empty text would match any element, so the check proves nothing.
-function readExpectedText(input: unknown, path: string, context: ParseContext): Parsed<SafeText> {
-  const value = readPlanText(input, path, context, context.rules.limits.maximumTextLength, 0);
+function readExpectedText(input: unknown, path: string, context: ParseContext): Parsed<TextOrValue> {
+  const value = readTextOrValue(input, path, context, context.rules.limits.maximumTextLength, 0);
   if (value === '') { context.issues.push({ code: 'vacuous', path }); return INVALID; }
   return value;
 }
@@ -133,18 +232,23 @@ function readElementAssertion(input: unknown, path: string, context: ParseContex
   return value === INVALID ? INVALID : { kind, value };
 }
 
-const PAGE_KINDS = [...PAGE_TEXT_KINDS, 'url'] as const;
-
 function readPageAssertion(input: unknown, path: string, context: ParseContext): Parsed<PageAssertion> {
   const head = readAssertionHead(input, path, context);
   if (head === INVALID) return INVALID;
-  const kind = readOneOf(head['kind'], `${path}.kind`, context.issues, PAGE_KINDS);
+  const kind = readOneOf(head['kind'], `${path}.kind`, context.issues, context.grammar.pageKinds);
   if (kind === INVALID) return INVALID;
   if (readRecord(input, path, context.issues, ['kind', 'value']) === INVALID) return INVALID;
   if (kind === 'url') {
     const url = readUrl(head['value'], `${path}.value`, context);
     return url === INVALID ? INVALID : { kind, value: url };
   }
+  if (kind === 'urlPathStartsWith') {
+    // A plain text prefix of the path, so it must start where every path starts.
+    const prefix = readPlanText(head['value'], `${path}.value`, context, MAXIMUM_URL_LENGTH);
+    if (prefix !== INVALID && !prefix.startsWith('/')) { context.issues.push({ code: 'invalid_url', path: `${path}.value` }); return INVALID; }
+    return prefix === INVALID ? INVALID : { kind, value: prefix };
+  }
+  if (!isOneOf(PAGE_TEXT_KINDS, kind)) { context.issues.push({ code: 'unknown_value', path: `${path}.kind` }); return INVALID; }
   // A page may have an empty title, so an empty expected title or path is a real check.
   const value = readPlanText(head['value'], `${path}.value`, context, context.rules.limits.maximumTextLength, 0);
   return value === INVALID ? INVALID : { kind, value };
@@ -162,37 +266,84 @@ function readCriterionId(head: Readonly<Record<string, unknown>>, stepPath: stri
   return brand<string, 'CriterionId'>(value);
 }
 
-// A name from a list the trusted project declares. The error never repeats the name.
-function readDeclared<Name extends string>(input: unknown, path: string, context: ParseContext, declared: readonly Name[]): Parsed<Name> {
-  if (typeof input !== 'string') { context.issues.push({ code: 'wrong_type', path }); return INVALID; }
-  const found = declared.find((name) => name === input);
-  if (found === undefined) { context.issues.push({ code: 'unknown_value', path }); return INVALID; }
-  return found;
+// Lines for a multi-line fill, within the project's limits. Too many lines are reported at the
+// first line past the limit; too many characters, counting the line feed between lines, at the
+// line that crosses the limit. A value reference counts as no characters here: its text is only
+// known at run time.
+function readMultiLineText(input: unknown, path: string, context: ParseContext): Parsed<MultiLineText> {
+  const fields = readRecord(input, path, context.issues, ['lines']);
+  if (fields === INVALID) return INVALID;
+  const linesPath = `${path}.lines`;
+  const { maximumFillLines, maximumFillCharacters } = context.rules.limits;
+  const raw = readList(fields['lines'], linesPath, context.issues, Number.POSITIVE_INFINITY);
+  if (raw === INVALID) return INVALID;
+  if (raw.length > maximumFillLines) { context.issues.push({ code: 'too_large', path: `${linesPath}[${maximumFillLines}]` }); return INVALID; }
+  const lines = raw.map((line, index) => readTextOrValue(line, `${linesPath}[${index}]`, context, maximumFillCharacters, 0));
+  if (!allValid(lines)) return INVALID;
+  let characters = 0;
+  for (const [index, line] of lines.entries()) {
+    characters += (index === 0 ? 0 : 1) + (literalText(line)?.length ?? 0);
+    if (characters > maximumFillCharacters) { context.issues.push({ code: 'too_long', path: `${linesPath}[${index}]` }); return INVALID; }
+  }
+  return { lines };
 }
 
-// A fill value: literal text, or a reference to a secret the project declares.
-function readFillValue(input: unknown, path: string, context: ParseContext): Parsed<SafeText | SecretReference> {
-  if (typeof input !== 'object' || input === null || Array.isArray(input)) return readPlanText(input, path, context, context.rules.limits.maximumTextLength, 0);
+// A fill value: literal text, a reference to a secret the project declares, and from version 1.2
+// a value reference or lines of text.
+function readFillValue(input: unknown, path: string, context: ParseContext): Parsed<TextOrValue | SecretReference | MultiLineText> {
+  if (!isPlainObject(input)) return readPlanText(input, path, context, context.rules.limits.maximumTextLength, 0);
+  if (context.grammar.runValues && Object.hasOwn(input, 'lines')) return readMultiLineText(input, path, context);
+  if (context.grammar.runValues && Object.hasOwn(input, 'valueName')) return readValueReference(input, path, context);
   const fields = readRecord(input, path, context.issues, ['secretName']);
   if (fields === INVALID) return INVALID;
   const secretName = readDeclared(fields['secretName'], `${path}.secretName`, context, context.rules.secretNames);
   return secretName === INVALID ? INVALID : { secretName };
 }
 
+// True when a fill value writes literal text, as a password typed into the plan would be.
+function holdsLiteralText(value: TextOrValue | SecretReference | MultiLineText): boolean {
+  if (typeof value === 'object' && 'lines' in value) return value.lines.some((line) => (literalText(line) ?? '') !== '');
+  if (typeof value === 'object' && 'secretName' in value) return false;
+  return (literalText(value) ?? '') !== '';
+}
+
+function readModifiers(input: unknown, path: string, context: ParseContext): Parsed<readonly Modifier[]> {
+  const raw = readList(input, path, context.issues, MAXIMUM_MODIFIERS);
+  if (raw === INVALID) return INVALID;
+  const modifiers = raw.map((modifier, index) => readOneOf(modifier, `${path}[${index}]`, context.issues, MODIFIERS));
+  if (!allValid(modifiers)) return INVALID;
+  if (new Set(modifiers).size !== modifiers.length) { context.issues.push({ code: 'duplicate', path }); return INVALID; }
+  return modifiers;
+}
+
+// A capture name names a file, so it follows the capture-name pattern.
 function readCaptureName(input: unknown, path: string, context: ParseContext): Parsed<Step> {
-  if (typeof input !== 'string' || !CAPTURE_NAME.test(input)) {
-    context.issues.push({ code: 'unknown_value', path });
-    return INVALID;
-  }
+  if (typeof input !== 'string') { context.issues.push({ code: 'wrong_type', path }); return INVALID; }
+  if (!CAPTURE_NAME.test(input)) { context.issues.push({ code: 'unknown_value', path }); return INVALID; }
   return { type: 'capture', name: brand<string, 'CaptureName'>(input) };
+}
+
+// A remember step defines its name only once it has been read, so its own locator cannot use it,
+// and a name already defined is a duplicate.
+function readRemember(head: Readonly<Record<string, unknown>>, path: string, context: ParseContext): Parsed<Step> {
+  const name = readValueName(head['name'], `${path}.name`, context.issues);
+  const from = readRecord(head[FROM_FIELD], `${path}.${FROM_FIELD}`, context.issues, ['element', 'read']);
+  const parts = from === INVALID ? [INVALID, INVALID] as const : [
+    readLocator(from['element'], `${path}.from.element`, context),
+    readOneOf(from['read'], `${path}.from.read`, context.issues, REMEMBER_READS),
+  ] as const;
+  if (name === INVALID) return INVALID;
+  if (context.defined.has(name)) { context.issues.push({ code: 'duplicate', path: `${path}.name` }); return INVALID; }
+  context.defined.add(name);
+  return allValid(parts) ? { type: 'remember', name, from: { element: parts[0], read: parts[1] } } : INVALID;
 }
 
 function readStep(input: unknown, path: string, context: ParseContext): Parsed<Step> {
   const head = peekRecord(input, path, context.issues);
   if (head === INVALID) return INVALID;
-  const type = readOneOf(head['type'], `${path}.type`, context.issues, STEP_TYPES, 'unknown_step');
+  const type = readOneOf(head['type'], `${path}.type`, context.issues, context.grammar.stepTypes, 'unknown_step');
   if (type === INVALID) return INVALID;
-  const fields = STEP_FIELDS[type];
+  const fields = context.grammar.stepFields[type];
   // The criterion id is checked on its own below, so that a missing one is reported as vacuous.
   const required = fields.required.filter((field) => field !== CRITERION_FIELD);
   if (readRecord(input, path, context.issues, [...fields.required, ...fields.optional], required) === INVALID) return INVALID;
@@ -200,7 +351,7 @@ function readStep(input: unknown, path: string, context: ParseContext): Parsed<S
   const longest = context.rules.limits.maximumTextLength;
   switch (type) {
     case 'navigate': {
-      const url = readUrl(head['url'], `${path}.url`, context);
+      const url = readNavigation(head['url'], `${path}.url`, context);
       return url === INVALID ? INVALID : { type, url };
     }
     case 'click':
@@ -213,14 +364,14 @@ function readStep(input: unknown, path: string, context: ParseContext): Parsed<S
       if (!allValid(parts)) return INVALID;
       // A password or token typed as literal text would put a secret in the plan. Clearing the
       // field with empty text holds no secret, so it stays allowed.
-      if (typeof parts[1] === 'string' && parts[1] !== '' && namesSensitiveField(parts[0])) {
+      if (holdsLiteralText(parts[1]) && namesSensitiveField(parts[0])) {
         context.issues.push({ code: 'literal_secret', path: `${path}.value` });
         return INVALID;
       }
       return { type, locator: parts[0], value: parts[1] };
     }
     case 'select': {
-      const parts = [locator(), readPlanText(head['option'], `${path}.option`, context, longest)] as const;
+      const parts = [locator(), readTextOrValue(head['option'], `${path}.option`, context, longest)] as const;
       return allValid(parts) ? { type, locator: parts[0], option: parts[1] } : INVALID;
     }
     case 'upload': {
@@ -228,8 +379,10 @@ function readStep(input: unknown, path: string, context: ParseContext): Parsed<S
       return allValid(parts) ? { type, locator: parts[0], fixture: parts[1] } : INVALID;
     }
     case 'press': {
-      const parts = [locator(), readOneOf(head['key'], `${path}.key`, context.issues, KEYS)] as const;
-      return allValid(parts) ? { type, locator: parts[0], key: parts[1] } : INVALID;
+      const parts = [locator(), readOneOf(head['key'], `${path}.key`, context.issues, context.grammar.keys)] as const;
+      if (!Object.hasOwn(head, 'modifiers')) return allValid(parts) ? { type, locator: parts[0], key: parts[1] } : INVALID;
+      const modifiers = readModifiers(head['modifiers'], `${path}.modifiers`, context);
+      return allValid(parts) && modifiers !== INVALID ? { type, locator: parts[0], key: parts[1], modifiers } : INVALID;
     }
     case 'frame': {
       // The depth was checked before the walk began, so this recursion is bounded.
@@ -239,14 +392,20 @@ function readStep(input: unknown, path: string, context: ParseContext): Parsed<S
     case 'dialog': {
       const action = readOneOf(head['action'], `${path}.action`, context.issues, DIALOG_ACTIONS);
       if (!Object.hasOwn(head, 'expectText')) return action === INVALID ? INVALID : { type, action };
-      const expectText = readPlanText(head['expectText'], `${path}.expectText`, context, longest);
+      const expectText = readTextOrValue(head['expectText'], `${path}.expectText`, context, longest);
       return action === INVALID || expectText === INVALID ? INVALID : { type, action, expectText };
     }
     case 'expect': {
       const parts = [
         locator(), readElementAssertion(head['assert'], `${path}.assert`, context), readCriterionId(head, path, context),
       ] as const;
-      return allValid(parts) ? { type, locator: parts[0], assert: parts[1], criterionId: parts[2] } : INVALID;
+      if (!allValid(parts)) return INVALID;
+      // A count of matches says nothing once a position has picked one of them.
+      if ((parts[1].kind === 'countEquals' || parts[1].kind === 'absent') && parts[0].position !== undefined) {
+        context.issues.push({ code: 'position_not_allowed', path: `${path}.locator.position` });
+        return INVALID;
+      }
+      return { type, locator: parts[0], assert: parts[1], criterionId: parts[2] };
     }
     case 'expectPage': {
       const parts = [readPageAssertion(head['assert'], `${path}.assert`, context), readCriterionId(head, path, context)] as const;
@@ -258,6 +417,8 @@ function readStep(input: unknown, path: string, context: ParseContext): Parsed<S
     }
     case 'capture':
       return readCaptureName(head['name'], `${path}.name`, context);
+    case 'remember':
+      return readRemember(head, path, context);
   }
 }
 
@@ -340,7 +501,7 @@ function sizeInBytes(input: unknown): number {
 }
 
 const plainFields = (input: unknown): Readonly<Record<string, unknown>> | undefined =>
-  typeof input === 'object' && input !== null && !Array.isArray(input) ? Object.fromEntries(Object.entries(input)) : undefined;
+  isPlainObject(input) ? Object.fromEntries(Object.entries(input)) : undefined;
 
 // The path of the first frame step nested deeper than `maximumDepth`, or undefined. It looks only
 // at frame steps and their step lists, without recursion, so even a plan nested thousands deep is
@@ -368,20 +529,37 @@ export function readPlanData(input: unknown, rules: PlanRules): Result<PlanData,
   if (sizeInBytes(input) > rules.limits.maximumPlanBytes) return failure([{ code: 'too_large', path: '$' }]);
   const tooDeep = tooDeepFrame(input, rules.limits.maximumFrameDepth);
   if (tooDeep !== undefined) return failure([{ code: 'too_large', path: tooDeep }]);
-  const context: ParseContext = { rules, issues: [] };
-  const fields = readRecord(input, '$', context.issues, [...PLAN_FIELDS, ...OPTIONAL_PLAN_FIELDS], PLAN_FIELDS);
+  // The declared version decides the grammar. A version this engine does not read is refused
+  // below; the current grammar reads the rest so every other problem is reported too.
+  const declaredGrammar = grammarFor(plainFields(input)?.['version']);
+  const grammar = declaredGrammar ?? CURRENT_GRAMMAR;
+  const context: ParseContext = { rules, issues: [], grammar, defined: new Set() };
+  const fields = readRecord(input, '$', context.issues, [...PLAN_FIELDS, ...grammar.optionalPlanFields], PLAN_FIELDS);
   if (fields === INVALID) return failure(context.issues);
   // A plan for a newer language is refused outright: running it with the unknown parts skipped
   // would turn a skipped check into a silent pass.
-  if (fields['version'] !== CURRENT_PLAN_VERSION) context.issues.push({ code: 'version_unsupported', path: '$.version' });
+  if (declaredGrammar === undefined) context.issues.push({ code: 'version_unsupported', path: '$.version' });
   const meta = readMeta(fields['meta'], '$.meta', context);
   const targets = readTargetIds(fields['targets'], context);
+  // The plan's values come before every step, so every step may use them.
+  const valueContext: ValueContext = {
+    issues: context.issues, emailDomains: rules.emailDomains,
+    readText: (text, path, maximumLength) => readPlanText(text, path, context, maximumLength),
+  };
+  const values = Object.hasOwn(fields, 'values') ? readGeneratedValues(fields['values'], '$.values', valueContext, context.defined) : undefined;
+  const clock = Object.hasOwn(fields, 'clock') ? readPlanClock(fields['clock'], '$.clock', context.issues) : undefined;
   const steps = readStepList(fields['steps'], '$.steps', context);
   if (steps !== INVALID) checkWholePlan(steps, context);
   const storageState = Object.hasOwn(fields, 'storageState') ? readStorageState(fields['storageState'], context) : undefined;
-  if (context.issues.length > 0 || meta === INVALID || targets === INVALID || steps === INVALID || storageState === INVALID) return failure(context.issues);
-  // Left out when absent, so a plan without storage state hashes as it always did.
-  return success({ version: CURRENT_PLAN_VERSION, meta, targets, steps, ...(storageState === undefined ? {} : { storageState }) });
+  if (context.issues.length > 0 || meta === INVALID || targets === INVALID || steps === INVALID || storageState === INVALID
+    || values === INVALID || clock === INVALID) return failure(context.issues);
+  // Optional fields are left out when absent, so a plan without them hashes as it always did.
+  return success({
+    version: grammar.version, meta, targets, steps,
+    ...(storageState === undefined ? {} : { storageState }),
+    ...(values === undefined ? {} : { values }),
+    ...(clock === undefined ? {} : { clock }),
+  });
 }
 
 // Every plan this parser made, so that assertBranded can tell a parsed plan from a copy or a
@@ -408,6 +586,12 @@ export function planParser(project: Project): (input: unknown) => Result<Plan, r
     return success(plan);
   };
 }
+
+// The rules the version 1 migration reads its output under: the language only, with the
+// project-independent defaults. Version 1 had no secrets, fixtures, frames or run values.
+export const languageOnlyRules = (limits: Limits): PlanRules => ({
+  origins: 'any', targetIds: 'any', secretNames: [], fixtures: [], limits, testIdAttributes: DEFAULT_TEST_ID_ATTRIBUTES, emailDomains: [],
+});
 
 // The run-time half of the brand: the type system stops a forged Plan at compile time, but a cast
 // defeats it. run() calls this first, so an object the parser did not make is refused before any

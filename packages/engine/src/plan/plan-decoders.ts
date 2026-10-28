@@ -16,6 +16,11 @@ export const PLAN_ERROR_CODES = [
   // A secret written into the plan: literal text in a sensitive field, credential-shaped text, or
   // saved storage state itself. A plan names secrets with { secretName }.
   'literal_secret',
+  // A reference to a run value that no earlier part of the plan defines.
+  'undefined_value',
+  // A position on the locator of a check that counts matches (countEquals or absent), where
+  // picking one element would make the count meaningless.
+  'position_not_allowed',
 ] as const;
 export type PlanErrorCode = (typeof PLAN_ERROR_CODES)[number];
 
@@ -87,6 +92,12 @@ export function readText(
   if (input.length > maximumLength) { issues.push({ code: 'too_long', path }); return INVALID; }
   if (isUnsafeText(input)) { issues.push({ code: 'unsafe_text', path }); return INVALID; }
   return brand<string, 'SafeText'>(input);
+}
+
+// Text made at run time, such as a generated value, branded only once it passes the same safety
+// rules and length limit as text in a plan. Undefined means it failed them.
+export function runTimeText(value: string, maximumLength: number): SafeText | undefined {
+  return value.length <= maximumLength && !isUnsafeText(value) ? brand<string, 'SafeText'>(value) : undefined;
 }
 
 export function readOneOf<Value extends string>(

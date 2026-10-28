@@ -75,10 +75,12 @@ export interface ActionRunner {
   // Given a guard, the driver asks it first and acts only on an allow. The CDP driver starts
   // passing the resolved element with SPEC-06 (docs/specs/SPEC-06-cdp-driver.md).
   // For a fill whose value is a secret reference, the engine passes the resolved secret; the driver
-  // reveals it only at the moment it types, and never reports it back.
+  // reveals it only at the moment it types, and never reports it back. The engine replaces value
+  // references before it acts; a driver refuses any step that still holds one.
   act(step: ActionStep, guard?: ActionGuard, secret?: Secret): Promise<Result<void, DriverError>>;
 }
 export interface Prober {
+  // The engine replaces a locator's value references with their text before it probes.
   probe(locator: Locator): Promise<ElementProbe>;
 }
 export interface Camera {

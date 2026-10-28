@@ -14,6 +14,9 @@ export type NamingLintConfig = {
   readonly bannedInComments: readonly NamingRule[];
   // Exact, case-sensitive exceptions to bannedWords.
   readonly allowedWords: readonly string[];
+  // Exact, case-sensitive string values (and JSON string values) allowed although they match a
+  // banned word. Names declared in code, file names and JSON keys get no such exception.
+  readonly allowedStringValues: readonly string[];
   // Abbreviation, then the word to write instead. Any name using the abbreviation fails.
   readonly spellOut: Readonly<Record<string, string>>;
   // Informational: abbreviations a reviewer accepts without a glossary entry.
@@ -59,6 +62,8 @@ export const NAMING_LINT: NamingLintConfig = {
     { pattern: /^\s*\(?\s*(see\s+)?(docs\/specs\/)?SPEC-\d{2}[\w.-]*\s*\)?\s*\.?\s*$/i, why: 'a spec reference cannot be the whole comment' },
   ],
   allowedWords: ['P1', 'P2', 'P3', 'P4'],
+  // The function keys a plan's press step may name: keyboard keys, not research job ids.
+  allowedStringValues: ['F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9', 'F10', 'F11', 'F12'],
   spellOut: {
     ac: 'criterion', cfg: 'config', ctx: 'context', env: 'environment', err: 'error', max: 'maximum',
     mb: 'megabytes', md: 'markdown', min: 'minimum', ms: 'milliseconds', msg: 'message', opts: 'options',

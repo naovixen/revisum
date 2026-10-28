@@ -1,6 +1,6 @@
 // The assertion oracle: pure functions from a probe to a verdict. It lives in the engine so that
 // neither a driver nor an AI can change what "passed" means.
-import type { ElementAssertion, ElementProbe, PageAssertion, PageProbe } from '@revisum/contracts';
+import type { ElementProbe, PageAssertion, PageProbe, ResolvedElementAssertion } from '@revisum/contracts';
 
 export type Verdict = { readonly pass: boolean; readonly code: 'not-found' | 'ambiguous' | 'assertion-failed' | null };
 
@@ -12,7 +12,8 @@ const AMBIGUOUS: Verdict = { pass: false, code: 'ambiguous' };
 // Collapses runs of white space and trims, so layout white space never decides a text check.
 export const normalise = (text: string): string => text.replace(/\s+/g, ' ').trim();
 
-export function checkElement(assertion: ElementAssertion, probe: ElementProbe): Verdict {
+// The assertion's expected text is final: the run replaces value references before checking.
+export function checkElement(assertion: ResolvedElementAssertion, probe: ElementProbe): Verdict {
   // Checks on how many elements match come before the single-element rule below.
   if (assertion.kind === 'absent') return probe.count === 0 ? PASSED : FAILED;
   if (assertion.kind === 'countEquals') return probe.count === assertion.value ? PASSED : FAILED;
@@ -42,5 +43,7 @@ export function checkPage(assertion: PageAssertion, probe: PageProbe): Verdict {
     case 'title': return normalise(probe.title) === normalise(assertion.value) ? PASSED : FAILED;
     // The expected URL may be a path; it is resolved against the page's URL before comparing.
     case 'url': return new URL(assertion.value, probe.url).href === new URL(probe.url).href ? PASSED : FAILED;
+    // A plain text prefix of the path: the query and fragment are not part of it.
+    case 'urlPathStartsWith': return new URL(probe.url).pathname.startsWith(assertion.value) ? PASSED : FAILED;
   }
 }

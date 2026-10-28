@@ -1,9 +1,9 @@
 // Turns any protocol's PageOperations into a Session. Auto-waiting, probing, masking and
 // auditing live here once, so every protocol behaves the same way.
 import {
-  failure, reveal, success,
-  type ActionGuard, type ActionStep, type DriverError, type ElementProbe, type Locator, type PageProbe, type Result, type Secret,
-  type SessionEnvironment,
+  failure, literalActionStep, performableLocator, reveal, success,
+  type ActionGuard, type ActionStep, type DriverError, type ElementProbe, type Locator, type PageProbe, type ResolvedLocator, type Result,
+  type Secret, type SessionEnvironment,
 } from '@revisum/contracts';
 import {
   actionability, armHitCheck, findByLabel, findByTestId, findByText, fontsReady, maskElements, pageInfo, probeElement,
@@ -25,7 +25,7 @@ export type SessionDetails = {
 };
 
 // Finds the elements a locator matches. An error while the page navigates counts as "nothing found yet".
-export async function locate<Handle>(operations: PageOperations<Handle>, locator: Locator): Promise<Handle[]> {
+export async function locate<Handle>(operations: PageOperations<Handle>, locator: ResolvedLocator): Promise<Handle[]> {
   try {
     switch (locator.by) {
       case 'role': return await operations.byRole(locator.role, locator.name);
@@ -43,7 +43,7 @@ type Actionable<Handle> = Result<{ readonly element: Handle; readonly at: { x: n
 // Auto-wait: exactly one match that is attached, visible, stable, enabled and hit by a pointer at
 // its centre. Never the first of several matches; a typed failure at the deadline.
 export async function waitUntilActionable<Handle>(
-  operations: PageOperations<Handle>, locator: Locator, timeoutMilliseconds: number,
+  operations: PageOperations<Handle>, locator: ResolvedLocator, timeoutMilliseconds: number,
 ): Promise<Actionable<Handle>> {
   const deadline = Date.now() + timeoutMilliseconds;
   let count = 0;
@@ -74,7 +74,10 @@ export async function waitUntilActionable<Handle>(
 }
 
 export function buildSession<Handle>(operations: PageOperations<Handle>, environment: SessionEnvironment, details: SessionDetails): DriverSession {
-  const probe = async (locator: Locator): Promise<ElementProbe> => {
+  const probe = async (planLocator: Locator): Promise<ElementProbe> => {
+    // A value reference, a position or another test-id attribute matches nothing here yet.
+    const locator = performableLocator(planLocator);
+    if (locator === undefined) return NO_ELEMENT;
     const found = await locate(operations, locator);
     const element = found[0];
     if (found.length !== 1 || element === undefined) return { ...NO_ELEMENT, count: found.length };
@@ -85,7 +88,7 @@ export function buildSession<Handle>(operations: PageOperations<Handle>, environ
     }
   };
   // A click with a hit-target check: a click that lands on another element is swallowed in the page and retried.
-  const click = async (locator: Locator): Promise<Result<void, DriverError>> => {
+  const click = async (locator: ResolvedLocator): Promise<Result<void, DriverError>> => {
     const deadline = Date.now() + environment.timeoutMilliseconds;
     for (;;) {
       const waited = await waitUntilActionable(operations, locator, Math.max(deadline - Date.now(), 0));
@@ -105,18 +108,21 @@ export function buildSession<Handle>(operations: PageOperations<Handle>, environ
     if (step.type === 'hover' || step.type === 'select' || step.type === 'upload') {
       return failure({ code: 'not-actionable', detail: `this driver does not perform ${step.type} steps yet` });
     }
+    // Anything this driver cannot perform in full is refused before it touches the page.
+    const action = literalActionStep(step);
+    if (action === undefined) return failure({ code: 'not-actionable', detail: `this driver does not perform this ${step.type} step yet` });
     // A secret reference arrives with the secret the engine resolved for it. Without that secret
     // there is nothing to type, and typing nothing could pass a step that should fail.
-    const typed = step.type === 'fill' ? step.value : '';
+    const typed = action.type === 'fill' ? action.value : '';
     const typedSecret = typeof typed === 'string' ? null : secret?.name === typed.secretName ? secret : undefined;
     if (typedSecret === undefined) return failure({ code: 'not-actionable', detail: 'a secret reference reached the driver without its secret' });
     try {
-      if (step.type === 'click') return await click(step.locator);
-      const waited = await waitUntilActionable(operations, step.locator, environment.timeoutMilliseconds);
+      if (action.type === 'click') return await click(action.locator);
+      const waited = await waitUntilActionable(operations, action.locator, environment.timeoutMilliseconds);
       if (!waited.ok) return waited;
       // The secret is revealed here, as it is typed, and nowhere else in this driver.
-      if (step.type === 'fill') await operations.fill(waited.value.element, typedSecret === null ? String(typed) : reveal(typedSecret));
-      else await operations.press(waited.value.element, step.key);
+      if (action.type === 'fill') await operations.fill(waited.value.element, typedSecret === null ? String(typed) : reveal(typedSecret));
+      else if (action.type === 'press') await operations.press(waited.value.element, action.key);
       return success(undefined);
     } catch (error) {
       return failure({ code: 'not-actionable', detail: errorText(error) });

@@ -77,11 +77,22 @@ export function validateAgainstSchema(schema: unknown, value: unknown): string[]
             for (const name of rule) if (!Object.hasOwn(instance, String(name))) problems.push(`${path}: is missing the required property ${String(name)}`);
           }
           break;
-        case 'additionalProperties':
-          if (rule !== false) { problems.push(`${path}: only "additionalProperties": false is supported`); break; }
+        case 'additionalProperties': {
+          // false refuses every property not declared; a schema checks each of them against it.
+          if (rule !== false && !isObject(rule)) { problems.push(`${path}: "additionalProperties" must be false or a schema`); break; }
+          if (!isObject(instance)) break;
+          const declared = isObject(node['properties']) ? node['properties'] : {};
+          for (const name of Object.keys(instance).filter((key) => !Object.hasOwn(declared, key))) {
+            if (rule === false) problems.push(`${path}: has the unknown property ${name}`);
+            else problems.push(...validate(rule, instance[name], `${path}.${name}`));
+          }
+          break;
+        }
+        case 'propertyNames':
           if (isObject(instance)) {
-            const declared = isObject(node['properties']) ? node['properties'] : {};
-            for (const name of Object.keys(instance)) if (!Object.hasOwn(declared, name)) problems.push(`${path}: has the unknown property ${name}`);
+            for (const name of Object.keys(instance)) {
+              if (validate(rule, name, path).length > 0) problems.push(`${path}: has a property whose name is not allowed`);
+            }
           }
           break;
         case 'oneOf': {
