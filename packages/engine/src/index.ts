@@ -19,6 +19,12 @@ export { assertBranded, planParser } from './plan/plan-parser.ts';
 export { migratePlan, type CriterionMapping } from './plan/plan-migration.ts';
 export { clockAdvanceMilliseconds, totalClockAdvanceMilliseconds } from './clock-advance.ts';
 export { planJsonSchema, type JsonSchema } from './plan/plan-schema.ts';
+export {
+  readPlanText, writePlanText,
+  type DraftError, type TextErrorCode, type TextPosition, type TextReading, type TextWarning,
+} from './plan/readable/plan-text.ts';
+export { writePlanJson } from './plan/plan-json.ts';
+export { admitDraft, type PlanParse } from './plan/plan-drafts.ts';
 export { parseAiText, type AiText } from './ai-text.ts';
 export * from './coverage-study.ts';
 export * from './logging.ts';

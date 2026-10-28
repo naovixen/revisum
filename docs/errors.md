@@ -7,7 +7,7 @@
 - Plan codes use underscores (`unknown_step`); every other union uses hyphens (`not-found`).
 - Each code says what was refused and what to do. Errors carry a code and a location, never the offending value, so private or hostile text is never echoed back.
 
-Plan errors (`PlanErrorCode`, from the plan parser in `engine`) come first, then step errors (`StepErrorCode`, decided by the engine at run time), then service call errors (`ServiceCallErrorCode`, from a declared call), then driver, runner, review recorder, event sink, command-line, approval, trust, policy and run refusal errors.
+Plan errors (`PlanErrorCode`, from the plan parser in `engine`) come first, then readable plan errors (`TextErrorCode`, from the readable plan reader in `engine`), then step errors (`StepErrorCode`, decided by the engine at run time), then service call errors (`ServiceCallErrorCode`, from a declared call), then driver, runner, review recorder, event sink, command-line, approval, trust, policy and run refusal errors.
 
 ## not_object
 
@@ -112,6 +112,46 @@ A stub response sets a header that changes how the browser treats the response: 
 ## no_criterion_id
 
 Migration error. A version 1 plan has an assertion with no entry in the criterion mapping, so the migration cannot say which acceptance criterion it checks. Add the criterion id to the mapping, keyed by the assertion step's JSON path, such as `$.steps[3]`.
+
+## unknown-statement
+
+Readable plan error. The line is not a statement the readable grammar has, or not one that may stand there: a header after the first step, or any statement after the `Clean up:` block. Check the statement's words against the grammar in SPEC-28, or move the line.
+
+## bad-locator
+
+Readable plan error. A locator cannot be read: an unknown role, a position with the wrong English suffix (`2th`), or a locator kind's words misspelt. Write `<role> "<name>"`, `label "<text>"`, `text "<text>"` or `test id "<id>"`, optionally after `first`, `last` or an ordinal such as `2nd`.
+
+## bad-string
+
+Readable plan error. Quoted text is not closed on its line, holds an escape other than `\"` and `\\`, or a value reference is not one name in braces, such as `{orderCode}`. Close the quotes, escape quotes and backslashes only, and write references with no spaces.
+
+## bad-indent
+
+Readable plan error. A line is indented by anything but spaces, by an odd number of spaces, or deeper than the blocks open above it. Indent the lines of a `Values:`, `Clean up:`, `In frame …:` or `In new tab at …:` block by two spaces more than the line that opens it.
+
+## missing-header
+
+Readable plan error. The text has no `Plan:`, `Version:` or `Targets:` header. Add it before the first step.
+
+## duplicate-header
+
+Readable plan error. A header is written twice. Keep one.
+
+## no-criterion
+
+Readable plan error. An `Expect` line has no `Criterion:` line before it, so the check would trace to no acceptance criterion. Add `Criterion: <criterion id>` before it.
+
+## unknown-key-name
+
+Readable plan error. A `Press` line names a key or modifier the plan language does not have. Use a key name such as `Enter`, `a` or `Backquote`, and the modifiers `Alt`, `Control`, `Meta`, `Shift` or `ControlOrMeta`.
+
+## too-large
+
+Readable plan error. The text is larger than any plan may be, so none of it is read. Split the plan.
+
+## duplicate-key
+
+Readable plan error. A name is written twice where the plan's JSON holds it once: under `Values:`, in one argument list, in one query or in one `remembering` list. Remove or rename the second one.
 
 ## value-empty
 
@@ -270,6 +310,8 @@ Command-line error, and trust error from the project loader. The project configu
 ## untrusted-source
 
 Command-line error, and trust error. The project configuration came from a branch other than the protected branch and has no approval, or the protected branch could not be read. Merge `project.json` to the protected branch.
+
+Plan draft error, too. A draft claims a source only core itself records: a `core-recorded` basis, or one of core's own routes (`draft-command`, `ticket`, `builder`, `recorder`, `chat`) as a declared source. Declare `hand-written` or `customer-llm`, or declare nothing.
 
 ## plan-rejected
 

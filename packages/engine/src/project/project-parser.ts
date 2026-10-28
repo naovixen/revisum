@@ -189,7 +189,7 @@ function readTarget(input: unknown, path: string, issues: Issues): Parsed<Target
 }
 
 // The largest value a project may set for each limit. Every limit is a whole number of at least 1.
-const LIMIT_CEILINGS: { readonly [Key in keyof Limits]: number } = {
+export const LIMIT_CEILINGS: { readonly [Key in keyof Limits]: number } = {
   maximumPlanBytes: 1 << 20, maximumSteps: 1000, maximumTextLength: 4000, stepTimeoutMilliseconds: 60_000, maximumFrameDepth: 16,
   maximumFillLines: 500, maximumFillCharacters: 20_000, maximumDownloadBytes: LARGEST_DOWNLOAD_BYTES, maximumCalls: 200,
   backendCheckTimeoutMilliseconds: 120_000, requestQuietMilliseconds: 5000,

@@ -288,8 +288,10 @@ Clean up:
 
 ```ts
 // Plan, PlanData, PlanError, PlanLimits and parseAiText: SPEC-01. Result, Brand, Origin, TargetId, Role,
-// EventSink and DerivedActor: SPEC-27. SecretName: SPEC-04. CriterionId: SPEC-01.
-export type PlanSource = 'hand-written' | 'customer-llm' | 'draft-command' | 'ticket' | 'builder' | 'recorder' | 'chat';
+// EventSink, SinkError and DerivedActor: SPEC-27. SecretName: SPEC-04. CriterionId: SPEC-01.
+export const PLAN_SOURCES = ['hand-written', 'customer-llm', 'draft-command', 'ticket', 'builder', 'recorder', 'chat'] as const;
+export type PlanSource = (typeof PLAN_SOURCES)[number];
+export const DECLARABLE_PLAN_SOURCES = ['hand-written', 'customer-llm'] as const;
 // core-recorded: core produced the draft. declared: an author named the source of a file; never checked or trusted.
 export type ProvenanceBasis = 'core-recorded' | 'declared';
 export type PlanProvenance = {
@@ -297,16 +299,21 @@ export type PlanProvenance = {
   readonly reference?: string;                     // spec path, issue id or session id; never content
 };
 export type PlanFormat = 'json' | 'text';
-// What every route produces: text, never a Plan. Only parsePlan makes a Plan.
-export type PlanDraft = { readonly format: PlanFormat; readonly content: string; readonly provenance: PlanProvenance };
+// What every route produces: text, never a Plan. Only parsePlan makes a Plan. `provenance` is the
+// declared source; left out, the draft is hand-written, basis declared. Only hand-written and
+// customer-llm may be declared (DECLARABLE_PLAN_SOURCES); anything else is refused as untrusted-source.
+export type PlanDraft = { readonly format: PlanFormat; readonly content: string; readonly provenance?: PlanProvenance };
 
 export type TextPosition = { readonly line: number; readonly column: number };          // 1-based
 export type TextErrorCode = 'unknown-statement' | 'bad-locator' | 'bad-string' | 'bad-indent' | 'missing-header'
-  | 'duplicate-header' | 'no-criterion' | 'relative-url-without-origin' | 'unknown-key-name' | 'too-large';
-// Text errors and the parser's errors, each placed by line and column; neither echoes a value.
+  | 'duplicate-header' | 'no-criterion' | 'unknown-key-name' | 'too-large' | 'duplicate-key';
+// Text errors and the parser's errors, each placed by line and column (a JSON draft's parser errors
+// have no lines); none echoes a value. A refused source claim and an unrecorded submission have no place.
 export type DraftError =
   | { readonly stage: 'text'; readonly code: TextErrorCode; readonly position: TextPosition }
-  | { readonly stage: 'plan'; readonly code: PlanErrorCode; readonly path: string; readonly position: TextPosition | null };
+  | { readonly stage: 'plan'; readonly code: PlanErrorCode; readonly path: string; readonly position: TextPosition | null }
+  | { readonly stage: 'source'; readonly code: 'untrusted-source'; readonly position: null }
+  | { readonly stage: 'audit'; readonly code: SinkError['code']; readonly position: null };
 export type TextWarning = { readonly code: 'comment-dropped'; readonly position: TextPosition };
 // Reading text gives plain JSON for the plan parser, plus the line each JSON path came from.
 export type TextReading = {
@@ -315,9 +322,11 @@ export type TextReading = {
 export type PlanParse = (input: unknown) => Result<Plan, readonly PlanError[]>;          // what planParser(project) returns
 export function readPlanText(text: string, limits: PlanLimits): Result<TextReading, readonly DraftError[]>; // pure; never a Plan
 export function writePlanText(plan: Plan): string;    // pure; canonical text
-export function writePlanJson(plan: Plan): string;    // pure; canonical JSON: fixed key order, two-space indent, LF, final newline
-export function planHash(plan: Plan): string;         // SHA-256 of writePlanJson(plan); the approval subject (SPEC-02)
-// The one door from a draft to a Plan for every route. Appends plan.submitted or plan.rejected with the provenance.
+// pure; canonical JSON: canonicalJson's key order (sorted), two-space indent, LF, final newline
+export function writePlanJson(plan: Plan): string;
+export function planHash(plan: Plan): string;         // SHA-256 of canonicalJson(plan), as built; the approval subject (SPEC-02)
+// The one door from a draft to a Plan for every route. Appends plan.submitted or plan.rejected with
+// the provenance (EventInput.planProvenance); a refused source claim is recorded without it.
 export function admitDraft(draft: PlanDraft, parsePlan: PlanParse, events: EventSink, actor: DerivedActor)
   : Result<Plan, readonly DraftError[]>;
 

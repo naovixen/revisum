@@ -31,6 +31,7 @@ const entryFor = (event: EventInput, actor: DerivedActor): string => JSON.string
   proofKind: event.proofKind,
   code: event.code,
   path: event.path,
+  planProvenance: event.planProvenance,
   actor: actor.actor,
   actorType: actor.actorType,
 });

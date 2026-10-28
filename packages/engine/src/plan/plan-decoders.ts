@@ -46,9 +46,11 @@ const SCRIPT_LIKE: readonly RegExp[] = [
   /data\s*:\s*text\/html/i,
 ];
 
-// True for text with control or bidirectional-override characters, or anything that looks like script.
+// True for text with control or bidirectional-override characters, anything that looks like
+// script, or half of a UTF-16 surrogate pair on its own, which no UTF-8 file can hold, so the plan
+// would change when saved.
 export const isUnsafeText = (value: string): boolean =>
-  CONTROL_OR_BIDIRECTIONAL.test(value) || SCRIPT_LIKE.some((pattern) => pattern.test(value));
+  CONTROL_OR_BIDIRECTIONAL.test(value) || SCRIPT_LIKE.some((pattern) => pattern.test(value)) || !value.isWellFormed();
 
 // The same characters apart from tab and line breaks, which prose such as release notes needs.
 const CONTROL_OR_BIDIRECTIONAL_IN_PROSE = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f‪-‮⁦-⁩]/;

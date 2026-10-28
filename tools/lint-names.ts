@@ -346,6 +346,9 @@ function isExportedDeclaration(tokens: readonly Token[], index: number): boolean
   return false;
 }
 
+// The field of a plan check that holds the user's own criterion id.
+const USER_CRITERION_ID_FIELD = 'criterionId';
+
 function lintJson(checker: Checker, file: string, source: string, violations: NamingViolation[]): void {
   let parsed: unknown;
   try {
@@ -358,21 +361,24 @@ function lintJson(checker: Checker, file: string, source: string, violations: Na
     const offset = source.indexOf(JSON.stringify(text));
     return offset === -1 ? 0 : source.slice(0, offset).split('\n').length;
   };
-  const visit = (value: unknown): void => {
+  // `userId` marks the value of a plan check's criterionId: the user's own id for a criterion of
+  // their spec, such as "AC-3". It is data, not a name of ours, so the naming rules skip it; banned
+  // text and this repository's own criterion ids are still caught in it.
+  const visit = (value: unknown, userId = false): void => {
     if (typeof value === 'string') {
       if (checker.config.criterionIdPattern.test(value)) {
         violations.push({ file, line: lineOf(value), name: value, why: 'criterion id outside test metadata' });
       }
-      const problems = isNameLike(value) && !checker.config.allowedStringValues.includes(value)
+      const problems = isNameLike(value) && !userId && !checker.config.allowedStringValues.includes(value)
         ? nameProblems(checker, value, false)
         : [firstMatch(checker.config.bannedText, value)].filter((why) => why !== undefined);
       for (const why of problems) violations.push({ file, line: lineOf(value), name: value, why });
     } else if (Array.isArray(value)) {
-      value.forEach(visit);
+      value.forEach((item) => visit(item));
     } else if (typeof value === 'object' && value !== null) {
       for (const [key, child] of Object.entries(value)) {
         for (const why of nameProblems(checker, key, false)) violations.push({ file, line: lineOf(key), name: key, why });
-        visit(child);
+        visit(child, key === USER_CRITERION_ID_FIELD);
       }
     }
   };
@@ -473,6 +479,10 @@ const PLANTED_CASES: readonly PlantedCase[] = [
   { path: 'packages/demo/src/planted-claim.ts', source: `// Backed by ${PLANTED_CLAIM_ID}.\nexport const value = 1;\n`, expectedWhy: 'claim id' },
   // A lowercase name that starts with a banned id is not mistaken for an opaque machine id.
   { path: 'packages/demo/planted-lowercase.json', source: '{ "name": "p3core" }\n', expectedWhy: 'spike name' },
+  // A user's criterion id is data only as the value of a criterionId field; anywhere else it is still caught.
+  { path: 'packages/demo/planted-criterion-elsewhere.json', source: '{ "name": "AC-3" }\n', expectedWhy: 'acceptance criterion: write "criterion"' },
+  // Banned text is still caught in a criterionId value.
+  { path: 'packages/demo/planted-criterion-claim.json', source: `{ "criterionId": "${PLANTED_CLAIM_ID}" }\n`, expectedWhy: 'claim id' },
 ];
 
 const CLEAN_FILES: readonly CleanFile[] = [
@@ -495,6 +505,11 @@ const CLEAN_FILES: readonly CleanFile[] = [
       asset: 'test-assets/sc2-4-2-title-page-with-title.html',
       keys: ['F1', 'F12'],
     }),
+  },
+  {
+    // A plan check's criterionId holds the user's own id for a criterion of their spec.
+    path: 'packages/demo/clean-criterion-id.json',
+    source: '{ "steps": [{ "type": "expectPage", "criterionId": "AC-3" }] }\n',
   },
   {
     // The function keys F1 to F12 are keyboard keys when written as string values.

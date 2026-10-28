@@ -4,6 +4,7 @@
 // See docs/specs/SPEC-27-shared-types-and-events.md.
 import type { ApprovalErrorCode, ApprovalProof } from './approval.ts';
 import type { Brand } from './brand.ts';
+import type { PlanProvenance } from './plan-drafts.ts';
 import type { PolicyRuleId } from './policy.ts';
 import type { Result } from './result.ts';
 
@@ -28,8 +29,7 @@ export type AuditEventKind =
   | 'trusted.changed-with-code' | 'run.finished' | 'review.decided' | 'severity.overridden' | 'adapter.admitted'
   | 'pack.admitted' | 'check.removed' | 'tracker.changed' | 'holdout.access-refused';
 
-// What a caller records. The actor is passed separately, as a DerivedActor. The plan authoring
-// route (which tool produced a draft) joins this when plan authoring is built (SPEC-28).
+// What a caller records. The actor is passed separately, as a DerivedActor.
 export type EventInput = {
   readonly kind: AuditEventKind;
   readonly subjectHash?: string;
@@ -41,6 +41,8 @@ export type EventInput = {
   readonly code?: ApprovalErrorCode | PolicyRuleId;
   // On trusted.changed-with-code: the trusted file the change edited, relative to the repository root.
   readonly path?: string;
+  // On plan.submitted and plan.rejected: where the draft came from, as recorded, never trusted.
+  readonly planProvenance?: PlanProvenance;
 };
 
 // not-append-only: the file no longer holds exactly what the sink wrote, so something else
