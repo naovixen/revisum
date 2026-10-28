@@ -25,6 +25,8 @@ Plan error. A required field is absent, such as an assertion's `value`. Add it.
 
 Plan error. A value has the wrong JSON type, such as a number where text is expected. Use the type the plan language defines.
 
+An `advanceClock` amount must be a whole number of at least 1: a missing amount, 0, a negative or fractional number, or text such as `"15"` is `wrong_type` at `.by.amount`.
+
 ## unknown_step
 
 Plan error. A step's `type` is not one of the plan language's steps. Use one of the listed step types.
@@ -58,6 +60,8 @@ Plan error. Text holds control or bidirectional-override characters, or somethin
 ## too_large
 
 Plan error. The plan is larger than the project's byte limit, nests frame steps deeper than its `maximumFrameDepth`, or has a list longer than allowed. Size and depth are checked before the plan is read, so nothing else in it is reported.
+
+An `advanceClock` step is also `too_large` when its amount is over the project's `limits.maximumClockAdvanceMilliseconds` (reported at `.by.amount`), or when it is the step at which the plan's advances, added up in document order with those inside `frame` and `newTab` blocks, first pass `limits.maximumTotalClockAdvanceMilliseconds` (reported at the step). Split the wait over fewer, shorter advances, or raise the limits in the trusted project. A project whose step limit is above its plan limit is refused with `too_large` at `limits.maximumClockAdvanceMilliseconds`.
 
 ## too_long
 
@@ -120,6 +124,8 @@ Step error. A run value used by the step breaks the safe-text rules, or is `""`,
 ## value-too-long
 
 Step error. A run value used by the step is longer than the project's `maximumTextLength`. The step fails before anything is sent to the page. Shorten the value's prefix, or raise the limit in the trusted project.
+
+The clipboard text an `expectClipboard` or a clipboard `remember` reads is also `value-too-long` when it is longer than the project's `limits.maximumClipboardCharacters` (20,000 unless the project sets it, at most 200,000). The text is never recorded.
 
 ## state-not-exposed
 
@@ -204,6 +210,14 @@ Driver error. A download grew past the project's `limits.maximumDownloadBytes` (
 ## storage-origin-mismatch
 
 Driver error. A `setStorage` or `removeStorage` step ran while the page was on another origin than the storage entry's declared `origin`, so nothing was written or removed. Navigate to a page on the entry's origin first.
+
+## clock-runaway
+
+Driver error. One `advanceClock` step would have fired more timer callbacks than the project's `limits.maximumTimersPerAdvance` (10,000 unless the project sets it, at most 100,000), such as a zero-delay timer loop or an endless animation-frame loop. The step fails and the run ends `Failed` there, so a timer loop cannot hang a run. Advance by less, fix the loop, or raise the limit in the trusted project.
+
+## clipboard-unavailable
+
+Driver error. The browser cannot keep the clipboard inside its own memory, so the driver never reads it: every `expectClipboard` and clipboard `remember` fails, and the host's clipboard is never touched. Run the plan on a target whose browser keeps a run-local clipboard.
 
 ## image-missing
 

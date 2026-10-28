@@ -277,6 +277,12 @@
         },
         {
           "$ref": "#/$defs/expectStorageStep"
+        },
+        {
+          "$ref": "#/$defs/advanceClockStep"
+        },
+        {
+          "$ref": "#/$defs/expectClipboardStep"
         }
       ]
     },
@@ -689,6 +695,20 @@
         },
         "from": {
           "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "clipboard": {
+                  "enum": [
+                    "text"
+                  ]
+                }
+              },
+              "required": [
+                "clipboard"
+              ],
+              "additionalProperties": false
+            },
             {
               "type": "object",
               "properties": {
@@ -1173,6 +1193,69 @@
       "required": [
         "type",
         "entry",
+        "assert",
+        "criterionId"
+      ],
+      "additionalProperties": false
+    },
+    "advanceClockStep": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "advanceClock"
+        },
+        "by": {
+          "type": "object",
+          "properties": {
+            "amount": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "unit": {
+              "enum": [
+                "milliseconds",
+                "seconds",
+                "minutes",
+                "hours",
+                "days"
+              ]
+            }
+          },
+          "required": [
+            "amount",
+            "unit"
+          ],
+          "additionalProperties": false
+        },
+        "mode": {
+          "enum": [
+            "runTimers",
+            "skipAhead"
+          ]
+        }
+      },
+      "required": [
+        "type",
+        "by"
+      ],
+      "additionalProperties": false
+    },
+    "expectClipboardStep": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "expectClipboard"
+        },
+        "assert": {
+          "$ref": "#/$defs/clipboardAssertion"
+        },
+        "criterionId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+        }
+      },
+      "required": [
+        "type",
         "assert",
         "criterionId"
       ],
@@ -1880,6 +1963,66 @@
           "properties": {
             "kind": {
               "const": "equals"
+            },
+            "value": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+                },
+                {
+                  "$ref": "#/$defs/valueReference"
+                }
+              ]
+            }
+          },
+          "required": [
+            "kind",
+            "value"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "clipboardAssertion": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "textEquals"
+            },
+            "value": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+                },
+                {
+                  "$ref": "#/$defs/valueReference"
+                },
+                {
+                  "$ref": "#/$defs/multiLineText"
+                }
+              ]
+            }
+          },
+          "required": [
+            "kind",
+            "value"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "enum": [
+                "textContains",
+                "textExcludes"
+              ]
             },
             "value": {
               "oneOf": [

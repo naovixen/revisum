@@ -289,6 +289,9 @@ function runtimeRule(
     case 'call': case 'expectBackend':
     case 'stub': case 'resetRequests': case 'expectRequests': case 'expectResponse':
     case 'setStorage': case 'removeStorage': case 'expectStorage':
+    // A clock advance moves the page's own clock and a clipboard check only reads: neither sends
+    // input, so neither is a side effect, and a proposal may hold both.
+    case 'advanceClock': case 'expectClipboard':
       return null;
   }
 }

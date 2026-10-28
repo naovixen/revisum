@@ -11,9 +11,11 @@ import type { Target } from './target.ts';
 // no-download: a download step's click started no download within the step timeout.
 // download-too-large: the file grew past the project's maximumDownloadBytes; its partial bytes are deleted.
 // storage-origin-mismatch: a storage write's page is not on the entry's declared origin, so nothing was written.
+// clock-runaway: one clock advance would fire more timer callbacks than the project's maximumTimersPerAdvance.
+// clipboard-unavailable: the browser cannot keep the clipboard in its own memory, so it is never read.
 export type DriverErrorCode =
   | 'not-found' | 'ambiguous' | 'not-actionable' | 'timeout' | 'navigation-failed' | 'policy-denied'
-  | 'no-download' | 'download-too-large' | 'storage-origin-mismatch';
+  | 'no-download' | 'download-too-large' | 'storage-origin-mismatch' | 'clock-runaway' | 'clipboard-unavailable';
 export type DriverError = { readonly code: DriverErrorCode; readonly detail: string };
 
 // Why a declared target cannot run. A driver explains a "no"; it never substitutes another target.

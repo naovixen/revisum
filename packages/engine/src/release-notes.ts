@@ -3,8 +3,8 @@
 // replace it, and never containing typed or expected values.
 import {
   literalText, referencedValueName,
-  type AiWriter, type ArtifactReference, type ArtifactStore, type Locator, type Plan, type RememberSource, type REQUEST_COUNT_KINDS, type RequestCount,
-  type ResponseAssertion, type Step, type StorageAssertion, type TextOrValue,
+  type AiWriter, type ArtifactReference, type ArtifactStore, type ClipboardAssertion, type ClockAdvance, type Locator, type Plan,
+  type RememberSource, type REQUEST_COUNT_KINDS, type RequestCount, type ResponseAssertion, type Step, type StorageAssertion, type TextOrValue,
 } from '@revisum/contracts';
 import { parseAiText } from './ai-text.ts';
 import type { PlanErrorCode } from './plan/plan-decoders.ts';
@@ -84,11 +84,21 @@ export function describeStep(step: Step): string {
     case 'setStorage': return `Wrote the declared \`${codeSpanText(step.entry)}\` storage entry`;
     case 'removeStorage': return `Removed the declared \`${codeSpanText(step.entry)}\` storage entry`;
     case 'expectStorage': return `Checked that the \`${codeSpanText(step.entry)}\` storage entry ${STORAGE_ASSERTION_TEXT[step.assert.kind]}`;
+    case 'advanceClock': return `Advanced the page's clock by ${describeClockAdvance(step.by)}${step.mode === 'skipAhead' ? ', skipping ahead' : ''}`;
+    case 'expectClipboard': return `Checked that the clipboard ${CLIPBOARD_ASSERTION_TEXT[step.assert.kind]}`;
   }
 }
 
+// "1 minute", "10 minutes": the amount is a whole number the plan wrote, never page data.
+const describeClockAdvance = (by: ClockAdvance): string => `${by.amount} ${by.amount === 1 ? by.unit.slice(0, -1) : by.unit}`;
+
+const CLIPBOARD_ASSERTION_TEXT: { readonly [Kind in ClipboardAssertion['kind']]: string } = {
+  textEquals: 'holds the expected text', textContains: 'contains the expected text', textExcludes: 'does not contain the excluded text',
+};
+
 function describeRememberSource(from: RememberSource): string {
   if ('element' in from) return `${from.read === 'text' ? 'the text' : 'the value'} of ${describeLocator(from.element)}`;
+  if ('clipboard' in from) return "the clipboard's text";
   const field = `field "${markdownEscape(from.field)}" of the latest \`${codeSpanText(from.response)}\` response`;
   return from.read === 'text' ? field : `the length of ${field}`;
 }

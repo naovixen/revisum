@@ -5,13 +5,15 @@
 // the text safety rules, that values and downloads are defined before use, that a second tab
 // and a call open only at the top level, that a call and its arguments and fields fit the
 // project's declarations, that each stub, observed request, storage entry and field is one the
-// project declares, and that a plan declaring "1.1" uses nothing 1.2 added. Passing the
-// schema is never a reason to trust a plan.
+// project declares, that each clock advance and the plan's advances together fit the project's
+// limits, and that a plan declaring "1.1" uses nothing 1.2 added. Passing the schema is never a
+// reason to trust a plan.
 // `npm run lint` checks that docs/plan-language/plan.schema.json is exactly this schema.
 // See docs/specs/SPEC-01-plan-language-and-parser.md, docs/specs/SPEC-30-plan-values-positions-and-keys.md
-// docs/specs/SPEC-31-page-states-metadata-downloads-and-tabs.md and docs/specs/SPEC-32-declared-service-calls.md.
+// docs/specs/SPEC-31-page-states-metadata-downloads-and-tabs.md, docs/specs/SPEC-32-declared-service-calls.md
+// and docs/specs/SPEC-34-clock-advance-and-clipboard.md.
 import {
-  AUDIT_MODES, BACKEND_ASSERTION_KINDS, DATE_ANCHORS, DATE_FORMATS, DIALOG_ACTIONS, DOWNLOAD_TEXT_KINDS, ELEMENT_STATE_KINDS, ELEMENT_TEXT_KINDS, KEYS,
+  AUDIT_MODES, BACKEND_ASSERTION_KINDS, CLIPBOARD_ASSERTION_KINDS, CLIPBOARD_READS, CLOCK_ADVANCE_MODES, CLOCK_UNITS, DATE_ANCHORS, DATE_FORMATS, DIALOG_ACTIONS, DOWNLOAD_TEXT_KINDS, ELEMENT_STATE_KINDS, ELEMENT_TEXT_KINDS, KEYS,
   LOCATOR_KINDS, MODIFIERS, PAGE_TEXT_KINDS, POSITION_WORDS, REMEMBER_READS, RESPONSE_FIELD_PRESENCE_KINDS, RESPONSE_FIELD_TEXT_KINDS,
   RESPONSE_READS, ROLES, SCRIPT_MODES, STORAGE_ASSERTION_KINDS, STUB_ACTIONS,
   type StepType,
@@ -71,9 +73,11 @@ const STEP_FIELD_SCHEMAS: Readonly<Record<string, JsonSchema>> = {
   [CRITERION_FIELD]: { type: 'string', pattern: CRITERION_ID.source },
   mode: { enum: [...AUDIT_MODES] },
   name: { type: 'string', pattern: CAPTURE_NAME.source },
-  // An element of the page, or a field of the latest response a declared request check saw.
+  // An element of the page, a field of the latest response a declared request check saw, or the
+  // clipboard's plain text.
   from: {
     oneOf: [
+      closedObject({ clipboard: { enum: [...CLIPBOARD_READS] } }, ['clipboard']),
       closedObject({ element: reference('locator'), read: { enum: [...REMEMBER_READS] } }, ['element', 'read']),
       closedObject({
         response: { type: 'string', pattern: DECLARED_NAME.source }, field: { type: 'string', pattern: DECLARED_NAME.source },
@@ -93,6 +97,8 @@ const STEP_FIELD_SCHEMAS: Readonly<Record<string, JsonSchema>> = {
   request: { type: 'string', pattern: DECLARED_NAME.source },
   entry: { type: 'string', pattern: DECLARED_NAME.source },
   count: reference('requestCount'),
+  // A whole amount of at least 1 of a unit. The parser checks it against the project's limits.
+  by: closedObject({ amount: { type: 'integer', minimum: 1 }, unit: { enum: [...CLOCK_UNITS] } }, ['amount', 'unit']),
 };
 
 // Step fields whose schema depends on the step type.
@@ -106,6 +112,8 @@ const STEP_TYPE_FIELD_SCHEMAS: { readonly [Type in StepType]?: Readonly<Record<s
   stub: { action: { enum: [...STUB_ACTIONS] } },
   expectResponse: { assert: reference('responseAssertion') },
   expectStorage: { assert: reference('storageAssertion') },
+  advanceClock: { mode: { enum: [...CLOCK_ADVANCE_MODES] } },
+  expectClipboard: { assert: reference('clipboardAssertion') },
 };
 
 function stepSchema(type: StepType): JsonSchema {
@@ -253,6 +261,15 @@ export function planJsonSchema(): JsonSchema {
         oneOf: [
           closedObject({ kind: { enum: STORAGE_ASSERTION_KINDS.filter((kind) => kind !== 'equals') } }, ['kind']),
           closedObject({ kind: { const: 'equals' }, value: textOrValue(1) }, ['kind', 'value']),
+        ],
+      },
+      // A check on the clipboard's plain text. Only textEquals compares against several lines.
+      clipboardAssertion: {
+        oneOf: [
+          closedObject({
+            kind: { const: 'textEquals' }, value: { oneOf: [text(1), reference('valueReference'), reference('multiLineText')] },
+          }, ['kind', 'value']),
+          closedObject({ kind: { enum: CLIPBOARD_ASSERTION_KINDS.filter((kind) => kind !== 'textEquals') }, value: textOrValue(1) }, ['kind', 'value']),
         ],
       },
       // A URL a check compares and never visits: a path starting with "/", or an absolute http or

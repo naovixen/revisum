@@ -401,6 +401,9 @@ async function executeStep(step: Step, index: number, session: Session, target: 
     // The driver's network and storage ports come with the CDP driver; isUnsupported refused these above.
     case 'stub': case 'resetRequests': case 'expectRequests': case 'expectResponse':
     case 'setStorage': case 'removeStorage': case 'expectStorage':
+    // The driver's clock and clipboard ports come with the CDP driver; isUnsupported refused these
+    // above, so an advance never becomes a real wait.
+    case 'advanceClock': case 'expectClipboard':
       return { ...base, outcome: 'failed', code: 'unsupported-step' };
     case 'expect': {
       const locator = resolveLocator(step.locator, context.values, context.inputs.project);

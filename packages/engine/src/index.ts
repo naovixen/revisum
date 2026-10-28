@@ -17,6 +17,7 @@ export { policyGate, type PolicyGate, type PolicyGateOptions } from './policy/po
 export { BUILT_IN_IRREVERSIBLE_PATTERNS } from './policy/irreversible-patterns.ts';
 export { assertBranded, planParser } from './plan/plan-parser.ts';
 export { migratePlan, type CriterionMapping } from './plan/plan-migration.ts';
+export { clockAdvanceMilliseconds, totalClockAdvanceMilliseconds } from './clock-advance.ts';
 export { planJsonSchema, type JsonSchema } from './plan/plan-schema.ts';
 export { parseAiText, type AiText } from './ai-text.ts';
 export * from './coverage-study.ts';

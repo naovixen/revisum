@@ -1,8 +1,8 @@
 // The plan language's grammar as data: which fields each step and locator has, and the patterns
 // its ids follow. The plan parser reads these tables to decode a plan, and planJsonSchema() reads
 // the same tables to build the published JSON Schema, so the two cannot drift apart.
-// See docs/specs/SPEC-01-plan-language-and-parser.md, docs/specs/SPEC-30-plan-values-positions-and-keys.md
-// and docs/specs/SPEC-31-page-states-metadata-downloads-and-tabs.md.
+// See docs/specs/SPEC-01-plan-language-and-parser.md, docs/specs/SPEC-30-plan-values-positions-and-keys.md,
+// docs/specs/SPEC-31-page-states-metadata-downloads-and-tabs.md and docs/specs/SPEC-34-clock-advance-and-clipboard.md.
 import {
   DOWNLOAD_SIZE_KINDS, DOWNLOAD_TEXT_KINDS, ELEMENT_STATE_KINDS, ELEMENT_TEXT_KINDS, KEYS, PAGE_TEXT_KINDS, PLAN_VERSION,
   type Key, type StepType,
@@ -53,22 +53,28 @@ export const STEP_FIELDS: { readonly [Type in StepType]: StepFields } = {
   setStorage: { required: ['type', 'entry'], optional: ['arguments'] },
   removeStorage: { required: ['type', 'entry'], optional: [] },
   expectStorage: { required: ['type', 'entry', 'assert', CRITERION_FIELD], optional: [] },
+  // An advance without a mode runs timers.
+  advanceClock: { required: ['type', 'by'], optional: ['mode'] },
+  expectClipboard: { required: ['type', 'assert', CRITERION_FIELD], optional: [] },
 };
 // Stubs, request checks and web storage, which name what the trusted project declares.
 const NETWORK_AND_STORAGE_STEP_TYPES: readonly StepType[] = [
   'stub', 'resetRequests', 'expectRequests', 'expectResponse', 'setStorage', 'removeStorage', 'expectStorage',
 ];
+// Advancing the run's virtual clock and checking the clipboard, which need no declaration.
+const CLOCK_AND_CLIPBOARD_STEP_TYPES: readonly StepType[] = ['advanceClock', 'expectClipboard'];
 export const STEP_TYPES: readonly StepType[] = [
   'navigate', 'click', 'hover', 'fill', 'select', 'upload', 'press', 'frame', 'dialog', 'expect', 'expectPage', 'a11yAudit', 'capture',
-  'remember', 'download', 'expectDownload', 'newTab', 'call', 'expectBackend', ...NETWORK_AND_STORAGE_STEP_TYPES,
+  'remember', 'download', 'expectDownload', 'newTab', 'call', 'expectBackend', ...NETWORK_AND_STORAGE_STEP_TYPES, ...CLOCK_AND_CLIPBOARD_STEP_TYPES,
 ];
 // The steps language 1.2 added, which a plan declaring "1.1" cannot use.
 const NEWER_STEP_TYPES: readonly StepType[] = [
-  'remember', 'download', 'expectDownload', 'newTab', 'call', 'expectBackend', ...NETWORK_AND_STORAGE_STEP_TYPES,
+  'remember', 'download', 'expectDownload', 'newTab', 'call', 'expectBackend', ...NETWORK_AND_STORAGE_STEP_TYPES, ...CLOCK_AND_CLIPBOARD_STEP_TYPES,
 ];
-// The steps that check something. A plan needs at least one, or it would pass without proving anything.
+// The steps that check something. A plan needs at least one, or it would pass without proving
+// anything. A clock advance checks nothing.
 export const ASSERTION_STEP_TYPES: readonly StepType[] = [
-  'expect', 'expectPage', 'expectDownload', 'expectBackend', 'expectRequests', 'expectResponse', 'expectStorage',
+  'expect', 'expectPage', 'expectDownload', 'expectBackend', 'expectRequests', 'expectResponse', 'expectStorage', 'expectClipboard',
 ];
 // The steps that call a declared service. Only the plan's own list of steps may hold them, and a
 // plan's cleanup holds nothing else but calls.

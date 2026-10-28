@@ -41,11 +41,24 @@ export type Limits = {
   // How long no matching request may be in flight before a request count is compared with
   // equals or atMost, so a request still on its way is counted.
   readonly requestQuietMilliseconds: number;
+  // How far one advanceClock step may move the run's virtual clock, and how far all of a plan's
+  // advances may move it together. The step limit is never above the plan limit.
+  readonly maximumClockAdvanceMilliseconds: number;
+  readonly maximumTotalClockAdvanceMilliseconds: number;
+  // How many timer callbacks one advance may fire before it fails with clock-runaway, so a timer
+  // loop in the page cannot hang a run.
+  readonly maximumTimersPerAdvance: number;
+  // The longest clipboard text a clipboard check or remember reads; longer text fails with value-too-long.
+  readonly maximumClipboardCharacters: number;
 };
+const HOUR_IN_MILLISECONDS = 60 * 60 * 1000;
+const DAY_IN_MILLISECONDS = 24 * HOUR_IN_MILLISECONDS;
 export const DEFAULT_LIMITS: Limits = {
   maximumPlanBytes: 64 * 1024, maximumSteps: 100, maximumTextLength: 500, stepTimeoutMilliseconds: 5000, maximumFrameDepth: 3,
   maximumFillLines: 50, maximumFillCharacters: 4000, maximumDownloadBytes: 5 * 1024 * 1024, maximumCalls: 20,
   backendCheckTimeoutMilliseconds: 10_000, requestQuietMilliseconds: 500,
+  maximumClockAdvanceMilliseconds: HOUR_IN_MILLISECONDS, maximumTotalClockAdvanceMilliseconds: DAY_IN_MILLISECONDS,
+  maximumTimersPerAdvance: 10_000, maximumClipboardCharacters: 20_000,
 };
 // The limits the plan parser checks before it walks a plan, so an oversized plan costs nothing to reject.
 export type PlanLimits = Pick<Limits, 'maximumPlanBytes' | 'maximumSteps' | 'maximumFrameDepth'>;
@@ -175,33 +188,36 @@ function readTarget(input: unknown, path: string, issues: Issues): Parsed<Target
   return { id, adapter, engine, device, locale, timezone, colorScheme, reducedMotion };
 }
 
-const LIMIT_KEYS = [
-  'maximumPlanBytes', 'maximumSteps', 'maximumTextLength', 'stepTimeoutMilliseconds', 'maximumFrameDepth',
-  'maximumFillLines', 'maximumFillCharacters', 'maximumDownloadBytes', 'maximumCalls', 'backendCheckTimeoutMilliseconds',
-  'requestQuietMilliseconds',
-] as const;
+// The largest value a project may set for each limit. Every limit is a whole number of at least 1.
+const LIMIT_CEILINGS: { readonly [Key in keyof Limits]: number } = {
+  maximumPlanBytes: 1 << 20, maximumSteps: 1000, maximumTextLength: 4000, stepTimeoutMilliseconds: 60_000, maximumFrameDepth: 16,
+  maximumFillLines: 500, maximumFillCharacters: 20_000, maximumDownloadBytes: LARGEST_DOWNLOAD_BYTES, maximumCalls: 200,
+  backendCheckTimeoutMilliseconds: 120_000, requestQuietMilliseconds: 5000,
+  maximumClockAdvanceMilliseconds: 31 * DAY_IN_MILLISECONDS, maximumTotalClockAdvanceMilliseconds: 31 * DAY_IN_MILLISECONDS,
+  maximumTimersPerAdvance: 100_000, maximumClipboardCharacters: 200_000,
+};
+const isLimitKey = (key: string): key is keyof Limits => Object.hasOwn(LIMIT_CEILINGS, key);
+const LIMIT_KEYS: readonly (keyof Limits)[] = Object.keys(LIMIT_CEILINGS).filter(isLimitKey);
 
+// The project's limits: each one it sets, within its ceiling, and the default for the rest.
 function readLimits(input: unknown, path: string, issues: Issues): Parsed<Limits> {
   if (input === undefined) return DEFAULT_LIMITS;
   const fields = readRecord(input, path, issues, LIMIT_KEYS, []);
   if (fields === INVALID) return INVALID;
-  const pick = (key: (typeof LIMIT_KEYS)[number], highest: number): Parsed<number> =>
-    fields[key] === undefined ? DEFAULT_LIMITS[key] : readInteger(fields[key], `${path}.${key}`, issues, 1, highest);
-  const parts = [
-    pick('maximumPlanBytes', 1 << 20), pick('maximumSteps', 1000), pick('maximumTextLength', 4000),
-    pick('stepTimeoutMilliseconds', 60_000), pick('maximumFrameDepth', 16), pick('maximumFillLines', 500),
-    pick('maximumFillCharacters', 20_000), pick('maximumDownloadBytes', LARGEST_DOWNLOAD_BYTES), pick('maximumCalls', 200),
-    pick('backendCheckTimeoutMilliseconds', 120_000), pick('requestQuietMilliseconds', 5000),
-  ] as const;
-  if (!allValid(parts)) return INVALID;
-  const [
-    maximumPlanBytes, maximumSteps, maximumTextLength, stepTimeoutMilliseconds, maximumFrameDepth, maximumFillLines, maximumFillCharacters,
-    maximumDownloadBytes, maximumCalls, backendCheckTimeoutMilliseconds, requestQuietMilliseconds,
-  ] = parts;
-  return {
-    maximumPlanBytes, maximumSteps, maximumTextLength, stepTimeoutMilliseconds, maximumFrameDepth, maximumFillLines, maximumFillCharacters,
-    maximumDownloadBytes, maximumCalls, backendCheckTimeoutMilliseconds, requestQuietMilliseconds,
-  };
+  const limits: { -readonly [Key in keyof Limits]: number } = { ...DEFAULT_LIMITS };
+  let valid = true;
+  for (const key of LIMIT_KEYS) {
+    if (fields[key] === undefined) continue;
+    const value = readInteger(fields[key], `${path}.${key}`, issues, 1, LIMIT_CEILINGS[key]);
+    if (value === INVALID) valid = false;
+    else limits[key] = value;
+  }
+  // One advance may not move the clock further than the whole plan may.
+  if (valid && limits.maximumClockAdvanceMilliseconds > limits.maximumTotalClockAdvanceMilliseconds) {
+    issues.push({ code: 'too_large', path: `${path}.maximumClockAdvanceMilliseconds` });
+    return INVALID;
+  }
+  return valid ? limits : INVALID;
 }
 
 // An optional list of distinct names that each match `pattern`. Absent means none are declared.

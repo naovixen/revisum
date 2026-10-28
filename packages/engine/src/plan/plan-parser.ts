@@ -8,16 +8,17 @@
 // Calls name a declaration of the trusted project, with arguments typed by it; nothing a plan
 // writes can name a URL, a method, a header or a body. Stubs, request checks and storage entries
 // likewise: a plan names a declaration and gives typed arguments, never a response, a matcher, a
-// storage key or a value to store.
+// storage key or a value to store. A clock advance is a bounded whole amount of a unit, never a
+// wait, and the clipboard can only be checked or remembered, never written.
 // See docs/specs/SPEC-01-plan-language-and-parser.md, docs/specs/SPEC-30-plan-values-positions-and-keys.md,
-// docs/specs/SPEC-31-page-states-metadata-downloads-and-tabs.md, docs/specs/SPEC-32-declared-service-calls.md
-// and docs/specs/SPEC-33-network-stubs-request-checks-and-storage.md.
+// docs/specs/SPEC-31-page-states-metadata-downloads-and-tabs.md, docs/specs/SPEC-32-declared-service-calls.md,
+// docs/specs/SPEC-33-network-stubs-request-checks-and-storage.md and docs/specs/SPEC-34-clock-advance-and-clipboard.md.
 import {
-  AUDIT_MODES, BACKEND_ASSERTION_KINDS, DIALOG_ACTIONS, DOWNLOAD_SIZE_KINDS, literalText, ELEMENT_STATE_KINDS, LOCATOR_KINDS, MODIFIERS, PAGE_TEXT_KINDS,
+  AUDIT_MODES, BACKEND_ASSERTION_KINDS, CLIPBOARD_ASSERTION_KINDS, CLIPBOARD_READS, CLOCK_ADVANCE_MODES, CLOCK_UNITS, DIALOG_ACTIONS, DOWNLOAD_SIZE_KINDS, literalText, ELEMENT_STATE_KINDS, LOCATOR_KINDS, MODIFIERS, PAGE_TEXT_KINDS,
   POSITION_WORDS, REMEMBER_READS, REQUEST_COUNT_KINDS, RESPONSE_ASSERTION_KINDS, RESPONSE_FIELD_PRESENCE_KINDS, RESPONSE_READS, ROLES, SCRIPT_MODES,
   STORAGE_ASSERTION_KINDS, STUB_ACTIONS,
   failure, success,
-  type AllowedUrl, type BackendAssertion, type Brand, type CallArgument, type CallArguments, type CallDeclaration, type CallName, type CallStep,
+  type AllowedUrl, type BackendAssertion, type ClipboardAssertion, type ClockAdvance, type Brand, type CallArgument, type CallArguments, type CallDeclaration, type CallName, type CallStep,
   type CriterionId, type DownloadAssertion, type FieldName, type ParameterName, type ParameterType, type ValueName, type DownloadName, type ElementAssertion, type EmailDomain,
   type FixtureName, type JsonPointer, type Locator,
   type Modifier, type MultiLineText, type NetworkAndStorageStep, type ObservedRequestDeclaration, type Origin, type PageAssertion, type PathTemplate,
@@ -26,6 +27,7 @@ import {
   type StorageEntryName, type StubDeclaration, type StubName, type TargetId, type TestIdAttribute, type TextOrValue, type ValueReference,
 } from '@revisum/contracts';
 import { brand } from '../brand.ts';
+import { clockAdvanceMilliseconds } from '../clock-advance.ts';
 import { DEFAULT_TEST_ID_ATTRIBUTES, readId, type Limits, type Project } from '../project/project-parser.ts';
 import {
   INVALID, allValid, isOneOf, peekRecord, readInteger, readList, readOneOf, readRecord, readText,
@@ -79,6 +81,9 @@ type ParseContext = {
   // The stubs started so far, in document order, anywhere in the plan: a stub applies to the
   // whole browser context, so a stop anywhere after its start is valid.
   readonly startedStubs: Set<string>;
+  // How far the advances read so far move the clock, in document order, anywhere in the plan, and
+  // whether the plan limit has been passed: only the step that first passes it is refused.
+  readonly clockAdvance: { milliseconds: number; limitPassed: boolean };
 };
 
 const rulesOf = (project: Project): PlanRules => ({
@@ -391,6 +396,13 @@ const isNameTaken = (name: string, context: ParseContext): boolean => context.de
 // the source names a response, or else one element of the page.
 function readRememberSource(input: unknown, path: string, context: ParseContext): Parsed<RememberSource> {
   const { issues } = context;
+  // The clipboard's plain text, the only clipboard format a plan may read.
+  if (isPlainObject(input) && Object.hasOwn(input, 'clipboard')) {
+    const fields = readRecord(input, path, issues, ['clipboard']);
+    if (fields === INVALID) return INVALID;
+    const clipboard = readOneOf(fields['clipboard'], `${path}.clipboard`, issues, CLIPBOARD_READS);
+    return clipboard === INVALID ? INVALID : { clipboard };
+  }
   if (isPlainObject(input) && Object.hasOwn(input, 'response')) {
     const fields = readRecord(input, path, issues, ['response', 'field', 'read']);
     if (fields === INVALID) return INVALID;
@@ -748,6 +760,76 @@ function readNetworkOrStorageStep(
   }
 }
 
+// ---- The clock and the clipboard ----------------------------------------------------------------------
+
+// A whole amount of at least 1 of a unit, within the project's step limit. A missing amount is the
+// wrong type, as any other non-whole amount is. An amount too large for its unit is refused with
+// too_large, never echoed.
+function readClockAdvance(input: unknown, path: string, context: ParseContext): Parsed<ClockAdvance> {
+  const fields = readRecord(input, path, context.issues, ['amount', 'unit'], ['unit']);
+  if (fields === INVALID) return INVALID;
+  const amountPath = `${path}.amount`;
+  const raw = fields['amount'];
+  const amount = typeof raw === 'number' && Number.isInteger(raw) && raw >= 1 ? raw : INVALID;
+  if (amount === INVALID) context.issues.push({ code: 'wrong_type', path: amountPath });
+  const unit = readOneOf(fields['unit'], `${path}.unit`, context.issues, CLOCK_UNITS);
+  if (amount === INVALID || unit === INVALID) return INVALID;
+  const by = { amount, unit };
+  if (clockAdvanceMilliseconds(by) > context.rules.limits.maximumClockAdvanceMilliseconds) {
+    context.issues.push({ code: 'too_large', path: amountPath });
+    return INVALID;
+  }
+  return by;
+}
+
+// Adds an advance to the plan's total. Plans are straight-line, so the total is exactly how far
+// the run's clock moves; the step at which it first passes the plan limit is refused, and only
+// that one. False when this step is it.
+function addClockAdvance(by: ClockAdvance, path: string, context: ParseContext): boolean {
+  const total = context.clockAdvance;
+  total.milliseconds += clockAdvanceMilliseconds(by);
+  if (total.limitPassed || total.milliseconds <= context.rules.limits.maximumTotalClockAdvanceMilliseconds) return true;
+  total.limitPassed = true;
+  context.issues.push({ code: 'too_large', path });
+  return false;
+}
+
+// An advance of the run's virtual clock. The mode is left out when absent, so the step stays as written.
+function readAdvanceClock(head: Readonly<Record<string, unknown>>, path: string, context: ParseContext): Parsed<Step> {
+  const by = readClockAdvance(head['by'], `${path}.by`, context);
+  const mode = Object.hasOwn(head, 'mode') ? readOneOf(head['mode'], `${path}.mode`, context.issues, CLOCK_ADVANCE_MODES) : undefined;
+  if (by === INVALID || mode === INVALID || !addClockAdvance(by, path, context)) return INVALID;
+  return { type: 'advanceClock', by, ...(mode === undefined ? {} : { mode }) };
+}
+
+// Expected clipboard text written as lines, within the fill limits. A single empty line is empty
+// text, which would make the check vacuous.
+function readExpectedLines(input: unknown, path: string, context: ParseContext): Parsed<MultiLineText> {
+  const lines = readMultiLineText(input, path, context);
+  if (lines !== INVALID && lines.lines.length === 1 && lines.lines[0] === '') { context.issues.push({ code: 'vacuous', path }); return INVALID; }
+  return lines;
+}
+
+// A check on the clipboard's plain text. Only textEquals compares against several lines; for
+// textContains and textExcludes, lines are the wrong type of value.
+function readClipboardAssertion(input: unknown, path: string, context: ParseContext): Parsed<ClipboardAssertion> {
+  const head = readAssertionHead(input, path, context);
+  if (head === INVALID) return INVALID;
+  const kind = readOneOf(head['kind'], `${path}.kind`, context.issues, CLIPBOARD_ASSERTION_KINDS);
+  if (kind === INVALID) return INVALID;
+  if (readRecord(input, path, context.issues, ['kind', 'value']) === INVALID) return INVALID;
+  const valuePath = `${path}.value`;
+  const value = head['value'];
+  const writtenAsLines = isPlainObject(value) && Object.hasOwn(value, 'lines');
+  if (writtenAsLines && kind === 'textEquals') {
+    const lines = readExpectedLines(value, valuePath, context);
+    return lines === INVALID ? INVALID : { kind, value: lines };
+  }
+  if (writtenAsLines) { context.issues.push({ code: 'wrong_type', path: valuePath }); return INVALID; }
+  const expected = readExpectedText(value, valuePath, context);
+  return expected === INVALID ? INVALID : { kind, value: expected };
+}
+
 // The plan's cleanup: calls only, read after the steps, so they may use the values the steps remember.
 function readCleanup(input: unknown, context: ParseContext): Parsed<readonly CallStep[]> {
   const raw = readList(input, '$.cleanup', context.issues, context.rules.limits.maximumSteps, 0);
@@ -880,6 +962,12 @@ function readStep(input: unknown, path: string, context: ParseContext): Parsed<S
     case 'stub': case 'resetRequests': case 'expectRequests': case 'expectResponse':
     case 'setStorage': case 'removeStorage': case 'expectStorage':
       return readNetworkOrStorageStep(head, path, type, context);
+    case 'advanceClock':
+      return readAdvanceClock(head, path, context);
+    case 'expectClipboard': {
+      const parts = [readClipboardAssertion(head['assert'], `${path}.assert`, context), readCriterionId(head, path, context)] as const;
+      return allValid(parts) ? { type, assert: parts[0], criterionId: parts[1] } : INVALID;
+    }
   }
 }
 
@@ -1004,6 +1092,7 @@ export function readPlanData(input: unknown, rules: PlanRules): Result<PlanData,
   const grammar = declaredGrammar ?? CURRENT_GRAMMAR;
   const context: ParseContext = {
     rules, issues: [], grammar, defined: new Set(), downloads: new Set(), topLevel: true, startedStubs: new Set(),
+    clockAdvance: { milliseconds: 0, limitPassed: false },
   };
   const fields = readRecord(input, '$', context.issues, [...PLAN_FIELDS, ...grammar.optionalPlanFields], PLAN_FIELDS);
   if (fields === INVALID) return failure(context.issues);

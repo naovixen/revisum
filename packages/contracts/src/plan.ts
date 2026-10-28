@@ -4,6 +4,7 @@
 // See docs/specs/SPEC-01-plan-language-and-parser.md, docs/specs/SPEC-30-plan-values-positions-and-keys.md
 // and docs/specs/SPEC-31-page-states-metadata-downloads-and-tabs.md.
 import type { Brand } from './brand.ts';
+import type { ClipboardRead, ClockAndClipboardStep } from './clock-and-clipboard.ts';
 import type { NetworkAndStorageStep, RequestName, ResponseRead } from './network-and-storage.ts';
 import type { BackendAssertion, CallArguments, CallName, FieldName } from './service-calls.ts';
 import type { TargetId } from './target.ts';
@@ -179,12 +180,14 @@ export type PathTemplate = {
   readonly segments: readonly TextOrValue[];
   readonly query?: Readonly<Record<string, TextOrValue>>;
 };
-// Where a remember step reads its value: one element's visible text or its input value, or a
-// field of the latest response a declared request check saw, as text or as an array's length.
+// Where a remember step reads its value: one element's visible text or its input value, a field
+// of the latest response a declared request check saw, as text or as an array's length, or the
+// plain text of the run's own clipboard.
 export const REMEMBER_READS = ['text', 'value'] as const;
 export type RememberSource =
   | { readonly element: Locator; readonly read: (typeof REMEMBER_READS)[number] }
-  | { readonly response: RequestName; readonly field: FieldName; readonly read: ResponseRead };
+  | { readonly response: RequestName; readonly field: FieldName; readonly read: ResponseRead }
+  | { readonly clipboard: ClipboardRead };
 
 // How a navigate step may load the page. "disabled" turns script execution off until the next
 // navigate, so the checks see what the server sent: nothing runs in the page, not even the
@@ -230,7 +233,9 @@ export type Step =
   // Starts or stops a stub, resets or checks the requests a declared matcher sees, checks the
   // latest response, and writes, removes or checks a declared storage entry, each only by the name
   // the trusted project gives it. See network-and-storage.ts.
-  | NetworkAndStorageStep;
+  | NetworkAndStorageStep
+  // Moves the run's virtual clock forward, or checks the clipboard's text. See clock-and-clipboard.ts.
+  | ClockAndClipboardStep;
 export type StepType = Step['type'];
 // The steps that act on an element; the driver's ActionRunner port performs them. The policy
 // gate judges a download as the click it is.
