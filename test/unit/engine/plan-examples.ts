@@ -86,7 +86,41 @@ export const TEST_SERVICE_CALLS: JsonRecord = {
   },
 };
 
-// A trusted project with one target and the shop's test service, whose limits a test may tighten
+// The stub, observed request and storage entries the 1.2 golden plans name
+// (docs/specs/SPEC-33-network-stubs-request-checks-and-storage.md), copied from
+// stub-and-storage-examples.ts. Each is on the allowed origin and names no fixture, secret or
+// service, so a test that replaces the fixtures, secret names or services still gets a project
+// that parses.
+export const TEST_STUBS: JsonRecord = {
+  loginNeedsCode: {
+    request: { origin: ORIGIN, method: 'POST', path: '/api/v1/login', match: 'exact' },
+    parameters: { reason: { kind: 'text', maximumLength: 80 } },
+    responses: [
+      {
+        status: 401, mediaType: 'application/json', headers: { 'x-request-id': 'stub-login-1' },
+        body: { json: { error: 'totp-required', message: { $parameter: 'reason' } } },
+      },
+      { status: 200, mediaType: 'application/json', body: { json: { status: 'success' } } },
+    ],
+    allowInProposals: true,
+  },
+};
+export const TEST_OBSERVED_REQUESTS: JsonRecord = {
+  likes: {
+    request: { origin: ORIGIN, method: 'GET', path: '/api/transactions/likes', match: 'exact' },
+    fields: { likeList: '/results', firstLiker: '/results/0/name', errorCode: '/code' },
+    maximumResponseBytes: 65_536,
+  },
+};
+export const TEST_STORAGE_ENTRIES: JsonRecord = {
+  pinnedMenu: {
+    area: 'local', origin: ORIGIN, key: 'grafana.navigation.docked', access: 'readWrite',
+    value: { $parameter: 'docked' }, parameters: { docked: { kind: 'boolean' } }, allowInProposals: true,
+  },
+  privateKey: { area: 'local', origin: ORIGIN, key: 'E2E.priv_key', access: 'read', allowInProposals: false },
+};
+
+// A trusted project with one target, the shop's test service and the declarations above, whose limits a test may tighten
 // and to which a test may add or replace other project fields, such as declared secret names and
 // fixtures.
 export const testProjectInput = (limits: Readonly<Record<string, number>> = {}, fields: JsonRecord = {}): JsonRecord => ({
@@ -99,6 +133,9 @@ export const testProjectInput = (limits: Readonly<Record<string, number>> = {}, 
   services: [TEST_SERVICE],
   secretNames: TEST_SERVICE_SECRET_NAMES,
   calls: TEST_SERVICE_CALLS,
+  stubs: TEST_STUBS,
+  observedRequests: TEST_OBSERVED_REQUESTS,
+  storageEntries: TEST_STORAGE_ENTRIES,
   ...fields,
 });
 
