@@ -23,7 +23,7 @@ M1, language and trust:
 - [x] SPEC-04 secrets and redaction
 - [x] SPEC-30 plan values, positions and keys: parser and engine parts; owns plan language 1.2
 - [x] SPEC-31 page states, metadata, downloads and tabs: parser parts
-- [ ] SPEC-32 declared service calls: declarations and request building, against a fake caller
+- [x] SPEC-32 declared service calls: declarations and request building, against a fake caller
 - [ ] SPEC-33 network stubs, request checks and storage: grammar
 - [ ] SPEC-34 clock advance and clipboard checks: parser parts
 - [ ] Re-run the coverage study on plan 1.2, plus a fresh sample of at least 50, before 2026-11-23
