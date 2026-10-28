@@ -5,3 +5,4 @@ Actual time per spec, for the velocity kill criteria in `E:\core\docs\09-mvp-pla
 | Spec | Milestone | Started | Committed | Days | Notes |
 |---|---|---|---|---|---|
 | SPEC-00 (seed) | M0 | 2026-10-27 | 2026-10-28 | 2 | Seed and build gates; remaining criteria queued in `START.md` |
+| SPEC-27 | M1 | 2026-10-28 | 2026-10-28 | 1 | One test-helper fix approved by the founder (ES module scratch folder) |
