@@ -28,7 +28,7 @@ M1, language and trust:
 - [x] SPEC-34 clock advance and clipboard checks: parser parts
 - [x] Re-run the coverage study on plan 1.2, plus a fresh sample of at least 50, before 2026-11-23: 45% overall, 36% fresh; not met. Founder chose evidence mode with opt-in unsafe features (`docs/decisions/language-fit-pivot.md`)
 - [x] SPEC-28 plan authoring (readable format, conversion, `admitDraft`, provenance)
-- [ ] SPEC-35 evidence mode: declaration, suite-file trust, report decoder, result mapping and labels (no containers)
+- [x] SPEC-35 evidence mode: declaration, suite-file trust, report decoder, result mapping and labels (no containers)
 - [ ] SPEC-36 unsafe plan features: plan 1.3 parser parts, declarations, gate rules and labels
 - [ ] Measure coverage on plan 1.3 with unsafe features, with parsed plans and strict judging (no generous assumptions)
 - [ ] SPEC-00 remaining criteria (04, 07, 09, 10, 16, 19, 20; finish 05, 08, 11, 15, 17)
@@ -41,7 +41,7 @@ M2, driver and isolation (alpha):
 - [ ] SPEC-05 target matrix and lock
 - [ ] SPEC-06 CDP driver, with SPEC-03's guard wired in
 - [ ] SPEC-07 isolated runner and egress
-- [ ] SPEC-35 workload runner: suite run, egress, traces and manifest
+- [ ] SPEC-35 workload runner: suite run, egress, traces and manifest; zero-test suites end Failed, expected failures raise a review item
 - [ ] SPEC-30 to 34 and SPEC-36 driver and runner parts (states, downloads, tab, real service caller, stubs, storage, clock, clipboard, CSS, XPath, DOM checks, page scripts, then database commands)
 - [ ] SPEC-08 manifest and replay
 - [ ] M2 exit
