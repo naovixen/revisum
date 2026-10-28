@@ -18,14 +18,14 @@ M1, language and trust:
 
 - [x] SPEC-27 shared types and event sink
 - [x] SPEC-01 plan language and parser
-- [ ] SPEC-02 project trust and approval
+- [x] SPEC-02 project trust and approval
 - [ ] SPEC-03 policy gate (static check and guard logic)
 - [ ] SPEC-04 secrets and redaction
 - [ ] SPEC-30 plan values, positions and keys: parser and engine parts; owns plan language 1.2
 - [ ] SPEC-31 page states, metadata, downloads and tabs: parser parts
 - [ ] SPEC-32 declared service calls: declarations and request building, against a fake caller
 - [ ] SPEC-33 network stubs, request checks and storage: grammar
-- [ ] SPEC-34 clock advance and clipboard checks: parser parts (spec to draft)
+- [ ] SPEC-34 clock advance and clipboard checks: parser parts
 - [ ] Re-run the coverage study on plan 1.2, plus a fresh sample of at least 50, before 2026-11-23
 - [ ] SPEC-28 plan authoring (readable format, conversion, `admitDraft`, provenance)
 - [ ] SPEC-00 remaining criteria (04, 07, 09, 10, 16, 19, 20; finish 05, 08, 11, 15, 17)
