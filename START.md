@@ -21,6 +21,11 @@ M1, language and trust:
 - [ ] SPEC-02 project trust and approval
 - [ ] SPEC-03 policy gate (static check and guard logic)
 - [ ] SPEC-04 secrets and redaction
+- [ ] SPEC-30 plan values, positions and keys: parser and engine parts; owns plan language 1.2
+- [ ] SPEC-31 page states, metadata, downloads and tabs: parser parts
+- [ ] SPEC-32 declared service calls: declarations and request building, against a fake caller
+- [ ] SPEC-33 network stubs, request checks and storage: grammar
+- [ ] Re-run the coverage study on plan 1.2, plus a fresh sample of at least 50, before 2026-11-23
 - [ ] SPEC-28 plan authoring (readable format, conversion, `admitDraft`, provenance)
 - [ ] SPEC-00 remaining criteria (04, 07, 09, 10, 16, 19, 20; finish 05, 08, 11, 15, 17)
 - [ ] M1 exit
@@ -30,6 +35,7 @@ M2, driver and isolation (alpha):
 - [ ] SPEC-05 target matrix and lock
 - [ ] SPEC-06 CDP driver, with SPEC-03's guard wired in
 - [ ] SPEC-07 isolated runner and egress
+- [ ] SPEC-30 to 33 driver and runner parts (states, downloads, tab, real service caller, stubs, storage)
 - [ ] SPEC-08 manifest and replay
 - [ ] M2 exit
 
