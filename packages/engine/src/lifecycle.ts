@@ -4,11 +4,11 @@
 //   Planned ──► Resolved ──► Running ──► Passed | Failed | Errored | Denied
 //      │            └──────────────────► Errored
 //      ├──► TargetUnavailable   (explicit; the engine never substitutes a target)
-//      └──► Refused             (a plan not allowed on production that would reach it; no driver is called)
+//      └──► Refused             (production it may not reach, or a secret the store lacks; no driver is called)
 //
 // A plan reaches Planned only once the policy gate has authorised it. Denied is the run the gate's
 // runtime guard stopped before an action; the denied action sent no input event.
-import type { Plan, PolicyRuleId, Session, Target, Unavailable } from '@revisum/contracts';
+import type { Plan, PolicyRuleId, SecretName, Session, Target, Unavailable } from '@revisum/contracts';
 import type { RunManifest } from './manifest.ts';
 
 export type Transitions = {
@@ -36,10 +36,15 @@ export type Running = Omit<Resolved, 'state'> & { readonly state: 'Running' };
 export type Finished<State extends 'Passed' | 'Failed' | 'Errored'> = Omit<Running, 'state' | 'session'> & { readonly state: State };
 export type TargetUnavailableRun = Omit<Planned, 'state'> & { readonly state: 'TargetUnavailable'; readonly unavailable: Unavailable };
 
-// Why a run was refused before any driver call. origin_not_allowed: the run would reach one of the
-// project's production origins, which only an approved plan may reach, and only when the project
-// allows production for approved plans.
-export type Refusal = { readonly code: 'origin_not_allowed'; readonly origin: string };
+// Why a run was refused before any driver call.
+//   origin_not_allowed: the run would reach one of the project's production origins, which only an
+//     approved plan may reach, and only when the project allows production for approved plans.
+//   secret-missing: the plan names a secret the secret store cannot resolve. The refusal names the
+//     secret, never a value.
+export type RefusalCode = 'origin_not_allowed' | 'secret-missing';
+export type Refusal =
+  | { readonly code: Extract<RefusalCode, 'origin_not_allowed'>; readonly origin: string }
+  | { readonly code: Extract<RefusalCode, 'secret-missing'>; readonly secretName: SecretName };
 export type RefusedRun = Omit<Planned, 'state'> & { readonly state: 'Refused'; readonly refusal: Refusal };
 
 // Which policy rule stopped the run, and at which step.

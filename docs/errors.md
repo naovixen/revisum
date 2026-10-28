@@ -7,7 +7,7 @@
 - Plan codes use underscores (`unknown_step`); every other union uses hyphens (`not-found`).
 - Each code says what was refused and what to do. Errors carry a code and a location, never the offending value, so private or hostile text is never echoed back.
 
-Plan errors (`PlanErrorCode`, from the plan parser in `engine`) come first, then driver, runner, review recorder, event sink, command-line, approval, trust and policy errors.
+Plan errors (`PlanErrorCode`, from the plan parser in `engine`) come first, then driver, runner, review recorder, event sink, command-line, approval, trust, policy and run refusal errors.
 
 ## not_object
 
@@ -45,6 +45,8 @@ Plan error. A URL uses a scheme other than `http` or `https`.
 
 Plan error. An absolute URL's origin is not on the project's allow-list. Use a path, or add the origin to the trusted project configuration.
 
+As a run refusal, the run would reach one of the project's production origins, which only an approved plan may reach, and only when the project allows production for approved plans. No browser was opened.
+
 ## target_not_in_matrix
 
 Plan error. A plan names a target the project's matrix does not declare. Nothing is substituted: declare the target, or remove it from the plan.
@@ -76,6 +78,10 @@ Plan error. Required text or a required list is empty.
 ## vacuous
 
 Plan error. A check would pass on anything, or proves nothing traceable: a plan with no assertion, an empty assertion (`assert: {}`), a text or value assertion whose expected text is empty, or an assertion without a `criterionId`. Give each assertion its expected text and the id of the acceptance criterion it checks.
+
+## literal_secret
+
+Plan error. The plan holds a secret instead of naming one: literal text filled into a field whose locator names a password, passcode, token, secret or API key (or the German or French word for one), text shaped like a credential anywhere in the plan (a JSON Web Token, a `Bearer` value, or a key with a known prefix such as `ghp_`, `sk-` or `AKIA`), or saved storage state written into `storageState` itself. The error gives the path, never the text. Declare the secret's name in the project's `secretNames`, put its value in the secret store (a CI secret of the same name), and write `{ "secretName": "…" }` in the plan.
 
 ## no_criterion_id
 
@@ -276,3 +282,7 @@ Policy error. The plan navigates to an origin the trusted project marks as produ
 ## over-limit
 
 Policy error. The plan exceeds the trusted project's limits: more steps in one list than `maximumSteps`, frames nested deeper than `maximumFrameDepth`, or more bytes than `maximumPlanBytes`. Split the plan, or raise the limit in the trusted project.
+
+## secret-missing
+
+Run refusal. The plan names a secret, in a fill or in `storageState`, that the secret store cannot resolve, or the run was given no secret store at all. The run ends `Refused` before any browser opens; the refusal names the secret, never a value. Set the CI secret or environment variable of that exact name (an empty value counts as missing).

@@ -44,6 +44,8 @@ export const LOCATOR_FIELDS = {
 } as const;
 
 export const PLAN_FIELDS = ['version', 'meta', 'targets', 'steps'] as const;
+// Top-level fields a plan may leave out. storageState names saved browser storage state.
+export const OPTIONAL_PLAN_FIELDS = ['storageState'] as const;
 export const META_FIELDS = ['featureId', 'specReference', 'title'] as const;
 
 export const FEATURE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;

@@ -5,7 +5,7 @@ import {
   success,
   type A11yFinding, type ActionGuard, type ApprovalLabel, type ArtifactReference, type ArtifactStore, type Authorised,
   type BrowserDriver, type Clock, type ElementProbe, type EventSink, type Plan, type PolicyRuleId, type Redactor, type Result,
-  type Session, type Step, type Target, type TargetId, type Unavailable,
+  type SecretStore, type Session, type Step, type Target, type TargetId, type Unavailable,
 } from '@revisum/contracts';
 import { approvalLabel, type PlanStanding } from './approval/plan-standing.ts';
 import { canonicalJson, sha256 } from './hashing.ts';
@@ -18,6 +18,7 @@ import { assertBranded } from './plan/plan-parser.ts';
 import { assertAuthorised, policyGate, type PolicyGate } from './policy/policy-gate.ts';
 import type { Project } from './project/project-parser.ts';
 import { SENSITIVE_PLACEHOLDER } from './redaction.ts';
+import { NO_SECRETS, resolvePlanSecrets, secretRecords, withSecretRedaction, type ResolvedSecrets } from './secrets/secret-resolution.ts';
 
 export type RunInputs = {
   // Only the policy gate makes an Authorised plan, so a plan it has not cleared does not type-check.
@@ -44,6 +45,9 @@ export type RunPorts = {
   // The audit sink that policy denials are appended to. Without one, the run's own log and its
   // result still record a denial.
   readonly audit?: EventSink;
+  // Where the secrets the plan names are resolved, such as environmentSecretStore(process.env).
+  // Without one, every secret reference is missing and such a plan is refused.
+  readonly secrets?: SecretStore;
 };
 
 export type StepOutcome = 'passed' | 'failed' | 'skipped';
@@ -88,6 +92,9 @@ type RunContext = {
   readonly gate: PolicyGate;
   // The runtime guard's denial, once it has stopped an action.
   readonly denials: lifecycle.Denial[];
+  // The caller's redactor with the plan's secrets added: every kept text goes through it.
+  readonly redactor: Redactor;
+  readonly secrets: ResolvedSecrets;
 };
 
 // Keeps nothing, for callers with no audit sink: the run's log and result record the denial.
@@ -102,9 +109,14 @@ export async function run(inputs: RunInputs, ports: RunPorts): Promise<RunResult
   const target = inputs.project.matrix.find((candidate) => candidate.id === inputs.targetId);
   const declared = target !== undefined && inputs.plan.targets.includes(inputs.targetId);
   const runId = sha256(`${sha256(canonicalJson(inputs.plan))}:${inputs.targetId}:${inputs.seed}`).slice(0, 16);
-  const logger = manifestLogger(ports.events, ports.redactor, runId);
+  // Resolving reads only the store, so it can come first: the run's redactor needs the secrets
+  // before anything is logged. A missing secret refuses the run below, before any driver call.
+  const resolution = resolvePlanSecrets(inputs.plan, ports.secrets);
+  const secrets = resolution.ok ? resolution.value : NO_SECRETS;
+  const redactor = withSecretRedaction(ports.redactor, secrets);
+  const logger = manifestLogger(ports.events, redactor, runId);
   const gate = policyGate({ project: inputs.project, events: ports.audit ?? UNRECORDED_AUDIT });
-  const context: RunContext = { inputs, ports, logger, gate, denials: [] };
+  const context: RunContext = { inputs, ports, logger, gate, denials: [], redactor, secrets };
 
   if (target === undefined || !declared) {
     return unavailableResult(inputs.targetId, { reason: 'not-declared', detail: 'target is not in both the plan and the matrix' }, context, startedAt);
@@ -125,6 +137,18 @@ export async function run(inputs: RunInputs, ports: RunPorts): Promise<RunResult
     }, inputs);
   }
 
+  if (!resolution.ok) {
+    const refused = lifecycle.refuse(planned, { code: 'secret-missing', secretName: resolution.error });
+    logger.log({
+      kind: 'run.state', state: refused.state, targetId: target.id, code: refused.refusal.code,
+      detail: `the secret store has no secret named ${resolution.error}`,
+    });
+    return seal({
+      state: refused.state, targetId: target.id, manifest: null, manifestHash: null, steps: [], blockedOrigins: [],
+      unavailable: null, refusal: refused.refusal, timings: { totalMilliseconds: ports.clock.now() - startedAt, stepMilliseconds: [] },
+    }, inputs);
+  }
+
   const opened = await openSession(planned, context);
   if (!opened.ok) {
     const unavailable = lifecycle.targetUnavailable(planned, opened.error);
@@ -134,6 +158,7 @@ export async function run(inputs: RunInputs, ports: RunPorts): Promise<RunResult
   const manifest = buildManifest({
     plan: inputs.plan, target, adapter: driver.info, browser: session.browser,
     seed: inputs.seed, fixedTimeMilliseconds: inputs.fixedTimeMilliseconds, fixtures: inputs.fixtures, host: inputs.host,
+    ...secretRecords(secrets),
   });
   const resolved = lifecycle.resolve(planned, session, manifest, manifestHash(manifest));
   logger.log({ kind: 'run.state', state: resolved.state, targetId: target.id, adapter: driver.info.id, sha256: resolved.manifestHash });
@@ -252,8 +277,6 @@ const UNSUPPORTED_ASSERTION_KINDS: readonly string[] = ['checked', 'unchecked', 
 function isUnsupported(step: Step): boolean {
   switch (step.type) {
     case 'hover': case 'select': case 'upload': case 'frame': case 'dialog': return true;
-    // A secret reference needs the secret store, which the run does not have yet.
-    case 'fill': return typeof step.value !== 'string';
     case 'expect': return UNSUPPORTED_ASSERTION_KINDS.includes(step.assert.kind);
     default: return false;
   }
@@ -275,7 +298,9 @@ async function executeStep(step: Step, index: number, session: Session, target: 
     case 'select':
     case 'upload':
     case 'press': {
-      const acted = await session.act(step, guardFor(step, index, target, context));
+      // A secret is handed to the driver opaque; it is revealed only as the driver types it.
+      const secret = step.type === 'fill' && typeof step.value !== 'string' ? context.secrets.fills.get(step.value.secretName) : undefined;
+      const acted = await session.act(step, guardFor(step, index, target, context), secret);
       return acted.ok ? { ...base, outcome: 'passed' } : { ...base, outcome: 'failed', code: acted.error.code };
     }
     case 'frame':
@@ -289,7 +314,7 @@ async function executeStep(step: Step, index: number, session: Session, target: 
       });
       return verdict.pass
         ? { ...base, outcome: 'passed' }
-        : { ...base, outcome: 'failed', code: verdict.code ?? 'assertion-failed', observed: observe(last, context.ports.redactor) };
+        : { ...base, outcome: 'failed', code: verdict.code ?? 'assertion-failed', observed: observe(last, context.redactor) };
     }
     case 'expectPage': {
       let title = '';
@@ -300,7 +325,7 @@ async function executeStep(step: Step, index: number, session: Session, target: 
       });
       return verdict.pass
         ? { ...base, outcome: 'passed' }
-        : { ...base, outcome: 'failed', code: 'assertion-failed', observed: context.ports.redactor.text(title) };
+        : { ...base, outcome: 'failed', code: 'assertion-failed', observed: context.redactor.text(title) };
     }
     case 'a11yAudit': {
       const findings = [...(await session.audit())].sort((left, right) => (left.ruleId < right.ruleId ? -1 : left.ruleId > right.ruleId ? 1 : 0));

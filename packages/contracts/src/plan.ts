@@ -93,5 +93,8 @@ export type PlanData = {
   readonly meta: PlanMeta;
   readonly targets: readonly TargetId[];
   readonly steps: readonly Step[];
+  // Saved browser storage state (cookies and local storage) to start the session with. It is a
+  // secret a person exported, so the plan names it and the secret store holds the JSON.
+  readonly storageState?: SecretReference;
 };
 export type Plan = Brand<PlanData, 'Plan'>;

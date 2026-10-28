@@ -13,6 +13,9 @@ export const PLAN_ERROR_CODES = [
   'vacuous',
   // A version 1 assertion that the migration's mapping gives no criterion id.
   'no_criterion_id',
+  // A secret written into the plan: literal text in a sensitive field, credential-shaped text, or
+  // saved storage state itself. A plan names secrets with { secretName }.
+  'literal_secret',
 ] as const;
 export type PlanErrorCode = (typeof PLAN_ERROR_CODES)[number];
 

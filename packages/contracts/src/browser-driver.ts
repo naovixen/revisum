@@ -3,6 +3,7 @@
 // See docs/specs/SPEC-06-cdp-driver.md and docs/specs/SPEC-27-shared-types-and-events.md.
 import type { ActionStep, Locator } from './plan.ts';
 import type { GuardVerdict } from './policy.ts';
+import type { Secret } from './secret.ts';
 import type { Result } from './result.ts';
 import type { Target } from './target.ts';
 
@@ -73,7 +74,9 @@ export interface PageNavigator {
 export interface ActionRunner {
   // Given a guard, the driver asks it first and acts only on an allow. The CDP driver starts
   // passing the resolved element with SPEC-06 (docs/specs/SPEC-06-cdp-driver.md).
-  act(step: ActionStep, guard?: ActionGuard): Promise<Result<void, DriverError>>;
+  // For a fill whose value is a secret reference, the engine passes the resolved secret; the driver
+  // reveals it only at the moment it types, and never reports it back.
+  act(step: ActionStep, guard?: ActionGuard, secret?: Secret): Promise<Result<void, DriverError>>;
 }
 export interface Prober {
   probe(locator: Locator): Promise<ElementProbe>;

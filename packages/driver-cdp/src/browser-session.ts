@@ -1,8 +1,9 @@
 // Turns any protocol's PageOperations into a Session. Auto-waiting, probing, masking and
 // auditing live here once, so every protocol behaves the same way.
 import {
-  failure, success,
-  type ActionStep, type DriverError, type ElementProbe, type Locator, type PageProbe, type Result, type SessionEnvironment,
+  failure, reveal, success,
+  type ActionGuard, type ActionStep, type DriverError, type ElementProbe, type Locator, type PageProbe, type Result, type Secret,
+  type SessionEnvironment,
 } from '@revisum/contracts';
 import {
   actionability, armHitCheck, findByLabel, findByTestId, findByText, fontsReady, maskElements, pageInfo, probeElement,
@@ -99,19 +100,22 @@ export function buildSession<Handle>(operations: PageOperations<Handle>, environ
       }
     }
   };
-  const act = async (step: ActionStep): Promise<Result<void, DriverError>> => {
+  const act = async (step: ActionStep, _guard?: ActionGuard, secret?: Secret): Promise<Result<void, DriverError>> => {
     // The engine does not send these yet (it reports them as unsupported-step); refuse them here too.
     if (step.type === 'hover' || step.type === 'select' || step.type === 'upload') {
       return failure({ code: 'not-actionable', detail: `this driver does not perform ${step.type} steps yet` });
     }
-    // A secret reference is resolved before a step reaches a driver; a driver only ever types text.
+    // A secret reference arrives with the secret the engine resolved for it. Without that secret
+    // there is nothing to type, and typing nothing could pass a step that should fail.
     const typed = step.type === 'fill' ? step.value : '';
-    if (typeof typed !== 'string') return failure({ code: 'not-actionable', detail: 'a secret reference reached the driver unresolved' });
+    const typedSecret = typeof typed === 'string' ? null : secret?.name === typed.secretName ? secret : undefined;
+    if (typedSecret === undefined) return failure({ code: 'not-actionable', detail: 'a secret reference reached the driver without its secret' });
     try {
       if (step.type === 'click') return await click(step.locator);
       const waited = await waitUntilActionable(operations, step.locator, environment.timeoutMilliseconds);
       if (!waited.ok) return waited;
-      if (step.type === 'fill') await operations.fill(waited.value.element, typed);
+      // The secret is revealed here, as it is typed, and nowhere else in this driver.
+      if (step.type === 'fill') await operations.fill(waited.value.element, typedSecret === null ? String(typed) : reveal(typedSecret));
       else await operations.press(waited.value.element, step.key);
       return success(undefined);
     } catch (error) {

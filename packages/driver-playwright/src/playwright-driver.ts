@@ -2,9 +2,9 @@
 // stays until the own drivers pass the capability contract tests.
 // See docs/decisions/browser-and-audit-dependencies.md.
 import {
-  determinismScript, deviceProfile, failure, success,
+  determinismScript, deviceProfile, failure, reveal, success,
   type ActionStep, type BrowserDriver, type DriverError, type ElementProbe, type Key, type Locator,
-  type Result, type Session, type SessionEnvironment, type Target,
+  type Result, type Secret, type Session, type SessionEnvironment, type Target,
 } from '@revisum/contracts';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -90,8 +90,8 @@ async function createSession(browser: Browser, target: Target, environment: Sess
     async page() {
       return { url: page.url(), title: await page.title() };
     },
-    async act(step) {
-      return act(page, step, timeout);
+    async act(step, _guard, secret) {
+      return act(page, step, timeout, secret);
     },
     async probe(locator) {
       const found = locate(page, locator);
@@ -133,20 +133,22 @@ function locate(page: Page, locator: Locator): PlaywrightLocator {
   }
 }
 
-async function act(page: Page, step: ActionStep, timeout: number): Promise<Result<void, DriverError>> {
+async function act(page: Page, step: ActionStep, timeout: number, secret: Secret | undefined): Promise<Result<void, DriverError>> {
   // The engine does not send these yet (it reports them as unsupported-step); refuse them here too.
   if (step.type === 'hover' || step.type === 'select' || step.type === 'upload') {
     return failure({ code: 'not-actionable', detail: `this driver does not perform ${step.type} steps yet` });
   }
-  // A secret reference is resolved before a step reaches a driver; a driver only ever types text.
-  if (step.type === 'fill' && typeof step.value !== 'string') {
-    return failure({ code: 'not-actionable', detail: 'a secret reference reached the driver unresolved' });
+  // A secret reference arrives with the secret the engine resolved for it. Without that secret
+  // there is nothing to type, and typing nothing could pass a step that should fail.
+  if (step.type === 'fill' && typeof step.value !== 'string' && secret?.name !== step.value.secretName) {
+    return failure({ code: 'not-actionable', detail: 'a secret reference reached the driver without its secret' });
   }
   const found = locate(page, step.locator);
   try {
     switch (step.type) {
       case 'click': await found.click({ timeout }); break;
-      case 'fill': if (typeof step.value === 'string') await found.fill(step.value, { timeout }); break;
+      // The secret is revealed here, as it is typed, and nowhere else in this driver.
+      case 'fill': await found.fill(typeof step.value === 'string' ? step.value : reveal(secret ?? missingSecret()), { timeout }); break;
       case 'press': await found.press(KEY_NAMES[step.key], { timeout }); break;
     }
     return success(undefined);
@@ -154,6 +156,11 @@ async function act(page: Page, step: ActionStep, timeout: number): Promise<Resul
     const count = await found.count().catch(() => 0);
     return failure(driverError(count === 0 ? 'not-found' : count > 1 ? 'ambiguous' : 'not-actionable', error));
   }
+}
+
+// Unreachable: act() refuses a secret reference without its secret before it locates anything.
+function missingSecret(): never {
+  throw new Error('a secret reference reached the driver without its secret');
 }
 
 const driverError = (code: DriverError['code'], error: unknown): DriverError =>

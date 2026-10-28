@@ -46,6 +46,19 @@
     },
     "steps": {
       "$ref": "#/$defs/steps"
+    },
+    "storageState": {
+      "type": "object",
+      "properties": {
+        "secretName": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "secretName"
+      ],
+      "additionalProperties": false
     }
   },
   "required": [

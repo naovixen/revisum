@@ -35,11 +35,14 @@ function closedObject(properties: Readonly<Record<string, JsonSchema>>, required
   return { type: 'object', properties, required: [...required], additionalProperties: false };
 }
 
+// A reference to a secret the project declares, as a fill value or saved storage state.
+const SECRET_REFERENCE: JsonSchema = closedObject({ secretName: { type: 'string', 'minLength': 1 } }, ['secretName']);
+
 // The schema of each field a step may hold, by field name. A step's own table entry lists which it has.
 const STEP_FIELD_SCHEMAS: Readonly<Record<string, JsonSchema>> = {
   url: reference('url'),
   locator: reference('locator'),
-  value: { oneOf: [text(0), closedObject({ secretName: { type: 'string', 'minLength': 1 } }, ['secretName'])] },
+  value: { oneOf: [text(0), SECRET_REFERENCE] },
   option: text(1),
   fixture: { type: 'string', 'minLength': 1 },
   key: { enum: [...KEYS] },
@@ -102,6 +105,8 @@ export function planJsonSchema(): JsonSchema {
       }, META_FIELDS),
       targets: { type: 'array', items: { type: 'string', pattern: LOWERCASE_ID.source }, 'minItems': 1, 'uniqueItems': true },
       steps: reference('steps'),
+      // Saved browser storage state, by secret name. The JSON itself never appears in a plan.
+      storageState: SECRET_REFERENCE,
     }, PLAN_FIELDS),
     $defs: {
       steps: { type: 'array', items: reference('step'), 'minItems': 1 },

@@ -1,7 +1,8 @@
 // The plan parser: the only way to obtain a Plan. It rejects unknown fields and steps at any
 // depth, origins off the allow-list, targets off the matrix, undeclared secrets and fixtures,
 // script-like text, vacuous checks and oversized or too deeply nested input, before any side
-// effect. A plan it accepts is frozen and remembered, so run() can tell it from a look-alike.
+// effect. Literal secrets are refused: a fill of literal text into a sensitive field, and
+// credential-shaped text anywhere. A plan it accepts is frozen and remembered, so run() can tell it from a look-alike.
 // See docs/specs/SPEC-01-plan-language-and-parser.md.
 import {
   AUDIT_MODES, DIALOG_ACTIONS, ELEMENT_STATE_KINDS, ELEMENT_TEXT_KINDS, KEYS, LOCATOR_KINDS, PAGE_TEXT_KINDS, ROLES,
@@ -19,8 +20,9 @@ import {
 import {
   ASSERTION_STEP_TYPES, CAPTURE_NAME, CRITERION_FIELD, CRITERION_ID, CURRENT_PLAN_VERSION, FEATURE_ID, LOCATOR_FIELDS,
   MAXIMUM_EXPECTED_COUNT, MAXIMUM_SPEC_REFERENCE_LENGTH, MAXIMUM_TEST_ID_LENGTH, MAXIMUM_TITLE_LENGTH, MAXIMUM_URL_LENGTH,
-  META_FIELDS, PLAN_FIELDS, STEP_FIELDS, STEP_TYPES,
+  META_FIELDS, OPTIONAL_PLAN_FIELDS, PLAN_FIELDS, STEP_FIELDS, STEP_TYPES,
 } from './plan-grammar.ts';
+import { looksLikeCredential, namesSensitiveField } from './literal-secrets.ts';
 
 // A base used only to tell whether a URL is relative to the app under test.
 const RELATIVE_BASE = new URL('https://relative.invalid');
@@ -43,8 +45,15 @@ const rulesOf = (project: Project): PlanRules => ({
   secretNames: project.secretNames, fixtures: project.fixtures, limits: project.limits,
 });
 
+// Text from the plan, refused as literal_secret when it is shaped like a credential.
+function readPlanText(input: unknown, path: string, context: ParseContext, maximumLength: number, minimumLength = 1): Parsed<SafeText> {
+  const text = readText(input, path, context.issues, maximumLength, minimumLength);
+  if (text !== INVALID && looksLikeCredential(text)) { context.issues.push({ code: 'literal_secret', path }); return INVALID; }
+  return text;
+}
+
 function readUrl(input: unknown, path: string, context: ParseContext): Parsed<AllowedUrl> {
-  const text = readText(input, path, context.issues, MAXIMUM_URL_LENGTH);
+  const text = readPlanText(input, path, context, MAXIMUM_URL_LENGTH);
   if (text === INVALID) return INVALID;
   let url: URL;
   try { url = new URL(text, RELATIVE_BASE); } catch { context.issues.push({ code: 'invalid_url', path }); return INVALID; }
@@ -73,20 +82,20 @@ function readLocator(input: unknown, path: string, context: ParseContext): Parse
     case 'role': {
       const parts = [
         readOneOf(head['role'], `${path}.role`, context.issues, ROLES),
-        readText(head['name'], `${path}.name`, context.issues, longest),
+        readPlanText(head['name'], `${path}.name`, context, longest),
       ] as const;
       return allValid(parts) ? { by, role: parts[0], name: parts[1] } : INVALID;
     }
     case 'label': {
-      const label = readText(head['label'], `${path}.label`, context.issues, longest);
+      const label = readPlanText(head['label'], `${path}.label`, context, longest);
       return label === INVALID ? INVALID : { by, label };
     }
     case 'text': {
-      const text = readText(head['text'], `${path}.text`, context.issues, longest);
+      const text = readPlanText(head['text'], `${path}.text`, context, longest);
       return text === INVALID ? INVALID : { by, text };
     }
     case 'testId': {
-      const testId = readText(head['testId'], `${path}.testId`, context.issues, MAXIMUM_TEST_ID_LENGTH);
+      const testId = readPlanText(head['testId'], `${path}.testId`, context, MAXIMUM_TEST_ID_LENGTH);
       return testId === INVALID ? INVALID : { by, testId };
     }
   }
@@ -102,7 +111,7 @@ function readAssertionHead(input: unknown, path: string, context: ParseContext):
 
 // Expected text for a text check. Empty text would match any element, so the check proves nothing.
 function readExpectedText(input: unknown, path: string, context: ParseContext): Parsed<SafeText> {
-  const value = readText(input, path, context.issues, context.rules.limits.maximumTextLength, 0);
+  const value = readPlanText(input, path, context, context.rules.limits.maximumTextLength, 0);
   if (value === '') { context.issues.push({ code: 'vacuous', path }); return INVALID; }
   return value;
 }
@@ -137,7 +146,7 @@ function readPageAssertion(input: unknown, path: string, context: ParseContext):
     return url === INVALID ? INVALID : { kind, value: url };
   }
   // A page may have an empty title, so an empty expected title or path is a real check.
-  const value = readText(head['value'], `${path}.value`, context.issues, context.rules.limits.maximumTextLength, 0);
+  const value = readPlanText(head['value'], `${path}.value`, context, context.rules.limits.maximumTextLength, 0);
   return value === INVALID ? INVALID : { kind, value };
 }
 
@@ -149,6 +158,7 @@ function readCriterionId(head: Readonly<Record<string, unknown>>, stepPath: stri
   if (!Object.hasOwn(head, CRITERION_FIELD) || value === '') { context.issues.push({ code: 'vacuous', path }); return INVALID; }
   if (typeof value !== 'string') { context.issues.push({ code: 'wrong_type', path }); return INVALID; }
   if (!CRITERION_ID.test(value)) { context.issues.push({ code: 'unknown_value', path }); return INVALID; }
+  if (looksLikeCredential(value)) { context.issues.push({ code: 'literal_secret', path }); return INVALID; }
   return brand<string, 'CriterionId'>(value);
 }
 
@@ -162,7 +172,7 @@ function readDeclared<Name extends string>(input: unknown, path: string, context
 
 // A fill value: literal text, or a reference to a secret the project declares.
 function readFillValue(input: unknown, path: string, context: ParseContext): Parsed<SafeText | SecretReference> {
-  if (typeof input !== 'object' || input === null || Array.isArray(input)) return readText(input, path, context.issues, context.rules.limits.maximumTextLength, 0);
+  if (typeof input !== 'object' || input === null || Array.isArray(input)) return readPlanText(input, path, context, context.rules.limits.maximumTextLength, 0);
   const fields = readRecord(input, path, context.issues, ['secretName']);
   if (fields === INVALID) return INVALID;
   const secretName = readDeclared(fields['secretName'], `${path}.secretName`, context, context.rules.secretNames);
@@ -200,10 +210,17 @@ function readStep(input: unknown, path: string, context: ParseContext): Parsed<S
     }
     case 'fill': {
       const parts = [locator(), readFillValue(head['value'], `${path}.value`, context)] as const;
-      return allValid(parts) ? { type, locator: parts[0], value: parts[1] } : INVALID;
+      if (!allValid(parts)) return INVALID;
+      // A password or token typed as literal text would put a secret in the plan. Clearing the
+      // field with empty text holds no secret, so it stays allowed.
+      if (typeof parts[1] === 'string' && parts[1] !== '' && namesSensitiveField(parts[0])) {
+        context.issues.push({ code: 'literal_secret', path: `${path}.value` });
+        return INVALID;
+      }
+      return { type, locator: parts[0], value: parts[1] };
     }
     case 'select': {
-      const parts = [locator(), readText(head['option'], `${path}.option`, context.issues, longest)] as const;
+      const parts = [locator(), readPlanText(head['option'], `${path}.option`, context, longest)] as const;
       return allValid(parts) ? { type, locator: parts[0], option: parts[1] } : INVALID;
     }
     case 'upload': {
@@ -222,7 +239,7 @@ function readStep(input: unknown, path: string, context: ParseContext): Parsed<S
     case 'dialog': {
       const action = readOneOf(head['action'], `${path}.action`, context.issues, DIALOG_ACTIONS);
       if (!Object.hasOwn(head, 'expectText')) return action === INVALID ? INVALID : { type, action };
-      const expectText = readText(head['expectText'], `${path}.expectText`, context.issues, longest);
+      const expectText = readPlanText(head['expectText'], `${path}.expectText`, context, longest);
       return action === INVALID || expectText === INVALID ? INVALID : { type, action, expectText };
     }
     case 'expect': {
@@ -256,12 +273,16 @@ function readMeta(input: unknown, path: string, context: ParseContext): Parsed<P
   const fields = readRecord(input, path, context.issues, META_FIELDS);
   if (fields === INVALID) return INVALID;
   const rawFeatureId = fields['featureId'];
-  const featureId = typeof rawFeatureId === 'string' && FEATURE_ID.test(rawFeatureId) ? brand<string, 'FeatureId'>(rawFeatureId) : INVALID;
-  if (featureId === INVALID) context.issues.push({ code: 'unknown_value', path: `${path}.featureId` });
+  const featureId = typeof rawFeatureId === 'string' && FEATURE_ID.test(rawFeatureId) && !looksLikeCredential(rawFeatureId)
+    ? brand<string, 'FeatureId'>(rawFeatureId) : INVALID;
+  if (featureId === INVALID) {
+    const credential = typeof rawFeatureId === 'string' && looksLikeCredential(rawFeatureId);
+    context.issues.push({ code: credential ? 'literal_secret' : 'unknown_value', path: `${path}.featureId` });
+  }
   const parts = [
     featureId,
-    readText(fields['specReference'], `${path}.specReference`, context.issues, MAXIMUM_SPEC_REFERENCE_LENGTH),
-    readText(fields['title'], `${path}.title`, context.issues, MAXIMUM_TITLE_LENGTH),
+    readPlanText(fields['specReference'], `${path}.specReference`, context, MAXIMUM_SPEC_REFERENCE_LENGTH),
+    readPlanText(fields['title'], `${path}.title`, context, MAXIMUM_TITLE_LENGTH),
   ] as const;
   return allValid(parts) ? { featureId: parts[0], specReference: parts[1], title: parts[2] } : INVALID;
 }
@@ -282,6 +303,22 @@ function readTargetIds(input: unknown, context: ParseContext): Parsed<readonly T
   });
   if (new Set(ids).size !== ids.length) { context.issues.push({ code: 'duplicate', path: '$.targets' }); return INVALID; }
   return allValid(ids) ? ids : INVALID;
+}
+
+// Saved browser storage state, named as { secretName }. Storage state written into the plan itself,
+// as JSON text or as an object of cookies, is a literal secret: it is refused at $.storageState as
+// a whole, so no part of it is read or echoed.
+function readStorageState(input: unknown, context: ParseContext): Parsed<SecretReference> {
+  const path = '$.storageState';
+  const fields = plainFields(input);
+  if (typeof input === 'string' || (fields !== undefined && !Object.hasOwn(fields, 'secretName'))) {
+    context.issues.push({ code: 'literal_secret', path });
+    return INVALID;
+  }
+  const reference = readRecord(input, path, context.issues, ['secretName']);
+  if (reference === INVALID) return INVALID;
+  const secretName = readDeclared(reference['secretName'], `${path}.secretName`, context, context.rules.secretNames);
+  return secretName === INVALID ? INVALID : { secretName };
 }
 
 // Every step, including the steps inside frames, depth first.
@@ -332,7 +369,7 @@ export function readPlanData(input: unknown, rules: PlanRules): Result<PlanData,
   const tooDeep = tooDeepFrame(input, rules.limits.maximumFrameDepth);
   if (tooDeep !== undefined) return failure([{ code: 'too_large', path: tooDeep }]);
   const context: ParseContext = { rules, issues: [] };
-  const fields = readRecord(input, '$', context.issues, PLAN_FIELDS);
+  const fields = readRecord(input, '$', context.issues, [...PLAN_FIELDS, ...OPTIONAL_PLAN_FIELDS], PLAN_FIELDS);
   if (fields === INVALID) return failure(context.issues);
   // A plan for a newer language is refused outright: running it with the unknown parts skipped
   // would turn a skipped check into a silent pass.
@@ -341,8 +378,10 @@ export function readPlanData(input: unknown, rules: PlanRules): Result<PlanData,
   const targets = readTargetIds(fields['targets'], context);
   const steps = readStepList(fields['steps'], '$.steps', context);
   if (steps !== INVALID) checkWholePlan(steps, context);
-  if (context.issues.length > 0 || meta === INVALID || targets === INVALID || steps === INVALID) return failure(context.issues);
-  return success({ version: CURRENT_PLAN_VERSION, meta, targets, steps });
+  const storageState = Object.hasOwn(fields, 'storageState') ? readStorageState(fields['storageState'], context) : undefined;
+  if (context.issues.length > 0 || meta === INVALID || targets === INVALID || steps === INVALID || storageState === INVALID) return failure(context.issues);
+  // Left out when absent, so a plan without storage state hashes as it always did.
+  return success({ version: CURRENT_PLAN_VERSION, meta, targets, steps, ...(storageState === undefined ? {} : { storageState }) });
 }
 
 // Every plan this parser made, so that assertBranded can tell a parsed plan from a copy or a

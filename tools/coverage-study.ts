@@ -14,9 +14,11 @@ const REPORT_PATH = 'docs/coverage-study/report.md';
 const KILL_THRESHOLD = 0.7;
 
 // The stand-in project the study's plans are parsed against: one Chromium target, and paths
-// relative to the app under test. A study plan names the target "playwright-chromium".
+// relative to the app under test. A study plan names the target "playwright-chromium". Plans sign
+// in with the test account's password as a secret reference, since a plan never holds a secret.
 const STUDY_PROJECT = {
   origins: ['http://127.0.0.1:4173'],
+  secretNames: ['TEST_ACCOUNT_PASSWORD'],
   matrix: [{
     id: 'playwright-chromium', adapter: 'playwright', engine: 'chromium', device: 'desktop-1280',
     locale: 'en-GB', timezone: 'UTC', colorScheme: 'light', reducedMotion: 'reduce',
