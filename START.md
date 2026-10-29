@@ -39,7 +39,7 @@ M1, language and trust:
 
 M2, driver and isolation (alpha):
 
-- [ ] SPEC-05 target matrix and lock
+- [x] SPEC-05 target matrix and lock
 - [ ] SPEC-06 CDP driver, with SPEC-03's guard wired in
 - [ ] SPEC-07 isolated runner and egress
 - [ ] SPEC-35 workload runner: suite run, egress, traces and manifest; zero-test suites end Failed, expected failures raise a review item
