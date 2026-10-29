@@ -9,7 +9,8 @@ import { isAbsolute, relative, resolve } from 'node:path';
 import { chromiumBuild } from './browser-build.ts';
 import { buildSession, errorText } from './browser-session.ts';
 import { CdpConnection } from './cdp-connection.ts';
-import { QUIET_CHROME_FLAGS } from './chrome-flags.ts';
+import { QUIET_CHROME_FLAGS, proxyFlags } from './chrome-flags.ts';
+import { EgressRecorder } from './egress-records.ts';
 import { launchChromium, type LaunchedChromium } from './chromium-launcher.ts';
 import { focusAndSelect, focusElement, frameContentOffset } from './in-page.ts';
 import type { DriverSession, OwnBrowserDriver, PageArgument, PageFunction, PageOperations, Point, RoleAndName } from './page-operations.ts';
@@ -90,6 +91,9 @@ export type CdpDriverOptions = {
   // The project's fixtures folder. An upload step sends a declared fixture from here, and never a
   // file outside it. Without it, the driver refuses every upload.
   readonly fixturesFolder?: string;
+  // The egress proxy every request goes through, such as the isolated runner's. includeLoopback
+  // sends requests to 127.0.0.1 and localhost through it too; without it they go direct.
+  readonly proxy?: { readonly server: string; readonly includeLoopback: boolean };
 };
 
 // The absolute path of a declared fixture inside the fixtures folder. A name that leads out of the
@@ -127,7 +131,7 @@ export function cdpDriver(options: CdpDriverOptions): OwnBrowserDriver {
       let launched: LaunchedChromium;
       try {
         launched = await launchChromium(options.executablePath, {
-          arguments: [...QUIET_CHROME_FLAGS, `--lang=${target.locale}`],
+          arguments: [...QUIET_CHROME_FLAGS, `--lang=${target.locale}`, ...(options.proxy === undefined ? [] : proxyFlags(options.proxy))],
           launchTimeoutMilliseconds: options.launchTimeoutMilliseconds ?? 30_000,
           commandTimeoutMilliseconds: COMMAND_TIMEOUT_MILLISECONDS,
           profilePrefix: 'cdp-driver-',
@@ -157,8 +161,11 @@ async function createSession(
 
   const profile = deviceProfile(target);
   await page.send('Page.enable');
-  const watch = new PageWatch(connection, { browserContextId, targetId, sessionId });
+  // Every request's origin and channel, for the run's egress events.
+  const recorder = new EgressRecorder(connection);
+  const watch = new PageWatch(connection, { browserContextId, targetId, sessionId }, (url) => recorder.record(url, 'popup'));
   await watch.start();
+  await recorder.start(sessionId);
   await page.send('Emulation.setDeviceMetricsOverride', { width: profile.width, height: profile.height, deviceScaleFactor: profile.scale, mobile: profile.mobile });
   // The quoted key is the protocol's own parameter name.
   if (profile.touch) await page.send('Emulation.setTouchEmulationEnabled', { enabled: true, 'maxTouchPoints': 5 });
@@ -194,6 +201,7 @@ async function createSession(
     browser: { name: 'chromium', version: /\/(\S+)$/.exec(version.product)?.[1] ?? version.product },
     processId: launched.browserProcess.pid ?? -1,
     blockedOrigins: () => blocked,
+    egressRecords: () => recorder.records(),
     close: () => launched.stop(),
     events: watch,
     fixturePath: (fixture) => fixtureFilePath(fixturesFolder, fixture),

@@ -20,6 +20,7 @@
     "cost-report": "node tools/cost-report.ts",
     "check:tests": "npm run typecheck && npm run lint && npm run lint:names && npm test && npm run proofs && npm run replay",
     "check": "npm run check:tests && npm run gates",
+    "check:containers": "node --test --test-concurrency=1 \"test/containers/*.test.ts\"",
     "check:linux": "npx -y @devcontainers/cli@0.89.0 up --workspace-folder . && npx -y @devcontainers/cli@0.89.0 exec --workspace-folder . bash -c \"npm ci --no-audit --no-fund && npm run browsers && npm run check\""
   },
   "devDependencies": {

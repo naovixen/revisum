@@ -37,6 +37,20 @@ jobs:
               chown -R node:node /workspace
               su node -c "npm run browsers && npm run check:tests"
             '
+      # The real-container tests (docs/decisions/container-tests.md) start the run image's
+      # containers on this runner's own Docker, so they show whether egress can be enforced in CI.
+      # The pinned image runs them with the runner's Docker socket and client mounted, and with the
+      # workspace at the same path as on the runner, so every folder the tests ask Docker to mount
+      # exists there too. The step before installed the Linux dependencies and browsers they use.
+      - name: Run the real-container tests on the runner's Docker
+        run: |
+          docker run --rm \
+            --volume /var/run/docker.sock:/var/run/docker.sock \
+            --volume "$(command -v docker):/usr/local/bin/docker:ro" \
+            --volume /usr/libexec/docker/cli-plugins:/usr/libexec/docker/cli-plugins:ro \
+            --volume "$GITHUB_WORKSPACE:$GITHUB_WORKSPACE" --workdir "$GITHUB_WORKSPACE" \
+            mcr.microsoft.com/devcontainers/typescript-node:24-bookworm@sha256:970eebf5b82d3800bdd9f46680e1c4c664d365d18603148540788356700ce301 \
+            bash -euo pipefail -c 'npm run check:containers'
       # The gates run even when a test failed, so a failing or flaky run is still recorded; the job
       # fails either way. They record the project's metrics and check the guarantee map.
       - name: Record the project's metrics and check the guarantee map

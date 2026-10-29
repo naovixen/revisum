@@ -1,7 +1,7 @@
 // The seam each browser protocol implements once. buildSession (browser-session.ts) turns a
 // PageOperations into a Session, so auto-waiting, probes and audits behave the same on every
 // protocol. One PageOperations serves one document: the page's top document, or an iframe's.
-import type { A11yNode, BrowserDriver, Key, Result, Session, SessionEnvironment, Target, Unavailable } from '@revisum/contracts';
+import type { A11yNode, BrowserDriver, BrowserRequestRecord, Key, Result, Session, SessionEnvironment, Target, Unavailable } from '@revisum/contracts';
 import type { AuditRuleResult } from './page-audit.ts';
 
 export type Point = { readonly x: number; readonly y: number };
@@ -74,6 +74,9 @@ export interface DriverSession extends Session {
   readonly processId: number;
   // Evaluates a self-contained page function that returns a string (tests and evidence only).
   evaluate(pageFunction: PageFunction, inputs?: readonly (string | number | boolean)[]): Promise<string>;
+  // Every request the session's page, workers and popups sent, by origin and channel, in order.
+  // Joined with the egress proxy's decisions, they make the run's egress events.
+  egressRecords(): readonly BrowserRequestRecord[];
 }
 
 export interface OwnBrowserDriver extends BrowserDriver {

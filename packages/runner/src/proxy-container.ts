@@ -1,0 +1,88 @@
+// The egress proxy as the main process of a run's proxy container. The runner passes the proxy's
+// rules in one environment variable; the proxy listens on every interface of the container and
+// appends each decision as a JSON line to a file in the container's private /tmp, which the runner
+// reads back. Both the rules and the decision lines cross a process boundary, so each is decoded
+// here before use. See docs/specs/SPEC-07-isolated-runner-and-egress.md.
+import type { ProxyDecision, ResponseRewrite } from '@revisum/contracts';
+import { appendFileSync } from 'node:fs';
+import { startProxyServer, type ProxyRules, type RewriteRule } from './egress-proxy.ts';
+
+export const PROXY_PORT = 3128;
+export const DECISIONS_FILE = '/tmp/egress-decisions.jsonl';
+export const RULES_VARIABLE = 'EGRESS_PROXY_RULES';
+
+const field = (value: unknown, name: string): unknown =>
+  typeof value === 'object' && value !== null && !Array.isArray(value) ? Object.getOwnPropertyDescriptor(value, name)?.value : undefined;
+
+// A URL origin written exactly as the URL parser would write it, such as "http://127.0.0.1:4310".
+function readOrigin(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  try {
+    return new URL(value).origin === value ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function readOrigins(value: unknown): readonly string[] | null {
+  if (!Array.isArray(value)) return null;
+  const origins = value.map(readOrigin);
+  return origins.every((origin) => origin !== null) ? origins.filter((origin) => origin !== null) : null;
+}
+
+function readRewriteRule(value: unknown): RewriteRule | null {
+  const origin = readOrigin(field(value, 'origin'));
+  const rewrite = field(value, 'rewrite');
+  const name = field(rewrite, 'name');
+  const find = field(rewrite, 'find');
+  const replace = field(rewrite, 'replace');
+  if (origin === null || typeof name !== 'string' || typeof find !== 'string' || typeof replace !== 'string') return null;
+  const decoded: ResponseRewrite = { name, find, replace };
+  return { origin, rewrite: decoded };
+}
+
+// The proxy's rules from their JSON text, or null when the text is not exactly that shape.
+export function readProxyRules(text: string): ProxyRules | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return null;
+  }
+  const allowedOrigins = readOrigins(field(parsed, 'allowedOrigins'));
+  const privateOrigins = readOrigins(field(parsed, 'privateOrigins'));
+  const rawRewrites = field(parsed, 'rewrites');
+  if (allowedOrigins === null || privateOrigins === null || !Array.isArray(rawRewrites)) return null;
+  const rewrites = rawRewrites.map(readRewriteRule);
+  if (!rewrites.every((rule) => rule !== null)) return null;
+  return { allowedOrigins, privateOrigins, rewrites: rewrites.filter((rule) => rule !== null) };
+}
+
+// One decision line written by the proxy container, or null when the line is anything else.
+export function readProxyDecision(line: string): ProxyDecision | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(line);
+  } catch {
+    return null;
+  }
+  const origin = field(parsed, 'origin');
+  const decision = field(parsed, 'decision');
+  if (typeof origin !== 'string' || origin === '' || (decision !== 'allowed' && decision !== 'blocked')) return null;
+  return { origin, decision };
+}
+
+async function main(): Promise<number> {
+  const rules = readProxyRules(process.env[RULES_VARIABLE] ?? '');
+  if (rules === null) {
+    console.error(`${RULES_VARIABLE} does not hold the egress proxy's rules`);
+    return 2;
+  }
+  const proxy = await startProxyServer(rules, {
+    listenHost: '0.0.0.0', port: PROXY_PORT, onDecision: (decision) => appendFileSync(DECISIONS_FILE, `${JSON.stringify(decision)}\n`),
+  });
+  console.log(`egress proxy listening at ${proxy.url}`);
+  return 0;
+}
+
+if (import.meta.main) process.exitCode = await main();

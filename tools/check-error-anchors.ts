@@ -20,6 +20,8 @@ export const ERROR_CODE_UNIONS: readonly { readonly file: string; readonly name:
   { file: 'packages/engine/src/evidence/suite-report.ts', name: 'SuiteDecodeErrorCode' },
   { file: 'packages/contracts/src/browser-driver.ts', name: 'DriverErrorCode' },
   { file: 'packages/contracts/src/error-codes.ts', name: 'RunnerError' },
+  { file: 'packages/runner/src/egress-policy.ts', name: 'EgressPolicyError' },
+  { file: 'packages/runner/src/run-image.ts', name: 'RunImageError' },
   { file: 'packages/contracts/src/error-codes.ts', name: 'RecorderError' },
   { file: 'packages/contracts/src/audit-events.ts', name: 'SinkError' },
   { file: 'packages/contracts/src/error-codes.ts', name: 'CliErrorCode' },

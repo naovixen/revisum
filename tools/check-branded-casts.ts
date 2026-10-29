@@ -67,7 +67,8 @@ export const BRAND_OWNERS: Readonly<Record<string, readonly string[]>> = {
   // Evidence mode: a suite and its image are named in the project file; a decoded report and a
   // test's id come only from the report decoder and the result built from it.
   SuiteName: [EVIDENCE_DECLARATIONS],
-  ImageDigest: [EVIDENCE_DECLARATIONS],
+  // The isolated runner reads its own run image's id back from Docker.
+  ImageDigest: [EVIDENCE_DECLARATIONS, 'packages/runner/src/run-image.ts'],
   SuiteReport: ['packages/engine/src/evidence/suite-report.ts'],
   // Unsafe plan features: page scripts and database commands are named by the declaration-section
   // reader, and a plan refers to them by those names; only the plan parser reads an inline

@@ -327,13 +327,29 @@ Runner error. The container image's digest differs from the pinned digest, so no
 
 ## egress-unenforceable
 
-Runner error. Network egress cannot be enforced on this host. The run is reported at the `host` guarantee level and claims no hermetic isolation.
+Runner log entry. Network egress cannot be enforced on this host: Docker could not create a network with no route out, or a probe from inside the run container reached an address outside. The run still starts, at the `host` guarantee level, and claims no hermetic isolation.
 
 Run refusal, for an evidence run (`run --suite`): Revisum never runs a team's own suite code without egress control, so the run is refused before any suite code runs. Run it on a host where the isolated runner can enforce egress.
 
 ## start-failed
 
 Runner error. The isolated run environment did not start.
+
+## rewrite-origin-not-fixture
+
+Egress policy error. A browser mutant's response rewrite names an origin that is not a declared fixture origin. A rewrite may change only the project's own fixture apps, never the app under test or a third party, so the whole policy is refused.
+
+## base-image-unpinned
+
+Run image error. `.devcontainer/devcontainer.json` names no base image pinned by digest, so the run image cannot be built from a known base.
+
+## docker-unavailable
+
+Run image error. The Docker client could not reach a Docker server, so the run image cannot be built.
+
+## build-failed
+
+Run image error. Building `packages/runner/image/Dockerfile` failed, or the built image has no id. The detail holds the end of Docker's output.
 
 ## no-reason
 

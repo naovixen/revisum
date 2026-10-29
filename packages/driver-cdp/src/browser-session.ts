@@ -3,7 +3,7 @@
 // See docs/specs/SPEC-06-cdp-driver.md.
 import {
   failure, literalActionStep, literalText, performableLocator, reveal, success,
-  type ActionGuard, type ActionStep, type DialogStep, type DocumentSession, type DriverError, type ElementProbe, type Locator, type PageProbe,
+  type ActionGuard, type ActionStep, type BrowserRequestRecord, type DialogStep, type DocumentSession, type DriverError, type ElementProbe, type Locator, type PageProbe,
   type ResolvedActionStep, type ResolvedElement, type ResolvedLocator, type Result, type Secret, type SessionEnvironment,
 } from '@revisum/contracts';
 import {
@@ -26,6 +26,8 @@ export type SessionDetails = {
   readonly browser: { readonly name: string; readonly version: string };
   readonly processId: number;
   readonly blockedOrigins: () => readonly string[];
+  // Every request's origin and the channel it left the browser by.
+  readonly egressRecords: () => readonly BrowserRequestRecord[];
   readonly close: () => Promise<void>;
   readonly events: PageEvents;
   // The absolute path of a declared upload fixture, or why it cannot be sent.
@@ -342,6 +344,7 @@ export function buildSession<Handle>(operations: PageOperations<Handle>, environ
     browser: details.browser,
     processId: details.processId,
     blockedOrigins: details.blockedOrigins,
+    egressRecords: details.egressRecords,
     evaluate: (pageFunction: PageFunction, inputs = []) => operations.callForString(pageFunction, inputs),
     close: details.close,
   };

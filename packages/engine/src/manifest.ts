@@ -1,6 +1,6 @@
 // The run manifest: every input that decides a run's result, hashed, so a run can be replayed and
 // compared. See docs/specs/SPEC-08-manifest-and-replay.md.
-import { failure, success, type AdapterInfo, type Plan, type RedactionMode, type Result, type SecretName, type Target, type UnsafeFeature } from '@revisum/contracts';
+import { failure, success, type AdapterInfo, type AppliedRewrite, type Plan, type RedactionMode, type Result, type SecretName, type Target, type UnsafeFeature } from '@revisum/contracts';
 import { canonicalJson, sha256 } from './hashing.ts';
 import { declarationsNamedBy, unsafeFeaturesOf } from './plan/unsafe-features.ts';
 import type { Project } from './project/project-parser.ts';
@@ -43,6 +43,9 @@ export type RunManifest = {
   // and its hash stay exactly as they were.
   readonly unsafeFeatures?: readonly UnsafeFeature[];
   readonly unsafeDeclarations?: readonly UnsafeDeclarationRecord[];
+  // Present only when the egress proxy applied a browser mutant's rewrite, so a mutated run can
+  // never pass for a plain one, and a plain run's manifest and hash stay as they were.
+  readonly responseRewrites?: readonly AppliedRewrite[];
 };
 
 export const planHash = (plan: Plan): string => sha256(canonicalJson(plan));
@@ -91,6 +94,8 @@ export function buildManifest(inputs: {
   readonly unsafe?: UnsafeFeatureRecord;
   // Other inputs the run could not pin, such as a browser build the lockfile does not cover.
   readonly unpinned?: readonly string[];
+  // The browser mutants' rewrites the egress proxy applied (EgressProxy.rewritesApplied).
+  readonly responseRewrites?: readonly AppliedRewrite[];
 }): RunManifest {
   const secrets = inputs.secrets === undefined || inputs.secrets.length === 0
     ? {}
@@ -110,6 +115,10 @@ export function buildManifest(inputs: {
     ...secrets,
     ...(inputs.storageState === undefined ? {} : { storageState: inputs.storageState }),
     ...(inputs.unsafe === undefined ? {} : inputs.unsafe),
+    ...(inputs.responseRewrites === undefined || inputs.responseRewrites.length === 0 ? {} : {
+      responseRewrites: inputs.responseRewrites.map((applied) => ({ origin: applied.origin, name: applied.name }))
+        .sort((left, right) => (left.origin === right.origin ? (left.name < right.name ? -1 : 1) : (left.origin < right.origin ? -1 : 1))),
+    }),
   };
 }
 

@@ -15,6 +15,11 @@ type AttachedToTarget = { readonly sessionId: string; readonly targetInfo: Targe
 type TargetCrashed = { readonly targetId: string };
 type DetachedFromTarget = { readonly sessionId: string };
 type DialogOpening = { readonly message: string };
+type RequestPaused = { readonly request: { readonly url: string } };
+
+// How long a popup is given to ask for its first page, so that request can be recorded before the
+// popup is closed. A popup opened with no address asks for nothing and is closed after this wait.
+const POPUP_REQUEST_WAIT_MILLISECONDS = 1_000;
 
 export type WatchedPage = { readonly browserContextId: string; readonly targetId: string; readonly sessionId: string };
 
@@ -26,10 +31,13 @@ export class PageWatch implements PageEvents {
   #openings = 0;
   readonly #onCrash = new Set<() => void>();
   readonly #onDialog = new Set<() => void>();
+  readonly #onPopupRequest: (url: string) => void;
 
-  constructor(connection: CdpConnection, page: WatchedPage) {
+  // onPopupRequest is told the address each held-back popup asked for.
+  constructor(connection: CdpConnection, page: WatchedPage, onPopupRequest: (url: string) => void = () => undefined) {
     this.#connection = connection;
     this.#page = page;
+    this.#onPopupRequest = onPopupRequest;
   }
 
   // Starts listening. Called once, before the page loads anything.
@@ -110,14 +118,28 @@ export class PageWatch implements PageEvents {
 
   // A popup that can reach its opener shares the opener's renderer process, so while it waits to
   // start, the opener waits too. Its every request is held back first, so it loads nothing; then
-  // it is let start, and closed.
+  // it is let start, its first request (held back) is recorded, and it is closed.
   async #closePopup(popupSessionId: string, popupTargetId: string): Promise<void> {
     const connection = this.#connection;
+    let stopListening = (): void => undefined;
+    let timer: NodeJS.Timeout | undefined;
+    const firstRequest = new Promise<void>((resolve) => {
+      timer = setTimeout(resolve, POPUP_REQUEST_WAIT_MILLISECONDS);
+      stopListening = connection.on(popupSessionId, 'Fetch.requestPaused', (parameters) => {
+        stopListening();
+        this.#onPopupRequest((parameters as RequestPaused).request.url);
+        resolve();
+      });
+    });
     try {
       await connection.send(popupSessionId, 'Fetch.enable', { patterns: [{ urlPattern: '*', requestStage: 'Request' }] });
       await connection.send(popupSessionId, 'Runtime.runIfWaitingForDebugger');
+      await firstRequest;
     } catch {
       // The popup closed itself first; closing it below is then harmless.
+    } finally {
+      clearTimeout(timer);
+      stopListening();
     }
     await connection.send(undefined, 'Target.closeTarget', { targetId: popupTargetId }).catch(() => undefined);
   }
