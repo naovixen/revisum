@@ -8,6 +8,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { migratePlan, type CriterionMapping } from '@revisum/engine';
+import { futureVersions } from '../../support/plan-changelog.ts';
 import { GOLDEN } from '../../support/repository.ts';
 import { criterionMapping, defaultParser, goldenPlan, goldenPlanNames, legacyPlan, signupPlan, stepsOf } from './plan-examples.ts';
 import { NEW_VERSION, PREVIOUS_VERSION, label, type JsonRecord } from './run-value-examples.ts';
@@ -57,8 +58,8 @@ test('the same steps declared as "1.2" parse too, keeping the declared version',
   assert.deepEqual(parsed.value.steps, stepsOf(signupPlan()));
 });
 
-test('a plan declaring a version newer than 1.2 is still refused with version_unsupported', { criterion: 'AC-SPEC-30-01' }, () => {
-  for (const version of ['1.3', '1.20', '2.0']) {
+test('a plan declaring a version newer than any the changelog lists is still refused with version_unsupported', { criterion: 'AC-SPEC-30-01' }, () => {
+  for (const version of futureVersions()) {
     assert.deepEqual(parsePlan({ ...signupPlan(), version }), { ok: false, error: [{ code: 'version_unsupported', path: '$.version' }] }, version);
   }
 });

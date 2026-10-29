@@ -10,10 +10,10 @@ import { join } from 'node:path';
 import { after, before, test } from 'node:test';
 import { parseProject, planParser } from '@revisum/engine';
 import { testProjectInput } from '../unit/engine/plan-examples.ts';
+import { changelogEntry, entriesFor } from '../support/plan-changelog.ts';
 import { GOLDEN, REPOSITORY_ROOT } from '../support/repository.ts';
 import { copyRepository, type LintOutcome, type ScratchRepository } from './scratch-repository.ts';
 
-const CHANGELOG_PATH = 'docs/plan-language/CHANGELOG.md';
 const CLOCK_PLAN_PATH = 'golden/plans/session-expiry-clock.json';
 const CLIPBOARD_PLAN_PATH = 'golden/plans/copied-invite-link.json';
 const REMEMBER_PLAN_PATH = 'golden/plans/remembered-copied-link.json';
@@ -79,8 +79,6 @@ test('the clock, clipboard and clipboard-remember golden plans declare 1.2 and p
 
 // ---- The changelog's 1.2 entry ---------------------------------------------------------------------
 
-const newestEntry = (): string => readText(CHANGELOG_PATH).split(/\r?\n(?=## )/).find((section) => section.startsWith('## ')) ?? '';
-
 const NAMED_IN_ENTRY = [
   'advanceClock', 'runTimers', 'skipAhead', 'milliseconds', 'seconds', 'minutes', 'hours', 'days',
   'expectClipboard', 'textExcludes', 'clipboard',
@@ -89,16 +87,17 @@ const NAMED_IN_ENTRY = [
 ];
 
 test('the 1.2 changelog entry names each new step, mode, unit, check, source, limit and error code, in code type', { criterion: 'AC-SPEC-34-01' }, () => {
-  const entry = newestEntry();
+  const entry = changelogEntry('1.2');
   assert.match(entry, /^## 1\.2\b/);
   assert.deepEqual(NAMED_IN_ENTRY.filter((name) => !entry.includes(`\`${name}\``)), [], 'names the 1.2 entry leaves out');
 });
 
-test('the 1.2 changelog entry is still the one unreleased entry, with a schema sha256', { criterion: 'AC-SPEC-34-01' }, () => {
-  const entry = newestEntry();
-  assert.match(entry, /^## 1\.2 \(unreleased\)/);
+// Dating the entry when 1.2 is released is allowed.
+test('the changelog has one 1.2 entry, unreleased or dated, with a schema sha256', { criterion: 'AC-SPEC-34-01' }, () => {
+  const entry = changelogEntry('1.2');
+  assert.match(entry, /^## 1\.2 \((unreleased|\d{4}-\d{2}-\d{2})/);
   assert.match(entry, /Schema sha256: `[0-9a-f]{64}`/);
-  assert.equal(readText(CHANGELOG_PATH).split(/\r?\n/).filter((line) => /^## 1\.2\b/.test(line)).length, 1);
+  assert.equal(entriesFor('1.2').length, 1);
 });
 
 // ---- The lint check ---------------------------------------------------------------------------------

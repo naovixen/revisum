@@ -1,36 +1,29 @@
 // The published schema for plan language 1.2. golden/plans/ holds every 1.1 golden plan and one
 // 1.2 golden plan per feature, and `npm run lint` validates all of them against the schema. The
-// changelog's newest entry is "1.2" and names the schema's sha256, so a schema change without an
-// entry update fails the lint. Each lint test breaks one promise in a throw-away copy of the
+// changelog has one 1.2 entry naming a schema sha256, and the newest entry must name the committed
+// schema's, so a schema change without an entry update fails the lint. Each lint test breaks one promise in a throw-away copy of the
 // repository; the general schema checks are in plan-schema-check.test.ts.
 // See docs/specs/SPEC-30-plan-values-positions-and-keys.md.
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { after, before, test } from 'node:test';
 import { parseProject, planParser } from '@revisum/engine';
 import { testProjectInput } from '../unit/engine/plan-examples.ts';
+import { CHANGELOG_PATH, changelogEntry, entriesFor, withoutNewestEntry } from '../support/plan-changelog.ts';
 import { GOLDEN, REPOSITORY_ROOT } from '../support/repository.ts';
 import { copyRepository, type LintOutcome, type ScratchRepository } from './scratch-repository.ts';
 
-const SCHEMA_PATH = 'docs/plan-language/plan.schema.json';
-const CHANGELOG_PATH = 'docs/plan-language/CHANGELOG.md';
 const TIMEOUT = 300_000;
 
 type JsonRecord = Record<string, unknown>;
 
-const sha256Of = (text: string): string => createHash('sha256').update(text).digest('hex');
 const readText = (relativePath: string): string => readFileSync(join(REPOSITORY_ROOT, relativePath), 'utf8');
 
 const goldenPlans = (): { readonly name: string; readonly plan: JsonRecord }[] =>
   readdirSync(join(GOLDEN, 'plans')).filter((name) => name.endsWith('.json')).sort()
     .map((name) => ({ name, plan: JSON.parse(readFileSync(join(GOLDEN, 'plans', name), 'utf8')) }));
 const newerGoldenPlans = () => goldenPlans().filter(({ plan }) => plan['version'] === '1.2');
-
-// The sections of the changelog, each from its "## " heading to the next.
-const changelogEntries = (changelog: string): string[] =>
-  changelog.split(/\r?\n(?=## )/).filter((section) => section.startsWith('## '));
 
 let scratch: ScratchRepository;
 before(() => { scratch = copyRepository(); });
@@ -43,13 +36,13 @@ function assertFailsNaming(outcome: LintOutcome, fileName: string): void {
 
 // ---- The changelog entry ------------------------------------------------------------------------
 
-test('the newest changelog entry is for version 1.2 and names the committed schema\'s sha256', { criterion: 'AC-SPEC-30-02' }, () => {
-  const entries = changelogEntries(readText(CHANGELOG_PATH));
-  const newest = entries[0];
-  assert.ok(newest !== undefined, 'the changelog has entries');
-  assert.match(newest.split(/\r?\n/)[0] ?? '', /^## 1\.2 \((unreleased|\d{4}-\d{2}-\d{2})/);
-  assert.ok(newest.includes(sha256Of(readText(SCHEMA_PATH))), 'the 1.2 entry names the schema hash');
-  assert.equal(entries.filter((entry) => /^## 1\.2\b/.test(entry)).length, 1, 'there is one 1.2 entry');
+// The 1.2 entry names the schema as it stood when 1.2 was the newest version. That the newest
+// entry names the committed schema's hash is checked in plan-schema-check.test.ts.
+test('the changelog has one 1.2 entry, unreleased or dated, naming a schema sha256', { criterion: 'AC-SPEC-30-02' }, () => {
+  const entry = changelogEntry('1.2');
+  assert.match(entry.split(/\r?\n/)[0] ?? '', /^## 1\.2 \((unreleased|\d{4}-\d{2}-\d{2})/);
+  assert.match(entry, /Schema sha256: `[0-9a-f]{64}`/, 'the 1.2 entry names a schema hash');
+  assert.equal(entriesFor('1.2').length, 1, 'there is one 1.2 entry');
 });
 
 // ---- One 1.2 golden plan per feature ------------------------------------------------------------
@@ -131,8 +124,9 @@ test('the lint accepts a new 1.2 golden plan that validates', { criterion: 'AC-S
   assert.equal(outcome.passed, true, outcome.failureOutput);
 });
 
-test('the lint fails, naming the changelog, when the 1.2 entry is removed', { criterion: 'AC-SPEC-30-02', timeout: TIMEOUT }, () => {
-  const outcome = scratch.lintWithEdit(CHANGELOG_PATH, (text) =>
-    text.split(/\r?\n(?=## )/).filter((section) => !/^## 1\.2\b/.test(section)).join('\n'));
+// The newest entry is the one that must name the committed schema's hash, so removing it, whichever
+// version it is for, leaves a changelog the lint refuses.
+test('the lint fails, naming the changelog, when the newest entry is removed', { criterion: 'AC-SPEC-30-02', timeout: TIMEOUT }, () => {
+  const outcome = scratch.lintWithEdit(CHANGELOG_PATH, withoutNewestEntry);
   assertFailsNaming(outcome, 'CHANGELOG.md');
 });

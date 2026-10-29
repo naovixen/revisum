@@ -7,10 +7,10 @@ import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { after, before, test } from 'node:test';
+import { changelogEntry } from '../support/plan-changelog.ts';
 import { GOLDEN, REPOSITORY_ROOT } from '../support/repository.ts';
 import { copyRepository, type LintOutcome, type ScratchRepository } from './scratch-repository.ts';
 
-const CHANGELOG_PATH = 'docs/plan-language/CHANGELOG.md';
 const DOWNLOAD_PLAN_PATH = 'golden/plans/export-download.json';
 const TIMEOUT = 300_000;
 
@@ -56,15 +56,13 @@ for (const [feature, uses] of Object.entries(FEATURES)) {
 
 // ---- The changelog's 1.2 entry --------------------------------------------------------------------
 
-const newestEntry = (): string => readText(CHANGELOG_PATH).split(/\r?\n(?=## )/).find((section) => section.startsWith('## ')) ?? '';
-
 const NAMED_IN_ENTRY = [
   ...STATES, 'hrefEquals', 'metaContent', 'canonicalUrl', 'scripts', 'download', 'expectDownload', ...DOWNLOAD_CHECKS, 'newTab',
   'maximumDownloadBytes', 'keepDownloads', 'misplaced_step', 'state-not-exposed', 'download-not-text', 'no-download', 'download-too-large',
 ];
 
 test('the 1.2 changelog entry names each new step, check, setting and error code, in code type', { criterion: 'AC-SPEC-30-02' }, () => {
-  const entry = newestEntry();
+  const entry = changelogEntry('1.2');
   assert.match(entry, /^## 1\.2\b/);
   assert.deepEqual(NAMED_IN_ENTRY.filter((name) => !entry.includes(`\`${name}\``)), [], 'names the 1.2 entry leaves out');
 });

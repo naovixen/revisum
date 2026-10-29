@@ -10,6 +10,7 @@ import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { after, before, test } from 'node:test';
+import { changelogEntry } from '../support/plan-changelog.ts';
 import { PACKAGES, REPOSITORY_ROOT } from '../support/repository.ts';
 import { copyRepository, type ScratchRepository } from './scratch-repository.ts';
 
@@ -141,7 +142,6 @@ test('the lint fails when an engine module other than the secret values module i
 
 // ---- The changelog ---------------------------------------------------------------------------------
 
-const CHANGELOG_PATH = 'docs/plan-language/CHANGELOG.md';
 const NAMED_IN_ENTRY = [
   'call', 'expectBackend', 'cleanup', 'remember', 'calls', 'services', 'maximumCalls', 'backendCheckTimeoutMilliseconds',
   'unsafe_interpolation', 'header_not_allowed', 'side-effect-in-proposal', 'parameter-invalid', 'unexpected-status',
@@ -149,8 +149,7 @@ const NAMED_IN_ENTRY = [
 ];
 
 test('the 1.2 changelog entry names the call steps, settings and codes, in code type', { criterion: 'AC-SPEC-30-02' }, () => {
-  const changelog = readFileSync(join(REPOSITORY_ROOT, CHANGELOG_PATH), 'utf8');
-  const entry = changelog.split(/\r?\n(?=## )/).find((section) => section.startsWith('## ')) ?? '';
+  const entry = changelogEntry('1.2');
   assert.match(entry, /^## 1\.2\b/);
   assert.deepEqual(NAMED_IN_ENTRY.filter((name) => !entry.includes(`\`${name}\``)), [], 'names the 1.2 entry leaves out');
 });

@@ -9,6 +9,7 @@ import {
   type BrowserDriver,
 } from '@revisum/engine';
 import { memoryArtifactStore, memoryRunEventSink, systemClock } from '../../support/memory-ports.ts';
+import { futureVersions } from '../../support/plan-changelog.ts';
 import {
   CURRENT_VERSION, ORIGIN, accountClosurePlan, defaultParser, signupPlan, stepsOf, testProject, withValue,
   type JsonRecord,
@@ -32,7 +33,7 @@ const insertAt = (plan: JsonRecord, index: number, step: JsonRecord): JsonRecord
 
 // ---- A newer declared version -------------------------------------------------------------------
 
-for (const version of ['1.3', '1.10', '2.0']) {
+for (const version of futureVersions()) {
   test(`rejects a plan that declares the newer version ${version} with version_unsupported`, { criterion: 'AC-SPEC-01-07' }, () => {
     const parsed = parsePlan({ ...signupPlan(), version });
     assert.deepEqual(parsed, { ok: false, error: [{ code: 'version_unsupported', path: '$.version' }] });
