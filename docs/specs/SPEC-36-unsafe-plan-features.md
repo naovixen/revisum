@@ -164,6 +164,29 @@ export function unsafeFeaturesOf(plan: Plan): readonly UnsafeFeature[];   // sor
 - A failed `evaluate` or `database` step ends the run `Errored`, and cleanup still runs. A failed check ends it `Failed`. `write` steps are never repeated.
 - The guarantee statement is computed from `unsafeFeaturesOf(plan)` and the run's isolation alone, never from what a run happened to do, so two runs of one plan carry the same label.
 
+**Build notes.** Points the criteria leave open, settled while building (2026-10-29; `docs/decisions/answers.md`):
+
+- **Version tests.** Tests that pinned "1.2 is the newest version" now look up their own version's changelog entry. A "future version" example is computed as one past the newest. A later bump needs no test edits (founder, 2026-10-29).
+- **Closed runs unchanged.** `unsafeFeatures` on `RunResult` and `RunManifest` is present only when a plan uses one, as `secrets` is. Closed runs keep today's hashes exactly (AC-SPEC-36-03).
+- **Error paths for a disabled feature.**
+  - Locators: `.locator.by`.
+  - Inline scripts: `.script.inline`.
+  - Assertions: `.assert.kind`.
+  - Remember sources: `.from.read`.
+  - Steps: `.type`.
+  - A too-deep `inside` chain is refused at the fourth `inside`.
+- **Surfaces.**
+  - `GuaranteeConditions` gains `unsafeFeatures`; each lost guarantee's reason names the feature.
+  - `RunInputs` gains `scriptSources`, keyed by declared file path.
+  - In M1 a page-script or database plan still builds its manifest; those steps report `unsupported-step`.
+- **Feature names.** `unsafeFeaturesOf` names each feature once, by what the plan uses. A plan whose only script is inline lists `inline-page-script`, not `page-script`.
+- **Script files.** Declared script files are trusted files; changing one raises `changed-with-code` now. Reading their protected-branch versions comes with M2, when scripts run.
+- **Coverage.** The tool reports `shareWithUnsafeFeatures` and `shareWithUnsafeFeaturesBySample` beside the closed shares. The closed share counts no plan that uses an unsafe feature.
+- **Metrics and levels (AC-SPEC-36-18)** are built and tested with SPEC-15 and SPEC-21, as SPEC-35's AC-17 is.
+- **Golden plans.** 1.3 golden plans live in `golden/unsafe-plans/` and parse against an unsafe-enabled project. `golden/plans/` stays 1.1 and 1.2.
+- **Readable text.** 1.3 unsafe constructs have no readable form in M1. `writePlanText` refuses a plan using one with text code `no-readable-form`, and JSON stays the route. A readable form is queued.
+- **Changelog.** This spec's first code commit dates the 1.2 entry and opens "1.3 (unreleased)", naming the new constructs, codes and schema hash.
+
 ## Acceptance criteria
 
 - AC-SPEC-36-01: When a plan declaring `"1.3"` uses a feature its project does not enable, the parser shall refuse it with `unsafe_feature_disabled` at every path where a disabled feature appears, echo no value and make zero driver, script or command calls (oracle: specified; one hostile plan per feature, and one using all six).
