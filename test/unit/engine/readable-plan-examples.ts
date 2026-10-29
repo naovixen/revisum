@@ -334,7 +334,9 @@ export const EVERY_STEP_TYPE = [
   'expectDownload', 'newTab', 'a11yAudit', 'capture', 'remember', 'call', 'expectBackend', 'stub', 'resetRequests',
   'expectRequests', 'expectResponse', 'setStorage', 'removeStorage', 'expectStorage', 'advanceClock', 'expectClipboard',
 ] as const satisfies readonly StepType[];
-type StepTypeLeftOut = Exclude<StepType, (typeof EVERY_STEP_TYPE)[number]>;
+// The unsafe steps of plan 1.3 have no readable form (SPEC-36), so the readable examples leave them out.
+type UnsafeStepType = 'evaluate' | 'expectScript' | 'database' | 'expectDatabase';
+type StepTypeLeftOut = Exclude<StepType, (typeof EVERY_STEP_TYPE)[number] | UnsafeStepType>;
 export const NO_STEP_TYPE_LEFT_OUT: [StepTypeLeftOut] extends [never] ? true : false = true;
 
 // The features a plan uses, as words such as "step navigate", "locator role",

@@ -131,7 +131,7 @@ test('a run\'s statement is the gate\'s statement for the plan\'s features on th
   // Plan runs are not yet inside the isolated runner, so egress is not enforced.
   for (const plan of [unsafePlan([OPEN_CART, CSS_CHECK]), FOUR_FEATURES_PLAN()]) {
     const { result } = await runUnsafePlan(plan);
-    assert.deepEqual(result.guarantees, statementFor(result.unsafeFeatures, false));
+    assert.deepEqual(result.guarantees, statementFor(result.unsafeFeatures ?? [], false));
   }
 });
 
@@ -208,7 +208,7 @@ const COMMAND_PLAN = (): JsonRecord => unsafePlan([OPEN_CART, ORDER_COUNT_CHECK]
 
 test('the manifest records one sha256 for the database command the plan uses, by its declared name', { criterion: 'AC-SPEC-36-17' }, async () => {
   const { result } = await runUnsafePlan(COMMAND_PLAN());
-  const records = manifestOf(result).unsafeDeclarations;
+  const records = manifestOf(result).unsafeDeclarations ?? [];
   assert.deepEqual(records.map((record) => [record.kind, record.name]), [['command', 'countOrders']]);
   assert.match(records[0]?.sha256 ?? '', /^[0-9a-f]{64}$/);
 });
@@ -218,7 +218,7 @@ test('a change to the command\'s argument vector changes the manifest hash, thou
   const changed = [{ literal: 'node' }, { literal: 'scripts/count-orders.js' }, { literal: '--verbose' }, { literal: '--' }, { $parameter: 'email' }];
   const after = (await runUnsafePlan(COMMAND_PLAN(), { projectFile: withArguments('countOrders', changed) })).result;
   assert.equal(manifestOf(after).planHash, manifestOf(before).planHash);
-  assert.notEqual(manifestOf(after).unsafeDeclarations[0]?.sha256, manifestOf(before).unsafeDeclarations[0]?.sha256);
+  assert.notEqual(manifestOf(after).unsafeDeclarations?.[0]?.sha256, manifestOf(before).unsafeDeclarations?.[0]?.sha256);
   assert.notEqual(after.manifestHash, before.manifestHash);
 });
 
