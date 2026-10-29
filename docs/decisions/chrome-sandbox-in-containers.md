@@ -19,12 +19,14 @@ Founder decision, 2026-10-28.
 - CI starts the pinned image with `docker run` after checkout instead of as a job container, because a job container starts before the profile file exists on the runner.
 - Setup (`npm ci`, the browsers' system libraries) runs as root; the browsers and `npm run check` run as `node`, because Chrome refuses to sandbox as root.
 
+- **Addition, founder decision 2026-10-29:** the Chrome rule also allows `chroot`. SPEC-07's run container drops every capability, and Docker's default allows `chroot` only with `CAP_SYS_CHROOT`, so Chrome's sandbox stopped at `sys_chroot`. The kernel still checks that capability, which Chrome holds only inside its own new user namespace, so the container gains nothing on the host. Rejected instead: `--cap-add SYS_CHROOT` (breaks AC-SPEC-07-04's empty capability set) and `--no-sandbox`.
+
 ## Findings
 
 - With Docker's default profile, Chrome stops at start-up with "No usable sandbox!", and 14 of 82 tests failed on the Linux image.
 - With the narrow profile, `npm run check:linux` passes: 82 tests, 23 proofs and the golden replay. The CI step, run locally on a copy of the repository, also passes.
 - As root, Chrome refuses to start without `--no-sandbox`, whatever the profile.
-- Source: Docker 29.8.2's default profile (`vendor/github.com/moby/profiles/seccomp/default.json` at tag `docker-v29.8.2`, SHA-256 `536529b665dd0972c37bfb569f5d4ac8a53592e7b00752bc39ff063ca9864c74`). The change removes the two rules that allow `clone` only without namespace flags, and adds one rule allowing `clone`, `setns` and `unshare`. `clone3` still returns "not implemented", so the C library falls back to `clone`.
+- Source: Docker 29.8.2's default profile (`vendor/github.com/moby/profiles/seccomp/default.json` at tag `docker-v29.8.2`, SHA-256 `536529b665dd0972c37bfb569f5d4ac8a53592e7b00752bc39ff063ca9864c74`). The change removes the two rules that allow `clone` only without namespace flags, and adds one rule allowing `clone`, `setns` and `unshare` (and, since 2026-10-29, `chroot`). `clone3` still returns "not implemented", so the C library falls back to `clone`.
 
 ## Risks
 

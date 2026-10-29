@@ -826,12 +826,13 @@
     },
     {
       "names": [
+        "chroot",
         "clone",
         "setns",
         "unshare"
       ],
       "action": "SCMP_ACT_ALLOW",
-      "comment": "Chrome's sandbox creates user, PID and network namespaces. Docker's default allows these only with CAP_SYS_ADMIN. Everything else is Docker 29.8.2's default profile, unchanged."
+      "comment": "Chrome's sandbox creates user, PID and network namespaces, then chroots inside its own user namespace. Docker's default allows these only with CAP_SYS_ADMIN, or chroot only with CAP_SYS_CHROOT; the kernel still checks that capability, which Chrome holds only in its new namespace. Everything else is Docker 29.8.2's default profile, unchanged."
     }
   ]
 }
