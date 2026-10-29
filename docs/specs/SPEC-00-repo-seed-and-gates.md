@@ -143,6 +143,89 @@ export const NAMING_LINT: NamingLintConfig = {
 // core <- adapters, packs, renderers, cli   (core imports none of them)
 ```
 
+**Build notes.** Points the criteria leave open for the remaining criteria, settled from this spec's scope, `CONTRIBUTING.md`, `START.md` and `docs/decisions/` (2026-10-29). The founder settled how the guarantee map treats rows whose tests come later.
+
+- **Where each check runs.**
+  - Checks that read only files go in `npm run lint`, so the scratch-copy lint tests in `test/proofs/` exercise them. They must not need Git: the scratch copy is not a repository.
+  - Checks that need test outcomes or Git history run in a new last step of `npm run check`, `npm run gates`, after `npm run replay`.
+  - Test outcomes: `tools/run-test-folder.ts` adds a reporter module from `tools/` that writes one JSON line per test (file, full name with suite names joined by ` > `, line, passed, duration) to `.test-results/`, which Git ignores. A test id is `<file>#<full name>`. A test's criterion is read from its source at the reported line, as the naming lint reads it.
+  - `DependencyReview`, `DependencyCheck`, `GuaranteeRow`, `GuaranteeMap` and `SeedProvenance` live in `tools/`, beside the checks that use them: they describe this repository's build, and no package imports them. `TEST_SET` stays in `tools/check-tests-apart.ts`.
+  - The root configuration the gates need (`package.json` scripts, `.gitignore`, `licences.json`, `.github/workflows/ci.yml`) changes in the code commit, as earlier specs' code commits did. CODEOWNERS gives `.github/` to the founder, who reads it before pushing.
+  - Tests never write to the real `node_modules`: the scratch copy links it.
+- **Dependency reviews (AC-SPEC-00-04).**
+  - `tools/dependency-reviews.ts` holds one typed `DependencyReview` per component, transcribed from `docs/decisions/browser-and-audit-dependencies.md`: `axe-core` 4.14.0 `default`, and `playwright-core` 1.64.1 `optional-adapter`.
+  - The trust path is every package that `package-lock.json` installs as a non-development dependency of a workspace package. Today that is those two. Development-only packages (`typescript`, `@types/node`, `@puppeteer/browsers`) are off it. Browser builds are locked by SPEC-05, not here.
+  - The lint fails when such a package has no review; when the review's version is not the exact version in the lock file and in every manifest; when a check is `fail` and the decision is `default`; or when an evidence entry that is a repository path does not exist. `partial` does not fail.
+  - Tests: scratch-copy lint with a planted dependency that has no review, and with a `default` review given a `fail`.
+- **Tests apart (AC-SPEC-00-05).**
+  - Built: `tools/check-tests-apart.ts` and the pull-request job.
+  - Add a mode that checks each commit of a range on its own (`--commits <from>..<to>`). CI runs it on every push to `main`, because commits reach `main` without a pull request. No commit in history mixes the two today.
+  - Tests: mixed, tests-only and code-only path lists, and a scratch Git repository holding one mixed commit.
+  - Waits for beta: branch protection can't require the check on GitHub Free. Until then the branch-gates check (AC-SPEC-00-20) proves, on recorded JSON, that `ci` and `tests-apart` are both required.
+- **Commit trailers and metrics (AC-SPEC-00-07).**
+  - Grammar. Keys are exact, one value per line, in Git's trailer block:
+    - `Agent: claude-code/<version>`, at most once. The version is the one `claude --version` prints, such as `2.1.312`. The tool part matches `[a-z][a-z0-9-]*`; the version is semantic.
+    - `Spec: SPEC-nn`, once per spec. It must name a file in `docs/specs/`.
+    - `Criteria: AC-SPEC-nn-mm[, AC-SPEC-nn-mm]`. Each id must exist in `docs/specs/`.
+  - A commit is malformed when a value breaks its grammar or names something that doesn't exist; when a key is a near miss (`agent:`, `Specs:`, `Criterion:`); or when it carries a `Co-Authored-By:` trailer naming Claude but no `Agent:`. Other trailers are ignored.
+  - Cut-over. Commits up to and including the one that adds these notes carry no `Agent:` trailer and can't be rewritten (amending and rebasing are denied). The tool records that commit's hash. The malformed check and all three commit metrics cover only its descendants, and the output counts the earlier commits as `beforeTrailers`. From the next commit on, the main session adds all three trailers.
+  - A malformed commit can't be amended. So the main session checks each message before committing (`node tools/check-commit-trailers.ts --message <file>`). A malformed commit already made is listed, with its reason, in a known-exceptions list in the tool by a later commit, which the founder reads.
+  - `agentAuthoredShare` is commits with `Agent:` over commits since the cut-over; `specLinkedShare` is commits with `Spec:` or `Criteria:` over the same.
+  - `tracedCriteriaShare` is criterion ids in `docs/specs/` with at least one passing tagged test in this run, over all criterion ids in `docs/specs/`, with a per-spec breakdown.
+  - `flakyRunRate` for one run is 0 or 1, as SPEC-27's `RunRecord.flakyPair`. When a test file fails, `run-test-folder` reruns it once, only to measure. The run still fails (no retries), and it is flaky if the rerun passes. Rates over many runs are SPEC-15's.
+  - Output: `.test-results/project-metrics.json` (a `RunRecord`, the four metrics and `approvalStrength: 'declared'`) and a Markdown summary. The `ci` job checks out full history (`fetch-depth: 0`). On push to `main` it appends the summary to the job summary and uploads `.test-results/` as an artefact: action pinned by commit hash, kept 90 days, well inside the free quota.
+  - Tests: scratch Git repositories built by the test, with fixture commits and a fixture results file. Each share equals a hand count; a malformed trailer fails.
+- **Licences (AC-SPEC-00-08).**
+  - Built: `tools/check-licences.ts` matches each package's `license` to `licences.json`.
+  - Add a `roles` map to `licences.json`. The check requires Apache-2.0 for `schema`, `sdk`, `driver` and `adapter`, and FSL-1.1-ALv2 for `engine`; `product` may carry either. Roles today: `contracts` schema; `driver-cdp` and `driver-playwright` driver; `auditor-axe` and `report` adapter; `action` sdk; `engine` engine; `auditor-act`, `runner` and `cli` product (FSL by choice).
+  - Every tracked `*.schema.json` (today `docs/plan-language/plan.schema.json`) is listed in `licences.json` as Apache-2.0; an unlisted one fails.
+  - axe-core is pinned at 4.14.0. `licences.json` records the sha256 of its MPL-2.0 files `axe.js` and `axe.min.js`, as the vendor publishes them in `sri-history.json` for 4.14.0. The check fails when an installed file's hash differs, when the installed version is not the pinned one, or when a file under `packages/` is a copy of an `axe*.js` file. The installed files match today.
+  - The check takes the installed-packages folder as an option (default `node_modules`), so tests point it at a fixture folder holding an edited copy.
+- **Cost report (AC-SPEC-00-09).**
+  - There is no hosted service and no billing access, so spend is a declared record: `docs/costs/hosted-costs.json` holds the month, the customer count (0) and one line per hosted service (service, plan, monthly USD, `source: 'declared'`). Today: GitHub Free, private repository, Actions inside the free minutes, USD 0.
+  - `npm run cost-report` (`node tools/cost-report.ts`) prints the month's report and fails when the total is over USD 5 while customers is 0. The lint runs the same check, so a committed record over budget fails CI. Nothing reads an account or an API.
+  - The founder updates the record monthly and whenever a paid service is added.
+  - Tests: scratch-copy lint with a record totalling USD 5.01, and one at exactly USD 5.
+- **Guarantee map (AC-SPEC-00-10).**
+  - `tools/guarantee-map.ts` holds the `GuaranteeMap`. Each row has its test id, the class shown when that test passes, and a weaker class shown when it is missing or fails (by default "claimed, not proven by CI").
+  - The gates step fails when a mapped test id is in no result or didn't pass, and writes `.test-results/guarantees.md` showing each row's class for that run.
+  - The published table is `docs/guarantees.md`, generated with `--write` from a green run. The gates step fails when it differs from what the run generates, as the schema check does.
+  - Classes when proven: `ai-output-only-as-plan` runtime-checked; `known-actions-only` structural, for plans without unsafe features; `lifecycle-no-skip` type-level; `declared-log-fields` structural, for field names only; `targets-not-substituted`, `pii-masked-in-pixels`, `same-inputs-same-result` and `browser-egress-allow-list` runtime, partial (egress is enforced by SPEC-07); `secrets-absent` type-level, runtime-partial for echoes; `adapters-substitutable` runtime; `report-runs-no-content` type-level and runtime; `person-approval` runtime-checked, recorded as declared; `no-pii-in-reports`, `actions-tamper-evident` and `spec-to-commit-trace` runtime.
+  - Every row has a passing test to map today except three, which have none until M3: `no-pii-in-reports` (SPEC-09 and SPEC-12), and `actions-tamper-evident` and `spec-to-commit-trace` (SPEC-14).
+  - Those three rows are marked pending, each with the specs that will give it a test (founder, 2026-10-29). A pending row shows its weaker class and doesn't fail the gates step until every one of its specs is ticked in `START.md`; from then on it fails like any other row when its test is missing or fails. A pending mark on a row whose specs are all ticked fails the step, so the mark can't outlive its reason.
+  - Tests: a fixture results file where one mapped test fails, and one missing a mapped id. Both fail, and the run's table shows the weaker class. A pending row with an unticked spec passes and shows its weaker class; the same row once its specs are ticked fails.
+- **Seeding (AC-SPEC-00-11).**
+  - Seeded 2026-10-28; `seed-provenance.json` records 676 files. Seeded code has changed since (60 package files differ from their source hash), so hashes are compared only while seeding.
+  - Add `tools/seed-from-research.ts --research <repository> --commit <hash> --files <list>`. It copies each file from that commit with `git show`, writes `seed-provenance.json`, and fails, naming the file, when the commit lacks it. It names no research path itself; the repository is an argument.
+  - The lint adds a shape check of `seed-provenance.json`: a 40-hex commit, 64-hex hashes, unique `to` paths inside this repository, and `reusedCriteria` spec ids that exist in `docs/specs/`.
+  - Tests: a scratch Git repository built by the test stands in for the research repository.
+- **Criterion ids (AC-SPEC-00-15).**
+  - Built: the naming lint rejects a criterion id anywhere but a test's `criterion` value.
+  - Add: a `criterion` value must name a criterion in `docs/specs/`.
+  - The trace index is `.test-results/trace-index.json` (criterion, test ids, outcome), written by the gates step. It is generated, never committed, so the lint never reads it. Trailers live in Git, not in files.
+  - Tests: scratch-copy lint with an id planted in a code string and in a comment, and with a test naming `AC-SPEC-99-01`.
+- **Glossary (AC-SPEC-00-16).**
+  - `tools/check-glossary.ts` runs in the lint. Code names are the backticked tokens in the "Code name" column of the Domain terms and Metrics tables.
+  - A token resolves when it is an exported declaration in `packages/*/src` or `tools/`; a string literal or property name declared in `packages/*/src` (step names, union members such as `runTimers`); or, when it holds `/` or a file extension, a tracked path. Tokens of other shapes, such as JSON examples, are skipped.
+  - A row whose "Where" says only "planned" is skipped; a partly planned row ("exists; driver planned") is checked. The "All are planned" line under Metrics and the "planned, SPEC-00" entries are updated as these land.
+  - The core package's public API is every type and interface exported from `packages/engine/src/index.ts`, following `export *` into `contracts`, which the engine re-exports. About 160 are missing from the glossary today; the code commit adds rows, one family per row. Sources are read as text: TypeScript 7 has no stable compiler API.
+  - The Standard names table must equal `standardNames` in `tools/naming-lint-config.ts`.
+  - Tests: scratch-copy lint with a row naming a missing export, an exported engine type taken out of the glossary, and a standard name dropped.
+- **Research links (AC-SPEC-00-17).**
+  - Built: the naming lint bans spike names and research citations in comments.
+  - Add `tools/check-research-links.ts` to the lint. It fails when a tracked file other than `*.md`, `docs/**` and `seed-provenance.json` holds `docs/research/`, a path into the research repository (`E:\core`, `E:/core`) or any `from` path of the record. It also fails when any tracked file except `seed-provenance.json`, docs included, holds the research commit or a prefix of it of 7 or more characters. Both pass today.
+  - Tests: scratch-copy lint planting each.
+- **Deny rules and declared approvals (AC-SPEC-00-19).**
+  - This spec's scope and the founder's decision of 2026-10-27 (`docs/decisions/single-session-workflow.md`) let the agent commit, and SPEC-02's lock-down route requires push, merge and pull-request-approval denials. So the check requires those three, through the engine's `parseDenyRules` and `deniesRequiredActions` (exported from the engine for the tool), plus this repository's history denials: amend, `--no-verify`, rebase, tag and `reset --hard`. The criterion's "commit" is met by denying commits that rewrite history or skip hooks, not ordinary commits.
+  - It reads `.claude/settings.json` from the working tree, in the lint; on a push to `main`, that is the default branch's copy.
+  - Declared: `project-metrics.json` carries `approvalStrength: 'declared'`, and the summary says the approval is the founder's push under the agent lock-down, declared and not verified.
+  - Tests: scratch-copy lint with each required denial removed in turn.
+- **Branch gates (AC-SPEC-00-20).**
+  - `tools/check-branch-gates.ts --rules <file> [--protection <file>] [--require-checks]` reads GitHub's JSON for a branch's rules and its classic protection.
+  - It fails when any rule or protection requires an approving review (a count of 1 or more), a code-owner review or last-push approval, or requires a status check that `ci.yml` doesn't produce. With `--require-checks` it also fails unless `ci` and `tests-apart` are required (AC-SPEC-00-05).
+  - Fixtures in `fixtures/branch-gates/`: the planned beta ruleset (passes), and one each with a review count of 1, a code-owner review and an unknown required check (each fails). `main` has neither rules nor protection today, so empty JSON passes.
+  - Waits for beta: a CI step that fetches the live rules with the job's token. The rules endpoint needs read access only; classic protection needs an admin token, so beta protects `main` with a ruleset. The agent can't read either locally (`gh api` is denied).
+
 ## Acceptance criteria
 
 - AC-SPEC-00-01: When CI runs on the pinned Linux image, core shall pass, unchanged: the core skeleton's 32 contract tests and 22 proofs (spike P3); the CDP driver's contract suite (P4); the accessibility engine's ACT re-score (P5); and the report renderer's golden report (P6) (oracle: regression; reuses AC-p4-01, AC-p4-02, AC-p5-11, AC-p6-20).
