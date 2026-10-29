@@ -26,7 +26,12 @@ export const TRAILER_CUT_OVER = '8165795feae3c457955329b5cdafa883a6e65f62';
 
 // Malformed commits made after the cut-over, which can't be rewritten: the commit, then why it is
 // malformed. Adding one is a reviewed change the founder reads before pushing.
-export const KNOWN_MALFORMED_COMMITS: readonly { readonly commit: string; readonly reason: string }[] = [];
+export const KNOWN_MALFORMED_COMMITS: readonly { readonly commit: string; readonly reason: string }[] = [
+  { commit: '892d0fee9be98a1cfb6a1e46d9096bf1d1744e07', reason: 'Spec trailer lists several specs on one line; one Spec line per spec is required (SPEC-35, SPEC-36)' },
+  { commit: '2573b99bff238c48b748a04763dd50af7d06ed81', reason: 'Spec trailer lists several specs on one line; one Spec line per spec is required (SPEC-02, SPEC-03)' },
+  { commit: 'd2f2afb3e32ce939dd7df11643fe42028190bf60', reason: 'Spec trailer lists several specs on one line; one Spec line per spec is required (SPEC-02, SPEC-03, SPEC-00)' },
+  { commit: '4f0473cac1d0ff61e962a7ab73b48c31dae2a1b9', reason: 'Spec trailer lists several specs on one line; one Spec line per spec is required (SPEC-02, SPEC-03, SPEC-00)' },
+];
 
 // The run as SPEC-27's RunRecord in contracts describes it. Tools are compiled apart from the
 // packages, so the shape is repeated here rather than imported.
