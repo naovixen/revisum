@@ -1,10 +1,13 @@
 // Runs the coverage study: reads the sampled test intents in docs/coverage-study/intents.json,
 // checks each with the engine's assessCoverage (an intent marked expressible counts only if its
 // plan parses, with its suite's project when the file gives one) and writes
-// docs/coverage-study/report.md, with the expressible share of each sample and of both. It is run
-// by hand when the study changes, not by `npm run check`.
+// docs/coverage-study/report.md, with the expressible share of each sample and of both: the
+// closed-language share and, beside it, the "1.3 with unsafe features" share. The kill criterion
+// is decided by the closed share alone. It is run by hand when the study changes, not by
+// `npm run check`.
 //   node tools/coverage-study.ts
-// See docs/specs/SPEC-01-plan-language-and-parser.md and docs/specs/SPEC-30-plan-values-positions-and-keys.md.
+// See docs/specs/SPEC-01-plan-language-and-parser.md, docs/specs/SPEC-30-plan-values-positions-and-keys.md
+// and docs/specs/SPEC-36-unsafe-plan-features.md.
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { loadEngineFunction } from './engine-loader.ts';
@@ -29,10 +32,19 @@ const STUDY_PROJECT = {
 type ReportedIntent = {
   readonly suite: string; readonly sample: string; readonly sourceUrl: string; readonly testName: string; readonly verdict: string;
   readonly reason: string;
+  // The unsafe features its plan uses; empty for a closed plan.
+  readonly unsafeFeatures: readonly string[];
 };
 // Each sample's share; null for a sample with no intents.
 type SampleShares = { readonly original: number | null; readonly fresh: number | null };
-type Report = { readonly intents: readonly ReportedIntent[]; readonly expressibleShare: number; readonly bySample: SampleShares };
+// One share, overall and per sample.
+type Share = { readonly overall: number; readonly bySample: SampleShares };
+type Report = {
+  readonly intents: readonly ReportedIntent[];
+  // The closed-language share, and the "1.3 with unsafe features" share.
+  readonly closed: Share;
+  readonly withUnsafeFeatures: Share;
+};
 
 const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> => typeof value === 'object' && value !== null && !Array.isArray(value);
 const textField = (record: Readonly<Record<string, unknown>>, name: string): string => String(record[name] ?? '');
@@ -42,23 +54,31 @@ const shareOrNull = (value: unknown): number | null => {
   throw new Error('assessCoverage returned an unexpected share');
 };
 
+// One share from the engine's report: its overall value and its per-sample record.
+function readShare(value: Readonly<Record<string, unknown>>, overallField: string, bySampleField: string): Share {
+  const overall = value[overallField];
+  const bySample = value[bySampleField];
+  if (typeof overall !== 'number' || !isRecord(bySample)) throw new Error('assessCoverage returned an unexpected shape');
+  return { overall, bySample: { original: shareOrNull(bySample['original']), fresh: shareOrNull(bySample['fresh']) } };
+}
+
 // Reads the engine's report back into plain fields, refusing anything that is not its shape.
 function readReport(value: unknown): Report {
-  if (!isRecord(value) || !Array.isArray(value['intents']) || typeof value['expressibleShare'] !== 'number' || !isRecord(value['expressibleShareBySample'])) {
-    throw new Error('assessCoverage returned an unexpected shape');
-  }
-  const bySample = value['expressibleShareBySample'];
+  if (!isRecord(value) || !Array.isArray(value['intents'])) throw new Error('assessCoverage returned an unexpected shape');
   const intents = value['intents'].map((intent): ReportedIntent => {
     if (!isRecord(intent)) throw new Error('assessCoverage returned an unexpected intent');
+    const features = intent['unsafeFeatures'] ?? [];
+    if (!Array.isArray(features)) throw new Error('assessCoverage returned an unexpected intent');
     return {
       suite: textField(intent, 'suite'), sample: textField(intent, 'sample'), sourceUrl: textField(intent, 'sourceUrl'),
       testName: textField(intent, 'testName'),
-      verdict: textField(intent, 'verdict'), reason: textField(intent, 'reason'),
+      verdict: textField(intent, 'verdict'), reason: textField(intent, 'reason'), unsafeFeatures: features.map(String),
     };
   });
   return {
-    intents, expressibleShare: value['expressibleShare'],
-    bySample: { original: shareOrNull(bySample['original']), fresh: shareOrNull(bySample['fresh']) },
+    intents,
+    closed: readShare(value, 'expressibleShare', 'expressibleShareBySample'),
+    withUnsafeFeatures: readShare(value, 'shareWithUnsafeFeatures', 'shareWithUnsafeFeaturesBySample'),
   };
 }
 
@@ -71,35 +91,44 @@ const cell = (text: string): string => text.replace(/\|/g, '\\|').replace(/\r?\n
 
 const percentOf = (share: number): string => `${(share * 100).toFixed(1)}%`;
 
-// One line per sample that has intents.
-function sampleLines(intents: readonly ReportedIntent[], bySample: SampleShares): string[] {
+// The name the report gives the second share.
+const SHARE_WITH_UNSAFE_FEATURES = '1.3 with unsafe features';
+
+// One line per sample that has intents, with both shares side by side.
+function sampleLines(intents: readonly ReportedIntent[], closed: SampleShares, withUnsafeFeatures: SampleShares): string[] {
   return (['original', 'fresh'] as const).flatMap((sample) => {
-    const share = bySample[sample];
+    const closedShare = closed[sample];
+    const unsafeShare = withUnsafeFeatures[sample];
     const count = intents.filter((intent) => intent.sample === sample).length;
-    return share === null ? [] : [`- The ${sample} sample: ${count} intents, ${percentOf(share)} expressible.`];
+    return closedShare === null || unsafeShare === null
+      ? []
+      : [`- The ${sample} sample: ${count} intents, ${percentOf(closedShare)} expressible in the closed language, ${percentOf(unsafeShare)} in ${SHARE_WITH_UNSAFE_FEATURES}.`];
   });
 }
 
-function reportMarkdown({ intents, expressibleShare, bySample }: Report): string {
+function reportMarkdown({ intents, closed, withUnsafeFeatures }: Report): string {
   const suites = new Set(intents.map((intent) => intent.suite)).size;
-  const expressible = intents.filter((intent) => intent.verdict === 'expressible').length;
-  const percent = percentOf(expressibleShare);
+  const expressible = intents.filter((intent) => intent.verdict === 'expressible');
+  const closedCount = expressible.filter((intent) => intent.unsafeFeatures.length === 0).length;
+  // The kill criterion counts intents expressible without an escape hatch: the closed share alone.
+  const killCriterionMet = closed.overall >= KILL_THRESHOLD;
   return [
     '# Coverage study',
     '',
     '## In short',
     '',
-    `- ${intents.length} test intents from ${suites} suites; ${expressible} expressible in the plan language (${percent}).`,
-    ...sampleLines(intents, bySample),
-    `- The MVP plan's kill criterion is ${KILL_THRESHOLD * 100}% expressible: ${expressibleShare >= KILL_THRESHOLD ? 'met' : 'not met'}.`,
-    '- An intent marked expressible counts only when its plan passes the plan parser.',
+    `- ${intents.length} test intents from ${suites} suites; ${closedCount} expressible in the closed plan language (${percentOf(closed.overall)}).`,
+    `- ${SHARE_WITH_UNSAFE_FEATURES}, where each suite's project enables them: ${expressible.length} expressible (${percentOf(withUnsafeFeatures.overall)}).`,
+    ...sampleLines(intents, closed.bySample, withUnsafeFeatures.bySample),
+    `- The MVP plan's kill criterion is ${KILL_THRESHOLD * 100}% expressible in the closed language: ${killCriterionMet ? 'met' : 'not met'}.`,
+    '- An intent marked expressible counts only when its plan passes the plan parser under its suite\'s project. A plan using an unsafe feature counts only toward the second share.',
     `- Generated by \`node tools/coverage-study.ts\` from \`${STUDY_PATH}\`. Do not edit by hand.`,
     '',
     '## Intents',
     '',
-    '| Suite | Sample | Test | Verdict | Reason |',
-    '|---|---|---|---|---|',
-    ...intents.map((intent) => `| ${cell(intent.suite)} | ${intent.sample} | [${cell(intent.testName)}](${linkTarget(intent.sourceUrl)}) | ${intent.verdict} | ${cell(intent.reason)} |`),
+    '| Suite | Sample | Test | Verdict | Unsafe features | Reason |',
+    '|---|---|---|---|---|---|',
+    ...intents.map((intent) => `| ${cell(intent.suite)} | ${intent.sample} | [${cell(intent.testName)}](${linkTarget(intent.sourceUrl)}) | ${intent.verdict} | ${cell(intent.unsafeFeatures.join(', '))} | ${cell(intent.reason)} |`),
     '',
   ].join('\n');
 }
@@ -119,7 +148,7 @@ async function main(root: string): Promise<number> {
   }
   const report = readReport(outcome['value']);
   writeFileSync(join(root, REPORT_PATH), reportMarkdown(report));
-  console.log(`coverage study: wrote ${REPORT_PATH}; ${(report.expressibleShare * 100).toFixed(1)}% expressible`);
+  console.log(`coverage study: wrote ${REPORT_PATH}; ${percentOf(report.closed.overall)} expressible in the closed language, ${percentOf(report.withUnsafeFeatures.overall)} in ${SHARE_WITH_UNSAFE_FEATURES}`);
   return 0;
 }
 

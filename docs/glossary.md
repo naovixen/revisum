@@ -13,7 +13,7 @@
 | Product name | `PRODUCT` (`PRODUCT.name`, `PRODUCT.schemaNamespace`) | `contracts`, exists | The only place the product name is written; schema ids are built from it |
 | Engine | `engine` package | `packages/engine` | The trusted core: parsing, trust, policy, lifecycle, interpreter, oracle, hashing, redaction, audit log |
 | Package | npm workspace | `packages/*` | One unit of the monorepo, with its own licence and allowed imports |
-| Plan | `Plan`, made only by `planParser`; `assertBranded` checks it at run time | type in `contracts`, parser in `engine`, exists | A human-approved, typed test plan in language version 1.2 (a plan declaring 1.1 parses as it always did); outside input until the engine parses it |
+| Plan | `Plan`, made only by `planParser`; `assertBranded` checks it at run time | type in `contracts`, parser in `engine`, exists | A human-approved, typed test plan in language version 1.3 (a plan declaring 1.2, the closed language, or 1.1 parses as it always did); outside input until the engine parses it |
 | Step | `Step`, `ActionStep` | `contracts`, exists | One instruction in a plan, from a closed set: navigate, click, hover, fill, select, upload, press, frame, dialog, expect, expectPage, a11yAudit, capture, remember |
 | Plan migration | `migratePlan`, `CriterionMapping` | `engine`, exists | Turns a version 1 plan into version 1.1 by adding the criterion id the author gives for each assertion, keyed by its JSON path |
 | Plan schema | `planJsonSchema`, `docs/plan-language/plan.schema.json` | `engine`, exists | The published JSON Schema of the plan language, built from the parser's own tables; necessary, not sufficient |
@@ -94,6 +94,10 @@
 | Suite pass | `SuitePass` (`gating`, `proposal`), `suitePasses`, `evidenceMergeGateOpen` | `contracts` and `engine/src/evidence/`, exists | The gating pass runs the protected branch's suite files and may open the merge gate; the proposal pass runs a change's own and never does |
 | Suite report | `parseSuiteReport`, `SuiteReport`, `SuiteDecodeError`, `evidenceResult`, `SuiteTestResult` | `engine/src/evidence/`, exists | A Playwright Test JSON report decoded under limits, and the run result built from it; criterion ids from its annotations are "linked by the suite" |
 | Run history, thresholds | `RunRecord`, `Thresholds`, `ThresholdMetric` | `contracts`, exists | Finished runs as metrics see them, and the levels the maturity ladder needs |
+| Unsafe plan feature | `UnsafeFeature` (`css-locator`, `xpath-locator`, `dom-checks`, `page-script`, `inline-page-script`, `database-command`), `UnsafeFeaturesDeclaration`, `unsafeFeaturesOf` | types in `contracts`, read by `engine/src/project/unsafe-feature-declarations.ts`, exists | An opt-in escape hatch of plan language 1.3, off unless the trusted project's `unsafeFeatures` section enables it. A run using one is labelled unsafe, runs at the `host` level and never counts as verified evidence |
+| Structural locator | `StructuralLocatorWith` (`css`, `xpath`) | `contracts`, exists | A CSS or XPath locator: finds elements by page structure, not by role or name. Its selector is literal plan text |
+| DOM check | `DomCheckWith`, `DOM_CHECK_KINDS` | `contracts`, exists | A check of a class, computed style or attribute: an implementation detail, not what a user perceives |
+| Page script, database command | `PageScriptDeclaration`, `ScriptName`, `InlineScript`, `DatabaseCommandDeclaration`, `CommandName` | `contracts`, exists | A script the project declares under `plans/scripts/`, or one written inline, run in the page; a command the project declares, run in a workload container that reaches only its database service |
 
 ## Metrics
 

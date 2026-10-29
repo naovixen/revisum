@@ -10,7 +10,7 @@ import type { Plan } from './plan.ts';
 export type PolicyRuleId =
   | 'irreversible-action' | 'irreversible-submit' | 'destructive-navigation' | 'irreversible-dialog'
   | 'unnamed-control' | 'no-locale-patterns' | 'undeclared-origin' | 'production-origin' | 'over-limit'
-  | 'side-effect-in-proposal';
+  | 'side-effect-in-proposal' | 'inline-script-in-proposal';
 
 // A plan the policy gate cleared for its targets. Only the gate makes one, and run() takes nothing
 // else. It is branded with a key of its own, not with Brand, so it stays a narrower Plan: a second

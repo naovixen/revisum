@@ -154,7 +154,7 @@ function readSuiteName(input: unknown, path: string, issues: Issues): Parsed<Sui
 }
 
 // Anything but "sha256:" and 64 lowercase hex digits, a tag included, is the wrong kind of value.
-function readImageDigest(input: unknown, path: string, issues: Issues): Parsed<ImageDigest> {
+export function readImageDigest(input: unknown, path: string, issues: Issues): Parsed<ImageDigest> {
   if (typeof input !== 'string' || !IMAGE_DIGEST.test(input)) { issues.push({ code: 'wrong_type', path }); return INVALID; }
   return brand<string, 'ImageDigest'>(input);
 }
@@ -205,6 +205,12 @@ function readProjects(input: unknown, path: string, issues: Issues): Parsed<read
   if (new Set(projects).size !== projects.length) { issues.push({ code: 'duplicate', path }); return INVALID; }
   return projects;
 }
+
+// The variables a process receives, by name, under the same rules as a suite's environment: a
+// database command's environment is read this way too.
+export const readEnvironmentVariables = (
+  input: unknown, path: string, issues: Issues, secretNames: readonly SecretName[],
+): Parsed<Readonly<Record<string, EnvironmentValue>>> => readEnvironment(input, path, { issues, secretNames });
 
 // The variables the suite's process receives, by name; absent means none. A reserved name is
 // refused at the name, with nothing under it read.

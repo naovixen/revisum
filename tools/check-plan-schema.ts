@@ -1,6 +1,7 @@
 // Keeps the plan language's published JSON Schema true. It fails, naming the file, when:
 //   - docs/plan-language/plan.schema.json is not exactly what the engine's planJsonSchema() builds;
-//   - a golden plan in golden/plans/ does not validate against the schema;
+//   - a golden plan in golden/plans/ or golden/unsafe-plans/ (the 1.3 plans using unsafe features)
+//     does not validate against the schema;
 //   - the newest entry in docs/plan-language/CHANGELOG.md does not name the schema file's sha256,
 //     so the schema cannot change without a changelog entry.
 // There is no release build yet, so this runs in `npm run lint`.
@@ -16,7 +17,7 @@ import { reportProblems } from './workspace-packages.ts';
 
 export const SCHEMA_PATH = 'docs/plan-language/plan.schema.json';
 export const CHANGELOG_PATH = 'docs/plan-language/CHANGELOG.md';
-const GOLDEN_PLANS = 'golden/plans';
+const GOLDEN_PLAN_FOLDERS: readonly string[] = ['golden/plans', 'golden/unsafe-plans'];
 const REGENERATE = 'node tools/check-plan-schema.ts --write';
 
 const sha256 = (text: string): string => createHash('sha256').update(text).digest('hex');
@@ -48,11 +49,15 @@ function checkChangelog(root: string, schemaText: string): string[] {
 }
 
 function checkGoldenPlans(root: string, schema: unknown): string[] {
-  const folder = join(root, GOLDEN_PLANS);
-  if (!existsSync(folder)) return [`${GOLDEN_PLANS} is missing`];
+  return GOLDEN_PLAN_FOLDERS.flatMap((goldenFolder) => checkGoldenFolder(root, goldenFolder, schema));
+}
+
+function checkGoldenFolder(root: string, goldenFolder: string, schema: unknown): string[] {
+  const folder = join(root, goldenFolder);
+  if (!existsSync(folder)) return [`${goldenFolder} is missing`];
   const problems: string[] = [];
   for (const name of readdirSync(folder).filter((file) => file.endsWith('.json')).sort()) {
-    const file = `${GOLDEN_PLANS}/${name}`;
+    const file = `${goldenFolder}/${name}`;
     let plan: unknown;
     try { plan = JSON.parse(readFileSync(join(folder, name), 'utf8')); } catch { problems.push(`${file} is not valid JSON`); continue; }
     for (const problem of validateAgainstSchema(schema, plan)) problems.push(`${file} does not validate against ${SCHEMA_PATH}: ${problem}`);
@@ -75,7 +80,7 @@ export async function checkPlanSchema(root: string): Promise<string[]> {
   try {
     problems.push(...checkGoldenPlans(root, built.schema));
   } catch (error) {
-    problems.push(`cannot validate ${GOLDEN_PLANS}: ${error instanceof Error ? error.message : String(error)}`);
+    problems.push(`cannot validate ${GOLDEN_PLAN_FOLDERS.join(' and ')}: ${error instanceof Error ? error.message : String(error)}`);
   }
   return problems;
 }

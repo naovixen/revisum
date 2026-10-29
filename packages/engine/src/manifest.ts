@@ -1,7 +1,10 @@
 // The run manifest: every input that decides a run's result, hashed, so a run can be replayed and
 // compared. See docs/specs/SPEC-08-manifest-and-replay.md.
-import type { AdapterInfo, Plan, RedactionMode, SecretName, Target } from '@revisum/contracts';
+import { failure, success, type AdapterInfo, type Plan, type RedactionMode, type Result, type SecretName, type Target, type UnsafeFeature } from '@revisum/contracts';
 import { canonicalJson, sha256 } from './hashing.ts';
+import { declarationsNamedBy, unsafeFeaturesOf } from './plan/unsafe-features.ts';
+import type { Project } from './project/project-parser.ts';
+import { declaredCommands, declaredScripts } from './project/unsafe-feature-declarations.ts';
 import { ENGINE_VERSION, schemaId } from './version.ts';
 
 // A file of the app under test, by content hash.
@@ -11,6 +14,12 @@ export type HostInfo = { readonly platform: string; readonly arch: string };
 export type SecretRecord = { readonly name: SecretName; readonly mode: RedactionMode };
 // Saved browser storage state the plan used, by secret name and the sha256 of its content.
 export type StorageStateRecord = { readonly name: SecretName; readonly sha256: string };
+// A page script or database command the plan names, by its declared name: a script by the sha256
+// of its source file, a command by the sha256 of its whole declaration, so one byte of either
+// changes the manifest hash.
+export type UnsafeDeclarationRecord = { readonly kind: 'script' | 'command'; readonly name: string; readonly sha256: string };
+// What a run of a plan using unsafe features records beside its plan hash.
+export type UnsafeFeatureRecord = { readonly unsafeFeatures: readonly UnsafeFeature[]; readonly unsafeDeclarations: readonly UnsafeDeclarationRecord[] };
 
 export type RunManifest = {
   readonly schema: string;
@@ -30,12 +39,38 @@ export type RunManifest = {
   // hashes stay exactly as they were.
   readonly secrets?: readonly SecretRecord[];
   readonly storageState?: StorageStateRecord;
+  // Present only when the plan uses an unsafe feature, as for secrets, so a closed run's manifest
+  // and its hash stay exactly as they were.
+  readonly unsafeFeatures?: readonly UnsafeFeature[];
+  readonly unsafeDeclarations?: readonly UnsafeDeclarationRecord[];
 };
 
 export const planHash = (plan: Plan): string => sha256(canonicalJson(plan));
 
 // The non-hermetic input of a run that calls declared services: their responses.
 export const SERVICE_CALLS_INPUT = 'service-calls';
+
+// What the manifest records about the plan's unsafe features: the features, and each declaration
+// the plan names, with its sha256. Undefined for a closed plan. A named script whose source the run
+// was not given is reported by its file, so the run can be refused rather than record no hash.
+export function unsafeFeatureRecord(
+  plan: Plan, project: Project, scriptSources: Readonly<Record<string, Uint8Array>>,
+): Result<UnsafeFeatureRecord | undefined, string> {
+  const unsafeFeatures = unsafeFeaturesOf(plan);
+  if (unsafeFeatures.length === 0) return success(undefined);
+  const named = declarationsNamedBy(plan);
+  const scripts = Object.entries(declaredScripts(project.unsafeFeatures)).filter(([name]) => named.scripts.some((used) => used === name));
+  const commands = Object.entries(declaredCommands(project.unsafeFeatures)).filter(([name]) => named.commands.some((used) => used === name));
+  const records: UnsafeDeclarationRecord[] = [];
+  for (const [name, declaration] of scripts) {
+    const source = Object.hasOwn(scriptSources, declaration.file) ? scriptSources[declaration.file] : undefined;
+    if (source === undefined) return failure(declaration.file);
+    records.push({ kind: 'script', name, sha256: sha256(source) });
+  }
+  for (const [name, declaration] of commands) records.push({ kind: 'command', name, sha256: sha256(canonicalJson(declaration)) });
+  const order = (record: UnsafeDeclarationRecord): string => `${record.kind}:${record.name}`;
+  return success({ unsafeFeatures, unsafeDeclarations: records.sort((left, right) => (order(left) < order(right) ? -1 : 1)) });
+}
 
 export function buildManifest(inputs: {
   readonly plan: Plan; readonly target: Target; readonly adapter: AdapterInfo;
@@ -45,6 +80,8 @@ export function buildManifest(inputs: {
   readonly secrets?: readonly SecretRecord[]; readonly storageState?: StorageStateRecord;
   // True when the plan calls declared services, whose responses the run cannot pin.
   readonly callsServices?: boolean;
+  // Present when the plan uses unsafe features (unsafeFeatureRecord).
+  readonly unsafe?: UnsafeFeatureRecord;
 }): RunManifest {
   const secrets = inputs.secrets === undefined || inputs.secrets.length === 0
     ? {}
@@ -63,6 +100,7 @@ export function buildManifest(inputs: {
     nonHermeticInputs: inputs.callsServices === true ? [SERVICE_CALLS_INPUT] : [],
     ...secrets,
     ...(inputs.storageState === undefined ? {} : { storageState: inputs.storageState }),
+    ...(inputs.unsafe === undefined ? {} : inputs.unsafe),
   };
 }
 

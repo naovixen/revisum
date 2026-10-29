@@ -127,7 +127,7 @@ export function evidenceResult(
     mode: 'evidence',
     // A suite runs only inside the isolated runner, behind its egress proxy; without it the run is
     // refused with egress-unenforceable before any suite code runs.
-    guarantees: guaranteeStatement({ mode: 'evidence', egressEnforced: true, unmaskedScreenshotsKept: suite.keepSuiteScreenshots }),
+    guarantees: guaranteeStatement({ mode: 'evidence', egressEnforced: true, unmaskedScreenshotsKept: suite.keepSuiteScreenshots, unsafeFeatures: [] }),
     targetId: suite.name,
     // The evidence manifest record is written once the runner pins the suite's inputs.
     manifest: null, manifestHash: null,

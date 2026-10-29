@@ -11,7 +11,7 @@
 // See docs/specs/SPEC-32-declared-service-calls.md.
 import {
   failure, success,
-  type CallDeclaration, type CallName, type CallStep, type Clock, type DeclaredService, type HttpMethod, type JsonPointer, type Result,
+  type CallDeclaration, type CallName, type CallStep, type CleanupStep, type Clock, type CommandName, type DeclaredService, type HttpMethod, type JsonPointer, type Result,
   type SafeText,
   type SecretStore, type ServiceCallErrorCode, type ServiceCaller, type ServiceName, type ServiceRequest, type ServiceResponse, type Step,
   type ValueName,
@@ -48,14 +48,14 @@ export type CallStepOutcome = {
   readonly serviceCall?: ServiceCallRecord;
 };
 
-// A cleanup call's record. A failed one is always cleanup-failed; `cause` says what failed.
+// A cleanup step's record, naming its call or its database command. A failed one is always
+// cleanup-failed; `cause` says what failed.
 export type CleanupResult = {
   readonly index: number;
-  readonly call: CallName;
   readonly outcome: 'passed' | 'failed' | 'skipped';
   readonly code?: 'cleanup-failed';
-  readonly cause?: CallStepCode;
-};
+  readonly cause?: CallStepCode | 'unsupported-step';
+} & ({ readonly call: CallName } | { readonly command: CommandName });
 
 // What the run hands these steps. `values` is the run's own map: a call adds what it remembers.
 export type CallStepContext = {
@@ -192,11 +192,21 @@ export async function runBackendCheck(step: Extract<Step, { type: 'expectBackend
 const needsUnsetValue = (step: CallStep, values: ReadonlyMap<ValueName, SafeText>): boolean =>
   Object.values(step.arguments).some((argument) => typeof argument === 'object' && 'valueName' in argument && !values.has(argument.valueName));
 
-// The cleanup calls, in order, each recorded. They are numbered after the plan's steps in the log.
-export async function runCleanup(cleanup: readonly CallStep[], firstIndex: number, context: CallStepContext): Promise<readonly CleanupResult[]> {
+// The cleanup steps, in order, each recorded. They are numbered after the plan's steps in the log.
+// A run that calls services always has a context: run() refused it before any step otherwise.
+export async function runCleanup(
+  cleanup: readonly CleanupStep[], firstIndex: number, context: CallStepContext | undefined,
+): Promise<readonly CleanupResult[]> {
   const results: CleanupResult[] = [];
   for (const [index, step] of cleanup.entries()) {
+    // Database commands run in a workload container, which comes with the isolated runner, so a
+    // cleanup command is recorded as failed and raises a review item: its test data may be left.
+    if (step.type === 'database') {
+      results.push({ index, command: step.command, outcome: 'failed', code: 'cleanup-failed', cause: 'unsupported-step' });
+      continue;
+    }
     const base = { index, call: step.call } as const;
+    if (context === undefined) { results.push({ ...base, outcome: 'failed', code: 'cleanup-failed', cause: 'service-unreachable' }); continue; }
     if (needsUnsetValue(step, context.values)) { results.push({ ...base, outcome: 'skipped' }); continue; }
     let outcome: CallStepOutcome;
     try {

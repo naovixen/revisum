@@ -4,7 +4,8 @@
 import {
   literalText, referencedValueName,
   type AiWriter, type ArtifactReference, type ArtifactStore, type ClipboardAssertion, type ClockAdvance, type Locator, type Plan,
-  type RememberSource, type REQUEST_COUNT_KINDS, type RequestCount, type ResponseAssertion, type Step, type StorageAssertion, type TextOrValue,
+  type RememberSource, type REQUEST_COUNT_KINDS, type RequestCount, type ResponseAssertion, type ScriptChoice, type Step, type StorageAssertion,
+  type TextOrValue,
 } from '@revisum/contracts';
 import { parseAiText } from './ai-text.ts';
 import type { PlanErrorCode } from './plan/plan-decoders.ts';
@@ -23,6 +24,8 @@ const ASSERTION_TEXT: { readonly [Kind in Extract<Step, { type: 'expect' }>['ass
   focused: 'has focus', countEquals: 'matches the expected number of times',
   selected: 'is selected', unselected: 'is not selected', expanded: 'is expanded', collapsed: 'is collapsed',
   pressed: 'is pressed', unpressed: 'is not pressed', current: 'is marked as current', hrefEquals: 'links to the expected address',
+  hasClass: 'has the expected class', lacksClass: 'lacks the excluded class', computedStyleEquals: 'has the expected computed style',
+  attributeEquals: 'has the expected attribute value', attributeAbsent: 'lacks the attribute',
 };
 const PAGE_ASSERTION_TEXT: { readonly [Kind in Extract<Step, { type: 'expectPage' }>['assert']['kind']]: string } = {
   title: 'title', urlPath: 'URL path', url: 'URL', urlPathStartsWith: 'URL path prefix',
@@ -46,6 +49,9 @@ function describeLocator(locator: Locator): string {
     case 'label': return `the "${markdownEscape(plainText(locator.label))}" field`;
     case 'text': return `the text "${markdownEscape(plainText(locator.text))}"`;
     case 'testId': return `the \`${codeSpanText(plainText(locator.testId))}\` element`;
+    // The selector or expression is the plan's own literal text, never a value.
+    case 'css': return `the element found by CSS \`${codeSpanText(locator.selector)}\``;
+    case 'xpath': return `the element found by XPath \`${codeSpanText(locator.expression)}\``;
   }
 }
 
@@ -86,8 +92,16 @@ export function describeStep(step: Step): string {
     case 'expectStorage': return `Checked that the \`${codeSpanText(step.entry)}\` storage entry ${STORAGE_ASSERTION_TEXT[step.assert.kind]}`;
     case 'advanceClock': return `Advanced the page's clock by ${describeClockAdvance(step.by)}${step.mode === 'skipAhead' ? ', skipping ahead' : ''}`;
     case 'expectClipboard': return `Checked that the clipboard ${CLIPBOARD_ASSERTION_TEXT[step.assert.kind]}`;
+    case 'evaluate': return `Ran ${describeScript(step.script)}`;
+    case 'expectScript': return `Checked that field "${markdownEscape(step.field)}" of ${describeScript(step.script)} ${BACKEND_ASSERTION_TEXT[step.assert.kind]}`;
+    case 'database': return `Ran the declared \`${codeSpanText(step.command)}\` database command`;
+    case 'expectDatabase': return `Checked that field "${markdownEscape(step.field)}" of \`${codeSpanText(step.command)}\` ${BACKEND_ASSERTION_TEXT[step.assert.kind]}`;
   }
 }
+
+// A page script by its declared name; an inline script's text is never quoted.
+const describeScript = (script: ScriptChoice): string =>
+  (typeof script === 'string' ? `the declared \`${codeSpanText(script)}\` page script` : 'an inline page script');
 
 // "1 minute", "10 minutes": the amount is a whole number the plan wrote, never page data.
 const describeClockAdvance = (by: ClockAdvance): string => `${by.amount} ${by.amount === 1 ? by.unit.slice(0, -1) : by.unit}`;
@@ -97,7 +111,10 @@ const CLIPBOARD_ASSERTION_TEXT: { readonly [Kind in ClipboardAssertion['kind']]:
 };
 
 function describeRememberSource(from: RememberSource): string {
-  if ('element' in from) return `${from.read === 'text' ? 'the text' : 'the value'} of ${describeLocator(from.element)}`;
+  if ('element' in from) {
+    const read = from.read === 'attribute' ? `the \`${codeSpanText(from.attribute)}\` attribute` : from.read === 'text' ? 'the text' : 'the value';
+    return `${read} of ${describeLocator(from.element)}`;
+  }
   if ('clipboard' in from) return "the clipboard's text";
   const field = `field "${markdownEscape(from.field)}" of the latest \`${codeSpanText(from.response)}\` response`;
   return from.read === 'text' ? field : `the length of ${field}`;

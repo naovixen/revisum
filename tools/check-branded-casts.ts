@@ -21,6 +21,7 @@ const TRUSTED_PROJECT_LOADER = 'packages/engine/src/project/trusted-project.ts';
 const CALL_DECLARATIONS = 'packages/engine/src/project/call-declarations.ts';
 const EVIDENCE_DECLARATIONS = 'packages/engine/src/project/evidence-declarations.ts';
 const EVIDENCE_RESULT = 'packages/engine/src/evidence/evidence-result.ts';
+const UNSAFE_FEATURE_DECLARATIONS = 'packages/engine/src/project/unsafe-feature-declarations.ts';
 
 // Each branded type, and the only files that may create a value of it. A branded type declared in
 // packages/ but missing here is still checked: it has no owner, so any cast to it fails until its
@@ -54,7 +55,8 @@ export const BRAND_OWNERS: Readonly<Record<string, readonly string[]>> = {
   // the names the declarations gave them.
   ServiceName: [CALL_DECLARATIONS],
   CallName: [CALL_DECLARATIONS, PLAN_PARSER],
-  ParameterName: [CALL_DECLARATIONS],
+  // A database command's argument vector names its declared parameters.
+  ParameterName: [CALL_DECLARATIONS, UNSAFE_FEATURE_DECLARATIONS],
   FieldName: [CALL_DECLARATIONS, PLAN_PARSER],
   JsonPointer: [CALL_DECLARATIONS],
   // Stubs, observed requests and storage entries are named by the same declaration-section reader
@@ -67,6 +69,12 @@ export const BRAND_OWNERS: Readonly<Record<string, readonly string[]>> = {
   SuiteName: [EVIDENCE_DECLARATIONS],
   ImageDigest: [EVIDENCE_DECLARATIONS],
   SuiteReport: ['packages/engine/src/evidence/suite-report.ts'],
+  // Unsafe plan features: page scripts and database commands are named by the declaration-section
+  // reader, and a plan refers to them by those names; only the plan parser reads an inline
+  // script's source.
+  ScriptName: [CALL_DECLARATIONS, PLAN_PARSER],
+  CommandName: [CALL_DECLARATIONS, PLAN_PARSER],
+  ScriptSource: [PLAN_PARSER],
   SuiteTestId: [EVIDENCE_RESULT],
   ValidReport: ['packages/report/src/model/report-parser.ts'],
   ActorId: [ACTOR_MODULE],

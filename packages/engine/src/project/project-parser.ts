@@ -8,6 +8,7 @@ import {
   type Brand, type CallDeclaration, type CallName, type DeclaredService, type DeviceProfileId, type FixtureName, type IrreversiblePatterns, type Locale, type Origin, type Result,
   type EmailDomain, type EvidenceMode, type SafeText, type SecretName, type Target, type TestIdAttribute, type TimeZone,
   type ObservedRequestDeclaration, type RequestName, type StorageEntryDeclaration, type StorageEntryName, type StubDeclaration, type StubName,
+  type UnsafeFeaturesDeclaration,
 } from '@revisum/contracts';
 import { brand } from '../brand.ts';
 import {
@@ -16,6 +17,7 @@ import {
 import { readCallDeclarations, readServices } from './call-declarations.ts';
 import { readObservedRequestDeclarations, readStorageEntryDeclarations, readStubDeclarations } from './network-and-storage-declarations.ts';
 import { readEvidenceMode } from './evidence-declarations.ts';
+import { readUnsafeFeatures } from './unsafe-feature-declarations.ts';
 import { LARGEST_DOWNLOAD_BYTES, LOWERCASE_ID, MAXIMUM_TEST_ID_LENGTH, MAXIMUM_URL_LENGTH } from '../plan/plan-grammar.ts';
 
 const DEVICE_IDS = Object.keys(DEVICE_PROFILES) as DeviceProfileId[];
@@ -51,6 +53,8 @@ export type Limits = {
   readonly maximumTimersPerAdvance: number;
   // The longest clipboard text a clipboard check or remember reads; longer text fails with value-too-long.
   readonly maximumClipboardCharacters: number;
+  // How long a page-script check repeats its read script before it fails.
+  readonly scriptCheckTimeoutMilliseconds: number;
 };
 const HOUR_IN_MILLISECONDS = 60 * 60 * 1000;
 const DAY_IN_MILLISECONDS = 24 * HOUR_IN_MILLISECONDS;
@@ -59,7 +63,7 @@ export const DEFAULT_LIMITS: Limits = {
   maximumFillLines: 50, maximumFillCharacters: 4000, maximumDownloadBytes: 5 * 1024 * 1024, maximumCalls: 20,
   backendCheckTimeoutMilliseconds: 10_000, requestQuietMilliseconds: 500,
   maximumClockAdvanceMilliseconds: HOUR_IN_MILLISECONDS, maximumTotalClockAdvanceMilliseconds: DAY_IN_MILLISECONDS,
-  maximumTimersPerAdvance: 10_000, maximumClipboardCharacters: 20_000,
+  maximumTimersPerAdvance: 10_000, maximumClipboardCharacters: 20_000, scriptCheckTimeoutMilliseconds: 10_000,
 };
 // The limits the plan parser checks before it walks a plan, so an oversized plan costs nothing to reject.
 export type PlanLimits = Pick<Limits, 'maximumPlanBytes' | 'maximumSteps' | 'maximumFrameDepth'>;
@@ -122,6 +126,9 @@ export type ProjectData = {
   // The team's own Playwright suites Revisum may run, and the limits their outputs are decoded
   // under. Absent means evidence mode is off: nothing else can turn it on.
   readonly evidenceMode?: EvidenceMode;
+  // The unsafe plan features a person turned on, and the page scripts and database commands a plan
+  // may then name. Absent means every unsafe feature is off: nothing else can turn one on.
+  readonly unsafeFeatures?: UnsafeFeaturesDeclaration;
 };
 export type Project = Brand<ProjectData, 'Project'>;
 
@@ -198,7 +205,7 @@ export const LIMIT_CEILINGS: { readonly [Key in keyof Limits]: number } = {
   maximumFillLines: 500, maximumFillCharacters: 20_000, maximumDownloadBytes: LARGEST_DOWNLOAD_BYTES, maximumCalls: 200,
   backendCheckTimeoutMilliseconds: 120_000, requestQuietMilliseconds: 5000,
   maximumClockAdvanceMilliseconds: 31 * DAY_IN_MILLISECONDS, maximumTotalClockAdvanceMilliseconds: 31 * DAY_IN_MILLISECONDS,
-  maximumTimersPerAdvance: 100_000, maximumClipboardCharacters: 200_000,
+  maximumTimersPerAdvance: 100_000, maximumClipboardCharacters: 200_000, scriptCheckTimeoutMilliseconds: 120_000,
 };
 const isLimitKey = (key: string): key is keyof Limits => Object.hasOwn(LIMIT_CEILINGS, key);
 const LIMIT_KEYS: readonly (keyof Limits)[] = Object.keys(LIMIT_CEILINGS).filter(isLimitKey);
@@ -365,7 +372,7 @@ export function parseProject(input: unknown): Result<Project, readonly PlanError
     input, '$', issues,
     [
       'origins', 'productionOrigins', 'matrix', 'limits', 'secretNames', 'fixtures', 'policy', 'testIdAttributes', 'generatedEmailDomains',
-      'evidence', 'services', 'calls', 'stubs', 'observedRequests', 'storageEntries', 'evidenceMode',
+      'evidence', 'services', 'calls', 'stubs', 'observedRequests', 'storageEntries', 'evidenceMode', 'unsafeFeatures',
     ],
     ['origins', 'matrix'],
   );
@@ -404,6 +411,10 @@ export function parseProject(input: unknown): Result<Project, readonly PlanError
   const storageEntries = readStorageEntryDeclarations(fields['storageEntries'], network);
   // A suite's environment names secrets, so those are read first.
   const evidenceMode = readEvidenceMode(fields['evidenceMode'], issues, secretNames === INVALID ? [] : secretNames);
+  // Database commands name services and secrets, so those are read first.
+  const unsafeFeatures = readUnsafeFeatures(fields['unsafeFeatures'], {
+    issues, services: services === INVALID ? [] : services, secretNames: secretNames === INVALID ? [] : secretNames,
+  });
   const matrix = rawMatrix === INVALID ? [] : rawMatrix.map((target, index) => readTarget(target, `$.matrix[${index}]`, issues));
   const seen = new Set<string>();
   matrix.forEach((target, index) => {
@@ -415,10 +426,12 @@ export function parseProject(input: unknown): Result<Project, readonly PlanError
     || productionOrigins === INVALID || policy === INVALID || testIdAttributes === INVALID || generatedEmailDomains === INVALID
     || evidence === INVALID || services === INVALID || calls === INVALID
     || stubs === INVALID || observedRequests === INVALID || storageEntries === INVALID || evidenceMode === INVALID
-    || !allValid(origins) || !allValid(matrix)) return failure(issues);
-  // Left out when absent, so a project without evidence mode parses exactly as it did before.
+    || unsafeFeatures === INVALID || !allValid(origins) || !allValid(matrix)) return failure(issues);
+  // Left out when absent, so a project without evidence mode or unsafe features parses exactly as
+  // it did before.
   return success(brand<ProjectData, 'Project'>({
     origins, productionOrigins, matrix, limits, secretNames, fixtures, policy, testIdAttributes, generatedEmailDomains, evidence,
     services, calls, stubs, observedRequests, storageEntries, ...(evidenceMode === undefined ? {} : { evidenceMode }),
+    ...(unsafeFeatures === undefined ? {} : { unsafeFeatures }),
   }));
 }

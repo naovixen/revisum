@@ -8,11 +8,14 @@ import type { ClipboardRead, ClockAndClipboardStep } from './clock-and-clipboard
 import type { NetworkAndStorageStep, RequestName, ResponseRead } from './network-and-storage.ts';
 import type { BackendAssertion, CallArguments, CallName, FieldName } from './service-calls.ts';
 import type { TargetId } from './target.ts';
+import type { DatabaseCommandStep, DatabaseStep, PageScriptStep } from './unsafe-plan-features.ts';
 
-// The language version the running engine parses. A plan declares it as text, "1.2" or "1.1":
-// 1.1 is a subset of 1.2, so a plan declaring "1.1" parses exactly as it always did. Plans of
-// version 1 reach the engine only through its migration, which adds what version 1 lacked.
-export const PLAN_VERSION = { major: 1, minor: 2 } as const;
+// The language version the running engine parses. A plan declares it as text, "1.3", "1.2" or
+// "1.1": each is a subset of the next, so a plan declaring an older version parses exactly as it
+// always did. 1.2 is the closed language; 1.3 adds only the unsafe features a trusted project may
+// enable (unsafe-plan-features.ts). Plans of version 1 reach the engine only through its
+// migration, which adds what version 1 lacked.
+export const PLAN_VERSION = { major: 1, minor: 3 } as const;
 
 // Text that passed the engine's safety rules: no control or bidirectional-override characters
 // and nothing that looks like script.
@@ -73,18 +76,36 @@ export type Position = (typeof POSITION_WORDS)[number] | number;
 // An attribute a testId locator may match: "id" or a data- attribute the project declares.
 export type TestIdAttribute = Brand<string, 'TestIdAttribute'>;
 
-// Role-first and name-first locators. There is no CSS or XPath: both are brittle and can encode
-// logic. `Text` is what the locator's text fields hold: in a plan, literal text or a value
-// reference; once the run has replaced every reference, only text.
-export type LocatorWith<Text> =
+// Role-first and name-first locators: what the closed language finds elements by. `Text` is what
+// the locator's text fields hold: in a plan, literal text or a value reference; once the run has
+// replaced every reference, only text.
+export type SemanticLocatorWith<Text> =
   | { readonly by: 'role'; readonly role: Role; readonly name: Text; readonly position?: Position }
   | { readonly by: 'label'; readonly label: Text; readonly position?: Position }
   | { readonly by: 'text'; readonly text: Text; readonly position?: Position }
   | { readonly by: 'testId'; readonly testId: Text; readonly attribute?: TestIdAttribute; readonly position?: Position };
+// CSS and XPath locators: unsafe features a trusted project may enable (unsafe-plan-features.ts).
+// They find elements by page structure. The selector or expression is literal plan text, never a
+// value reference, so what it can match is fixed when the plan is approved; only hasText may hold
+// a value reference. hasText keeps the matches whose normalised text contains it, and inside
+// evaluates the selector within the one element another locator finds, up to 3 deep.
+export type StructuralLocatorWith<Text> =
+  | {
+    readonly by: 'css'; readonly selector: SafeText; readonly hasText?: Text; readonly inside?: LocatorWith<Text>;
+    readonly position?: Position;
+  }
+  | {
+    readonly by: 'xpath'; readonly expression: SafeText; readonly hasText?: Text; readonly inside?: LocatorWith<Text>;
+    readonly position?: Position;
+  };
+export type LocatorWith<Text> = SemanticLocatorWith<Text> | StructuralLocatorWith<Text>;
 export type Locator = LocatorWith<TextOrValue>;
 // A locator whose value references the run has replaced with their text: what a driver receives.
-export type ResolvedLocator = LocatorWith<SafeText>;
+// Drivers resolve semantic locators only, until CSS and XPath resolution lands with the CDP driver.
+export type ResolvedLocator = SemanticLocatorWith<SafeText>;
 export const LOCATOR_KINDS = ['role', 'label', 'text', 'testId'] as const;
+export const STRUCTURAL_LOCATOR_KINDS = ['css', 'xpath'] as const;
+export type StructuralLocatorKind = (typeof STRUCTURAL_LOCATOR_KINDS)[number];
 
 // ---- Keys -----------------------------------------------------------------------------------
 
@@ -119,15 +140,27 @@ export const ELEMENT_STATE_KINDS = [
 ] as const;
 // Text checks compare against non-empty text: an empty expected text would match anything.
 export const ELEMENT_TEXT_KINDS = ['textEquals', 'textContains', 'valueEquals', 'valueContains'] as const;
-export type ElementAssertionWith<Text> =
+// Checks of what a user perceives or assistive technology exposes.
+export type ObservableElementAssertionWith<Text> =
   | { readonly kind: (typeof ELEMENT_STATE_KINDS)[number] }
   | { readonly kind: (typeof ELEMENT_TEXT_KINDS)[number]; readonly value: Text }
   | { readonly kind: 'countEquals'; readonly value: number }
   // A link's href, resolved to an absolute URL, compared as text. The link is never followed.
   | { readonly kind: 'hrefEquals'; readonly value: Text };
+// DOM checks: an unsafe feature a trusted project may enable (unsafe-plan-features.ts). They read
+// implementation details: one class token, a computed style compared with the text
+// getComputedStyle gives (such as "rgb(220, 38, 38)"), or an attribute by its lowercase name.
+export const DOM_CHECK_KINDS = ['hasClass', 'lacksClass', 'computedStyleEquals', 'attributeEquals', 'attributeAbsent'] as const;
+export type DomCheckWith<Text> =
+  | { readonly kind: 'hasClass' | 'lacksClass'; readonly value: SafeText }
+  | { readonly kind: 'computedStyleEquals'; readonly property: SafeText; readonly value: SafeText }
+  | { readonly kind: 'attributeEquals'; readonly name: SafeText; readonly value: Text }
+  | { readonly kind: 'attributeAbsent'; readonly name: SafeText };
+export type ElementAssertionWith<Text> = ObservableElementAssertionWith<Text> | DomCheckWith<Text>;
 export type ElementAssertion = ElementAssertionWith<TextOrValue>;
-// An element assertion whose expected text is final: what the oracle compares against.
-export type ResolvedElementAssertion = ElementAssertionWith<SafeText>;
+// An element assertion whose expected text is final: what the oracle compares against. The oracle
+// decides observable checks only, until DOM reads land with the CDP driver.
+export type ResolvedElementAssertion = ObservableElementAssertionWith<SafeText>;
 
 export const PAGE_TEXT_KINDS = ['urlPath', 'title'] as const;
 export type PageAssertion =
@@ -180,12 +213,15 @@ export type PathTemplate = {
   readonly segments: readonly TextOrValue[];
   readonly query?: Readonly<Record<string, TextOrValue>>;
 };
-// Where a remember step reads its value: one element's visible text or its input value, a field
-// of the latest response a declared request check saw, as text or as an array's length, or the
-// plain text of the run's own clipboard.
+// Where a remember step reads its value: one element's visible text or its input value, one of its
+// attributes by lowercase name (a DOM check, so an unsafe feature), a field of the latest response
+// a declared request check saw, as text or as an array's length, or the plain text of the run's
+// own clipboard.
 export const REMEMBER_READS = ['text', 'value'] as const;
+export const REMEMBER_ATTRIBUTE_READ = 'attribute';
 export type RememberSource =
   | { readonly element: Locator; readonly read: (typeof REMEMBER_READS)[number] }
+  | { readonly element: Locator; readonly read: typeof REMEMBER_ATTRIBUTE_READ; readonly attribute: SafeText }
   | { readonly response: RequestName; readonly field: FieldName; readonly read: ResponseRead }
   | { readonly clipboard: ClipboardRead };
 
@@ -235,7 +271,11 @@ export type Step =
   // the trusted project gives it. See network-and-storage.ts.
   | NetworkAndStorageStep
   // Moves the run's virtual clock forward, or checks the clipboard's text. See clock-and-clipboard.ts.
-  | ClockAndClipboardStep;
+  | ClockAndClipboardStep
+  // Runs a page script or a database command the trusted project declares, or checks a field of
+  // what one returns: unsafe features. See unsafe-plan-features.ts.
+  | PageScriptStep
+  | DatabaseCommandStep;
 export type StepType = Step['type'];
 // The steps that act on an element; the driver's ActionRunner port performs them. The policy
 // gate judges a download as the click it is.
@@ -249,8 +289,10 @@ export type ResolvedActionStep =
   | { readonly type: 'select'; readonly locator: ResolvedLocator; readonly option: SafeText }
   | { readonly type: 'upload'; readonly locator: ResolvedLocator; readonly fixture: FixtureName }
   | { readonly type: 'press'; readonly locator: ResolvedLocator; readonly key: Key; readonly modifiers?: readonly Modifier[] };
-// A step that calls a declared service: what a plan's cleanup list holds.
+// A step that calls a declared service.
 export type CallStep = Extract<Step, { type: 'call' }>;
+// What a plan's cleanup list holds: calls, and from 1.3 database commands.
+export type CleanupStep = CallStep | DatabaseStep;
 export type ServiceCallStep = Extract<Step, { type: 'call' | 'expectBackend' }>;
 export const DIALOG_ACTIONS = ['accept', 'dismiss'] as const;
 export const AUDIT_MODES = ['report', 'gate'] as const;
@@ -269,8 +311,8 @@ export type PlanData = {
   readonly values?: Readonly<Record<string, GeneratedValue>>;
   // The page's frozen clock, relative to the run's clock start. Absent: the run's clock start.
   readonly clock?: PlanClock;
-  // Calls run in order after the steps, whatever the outcome, such as deleting the test data the
-  // steps created.
-  readonly cleanup?: readonly CallStep[];
+  // Calls, and database commands, run in order after the steps, whatever the outcome, such as
+  // deleting the test data the steps created.
+  readonly cleanup?: readonly CleanupStep[];
 };
 export type Plan = Brand<PlanData, 'Plan'>;

@@ -6,26 +6,29 @@
 // and a call open only at the top level, that a call and its arguments and fields fit the
 // project's declarations, that each stub, observed request, storage entry and field is one the
 // project declares, that each clock advance and the plan's advances together fit the project's
-// limits, and that a plan declaring "1.1" uses nothing 1.2 added. Passing the schema is never a
-// reason to trust a plan.
+// limits, that a plan declaring "1.1" uses nothing 1.2 added, and that a plan uses an unsafe
+// feature of 1.3 only when it declares "1.3" and its trusted project enables that feature. Passing
+// the schema is never a reason to trust a plan.
 // `npm run lint` checks that docs/plan-language/plan.schema.json is exactly this schema.
 // See docs/specs/SPEC-01-plan-language-and-parser.md, docs/specs/SPEC-30-plan-values-positions-and-keys.md
 // docs/specs/SPEC-31-page-states-metadata-downloads-and-tabs.md, docs/specs/SPEC-32-declared-service-calls.md
-// and docs/specs/SPEC-34-clock-advance-and-clipboard.md.
+// docs/specs/SPEC-34-clock-advance-and-clipboard.md and docs/specs/SPEC-36-unsafe-plan-features.md.
 import {
-  AUDIT_MODES, BACKEND_ASSERTION_KINDS, CLIPBOARD_ASSERTION_KINDS, CLIPBOARD_READS, CLOCK_ADVANCE_MODES, CLOCK_UNITS, DATE_ANCHORS, DATE_FORMATS, DIALOG_ACTIONS, DOWNLOAD_TEXT_KINDS, ELEMENT_STATE_KINDS, ELEMENT_TEXT_KINDS, KEYS,
-  LOCATOR_KINDS, MODIFIERS, PAGE_TEXT_KINDS, POSITION_WORDS, REMEMBER_READS, RESPONSE_FIELD_PRESENCE_KINDS, RESPONSE_FIELD_TEXT_KINDS,
+  AUDIT_MODES, BACKEND_ASSERTION_KINDS, CALL_EFFECTS, CLIPBOARD_ASSERTION_KINDS, CLIPBOARD_READS, CLOCK_ADVANCE_MODES, CLOCK_UNITS, DATE_ANCHORS,
+  DATE_FORMATS, DIALOG_ACTIONS, DOWNLOAD_TEXT_KINDS, ELEMENT_STATE_KINDS, ELEMENT_TEXT_KINDS, KEYS,
+  MODIFIERS, PAGE_TEXT_KINDS, POSITION_WORDS, REMEMBER_ATTRIBUTE_READ, REMEMBER_READS, RESPONSE_FIELD_PRESENCE_KINDS, RESPONSE_FIELD_TEXT_KINDS,
   RESPONSE_READS, ROLES, SCRIPT_MODES, STORAGE_ASSERTION_KINDS, STUB_ACTIONS,
   type StepType,
 } from '@revisum/contracts';
 import { schemaId } from '../version.ts';
 import {
-  DECLARED_NAME, CAPTURE_NAME, CLOCK_TIME, CRITERION_FIELD, CRITERION_ID, CURRENT_PLAN_VERSION, DOWNLOAD_NAME, EMAIL_LOCAL_PREFIX, FEATURE_ID, FROM_FIELD,
-  LARGEST_DOWNLOAD_BYTES, LOCATOR_FIELDS, LOWERCASE_ID, MAXIMUM_DAY_OFFSET, MAXIMUM_EXPECTED_COUNT, MAXIMUM_META_NAME_LENGTH,
-  MAXIMUM_MODIFIERS, MAXIMUM_PATH_SEGMENTS, MAXIMUM_POSITION,
-  MAXIMUM_SPEC_REFERENCE_LENGTH, MAXIMUM_TEST_ID_LENGTH, MAXIMUM_TITLE_LENGTH, MAXIMUM_URL_LENGTH, MAXIMUM_VALUE_PREFIX_LENGTH,
-  META_FIELDS, OPTIONAL_LOCATOR_FIELDS, PLAN_FIELDS, PREVIOUS_PLAN_VERSION, QUERY_KEY, RESPONSE_STATUS, STEP_FIELDS, STEP_TYPES, UNIQUE_NUMBER_DIGITS,
-  VALUE_NAME,
+  ALL_LOCATOR_KINDS, ATTRIBUTE_NAME, CLASS_TOKEN, CLOSED_PLAN_VERSION, DECLARED_NAME, CAPTURE_NAME, CLOCK_TIME, CRITERION_FIELD, CRITERION_ID,
+  CURRENT_PLAN_VERSION, DOWNLOAD_NAME, EMAIL_LOCAL_PREFIX, FEATURE_ID, FROM_FIELD,
+  LARGEST_DOWNLOAD_BYTES, LOCATOR_FIELDS, LOWERCASE_ID, MAXIMUM_DAY_OFFSET, MAXIMUM_EXPECTED_COUNT, MAXIMUM_INLINE_SCRIPT_LENGTH,
+  MAXIMUM_META_NAME_LENGTH, MAXIMUM_MODIFIERS, MAXIMUM_PATH_SEGMENTS, MAXIMUM_POSITION, MAXIMUM_SELECTOR_LENGTH,
+  MAXIMUM_SPEC_REFERENCE_LENGTH, MAXIMUM_STYLE_VALUE_LENGTH, MAXIMUM_TEST_ID_LENGTH, MAXIMUM_TITLE_LENGTH, MAXIMUM_URL_LENGTH, MAXIMUM_VALUE_PREFIX_LENGTH,
+  META_FIELDS, OPTIONAL_LOCATOR_FIELDS, PLAN_FIELDS, PREVIOUS_PLAN_VERSION, QUERY_KEY, RESPONSE_STATUS, STEP_FIELDS, STEP_TYPES, STYLE_PROPERTY,
+  UNIQUE_NUMBER_DIGITS, VALUE_NAME, type LocatorKind,
 } from './plan-grammar.ts';
 
 // A JSON Schema document or part of one. Plain JSON values only, so it serialises exactly.
@@ -58,6 +61,27 @@ const recordOf = (keyPattern: RegExp, values: JsonSchema): JsonSchema =>
 // A reference to a secret the project declares, as a fill value or saved storage state.
 const SECRET_REFERENCE: JsonSchema = closedObject({ secretName: { type: 'string', 'minLength': 1 } }, ['secretName']);
 
+// A CSS selector or XPath expression: literal text on one line, with none of "{", "}", ";" and "@".
+const SELECTOR_TEXT: JsonSchema = {
+  type: 'string', 'minLength': 1, 'maxLength': MAXIMUM_SELECTOR_LENGTH, pattern: `^[^{};@${UNSAFE_CHARACTERS}]*$`,
+};
+// A response, result or output field declared as a JSON pointer, by name.
+const DECLARED_FIELDS: JsonSchema = recordOf(DECLARED_NAME, { type: 'string', pattern: '^(/([^~]|~[01])*)*$' });
+// A script a page-script step runs: a name the project declares, or one written into the plan.
+// The source may hold line breaks and tabs, but no other control characters.
+const SCRIPT_CHOICE: JsonSchema = {
+  oneOf: [
+    { type: 'string', pattern: DECLARED_NAME.source },
+    closedObject({
+      inline: closedObject({
+        source: { type: 'string', 'minLength': 1, 'maxLength': MAXIMUM_INLINE_SCRIPT_LENGTH, pattern: '^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$' },
+        effect: { enum: [...CALL_EFFECTS] },
+        fields: DECLARED_FIELDS,
+      }, ['source', 'effect']),
+    }, ['inline']),
+  ],
+};
+
 // The schema of each field a step may hold, by field name. A step's own table entry lists which it has.
 const STEP_FIELD_SCHEMAS: Readonly<Record<string, JsonSchema>> = {
   url: { oneOf: [reference('url'), reference('pathTemplate')] },
@@ -79,6 +103,10 @@ const STEP_FIELD_SCHEMAS: Readonly<Record<string, JsonSchema>> = {
     oneOf: [
       closedObject({ clipboard: { enum: [...CLIPBOARD_READS] } }, ['clipboard']),
       closedObject({ element: reference('locator'), read: { enum: [...REMEMBER_READS] } }, ['element', 'read']),
+      // An element's attribute: a DOM check, an unsafe feature of 1.3.
+      closedObject({
+        element: reference('locator'), read: { const: REMEMBER_ATTRIBUTE_READ }, attribute: { type: 'string', pattern: ATTRIBUTE_NAME.source },
+      }, ['element', 'read', 'attribute']),
       closedObject({
         response: { type: 'string', pattern: DECLARED_NAME.source }, field: { type: 'string', pattern: DECLARED_NAME.source },
         read: { enum: [...RESPONSE_READS] },
@@ -99,6 +127,9 @@ const STEP_FIELD_SCHEMAS: Readonly<Record<string, JsonSchema>> = {
   count: reference('requestCount'),
   // A whole amount of at least 1 of a unit. The parser checks it against the project's limits.
   by: closedObject({ amount: { type: 'integer', minimum: 1 }, unit: { enum: [...CLOCK_UNITS] } }, ['amount', 'unit']),
+  // Unsafe features of 1.3: a page script and a database command, each as the project declares it.
+  script: SCRIPT_CHOICE,
+  command: { type: 'string', pattern: DECLARED_NAME.source },
 };
 
 // Step fields whose schema depends on the step type.
@@ -114,6 +145,8 @@ const STEP_TYPE_FIELD_SCHEMAS: { readonly [Type in StepType]?: Readonly<Record<s
   expectStorage: { assert: reference('storageAssertion') },
   advanceClock: { mode: { enum: [...CLOCK_ADVANCE_MODES] } },
   expectClipboard: { assert: reference('clipboardAssertion') },
+  expectScript: { assert: reference('backendAssertion') },
+  expectDatabase: { assert: reference('backendAssertion') },
 };
 
 function stepSchema(type: StepType): JsonSchema {
@@ -135,9 +168,14 @@ const LOCATOR_FIELD_SCHEMAS: Readonly<Record<string, JsonSchema>> = {
   // The project declares which attributes; the parser checks the name against that list.
   attribute: { type: 'string', 'minLength': 1 },
   position: { oneOf: [{ enum: [...POSITION_WORDS] }, integer(1, MAXIMUM_POSITION)] },
+  // CSS and XPath locators: unsafe features of 1.3. Only hasText may hold a value reference.
+  selector: SELECTOR_TEXT,
+  expression: SELECTOR_TEXT,
+  hasText: textOrValue(1),
+  inside: reference('locator'),
 };
 
-function locatorSchema(kind: (typeof LOCATOR_KINDS)[number]): JsonSchema {
+function locatorSchema(kind: LocatorKind): JsonSchema {
   const properties: Record<string, JsonSchema> = { by: { const: kind } };
   for (const field of [...LOCATOR_FIELDS[kind], ...OPTIONAL_LOCATOR_FIELDS[kind]]) {
     const schema = LOCATOR_FIELD_SCHEMAS[field];
@@ -169,13 +207,15 @@ export function planJsonSchema(): JsonSchema {
     $id: schemaId('plan', 1),
     title: `Plan language ${CURRENT_PLAN_VERSION}`,
     description: 'A closed, versioned test plan. Every assertion names the acceptance criterion it checks. '
-      + `A plan declaring "${PREVIOUS_PLAN_VERSION}" may use only what that version had. `
+      + `A plan declaring "${PREVIOUS_PLAN_VERSION}" or "${CLOSED_PLAN_VERSION}" may use only what that version had. `
+      + `The unsafe features of "${CURRENT_PLAN_VERSION}" (CSS and XPath locators, DOM checks, page scripts and database commands) `
+      + 'parse only when the trusted project enables each one, and a run using any of them is labelled unsafe. '
       + 'Fitting this schema is necessary, not sufficient: the plan parser also checks the project\'s allow-list, '
       + 'matrix, declared secrets, fixtures, test-id attributes and email domains, its limits, its text safety rules '
       + 'that every value and download is defined before it is used, that a second tab and a call stand only at the top level, '
       + 'and that each call, stub, observed request, storage entry, argument and field is one the project declares.',
     ...closedObject({
-      version: { enum: [PREVIOUS_PLAN_VERSION, CURRENT_PLAN_VERSION] },
+      version: { enum: [PREVIOUS_PLAN_VERSION, CLOSED_PLAN_VERSION, CURRENT_PLAN_VERSION] },
       meta: closedObject({
         featureId: { type: 'string', pattern: FEATURE_ID.source },
         specReference: text(1, MAXIMUM_SPEC_REFERENCE_LENGTH),
@@ -189,20 +229,29 @@ export function planJsonSchema(): JsonSchema {
       values: recordOf(VALUE_NAME, GENERATED_VALUE),
       // The page's frozen clock, relative to the run's clock start.
       clock: closedObject({ day: reference('relativeDay'), time: { type: 'string', pattern: CLOCK_TIME.source } }, ['day', 'time']),
-      // Calls run in order after the steps, whatever the outcome.
-      cleanup: { type: 'array', items: reference('callStep') },
+      // Calls and database commands run in order after the steps, whatever the outcome.
+      cleanup: { type: 'array', items: { oneOf: [reference('callStep'), reference('databaseStep')] } },
     }, PLAN_FIELDS),
     $defs: {
       steps: { type: 'array', items: reference('step'), 'minItems': 1 },
       step: { oneOf: STEP_TYPES.map((type) => reference(`${type}Step`)) },
       ...Object.fromEntries(STEP_TYPES.map((type) => [`${type}Step`, stepSchema(type)])),
-      locator: { oneOf: LOCATOR_KINDS.map((kind) => locatorSchema(kind)) },
+      locator: { oneOf: ALL_LOCATOR_KINDS.map((kind) => locatorSchema(kind)) },
       elementAssertion: {
         oneOf: [
           closedObject({ kind: { enum: [...ELEMENT_STATE_KINDS] } }, ['kind']),
           closedObject({ kind: { enum: [...ELEMENT_TEXT_KINDS] }, value: textOrValue(1) }, ['kind', 'value']),
           closedObject({ kind: { const: 'countEquals' }, value: integer(0, MAXIMUM_EXPECTED_COUNT) }, ['kind', 'value']),
           closedObject({ kind: { const: 'hrefEquals' }, value: { oneOf: [reference('comparedUrl'), reference('valueReference')] } }, ['kind', 'value']),
+          // DOM checks: an unsafe feature of 1.3.
+          closedObject({ kind: { enum: ['hasClass', 'lacksClass'] }, value: { type: 'string', pattern: CLASS_TOKEN.source } }, ['kind', 'value']),
+          closedObject({
+            kind: { const: 'computedStyleEquals' }, property: { type: 'string', pattern: STYLE_PROPERTY.source }, value: text(1, MAXIMUM_STYLE_VALUE_LENGTH),
+          }, ['kind', 'property', 'value']),
+          closedObject({
+            kind: { const: 'attributeEquals' }, name: { type: 'string', pattern: ATTRIBUTE_NAME.source }, value: textOrValue(0),
+          }, ['kind', 'name', 'value']),
+          closedObject({ kind: { const: 'attributeAbsent' }, name: { type: 'string', pattern: ATTRIBUTE_NAME.source } }, ['kind', 'name']),
         ],
       },
       pageAssertion: {

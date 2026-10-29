@@ -185,6 +185,11 @@ export function unsafeFeaturesOf(plan: Plan): readonly UnsafeFeature[];   // sor
 - **Metrics and levels (AC-SPEC-36-18)** are built and tested with SPEC-15 and SPEC-21, as SPEC-35's AC-17 is.
 - **Golden plans.** 1.3 golden plans live in `golden/unsafe-plans/` and parse against an unsafe-enabled project. `golden/plans/` stays 1.1 and 1.2.
 - **Readable text.** 1.3 unsafe constructs have no readable form in M1. `writePlanText` refuses a plan using one with text code `no-readable-form`, and JSON stays the route. A readable form is queued.
+- **Safety rules the code adds.**
+  - A database command's first argument is always literal, so a plan never chooses the program.
+  - A production database command is denied even in an approved plan, whatever the policy says.
+  - Inline script source has its own brand, `ScriptSource`. Credential-shaped text in it is `literal_secret`.
+  - A plan naming a script whose source the run wasn't given is refused with `script-source-missing`, so the manifest never lacks a script's hash.
 - **Changelog.** This spec's first code commit dates the 1.2 entry and opens "1.3 (unreleased)", naming the new constructs, codes and schema hash.
 
 ## Acceptance criteria

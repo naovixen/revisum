@@ -16,12 +16,14 @@ export * from './approval/plan-standing.ts';
 export { policyGate, type PolicyGate, type PolicyGateOptions } from './policy/policy-gate.ts';
 export { BUILT_IN_IRREVERSIBLE_PATTERNS } from './policy/irreversible-patterns.ts';
 export { assertBranded, planParser } from './plan/plan-parser.ts';
+export { unsafeConstructsOf, unsafeFeaturesOf, type UnsafeConstruct } from './plan/unsafe-features.ts';
+export { enabledUnsafeFeatures } from './project/unsafe-feature-declarations.ts';
 export { migratePlan, type CriterionMapping } from './plan/plan-migration.ts';
 export { clockAdvanceMilliseconds, totalClockAdvanceMilliseconds } from './clock-advance.ts';
 export { planJsonSchema, type JsonSchema } from './plan/plan-schema.ts';
 export {
-  readPlanText, writePlanText,
-  type DraftError, type TextErrorCode, type TextPosition, type TextReading, type TextWarning,
+  readPlanText, readablePlanText, writePlanText,
+  type DraftError, type NoReadableForm, type TextErrorCode, type TextPosition, type TextReading, type TextWarning,
 } from './plan/readable/plan-text.ts';
 export { writePlanJson } from './plan/plan-json.ts';
 export { admitDraft, type PlanParse } from './plan/plan-drafts.ts';

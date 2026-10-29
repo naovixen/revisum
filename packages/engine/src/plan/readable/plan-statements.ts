@@ -16,7 +16,7 @@ import {
 } from '@revisum/contracts';
 import { FROM_FIELD, STEP_TYPES } from '../plan-grammar.ts';
 import {
-  BARE, DIGITS, END, NUMBER, QUOTED, REFERENCE, URL_WORD,
+  BARE, DIGITS, END, NO_READABLE_FORM, NUMBER, QUOTED, REFERENCE, URL_WORD,
   better, choice, constant, countedWord, either, entry, field, group, isRecord, list, map, notThisStatement, oneOf, optional, orElse,
   phrases, record, reportedAs, skipSpaces, unitOf, wordAt, words, wordsFor,
   type EntrySyntax, type RecordPart, type Syntax,
@@ -85,6 +85,10 @@ const LOCATOR_FORMS: { readonly [Kind in Locator['by']]: readonly RecordPart[] }
   label: [words('label'), field('label', TEXT)],
   text: [words('text'), field('text', TEXT)],
   testId: [words('test id'), field('testId', TEXT), optional(words('in attribute'), field('attribute', BARE))],
+  // CSS and XPath locators are unsafe plan features, written in JSON until the readable format
+  // gives them a form (docs/specs/SPEC-36-unsafe-plan-features.md).
+  css: [NO_READABLE_FORM],
+  xpath: [NO_READABLE_FORM],
 };
 // Any locator that cannot be read is bad-locator, at the locator.
 export const LOCATOR = reportedAs('bad-locator', variants('by', LOCATOR_FORMS, [optional(field('position', POSITION))]));
@@ -211,6 +215,12 @@ const ELEMENT_CHECK_FORMS: { readonly [Kind in Exclude<ElementAssertion['kind'],
   valueContains: [words('has value containing'), field('value', TEXT)],
   countEquals: [words('count is'), field('value', NUMBER)],
   hrefEquals: [words('links to'), field('value', TEXT)],
+  // DOM checks are an unsafe plan feature, written in JSON until the readable format gives them a form.
+  hasClass: [NO_READABLE_FORM],
+  lacksClass: [NO_READABLE_FORM],
+  computedStyleEquals: [NO_READABLE_FORM],
+  attributeEquals: [NO_READABLE_FORM],
+  attributeAbsent: [NO_READABLE_FORM],
 };
 // "is visible", "has text containing …" and the other checks after an element's locator.
 const ELEMENT_ASSERTION = choice(record([words('is'), field('kind', oneOf(ELEMENT_STATE_KINDS))]), variants('kind', ELEMENT_CHECK_FORMS));
@@ -269,7 +279,8 @@ const REQUEST_COUNT = choice(...Object.entries(REQUEST_COUNT_WORDS).map(([kind, 
 // ---- Steps ------------------------------------------------------------------------------------------
 
 const RESPONSE_READ_WORDS: { readonly [Read in ResponseRead]: string } = { text: 'text', arrayLength: 'length' };
-// Where a remember step reads: the clipboard, a field of a response, or an element.
+// Where a remember step reads: the clipboard, a field of a response, or an element's text or value.
+// Remembering an attribute is a DOM check, an unsafe plan feature with no readable form yet.
 const REMEMBER_SOURCE = choice(
   record([words('clipboard'), field('clipboard', oneOf(CLIPBOARD_READS))]),
   record([field('read', wordsFor(RESPONSE_READ_WORDS)), words('of field'), field('field', BARE), words('in response'), field('response', BARE)]),
@@ -319,6 +330,12 @@ const STEP_FORMS: { readonly [Type in StepType]: readonly (readonly RecordPart[]
   expectStorage: [[words('Expect storage entry'), field('entry', BARE), field('assert', variants('kind', STORAGE_CHECK_FORMS))]],
   advanceClock: [[words('Advance clock by'), field('by', CLOCK_ADVANCE), optional(field('mode', wordsFor(CLOCK_MODE_WORDS)))]],
   expectClipboard: [[words('Expect clipboard'), field('assert', variants('kind', CLIPBOARD_CHECK_FORMS))]],
+  // Page scripts and database commands are unsafe plan features, written in JSON until the readable
+  // format gives them a form.
+  evaluate: [[NO_READABLE_FORM]],
+  expectScript: [[NO_READABLE_FORM]],
+  database: [[NO_READABLE_FORM]],
+  expectDatabase: [[NO_READABLE_FORM]],
 };
 
 // Each step type's statement: its forms, each a whole line.

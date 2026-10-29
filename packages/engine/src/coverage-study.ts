@@ -4,10 +4,18 @@
 // A suite may give its own project, with the declarations its plans rely on (secret names,
 // email domains, test-id attributes); its intents' plans are parsed with that project. Each
 // intent belongs to a sample: the original one, or the fresh one drawn after the grammar froze.
-// See docs/specs/SPEC-01-plan-language-and-parser.md and docs/specs/SPEC-30-plan-values-positions-and-keys.md.
-import { failure, success, type Plan, type Result, type SafeText } from '@revisum/contracts';
+//
+// Two shares are reported side by side: the closed-language share, of intents whose plan parses
+// and uses no unsafe feature, and the "1.3 with unsafe features" share, of intents whose plan
+// parses under its suite's project with or without them. A plan using a feature its suite does not
+// enable does not parse, so it counts toward neither. The language-fit kill criterion is decided by
+// the closed share alone.
+// See docs/specs/SPEC-01-plan-language-and-parser.md, docs/specs/SPEC-30-plan-values-positions-and-keys.md
+// and docs/specs/SPEC-36-unsafe-plan-features.md.
+import { failure, success, type Plan, type Result, type SafeText, type UnsafeFeature } from '@revisum/contracts';
 import { INVALID, allValid, peekRecord, readList, readOneOf, readRecord, readText, type Issues, type Parsed, type PlanError } from './plan/plan-decoders.ts';
 import { planParser } from './plan/plan-parser.ts';
+import { unsafeFeaturesOf } from './plan/unsafe-features.ts';
 import { parseProject } from './project/project-parser.ts';
 
 export const COVERAGE_VERDICTS = ['expressible', 'not-expressible'] as const;
@@ -23,13 +31,22 @@ export type CoverageIntent = {
   readonly testName: SafeText;
   readonly verdict: CoverageVerdict;
   readonly reason: string;
+  // The unsafe features an expressible intent's plan uses. Present only when there is one: such an
+  // intent counts toward the share with unsafe features, never the closed share.
+  readonly unsafeFeatures?: readonly UnsafeFeature[];
 };
+// Each sample's share; null for a sample with no intents.
+export type SharesBySample = { readonly [Sample in CoverageSample]: number | null };
 export type CoverageReport = {
   readonly intents: readonly CoverageIntent[];
-  // Of every intent, both samples together.
+  // The closed-language share: intents whose plan parses and uses no unsafe feature. Of every
+  // intent, both samples together, and of each sample on its own.
   readonly expressibleShare: number;
-  // Of each sample on its own; null for a sample with no intents.
-  readonly expressibleShareBySample: { readonly [Sample in CoverageSample]: number | null };
+  readonly expressibleShareBySample: SharesBySample;
+  // The "1.3 with unsafe features" share: intents whose plan parses under its suite's project,
+  // whatever it uses. Overall, and of each sample on its own.
+  readonly shareWithUnsafeFeatures: number;
+  readonly shareWithUnsafeFeaturesBySample: SharesBySample;
 };
 
 type ParsePlan = (input: unknown) => Result<Plan, readonly PlanError[]>;
@@ -99,8 +116,20 @@ function readSuites(input: unknown, issues: Issues): Parsed<ReadonlyMap<string, 
 const overturnedReason = (errors: readonly PlanError[]): string =>
   `Marked expressible, but its plan was rejected: ${errors.slice(0, 5).map((error) => `${error.code} at ${error.path}`).join('; ')}${errors.length > 5 ? '; and more' : ''}`;
 
-const shareOf = (intents: readonly CoverageIntent[]): number | null =>
-  intents.length === 0 ? null : intents.filter((intent) => intent.verdict === 'expressible').length / intents.length;
+// The share of `intents` that `counts`; null for no intents.
+const shareOf = (intents: readonly CoverageIntent[], counts: (intent: CoverageIntent) => boolean): number | null =>
+  intents.length === 0 ? null : intents.filter(counts).length / intents.length;
+
+// What each share counts: every expressible intent, or only those whose plan uses no unsafe feature.
+const expressibleWithAnyFeature = (intent: CoverageIntent): boolean => intent.verdict === 'expressible';
+const expressibleInClosedLanguage = (intent: CoverageIntent): boolean => intent.verdict === 'expressible' && intent.unsafeFeatures === undefined;
+
+function sharesBySample(intents: readonly CoverageIntent[], counts: (intent: CoverageIntent) => boolean): SharesBySample {
+  return {
+    original: shareOf(intents.filter((intent) => intent.sample === 'original'), counts),
+    fresh: shareOf(intents.filter((intent) => intent.sample === 'fresh'), counts),
+  };
+}
 
 // Decodes a study file and checks every intent marked expressible with its suite's parser, or with
 // `parsePlan` when the file gives its suite no project.
@@ -116,14 +145,15 @@ export function assessCoverage(input: unknown, parsePlan: ParsePlan): Result<Cov
   const intents = recorded.map(({ plan, ...intent }): CoverageIntent => {
     if (intent.verdict !== 'expressible') return intent;
     const parsed = (parsers.get(intent.suite) ?? parsePlan)(plan);
-    return parsed.ok ? intent : { ...intent, verdict: 'not-expressible', reason: overturnedReason(parsed.error) };
+    if (!parsed.ok) return { ...intent, verdict: 'not-expressible', reason: overturnedReason(parsed.error) };
+    const unsafeFeatures = unsafeFeaturesOf(parsed.value);
+    return unsafeFeatures.length === 0 ? intent : { ...intent, unsafeFeatures };
   });
   return success({
     intents,
-    expressibleShare: shareOf(intents) ?? 0,
-    expressibleShareBySample: {
-      original: shareOf(intents.filter((intent) => intent.sample === 'original')),
-      fresh: shareOf(intents.filter((intent) => intent.sample === 'fresh')),
-    },
+    expressibleShare: shareOf(intents, expressibleInClosedLanguage) ?? 0,
+    expressibleShareBySample: sharesBySample(intents, expressibleInClosedLanguage),
+    shareWithUnsafeFeatures: shareOf(intents, expressibleWithAnyFeature) ?? 0,
+    shareWithUnsafeFeaturesBySample: sharesBySample(intents, expressibleWithAnyFeature),
   });
 }

@@ -112,7 +112,10 @@ export function resolveText(text: TextOrValue, values: RunValues, maximumLength:
   return success(value);
 }
 
-export function resolveLocator(locator: Locator, values: RunValues, project: Project): Resolved<ResolvedLocator> {
+// The locator a driver matches, with its value references replaced. A CSS or XPath locator has no
+// resolved form until the drivers resolve them, so it is unsupported here; the run reports such a
+// step before it gets this far.
+export function resolveLocator(locator: Locator, values: RunValues, project: Project): Result<ResolvedLocator, StepErrorCode | 'unsupported-step'> {
   switch (locator.by) {
     case 'role': {
       const name = resolveText(locator.name, values, project.limits.maximumTextLength);
@@ -130,13 +133,30 @@ export function resolveLocator(locator: Locator, values: RunValues, project: Pro
       const testId = resolveText(locator.testId, values, project.limits.maximumTextLength);
       return testId.ok ? success({ ...locator, testId: testId.value }) : testId;
     }
+    case 'css': case 'xpath':
+      return failure('unsupported-step');
   }
 }
 
-export function resolveElementAssertion(assertion: ElementAssertion, values: RunValues, project: Project): Resolved<ResolvedElementAssertion> {
-  if (assertion.kind === 'countEquals' || !('value' in assertion)) return success(assertion);
-  const value = resolveText(assertion.value, values, project.limits.maximumTextLength);
-  return value.ok ? success({ kind: assertion.kind, value: value.value }) : value;
+// The check the oracle compares against, with its expected text final. A DOM check has no oracle
+// form until the drivers read classes, styles and attributes, so it is unsupported here; the run
+// reports such a step before it gets this far.
+export function resolveElementAssertion(
+  assertion: ElementAssertion, values: RunValues, project: Project,
+): Result<ResolvedElementAssertion, StepErrorCode | 'unsupported-step'> {
+  switch (assertion.kind) {
+    case 'hasClass': case 'lacksClass': case 'computedStyleEquals': case 'attributeEquals': case 'attributeAbsent':
+      return failure('unsupported-step');
+    case 'countEquals':
+      return success(assertion);
+    case 'textEquals': case 'textContains': case 'valueEquals': case 'valueContains': case 'hrefEquals': {
+      const value = resolveText(assertion.value, values, project.limits.maximumTextLength);
+      return value.ok ? success({ kind: assertion.kind, value: value.value }) : value;
+    }
+    default:
+      // The state checks compare against nothing.
+      return success(assertion);
+  }
 }
 
 // The action a driver performs, with every value replaced. A multi-line fill has no driver form

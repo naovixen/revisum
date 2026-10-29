@@ -4,7 +4,10 @@
 //   - decide() is the static check, made before a run starts. It reads the plan's navigations and
 //     the locator names of its clicks, its size and number of calls against the trusted limits, its
 //     targets' locales, what each declared call it makes may reach and change, and whether a
-//     proposal starts a stub or writes storage its declaration keeps out of proposals. Only an allow decision carries an Authorised plan, the only kind run() accepts.
+//     proposal starts a stub or writes storage its declaration keeps out of proposals. For the
+//     unsafe plan features, it denies a proposal that holds an inline script or runs a write script
+//     or command its declaration keeps out of proposals, and any database command whose service is
+//     on a production origin. Only an allow decision carries an Authorised plan, the only kind run() accepts.
 //   - guardAction() is the runtime guard. The driver calls it just before every action, with the
 //     element the locator resolved to and any open dialog's text, so it sees what the plan alone
 //     cannot: the name behind a test id, the form a key press would submit, where a link leads.
@@ -12,17 +15,18 @@
 // Both are deterministic and read nothing but their arguments and the project. Each denial appends
 // one plan.denied audit event whose code is the rule, so a denial leaves a record even when
 // nothing ran.
-// See docs/specs/SPEC-03-policy-gate.md.
+// See docs/specs/SPEC-03-policy-gate.md and docs/specs/SPEC-36-unsafe-plan-features.md.
 import { literalText } from '@revisum/contracts';
 import type {
-  AllowedUrl, Authorised, EventSink, GuardVerdict, Locale, Locator, PathTemplate, Plan, PolicyDecision, PolicyRuleId, RemoveStorageStep,
-  ResolvedElement, ServiceCallStep, SetStorageStep, Step, StubStep, Target, TargetId,
+  AllowedUrl, Authorised, DatabaseCommandStep, EventSink, GuardVerdict, Locale, Locator, PageScriptStep, PathTemplate, Plan, PolicyDecision,
+  PolicyRuleId, RemoveStorageStep, ResolvedElement, ServiceCallStep, SetStorageStep, Step, StubStep, Target, TargetId,
 } from '@revisum/contracts';
 import { deriveActor, sourceActorId } from '../actor.ts';
 import type { PlanStanding } from '../approval/plan-standing.ts';
 import { planHash } from '../manifest.ts';
 import type { Limits, Project, ProjectPolicy } from '../project/project-parser.ts';
 import type { TrustedProject } from '../project/trusted-project.ts';
+import { declaredCommands, declaredScripts } from '../project/unsafe-feature-declarations.ts';
 import { isAllowedName, matchesIrreversiblePattern, patternsForLocale } from './irreversible-patterns.ts';
 
 export interface PolicyGate {
@@ -147,14 +151,18 @@ function isOverLimit(plan: Plan, limits: Limits): boolean {
     || steps.some((step) => (step.type === 'frame' && (depth + 1 > limits.maximumFrameDepth || listTooLong(step.steps, depth + 1)))
       || (step.type === 'newTab' && listTooLong(step.steps, depth)));
   const bytes = new TextEncoder().encode(JSON.stringify(plan)).length;
-  return bytes > limits.maximumPlanBytes || listTooLong(plan.steps, 0) || serviceCallSteps(plan).length > limits.maximumCalls;
+  const scripts = everyStep(plan.steps).filter(({ step }) => step.type === 'evaluate' || step.type === 'expectScript');
+  return bytes > limits.maximumPlanBytes || listTooLong(plan.steps, 0) || externalCallSteps(plan).length + scripts.length > limits.maximumCalls;
 }
 
-// Every step that calls a service, the plan's steps first and its cleanup after, each with its
-// step index, or null for a cleanup call, which no step index names. Calls stand only at the top
-// level, so frames and second tabs hold none. A backend check counts once, however often it polls.
-function serviceCallSteps(plan: Plan): { readonly step: ServiceCallStep; readonly index: number | null }[] {
-  const steps = plan.steps.flatMap((step, index) => (step.type === 'call' || step.type === 'expectBackend' ? [{ step, index }] : []));
+// Every step that calls a service or runs a database command, the plan's steps first and its
+// cleanup after, each with its step index, or null for a cleanup step, which no step index names.
+// Both stand only at the top level, so frames and second tabs hold none. A check counts once,
+// however often it polls.
+function externalCallSteps(plan: Plan): { readonly step: ServiceCallStep | DatabaseCommandStep; readonly index: number | null }[] {
+  const isExternal = (step: Step): step is ServiceCallStep | DatabaseCommandStep =>
+    step.type === 'call' || step.type === 'expectBackend' || step.type === 'database' || step.type === 'expectDatabase';
+  const steps = plan.steps.flatMap((step, index) => (isExternal(step) ? [{ step, index }] : []));
   return [...steps, ...(plan.cleanup ?? []).map((step) => ({ step, index: null }))];
 }
 
@@ -168,6 +176,33 @@ function callRule(step: ServiceCallStep, context: StaticContext): PolicyRuleId |
   if (!context.productionAllowed && context.project.productionOrigins.some((origin) => origin === service.origin)) return 'production-origin';
   if (!context.approved && declaration.effect === 'write' && !declaration.allowInProposals) return 'side-effect-in-proposal';
   return null;
+}
+
+// What a database command may not do: reach a service on a production origin, whatever the plan's
+// standing, since the gate cannot judge what the team's program does there; or, in a proposal,
+// change something unless its declaration allows it in proposals.
+function commandRule(step: DatabaseCommandStep, context: StaticContext): PolicyRuleId | null {
+  const declaration = Object.entries(declaredCommands(context.project.unsafeFeatures)).find(([name]) => name === step.command)?.[1];
+  const service = context.project.services.find((candidate) => candidate.name === declaration?.service);
+  if (declaration === undefined || service === undefined) return 'undeclared-origin';
+  if (context.project.productionOrigins.some((origin) => origin === service.origin)) return 'production-origin';
+  if (!context.approved && declaration.effect === 'write' && !declaration.allowInProposals) return 'side-effect-in-proposal';
+  return null;
+}
+
+const externalCallRule = (step: ServiceCallStep | DatabaseCommandStep, context: StaticContext): PolicyRuleId | null =>
+  (step.type === 'call' || step.type === 'expectBackend' ? callRule(step, context) : commandRule(step, context));
+
+// What a page script may not do in a proposal: be written into the plan, since its source and its
+// claimed effect are the plan's own and no person declared them; or change something unless its
+// declaration allows it in proposals. A script the project does not declare is no one's.
+function scriptRule(step: PageScriptStep, context: StaticContext): PolicyRuleId | null {
+  if (context.approved) return null;
+  if (typeof step.script !== 'string') return 'inline-script-in-proposal';
+  const name = step.script;
+  const declaration = Object.entries(declaredScripts(context.project.unsafeFeatures)).find(([declared]) => declared === name)?.[1];
+  if (declaration === undefined) return 'undeclared-origin';
+  return declaration.effect === 'write' && !declaration.allowInProposals ? 'side-effect-in-proposal' : null;
 }
 
 type StaticContext = {
@@ -215,6 +250,7 @@ function staticRule(step: Step, context: StaticContext): PolicyRuleId | null {
     if (name !== null && isIrreversibleName(name, context.patterns, context.project.policy)) return 'irreversible-action';
   }
   if (step.type === 'stub' || step.type === 'setStorage' || step.type === 'removeStorage') return sideEffectRule(step, context);
+  if (step.type === 'evaluate' || step.type === 'expectScript') return scriptRule(step, context);
   return null;
 }
 
@@ -233,8 +269,8 @@ function staticDenial(plan: Plan, targets: readonly Target[], standing: PlanStan
     const rule = staticRule(step, context);
     if (rule !== null) return { rule, stepIndex: index };
   }
-  for (const { step, index } of serviceCallSteps(plan)) {
-    const rule = callRule(step, context);
+  for (const { step, index } of externalCallSteps(plan)) {
+    const rule = externalCallRule(step, context);
     if (rule !== null) return { rule, stepIndex: index };
   }
   return null;
@@ -243,12 +279,15 @@ function staticDenial(plan: Plan, targets: readonly Target[], standing: PlanStan
 // ---- The runtime guard --------------------------------------------------------------------------
 
 // A control with no accessible name could be anything, so it is acted on only when the project
-// allows it by test id, either the one the locator used or the element's own.
-function isAllowedUnnamed(locator: Locator, element: ResolvedElement, policy: ProjectPolicy): boolean {
-  const allowed = policy.unnamedControlsAllowedByTestId;
+// allows it by test id, either the one the locator used or the element's own, or, for a CSS or
+// XPath locator, by that exact selector or expression in its unsafe features' list.
+function isAllowedUnnamed(locator: Locator, element: ResolvedElement, project: Project | TrustedProject): boolean {
+  const allowed = project.policy.unnamedControlsAllowedByTestId;
   const testId = locator.by === 'testId' ? literalText(locator.testId) : undefined;
+  const structural = locator.by === 'css' ? locator.selector : locator.by === 'xpath' ? locator.expression : undefined;
   return (testId !== undefined && allowed.includes(testId))
-    || (element.testId !== undefined && allowed.some((testId) => testId === element.testId));
+    || (element.testId !== undefined && allowed.some((testId) => testId === element.testId))
+    || (structural !== undefined && (project.unsafeFeatures?.unnamedControlsAllowed ?? []).includes(structural));
 }
 
 function linkRule(element: ResolvedElement, policy: ProjectPolicy): PolicyRuleId | null {
@@ -274,7 +313,7 @@ function runtimeRule(
       return isDestructivePath(read.path, policy) ? 'destructive-navigation' : null;
     }
     case 'click': case 'download': case 'hover': case 'fill': case 'select': case 'upload': case 'press': {
-      if (isBlank(element.name) && !isAllowedUnnamed(step.locator, element, policy)) return 'unnamed-control';
+      if (isBlank(element.name) && !isAllowedUnnamed(step.locator, element, project)) return 'unnamed-control';
       // A download is the click that starts it, so it is guarded exactly as a click.
       if (step.type === 'click' || step.type === 'download') return irreversible(element.name) ? 'irreversible-action' : linkRule(element, policy);
       if (step.type !== 'press' || !ACTIVATING_KEYS.includes(step.key)) return null;
@@ -292,6 +331,9 @@ function runtimeRule(
     // A clock advance moves the page's own clock and a clipboard check only reads: neither sends
     // input, so neither is a side effect, and a proposal may hold both.
     case 'advanceClock': case 'expectClipboard':
+    // A page script or a database command acts on no element the guard could see: the static check
+    // judged its declaration before the run started.
+    case 'evaluate': case 'expectScript': case 'database': case 'expectDatabase':
       return null;
   }
 }

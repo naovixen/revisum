@@ -14,6 +14,7 @@ import { failure, success, type Plan, type Result, type SinkError, type StepType
 import type { PlanLimits } from '../../project/project-parser.ts';
 import type { PlanError, PlanErrorCode } from '../plan-decoders.ts';
 import { CRITERION_FIELD, STEP_FIELDS, STEP_TYPES } from '../plan-grammar.ts';
+import { unsafeConstructsOf } from '../unsafe-features.ts';
 import { CLEANUP_LINE, CRITERION_LINE, HEADERS, STEP_STATEMENTS, VALUES_LINE, VALUE_DEFINITION } from './plan-statements.ts';
 import { better, isRecord, notThisStatement, skipSpaces, type TextErrorCode, type TextFailure, type TextPosition } from './text-syntax.ts';
 
@@ -228,11 +229,25 @@ export const placedPlanErrors = (errors: readonly PlanError[], positions: Readon
 const valueAt = (value: unknown, path: readonly string[]): unknown =>
   path.reduce<unknown>((holder, key) => (isRecord(holder) ? holder[key] : undefined), value);
 
-// The canonical text of a parsed plan. Pure.
+// Why a plan has no readable text: it holds a construct the readable format has no form for, at
+// that construct's path, so it stays JSON.
+export type NoReadableForm = { readonly code: Extract<TextErrorCode, 'no-readable-form'>; readonly path: string };
+
+// The canonical text of a parsed plan, or no-readable-form at the first construct the readable
+// format has no form for: an unsafe plan feature, at the path of the field that names it. The one
+// route to readable text for a plan that may hold one. Pure.
+export function readablePlanText(plan: Plan): Result<string, NoReadableForm> {
+  const first = unsafeConstructsOf(plan)[0];
+  return first === undefined ? success(writePlanText(plan)) : failure({ code: 'no-readable-form', path: first.path });
+}
+
+// The canonical text of a parsed plan. Pure. A plan holding an unsafe feature has no readable form,
+// so passing one is a programming error: a caller that may hold one uses readablePlanText.
 export function writePlanText(plan: Plan): string {
   const lines: string[] = [];
   const put = (depth: number, text: string | undefined): void => {
-    // Every construct of the language has a readable form, so this is a broken grammar, never a plan.
+    // Every construct of the closed language has a readable form, so this is a broken grammar or a
+    // plan with an unsafe feature, which only readablePlanText may be given.
     if (text === undefined) throw new Error('the readable grammar has no form for part of this plan');
     lines.push(`${INDENT.repeat(depth)}${text}`);
   };

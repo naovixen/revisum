@@ -32,8 +32,12 @@ export const PLAN_ERROR_CODES = [
   // A suite declaration whose command does not invoke Playwright Test, or sets an argument Revisum
   // sets itself.
   'command_not_allowed',
-  // A suite declaration's path or working directory that is absolute or leaves the repository.
+  // A suite declaration's path or working directory that is absolute or leaves the repository, or
+  // a page script declaration's file outside plans/scripts/.
   'path_not_allowed',
+  // An unsafe plan feature, such as a CSS locator or a page script, that the trusted project does
+  // not enable. Reported at the field that names the feature, with nothing under it read.
+  'unsafe_feature_disabled',
 ] as const;
 export type PlanErrorCode = (typeof PLAN_ERROR_CODES)[number];
 
@@ -64,6 +68,11 @@ const CONTROL_OR_BIDIRECTIONAL_IN_PROSE = /[\u0000-\u0008\u000b\u000c\u000e-\u00
 // The rule for multi-line prose: as isUnsafeText, but tabs and line breaks are allowed.
 export const isUnsafeProse = (value: string): boolean =>
   CONTROL_OR_BIDIRECTIONAL_IN_PROSE.test(value) || SCRIPT_LIKE.some((pattern) => pattern.test(value));
+
+// The rule for a script's source text, which is code by design, so looking like script is no
+// fault: control or bidirectional-override characters other than tabs and line breaks, or half of
+// a surrogate pair, are refused.
+export const isUnsafeSource = (value: string): boolean => CONTROL_OR_BIDIRECTIONAL_IN_PROSE.test(value) || !value.isWellFormed();
 
 // True when `input` is one of `values`, narrowing it to that union.
 export const isOneOf = <Value extends string>(values: readonly Value[], input: string): input is Value =>

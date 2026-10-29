@@ -36,6 +36,7 @@ const LITERAL_SEGMENT = /^([A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f]{2})+$/;
 const STRING_PLACEHOLDER = /\{([^{}]*)\}/g;
 
 const MAXIMUM_SERVICES = 64;
+const LARGEST_PORT = 65_535;
 const MAXIMUM_CALLS = 256;
 const MAXIMUM_PARAMETERS = 64;
 const MAXIMUM_ONE_OF_VALUES = 256;
@@ -58,15 +59,16 @@ const isPlainObject = (input: unknown): input is Readonly<Record<string, unknown
 
 // ---- Services ---------------------------------------------------------------------------------
 
-// An optional list of services, each { name, origin, private }. Absent means none; `private`
-// defaults to false, so a service may reach a private address only when the person says so.
+// An optional list of services, each { name, origin, private, port }. Absent means none; `private`
+// defaults to false, so a service may reach a private address only when the person says so. The
+// port, the one a database command may reach, is left out when absent.
 export function readServices(input: unknown, issues: Issues): Parsed<readonly DeclaredService[]> {
   if (input === undefined) return [];
   const raw = readList(input, '$.services', issues, MAXIMUM_SERVICES, 0);
   if (raw === INVALID) return INVALID;
   const services = raw.map((entry, index): Parsed<DeclaredService> => {
     const path = `$.services[${index}]`;
-    const fields = readRecord(entry, path, issues, ['name', 'origin', 'private'], ['name', 'origin']);
+    const fields = readRecord(entry, path, issues, ['name', 'origin', 'private', 'port'], ['name', 'origin']);
     if (fields === INVALID) return INVALID;
     const name = fields['name'];
     const readName = (): Parsed<ServiceName> => {
@@ -76,8 +78,10 @@ export function readServices(input: unknown, issues: Issues): Parsed<readonly De
     };
     const isPrivate = fields['private'] ?? false;
     if (typeof isPrivate !== 'boolean') issues.push({ code: 'wrong_type', path: `${path}.private` });
+    const port = Object.hasOwn(fields, 'port') ? readInteger(fields['port'], `${path}.port`, issues, 1, LARGEST_PORT) : undefined;
     const parts = [readName(), readOrigin(fields['origin'], `${path}.origin`, issues), typeof isPrivate === 'boolean' ? isPrivate : INVALID] as const;
-    return allValid(parts) ? { name: parts[0], origin: parts[1], private: parts[2] } : INVALID;
+    if (!allValid(parts) || port === INVALID) return INVALID;
+    return { name: parts[0], origin: parts[1], private: parts[2], ...(port === undefined ? {} : { port }) };
   });
   if (!allValid(services)) return INVALID;
   if (new Set(services.map((service) => service.name)).size !== services.length) {

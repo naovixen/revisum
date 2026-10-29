@@ -7,6 +7,7 @@
 // (docs/specs/SPEC-06-cdp-driver.md).
 // See docs/specs/SPEC-30-plan-values-positions-and-keys.md and
 // docs/specs/SPEC-31-page-states-metadata-downloads-and-tabs.md.
+import { DOM_CHECK_KINDS } from './plan.ts';
 import type {
   ActionStep, ElementAssertion, Locator, PageAssertion, ResolvedActionStep, ResolvedLocator, SafeText, Step, TextOrValue, ValueName,
 } from './plan.ts';
@@ -19,26 +20,30 @@ export const literalText = (text: TextOrValue): SafeText | undefined => (typeof 
 // The name of the run value it refers to; undefined when it is literal text.
 export const referencedValueName = (text: TextOrValue): ValueName | undefined => (typeof text === 'string' ? undefined : text.valueName);
 
-// The locator with its texts typed as literal text, or undefined when a value reference is left.
+// The locator with its texts typed as literal text, or undefined when a value reference is left or
+// when it is a CSS or XPath locator, which no driver resolves yet.
 export function literalLocator(locator: Locator): ResolvedLocator | undefined {
   switch (locator.by) {
     case 'role': { const name = literalText(locator.name); return name === undefined ? undefined : { ...locator, name }; }
     case 'label': { const label = literalText(locator.label); return label === undefined ? undefined : { ...locator, label }; }
     case 'text': { const text = literalText(locator.text); return text === undefined ? undefined : { ...locator, text }; }
     case 'testId': { const testId = literalText(locator.testId); return testId === undefined ? undefined : { ...locator, testId }; }
+    case 'css': case 'xpath': return undefined;
   }
 }
 
-// True when the locator picks a position among its matches, or matches a test id on an attribute
-// other than the default: what the drivers do not resolve yet.
+// True when the locator picks a position among its matches, matches a test id on an attribute
+// other than the default, or finds its element by CSS or XPath: what the drivers do not resolve yet.
 export const needsLocatorFeatures = (locator: Locator): boolean =>
-  locator.position !== undefined
+  locator.position !== undefined || locator.by === 'css' || locator.by === 'xpath'
   || (locator.by === 'testId' && locator.attribute !== undefined && locator.attribute !== DEFAULT_TEST_ID_ATTRIBUTE);
 
 // Element checks the drivers' probe cannot decide yet: it reports no checked, focused or
-// accessibility state and no link target, so these checks could never pass on their merits.
+// accessibility state, no link target and no class, computed style or attribute, so these checks
+// could never pass on their merits.
 const ELEMENT_CHECKS_NO_DRIVER_DECIDES: readonly ElementAssertion['kind'][] = [
   'checked', 'unchecked', 'focused', 'selected', 'unselected', 'expanded', 'collapsed', 'pressed', 'unpressed', 'current', 'hrefEquals',
+  ...DOM_CHECK_KINDS,
 ];
 // Page checks the drivers' page probe cannot decide yet: it reads no part of the document head.
 const PAGE_CHECKS_NO_DRIVER_DECIDES: readonly PageAssertion['kind'][] = ['metaContent', 'canonicalUrl'];
@@ -65,12 +70,15 @@ export function needsDriverFeatures(step: Step): boolean {
     // The CDP driver's clock and clipboard ports carry these out, with the determinism kit's timer
     // tracking (docs/specs/SPEC-34-clock-advance-and-clipboard.md).
     case 'advanceClock': case 'expectClipboard': return true;
-    // Reading a response field needs the network port and reading the clipboard the clipboard
-    // port; reading an element only the prober.
-    case 'remember': return !('element' in step.from);
+    // Reading a response field needs the network port, reading the clipboard the clipboard port and
+    // reading an attribute the DOM reads; reading an element's text or value only the prober.
+    case 'remember': return !('element' in step.from) || step.from.read === 'attribute';
     case 'frame': case 'dialog': case 'a11yAudit': case 'capture': return false;
-    // Calls never reach a driver: the engine sends them through the run's service caller.
-    case 'call': case 'expectBackend': return false;
+    // Page scripts need the driver's script port (docs/specs/SPEC-36-unsafe-plan-features.md).
+    case 'evaluate': case 'expectScript': return true;
+    // Calls never reach a driver: the engine sends them through the run's service caller. Database
+    // commands neither: they run in a workload container.
+    case 'call': case 'expectBackend': case 'database': case 'expectDatabase': return false;
   }
 }
 

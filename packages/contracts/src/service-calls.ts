@@ -18,8 +18,10 @@ import type { Origin } from './target.ts';
 // A service's name, such as "shop": a lowercase letter, then up to 39 lowercase letters, digits or hyphens.
 export type ServiceName = Brand<string, 'ServiceName'>;
 // A backend the project declares. `private` says its origin may resolve to a private or loopback
-// address, such as a test API on the CI machine; any other service that does is blocked.
-export type DeclaredService = { readonly name: ServiceName; readonly origin: Origin; readonly private: boolean };
+// address, such as a test API on the CI machine; any other service that does is blocked. `port`
+// is the one TCP port a database command may reach on the service's host; a database command's
+// service must have one. Absent for a service that declares none.
+export type DeclaredService = { readonly name: ServiceName; readonly origin: Origin; readonly private: boolean; readonly port?: number };
 
 // ---- Call declarations ----------------------------------------------------------------------
 

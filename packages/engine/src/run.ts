@@ -10,19 +10,21 @@ import {
   type BrowserDriver, type Clock, type ElementProbe, type EventSink, type Plan, type PolicyRuleId, type Redactor,
   type ResolvedElement, type Result, type SafeText, type SecretStore, type ServiceCaller, type Session, type Step, type Target, type TargetId,
   type Unavailable, type ValueName, type GuaranteeStatement, type RunMode, type SuiteFinding, type SuiteName, type SuitePass,
-  type SuiteTestId, type SuiteTestResult,
+  type SuiteTestId, type SuiteTestResult, type UnsafeFeature,
 } from '@revisum/contracts';
 import { approvalLabel, type PlanStanding } from './approval/plan-standing.ts';
 import { guaranteeStatement } from './guarantees.ts';
 import { canonicalJson, sha256 } from './hashing.ts';
 import * as lifecycle from './lifecycle.ts';
 import { manifestLogger, type Logger, type RunEventSink } from './logging.ts';
-import { buildManifest, manifestHash, type FixtureReference, type HostInfo, type RunManifest } from './manifest.ts';
+import { buildManifest, manifestHash, unsafeFeatureRecord, type FixtureReference, type HostInfo, type RunManifest } from './manifest.ts';
 import { checkElement, checkPage, normalise, type Verdict } from './oracle.ts';
 import type { PlanError } from './plan/plan-decoders.ts';
 import { assertBranded } from './plan/plan-parser.ts';
+import { unsafeFeaturesOf } from './plan/unsafe-features.ts';
 import { assertAuthorised, policyGate, type PolicyGate } from './policy/policy-gate.ts';
 import type { Project } from './project/project-parser.ts';
+import { declaredCommands } from './project/unsafe-feature-declarations.ts';
 import { SENSITIVE_PLACEHOLDER } from './redaction.ts';
 import { withResultHash } from './result-hash.ts';
 import {
@@ -49,6 +51,10 @@ export type RunInputs = {
   // proposal: it never reaches the project's production origins. An approved plan reaches them
   // only when the project's policy allows production for approved plans.
   readonly standing?: PlanStanding;
+  // The sources of the page scripts the project declares, keyed by each declared file path, as the
+  // protected branch holds them. The manifest records the sha256 of each one the plan names, so a
+  // plan that names a script whose source is not here is refused before any side effect.
+  readonly scriptSources?: Readonly<Record<string, Uint8Array>>;
 };
 
 export type RunPorts = {
@@ -108,6 +114,9 @@ export type RunResult = {
   readonly mode: RunMode;
   // Which guarantees hold for this run, and why each lost one is lost.
   readonly guarantees: GuaranteeStatement;
+  // The unsafe features the run's plan uses: the run's unsafe label. Present only when there is one,
+  // so a closed run's result and its hash stay exactly as they were.
+  readonly unsafeFeatures?: readonly UnsafeFeature[];
   // Present for an evidence run.
   readonly suite?: SuiteRunRecord;
   readonly evidence?: EvidenceRunRecord;
@@ -211,6 +220,18 @@ export async function run(inputs: RunInputs, ports: RunPorts): Promise<RunResult
     }, inputs);
   }
 
+  // Refused before any side effect when the plan names a page script whose source the run was not
+  // given: the manifest could not record what would run.
+  const unsafe = unsafeFeatureRecord(inputs.plan, inputs.project, inputs.scriptSources ?? {});
+  if (!unsafe.ok) {
+    const refused = lifecycle.refuse(planned, { code: 'script-source-missing', file: unsafe.error });
+    logger.log({ kind: 'run.state', state: refused.state, targetId: target.id, code: refused.refusal.code });
+    return seal({
+      state: refused.state, targetId: target.id, manifest: null, manifestHash: null, steps: [], blockedOrigins: [],
+      unavailable: null, refusal: refused.refusal, timings: { totalMilliseconds: ports.clock.now() - startedAt, stepMilliseconds: [] },
+    }, inputs);
+  }
+
   // Refused before any side effect when the plan calls a service and no caller was wired in.
   if (callsServices(inputs.plan) && calls === undefined) {
     const refused = lifecycle.refuse(planned, { code: 'services-unavailable' });
@@ -231,6 +252,7 @@ export async function run(inputs: RunInputs, ports: RunPorts): Promise<RunResult
     plan: inputs.plan, target, adapter: driver.info, browser: session.browser,
     seed: inputs.seed, fixedTimeMilliseconds: inputs.fixedTimeMilliseconds, fixtures: inputs.fixtures, host: inputs.host,
     ...secretRecords(secrets), callsServices: callsServices(inputs.plan),
+    ...(unsafe.value === undefined ? {} : { unsafe: unsafe.value }),
   });
   const resolved = lifecycle.resolve(planned, session, manifest, manifestHash(manifest));
   logger.log({ kind: 'run.state', state: resolved.state, targetId: target.id, adapter: driver.info.id, sha256: resolved.manifestHash });
@@ -254,11 +276,12 @@ export async function run(inputs: RunInputs, ports: RunPorts): Promise<RunResult
       });
     }
     // A denied action failed its step, so every later step was skipped and nothing ran after it.
-    // A failed call could not set up or reach what the test needs, which is not a product failure.
+    // A failed call, page script or database command could not set up or reach what the test
+    // needs, which is not a product failure.
     const denial = context.denials[0];
     finished = denial !== undefined && steps.some((done) => done.code === 'policy-denied')
       ? lifecycle.deny(running, denial)
-      : steps.some((done) => done.type === 'call' && done.outcome === 'failed')
+      : steps.some((done) => SETUP_STEP_TYPES.includes(done.type) && done.outcome === 'failed')
         ? lifecycle.finish(running, 'Errored')
         : lifecycle.finish(running, steps.every((done) => done.outcome === 'passed') ? 'Passed' : 'Failed');
   } catch (error) {
@@ -267,9 +290,8 @@ export async function run(inputs: RunInputs, ports: RunPorts): Promise<RunResult
   } finally {
     await session.close();
   }
-  // Whatever the outcome. A failing cleanup call never changes the verdict; it raises a review item.
-  const cleanup = inputs.plan.cleanup === undefined || calls === undefined
-    ? undefined : await runCleanup(inputs.plan.cleanup, inputs.plan.steps.length, calls);
+  // Whatever the outcome. A failing cleanup step never changes the verdict; it raises a review item.
+  const cleanup = inputs.plan.cleanup === undefined ? undefined : await runCleanup(inputs.plan.cleanup, inputs.plan.steps.length, calls);
   const reviewItems = (cleanup ?? []).flatMap((done): RunReviewItem[] => (done.outcome === 'failed' ? [{ code: 'cleanup-failed', cleanupIndex: done.index }] : []));
   const blocked = [...new Set(session.blockedOrigins())].sort();
   for (const origin of blocked) logger.log({ kind: 'network.blocked', origin });
@@ -310,17 +332,22 @@ export async function runUntrusted(
 const productionAllowed = (inputs: RunInputs): boolean =>
   inputs.standing?.mode === 'approved' && inputs.project.policy.allowProductionForApprovedPlans;
 
+// The steps that set up or reach what the test needs: when one fails, the run could not test.
+const SETUP_STEP_TYPES: readonly Step['type'][] = ['call', 'evaluate', 'database'];
+
 // True when the plan calls a declared service, in its steps or its cleanup.
 const callsServices = (plan: Plan): boolean =>
-  (plan.cleanup ?? []).length > 0 || plan.steps.some((step) => step.type === 'call' || step.type === 'expectBackend');
+  [...plan.steps, ...(plan.cleanup ?? [])].some((step) => step.type === 'call' || step.type === 'expectBackend');
 
-// The origins of the services the plan's calls reach, its cleanup included.
+// The origins of the services the plan's calls and database commands reach, its cleanup included.
 function serviceOrigins(inputs: RunInputs): string[] {
   const steps = [...inputs.plan.steps, ...(inputs.plan.cleanup ?? [])];
+  const commands = declaredCommands(inputs.project.unsafeFeatures);
   return steps.flatMap((step) => {
-    if (step.type !== 'call' && step.type !== 'expectBackend') return [];
-    const declaration = Object.entries(inputs.project.calls).find(([name]) => name === step.call)?.[1];
-    const service = inputs.project.services.find((candidate) => candidate.name === declaration?.service);
+    let serviceName: string | undefined;
+    if (step.type === 'call' || step.type === 'expectBackend') serviceName = Object.entries(inputs.project.calls).find(([name]) => name === step.call)?.[1].service;
+    else if (step.type === 'database' || step.type === 'expectDatabase') serviceName = Object.entries(commands).find(([name]) => name === step.command)?.[1].service;
+    const service = inputs.project.services.find((candidate) => candidate.name === serviceName);
     return service === undefined ? [] : [service.origin];
   });
 }
@@ -374,6 +401,9 @@ async function openSession(planned: lifecycle.Planned, context: RunContext): Pro
 function isUnsupported(step: Step): boolean {
   switch (step.type) {
     case 'hover': case 'select': case 'upload': case 'frame': case 'dialog': case 'remember': return true;
+    // Database commands run in a workload container, which comes with the isolated runner
+    // (docs/specs/SPEC-36-unsafe-plan-features.md).
+    case 'database': case 'expectDatabase': return true;
     // The features a step may need that no driver has yet are decided in one place, in contracts.
     default: return needsDriverFeatures(step);
   }
@@ -431,6 +461,9 @@ async function executeStep(step: Step, index: number, session: Session, target: 
     // The driver's clock and clipboard ports come with the CDP driver; isUnsupported refused these
     // above, so an advance never becomes a real wait.
     case 'advanceClock': case 'expectClipboard':
+    // Page scripts need the driver's script port and database commands the workload runner;
+    // isUnsupported refused these above, so nothing of them runs.
+    case 'evaluate': case 'expectScript': case 'database': case 'expectDatabase':
       return { ...base, outcome: 'failed', code: 'unsupported-step' };
     case 'expect': {
       const locator = resolveLocator(step.locator, context.values, context.inputs.project);
@@ -517,13 +550,20 @@ function unavailableResult(targetId: string, unavailable: Unavailable, context: 
   }, context.inputs);
 }
 
-// What every plan run vouches for. Until the isolated runner (SPEC-07) runs plans behind its egress
-// proxy, a plan run runs on the host, so egress, credentials and replay are not claimed.
-const PLAN_RUN_GUARANTEES = guaranteeStatement({ mode: 'plan', egressEnforced: false, unmaskedScreenshotsKept: false });
+// What a plan run vouches for: decided by the plan's unsafe features and the run's isolation alone,
+// never by what the run happened to do, so two runs of one plan say the same. Until the isolated
+// runner (SPEC-07) runs plans behind its egress proxy, a plan run runs on the host, so egress,
+// credentials and replay are not claimed.
+const planRunGuarantees = (unsafeFeatures: readonly UnsafeFeature[]): GuaranteeStatement =>
+  guaranteeStatement({ mode: 'plan', egressEnforced: false, unmaskedScreenshotsKept: false, unsafeFeatures });
 
-// Adds the run mode, the guarantee statement, the approval label (for an approved plan) and the result hash.
-function seal(outcome: Omit<RunResult, 'resultHash' | 'approvalLabel' | 'mode' | 'guarantees'>, inputs: RunInputs): RunResult {
+// Adds the run mode, the guarantee statement, the unsafe label (for a plan using unsafe features),
+// the approval label (for an approved plan) and the result hash.
+function seal(outcome: Omit<RunResult, 'resultHash' | 'approvalLabel' | 'mode' | 'guarantees' | 'unsafeFeatures'>, inputs: RunInputs): RunResult {
   const standing = inputs.standing;
-  const labelled = { ...outcome, mode: 'plan' as const, guarantees: PLAN_RUN_GUARANTEES };
+  const unsafeFeatures = unsafeFeaturesOf(inputs.plan);
+  const labelled = {
+    ...outcome, mode: 'plan' as const, guarantees: planRunGuarantees(unsafeFeatures), ...(unsafeFeatures.length === 0 ? {} : { unsafeFeatures }),
+  };
   return withResultHash(standing?.mode === 'approved' ? { ...labelled, approvalLabel: approvalLabel(standing.approval) } : labelled);
 }

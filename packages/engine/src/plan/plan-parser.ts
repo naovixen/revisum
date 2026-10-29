@@ -13,11 +13,20 @@
 // See docs/specs/SPEC-01-plan-language-and-parser.md, docs/specs/SPEC-30-plan-values-positions-and-keys.md,
 // docs/specs/SPEC-31-page-states-metadata-downloads-and-tabs.md, docs/specs/SPEC-32-declared-service-calls.md,
 // docs/specs/SPEC-33-network-stubs-request-checks-and-storage.md and docs/specs/SPEC-34-clock-advance-and-clipboard.md.
+// The unsafe features of version 1.3 (CSS and XPath locators, DOM checks, page scripts and
+// database commands) are read only once the trusted project enables each one; a disabled one is
+// refused with unsafe_feature_disabled at the field that names it, every use of it, with nothing
+// under it read. A selector or expression is literal plan text, so what a locator can match is
+// fixed when the plan is approved. See docs/specs/SPEC-36-unsafe-plan-features.md.
 import {
-  AUDIT_MODES, BACKEND_ASSERTION_KINDS, CLIPBOARD_ASSERTION_KINDS, CLIPBOARD_READS, CLOCK_ADVANCE_MODES, CLOCK_UNITS, DIALOG_ACTIONS, DOWNLOAD_SIZE_KINDS, literalText, ELEMENT_STATE_KINDS, LOCATOR_KINDS, MODIFIERS, PAGE_TEXT_KINDS,
-  POSITION_WORDS, REMEMBER_READS, REQUEST_COUNT_KINDS, RESPONSE_ASSERTION_KINDS, RESPONSE_FIELD_PRESENCE_KINDS, RESPONSE_READS, ROLES, SCRIPT_MODES,
-  STORAGE_ASSERTION_KINDS, STUB_ACTIONS,
+  AUDIT_MODES, BACKEND_ASSERTION_KINDS, CALL_EFFECTS, CLIPBOARD_ASSERTION_KINDS, CLIPBOARD_READS, CLOCK_ADVANCE_MODES, CLOCK_UNITS, DIALOG_ACTIONS,
+  DOM_CHECK_KINDS, DOWNLOAD_SIZE_KINDS, literalText, ELEMENT_STATE_KINDS, MODIFIERS, PAGE_TEXT_KINDS,
+  POSITION_WORDS, REMEMBER_ATTRIBUTE_READ, REMEMBER_READS, REQUEST_COUNT_KINDS, RESPONSE_ASSERTION_KINDS, RESPONSE_FIELD_PRESENCE_KINDS, RESPONSE_READS,
+  ROLES, SCRIPT_MODES, STORAGE_ASSERTION_KINDS, STRUCTURAL_LOCATOR_KINDS, STUB_ACTIONS,
   failure, success,
+  type CallEffect, type CleanupStep, type CommandName, type DatabaseCommandDeclaration, type InlineScript, type PageScriptDeclaration,
+  type ScriptArgument, type ScriptArguments, type ScriptChoice, type ScriptName, type ScriptParameterType, type ScriptSource,
+  type StepType, type StructuralLocatorKind, type UnsafeFeature,
   type AllowedUrl, type BackendAssertion, type ClipboardAssertion, type ClockAdvance, type Brand, type CallArgument, type CallArguments, type CallDeclaration, type CallName, type CallStep,
   type CriterionId, type DownloadAssertion, type FieldName, type ParameterName, type ParameterType, type ValueName, type DownloadName, type ElementAssertion, type EmailDomain,
   type FixtureName, type JsonPointer, type Locator,
@@ -28,16 +37,21 @@ import {
 } from '@revisum/contracts';
 import { brand } from '../brand.ts';
 import { clockAdvanceMilliseconds } from '../clock-advance.ts';
+import { readFields } from '../project/call-declarations.ts';
 import { DEFAULT_TEST_ID_ATTRIBUTES, readId, type Limits, type Project } from '../project/project-parser.ts';
+import { declaredCommands, declaredScripts, enabledUnsafeFeatures } from '../project/unsafe-feature-declarations.ts';
 import {
-  INVALID, allValid, isOneOf, peekRecord, readInteger, readList, readOneOf, readRecord, readText,
+  INVALID, allValid, isOneOf, isUnsafeSource, peekRecord, readInteger, readList, readOneOf, readRecord, readText,
   type Issues, type Parsed, type PlanError,
 } from './plan-decoders.ts';
 import {
-  ASSERTION_STEP_TYPES, CAPTURE_NAME, CLEANUP_STEP_TYPES, CRITERION_FIELD, SERVICE_CALL_STEP_TYPES, CRITERION_ID, CURRENT_GRAMMAR, DOWNLOAD_KINDS, DOWNLOAD_NAME, ELEMENT_KINDS, FEATURE_ID,
-  FROM_FIELD, LARGEST_DOWNLOAD_BYTES, LOCATOR_FIELDS, MAXIMUM_EXPECTED_COUNT, MAXIMUM_META_NAME_LENGTH, MAXIMUM_MODIFIERS, MAXIMUM_PATH_SEGMENTS, MAXIMUM_POSITION, MAXIMUM_QUERY_VALUES,
-  MAXIMUM_SPEC_REFERENCE_LENGTH, MAXIMUM_TEST_ID_LENGTH, MAXIMUM_TITLE_LENGTH, MAXIMUM_URL_LENGTH, META_FIELDS, PLAN_FIELDS,
-  QUERY_KEY, RESPONSE_STATUS, grammarFor, type Grammar,
+  ALL_ELEMENT_KINDS, ASSERTION_STEP_TYPES, ATTRIBUTE_NAME, CAPTURE_NAME, CLASS_TOKEN, CLEANUP_STEP_TYPES, CRITERION_FIELD, CRITERION_ID, CURRENT_GRAMMAR,
+  DATABASE_COMMAND_FEATURE, DOM_CHECKS_FEATURE, DOWNLOAD_KINDS, DOWNLOAD_NAME, FEATURE_ID,
+  FROM_FIELD, INLINE_SCRIPT_FEATURE, LARGEST_DOWNLOAD_BYTES, LOCATOR_FEATURES, LOCATOR_FIELDS, MAXIMUM_EXPECTED_COUNT, MAXIMUM_INLINE_SCRIPT_LENGTH,
+  MAXIMUM_INSIDE_DEPTH, MAXIMUM_META_NAME_LENGTH, MAXIMUM_MODIFIERS, MAXIMUM_PATH_SEGMENTS, MAXIMUM_POSITION, MAXIMUM_QUERY_VALUES,
+  MAXIMUM_SELECTOR_LENGTH, MAXIMUM_SPEC_REFERENCE_LENGTH, MAXIMUM_STYLE_VALUE_LENGTH, MAXIMUM_TEST_ID_LENGTH, MAXIMUM_TITLE_LENGTH, MAXIMUM_URL_LENGTH,
+  META_FIELDS, NAMED_SCRIPT_FEATURE, PLAN_FIELDS, QUERY_KEY, RESPONSE_STATUS, SELECTOR_FORBIDDEN_CHARACTERS, STYLE_PROPERTY, TOP_LEVEL_STEP_TYPES,
+  grammarFor, isDatabaseCommandStepType, isPageScriptStepType, type Grammar,
 } from './plan-grammar.ts';
 import { readGeneratedValues, readPlanClock, readValueName, type ValueContext } from './plan-values.ts';
 import { looksLikeCredential, namesSensitiveField } from './literal-secrets.ts';
@@ -63,6 +77,11 @@ export type PlanRules = {
   readonly stubs: Readonly<Record<StubName, StubDeclaration>>;
   readonly observedRequests: Readonly<Record<RequestName, ObservedRequestDeclaration>>;
   readonly storageEntries: Readonly<Record<StorageEntryName, StorageEntryDeclaration>>;
+  // The unsafe features the trusted project enables, and the page scripts and database commands
+  // a plan may name once their feature is on.
+  readonly unsafeFeatures: readonly UnsafeFeature[];
+  readonly pageScripts: Readonly<Record<ScriptName, PageScriptDeclaration>>;
+  readonly databaseCommands: Readonly<Record<CommandName, DatabaseCommandDeclaration>>;
 };
 
 type ParseContext = {
@@ -91,10 +110,20 @@ const rulesOf = (project: Project): PlanRules => ({
   secretNames: project.secretNames, fixtures: project.fixtures, limits: project.limits,
   testIdAttributes: project.testIdAttributes, emailDomains: project.generatedEmailDomains, calls: project.calls,
   stubs: project.stubs, observedRequests: project.observedRequests, storageEntries: project.storageEntries,
+  unsafeFeatures: enabledUnsafeFeatures(project.unsafeFeatures), pageScripts: declaredScripts(project.unsafeFeatures),
+  databaseCommands: declaredCommands(project.unsafeFeatures),
 });
 
 const isPlainObject = (input: unknown): input is Readonly<Record<string, unknown>> =>
   typeof input === 'object' && input !== null && !Array.isArray(input);
+
+// True when the trusted project enables `feature`. A disabled feature is refused at `path`, the
+// field that names it, and the caller reads nothing under it, so no part of it is echoed or judged.
+function featureEnabled(feature: UnsafeFeature, path: string, context: ParseContext): boolean {
+  if (context.rules.unsafeFeatures.includes(feature)) return true;
+  context.issues.push({ code: 'unsafe_feature_disabled', path });
+  return false;
+}
 
 // Text from the plan, refused as literal_secret when it is shaped like a credential.
 function readPlanText(input: unknown, path: string, context: ParseContext, maximumLength: number, minimumLength = 1): Parsed<SafeText> {
@@ -194,12 +223,17 @@ function readDeclared<Name extends string>(input: unknown, path: string, context
   return found;
 }
 
-function readLocator(input: unknown, path: string, context: ParseContext): Parsed<Locator> {
+const isStructuralKind = (kind: string): kind is StructuralLocatorKind => isOneOf(STRUCTURAL_LOCATOR_KINDS, kind);
+
+// A locator. `insideDepth` counts the `inside` links above it: a CSS or XPath locator chains at
+// most MAXIMUM_INSIDE_DEPTH of them, and the one past the limit is refused, with nothing under it read.
+function readLocator(input: unknown, path: string, context: ParseContext, insideDepth = 0): Parsed<Locator> {
   const longest = context.rules.limits.maximumTextLength;
   const head = peekRecord(input, path, context.issues);
   if (head === INVALID) return INVALID;
-  const by = readOneOf(head['by'], `${path}.by`, context.issues, LOCATOR_KINDS);
+  const by = readOneOf(head['by'], `${path}.by`, context.issues, context.grammar.locatorKinds);
   if (by === INVALID) return INVALID;
+  if (isStructuralKind(by) && !featureEnabled(LOCATOR_FEATURES[by], `${path}.by`, context)) return INVALID;
   const allowed = [...LOCATOR_FIELDS[by], ...context.grammar.optionalLocatorFields[by]];
   if (readRecord(input, path, context.issues, allowed, LOCATOR_FIELDS[by]) === INVALID) return INVALID;
   // Optional fields are left out when absent, so a 1.1 locator stays exactly as it was.
@@ -228,7 +262,33 @@ function readLocator(input: unknown, path: string, context: ParseContext): Parse
       if (testId === INVALID || attribute === INVALID || position === INVALID) return INVALID;
       return { by, testId, ...(attribute === undefined ? {} : { attribute }), ...positioned };
     }
+    case 'css': case 'xpath': {
+      const textField = by === 'css' ? 'selector' : 'expression';
+      const selector = readSelectorText(head[textField], `${path}.${textField}`, context);
+      const hasText = Object.hasOwn(head, 'hasText') ? readTextOrValue(head['hasText'], `${path}.hasText`, context, longest) : undefined;
+      const inside = Object.hasOwn(head, 'inside') ? readInside(head['inside'], `${path}.inside`, context, insideDepth) : undefined;
+      if (selector === INVALID || hasText === INVALID || inside === INVALID || position === INVALID) return INVALID;
+      // Optional fields are left out when absent.
+      const optional = { ...(hasText === undefined ? {} : { hasText }), ...(inside === undefined ? {} : { inside }), ...positioned };
+      return by === 'css' ? { by, selector, ...optional } : { by, expression: selector, ...optional };
+    }
   }
+}
+
+// A CSS selector or XPath expression: literal plan text, never a value reference (wrong_type), of 1
+// to MAXIMUM_SELECTOR_LENGTH characters, on one line and with none of "{", "}", ";" and "@"
+// (unsafe_text), so what it matches is fixed when the plan is approved.
+function readSelectorText(input: unknown, path: string, context: ParseContext): Parsed<SafeText> {
+  const text = readPlanText(input, path, context, MAXIMUM_SELECTOR_LENGTH);
+  if (text !== INVALID && SELECTOR_FORBIDDEN_CHARACTERS.test(text)) { context.issues.push({ code: 'unsafe_text', path }); return INVALID; }
+  return text;
+}
+
+// The locator a CSS or XPath locator is evaluated inside, unless the chain is already as deep as it
+// may be: then this link is refused with too_large, and nothing under it is read.
+function readInside(input: unknown, path: string, context: ParseContext, insideDepth: number): Parsed<Locator> {
+  if (insideDepth >= MAXIMUM_INSIDE_DEPTH) { context.issues.push({ code: 'too_large', path }); return INVALID; }
+  return readLocator(input, path, context, insideDepth + 1);
 }
 
 // An assertion written as `{}` checks nothing, so it is vacuous rather than merely incomplete.
@@ -268,10 +328,11 @@ function readLinkTarget(input: unknown, path: string, context: ParseContext): Pa
 function readElementAssertion(input: unknown, path: string, context: ParseContext): Parsed<ElementAssertion> {
   const head = readAssertionHead(input, path, context);
   if (head === INVALID) return INVALID;
-  const kind = readOneOf(head['kind'], `${path}.kind`, context.issues, ELEMENT_KINDS);
+  const kind = readOneOf(head['kind'], `${path}.kind`, context.issues, ALL_ELEMENT_KINDS);
   if (kind === INVALID) return INVALID;
   // A kind the declared version does not have is refused as that version's parser refuses it.
   if (!context.grammar.elementKinds.includes(kind)) { context.issues.push({ code: 'unknown_value', path: `${path}.kind` }); return INVALID; }
+  if (isOneOf(DOM_CHECK_KINDS, kind)) return featureEnabled(DOM_CHECKS_FEATURE, `${path}.kind`, context) ? readDomCheck(kind, head, path, context) : INVALID;
   if (isOneOf(ELEMENT_STATE_KINDS, kind)) return readRecord(input, path, context.issues, ['kind']) === INVALID ? INVALID : { kind };
   if (readRecord(input, path, context.issues, ['kind', 'value']) === INVALID) return INVALID;
   if (kind === 'countEquals') {
@@ -284,6 +345,51 @@ function readElementAssertion(input: unknown, path: string, context: ParseContex
   }
   const value = readExpectedText(head['value'], `${path}.value`, context);
   return value === INVALID ? INVALID : { kind, value };
+}
+
+// A literal name that must match `pattern`, such as a class token or an attribute name: never a
+// value reference, since it says what the check reads. The error never repeats the name.
+function readLiteralName(input: unknown, path: string, context: ParseContext, pattern: RegExp): Parsed<SafeText> {
+  const name = readPlanText(input, path, context, Number.POSITIVE_INFINITY);
+  if (name !== INVALID && !pattern.test(name)) { context.issues.push({ code: 'unknown_value', path }); return INVALID; }
+  return name;
+}
+
+// A DOM check, once the project enables them: one class token, a lowercase style property and the
+// computed value expected, or an attribute by its lowercase name. Only an attribute's expected
+// value may be a value reference; it may be empty, since an attribute set to "" is a real state.
+function readDomCheck(
+  kind: (typeof DOM_CHECK_KINDS)[number], head: Readonly<Record<string, unknown>>, path: string, context: ParseContext,
+): Parsed<ElementAssertion> {
+  const { issues } = context;
+  switch (kind) {
+    case 'hasClass': case 'lacksClass': {
+      if (readRecord(head, path, issues, ['kind', 'value']) === INVALID) return INVALID;
+      const value = readLiteralName(head['value'], `${path}.value`, context, CLASS_TOKEN);
+      return value === INVALID ? INVALID : { kind, value };
+    }
+    case 'computedStyleEquals': {
+      if (readRecord(head, path, issues, ['kind', 'property', 'value']) === INVALID) return INVALID;
+      const parts = [
+        readLiteralName(head['property'], `${path}.property`, context, STYLE_PROPERTY),
+        readPlanText(head['value'], `${path}.value`, context, MAXIMUM_STYLE_VALUE_LENGTH),
+      ] as const;
+      return allValid(parts) ? { kind, property: parts[0], value: parts[1] } : INVALID;
+    }
+    case 'attributeEquals': {
+      if (readRecord(head, path, issues, ['kind', 'name', 'value']) === INVALID) return INVALID;
+      const parts = [
+        readLiteralName(head['name'], `${path}.name`, context, ATTRIBUTE_NAME),
+        readTextOrValue(head['value'], `${path}.value`, context, context.rules.limits.maximumTextLength, 0),
+      ] as const;
+      return allValid(parts) ? { kind, name: parts[0], value: parts[1] } : INVALID;
+    }
+    case 'attributeAbsent': {
+      if (readRecord(head, path, issues, ['kind', 'name']) === INVALID) return INVALID;
+      const name = readLiteralName(head['name'], `${path}.name`, context, ATTRIBUTE_NAME);
+      return name === INVALID ? INVALID : { kind, name };
+    }
+  }
 }
 
 function readPageAssertion(input: unknown, path: string, context: ParseContext): Parsed<PageAssertion> {
@@ -413,6 +519,16 @@ function readRememberSource(input: unknown, path: string, context: ParseContext)
     const field = readDeclaredField(fields['field'], `${path}.field`, named[1].fields, context);
     return field === INVALID || read === INVALID ? INVALID : { response: named[0], field, read };
   }
+  // One of an element's attributes: a DOM check, so read only once the project enables them.
+  if (isPlainObject(input) && input['read'] === REMEMBER_ATTRIBUTE_READ && context.grammar.elementReads.includes(REMEMBER_ATTRIBUTE_READ)) {
+    if (!featureEnabled(DOM_CHECKS_FEATURE, `${path}.read`, context)) return INVALID;
+    const fields = readRecord(input, path, issues, ['element', 'read', 'attribute']);
+    if (fields === INVALID) return INVALID;
+    const parts = [
+      readLocator(fields['element'], `${path}.element`, context), readLiteralName(fields['attribute'], `${path}.attribute`, context, ATTRIBUTE_NAME),
+    ] as const;
+    return allValid(parts) ? { element: parts[0], read: REMEMBER_ATTRIBUTE_READ, attribute: parts[1] } : INVALID;
+  }
   const fields = readRecord(input, path, issues, ['element', 'read']);
   if (fields === INVALID) return INVALID;
   const parts = [
@@ -523,6 +639,12 @@ function readCallArgument(input: unknown, path: string, type: ParameterType, con
     context.issues.push({ code: typeof input === 'string' ? 'literal_secret' : 'wrong_type', path });
     return INVALID;
   }
+  return readPlainArgument(input, path, type, context);
+}
+
+// An argument for a parameter that is not a secret: a literal value or a run value by name. A
+// secret reference here is the wrong type: a page script or a command never takes one.
+function readPlainArgument(input: unknown, path: string, type: ScriptParameterType, context: ParseContext): Parsed<ScriptArgument> {
   if (isPlainObject(input)) {
     if (Object.hasOwn(input, 'valueName')) return readValueReference(input, path, context);
     context.issues.push({ code: 'wrong_type', path });
@@ -545,29 +667,40 @@ function readCallArgument(input: unknown, path: string, type: ParameterType, con
   return value;
 }
 
-// Exactly the declaration's parameters: a missing one and an extra one are both refused. Calls,
-// stubs and storage entries all type their arguments this way.
-function readCallArguments(
-  input: unknown, path: string, declared: Readonly<Record<ParameterName, ParameterType>>, context: ParseContext,
-): Parsed<CallArguments> {
+// Exactly the declaration's parameters, each read by `readOne`: a missing one and an extra one are
+// both refused. Calls, stubs, storage entries, page scripts and commands all type their arguments
+// this way.
+function readArgumentsWith<Type, Argument>(
+  input: unknown, path: string, declared: Readonly<Record<ParameterName, Type>>, context: ParseContext,
+  readOne: (input: unknown, path: string, type: Type, context: ParseContext) => Parsed<Argument>,
+): Parsed<Readonly<Record<ParameterName, Argument>>> {
   if (!isPlainObject(input)) { context.issues.push({ code: 'wrong_type', path }); return INVALID; }
-  const parameters = Object.entries(declared);
+  const parameters = Object.entries<Type>(declared);
   const names = parameters.map(([name]) => name);
   if (readRecord(input, path, context.issues, names) === INVALID) return INVALID;
-  const entries = parameters.map(([name, type]): Parsed<readonly [string, CallArgument]> => {
-    const argument = readCallArgument(input[name], `${path}.${name}`, type, context);
+  const entries = parameters.map(([name, type]): Parsed<readonly [string, Argument]> => {
+    const argument = readOne(input[name], `${path}.${name}`, type, context);
     return argument === INVALID ? INVALID : [name, argument];
   });
   return allValid(entries) ? Object.fromEntries(entries) : INVALID;
 }
 
-// The response fields a call step remembers, as run values for the steps after it. Each field is
-// one the call declares; each name is new, as a remember step's would be.
+const readCallArguments = (
+  input: unknown, path: string, declared: Readonly<Record<ParameterName, ParameterType>>, context: ParseContext,
+): Parsed<CallArguments> => readArgumentsWith(input, path, declared, context, readCallArgument);
+
+const readScriptArguments = (
+  input: unknown, path: string, declared: Readonly<Record<ParameterName, ScriptParameterType>>, context: ParseContext,
+): Parsed<ScriptArguments> => readArgumentsWith(input, path, declared, context, readPlainArgument);
+
+// The fields of a call's response, a script's result or a command's output that a step remembers,
+// as run values for the steps after it. Each field is one the declaration gives; each name is new,
+// as a remember step's would be.
 function readRememberedFields(
-  input: unknown, path: string, declaration: CallDeclaration, context: ParseContext,
+  input: unknown, path: string, declaredFields: Readonly<Record<FieldName, JsonPointer>> | undefined, context: ParseContext,
 ): Parsed<Readonly<Record<ValueName, FieldName>>> {
   if (!isPlainObject(input)) { context.issues.push({ code: 'wrong_type', path }); return INVALID; }
-  const declared = Object.keys(declaration.fields ?? {});
+  const declared = Object.keys(declaredFields ?? {});
   const entries = Object.entries(input).map(([key, field]): Parsed<readonly [ValueName, FieldName]> => {
     const at = `${path}.${key}`;
     const name = readValueName(key, at, context.issues);
@@ -590,7 +723,7 @@ function readCall(head: Readonly<Record<string, unknown>>, path: string, context
   const [call, declaration] = named;
   const callArguments = readCallArguments(head['arguments'], `${path}.arguments`, declaration.parameters, context);
   if (!Object.hasOwn(head, 'remember')) return callArguments === INVALID ? INVALID : { type: 'call', call, arguments: callArguments };
-  const remember = readRememberedFields(head['remember'], `${path}.remember`, declaration, context);
+  const remember = readRememberedFields(head['remember'], `${path}.remember`, declaration.fields, context);
   return callArguments === INVALID || remember === INVALID ? INVALID : { type: 'call', call, arguments: callArguments, remember };
 }
 
@@ -624,6 +757,128 @@ function readExpectBackend(head: Readonly<Record<string, unknown>>, path: string
   ] as const;
   return allValid(parts)
     ? { type: 'expectBackend', call, arguments: parts[0], field: parts[1], assert: parts[2], criterionId: parts[3] }
+    : INVALID;
+}
+
+// ---- Page scripts and database commands ---------------------------------------------------------------
+
+// A page-script or database step is read only once its feature is on. A database step needs
+// database-command, refused at its type. A named script needs page-script, refused at its type; an
+// inline one needs inline-page-script, refused at its `inline`, and a project can enable that only
+// together with page-script, so one check covers both.
+function unsafeStepEnabled(type: StepType, head: Readonly<Record<string, unknown>>, path: string, context: ParseContext): boolean {
+  if (isDatabaseCommandStepType(type)) return featureEnabled(DATABASE_COMMAND_FEATURE, `${path}.type`, context);
+  if (!isPageScriptStepType(type)) return true;
+  const script = head['script'];
+  if (isPlainObject(script) && Object.hasOwn(script, 'inline')) return featureEnabled(INLINE_SCRIPT_FEATURE, `${path}.script.inline`, context);
+  return featureEnabled(NAMED_SCRIPT_FEATURE, `${path}.type`, context);
+}
+
+// What a step's script is, whether named or inline: its parameters, effect and result fields, and
+// where a check that needs a read script reports a write one.
+type ScriptUse = {
+  readonly script: ScriptChoice;
+  readonly parameters: Readonly<Record<ParameterName, ScriptParameterType>>;
+  readonly effect: CallEffect;
+  readonly fields: Readonly<Record<FieldName, JsonPointer>> | undefined;
+  readonly effectPath: string;
+};
+
+// A script's source text: 1 to MAXIMUM_INLINE_SCRIPT_LENGTH characters, line breaks allowed, no
+// other control characters, and nothing shaped like a credential.
+function readScriptSource(input: unknown, path: string, context: ParseContext): Parsed<ScriptSource> {
+  const { issues } = context;
+  if (typeof input !== 'string') { issues.push({ code: 'wrong_type', path }); return INVALID; }
+  if (input.length === 0) { issues.push({ code: 'empty', path }); return INVALID; }
+  if (input.length > MAXIMUM_INLINE_SCRIPT_LENGTH) { issues.push({ code: 'too_long', path }); return INVALID; }
+  if (isUnsafeSource(input)) { issues.push({ code: 'unsafe_text', path }); return INVALID; }
+  if (looksLikeCredential(input)) { issues.push({ code: 'literal_secret', path }); return INVALID; }
+  return brand<string, 'ScriptSource'>(input);
+}
+
+// An inline script: its source, its effect as the plan claims it, and its result fields. It takes
+// no parameters, so its arguments are always {}.
+function readInlineScript(input: unknown, path: string, context: ParseContext): Parsed<InlineScript> {
+  const fields = readRecord(input, path, context.issues, ['source', 'effect', 'fields'], ['source', 'effect']);
+  if (fields === INVALID) return INVALID;
+  const resultFields = Object.hasOwn(fields, 'fields') ? readFields(fields['fields'], `${path}.fields`, context.issues) : undefined;
+  const parts = [
+    readScriptSource(fields['source'], `${path}.source`, context), readOneOf(fields['effect'], `${path}.effect`, context.issues, CALL_EFFECTS),
+  ] as const;
+  if (!allValid(parts) || resultFields === INVALID) return INVALID;
+  return { source: parts[0], effect: parts[1], ...(resultFields === undefined ? {} : { fields: resultFields }) };
+}
+
+// The script a step runs: a name the project declares, or { "inline": … }.
+function readScriptChoice(input: unknown, path: string, context: ParseContext): Parsed<ScriptUse> {
+  if (isPlainObject(input)) {
+    const fields = readRecord(input, path, context.issues, ['inline']);
+    if (fields === INVALID) return INVALID;
+    const inline = readInlineScript(fields['inline'], `${path}.inline`, context);
+    if (inline === INVALID) return INVALID;
+    return { script: { inline }, parameters: {}, effect: inline.effect, fields: inline.fields, effectPath: `${path}.inline.effect` };
+  }
+  const named = readDeclaredName<'ScriptName', PageScriptDeclaration>(input, path, context, context.rules.pageScripts);
+  if (named === INVALID) return INVALID;
+  const [script, declaration] = named;
+  return { script, parameters: declaration.parameters, effect: declaration.effect, fields: declaration.fields, effectPath: path };
+}
+
+// The command a database step runs, as one of the project's declared commands.
+const readCommandName = (input: unknown, path: string, context: ParseContext): Parsed<readonly [CommandName, DatabaseCommandDeclaration]> =>
+  readDeclaredName<'CommandName', DatabaseCommandDeclaration>(input, path, context, context.rules.databaseCommands);
+
+// An evaluate step: runs its script, and may remember fields of its result once its arguments are read.
+function readEvaluate(head: Readonly<Record<string, unknown>>, path: string, context: ParseContext): Parsed<Step> {
+  const use = readScriptChoice(head['script'], `${path}.script`, context);
+  if (use === INVALID) return INVALID;
+  const scriptArguments = readScriptArguments(head['arguments'], `${path}.arguments`, use.parameters, context);
+  if (!Object.hasOwn(head, 'remember')) return scriptArguments === INVALID ? INVALID : { type: 'evaluate', script: use.script, arguments: scriptArguments };
+  const remember = readRememberedFields(head['remember'], `${path}.remember`, use.fields, context);
+  return scriptArguments === INVALID || remember === INVALID ? INVALID : { type: 'evaluate', script: use.script, arguments: scriptArguments, remember };
+}
+
+// A script check: a read script, one of its result fields and a check on it. A write script is
+// refused as not declared for this use, since a check may repeat its script.
+function readExpectScript(head: Readonly<Record<string, unknown>>, path: string, context: ParseContext): Parsed<Step> {
+  const use = readScriptChoice(head['script'], `${path}.script`, context);
+  if (use === INVALID) return INVALID;
+  if (use.effect !== 'read') { context.issues.push({ code: 'unknown_value', path: use.effectPath }); return INVALID; }
+  const parts = [
+    readScriptArguments(head['arguments'], `${path}.arguments`, use.parameters, context),
+    readDeclaredField(head['field'], `${path}.field`, use.fields, context),
+    readBackendAssertion(head['assert'], `${path}.assert`, context), readCriterionId(head, path, context),
+  ] as const;
+  return allValid(parts)
+    ? { type: 'expectScript', script: use.script, arguments: parts[0], field: parts[1], assert: parts[2], criterionId: parts[3] }
+    : INVALID;
+}
+
+// A database step: runs a declared command, and may remember fields of its JSON output.
+function readDatabase(head: Readonly<Record<string, unknown>>, path: string, context: ParseContext): Parsed<Step> {
+  const named = readCommandName(head['command'], `${path}.command`, context);
+  if (named === INVALID) return INVALID;
+  const [command, declaration] = named;
+  const commandArguments = readScriptArguments(head['arguments'], `${path}.arguments`, declaration.parameters, context);
+  if (!Object.hasOwn(head, 'remember')) return commandArguments === INVALID ? INVALID : { type: 'database', command, arguments: commandArguments };
+  const remember = readRememberedFields(head['remember'], `${path}.remember`, declaration.fields, context);
+  return commandArguments === INVALID || remember === INVALID ? INVALID : { type: 'database', command, arguments: commandArguments, remember };
+}
+
+// A database check: a read command, one of its output fields and a check on it. A write command is
+// refused as not declared for this use, since a check may repeat its command.
+function readExpectDatabase(head: Readonly<Record<string, unknown>>, path: string, context: ParseContext): Parsed<Step> {
+  const named = readCommandName(head['command'], `${path}.command`, context);
+  if (named === INVALID) return INVALID;
+  const [command, declaration] = named;
+  if (declaration.effect !== 'read') { context.issues.push({ code: 'unknown_value', path: `${path}.command` }); return INVALID; }
+  const parts = [
+    readScriptArguments(head['arguments'], `${path}.arguments`, declaration.parameters, context),
+    readDeclaredField(head['field'], `${path}.field`, declaration.fields, context),
+    readBackendAssertion(head['assert'], `${path}.assert`, context), readCriterionId(head, path, context),
+  ] as const;
+  return allValid(parts)
+    ? { type: 'expectDatabase', command, arguments: parts[0], field: parts[1], assert: parts[2], criterionId: parts[3] }
     : INVALID;
 }
 
@@ -830,11 +1085,12 @@ function readClipboardAssertion(input: unknown, path: string, context: ParseCont
   return expected === INVALID ? INVALID : { kind, value: expected };
 }
 
-// The plan's cleanup: calls only, read after the steps, so they may use the values the steps remember.
-function readCleanup(input: unknown, context: ParseContext): Parsed<readonly CallStep[]> {
+// The plan's cleanup: calls and database commands only, read after the steps, so they may use the
+// values the steps remember.
+function readCleanup(input: unknown, context: ParseContext): Parsed<readonly CleanupStep[]> {
   const raw = readList(input, '$.cleanup', context.issues, context.rules.limits.maximumSteps, 0);
   if (raw === INVALID) return INVALID;
-  const calls = raw.map((entry, index): Parsed<CallStep> => {
+  const calls = raw.map((entry, index): Parsed<CleanupStep> => {
     const path = `$.cleanup[${index}]`;
     const head = peekRecord(entry, path, context.issues);
     if (head === INVALID) return INVALID;
@@ -843,7 +1099,7 @@ function readCleanup(input: unknown, context: ParseContext): Parsed<readonly Cal
     // Nothing inside a misplaced step is read.
     if (!CLEANUP_STEP_TYPES.includes(type)) { context.issues.push({ code: 'misplaced_step', path }); return INVALID; }
     const step = readStep(entry, path, context);
-    return step !== INVALID && step.type === 'call' ? step : INVALID;
+    return step !== INVALID && (step.type === 'call' || step.type === 'database') ? step : INVALID;
   });
   return allValid(calls) ? calls : INVALID;
 }
@@ -856,9 +1112,10 @@ function readStep(input: unknown, path: string, context: ParseContext): Parsed<S
   // A second tab opens only from the plan's own list of steps, so a tab never holds another tab
   // and a frame never opens one. Nothing inside a misplaced tab is read.
   if (type === 'newTab' && !context.topLevel) { context.issues.push({ code: 'misplaced_step', path }); return INVALID; }
-  // A call is setup or a check for the whole test, not an action in a page, so neither a frame
-  // nor a second tab may hold one.
-  if (SERVICE_CALL_STEP_TYPES.includes(type) && !context.topLevel) { context.issues.push({ code: 'misplaced_step', path }); return INVALID; }
+  // A call or a database command is setup or a check for the whole test, not an action in a page,
+  // so neither a frame nor a second tab may hold one.
+  if (TOP_LEVEL_STEP_TYPES.includes(type) && !context.topLevel) { context.issues.push({ code: 'misplaced_step', path }); return INVALID; }
+  if (!unsafeStepEnabled(type, head, path, context)) return INVALID;
   const fields = context.grammar.stepFields[type];
   // The criterion id is checked on its own below, so that a missing one is reported as vacuous.
   const required = fields.required.filter((field) => field !== CRITERION_FIELD);
@@ -968,6 +1225,14 @@ function readStep(input: unknown, path: string, context: ParseContext): Parsed<S
       const parts = [readClipboardAssertion(head['assert'], `${path}.assert`, context), readCriterionId(head, path, context)] as const;
       return allValid(parts) ? { type, assert: parts[0], criterionId: parts[1] } : INVALID;
     }
+    case 'evaluate':
+      return readEvaluate(head, path, context);
+    case 'expectScript':
+      return readExpectScript(head, path, context);
+    case 'database':
+      return readDatabase(head, path, context);
+    case 'expectDatabase':
+      return readExpectDatabase(head, path, context);
   }
 }
 
@@ -1153,7 +1418,7 @@ export function planParser(project: Project): (input: unknown) => Result<Plan, r
 // project-independent defaults. Version 1 had no secrets, fixtures, frames or run values.
 export const languageOnlyRules = (limits: Limits): PlanRules => ({
   origins: 'any', targetIds: 'any', secretNames: [], fixtures: [], limits, testIdAttributes: DEFAULT_TEST_ID_ATTRIBUTES, emailDomains: [],
-  calls: {}, stubs: {}, observedRequests: {}, storageEntries: {},
+  calls: {}, stubs: {}, observedRequests: {}, storageEntries: {}, unsafeFeatures: [], pageScripts: {}, databaseCommands: {},
 });
 
 // The run-time half of the brand: the type system stops a forged Plan at compile time, but a cast

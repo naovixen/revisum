@@ -6,6 +6,7 @@
 import type { Brand } from './brand.ts';
 import type { CriterionId, SafeText, SecretName } from './plan.ts';
 import type { ArtifactReference, GuaranteeLevel } from './run-ports.ts';
+import type { UnsafeFeature } from './unsafe-plan-features.ts';
 
 // A declared suite's name, as `run --suite <name>` gives it: a lowercase letter, then up to 39
 // lowercase letters, digits or hyphens.
@@ -82,10 +83,11 @@ export const GUARANTEE_IDS = [
   'replay-identical',
 ] as const;
 export type GuaranteeId = (typeof GUARANTEE_IDS)[number];
-// Why a guarantee does not hold. SPEC-36's unsafe plan features will add their own reasons.
+// Why a guarantee does not hold.
 //   evidence-mode: the run executed the team's own test code, which Revisum cannot vouch for.
 //   egress-unenforceable: the run was not inside the isolated runner, so egress was not enforced.
-export type GuaranteeLossReason = 'evidence-mode' | 'egress-unenforceable';
+//   an unsafe feature's name: the plan uses that feature, which gives the guarantee up.
+export type GuaranteeLossReason = 'evidence-mode' | 'egress-unenforceable' | UnsafeFeature;
 // The level is the summary: 'isolated' only when every guarantee holds.
 export type GuaranteeStatement = {
   readonly level: GuaranteeLevel;

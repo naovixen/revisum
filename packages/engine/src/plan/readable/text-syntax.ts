@@ -11,7 +11,10 @@
 
 // Why readable text was refused. None of them carries a value from the text.
 export type TextErrorCode = 'unknown-statement' | 'bad-locator' | 'bad-string' | 'bad-indent' | 'missing-header'
-  | 'duplicate-header' | 'no-criterion' | 'unknown-key-name' | 'too-large' | 'duplicate-key';
+  | 'duplicate-header' | 'no-criterion' | 'unknown-key-name' | 'too-large' | 'duplicate-key'
+  // Writing, not reading: the plan holds a construct the readable format has no form for, so it
+  // stays JSON (readablePlanText).
+  | 'no-readable-form';
 
 // A place in readable text: a 1-based line and a 1-based column.
 export type TextPosition = { readonly line: number; readonly column: number };
@@ -192,6 +195,15 @@ export const END: RecordPart = {
     return at === line.length ? read(null, at) : refused(notThisStatement(at));
   },
   write: () => '',
+};
+
+// A construct the readable format has no form for, such as an unsafe plan feature: it never reads
+// from text and never writes, so such a plan stays JSON. A table entry of this part is the explicit
+// "no readable form" for its step, locator or check kind.
+export const NO_READABLE_FORM: RecordPart = {
+  keys: [],
+  read: (_line, index) => refused(notThisStatement(index)),
+  write: () => undefined,
 };
 
 // ---- Words --------------------------------------------------------------------------------------

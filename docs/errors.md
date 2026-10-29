@@ -115,7 +115,11 @@ Project error. An evidence-mode suite's `command` does not invoke Playwright Tes
 
 ## path_not_allowed
 
-Project error. An evidence-mode suite's `paths` entry or `workingDirectory` is absolute, names a drive or network share, uses a backslash, or climbs out of the repository with `..`. Write it relative to the repository root with forward slashes, such as `apps/web/e2e/**`.
+Project error. An evidence-mode suite's `paths` entry or `workingDirectory` is absolute, names a drive or network share, uses a backslash, or climbs out of the repository with `..`. Write it relative to the repository root with forward slashes, such as `apps/web/e2e/**`. A declared page script's `file` must be a `.js` file under `plans/scripts/`, with no `.` or `..` segment, such as `plans/scripts/read-cart.js`.
+
+## unsafe_feature_disabled
+
+Plan error. A plan declaring `"1.3"` uses an unsafe feature its trusted `project.json` does not enable: a CSS or XPath locator (reported at the locator's `by`), a DOM check (at the assertion's `kind`, or a `remember` source's `read`), a named page script or a database command (at the step's `type`), or an inline script (at its `script.inline`). Every use is reported, and nothing under it is read or echoed. A person turns a feature on under `unsafeFeatures` in `project.json` on the protected branch; a change that turns one on in its own `project.json` runs without it until the change is approved and merged. Inline scripts need `pageScripts.allowInline: true` too. Runs using any unsafe feature are labelled unsafe and never count as verified evidence.
 
 ## no_criterion_id
 
@@ -182,6 +186,10 @@ Suite output error. A trace archive records a trace version Revisum does not rea
 ## duplicate-key
 
 Readable plan error. A name is written twice where the plan's JSON holds it once: under `Values:`, in one argument list, in one query or in one `remembering` list. Remove or rename the second one.
+
+## no-readable-form
+
+Readable plan error. The plan uses an unsafe feature (a CSS or XPath locator, a DOM check, a page script or a database command), which the readable `.plan` format has no form for yet, so the plan is not written as text; the error gives the path of the first such construct. Keep the plan as JSON.
 
 ## value-empty
 
@@ -447,7 +455,7 @@ Policy error. The plan would accept a dialog whose text matches an irreversible 
 
 ## unnamed-control
 
-Policy error. The plan would act on a control with no accessible name, which could be anything. Give the control an accessible name (its absence is an accessibility defect too), or allow its test id in `policy.unnamedControlsAllowedByTestId`.
+Policy error. The plan would act on a control with no accessible name, which could be anything. Give the control an accessible name (its absence is an accessibility defect too), or allow its test id in `policy.unnamedControlsAllowedByTestId`, or, for a CSS or XPath locator, its exact selector or expression in `unsafeFeatures.unnamedControlsAllowed`.
 
 ## no-locale-patterns
 
@@ -459,15 +467,19 @@ Policy error. The plan navigates to an origin the trusted project does not list 
 
 ## production-origin
 
-Policy error. The plan navigates to an origin the trusted project marks as production. Production is denied to every plan unless the trusted `policy.allowProductionForApprovedPlans` is true, and then only to approved plans, never to a proposal.
+Policy error. The plan navigates to an origin the trusted project marks as production. Production is denied to every plan unless the trusted `policy.allowProductionForApprovedPlans` is true, and then only to approved plans, never to a proposal. A database command whose service is on a production origin is denied to every plan, approved or not.
 
 ## over-limit
 
-Policy error. The plan exceeds the trusted project's limits: more steps in one list than `maximumSteps`, frames nested deeper than `maximumFrameDepth`, more bytes than `maximumPlanBytes`, or more `call` and `expectBackend` steps, cleanup included, than `maximumCalls` (default 20). A backend check counts once, however often it polls. Split the plan, or raise the limit in the trusted project.
+Policy error. The plan exceeds the trusted project's limits: more steps in one list than `maximumSteps`, frames nested deeper than `maximumFrameDepth`, more bytes than `maximumPlanBytes`, or more `call`, `expectBackend`, page-script and database steps, cleanup included, than `maximumCalls` (default 20). A check counts once, however often it polls. Split the plan, or raise the limit in the trusted project.
 
 ## side-effect-in-proposal
 
-Policy error. A plan with no approval makes a `write` call, in its steps or its cleanup, whose declaration does not set `allowInProposals`; or it starts a stub, or writes or removes a storage entry, whose declaration does not set it. A proposal may read and may make writes the project allows in proposals, such as seeding test data; any other write waits for approval. Approve the plan, or set `allowInProposals: true` on a declaration that only touches disposable test data.
+Policy error. A plan with no approval makes a `write` call, in its steps or its cleanup, whose declaration does not set `allowInProposals`; or it starts a stub, or writes or removes a storage entry, or runs a `write` page script or `write` database command (cleanup included), whose declaration does not set it. A proposal may read and may make writes the project allows in proposals, such as seeding test data; any other write waits for approval. Approve the plan, or set `allowInProposals: true` on a declaration that only touches disposable test data.
+
+## inline-script-in-proposal
+
+Policy error. A plan with no approval holds an inline page script: its source and its claimed effect are the plan's own, and no person declared them, so it runs only once the plan is approved. Approve the plan, or move the script into a file under `plans/scripts/` and declare it under `unsafeFeatures.pageScripts.scripts`.
 
 ## secret-missing
 
@@ -476,6 +488,10 @@ Run refusal. The plan names a secret, in a fill, in `storageState` or as a call'
 ## services-unavailable
 
 Run refusal. The plan makes a `call` or `expectBackend`, or has `cleanup` calls, but the run was given no service caller. The run ends `Refused` before any browser opens or any call is made. Run it where the service caller is wired in; until the isolated runner lands, only a caller a test supplies is available.
+
+## script-source-missing
+
+Run refusal. The plan names a page script whose source file the run was not given, so the manifest could not record the sha256 of what would run. The run ends `Refused` before any browser opens. The refusal names the declared file, never its content. Run it where the protected branch's `plans/scripts/` files are supplied.
 
 ## evidence-mode-disabled
 
