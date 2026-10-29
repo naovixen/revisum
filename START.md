@@ -31,7 +31,7 @@ M1, language and trust:
 - [x] SPEC-35 evidence mode: declaration, suite-file trust, report decoder, result mapping and labels (no containers)
 - [x] SPEC-36 unsafe plan features: plan 1.3 parser parts, declarations, gate rules and labels
 - [ ] Readable text forms for plan 1.3's unsafe constructs (SPEC-28 addition)
-- [ ] Measure coverage on plan 1.3 with unsafe features, with parsed plans and strict judging (no generous assumptions)
+- [x] Measure coverage on plan 1.3 with unsafe features, with parsed plans and strict judging: 52% overall, 44% fresh (2026-10-29)
 - [ ] SPEC-00 remaining criteria (04, 07, 09, 10, 16, 19, 20; finish 05, 08, 11, 15, 17)
 - [x] Fix the intermittent browser failures: Chromium's Windows port randomisation refused about 1 local connection in 60; disabled in both launchers, and browser test files run one at a time (2026-10-28)
 - [ ] Add a contract test that Chromium's effective feature list disables port randomisation and keeps Playwright's defaults
