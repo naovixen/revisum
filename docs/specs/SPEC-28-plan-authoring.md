@@ -388,7 +388,7 @@ The example's source is `() => {`, LF, a tab, `const rows = document.querySelect
 
 **Risks.**
 
-- U+2028, U+2029 and U+0085 pass the parser in a script source and stand raw in a script line. The reader splits only at LF, so they survive the round trip, but an editor may show them as line breaks, or they may go unseen in review. A `\u` escape, or refusing them as `unsafe_text`, would close this.
+- U+2028, U+2029 and U+0085 would stand raw in a script line, where an editor may show them as line breaks or they may go unseen in review. The one plan parser refuses them in a script source as `unsafe_text` (Build notes, "Line separators in scripts"), so a script line never holds one, and a source that needs one writes its escape in the script's own code.
 - An inline check's opening line holds the effect, the returned fields and the check, so it is longer than its JSON. Inline scripts are rare, and a proposal can't run one.
 
 **Golden plans as text.** Each of the six 1.3 golden plans (`golden/unsafe-plans/`) reads back to its JSON file byte for byte, through `parsePlan` with every feature enabled and `writePlanJson`. Each starts with the same five headers, with its own title and the file's name as the spec anchor:

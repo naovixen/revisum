@@ -187,9 +187,17 @@ Suite output error. A trace archive records a trace version Revisum does not rea
 
 Readable plan error. A name is written twice where the plan's JSON holds it once: under `Values:`, in one argument list, in one query or in one `remembering` list. Remove or rename the second one.
 
+## missing-unsafe-mark
+
+Readable plan error. The line holds an unsafe construct (a CSS or XPath locator, a DOM check, remembering an attribute, a page script or a database command) but does not start with the mark `Unsafe:`. Add the mark after the line's indentation, so every reader of the plan sees it. The error is at column 1.
+
+## unneeded-unsafe-mark
+
+Readable plan error. The line starts with the mark `Unsafe:` but holds no unsafe construct, or is not a step line at all (a header, `Criterion:`, `Values:`, `Clean up:` or a value definition). A frame line is marked only for its own locator, never for the steps in its block. Remove the mark. The error is at column 1.
+
 ## no-readable-form
 
-Readable plan error. The plan uses an unsafe feature (a CSS or XPath locator, a DOM check, a page script or a database command), which the readable `.plan` format has no form for yet, so the plan is not written as text; the error gives the path of the first such construct. Keep the plan as JSON.
+Readable plan error. The plan holds a construct the readable `.plan` format has no form for, so it is not written as text; the error gives the path of the first such construct. Every construct of plan language 1.3 has a readable form, so no plan gets this today; it is kept for a construct that reaches the language before its readable form does. Keep such a plan as JSON.
 
 ## value-empty
 

@@ -5,7 +5,9 @@
 // A file is headers, then steps, then an optional `Clean up:` block. Indentation is two spaces per
 // block level. Blank lines and comment lines (starting with #) may stand anywhere; comments are
 // dropped with a warning. A check takes the criterion id of the `Criterion:` line before it, in
-// reading order. Errors give a line and a column and never repeat the text.
+// reading order. A step line holding an unsafe construct starts with the mark `Unsafe:`, and no
+// other line does. An inline script's source follows its statement in a source block, one quoted
+// script line per line. Errors give a line and a column and never repeat the text.
 //
 // The writer writes exactly one text for a plan: LF line ends, a final newline, the headers in a
 // fixed order, a `Criterion:` line wherever the criterion id changes, and never `Origin:`.
@@ -13,10 +15,14 @@
 import { failure, success, type Plan, type Result, type SinkError, type StepType } from '@revisum/contracts';
 import type { PlanLimits } from '../../project/project-parser.ts';
 import type { PlanError, PlanErrorCode } from '../plan-decoders.ts';
-import { CRITERION_FIELD, STEP_FIELDS, STEP_TYPES } from '../plan-grammar.ts';
-import { unsafeConstructsOf } from '../unsafe-features.ts';
-import { CLEANUP_LINE, CRITERION_LINE, HEADERS, STEP_STATEMENTS, VALUES_LINE, VALUE_DEFINITION } from './plan-statements.ts';
-import { better, isRecord, notThisStatement, skipSpaces, type TextErrorCode, type TextFailure, type TextPosition } from './text-syntax.ts';
+import { CRITERION_FIELD, STEP_FIELDS } from '../plan-grammar.ts';
+import {
+  CLEANUP_LINE, CRITERION_LINE, HEADERS, STEP_STATEMENTS, UNSAFE_MARK, VALUES_LINE, VALUE_DEFINITION, needsUnsafeMark,
+  type StatementBlock,
+} from './plan-statements.ts';
+import {
+  SCRIPT_LINE, better, isRecord, notThisStatement, skipSpaces, wordAt, type TextErrorCode, type TextFailure, type TextPosition,
+} from './text-syntax.ts';
 
 export type { TextErrorCode, TextPosition } from './text-syntax.ts';
 
@@ -43,18 +49,46 @@ export type DraftError =
 type Fields = Record<string, unknown>;
 
 // The JSON fields a statement does not hold itself: a check's criterion id comes from the
-// Criterion: line before it, and a frame's or second tab's steps from the block after it.
+// Criterion: line before it, a frame's or second tab's steps from the block after it, and an
+// inline script's source (script.inline.source) from its source block.
 const STEPS_FIELD = 'steps';
+const SCRIPT_FIELD = 'script';
+const INLINE_FIELD = 'inline';
+const SOURCE_FIELD = 'source';
 const isCheck = (type: StepType): boolean => STEP_FIELDS[type].required.includes(CRITERION_FIELD);
-const opensBlock = (type: StepType): boolean => STEP_FIELDS[type].required.includes(STEPS_FIELD);
 const INDENT = '  ';
 const LINE_START: TextPosition = { line: 1, column: 1 };
+// Script lines are joined with LF, and a source is split at LF to write them: one line each.
+const SCRIPT_LINE_BREAK = '\n';
 
 // What the lines of a block are read into.
 type Block =
   | { readonly kind: 'top' }
   | { readonly kind: 'values'; readonly values: Fields }
-  | { readonly kind: 'steps'; readonly steps: unknown[]; readonly path: string };
+  | { readonly kind: 'steps'; readonly steps: unknown[]; readonly path: string }
+  // An inline script's source lines, joined into `inline.source`; `path` is the source's JSON path.
+  | { readonly kind: 'source'; readonly lines: string[]; readonly inline: Fields; readonly path: string };
+
+// Where the line's statement starts once its `Unsafe:` mark is passed over, or undefined when it
+// has none. The mark is a grammar word, read in any case.
+function afterMark(line: string, indent: number): number | undefined {
+  const { word, end } = wordAt(line, indent);
+  return word.toLowerCase() === UNSAFE_MARK.toLowerCase() ? end : undefined;
+}
+
+// A step's inline script, copied so its source can be added from the source block, or undefined
+// for a step that runs no inline script.
+function inlineScriptOf(step: Fields): Fields | undefined {
+  const script = step[SCRIPT_FIELD];
+  if (!isRecord(script) || !isRecord(script[INLINE_FIELD])) return undefined;
+  const inline: Fields = { ...script[INLINE_FIELD] };
+  step[SCRIPT_FIELD] = { ...script, [INLINE_FIELD]: inline };
+  return inline;
+}
+
+// A refused line that opens a block whose kind its words still show: an inline script's source
+// lines are read as script lines, so their own errors are reported rather than unknown-statement.
+const INLINE_STATEMENT_START = /^\s*(run|expect)\s+inline\b/i;
 
 // Reads readable text into plain JSON for the plan parser. Pure: it never builds a Plan.
 export function readPlanText(text: string, limits: PlanLimits): Result<TextReading, readonly DraftError[]> {
@@ -101,21 +135,29 @@ export function readPlanText(text: string, limits: PlanLimits): Result<TextReadi
     });
   }
 
-  // A Criterion: line, or a step, into `target`. True when it was a step.
-  function readStepLine(target: unknown[], path: string, line: string, indent: number, number: number, earlier?: TextFailure): boolean {
+  // Only a step line may carry the Unsafe: mark; any other line that reads with one is refused.
+  const refuseMark = (marked: boolean, number: number): void => { if (marked) refuse('unneeded-unsafe-mark', number, 1); };
+
+  // A Criterion: line, or a step, into `target`. True when it was a step. A step line's mark must
+  // match what its statement holds, as needsUnsafeMark decides from the words read.
+  function readStepLine(target: unknown[], path: string, line: string, indent: number, number: number, marked: boolean, earlier?: TextFailure): boolean {
     const criterionLine = CRITERION_LINE.read(line, indent);
     if (criterionLine.ok) {
+      refuseMark(marked, number);
       criterion = { id: isRecord(criterionLine.value) ? criterionLine.value['criterion'] : undefined, position: at(number) };
       return false;
     }
     let found = better(earlier, criterionLine.failure);
-    // A line ending with ":" may open a block: a frame or a second tab.
+    // A line ending with ":" may open a block: a frame's or second tab's steps, or a source block.
     const blockLine = line.endsWith(':') ? line.slice(0, -1).replace(/ +$/, '') : undefined;
-    for (const { type, syntax } of STEP_STATEMENTS) {
-      const reading = opensBlock(type) ? (blockLine === undefined ? undefined : syntax.read(blockLine, indent)) : syntax.read(line, indent);
+    for (const { type, syntax, opens } of STEP_STATEMENTS) {
+      const reading = opens !== undefined ? (blockLine === undefined ? undefined : syntax.read(blockLine, indent)) : syntax.read(line, indent);
       if (reading === undefined) continue;
       if (!reading.ok) { found = better(found, reading.failure); continue; }
       const step: Fields = isRecord(reading.value) ? { ...reading.value } : {};
+      const needed = needsUnsafeMark(step);
+      if (needed && !marked) refuse('missing-unsafe-mark', number, 1);
+      if (!needed && marked) refuse('unneeded-unsafe-mark', number, 1);
       const stepPath = `${path}[${target.length}]`;
       positions.set(stepPath, at(number));
       // With an Origin: header, a path in Go to or In new tab at is resolved against it.
@@ -125,25 +167,35 @@ export function readPlanText(text: string, limits: PlanLimits): Result<TextReadi
         if (criterion === undefined) refuse('no-criterion', number, 1);
         else { step[CRITERION_FIELD] = criterion.id; positions.set(`${stepPath}.${CRITERION_FIELD}`, criterion.position); }
       }
-      if (opensBlock(type)) {
+      if (opens === 'steps') {
         const nested: unknown[] = [];
         step[STEPS_FIELD] = nested;
         blocks.push({ kind: 'steps', steps: nested, path: `${stepPath}.${STEPS_FIELD}` });
+      }
+      if (opens === 'source') {
+        const sourcePath = `${stepPath}.${SCRIPT_FIELD}.${INLINE_FIELD}.${SOURCE_FIELD}`;
+        blocks.push({ kind: 'source', lines: [], inline: inlineScriptOf(step) ?? {}, path: sourcePath });
       }
       target.push(step);
       return true;
     }
     refuseFor(found ?? notThisStatement(indent), number);
     // A refused block's lines are still read, into nothing, so their own errors are reported too.
-    if (blockLine !== undefined) blocks.push({ kind: 'steps', steps: [], path: `${path}[${target.length}].${STEPS_FIELD}` });
+    if (blockLine !== undefined) {
+      const refusedPath = `${path}[${target.length}]`;
+      blocks.push(INLINE_STATEMENT_START.test(blockLine)
+        ? { kind: 'source', lines: [], inline: {}, path: refusedPath }
+        : { kind: 'steps', steps: [], path: `${refusedPath}.${STEPS_FIELD}` });
+    }
     return false;
   }
 
-  function readTopLine(line: string, indent: number, number: number): void {
+  function readTopLine(line: string, indent: number, number: number, marked: boolean): void {
     let found: TextFailure | undefined;
     for (const header of HEADERS) {
       const reading = header.line.read(line, indent);
       if (!reading.ok) { found = better(found, reading.failure); continue; }
+      refuseMark(marked, number);
       if (!placeHeader(header.name, number)) return;
       const value = isRecord(reading.value) ? reading.value['value'] : undefined;
       if (header.path !== null) setHeaderField(header.path, value, number);
@@ -152,6 +204,7 @@ export function readPlanText(text: string, limits: PlanLimits): Result<TextReadi
     }
     const valuesLine = VALUES_LINE.read(line, indent);
     if (valuesLine.ok) {
+      refuseMark(marked, number);
       if (!placeHeader('Values:', number)) return;
       values = {};
       positions.set('$.values', at(number));
@@ -160,6 +213,7 @@ export function readPlanText(text: string, limits: PlanLimits): Result<TextReadi
     }
     const cleanupLine = CLEANUP_LINE.read(line, indent);
     if (cleanupLine.ok && phase !== 'cleanup') {
+      refuseMark(marked, number);
       cleanup = [];
       phase = 'cleanup';
       positions.set('$.cleanup', at(number));
@@ -168,12 +222,24 @@ export function readPlanText(text: string, limits: PlanLimits): Result<TextReadi
     }
     if (phase === 'cleanup') { refuse('unknown-statement', number, 1); return; }
     found = better(found, better(valuesLine.ok ? undefined : valuesLine.failure, cleanupLine.ok ? undefined : cleanupLine.failure));
-    if (readStepLine(steps, '$.steps', line, indent, number, found)) phase = 'steps';
+    if (readStepLine(steps, '$.steps', line, indent, number, marked, found)) phase = 'steps';
   }
 
-  function readValueLine(into: Fields, line: string, indent: number, number: number): void {
+  // One script line of a source block: quoted text and nothing else, a mark included. Anything
+  // else is bad-string at its first character outside the quotes.
+  function readScriptLine(block: Extract<Block, { kind: 'source' }>, line: string, indent: number, number: number): void {
+    const reading = SCRIPT_LINE.read(line, indent);
+    if (!reading.ok) { refuse('bad-string', number, reading.failure.code === 'bad-string' ? reading.failure.column : indent + 1); return; }
+    if (reading.next < line.length) { refuse('bad-string', number, reading.next + 1); return; }
+    if (block.lines.length === 0) positions.set(block.path, at(number));
+    block.lines.push(typeof reading.value === 'string' ? reading.value : '');
+    block.inline[SOURCE_FIELD] = block.lines.join(SCRIPT_LINE_BREAK);
+  }
+
+  function readValueLine(into: Fields, line: string, indent: number, number: number, marked: boolean): void {
     const reading = VALUE_DEFINITION.read(line, indent);
     if (!reading.ok) { refuseFor(reading.failure, number); return; }
+    refuseMark(marked, number);
     const { name, value, nameColumn } = reading.value;
     // JSON cannot hold one name twice.
     if (Object.hasOwn(into, name)) { refuse('duplicate-key', number, nameColumn); return; }
@@ -193,10 +259,15 @@ export function readPlanText(text: string, limits: PlanLimits): Result<TextReadi
     if (/\s/.test(line[indent] ?? '') || indent % 2 !== 0 || depth >= blocks.length) { refuse('bad-indent', number, 1); return; }
     blocks.length = depth + 1;
     const block = blocks[depth] ?? { kind: 'top' };
+    if (block.kind === 'source') { readScriptLine(block, line, indent, number); return; }
+    // The mark is passed over as spaces, so every column after it stays where it is in the text.
+    const statementStart = afterMark(line, indent);
+    const marked = statementStart !== undefined;
+    const statement = marked ? `${line.slice(0, indent)}${' '.repeat(statementStart - indent)}${line.slice(statementStart)}` : line;
     switch (block.kind) {
-      case 'top': readTopLine(line, indent, number); return;
-      case 'values': readValueLine(block.values, line, indent, number); return;
-      case 'steps': readStepLine(block.steps, block.path, line, indent, number); return;
+      case 'top': readTopLine(statement, indent, number, marked); return;
+      case 'values': readValueLine(block.values, statement, indent, number, marked); return;
+      case 'steps': readStepLine(block.steps, block.path, statement, indent, number, marked); return;
     }
   });
 
@@ -230,24 +301,30 @@ const valueAt = (value: unknown, path: readonly string[]): unknown =>
   path.reduce<unknown>((holder, key) => (isRecord(holder) ? holder[key] : undefined), value);
 
 // Why a plan has no readable text: it holds a construct the readable format has no form for, at
-// that construct's path, so it stays JSON.
+// that construct's path, so it stays JSON. Every construct of plan language 1.3 has a form, so no
+// plan gets this today; it is kept for a construct that reaches the language before its form does.
 export type NoReadableForm = { readonly code: Extract<TextErrorCode, 'no-readable-form'>; readonly path: string };
 
-// The canonical text of a parsed plan, or no-readable-form at the first construct the readable
-// format has no form for: an unsafe plan feature, at the path of the field that names it. The one
-// route to readable text for a plan that may hold one. Pure.
+// The canonical text of a parsed plan. Every construct of the language has a readable form, the
+// unsafe features included, so it always gives writePlanText's text. Pure.
 export function readablePlanText(plan: Plan): Result<string, NoReadableForm> {
-  const first = unsafeConstructsOf(plan)[0];
-  return first === undefined ? success(writePlanText(plan)) : failure({ code: 'no-readable-form', path: first.path });
+  return success(writePlanText(plan));
 }
 
-// The canonical text of a parsed plan. Pure. A plan holding an unsafe feature has no readable form,
-// so passing one is a programming error: a caller that may hold one uses readablePlanText.
+// A step's fields without its inline script's source, which is written as the source block after
+// the statement, and the source; the fields as they are for any other step.
+function withoutSource(fields: Fields): { readonly statement: Fields; readonly source: unknown } {
+  const script = fields[SCRIPT_FIELD];
+  if (!isRecord(script) || !isRecord(script[INLINE_FIELD])) return { statement: fields, source: undefined };
+  const { [SOURCE_FIELD]: source, ...inline } = script[INLINE_FIELD];
+  return { statement: { ...fields, [SCRIPT_FIELD]: { ...script, [INLINE_FIELD]: inline } }, source };
+}
+
+// The canonical text of a parsed plan. Pure.
 export function writePlanText(plan: Plan): string {
   const lines: string[] = [];
   const put = (depth: number, text: string | undefined): void => {
-    // Every construct of the closed language has a readable form, so this is a broken grammar or a
-    // plan with an unsafe feature, which only readablePlanText may be given.
+    // Every construct of the language has a readable form, so this is a broken grammar.
     if (text === undefined) throw new Error('the readable grammar has no form for part of this plan');
     lines.push(`${INDENT.repeat(depth)}${text}`);
   };
@@ -263,20 +340,31 @@ export function writePlanText(plan: Plan): string {
   const writeSteps = (steps: readonly unknown[], depth: number): void => {
     for (const step of steps) {
       const fields: Fields = isRecord(step) ? { ...step } : {};
-      const type = STEP_TYPES.find((candidate) => candidate === fields['type']);
-      const statement = STEP_STATEMENTS.find((candidate) => candidate.type === type);
-      if (type === undefined || statement === undefined) { put(depth, undefined); return; }
       const id = fields[CRITERION_FIELD];
+      const nested = fields[STEPS_FIELD];
+      delete fields[CRITERION_FIELD];
+      delete fields[STEPS_FIELD];
+      // The first of the step type's statements that has text for the step.
+      let written: { readonly text: string; readonly opens: StatementBlock | undefined; readonly source: unknown } | undefined;
+      let type: StepType | undefined;
+      for (const candidate of STEP_STATEMENTS) {
+        if (candidate.type !== fields['type']) continue;
+        type = candidate.type;
+        const { statement, source } = candidate.opens === 'source' ? withoutSource(fields) : { statement: fields, source: undefined };
+        const text = candidate.syntax.write(statement);
+        if (text !== undefined) { written = { text, opens: candidate.opens, source }; break; }
+      }
+      if (type === undefined || written === undefined) { put(depth, undefined); return; }
       if (isCheck(type) && id !== criterion) {
         put(depth, CRITERION_LINE.write({ criterion: id }));
         criterion = id;
       }
-      const nested = fields[STEPS_FIELD];
-      delete fields[CRITERION_FIELD];
-      delete fields[STEPS_FIELD];
-      const text = statement.syntax.write(fields);
-      put(depth, opensBlock(type) && text !== undefined ? `${text}:` : text);
-      if (opensBlock(type) && Array.isArray(nested)) writeSteps(nested, depth + 1);
+      const mark = needsUnsafeMark(fields) ? `${UNSAFE_MARK} ` : '';
+      put(depth, `${mark}${written.text}${written.opens === undefined ? '' : ':'}`);
+      if (written.opens === 'steps' && Array.isArray(nested)) writeSteps(nested, depth + 1);
+      if (written.opens === 'source' && typeof written.source === 'string') {
+        for (const scriptLine of written.source.split(SCRIPT_LINE_BREAK)) put(depth + 1, SCRIPT_LINE.write(scriptLine));
+      }
     }
   };
   writeSteps(plan.steps, 0);

@@ -12,8 +12,11 @@
 // Why readable text was refused. None of them carries a value from the text.
 export type TextErrorCode = 'unknown-statement' | 'bad-locator' | 'bad-string' | 'bad-indent' | 'missing-header'
   | 'duplicate-header' | 'no-criterion' | 'unknown-key-name' | 'too-large' | 'duplicate-key'
+  // A line's "Unsafe:" mark does not match what the line holds: a line holding an unsafe construct
+  // has no mark, or a marked line holds none.
+  | 'missing-unsafe-mark' | 'unneeded-unsafe-mark'
   // Writing, not reading: the plan holds a construct the readable format has no form for, so it
-  // stays JSON (readablePlanText).
+  // would stay JSON (readablePlanText). Every construct of the language has a form today.
   | 'no-readable-form';
 
 // A place in readable text: a 1-based line and a 1-based column.
@@ -124,29 +127,43 @@ export const URL_WORD: Syntax = {
   write: (value) => (typeof value === 'string' && value !== '' && !value.includes(' ') ? value : undefined),
 };
 
-// Quoted text: `\"` and `\\` are the only escapes, and the writer escapes every quote and backslash.
-export const QUOTED: Syntax = {
-  read(line, index) {
-    const start = skipSpaces(line, index);
-    if (line[start] !== '"') return refused(notThisStatement(start));
-    let text = '';
-    for (let at = start + 1; at < line.length; at += 1) {
-      const character = line[at] ?? '';
-      if (character === '"') return read(text, at + 1);
-      if (character === '\\') {
-        const escaped = line[at + 1];
-        if (escaped !== '"' && escaped !== '\\') return refused({ code: 'bad-string', column: at + 1, reach: at });
-        text += escaped;
-        at += 1;
-      } else {
-        text += character;
+// Quoted text whose escapes are `escapes`: the letter after a backslash, and the character it
+// stands for. The writer escapes exactly those characters and nothing else, so what it writes
+// reads back as the same text.
+function quotedWith(escapes: Readonly<Record<string, string>>): Syntax {
+  const escapeOf = new Map(Object.entries(escapes).map(([letter, character]) => [character, `\\${letter}`]));
+  return {
+    read(line, index) {
+      const start = skipSpaces(line, index);
+      if (line[start] !== '"') return refused(notThisStatement(start));
+      let text = '';
+      for (let at = start + 1; at < line.length; at += 1) {
+        const character = line[at] ?? '';
+        if (character === '"') return read(text, at + 1);
+        if (character === '\\') {
+          const letter = line[at + 1] ?? '';
+          const escaped = Object.hasOwn(escapes, letter) ? escapes[letter] : undefined;
+          if (escaped === undefined) return refused({ code: 'bad-string', column: at + 1, reach: at });
+          text += escaped;
+          at += 1;
+        } else {
+          text += character;
+        }
       }
-    }
-    // Never closed: the rest of the line is inside the string, so no other reading gets further.
-    return refused({ code: 'bad-string', column: start + 1, reach: line.length });
-  },
-  write: (value) => (typeof value === 'string' ? `"${value.replace(/["\\]/g, '\\$&')}"` : undefined),
-};
+      // Never closed: the rest of the line is inside the string, so no other reading gets further.
+      return refused({ code: 'bad-string', column: start + 1, reach: line.length });
+    },
+    write: (value) => (typeof value === 'string' ? `"${[...value].map((character) => escapeOf.get(character) ?? character).join('')}"` : undefined),
+  };
+}
+
+// Quoted text: `\"` and `\\` are the only escapes, and the writer escapes every quote and backslash.
+export const QUOTED: Syntax = quotedWith({ '"': '"', '\\': '\\' });
+
+// One line of an inline script's source. A source may hold tabs and carriage returns, which other
+// plan text never does, so a script line also has `\t` and `\r`. Every other character stands as
+// it is between the quotes, so leading and trailing spaces survive the reader's trimming.
+export const SCRIPT_LINE: Syntax = quotedWith({ '"': '"', '\\': '\\', 't': '\t', 'r': '\r' });
 
 // A value reference, `{name}`: a value name in braces, with no spaces.
 export const REFERENCE: Syntax = {
@@ -195,15 +212,6 @@ export const END: RecordPart = {
     return at === line.length ? read(null, at) : refused(notThisStatement(at));
   },
   write: () => '',
-};
-
-// A construct the readable format has no form for, such as an unsafe plan feature: it never reads
-// from text and never writes, so such a plan stays JSON. A table entry of this part is the explicit
-// "no readable form" for its step, locator or check kind.
-export const NO_READABLE_FORM: RecordPart = {
-  keys: [],
-  read: (_line, index) => refused(notThisStatement(index)),
-  write: () => undefined,
 };
 
 // ---- Words --------------------------------------------------------------------------------------

@@ -7,16 +7,17 @@
 // the language's own tables (roles, keys, states, units, formats), and each table of forms is typed
 // by the union it covers, so a step, check or value kind added to the language without a readable
 // form fails to compile.
-// See docs/specs/SPEC-28-plan-authoring.md ("Readable syntax for plan 1.2").
+// See docs/specs/SPEC-28-plan-authoring.md ("Readable syntax for plan 1.2" and "for plan 1.3").
 import {
-  AUDIT_MODES, CLIPBOARD_READS, CLOCK_UNITS, ELEMENT_STATE_KINDS, KEYS, MODIFIERS, POSITION_WORDS, REMEMBER_READS, ROLES,
+  AUDIT_MODES, CALL_EFFECTS, CLIPBOARD_READS, CLOCK_UNITS, DOM_CHECK_KINDS, ELEMENT_STATE_KINDS, KEYS, MODIFIERS, POSITION_WORDS,
+  REMEMBER_ATTRIBUTE_READ, REMEMBER_READS, ROLES, STRUCTURAL_LOCATOR_KINDS,
   type BackendAssertion, type ClipboardAssertion, type ClockAdvanceMode, type DateAnchor, type DateFormat, type DIALOG_ACTIONS,
   type DownloadAssertion, type ElementAssertion, type GeneratedValue, type Locator, type PageAssertion, type REQUEST_COUNT_KINDS,
   type ResponseAssertion, type ResponseRead, type SCRIPT_MODES, type StepType, type StorageAssertion,
 } from '@revisum/contracts';
-import { FROM_FIELD, STEP_TYPES } from '../plan-grammar.ts';
+import { FROM_FIELD, STEP_FIELDS, STEP_TYPES, UNSAFE_STEP_TYPES } from '../plan-grammar.ts';
 import {
-  BARE, DIGITS, END, NO_READABLE_FORM, NUMBER, QUOTED, REFERENCE, URL_WORD,
+  BARE, DIGITS, END, NUMBER, QUOTED, REFERENCE, URL_WORD,
   better, choice, constant, countedWord, either, entry, field, group, isRecord, list, map, notThisStatement, oneOf, optional, orElse,
   phrases, record, reportedAs, skipSpaces, unitOf, wordAt, words, wordsFor,
   type EntrySyntax, type RecordPart, type Syntax,
@@ -80,18 +81,46 @@ const POSITION: Syntax = {
   },
 };
 
+// The locator a CSS or XPath locator is evaluated inside: any locator, so the locator syntax refers
+// to itself. It is looked up when used, because LOCATOR is defined below.
+const INSIDE: Syntax = { read: (line, index) => LOCATOR.read(line, index), write: (value) => LOCATOR.write(value) };
+
+// A CSS or XPath locator: the selector or expression, then its own containing text, then the
+// locator it is inside. `inside` takes the whole rest of the locator, so a chain reads one way only,
+// and a containing text before an `inside` is always the outer locator's own.
+const structuralLocator = (kind: string, textKey: string): readonly RecordPart[] => [
+  words(kind), field(textKey, TEXT),
+  optional(words('containing text'), field('hasText', TEXT)),
+  optional(words('inside'), field('inside', INSIDE)),
+];
+
 const LOCATOR_FORMS: { readonly [Kind in Locator['by']]: readonly RecordPart[] } = {
   role: [field('role', oneOf(ROLES)), field('name', TEXT)],
   label: [words('label'), field('label', TEXT)],
   text: [words('text'), field('text', TEXT)],
   testId: [words('test id'), field('testId', TEXT), optional(words('in attribute'), field('attribute', BARE))],
-  // CSS and XPath locators are unsafe plan features, written in JSON until the readable format
-  // gives them a form (docs/specs/SPEC-36-unsafe-plan-features.md).
-  css: [NO_READABLE_FORM],
-  xpath: [NO_READABLE_FORM],
+  css: structuralLocator('css', 'selector'),
+  xpath: structuralLocator('xpath', 'expression'),
 };
 // Any locator that cannot be read is bad-locator, at the locator.
-export const LOCATOR = reportedAs('bad-locator', variants('by', LOCATOR_FORMS, [optional(field('position', POSITION))]));
+const ANY_LOCATOR = reportedAs('bad-locator', variants('by', LOCATOR_FORMS, [optional(field('position', POSITION))]));
+
+// True for a CSS or XPath locator, or one evaluated inside one.
+const holdsStructuralLocator = (locator: unknown): boolean =>
+  isRecord(locator) && (STRUCTURAL_LOCATOR_KINDS.some((kind) => kind === locator['by']) || holdsStructuralLocator(locator['inside']));
+
+// Only a CSS or XPath locator has an `inside`, so `inside` after a role, label, text or test-id
+// locator is bad-locator, at that word, rather than an unknown statement.
+export const LOCATOR: Syntax = {
+  read(line, index) {
+    const reading = ANY_LOCATOR.read(line, index);
+    if (!reading.ok || holdsStructuralLocator(reading.value)) return reading;
+    const after = wordAt(line, reading.next);
+    if (after.word.toLowerCase() !== 'inside') return reading;
+    return { ok: false, failure: { code: 'bad-locator', column: after.start + 1, reach: after.start } };
+  },
+  write: (value) => ANY_LOCATOR.write(value),
+};
 
 // ---- Keys -----------------------------------------------------------------------------------------
 
@@ -215,12 +244,14 @@ const ELEMENT_CHECK_FORMS: { readonly [Kind in Exclude<ElementAssertion['kind'],
   valueContains: [words('has value containing'), field('value', TEXT)],
   countEquals: [words('count is'), field('value', NUMBER)],
   hrefEquals: [words('links to'), field('value', TEXT)],
-  // DOM checks are an unsafe plan feature, written in JSON until the readable format gives them a form.
-  hasClass: [NO_READABLE_FORM],
-  lacksClass: [NO_READABLE_FORM],
-  computedStyleEquals: [NO_READABLE_FORM],
-  attributeEquals: [NO_READABLE_FORM],
-  attributeAbsent: [NO_READABLE_FORM],
+  // DOM checks. A class name is quoted, because a class token may hold quotes, braces and commas;
+  // CSS property and attribute names are bare words.
+  hasClass: [words('has class'), field('value', TEXT)],
+  lacksClass: [words('lacks class'), field('value', TEXT)],
+  computedStyleEquals: [words('computed style'), field('property', BARE), words('is'), field('value', TEXT)],
+  // "is absent" is the attribute's absence; `is "absent"` compares its value with the word.
+  attributeEquals: [words('attribute'), field('name', BARE), words('is'), field('value', TEXT)],
+  attributeAbsent: [words('attribute'), field('name', BARE), words('is absent')],
 };
 // "is visible", "has text containing …" and the other checks after an element's locator.
 const ELEMENT_ASSERTION = choice(record([words('is'), field('kind', oneOf(ELEMENT_STATE_KINDS))]), variants('kind', ELEMENT_CHECK_FORMS));
@@ -279,13 +310,31 @@ const REQUEST_COUNT = choice(...Object.entries(REQUEST_COUNT_WORDS).map(([kind, 
 // ---- Steps ------------------------------------------------------------------------------------------
 
 const RESPONSE_READ_WORDS: { readonly [Read in ResponseRead]: string } = { text: 'text', arrayLength: 'length' };
-// Where a remember step reads: the clipboard, a field of a response, or an element's text or value.
-// Remembering an attribute is a DOM check, an unsafe plan feature with no readable form yet.
+// Where a remember step reads: the clipboard, a field of a response, an element's text or value,
+// or one of an element's attributes (a DOM check).
 const REMEMBER_SOURCE = choice(
   record([words('clipboard'), field('clipboard', oneOf(CLIPBOARD_READS))]),
   record([field('read', wordsFor(RESPONSE_READ_WORDS)), words('of field'), field('field', BARE), words('in response'), field('response', BARE)]),
   record([field('read', oneOf(REMEMBER_READS)), words('of'), field('element', LOCATOR)]),
+  record([words('attribute'), constant('read', REMEMBER_ATTRIBUTE_READ), field('attribute', BARE), words('of'), field('element', LOCATOR)]),
 );
+
+// ---- Page scripts and database commands -----------------------------------------------------------
+
+// "returning <field> at "<pointer>", …" or "returning nothing", in the JSON order. Without either,
+// the inline script's fields are left out. Pointers are quoted, because they may hold spaces; ""
+// points at the whole result.
+const RETURNED_FIELDS = optional(either(
+  group([words('returning nothing'), constant('fields', {})]),
+  group([words('returning'), field('fields', map(entry(['name', words('at'), 'value'], QUOTED)))]),
+));
+// "inline read page script returning …": an inline script without its source, which follows the
+// statement in a source block, one quoted script line per line.
+const INLINE_SCRIPT = record([
+  field('inline', record([words('inline'), field('effect', oneOf(CALL_EFFECTS)), words('page script'), RETURNED_FIELDS])),
+]);
+// A script or command check's field and its check, after the script or command and its arguments.
+const FIELD_CHECK = [words('field'), field('field', BARE), field('assert', variants('kind', BACKEND_CHECK_FORMS))];
 
 const SCRIPT_MODE_WORDS: { readonly [Mode in (typeof SCRIPT_MODES)[number]]: string } = { disabled: 'without scripts' };
 const CLOCK_MODE_WORDS: { readonly [Mode in ClockAdvanceMode]: string } = { runTimers: 'running timers', skipAhead: 'skipping ahead' };
@@ -293,10 +342,16 @@ const DIALOG_ACTION_WORDS: { readonly [Action in (typeof DIALOG_ACTIONS)[number]
 // "599 seconds", "1 second": the unit is singular for 1.
 const CLOCK_ADVANCE = record([field('amount', NUMBER), unitOf('unit', 'amount', CLOCK_UNITS)]);
 
+// A statement form that opens a source block: an inline script's statement, whose source follows
+// in the block, one quoted script line per line, and is not part of the statement's own text.
+type SourceBlockForm = { readonly sourceBlock: readonly RecordPart[] };
+const sourceBlock = (...parts: readonly RecordPart[]): SourceBlockForm => ({ sourceBlock: parts });
+
 // Every step's statement forms, without the fields the document around it supplies: a check's
-// criterionId comes from the Criterion: line before it, and a frame's or tab's steps from the
-// indented block after it. Every check starts with "Expect", and only checks do.
-const STEP_FORMS: { readonly [Type in StepType]: readonly (readonly RecordPart[])[] } = {
+// criterionId comes from the Criterion: line before it, a frame's or tab's steps from the indented
+// block after it, and an inline script's source from its source block. Every check starts with
+// "Expect", and only checks do.
+const STEP_FORMS: { readonly [Type in StepType]: readonly (readonly RecordPart[] | SourceBlockForm)[] } = {
   navigate: [[words('Go to'), field('url', NAVIGATION), optional(field('scripts', wordsFor(SCRIPT_MODE_WORDS)))]],
   click: [[words('Click'), field('locator', LOCATOR)]],
   download: [[words('Download'), field('name', TEXT), words('by clicking'), field('locator', LOCATOR)]],
@@ -330,17 +385,54 @@ const STEP_FORMS: { readonly [Type in StepType]: readonly (readonly RecordPart[]
   expectStorage: [[words('Expect storage entry'), field('entry', BARE), field('assert', variants('kind', STORAGE_CHECK_FORMS))]],
   advanceClock: [[words('Advance clock by'), field('by', CLOCK_ADVANCE), optional(field('mode', wordsFor(CLOCK_MODE_WORDS)))]],
   expectClipboard: [[words('Expect clipboard'), field('assert', variants('kind', CLIPBOARD_CHECK_FORMS))]],
-  // Page scripts and database commands are unsafe plan features, written in JSON until the readable
-  // format gives them a form.
-  evaluate: [[NO_READABLE_FORM]],
-  expectScript: [[NO_READABLE_FORM]],
-  database: [[NO_READABLE_FORM]],
-  expectDatabase: [[NO_READABLE_FORM]],
+  // A page script by name, or inline with its source in a source block. Without "with", the
+  // arguments are {}, which is how an inline script's arguments are always written.
+  evaluate: [
+    [words('Run page script'), field('script', BARE), CALL_ARGUMENTS, REMEMBERING],
+    sourceBlock(words('Run'), field('script', INLINE_SCRIPT), CALL_ARGUMENTS, REMEMBERING),
+  ],
+  expectScript: [
+    [words('Expect page script'), field('script', BARE), CALL_ARGUMENTS, ...FIELD_CHECK],
+    sourceBlock(words('Expect'), field('script', INLINE_SCRIPT), CALL_ARGUMENTS, ...FIELD_CHECK),
+  ],
+  database: [[words('Run database command'), field('command', BARE), CALL_ARGUMENTS, REMEMBERING]],
+  expectDatabase: [[words('Expect database command'), field('command', BARE), CALL_ARGUMENTS, ...FIELD_CHECK]],
 };
 
-// Each step type's statement: its forms, each a whole line.
-export const STEP_STATEMENTS: readonly { readonly type: StepType; readonly syntax: Syntax }[] = STEP_TYPES.map((type) =>
-  ({ type, syntax: choice(...STEP_FORMS[type].map((parts) => record([constant('type', type), ...parts, END]))) }));
+// The block a statement opens: a frame's or second tab's steps, or an inline script's source lines.
+export type StatementBlock = 'steps' | 'source';
+// A step statement: the step type it reads, its syntax as a whole line (without the ":" that opens
+// a block), and the block it opens, if any. A step type may have several, such as a named and an
+// inline page script.
+export type StepStatement = { readonly type: StepType; readonly syntax: Syntax; readonly opens: StatementBlock | undefined };
+
+const opensSteps = (type: StepType): boolean => STEP_FIELDS[type].required.includes('steps');
+
+export const STEP_STATEMENTS: readonly StepStatement[] = STEP_TYPES.flatMap((type) => STEP_FORMS[type].map((form): StepStatement => {
+  const parts = 'sourceBlock' in form ? form.sourceBlock : form;
+  const opens = 'sourceBlock' in form ? 'source' : opensSteps(type) ? 'steps' : undefined;
+  return { type, syntax: record([constant('type', type), ...parts, END]), opens };
+}));
+
+// ---- The unsafe mark --------------------------------------------------------------------------------
+
+// Every step line whose own statement holds an unsafe construct starts with this mark, after its
+// indentation, so no reader can miss one; no other line carries it. It is a grammar word, so it is
+// read in any case, and written as shown followed by one space.
+export const UNSAFE_MARK = 'Unsafe:';
+
+// Whether a step statement's own fields hold an unsafe construct: a CSS or XPath locator anywhere
+// in it, a DOM check, remembering an attribute, a page script or a database command. A frame's or
+// second tab's steps are not its own: they carry their own marks. It works on plain JSON, so the
+// reader decides from the words it read and the writer from the parsed plan, by one rule.
+export function needsUnsafeMark(statement: Readonly<Record<string, unknown>>): boolean {
+  const from = statement[FROM_FIELD];
+  const assertion = statement['assert'];
+  return UNSAFE_STEP_TYPES.some((type) => type === statement['type'])
+    || holdsStructuralLocator(statement['locator'])
+    || (isRecord(from) && (from['read'] === REMEMBER_ATTRIBUTE_READ || holdsStructuralLocator(from['element'])))
+    || (statement['type'] === 'expect' && isRecord(assertion) && DOM_CHECK_KINDS.some((kind) => kind === assertion['kind']));
+}
 
 // ---- Headers and other lines ----------------------------------------------------------------------
 

@@ -69,10 +69,16 @@ const CONTROL_OR_BIDIRECTIONAL_IN_PROSE = /[\u0000-\u0008\u000b\u000c\u000e-\u00
 export const isUnsafeProse = (value: string): boolean =>
   CONTROL_OR_BIDIRECTIONAL_IN_PROSE.test(value) || SCRIPT_LIKE.some((pattern) => pattern.test(value));
 
+// Characters an editor may show as a line break, though only LF splits a source into script lines
+// in the readable plan format: next line (U+0085), line separator and paragraph separator.
+const HIDDEN_LINE_BREAK = /[\u0085\u2028\u2029]/;
+
 // The rule for a script's source text, which is code by design, so looking like script is no
-// fault: control or bidirectional-override characters other than tabs and line breaks, or half of
-// a surrogate pair, are refused.
-export const isUnsafeSource = (value: string): boolean => CONTROL_OR_BIDIRECTIONAL_IN_PROSE.test(value) || !value.isWellFormed();
+// fault: control or bidirectional-override characters other than tabs and line breaks, a hidden
+// line break that would make one script line look like several, or half of a surrogate pair, are
+// refused.
+export const isUnsafeSource = (value: string): boolean =>
+  CONTROL_OR_BIDIRECTIONAL_IN_PROSE.test(value) || HIDDEN_LINE_BREAK.test(value) || !value.isWellFormed();
 
 // True when `input` is one of `values`, narrowing it to that union.
 export const isOneOf = <Value extends string>(values: readonly Value[], input: string): input is Value =>

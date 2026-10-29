@@ -74,7 +74,7 @@ const NETWORK_AND_STORAGE_STEP_TYPES: readonly StepType[] = [
 const CLOCK_AND_CLIPBOARD_STEP_TYPES: readonly StepType[] = ['advanceClock', 'expectClipboard'];
 // The unsafe features' steps, which only a plan declaring the current version may hold, and only
 // once its project enables their feature.
-const UNSAFE_STEP_TYPES: readonly StepType[] = ['evaluate', 'expectScript', 'database', 'expectDatabase'];
+export const UNSAFE_STEP_TYPES: readonly StepType[] = ['evaluate', 'expectScript', 'database', 'expectDatabase'];
 export const STEP_TYPES: readonly StepType[] = [
   'navigate', 'click', 'hover', 'fill', 'select', 'upload', 'press', 'frame', 'dialog', 'expect', 'expectPage', 'a11yAudit', 'capture',
   'remember', 'download', 'expectDownload', 'newTab', 'call', 'expectBackend', ...NETWORK_AND_STORAGE_STEP_TYPES, ...CLOCK_AND_CLIPBOARD_STEP_TYPES,

@@ -68,13 +68,14 @@ const SELECTOR_TEXT: JsonSchema = {
 // A response, result or output field declared as a JSON pointer, by name.
 const DECLARED_FIELDS: JsonSchema = recordOf(DECLARED_NAME, { type: 'string', pattern: '^(/([^~]|~[01])*)*$' });
 // A script a page-script step runs: a name the project declares, or one written into the plan.
-// The source may hold line breaks and tabs, but no other control characters.
+// The source may hold line breaks and tabs, but no other control characters, and none of the
+// characters an editor may show as a line break (U+0085, U+2028 and U+2029).
 const SCRIPT_CHOICE: JsonSchema = {
   oneOf: [
     { type: 'string', pattern: DECLARED_NAME.source },
     closedObject({
       inline: closedObject({
-        source: { type: 'string', 'minLength': 1, 'maxLength': MAXIMUM_INLINE_SCRIPT_LENGTH, pattern: '^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$' },
+        source: { type: 'string', 'minLength': 1, 'maxLength': MAXIMUM_INLINE_SCRIPT_LENGTH, pattern: '^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f\\u007f\\u0085\\u2028\\u2029\\u202a-\\u202e\\u2066-\\u2069]*$' },
         effect: { enum: [...CALL_EFFECTS] },
         fields: DECLARED_FIELDS,
       }, ['source', 'effect']),
