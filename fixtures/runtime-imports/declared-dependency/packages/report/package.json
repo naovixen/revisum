@@ -1,0 +1,9 @@
+{
+  "name": "@revisum/report",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "optionalDependencies": {
+    "chrome-remote-interface": "0.33.0"
+  }
+}

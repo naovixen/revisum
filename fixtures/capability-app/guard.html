@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Guarded actions</title><link rel="stylesheet" href="capability.css"></head>
+<body>
+<main>
+  <h1>Guarded actions</h1>
+  <button type="button" id="save">Save draft</button>
+  <!-- Its test id does not say what it does; only its accessible name does. -->
+  <button type="button" data-testid="close-account">Delete account</button>
+  <label for="note">Note</label>
+  <input id="note" type="text">
+  <button type="button" id="help">Help</button>
+  <label for="size">Size</label>
+  <select id="size"><option>Small</option><option>Medium</option><option>Large</option></select>
+  <label for="attachment">Attachment</label>
+  <input id="attachment" type="file">
+  <button type="button" id="ask">Ask a question</button>
+  <button type="button" id="ask-to-clear">Clear drafts</button>
+  <p data-testid="input-events">0</p>
+  <p data-testid="save-clicks">0</p>
+  <p data-testid="note-keys">0</p>
+  <p data-testid="help-state">closed</p>
+  <p data-testid="size-chosen">Small</p>
+  <p data-testid="attachment-name">none</p>
+  <p data-testid="dialog-status">Waiting</p>
+</main>
+<script src="guard.js"></script>
+</body>
+</html>

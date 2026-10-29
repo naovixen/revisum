@@ -1,0 +1,7 @@
+body { font-family: sans-serif; margin: 24px; }
+main { max-width: 900px; }
+button, input, select { font-size: 16px; margin: 6px 0; }
+#stage { position: relative; height: 120px; }
+#stage button { position: absolute; left: 0; top: 40px; }
+#cover { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.3); z-index: 10; }
+iframe { border: 1px solid #888; display: block; }

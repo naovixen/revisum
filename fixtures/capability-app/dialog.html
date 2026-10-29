@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Draft</title><link rel="stylesheet" href="capability.css"></head>
+<body>
+<main>
+  <h1>Draft</h1>
+  <button type="button" id="ask">Ask a question</button>
+  <p data-testid="dialog-status">Waiting</p>
+</main>
+<script>
+  const dialogStatus = document.querySelector('[data-testid="dialog-status"]');
+  document.getElementById('ask').addEventListener('click', () => {
+    const kept = window.confirm('Keep the draft?');
+    dialogStatus.textContent = kept ? 'Kept' : 'Discarded';
+  });
+</script>
+</body>
+</html>

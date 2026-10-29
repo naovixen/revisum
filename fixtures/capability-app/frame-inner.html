@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Checkout form</title><link rel="stylesheet" href="capability.css"></head>
+<body>
+  <label for="holder">Card holder</label>
+  <input id="holder" type="text">
+  <button type="button" id="confirm">Confirm order</button>
+  <p data-testid="frame-status">Waiting</p>
+<script>
+  const frameStatus = document.querySelector('[data-testid="frame-status"]');
+  document.getElementById('confirm').addEventListener('click', () => {
+    frameStatus.textContent = `Confirmed for ${document.getElementById('holder').value}`;
+  });
+</script>
+</body>
+</html>

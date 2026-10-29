@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Checkout</title><link rel="stylesheet" href="capability.css"></head>
+<body>
+<main>
+  <h1>Checkout</h1>
+  <!-- An outer button with the same name as the one in the frame: a step meant for the frame
+       must never press this one. -->
+  <button type="button" id="outer-confirm">Confirm order</button>
+  <p data-testid="outer-status">Not confirmed</p>
+  <iframe data-testid="checkout-frame" title="Checkout form" src="frame-inner.html" width="600" height="260"></iframe>
+</main>
+<script>
+  const outerStatus = document.querySelector('[data-testid="outer-status"]');
+  document.getElementById('outer-confirm').addEventListener('click', () => { outerStatus.textContent = 'Outer confirmed'; });
+</script>
+</body>
+</html>

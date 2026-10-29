@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Pages</title><link rel="stylesheet" href="capability.css"></head>
+<body>
+<main>
+  <h1>Pages</h1>
+  <button type="button" id="popup">Open help</button>
+  <a href="/help.html" target="_blank">Open the guide</a>
+  <button type="button" id="export">Export list</button>
+  <a href="/report.csv" download="capability-report.csv">Download the report</a>
+  <button type="button" id="stay">Stay here</button>
+  <p data-testid="pages-status">Ready</p>
+  <p data-testid="popup-state">none</p>
+</main>
+<script>
+  const pagesStatus = document.querySelector('[data-testid="pages-status"]');
+  const popupState = document.querySelector('[data-testid="popup-state"]');
+  let popup = null;
+  document.getElementById('popup').addEventListener('click', () => { popup = window.open('/help.html', 'help', 'width=400,height=300'); });
+  // Whether the popup this page opened is still open, as the page itself sees it.
+  setInterval(() => { if (popup !== null) popupState.textContent = popup.closed ? 'closed' : 'open'; }, 50);
+  document.getElementById('export').addEventListener('click', () => {
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(new Blob(['name,count\nalpha,1\n'], { type: 'text/csv' }));
+    link.download = 'capability-export-list.csv';
+    document.body.appendChild(link);
+    link.click();
+  });
+  document.getElementById('stay').addEventListener('click', () => { pagesStatus.textContent = 'Stayed'; });
+</script>
+</body>
+</html>

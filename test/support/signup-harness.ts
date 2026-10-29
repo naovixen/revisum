@@ -20,8 +20,11 @@ export const FIXED_TIME_MILLISECONDS = Date.UTC(2026, 0, 15, 10, 30, 0);
 export const LOCALE = 'de-DE';
 export const TIMEZONE = 'Asia/Tokyo';
 
-// Every driver must pass the contract unchanged on each of these targets.
-export const CONTRACT_TARGETS = ['playwright-chromium', 'playwright-firefox', 'playwright-webkit', 'cdp-chromium'] as const;
+// Every driver must pass the contract unchanged on each of these targets. The own CDP driver runs
+// it twice: on Chrome for Testing and on its headless shell, the build CI uses.
+export const CONTRACT_TARGETS = [
+  'playwright-chromium', 'playwright-firefox', 'playwright-webkit', 'cdp-chromium', 'cdp-chromium-headless-shell',
+] as const;
 
 const desktop = { device: 'desktop-1280', locale: LOCALE, timezone: TIMEZONE, colorScheme: 'dark', reducedMotion: 'reduce' } as const;
 
@@ -35,6 +38,8 @@ export const makeProjectFile = (origin: string) => ({
     { id: 'playwright-firefox', adapter: 'playwright', engine: 'firefox', ...desktop },
     { id: 'playwright-webkit', adapter: 'playwright', engine: 'webkit', ...desktop },
     { id: 'cdp-chromium', adapter: 'cdp', engine: 'chromium', ...desktop },
+    // The same CDP driver, given the headless shell's executable instead of Chrome for Testing's.
+    { id: 'cdp-chromium-headless-shell', adapter: 'cdp-headless-shell', engine: 'chromium', ...desktop },
     // Targets no registered driver can serve, to prove they are reported and never substituted.
     { id: 'playwright-firefox-phone', adapter: 'playwright', engine: 'firefox', ...desktop, device: 'phone-390' },
     { id: 'appium-android', adapter: 'appium', engine: 'chromium', ...desktop, device: 'phone-390' },
@@ -50,6 +55,7 @@ export function makeProject(origin: string): Project {
 export const makeDrivers = (): ReadonlyMap<string, BrowserDriver> => new Map<string, BrowserDriver>([
   ['playwright', playwrightDriver()],
   ['cdp', cdpDriver({ executablePath: BROWSERS.chrome })],
+  ['cdp-headless-shell', cdpDriver({ executablePath: BROWSERS.chromeHeadlessShell })],
 ]);
 
 export type Ran = { readonly result: RunResult; readonly events: RunEventSink; readonly store: MemoryArtifactStore };

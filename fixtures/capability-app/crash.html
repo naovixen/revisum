@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Report</title><link rel="stylesheet" href="capability.css"></head>
+<body>
+<main>
+  <h1>Report</h1>
+  <!-- Never enabled, so a click on it waits until the tab crashes. -->
+  <button type="button" disabled>Start the report</button>
+  <p data-testid="crash-status">Waiting</p>
+</main>
+<script>
+  // 300 ms after the page has loaded, while the next step waits, the page asks for this file.
+  // The test ends the tab's renderer when the server sees the request.
+  window.addEventListener('load', () => { setTimeout(() => { fetch('/crash-ready.txt').catch(() => undefined); }, 300); });
+</script>
+</body>
+</html>

@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Attach a file</title><link rel="stylesheet" href="capability.css"></head>
+<body>
+<main>
+  <h1>Attach a file</h1>
+  <label for="attachment">Attachment</label>
+  <input id="attachment" type="file">
+  <p data-testid="upload-name">none</p>
+  <p data-testid="upload-content">empty</p>
+</main>
+<script>
+  const input = document.getElementById('attachment');
+  input.addEventListener('change', async () => {
+    const file = input.files[0];
+    document.querySelector('[data-testid="upload-name"]').textContent = file ? file.name : 'none';
+    document.querySelector('[data-testid="upload-content"]').textContent = file ? (await file.text()).trim() : 'empty';
+  });
+</script>
+</body>
+</html>

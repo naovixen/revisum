@@ -1,0 +1,11 @@
+[
+{ "browser": "chrome", "major": 157, "fixHours": 20, "revalidatedAt": "2026-08-18T09:00:00Z" },
+{ "browser": "chrome", "major": 153, "fixHours": 1, "revalidatedAt": "2026-04-28T09:00:00Z" },
+{ "browser": "firefox", "major": 120, "fixHours": 50, "revalidatedAt": "2026-03-10T09:00:00Z" },
+{ "browser": "chrome", "major": 151, "fixHours": 1, "revalidatedAt": "2026-03-03T09:00:00Z" },
+{ "browser": "chrome", "major": 158, "fixHours": 20, "revalidatedAt": "2026-09-15T09:00:00Z" },
+{ "browser": "chrome", "major": 156, "fixHours": 1, "revalidatedAt": "2026-07-21T09:00:00Z" },
+{ "browser": "chrome", "major": 152, "fixHours": 1, "revalidatedAt": "2026-03-31T09:00:00Z" },
+{ "browser": "chrome", "major": 155, "fixHours": 1, "revalidatedAt": "2026-06-23T09:00:00Z" },
+{ "browser": "chrome", "major": 154, "fixHours": 1, "revalidatedAt": "2026-05-26T09:00:00Z" }
+]
