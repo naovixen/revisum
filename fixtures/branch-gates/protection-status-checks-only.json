@@ -1,0 +1,31 @@
+{
+  "required_status_checks": {
+    "strict": false,
+    "contexts": [
+      "ci",
+      "tests-apart"
+    ],
+    "checks": [
+      {
+        "context": "ci",
+        "app_id": 15368
+      },
+      {
+        "context": "tests-apart",
+        "app_id": 15368
+      }
+    ]
+  },
+  "enforce_admins": {
+    "enabled": false
+  },
+  "required_linear_history": {
+    "enabled": false
+  },
+  "allow_force_pushes": {
+    "enabled": false
+  },
+  "allow_deletions": {
+    "enabled": false
+  }
+}
