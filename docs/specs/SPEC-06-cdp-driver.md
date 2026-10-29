@@ -27,6 +27,27 @@ export interface BrowserDriver {
 export type UpkeepRecord = { browser: 'chrome' | 'firefox'; major: number; fixHours: number; revalidatedAt: string };
 ```
 
+### Build notes (alignment with the seeded code, 2026-10-29)
+
+The seeded `contracts` code and the tests built on it win where they differ from the block above. Marked additions are new with this spec.
+
+- **Seeded shapes stay.** `AdapterInfo`, `SessionEnvironment` and `BrowserDriver` keep their seeded fields; `supports` returns `Result<true, Unavailable>`. Policy reaches the driver as the `ActionGuard` the engine passes to each `act` call, and a secret as `act`'s `secret` argument, not through the environment. `UpkeepRecord` lives in `tools/`, not `contracts`.
+- **The guard stays optional on `act`.** Two seeded tests call `act` without one, so making it required would change committed tests. This replaces the M1 exit's "`Session.act`'s guard becomes required". Instead:
+  - the engine passes a guard on every `act` call, and a proof checks this;
+  - both real drivers, given a guard, resolve the element, build its `ResolvedElement`, ask the guard, and dispatch nothing on a deny (AC-09). For a dialog step the guard gets the dialog's text.
+- **Steps this spec makes real on the CDP driver:** `hover`, `select`, `upload` (a declared fixture file set on the file input), `frame` (its steps run inside the iframe's document) and `dialog` (accept or dismiss the open dialog, checking `expectText`). The engine stops reporting these as `unsupported-step`. The Playwright fallback refuses them with `unsupported-step` and nothing dispatched. `remember` stays unsupported until SPEC-30's driver parts.
+- **New driver error codes** (addition): `target-crashed`, when the page's renderer dies (CDP `Inspector.targetCrashed` or a closed target); and `unsupported-step`, when a step makes the page open a popup or a second page, or start a download. The popup is closed, the download is cancelled and its partial file deleted, and the step fails. Downloads by a `download` step and `newTab` stay with SPEC-31's driver parts.
+- **A crash** fails the step that was running with `target-crashed`, skips the rest, and `close()` still ends every process the driver started (AC-04, AC-07).
+- **Headless shell** (AC-01). `tools/install-browsers.ts` also installs the `chrome-headless-shell` build matching `CHROME_FOR_TESTING_BUILD`. The contract suite runs on a second CDP target that uses it, through the same driver with a different executable path.
+- **Auto-wait** (AC-03) keeps the seeded checks (attached, visible, stable, enabled, receives the click). The limit for "never actionable" is the step timeout plus 1,500 ms.
+- **Runtime imports** (AC-06). A lint in `tools/` fails when any package in the default runtime set imports, or depends on, `playwright`, `playwright-core`, `puppeteer`, `puppeteer-core`, `webdriverio`, `selenium-webdriver` or `chrome-remote-interface`. The default runtime set is every package except `driver-playwright`, the optional fallback. `npm run check` runs it.
+- **Upkeep** (AC-08):
+  - `docs/decisions/browser-upkeep.json` holds the records `{ browser, major, fixHours, revalidatedAt }`.
+  - `tools/browser-upkeep.ts` decodes them and reports the average `fixHours` over the first six Chrome majors. When that average is over 1.8 it prints a flag naming the Playwright fallback rule and exits 1. With fewer than six records, it reports the running average without flagging.
+  - A weekly scheduled CI job reads the latest stable Chrome for Testing version from its public version list. When that major is newer than the pinned one, the job reruns the contract and capability suites against the new build. It fails when the new major has no upkeep record.
+  - The session adds the record when it moves the pin; the founder's push approves it. Tests use fixture records and a fixture version list, never the network.
+- **Capability runs** (AC-02). The capability tests for iframes, dialogs, uploads and a crashed tab run 20 times in one test file, against local fixture pages, in `npm run check:linux`.
+
 ## Acceptance criteria
 
 - AC-SPEC-06-01: When the core skeleton's unchanged contract suite (spike P3) runs on the CDP adapter against Chrome for Testing and the headless shell, all 8 tests shall pass (oracle: regression; reuses AC-p4-01, AC-p4-02, AC-p4-29).
