@@ -18,7 +18,7 @@ Let people and tools write plans in whatever way fits their workflow, while ever
     - `declared` when an author names it for a file (`hand-written` by default, or `customer-llm`).
     - The source is recorded and shown, never trusted: it changes no gate, approval or metric.
   - **Route b, the customer's own LLM or agent:** it writes either form against the published JSON Schema and grammar reference. MCP (SPEC-18, phase 2a) accepts both forms.
-  - **Route c, `core draft` (M4).** It turns the acceptance criteria of a spec, or of a ticket saved as Markdown, into a readable draft through the `AiPlanner` port, on the customer's own key or a local model.
+  - **Route c, `core draft` (M2; moved from M4, founder, 2026-10-29).** It turns the acceptance criteria of a spec, or of a ticket saved as Markdown, into a readable draft through the `AiPlanner` port, on the customer's own key or a local model.
     - The criteria are extracted deterministically from Markdown.
     - The planner sees only the criteria text, the grammar version, and the project's declared origins and targets. It never sees secrets, page content or artefacts. This egress is listed in the logging manifest (SPEC-09).
     - Model output is typed `unknown` and bounded by `parseAiText` (SPEC-01) before it becomes a draft.
@@ -601,7 +601,7 @@ export interface ChatDrafter { reply(conversationId: string, message: string): P
 
 ## Milestone
 
-M1 (readable format, conversion, `admitDraft`, provenance); M4 (`draft`); phase 2a (MCP text input, tickets); phase 2b (builder, recorder; chat, paid).
+M1 (readable format, conversion, `admitDraft`, provenance); M2 (`draft`, moved from M4 on 2026-10-29: `docs/decisions/drafting-earlier.md`; SPEC-37 adds `--explore`); phase 2a (MCP text input, tickets); phase 2b (builder, recorder; chat, paid).
 
 ## Satisfies
 

@@ -43,6 +43,8 @@ M2, driver and isolation (alpha):
 - [x] SPEC-06 CDP driver, with SPEC-03's guard wired in
 - [x] SPEC-07 isolated runner and egress
 - [ ] SPEC-35 workload runner: suite run, egress, traces and manifest; zero-test suites end Failed, expected failures raise a review item
+- [ ] SPEC-28 `draft` (route c), with SPEC-37's planner adapters; moved from M4 (founder, 2026-10-29: `docs/decisions/drafting-earlier.md`)
+- [ ] SPEC-37 explore to draft: `draft --explore`, crawl, page map, locator check
 - [ ] SPEC-30 to 34 and SPEC-36 driver and runner parts (states, downloads, tab, real service caller, stubs, storage, clock, clipboard, CSS, XPath, DOM checks, page scripts, then database commands)
 - [ ] SPEC-08 manifest and replay
 - [ ] M2 exit
@@ -64,7 +66,6 @@ M4, launch (beta):
 
 - [ ] SPEC-16 CLI and GitHub Action, with SPEC-35's `run --suite` and Action input
 - [ ] SPEC-17 release artefacts and claims (marketing render target and claim lint), with SPEC-36's `doctor` checks and claim wording
-- [ ] SPEC-28 `draft`
 - [ ] M4 exit
 
 The queue ends at beta. Phase 2 specs (SPEC-18 onwards) wait for pilots.

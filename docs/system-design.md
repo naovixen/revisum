@@ -128,6 +128,7 @@ flowchart LR
   t1[Hand-written<br/>readable .plan or JSON] --> P
   t2[Customer's own LLM<br/>or agent, or MCP] --> P
   t3[revisum draft<br/>from a spec] --> P
+  t7[revisum draft --explore<br/>from the running app] --> P
   t4[From a ticket's acceptance<br/>criteria, phase 2a] --> P
   t5[Plan builder or recorder,<br/>phase 2b] --> P
   t6[Revisum chat drafter,<br/>paid, phase 2b] --> P
@@ -255,9 +256,9 @@ Allowed abbreviations: id, url, uri, html, css, json, http, api, cli, ci, pr, cd
 |---|---|---|
 | M0 seed | All skeletons; `engine`, `driver-cdp`, `auditor-act`, `report` from spikes | Spike suites pass unchanged in CI |
 | M1 language and trust | `contracts`, `engine` | Plans in readable or JSON form parse, gate and need a person's approval. SPEC-35's suite declaration, suite-file trust, report decoder, result mapping and labels (no containers), and SPEC-36's plan 1.3 parser parts, declarations, gate rules and labels; coverage measured on 1.3 with parsed plans (built) |
-| M2 driver and isolation | `driver-cdp`, `runner`, `engine` (manifest) | A plan runs in the container, egress blocked, replay matches. SPEC-35's workload runner runs a suite with egress, traces and manifest, before the remaining plan-language driver parts; SPEC-36's driver parts (CSS, XPath, DOM checks, page scripts), then database commands. **Alpha** |
+| M2 driver and isolation | `driver-cdp`, `runner`, `engine` (manifest) | A plan runs in the container, egress blocked, replay matches. SPEC-35's workload runner runs a suite with egress, traces and manifest, before the remaining plan-language driver parts; SPEC-36's driver parts (CSS, XPath, DOM checks, page scripts), then database commands. `cli`: SPEC-28's `draft` and SPEC-37's `draft --explore` (moved from M4, 2026-10-29). **Alpha** |
 | M3 evidence | `auditor-axe`, `auditor-act`, `report`, `engine` (review, audit log, metrics); WCAG test base in `test/wcag/` and `fixtures/wcag/` | Report, PR comment, review queue and recorder work end to end; CI publishes "verifies N of M criteria" per level. SPEC-35's snapshot audit, masked captures, report, PR comment and review queue; SPEC-36's labels in exporters |
-| M4 launch | `cli` (including `draft`), `action`, docs | `npx revisum run` and the Action work on a demo app. SPEC-35's `run --suite` and Action input; SPEC-36's `doctor` checks and claim-lint wording. **Beta** |
+| M4 launch | `cli` (the remaining commands), `action`, docs | `npx revisum run` and the Action work on a demo app. SPEC-35's `run --suite` and Action input; SPEC-36's `doctor` checks and claim-lint wording. **Beta** |
 
 **Action:** review this table against `09` at every milestone exit.
 
