@@ -55,8 +55,10 @@ export type ResolvedElement = {
 };
 
 // Asked by a driver once it has resolved an action's element, before any input event. On a deny
-// the driver performs nothing and returns policy-denied.
-export type ActionGuard = (element: ResolvedElement) => GuardVerdict;
+// the driver performs nothing and returns policy-denied. For a dialog step the element has every
+// field null and `dialogText` is the open dialog's text, which decides whether accepting it is
+// irreversible; for every other step it is null.
+export type ActionGuard = (element: ResolvedElement, dialogText: string | null) => GuardVerdict;
 
 export const IMPACTS = ['minor', 'moderate', 'serious', 'critical', 'unknown'] as const;
 export type Impact = (typeof IMPACTS)[number];
@@ -80,7 +82,8 @@ export interface PageNavigator {
 }
 export interface ActionRunner {
   // Given a guard, the driver asks it first and acts only on an allow. The CDP driver starts
-  // passing the resolved element with SPEC-06 (docs/specs/SPEC-06-cdp-driver.md).
+  // passing the resolved element, and answering dialogs, with SPEC-06
+  // (docs/specs/SPEC-06-cdp-driver.md); until then a driver refuses a dialog step.
   // For a fill whose value is a secret reference, the engine passes the resolved secret; the driver
   // reveals it only at the moment it types, and never reports it back. The engine replaces value
   // references before it acts; a driver refuses any step that still holds one.

@@ -14,9 +14,20 @@ export function approvalFor(plan: Plan, store: ApprovalStore): Approval | null {
   return store.forSubject(hash).find((approval) => approval.subject.kind === 'plan' && approval.subject.hash === hash) ?? null;
 }
 
+const PROPOSAL: PlanStanding = { mode: 'proposal' };
+
 export function planStanding(plan: Plan, store: ApprovalStore): PlanStanding {
   const approval = approvalFor(plan, store);
-  return approval === null ? { mode: 'proposal' } : { mode: 'approved', approval };
+  return approval === null ? PROPOSAL : { mode: 'approved', approval };
+}
+
+// The standing a plan may act on: the one it was given only when that standing's approval is for
+// this plan's own hash. A standing made for another plan, or none at all, leaves it a proposal, so
+// a caller cannot lend one plan's approval to another. The policy gate and run() both use this.
+export function ownStanding(plan: Plan, standing: PlanStanding | undefined): PlanStanding {
+  if (standing?.mode !== 'approved') return PROPOSAL;
+  const subject = standing.approval.subject;
+  return subject.kind === 'plan' && subject.hash === planHash(plan) ? standing : PROPOSAL;
 }
 
 // True only for an approved plan, whatever the approval's strength.

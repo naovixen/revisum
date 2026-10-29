@@ -54,7 +54,8 @@ const PAGE_CHECKS_NO_DRIVER_DECIDES: readonly PageAssertion['kind'][] = ['metaCo
 // checks, response checks and reads, and web storage), or its clock and clipboard ports (clock
 // advances, clipboard checks and reads). The run reports such a step as
 // unsupported-step before anything of it reaches the driver. Steps no driver performs at all
-// (hover, select, upload, frame, dialog and remember) are the run's to refuse whole.
+// (hover, select, upload, frame and remember) are the run's to refuse whole. A dialog step goes to
+// the driver, so the runtime guard sees the dialog's text before anything answers it.
 export function needsDriverFeatures(step: Step): boolean {
   switch (step.type) {
     case 'click': case 'hover': case 'select': case 'upload': return needsLocatorFeatures(step.locator);
@@ -89,7 +90,8 @@ export const performableLocator = (locator: Locator): ResolvedLocator | undefine
 // The action as a driver performs it today: literal locator and text, a fill of literal text or of
 // a secret reference, and no feature it lacks. Undefined means the driver must refuse the step.
 export function literalActionStep(step: ActionStep): ResolvedActionStep | undefined {
-  if (needsDriverFeatures(step)) return undefined;
+  // No driver answers a dialog yet (docs/specs/SPEC-06-cdp-driver.md), so a driver refuses one.
+  if (step.type === 'dialog' || needsDriverFeatures(step)) return undefined;
   const locator = literalLocator(step.locator);
   if (locator === undefined) return undefined;
   switch (step.type) {

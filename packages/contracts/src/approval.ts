@@ -97,6 +97,10 @@ export interface VersionControlPort {
   pullRequest(pullRequest: number): Promise<Result<{ readonly author: string; readonly headCommit: string }, 'unavailable'>>;
   // The id of the last commit in the pull request that changed `path`.
   lastCommitTouching(path: string, pullRequest: number): Promise<Result<string, 'unavailable'>>;
+  // The file at `path` as `commit` holds it: what a reviewer of that commit saw. A code-owner
+  // review verifies only through a port that has it; ports that only load the trusted project
+  // leave it out.
+  fileAtCommit?(path: string, commit: string): Promise<Result<{ readonly bytes: Uint8Array }, 'not-found' | 'unavailable'>>;
   // Who landed `commit` on `branch`, and when; null when it never landed there.
   landedBy(commit: string, branch: string): Promise<Result<(VersionControlAccount & { readonly at: string }) | null, 'unavailable'>>;
 }

@@ -64,21 +64,45 @@ export function parseApproversFile(input: unknown): ApproversFile | null {
 // A rule such as "Bash(git push *)" or "PowerShell(gh pr review *)", in Claude Code's settings.json.
 const SHELL_RULE = /^(?:Bash|PowerShell)\((.*)\)$/s;
 
-// Commands an agent would run to push, merge or approve a pull request. A rule denies an action
-// when its pattern matches one of the action's commands. Merge counts as denied when either
-// git merge or gh pr merge is, as the spec's build notes settle.
-const ACTION_COMMANDS: Readonly<Record<'push' | 'merge' | 'approve-pull-request', readonly string[]>> = {
-  'push': ['git push origin main'],
-  'merge': ['git merge feature', 'gh pr merge 1'],
-  'approve-pull-request': ['gh pr review 1 --approve'],
+// The command family behind each action that would let the agent approve its own work. A family is
+// the command alone and the command with any arguments: every remote, branch and flag of git push;
+// every pull request and flag of gh pr merge; every gh pr review, since --approve, -a and the order
+// of arguments vary. Denying one example command, such as "git push origin main", leaves the rest
+// of the family open, so it does not count. A local git merge lands nothing without a push, so
+// merge is denied by denying gh pr merge, which merges on GitHub.
+const ACTION_FAMILIES: Readonly<Record<'push' | 'merge' | 'approve-pull-request', string>> = {
+  'push': 'git push',
+  'merge': 'gh pr merge',
+  'approve-pull-request': 'gh pr review',
 };
 
-// A rule's command pattern as a regular expression: "*" matches anything, and the older ":*"
-// suffix means "this prefix followed by anything".
-function commandExpression(pattern: string): RegExp {
-  const prefixed = pattern.endsWith(':*') ? `${pattern.slice(0, -2)}*` : pattern;
-  const escaped = prefixed.split('*').map((part) => part.replace(/[.+?^${}()|[\]\\]/g, '\\$&')).join('.*');
+// A rule's command pattern, with the older ":*" suffix ("this prefix followed by anything")
+// written as a plain trailing "*".
+const asGlob = (pattern: string): string => (pattern.endsWith(':*') ? `${pattern.slice(0, -2)}*` : pattern);
+
+// A glob as a regular expression over a whole command: "*" matches anything.
+function globExpression(glob: string): RegExp {
+  const escaped = glob.split('*').map((part) => part.replace(/[.+?^${}()|[\]\\]/g, '\\$&')).join('.*');
   return new RegExp(`^${escaped}$`);
+}
+
+// True when the pattern matches the family's command with no arguments. As Claude Code reads its
+// rules, a trailing " *" also matches the command with nothing after it.
+function deniesBareCommand(glob: string, family: string): boolean {
+  return globExpression(glob).test(family) || (glob.endsWith(' *') && globExpression(glob.slice(0, -2)).test(family));
+}
+
+// True when the pattern matches the family's command followed by any arguments at all: it ends in
+// "*" and what comes before that star matches the start of "<family> ", so the star swallows every
+// argument list whatever it holds. "git push *" and "git *" qualify; "git push origin *" does not.
+function deniesEveryArgument(glob: string, family: string): boolean {
+  if (!glob.endsWith('*')) return false;
+  const head = globExpression(glob.slice(0, -1));
+  const withSpace = `${family} `;
+  for (let length = 0; length <= withSpace.length; length++) {
+    if (head.test(withSpace.slice(0, length))) return true;
+  }
+  return false;
 }
 
 // The deny rules from a Claude Code settings.json (`permissions.deny`), or null when the file
@@ -92,14 +116,15 @@ export function parseDenyRules(input: unknown): readonly string[] | null {
   return deny.filter((rule): rule is string => typeof rule === 'string');
 }
 
-// True when the rules deny push, merge and pull-request approval in Bash or PowerShell.
+// True when the rules deny the whole of each family, push, merge and pull-request approval, in
+// Bash or PowerShell: its command alone and with any arguments, by one rule or two.
 export function deniesRequiredActions(rules: readonly string[]): boolean {
-  const patterns = rules.flatMap((rule) => {
+  const globs = rules.flatMap((rule) => {
     const command = SHELL_RULE.exec(rule.trim())?.[1];
-    return command === undefined ? [] : [commandExpression(command.trim())];
+    return command === undefined ? [] : [asGlob(command.trim())];
   });
-  return Object.values(ACTION_COMMANDS).every((commands) =>
-    commands.some((command) => patterns.some((pattern) => pattern.test(command))));
+  return Object.values(ACTION_FAMILIES).every((family) =>
+    globs.some((glob) => deniesBareCommand(glob, family)) && globs.some((glob) => deniesEveryArgument(glob, family)));
 }
 
 // ---- holdouts.json ----------------------------------------------------------------------------------

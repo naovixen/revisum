@@ -5,14 +5,14 @@
 // plan's cleanup calls run after the steps whatever the outcome.
 // See docs/specs/SPEC-32-declared-service-calls.md for calls.
 import {
-  needsDriverFeatures, success,
+  needsDriverFeatures,
   type A11yFinding, type ActionGuard, type ApprovalLabel, type ArtifactReference, type ArtifactStore, type Authorised,
-  type BrowserDriver, type Clock, type ElementProbe, type EventSink, type Plan, type PolicyRuleId, type Redactor,
+  type BrowserDriver, type Clock, type DialogStep, type ElementProbe, type EventSink, type GuardVerdict, type Plan, type PolicyRuleId, type Redactor,
   type ResolvedElement, type Result, type SafeText, type SecretStore, type ServiceCaller, type Session, type Step, type Target, type TargetId,
   type Unavailable, type ValueName, type GuaranteeStatement, type RunMode, type SuiteFinding, type SuiteName, type SuitePass,
   type SuiteTestId, type SuiteTestResult, type UnsafeFeature,
 } from '@revisum/contracts';
-import { approvalLabel, type PlanStanding } from './approval/plan-standing.ts';
+import { approvalLabel, ownStanding, type PlanStanding } from './approval/plan-standing.ts';
 import { guaranteeStatement } from './guarantees.ts';
 import { canonicalJson, sha256 } from './hashing.ts';
 import * as lifecycle from './lifecycle.ts';
@@ -28,7 +28,7 @@ import { declaredCommands } from './project/unsafe-feature-declarations.ts';
 import { SENSITIVE_PLACEHOLDER } from './redaction.ts';
 import { withResultHash } from './result-hash.ts';
 import {
-  generateRunValues, resolveActionStep, resolveElementAssertion, resolveLocator, resolvePathTemplate, resolvePlanClock,
+  generateRunValues, resolveActionStep, resolveElementAssertion, resolveLocator, resolvePathTemplate, resolvePlanClock, resolveText,
 } from './run-values.ts';
 import {
   NO_SECRETS, resolvePlanSecrets, resolvedSecretStore, secretRecords, withSecretRedaction, type ResolvedSecrets,
@@ -49,7 +49,8 @@ export type RunInputs = {
   readonly host: HostInfo;
   // The plan's standing (planStanding). Absent means no approval was supplied, so the run is a
   // proposal: it never reaches the project's production origins. An approved plan reaches them
-  // only when the project's policy allows production for approved plans.
+  // only when the project's policy allows production for approved plans. A standing whose
+  // approval is for another plan's hash is ignored: the run is a proposal.
   readonly standing?: PlanStanding;
   // The sources of the page scripts the project declares, keyed by each declared file path, as the
   // protected branch holds them. The manifest records the sha256 of each one the plan names, so a
@@ -63,9 +64,9 @@ export type RunPorts = {
   readonly artifacts: ArtifactStore;
   readonly redactor: Redactor;
   readonly events: RunEventSink;
-  // The audit sink that policy denials are appended to. Without one, the run's own log and its
-  // result still record a denial.
-  readonly audit?: EventSink;
+  // The audit sink that policy denials are appended to. Required, so no run can deny a plan
+  // without a record; a denial the sink fails to record is marked unrecorded in the outcome.
+  readonly audit: EventSink;
   // Where the secrets the plan names are resolved, such as environmentSecretStore(process.env).
   // Without one, every secret reference is missing and such a plan is refused.
   readonly secrets?: SecretStore;
@@ -143,8 +144,9 @@ export type RunResult = {
 };
 
 export type Rejected = { readonly state: 'Rejected'; readonly errors: readonly PlanError[] };
-// A parsed plan the policy gate's static check denied, so no run started.
-export type DeniedPlan = { readonly state: 'Denied'; readonly rule: PolicyRuleId; readonly stepIndex: number | null };
+// A parsed plan the policy gate's static check denied, so no run started. `unrecorded` is present
+// when the audit sink failed to record the denial.
+export type DeniedPlan = { readonly state: 'Denied'; readonly rule: PolicyRuleId; readonly stepIndex: number | null; readonly unrecorded?: true };
 
 type RunContext = {
   readonly inputs: RunInputs;
@@ -162,14 +164,14 @@ type RunContext = {
   readonly calls: CallStepContext | undefined;
 };
 
-// Keeps nothing, for callers with no audit sink: the run's log and result record the denial.
-const UNRECORDED_AUDIT: EventSink = { append: () => success({ sequence: 0 }) };
-
 const POLL_INTERVAL_MILLISECONDS = 50;
 
-export async function run(inputs: RunInputs, ports: RunPorts): Promise<RunResult> {
+export async function run(given: RunInputs, ports: RunPorts): Promise<RunResult> {
   // First, before any side effect: a plan the parser did not make is refused, whatever its type says.
-  assertBranded(inputs.plan);
+  assertBranded(given.plan);
+  // A standing lent from another plan is dropped here, so production, the origin allow-list and
+  // the approval label all see the plan as the proposal it is.
+  const inputs: RunInputs = { ...given, standing: ownStanding(given.plan, given.standing) };
   const startedAt = ports.clock.now();
   const target = inputs.project.matrix.find((candidate) => candidate.id === inputs.targetId);
   const declared = target !== undefined && inputs.plan.targets.includes(inputs.targetId);
@@ -180,7 +182,7 @@ export async function run(inputs: RunInputs, ports: RunPorts): Promise<RunResult
   const secrets = resolution.ok ? resolution.value : NO_SECRETS;
   const redactor = withSecretRedaction(ports.redactor, secrets);
   const logger = manifestLogger(ports.events, redactor, runId);
-  const gate = policyGate({ project: inputs.project, events: ports.audit ?? UNRECORDED_AUDIT });
+  const gate = policyGate({ project: inputs.project, events: ports.audit });
   // Generation is pure, so values exist before anything runs; a run with no target has none.
   const values = new Map<ValueName, SafeText>(target === undefined
     ? [] : generateRunValues(inputs.plan, inputs.seed, inputs.fixedTimeMilliseconds, target, inputs.project));
@@ -192,8 +194,9 @@ export async function run(inputs: RunInputs, ports: RunPorts): Promise<RunResult
   if (target === undefined || !declared) {
     return unavailableResult(inputs.targetId, { reason: 'not-declared', detail: 'target is not in both the plan and the matrix' }, context, startedAt);
   }
-  // Before any side effect on the target: a plan the gate did not clear for it is refused.
-  assertAuthorised(inputs.plan, target.id);
+  // Before any side effect on the target: a plan the gate did not clear for it, under this very
+  // project, is refused.
+  assertAuthorised(inputs.plan, target.id, inputs.project);
   const planned = lifecycle.plan(inputs.plan, target);
   logger.log({ kind: 'run.state', state: planned.state, targetId: target.id });
 
@@ -318,10 +321,12 @@ export async function runUntrusted(
 ): Promise<Rejected | DeniedPlan | readonly RunResult[]> {
   const parsed = parsePlan(input);
   if (!parsed.ok) return { state: 'Rejected', errors: parsed.error };
-  const gate = policyGate({ project: base.project, events: ports.audit ?? UNRECORDED_AUDIT });
+  const gate = policyGate({ project: base.project, events: ports.audit });
   const targets = base.project.matrix.filter((target) => parsed.value.targets.includes(target.id));
   const decision = gate.decide(parsed.value, targets, base.standing);
-  if (decision.kind === 'deny') return { state: 'Denied', rule: decision.rule, stepIndex: decision.stepIndex };
+  if (decision.kind === 'deny') {
+    return { state: 'Denied', rule: decision.rule, stepIndex: decision.stepIndex, ...(decision.unrecorded ? { unrecorded: true } : {}) };
+  }
   const results: RunResult[] = [];
   for (const targetId of decision.plan.targets) results.push(await run({ ...base, plan: decision.plan, targetId }, ports));
   return results;
@@ -400,7 +405,7 @@ async function openSession(planned: lifecycle.Planned, context: RunContext): Pro
 // report a pass it did not earn or act in part.
 function isUnsupported(step: Step): boolean {
   switch (step.type) {
-    case 'hover': case 'select': case 'upload': case 'frame': case 'dialog': case 'remember': return true;
+    case 'hover': case 'select': case 'upload': case 'frame': case 'remember': return true;
     // Database commands run in a workload container, which comes with the isolated runner
     // (docs/specs/SPEC-36-unsafe-plan-features.md).
     case 'database': case 'expectDatabase': return true;
@@ -425,7 +430,7 @@ async function executeStep(step: Step, index: number, session: Session, target: 
         path = resolved.value;
         const verdict = context.gate.guardAction({ type: 'navigate', url: path }, index, NO_ELEMENT, null, target.locale);
         if (verdict.kind === 'deny') {
-          context.denials.push({ rule: verdict.rule, stepIndex: verdict.stepIndex });
+          keepDenial(verdict, context);
           return { ...base, outcome: 'failed', code: 'policy-denied' };
         }
       }
@@ -449,8 +454,15 @@ async function executeStep(step: Step, index: number, session: Session, target: 
       const acted = await session.act(resolved, guardFor(resolved, index, target, context), secret);
       return acted.ok ? { ...base, outcome: 'passed' } : { ...base, outcome: 'failed', code: acted.error.code };
     }
+    case 'dialog': {
+      // The driver answers the dialog the page opened, asking the runtime guard first with the
+      // dialog's text, so accepting an irreversible one ends the run Denied with nothing sent.
+      const answer = resolveDialogStep(step, context);
+      if (!answer.ok) return { ...base, outcome: 'failed', code: answer.error };
+      const acted = await session.act(answer.value, guardFor(answer.value, index, target, context));
+      return acted.ok ? { ...base, outcome: 'passed' } : { ...base, outcome: 'failed', code: acted.error.code };
+    }
     case 'frame':
-    case 'dialog':
     case 'remember':
     case 'download':
     case 'expectDownload':
@@ -512,12 +524,25 @@ async function executeStep(step: Step, index: number, session: Session, target: 
   }
 }
 
-// The runtime guard the driver asks before the step's input event, with the element it resolved.
-// A denial is kept, so the run can end Denied naming the rule.
+// A dialog step with its expected text's value references replaced, as a driver must receive it.
+function resolveDialogStep(step: DialogStep, context: RunContext): Result<DialogStep, string> {
+  if (step.expectText === undefined) return { ok: true, value: step };
+  const expected = resolveText(step.expectText, context.values, context.inputs.project.limits.maximumTextLength);
+  return expected.ok ? { ok: true, value: { ...step, expectText: expected.value } } : expected;
+}
+
+// Keeps the runtime guard's denial, so the run can end Denied naming the rule, and marked
+// unrecorded when the audit sink did not record it.
+function keepDenial(verdict: Extract<GuardVerdict, { kind: 'deny' }>, context: RunContext): void {
+  context.denials.push({ rule: verdict.rule, stepIndex: verdict.stepIndex, ...(verdict.unrecorded ? { unrecorded: true } : {}) });
+}
+
+// The runtime guard the driver asks before the step's input event, with the element it resolved
+// and, for a dialog step, the open dialog's text.
 function guardFor(step: Step, index: number, target: Target, context: RunContext): ActionGuard {
-  return (element) => {
-    const verdict = context.gate.guardAction(step, index, element, null, target.locale);
-    if (verdict.kind === 'deny') context.denials.push({ rule: verdict.rule, stepIndex: verdict.stepIndex });
+  return (element, dialogText) => {
+    const verdict = context.gate.guardAction(step, index, element, dialogText, target.locale);
+    if (verdict.kind === 'deny') keepDenial(verdict, context);
     return verdict;
   };
 }

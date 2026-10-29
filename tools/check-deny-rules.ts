@@ -57,7 +57,7 @@ export async function checkDenyRules(root: string): Promise<string[]> {
     const prefix = `${shell}(`;
     const shellRules = rules.filter((rule) => rule.trim().startsWith(prefix));
     if (deniesRequiredActions(shellRules) !== true) {
-      problems.push(`${SETTINGS_PATH} does not deny push, merge (git merge or gh pr merge) and pull-request approval (gh pr review) in ${shell}`);
+      problems.push(`${SETTINGS_PATH} does not deny the whole of push (git push), merge (gh pr merge) and pull-request approval (gh pr review) in ${shell}`);
     }
     const patterns = shellPatterns(rules, shell);
     for (const { action, commands } of HISTORY_DENIALS) {

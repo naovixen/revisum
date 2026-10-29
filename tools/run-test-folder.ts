@@ -96,7 +96,7 @@ function main(folders: readonly string[]): number {
     writeFileSync(resultsFile, '');
     return 0;
   }
-  const scratchFolder = mkdtempSync(join(tmpdir(), 'revisum-test-results-'));
+  const scratchFolder = mkdtempSync(join(tmpdir(), 'test-results-'));
   try {
     const browserFiles = files.filter((file) => drivesBrowser(file));
     const otherFiles = files.filter((file) => !browserFiles.includes(file));

@@ -277,9 +277,13 @@ export type Step =
   | PageScriptStep
   | DatabaseCommandStep;
 export type StepType = Step['type'];
-// The steps that act on an element; the driver's ActionRunner port performs them. The policy
-// gate judges a download as the click it is.
-export type ActionStep = Extract<Step, { type: 'click' | 'hover' | 'fill' | 'select' | 'upload' | 'press' | 'download' }>;
+// The steps that send input to the page; the driver's ActionRunner port performs them, asking the
+// policy gate's runtime guard first. All but a dialog act on an element; answering a dialog acts
+// on the dialog the page opened, so the guard reads its text. The policy gate judges a download as
+// the click it is.
+export type ActionStep = Extract<Step, { type: 'click' | 'hover' | 'fill' | 'select' | 'upload' | 'press' | 'download' | 'dialog' }>;
+// Accepts or dismisses the next dialog the page opens.
+export type DialogStep = Extract<Step, { type: 'dialog' }>;
 // An action step with every value reference replaced by its text, as the engine hands it to a
 // driver. A multi-line fill has no resolved form until the CDP driver inserts lines of text.
 export type ResolvedActionStep =

@@ -14,7 +14,8 @@
 //
 // Both are deterministic and read nothing but their arguments and the project. Each denial appends
 // one plan.denied audit event whose code is the rule, so a denial leaves a record even when
-// nothing ran.
+// nothing ran; a denial the audit sink failed to record is marked unrecorded. An authorisation
+// holds only for the project it was cleared under: run() refuses it under any other.
 // See docs/specs/SPEC-03-policy-gate.md and docs/specs/SPEC-36-unsafe-plan-features.md.
 import { literalText } from '@revisum/contracts';
 import type {
@@ -22,15 +23,17 @@ import type {
   PolicyRuleId, RemoveStorageStep, ResolvedElement, ServiceCallStep, SetStorageStep, Step, StubStep, Target, TargetId,
 } from '@revisum/contracts';
 import { deriveActor, sourceActorId } from '../actor.ts';
-import type { PlanStanding } from '../approval/plan-standing.ts';
+import { ownStanding, type PlanStanding } from '../approval/plan-standing.ts';
+import { canonicalJson, sha256 } from '../hashing.ts';
 import { planHash } from '../manifest.ts';
 import type { Limits, Project, ProjectPolicy } from '../project/project-parser.ts';
 import type { TrustedProject } from '../project/trusted-project.ts';
 import { declaredCommands, declaredScripts } from '../project/unsafe-feature-declarations.ts';
-import { isAllowedName, matchesIrreversiblePattern, patternsForLocale } from './irreversible-patterns.ts';
+import { everyIrreversiblePattern, isAllowedName, matchesIrreversiblePattern, patternsForLocale } from './irreversible-patterns.ts';
 
 export interface PolicyGate {
-  // The static check of a whole plan for the targets it will run on. A missing standing is a proposal.
+  // The static check of a whole plan for the targets it will run on. A missing standing, or one
+  // whose approval is for another plan's hash, is a proposal.
   decide(plan: Plan, targets: readonly Target[], standing?: PlanStanding): PolicyDecision;
   // The runtime check of one action. A step that acts on no element, such as a dialog step,
   // passes an element with every field null.
@@ -56,24 +59,37 @@ const ACTIVATING_KEYS: readonly string[] = ['Enter', 'Space'];
 // Only used to read the path of a URL that is relative to the app under test.
 const RELATIVE_BASE = new URL('https://relative.invalid');
 
-// Every plan the gate authorised, with the targets it authorised it for, so run() can refuse a
-// plan that was only cast to Authorised. A WeakMap holds no plan alive and cannot be listed.
-const AUTHORISED_TARGETS = new WeakMap<object, Set<string>>();
+// Every plan the gate authorised, with each project and target it authorised it for, so run() can
+// refuse a plan that was only cast to Authorised, or that was cleared under another project's
+// allowances. A WeakMap holds no plan alive and cannot be listed.
+const AUTHORISED_CLEARANCES = new WeakMap<object, Set<string>>();
+
+// What a project allows, as one hash over everything the gate reads from it. Where the project was
+// read from (its provenance) allows nothing, so it is left out, and the same project file gives
+// the same hash whether it was parsed or loaded from the protected branch.
+function projectFingerprint(project: Project | TrustedProject): string {
+  const allowances = Object.fromEntries(Object.entries(project).filter(([key]) => key !== 'provenance'));
+  return sha256(canonicalJson(allowances));
+}
+
+const clearance = (projectHash: string, targetId: string): string => `${projectHash}:${targetId}`;
 
 // The one place a plan becomes Authorised: after decide() found nothing to deny.
-function authorised(plan: Plan, targets: readonly Target[]): Authorised {
-  const known = AUTHORISED_TARGETS.get(plan) ?? new Set<string>();
-  for (const target of targets) known.add(target.id);
-  AUTHORISED_TARGETS.set(plan, known);
+function authorised(plan: Plan, targets: readonly Target[], projectHash: string): Authorised {
+  const known = AUTHORISED_CLEARANCES.get(plan) ?? new Set<string>();
+  for (const target of targets) known.add(clearance(projectHash, target.id));
+  AUTHORISED_CLEARANCES.set(plan, known);
   return plan as Authorised;
 }
 
 // The run-time half of the Authorised brand: run() calls this before acting on a plan for a
-// target, so a plan the gate never cleared for that target is refused, whatever its type says.
-export function assertAuthorised(plan: unknown, targetId: TargetId): asserts plan is Authorised {
-  const known = typeof plan === 'object' && plan !== null ? AUTHORISED_TARGETS.get(plan) : undefined;
-  if (known === undefined || !known.has(targetId)) {
-    throw new TypeError('refused a plan that the policy gate did not authorise for this target');
+// target, so a plan the gate never cleared for that target, under exactly this project, is
+// refused, whatever its type says. A plan cleared where "Delete account" is allowed cannot then
+// run under a project that does not allow it.
+export function assertAuthorised(plan: unknown, targetId: TargetId, project: Project | TrustedProject): asserts plan is Authorised {
+  const known = typeof plan === 'object' && plan !== null ? AUTHORISED_CLEARANCES.get(plan) : undefined;
+  if (known === undefined || !known.has(clearance(projectFingerprint(project), targetId))) {
+    throw new TypeError('refused a plan that the policy gate did not authorise for this target under this project');
   }
 }
 
@@ -257,12 +273,14 @@ function staticRule(step: Step, context: StaticContext): PolicyRuleId | null {
 function staticDenial(plan: Plan, targets: readonly Target[], standing: PlanStanding, project: Project | TrustedProject): Denial | null {
   if (isOverLimit(plan, project.limits)) return { rule: 'over-limit', stepIndex: null };
   const patternSets = targets.map((target) => patternsForLocale(target.locale, project.policy.irreversiblePatterns));
-  const patterns: string[] = [];
+  // With no targets no language is known, so every pattern applies: the engine's own never lapse.
+  const patterns: string[] = targets.length === 0 ? [...everyIrreversiblePattern(project.policy.irreversiblePatterns)] : [];
   for (const set of patternSets) {
     if (set === null) return { rule: 'no-locale-patterns', stepIndex: null };
     patterns.push(...set);
   }
   // Production is closed to every plan unless the project opens it, and then only to approved plans.
+  // The standing is already the plan's own (ownStanding), never another plan's.
   const productionAllowed = standing.mode === 'approved' && project.policy.allowProductionForApprovedPlans;
   const context: StaticContext = { project, patterns, productionAllowed, approved: standing.mode === 'approved' };
   for (const { step, index } of everyStep(plan.steps)) {
@@ -340,25 +358,30 @@ function runtimeRule(
 
 // ---- The gate -----------------------------------------------------------------------------------
 
+// Added to a denial the audit sink did not record. The denial stands either way; the mark makes
+// the lost record show in the outcome instead of passing silently.
+const UNRECORDED = { unrecorded: true } as const;
+
 export function policyGate(options: PolicyGateOptions): PolicyGate {
   const { project, events } = options;
-  // The audit record is appended whether or not the sink accepts it: the decision stands either way.
-  const record = (rule: PolicyRuleId, plan?: Plan): void => {
-    events.append({ kind: 'plan.denied', code: rule, ...(plan === undefined ? {} : { subjectHash: planHash(plan) }) }, POLICY_GATE_ACTOR);
-  };
+  const projectHash = projectFingerprint(project);
+  // True when the audit sink accepted the denial's event.
+  const record = (rule: PolicyRuleId, plan?: Plan): boolean =>
+    events.append({ kind: 'plan.denied', code: rule, ...(plan === undefined ? {} : { subjectHash: planHash(plan) }) }, POLICY_GATE_ACTOR).ok;
   return {
-    decide(plan, targets, standing = { mode: 'proposal' }) {
-      const denial = staticDenial(plan, targets, standing, project);
-      if (denial === null) return { kind: 'allow', plan: authorised(plan, targets) };
-      record(denial.rule, plan);
-      return { kind: 'deny', rule: denial.rule, stepIndex: denial.stepIndex };
+    decide(plan, targets, standing) {
+      // A standing made for another plan is no standing: the plan is judged as a proposal.
+      const denial = staticDenial(plan, targets, ownStanding(plan, standing), project);
+      if (denial === null) return { kind: 'allow', plan: authorised(plan, targets, projectHash) };
+      const recorded = record(denial.rule, plan);
+      return { kind: 'deny', rule: denial.rule, stepIndex: denial.stepIndex, ...(recorded ? {} : UNRECORDED) };
     },
     guardAction(step, stepIndex, element, dialogText, locale) {
       const patterns = patternsForLocale(locale, project.policy.irreversiblePatterns);
       const rule = patterns === null ? 'no-locale-patterns' : runtimeRule(step, element, dialogText, patterns, project);
       if (rule === null) return { kind: 'allow' };
-      record(rule);
-      return { kind: 'deny', rule, stepIndex };
+      const recorded = record(rule);
+      return { kind: 'deny', rule, stepIndex, ...(recorded ? {} : UNRECORDED) };
     },
   };
 }

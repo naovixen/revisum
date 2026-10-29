@@ -62,8 +62,9 @@ export type Refusal =
 export type EvidenceRefusal = { readonly code: Extract<RefusalCode, 'evidence-mode-disabled' | 'suite-not-declared' | 'egress-unenforceable'> };
 export type RefusedRun = Omit<Planned, 'state'> & { readonly state: 'Refused'; readonly refusal: Refusal };
 
-// Which policy rule stopped the run, and at which step.
-export type Denial = { readonly rule: PolicyRuleId; readonly stepIndex: number };
+// Which policy rule stopped the run, and at which step. `unrecorded` is present when the audit sink
+// failed to record the denial, so the result differs from one whose denial was recorded.
+export type Denial = { readonly rule: PolicyRuleId; readonly stepIndex: number; readonly unrecorded?: true };
 export type DeniedRun = Omit<Running, 'state' | 'session'> & { readonly state: 'Denied'; readonly denial: Denial };
 
 export const plan = (approved: Plan, target: Target): Planned => ({ state: 'Planned', plan: approved, target });
