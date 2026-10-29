@@ -20,3 +20,4 @@ Actual time per spec, for the velocity kill criteria in `E:\core\docs\09-mvp-pla
 | SPEC-35 (M1 parts) | M1 | 2026-10-28 | 2026-10-28 | 1 | Green first run; two runner rules noted for M2 |
 | SPEC-36 (M1 parts) | M1 | 2026-10-29 | 2026-10-29 | 1 | Plan 1.3 opened; version tests made version-agnostic |
 | SPEC-28 (1.3 readable forms) | M1 | 2026-10-29 | 2026-10-29 | 1 | Founder approved flipping the no-readable-form test; green first run |
+| SPEC-00 (remaining criteria) | M1 | 2026-10-29 | 2026-10-29 | 1 | Founder chose pending guarantee rows; trailers checked from 8165795; merged seed sources kept; green on Linux |
