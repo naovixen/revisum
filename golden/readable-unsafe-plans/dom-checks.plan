@@ -1,0 +1,19 @@
+Plan: Badge classes, style and attributes
+Feature: CART-1
+Spec: specs/cart.md#dom-checks
+Version: 1.3
+Targets: playwright-chromium
+Go to /cart
+Criterion: cart.badge-active
+Unsafe: Expect test id "cart-badge" has class "is-active"
+Criterion: cart.badge-not-empty
+Unsafe: Expect test id "cart-badge" lacks class "is-empty"
+Criterion: cart.badge-red
+Unsafe: Expect test id "cart-badge" computed style background-color is "rgb(220, 38, 38)"
+Criterion: cart.sorted-by-price
+Unsafe: Expect button "Sort by price" attribute aria-sort is "ascending"
+Criterion: cart.checkout-enabled
+Unsafe: Expect button "Check out" attribute disabled is absent
+Unsafe: Remember attribute data-order-id of test id "order-row" as orderId
+Criterion: cart.status-shown
+Expect test id "status" is visible

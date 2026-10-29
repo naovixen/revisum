@@ -1,0 +1,11 @@
+Plan: First transaction by record-id prefix
+Feature: CART-1
+Spec: specs/cart.md#css-locator
+Version: 1.3
+Targets: playwright-chromium
+Go to /cart
+Criterion: cart.item-shown
+Unsafe: Expect first css "[data-test^=\"transaction-item-\"]" is visible
+Unsafe: Click css "button" containing text "Add" inside 2nd css "li.product"
+Criterion: cart.status-shown
+Expect test id "status" is visible

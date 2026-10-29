@@ -23,7 +23,7 @@ const ERROR_CODES: Readonly<Record<string, readonly string[]>> = {
   ],
   text: [
     'unknown-statement', 'bad-locator', 'bad-string', 'bad-indent', 'missing-header', 'duplicate-header', 'no-criterion',
-    'unknown-key-name', 'too-large', 'duplicate-key', 'no-readable-form',
+    'unknown-key-name', 'too-large', 'duplicate-key', 'no-readable-form', 'missing-unsafe-mark', 'unneeded-unsafe-mark',
   ],
   suiteDecode: [
     'suite-report-missing', 'suite-report-invalid', 'suite-report-unsupported', 'trace-invalid', 'trace-unsupported', 'too-large',

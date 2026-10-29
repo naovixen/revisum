@@ -1,0 +1,10 @@
+Plan: Second list item by XPath
+Feature: CART-1
+Spec: specs/cart.md#xpath-locator
+Version: 1.3
+Targets: playwright-chromium
+Go to /cart
+Criterion: cart.total-shown
+Unsafe: Expect xpath "//main//li[2]" has text containing "Total"
+Criterion: cart.status-shown
+Expect test id "status" is visible

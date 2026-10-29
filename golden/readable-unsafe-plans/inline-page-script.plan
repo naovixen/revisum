@@ -1,0 +1,10 @@
+Plan: Editor blocks read by an inline script
+Feature: CART-1
+Spec: specs/cart.md#inline-page-script
+Version: 1.3
+Targets: playwright-chromium
+Go to /cart
+Unsafe: Run inline read page script returning blockCount at "/blocks" remembering field blockCount as blockCount:
+  "() => ({ blocks: window.editorStore.blocks.length })"
+Criterion: cart.status-shown
+Expect test id "status" is visible

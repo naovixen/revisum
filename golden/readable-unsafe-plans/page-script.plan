@@ -1,0 +1,11 @@
+Plan: Cart store read by a named script
+Feature: CART-1
+Spec: specs/cart.md#page-script
+Version: 1.3
+Targets: playwright-chromium
+Go to /cart
+Unsafe: Run page script readCart with currency "eur" remembering field itemCount as cartCount
+Criterion: cart.three-items
+Unsafe: Expect page script readCart with currency "eur" field itemCount is "3"
+Criterion: cart.status-shown
+Expect test id "status" is visible

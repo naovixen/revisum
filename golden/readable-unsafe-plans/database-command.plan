@@ -1,0 +1,13 @@
+Plan: Orders seeded and counted by database commands
+Feature: CART-1
+Spec: specs/cart.md#database-command
+Version: 1.3
+Targets: playwright-chromium
+Go to /cart
+Unsafe: Run database command seedOrders with count 3
+Criterion: orders.three-seeded
+Unsafe: Expect database command countOrders with email "ada@example.com" field count is "3"
+Criterion: cart.status-shown
+Expect test id "status" is visible
+Clean up:
+  Unsafe: Run database command seedOrders with count 3

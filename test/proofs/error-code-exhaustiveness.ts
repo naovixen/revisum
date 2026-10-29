@@ -49,6 +49,7 @@ export function describeTextError(code: TextErrorCode): string {
   switch (code) {
     case 'unknown-statement': case 'bad-locator': case 'bad-string': case 'bad-indent': case 'missing-header':
     case 'duplicate-header': case 'no-criterion': case 'unknown-key-name': case 'too-large': case 'duplicate-key': case 'no-readable-form':
+    case 'missing-unsafe-mark': case 'unneeded-unsafe-mark':
       return 'text rejected';
     default:
       return unreachable(code);
@@ -58,6 +59,7 @@ export function describeTextErrorForgettingOne(code: TextErrorCode): string {
   switch (code) {
     case 'unknown-statement': case 'bad-locator': case 'bad-string': case 'bad-indent': case 'missing-header':
     case 'duplicate-header': case 'no-criterion': case 'too-large': case 'duplicate-key': case 'no-readable-form':
+    case 'missing-unsafe-mark': case 'unneeded-unsafe-mark':
       return 'text rejected';
     default:
       // @ts-expect-error 'unknown-key-name' is not handled, so the code does not narrow to never
