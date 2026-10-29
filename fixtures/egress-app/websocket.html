@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>WebSocket</title></head>
+<body>
+<h1>WebSocket</h1>
+<p data-testid="status">connecting</p>
+<script>
+  // A WebSocket to an undeclared origin. The browser's request interception does not see
+  // WebSockets, so only the proxy outside the browser can stop this one.
+  const status = document.querySelector('[data-testid="status"]');
+  const socket = new WebSocket('ws://socket.invalid/feed');
+  socket.addEventListener('open', () => { status.textContent = 'open'; });
+  socket.addEventListener('close', () => { status.textContent = 'closed'; });
+</script>
+</body>
+</html>

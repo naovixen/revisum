@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Worker</title></head>
+<body>
+<h1>Worker</h1>
+<p data-testid="status">starting</p>
+<script>
+  // A dedicated worker, loaded from this page's own origin, that sends a request to an undeclared one.
+  const status = document.querySelector('[data-testid="status"]');
+  const worker = new Worker('/egress-worker.js');
+  worker.addEventListener('message', (event) => { status.textContent = event.data; });
+</script>
+</body>
+</html>

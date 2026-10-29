@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Leak fixture</title></head>
+<body>
+<h1>Leak fixture</h1>
+<p data-testid="socket-state">connecting</p>
+<script>
+  // Run inside the isolated container: the page tries a WebSocket to an undeclared origin, which
+  // only the egress proxy can see, and shows "closed" once it has been refused.
+  const state = document.querySelector('[data-testid="socket-state"]');
+  const socket = new WebSocket('ws://outside.invalid/feed');
+  socket.addEventListener('open', () => { state.textContent = 'open'; });
+  socket.addEventListener('close', () => { state.textContent = 'closed'; });
+</script>
+</body>
+</html>

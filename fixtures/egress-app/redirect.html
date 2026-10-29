@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Redirect</title></head>
+<body>
+<h1>Redirect</h1>
+<p data-testid="status">sending</p>
+<script>
+  // A request to this page's own origin, which the fixture server answers with a redirect to an
+  // undeclared origin (see the /leave route of the test's fixture server).
+  const status = document.querySelector('[data-testid="status"]');
+  fetch('/leave', { mode: 'no-cors' })
+    .then(() => { status.textContent = 'answered'; }, () => { status.textContent = 'failed'; });
+</script>
+</body>
+</html>

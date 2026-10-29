@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Beacon</title></head>
+<body>
+<h1>Beacon</h1>
+<p data-testid="status">sending</p>
+<script>
+  // A beacon to an undeclared origin, as an analytics script would send one.
+  const queued = navigator.sendBeacon('http://beacon.invalid/collect', 'visit');
+  document.querySelector('[data-testid="status"]').textContent = queued ? 'queued' : 'refused';
+</script>
+</body>
+</html>

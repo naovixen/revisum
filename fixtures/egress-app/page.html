@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Page request</title></head>
+<body>
+<h1>Page request</h1>
+<p data-testid="status">sending</p>
+<script>
+  // An ordinary request from the page to an undeclared origin.
+  const status = document.querySelector('[data-testid="status"]');
+  fetch('http://page.invalid/data', { mode: 'no-cors' })
+    .then(() => { status.textContent = 'answered'; }, () => { status.textContent = 'failed'; });
+</script>
+</body>
+</html>

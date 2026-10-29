@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Popup</title></head>
+<body>
+<h1>Popup</h1>
+<button type="button" id="open-partner">Open the partner site</button>
+<p data-testid="status">waiting</p>
+<script>
+  // A popup that loads an undeclared origin. A click opens it, as a user's would.
+  document.getElementById('open-partner').addEventListener('click', () => {
+    window.open('http://popup.invalid/welcome', 'partner', 'width=400,height=300');
+    document.querySelector('[data-testid="status"]').textContent = 'opened';
+  });
+</script>
+</body>
+</html>
