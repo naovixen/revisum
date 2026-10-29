@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Encoded echo - Fixture</title>
+</head>
+<body>
+<main>
+  <h1>Encoded echo</h1>
+  <p>A careless page: it echoes what was typed into the token field inside longer encoded texts, as a page that builds request headers and form bodies might show them.</p>
+  <label for="token">Access token</label>
+  <input id="token" name="token" type="password" autocomplete="off">
+  <label for="note">Note</label>
+  <input id="note" name="note" type="text" autocomplete="off">
+  <button type="button" id="show">Show echoes</button>
+  <p data-testid="echo-basic-offset-0" id="echo-basic-offset-0"></p>
+  <p data-testid="echo-basic-offset-1" id="echo-basic-offset-1"></p>
+  <p data-testid="echo-basic-offset-2" id="echo-basic-offset-2"></p>
+  <p data-testid="echo-form" id="echo-form"></p>
+  <p data-testid="echo-lower-hex" id="echo-lower-hex"></p>
+</main>
+<script src="/app.js"></script>
+</body>
+</html>
