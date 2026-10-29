@@ -3179,22 +3179,24 @@
     {
       "from": "docs/research/spikes/p4/src/drivers/cdp/client.ts",
       "to": "packages/driver-cdp/src/cdp-connection.ts",
-      "sourceSha256": "146377020138e7a350ddd59dd2937e251d4b8c34be4403d20b16074e17d2072b"
-    },
-    {
-      "from": "docs/research/spikes/p5/src/cdp/client.ts",
-      "to": "packages/driver-cdp/src/cdp-connection.ts",
-      "sourceSha256": "19f556c1f9cfa057f86b1f9376730e6c9cd17ec3f2d25d641ec8de3d08369ad7"
+      "sourceSha256": "146377020138e7a350ddd59dd2937e251d4b8c34be4403d20b16074e17d2072b",
+      "mergedFrom": [
+        {
+          "from": "docs/research/spikes/p5/src/cdp/client.ts",
+          "sourceSha256": "19f556c1f9cfa057f86b1f9376730e6c9cd17ec3f2d25d641ec8de3d08369ad7"
+        }
+      ]
     },
     {
       "from": "docs/research/spikes/p4/src/drivers/cdp/driver.ts",
       "to": "packages/driver-cdp/src/cdp-driver.ts",
-      "sourceSha256": "1b9558750c895bf8418297f3d4ea546b0f8c1ff3c335cb033d156e5c5021a7d3"
-    },
-    {
-      "from": "docs/research/spikes/p4/src/drivers/cdp/types.ts",
-      "to": "packages/driver-cdp/src/cdp-driver.ts",
-      "sourceSha256": "f84c19fc627f33e90819ab87af23e462b12dd27e10b76bf3b1477665285b8fa3"
+      "sourceSha256": "1b9558750c895bf8418297f3d4ea546b0f8c1ff3c335cb033d156e5c5021a7d3",
+      "mergedFrom": [
+        {
+          "from": "docs/research/spikes/p4/src/drivers/cdp/types.ts",
+          "sourceSha256": "f84c19fc627f33e90819ab87af23e462b12dd27e10b76bf3b1477665285b8fa3"
+        }
+      ]
     },
     {
       "from": "docs/research/spikes/p4/src/drivers/shared/chrome.ts",
@@ -3204,12 +3206,13 @@
     {
       "from": "docs/research/spikes/p4/src/drivers/shared/process.ts",
       "to": "packages/driver-cdp/src/chromium-launcher.ts",
-      "sourceSha256": "82079b6191c4b3456af3dceca5009d53806e6220b706af9f2f096e36940f0c8e"
-    },
-    {
-      "from": "docs/research/spikes/p5/src/cdp/client.ts",
-      "to": "packages/driver-cdp/src/chromium-launcher.ts",
-      "sourceSha256": "19f556c1f9cfa057f86b1f9376730e6c9cd17ec3f2d25d641ec8de3d08369ad7"
+      "sourceSha256": "82079b6191c4b3456af3dceca5009d53806e6220b706af9f2f096e36940f0c8e",
+      "mergedFrom": [
+        {
+          "from": "docs/research/spikes/p5/src/cdp/client.ts",
+          "sourceSha256": "19f556c1f9cfa057f86b1f9376730e6c9cd17ec3f2d25d641ec8de3d08369ad7"
+        }
+      ]
     },
     {
       "from": "docs/research/spikes/p4/src/drivers/shared/inpage.ts",
@@ -3269,12 +3272,13 @@
     {
       "from": "docs/research/spikes/p3/src/core/logging.ts",
       "to": "packages/engine/src/logging.ts",
-      "sourceSha256": "bb07a1d3d57936bbbf17757a919b64211c30a3b6c0b2fc5b25fa8f02ad3878eb"
-    },
-    {
-      "from": "docs/research/spikes/p3/src/core/ports.ts",
-      "to": "packages/engine/src/logging.ts",
-      "sourceSha256": "58a0c370cb5b43bfa0e7b2345cb4e51c6fbe2b1298ebc8c99eb930cdf7d4e931"
+      "sourceSha256": "bb07a1d3d57936bbbf17757a919b64211c30a3b6c0b2fc5b25fa8f02ad3878eb",
+      "mergedFrom": [
+        {
+          "from": "docs/research/spikes/p3/src/core/ports.ts",
+          "sourceSha256": "58a0c370cb5b43bfa0e7b2345cb4e51c6fbe2b1298ebc8c99eb930cdf7d4e931"
+        }
+      ]
     },
     {
       "from": "docs/research/spikes/p3/src/core/manifest.ts",

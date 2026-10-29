@@ -8,11 +8,12 @@
 //                                                 check that the lint rejects them
 // See docs/specs/SPEC-00-repo-seed-and-gates.md.
 
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { globToPattern } from './glob.ts';
 import { NAMING_LINT, type NamingLintConfig, type NamingRule } from './naming-lint-config.ts';
+import { readSpecCriteria } from './spec-criteria.ts';
 
 export type NamingViolation = {
   readonly file: string;
@@ -90,14 +91,19 @@ type Checker = {
   readonly include: readonly RegExp[];
   readonly exclude: readonly RegExp[];
   readonly spellOutWords: ReadonlyMap<string, string>;
+  // The criteria docs/specs/ defines, which a test's `criterion` value must name; undefined when
+  // the folder being linted has no specs (the self-test's scratch folder).
+  readonly definedCriteria: ReadonlySet<string> | undefined;
 };
 
-function createChecker(config: NamingLintConfig): Checker {
+function createChecker(config: NamingLintConfig, root?: string): Checker {
+  const hasSpecs = root !== undefined && existsSync(join(root, 'docs', 'specs'));
   return {
     config,
     include: config.include.map(globToPattern),
     exclude: config.exclude.map(globToPattern),
     spellOutWords: new Map(Object.entries(config.spellOut)),
+    definedCriteria: hasSpecs ? readSpecCriteria(root).all : undefined,
   };
 }
 
@@ -308,6 +314,8 @@ function lintCode(checker: Checker, file: string, source: string, violations: Na
         const isTestMetadata = isTestFile && token.kind === 'string' && before?.text === ':' && twoBefore?.text === 'criterion';
         if (!isTestMetadata) {
           violations.push({ file, line: token.line, name: token.text, why: 'criterion id outside test metadata' });
+        } else if (checker.definedCriteria !== undefined && !checker.definedCriteria.has(token.text)) {
+          violations.push({ file, line: token.line, name: token.text, why: 'criterion that no spec in docs/specs/ defines' });
         }
         continue;
       }
@@ -419,7 +427,7 @@ function listFiles(root: string, folder = ''): string[] {
 }
 
 export function lintRepository(root: string, config: NamingLintConfig = NAMING_LINT): NamingViolation[] {
-  const checker = createChecker(config);
+  const checker = createChecker(config, root);
   const violations: NamingViolation[] = [];
   const checkedFolders = new Set<string>();
 

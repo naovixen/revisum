@@ -61,7 +61,7 @@ The founder drives one Claude Code session, which works through the spec queue i
 | 7. Push | Founder | Reads the commits, then pushes to `main` | — |
 
 - An optional cold review uses `docs/prompts/session-review.md`, in a third fresh helper.
-- The test set is `test/`, `proofs/`, `fixtures/` and `golden/`. No commit may change it together with anything else; this stops a change editing a test to make its own code pass. Check staged files with `git diff --cached --name-only | node tools/check-tests-apart.ts`. CI runs the same check on pull requests.
+- The test set is `test/`, `proofs/`, `fixtures/` and `golden/`. No commit may change it together with anything else; this stops a change editing a test to make its own code pass. Check staged files with `git diff --cached --name-only | node tools/check-tests-apart.ts`. CI runs the same check on pull requests, and on every push to `main` checks each pushed commit on its own (`--commits <from>..<to>`).
 - `.github/CODEOWNERS` gives the test set and CI configuration to the founder.
 
 ## Definition of Done
@@ -82,11 +82,13 @@ A spec is done when all of these hold:
 | `npm run check` | Everything below, in order. Must be green before you finish |
 | `npm run check:linux` | `npm run check` on CI's pinned Linux image, in Docker. Needs Docker Desktop running |
 | `npm run typecheck` | `tsc --build` over every package and `tools/`. A wrong-way import between packages fails here |
-| `npm run lint` | Licence map, folder layout, and the trusted-package import check |
+| `npm run lint` | Checks that read only files: licences and roles, folder layout, imports, dependency reviews, the cost record, the seed record, research links, deny rules and the glossary |
 | `npm run lint:names` | The naming lint's self-test, then the naming lint over the repository |
 | `npm test` | Unit and contract tests (`test/unit/`, `test/contract/`) |
 | `npm run proofs` | Hostile plans, secret leaks, egress, PII and audit-chain proofs (`test/proofs/`) |
 | `npm run replay` | Golden runs replayed and compared by hash (`test/replay/`) |
+| `npm run gates` | After the tests: the project's metrics and trace index from commit trailers and test results, and the guarantee map. CI runs it even when a test failed |
+| `npm run cost-report` | The month's declared hosted costs; fails over USD 5 at zero customers |
 | `npm test -w <package>` | Tests for one package, once it has a `test` script |
 
 ## Code rules
@@ -95,7 +97,7 @@ A spec is done when all of these hold:
 - **Dependency direction.** Every package depends only on `contracts`, except `cli`, which wires the others together, `action`, which wraps `cli`, and `auditor-act`, which reuses `driver-cdp`'s browser connection and launcher. Each package's `tsconfig.json` lists the packages it may import; importing any other fails the build.
 - **Outside input is `unknown`** until a hand-written decoder in `engine` parses it. No `as` casts to branded types outside their owning parser.
 - **Browsers run headless**, always.
-- **Licences.** `licences.json` maps each package to Apache-2.0 or FSL-1.1-ALv2; `npm run lint` checks every `package.json` against it.
+- **Licences.** `licences.json` maps each package to Apache-2.0 or FSL-1.1-ALv2 and gives it a role; `npm run lint` checks every `package.json` against it, each role's licence, every `*.schema.json`, and axe-core's pinned files.
 
 ## Naming rules
 
@@ -119,3 +121,7 @@ Agent: <tool>/<version>       when an agent wrote the change
 Spec: SPEC-nn                 one per spec the commit implements
 Criteria: AC-SPEC-nn-mm, AC-SPEC-nn-mm
 ```
+
+- Keys are exact, one value per line, in the message's last paragraph. `Agent:` appears at most once, as `claude-code/<version>`; each `Spec:` and criterion id must exist in `docs/specs/`. A `Co-Authored-By:` naming Claude needs an `Agent:` line.
+- A commit can't be amended, so check the message first: `node tools/check-commit-trailers.ts --message <file>`.
+- `npm run gates` fails on a malformed commit after the trailer cut-over (`TRAILER_CUT_OVER` in `tools/project-metrics.ts`). One already made is listed with its reason in `KNOWN_MALFORMED_COMMITS` by a later commit.

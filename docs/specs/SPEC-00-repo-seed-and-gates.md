@@ -195,9 +195,9 @@ export const NAMING_LINT: NamingLintConfig = {
   - Those three rows are marked pending, each with the specs that will give it a test (founder, 2026-10-29). A pending row shows its weaker class and doesn't fail the gates step until every one of its specs is ticked in `START.md`; from then on it fails like any other row when its test is missing or fails. A pending mark on a row whose specs are all ticked fails the step, so the mark can't outlive its reason.
   - Tests: a fixture results file where one mapped test fails, and one missing a mapped id. Both fail, and the run's table shows the weaker class. A pending row with an unticked spec passes and shows its weaker class; the same row once its specs are ticked fails.
 - **Seeding (AC-SPEC-00-11).**
-  - Seeded 2026-10-28; `seed-provenance.json` records 676 files. Seeded code has changed since (60 package files differ from their source hash), so hashes are compared only while seeding.
+  - Seeded 2026-10-28; `seed-provenance.json` records 676 sources for 672 files. Four files were merged from two prototype files each; the second source sits in that entry's `mergedFrom` list, so every seeded prototype file stays on record and `to` stays unique. Seeded code has changed since (60 package files differ from their source hash), so hashes are compared only while seeding.
   - Add `tools/seed-from-research.ts --research <repository> --commit <hash> --files <list>`. It copies each file from that commit with `git show`, writes `seed-provenance.json`, and fails, naming the file, when the commit lacks it. It names no research path itself; the repository is an argument.
-  - The lint adds a shape check of `seed-provenance.json`: a 40-hex commit, 64-hex hashes, unique `to` paths inside this repository, and `reusedCriteria` spec ids that exist in `docs/specs/`.
+  - The lint adds a shape check of `seed-provenance.json`: a 40-hex commit, 64-hex hashes (including `mergedFrom` sources), unique `to` paths inside this repository, and `reusedCriteria` spec ids that exist in `docs/specs/`.
   - Tests: a scratch Git repository built by the test stands in for the research repository.
 - **Criterion ids (AC-SPEC-00-15).**
   - Built: the naming lint rejects a criterion id anywhere but a test's `criterion` value.

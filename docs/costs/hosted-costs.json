@@ -1,0 +1,14 @@
+{
+  "month": "2026-10",
+  "customers": 0,
+  "confirmedBy": "founder",
+  "confirmedOn": "2026-10-29",
+  "services": [
+    {
+      "service": "GitHub",
+      "plan": "GitHub Free, private repository; no billing details on the account; Actions spending limit USD 0; Actions usage USD 0, inside the free minutes",
+      "monthlyUsd": 0,
+      "source": "declared"
+    }
+  ]
+}

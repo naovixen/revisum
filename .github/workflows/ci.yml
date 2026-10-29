@@ -17,8 +17,11 @@ jobs:
   ci:
     runs-on: ubuntu-24.04
     steps:
+      # Full history: the gates read commit trailers back to the cut-over.
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
-      - name: Run every gate in the pinned image
+        with:
+          fetch-depth: 0
+      - name: Run every check and test in the pinned image
         run: |
           # The profile lets Chrome's sandbox create its namespaces, as in the dev container.
           docker run --rm \
@@ -32,8 +35,47 @@ jobs:
               node node_modules/playwright-core/cli.js install-deps chromium firefox webkit
               # Chrome refuses to sandbox as root, so the browsers and the check run as "node".
               chown -R node:node /workspace
-              su node -c "npm run browsers && npm run check"
+              su node -c "npm run browsers && npm run check:tests"
             '
+      # The gates run even when a test failed, so a failing or flaky run is still recorded; the job
+      # fails either way. They record the project's metrics and check the guarantee map.
+      - name: Record the project's metrics and check the guarantee map
+        if: always()
+        run: |
+          docker run --rm \
+            --volume "$GITHUB_WORKSPACE:/workspace" --workdir /workspace \
+            mcr.microsoft.com/devcontainers/typescript-node:24-bookworm@sha256:970eebf5b82d3800bdd9f46680e1c4c664d365d18603148540788356700ce301 \
+            bash -euo pipefail -c 'chown -R node:node /workspace && su node -c "npm run gates"'
+      # Commits reach main without a pull request, so each pushed commit is checked on its own.
+      - name: Fail if a pushed commit changes the test set and other files together
+        if: always() && github.event_name == 'push'
+        env:
+          PUSHED_FROM: ${{ github.event.before }}
+          PUSHED_TO: ${{ github.sha }}
+        run: |
+          # A new branch has no "before" commit; then every commit it holds is checked.
+          if [ "$PUSHED_FROM" = "0000000000000000000000000000000000000000" ]; then
+            PUSHED_FROM="$(git rev-list --max-parents=0 "$PUSHED_TO" | tail -n 1)"
+          fi
+          docker run --rm \
+            --volume "$GITHUB_WORKSPACE:/workspace" --workdir /workspace \
+            --env PUSHED_FROM --env PUSHED_TO \
+            mcr.microsoft.com/devcontainers/typescript-node:24-bookworm@sha256:970eebf5b82d3800bdd9f46680e1c4c664d365d18603148540788356700ce301 \
+            bash -euo pipefail -c 'chown -R node:node /workspace && su node -c "node tools/check-tests-apart.ts --commits $PUSHED_FROM..$PUSHED_TO"'
+      - name: Add the project's metrics to the job summary
+        if: always() && github.event_name == 'push'
+        run: |
+          if [ -f .test-results/project-metrics.md ]; then cat .test-results/project-metrics.md >> "$GITHUB_STEP_SUMMARY"; fi
+          if [ -f .test-results/guarantees.md ]; then cat .test-results/guarantees.md >> "$GITHUB_STEP_SUMMARY"; fi
+      - name: Keep the test results, metrics and trace index
+        if: always() && github.event_name == 'push'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: test-results
+          path: .test-results/
+          include-hidden-files: true
+          retention-days: 90
+          if-no-files-found: warn
 
   tests-apart:
     if: github.event_name == 'pull_request'

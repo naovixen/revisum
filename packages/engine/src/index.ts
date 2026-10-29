@@ -13,6 +13,8 @@ export {
   approvalVerifier, unverified, type ApprovalVerifier, type ApprovalVerifierOptions, type VerifiedOutcome, type VerifierResult,
 } from './approval/approval-verifier.ts';
 export * from './approval/plan-standing.ts';
+// Read by tools/check-deny-rules.ts, which checks this repository's own agent lock-down.
+export { deniesRequiredActions, parseDenyRules } from './approval/approvers-file.ts';
 export { policyGate, type PolicyGate, type PolicyGateOptions } from './policy/policy-gate.ts';
 export { BUILT_IN_IRREVERSIBLE_PATTERNS } from './policy/irreversible-patterns.ts';
 export { assertBranded, planParser } from './plan/plan-parser.ts';

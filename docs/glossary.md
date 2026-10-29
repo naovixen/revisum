@@ -66,11 +66,15 @@
 | ACT rule, probe | `RuleMeta` with `kind: 'act-rule' \| 'probe'` | `auditor-act`, exists | A check that follows a W3C ACT rule, or a WCAG success criterion where no ACT rule exists |
 | Tab walk | `tabWalk`, `TabWalk` | `auditor-act`, exists | Presses Tab through a page and records focus order, visible focus and occlusion |
 | Report input | `ReportInput`, `ValidReport`, made only by `parseReportInput` | `report`, exists | The data a visual evidence report is rendered from |
-| Seed provenance | `seed-provenance.json` (`SeedProvenance` shape) | repository root, exists | Where each seeded file came from: research commit, source path and SHA-256. The only file that names the research commit |
+| Seed provenance | `seed-provenance.json` (`SeedProvenance` shape) | repository root, shape in `tools/check-seed-provenance.ts`, exists | Where each seeded file came from: research commit, source path and SHA-256. The only file that names the research commit |
 | Acceptance criterion | `criterion` (`criterionId`, `CriterionId`, `criteriaInScope`) | test metadata; on every plan assertion, exists | One observable behaviour a spec promises. Earlier name: AC |
 | Change class | `changeClass` (`changeClassId`) | planned | The kind of change a pull request makes, which sets how much review it needs |
 | Test set | `TEST_SET` | `tools/check-tests-apart.ts`, exists | Tests, proofs, fixtures and golden files: the paths that must change apart from code |
-| Dependency review | `DependencyReview` with `DependencyCheck` items | planned, SPEC-00 | The keep-or-drop test every third-party component on the trust path must pass. Earlier name: R11 test |
+| Dependency review | `DependencyReview` with `DependencyCheck` items, `DEPENDENCY_REVIEWS` | `tools/check-dependency-reviews.ts`, reviews in `tools/dependency-reviews.ts`, exists | The keep-or-drop test every third-party component on the trust path must pass. Earlier name: R11 test |
+| Guarantee map | `GuaranteeMap`, `GuaranteeRow`, `GUARANTEE_MAP` | `tools/guarantee-map.ts`, exists | Each published guarantee, the CI test that proves it, the class shown when the test passes and the weaker class shown when it does not. Published as `docs/guarantees.md` |
+| Test results, trace index | `tools/test-results-reporter.ts`, `readTestResults`, `TraceEntry` | `tools/`, exists | One JSON line per test in `.test-results/`; a test id is `<file>#<full name>`. The trace index lists each criterion with its tests and their outcomes |
+| Commit trailers | `readCommitTrailers`, `CommitTrailers`, `KNOWN_MALFORMED_COMMITS` | `tools/check-commit-trailers.ts` and `tools/project-metrics.ts`, exists | The `Agent:`, `Spec:` and `Criteria:` lines the project's own metrics are read from |
+| Hosted costs | `HostedCosts`, `docs/costs/hosted-costs.json` | `tools/cost-report.ts`, exists | The declared monthly record of hosted spend and customers; at zero customers spend stays at or under USD 5 |
 | Naming lint | `NamingLintConfig`, `NAMING_LINT`, `lintRepository` | `tools/`, exists | Enforces the naming rules in CI |
 | Declared approval | `DeclaredApproval`, strength `declared` | `contracts`, exists | An approval resting on the founder's own push or merge under the agent lock-down; labelled "declared, not verified" |
 | Verified approval | `VerifiedApproval`, strength `verified` | `contracts`, exists | An optional approval by a code owner's review; never required. No gate, metric or level takes it (`tools/check-approval-strength.ts`) |
@@ -98,22 +102,66 @@
 | Structural locator | `StructuralLocatorWith` (`css`, `xpath`) | `contracts`, exists | A CSS or XPath locator: finds elements by page structure, not by role or name. Its selector is literal plan text |
 | DOM check | `DomCheckWith`, `DOM_CHECK_KINDS` | `contracts`, exists | A check of a class, computed style or attribute: an implementation detail, not what a user perceives |
 | Page script, database command | `PageScriptDeclaration`, `ScriptName`, `InlineScript`, `DatabaseCommandDeclaration`, `CommandName` | `contracts`, exists | A script the project declares under `plans/scripts/`, or one written inline, run in the page; a command the project declares, run in a workload container that reaches only its database service |
+| Branded type | `Brand` | `contracts`, exists | A value that the module owning the brand has checked; only that module's parser may create one |
+| Result | `Result`, `Success`, `Failure` | `contracts`, exists | Success or failure returned as a value, never thrown, so every caller handles both |
+| Safe text | `SafeText` | `contracts`, exists | Text that passed the engine's safety rules: no control or bidirectional-override characters, and nothing that looks like script |
+| Plan parts | `PlanData`, `PlanMeta`, `FeatureId`, `StepType`, `CaptureName`, `AllowedUrl` | `contracts`, exists | A plan's fields before the parser brands them; its metadata (feature, spec reference, title); the names of the step types; a capture's name; a URL path or an absolute URL on the allow-list |
+| Plan error | `PlanError`, `Issues`, `Parsed`, `PlanParse` | `engine`, exists | One reason a plan was refused, with its JSON path; the list a decoder collects them in; a decoded value or the invalid marker; the parser function a project gives |
+| Locator forms | `LocatorWith`, `SemanticLocatorWith`, `StructuralLocatorKind`, `Role`, `Position` | `contracts`, exists | A locator generic over what its text fields hold: plan text with value references, or resolved text. Semantic forms find by role, name, label, text or test id; structural kinds are CSS and XPath. `Role` is the closed list of ARIA roles; `Position` is first, last or an index |
+| Element and page checks | `ElementAssertion`, `ElementAssertionWith`, `ObservableElementAssertionWith`, `ResolvedElementAssertion`, `PageAssertion` | `contracts`, exists | What an expect step checks on an element (what a user perceives, or a DOM check from 1.3), the same with its text made final for the oracle, and what an expectPage step checks: text, URL, path prefix, meta content or canonical link |
+| Resolved action | `ResolvedActionStep` | `contracts`, exists | An action step with every value reference replaced by its text, as the engine hands it to a driver |
+| Key | `Key` | `contracts`, exists | A keyboard key a press step may name, from a closed list |
+| Remembered value source | `RememberSource` | `contracts`, exists | Where a remember step reads its value: an element's text, value or attribute, a field of an observed response, or the run's clipboard |
+| Relative date | `RelativeDay`, `DateAnchor`, `DateFormat` | `contracts`, exists | A generated date: a whole number of days from an anchor (today, start of week or month), written in one of a closed set of formats |
+| Call parts | `CallStep`, `ServiceCallStep`, `CleanupStep`, `CallArgument`, `CallArguments`, `CallEffect`, `ParameterName`, `FieldName`, `HttpMethod` | `contracts`, exists | The steps that call a declared service; what a cleanup list holds; a call's arguments by parameter name (text, a run value, a number, a boolean or a secret); whether a call reads or writes; its declared parameter and response field names; its method |
+| Call headers and bodies | `HeaderScheme`, `HeaderValue`, `ServiceRequestHeader`, `ParameterPlaceholder`, `InterpolatedString`, `JsonBodyWithSecrets`, `JsonPointer` | `contracts`, exists | A header from literal text or a secret written in a scheme (bearer, basic, token, raw); the placeholders a JSON template fills from parameters; a body whose secrets stay opaque until the caller sends it; the RFC 6901 pointer that names a response field |
+| Call outcomes | `BackendAssertion`, `ServiceCallErrorCode`, `ResponseReadErrorCode`, `RequestBuildError`, `CallStepCode`, `ServiceCallRecord`, `CleanupResult` | `contracts` and `engine`, exists | A backend check on one response field; why a call, reading its response or building its request failed; why a call step failed; what a run records of a call (status and body sha256 only) and of a cleanup step |
+| Clock and clipboard steps | `AdvanceClockStep`, `ExpectClipboardStep`, `ClockAndClipboardStep`, `ClipboardRead` | `contracts`, exists | The plan steps that move the virtual clock and check the run's clipboard, and what a clipboard read returns (plain text) |
+| Stub parts | `StubStep`, `StubAction`, `StubResponse`, `StubResponseBody`, `StubMediaType`, `ResolvedStub`, `ResolvedStubResponse` | `contracts`, exists | The step that starts or stops a stub; one declared response (status, media type, body from a fixture, JSON template, text or nothing); the stub with its parameters filled, as a driver serves it |
+| Request check parts | `ResetRequestsStep`, `ExpectRequestsStep`, `ExpectResponseStep`, `RequestCount`, `ResponseAssertion`, `ResponseRead`, `ObservedExchange` | `contracts`, exists | The steps that reset and count an observed request's exchanges and check its latest response; one recorded request and response, whose body is kept only for declared fields |
+| Storage parts | `SetStorageStep`, `RemoveStorageStep`, `ExpectStorageStep`, `StorageAssertion`, `StorageArea`, `StorageAccess`, `NetworkAndStorageStep` | `contracts`, exists | The steps that write, remove and check a declared storage entry; local or session storage; read or read-write access; the union of the network and storage steps |
+| Network and storage ports | `NetworkPort`, `StoragePort` | `contracts`, exists; driver planned (SPEC-06) | What a session offers to start and stop stubs, observe requests, and read and write storage |
+| Driver capabilities | `PageNavigator`, `ActionRunner`, `Prober`, `Camera`, `Auditor`, `AdapterInfo` | `contracts`, exists | The parts a `Session` combines: navigate and read the page, act on an element, probe a locator, take a masked screenshot, audit accessibility; and the driver's id, version and protocol |
+| Driver observations | `ElementProbe`, `PageProbe`, `A11yNode`, `Box`, `Impact` | `contracts`, exists | A read-only look at what a locator matches; the page's URL and title; a node of the accessibility tree; a rectangle in CSS pixels; an accessibility finding's severity |
+| Driver failure | `DriverError`, `Unavailable`, `UnavailableReason` | `contracts`, exists | A driver error with its closed code; why a declared target cannot run. A driver explains a "no"; it never substitutes another target |
+| Session environment | `SessionEnvironment` | `contracts`, exists | Everything a driver needs to make a session hermetic and repeatable: base URL, allowed origins, seed, frozen time, the selectors to mask and the step timeout |
+| Target settings | `Engine`, `DeviceProfile`, `DeviceProfileId`, `Locale`, `TimeZone`, `ColorScheme`, `MotionPreference`, `Origin`, `AdapterId` | `contracts`, exists | What a target pins: browser engine (chromium, firefox, webkit), device profile, BCP 47 locale, IANA time zone, colour scheme, reduced motion, the origins as `scheme://host[:port]`, and the driver adapter |
+| Evidence suite parts | `SuiteName`, `ImageDigest`, `EnvironmentValue`, `SuiteTestId`, `SuiteTestOutcome`, `SuiteFinding`, `SuiteLocation` | `contracts`, exists | A declared suite's name; its container image pinned by digest, never a tag; a variable its process receives (text or a secret); a test's id (the sha256 of file, title path and project); its outcome; a failed test as a finding, with where it failed |
+| Suite report parts | `SuiteReportTest`, `SuiteAnnotation`, `SuiteAttachment`, `SuiteReportError`, `SuiteErrorLocation`, `SuiteTrace`, `SuiteDecodeErrorCode` | `engine/src/evidence/`, exists | One test of a decoded Playwright report, with its annotations, attachments and errors; what a trace archive held; why a suite's output was refused |
+| Evidence run parts | `EvidenceContext`, `PlannedSuitePass`, `EvidenceRunRecord`, `SuiteRunRecord` | `engine`, exists | What the result builder needs besides the report; one pass of a suite and whose suite files it runs; what only an evidence run records (pass, exit code, any mismatch); its tests and the findings they became |
+| Page script steps | `EvaluateStep`, `ExpectScriptStep`, `PageScriptStep`, `ScriptChoice`, `ScriptSource`, `ScriptArgument`, `ScriptArguments`, `ScriptParameterType` | `contracts`, exists | Running a page script and remembering fields of its result, or checking one field until it passes; a declared or inline script; its source text; its arguments, never a secret |
+| Database command steps | `DatabaseStep`, `ExpectDatabaseStep`, `DatabaseCommandStep`, `CommandArgument`, `CommandOutput` | `contracts`, exists | Running a declared database command and remembering fields of its JSON output, or checking one field; one argument of its argument vector (no shell); whether it prints nothing or JSON |
+| Unsafe feature records | `UnsafeConstruct`, `UnsafeFeatureRecord`, `UnsafeDeclarationRecord` | `engine`, exists | One use of an unsafe feature at its JSON path; what a run of such a plan records beside its plan hash: the features and each script or command by name and sha256 |
+| Manifest records | `FixtureReference`, `HostInfo`, `SecretRecord` | `engine`, exists | A file of the app under test by content hash; the host's platform and architecture; a secret the plan used, by name and redaction mode, never its value |
+| Logger | `Logger`, `LogRecord`, `LogField`, `LoggedEvent`, `EventKind`, `Exact` | `engine`, exists | Logs only manifest fields: a record is a kind and a subset of the fields `LOGGING_MANIFEST` lists, and `Exact` makes any other key fail to compile; the sink stores it with the run id and sequence number |
+| Audit sink error | `SinkError` | `contracts`, exists | Why the audit sink refused to append: the file was truncated or rewritten, or the write failed |
+| Run parts | `RunInputs`, `RunPorts`, `StepResult`, `StepOutcome`, `RunReviewItem`, `Rejected`, `DeniedPlan` | `engine`, exists | What a run takes (an Authorised plan, project, target, seed, clock, fixtures, standing) and the ports it writes through; each step's outcome; what a person should look at afterwards; a plan the parser rejected or the policy gate denied, so no run started |
+| Oracle verdict | `Verdict` | `engine`, exists | Whether an assertion passed and, if not, why: not found, ambiguous or failed |
+| Project settings | `ProjectData`, `ProjectPolicy`, `Limits`, `PlanLimits`, `EvidenceSettings` | `engine`, exists | The project's fields before parsing; its policy; its limits, and those the parser checks before walking a plan; what a run keeps as evidence beyond its defaults |
+| Trusted project loading | `LoadedProject`, `ChangeUnderTest`, `ProjectLoadError`, `TrustedFileReviewItem` | `engine`, exists | The project read from the protected branch with its review items; the files the change under test touches; why loading failed; a trusted file the change edited, which the loader ignored |
+| Approval verifier parts | `ApprovalVerifier`, `ApprovalVerifierOptions`, `VerifiedOutcome`, `VerifierResult` | `engine`, exists | The verifier, what it is built with, and what it returns: an Approval with the actor it was derived for, or an approval error |
+| Policy gate options | `PolicyGateOptions` | `engine`, exists | What the policy gate is built with: the project (trusted or not), whose policy it applies, and the audit sink its denials are appended to |
+| Coverage study parts | `CoverageIntent`, `CoverageReport`, `CoverageSample`, `CoverageVerdict`, `SharesBySample` | `engine`, exists | One sampled test intent and its verdict; the study's shares, overall and per sample (original, fresh), closed and with unsafe features |
+| Guarantee conditions | `GuaranteeConditions` | `engine`, exists | What decides a run's guarantee statement: its mode, whether egress was enforced, whether unmasked screenshots were kept, and the unsafe features it used |
+| Readable text parts | `TextReading`, `TextWarning`, `TextPosition`, `NoReadableForm` | `engine`, exists | Reading readable text: plain JSON, where each path came from, and warnings; a 1-based line and column; why a plan has no readable form and stays JSON |
+| Plan schema document | `JsonSchema` | `engine`, exists | A JSON Schema document or part of one, as plain JSON values |
+| Release artefacts | `ReleaseArtefacts` | `engine`, exists | The deterministic release-notes draft and an optional AI suggestion stored beside it, never instead of it |
 
 ## Metrics
 
-| Term | Code name | Earlier name |
-|---|---|---|
-| Share of criteria traced to a passing test | `tracedCriteriaShare` | T |
-| Share of runs that were flaky | `flakyRunRate` | F |
-| Share of results verified without human review | `verifiedWithoutReviewShare` | V |
-| Share of commits authored by an agent | `agentAuthoredShare` | A |
-| Share of commits linked to a spec | `specLinkedShare` | S |
-| Share of mutants the tests caught | `mutantsCaughtShare` | M |
-| Plan approvals per change | `planApprovalsPerChange` | P |
-| Share of merges without review | `unreviewedMergeShare` | U |
-| Defects that escaped to users | `escapedDefects` | E |
+| Term | Code name | Where | Earlier name |
+|---|---|---|---|
+| Share of criteria traced to a passing test | `tracedCriteriaShare` | `ThresholdMetric` in `contracts`; this repository's own in `tools/project-metrics.ts`, exists | T |
+| Share of runs that were flaky | `flakyRunRate` | `ThresholdMetric` in `contracts`; this repository's own in `tools/project-metrics.ts`, exists | F |
+| Share of results verified without human review | `verifiedWithoutReviewShare` | `ThresholdMetric` in `contracts`, exists; computed by SPEC-15, planned | V |
+| Share of commits authored by an agent | `agentAuthoredShare` | `ThresholdMetric` in `contracts`; this repository's own in `tools/project-metrics.ts`, exists | A |
+| Share of commits linked to a spec | `specLinkedShare` | `ThresholdMetric` in `contracts`; this repository's own in `tools/project-metrics.ts`, exists | S |
+| Share of mutants the tests caught | `mutantsCaughtShare` | `ThresholdMetric` in `contracts`, exists; computed by SPEC-15, planned | M |
+| Plan approvals per change | `planApprovalsPerChange` | planned (SPEC-15) | P |
+| Share of merges without review | `unreviewedMergeShare` | `ThresholdMetric` in `contracts`, exists; computed by SPEC-15, planned | U |
+| Defects that escaped to users | `escapedDefects` | planned (SPEC-15) | E |
 
-All are planned (SPEC-00 and SPEC-15).
+This repository's own four (traced, flaky, agent-authored, spec-linked) are recorded by `npm run gates`, as declared, not verified. The rest are computed for users by SPEC-15.
 
 ## Standard names
 

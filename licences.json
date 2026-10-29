@@ -3,6 +3,18 @@
     "Apache-2.0": "LICENSE-APACHE",
     "FSL-1.1-ALv2": "LICENSE-FSL"
   },
+  "roles": {
+    "contracts": "schema",
+    "engine": "engine",
+    "driver-cdp": "driver",
+    "driver-playwright": "driver",
+    "auditor-axe": "adapter",
+    "auditor-act": "product",
+    "runner": "product",
+    "report": "adapter",
+    "cli": "product",
+    "action": "sdk"
+  },
   "packages": {
     "contracts": "Apache-2.0",
     "engine": "FSL-1.1-ALv2",
@@ -14,5 +26,18 @@
     "report": "Apache-2.0",
     "cli": "FSL-1.1-ALv2",
     "action": "Apache-2.0"
+  },
+  "schemas": {
+    "docs/plan-language/plan.schema.json": "Apache-2.0"
+  },
+  "pinnedThirdPartyFiles": {
+    "axe-core": {
+      "version": "4.14.0",
+      "licence": "MPL-2.0",
+      "files": {
+        "axe.js": "sha256-quC4s2J4CJliEFsjUepk9Np9PUQLVOFi4hYW1ZeqDW8=",
+        "axe.min.js": "sha256-IMCf4Veoo0ow4kGqofza3mV3NPCKs3ns++t9RcxG6Hg="
+      }
+    }
   }
 }
