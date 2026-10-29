@@ -1,0 +1,11 @@
+{
+  "description": "A review decision: the owner accepts a needs-review item about the sign-up button's contrast.",
+  "kind": "review-decision",
+  "path": "reviews/decisions/signup-contrast.json",
+  "codeOwnersLine": "/reviews/ @owner-grace",
+  "content": {
+    "itemId": "signup-contrast",
+    "decision": "accept",
+    "reason": "The button colour meets the brand guide and was checked by hand"
+  }
+}

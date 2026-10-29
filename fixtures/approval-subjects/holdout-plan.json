@@ -1,0 +1,10 @@
+{
+  "description": "A holdout plan: never in the repository; holdouts.json on the protected branch lists its hash under its change class.",
+  "kind": "holdout-plan",
+  "path": "holdouts.json",
+  "codeOwnersLine": "/holdouts.json @owner-grace",
+  "content": {
+    "changeClassId": "account-deletion",
+    "title": "A deleted account cannot sign in again"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "description": "A high-risk extra review: the owner read the account deletion flow end to end.",
+  "kind": "extra-review",
+  "path": "reviews/extra/account-deletion.json",
+  "codeOwnersLine": "/reviews/ @owner-grace",
+  "content": {
+    "changeClassId": "account-deletion",
+    "decision": "approve",
+    "reason": "Read the deletion flow and its rollback end to end"
+  }
+}

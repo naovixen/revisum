@@ -1,0 +1,11 @@
+{
+  "description": "A trusted-file change: a new visual baseline for the sign-up page, in a folder core trusts.",
+  "kind": "trusted-file",
+  "path": "baselines/signup.json",
+  "codeOwnersLine": "/baselines/ @owner-grace",
+  "content": {
+    "page": "signup",
+    "viewport": "desktop-1280",
+    "image": "baselines/signup.png"
+  }
+}
