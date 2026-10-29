@@ -25,3 +25,4 @@ Actual time per spec, for the velocity kill criteria in `E:\core\docs\09-mvp-pla
 | M1 exit | M1 | 2026-10-29 | 2026-10-29 | 1 | Reviews of SPEC-02, 03, 04 found trust-path gaps, all fixed; green on Windows and Linux |
 | SPEC-05 | M2 | 2026-10-29 | 2026-10-29 | 1 | Aligned with seeded contracts (optional target fields keep replay hashes); lock CLI and downloads wait for SPEC-16; green on Windows and Linux |
 | SPEC-06 | M2 | 2026-10-29 | 2026-10-29 | 1 | Guard stays optional on act (seeded tests); three driver codes pinned under the standing exception; Linux zygote leak on close fixed; green on Windows and Linux. Weekly upkeep workflow not yet run on GitHub |
+| SPEC-07 | M2 | 2026-10-29 | 2026-10-29 | 1 | Founder chose real-container tests on the host and one CI step, and chroot in the seccomp profile; check:containers 22/22 on Windows; green on Windows and Linux. CI container step not yet run on GitHub |
