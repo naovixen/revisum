@@ -1,6 +1,6 @@
 // The seam each browser protocol implements once. buildSession (browser-session.ts) turns a
 // PageOperations into a Session, so auto-waiting, probes and audits behave the same on every
-// protocol.
+// protocol. One PageOperations serves one document: the page's top document, or an iframe's.
 import type { A11yNode, BrowserDriver, Key, Result, Session, SessionEnvironment, Target, Unavailable } from '@revisum/contracts';
 import type { AuditRuleResult } from './page-audit.ts';
 
@@ -26,11 +26,36 @@ export interface PageOperations<Handle> {
   // Elements with this role and exact accessible name, found by the browser's own accessibility engine.
   byRole(role: string, name: string): Promise<Handle[]>;
   accessibilityTree(): Promise<A11yNode>;
+  // The element's role and accessible name, as the browser's accessibility engine computes them;
+  // null for one it does not expose.
+  roleAndName(element: Handle): Promise<RoleAndName>;
+  // Points are in this document's viewport.
   click(element: Handle, at: Point): Promise<void>;
+  hover(at: Point): Promise<void>;
   fill(element: Handle, value: string): Promise<void>;
   press(element: Handle, key: Key): Promise<void>;
+  // Gives a file input these files, by absolute path, firing its input and change events.
+  setFiles(element: Handle, paths: readonly string[]): Promise<void>;
+  // The document of the iframe element, as operations of its own; null when the element is not an
+  // iframe whose document this protocol can reach.
+  frame(element: Handle): Promise<PageOperations<Handle> | null>;
   // A PNG of the viewport.
   screenshotPng(): Promise<Uint8Array>;
+}
+
+export type RoleAndName = { readonly role: string | null; readonly name: string | null };
+
+// What a session learns from the browser about its page outside any one command.
+export interface PageEvents {
+  // True once the page's renderer has died or its target has closed.
+  crashed(): boolean;
+  // The text of the dialog the page has open, or null when none is open.
+  openDialog(): string | null;
+  // Accepts or dismisses the open dialog.
+  answerDialog(accept: boolean): Promise<void>;
+  // How many popups, second pages and downloads the page has started so far. Each is closed or
+  // cancelled as soon as it starts.
+  unsupportedOpenings(): number;
 }
 
 export type Actionability = {

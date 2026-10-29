@@ -67,6 +67,10 @@ export function armHitCheck(element: Element): string {
     const target = event.target instanceof Element ? event.target : null;
     const label = target?.closest('label') as HTMLLabelElement | null;
     const onElement = target !== null && (target === element || element.contains(target) || label?.control === element);
+    // The click event ends the pointer sequence, so the check stops listening there. It must not
+    // outlive the click: a dialog the click opens can stop the driver from reading it, and a
+    // check left armed would swallow the page's own later clicks.
+    if (event.type === 'click') check.disarm();
     if (onElement) {
       if (check.state === 'none') check.state = 'hit';
       return;
@@ -160,5 +164,87 @@ export function focusAndSelect(element: HTMLInputElement): string {
 
 export function focusElement(element: HTMLElement): string {
   element.focus();
+  return 'ok';
+}
+
+// What the policy gate's runtime guard needs to know about an element besides its role and name,
+// as JSON: its box, the accessible name of its form's submit control, the URL of the link it is
+// in, and its own test id. A field the page does not show is null.
+export function guardDetails(element: Element): string {
+  const normalise = (text: string): string => text.replace(/\s+/g, ' ').trim();
+  const nameOf = (control: Element): string => {
+    const ariaLabel = control.getAttribute('aria-label');
+    if (ariaLabel !== null && normalise(ariaLabel) !== '') return normalise(ariaLabel);
+    const labelledBy = control.getAttribute('aria-labelledby');
+    if (labelledBy !== null) {
+      const text = normalise(labelledBy.split(/\s+/).map((id) => document.getElementById(id)?.textContent ?? '').join(' '));
+      if (text !== '') return text;
+    }
+    if (control instanceof HTMLInputElement) return normalise(control.type === 'image' ? control.alt : control.value || 'Submit');
+    return normalise((control as HTMLElement).innerText ?? control.textContent ?? '');
+  };
+  const rectangle = element.getBoundingClientRect();
+  const field = element as HTMLInputElement;
+  const form = field.form instanceof HTMLFormElement ? field.form : element.closest('form');
+  const submit = form === null ? undefined : Array.from(form.elements).find((control) =>
+    (control instanceof HTMLButtonElement && control.type === 'submit')
+    || (control instanceof HTMLInputElement && (control.type === 'submit' || control.type === 'image')));
+  const submitName = submit === undefined ? '' : nameOf(submit);
+  const link = element.closest('a[href]');
+  return JSON.stringify({
+    box: { x: rectangle.x, y: rectangle.y, width: rectangle.width, height: rectangle.height },
+    formSubmitName: submitName === '' ? null : submitName,
+    linkUrl: link instanceof HTMLAnchorElement ? link.href : null,
+    testId: element.getAttribute('data-testid'),
+  });
+}
+
+// Chooses the option of a select whose visible text, or else whose value, is `option`, and fires
+// the input and change events a person's choice fires. Returns 'selected', 'no-option' or
+// 'not-a-select'.
+export function selectOption(element: Element, option: string): string {
+  const normalise = (text: string): string => text.replace(/\s+/g, ' ').trim();
+  if (!(element instanceof HTMLSelectElement)) return 'not-a-select';
+  const options = Array.from(element.options);
+  const chosen = options.find((candidate) => normalise(candidate.label || candidate.text) === normalise(option))
+    ?? options.find((candidate) => candidate.value === option);
+  if (chosen === undefined) return 'no-option';
+  element.value = chosen.value;
+  element.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+  element.dispatchEvent(new Event('change', { bubbles: true }));
+  return 'selected';
+}
+
+// Where an iframe's document starts in its parent's viewport, as JSON {x, y}: the iframe's box
+// plus its border and padding. The iframe is scrolled into view first, so its contents can be hit.
+export function frameContentOffset(frame: Element): string {
+  const first = frame.getBoundingClientRect();
+  const inView = first.top >= 0 && first.left >= 0 && first.bottom <= innerHeight && first.right <= innerWidth;
+  if (!inView) frame.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' });
+  const rectangle = frame.getBoundingClientRect();
+  const style = getComputedStyle(frame);
+  const pixels = (value: string): number => Number.parseFloat(value) || 0;
+  return JSON.stringify({
+    x: rectangle.x + frame.clientLeft + pixels(style.paddingLeft),
+    y: rectangle.y + frame.clientTop + pixels(style.paddingTop),
+  });
+}
+
+// True when the element belongs to this document, not to a frame inside it.
+export function inThisDocument(element: Element): string {
+  return element.ownerDocument === document ? 'yes' : 'no';
+}
+
+// Waits two animation frames, so whatever an action started (a popup, a download) has reached
+// the browser before the driver looks.
+export async function afterTwoFrames(): Promise<string> {
+  const nextFrame = (): Promise<void> => new Promise((resolve) => {
+    let done = false;
+    const finish = (): void => { if (!done) { done = true; resolve(); } };
+    requestAnimationFrame(() => finish());
+    setTimeout(finish, 50); // a hidden or throttled page may not paint
+  });
+  await nextFrame();
+  await nextFrame();
   return 'ok';
 }

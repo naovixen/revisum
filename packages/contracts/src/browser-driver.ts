@@ -1,7 +1,7 @@
 // The browser driver ports: what the engine needs from one browser session, split into small
 // interfaces. Each driver package implements them; the engine never imports a driver.
 // See docs/specs/SPEC-06-cdp-driver.md and docs/specs/SPEC-27-shared-types-and-events.md.
-import type { ActionStep, Locator } from './plan.ts';
+import type { ActionStep, Locator, ResolvedLocator } from './plan.ts';
 import type { GuardVerdict } from './policy.ts';
 import type { Secret } from './secret.ts';
 import type { Result } from './result.ts';
@@ -16,7 +16,17 @@ import type { AdapterId, Target } from './target.ts';
 export type DriverErrorCode =
   | 'not-found' | 'ambiguous' | 'not-actionable' | 'timeout' | 'navigation-failed' | 'policy-denied'
   | 'no-download' | 'download-too-large' | 'storage-origin-mismatch' | 'clock-runaway' | 'clipboard-unavailable';
-export type DriverError = { readonly code: DriverErrorCode; readonly detail: string };
+// Driver errors that came with the own CDP driver's capabilities. They stop a step for something
+// other than its element, and are kept apart from DriverErrorCode, whose codes the shared types pin.
+// target-crashed: the page's renderer died, or its target closed, while the step ran. The step
+// fails, the rest of the run is skipped, and close() still ends every process.
+// unsupported-step: the driver does not perform this kind of step, or the step made the page open
+// a popup or a second page, or start a download. The popup is closed and the download cancelled,
+// with nothing of it kept, so the step never passes with a partial result.
+// assertion-failed: a dialog step's expected text is not the open dialog's text, so nothing
+// answered the dialog.
+export type DriverStopCode = 'target-crashed' | 'unsupported-step' | 'assertion-failed';
+export type DriverError = { readonly code: DriverErrorCode | DriverStopCode; readonly detail: string };
 
 // Why a declared target cannot run. A driver explains a "no"; it never substitutes another target.
 // provider-unavailable: the cloud or device provider could not supply the target.
@@ -92,9 +102,10 @@ export interface PageNavigator {
   page(): Promise<PageProbe>;
 }
 export interface ActionRunner {
-  // Given a guard, the driver asks it first and acts only on an allow. The CDP driver starts
-  // passing the resolved element, and answering dialogs, with SPEC-06
-  // (docs/specs/SPEC-06-cdp-driver.md); until then a driver refuses a dialog step.
+  // Given a guard, the driver resolves the step's element, asks the guard with it, and acts only
+  // on an allow; on a deny it sends no input event and returns policy-denied. The engine passes a
+  // guard with every action. A dialog step asks the guard with the open dialog's text.
+  // A driver that does not perform a kind of step returns unsupported-step, with nothing sent.
   // For a fill whose value is a secret reference, the engine passes the resolved secret; the driver
   // reveals it only at the moment it types, and never reports it back. The engine replaces value
   // references before it acts; a driver refuses any step that still holds one.
@@ -114,8 +125,20 @@ export interface Auditor {
   accessibilitySnapshot(): Promise<A11yNode>;
 }
 
+// The ports one document of a session's page offers: the top document, or an iframe's document
+// inside it. A step acts and checks through them.
+export interface DocumentSession extends PageNavigator, ActionRunner, Prober, Camera, Auditor {
+  // The document of the one iframe the locator finds, waited for as an action waits for its
+  // element. Steps given to it act and check inside that frame only. A driver without it does not
+  // run frame steps, and the run fails them with unsupported-step.
+  frame?(locator: ResolvedLocator): Promise<Result<DocumentSession, DriverError>>;
+  // True once the page's renderer has died. A check waiting on a crashed page then fails with
+  // target-crashed rather than waiting out its timeout. A driver without it never reports a crash.
+  crashed?(): boolean;
+}
+
 // One open browser session: every driver port together.
-export interface Session extends PageNavigator, ActionRunner, Prober, Camera, Auditor {
+export interface Session extends DocumentSession {
   readonly browser: { readonly name: string; readonly version: string };
   // Origins of the requests the session refused, as evidence that the run stayed hermetic.
   blockedOrigins(): readonly string[];

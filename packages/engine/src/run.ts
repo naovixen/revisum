@@ -7,7 +7,7 @@
 import {
   needsDriverFeatures,
   type A11yFinding, type ActionGuard, type ApprovalLabel, type ArtifactReference, type ArtifactStore, type Authorised,
-  type BrowserDriver, type Clock, type LockEntry, type DialogStep, type ElementProbe, type EventSink, type GuardVerdict, type Plan, type PolicyRuleId, type Redactor,
+  type BrowserDriver, type Clock, type DocumentSession, type LockEntry, type DialogStep, type ElementProbe, type EventSink, type GuardVerdict, type Plan, type PolicyRuleId, type Redactor,
   type ResolvedElement, type Result, type SafeText, type SecretStore, type ServiceCaller, type Session, type Step, type Target, type TargetId,
   type Unavailable, type ValueName, type GuaranteeStatement, type RunMode, type SuiteFinding, type SuiteName, type SuitePass,
   type SuiteTestId, type SuiteTestResult, type UnsafeFeature,
@@ -431,10 +431,12 @@ async function openSession(planned: lifecycle.Planned, context: RunContext): Pro
 
 // Steps the plan language has but no driver performs yet. Each fails with unsupported-step, never
 // passes or is skipped, and nothing of it reaches the driver, so a plan that relies on one cannot
-// report a pass it did not earn or act in part.
+// report a pass it did not earn or act in part. Hover, select and upload go to the driver, which
+// refuses them the same way when it does not perform them; a frame step needs the driver's frame
+// port.
 function isUnsupported(step: Step): boolean {
   switch (step.type) {
-    case 'hover': case 'select': case 'upload': case 'frame': case 'remember': return true;
+    case 'remember': return true;
     // Database commands run in a workload container, which comes with the isolated runner
     // (docs/specs/SPEC-36-unsafe-plan-features.md).
     case 'database': case 'expectDatabase': return true;
@@ -446,7 +448,9 @@ function isUnsupported(step: Step): boolean {
 // What the runtime guard is given for a step that acts on no element.
 const NO_ELEMENT: ResolvedElement = { role: null, name: null, box: null, formSubmitName: null, linkUrl: null };
 
-async function executeStep(step: Step, index: number, session: Session, target: Target, context: RunContext): Promise<StepResult> {
+// Runs one step on a document of the page: the top document, or an iframe's for the steps inside a
+// frame step, which report under the frame step's own index.
+async function executeStep(step: Step, index: number, session: DocumentSession, target: Target, context: RunContext): Promise<StepResult> {
   const base = { index, type: step.type } as const;
   if (isUnsupported(step)) return { ...base, outcome: 'failed', code: 'unsupported-step' };
   // No driver loads saved storage state into its session yet (that comes with the CDP driver's
@@ -500,7 +504,20 @@ async function executeStep(step: Step, index: number, session: Session, target: 
       const acted = await session.act(answer.value, guardFor(answer.value, index, target, context));
       return acted.ok ? { ...base, outcome: 'passed' } : { ...base, outcome: 'failed', code: acted.error.code };
     }
-    case 'frame':
+    case 'frame': {
+      // The frame's steps run in order inside the iframe's document. They have no results of their
+      // own: the first that fails fails the frame step, with its code and observation.
+      if (session.frame === undefined) return { ...base, outcome: 'failed', code: 'unsupported-step' };
+      const locator = resolveLocator(step.locator, context.values, context.inputs.project);
+      if (!locator.ok) return { ...base, outcome: 'failed', code: locator.error };
+      const entered = await session.frame(locator.value);
+      if (!entered.ok) return { ...base, outcome: 'failed', code: entered.error.code };
+      for (const inner of step.steps) {
+        const done = await executeStep(inner, index, entered.value, target, context);
+        if (done.outcome !== 'passed') return { ...done, type: step.type };
+      }
+      return { ...base, outcome: 'passed' };
+    }
     case 'remember':
     case 'download':
     case 'expectDownload':
@@ -521,21 +538,23 @@ async function executeStep(step: Step, index: number, session: Session, target: 
       const assertion = resolveElementAssertion(step.assert, context.values, context.inputs.project);
       if (!assertion.ok) return { ...base, outcome: 'failed', code: assertion.error };
       let last: ElementProbe | null = null;
-      const verdict = await poll(context, async () => {
+      const verdict = await poll(context, session, async () => {
         last = await session.probe(locator.value);
         return checkElement(assertion.value, last);
       });
+      if (verdict.code === TARGET_CRASHED) return { ...base, outcome: 'failed', code: TARGET_CRASHED };
       return verdict.pass
         ? { ...base, outcome: 'passed' }
         : { ...base, outcome: 'failed', code: verdict.code ?? 'assertion-failed', observed: observe(last, context, context.secretFilledFields.has(canonicalJson(locator.value))) };
     }
     case 'expectPage': {
       let title = '';
-      const verdict = await poll(context, async () => {
+      const verdict = await poll(context, session, async () => {
         const page = await session.page();
         title = page.title;
         return checkPage(step.assert, page);
       });
+      if (verdict.code === TARGET_CRASHED) return { ...base, outcome: 'failed', code: TARGET_CRASHED };
       return verdict.pass
         ? { ...base, outcome: 'passed' }
         : { ...base, outcome: 'failed', code: 'assertion-failed', observed: context.isShortSecret(title) ? SECRET_PLACEHOLDER : context.redactor.text(title) };
@@ -585,12 +604,27 @@ function guardFor(step: Step, index: number, target: Target, context: RunContext
   };
 }
 
-// Repeats a check until it passes or the step timeout runs out.
-async function poll(context: RunContext, check: () => Promise<Verdict>): Promise<Verdict> {
+const TARGET_CRASHED = 'target-crashed';
+// A check's verdict, or the page's renderer died while the check waited.
+type PollVerdict = Verdict | { readonly pass: false; readonly code: typeof TARGET_CRASHED };
+
+// Repeats a check until it passes or the step timeout runs out. A page that crashes stops the
+// wait at once: nothing on it can change any more.
+async function poll(context: RunContext, session: DocumentSession, check: () => Promise<Verdict>): Promise<PollVerdict> {
+  const crashed = (): boolean => session.crashed?.() === true;
   const deadline = context.ports.clock.now() + context.inputs.project.limits.stepTimeoutMilliseconds;
   for (;;) {
-    const verdict = await check();
-    if (verdict.pass || context.ports.clock.now() >= deadline) return verdict;
+    let verdict: Verdict;
+    try {
+      verdict = await check();
+    } catch (error) {
+      // A read that failed because the page died is the crash; any other failure is the adapter's.
+      if (crashed()) return { pass: false, code: TARGET_CRASHED };
+      throw error;
+    }
+    if (verdict.pass) return verdict;
+    if (crashed()) return { pass: false, code: TARGET_CRASHED };
+    if (context.ports.clock.now() >= deadline) return verdict;
     await context.ports.clock.sleep(POLL_INTERVAL_MILLISECONDS);
   }
 }

@@ -2,15 +2,18 @@
 // WebSocket, with no third-party automation library. See docs/specs/SPEC-06-cdp-driver.md.
 import {
   determinismScript, deviceProfile, failure, success,
-  type A11yNode, type Key, type SessionEnvironment, type Target,
+  type A11yNode, type DriverError, type Key, type Result, type SessionEnvironment, type Target,
 } from '@revisum/contracts';
+import { realpathSync } from 'node:fs';
+import { isAbsolute, relative, resolve } from 'node:path';
 import { chromiumBuild } from './browser-build.ts';
 import { buildSession, errorText } from './browser-session.ts';
 import { CdpConnection } from './cdp-connection.ts';
 import { QUIET_CHROME_FLAGS } from './chrome-flags.ts';
 import { launchChromium, type LaunchedChromium } from './chromium-launcher.ts';
-import { focusAndSelect, focusElement } from './in-page.ts';
-import type { DriverSession, OwnBrowserDriver, PageArgument, PageFunction, PageOperations, Point } from './page-operations.ts';
+import { focusAndSelect, focusElement, frameContentOffset } from './in-page.ts';
+import type { DriverSession, OwnBrowserDriver, PageArgument, PageFunction, PageOperations, Point, RoleAndName } from './page-operations.ts';
+import { PageWatch } from './page-watch.ts';
 
 export const CDP_ADAPTER_VERSION = '0.1.0';
 const COMMAND_TIMEOUT_MILLISECONDS = 30_000;
@@ -79,8 +82,34 @@ type AccessibilityNode = {
   readonly backendDOMNodeId?: number;
 };
 type RequestPaused = { readonly requestId: string; readonly request: { readonly url: string } };
+type DescribedNode = { readonly node: { readonly backendNodeId: number; readonly frameId?: string } };
 
-export type CdpDriverOptions = { readonly executablePath: string; readonly launchTimeoutMilliseconds?: number };
+export type CdpDriverOptions = {
+  readonly executablePath: string;
+  readonly launchTimeoutMilliseconds?: number;
+  // The project's fixtures folder. An upload step sends a declared fixture from here, and never a
+  // file outside it. Without it, the driver refuses every upload.
+  readonly fixturesFolder?: string;
+};
+
+// The absolute path of a declared fixture inside the fixtures folder. A name that leads out of the
+// folder, by "..", an absolute path or a link, is refused, as is a file that is not there.
+export function fixtureFilePath(fixturesFolder: string | undefined, fixture: string): Result<string, DriverError> {
+  if (fixturesFolder === undefined) return failure({ code: 'unsupported-step', detail: 'this driver was given no fixtures folder to upload from' });
+  let folder: string;
+  let file: string;
+  try {
+    folder = realpathSync(fixturesFolder);
+    file = realpathSync(resolve(folder, fixture));
+  } catch {
+    return failure({ code: 'not-found', detail: 'the fixture file is not in the fixtures folder' });
+  }
+  const inside = relative(folder, file);
+  if (inside === '' || inside.startsWith('..') || isAbsolute(inside)) {
+    return failure({ code: 'not-actionable', detail: 'the fixture leads outside the fixtures folder' });
+  }
+  return success(file);
+}
 
 export function cdpDriver(options: CdpDriverOptions): OwnBrowserDriver {
   return {
@@ -107,7 +136,7 @@ export function cdpDriver(options: CdpDriverOptions): OwnBrowserDriver {
         return failure({ reason: 'launch-failed', detail: errorText(error) });
       }
       try {
-        return success(await createSession(launched, target, environment));
+        return success(await createSession(launched, target, environment, options.fixturesFolder));
       } catch (error) {
         await launched.stop();
         return failure({ reason: 'launch-failed', detail: errorText(error) });
@@ -116,7 +145,9 @@ export function cdpDriver(options: CdpDriverOptions): OwnBrowserDriver {
   };
 }
 
-async function createSession(launched: LaunchedChromium, target: Target, environment: SessionEnvironment): Promise<DriverSession> {
+async function createSession(
+  launched: LaunchedChromium, target: Target, environment: SessionEnvironment, fixturesFolder: string | undefined,
+): Promise<DriverSession> {
   const connection = launched.connection;
   const version = await connection.send<{ product: string; userAgent: string }>(undefined, 'Browser.getVersion');
   const { browserContextId } = await connection.send<{ browserContextId: string }>(undefined, 'Target.createBrowserContext', { disposeOnDetach: true });
@@ -126,6 +157,8 @@ async function createSession(launched: LaunchedChromium, target: Target, environ
 
   const profile = deviceProfile(target);
   await page.send('Page.enable');
+  const watch = new PageWatch(connection, { browserContextId, targetId, sessionId });
+  await watch.start();
   await page.send('Emulation.setDeviceMetricsOverride', { width: profile.width, height: profile.height, deviceScaleFactor: profile.scale, mobile: profile.mobile });
   // The quoted key is the protocol's own parameter name.
   if (profile.touch) await page.send('Emulation.setTouchEmulationEnabled', { enabled: true, 'maxTouchPoints': 5 });
@@ -156,36 +189,76 @@ async function createSession(launched: LaunchedChromium, target: Target, environ
   });
   await page.send('Fetch.enable', { patterns: [{ urlPattern: '*', requestStage: 'Request' }] });
 
-  const operations = new CdpPage(connection, sessionId);
+  const operations = new CdpPage(connection, sessionId, watch, null);
   return buildSession(operations, environment, {
     browser: { name: 'chromium', version: /\/(\S+)$/.exec(version.product)?.[1] ?? version.product },
     processId: launched.browserProcess.pid ?? -1,
     blockedOrigins: () => blocked,
     close: () => launched.stop(),
+    events: watch,
+    fixturePath: (fixture) => fixtureFilePath(fixturesFolder, fixture),
   });
 }
 
-// PageOperations over one flat CDP session. Element handles are remote object ids.
+// Where a CdpPage's document is when it is an iframe's: the frame's id, its element in the parent
+// document, and the isolated script world it is read through. The page's own scripts cannot see
+// or change that world; it shares only the document.
+type FrameScope = {
+  readonly parent: CdpPage;
+  readonly frameElement: string;
+  readonly frameId: string;
+  executionContextId: number;
+};
+
+// The name of the isolated script world the driver reads a frame's document through.
+const FRAME_WORLD_NAME = 'driver-frame';
+// Messages of a command that named an execution context the page has since destroyed.
+const LOST_CONTEXT = /context|Cannot find/i;
+
+// PageOperations over one flat CDP session, for its top document or one of its iframes' documents.
+// Element handles are remote object ids.
 class CdpPage implements PageOperations<string> {
   readonly protocol = 'cdp' as const;
   readonly accessibilityTreeSource = 'browser' as const;
   readonly #connection: CdpConnection;
   readonly #sessionId: string;
+  readonly #watch: PageWatch;
+  readonly #frame: FrameScope | null;
 
-  constructor(connection: CdpConnection, sessionId: string) {
+  constructor(connection: CdpConnection, sessionId: string, watch: PageWatch, frame: FrameScope | null) {
     this.#connection = connection;
     this.#sessionId = sessionId;
+    this.#watch = watch;
+    this.#frame = frame;
   }
 
+  // Every command goes through the watch, so a crashed page fails it at once.
   #send<Value = Record<string, unknown>>(method: string, parameters: Record<string, unknown> = {}): Promise<Value> {
-    return this.#connection.send<Value>(this.#sessionId, method, parameters);
+    return this.#watch.command<Value>(method, parameters);
+  }
+
+  // Waits for a command that a dialog may hold up, such as the mouse release whose click opens a
+  // dialog: it ends when the command does or when a dialog opens. The browser answers the command
+  // itself only once the dialog is answered.
+  async #untilDialog(command: Promise<unknown>): Promise<void> {
+    command.catch(() => undefined);
+    const opened = this.#watch.dialogOpened();
+    try {
+      await Promise.race([command, opened.promise]);
+    } finally {
+      opened.cancel();
+    }
   }
 
   async navigate(url: string, timeoutMilliseconds: number): Promise<void> {
-    const loaded = this.#connection.once(this.#sessionId, 'Page.loadEventFired', timeoutMilliseconds);
+    const frameId = this.#frame?.frameId;
+    // The top document has loaded at its load event; a frame once it stops loading.
+    const loaded = frameId === undefined
+      ? this.#connection.once(this.#sessionId, 'Page.loadEventFired', timeoutMilliseconds)
+      : this.#frameStoppedLoading(frameId, timeoutMilliseconds);
     loaded.promise.catch(() => undefined);
     try {
-      const navigated = await this.#send<{ errorText?: string }>('Page.navigate', { url });
+      const navigated = await this.#send<{ errorText?: string }>('Page.navigate', { url, ...(frameId === undefined ? {} : { frameId }) });
       if (navigated.errorText) throw new Error(navigated.errorText);
       await loaded.promise;
     } finally {
@@ -193,10 +266,44 @@ class CdpPage implements PageOperations<string> {
     }
   }
 
+  #frameStoppedLoading(frameId: string, timeoutMilliseconds: number): { readonly promise: Promise<unknown>; cancel(): void } {
+    let stopListening = (): void => undefined;
+    let timer: NodeJS.Timeout | undefined;
+    const promise = new Promise<unknown>((resolveLoaded, reject) => {
+      stopListening = this.#connection.on(this.#sessionId, 'Page.frameStoppedLoading', (parameters) => {
+        if ((parameters as { frameId?: string }).frameId !== frameId) return;
+        clearTimeout(timer);
+        stopListening();
+        resolveLoaded(parameters);
+      });
+      timer = setTimeout(() => { stopListening(); reject(new Error(`the frame did not load within ${timeoutMilliseconds} ms`)); }, timeoutMilliseconds);
+    });
+    return { promise, cancel: () => { clearTimeout(timer); stopListening(); } };
+  }
+
+  // The document object: the top document's, in the page's main world, or the frame's, in its
+  // isolated world. A frame that has navigated since has lost its world, so a new one is made.
   async #documentObject(): Promise<string> {
-    const evaluated = await this.#send<CallResult>('Runtime.evaluate', { expression: 'document' });
+    const frame = this.#frame;
+    let evaluated: CallResult;
+    if (frame === null) {
+      evaluated = await this.#send<CallResult>('Runtime.evaluate', { expression: 'document' });
+    } else {
+      try {
+        evaluated = await this.#send<CallResult>('Runtime.evaluate', { expression: 'document', contextId: frame.executionContextId });
+      } catch (error) {
+        if (!LOST_CONTEXT.test(errorText(error)) || this.#watch.crashed()) throw error;
+        frame.executionContextId = await this.#isolatedWorld(frame.frameId);
+        evaluated = await this.#send<CallResult>('Runtime.evaluate', { expression: 'document', contextId: frame.executionContextId });
+      }
+    }
     if (evaluated.result.objectId === undefined) throw new Error('no document');
     return evaluated.result.objectId;
+  }
+
+  async #isolatedWorld(frameId: string): Promise<number> {
+    const created = await this.#send<{ executionContextId: number }>('Page.createIsolatedWorld', { frameId, worldName: FRAME_WORLD_NAME });
+    return created.executionContextId;
   }
 
   async #call(pageFunction: PageFunction, inputs: readonly PageArgument<string>[], returnByValue: boolean): Promise<CallResult> {
@@ -224,21 +331,36 @@ class CdpPage implements PageOperations<string> {
   }
 
   async byRole(role: string, name: string): Promise<string[]> {
-    const documentNode = await this.#send<{ root: { backendNodeId: number } }>('DOM.getDocument', { depth: 0 });
+    const frame = this.#frame;
+    const root = frame === null
+      ? (await this.#send<{ root: { backendNodeId: number } }>('DOM.getDocument', { depth: 0 })).root.backendNodeId
+      : (await this.#send<DescribedNode>('DOM.describeNode', { objectId: await this.#documentObject() })).node.backendNodeId;
     const queried = await this.#send<{ nodes: AccessibilityNode[] }>('Accessibility.queryAXTree', {
-      backendNodeId: documentNode.root.backendNodeId, role: role === 'img' ? 'image' : role, accessibleName: name,
+      backendNodeId: root, role: role === 'img' ? 'image' : role, accessibleName: name,
     });
     const handles: string[] = [];
     for (const node of queried.nodes) {
       if (node.ignored || node.backendDOMNodeId === undefined) continue;
-      const resolved = await this.#send<{ object: { objectId?: string } }>('DOM.resolveNode', { backendNodeId: node.backendDOMNodeId });
+      const resolved = await this.#send<{ object: { objectId?: string } }>('DOM.resolveNode', {
+        backendNodeId: node.backendDOMNodeId, ...(frame === null ? {} : { executionContextId: frame.executionContextId }),
+      });
       if (resolved.object.objectId) handles.push(resolved.object.objectId);
     }
     return handles;
   }
 
+  async roleAndName(element: string): Promise<RoleAndName> {
+    const { nodes } = await this.#send<{ nodes: AccessibilityNode[] }>('Accessibility.getPartialAXTree', { objectId: element, fetchRelatives: false });
+    const node = nodes[0];
+    if (node === undefined || node.ignored) return { role: null, name: null };
+    const role = typeof node.role?.value === 'string' && node.role.value !== '' ? node.role.value : null;
+    const name = typeof node.name?.value === 'string' && node.name.value !== '' ? node.name.value : null;
+    return { role: role === null ? null : ROLE_NAMES[role] ?? role, name };
+  }
+
   async accessibilityTree(): Promise<A11yNode> {
-    const { nodes } = await this.#send<{ nodes: AccessibilityNode[] }>('Accessibility.getFullAXTree');
+    const frameId = this.#frame?.frameId;
+    const { nodes } = await this.#send<{ nodes: AccessibilityNode[] }>('Accessibility.getFullAXTree', frameId === undefined ? {} : { frameId });
     const byId = new Map(nodes.map((node) => [node.nodeId, node]));
     const build = (node: AccessibilityNode): A11yNode[] => {
       const children = (node.childIds ?? []).flatMap((id) => { const child = byId.get(id); return child ? build(child) : []; });
@@ -251,17 +373,35 @@ class CdpPage implements PageOperations<string> {
     return tree.length === 1 && tree[0] ? tree[0] : { role: 'document', name: '', children: tree };
   }
 
+  // Where this document's viewport starts in the top document's viewport: the sum of the frame
+  // offsets on the way down. Mouse events are dispatched to the top document.
+  async #viewportOffset(): Promise<Point> {
+    const frame = this.#frame;
+    if (frame === null) return { x: 0, y: 0 };
+    const above = await frame.parent.#viewportOffset();
+    const offset = decodePoint(await frame.parent.callForString(frameContentOffset, [{ element: frame.frameElement }]));
+    return { x: above.x + offset.x, y: above.y + offset.y };
+  }
+
   async click(_element: string, at: Point): Promise<void> {
-    const pressed = { x: at.x, y: at.y, button: 'left' as const, clickCount: 1 };
-    await this.#send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: at.x, y: at.y });
-    await this.#send('Input.dispatchMouseEvent', { type: 'mousePressed', ...pressed });
-    await this.#send('Input.dispatchMouseEvent', { type: 'mouseReleased', ...pressed });
+    const offset = await this.#viewportOffset();
+    const point = { x: at.x + offset.x, y: at.y + offset.y };
+    const pressed = { ...point, button: 'left' as const, clickCount: 1 };
+    await this.#send('Input.dispatchMouseEvent', { type: 'mouseMoved', ...point });
+    await this.#untilDialog(this.#send('Input.dispatchMouseEvent', { type: 'mousePressed', ...pressed }));
+    if (this.#watch.openDialog() !== null) return;
+    await this.#untilDialog(this.#send('Input.dispatchMouseEvent', { type: 'mouseReleased', ...pressed }));
+  }
+
+  async hover(at: Point): Promise<void> {
+    const offset = await this.#viewportOffset();
+    await this.#untilDialog(this.#send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: at.x + offset.x, y: at.y + offset.y }));
   }
 
   async fill(element: string, value: string): Promise<void> {
     await this.callForString(focusAndSelect, [{ element }]);
     if (value === '') await this.#pressKey(KEY_DEFINITIONS.Backspace);
-    else await this.#send('Input.insertText', { text: value });
+    else await this.#untilDialog(this.#send('Input.insertText', { text: value }));
   }
 
   async press(element: string, key: Key): Promise<void> {
@@ -271,12 +411,43 @@ class CdpPage implements PageOperations<string> {
 
   async #pressKey(definition: KeyDefinition): Promise<void> {
     const common = { key: definition.key, code: definition.code, windowsVirtualKeyCode: definition.keyCode };
-    await this.#send('Input.dispatchKeyEvent', { type: definition.text ? 'keyDown' : 'rawKeyDown', ...common, ...(definition.text ? { text: definition.text } : {}) });
-    await this.#send('Input.dispatchKeyEvent', { type: 'keyUp', ...common });
+    await this.#untilDialog(this.#send('Input.dispatchKeyEvent', {
+      type: definition.text ? 'keyDown' : 'rawKeyDown', ...common, ...(definition.text ? { text: definition.text } : {}),
+    }));
+    if (this.#watch.openDialog() !== null) return;
+    await this.#untilDialog(this.#send('Input.dispatchKeyEvent', { type: 'keyUp', ...common }));
+  }
+
+  async setFiles(element: string, paths: readonly string[]): Promise<void> {
+    await this.#send('DOM.setFileInputFiles', { files: [...paths], objectId: element });
+  }
+
+  async frame(element: string): Promise<PageOperations<string> | null> {
+    const described = await this.#send<DescribedNode>('DOM.describeNode', { objectId: element });
+    const frameId = described.node.frameId;
+    if (frameId === undefined) return null;
+    let executionContextId: number;
+    try {
+      executionContextId = await this.#isolatedWorld(frameId);
+    } catch (error) {
+      // A frame whose document runs in another renderer process has no world in this session.
+      if (this.#watch.crashed()) throw error;
+      return null;
+    }
+    return new CdpPage(this.#connection, this.#sessionId, this.#watch, { parent: this, frameElement: element, frameId, executionContextId });
   }
 
   async screenshotPng(): Promise<Uint8Array> {
     const captured = await this.#send<{ data: string }>('Page.captureScreenshot', { format: 'png' });
     return new Uint8Array(Buffer.from(captured.data, 'base64'));
   }
+}
+
+// Decodes the {x, y} JSON frameContentOffset (in-page.ts) reports.
+function decodePoint(text: string): Point {
+  const parsed: unknown = JSON.parse(text);
+  const fields = typeof parsed === 'object' && parsed !== null ? parsed as Record<string, unknown> : {};
+  const [x, y] = [fields['x'], fields['y']];
+  if (typeof x !== 'number' || typeof y !== 'number') throw new Error('the frame offset is not a point');
+  return { x, y };
 }

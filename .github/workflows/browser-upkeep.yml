@@ -1,0 +1,54 @@
+# Weekly browser upkeep for the own CDP driver. It reads the latest Stable Chrome for Testing
+# version from Google's public version list. When that major is newer than the pinned build, it
+# installs the new build and its headless shell and re-runs the contract and capability suites on
+# them. Then tools/browser-upkeep.ts reports the average fix hours per major, flags the Playwright
+# fallback rule when they are over the limit, and fails when the new major has no upkeep record.
+# Runs in the same pinned image as the "ci" workflow. See docs/specs/SPEC-06-cdp-driver.md.
+name: browser-upkeep
+
+on:
+  schedule:
+    # Mondays at 06:00 UTC.
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  browser-upkeep:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - name: Re-validate the driver on a newer Chrome for Testing major
+        run: |
+          # The profile lets Chrome's sandbox create its namespaces, as in the dev container.
+          docker run --rm \
+            --security-opt seccomp=.devcontainer/seccomp-chrome-sandbox.json \
+            --volume "$GITHUB_WORKSPACE:/workspace" --workdir /workspace \
+            mcr.microsoft.com/devcontainers/typescript-node:24-bookworm@sha256:970eebf5b82d3800bdd9f46680e1c4c664d365d18603148540788356700ce301 \
+            bash -euo pipefail -c '
+              npm ci
+              # The system libraries the browsers need on Linux, installed as root.
+              node node_modules/playwright-core/cli.js install-deps chromium firefox webkit
+              chown -R node:node /workspace
+              su node -c "bash -euo pipefail" <<"UPKEEP"
+                npm run browsers
+                curl --fail --silent --show-error --location \
+                  https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions.json --output .browsers/latest-versions.json
+                stable=$(node -e "console.log(JSON.parse(require(\"fs\").readFileSync(\".browsers/latest-versions.json\", \"utf8\")).channels.Stable.version)")
+                pinned=$(node --input-type=module -e "import(\"./tools/install-browsers.ts\").then((tool) => console.log(tool.CHROME_FOR_TESTING_BUILD))")
+                suites=0
+                if [ "${stable%%.*}" -gt "${pinned%%.*}" ]; then
+                  echo "Chrome for Testing Stable ${stable} is a newer major than the pinned ${pinned}: re-running the contract and capability suites"
+                  npx @puppeteer/browsers install "chrome@${stable}" --path "$PWD/.browsers/latest"
+                  npx @puppeteer/browsers install "chrome-headless-shell@${stable}" --path "$PWD/.browsers/latest"
+                  export CHROME_PATH="$PWD/.browsers/latest/chrome/linux-${stable}/chrome-linux64/chrome"
+                  export CHROME_HEADLESS_SHELL_PATH="$PWD/.browsers/latest/chrome-headless-shell/linux-${stable}/chrome-headless-shell-linux64/chrome-headless-shell"
+                  node tools/run-test-folder.ts test/contract || suites=1
+                fi
+                upkeep=0
+                node tools/browser-upkeep.ts --versions .browsers/latest-versions.json || upkeep=1
+                exit $(( suites | upkeep ))
+          UPKEEP
+            '

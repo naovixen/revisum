@@ -305,6 +305,18 @@ Driver error. One `advanceClock` step would have fired more timer callbacks than
 
 Driver error. The browser cannot keep the clipboard inside its own memory, so the driver never reads it: every `expectClipboard` and clipboard `remember` fails, and the host's clipboard is never touched. Run the plan on a target whose browser keeps a run-local clipboard.
 
+## target-crashed
+
+Driver error. The page's renderer died, or its browser target closed, while the step ran. The step fails, every later step is skipped, and the session still closes and ends every browser process. Run the plan again; if it keeps crashing, the page itself may exhaust the renderer's memory.
+
+## unsupported-step
+
+Driver error. The step needs something this run cannot do yet: the driver does not perform this kind of step, or the step made the page open a popup or a second page, or start a download. The popup is closed and the download cancelled, with nothing of it kept, and every later step is skipped. Run the plan on a target whose driver performs the step, or change the step.
+
+## assertion-failed
+
+Driver error. A `dialog` step's `expectText` is not the text of the dialog the page opened, so nothing answered the dialog. Check the expected text, or the step before it that opens the dialog.
+
 ## image-missing
 
 Runner error. The pinned container image is not available, so no browser was launched.

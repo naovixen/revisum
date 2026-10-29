@@ -1,16 +1,18 @@
 // The fallback driver: Chromium, Firefox and WebKit through Playwright, always headless. It
-// stays until the own drivers pass the capability contract tests.
+// stays until the own drivers pass the capability contract tests. It clicks, fills and presses,
+// asking the policy gate's runtime guard first; the steps only the own CDP driver performs (hover,
+// select, upload, frame and dialog) it refuses with unsupported-step, with nothing sent.
 // See docs/decisions/browser-and-audit-dependencies.md.
 import {
   determinismScript, deviceProfile, failure, literalActionStep, performableLocator, reveal, success,
-  type ActionStep, type BrowserDriver, type DriverError, type ElementProbe, type Key, type ResolvedLocator,
+  type ActionGuard, type ActionStep, type BrowserDriver, type DriverError, type ElementProbe, type Key, type ResolvedElement, type ResolvedLocator,
   type Result, type Secret, type Session, type SessionEnvironment, type Target,
 } from '@revisum/contracts';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { chromium, firefox, webkit, type Browser, type Locator as PlaywrightLocator, type Page } from 'playwright-core';
 import { AXE_SOURCE, AXE_TAGS, runAxe, toFindings } from './axe-audit.ts';
-import { accessibilitySnapshot, probeElement } from './in-page.ts';
+import { accessibilitySnapshot, probeElement, resolvedElement } from './in-page.ts';
 
 const requireFromHere = createRequire(import.meta.url);
 const PLAYWRIGHT_VERSION = (JSON.parse(readFileSync(requireFromHere.resolve('playwright-core/package.json'), 'utf8')) as { version: string }).version;
@@ -121,8 +123,8 @@ async function createSession(browser: Browser, target: Target, environment: Sess
     async page() {
       return { url: page.url(), title: await page.title() };
     },
-    async act(step, _guard, secret) {
-      return act(page, step, timeout, secret);
+    async act(step, guard, secret) {
+      return act(page, step, timeout, guard, secret);
     },
     async probe(planLocator) {
       // A value reference, a position or another test-id attribute matches nothing here yet.
@@ -167,33 +169,65 @@ function locate(page: Page, locator: ResolvedLocator): PlaywrightLocator {
   }
 }
 
-async function act(page: Page, step: ActionStep, timeout: number, secret: Secret | undefined): Promise<Result<void, DriverError>> {
-  // The engine does not send these yet (it reports them as unsupported-step); refuse them here too.
-  if (step.type === 'hover' || step.type === 'select' || step.type === 'upload') {
-    return failure({ code: 'not-actionable', detail: `this driver does not perform ${step.type} steps yet` });
+// Steps the own CDP driver performs and this fallback does not.
+const OWN_DRIVER_STEPS: readonly ActionStep['type'][] = ['hover', 'select', 'upload', 'dialog'];
+
+async function act(
+  page: Page, step: ActionStep, timeout: number, guard: ActionGuard | undefined, secret: Secret | undefined,
+): Promise<Result<void, DriverError>> {
+  if (OWN_DRIVER_STEPS.includes(step.type)) {
+    return failure({ code: 'unsupported-step', detail: `the Playwright fallback does not perform ${step.type} steps` });
   }
   // Anything this driver cannot perform in full is refused before it touches the page.
   const action = literalActionStep(step);
-  if (action === undefined) return failure({ code: 'not-actionable', detail: `this driver does not perform this ${step.type} step yet` });
+  if (action === undefined) return failure({ code: 'unsupported-step', detail: `this driver does not perform this ${step.type} step yet` });
   // A secret reference arrives with the secret the engine resolved for it. Without that secret
   // there is nothing to type, and typing nothing could pass a step that should fail.
   if (action.type === 'fill' && typeof action.value !== 'string' && secret?.name !== action.value.secretName) {
     return failure({ code: 'not-actionable', detail: 'a secret reference reached the driver without its secret' });
   }
   const found = locate(page, action.locator);
+  const deadline = Date.now() + timeout;
+  const remaining = (): number => Math.max(deadline - Date.now(), 1);
   try {
+    // The element is resolved and shown to the guard before any input event.
+    if (guard !== undefined) {
+      await found.waitFor({ state: 'visible', timeout: remaining() });
+      const verdict = guard(decodeResolvedElement(await found.evaluate(resolvedElement)), null);
+      if (verdict.kind === 'deny') return failure({ code: 'policy-denied', detail: `denied by the ${verdict.rule} rule` });
+    }
     switch (action.type) {
-      case 'click': await found.click({ timeout }); break;
+      case 'click': await found.click({ timeout: remaining() }); break;
       // The secret is revealed here, as it is typed, and nowhere else in this driver.
-      case 'fill': await found.fill(typeof action.value === 'string' ? action.value : reveal(secret ?? missingSecret()), { timeout }); break;
-      case 'press': await found.press(keyName(action.key), { timeout }); break;
-      case 'hover': case 'select': case 'upload': break;
+      case 'fill': await found.fill(typeof action.value === 'string' ? action.value : reveal(secret ?? missingSecret()), { timeout: remaining() }); break;
+      case 'press': await found.press(keyName(action.key), { timeout: remaining() }); break;
+      // Refused above, before the element was looked for.
+      case 'hover': case 'select': case 'upload': return failure({ code: 'unsupported-step', detail: `the Playwright fallback does not perform ${action.type} steps` });
     }
     return success(undefined);
   } catch (error) {
     const count = await found.count().catch(() => 0);
     return failure(driverError(count === 0 ? 'not-found' : count > 1 ? 'ambiguous' : 'not-actionable', error));
   }
+}
+
+// Decodes what resolvedElement (in-page.ts) reports. A field of another shape is read as not shown.
+function decodeResolvedElement(text: string): ResolvedElement {
+  const parsed: unknown = JSON.parse(text);
+  const fields = typeof parsed === 'object' && parsed !== null ? parsed as Record<string, unknown> : {};
+  const box = fields['box'];
+  const boxFields = typeof box === 'object' && box !== null ? box as Record<string, unknown> : {};
+  const [x, y, width, height] = [boxFields['x'], boxFields['y'], boxFields['width'], boxFields['height']];
+  const textOrNull = (value: unknown): string | null => (typeof value === 'string' && value !== '' ? value : null);
+  const testId = textOrNull(fields['testId']);
+  return {
+    role: textOrNull(fields['role']),
+    name: textOrNull(fields['name']),
+    box: typeof x === 'number' && typeof y === 'number' && typeof width === 'number' && typeof height === 'number' ? { x, y, width, height } : null,
+    formSubmitName: textOrNull(fields['formSubmitName']),
+    linkUrl: textOrNull(fields['linkUrl']),
+    ...(testId === null ? {} : { testId }),
+  };
 }
 
 // Unreachable: act() refuses a secret reference without its secret before it locates anything.
