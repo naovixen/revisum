@@ -18,3 +18,4 @@ Actual time per spec, for the velocity kill criteria in `E:\core\docs\09-mvp-pla
 | SPEC-28 (M1 parts) | M1 | 2026-10-28 | 2026-10-28 | 1 | Readable form for plan 1.2 added; commit waited for the browser-failure fix |
 | Browser failures | M1 | 2026-10-28 | 2026-10-28 | 1 | Root cause: Chromium port randomisation on Windows; checks now about 5.5 minutes |
 | SPEC-35 (M1 parts) | M1 | 2026-10-28 | 2026-10-28 | 1 | Green first run; two runner rules noted for M2 |
+| SPEC-36 (M1 parts) | M1 | 2026-10-29 | 2026-10-29 | 1 | Plan 1.3 opened; version tests made version-agnostic |
