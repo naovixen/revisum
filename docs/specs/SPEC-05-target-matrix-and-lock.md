@@ -37,6 +37,26 @@ export function lock(project: TrustedProject, registry: AdapterRegistry): Promis
 export function testedOn(target: Target): string; // e.g. "Chromium 156, phone viewport (emulated)"
 ```
 
+### Build notes (alignment with the seeded code, 2026-10-29)
+
+The seeded `contracts` code and the tests built on it win where they differ from the block above. Marked additions are new with this spec.
+
+- **`Unavailable` keeps its seeded shape** `{ reason, detail }`; tests build it that way. The run result already carries `targetId`, so the field above is dropped. `UnavailableReason` gains `provider-unavailable` and `build-mismatch` (addition).
+- **`Target` keeps its seeded fields.** `device` stays the closed `DeviceProfileId` set; "phone profile" means `phone-390`, "desktop" `desktop-1280`.
+- **New `Target` fields are optional** (addition): `kind`, `version`, `fidelity`, `provider`, `required`, `vendorExtensions`. The project parser sets each only when the project file gives it, so existing manifests and replay hashes don't change. Code reads them through engine helpers with these defaults: `kind` `browser`; `version` the adapter's own build, pinned by the lockfile; `provider` `local`; `required` `true`; `fidelity` `engine` on a desktop or laptop profile, `engine-emulated` on a tablet or phone profile. Keys in `vendorExtensions` must be `vendor:name`; any other key is rejected with its JSON path. Every value is checked against its closed set.
+- **`AdapterRegistry`** is built from the run context's `drivers` map by an engine function `adapterRegistry(drivers)`; `find` returns `null` for an unregistered id.
+- **Resolution** follows research `05` §2 in this order: (1) not in the matrix: `not-declared`; (2) adapter not registered: `adapter-not-registered`, no fallback; (3) `supports(target)` refuses: `engine-not-supported` or `device-not-supported`, and no other adapter is tried; (4) lock entry present and the build's hash differs: `build-mismatch`; (5) launch or provider failure: `launch-failed` or `provider-unavailable`; (6) retries use the same target only; (7) required versus optional, below; (8) `testedOn` wording; (9) `nonHermeticInputs`.
+- **Builds** (addition to `BrowserDriver`, optional so existing test drivers stay valid): `build?(target): Promise<Result<BrowserBuild, BuildFailure>>`, where `BrowserBuild = { version, executablePath }` and `BuildFailure = { code: 'lock-download-failed' | 'lock-offline' | UnavailableReason; detail }`. An adapter without `build` can't pin its browser, so its runs list `browser-build` under `nonHermeticInputs` when a lockfile is in use.
+- **Lockfile** `targets.lock.json` beside `project.json`: `{ schema, entries: LockEntry[] }`, entries sorted by target id, canonical JSON with a final newline. A hand-written engine decoder parses it; unknown keys are rejected.
+  - `lock(project, registry, previous)` returns `Result<readonly LockEntry[], LockFailure>`, `LockFailure = { targetId, code: 'lock-download-failed' | 'lock-offline' | 'build-mismatch' | UnavailableReason, detail }`. A previous entry with the same version and a different hash fails with `build-mismatch` (AC-08).
+  - `lockToFile(folder, project, registry)` reads the existing file, calls `lock`, and writes (temporary file, then rename) only on success, so any failure leaves the file byte-identical (AC-07).
+  - At run time, a run given lock entries hashes the adapter's build before `open`; a different hash ends the run `TargetUnavailable` with `build-mismatch` and opens no browser. A run given no lock entries behaves as before.
+- **Required and optional targets** (AC-05). `ExitCode` and `EXIT_PRECEDENCE` move into `contracts` now, exactly as SPEC-11 declares them (addition taken early). An engine function `unavailableTargetOutcome(target)` returns `{ exitCode: 3 }` for a required target and `{ exitCode: 0, skipped: true, warning }` for an optional one. SPEC-11's JUnit exporter and SPEC-16's CLI consume it; this spec tests the function.
+- **`testedOn(target, build?)`** lives in `engine` and is pure. It names the engine and, when known, the major version, then the device profile, then the fidelity in brackets when it isn't `engine`, such as "Chromium 156, phone viewport (emulated)". WebKit always reads "patched WebKit, not Safari". It never contains "Safari" otherwise, "Android", "iPhone" or "iOS".
+- **`nonHermeticInputs`**: `AdapterInfo` gains an optional `cannotPin?: readonly string[]` (addition), merged into the manifest's existing list only when non-empty, so other manifests keep their hashes.
+- **Not yet wired:** the `lock` CLI command (SPEC-16) and real browser downloads. `driver-cdp`'s `build` locates the Chrome for Testing build that `tools/install-browsers.ts` installs and reports `lock-download-failed` when it is missing; downloading at lock time would need `@puppeteer/browsers` at run time and a dependency review first.
+- **Risk:** `targets.lock.json` is not yet a trusted file (SPEC-02). A changed lockfile can only refuse a run or pin a hash that must still match the executable on the machine. Revisit at the M2 exit review.
+
 ## Acceptance criteria
 
 - AC-SPEC-05-01: When a plan names a target that is not in the matrix, the run shall end `TargetUnavailable` with `not-declared` (oracle: specified).
