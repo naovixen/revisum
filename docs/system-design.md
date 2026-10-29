@@ -10,6 +10,7 @@
 - **One TypeScript monorepo on Node 24 with ten phase-1 packages.** A zero-dependency engine sits in the middle. Drivers, auditors, renderers, the runner and the CLI plug into it through typed ports. The compiler rejects any import in the wrong direction.
 - **One run is a straight pipeline:** parse the plan, then check trust and policy, resolve targets, run in an isolated container, capture masked evidence, audit accessibility with two engines, and decide with a pure oracle. The run ends by writing a hashed result, report, PR comment and review queue.
 - **AI never reaches execution unparsed.** Plans arrive as `unknown` and become typed only through the engine's parser. Every human decision goes into a hash-chained audit log.
+- **The closed plan language is the default.** Evidence mode (a team's own Playwright suite, wrapped with Revisum's evidence) and unsafe plan features are opt-in in the trusted project file, and every output resting on them is labelled `host` (`docs/decisions/language-fit-pivot.md`).
 - **The code must read without the research.** No research IDs appear in any identifier, names are domain words, and a CI lint enforces both (Finding 6).
 - **Start here, then `15`.** `15` turns this design into the first sessions, prompts and repository settings.
 
@@ -25,6 +26,7 @@
 | Runs execute in a container pinned by digest, with an egress proxy outside the browser; the same image is the dev container | Container digests pin OS and fonts [C-R13-004]; in-browser routing leaks [C-F1-005]; one image keeps local and CI runs equal | med |
 | Tests, proofs, fixtures and golden files live in top-level folders that code owners hold, apart from the code | Models edit tests to pass [C-R13-062]; SPEC-00 AC-05 | high |
 | No product names, research IDs or single letters in code identifiers; a lint enforces it | Founder requirement, 2026-10-27: maintainable by people without AI | high |
+| The closed language stays the default; evidence mode and unsafe features are enabled only in the trusted project file, labelled `host` and never counted as verified evidence | The coverage study found 36% of fresh intents expressible against the 70% language-fit criterion; founder decision, 2026-10-28 (`docs/decisions/language-fit-pivot.md`) | high |
 
 ## Findings
 
@@ -41,7 +43,7 @@
 | Public schema | JSON Schema 2020-12, generated from the TypeScript types | Agents draft plans against it |
 | Browser | Chrome for Testing and chrome-headless-shell, pinned by version and executable hash | Headless shell in CI [C-R10-016] |
 | Accessibility | axe-core 4.14.0 (MPL-2.0, files unmodified) and core's own ACT-rule engine | Run side by side on Chromium |
-| Isolation | Docker image pinned by digest; an egress proxy allows only declared origins | The same image runs CI and the dev container |
+| Isolation | Docker image pinned by digest; an egress proxy allows only declared origins. Evidence suites and database commands run in the team's own workload images, also pinned by digest | The same image runs CI and the dev container |
 | Outputs | JSON result, JUnit XML, SARIF, HTML report, PR image and comment | GitHub reads SARIF; other CIs read JUnit [C-R07-027][C-R07-025] |
 | Audit | Append-only JSONL, hash-chained, anchored outside the agent's write scope | Actors pseudonymous |
 | CI | GitHub Actions on a pinned Linux image; short-lived OIDC tokens | [C-R09-022] |
@@ -101,17 +103,17 @@ flowchart TB
 | Package | Job | Seeded from | Spec |
 |---|---|---|---|
 | `contracts` | Shared types, plan and result schemas, port interfaces | P7 core types, P3 `ports.ts` | SPEC-27, SPEC-01 |
-| `engine` | Everything trusted: parse (readable and JSON plans), trust, policy, lifecycle, interpret, decide, hash, redact, record | P3 `src/core` | SPEC-01 to 05, 08, 11, 13 to 15, 28 |
+| `engine` | Everything trusted: parse (readable and JSON plans), trust, policy, lifecycle, interpret, decide, hash, redact, record; decode suite reports and traces | P3 `src/core` | SPEC-01 to 05, 08, 11, 13 to 15, 28, 35, 36 |
 | `driver-cdp` | Drive Chromium over CDP | P4 `src/drivers/cdp` and `shared` | SPEC-06 |
 | `driver-playwright` | Fallback Chromium driver | P3 `src/adapters/playwright` | SPEC-06 |
 | `auditor-axe` | Run axe-core in the page | P3 `src/adapters/shared/axe.ts` | SPEC-10 |
 | `auditor-act` | Core's own ACT-rule engine | P5 `src` | SPEC-10 |
-| `runner` | Start the pinned container and egress proxy | New | SPEC-07 |
+| `runner` | Start the pinned container and egress proxy; the workload runner starts team images by digest | New | SPEC-07, SPEC-35 |
 | `report` | Report, PR image and exporters | P6 `src/render`, `src/model` | SPEC-11, SPEC-12 |
 | `cli` | Commands `validate`, `lock`, `run`, `draft`, `export`, `review`, `approve`, `doctor` | P6 `cli.ts` (shape only) | SPEC-16, SPEC-28 |
 | `action` | GitHub Action wrapper | New | SPEC-16 |
 
-Phase 2 adds `driver-bidi` (Firefox, from P4), `mcp-server`, `tracker-github` and protocol packs under `packs/` (from P7).
+Evidence mode and unsafe features add no package (SPEC-35, SPEC-36). Phase 2 adds `driver-bidi` (Firefox, from P4), `mcp-server`, `tracker-github` and protocol packs under `packs/` (from P7).
 
 **Action:** create exactly these packages at M0; a new package needs a spec that names its port.
 
@@ -155,6 +157,19 @@ flowchart TD
   R1 & R2 & R3 & R4 --> O
 ```
 
+Evidence mode is a second entry route (SPEC-35). It runs a team's own Playwright suite instead of a plan, then joins the same result stages:
+
+```mermaid
+flowchart TD
+  S[Suite declared in<br/>the trusted project] --> T{Trust check:<br/>suite files from protected branch}
+  T --> W[Workload container from the<br/>team's image, egress proxy]
+  W --> X[Decode the suite report<br/>and traces under limits]
+  X --> Y[Audit recorded page snapshots<br/>with both engines]
+  Y --> K2[Result JSON and manifest,<br/>labelled host]
+  K2 --> L2[Report, PR comment,<br/>review queue, audit log]
+```
+
+- **Unsafe features** (SPEC-36): the parse stage accepts CSS and XPath locators, DOM checks, page scripts and database commands only when the trusted project enables them; otherwise the plan is rejected.
 - **Lifecycle states** follow `04` Finding 4: Proposed, Rejected, Planned, Denied, TargetUnavailable, Authorised, Resolved, Running, Passed, Failed, Errored. Illegal transitions are compile errors.
 - **Approval routes** (SPEC-02, `13` FR-06). No gate sits behind a second person (founder, 2026-10-27):
   - **Declared:** the owner's approval under the agent lock-down in `15`. The coding agent may commit but can't push or merge, so a push or merge to the default branch is the founder's (`docs/decisions/single-session-workflow.md`). It suffices for every subject: plans, trusted files, review decisions, high-risk extra reviews and holdout plans. Anything built on it is labelled `declared`.
@@ -203,6 +218,7 @@ revisum/
 
 - Inside a package, folders are named after what they hold: `src/plan/`, `src/policy/`, `src/audit-log/`, never `src/p3/` or `src/r11/`.
 - One concept per file, named after its main export: `policy-gate.ts` exports `evaluatePolicy`.
+- Customer repositories may hold `plans/scripts/`, the page scripts their project declares (SPEC-36). Like everything under `plans/`, they are trusted files.
 
 **Action:** SPEC-00 creates this tree; CI fails if a source file sits outside `packages/*/src` or a test sits outside `test/`.
 
@@ -238,10 +254,10 @@ Allowed abbreviations: id, url, uri, html, css, json, http, api, cli, ci, pr, cd
 | Milestone | Packages touched | Working slice at the exit |
 |---|---|---|
 | M0 seed | All skeletons; `engine`, `driver-cdp`, `auditor-act`, `report` from spikes | Spike suites pass unchanged in CI |
-| M1 language and trust | `contracts`, `engine` | Plans in readable or JSON form parse, gate and need a person's approval |
-| M2 driver and isolation | `driver-cdp`, `runner`, `engine` (manifest) | A plan runs in the container, egress blocked, replay matches. **Alpha** |
-| M3 evidence | `auditor-axe`, `auditor-act`, `report`, `engine` (review, audit log, metrics); WCAG test base in `test/wcag/` and `fixtures/wcag/` | Report, PR comment, review queue and recorder work end to end; CI publishes "verifies N of M criteria" per level |
-| M4 launch | `cli` (including `draft`), `action`, docs | `npx revisum run` and the Action work on a demo app. **Beta** |
+| M1 language and trust | `contracts`, `engine` | Plans in readable or JSON form parse, gate and need a person's approval. SPEC-35's suite declaration, suite-file trust, report decoder, result mapping and labels (no containers), and SPEC-36's plan 1.3 parser parts, declarations, gate rules and labels; coverage measured on 1.3 with parsed plans (built) |
+| M2 driver and isolation | `driver-cdp`, `runner`, `engine` (manifest) | A plan runs in the container, egress blocked, replay matches. SPEC-35's workload runner runs a suite with egress, traces and manifest, before the remaining plan-language driver parts; SPEC-36's driver parts (CSS, XPath, DOM checks, page scripts), then database commands. **Alpha** |
+| M3 evidence | `auditor-axe`, `auditor-act`, `report`, `engine` (review, audit log, metrics); WCAG test base in `test/wcag/` and `fixtures/wcag/` | Report, PR comment, review queue and recorder work end to end; CI publishes "verifies N of M criteria" per level. SPEC-35's snapshot audit, masked captures, report, PR comment and review queue; SPEC-36's labels in exporters |
+| M4 launch | `cli` (including `draft`), `action`, docs | `npx revisum run` and the Action work on a demo app. SPEC-35's `run --suite` and Action input; SPEC-36's `doctor` checks and claim-lint wording. **Beta** |
 
 **Action:** review this table against `09` at every milestone exit.
 
@@ -250,6 +266,7 @@ Allowed abbreviations: id, url, uri, html, css, json, http, api, cli, ci, pr, cd
 - **The name needs UK and EU trademark checks.** Revisum cleared GitHub, npm, domains and US marks only; the `PRODUCT` constant keeps any rename to one line.
 - **Licence boundaries need a lawyer's read.** Placing the CLI under FSL and the Action under Apache-2.0 is a design call, not evidence.
 - **The dev container depends on Docker** on the founder's machine and in CI; egress enforcement in standard CI containers is unproven until M2 (`09` kill criteria).
+- **Evidence mode runs team code,** and database commands run team images, so the runner's isolation and egress controls (SPEC-07) are load-bearing, not defence in depth.
 - **The diagrams describe phase 1 only.** Firefox, MCP, packs and hosting change `cli` wiring but not the engine's ports.
 
 ## Sources
