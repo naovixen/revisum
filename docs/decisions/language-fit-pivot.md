@@ -93,6 +93,10 @@ All yes:
 
 The placement above is now the queue in `START.md`.
 
+## Founder's answer at the M1 exit (2026-10-29)
+
+The measured share stays under the threshold: 36% fresh on 1.2 without escape hatches, 44% fresh on 1.3 even counting unsafe features. The founder recorded this pivot as the response to the language-fit signal, the one `E:\core\docs\09-mvp-plan.md` §6 lists, so the criterion no longer stops the build on 2026-11-23. The threshold is unchanged and is still reported as unmet. The build goes on until it is demoable; the founder then judges, by using it, whether the product is worthwhile.
+
 ## Projected coverage with unsafe features
 
 **In short:** a **projection**, not a measurement. The parser can't check 1.3 plans yet. With every SPEC-36 feature enabled, judged by the same strict whole-test rule as `docs/coverage-study/rerun-1.2.md`, the shares would be:

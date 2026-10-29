@@ -82,7 +82,7 @@ From `E:\core\docs\09-mvp-plan.md` §6, counted from the plan's day 0, 2026-11-0
 | Upkeep | Fixes average over 1.8 h across the first 6 Chromium majors | 2027-03-31 |
 | Velocity | M3 not done | 2027-06-07 |
 
-- **Language fit:** the row stands as it is. Its response, evidence mode with opt-in unsafe features, is under way (`docs/decisions/language-fit-pivot.md`).
+- **Language fit: resolved, does not stop the build.** The share stays under 70% (36% fresh on 1.2). On 2026-10-29 the founder recorded evidence mode with opt-in unsafe features (`docs/decisions/language-fit-pivot.md`) as this signal's response, the one the MVP plan lists. The build goes on until it is demoable, so the founder can judge from use whether the product is worthwhile.
 
 ## Setup reference
 
