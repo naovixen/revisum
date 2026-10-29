@@ -31,8 +31,9 @@ import {
   generateRunValues, resolveActionStep, resolveElementAssertion, resolveLocator, resolvePathTemplate, resolvePlanClock, resolveText,
 } from './run-values.ts';
 import {
-  NO_SECRETS, resolvePlanSecrets, resolvedSecretStore, secretRecords, withSecretRedaction, type ResolvedSecrets,
+  NO_SECRETS, resolvePlanSecrets, resolvedSecretStore, secretRecords, shortSecretObservation, withSecretRedaction, type ResolvedSecrets,
 } from './secrets/secret-resolution.ts';
+import { SECRET_PLACEHOLDER } from './secrets/secret-values.ts';
 import {
   runBackendCheck, runCallStep, runCleanup, type CallStepContext, type CleanupResult, type ServiceCallRecord,
 } from './service-calls/call-steps.ts';
@@ -158,6 +159,11 @@ type RunContext = {
   // The caller's redactor with the plan's secrets added: every kept text goes through it.
   readonly redactor: Redactor;
   readonly secrets: ResolvedSecrets;
+  // Whether a whole observed text is a secret too short to search for by value.
+  readonly isShortSecret: (observed: string) => boolean;
+  // The fields, by their resolved locator as canonical JSON, whose last fill typed a secret. What a
+  // check reads back from one is the secret, whatever its length, so it is never kept.
+  readonly secretFilledFields: Set<string>;
   // The run's values by name: the plan's generated values, and the response fields calls remember.
   readonly values: Map<ValueName, SafeText>;
   // What the call steps use, when the run has a service caller.
@@ -189,7 +195,9 @@ export async function run(given: RunInputs, ports: RunPorts): Promise<RunResult>
   const calls: CallStepContext | undefined = ports.services === undefined ? undefined : {
     caller: ports.services, project: inputs.project, values, secrets: resolvedSecretStore(secrets), clock: ports.clock, logger,
   };
-  const context: RunContext = { inputs, ports, logger, gate, denials: [], redactor, secrets, values, calls };
+  const context: RunContext = {
+    inputs, ports, logger, gate, denials: [], redactor, secrets, isShortSecret: shortSecretObservation(secrets), secretFilledFields: new Set(), values, calls,
+  };
 
   if (target === undefined || !declared) {
     return unavailableResult(inputs.targetId, { reason: 'not-declared', detail: 'target is not in both the plan and the matrix' }, context, startedAt);
@@ -420,6 +428,10 @@ const NO_ELEMENT: ResolvedElement = { role: null, name: null, box: null, formSub
 async function executeStep(step: Step, index: number, session: Session, target: Target, context: RunContext): Promise<StepResult> {
   const base = { index, type: step.type } as const;
   if (isUnsupported(step)) return { ...base, outcome: 'failed', code: 'unsupported-step' };
+  // No driver loads saved storage state into its session yet (that comes with the CDP driver's
+  // session environment). A plan that names it relies on being signed in, so its first step fails
+  // and nothing reaches the driver, rather than running without the state the plan declared.
+  if (context.inputs.plan.storageState !== undefined) return { ...base, outcome: 'failed', code: 'unsupported-step' };
   switch (step.type) {
     case 'navigate': {
       let path = step.url;
@@ -451,6 +463,11 @@ async function executeStep(step: Step, index: number, session: Session, target: 
       const resolved = action.value;
       // A secret is handed to the driver opaque; it is revealed only as the driver types it.
       const secret = resolved.type === 'fill' && typeof resolved.value !== 'string' ? context.secrets.fills.get(resolved.value.secretName) : undefined;
+      // Marked before acting: a fill that fails part way may still have typed some of the secret.
+      if (resolved.type === 'fill') {
+        if (secret === undefined) context.secretFilledFields.delete(canonicalJson(resolved.locator));
+        else context.secretFilledFields.add(canonicalJson(resolved.locator));
+      }
       const acted = await session.act(resolved, guardFor(resolved, index, target, context), secret);
       return acted.ok ? { ...base, outcome: 'passed' } : { ...base, outcome: 'failed', code: acted.error.code };
     }
@@ -489,7 +506,7 @@ async function executeStep(step: Step, index: number, session: Session, target: 
       });
       return verdict.pass
         ? { ...base, outcome: 'passed' }
-        : { ...base, outcome: 'failed', code: verdict.code ?? 'assertion-failed', observed: observe(last, context.redactor) };
+        : { ...base, outcome: 'failed', code: verdict.code ?? 'assertion-failed', observed: observe(last, context, context.secretFilledFields.has(canonicalJson(locator.value))) };
     }
     case 'expectPage': {
       let title = '';
@@ -500,7 +517,7 @@ async function executeStep(step: Step, index: number, session: Session, target: 
       });
       return verdict.pass
         ? { ...base, outcome: 'passed' }
-        : { ...base, outcome: 'failed', code: 'assertion-failed', observed: context.redactor.text(title) };
+        : { ...base, outcome: 'failed', code: 'assertion-failed', observed: context.isShortSecret(title) ? SECRET_PLACEHOLDER : context.redactor.text(title) };
     }
     case 'a11yAudit': {
       const findings = [...(await session.audit())].sort((left, right) => (left.ruleId < right.ruleId ? -1 : left.ruleId > right.ruleId ? 1 : 0));
@@ -557,12 +574,15 @@ async function poll(context: RunContext, check: () => Promise<Verdict>): Promise
   }
 }
 
-// What a failed check saw, redacted: never the text of a sensitive element.
-function observe(probe: ElementProbe | null, redactor: Redactor): string {
+// What a failed check saw, redacted: never the text of a sensitive element, nothing read from a
+// field a secret was typed into, and no text that is a whole short secret.
+function observe(probe: ElementProbe | null, context: RunContext, filledFromSecret: boolean): string {
   if (probe === null || probe.count === 0) return '(no element)';
   if (probe.count > 1) return `(${probe.count} elements)`;
   if (probe.sensitive) return SENSITIVE_PLACEHOLDER;
-  return redactor.text(normalise(probe.value ?? probe.text)).slice(0, 200);
+  const seen = normalise(probe.value ?? probe.text);
+  if (filledFromSecret || context.isShortSecret(seen)) return SECRET_PLACEHOLDER;
+  return context.redactor.text(seen).slice(0, 200);
 }
 
 const errorText = (error: unknown): string => (error instanceof Error ? error.message : String(error)).slice(0, 200);

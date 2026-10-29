@@ -1,7 +1,7 @@
 // The engine's one module that reads secret values. It is on the reveal allow-list because
 // redaction and leak scanning cannot work without the value: they look for it, and for each form
 // in which it can echo, in text a run keeps or wrote. Everything here returns redacted text, forms
-// found, a mode or a hash, never the value itself. A declared call's header scheme is applied here
+// found, whether a text is a secret, a mode or a hash, never the value itself. A declared call's header scheme is applied here
 // too, inside a new opaque Secret.
 // See docs/specs/SPEC-04-secrets-and-redaction.md.
 import {
@@ -11,9 +11,6 @@ import { sha256 } from '../hashing.ts';
 
 // What replaces an echo of a secret in kept text.
 export const SECRET_PLACEHOLDER = '[redacted:secret]';
-
-// A base64 fragment shorter than this is too likely to occur by chance to count as an echo.
-const MINIMUM_ENCODED_FRAGMENT_LENGTH = 12;
 
 // Short values are redacted by key: searching outputs for them would match ordinary text.
 export const redactionModeOf = (secret: Secret): RedactionMode =>
@@ -33,35 +30,91 @@ function foldCase(text: string): string {
   return folded;
 }
 
-type EncodedEcho = { readonly form: 'raw' | 'uri' | 'base64' | 'base64url'; readonly text: string };
+const escapeForPattern = (text: string): string => text.replace(/[\\^$.*+?()[\]{}|/-]/g, '\\$&');
 
-// The base64 text of `bytes` as it appears inside a longer encoded string, for each of the three
-// alignments it can have there. Characters that also depend on neighbouring bytes are left out.
-function encodedFragments(bytes: Buffer, encoding: 'base64' | 'base64url'): string[] {
-  const fragments: string[] = [];
-  for (const offset of [0, 1, 2]) {
-    const encoded = Buffer.concat([Buffer.alloc(offset), bytes]).toString(encoding);
-    const start = offset === 0 ? 0 : 4;
-    const end = Math.floor((offset + bytes.length) / 3) * 4;
-    const fragment = encoded.slice(start, end);
-    if (fragment.length >= MINIMUM_ENCODED_FRAGMENT_LENGTH) fragments.push(fragment);
-  }
-  return fragments;
+// ---- URL and form encoding ------------------------------------------------------------------------
+
+// The percent escapes of one character's UTF-8 bytes: "%2f" for "/".
+const percentEscapes = (character: string): string =>
+  [...Buffer.from(character, 'utf8')].map((byte) => `%${byte.toString(16).padStart(2, '0')}`).join('');
+
+// A pattern for the value as any URL or form encoder may write it: each character as itself or
+// percent-escaped, and a space also as "+", as forms and URLSearchParams write it. Encoders differ
+// in which characters they escape (encodeURIComponent leaves "!" and "~" alone, URLSearchParams
+// does not), so every character may take either form. The pattern ignores case, so hex digits may
+// be upper or lower case and a case-changed echo is caught too.
+function uriPattern(value: string): RegExp {
+  const characters = [...value].map((character) => {
+    const options = [escapeForPattern(character), percentEscapes(character)];
+    if (character === ' ') options.push('\\+');
+    return `(?:${options.join('|')})`;
+  });
+  return new RegExp(characters.join(''), 'gi');
 }
 
-// Every exact form of a value, longest first within each form, so the whole echo is replaced
-// before any fragment of it.
-function encodedEchoes(value: string): EncodedEcho[] {
+// ---- Base64 inside longer text ---------------------------------------------------------------------
+
+const BASE64_ALPHABETS = {
+  base64: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/',
+  base64url: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_',
+} as const;
+
+// One base64 character as far as the value decides it: which of its six bits come from the value
+// (knownBits) and what they are (bits). The other bits come from the bytes around the value.
+type EncodedCharacter = { readonly knownBits: number; readonly bits: number };
+
+// The base64 characters that hold the value's bits when the value starts `offset` bytes into a
+// three-byte group, as it does inside a longer encoded text such as "user:password".
+function encodedCharacters(bytes: Buffer, offset: number): EncodedCharacter[] {
+  const characters: EncodedCharacter[] = [];
+  const characterCount = Math.ceil(((offset + bytes.length) * 8) / 6);
+  for (let character = 0; character < characterCount; character++) {
+    let knownBits = 0;
+    let bits = 0;
+    for (let bit = 0; bit < 6; bit++) {
+      const position = character * 6 + bit;
+      const byte = bytes[Math.floor(position / 8) - offset];
+      knownBits <<= 1;
+      bits <<= 1;
+      if (byte !== undefined) {
+        knownBits |= 1;
+        bits |= (byte >> (7 - (position % 8))) & 1;
+      }
+    }
+    // A leading character that holds only the preceding bytes' bits says nothing about the value.
+    if (knownBits !== 0) characters.push({ knownBits, bits });
+  }
+  return characters;
+}
+
+// A pattern for the value's base64 at each of the three alignments it can take inside a longer
+// encoded text, with any padding when the value ends it. A character the value only partly decides
+// matches every alphabet character that agrees on the value's bits, so all of the value's bits are
+// checked: a near miss differs in some character and does not match, however short the value.
+function base64Pattern(value: string, alphabet: string): RegExp {
   const bytes = Buffer.from(value, 'utf8');
-  const echoes: EncodedEcho[] = [{ form: 'raw', text: value }];
-  const uri = encodeURIComponent(value);
-  if (uri !== value) echoes.push({ form: 'uri', text: uri });
-  for (const encoding of ['base64', 'base64url'] as const) {
-    echoes.push({ form: encoding, text: bytes.toString(encoding) });
-    for (const fragment of encodedFragments(bytes, encoding)) echoes.push({ form: encoding, text: fragment });
-  }
-  return echoes;
+  const alignments = [0, 1, 2].map((offset) => {
+    const characters = encodedCharacters(bytes, offset).map(({ knownBits, bits }) => {
+      const allowed = [...alphabet].filter((_, index) => (index & knownBits) === bits).map(escapeForPattern);
+      return allowed.length === 1 ? allowed.join('') : `[${allowed.join('')}]`;
+    });
+    const padding = (offset + bytes.length) % 3 === 0 ? '' : '={0,2}';
+    return `(?:${characters.join('')}${padding})`;
+  });
+  return new RegExp(alignments.join('|'), 'g');
 }
+
+// ---- Finding and redacting echoes ------------------------------------------------------------------
+
+type EncodedEcho = { readonly form: 'uri' | 'base64' | 'base64url'; readonly pattern: RegExp };
+
+// Every encoded form of a value: URL and form encoding (whose pattern also matches the value as
+// typed, in any case), then base64 and base64url at every alignment.
+const encodedEchoes = (value: string): EncodedEcho[] => [
+  { form: 'uri', pattern: uriPattern(value) },
+  { form: 'base64', pattern: base64Pattern(value, BASE64_ALPHABETS.base64) },
+  { form: 'base64url', pattern: base64Pattern(value, BASE64_ALPHABETS.base64url) },
+];
 
 type Range = { readonly start: number; readonly end: number };
 
@@ -102,35 +155,55 @@ function replaceRanges(text: string, ranges: readonly Range[]): string {
   return kept + text.slice(position);
 }
 
-// Replaces every echo of one value: its exact encoded forms, then the value in any case, then any
-// prefix of it at least the minimum secret length long.
-function redactValue(text: string, value: string): string {
-  let redacted = text;
-  for (const echo of encodedEchoes(value)) redacted = redacted.split(echo.text).join(SECRET_PLACEHOLDER);
+// A function that replaces every echo of one value: its encoded forms, then the value in any case,
+// then any prefix of it at least the minimum secret length long.
+function valueRedaction(value: string): (text: string) => string {
+  const echoes = encodedEchoes(value);
   const foldedValue = foldCase(value);
-  redacted = replaceRanges(redacted, occurrences(foldCase(redacted), foldedValue));
-  return replaceRanges(redacted, prefixRuns(foldCase(redacted), foldedValue));
+  return (text) => {
+    let redacted = text;
+    for (const echo of echoes) redacted = redacted.replace(echo.pattern, SECRET_PLACEHOLDER);
+    redacted = replaceRanges(redacted, occurrences(foldCase(redacted), foldedValue));
+    return replaceRanges(redacted, prefixRuns(foldCase(redacted), foldedValue));
+  };
 }
 
-// A function that removes every echo of the given secrets from text. Secrets redacted by key are
-// left out: their values are never searched for. With no secret to look for, text is unchanged.
+// A function that removes every echo of the given secrets from text, longest value first, so a
+// longer secret is never left in part by a shorter one inside it. Secrets redacted by key are left
+// out: their values are never searched for. With no secret to look for, text is unchanged.
 export function secretRedaction(secrets: readonly Secret[]): (text: string) => string {
-  const values = [...new Set(secrets.filter((secret) => redactionModeOf(secret) === 'value').map(reveal))]
-    .sort((left, right) => right.length - left.length);
-  if (values.length === 0) return (text) => text;
-  return (text) => values.reduce(redactValue, text);
+  const redactions = [...new Set(secrets.filter((secret) => redactionModeOf(secret) === 'value').map(reveal))]
+    .sort((left, right) => right.length - left.length)
+    .map(valueRedaction);
+  if (redactions.length === 0) return (text) => text;
+  return (text) => redactions.reduce((redacted, redact) => redact(redacted), text);
+}
+
+// A function that tells whether a whole text, such as what a failed check observed, is one of the
+// given secrets redacted by key, in any case. Such a value is too short to search for inside longer
+// text, but a text that is nothing but the value is an echo of it.
+export function shortSecretMatch(secrets: readonly Secret[]): (text: string) => boolean {
+  const values = new Set(secrets.filter((secret) => redactionModeOf(secret) === 'key-only').map((secret) => foldCase(reveal(secret).trim())));
+  values.delete('');
+  return (text) => values.size > 0 && values.has(foldCase(text.trim()));
 }
 
 // The forms in which `secret` echoes in `text`. A value in another case counts only when it does
-// not also appear as typed, and a prefix only when the whole value does not appear in any case.
-// A value below the minimum length is not searched for, so it reports nothing.
+// not also appear as typed, a URL or form encoding only when it differs from the value in more than
+// case, and a prefix only when the whole value does not appear in any case. A value below the
+// minimum length is not searched for, so it reports nothing.
 export function echoFormsIn(text: string, secret: Secret): readonly LeakForm[] {
   const value = reveal(secret);
   if (value.length < MINIMUM_SECRET_LENGTH) return [];
-  const forms = new Set<LeakForm>();
-  for (const echo of encodedEchoes(value)) if (text.includes(echo.text)) forms.add(echo.form);
   const foldedText = foldCase(text);
   const foldedValue = foldCase(value);
+  const forms = new Set<LeakForm>();
+  if (text.includes(value)) forms.add('raw');
+  for (const echo of encodedEchoes(value)) {
+    const found = text.match(echo.pattern) ?? [];
+    const counts = echo.form === 'uri' ? found.some((match) => foldCase(match) !== foldedValue) : found.length > 0;
+    if (counts) forms.add(echo.form);
+  }
   const wholeInAnyCase = foldedText.includes(foldedValue);
   if (wholeInAnyCase && !forms.has('raw')) forms.add('case');
   if (!wholeInAnyCase && prefixRuns(foldedText, foldedValue).length > 0) forms.add('prefix');

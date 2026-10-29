@@ -1,7 +1,9 @@
 // Keeps secret values where they belong. reveal() is the one way to read a secret's value, and only
 // the modules in REVEAL_ALLOWED_MODULES may import it. This check fails, naming the file, when any
 // other code in packages/ or tools/ imports or re-exports reveal, under its own name or another
-// (`import { reveal as show }`), or reads it from a namespace import (`contracts.reveal`).
+// (`import { reveal as show }`), reads it from a namespace import (`contracts.reveal`), or
+// destructures it out of a namespace import or a dynamic import
+// (`const { reveal: show } = contracts`, `const { reveal } = await import('…')`).
 // See docs/specs/SPEC-04-secrets-and-redaction.md.
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -38,11 +40,41 @@ function closingBrace(tokens: readonly Token[], open: number): number {
   return tokens.length;
 }
 
-// Lines where `tokens` import or re-export reveal, or read it from a namespace import.
+// True when the tokens from `index` start a dynamic import, `import(…)`, with or without `await`.
+function startsDynamicImport(tokens: readonly Token[], index: number): boolean {
+  const start = isIdentifier(tokens[index], 'await') ? index + 1 : index;
+  return isIdentifier(tokens[start], 'import') && isPunctuator(tokens[start + 1], '(');
+}
+
+// True when the "=" at `index` is an assignment, not part of "==", "===" or "=>".
+const isAssignment = (tokens: readonly Token[], index: number): boolean =>
+  isPunctuator(tokens[index], '=') && !isPunctuator(tokens[index + 1], '=') && !isPunctuator(tokens[index + 1], '>')
+  && !isPunctuator(tokens[index - 1], '=') && !isPunctuator(tokens[index - 1], '!');
+
+// Lines in the object pattern between `open` and `end` that take the property reveal: a key at the
+// pattern's own level (`{ reveal }`, `{ reveal: show }`), not a local name given after ":".
+function revealKeysInPattern(tokens: readonly Token[], open: number, end: number): number[] {
+  const lines: number[] = [];
+  let depth = 0;
+  for (let inside = open; inside < end; inside++) {
+    const token = tokens[inside];
+    if (isPunctuator(token, '{') || isPunctuator(token, '[') || isPunctuator(token, '(')) depth += 1;
+    else if (isPunctuator(token, '}') || isPunctuator(token, ']') || isPunctuator(token, ')')) depth -= 1;
+    else if (depth === 1 && isIdentifier(token, REVEAL) && (isPunctuator(tokens[inside - 1], '{') || isPunctuator(tokens[inside - 1], ','))) {
+      lines.push(token?.line ?? 0);
+    }
+  }
+  return lines;
+}
+
+// Lines where `tokens` import or re-export reveal, read it from a namespace import, or destructure
+// it out of a namespace import or a dynamic import.
 function revealUses(tokens: readonly Token[]): number[] {
   const lines: number[] = [];
   const namespaces = new Set<string>();
   tokens.forEach((token, index) => {
+    // `const name = await import(…)` makes a namespace as `import * as name` does.
+    if (token.kind === 'identifier' && isAssignment(tokens, index + 1) && startsDynamicImport(tokens, index + 2)) namespaces.add(token.text);
     if (!isIdentifier(token, 'import') && !isIdentifier(token, 'export')) return;
     if (isPunctuator(tokens[index - 1], '.')) return;
     let next = index + 1;
@@ -63,6 +95,13 @@ function revealUses(tokens: readonly Token[]): number[] {
   });
   tokens.forEach((token, index) => {
     if (isIdentifier(token, REVEAL) && isPunctuator(tokens[index - 1], '.') && namespaces.has(tokens[index - 2]?.text ?? '')) lines.push(token.line);
+    // `{ … } = namespace` or `{ … } = await import(…)`: the pattern names what it takes.
+    if (!isPunctuator(token, '{')) return;
+    const end = closingBrace(tokens, index);
+    if (!isAssignment(tokens, end + 1)) return;
+    const source = tokens[end + 2];
+    const fromNamespace = source?.kind === 'identifier' && namespaces.has(source.text) && !isPunctuator(tokens[end + 3], '.');
+    if (fromNamespace || startsDynamicImport(tokens, end + 2)) lines.push(...revealKeysInPattern(tokens, index, end));
   });
   return lines;
 }

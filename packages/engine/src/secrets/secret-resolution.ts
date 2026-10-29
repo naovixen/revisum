@@ -8,7 +8,7 @@ import {
   type CallDeclaration, type CallName, type Plan, type Redactor, type Result, type Secret, type SecretName, type SecretStore, type Step,
 } from '@revisum/contracts';
 import type { SecretRecord, StorageStateRecord } from '../manifest.ts';
-import { redactionModeOf, secretRedaction, secretSha256, storageStateSecrets } from './secret-values.ts';
+import { redactionModeOf, secretRedaction, secretSha256, shortSecretMatch, storageStateSecrets } from './secret-values.ts';
 
 export type ResolvedSecrets = {
   // The secrets fill steps name, by name.
@@ -68,16 +68,26 @@ export function resolvePlanSecrets(
 // started, so a call never reaches past them.
 export const resolvedSecretStore = (secrets: ResolvedSecrets): SecretStore => ({ resolve: (name) => secrets.services.get(name) ?? null });
 
+// Every secret whose echoes the run looks for. Saved storage state counts as a whole and by each
+// cookie and stored value inside it.
+function watchedSecrets(secrets: ResolvedSecrets): Secret[] {
+  const storage = secrets.storageState === null ? [] : [secrets.storageState, ...storageStateSecrets(secrets.storageState)];
+  return [...secrets.fills.values(), ...secrets.services.values(), ...storage];
+}
+
 // The run's redactor: the caller's personal-data redaction, with every echo of the resolved secrets
 // removed first, so a pattern match cannot split a secret and leave part of it behind. Saved
 // storage state is redacted as a whole and by each cookie and stored value inside it.
 export function withSecretRedaction(redactor: Redactor, secrets: ResolvedSecrets): Redactor {
-  const storage = secrets.storageState === null ? [] : [secrets.storageState, ...storageStateSecrets(secrets.storageState)];
-  const watched = [...secrets.fills.values(), ...secrets.services.values(), ...storage];
+  const watched = watchedSecrets(secrets);
   if (watched.length === 0) return redactor;
   const redactSecrets = secretRedaction(watched);
   return { selectors: redactor.selectors, text: (value) => redactor.text(redactSecrets(value)) };
 }
+
+// Whether a whole observed text is one of the run's short secrets, which redaction by value never
+// looks for: a failed check that observed exactly such a value keeps a placeholder instead.
+export const shortSecretObservation = (secrets: ResolvedSecrets): ((observed: string) => boolean) => shortSecretMatch(watchedSecrets(secrets));
 
 // What the manifest records: each fill's and call's secret by name and redaction mode, once, and the
 // storage state's name and content hash.
