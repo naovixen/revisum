@@ -284,7 +284,200 @@ Clean up:
   Call deleteOrder with orderId {orderId}
 ```
 
-*End of the plan 1.2 addition. The types follow.*
+### Readable syntax for plan 1.3 (addition, 2026-10-29)
+
+**In short.** Every construct plan language 1.3 adds (SPEC-36) gets one readable form here: CSS and XPath locators with their `inside` chains, DOM checks, remembering an attribute, page scripts by name or inline, and database commands, in steps and in `Clean up:`. Every line that holds one starts with the mark `Unsafe:`, so no reader can miss it. A line without the mark can hold none, so on such lines, as in 1.2, nothing can express script, CSS or XPath. The rules of the 1.2 addition still hold; this section only adds to them. The reader still turns lines into plain JSON fields and never consults the project, so `parsePlan` alone decides. A disabled feature is refused with `unsafe_feature_disabled`. A 1.3 construct in a `Version: 1.2` or `Version: 1.1` plan is refused with the code that version's parser gives. Each error is placed on its marked line.
+
+**Writing text exactly.**
+
+- **The unsafe mark.**
+  - `Unsafe:` is the first token of a statement, after the indentation and before the statement as the grammars define it. So a check on a marked line still starts with `Expect` after the mark, and a line that opens a block still ends with `:`.
+  - The mark goes on every step line whose own statement holds an unsafe construct: a CSS or XPath locator anywhere in it, including inside another locator's `inside`; a DOM check; `Remember attribute`; a page-script or database statement. A frame line is marked when its own locator is CSS or XPath, never because of the steps in its block, which carry their own marks.
+  - It goes on no other line: not on headers, `Criterion:`, `Values:`, `Clean up:`, value definitions or script lines.
+  - The reader decides from the words it read, not from the parser. A line that reads correctly and holds an unsafe construct without the mark is the new text error `missing-unsafe-mark`. A marked line that holds none is `unneeded-unsafe-mark`. Both are at column 1. So the mark is never optional, and each JSON construct keeps one text.
+  - `Unsafe:` is not a header. It may stand on any step line, and the placement rules for headers don't apply to it. Like the other grammar words it is case-insensitive, and the writer prints `Unsafe:` followed by one space.
+- **Case.** The new grammar words are case-insensitive too: `css`, `xpath`, `containing text`, `inside`, `inline`, `read`, `write`, `page script`, `database command`, `returning` and the check words.
+- **Selectors and expressions** are quoted text, under the rules for quoted text: the writer escapes every `"` and `\`, and nothing else. They never take a value reference. `{name}` there reads as one, as anywhere quoted text stands, and the parser refuses it with `wrong_type`.
+- **Locator order.**
+  - A CSS or XPath locator is written in this order: the position, `css` or `xpath`, the selector or expression, `containing text <text>` (`hasText`), then `inside <locator>`.
+  - A locator's own `containing text` comes before its `inside`, so it can't be read as the inner locator's.
+  - `inside` takes the whole rest of the locator. So a chain `css "a" inside css "b" inside css "c"` reads one way only: `b` holds `c` as its `inside`.
+  - A role, label, text or test-id locator has no `inside`, so an `inside` after one is `bad-locator`.
+  - The reader reads a chain of any depth; the parser refuses the fourth `inside` with `too_large`.
+- **Bare or quoted.** Script, command, parameter and field names, CSS property names and attribute names are bare words. Class names are quoted, because a class token may hold quotes, braces and commas. JSON pointers are quoted, because they may hold spaces; `""` points at the whole result.
+- **Arguments and remembered fields** follow the `Call` rules:
+  - without `with`, `arguments` is `{}`;
+  - without `remembering`, `remember` is left out, and `remembering nothing` is `{}`;
+  - the writer keeps the declaration's order for arguments, and the JSON order for remembered and returned fields;
+  - a `secret` argument is read like any other, and the parser refuses it as `wrong_type`.
+- **Inline scripts.**
+  - An inline script's statement ends with `:` and opens a **source block**: one script line per text line, indented two spaces more, each written as quoted text with nothing else on the line.
+  - The script lines are joined with LF (U+000A) between them, and nothing is added at the end. So a source that ends with a line break has a last line `""`, and an empty line inside the source is `""`. A blank text line in the block is ignored, like any blank line, and adds no script line. A comment line is dropped with `comment-dropped`.
+  - A script line has two more escapes than other quoted text, because a script source may hold the two control characters other plan text can't: `\t` for a tab (U+0009) and `\r` for a carriage return (U+000D). `\"` and `\\` stay, and any other escape is `bad-string`. So a source with CRLF line ends has `\r` at the end of every script line but the last.
+  - The writer splits the source at every LF, then escapes every `"`, `\`, tab and carriage return, and nothing else. Every other character stands as it is between the quotes, leading and trailing spaces included, so the reader's trimming of line ends never touches the source.
+  - Every `ScriptSource` the parser accepts therefore has exactly one text and reads back byte for byte. The parser allows no control characters but tab, LF and carriage return, and each of those has one form.
+  - A line in a source block that is not one quoted script line, a mark included, is `bad-string` at its first character outside the quotes. A source block opens no deeper block, so a deeper line is `bad-indent`.
+  - A source block with no script lines leaves `source` out, and the parser gives `missing_field`. A single `""` is an empty source, which the parser refuses as `empty`.
+  - Only the two inline statements open a source block; a named script's statement never ends with `:`.
+- **Blocks.** With source blocks, six statements open a block: `Values:`, `Clean up:`, `In frame …:`, `In new tab at …:`, `Run inline …:` and `Expect inline …:`.
+- **Placement.** A database step may stand in `Clean up:`, as a `Call` may. Any other step in `Clean up:`, and a database step in a frame or a second tab, still reads into its block, and the parser refuses it with `misplaced_step`.
+- **Error places.** A parser error about an unsafe construct is placed on its marked line, because its path maps to the step. A path under `.script.inline.source` maps to the first script line, or to the statement when the source block is empty.
+- **Absent and empty**, added to the 1.2 table: `returning nothing` is `"fields": {}`, and without `returning`, `fields` is left out. **Names given twice:** a field named twice in one `returning` list is `duplicate-key`, at the second one.
+
+```
+Readable grammar v1: the plan 1.3 addition (every line holding one of these starts with "Unsafe:")
+
+Version: 1.3
+
+Locators: two more kinds, wherever a <locator> stands
+<locator>  = … | [<position>] css "<selector>" [containing text <text>] [inside <locator>]
+               | [<position>] xpath "<expression>" [containing text <text>] [inside <locator>]
+             without "containing text", hasText is left out; without "inside", inside is left out
+
+DOM checks
+Expect <locator> has class "<class>"                         hasClass
+Expect <locator> lacks class "<class>"                       lacksClass
+Expect <locator> computed style <property> is "<value>"      computedStyleEquals
+Expect <locator> attribute <attribute> is <text>             attributeEquals
+Expect <locator> attribute <attribute> is absent             attributeAbsent
+Remember attribute <attribute> of <locator> as <name>        "read": "attribute"
+
+Page scripts
+<script>   = page script <script name>                        "script": "<script name>"
+           | inline read|write page script [<returning>]      "script": { "inline": { "source", "effect", "fields" } }
+<returning> = returning <field> at "<pointer>"[, <field> at "<pointer>"]... | returning nothing
+Run <script> [with <arguments>] [remembering field <field> as <name>[, field <field> as <name>]... | remembering nothing]
+                                                              evaluate
+Expect <script> [with <arguments>] field <field> is present|absent | is <text> | contains <text> | is number <number>
+                                                              expectScript
+An inline script's statement ends with ":"; its source follows, indented two spaces, one script line per line:
+  "<script line>"                                             escapes: \" \\ \t (tab) \r (carriage return)
+
+Database commands, also in Clean up:
+Run database command <command> [with <arguments>] [remembering field <field> as <name>[, field <field> as <name>]... | remembering nothing]
+                                                              database
+Expect database command <command> [with <arguments>] field <field> is present|absent | is <text> | contains <text> | is number <number>
+                                                              expectDatabase
+
+Example (not a golden plan): a nested locator and a multi-line inline check
+Unsafe: Click css "button" containing text "Add" inside 2nd css "li.product"
+Criterion: orders.rows-counted
+Unsafe: Expect inline read page script returning count at "/count" field count is number 2:
+  "() => {"
+  "\tconst rows = document.querySelectorAll(\"tr.order\");"
+  "  return { count: rows.length };"
+  "}"
+```
+
+The example's source is `() => {`, LF, a tab, `const rows = document.querySelectorAll("tr.order");`, LF, `  return { count: rows.length };`, LF, `}`.
+
+**Decisions.**
+
+- **One mark, at the start of the line.** Marking only the construct (`unsafe css "…"`) was rejected: a locator or check sits mid-line, where a reader skims past it. A mark at the left margin shows in every diff and review, and a search for `Unsafe:` finds every use. The mark is required both ways, so it can't drift from what the line does.
+- **Words from 1.2.** Each form reuses a 1.2 pattern:
+  - `Run …` and `Expect … field … is` follow `Call` and `Expect backend`;
+  - `attribute <name> is` and `computed style <property> is` follow `count is` and `meta … is`;
+  - `Remember attribute … of` follows `Remember text of`.
+- **One text per JSON value**, added to the 1.2 list:
+  - a named script against an inline one: `page script readCart` and `inline read page script`;
+  - `returning` left out against `returning nothing`;
+  - `attribute x is absent` against `attribute x is "absent"`;
+  - a locator's `containing text "x"` (`hasText`) against the check `has text containing "x"`.
+- **Source as quoted lines, not a raw block.** A raw block would lose trailing spaces and carriage returns to the reader's line handling. It would also make a source line starting with `#` or ending with `:` ambiguous. Quoted lines keep every character, keep the source's own indentation apart from the plan's, and need only two more escapes.
+- **The writer's choices** that the reader does not need: one space after `Unsafe:`; an inline script's `{}` arguments written as nothing.
+
+**Risks.**
+
+- U+2028, U+2029 and U+0085 pass the parser in a script source and stand raw in a script line. The reader splits only at LF, so they survive the round trip, but an editor may show them as line breaks, or they may go unseen in review. A `\u` escape, or refusing them as `unsafe_text`, would close this.
+- An inline check's opening line holds the effect, the returned fields and the check, so it is longer than its JSON. Inline scripts are rare, and a proposal can't run one.
+
+**Golden plans as text.** Each of the six 1.3 golden plans (`golden/unsafe-plans/`) reads back to its JSON file byte for byte, through `parsePlan` with every feature enabled and `writePlanJson`. Each starts with the same five headers, with its own title and the file's name as the spec anchor:
+
+```
+Plan: <title>
+Feature: CART-1
+Spec: specs/cart.md#<file name>
+Version: 1.3
+Targets: playwright-chromium
+```
+
+Its steps follow.
+
+`css-locator`, "First transaction by record-id prefix":
+
+```
+Go to /cart
+Criterion: cart.item-shown
+Unsafe: Expect first css "[data-test^=\"transaction-item-\"]" is visible
+Unsafe: Click css "button" containing text "Add" inside 2nd css "li.product"
+Criterion: cart.status-shown
+Expect test id "status" is visible
+```
+
+`xpath-locator`, "Second list item by XPath":
+
+```
+Go to /cart
+Criterion: cart.total-shown
+Unsafe: Expect xpath "//main//li[2]" has text containing "Total"
+Criterion: cart.status-shown
+Expect test id "status" is visible
+```
+
+`dom-checks`, "Badge classes, style and attributes":
+
+```
+Go to /cart
+Criterion: cart.badge-active
+Unsafe: Expect test id "cart-badge" has class "is-active"
+Criterion: cart.badge-not-empty
+Unsafe: Expect test id "cart-badge" lacks class "is-empty"
+Criterion: cart.badge-red
+Unsafe: Expect test id "cart-badge" computed style background-color is "rgb(220, 38, 38)"
+Criterion: cart.sorted-by-price
+Unsafe: Expect button "Sort by price" attribute aria-sort is "ascending"
+Criterion: cart.checkout-enabled
+Unsafe: Expect button "Check out" attribute disabled is absent
+Unsafe: Remember attribute data-order-id of test id "order-row" as orderId
+Criterion: cart.status-shown
+Expect test id "status" is visible
+```
+
+`page-script`, "Cart store read by a named script":
+
+```
+Go to /cart
+Unsafe: Run page script readCart with currency "eur" remembering field itemCount as cartCount
+Criterion: cart.three-items
+Unsafe: Expect page script readCart with currency "eur" field itemCount is "3"
+Criterion: cart.status-shown
+Expect test id "status" is visible
+```
+
+`inline-page-script`, "Editor blocks read by an inline script":
+
+```
+Go to /cart
+Unsafe: Run inline read page script returning blockCount at "/blocks" remembering field blockCount as blockCount:
+  "() => ({ blocks: window.editorStore.blocks.length })"
+Criterion: cart.status-shown
+Expect test id "status" is visible
+```
+
+`database-command`, "Orders seeded and counted by database commands":
+
+```
+Go to /cart
+Unsafe: Run database command seedOrders with count 3
+Criterion: orders.three-seeded
+Unsafe: Expect database command countOrders with email "ada@example.com" field count is "3"
+Criterion: cart.status-shown
+Expect test id "status" is visible
+Clean up:
+  Unsafe: Run database command seedOrders with count 3
+```
+
+*End of the plan 1.2 and 1.3 additions. The types follow.*
 
 ```ts
 // Plan, PlanData, PlanError, PlanLimits and parseAiText: SPEC-01. Result, Brand, Origin, TargetId, Role,
@@ -370,7 +563,13 @@ export interface ChatDrafter { reply(conversationId: string, message: string): P
 - **Codes.** `TextErrorCode` gains `duplicate-key`, for a name written twice where JSON needs a key once. `relative-url-without-origin` no longer arises, because a path without `Origin:` stays a path, so it leaves the union.
 - **Lone surrogates.** Text holding half of a UTF-16 pair is refused as `unsafe_text` by the one plan parser, because it can't survive being saved as UTF-8.
 - **Grammar version.** `grammarVersion` stays `"v1"` until the readable format's first release; the 1.2 forms are part of v1.
+- **Line separators in scripts.** U+2028, U+2029 and U+0085 in `ScriptSource` are refused as `unsafe_text` by the one plan parser, so script lines never hide a line break.
+- **Drafts with unsafe lines.** `admitDraft` adds no rule of its own. The project's enablement decides each unsafe feature, and SPEC-36's gate refuses inline scripts in any unapproved plan, which every draft is.
 - **Text errors.** A statement's own error is at column 1, and any other inside the faulty token. Comments are whole lines starting with `#`.
+- **Plan 1.3 in text (addition, 2026-10-29).** Every unsafe construct of plan 1.3 (SPEC-36) now has a readable form, defined in "Readable syntax for plan 1.3" above. So AC-SPEC-28-01's round trip covers the golden plans in `golden/unsafe-plans/` too, parsed against a project that enables all six features. This supersedes SPEC-36's M1 note that they stay JSON.
+- **No readable form.** `readablePlanText` refuses only a construct the readable grammar has no form for, with text code `no-readable-form` at that construct's path. None remains: every plan 1.3 construct has a form, so it always returns text, and `writePlanText` writes every parsed plan. The code stays in `TextErrorCode` for any future construct that reaches the language before its readable form does.
+- **Unsafe mark codes.** `TextErrorCode` gains `missing-unsafe-mark` and `unneeded-unsafe-mark`, for a line whose `Unsafe:` mark doesn't match what it holds.
+- **Grammar version, 1.3.** The 1.3 forms are part of v1 too, so `grammarVersion` stays `"v1"`.
 
 ## Acceptance criteria
 

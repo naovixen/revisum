@@ -184,7 +184,7 @@ export function unsafeFeaturesOf(plan: Plan): readonly UnsafeFeature[];   // sor
 - **Coverage.** The tool reports `shareWithUnsafeFeatures` and `shareWithUnsafeFeaturesBySample` beside the closed shares. The closed share counts no plan that uses an unsafe feature.
 - **Metrics and levels (AC-SPEC-36-18)** are built and tested with SPEC-15 and SPEC-21, as SPEC-35's AC-17 is.
 - **Golden plans.** 1.3 golden plans live in `golden/unsafe-plans/` and parse against an unsafe-enabled project. `golden/plans/` stays 1.1 and 1.2.
-- **Readable text.** 1.3 unsafe constructs have no readable form in M1. `writePlanText` refuses a plan using one with text code `no-readable-form`, and JSON stays the route. A readable form is queued.
+- **Readable text.** Unsafe constructs have readable forms, each line marked `Unsafe:` (SPEC-28, "Readable syntax for plan 1.3"). Until that code lands, `readablePlanText` refuses them with `no-readable-form`.
 - **Safety rules the code adds.**
   - A database command's first argument is always literal, so a plan never chooses the program.
   - A production database command is denied even in an approved plan, whatever the policy says.
