@@ -31,6 +31,24 @@ export type TimeZone = Brand<string, 'TimeZone'>;
 // scheme://host[:port], with no path.
 export type Origin = Brand<string, 'Origin'>;
 
+// What kind of thing the target runs the app in. Only browsers run today; the others are declared
+// so a matrix can name them and get an honest "unavailable" rather than a stand-in.
+export const TARGET_KINDS = ['browser', 'mobile-web', 'native-app', 'desktop'] as const;
+export type TargetKind = (typeof TARGET_KINDS)[number];
+
+// How close the target is to what a user holds. engine: the browser engine itself;
+// engine-emulated: the engine with a device's viewport and input emulated; emulator and simulator:
+// a device emulated or simulated as a whole; real: a real device.
+export const FIDELITIES = ['engine', 'engine-emulated', 'emulator', 'simulator', 'real'] as const;
+export type Fidelity = (typeof FIDELITIES)[number];
+
+// Where the browser or device comes from.
+export const TARGET_PROVIDERS = ['local', 'emulator', 'cloud', 'bridge'] as const;
+export type TargetProvider = (typeof TARGET_PROVIDERS)[number];
+
+// A vendor's own setting, keyed "vendor:name" so it can never clash with a core field.
+export type VendorExtensionKey = `${string}:${string}`;
+
 export type Target = {
   readonly id: TargetId;
   readonly adapter: AdapterId;
@@ -40,6 +58,18 @@ export type Target = {
   readonly timezone: TimeZone;
   readonly colorScheme: ColorScheme;
   readonly reducedMotion: MotionPreference;
+  // The fields below are present only when the project file gives them, so the manifests of
+  // targets that leave them out stay byte for byte as they were. The engine's target helpers
+  // supply the defaults.
+  readonly kind?: TargetKind;
+  // The browser build the person asks for, such as "156.0.7258.5". Without it, the adapter's own
+  // build is used, pinned by the lockfile when there is one.
+  readonly version?: string;
+  readonly fidelity?: Fidelity;
+  readonly provider?: TargetProvider;
+  // Whether the run fails when this target is unavailable. An optional target is skipped with a warning.
+  readonly required?: boolean;
+  readonly vendorExtensions?: Readonly<Record<VendorExtensionKey, unknown>>;
 };
 
 export const deviceProfile = (target: Target): DeviceProfile => DEVICE_PROFILES[target.device];

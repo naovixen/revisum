@@ -15,6 +15,8 @@ export * from './clock-and-clipboard.ts';
 export * from './evidence-mode.ts';
 export * from './unsafe-plan-features.ts';
 export * from './browser-driver.ts';
+export type * from './target-lock.ts';
+export * from './exit-codes.ts';
 export type * from './policy.ts';
 export type * from './run-ports.ts';
 export * from './audit-events.ts';

@@ -4,11 +4,11 @@
 // policy gate applies, written by a person. AI output never reaches this type. The person declares
 // every target; the engine never invents one.
 import {
-  COLOR_SCHEMES, DEFAULT_TEST_ID_ATTRIBUTE, DEVICE_PROFILES, ENGINES, MOTION_PREFERENCES, success, failure,
+  COLOR_SCHEMES, DEFAULT_TEST_ID_ATTRIBUTE, DEVICE_PROFILES, ENGINES, FIDELITIES, MOTION_PREFERENCES, TARGET_KINDS, TARGET_PROVIDERS, success, failure,
   type Brand, type CallDeclaration, type CallName, type DeclaredService, type DeviceProfileId, type FixtureName, type IrreversiblePatterns, type Locale, type Origin, type Result,
   type EmailDomain, type EvidenceMode, type SafeText, type SecretName, type Target, type TestIdAttribute, type TimeZone,
   type ObservedRequestDeclaration, type RequestName, type StorageEntryDeclaration, type StorageEntryName, type StubDeclaration, type StubName,
-  type UnsafeFeaturesDeclaration,
+  type UnsafeFeaturesDeclaration, type VendorExtensionKey,
 } from '@revisum/contracts';
 import { brand } from '../brand.ts';
 import {
@@ -179,10 +179,68 @@ function readTimeZone(input: unknown, path: string, issues: Issues): Parsed<Time
   return INVALID;
 }
 
-const TARGET_KEYS = ['id', 'adapter', 'engine', 'device', 'locale', 'timezone', 'colorScheme', 'reducedMotion'] as const;
+const REQUIRED_TARGET_KEYS = ['id', 'adapter', 'engine', 'device', 'locale', 'timezone', 'colorScheme', 'reducedMotion'] as const;
+const OPTIONAL_TARGET_KEYS = ['kind', 'version', 'fidelity', 'provider', 'required', 'vendorExtensions'] as const;
+// A browser build as its vendor numbers it, such as "156.0.7258.5" or "26.0".
+const BUILD_VERSION = /^[0-9][0-9A-Za-z.+_-]{0,63}$/;
+// "vendor:name", both parts lowercase words such as "acme:device-farm-pool".
+const VENDOR_EXTENSION_KEY = /^[a-z0-9]+(-[a-z0-9]+)*:[a-zA-Z0-9]+([._-][a-zA-Z0-9]+)*$/;
+const MAXIMUM_VENDOR_EXTENSIONS = 32;
+// How deeply a vendor extension's value may nest, so a hostile project cannot exhaust the stack.
+const MAXIMUM_EXTENSION_DEPTH = 8;
+
+export function readBuildVersion(input: unknown, path: string, issues: Issues): Parsed<string> {
+  if (typeof input !== 'string') { issues.push({ code: 'wrong_type', path }); return INVALID; }
+  if (!BUILD_VERSION.test(input)) { issues.push({ code: 'unknown_value', path }); return INVALID; }
+  return input;
+}
+
+function readBoolean(input: unknown, path: string, issues: Issues): Parsed<boolean> {
+  if (typeof input !== 'boolean') { issues.push({ code: 'wrong_type', path }); return INVALID; }
+  return input;
+}
+
+// A plain JSON value: what a project file can hold, and what canonical JSON can hash.
+function isJsonValue(input: unknown, depth: number): boolean {
+  if (input === null || typeof input === 'string' || typeof input === 'boolean') return true;
+  if (typeof input === 'number') return Number.isFinite(input);
+  if (depth >= MAXIMUM_EXTENSION_DEPTH || typeof input !== 'object') return false;
+  if (Array.isArray(input)) return input.every((item) => isJsonValue(item, depth + 1));
+  const prototype = Object.getPrototypeOf(input);
+  if (prototype !== Object.prototype && prototype !== null) return false;
+  return Object.values(input).every((item) => isJsonValue(item, depth + 1));
+}
+
+const isVendorExtensionKey = (key: string): key is VendorExtensionKey => VENDOR_EXTENSION_KEY.test(key);
+
+// Settings a vendor's adapter reads. Core never acts on them, but every key must be namespaced and
+// every value plain JSON, so the manifest can record and hash them.
+function readVendorExtensions(input: unknown, path: string, issues: Issues): Parsed<Readonly<Record<VendorExtensionKey, unknown>>> {
+  const fields = peekRecord(input, path, issues);
+  if (fields === INVALID) return INVALID;
+  const before = issues.length;
+  const extensions: Record<VendorExtensionKey, unknown> = {};
+  const keys = Object.keys(fields);
+  if (keys.length > MAXIMUM_VENDOR_EXTENSIONS) issues.push({ code: 'too_large', path });
+  for (const key of keys) {
+    if (!isVendorExtensionKey(key)) { issues.push({ code: 'unknown_field', path: `${path}.${key}` }); continue; }
+    if (!isJsonValue(fields[key], 0)) { issues.push({ code: 'wrong_type', path: `${path}.${key}` }); continue; }
+    extensions[key] = fields[key];
+  }
+  return issues.length === before ? extensions : INVALID;
+}
+
+// One optional field, read only when the project file gives it. Absent stays absent, so the
+// target, and every manifest that records it, holds only what the person wrote.
+function readOptional<Value>(
+  fields: Readonly<Record<string, unknown>>, key: string, path: string, issues: Issues,
+  read: (input: unknown, path: string, issues: Issues) => Parsed<Value>,
+): Parsed<Value | undefined> {
+  return Object.hasOwn(fields, key) ? read(fields[key], `${path}.${key}`, issues) : undefined;
+}
 
 function readTarget(input: unknown, path: string, issues: Issues): Parsed<Target> {
-  const fields = readRecord(input, path, issues, TARGET_KEYS);
+  const fields = readRecord(input, path, issues, [...REQUIRED_TARGET_KEYS, ...OPTIONAL_TARGET_KEYS], REQUIRED_TARGET_KEYS);
   if (fields === INVALID) return INVALID;
   const parts = [
     readId<'TargetId'>(fields['id'], `${path}.id`, issues),
@@ -194,9 +252,26 @@ function readTarget(input: unknown, path: string, issues: Issues): Parsed<Target
     readOneOf(fields['colorScheme'], `${path}.colorScheme`, issues, COLOR_SCHEMES),
     readOneOf(fields['reducedMotion'], `${path}.reducedMotion`, issues, MOTION_PREFERENCES),
   ] as const;
-  if (!allValid(parts)) return INVALID;
+  const optional = [
+    readOptional(fields, 'kind', path, issues, (value, at, found) => readOneOf(value, at, found, TARGET_KINDS)),
+    readOptional(fields, 'version', path, issues, readBuildVersion),
+    readOptional(fields, 'fidelity', path, issues, (value, at, found) => readOneOf(value, at, found, FIDELITIES)),
+    readOptional(fields, 'provider', path, issues, (value, at, found) => readOneOf(value, at, found, TARGET_PROVIDERS)),
+    readOptional(fields, 'required', path, issues, readBoolean),
+    readOptional(fields, 'vendorExtensions', path, issues, readVendorExtensions),
+  ] as const;
+  if (!allValid(parts) || !allValid(optional)) return INVALID;
   const [id, adapter, engine, device, locale, timezone, colorScheme, reducedMotion] = parts;
-  return { id, adapter, engine, device, locale, timezone, colorScheme, reducedMotion };
+  const [kind, version, fidelity, provider, required, vendorExtensions] = optional;
+  return {
+    id, adapter, engine, device, locale, timezone, colorScheme, reducedMotion,
+    ...(kind === undefined ? {} : { kind }),
+    ...(version === undefined ? {} : { version }),
+    ...(fidelity === undefined ? {} : { fidelity }),
+    ...(provider === undefined ? {} : { provider }),
+    ...(required === undefined ? {} : { required }),
+    ...(vendorExtensions === undefined ? {} : { vendorExtensions }),
+  };
 }
 
 // The largest value a project may set for each limit. Every limit is a whole number of at least 1.

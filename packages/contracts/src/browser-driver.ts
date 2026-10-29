@@ -5,7 +5,7 @@ import type { ActionStep, Locator } from './plan.ts';
 import type { GuardVerdict } from './policy.ts';
 import type { Secret } from './secret.ts';
 import type { Result } from './result.ts';
-import type { Target } from './target.ts';
+import type { AdapterId, Target } from './target.ts';
 
 // policy-denied: the policy gate's runtime guard refused the action, so no input event was sent.
 // no-download: a download step's click started no download within the step timeout.
@@ -19,9 +19,20 @@ export type DriverErrorCode =
 export type DriverError = { readonly code: DriverErrorCode; readonly detail: string };
 
 // Why a declared target cannot run. A driver explains a "no"; it never substitutes another target.
+// provider-unavailable: the cloud or device provider could not supply the target.
+// build-mismatch: the browser build on this machine is not the one the lockfile pins.
 export type UnavailableReason =
-  | 'not-declared' | 'adapter-not-registered' | 'engine-not-supported' | 'device-not-supported' | 'launch-failed';
+  | 'not-declared' | 'adapter-not-registered' | 'engine-not-supported' | 'device-not-supported' | 'launch-failed'
+  | 'provider-unavailable' | 'build-mismatch';
 export type Unavailable = { readonly reason: UnavailableReason; readonly detail: string };
+
+// The exact browser build an adapter would run for a target: its version and the executable whose
+// sha256 the lockfile pins.
+export type BrowserBuild = { readonly version: string; readonly executablePath: string };
+// lock-download-failed: the build could not be fetched or is not where it should be.
+// lock-offline: fetching the build needs the network, and there is none.
+export type BuildFailureCode = 'lock-download-failed' | 'lock-offline' | UnavailableReason;
+export type BuildFailure = { readonly code: BuildFailureCode; readonly detail: string };
 
 // A rectangle in CSS pixels.
 export type Box = { readonly x: number; readonly y: number; readonly width: number; readonly height: number };
@@ -112,11 +123,28 @@ export interface Session extends PageNavigator, ActionRunner, Prober, Camera, Au
   close(): Promise<void>;
 }
 
-export type AdapterInfo = { readonly id: string; readonly version: string; readonly protocol: string };
+export type AdapterInfo = {
+  readonly id: string;
+  readonly version: string;
+  readonly protocol: string;
+  // Inputs this adapter cannot pin, such as a browser it does not install itself. The run manifest
+  // lists them under nonHermeticInputs.
+  readonly cannotPin?: readonly string[];
+};
 
 export interface BrowserDriver {
   readonly info: AdapterInfo;
   // A pure capability check. It says yes or explains no; it never substitutes.
   supports(target: Target): Result<true, Unavailable>;
   open(target: Target, environment: SessionEnvironment): Promise<Result<Session, Unavailable>>;
+  // The browser build `open` would launch for the target, without launching it, so it can be
+  // pinned by hash and checked before a run. An adapter without it cannot pin its browser.
+  build?(target: Target): Promise<Result<BrowserBuild, BuildFailure>>;
+}
+
+// The adapters a run may use, by id. `find` gives the one a target names, or null: core never
+// looks for another adapter instead.
+export interface AdapterRegistry {
+  all(): readonly BrowserDriver[];
+  find(id: AdapterId): BrowserDriver | null;
 }

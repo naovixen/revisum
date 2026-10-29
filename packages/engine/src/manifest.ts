@@ -72,6 +72,13 @@ export function unsafeFeatureRecord(
   return success({ unsafeFeatures, unsafeDeclarations: records.sort((left, right) => (order(left) < order(right) ? -1 : 1)) });
 }
 
+// The service-call responses first, as before, then any other unpinned inputs, sorted and once
+// each. A run with none of the others has exactly the list it always had, so its hash is unchanged.
+function nonHermeticInputs(callsServices: boolean, others: readonly string[]): readonly string[] {
+  const rest = [...new Set(others)].filter((input) => input !== SERVICE_CALLS_INPUT).sort();
+  return callsServices ? [SERVICE_CALLS_INPUT, ...rest] : rest;
+}
+
 export function buildManifest(inputs: {
   readonly plan: Plan; readonly target: Target; readonly adapter: AdapterInfo;
   readonly browser: { readonly name: string; readonly version: string };
@@ -82,6 +89,8 @@ export function buildManifest(inputs: {
   readonly callsServices?: boolean;
   // Present when the plan uses unsafe features (unsafeFeatureRecord).
   readonly unsafe?: UnsafeFeatureRecord;
+  // Other inputs the run could not pin, such as a browser build the lockfile does not cover.
+  readonly unpinned?: readonly string[];
 }): RunManifest {
   const secrets = inputs.secrets === undefined || inputs.secrets.length === 0
     ? {}
@@ -97,7 +106,7 @@ export function buildManifest(inputs: {
     clock: { fixedTimeMilliseconds: inputs.fixedTimeMilliseconds },
     fixtures: [...inputs.fixtures].sort((left, right) => (left.path < right.path ? -1 : 1)),
     host: inputs.host,
-    nonHermeticInputs: inputs.callsServices === true ? [SERVICE_CALLS_INPUT] : [],
+    nonHermeticInputs: nonHermeticInputs(inputs.callsServices === true, [...(inputs.adapter.cannotPin ?? []), ...(inputs.unpinned ?? [])]),
     ...secrets,
     ...(inputs.storageState === undefined ? {} : { storageState: inputs.storageState }),
     ...(inputs.unsafe === undefined ? {} : inputs.unsafe),

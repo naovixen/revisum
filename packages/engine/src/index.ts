@@ -43,6 +43,13 @@ export * from './manifest.ts';
 export * from './oracle.ts';
 export * as lifecycle from './lifecycle.ts';
 export * from './run.ts';
+export { adapterRegistry } from './target/adapter-registry.ts';
+export { isRequiredTarget, targetFidelity, targetKind, targetProvider } from './target/target-defaults.ts';
+export { testedOn } from './target/tested-on.ts';
+export { unavailableTargetOutcome } from './target/unavailable-target-outcome.ts';
+export {
+  BROWSER_BUILD_INPUT, LOCKFILE_NAME, LOCKFILE_SCHEMA, checkPinnedBuild, hashExecutable, lock, lockToFile, lockfileText, parseLockfile, readLockfile,
+} from './target/target-lock.ts';
 export { buildServiceRequest, DEFAULT_CALL_TIMEOUT_MILLISECONDS, DEFAULT_MAXIMUM_RESPONSE_BYTES, type RequestBuildError } from './service-calls/service-request.ts';
 export type { CallStepCode, CleanupResult, ServiceCallRecord } from './service-calls/call-steps.ts';
 export { generateValue, resolvePlanClock, type RunValues, type StepErrorCode } from './run-values.ts';

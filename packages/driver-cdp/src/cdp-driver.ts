@@ -4,6 +4,7 @@ import {
   determinismScript, deviceProfile, failure, success,
   type A11yNode, type Key, type SessionEnvironment, type Target,
 } from '@revisum/contracts';
+import { chromiumBuild } from './browser-build.ts';
 import { buildSession, errorText } from './browser-session.ts';
 import { CdpConnection } from './cdp-connection.ts';
 import { QUIET_CHROME_FLAGS } from './chrome-flags.ts';
@@ -87,6 +88,10 @@ export function cdpDriver(options: CdpDriverOptions): OwnBrowserDriver {
     supports(target) {
       if (target.engine !== 'chromium') return failure({ reason: 'engine-not-supported', detail: 'CDP drives Chromium only' });
       return success(true);
+    },
+    async build(target) {
+      if (target.engine !== 'chromium') return failure({ code: 'engine-not-supported', detail: 'CDP drives Chromium only' });
+      return chromiumBuild(options.executablePath);
     },
     async open(target, environment) {
       if (target.engine !== 'chromium') return failure({ reason: 'engine-not-supported', detail: 'CDP drives Chromium only' });

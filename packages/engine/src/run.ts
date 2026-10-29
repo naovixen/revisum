@@ -7,7 +7,7 @@
 import {
   needsDriverFeatures,
   type A11yFinding, type ActionGuard, type ApprovalLabel, type ArtifactReference, type ArtifactStore, type Authorised,
-  type BrowserDriver, type Clock, type DialogStep, type ElementProbe, type EventSink, type GuardVerdict, type Plan, type PolicyRuleId, type Redactor,
+  type BrowserDriver, type Clock, type LockEntry, type DialogStep, type ElementProbe, type EventSink, type GuardVerdict, type Plan, type PolicyRuleId, type Redactor,
   type ResolvedElement, type Result, type SafeText, type SecretStore, type ServiceCaller, type Session, type Step, type Target, type TargetId,
   type Unavailable, type ValueName, type GuaranteeStatement, type RunMode, type SuiteFinding, type SuiteName, type SuitePass,
   type SuiteTestId, type SuiteTestResult, type UnsafeFeature,
@@ -34,6 +34,8 @@ import {
   NO_SECRETS, resolvePlanSecrets, resolvedSecretStore, secretRecords, shortSecretObservation, withSecretRedaction, type ResolvedSecrets,
 } from './secrets/secret-resolution.ts';
 import { SECRET_PLACEHOLDER } from './secrets/secret-values.ts';
+import { adapterRegistry } from './target/adapter-registry.ts';
+import { BROWSER_BUILD_INPUT, checkPinnedBuild } from './target/target-lock.ts';
 import {
   runBackendCheck, runCallStep, runCleanup, type CallStepContext, type CleanupResult, type ServiceCallRecord,
 } from './service-calls/call-steps.ts';
@@ -57,6 +59,10 @@ export type RunInputs = {
   // protected branch holds them. The manifest records the sha256 of each one the plan names, so a
   // plan that names a script whose source is not here is refused before any side effect.
   readonly scriptSources?: Readonly<Record<string, Uint8Array>>;
+  // The lockfile's entries (readLockfile). Given, the target's browser build is hashed before any
+  // browser opens, and a build other than the pinned one ends the run TargetUnavailable with
+  // build-mismatch. Absent, no build is checked and nothing is recorded about pinning.
+  readonly lockEntries?: readonly LockEntry[];
 };
 
 export type RunPorts = {
@@ -258,12 +264,13 @@ export async function run(given: RunInputs, ports: RunPorts): Promise<RunResult>
     const unavailable = lifecycle.targetUnavailable(planned, opened.error);
     return unavailableResult(target.id, unavailable.unavailable, context, startedAt);
   }
-  const { session, driver } = opened.value;
+  const { session, driver, unpinned } = opened.value;
   const manifest = buildManifest({
     plan: inputs.plan, target, adapter: driver.info, browser: session.browser,
     seed: inputs.seed, fixedTimeMilliseconds: inputs.fixedTimeMilliseconds, fixtures: inputs.fixtures, host: inputs.host,
     ...secretRecords(secrets), callsServices: callsServices(inputs.plan),
     ...(unsafe.value === undefined ? {} : { unsafe: unsafe.value }),
+    ...(unpinned.length === 0 ? {} : { unpinned }),
   });
   const resolved = lifecycle.resolve(planned, session, manifest, manifestHash(manifest));
   logger.log({ kind: 'run.state', state: resolved.state, targetId: target.id, adapter: driver.info.id, sha256: resolved.manifestHash });
@@ -391,11 +398,25 @@ function reachableOrigins(inputs: RunInputs): readonly string[] {
   return inputs.project.origins.filter((origin) => !production.has(origin));
 }
 
-async function openSession(planned: lifecycle.Planned, context: RunContext): Promise<Result<{ session: Session; driver: BrowserDriver }, Unavailable>> {
-  const driver = context.ports.drivers.get(planned.target.adapter);
-  if (driver === undefined) return { ok: false, error: { reason: 'adapter-not-registered', detail: `no adapter '${planned.target.adapter}'` } };
+type OpenedSession = {
+  readonly session: Session;
+  readonly driver: BrowserDriver;
+  // Inputs the run could not pin, for the manifest's nonHermeticInputs.
+  readonly unpinned: readonly string[];
+};
+
+// Resolves the target in order, stopping at the first "no": only the adapter the target names is
+// asked, it is asked once, and nothing else is tried in its place. A pinned build is checked
+// before anything launches. See docs/specs/SPEC-05-target-matrix-and-lock.md.
+async function openSession(planned: lifecycle.Planned, context: RunContext): Promise<Result<OpenedSession, Unavailable>> {
+  const driver = adapterRegistry(context.ports.drivers).find(planned.target.adapter);
+  if (driver === null) return { ok: false, error: { reason: 'adapter-not-registered', detail: `no adapter '${planned.target.adapter}'` } };
   const supported = driver.supports(planned.target);
   if (!supported.ok) return supported;
+  const lockEntries = context.inputs.lockEntries;
+  const pinning = lockEntries === undefined ? undefined : await checkPinnedBuild(driver, planned.target, lockEntries);
+  if (pinning !== undefined && !pinning.ok) return pinning;
+  const unpinned = pinning?.value === 'unpinned' ? [BROWSER_BUILD_INPUT] : [];
   const opened = await driver.open(planned.target, {
     baseUrl: context.inputs.baseUrl,
     allowedOrigins: reachableOrigins(context.inputs),
@@ -405,7 +426,7 @@ async function openSession(planned: lifecycle.Planned, context: RunContext): Pro
     sensitiveSelectors: context.ports.redactor.selectors,
     timeoutMilliseconds: context.inputs.project.limits.stepTimeoutMilliseconds,
   });
-  return opened.ok ? { ok: true, value: { session: opened.value, driver } } : opened;
+  return opened.ok ? { ok: true, value: { session: opened.value, driver, unpinned } } : opened;
 }
 
 // Steps the plan language has but no driver performs yet. Each fails with unsupported-step, never
