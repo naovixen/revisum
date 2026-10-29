@@ -22,3 +22,4 @@ Actual time per spec, for the velocity kill criteria in `E:\core\docs\09-mvp-pla
 | SPEC-28 (1.3 readable forms) | M1 | 2026-10-29 | 2026-10-29 | 1 | Founder approved flipping the no-readable-form test; green first run |
 | SPEC-00 (remaining criteria) | M1 | 2026-10-29 | 2026-10-29 | 1 | Founder chose pending guarantee rows; trailers checked from 8165795; merged seed sources kept; green on Linux |
 | Port randomisation contract test | M1 | 2026-10-29 | 2026-10-29 | 1 | Reads the real command line; green on Windows and Linux |
+| M1 exit | M1 | 2026-10-29 | 2026-10-29 | 1 | Reviews of SPEC-02, 03, 04 found trust-path gaps, all fixed; green on Windows and Linux |
