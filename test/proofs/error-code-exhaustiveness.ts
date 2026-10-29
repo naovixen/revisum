@@ -113,7 +113,7 @@ export function describeDriverError(code: DriverErrorCode): string {
   switch (code) {
     case 'not-found': case 'ambiguous': case 'not-actionable': case 'timeout': case 'navigation-failed':
     case 'policy-denied': case 'no-download': case 'download-too-large': case 'storage-origin-mismatch':
-    case 'clock-runaway': case 'clipboard-unavailable':
+    case 'clock-runaway': case 'clipboard-unavailable': case 'target-crashed': case 'unsupported-step': case 'assertion-failed':
       return 'driver failed';
     default:
       return unreachable(code);
@@ -123,6 +123,7 @@ export function describeDriverErrorForgettingOne(code: DriverErrorCode): string 
   switch (code) {
     case 'not-found': case 'ambiguous': case 'not-actionable': case 'timeout': case 'policy-denied':
     case 'no-download': case 'download-too-large': case 'storage-origin-mismatch': case 'clock-runaway': case 'clipboard-unavailable':
+    case 'target-crashed': case 'unsupported-step': case 'assertion-failed':
       return 'driver failed';
     default:
       // @ts-expect-error 'navigation-failed' is not handled, so the code does not narrow to never
