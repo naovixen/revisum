@@ -52,7 +52,7 @@ function lintCommands(root: string): string[][] {
 }
 
 export function copyRepository(): ScratchRepository {
-  const root = mkdtempSync(join(tmpdir(), 'revisum-repository-'));
+  const root = mkdtempSync(join(tmpdir(), 'repository-'));
   for (const path of repositoryFiles()) {
     mkdirSync(dirname(join(root, path)), { recursive: true });
     copyFileSync(join(REPOSITORY_ROOT, path), join(root, path));

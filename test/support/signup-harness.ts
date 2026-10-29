@@ -12,7 +12,7 @@ import {
 import { BROWSERS } from './browsers.ts';
 import { authorise, trustedProjectFrom } from './policy-clearance.ts';
 import { startFixtureServer, type FixtureServer } from './fixture-server.ts';
-import { memoryArtifactStore, memoryRunEventSink, systemClock, type MemoryArtifactStore } from './memory-ports.ts';
+import { memoryArtifactStore, memoryEventSink, memoryRunEventSink, systemClock, type MemoryArtifactStore } from './memory-ports.ts';
 import { FIXTURES } from './repository.ts';
 
 export const SEED = 42;
@@ -87,7 +87,7 @@ export async function harness(): Promise<Harness> {
       // The target id comes from the trusted test project, so it is used as the branded value directly.
       // Every run takes a plan the policy gate authorised.
       const result = await run({ ...base(), plan: authorise(plan, trusted), targetId: targetId as TargetId }, {
-        drivers: chosenDrivers, clock: systemClock, artifacts: store, redactor: defaultRedactor(), events,
+        drivers: chosenDrivers, clock: systemClock, artifacts: store, redactor: defaultRedactor(), audit: memoryEventSink(), events,
       });
       return { result, events, store };
     },

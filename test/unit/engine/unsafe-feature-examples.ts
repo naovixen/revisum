@@ -21,7 +21,7 @@ import {
   type GuaranteeId, type GuaranteeStatement, type Plan, type PlanError, type PlanStanding, type Project, type Result, type RunResult,
   type UnsafeFeature,
 } from '@revisum/engine';
-import { memoryArtifactStore, memoryRunEventSink, systemClock } from '../../support/memory-ports.ts';
+import { memoryArtifactStore, memoryEventSink, memoryRunEventSink, systemClock } from '../../support/memory-ports.ts';
 import { authorise, trustedProjectFrom } from '../../support/policy-clearance.ts';
 import { DEFAULT_CLOCK_START, DEFAULT_SEED, recordingDriver, type Recording } from './run-value-examples.ts';
 import { FEATURES, ORIGIN, SCRIPT_SOURCES, unsafeProjectFile, type FeatureName, type JsonRecord } from './unsafe-feature-steps.ts';
@@ -125,7 +125,7 @@ export async function runUnsafePlan(raw: unknown, options: UnsafeRunOptions = {}
     ...(options.standing === undefined ? {} : { standing: options.standing }),
   }, {
     drivers: new Map([[driver.info.id, driver]]), clock: systemClock, artifacts: memoryArtifactStore(),
-    redactor: defaultRedactor(), events: memoryRunEventSink(),
+    redactor: defaultRedactor(), audit: memoryEventSink(), events: memoryRunEventSink(),
   });
   return { result, recording };
 }

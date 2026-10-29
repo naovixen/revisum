@@ -130,7 +130,7 @@ async function runAdmitted(plan: Plan, log: CallLog): Promise<void> {
     fixtures: [], host: { platform: 'test', arch: 'test' },
   }, {
     drivers: new Map([['playwright', loggingDriver(log)]]), clock: systemClock, artifacts: memoryArtifactStore(),
-    redactor: defaultRedactor(), events: memoryRunEventSink(),
+    redactor: defaultRedactor(), audit: memoryEventSink(), events: memoryRunEventSink(),
   });
 }
 

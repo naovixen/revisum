@@ -12,7 +12,7 @@ import { leakScanner, type Leak } from '@revisum/engine';
 import { echoForms, fakeSecretValue, resolvedSecret, type LeakForm } from './secret-examples.ts';
 
 let folder: string;
-before(() => { folder = mkdtempSync(join(tmpdir(), 'revisum-leak-scanner-')); });
+before(() => { folder = mkdtempSync(join(tmpdir(), 'leak-scanner-')); });
 after(() => { rmSync(folder, { recursive: true, force: true }); });
 
 // Writes a file in the test folder and returns its path.

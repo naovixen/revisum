@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import { arch, platform } from 'node:os';
 import { test } from 'node:test';
 import { defaultRedactor, failure, runUntrusted, type BrowserDriver, type PlanErrorCode } from '@revisum/engine';
-import { memoryArtifactStore, memoryRunEventSink, systemClock } from '../../support/memory-ports.ts';
+import { memoryArtifactStore, memoryEventSink, memoryRunEventSink, systemClock } from '../../support/memory-ports.ts';
 import { defaultParser, PRIVATE_MARKER, signupPlan, stepsOf } from './plan-examples.ts';
 import { accepted, rejection, PREVIOUS_VERSION } from './run-value-examples.ts';
 import {
@@ -283,7 +283,7 @@ test('a refused plan reaches neither the service caller nor the driver, and noth
   const { caller, requests } = fakeServiceCaller();
   const events = memoryRunEventSink();
   const ports = {
-    drivers: new Map([['playwright', spy]]), clock: systemClock, artifacts: memoryArtifactStore(), redactor: defaultRedactor(), events,
+    drivers: new Map([['playwright', spy]]), clock: systemClock, artifacts: memoryArtifactStore(), redactor: defaultRedactor(), audit: memoryEventSink(), events,
     services: caller,
   };
   const base = { project: callProject(), baseUrl: ORIGIN, seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() } };

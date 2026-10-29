@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { arch, platform } from 'node:os';
 import { test } from 'node:test';
 import { defaultRedactor, runUntrusted } from '@revisum/engine';
-import { memoryArtifactStore, memoryRunEventSink, systemClock } from '../../support/memory-ports.ts';
+import { memoryArtifactStore, memoryEventSink, memoryRunEventSink, systemClock } from '../../support/memory-ports.ts';
 import {
   OPEN_ACCOUNT_PAGE, ORIGIN, POLICY, PRODUCTION_ORIGIN, approvedStanding, comparable, decideOn, deniedCodes, parsedPlan, parserProject,
   planOf, policyProjectInput, testGate, type JsonRecord,
@@ -160,7 +160,7 @@ test('a plan the gate denies for any of these rules makes zero calls and opens n
   const { caller, requests } = fakeServiceCaller();
   const spy = spyDriver();
   const ports = {
-    drivers: new Map([['cdp', spy]]), clock: systemClock, artifacts: memoryArtifactStore(), redactor: defaultRedactor(),
+    drivers: new Map([['cdp', spy]]), clock: systemClock, artifacts: memoryArtifactStore(), redactor: defaultRedactor(), audit: memoryEventSink(),
     events: memoryRunEventSink(), services: caller,
   };
   const base = { project, baseUrl: ORIGIN, seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() } };

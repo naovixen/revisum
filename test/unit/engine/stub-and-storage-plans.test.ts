@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import { arch, platform } from 'node:os';
 import { test } from 'node:test';
 import { defaultRedactor, failure, runUntrusted, type BrowserDriver, type PlanErrorCode } from '@revisum/engine';
-import { memoryArtifactStore, memoryRunEventSink, systemClock } from '../../support/memory-ports.ts';
+import { memoryArtifactStore, memoryEventSink, memoryRunEventSink, systemClock } from '../../support/memory-ports.ts';
 import { PRIVATE_MARKER, defaultParser, signupPlan, stepsOf } from './plan-examples.ts';
 import { PREVIOUS_VERSION, accepted, rejection, type ParsePlan } from './run-value-examples.ts';
 import {
@@ -268,7 +268,7 @@ test('a refused plan reaches no driver method, and nothing is logged', { criteri
     async open() { driverCalls++; return failure({ reason: 'launch-failed', detail: 'the spy never launches' }); },
   };
   const events = memoryRunEventSink();
-  const ports = { drivers: new Map([['playwright', spy]]), clock: systemClock, artifacts: memoryArtifactStore(), redactor: defaultRedactor(), events };
+  const ports = { drivers: new Map([['playwright', spy]]), clock: systemClock, artifacts: memoryArtifactStore(), redactor: defaultRedactor(), audit: memoryEventSink(), events };
   const base = { project: stubProject(), baseUrl: ORIGIN, seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() } };
   for (const refused of REFUSED) {
     const outcome = await runUntrusted(refused.plan, parsePlan, base, ports);
@@ -286,7 +286,7 @@ test('counter-example: an accepted plan with a stub step does reach the driver',
     supports() { return { ok: true, value: true }; },
     async open() { opens++; return failure({ reason: 'launch-failed', detail: 'the spy never launches' }); },
   };
-  const ports = { drivers: new Map([['playwright', spy]]), clock: systemClock, artifacts: memoryArtifactStore(), redactor: defaultRedactor(), events: memoryRunEventSink() };
+  const ports = { drivers: new Map([['playwright', spy]]), clock: systemClock, artifacts: memoryArtifactStore(), redactor: defaultRedactor(), audit: memoryEventSink(), events: memoryRunEventSink() };
   const base = { project: stubProject(), baseUrl: ORIGIN, seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() } };
   await runUntrusted(planOf([OPEN_LOGIN, startStub('cartEmpty')]), parsePlan, base, ports);
   assert.equal(opens, 1);

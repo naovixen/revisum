@@ -19,7 +19,7 @@ const SAVED = 'SAVED_SESSION';
 const withStorageState = (name: string) => secretFillPlan([], { storageState: { secretName: name } });
 
 let folder: string;
-before(() => { folder = mkdtempSync(join(tmpdir(), 'revisum-storage-state-')); });
+before(() => { folder = mkdtempSync(join(tmpdir(), 'storage-state-')); });
 after(() => { rmSync(folder, { recursive: true, force: true }); });
 
 // ---- Parsing ------------------------------------------------------------------------------------

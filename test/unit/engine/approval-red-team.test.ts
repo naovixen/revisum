@@ -23,16 +23,16 @@ type Attempt = {
 const ATTEMPTS: readonly Attempt[] = [
   {
     title: 'the agent bot, named as maintainer, merging to the protected branch',
-    proof: (repository) => repository.lockdownProof({ commit: 'commit-main-head', mergedBy: 'revisum-agent[bot]' }),
+    proof: (repository) => repository.lockdownProof({ commit: 'commit-main-head', mergedBy: 'build-agent[bot]' }),
     code: 'not-maintainer',
   },
   {
     title: 'the agent app, named as maintainer, merging to the protected branch',
-    proof: (repository) => repository.lockdownProof({ commit: 'commit-app-merge', mergedBy: 'revisum-agent' }),
+    proof: (repository) => repository.lockdownProof({ commit: 'commit-app-merge', mergedBy: 'build-agent' }),
     code: 'not-maintainer',
     edit: (fixture) => {
       const lockdown = approversOf(fixture).agentLockdown;
-      if (lockdown !== undefined) lockdown.maintainer = 'revisum-agent';
+      if (lockdown !== undefined) lockdown.maintainer = 'build-agent';
     },
   },
   {

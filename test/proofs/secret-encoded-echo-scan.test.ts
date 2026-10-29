@@ -19,7 +19,7 @@ import {
   type Plan, type Project, type RunResult, type TargetId, type TrustedProject,
 } from '@revisum/engine';
 import { startFixtureServer, type FixtureServer } from '../support/fixture-server.ts';
-import { memoryArtifactStore, memoryRunEventSink, systemClock } from '../support/memory-ports.ts';
+import { memoryArtifactStore, memoryEventSink, memoryRunEventSink, systemClock } from '../support/memory-ports.ts';
 import { authorise, trustedProjectFrom } from '../support/policy-clearance.ts';
 import { FIXTURES } from '../support/repository.ts';
 import { FIXED_TIME_MILLISECONDS, SEED, makeDrivers, makeProjectFile } from '../support/signup-harness.ts';
@@ -88,7 +88,7 @@ async function runEcho(targetId: string, echo: string, value: unknown, secretVal
     baseUrl: server.origin, seed: SEED, fixedTimeMilliseconds: FIXED_TIME_MILLISECONDS, fixtures: server.fixtures,
     host: { platform: platform(), arch: arch() },
   }, {
-    drivers: makeDrivers(), clock: systemClock, artifacts: memoryArtifactStore(), redactor: defaultRedactor(), events,
+    drivers: makeDrivers(), clock: systemClock, artifacts: memoryArtifactStore(), redactor: defaultRedactor(), audit: memoryEventSink(), events,
     secrets: fakeEnvironmentStore({ [SECRET]: secretValue }),
   });
   return { result, eventLines: events.read().map((event) => JSON.stringify(event)).join('\n') };

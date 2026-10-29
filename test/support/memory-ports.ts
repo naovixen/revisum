@@ -1,7 +1,8 @@
 // In-memory implementations of the storage and time ports, for tests only.
 import {
-  sha256,
-  type ArtifactReference, type ArtifactStore, type Clock, type LoggedEvent, type RunEventSink,
+  sha256, success,
+  type ArtifactReference, type ArtifactStore, type Clock, type DerivedActor, type EventInput, type EventSink,
+  type LoggedEvent, type RunEventSink,
 } from '@revisum/engine';
 
 export function memoryRunEventSink(): RunEventSink {
@@ -9,6 +10,22 @@ export function memoryRunEventSink(): RunEventSink {
   return {
     append: (event) => { events.push(Object.freeze(event)); },
     read: () => Object.freeze([...events]),
+  };
+}
+
+// An audit sink that keeps every event it is given, with the actor it was appended for, so a
+// test can read back what was recorded. Every run's ports need one.
+export type RecordedEvent = { readonly event: EventInput; readonly actor: DerivedActor };
+export type MemoryEventSink = EventSink & { readonly recorded: readonly RecordedEvent[] };
+
+export function memoryEventSink(): MemoryEventSink {
+  const recorded: RecordedEvent[] = [];
+  return {
+    recorded,
+    append(event, actor) {
+      recorded.push({ event, actor });
+      return success({ sequence: recorded.length - 1 });
+    },
   };
 }
 

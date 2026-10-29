@@ -23,7 +23,7 @@ import {
   type Clock, type LoggedEvent, type PlanStanding, type Project, type Result, type RunResult,
   type ServiceCallErrorCode, type ServiceCaller, type ServiceRequest, type ServiceResponse,
 } from '@revisum/engine';
-import { memoryArtifactStore, memoryRunEventSink } from '../../support/memory-ports.ts';
+import { memoryArtifactStore, memoryEventSink, memoryRunEventSink } from '../../support/memory-ports.ts';
 import { authorise, trustedProjectFrom } from '../../support/policy-clearance.ts';
 import {
   DEFAULT_CLOCK_START, DEFAULT_SEED, NEW_VERSION, ORIGIN, TARGET_ID, accepted, projectFileWith, recordingDriver,
@@ -302,7 +302,7 @@ export async function runWithCalls(raw: unknown, options: CallRunOptions = {}): 
     baseUrl: ORIGIN, seed: DEFAULT_SEED, fixedTimeMilliseconds: DEFAULT_CLOCK_START, fixtures: [], host: { platform: 'test', arch: 'test' },
     ...(options.standing === undefined ? {} : { standing: options.standing }),
   }, {
-    drivers: new Map([[driver.info.id, driver]]), clock, artifacts: memoryArtifactStore(), redactor: defaultRedactor(), events,
+    drivers: new Map([[driver.info.id, driver]]), clock, artifacts: memoryArtifactStore(), redactor: defaultRedactor(), audit: memoryEventSink(), events,
     secrets: environmentSecretStore(options.environment ?? SECRET_VALUES), ...(options.withCaller === false ? {} : { services: caller }),
   });
   const logged = events.read();

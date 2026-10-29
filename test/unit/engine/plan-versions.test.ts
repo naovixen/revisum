@@ -8,7 +8,7 @@ import {
   defaultRedactor, failure, runUntrusted,
   type BrowserDriver,
 } from '@revisum/engine';
-import { memoryArtifactStore, memoryRunEventSink, systemClock } from '../../support/memory-ports.ts';
+import { memoryArtifactStore, memoryEventSink, memoryRunEventSink, systemClock } from '../../support/memory-ports.ts';
 import { futureVersions } from '../../support/plan-changelog.ts';
 import {
   CURRENT_VERSION, ORIGIN, accountClosurePlan, defaultParser, signupPlan, stepsOf, testProject, withValue,
@@ -86,7 +86,7 @@ test('a run of a plan with a newer step is refused before any driver is touched'
   const project = testProject();
   const ports = {
     drivers: new Map([['playwright', spy]]), clock: systemClock, artifacts: memoryArtifactStore(),
-    redactor: defaultRedactor(), events: memoryRunEventSink(),
+    redactor: defaultRedactor(), audit: memoryEventSink(), events: memoryRunEventSink(),
   };
   const base = {
     project, baseUrl: ORIGIN, seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() },

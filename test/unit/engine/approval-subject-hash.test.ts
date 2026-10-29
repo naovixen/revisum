@@ -118,7 +118,7 @@ function countingDriver(): CountingDriver {
 
 const runPorts = (driver: BrowserDriver) => ({
   drivers: new Map([['playwright', driver]]), clock: systemClock, artifacts: memoryArtifactStore(),
-  redactor: defaultRedactor(), events: memoryRunEventSink(),
+  redactor: defaultRedactor(), audit: memoryEventSink(), events: memoryRunEventSink(),
 });
 
 const runBase = (standing: PlanStanding) => ({

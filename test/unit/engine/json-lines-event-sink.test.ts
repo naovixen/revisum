@@ -24,7 +24,7 @@ let path: string;
 let sink: EventSink;
 
 beforeEach(() => {
-  folder = mkdtempSync(join(tmpdir(), 'revisum-event-sink-'));
+  folder = mkdtempSync(join(tmpdir(), 'event-sink-'));
   path = join(folder, 'audit.jsonl');
   sink = jsonLinesEventSink(path);
 });

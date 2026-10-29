@@ -17,7 +17,7 @@ import {
   type BrowserDriver, type Plan, type PlanError, type Result,
 } from '@revisum/engine';
 import { hostilePlans, type HostilePlan } from '../support/hostile-plans.ts';
-import { memoryArtifactStore, memoryRunEventSink, systemClock } from '../support/memory-ports.ts';
+import { memoryArtifactStore, memoryEventSink, memoryRunEventSink, systemClock } from '../support/memory-ports.ts';
 import { makeProject, signupPlan } from '../support/signup-harness.ts';
 
 const ORIGIN = 'http://127.0.0.1:4173';
@@ -45,7 +45,7 @@ const spyDriver = (id: string): BrowserDriver => ({
 
 const ports = () => ({
   drivers: new Map<string, BrowserDriver>([['playwright', spyDriver('playwright')], ['cdp', spyDriver('cdp')]]),
-  clock: systemClock, artifacts: memoryArtifactStore(), redactor: defaultRedactor(), events: memoryRunEventSink(),
+  clock: systemClock, artifacts: memoryArtifactStore(), redactor: defaultRedactor(), audit: memoryEventSink(), events: memoryRunEventSink(),
 });
 const base = {
   project, baseUrl: ORIGIN, seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() },

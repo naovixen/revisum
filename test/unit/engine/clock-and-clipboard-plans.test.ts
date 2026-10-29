@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 import { arch, platform } from 'node:os';
 import { afterEach, beforeEach, test } from 'node:test';
 import { defaultRedactor, failure, runUntrusted, type BrowserDriver, type PlanErrorCode } from '@revisum/engine';
-import { memoryArtifactStore, memoryRunEventSink, systemClock } from '../../support/memory-ports.ts';
+import { memoryArtifactStore, memoryEventSink, memoryRunEventSink, systemClock } from '../../support/memory-ports.ts';
 import { PRIVATE_MARKER, defaultParser, signupPlan, stepsOf } from './plan-examples.ts';
 import { projectWith } from './run-value-examples.ts';
 import { fakeServiceCaller } from './service-call-examples.ts';
@@ -296,7 +296,7 @@ function countingPorts() {
   const { caller, requests } = fakeServiceCaller();
   const events = memoryRunEventSink();
   const ports = {
-    drivers: new Map([['playwright', spy]]), clock: systemClock, artifacts: memoryArtifactStore(), redactor: defaultRedactor(), events, services: caller,
+    drivers: new Map([['playwright', spy]]), clock: systemClock, artifacts: memoryArtifactStore(), redactor: defaultRedactor(), audit: memoryEventSink(), events, services: caller,
   };
   return { ports, counts, requests, events };
 }

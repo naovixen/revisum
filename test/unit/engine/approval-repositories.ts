@@ -5,7 +5,10 @@
 //   - workingCopy: the change under test's own versions of the files it edits;
 //   - landings: which account landed which commit on which branch, and when;
 //   - pullRequests: each pull request's author, head commit, reviews, changed files and the last
-//     commit in it that touched each path.
+//     commit in it that touched each path;
+//   - filesAtCommits (optional): the files a commit holds where they differ from the protected
+//     branch, by commit then path. Any other file at any commit is served as the protected
+//     branch's, as if every reviewed commit had already landed unchanged.
 // Every repository also gets the sign-up plan at plans/signup.json and a holdouts.json that lists
 // one holdout plan's hash, so each subject kind has something on the protected branch.
 //
@@ -17,7 +20,9 @@
 //   - the loader's `change` argument is { files, events }: the files the change edits, and the
 //     sink its trusted.changed-with-code events go to; its result is { project, reviewItems };
 //   - pullRequest(number) answers { author, headCommit }, the author as a login;
-//   - lastCommitTouching(path, pullRequest) answers the commit id.
+//   - lastCommitTouching(path, pullRequest) answers the commit id;
+//   - fileAtCommit(path, commit) answers { bytes }, the file at `path` as `commit` holds it, or
+//     'not-found' when that commit has no such file.
 // See docs/specs/SPEC-02-project-trust-and-approval.md.
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -28,6 +33,7 @@ import {
   type ApprovalVerifier, type DerivedActor, type EventInput, type EventSink, type Plan, type Result,
   type TrustedProject, type VersionControlPort, type VersionControlReview,
 } from '@revisum/engine';
+import { memoryEventSink, type MemoryEventSink, type RecordedEvent } from '../../support/memory-ports.ts';
 import { FIXTURES } from '../../support/repository.ts';
 import { defaultParser, signupPlan, type JsonRecord } from './plan-examples.ts';
 
@@ -61,11 +67,12 @@ export type FixtureRepository = {
   workingCopy: Record<string, unknown>;
   landings: Landing[];
   pullRequests: Record<string, PullRequest>;
+  filesAtCommits?: Record<string, Record<string, unknown>>;
 };
 
 export type RepositoryName = 'solo' | 'team' | 'red-team';
 export type SubjectKind = ApprovalSubject['kind'];
-export type PortMethod = 'protectedFile' | 'reviews' | 'changedFiles' | 'landedBy' | 'pullRequest' | 'lastCommitTouching';
+export type PortMethod = 'protectedFile' | 'reviews' | 'changedFiles' | 'landedBy' | 'pullRequest' | 'lastCommitTouching' | 'fileAtCommit';
 
 // A holdout plan lives in the holdout store, never in the repository; holdouts.json on the
 // protected branch lists its hash by change class.
@@ -80,6 +87,9 @@ export function parsedSignupPlan(input: JsonRecord = signupPlan()): Plan {
   return parsed.value;
 }
 
+// A path as the fixture keys it: forward slashes, no leading "./" or "/".
+const repositoryFile = (path: string): string => path.replaceAll('\\', '/').replace(/^\.?\//, '');
+
 const fileBytes = (content: unknown): Uint8Array =>
   Buffer.from(typeof content === 'string' ? content : canonicalJson(content), 'utf8');
 
@@ -90,19 +100,9 @@ export function readFixture(name: RepositoryName): FixtureRepository {
   return fixture;
 }
 
-export type RecordedEvent = { readonly event: EventInput; readonly actor: DerivedActor };
-export type MemoryEventSink = EventSink & { readonly recorded: readonly RecordedEvent[] };
-
-export function memoryEventSink(): MemoryEventSink {
-  const recorded: RecordedEvent[] = [];
-  return {
-    recorded,
-    append(event, actor) {
-      recorded.push({ event, actor });
-      return success({ sequence: recorded.length - 1 });
-    },
-  };
-}
+// The in-memory audit sink lives with the other in-memory ports; it is re-exported here for the
+// tests that already import it from this file.
+export { memoryEventSink, type MemoryEventSink, type RecordedEvent };
 
 export const eventsOfKind = (events: MemoryEventSink, kind: EventInput['kind']): readonly RecordedEvent[] =>
   events.recorded.filter((recorded) => recorded.event.kind === kind);
@@ -153,7 +153,7 @@ export const SUBJECT_KINDS = Object.keys(SUBJECT_PATHS) as SubjectKind[];
 export function openRepository(name: RepositoryName, edit: (fixture: FixtureRepository) => void = () => {}): TestRepository {
   const fixture = readFixture(name);
   edit(fixture);
-  const root = mkdtempSync(join(tmpdir(), `revisum-approval-${name}-`));
+  const root = mkdtempSync(join(tmpdir(), `approval-${name}-`));
   for (const [path, content] of Object.entries({ ...fixture.protectedFiles, ...fixture.workingCopy })) {
     mkdirSync(dirname(join(root, path)), { recursive: true });
     writeFileSync(join(root, path), fileBytes(content));
@@ -166,12 +166,12 @@ export function openRepository(name: RepositoryName, edit: (fixture: FixtureRepo
   const versionControl = (unavailable: readonly PortMethod[] = []): VersionControlPort => {
     const down = new Set<PortMethod>(unavailable);
     const pullRequestNumbered = (number: number): PullRequest | undefined => fixture.pullRequests[String(number)];
-    return {
+    const port: Omit<VersionControlPort, 'fileAtCommit'> = {
       protectedBranch: fixture.protectedBranch,
       async protectedFile(path) {
         calls.push(`protectedFile ${path}`);
         if (down.has('protectedFile')) return failure('unavailable');
-        const content = fixture.protectedFiles[path.replaceAll('\\', '/').replace(/^\.?\//, '')];
+        const content = fixture.protectedFiles[repositoryFile(path)];
         return content === undefined ? failure('not-found') : success({ bytes: fileBytes(content), commit: fixture.protectedCommit });
       },
       async reviews(number) {
@@ -203,6 +203,19 @@ export function openRepository(name: RepositoryName, edit: (fixture: FixtureRepo
         return success(landing === undefined ? null : { login: landing.login, type: landing.type, at: landing.at });
       },
     };
+    // Added beside the literal, not inside it, so this file compiles whether or not the port
+    // declares the method yet. A commit's file is its own version where the fixture gives one, and
+    // otherwise the protected branch's.
+    return Object.assign(port, {
+      async fileAtCommit(path: string, commit: string): Promise<Result<{ readonly bytes: Uint8Array }, 'not-found' | 'unavailable'>> {
+        calls.push(`fileAtCommit ${path} ${commit}`);
+        if (down.has('fileAtCommit')) return failure('unavailable');
+        const file = repositoryFile(path);
+        const atCommit = fixture.filesAtCommits?.[commit];
+        const content = atCommit !== undefined && file in atCommit ? atCommit[file] : fixture.protectedFiles[file];
+        return content === undefined ? failure('not-found') : success({ bytes: fileBytes(content) });
+      },
+    });
   };
 
   const repository: TestRepository = {

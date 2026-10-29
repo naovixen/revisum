@@ -29,7 +29,7 @@
     },
     "approvers.json": {
       "agentLockdown": {
-        "maintainer": "revisum-agent[bot]",
+        "maintainer": "build-agent[bot]",
         "agentDenyRulesPath": ".claude/settings.json",
         "deniedActions": [
           "commit",
@@ -51,21 +51,21 @@
         ]
       }
     },
-    ".github/CODEOWNERS": "# The agent's own accounts named as code owners.\n/plans/ @revisum-agent[bot] @revisum-agent @github-actions[bot]\n"
+    ".github/CODEOWNERS": "# The agent's own accounts named as code owners.\n/plans/ @build-agent[bot] @build-agent @github-actions[bot]\n"
   },
   "workingCopy": {},
   "landings": [
     {
       "commit": "commit-main-head",
       "branch": "main",
-      "login": "revisum-agent[bot]",
+      "login": "build-agent[bot]",
       "type": "bot",
       "at": "2026-10-21T09:00:00Z"
     },
     {
       "commit": "commit-app-merge",
       "branch": "main",
-      "login": "revisum-agent",
+      "login": "build-agent",
       "type": "app",
       "at": "2026-10-22T09:00:00Z"
     },
@@ -98,7 +98,7 @@
           "state": "approved",
           "commit": "commit-pull-head",
           "reviewer": {
-            "login": "revisum-agent[bot]",
+            "login": "build-agent[bot]",
             "type": "bot"
           },
           "submittedAt": "2026-10-20T10:30:00Z"
@@ -108,7 +108,7 @@
           "state": "approved",
           "commit": "commit-pull-head",
           "reviewer": {
-            "login": "revisum-agent",
+            "login": "build-agent",
             "type": "app"
           },
           "submittedAt": "2026-10-20T11:30:00Z"

@@ -16,7 +16,7 @@ import { criterionId, specId } from '../support/criterion-ids.ts';
 import { REPOSITORY_ROOT } from '../support/repository.ts';
 import { describeRun, runTool, type ToolRun } from '../support/tool-runs.ts';
 
-const folder = mkdtempSync(join(tmpdir(), 'revisum-trailers-'));
+const folder = mkdtempSync(join(tmpdir(), 'trailers-'));
 after(() => { rmSync(folder, { recursive: true, force: true }); });
 
 let messageCount = 0;

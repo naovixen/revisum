@@ -27,7 +27,7 @@ export type GitRepository = {
 };
 
 export function createGitRepository(): GitRepository {
-  const folder = mkdtempSync(join(tmpdir(), 'revisum-git-'));
+  const folder = mkdtempSync(join(tmpdir(), 'git-'));
   const root = join(folder, 'repository');
   mkdirSync(root);
   const emptyConfig = join(folder, 'empty-gitconfig');

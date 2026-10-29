@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import { arch, platform } from 'node:os';
 import { test } from 'node:test';
 import { defaultRedactor, failure, runUntrusted, type BrowserDriver, type Plan } from '@revisum/engine';
-import { memoryArtifactStore, memoryRunEventSink, systemClock } from '../../support/memory-ports.ts';
+import { memoryArtifactStore, memoryEventSink, memoryRunEventSink, systemClock } from '../../support/memory-ports.ts';
 import {
   CLOSING_CHECK, OPEN_ORDERS, ORIGIN, accepted, label, navigate, parserFor, planOf, projectWith, reference, rejection,
   type JsonRecord,
@@ -320,7 +320,7 @@ test('a plan with a misplaced or off-list newTab is refused before any driver is
     async open() { calls++; return failure({ reason: 'launch-failed', detail: 'the spy never launches' }); },
   };
   const events = memoryRunEventSink();
-  const ports = { drivers: new Map([['playwright', spy]]), clock: systemClock, artifacts: memoryArtifactStore(), redactor: defaultRedactor(), events };
+  const ports = { drivers: new Map([['playwright', spy]]), clock: systemClock, artifacts: memoryArtifactStore(), redactor: defaultRedactor(), audit: memoryEventSink(), events };
   const base = { project: projectWith(), baseUrl: ORIGIN, seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() } };
   for (const plan of [planOf([OPEN_ORDERS, frame([newTab('/account'), CLOSING_CHECK])]), planOf([OPEN_ORDERS, newTab('https://evil.example/collect')])]) {
     const outcome = await runUntrusted(plan, parsePlan, base, ports);

@@ -51,7 +51,7 @@ function seed(pairs: readonly { readonly from: string; readonly to: string }[], 
 }
 
 const freshProduct = (): string => {
-  const folder = mkdtempSync(join(tmpdir(), 'revisum-seeded-'));
+  const folder = mkdtempSync(join(tmpdir(), 'seeded-'));
   const root = join(folder, 'product');
   mkdirSync(root);
   return root;

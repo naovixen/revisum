@@ -18,7 +18,7 @@ import { describeRun, runTool, type ToolRun } from '../support/tool-runs.ts';
 const fixture = (name: string): string => join(FIXTURES, 'branch-gates', name);
 
 // GitHub answers with no rules as an empty list; `main` has neither rules nor protection today.
-const folder = mkdtempSync(join(tmpdir(), 'revisum-branch-gates-'));
+const folder = mkdtempSync(join(tmpdir(), 'branch-gates-'));
 after(() => { rmSync(folder, { recursive: true, force: true }); });
 const EMPTY_RULES = join(folder, 'empty-rules.json');
 const EMPTY_PROTECTION = join(folder, 'empty-protection.json');

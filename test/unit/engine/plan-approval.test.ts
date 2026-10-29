@@ -14,7 +14,7 @@ import {
   PERSON_ACTOR_TYPES, approvalFor, defaultRedactor, failure, mergeGateOpen, planHash, planStanding, run, success, unverified,
   type Approval, type BrowserDriver, type Plan, type Project, type TargetId,
 } from '@revisum/engine';
-import { memoryArtifactStore, memoryRunEventSink, systemClock } from '../../support/memory-ports.ts';
+import { memoryArtifactStore, memoryEventSink, memoryRunEventSink, systemClock } from '../../support/memory-ports.ts';
 import { authorise, trustedProjectFrom } from '../../support/policy-clearance.ts';
 import { memoryApprovalStore, parsedSignupPlan, withRepository, type TestRepository } from './approval-repositories.ts';
 import { ORIGIN, TARGET_ID, signupPlan, testProject, testProjectInput, withValue, type JsonRecord } from './plan-examples.ts';
@@ -84,7 +84,7 @@ async function runPlan(plan: Plan, standing: ReturnType<typeof planStanding>, ba
     fixtures: [], host: { platform: 'test', arch: 'test' }, standing,
   }, {
     drivers: new Map([['playwright', driver]]), clock: systemClock, artifacts: memoryArtifactStore(),
-    redactor: defaultRedactor(), events: memoryRunEventSink(),
+    redactor: defaultRedactor(), audit: memoryEventSink(), events: memoryRunEventSink(),
   });
   return { result, driverCalls: driver.calls };
 }

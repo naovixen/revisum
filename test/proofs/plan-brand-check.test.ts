@@ -9,7 +9,7 @@ import {
   assertBranded, defaultRedactor, failure, planParser, run,
   type Authorised, type BrowserDriver, type Plan, type TargetId,
 } from '@revisum/engine';
-import { memoryArtifactStore, memoryRunEventSink, systemClock } from '../support/memory-ports.ts';
+import { memoryArtifactStore, memoryEventSink, memoryRunEventSink, systemClock } from '../support/memory-ports.ts';
 import { authorise, trustedProjectFrom } from '../support/policy-clearance.ts';
 import { ORIGIN, TARGET_ID, signupPlan, testProject, testProjectInput } from '../unit/engine/plan-examples.ts';
 
@@ -48,7 +48,7 @@ function watchedPorts(): Watched {
   const events = memoryRunEventSink();
   return {
     ports: {
-      drivers: new Map([['playwright', spy]]), clock: systemClock, redactor: defaultRedactor(), events,
+      drivers: new Map([['playwright', spy]]), clock: systemClock, redactor: defaultRedactor(), audit: memoryEventSink(), events,
       artifacts: { put: async (name, bytes, mediaType) => { storeWrites++; return store.put(name, bytes, mediaType); } },
     },
     driverCalls: () => driverCalls,

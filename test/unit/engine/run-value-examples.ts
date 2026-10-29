@@ -14,7 +14,7 @@ import {
   type ActionStep, type BrowserDriver, type ElementProbe, type GeneratedValue, type Plan, type PlanError, type Project,
   type Result, type RunResult, type Session, type SessionEnvironment, type ValueName,
 } from '@revisum/engine';
-import { memoryArtifactStore, memoryRunEventSink, systemClock } from '../../support/memory-ports.ts';
+import { memoryArtifactStore, memoryEventSink, memoryRunEventSink, systemClock } from '../../support/memory-ports.ts';
 import { authorise, trustedProjectFrom } from '../../support/policy-clearance.ts';
 import { ORIGIN, TARGET_ID, testProjectInput, type JsonRecord } from './plan-examples.ts';
 
@@ -153,7 +153,7 @@ export async function runPlan(raw: unknown, options: RunOptions = {}): Promise<{
     fixtures: [], host: { platform: 'test', arch: 'test' },
   }, {
     drivers: new Map([[driver.info.id, driver]]), clock: systemClock, artifacts: memoryArtifactStore(),
-    redactor: defaultRedactor(), events: memoryRunEventSink(),
+    redactor: defaultRedactor(), audit: memoryEventSink(), events: memoryRunEventSink(),
   });
   return { result, recording };
 }

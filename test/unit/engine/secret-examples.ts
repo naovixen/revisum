@@ -19,7 +19,7 @@ import {
   defaultRedactor, environmentSecretStore, failure, parseProject, planParser, run,
   type BrowserDriver, type ElementProbe, type Plan, type Project, type RunResult, type SecretName, type Session, type TargetId,
 } from '@revisum/engine';
-import { memoryArtifactStore, memoryRunEventSink, systemClock } from '../../support/memory-ports.ts';
+import { memoryArtifactStore, memoryEventSink, memoryRunEventSink, systemClock } from '../../support/memory-ports.ts';
 import { authorise, trustedProjectFrom } from '../../support/policy-clearance.ts';
 
 // The forms a leak scan looks for, as SPEC-04's Leak type names them.
@@ -195,7 +195,7 @@ export async function runWithSecrets(
   const trusted = await trustedProjectFrom(secretProjectFile(declared));
   const events = memoryRunEventSink();
   const artifacts = memoryArtifactStore();
-  const ports = { drivers: new Map([['fake', driver]]), clock: systemClock, artifacts, redactor: defaultRedactor(), events };
+  const ports = { drivers: new Map([['fake', driver]]), clock: systemClock, artifacts, redactor: defaultRedactor(), audit: memoryEventSink(), events };
   const result = await run({
     plan: authorise(parsedPlan(project, plan), trusted), project, targetId: FAKE_TARGET as TargetId, baseUrl: ORIGIN,
     seed: 7, fixedTimeMilliseconds: Date.UTC(2026, 0, 1), fixtures: [], host: { platform: 'test', arch: 'test' },

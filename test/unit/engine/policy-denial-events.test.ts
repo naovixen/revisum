@@ -75,7 +75,7 @@ test('when the runtime guard allows an action, no plan.denied event is appended'
 });
 
 test('a denial reaches the JSON Lines sink as a plan.denied entry carrying the rule', { criterion: 'AC-SPEC-03-05' }, async () => {
-  const folder = mkdtempSync(join(tmpdir(), 'revisum-policy-events-'));
+  const folder = mkdtempSync(join(tmpdir(), 'policy-events-'));
   try {
     const path = join(folder, 'audit.jsonl');
     const project = await trustedProject();

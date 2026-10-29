@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import { arch, platform } from 'node:os';
 import { test } from 'node:test';
 import { defaultRedactor, runUntrusted } from '@revisum/engine';
-import { memoryArtifactStore, memoryRunEventSink, systemClock } from '../../support/memory-ports.ts';
+import { memoryArtifactStore, memoryEventSink, memoryRunEventSink, systemClock } from '../../support/memory-ports.ts';
 import { PRIVATE_MARKER, defaultParser } from './plan-examples.ts';
 import { spyDriver } from './secret-examples.ts';
 import { fakeServiceCaller } from './service-call-examples.ts';
@@ -103,7 +103,7 @@ test('a plan refused for a disabled feature opens no browser, makes no call and 
   const spy = spyDriver();
   const { caller, requests } = fakeServiceCaller();
   const ports = {
-    drivers: new Map([['playwright', spy]]), clock: systemClock, artifacts: memoryArtifactStore(), redactor: defaultRedactor(),
+    drivers: new Map([['playwright', spy]]), clock: systemClock, artifacts: memoryArtifactStore(), redactor: defaultRedactor(), audit: memoryEventSink(),
     events: memoryRunEventSink(), services: caller,
   };
   const base = { project, baseUrl: ORIGIN, seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() } };

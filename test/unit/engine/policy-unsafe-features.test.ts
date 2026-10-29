@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 import { arch, platform } from 'node:os';
 import { test } from 'node:test';
 import { defaultRedactor, runUntrusted, type Plan } from '@revisum/engine';
-import { memoryArtifactStore, memoryRunEventSink, systemClock } from '../../support/memory-ports.ts';
+import { memoryArtifactStore, memoryEventSink, memoryRunEventSink, systemClock } from '../../support/memory-ports.ts';
 import { TEST_SERVICE } from './plan-examples.ts';
 import {
   ALLOWED, PROPOSAL, approvedStanding, comparable, decideOn, deniedCodes, denied, element, localeOf, parsedPlan, parserProject, stepAt,
@@ -108,7 +108,7 @@ test('the same write script and write command in an approved plan are allowed', 
 test('a plan the gate denies for any of these rules opens no browser, so no script or command runs', { criterion: 'AC-SPEC-36-08' }, async () => {
   const project = parserProject(PROJECT);
   const spy = spyDriver();
-  const ports = { drivers: new Map([['playwright', spy]]), clock: systemClock, artifacts: memoryArtifactStore(), redactor: defaultRedactor(), events: memoryRunEventSink() };
+  const ports = { drivers: new Map([['playwright', spy]]), clock: systemClock, artifacts: memoryArtifactStore(), redactor: defaultRedactor(), audit: memoryEventSink(), events: memoryRunEventSink() };
   const base = { project, baseUrl: ORIGIN, seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() } };
   const parse = (raw: unknown) => ({ ok: true as const, value: parsedPlan(raw as JsonRecord, PROJECT) });
   const rules: string[] = [];
@@ -150,7 +150,7 @@ test('a database command whose service is on a production origin is denied in an
 
 test('a production command is denied before anything starts: no browser is opened', { criterion: 'AC-SPEC-36-13' }, async () => {
   const spy = spyDriver();
-  const ports = { drivers: new Map([['playwright', spy]]), clock: systemClock, artifacts: memoryArtifactStore(), redactor: defaultRedactor(), events: memoryRunEventSink() };
+  const ports = { drivers: new Map([['playwright', spy]]), clock: systemClock, artifacts: memoryArtifactStore(), redactor: defaultRedactor(), audit: memoryEventSink(), events: memoryRunEventSink() };
   const base = {
     project: parserProject(PRODUCTION_PROJECT), baseUrl: ORIGIN, seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() },
   };

@@ -311,7 +311,7 @@ test('the result and log of a run whose responses echo its secrets hold no form 
 
 test('the leak scan finds no secret in the run\'s result and log, and does find a planted canary', { criterion: 'AC-SPEC-32-11' }, async () => {
   const ran = await runWithCalls(echoPlan, { route: echoingShop, projectFile: shortChecks });
-  const folder = mkdtempSync(join(tmpdir(), 'revisum-service-leaks-'));
+  const folder = mkdtempSync(join(tmpdir(), 'service-leaks-'));
   try {
     const canaryValue = fakeSecretValue();
     const resultFile = join(folder, 'result.json');

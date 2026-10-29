@@ -8,7 +8,7 @@ import {
   type AiPlanner, type AiWriter, type Box, type BrowserDriver, type RunResult, type Step,
 } from '@revisum/engine';
 import { hostilePlans } from '../support/hostile-plans.ts';
-import { memoryArtifactStore, memoryRunEventSink, systemClock } from '../support/memory-ports.ts';
+import { memoryArtifactStore, memoryEventSink, memoryRunEventSink, systemClock } from '../support/memory-ports.ts';
 import { decodePng } from '../support/png-decoder.ts';
 import {
   CONTRACT_TARGETS, EMAIL, FIXED_TIME_MILLISECONDS, NAME, SEED,
@@ -31,7 +31,7 @@ function spyDriver(id: string): BrowserDriver & { calls: number } {
 }
 const spyPorts = (drivers: ReadonlyMap<string, BrowserDriver>) => ({
   drivers, clock: systemClock, artifacts: { put: async () => { throw new Error('no side effects allowed'); } },
-  redactor: defaultRedactor(), events: memoryRunEventSink(),
+  redactor: defaultRedactor(), audit: memoryEventSink(), events: memoryRunEventSink(),
 });
 
 // ---- (a) Replay ---------------------------------------------------------------------------------
