@@ -1,2 +1,3 @@
-// Public entry point. Nothing is exported until the first spec for this package lands.
-export {};
+// Public entry point: the composition root. For now it runs a declared suite in evidence mode;
+// the command line itself is SPEC-16's.
+export { runSuite, type SuiteRunPorts } from './suite-run.ts';

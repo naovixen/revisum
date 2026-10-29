@@ -6,8 +6,11 @@
 import { failure, success, type ExecOutcome, type Result } from '@revisum/contracts';
 import { spawn } from 'node:child_process';
 
-// A host folder, a single host file or a named volume, always mounted read-only.
-export type ContainerMount = { readonly kind: 'folder' | 'file' | 'volume'; readonly source: string; readonly target: string };
+// A host folder, a single host file or a named volume, mounted read-only unless `writable` says
+// otherwise. Only a workload's output folder is ever writable.
+export type ContainerMount = {
+  readonly kind: 'folder' | 'file' | 'volume'; readonly source: string; readonly target: string; readonly writable?: true;
+};
 
 // A container to start. Every container the engine starts is also hardened the same way: no
 // capabilities, no way to gain privileges, a read-only root file system with a private /tmp.
@@ -25,6 +28,11 @@ export type ContainerOptions = {
   readonly environment: Readonly<Record<string, string>>;
   readonly mounts: readonly ContainerMount[];
   readonly command: readonly string[];
+  // Replaces the image's own entrypoint, so only Revisum's command starts the container.
+  readonly entrypoint?: string;
+  // The name servers its lookups are forwarded to, by address. Docker's own resolver still answers
+  // for the containers on its networks first.
+  readonly dns?: readonly string[];
 };
 
 export type EngineProblem = { readonly detail: string };
@@ -45,6 +53,13 @@ export interface ContainerEngine {
   probeEgress(containerId: string, targets: readonly ProbeTarget[]): Promise<'reached' | 'blocked'>;
   // Removes a container, running or not.
   removeContainer(containerId: string): Promise<void>;
+  // The user an image's containers run as by default, such as "node" or "1000:1000", or null when
+  // the image has none. Optional: without it the workload runner uses uid and gid 1000.
+  imageUser?(reference: string): Promise<string | null>;
+  // A running container's address on one of its networks, or null. Optional: without it a workload
+  // container's lookups are not forwarded to the proxy, so a process that ignores the proxy is
+  // still blocked but its attempt is not recorded.
+  containerAddress?(containerId: string, network: string): Promise<string | null>;
 }
 
 // Output beyond this is dropped, so a chatty command cannot exhaust memory.
@@ -83,7 +98,7 @@ const problem = (outcome: DockerOutcome): EngineProblem => ({ detail: (outcome.s
 
 function mountArgument(mount: ContainerMount): string {
   const type = mount.kind === 'volume' ? 'volume' : 'bind';
-  return `type=${type},source=${mount.source},target=${mount.target},readonly`;
+  return `type=${type},source=${mount.source},target=${mount.target}${mount.writable === true ? '' : ',readonly'}`;
 }
 
 // The Docker arguments that create, but do not start, a hardened container.
@@ -95,6 +110,8 @@ export function createArguments(options: ContainerOptions): readonly string[] {
     '--security-opt', `seccomp=${options.seccompProfile}`, '--security-opt', 'no-new-privileges',
     '--cap-drop', 'ALL', '--read-only', '--tmpfs', '/tmp:rw,nosuid,nodev,size=1024m', '--shm-size', '512m',
     '--workdir', options.workingFolder,
+    ...(options.entrypoint === undefined ? [] : ['--entrypoint', options.entrypoint]),
+    ...(options.dns ?? []).flatMap((address) => ['--dns', address]),
     ...Object.entries(options.environment).flatMap(([name, value]) => ['--env', `${name}=${value}`]),
     ...options.mounts.flatMap((mount) => ['--mount', mountArgument(mount)]),
     options.image, ...options.command,
@@ -164,5 +181,29 @@ export function dockerCliEngine(): ContainerEngine {
       return probed.value.stdout.trim().split('\n').at(-1) === 'blocked' ? 'blocked' : 'reached';
     },
     removeContainer,
+    async imageUser(reference) {
+      const outcome = await runDocker(['image', 'inspect', '--format', '{{.Config.User}}', reference]);
+      const user = outcome.stdout.trim();
+      return outcome.status === 0 && user !== '' ? user : null;
+    },
+    async containerAddress(containerId, network) {
+      const outcome = await runDocker(['container', 'inspect', '--format', '{{json .NetworkSettings.Networks}}', containerId]);
+      if (outcome.status !== 0) return null;
+      return networkAddress(outcome.stdout, network);
+    },
   };
+}
+
+// A container's IPv4 address on `network`, from Docker's JSON listing of its networks.
+function networkAddress(listing: string, network: string): string | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(listing);
+  } catch {
+    return null;
+  }
+  if (typeof parsed !== 'object' || parsed === null) return null;
+  const settings: unknown = Object.getOwnPropertyDescriptor(parsed, network)?.value;
+  const address: unknown = typeof settings === 'object' && settings !== null ? Reflect.get(settings, 'IPAddress') : undefined;
+  return typeof address === 'string' && /^\d{1,3}(\.\d{1,3}){3}$/.test(address) ? address : null;
 }

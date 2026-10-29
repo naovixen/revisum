@@ -15,12 +15,13 @@ import {
   type RunnerHandle,
 } from '@revisum/contracts';
 import { randomBytes } from 'node:crypto';
-import { platform } from 'node:os';
-import { isAbsolute, join, normalize, sep } from 'node:path';
-import type { ContainerEngine, ContainerMount, ContainerOptions, ProbeTarget } from './container-engine.ts';
+import { join } from 'node:path';
+import type { ContainerEngine, ContainerMount } from './container-engine.ts';
 import { joinEgressEvents } from './egress-events.ts';
-import { proxyRules } from './egress-proxy.ts';
-import { DECISIONS_FILE, PROXY_PORT, RULES_VARIABLE, readProxyDecision } from './proxy-container.ts';
+import {
+  DEFAULT_BRIDGE_NETWORK, OUTSIDE_PROBE_TARGETS, WORKSPACE, dependenciesVolumeFor, proxyContainer, proxyReadyScript, proxyUrl, readDecisions,
+  repositoryFolder, revisumMounts, runImageContainer,
+} from './run-containers.ts';
 import { RUN_IMAGE_TAG } from './run-image.ts';
 
 export type RunnerLogEntry = { readonly code: 'egress-unenforceable' | 'start-failed'; readonly detail: string };
@@ -39,56 +40,14 @@ export type DockerRunnerOptions = {
   readonly log?: (entry: RunnerLogEntry) => void;
 };
 
-// Where the repository appears inside the containers.
-const WORKSPACE = '/workspace';
-const CONTAINER_USER = 'node';
-const SECCOMP_PROFILE = join('.devcontainer', 'seccomp-chrome-sandbox.json');
-const DEV_CONTAINER_DEPENDENCIES_VOLUME = `${PRODUCT.name}-node-modules`;
-const DEFAULT_BRIDGE_NETWORK = 'bridge';
-const PROXY_READY_SECONDS = 30;
-// Public addresses that answer from any ordinary network. A probe from inside the run container
-// must reach none of them.
-const OUTSIDE_PROBE_TARGETS: readonly ProbeTarget[] = [{ host: '1.1.1.1', port: 443 }, { host: '8.8.8.8', port: 53 }];
-
-// Waits until the proxy accepts connections, trying once a second.
-const proxyReadyScript = (host: string): string => `
-  const { connect } = require('node:net');
-  let tries = ${PROXY_READY_SECONDS};
-  const attempt = () => {
-    const socket = connect({ host: ${JSON.stringify(host)}, port: ${PROXY_PORT} });
-    socket.on('connect', () => { socket.destroy(); process.exit(0); });
-    socket.on('error', () => { socket.destroy(); tries -= 1; if (tries === 0) process.exit(1); else setTimeout(attempt, 1000); });
-  };
-  attempt();`;
-
-// A repository-relative input folder, refused when it leads out of the repository or into .git.
-function inputFolder(input: string): string | null {
-  const path = normalize(input);
-  if (path === '' || path === '.' || isAbsolute(path) || path.split(/[\\/]/).some((part) => part === '..' || part === '.git')) return null;
-  return path.split(sep).join('/');
-}
-
 export function dockerRunner(options: DockerRunnerOptions): Runner {
   const engine = options.engine;
   const root = options.repositoryRoot;
   const log = options.log ?? ((): void => undefined);
-  const dependenciesVolume = options.dependenciesVolume === undefined
-    ? (platform() === 'linux' ? null : DEV_CONTAINER_DEPENDENCIES_VOLUME)
-    : options.dependenciesVolume;
+  const dependenciesVolume = dependenciesVolumeFor(options.dependenciesVolume);
   let level: GuaranteeLevel = 'host';
 
-  const sharedMounts = (): ContainerMount[] => [
-    { kind: 'folder', source: join(root, 'packages'), target: `${WORKSPACE}/packages` },
-    { kind: 'file', source: join(root, 'package.json'), target: `${WORKSPACE}/package.json` },
-    dependenciesVolume === null
-      ? { kind: 'folder', source: join(root, 'node_modules'), target: `${WORKSPACE}/node_modules` }
-      : { kind: 'volume', source: dependenciesVolume, target: `${WORKSPACE}/node_modules` },
-  ];
-
-  const containerOptions = (name: string, image: string, networks: readonly string[], environment: Readonly<Record<string, string>>,
-    mounts: readonly ContainerMount[], command: readonly string[]): ContainerOptions => ({
-    name, image, networks, user: CONTAINER_USER, seccompProfile: join(root, SECCOMP_PROFILE), workingFolder: WORKSPACE, environment, mounts, command,
-  });
+  const sharedMounts = (): ContainerMount[] => revisumMounts(root, dependenciesVolume);
 
   async function start(image: ImageDigest, policy: EgressPolicy): Promise<Result<RunnerHandle, RunnerError>> {
     level = 'host';
@@ -97,7 +56,7 @@ export function dockerRunner(options: DockerRunnerOptions): Runner {
     if (localId !== image) return failure({ code: 'image-digest-mismatch' });
     const inputs: string[] = [];
     for (const input of options.inputs ?? []) {
-      const folder = inputFolder(input);
+      const folder = repositoryFolder(input);
       if (folder === null) {
         log({ code: 'start-failed', detail: `the input ${input} is not a folder inside the repository` });
         return failure({ code: 'start-failed' });
@@ -134,26 +93,27 @@ export function dockerRunner(options: DockerRunnerOptions): Runner {
     }
 
     const proxyName = `${runId}-proxy`;
-    const proxy = await engine.startContainer(containerOptions(
-      proxyName, image, unenforceable === null ? [network, DEFAULT_BRIDGE_NETWORK] : [network],
-      { HOME: '/tmp', [RULES_VARIABLE]: JSON.stringify(proxyRules(policy, options.services)) },
-      sharedMounts(), ['node', 'packages/runner/src/proxy-container.ts'],
-    ));
+    const proxy = await engine.startContainer(proxyContainer(root, {
+      name: proxyName, image, networks: unenforceable === null ? [network, DEFAULT_BRIDGE_NETWORK] : [network],
+      policy, services: options.services, mounts: sharedMounts(),
+    }));
     if (!proxy.ok) return refuse(`the proxy container did not start: ${proxy.error.detail}`);
     containers.push(proxy.value);
     const proxyId = proxy.value;
 
-    const proxyUrl = `http://${proxyName}:${PROXY_PORT}`;
+    const proxyAddress = proxyUrl(proxyName);
     const runEnvironment = {
-      HOME: '/tmp', HTTP_PROXY: proxyUrl, HTTPS_PROXY: proxyUrl, NO_PROXY: 'localhost,127.0.0.1,::1',
-      'http_proxy': proxyUrl, 'https_proxy': proxyUrl, 'no_proxy': 'localhost,127.0.0.1,::1',
+      HOME: '/tmp', HTTP_PROXY: proxyAddress, HTTPS_PROXY: proxyAddress, NO_PROXY: 'localhost,127.0.0.1,::1',
+      'http_proxy': proxyAddress, 'https_proxy': proxyAddress, 'no_proxy': 'localhost,127.0.0.1,::1',
     };
     const runMounts: ContainerMount[] = [
       ...sharedMounts(),
       { kind: 'folder', source: join(root, '.browsers'), target: `${WORKSPACE}/.browsers` },
       ...inputs.map((input): ContainerMount => ({ kind: 'folder', source: join(root, input), target: `${WORKSPACE}/${input}` })),
     ];
-    const runContainer = await engine.startContainer(containerOptions(`${runId}-run`, image, [network], runEnvironment, runMounts, ['sleep', 'infinity']));
+    const runContainer = await engine.startContainer(runImageContainer(root, {
+      name: `${runId}-run`, image, networks: [network], environment: runEnvironment, mounts: runMounts, command: ['sleep', 'infinity'],
+    }));
     if (!runContainer.ok) return refuse(`the run container did not start: ${runContainer.error.detail}`);
     containers.push(runContainer.value);
     const runContainerId = runContainer.value;
@@ -172,9 +132,7 @@ export function dockerRunner(options: DockerRunnerOptions): Runner {
     let decisions: readonly ProxyDecision[] = [];
     // Reads the proxy's decisions back from its container.
     const refreshDecisions = async (): Promise<void> => {
-      const read = await engine.exec(proxyId, ['cat', DECISIONS_FILE]);
-      if (!read.ok || read.value.exitCode !== 0) return;
-      decisions = read.value.stdout.split('\n').map(readProxyDecision).filter((decision) => decision !== null);
+      decisions = await readDecisions(engine, proxyId) ?? decisions;
     };
     let stopped = false;
     const handle: RunnerHandle = {

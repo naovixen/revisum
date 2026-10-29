@@ -12,20 +12,26 @@ import {
 import { brand } from '../brand.ts';
 import { guaranteeStatement } from '../guarantees.ts';
 import { canonicalJson, sha256 } from '../hashing.ts';
-import type { TerminalState } from '../lifecycle.ts';
+import type { Refusal, TerminalState } from '../lifecycle.ts';
+import { manifestHash, type RunManifest } from '../manifest.ts';
 import { runTimeTextOrDigest } from '../plan/plan-decoders.ts';
 import { CRITERION_ID } from '../plan/plan-grammar.ts';
 import { withResultHash } from '../result-hash.ts';
-import type { RunResult, RunReviewItem } from '../run.ts';
-import type { SuiteReport, SuiteReportTest, SuiteTrace } from './suite-report.ts';
+import type { EvidenceOutcomeCode, RunResult, RunReviewItem } from '../run.ts';
+import type { SuiteDecodeError, SuiteReport, SuiteReportTest, SuiteTrace } from './suite-report.ts';
 
 // What the result builder needs besides the decoded outputs: the declared suite, which pass this
-// is, the suite command's exit code, and the redactor every kept text goes through.
+// is, the suite command's exit code, and the redactor every kept text goes through. A suite run
+// adds whether the runner stopped it at its timeout, and the manifest that pins its inputs.
 export type EvidenceContext = {
   readonly suite: EvidenceSuiteDeclaration;
   readonly pass: SuitePass;
   readonly exitCode: number;
   readonly redactor: Redactor;
+  readonly timedOut?: boolean;
+  readonly manifest?: RunManifest;
+  // What the egress proxy blocked, as seen on the wire. Kept redacted: a name can carry a secret.
+  readonly blockedOrigins?: readonly string[];
 };
 
 const CRITERION_ANNOTATION = 'criterion';
@@ -92,11 +98,26 @@ function failFinding(
 }
 
 // Interrupted tests and a disagreeing exit code make the run Errored: it could not test. Then a
-// failed or timed-out test makes it Failed; otherwise it Passed.
-function evidenceState(outcomes: readonly SuiteTestOutcome[], exitCodeMismatch: boolean): Extract<TerminalState, 'Passed' | 'Failed' | 'Errored'> {
-  if (exitCodeMismatch || outcomes.includes('interrupted')) return 'Errored';
+// failed or timed-out test, or a report with no tests at all, makes it Failed; otherwise it Passed.
+function evidenceState(
+  outcomes: readonly SuiteTestOutcome[], exitCodeMismatch: boolean, outcomeCode: EvidenceOutcomeCode | undefined,
+): Extract<TerminalState, 'Passed' | 'Failed' | 'Errored'> {
+  if (outcomeCode === 'suite-timeout' || exitCodeMismatch || outcomes.includes('interrupted')) return 'Errored';
+  if (outcomeCode === 'vacuous') return 'Failed';
   return outcomes.some((outcome) => FINDING_OUTCOMES.includes(outcome)) ? 'Failed' : 'Passed';
 }
+
+// The guarantee statement every evidence result carries. A suite runs only inside the isolated
+// runner, behind its egress proxy; without it the run is refused before any suite code runs.
+const evidenceGuarantees = (suite: EvidenceSuiteDeclaration, egressEnforced = true) =>
+  guaranteeStatement({ mode: 'evidence', egressEnforced, unmaskedScreenshotsKept: suite.keepSuiteScreenshots, unsafeFeatures: [] });
+
+const manifestFields = (context: EvidenceContext): Pick<RunResult, 'manifest' | 'manifestHash'> =>
+  context.manifest === undefined ? { manifest: null, manifestHash: null } : { manifest: context.manifest, manifestHash: manifestHash(context.manifest) };
+
+// Each blocked origin once, redacted, in a stable order.
+const keptOrigins = (context: EvidenceContext): readonly string[] =>
+  [...new Set((context.blockedOrigins ?? []).map((origin) => keptText(origin, context.redactor)))].sort();
 
 export function evidenceResult(
   report: SuiteReport, traces: readonly SuiteTrace[], audits: readonly A11yFinding[], context: EvidenceContext,
@@ -109,6 +130,7 @@ export function evidenceResult(
     const id = suiteTestId(test);
     const { criterionIds, invalid } = linkedCriteria(test);
     for (const annotationIndex of invalid) reviewItems.push({ code: 'spec-ambiguous', testId: id, annotationIndex });
+    if (test.outcome === 'expected-failure') reviewItems.push({ code: 'expected-failure', testId: id });
     const finding = FINDING_OUTCOMES.includes(test.outcome) ? failFinding(test, id, criterionIds, traces, redactor) : undefined;
     if (finding !== undefined) findings.push(finding);
     tests.push({
@@ -121,21 +143,58 @@ export function evidenceResult(
     });
   }
   const outcomes = report.tests.map((test) => test.outcome);
-  const exitCodeMismatch = exitCode !== agreeingExitCode(outcomes);
+  // A stopped suite's exit code is the stop's, and a suite with no tests is vacuous whatever its
+  // exit code says, so neither is compared with the outcomes.
+  const outcomeCode: EvidenceOutcomeCode | undefined = context.timedOut === true ? 'suite-timeout' : outcomes.length === 0 ? 'vacuous' : undefined;
+  const exitCodeMismatch = outcomeCode === undefined && exitCode !== agreeingExitCode(outcomes);
   return withResultHash({
-    state: evidenceState(outcomes, exitCodeMismatch),
+    state: evidenceState(outcomes, exitCodeMismatch, outcomeCode),
     mode: 'evidence',
-    // A suite runs only inside the isolated runner, behind its egress proxy; without it the run is
-    // refused with egress-unenforceable before any suite code runs.
-    guarantees: guaranteeStatement({ mode: 'evidence', egressEnforced: true, unmaskedScreenshotsKept: suite.keepSuiteScreenshots, unsafeFeatures: [] }),
+    guarantees: evidenceGuarantees(suite),
     targetId: suite.name,
-    // The evidence manifest record is written once the runner pins the suite's inputs.
-    manifest: null, manifestHash: null,
-    steps: [], blockedOrigins: [], unavailable: null,
+    ...manifestFields(context),
+    steps: [], blockedOrigins: keptOrigins(context), unavailable: null,
     suite: { name: suite.name, tests, findings, ...(audits.length === 0 ? {} : { accessibilityFindings: audits }) },
-    evidence: { pass, exitCode, exitCodeMismatch },
+    evidence: { pass, exitCode, exitCodeMismatch, ...(outcomeCode === undefined ? {} : { outcomeCode }) },
     ...(reviewItems.length === 0 ? {} : { reviewItems }),
     timings: { totalMilliseconds: report.tests.reduce((total, test) => total + test.durationMilliseconds, 0), stepMilliseconds: [] },
+  });
+}
+
+// The result of a suite run whose report could not be read: it wrote none, or the decoder refused
+// it, or its setup command failed first. It could not test, so it is Errored, with no tests.
+export function unreadSuiteResult(
+  context: EvidenceContext, outcomeCode: Extract<EvidenceOutcomeCode, 'suite-timeout' | 'setup-failed' | 'suite-report-unread'>,
+  decodeErrors: readonly SuiteDecodeError[] = [],
+): RunResult {
+  const { suite, pass, exitCode } = context;
+  return withResultHash({
+    state: 'Errored',
+    mode: 'evidence',
+    guarantees: evidenceGuarantees(suite),
+    targetId: suite.name,
+    ...manifestFields(context),
+    steps: [], blockedOrigins: keptOrigins(context), unavailable: null,
+    suite: { name: suite.name, tests: [], findings: [] },
+    evidence: { pass, exitCode, exitCodeMismatch: false, outcomeCode, ...(decodeErrors.length === 0 ? {} : { decodeErrors }) },
+    timings: { totalMilliseconds: 0, stepMilliseconds: [] },
+  });
+}
+
+// The result of `run --suite` refused before any suite code ran. Its guarantee statement says
+// egress was not enforced when that is why it was refused.
+export function refusedSuiteResult(suiteName: string, refusal: Refusal): RunResult {
+  return withResultHash({
+    state: 'Refused',
+    mode: 'evidence',
+    guarantees: guaranteeStatement({
+      mode: 'evidence', egressEnforced: refusal.code !== 'egress-unenforceable', unmaskedScreenshotsKept: false, unsafeFeatures: [],
+    }),
+    targetId: suiteName,
+    manifest: null, manifestHash: null,
+    steps: [], blockedOrigins: [], unavailable: null,
+    refusal,
+    timings: { totalMilliseconds: 0, stepMilliseconds: [] },
   });
 }
 

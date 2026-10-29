@@ -49,9 +49,12 @@ export type TargetUnavailableRun = Omit<Planned, 'state'> & { readonly state: 'T
 //   evidence-mode-disabled: the trusted project has no evidenceMode section.
 //   suite-not-declared: the evidenceMode section declares no suite of that name.
 //   egress-unenforceable: egress cannot be enforced on this host, and suite code never runs without it.
+//   image-missing, image-digest-mismatch: the suite's workload image is not here, or not the pinned one.
+//   workload-start-failed: the workload container did not start, so no suite code ran.
+// A suite whose declared secret the store cannot resolve is refused with secret-missing, as a plan is.
 export type RefusalCode =
   | 'origin_not_allowed' | 'secret-missing' | 'services-unavailable' | 'evidence-mode-disabled' | 'suite-not-declared' | 'egress-unenforceable'
-  | 'script-source-missing';
+  | 'script-source-missing' | 'image-missing' | 'image-digest-mismatch' | 'workload-start-failed';
 export type Refusal =
   | { readonly code: Extract<RefusalCode, 'origin_not_allowed'>; readonly origin: string }
   | { readonly code: Extract<RefusalCode, 'secret-missing'>; readonly secretName: SecretName }
@@ -59,7 +62,10 @@ export type Refusal =
   // The plan names a page script whose source file the run was not given, by its declared path.
   | { readonly code: Extract<RefusalCode, 'script-source-missing'>; readonly file: string }
   | EvidenceRefusal;
-export type EvidenceRefusal = { readonly code: Extract<RefusalCode, 'evidence-mode-disabled' | 'suite-not-declared' | 'egress-unenforceable'> };
+export type EvidenceRefusal = {
+  readonly code: Extract<RefusalCode, 'evidence-mode-disabled' | 'suite-not-declared' | 'egress-unenforceable' | 'image-missing'
+    | 'image-digest-mismatch' | 'workload-start-failed'>;
+};
 export type RefusedRun = Omit<Planned, 'state'> & { readonly state: 'Refused'; readonly refusal: Refusal };
 
 // Which policy rule stopped the run, and at which step. `unrecorded` is present when the audit sink

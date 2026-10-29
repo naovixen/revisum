@@ -83,6 +83,8 @@ Plan error. Required text or a required list is empty.
 
 Plan error. A check would pass on anything, or proves nothing traceable: a plan with no assertion, an empty assertion (`assert: {}`), a text or value assertion whose expected text is empty, a request count of `atLeast` 0, or an assertion without a `criterionId`. Give each assertion its expected text and the id of the acceptance criterion it checks.
 
+Evidence run outcome. The suite's report holds no tests, so the run checked nothing. It ends `Failed`, whatever the suite's exit code, and never opens the merge gate. Check the suite's paths, projects and `testMatch`.
+
 ## literal_secret
 
 Plan error. The plan holds a secret instead of naming one: literal text filled into a field whose locator names a password, passcode, token, secret or API key (or the German or French word for one), text shaped like a credential anywhere in the plan (a JSON Web Token, a `Bearer` value, or a key with a known prefix such as `ghp_`, `sk-` or `AKIA`), or saved storage state written into `storageState` itself. The error gives the path, never the text. Declare the secret's name in the project's `secretNames`, put its value in the secret store (a CI secret of the same name), and write `{ "secretName": "…" }` in the plan.
@@ -321,15 +323,23 @@ Driver error. A `dialog` step's `expectText` is not the text of the dialog the p
 
 Runner error. The pinned container image is not available, so no browser was launched.
 
+Workload runner error and run refusal, for an evidence run: the suite's workload image, or Revisum's own run image, is not on this host. Revisum never pulls a team's image; build or pull it yourself, then run again.
+
 ## image-digest-mismatch
 
 Runner error. The container image's digest differs from the pinned digest, so no browser was launched.
+
+Workload runner error and run refusal, for an evidence run: the local workload image has another id than the `image` digest the suite declares, so no suite code ran.
 
 ## egress-unenforceable
 
 Runner log entry. Network egress cannot be enforced on this host: Docker could not create a network with no route out, or a probe from inside the run container reached an address outside. The run still starts, at the `host` guarantee level, and claims no hermetic isolation.
 
 Run refusal, for an evidence run (`run --suite`): Revisum never runs a team's own suite code without egress control, so the run is refused before any suite code runs. Run it on a host where the isolated runner can enforce egress.
+
+## workload-start-failed
+
+Workload runner error and run refusal, for an evidence run. The workload container did not start, or the request could not be run: a working directory outside the checkout, an empty command, a variable name no environment can hold, or a path Docker cannot mount. No suite code ran. The runner's log says which.
 
 ## start-failed
 
@@ -412,6 +422,10 @@ Command-line error. The plan's approval was refused, so the plan was not run.
 ## replay-mismatch
 
 Command-line error. Replaying a recorded run gave a different result hash from the recorded one.
+
+## replay-not-claimed
+
+Replay error. The manifest is an evidence run's. Its suite code, the suite's own browser and the app server the suite starts cannot be pinned, so no replay is claimed identical. The manifest can still be used to run the suite again.
 
 ## internal
 
@@ -532,6 +546,18 @@ Run refusal. The plan names a page script whose source file the run was not give
 ## evidence-mode-disabled
 
 Run refusal. `run --suite` was asked for, but the trusted project file has no `evidenceMode` section, so no suite may run and no container starts. Evidence mode is turned on only in `project.json` on the protected branch: a change that adds the section runs without it until the change is approved and merged.
+
+## suite-timeout
+
+Evidence run outcome. The suite, or its setup command, ran past the declared `timeoutMilliseconds` and its container was stopped. The run ends `Errored`, and any test without a final outcome is reported `interrupted`, never passed. Raise the timeout, or split the suite.
+
+## setup-failed
+
+Evidence run outcome. The suite's setup command exited with a non-zero code, so the suite was not run. The run ends `Errored`. Run the setup command in the workload image yourself to see why.
+
+## suite-report-unread
+
+Evidence run outcome. The suite's JSON report was missing or refused; the result's `evidence.decodeErrors` give each code and JSON path. The run ends `Errored`, with no tests.
 
 ## suite-not-declared
 

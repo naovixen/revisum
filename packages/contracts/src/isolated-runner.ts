@@ -14,7 +14,9 @@ import type { Origin } from './target.ts';
 export type BrowserChannel = 'page' | 'websocket' | 'worker' | 'popup' | 'redirect' | 'beacon';
 // unattributed: the proxy decided on a request the browser never reported, such as a declared
 // service call or traffic from inside the container that was not the browser's.
-export type EgressChannel = BrowserChannel | 'unattributed';
+// process: a process in a workload container that ignored the proxy looked up an undeclared name.
+// It had no route out, so only the lookup shows the attempt.
+export type EgressChannel = BrowserChannel | 'unattributed' | 'process';
 export type EgressDecision = 'allowed' | 'blocked';
 
 // An origin as it was seen on the wire, not as a project declared it, so it is plain text:

@@ -1,4 +1,5 @@
-// Public entry point: the isolated runner and its egress proxy, the resolve-time address check,
+// Public entry point: the isolated runner and its egress proxy, the workload runner that runs a
+// team's own image behind the same proxy, the resolve-time address check,
 // the egress policy builder and how egress events are joined, and the declared-call caller's
 // header writing. See docs/specs/SPEC-07-isolated-runner-and-egress.md.
 export type { ExecOutcome, ResponseRewrite } from '@revisum/contracts';
@@ -8,6 +9,8 @@ export {
   type ContainerEngine, type ContainerMount, type ContainerOptions, type DockerOutcome, type EngineProblem, type ProbeTarget,
 } from './container-engine.ts';
 export { dockerRunner, type DockerRunnerOptions, type RunnerLogEntry } from './docker-runner.ts';
+export { workloadRunner, type WorkloadLogEntry, type WorkloadRunnerOptions } from './workload-runner.ts';
+export { noSuchNameAnswer, readDnsQuestion, type DnsQuestion } from './lookup-recorder.ts';
 export { hostAndPort, joinEgressEvents } from './egress-events.ts';
 export { buildEgressPolicy, type EgressPolicyError, type EgressPolicyInput } from './egress-policy.ts';
 export {

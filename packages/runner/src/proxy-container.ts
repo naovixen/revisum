@@ -1,15 +1,21 @@
 // The egress proxy as the main process of a run's proxy container. The runner passes the proxy's
 // rules in one environment variable; the proxy listens on every interface of the container and
 // appends each decision as a JSON line to a file in the container's private /tmp, which the runner
-// reads back. Both the rules and the decision lines cross a process boundary, so each is decoded
-// here before use. See docs/specs/SPEC-07-isolated-runner-and-egress.md.
+// reads back. For a workload's run it also answers name lookups and records them the same way.
+// Both the rules and the decision lines cross a process boundary, so each is decoded here before
+// use. See docs/specs/SPEC-07-isolated-runner-and-egress.md and docs/specs/SPEC-35-evidence-mode.md.
 import type { ProxyDecision, ResponseRewrite } from '@revisum/contracts';
 import { appendFileSync } from 'node:fs';
 import { startProxyServer, type ProxyRules, type RewriteRule } from './egress-proxy.ts';
+import { startLookupRecorder } from './lookup-recorder.ts';
 
 export const PROXY_PORT = 3128;
 export const DECISIONS_FILE = '/tmp/egress-decisions.jsonl';
 export const RULES_VARIABLE = 'EGRESS_PROXY_RULES';
+// Set for a workload's proxy: it also answers the run network's name lookups and records each name
+// in LOOKUPS_FILE, one JSON line each (lookup-recorder.ts).
+export const LOOKUPS_VARIABLE = 'EGRESS_PROXY_RECORDS_LOOKUPS';
+export const LOOKUPS_FILE = '/tmp/egress-lookups.jsonl';
 
 const field = (value: unknown, name: string): unknown =>
   typeof value === 'object' && value !== null && !Array.isArray(value) ? Object.getOwnPropertyDescriptor(value, name)?.value : undefined;
@@ -82,6 +88,15 @@ async function main(): Promise<number> {
     listenHost: '0.0.0.0', port: PROXY_PORT, onDecision: (decision) => appendFileSync(DECISIONS_FILE, `${JSON.stringify(decision)}\n`),
   });
   console.log(`egress proxy listening at ${proxy.url}`);
+  if (process.env[LOOKUPS_VARIABLE] === '1') {
+    // Without the recorder, egress is still blocked: only the record of ignored-proxy attempts is lost.
+    try {
+      await startLookupRecorder((name) => appendFileSync(LOOKUPS_FILE, `${JSON.stringify({ name })}\n`));
+      console.log('recording name lookups on port 53');
+    } catch (error) {
+      console.error(`name lookups are not recorded: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
   return 0;
 }
 

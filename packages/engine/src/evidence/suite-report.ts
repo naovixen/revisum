@@ -47,16 +47,29 @@ export type SuiteReportTest = {
   readonly durationMilliseconds: number;
 };
 // Only parseSuiteReport makes one, so a result can be built only from a decoded report.
-export type SuiteReport = Brand<{ readonly tests: readonly SuiteReportTest[] }, 'SuiteReport'>;
+// `playwrightVersion` is what the report says ran it: self-reported, kept only when it looks like a version.
+export type SuiteReport = Brand<SuiteReportFields, 'SuiteReport'>;
+type SuiteReportFields = { readonly tests: readonly SuiteReportTest[]; readonly playwrightVersion?: string };
 
-// What a trace archive held: the attachment path it was read from, and the test's actions in order.
-// Only the trace decoder makes one (SPEC-35's second milestone), so until then no run has traces.
-export type SuiteTrace = Brand<{ readonly attachmentPath: string; readonly actions: readonly string[] }, 'SuiteTrace'>;
+// What a trace archive held: the attachment path it was read from, the test's actions in order,
+// and the browser and Playwright version the trace says recorded it, which Revisum cannot check.
+// Only parseSuiteTrace makes one.
+export type SuiteTrace = Brand<{
+  readonly attachmentPath: string; readonly actions: readonly string[]; readonly browserName?: string; readonly playwrightVersion?: string;
+}, 'SuiteTrace'>;
+
+// Where the suite's process saw Revisum's output folder. An attachment path under it is read as
+// relative to the folder, since Playwright writes absolute paths.
+export type SuiteReportOptions = { readonly outputDirectory?: string };
 
 // Playwright's result statuses, each mapped to its outcome.
 const RESULT_OUTCOMES: Readonly<Record<string, SuiteTestOutcome>> = {
   passed: 'passed', failed: 'failed', timedOut: 'timed-out', skipped: 'skipped', interrupted: 'interrupted',
 };
+// The statuses a suite may expect a test to end with: "failed" for a test marked test.fail().
+const EXPECTED_STATUSES: readonly string[] = ['passed', 'failed', 'timedOut', 'skipped', 'interrupted'];
+// A self-reported Playwright version is kept only when it looks like one.
+const VERSION_TEXT = /^\d{1,4}\.\d{1,4}\.\d{1,4}([-+.][0-9A-Za-z.-]{1,32})?$/;
 // Playwright's statuses for a test as a whole. "flaky" is left out on purpose: with --retries=0 a
 // test runs once, so a report claiming a flaky test is not to be believed.
 const TEST_STATUSES: readonly string[] = ['expected', 'unexpected', 'skipped'];
@@ -65,19 +78,32 @@ const PROTOTYPE_KEYS: readonly string[] = ['__proto__', 'constructor', 'prototyp
 // The keys this decoder reads, which a refusal's path may name. Any other key is written "*".
 const READ_KEYS: ReadonlySet<string> = new Set([
   'suites', 'specs', 'tests', 'results', 'title', 'file', 'projectName', 'annotations', 'type', 'description', 'status', 'errors',
-  'message', 'location', 'line', 'column', 'attachments', 'name', 'contentType', 'path', 'duration', ...PROTOTYPE_KEYS,
+  'message', 'location', 'line', 'column', 'attachments', 'name', 'contentType', 'path', 'duration', 'expectedStatus', 'config', 'version',
+  ...PROTOTYPE_KEYS,
 ]);
 
-export function parseSuiteReport(input: unknown, limits: EvidenceLimits): Result<SuiteReport, readonly SuiteDecodeError[]> {
+export function parseSuiteReport(
+  input: unknown, limits: EvidenceLimits, options: SuiteReportOptions = {},
+): Result<SuiteReport, readonly SuiteDecodeError[]> {
   const walked = walk(input, limits);
   if (walked !== undefined) return failure([walked]);
-  const context: DecodeContext = { issues: [], tests: [], maximumTests: limits.maximumTests };
+  const outputPrefix = options.outputDirectory === undefined ? undefined : `${options.outputDirectory.replace(/\/+$/, '')}/`;
+  const context: DecodeContext = { issues: [], tests: [], maximumTests: limits.maximumTests, outputPrefix };
   const report = readObject(input, '$', context);
   if (report === INVALID) return failure(context.issues);
   const suites = readList(report['suites'], '$.suites', context);
   if (suites !== INVALID) suites.forEach((suite, index) => readSuite(suite, `$.suites[${index}]`, undefined, context));
   if (context.issues.length > 0) return failure(context.issues);
-  return success(brand<{ readonly tests: readonly SuiteReportTest[] }, 'SuiteReport'>({ tests: context.tests }));
+  const playwrightVersion = reportedVersion(report['config']);
+  return success(brand<SuiteReportFields, 'SuiteReport'>({ tests: context.tests, ...(playwrightVersion === undefined ? {} : { playwrightVersion }) }));
+}
+
+// The Playwright version the report's config gives, when it is there and looks like one. It only
+// labels the run, so a report without one is not refused.
+function reportedVersion(config: unknown): string | undefined {
+  if (typeof config !== 'object' || config === null || Array.isArray(config)) return undefined;
+  const version: unknown = Object.getOwnPropertyDescriptor(config, 'version')?.value;
+  return typeof version === 'string' && VERSION_TEXT.test(version) ? version : undefined;
 }
 
 // ---- The first pass: limits and keys over the whole value --------------------------------------
@@ -135,7 +161,11 @@ const isPlainObject = (value: object): boolean => {
 
 // ---- The second pass: the fields Revisum reads ---------------------------------------------------
 
-type DecodeContext = { readonly issues: SuiteDecodeError[]; readonly tests: SuiteReportTest[]; readonly maximumTests: number };
+type DecodeContext = {
+  readonly issues: SuiteDecodeError[]; readonly tests: SuiteReportTest[]; readonly maximumTests: number;
+  // The output folder as the suite saw it, ending in "/", when attachment paths may be absolute under it.
+  readonly outputPrefix: string | undefined;
+};
 type Fields = Readonly<Record<string, unknown>>;
 
 function refuse(path: string, context: DecodeContext): typeof INVALID {
@@ -212,9 +242,16 @@ function readTest(
     ? INVALID : rawAnnotations.map((annotation, index) => readAnnotation(annotation, `${path}.annotations[${index}]`, context));
   const status = fields['status'];
   const knownStatus = typeof status === 'string' && TEST_STATUSES.includes(status) ? status : refuse(`${path}.status`, context);
+  const expected = fields['expectedStatus'];
+  const expectedStatus = expected === undefined || (typeof expected === 'string' && EXPECTED_STATUSES.includes(expected))
+    ? expected : refuse(`${path}.expectedStatus`, context);
   const result = readOnlyResult(fields['results'], `${path}.results`, context);
-  if (project === INVALID || annotations === INVALID || !allValid(annotations) || knownStatus === INVALID || result === INVALID) return INVALID;
-  return { ...spec, project, annotations, ...result };
+  if (project === INVALID || annotations === INVALID || !allValid(annotations) || knownStatus === INVALID || expectedStatus === INVALID
+    || result === INVALID) return INVALID;
+  // A test the suite expects to fail, which failed, is Playwright's "expected" outcome: kept apart
+  // from both a pass and an ordinary failure.
+  const outcome: SuiteTestOutcome = expectedStatus === 'failed' && result.outcome === 'failed' ? 'expected-failure' : result.outcome;
+  return { ...spec, project, annotations, ...result, outcome };
 }
 
 function readAnnotation(input: unknown, path: string, context: DecodeContext): Parsed<SuiteAnnotation> {
@@ -281,7 +318,9 @@ function readAttachment(input: unknown, path: string, context: DecodeContext): P
   if (fields === INVALID) return INVALID;
   const name = readString(fields['name'], `${path}.name`, context);
   const contentType = readString(fields['contentType'], `${path}.contentType`, context);
-  const filePath = readOptionalString(fields, 'path', path, context);
+  const written = readOptionalString(fields, 'path', path, context);
+  const prefix = context.outputPrefix;
+  const filePath = written !== INVALID && written !== undefined && prefix !== undefined && written.startsWith(prefix) ? written.slice(prefix.length) : written;
   const inside = filePath === INVALID || filePath === undefined || staysInside(filePath) ? filePath : refuse(`${path}.path`, context);
   if (name === INVALID || contentType === INVALID || inside === INVALID) return INVALID;
   return inside === undefined ? { name, contentType } : { name, contentType, path: inside };

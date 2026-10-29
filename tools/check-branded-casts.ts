@@ -70,6 +70,7 @@ export const BRAND_OWNERS: Readonly<Record<string, readonly string[]>> = {
   // The isolated runner reads its own run image's id back from Docker.
   ImageDigest: [EVIDENCE_DECLARATIONS, 'packages/runner/src/run-image.ts'],
   SuiteReport: ['packages/engine/src/evidence/suite-report.ts'],
+  SuiteTrace: ['packages/engine/src/evidence/suite-trace.ts'],
   // Unsafe plan features: page scripts and database commands are named by the declaration-section
   // reader, and a plan refers to them by those names; only the plan parser reads an inline
   // script's source.

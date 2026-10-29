@@ -19,6 +19,7 @@ import * as lifecycle from './lifecycle.ts';
 import { manifestLogger, type Logger, type RunEventSink } from './logging.ts';
 import { buildManifest, manifestHash, unsafeFeatureRecord, type FixtureReference, type HostInfo, type RunManifest } from './manifest.ts';
 import { checkElement, checkPage, normalise, type Verdict } from './oracle.ts';
+import type { SuiteDecodeError } from './evidence/suite-report.ts';
 import type { PlanError } from './plan/plan-decoders.ts';
 import { assertBranded } from './plan/plan-parser.ts';
 import { unsafeFeaturesOf } from './plan/unsafe-features.ts';
@@ -101,11 +102,29 @@ export type StepResult = {
 // description is not a valid criterion id, so it was dropped (never echoed).
 export type RunReviewItem =
   | { readonly code: 'cleanup-failed'; readonly cleanupIndex: number }
-  | { readonly code: 'spec-ambiguous'; readonly testId: SuiteTestId; readonly annotationIndex: number };
+  | { readonly code: 'spec-ambiguous'; readonly testId: SuiteTestId; readonly annotationIndex: number }
+  // A test the suite marked as expected to fail did fail: Playwright counts it as expected, but a
+  // person should see why a failing test is kept.
+  | { readonly code: 'expected-failure'; readonly testId: SuiteTestId };
+
+// Why an evidence run ended as it did, beyond its tests' outcomes.
+//   vacuous: the report holds no tests, so the run checked nothing and ends Failed.
+//   suite-timeout: the suite ran past its timeout and was stopped; the run ends Errored.
+//   setup-failed: the suite's setup command failed or timed out, so the suite never ran; Errored.
+//   suite-report-unread: the suite's report is missing or was refused (decodeErrors says why); Errored.
+export type EvidenceOutcomeCode = 'vacuous' | 'suite-timeout' | 'setup-failed' | 'suite-report-unread';
 
 // What only an evidence run records: which pass it was, the suite command's exit code, and whether
-// that code disagreed with the outcomes the report gives, which makes the run Errored.
-export type EvidenceRunRecord = { readonly pass: SuitePass; readonly exitCode: number; readonly exitCodeMismatch: boolean };
+// that code disagreed with the outcomes the report gives, which makes the run Errored. The outcome
+// code and decode errors are present only when there are some, so other results stay as they were.
+export type EvidenceRunRecord = {
+  readonly pass: SuitePass;
+  readonly exitCode: number;
+  readonly exitCodeMismatch: boolean;
+  readonly outcomeCode?: EvidenceOutcomeCode;
+  // Codes and JSON paths only, never a value from the suite's output.
+  readonly decodeErrors?: readonly SuiteDecodeError[];
+};
 
 // An evidence run's tests, one per test and project, and the findings its failed tests became.
 export type SuiteRunRecord = {

@@ -102,7 +102,9 @@ export type RunMode = 'plan' | 'evidence';
 // The gating pass runs the protected branch's suite files and may open the merge gate. The
 // proposal pass runs the change's own version of them and never does.
 export type SuitePass = 'gating' | 'proposal';
-export type SuiteTestOutcome = 'passed' | 'failed' | 'timed-out' | 'skipped' | 'interrupted';
+// expected-failure: a test the suite marked as expected to fail (Playwright's test.fail()) that
+// failed. Playwright counts it as expected, but a person should look at why it is kept.
+export type SuiteTestOutcome = 'passed' | 'failed' | 'timed-out' | 'skipped' | 'interrupted' | 'expected-failure';
 // The sha256 of a test's file, title path and project.
 export type SuiteTestId = Brand<string, 'SuiteTestId'>;
 // Shown beside criterion ids that come from a suite's annotations: the suite's code makes the

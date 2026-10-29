@@ -61,6 +61,11 @@ export { declaredSuite, isSuiteFile, suitePasses, type PlannedSuitePass } from '
 export {
   DEFAULT_REPORT_DEPTH, parseSuiteReport,
   type SuiteAnnotation, type SuiteAttachment, type SuiteDecodeError, type SuiteDecodeErrorCode, type SuiteErrorLocation, type SuiteReport,
-  type SuiteReportError, type SuiteReportTest, type SuiteTrace,
+  type SuiteReportError, type SuiteReportOptions, type SuiteReportTest, type SuiteTrace,
 } from './evidence/suite-report.ts';
-export { evidenceMergeGateOpen, evidenceResult, type EvidenceContext } from './evidence/evidence-result.ts';
+export { SUPPORTED_TRACE_VERSIONS, parseSuiteTrace } from './evidence/suite-trace.ts';
+export { REPORT_PATH_VARIABLE, SUITE_REPORT_FILE, SUITE_RESULTS_FOLDER, suiteArguments, type SuiteArguments } from './evidence/suite-arguments.ts';
+export { suiteEnvironment, suiteRedactor, type SuiteEnvironment } from './evidence/suite-environment.ts';
+export {
+  evidenceMergeGateOpen, evidenceResult, refusedSuiteResult, unreadSuiteResult, type EvidenceContext,
+} from './evidence/evidence-result.ts';

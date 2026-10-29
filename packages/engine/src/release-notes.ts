@@ -152,11 +152,13 @@ export function releaseNoteDraft(plan: Plan, results: readonly RunResult[]): str
     '|---|---|---|---|---|---|---|',
   ];
   for (const result of results) {
-    const manifest = result.manifest;
+    // Only a plan run's manifest names a target and browser; an evidence run's never does.
+    const target = result.manifest?.target;
+    const browser = result.manifest?.browser;
     const passed = result.steps.filter((step) => step.outcome === 'passed').length;
-    lines.push(manifest === null
+    lines.push(target === undefined || browser === undefined
       ? `| ${result.targetId} | - | - | - | - | ${result.state}: ${result.unavailable?.reason ?? ''} | 0 of ${plan.steps.length} |`
-      : `| ${result.targetId} | ${manifest.browser.name} ${manifest.browser.version} | ${manifest.target.device} | ${manifest.target.locale} | ${manifest.target.timezone} | ${result.state} | ${passed} of ${plan.steps.length} |`);
+      : `| ${result.targetId} | ${browser.name} ${browser.version} | ${target.device} | ${target.locale} | ${target.timezone} | ${result.state} | ${passed} of ${plan.steps.length} |`);
   }
   lines.push('', '### What was checked', '', ...plan.steps.map((step, index) => `${index + 1}. ${describeStep(step)}`));
 

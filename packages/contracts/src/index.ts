@@ -20,6 +20,7 @@ export * from './exit-codes.ts';
 export type * from './policy.ts';
 export type * from './run-ports.ts';
 export type * from './isolated-runner.ts';
+export * from './workload.ts';
 export * from './audit-events.ts';
 export type * from './approval.ts';
 export type * from './error-codes.ts';

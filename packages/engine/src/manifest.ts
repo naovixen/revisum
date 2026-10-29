@@ -1,6 +1,10 @@
 // The run manifest: every input that decides a run's result, hashed, so a run can be replayed and
 // compared. See docs/specs/SPEC-08-manifest-and-replay.md.
-import { failure, success, type AdapterInfo, type AppliedRewrite, type Plan, type RedactionMode, type Result, type SecretName, type Target, type UnsafeFeature } from '@revisum/contracts';
+import {
+  failure, success,
+  type AdapterInfo, type AppliedRewrite, type EvidenceSuiteDeclaration, type ImageDigest, type Plan, type RedactionMode, type Result, type SecretName,
+  type SuiteName, type Target, type UnsafeFeature,
+} from '@revisum/contracts';
 import { canonicalJson, sha256 } from './hashing.ts';
 import { declarationsNamedBy, unsafeFeaturesOf } from './plan/unsafe-features.ts';
 import type { Project } from './project/project-parser.ts';
@@ -24,10 +28,15 @@ export type UnsafeFeatureRecord = { readonly unsafeFeatures: readonly UnsafeFeat
 export type RunManifest = {
   readonly schema: string;
   readonly engineVersion: string;
+  // For an evidence run, which has no plan, the sha256 of the suite's declaration, which decides
+  // what ran.
   readonly planHash: string;
-  readonly target: Target;
-  readonly adapter: AdapterInfo;
-  readonly browser: { readonly name: string; readonly version: string };
+  // The target, adapter and browser of a plan run. An evidence run has none of its own: the
+  // suite's own browser is self-reported in its evidence record.
+  readonly target?: Target;
+  readonly adapter?: AdapterInfo;
+  readonly browser?: { readonly name: string; readonly version: string };
+  // An evidence run fixes neither, so both are 0 for it; its evidence record says why.
   readonly seeds: { readonly random: number };
   readonly clock: { readonly fixedTimeMilliseconds: number };
   // Content hashes of the app under test. The base URL, and so its port, is left out on purpose.
@@ -46,7 +55,71 @@ export type RunManifest = {
   // Present only when the egress proxy applied a browser mutant's rewrite, so a mutated run can
   // never pass for a plain one, and a plain run's manifest and hash stay as they were.
   readonly responseRewrites?: readonly AppliedRewrite[];
+  // Present only for an evidence run, so a plan run's manifest and hash stay exactly as they were.
+  readonly evidence?: EvidenceManifestRecord;
 };
+
+// What pins an evidence run, as far as anything can: the suite's files, its commands and its image.
+// What the suite says about its own Playwright and browsers is recorded but marked self-reported,
+// since Revisum cannot check it.
+export type EvidenceManifestRecord = {
+  readonly suite: SuiteName;
+  // The sha256 of the sorted list of the suite's files, each by path and content hash.
+  readonly suiteFiles: { readonly count: number; readonly sha256: string };
+  // The sha256 of the declared command and setup command, as argument vectors.
+  readonly commandSha256: string;
+  readonly image: ImageDigest;
+  readonly selfReported: { readonly playwrightVersion: string | null; readonly browsers: readonly string[] };
+};
+
+// Inputs an evidence run can never pin: the team's test code, the browser its suite brings, and
+// the app server the suite starts.
+export const EVIDENCE_NON_HERMETIC_INPUTS: readonly string[] = ['app-server', 'suite-browser', 'suite-code'];
+
+// A file of the suite, by repository-relative path and content.
+export type SuiteFile = { readonly path: string; readonly bytes: Uint8Array };
+
+export type EvidenceManifestInputs = {
+  readonly suite: EvidenceSuiteDeclaration;
+  readonly suiteFiles: readonly SuiteFile[];
+  readonly playwrightVersion?: string | undefined;
+  readonly browsers: readonly string[];
+  readonly host: HostInfo;
+};
+
+export function evidenceManifest(inputs: EvidenceManifestInputs): RunManifest {
+  const files = inputs.suiteFiles.map((file) => ({ path: file.path, sha256: sha256(file.bytes) }))
+    .sort((left, right) => (left.path < right.path ? -1 : left.path > right.path ? 1 : 0));
+  const { suite } = inputs;
+  return {
+    schema: schemaId('run-manifest', 1),
+    engineVersion: ENGINE_VERSION,
+    planHash: sha256(canonicalJson(suite)),
+    seeds: { random: 0 },
+    clock: { fixedTimeMilliseconds: 0 },
+    fixtures: [],
+    host: inputs.host,
+    nonHermeticInputs: EVIDENCE_NON_HERMETIC_INPUTS,
+    evidence: {
+      suite: suite.name,
+      suiteFiles: { count: files.length, sha256: sha256(canonicalJson(files)) },
+      commandSha256: sha256(canonicalJson({ command: suite.command, setupCommand: suite.setupCommand ?? null })),
+      image: suite.image,
+      selfReported: { playwrightVersion: inputs.playwrightVersion ?? null, browsers: [...new Set(inputs.browsers)].sort() },
+    },
+  };
+}
+
+// Why a manifest cannot be replayed.
+//   replay-not-claimed: it is an evidence run's, whose suite code, browser and app server no
+//     manifest can pin. It can still be run again from the manifest, but not claimed identical.
+export type ReplayErrorCode = 'replay-not-claimed';
+
+// The manifest a replay would run, or why none may. The replay itself, which runs the manifest
+// again and compares result hashes, is SPEC-08's.
+export function replayManifest(manifest: RunManifest): Result<RunManifest, { readonly code: ReplayErrorCode }> {
+  return manifest.evidence === undefined ? success(manifest) : failure({ code: 'replay-not-claimed' });
+}
 
 export const planHash = (plan: Plan): string => sha256(canonicalJson(plan));
 
