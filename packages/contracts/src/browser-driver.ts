@@ -13,11 +13,6 @@ import type { AdapterId, Target } from './target.ts';
 // storage-origin-mismatch: a storage write's page is not on the entry's declared origin, so nothing was written.
 // clock-runaway: one clock advance would fire more timer callbacks than the project's maximumTimersPerAdvance.
 // clipboard-unavailable: the browser cannot keep the clipboard in its own memory, so it is never read.
-export type DriverErrorCode =
-  | 'not-found' | 'ambiguous' | 'not-actionable' | 'timeout' | 'navigation-failed' | 'policy-denied'
-  | 'no-download' | 'download-too-large' | 'storage-origin-mismatch' | 'clock-runaway' | 'clipboard-unavailable';
-// Driver errors that came with the own CDP driver's capabilities. They stop a step for something
-// other than its element, and are kept apart from DriverErrorCode, whose codes the shared types pin.
 // target-crashed: the page's renderer died, or its target closed, while the step ran. The step
 // fails, the rest of the run is skipped, and close() still ends every process.
 // unsupported-step: the driver does not perform this kind of step, or the step made the page open
@@ -25,8 +20,11 @@ export type DriverErrorCode =
 // with nothing of it kept, so the step never passes with a partial result.
 // assertion-failed: a dialog step's expected text is not the open dialog's text, so nothing
 // answered the dialog.
-export type DriverStopCode = 'target-crashed' | 'unsupported-step' | 'assertion-failed';
-export type DriverError = { readonly code: DriverErrorCode | DriverStopCode; readonly detail: string };
+export type DriverErrorCode =
+  | 'not-found' | 'ambiguous' | 'not-actionable' | 'timeout' | 'navigation-failed' | 'policy-denied'
+  | 'no-download' | 'download-too-large' | 'storage-origin-mismatch' | 'clock-runaway' | 'clipboard-unavailable'
+  | 'target-crashed' | 'unsupported-step' | 'assertion-failed';
+export type DriverError = { readonly code: DriverErrorCode; readonly detail: string };
 
 // Why a declared target cannot run. A driver explains a "no"; it never substitutes another target.
 // provider-unavailable: the cloud or device provider could not supply the target.

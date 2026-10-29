@@ -1,9 +1,14 @@
 // Starts a headless Chromium with a throwaway profile, waits for its DevTools address and
 // connects. Stopping it never leaves a process behind, and the profile folder is removed when
 // the browser exits.
+// Outside Windows the browser starts in a process group of its own, which its zygote, GPU,
+// utility and renderer processes join. Those may outlive the browser process by a moment, so
+// stopping waits until the whole group has exited, and ends what is left of it after a grace
+// period. Only that group is ever signalled: it holds nothing the driver did not start. On
+// Windows the browser's job object ends its children with it.
 import { spawn, type ChildProcess } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { platform, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { CdpConnection, type ConnectOptions } from './cdp-connection.ts';
 import { PORT_RANDOMISATION_FEATURE } from './chrome-flags.ts';
@@ -47,13 +52,60 @@ function removeFolder(folder: string): void {
 
 const hasExited = (child: ChildProcess): boolean => child.exitCode !== null || child.signalCode !== null;
 
+const OWN_PROCESS_GROUP = platform() !== 'win32';
+const GROUP_GRACE_MILLISECONDS = 2_000;
+const GROUP_FORCED_MILLISECONDS = 2_000;
+const GROUP_POLL_MILLISECONDS = 25;
+
+// Whether any process of the group still runs. On Linux a zombie (exited, its status not yet
+// collected by its parent) runs nothing, so it does not count.
+function groupRunning(groupId: number): boolean {
+  if (platform() === 'linux') {
+    for (const name of readdirSync('/proc')) {
+      if (!/^\d+$/.test(name)) continue;
+      let status: string;
+      try { status = readFileSync(`/proc/${name}/stat`, 'utf8'); } catch { continue; }
+      // After the command name, in brackets: state, parent process id, process group id.
+      const [state, , group] = status.slice(status.lastIndexOf(')') + 2).split(' ');
+      if (Number(group) === groupId && state !== 'Z') return true;
+    }
+    return false;
+  }
+  try {
+    process.kill(-groupId, 0);
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === 'EPERM';
+  }
+}
+
+// Waits until the group has no running process, for at most `milliseconds`. True when it has none.
+async function groupEnded(groupId: number, milliseconds: number): Promise<boolean> {
+  const deadline = Date.now() + milliseconds;
+  while (groupRunning(groupId)) {
+    if (Date.now() >= deadline) return false;
+    await new Promise((resolve) => setTimeout(resolve, GROUP_POLL_MILLISECONDS));
+  }
+  return true;
+}
+
+// Once the browser process has exited, waits for the rest of its process group, and ends any of
+// it still running after the grace period.
+async function endProcessGroup(groupId: number | undefined): Promise<void> {
+  if (!OWN_PROCESS_GROUP || groupId === undefined) return;
+  if (await groupEnded(groupId, GROUP_GRACE_MILLISECONDS)) return;
+  try { process.kill(-groupId, 'SIGKILL'); } catch { /* ended meanwhile */ }
+  await groupEnded(groupId, GROUP_FORCED_MILLISECONDS);
+}
+
 export function launchChromium(executablePath: string, options: LaunchOptions = {}): Promise<LaunchedChromium> {
   const userDataFolder = mkdtempSync(join(tmpdir(), options.profilePrefix ?? 'chromium-profile-'));
   const flags = [
     ...(options.arguments ?? ISOLATED_CHROMIUM_ARGUMENTS),
     '--remote-debugging-port=0', `--user-data-dir=${userDataFolder}`, 'about:blank',
   ];
-  const browserProcess = spawn(executablePath, flags, { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
+  // 'detached' starts the browser as the leader of a new process group outside Windows.
+  const browserProcess = spawn(executablePath, flags, { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true, detached: OWN_PROCESS_GROUP });
   const exited = new Promise<void>((resolve) => {
     if (hasExited(browserProcess)) resolve();
     browserProcess.once('exit', () => resolve());
@@ -71,6 +123,7 @@ export function launchChromium(executablePath: string, options: LaunchOptions = 
       browserProcess.kill();
       await exited;
     }
+    await endProcessGroup(browserProcess.pid);
     connection?.close();
     removeFolder(userDataFolder);
   };
