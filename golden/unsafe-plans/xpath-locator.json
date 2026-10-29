@@ -1,0 +1,40 @@
+{
+  "version": "1.3",
+  "meta": {
+    "featureId": "CART-1",
+    "specReference": "specs/cart.md#xpath-locator",
+    "title": "Second list item by XPath"
+  },
+  "targets": [
+    "playwright-chromium"
+  ],
+  "steps": [
+    {
+      "type": "navigate",
+      "url": "/cart"
+    },
+    {
+      "type": "expect",
+      "locator": {
+        "by": "xpath",
+        "expression": "//main//li[2]"
+      },
+      "assert": {
+        "kind": "textContains",
+        "value": "Total"
+      },
+      "criterionId": "cart.total-shown"
+    },
+    {
+      "type": "expect",
+      "locator": {
+        "by": "testId",
+        "testId": "status"
+      },
+      "assert": {
+        "kind": "visible"
+      },
+      "criterionId": "cart.status-shown"
+    }
+  ]
+}

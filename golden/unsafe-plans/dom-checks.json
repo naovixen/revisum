@@ -1,0 +1,104 @@
+{
+  "version": "1.3",
+  "meta": {
+    "featureId": "CART-1",
+    "specReference": "specs/cart.md#dom-checks",
+    "title": "Badge classes, style and attributes"
+  },
+  "targets": [
+    "playwright-chromium"
+  ],
+  "steps": [
+    {
+      "type": "navigate",
+      "url": "/cart"
+    },
+    {
+      "type": "expect",
+      "locator": {
+        "by": "testId",
+        "testId": "cart-badge"
+      },
+      "assert": {
+        "kind": "hasClass",
+        "value": "is-active"
+      },
+      "criterionId": "cart.badge-active"
+    },
+    {
+      "type": "expect",
+      "locator": {
+        "by": "testId",
+        "testId": "cart-badge"
+      },
+      "assert": {
+        "kind": "lacksClass",
+        "value": "is-empty"
+      },
+      "criterionId": "cart.badge-not-empty"
+    },
+    {
+      "type": "expect",
+      "locator": {
+        "by": "testId",
+        "testId": "cart-badge"
+      },
+      "assert": {
+        "kind": "computedStyleEquals",
+        "property": "background-color",
+        "value": "rgb(220, 38, 38)"
+      },
+      "criterionId": "cart.badge-red"
+    },
+    {
+      "type": "expect",
+      "locator": {
+        "by": "role",
+        "role": "button",
+        "name": "Sort by price"
+      },
+      "assert": {
+        "kind": "attributeEquals",
+        "name": "aria-sort",
+        "value": "ascending"
+      },
+      "criterionId": "cart.sorted-by-price"
+    },
+    {
+      "type": "expect",
+      "locator": {
+        "by": "role",
+        "role": "button",
+        "name": "Check out"
+      },
+      "assert": {
+        "kind": "attributeAbsent",
+        "name": "disabled"
+      },
+      "criterionId": "cart.checkout-enabled"
+    },
+    {
+      "type": "remember",
+      "name": "orderId",
+      "from": {
+        "element": {
+          "by": "testId",
+          "testId": "order-row"
+        },
+        "read": "attribute",
+        "attribute": "data-order-id"
+      }
+    },
+    {
+      "type": "expect",
+      "locator": {
+        "by": "testId",
+        "testId": "status"
+      },
+      "assert": {
+        "kind": "visible"
+      },
+      "criterionId": "cart.status-shown"
+    }
+  ]
+}

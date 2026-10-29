@@ -1,0 +1,57 @@
+{
+  "version": "1.3",
+  "meta": {
+    "featureId": "CART-1",
+    "specReference": "specs/cart.md#database-command",
+    "title": "Orders seeded and counted by database commands"
+  },
+  "targets": [
+    "playwright-chromium"
+  ],
+  "steps": [
+    {
+      "type": "navigate",
+      "url": "/cart"
+    },
+    {
+      "type": "database",
+      "command": "seedOrders",
+      "arguments": {
+        "count": 3
+      }
+    },
+    {
+      "type": "expectDatabase",
+      "command": "countOrders",
+      "arguments": {
+        "email": "ada@example.com"
+      },
+      "field": "count",
+      "assert": {
+        "kind": "equals",
+        "value": "3"
+      },
+      "criterionId": "orders.three-seeded"
+    },
+    {
+      "type": "expect",
+      "locator": {
+        "by": "testId",
+        "testId": "status"
+      },
+      "assert": {
+        "kind": "visible"
+      },
+      "criterionId": "cart.status-shown"
+    }
+  ],
+  "cleanup": [
+    {
+      "type": "database",
+      "command": "seedOrders",
+      "arguments": {
+        "count": 3
+      }
+    }
+  ]
+}

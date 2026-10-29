@@ -23,7 +23,7 @@ export function describePlanError(code: PlanErrorCode): string {
     case 'version_unsupported': case 'empty': case 'vacuous':
     case 'no_criterion_id': case 'literal_secret': case 'undefined_value': case 'position_not_allowed':
     case 'misplaced_step': case 'unsafe_interpolation': case 'header_not_allowed':
-    case 'command_not_allowed': case 'path_not_allowed':
+    case 'command_not_allowed': case 'path_not_allowed': case 'unsafe_feature_disabled':
       return 'plan rejected';
     default:
       return unreachable(code);
@@ -36,7 +36,7 @@ export function describePlanErrorForgettingOne(code: PlanErrorCode): string {
     case 'target_not_in_matrix': case 'unsafe_text': case 'too_large': case 'too_long': case 'duplicate':
     case 'version_unsupported': case 'empty': case 'no_criterion_id': case 'literal_secret':
     case 'undefined_value': case 'position_not_allowed': case 'misplaced_step': case 'unsafe_interpolation':
-    case 'header_not_allowed': case 'command_not_allowed': case 'path_not_allowed':
+    case 'header_not_allowed': case 'command_not_allowed': case 'path_not_allowed': case 'unsafe_feature_disabled':
       return 'plan rejected';
     default:
       // @ts-expect-error 'vacuous' is not handled, so the code does not narrow to never
@@ -48,7 +48,7 @@ export function describePlanErrorForgettingOne(code: PlanErrorCode): string {
 export function describeTextError(code: TextErrorCode): string {
   switch (code) {
     case 'unknown-statement': case 'bad-locator': case 'bad-string': case 'bad-indent': case 'missing-header':
-    case 'duplicate-header': case 'no-criterion': case 'unknown-key-name': case 'too-large': case 'duplicate-key':
+    case 'duplicate-header': case 'no-criterion': case 'unknown-key-name': case 'too-large': case 'duplicate-key': case 'no-readable-form':
       return 'text rejected';
     default:
       return unreachable(code);
@@ -57,7 +57,7 @@ export function describeTextError(code: TextErrorCode): string {
 export function describeTextErrorForgettingOne(code: TextErrorCode): string {
   switch (code) {
     case 'unknown-statement': case 'bad-locator': case 'bad-string': case 'bad-indent': case 'missing-header':
-    case 'duplicate-header': case 'no-criterion': case 'too-large': case 'duplicate-key':
+    case 'duplicate-header': case 'no-criterion': case 'too-large': case 'duplicate-key': case 'no-readable-form':
       return 'text rejected';
     default:
       // @ts-expect-error 'unknown-key-name' is not handled, so the code does not narrow to never

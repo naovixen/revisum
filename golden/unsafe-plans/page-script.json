@@ -1,0 +1,51 @@
+{
+  "version": "1.3",
+  "meta": {
+    "featureId": "CART-1",
+    "specReference": "specs/cart.md#page-script",
+    "title": "Cart store read by a named script"
+  },
+  "targets": [
+    "playwright-chromium"
+  ],
+  "steps": [
+    {
+      "type": "navigate",
+      "url": "/cart"
+    },
+    {
+      "type": "evaluate",
+      "script": "readCart",
+      "arguments": {
+        "currency": "eur"
+      },
+      "remember": {
+        "cartCount": "itemCount"
+      }
+    },
+    {
+      "type": "expectScript",
+      "script": "readCart",
+      "arguments": {
+        "currency": "eur"
+      },
+      "field": "itemCount",
+      "assert": {
+        "kind": "equals",
+        "value": "3"
+      },
+      "criterionId": "cart.three-items"
+    },
+    {
+      "type": "expect",
+      "locator": {
+        "by": "testId",
+        "testId": "status"
+      },
+      "assert": {
+        "kind": "visible"
+      },
+      "criterionId": "cart.status-shown"
+    }
+  ]
+}

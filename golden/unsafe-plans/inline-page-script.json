@@ -1,0 +1,44 @@
+{
+  "version": "1.3",
+  "meta": {
+    "featureId": "CART-1",
+    "specReference": "specs/cart.md#inline-page-script",
+    "title": "Editor blocks read by an inline script"
+  },
+  "targets": [
+    "playwright-chromium"
+  ],
+  "steps": [
+    {
+      "type": "navigate",
+      "url": "/cart"
+    },
+    {
+      "type": "evaluate",
+      "script": {
+        "inline": {
+          "source": "() => ({ blocks: window.editorStore.blocks.length })",
+          "effect": "read",
+          "fields": {
+            "blockCount": "/blocks"
+          }
+        }
+      },
+      "arguments": {},
+      "remember": {
+        "blockCount": "blockCount"
+      }
+    },
+    {
+      "type": "expect",
+      "locator": {
+        "by": "testId",
+        "testId": "status"
+      },
+      "assert": {
+        "kind": "visible"
+      },
+      "criterionId": "cart.status-shown"
+    }
+  ]
+}

@@ -1,0 +1,53 @@
+{
+  "version": "1.3",
+  "meta": {
+    "featureId": "CART-1",
+    "specReference": "specs/cart.md#css-locator",
+    "title": "First transaction by record-id prefix"
+  },
+  "targets": [
+    "playwright-chromium"
+  ],
+  "steps": [
+    {
+      "type": "navigate",
+      "url": "/cart"
+    },
+    {
+      "type": "expect",
+      "locator": {
+        "by": "css",
+        "selector": "[data-test^=\"transaction-item-\"]",
+        "position": "first"
+      },
+      "assert": {
+        "kind": "visible"
+      },
+      "criterionId": "cart.item-shown"
+    },
+    {
+      "type": "click",
+      "locator": {
+        "by": "css",
+        "selector": "button",
+        "hasText": "Add",
+        "inside": {
+          "by": "css",
+          "selector": "li.product",
+          "position": 2
+        }
+      }
+    },
+    {
+      "type": "expect",
+      "locator": {
+        "by": "testId",
+        "testId": "status"
+      },
+      "assert": {
+        "kind": "visible"
+      },
+      "criterionId": "cart.status-shown"
+    }
+  ]
+}

@@ -19,11 +19,11 @@ const ERROR_CODES: Readonly<Record<string, readonly string[]>> = {
     'scheme_not_allowed', 'origin_not_allowed', 'target_not_in_matrix', 'unsafe_text', 'too_large', 'too_long',
     'duplicate', 'version_unsupported', 'empty', 'vacuous', 'no_criterion_id', 'literal_secret', 'undefined_value',
     'position_not_allowed', 'misplaced_step', 'unsafe_interpolation', 'header_not_allowed', 'command_not_allowed',
-    'path_not_allowed',
+    'path_not_allowed', 'unsafe_feature_disabled',
   ],
   text: [
     'unknown-statement', 'bad-locator', 'bad-string', 'bad-indent', 'missing-header', 'duplicate-header', 'no-criterion',
-    'unknown-key-name', 'too-large', 'duplicate-key',
+    'unknown-key-name', 'too-large', 'duplicate-key', 'no-readable-form',
   ],
   suiteDecode: [
     'suite-report-missing', 'suite-report-invalid', 'suite-report-unsupported', 'trace-invalid', 'trace-unsupported', 'too-large',
@@ -55,6 +55,7 @@ const ERROR_CODES: Readonly<Record<string, readonly string[]>> = {
   policy: [
     'irreversible-action', 'irreversible-submit', 'destructive-navigation', 'irreversible-dialog', 'unnamed-control',
     'no-locale-patterns', 'undeclared-origin', 'production-origin', 'over-limit', 'side-effect-in-proposal',
+    'inline-script-in-proposal',
   ],
 };
 
