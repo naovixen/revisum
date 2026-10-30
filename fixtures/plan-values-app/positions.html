@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Positions</title></head>
+<body>
+<main>
+  <h1>Positions</h1>
+  <!-- Three of each, in document order: rows, buttons named "Open" and fields labelled "Quantity". -->
+  <p data-testid="order-row">Row one</p>
+  <p data-testid="order-row">Row two</p>
+  <p data-testid="order-row">Row three</p>
+  <button type="button" data-testid="open-order" data-position="first">Open</button>
+  <button type="button" data-testid="open-order" data-position="second">Open</button>
+  <button type="button" data-testid="open-order" data-position="third">Open</button>
+  <label for="quantity-1">Quantity</label>
+  <input id="quantity-1" class="quantity" type="text">
+  <label for="quantity-2">Quantity</label>
+  <input id="quantity-2" class="quantity" type="text">
+  <label for="quantity-3">Quantity</label>
+  <input id="quantity-3" class="quantity" type="text">
+  <!-- Which button was clicked last, how many clicks the buttons had, and each quantity ("-" when empty). -->
+  <p data-testid="opened">none</p>
+  <p data-testid="open-clicks">0</p>
+  <p data-testid="quantities">-,-,-</p>
+  <p data-testid="input-events">0</p>
+</main>
+<script src="counting.js"></script>
+<script src="positions.js"></script>
+</body>
+</html>

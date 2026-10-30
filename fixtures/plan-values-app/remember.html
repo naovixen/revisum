@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Remembered values</title></head>
+<body>
+<main>
+  <h1>Remembered values</h1>
+  <!-- Texts a remember step may read. The order number has whitespace around it, which a
+       remembered value loses. -->
+  <p data-testid="order-number">
+     ORD-58213
+  </p>
+  <p data-testid="empty-value"></p>
+  <p data-testid="blank-value">   </p>
+  <p data-testid="script-value">javascript:alert(1)</p>
+  <p data-testid="markup-value">&lt;script&gt;alert(1)&lt;/script&gt;</p>
+  <!-- Filled by remember.js with 501 letters, one more than the project's maximumTextLength. -->
+  <p data-testid="long-value"></p>
+  <!-- Filled by remember.js 400 ms after the page loads. -->
+  <p data-testid="late-value"></p>
+  <!-- Texts a path template must never let change the path's shape. -->
+  <p data-testid="dot-segment">.</p>
+  <p data-testid="dot-dot-segment">..</p>
+  <p data-testid="hostile-segment">a/b?c#d %2F ../名前</p>
+  <!-- Canary text that the leak scan must never find in what a run keeps. -->
+  <p data-testid="canary">RememberedCanaryQwXpLmZrTkVbNsHd</p>
+  <label for="reference">Reference</label>
+  <input id="reference" type="text" value="REF-7731">
+  <label for="search">Search</label>
+  <input id="search" type="text">
+  <button type="button" id="save">Save</button>
+  <p data-testid="save-clicks">0</p>
+  <p data-testid="input-events">0</p>
+</main>
+<script src="counting.js"></script>
+<script src="remember.js"></script>
+</body>
+</html>

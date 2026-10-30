@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Test ids</title></head>
+<body>
+<main>
+  <h1>Test ids</h1>
+  <!-- Its data-qa holds selector syntax: '"]', ',' and '*'. Only exact equality may match it. -->
+  <button type="button" data-qa='save"], button, [data-qa*="' data-result="exact-selector">Exact selector text</button>
+  <!-- Look-alikes that a selector built from plan text would match instead. -->
+  <button type="button" data-qa="save" data-result="save">Save</button>
+  <button type="button" data-qa="save-draft" data-result="save-draft">Save draft</button>
+  <!-- A backslash in the attribute, and its look-alike without one. -->
+  <button type="button" data-qa="a\b" data-result="backslash">Backslash</button>
+  <button type="button" data-qa="ab" data-result="no-backslash">No backslash</button>
+  <!-- An id that is not a valid CSS identifier. -->
+  <button type="button" id="*" data-result="star">Star</button>
+  <!-- The same test id under two attributes. -->
+  <button type="button" data-testid="shared" data-result="by-testid">By data-testid</button>
+  <button type="button" data-qa="shared" data-result="by-qa">By data-qa</button>
+  <!-- Which button was clicked last, and how many clicks the buttons had. -->
+  <p data-testid="clicked">none</p>
+  <p data-testid="button-clicks">0</p>
+  <p data-testid="input-events">0</p>
+</main>
+<script src="counting.js"></script>
+<script src="test-ids.js"></script>
+</body>
+</html>

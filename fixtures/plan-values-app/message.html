@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Message</title></head>
+<body>
+<main>
+  <h1>Message</h1>
+  <!-- A chat box: Enter sends the message, so a multi-line fill must not press it. -->
+  <label for="message">Message</label>
+  <textarea id="message"></textarea>
+  <!-- The box's value as a JSON string (line feeds shown as \n), its number of lines, the Enter
+       key presses it received and what it sent. -->
+  <p data-testid="message-json">""</p>
+  <p data-testid="message-lines">0</p>
+  <p data-testid="enter-presses">0</p>
+  <p data-testid="sent">not sent</p>
+  <p data-testid="order-number">ORD-58213</p>
+  <p data-testid="input-events">0</p>
+</main>
+<script src="counting.js"></script>
+<script src="message.js"></script>
+</body>
+</html>

@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Forms</title></head>
+<body>
+<main>
+  <h1>Forms</h1>
+  <!-- A form whose submit control is irreversible, and one whose submit control is not. -->
+  <form id="close-account">
+    <label for="reason">Reason</label>
+    <input id="reason" type="text">
+    <button type="submit">Delete account</button>
+  </form>
+  <form id="profile">
+    <label for="nickname">Nickname</label>
+    <input id="nickname" type="text">
+    <button type="submit">Update profile</button>
+  </form>
+  <!-- The Enter key presses each field received, and the id of the form last submitted. -->
+  <p data-testid="reason-enters">0</p>
+  <p data-testid="nickname-enters">0</p>
+  <p data-testid="submitted">nothing</p>
+  <p data-testid="input-events">0</p>
+</main>
+<script src="counting.js"></script>
+<script src="forms.js"></script>
+</body>
+</html>
