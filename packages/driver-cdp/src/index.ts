@@ -1,6 +1,7 @@
 // Public entry point: the own Chromium driver over the Chrome DevTools Protocol, and the CDP
 // connection and launcher that the accessibility engine also uses.
 export { cdpDriver, CDP_ADAPTER_VERSION, type CdpDriverOptions } from './cdp-driver.ts';
+export { heldModifierKeys, type HeldModifierKey } from './modifier-keys.ts';
 export {
   CdpConnection, CdpError, DEFAULT_COMMAND_TIMEOUT_MILLISECONDS, type CdpSessionClient, type ConnectOptions,
 } from './cdp-connection.ts';

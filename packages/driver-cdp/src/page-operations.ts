@@ -2,6 +2,7 @@
 // PageOperations into a Session, so auto-waiting, probes and audits behave the same on every
 // protocol. One PageOperations serves one document: the page's top document, or an iframe's.
 import type { A11yNode, BrowserDriver, BrowserRequestRecord, Key, Result, Session, SessionEnvironment, Target, Unavailable } from '@revisum/contracts';
+import type { HeldModifierKey } from './modifier-keys.ts';
 import type { AuditRuleResult } from './page-audit.ts';
 
 export type Point = { readonly x: number; readonly y: number };
@@ -32,8 +33,10 @@ export interface PageOperations<Handle> {
   // Points are in this document's viewport.
   click(element: Handle, at: Point): Promise<void>;
   hover(at: Point): Promise<void>;
+  // Inserts the text as typed text, line feeds included, with no key press for them.
   fill(element: Handle, value: string): Promise<void>;
-  press(element: Handle, key: Key): Promise<void>;
+  // Holds the modifier keys down in order, presses the key, then releases them in reverse.
+  press(element: Handle, key: Key, modifiers: readonly HeldModifierKey[]): Promise<void>;
   // Gives a file input these files, by absolute path, firing its input and change events.
   setFiles(element: Handle, paths: readonly string[]): Promise<void>;
   // The document of the iframe element, as operations of its own; null when the element is not an
@@ -41,6 +44,9 @@ export interface PageOperations<Handle> {
   frame(element: Handle): Promise<PageOperations<Handle> | null>;
   // A PNG of the viewport.
   screenshotPng(): Promise<Uint8Array>;
+  // The URL the browser could not show, while it shows its own error page in its place, such as
+  // for an HTTP error status with an empty body; null otherwise.
+  unreachableUrl(): Promise<string | null>;
 }
 
 export type RoleAndName = { readonly role: string | null; readonly name: string | null };

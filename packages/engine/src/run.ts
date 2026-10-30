@@ -7,7 +7,7 @@
 import {
   needsDriverFeatures,
   type A11yFinding, type ActionGuard, type ApprovalLabel, type ArtifactReference, type ArtifactStore, type Authorised,
-  type BrowserDriver, type Clock, type DocumentSession, type LockEntry, type DialogStep, type ElementProbe, type EventSink, type GuardVerdict, type Plan, type PolicyRuleId, type Redactor,
+  type BrowserDriver, type Clock, type DocumentSession, type DriverFeature, type LockEntry, type DialogStep, type ElementProbe, type EventSink, type GuardVerdict, type Plan, type PolicyRuleId, type Redactor,
   type ResolvedElement, type Result, type SafeText, type SecretStore, type ServiceCaller, type Session, type Step, type Target, type TargetId,
   type Unavailable, type ValueName, type GuaranteeStatement, type RunMode, type SuiteFinding, type SuiteName, type SuitePass,
   type SuiteTestId, type SuiteTestResult, type UnsafeFeature,
@@ -20,7 +20,7 @@ import { manifestLogger, type Logger, type RunEventSink } from './logging.ts';
 import { buildManifest, manifestHash, unsafeFeatureRecord, type FixtureReference, type HostInfo, type RunManifest } from './manifest.ts';
 import { checkElement, checkPage, normalise, type Verdict } from './oracle.ts';
 import type { SuiteDecodeError } from './evidence/suite-report.ts';
-import type { PlanError } from './plan/plan-decoders.ts';
+import { runTimeText, type PlanError } from './plan/plan-decoders.ts';
 import { assertBranded } from './plan/plan-parser.ts';
 import { unsafeFeaturesOf } from './plan/unsafe-features.ts';
 import { assertAuthorised, policyGate, type PolicyGate } from './policy/policy-gate.ts';
@@ -95,7 +95,11 @@ export type StepResult = {
   readonly findings?: readonly A11yFinding[];
   // A call or backend check's record: status and response sha256, never a header or the body.
   readonly serviceCall?: ServiceCallRecord;
+  // A remember step's record: the value's name and the sha256 of its text, never the text.
+  readonly remembered?: RememberedValueRecord;
 };
+
+export type RememberedValueRecord = { readonly valueName: ValueName; readonly sha256: string };
 
 // Something a run found that a person should look at, whatever the verdict: a cleanup call that
 // failed, so test data may be left behind; or a suite test's criterion annotation whose
@@ -189,8 +193,13 @@ type RunContext = {
   // The fields, by their resolved locator as canonical JSON, whose last fill typed a secret. What a
   // check reads back from one is the secret, whatever its length, so it is never kept.
   readonly secretFilledFields: Set<string>;
-  // The run's values by name: the plan's generated values, and the response fields calls remember.
+  // The run's values by name: the plan's generated values, the response fields calls remember and
+  // the page texts remember steps read.
   readonly values: Map<ValueName, SafeText>;
+  // The texts remember steps read from the page, which a failed check's observation never keeps.
+  readonly rememberedTexts: Set<string>;
+  // The optional plan features the session's driver performs; none until a session is open.
+  readonly performs: readonly DriverFeature[];
   // What the call steps use, when the run has a service caller.
   readonly calls: CallStepContext | undefined;
 };
@@ -222,6 +231,7 @@ export async function run(given: RunInputs, ports: RunPorts): Promise<RunResult>
   };
   const context: RunContext = {
     inputs, ports, logger, gate, denials: [], redactor, secrets, isShortSecret: shortSecretObservation(secrets), secretFilledFields: new Set(), values, calls,
+    rememberedTexts: new Set(), performs: [],
   };
 
   if (target === undefined || !declared) {
@@ -284,6 +294,8 @@ export async function run(given: RunInputs, ports: RunPorts): Promise<RunResult>
     return unavailableResult(target.id, unavailable.unavailable, context, startedAt);
   }
   const { session, driver, unpinned } = opened.value;
+  // From here on, a step needing an optional feature is refused only when this driver lacks it.
+  const stepContext: RunContext = { ...context, performs: driver.info.performs ?? [] };
   const manifest = buildManifest({
     plan: inputs.plan, target, adapter: driver.info, browser: session.browser,
     seed: inputs.seed, fixedTimeMilliseconds: inputs.fixedTimeMilliseconds, fixtures: inputs.fixtures, host: inputs.host,
@@ -304,7 +316,7 @@ export async function run(given: RunInputs, ports: RunPorts): Promise<RunResult>
       if (steps.some((done) => done.outcome === 'failed')) { steps.push({ index, type: step.type, outcome: 'skipped' }); continue; }
       const stepStartedAt = ports.clock.now();
       logger.log({ kind: 'step.start', stepIndex: index, stepType: step.type });
-      const result = await executeStep(step, index, session, target, context);
+      const result = await executeStep(step, index, session, target, stepContext);
       stepMilliseconds.push(ports.clock.now() - stepStartedAt);
       steps.push(result);
       logger.log({
@@ -448,19 +460,19 @@ async function openSession(planned: lifecycle.Planned, context: RunContext): Pro
   return opened.ok ? { ok: true, value: { session: opened.value, driver, unpinned } } : opened;
 }
 
-// Steps the plan language has but no driver performs yet. Each fails with unsupported-step, never
-// passes or is skipped, and nothing of it reaches the driver, so a plan that relies on one cannot
-// report a pass it did not earn or act in part. Hover, select and upload go to the driver, which
-// refuses them the same way when it does not perform them; a frame step needs the driver's frame
-// port.
-function isUnsupported(step: Step): boolean {
+// Steps the plan language has but the run's driver does not perform. Each fails with
+// unsupported-step, never passes or is skipped, and nothing of it reaches the driver, so a plan that
+// relies on one cannot report a pass it did not earn or act in part. Hover, select and upload go
+// to the driver, which refuses them the same way when it does not perform them; a frame step needs
+// the driver's frame port.
+function isUnsupported(step: Step, performs: readonly DriverFeature[]): boolean {
   switch (step.type) {
-    case 'remember': return true;
     // Database commands run in a workload container, which comes with the isolated runner
     // (docs/specs/SPEC-36-unsafe-plan-features.md).
     case 'database': case 'expectDatabase': return true;
-    // The features a step may need that no driver has yet are decided in one place, in contracts.
-    default: return needsDriverFeatures(step);
+    // What a step needs from a driver, and which of it is optional, is decided in one place, in
+    // contracts; the driver declares the optional features it performs.
+    default: return needsDriverFeatures(step, performs);
   }
 }
 
@@ -471,7 +483,7 @@ const NO_ELEMENT: ResolvedElement = { role: null, name: null, box: null, formSub
 // frame step, which report under the frame step's own index.
 async function executeStep(step: Step, index: number, session: DocumentSession, target: Target, context: RunContext): Promise<StepResult> {
   const base = { index, type: step.type } as const;
-  if (isUnsupported(step)) return { ...base, outcome: 'failed', code: 'unsupported-step' };
+  if (isUnsupported(step, context.performs)) return { ...base, outcome: 'failed', code: 'unsupported-step' };
   // No driver loads saved storage state into its session yet (that comes with the CDP driver's
   // session environment). A plan that names it relies on being signed in, so its first step fails
   // and nothing reaches the driver, rather than running without the state the plan declared.
@@ -506,7 +518,8 @@ async function executeStep(step: Step, index: number, session: DocumentSession, 
       if (!action.ok) return { ...base, outcome: 'failed', code: action.error };
       const resolved = action.value;
       // A secret is handed to the driver opaque; it is revealed only as the driver types it.
-      const secret = resolved.type === 'fill' && typeof resolved.value !== 'string' ? context.secrets.fills.get(resolved.value.secretName) : undefined;
+      const secret = resolved.type === 'fill' && typeof resolved.value !== 'string' && 'secretName' in resolved.value
+        ? context.secrets.fills.get(resolved.value.secretName) : undefined;
       // Marked before acting: a fill that fails part way may still have typed some of the secret.
       if (resolved.type === 'fill') {
         if (secret === undefined) context.secretFilledFields.delete(canonicalJson(resolved.locator));
@@ -537,7 +550,7 @@ async function executeStep(step: Step, index: number, session: DocumentSession, 
       }
       return { ...base, outcome: 'passed' };
     }
-    case 'remember':
+    case 'remember': return rememberFromPage(step, index, session, context);
     case 'download':
     case 'expectDownload':
     case 'newTab':
@@ -600,6 +613,40 @@ async function executeStep(step: Step, index: number, session: DocumentSession, 
   }
 }
 
+// Reads a remember step's value from the page through the prober, waiting as a check waits until
+// the locator matches one element with non-empty text (or input value), whitespace normalised.
+// The text must be safe text no longer than the project's maximumTextLength. Only the value's name
+// and sha256 are kept in the result and the events, never the text.
+async function rememberFromPage(step: Extract<Step, { type: 'remember' }>, index: number, session: DocumentSession, context: RunContext): Promise<StepResult> {
+  const base = { index, type: step.type } as const;
+  const from = step.from;
+  // isUnsupported refused every other source before the step got here.
+  if (!('element' in from) || from.read === 'attribute') return { ...base, outcome: 'failed', code: 'unsupported-step' };
+  const locator = resolveLocator(from.element, context.values, context.inputs.project);
+  if (!locator.ok) return { ...base, outcome: 'failed', code: locator.error };
+  const textOf = (probe: ElementProbe): string => normalise(from.read === 'value' ? probe.value ?? '' : probe.text);
+  const seen: { probe: ElementProbe | null } = { probe: null };
+  const verdict = await poll(context, session, async (): Promise<Verdict> => {
+    const probe = await session.probe(locator.value);
+    seen.probe = probe;
+    if (probe.count === 0) return { pass: false, code: 'not-found' };
+    if (probe.count > 1) return { pass: false, code: 'ambiguous' };
+    return textOf(probe) === '' ? { pass: false, code: null } : { pass: true, code: null };
+  });
+  if (verdict.code === TARGET_CRASHED || verdict.code === 'not-found' || verdict.code === 'ambiguous') return { ...base, outcome: 'failed', code: verdict.code };
+  const text = seen.probe === null ? '' : textOf(seen.probe);
+  if (text === '') return { ...base, outcome: 'failed', code: 'value-empty' };
+  const maximumLength = context.inputs.project.limits.maximumTextLength;
+  if (text.length > maximumLength) return { ...base, outcome: 'failed', code: 'value-too-long' };
+  const safe = runTimeText(text, maximumLength);
+  if (safe === undefined) return { ...base, outcome: 'failed', code: 'value-unsafe' };
+  context.values.set(step.name, safe);
+  context.rememberedTexts.add(safe);
+  const digest = sha256(safe);
+  context.logger.log({ kind: 'value.remembered', stepIndex: index, valueName: step.name, sha256: digest });
+  return { ...base, outcome: 'passed', remembered: { valueName: step.name, sha256: digest } };
+}
+
 // A dialog step with its expected text's value references replaced, as a driver must receive it.
 function resolveDialogStep(step: DialogStep, context: RunContext): Result<DialogStep, string> {
   if (step.expectText === undefined) return { ok: true, value: step };
@@ -656,7 +703,23 @@ function observe(probe: ElementProbe | null, context: RunContext, filledFromSecr
   if (probe.sensitive) return SENSITIVE_PLACEHOLDER;
   const seen = normalise(probe.value ?? probe.text);
   if (filledFromSecret || context.isShortSecret(seen)) return SECRET_PLACEHOLDER;
-  return context.redactor.text(seen).slice(0, 200);
+  return context.redactor.text(withoutRememberedTexts(seen, context.rememberedTexts)).slice(0, 200);
+}
+
+// Shown instead of a remembered value's text in what a failed check observed.
+const REMEMBERED_PLACEHOLDER = '[redacted:remembered-value]';
+// Shorter remembered texts, such as "3", are replaced only when they are the whole observation:
+// searched for inside longer text they would blank out unrelated characters.
+const SHORTEST_REMEMBERED_SEARCH = 8;
+
+// An observation with every text a remember step read replaced, so a remembered value never
+// reaches the result through a failed check.
+function withoutRememberedTexts(observed: string, remembered: ReadonlySet<string>): string {
+  if (remembered.has(observed)) return REMEMBERED_PLACEHOLDER;
+  let kept = observed;
+  const longestFirst = [...remembered].filter((text) => text.length >= SHORTEST_REMEMBERED_SEARCH).sort((left, right) => right.length - left.length);
+  for (const text of longestFirst) kept = kept.split(text).join(REMEMBERED_PLACEHOLDER);
+  return kept;
 }
 
 const errorText = (error: unknown): string => (error instanceof Error ? error.message : String(error)).slice(0, 200);

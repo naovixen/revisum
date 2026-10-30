@@ -2,14 +2,16 @@
 // masking and auditing live here once, so every protocol behaves the same way.
 // See docs/specs/SPEC-06-cdp-driver.md.
 import {
-  failure, literalActionStep, literalText, performableLocator, reveal, success,
-  type ActionGuard, type ActionStep, type BrowserRequestRecord, type DialogStep, type DocumentSession, type DriverError, type ElementProbe, type Locator, type PageProbe,
-  type ResolvedActionStep, type ResolvedElement, type ResolvedLocator, type Result, type Secret, type SessionEnvironment,
+  DEFAULT_TEST_ID_ATTRIBUTE, DRIVER_FEATURES, failure, literalActionStep, literalText, performableLocator, reveal, success,
+  type ActionGuard, type ActionStep, type BrowserRequestRecord, type DialogStep, type DocumentSession, type DriverError, type DriverFeature,
+  type ElementProbe, type Locator, type PageProbe, type Position, type ResolvedActionStep, type ResolvedElement, type ResolvedLocator, type Result,
+  type Secret, type SessionEnvironment,
 } from '@revisum/contracts';
 import {
-  actionability, afterTwoFrames, armHitCheck, findByLabel, findByTestId, findByText, fontsReady, guardDetails, inThisDocument, maskElements,
-  pageInfo, probeElement, readHitCheck, selectOption, unmaskElements,
+  actionability, afterTwoFrames, armHitCheck, findByLabel, findByTestId, findByText, fontsReady, guardDetails, inDocumentOrder, inThisDocument,
+  maskElements, pageInfo, probeElement, readHitCheck, selectOption, unmaskElements,
 } from './in-page.ts';
+import { heldModifierKeys } from './modifier-keys.ts';
 import { pageAudit, parseAudit, toFindings, type AuditRuleResult } from './page-audit.ts';
 import type { Actionability, DriverSession, PageEvents, PageFunction, PageOperations } from './page-operations.ts';
 
@@ -34,20 +36,43 @@ export type SessionDetails = {
   readonly fixturePath: (fixture: string) => Result<string, DriverError>;
 };
 
+// The scheme of the page the browser shows in place of one it could not show.
+const BROWSER_ERROR_PAGE = 'chrome-error:';
+
 const CRASHED: DriverError = { code: 'target-crashed', detail: 'the page\'s renderer died' };
+
+// The optional plan features every session buildSession makes performs, whatever its protocol:
+// positions and test-id attributes in locate, chords and multi-line text in perform, and the
+// probe a remember step reads through.
+export const SESSION_FEATURES: readonly DriverFeature[] = DRIVER_FEATURES;
 
 // Finds the elements a locator matches. An error while the page navigates counts as "nothing found yet".
 export async function locate<Handle>(operations: PageOperations<Handle>, locator: ResolvedLocator): Promise<Handle[]> {
   try {
-    switch (locator.by) {
-      case 'role': return await ownElements(operations, await operations.byRole(locator.role, locator.name));
-      case 'label': return await operations.callForElements(findByLabel, [locator.label]);
-      case 'text': return await operations.callForElements(findByText, [locator.text]);
-      case 'testId': return await operations.callForElements(findByTestId, [locator.testId]);
-    }
+    const found = await matches(operations, locator);
+    return locator.position === undefined ? found : await atPosition(operations, found, locator.position);
   } catch {
     return [];
   }
+}
+
+async function matches<Handle>(operations: PageOperations<Handle>, locator: ResolvedLocator): Promise<Handle[]> {
+  switch (locator.by) {
+    case 'role': return ownElements(operations, await operations.byRole(locator.role, locator.name));
+    case 'label': return operations.callForElements(findByLabel, [locator.label]);
+    case 'text': return operations.callForElements(findByText, [locator.text]);
+    case 'testId': return operations.callForElements(findByTestId, [locator.testId, locator.attribute ?? DEFAULT_TEST_ID_ATTRIBUTE]);
+  }
+}
+
+// The one match at the position, counted in document order, or none when there are fewer matches.
+// The browser's accessibility search and the label search do not promise document order, so the
+// matches are sorted in the page first.
+async function atPosition<Handle>(operations: PageOperations<Handle>, found: readonly Handle[], position: Position): Promise<Handle[]> {
+  const ordered = found.length < 2 ? [...found] : await operations.callForElements(inDocumentOrder, found.map((element) => ({ element })));
+  const index = position === 'first' ? 0 : position === 'last' ? ordered.length - 1 : position - 1;
+  const picked = ordered[index];
+  return picked === undefined ? [] : [picked];
 }
 
 // The browser's accessibility search may reach into the frames of a document; a locator matches
@@ -150,6 +175,10 @@ async function denial<Handle>(operations: PageOperations<Handle>, element: Handl
 
 type DocumentPorts = DocumentSession & { auditDetailed(): Promise<readonly AuditRuleResult[]> };
 
+// The text a fill of literal text or of lines types; a secret reference is revealed elsewhere.
+const textToFill = (value: Extract<ResolvedActionStep, { type: 'fill' }>['value']): string =>
+  (typeof value === 'string' ? value : 'lines' in value ? value.lines.join('\n') : '');
+
 // The ports of one document. `masked` lists the documents a screenshot masks: this one and every
 // document it is framed in, so a capture from inside a frame hides what the top page hides.
 function documentPorts<Handle>(
@@ -160,8 +189,8 @@ function documentPorts<Handle>(
   const timeout = environment.timeoutMilliseconds;
 
   const probe = async (planLocator: Locator): Promise<ElementProbe> => {
-    // A value reference, a position or another test-id attribute matches nothing here yet.
-    const locator = performableLocator(planLocator);
+    // A value reference, or a locator this session cannot resolve, matches nothing.
+    const locator = performableLocator(planLocator, SESSION_FEATURES);
     // An open dialog stops the page's scripts, so nothing can be read until it is answered.
     if (locator === undefined || events.openDialog() !== null) return NO_ELEMENT;
     const found = await locate(operations, locator);
@@ -220,9 +249,10 @@ function documentPorts<Handle>(
     if (denied !== null) return failure(denied);
     switch (action.type) {
       case 'hover': await operations.hover(at); break;
-      // The secret is revealed here, as it is typed, and nowhere else in this driver.
-      case 'fill': await operations.fill(element, typedSecret === null ? String(action.value) : reveal(typedSecret)); break;
-      case 'press': await operations.press(element, action.key); break;
+      // The secret is revealed here, as it is typed, and nowhere else in this driver. Lines are
+      // joined by line feeds and inserted as text, so no Enter key press can send a form early.
+      case 'fill': await operations.fill(element, typedSecret === null ? textToFill(action.value) : reveal(typedSecret)); break;
+      case 'press': await operations.press(element, action.key, heldModifierKeys(action.modifiers ?? [], process.platform)); break;
       case 'select': {
         const chosen = await operations.callForString(selectOption, [{ element }, action.option]);
         if (chosen === 'no-option') return failure({ code: 'not-found', detail: 'the select has no option with that text or value' });
@@ -263,12 +293,12 @@ function documentPorts<Handle>(
     }
     if (events.openDialog() !== null) return failure({ code: 'not-actionable', detail: 'a dialog is open: a dialog step must answer it first' });
     // Anything this driver cannot perform in full is refused before it touches the page.
-    const action = literalActionStep(step);
+    const action = literalActionStep(step, SESSION_FEATURES);
     if (action === undefined) return failure({ code: 'unsupported-step', detail: `this driver does not perform this ${step.type} step yet` });
     // A secret reference arrives with the secret the engine resolved for it. Without that secret
     // there is nothing to type, and typing nothing could pass a step that should fail.
     const typed = action.type === 'fill' ? action.value : '';
-    const typedSecret = typeof typed === 'string' ? null : secret?.name === typed.secretName ? secret : undefined;
+    const typedSecret = typeof typed === 'string' || 'lines' in typed ? null : secret?.name === typed.secretName ? secret : undefined;
     if (typedSecret === undefined) return failure({ code: 'not-actionable', detail: 'a secret reference reached the driver without its secret' });
     const openingsBefore = events.unsupportedOpenings();
     let acted: Result<void, DriverError>;
@@ -299,7 +329,11 @@ function documentPorts<Handle>(
       }
     },
     async page(): Promise<PageProbe> {
-      return JSON.parse(await operations.callForString(pageInfo, [])) as PageProbe;
+      const shown = JSON.parse(await operations.callForString(pageInfo, [])) as PageProbe;
+      // In place of a page it could not show, the browser shows its own error page at an internal
+      // URL; the page's URL is still the one navigated to, as the address bar shows.
+      if (!shown.url.startsWith(BROWSER_ERROR_PAGE)) return shown;
+      return { ...shown, url: await operations.unreachableUrl() ?? shown.url };
     },
     act,
     probe,

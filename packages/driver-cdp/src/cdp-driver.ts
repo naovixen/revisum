@@ -7,12 +7,13 @@ import {
 import { realpathSync } from 'node:fs';
 import { isAbsolute, relative, resolve } from 'node:path';
 import { chromiumBuild } from './browser-build.ts';
-import { buildSession, errorText } from './browser-session.ts';
+import { SESSION_FEATURES, buildSession, errorText } from './browser-session.ts';
 import { CdpConnection } from './cdp-connection.ts';
 import { QUIET_CHROME_FLAGS, proxyFlags } from './chrome-flags.ts';
 import { EgressRecorder } from './egress-records.ts';
 import { launchChromium, type LaunchedChromium } from './chromium-launcher.ts';
 import { focusAndSelect, focusElement, frameContentOffset } from './in-page.ts';
+import type { HeldModifierKey } from './modifier-keys.ts';
 import type { DriverSession, OwnBrowserDriver, PageArgument, PageFunction, PageOperations, Point, RoleAndName } from './page-operations.ts';
 import { PageWatch } from './page-watch.ts';
 
@@ -64,6 +65,33 @@ const KEY_DEFINITIONS: { readonly [Name in Key]: KeyDefinition } = {
   'F1': functionKey(1), 'F2': functionKey(2), 'F3': functionKey(3), 'F4': functionKey(4), 'F5': functionKey(5), 'F6': functionKey(6),
   'F7': functionKey(7), 'F8': functionKey(8), 'F9': functionKey(9), 'F10': functionKey(10), 'F11': functionKey(11), 'F12': functionKey(12),
 };
+// The modifier keys, as the left-hand key of each pair, and the bit each sets in the protocol's
+// modifiers mask, which tells the page which keys are held.
+const MODIFIER_KEY_DEFINITIONS: { readonly [Name in HeldModifierKey]: KeyDefinition & { readonly bit: number } } = {
+  Alt: { key: 'Alt', code: 'AltLeft', keyCode: 18, bit: 1 },
+  Control: { key: 'Control', code: 'ControlLeft', keyCode: 17, bit: 2 },
+  Meta: { key: 'Meta', code: 'MetaLeft', keyCode: 91, bit: 4 },
+  Shift: { key: 'Shift', code: 'ShiftLeft', keyCode: 16, bit: 8 },
+};
+// The protocol's location for the left-hand key of a pair.
+const LEFT_KEY = 1;
+const modifierMask = (held: readonly HeldModifierKey[]): number => held.reduce((mask, modifier) => mask | MODIFIER_KEY_DEFINITIONS[modifier].bit, 0);
+
+// What the US keyboard layout types for a key pressed with Shift, where it differs from the key.
+const SHIFTED_TEXT: Readonly<Record<string, string>> = {
+  '`': '~', '1': '!', '2': '@', '3': '#', '4': '$', '5': '%', '6': '^', '7': '&', '8': '*', '9': '(', '0': ')',
+  '-': '_', '=': '+', '[': '{', ']': '}', '\\': '|', ';': ':', '\'': '"', ',': '<', '.': '>', '/': '?',
+};
+
+// The key as pressed with the held modifiers. With Alt, Control or Meta held it types nothing, as a
+// keyboard shortcut does not; with Shift alone it types its shifted character.
+function heldKeyDefinition(definition: KeyDefinition, held: readonly HeldModifierKey[]): KeyDefinition {
+  if (held.some((modifier) => modifier !== 'Shift')) return { key: definition.key, code: definition.code, keyCode: definition.keyCode };
+  if (!held.includes('Shift') || definition.text === undefined) return definition;
+  const shifted = SHIFTED_TEXT[definition.text] ?? (/^[a-z]$/.test(definition.text) ? definition.text.toUpperCase() : definition.text);
+  return { ...definition, key: definition.text === definition.key ? shifted : definition.key, text: shifted };
+}
+
 // Chromium-internal roles mapped to ARIA roles, and structural roles left out of snapshots.
 const ROLE_NAMES: Readonly<Record<string, string>> = { RootWebArea: 'document', image: 'img', LabelText: 'label' };
 const TRANSPARENT_ROLES = new Set(['none', 'generic', 'StaticText', 'InlineTextBox', 'LineBreak', 'ignored', 'presentation']);
@@ -83,6 +111,7 @@ type AccessibilityNode = {
   readonly backendDOMNodeId?: number;
 };
 type RequestPaused = { readonly requestId: string; readonly request: { readonly url: string } };
+type FrameTree = { readonly frame: { readonly id: string; readonly unreachableUrl?: string }; readonly childFrames?: readonly FrameTree[] };
 type DescribedNode = { readonly node: { readonly backendNodeId: number; readonly frameId?: string } };
 
 export type CdpDriverOptions = {
@@ -117,7 +146,7 @@ export function fixtureFilePath(fixturesFolder: string | undefined, fixture: str
 
 export function cdpDriver(options: CdpDriverOptions): OwnBrowserDriver {
   return {
-    info: { id: 'cdp', version: CDP_ADAPTER_VERSION, protocol: 'Chrome DevTools Protocol (raw WebSocket)' },
+    info: { id: 'cdp', version: CDP_ADAPTER_VERSION, protocol: 'Chrome DevTools Protocol (raw WebSocket)', performs: SESSION_FEATURES },
     supports(target) {
       if (target.engine !== 'chromium') return failure({ reason: 'engine-not-supported', detail: 'CDP drives Chromium only' });
       return success(true);
@@ -220,6 +249,8 @@ type FrameScope = {
 
 // The name of the isolated script world the driver reads a frame's document through.
 const FRAME_WORLD_NAME = 'driver-frame';
+// What Page.navigate reports for a response whose HTTP status is an error and whose body is empty.
+const HTTP_ERROR_STATUS = 'net::ERR_HTTP_RESPONSE_CODE_FAILURE';
 // Messages of a command that named an execution context the page has since destroyed.
 const LOST_CONTEXT = /context|Cannot find/i;
 
@@ -267,7 +298,9 @@ class CdpPage implements PageOperations<string> {
     loaded.promise.catch(() => undefined);
     try {
       const navigated = await this.#send<{ errorText?: string }>('Page.navigate', { url, ...(frameId === undefined ? {} : { frameId }) });
-      if (navigated.errorText) throw new Error(navigated.errorText);
+      // An HTTP error status with an empty body is a page the server did send: the browser shows
+      // its own error page for it, and the plan's checks decide what that means.
+      if (navigated.errorText && navigated.errorText !== HTTP_ERROR_STATUS) throw new Error(navigated.errorText);
       await loaded.promise;
     } finally {
       loaded.cancel();
@@ -412,13 +445,30 @@ class CdpPage implements PageOperations<string> {
     else await this.#untilDialog(this.#send('Input.insertText', { text: value }));
   }
 
-  async press(element: string, key: Key): Promise<void> {
+  async press(element: string, key: Key, modifiers: readonly HeldModifierKey[]): Promise<void> {
     await this.callForString(focusElement, [{ element }]);
-    await this.#pressKey(KEY_DEFINITIONS[key]);
+    const held: HeldModifierKey[] = [];
+    for (const modifier of modifiers) {
+      held.push(modifier);
+      const definition = MODIFIER_KEY_DEFINITIONS[modifier];
+      await this.#untilDialog(this.#send('Input.dispatchKeyEvent', {
+        type: 'rawKeyDown', key: definition.key, code: definition.code, windowsVirtualKeyCode: definition.keyCode, location: LEFT_KEY, modifiers: modifierMask(held),
+      }));
+      if (this.#watch.openDialog() !== null) return;
+    }
+    await this.#pressKey(heldKeyDefinition(KEY_DEFINITIONS[key], held), modifierMask(held));
+    for (const modifier of [...modifiers].reverse()) {
+      if (this.#watch.openDialog() !== null) return;
+      held.splice(held.indexOf(modifier), 1);
+      const definition = MODIFIER_KEY_DEFINITIONS[modifier];
+      await this.#untilDialog(this.#send('Input.dispatchKeyEvent', {
+        type: 'keyUp', key: definition.key, code: definition.code, windowsVirtualKeyCode: definition.keyCode, location: LEFT_KEY, modifiers: modifierMask(held),
+      }));
+    }
   }
 
-  async #pressKey(definition: KeyDefinition): Promise<void> {
-    const common = { key: definition.key, code: definition.code, windowsVirtualKeyCode: definition.keyCode };
+  async #pressKey(definition: KeyDefinition, modifiers = 0): Promise<void> {
+    const common = { key: definition.key, code: definition.code, windowsVirtualKeyCode: definition.keyCode, modifiers };
     await this.#untilDialog(this.#send('Input.dispatchKeyEvent', {
       type: definition.text ? 'keyDown' : 'rawKeyDown', ...common, ...(definition.text ? { text: definition.text } : {}),
     }));
@@ -443,6 +493,14 @@ class CdpPage implements PageOperations<string> {
       return null;
     }
     return new CdpPage(this.#connection, this.#sessionId, this.#watch, { parent: this, frameElement: element, frameId, executionContextId });
+  }
+
+  async unreachableUrl(): Promise<string | null> {
+    const { frameTree } = await this.#send<{ frameTree: FrameTree }>('Page.getFrameTree');
+    const frameId = this.#frame?.frameId;
+    const find = (tree: FrameTree): FrameTree | undefined =>
+      (frameId === undefined || tree.frame.id === frameId ? tree : (tree.childFrames ?? []).map(find).find((found) => found !== undefined));
+    return find(frameTree)?.frame.unreachableUrl ?? null;
   }
 
   async screenshotPng(): Promise<Uint8Array> {

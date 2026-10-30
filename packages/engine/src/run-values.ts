@@ -7,7 +7,7 @@
 import {
   failure, literalText, referencedValueName, success,
   type AllowedUrl, type ElementAssertion, type GeneratedValue, type Locator, type PathTemplate, type Plan,
-  type PlanClock, type ResolvedActionStep, type ResolvedElementAssertion, type ResolvedLocator, type Result, type SafeText, type Step, type Target,
+  type PlanClock, type ResolvedActionStep, type ResolvedMultiLineText, type ResolvedElementAssertion, type ResolvedLocator, type Result, type SafeText, type Step, type Target,
   type TextOrValue, type TimeZone, type ValueName,
 } from '@revisum/contracts';
 import { brand } from './brand.ts';
@@ -159,8 +159,21 @@ export function resolveElementAssertion(
   }
 }
 
-// The action a driver performs, with every value replaced. A multi-line fill has no driver form
-// yet, so it is unsupported here; the run reports it before it gets this far.
+// The lines of a multi-line fill with every value replaced. Each line is held to the project's
+// maximumTextLength, and the lines with the line feeds between them to maximumFillCharacters:
+// the parser checked the literal lines, but a value's text is only known now.
+function resolveLines(lines: readonly TextOrValue[], values: RunValues, project: Project): Resolved<ResolvedMultiLineText> {
+  const resolved: SafeText[] = [];
+  for (const line of lines) {
+    const text = resolveText(line, values, project.limits.maximumTextLength);
+    if (!text.ok) return text;
+    resolved.push(text.value);
+  }
+  const characters = resolved.reduce((total, line) => total + line.length, 0) + Math.max(resolved.length - 1, 0);
+  return characters > project.limits.maximumFillCharacters ? failure('value-too-long') : success({ lines: resolved });
+}
+
+// The action a driver performs, with every value replaced.
 export function resolveActionStep(
   step: Extract<Step, { type: ResolvedActionStep['type'] }>, values: RunValues, project: Project,
 ): Result<ResolvedActionStep, StepErrorCode | 'unsupported-step'> {
@@ -175,7 +188,10 @@ export function resolveActionStep(
       return option.ok ? success({ type: step.type, locator: locator.value, option: option.value }) : option;
     }
     case 'fill': {
-      if (typeof step.value === 'object' && 'lines' in step.value) return failure('unsupported-step');
+      if (typeof step.value === 'object' && 'lines' in step.value) {
+        const lines = resolveLines(step.value.lines, values, project);
+        return lines.ok ? success({ type: step.type, locator: locator.value, value: lines.value }) : lines;
+      }
       if (typeof step.value === 'object' && 'secretName' in step.value) return success({ type: step.type, locator: locator.value, value: step.value });
       const value = resolveText(step.value, values, project.limits.maximumTextLength);
       return value.ok ? success({ type: step.type, locator: locator.value, value: value.value }) : value;

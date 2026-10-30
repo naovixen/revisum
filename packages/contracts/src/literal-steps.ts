@@ -1,10 +1,13 @@
 // The one place that tells literal text from a value reference, and a step a driver can perform
-// today from one it cannot. The engine replaces every value reference before a step reaches a
-// driver; drivers call literalActionStep and performableLocator once and refuse on undefined, so
-// no step is ever performed in part. Positions, test-id attributes other than data-testid, key
-// chords, multi-line text, the accessibility states, link targets, head metadata, pages loaded
-// with scripts off, downloads and second tabs come with the CDP driver
-// (docs/specs/SPEC-06-cdp-driver.md).
+// from one it cannot. The engine replaces every value reference before a step reaches a driver;
+// drivers call literalActionStep and performableLocator once, with the features they declare, and
+// refuse on undefined, so no step is ever performed in part.
+// Some features of plan language 1.2 are optional for a driver: positions, test-id attributes
+// other than data-testid, key chords, multi-line fills and remembered values. A driver declares
+// the ones it performs in its AdapterInfo; the run refuses a step needing one its driver does not
+// declare with unsupported-step, before anything of it reaches the driver. The accessibility
+// states, link targets, head metadata, pages loaded with scripts off, downloads and second tabs
+// no driver performs yet (docs/specs/SPEC-06-cdp-driver.md).
 // See docs/specs/SPEC-30-plan-values-positions-and-keys.md and
 // docs/specs/SPEC-31-page-states-metadata-downloads-and-tabs.md.
 import { DOM_CHECK_KINDS } from './plan.ts';
@@ -14,6 +17,17 @@ import type {
 
 // The test-id attribute a testId locator without `attribute` matches, and the project's default list.
 export const DEFAULT_TEST_ID_ATTRIBUTE = 'data-testid';
+
+// Features a driver may perform or not, declared in its AdapterInfo:
+//   positions         picks the first, last or nth of a locator's matches, in document order;
+//   testIdAttributes  matches a test id on a declared attribute other than data-testid;
+//   keyChords         holds modifier keys down while a key is pressed;
+//   multiLineFills    inserts lines of text joined by line feeds, with no Enter key press;
+//   rememberedValues  lets a remember step read an element's text or input value through its probe.
+export const DRIVER_FEATURES = ['positions', 'testIdAttributes', 'keyChords', 'multiLineFills', 'rememberedValues'] as const;
+export type DriverFeature = (typeof DRIVER_FEATURES)[number];
+
+const NO_FEATURES: readonly DriverFeature[] = [];
 
 // The text itself when it is literal; undefined when it is a reference to a run value.
 export const literalText = (text: TextOrValue): SafeText | undefined => (typeof text === 'string' ? text : undefined);
@@ -32,11 +46,18 @@ export function literalLocator(locator: Locator): ResolvedLocator | undefined {
   }
 }
 
-// True when the locator picks a position among its matches, matches a test id on an attribute
-// other than the default, or finds its element by CSS or XPath: what the drivers do not resolve yet.
-export const needsLocatorFeatures = (locator: Locator): boolean =>
-  locator.position !== undefined || locator.by === 'css' || locator.by === 'xpath'
-  || (locator.by === 'testId' && locator.attribute !== undefined && locator.attribute !== DEFAULT_TEST_ID_ATTRIBUTE);
+// The optional driver features a locator uses.
+function locatorFeatures(locator: Locator): DriverFeature[] {
+  const features: DriverFeature[] = [];
+  if (locator.position !== undefined) features.push('positions');
+  if (locator.by === 'testId' && locator.attribute !== undefined && locator.attribute !== DEFAULT_TEST_ID_ATTRIBUTE) features.push('testIdAttributes');
+  return features;
+}
+
+// True when the driver cannot resolve the locator: it finds its element by CSS or XPath, which no
+// driver resolves yet, or it uses an optional feature that `performs` does not list.
+export const needsLocatorFeatures = (locator: Locator, performs: readonly DriverFeature[] = NO_FEATURES): boolean =>
+  locator.by === 'css' || locator.by === 'xpath' || locatorFeatures(locator).some((feature) => !performs.includes(feature));
 
 // Element checks the drivers' probe cannot decide yet: it reports no checked, focused or
 // accessibility state, no link target and no class, computed style or attribute, so these checks
@@ -48,22 +69,24 @@ const ELEMENT_CHECKS_NO_DRIVER_DECIDES: readonly ElementAssertion['kind'][] = [
 // Page checks the drivers' page probe cannot decide yet: it reads no part of the document head.
 const PAGE_CHECKS_NO_DRIVER_DECIDES: readonly PageAssertion['kind'][] = ['metaContent', 'canonicalUrl'];
 
-// True when the step needs what no driver performs yet: a locator feature above, a key chord,
-// multi-line text, a check the probes cannot decide, a page loaded with scripts off, a download,
-// a check of a download, a second tab, the driver's network and storage ports (stubs, request
-// checks, response checks and reads, and web storage), or its clock and clipboard ports (clock
-// advances, clipboard checks and reads). The run reports such a step as
-// unsupported-step before anything of it reaches the driver. A remember step no driver performs
-// yet is the run's to refuse whole. Hover, select and upload go to the driver, which refuses them
-// with unsupported-step when it does not perform them; a frame step goes to the driver's frame
-// port. A dialog step goes to the driver, so the runtime guard sees the dialog's text before
-// anything answers it.
-export function needsDriverFeatures(step: Step): boolean {
+const isMultiLine = (value: Extract<Step, { type: 'fill' }>['value']): boolean => typeof value === 'object' && 'lines' in value;
+
+// True when the step needs what its driver does not perform: an optional feature above that
+// `performs` does not list, a CSS or XPath locator, a check the probes cannot decide, a page
+// loaded with scripts off, a download, a check of a download, a second tab, the driver's network
+// and storage ports (stubs, request checks, response checks and reads, and web storage), or its
+// clock and clipboard ports (clock advances, clipboard checks and reads). The run reports such a
+// step as unsupported-step before anything of it reaches the driver. Hover, select and upload go
+// to the driver, which refuses them with unsupported-step when it does not perform them; a frame
+// step goes to the driver's frame port. A dialog step goes to the driver, so the runtime guard
+// sees the dialog's text before anything answers it.
+export function needsDriverFeatures(step: Step, performs: readonly DriverFeature[] = NO_FEATURES): boolean {
+  const lacks = (feature: DriverFeature): boolean => !performs.includes(feature);
   switch (step.type) {
-    case 'click': case 'hover': case 'select': case 'upload': return needsLocatorFeatures(step.locator);
-    case 'press': return needsLocatorFeatures(step.locator) || step.modifiers !== undefined;
-    case 'fill': return needsLocatorFeatures(step.locator) || (typeof step.value === 'object' && 'lines' in step.value);
-    case 'expect': return needsLocatorFeatures(step.locator) || ELEMENT_CHECKS_NO_DRIVER_DECIDES.includes(step.assert.kind);
+    case 'click': case 'hover': case 'select': case 'upload': case 'frame': return needsLocatorFeatures(step.locator, performs);
+    case 'press': return needsLocatorFeatures(step.locator, performs) || (step.modifiers !== undefined && lacks('keyChords'));
+    case 'fill': return needsLocatorFeatures(step.locator, performs) || (isMultiLine(step.value) && lacks('multiLineFills'));
+    case 'expect': return needsLocatorFeatures(step.locator, performs) || ELEMENT_CHECKS_NO_DRIVER_DECIDES.includes(step.assert.kind);
     case 'expectPage': return PAGE_CHECKS_NO_DRIVER_DECIDES.includes(step.assert.kind);
     case 'navigate': return step.scripts !== undefined;
     case 'download': case 'expectDownload': case 'newTab': return true;
@@ -73,10 +96,13 @@ export function needsDriverFeatures(step: Step): boolean {
     // The CDP driver's clock and clipboard ports carry these out, with the determinism kit's timer
     // tracking (docs/specs/SPEC-34-clock-advance-and-clipboard.md).
     case 'advanceClock': case 'expectClipboard': return true;
-    // Reading a response field needs the network port, reading the clipboard the clipboard port and
-    // reading an attribute the DOM reads; reading an element's text or value only the prober.
-    case 'remember': return !('element' in step.from) || step.from.read === 'attribute';
-    case 'frame': case 'dialog': case 'a11yAudit': case 'capture': return false;
+    // Reading an element's text or value needs only the prober, of a driver that declares it reads
+    // values for later steps. Reading a response field needs the network port, reading the
+    // clipboard the clipboard port and reading an attribute the DOM reads.
+    case 'remember':
+      if (!('element' in step.from) || step.from.read === 'attribute') return true;
+      return lacks('rememberedValues') || needsLocatorFeatures(step.from.element, performs);
+    case 'dialog': case 'a11yAudit': case 'capture': return false;
     // Page scripts need the driver's script port (docs/specs/SPEC-36-unsafe-plan-features.md).
     case 'evaluate': case 'expectScript': return true;
     // Calls never reach a driver: the engine sends them through the run's service caller. Database
@@ -85,29 +111,39 @@ export function needsDriverFeatures(step: Step): boolean {
   }
 }
 
-// The locator a driver can match today: literal, with no locator feature it lacks.
-export const performableLocator = (locator: Locator): ResolvedLocator | undefined =>
-  (needsLocatorFeatures(locator) ? undefined : literalLocator(locator));
+// The locator a driver can match: literal, with no feature the driver lacks.
+export const performableLocator = (locator: Locator, performs: readonly DriverFeature[] = NO_FEATURES): ResolvedLocator | undefined =>
+  (needsLocatorFeatures(locator, performs) ? undefined : literalLocator(locator));
 
-// The action as a driver performs it today: literal locator and text, a fill of literal text or of
-// a secret reference, and no feature it lacks. Undefined means the driver must refuse the step.
-export function literalActionStep(step: ActionStep): ResolvedActionStep | undefined {
+// The action as a driver that performs `performs` carries it out: literal locator and text, a fill
+// of literal text, of literal lines or of a secret reference, and no feature it lacks. Undefined
+// means the driver must refuse the step.
+export function literalActionStep(step: ActionStep, performs: readonly DriverFeature[] = NO_FEATURES): ResolvedActionStep | undefined {
   // A dialog acts on no element: a driver that answers dialogs does so before calling this.
-  if (step.type === 'dialog' || needsDriverFeatures(step)) return undefined;
+  if (step.type === 'dialog' || needsDriverFeatures(step, performs)) return undefined;
   const locator = literalLocator(step.locator);
   if (locator === undefined) return undefined;
   switch (step.type) {
     case 'click': case 'hover': return { type: step.type, locator };
     case 'upload': return { type: step.type, locator, fixture: step.fixture };
-    case 'press': return { type: step.type, locator, key: step.key };
+    case 'press':
+      return step.modifiers === undefined ? { type: step.type, locator, key: step.key } : { type: step.type, locator, key: step.key, modifiers: step.modifiers };
     case 'select': {
       const option = literalText(step.option);
       return option === undefined ? undefined : { type: step.type, locator, option };
     }
     case 'fill': {
-      // Lines were refused above, so the value is text, a value reference or a secret reference.
       if (typeof step.value === 'object' && 'secretName' in step.value) return { type: step.type, locator, value: step.value };
-      const value = typeof step.value === 'object' && 'lines' in step.value ? undefined : literalText(step.value);
+      if (typeof step.value === 'object' && 'lines' in step.value) {
+        const lines: SafeText[] = [];
+        for (const line of step.value.lines) {
+          const literal = literalText(line);
+          if (literal === undefined) return undefined;
+          lines.push(literal);
+        }
+        return { type: step.type, locator, value: { lines } };
+      }
+      const value = literalText(step.value);
       return value === undefined ? undefined : { type: step.type, locator, value };
     }
     // Refused above: no driver performs a download yet.

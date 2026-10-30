@@ -121,8 +121,15 @@ export function findByText(text: string): Element[] {
   return matches.filter((element) => !matches.some((other) => other !== element && element.contains(other)));
 }
 
-export function findByTestId(testId: string): Element[] {
-  return Array.from(document.querySelectorAll('[data-testid]')).filter((element) => element.getAttribute('data-testid') === testId);
+// Elements whose `attribute` is exactly `testId`. Every element is compared by string equality, so
+// no selector is ever built from plan text and selector syntax in a test id matches only itself.
+export function findByTestId(testId: string, attribute: string): Element[] {
+  return Array.from(document.querySelectorAll('*')).filter((element) => element.getAttribute(attribute) === testId);
+}
+
+// The given elements in document order, for picking one by position.
+export function inDocumentOrder(...elements: Element[]): Element[] {
+  return elements.sort((left, right) => (left === right ? 0 : left.compareDocumentPosition(right) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1));
 }
 
 // Paints a solid black box over every element matching the selectors.

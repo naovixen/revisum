@@ -284,12 +284,14 @@ export type StepType = Step['type'];
 export type ActionStep = Extract<Step, { type: 'click' | 'hover' | 'fill' | 'select' | 'upload' | 'press' | 'download' | 'dialog' }>;
 // Accepts or dismisses the next dialog the page opens.
 export type DialogStep = Extract<Step, { type: 'dialog' }>;
+// Lines of a multi-line fill with every value reference replaced by its text.
+export type ResolvedMultiLineText = { readonly lines: readonly SafeText[] };
 // An action step with every value reference replaced by its text, as the engine hands it to a
-// driver. A multi-line fill has no resolved form until the CDP driver inserts lines of text.
+// driver.
 export type ResolvedActionStep =
   | { readonly type: 'click'; readonly locator: ResolvedLocator }
   | { readonly type: 'hover'; readonly locator: ResolvedLocator }
-  | { readonly type: 'fill'; readonly locator: ResolvedLocator; readonly value: SafeText | SecretReference }
+  | { readonly type: 'fill'; readonly locator: ResolvedLocator; readonly value: SafeText | SecretReference | ResolvedMultiLineText }
   | { readonly type: 'select'; readonly locator: ResolvedLocator; readonly option: SafeText }
   | { readonly type: 'upload'; readonly locator: ResolvedLocator; readonly fixture: FixtureName }
   | { readonly type: 'press'; readonly locator: ResolvedLocator; readonly key: Key; readonly modifiers?: readonly Modifier[] };

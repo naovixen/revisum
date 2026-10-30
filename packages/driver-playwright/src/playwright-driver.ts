@@ -183,7 +183,11 @@ async function act(
   if (action === undefined) return failure({ code: 'unsupported-step', detail: `this driver does not perform this ${step.type} step yet` });
   // A secret reference arrives with the secret the engine resolved for it. Without that secret
   // there is nothing to type, and typing nothing could pass a step that should fail.
-  if (action.type === 'fill' && typeof action.value !== 'string' && secret?.name !== action.value.secretName) {
+  // It declares no optional feature, so it is never given lines to fill; checked all the same.
+  if (action.type === 'fill' && typeof action.value !== 'string' && 'lines' in action.value) {
+    return failure({ code: 'unsupported-step', detail: 'the Playwright fallback does not perform multi-line fills' });
+  }
+  if (action.type === 'fill' && typeof action.value !== 'string' && 'secretName' in action.value && secret?.name !== action.value.secretName) {
     return failure({ code: 'not-actionable', detail: 'a secret reference reached the driver without its secret' });
   }
   const found = locate(page, action.locator);

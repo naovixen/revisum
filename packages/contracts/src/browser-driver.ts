@@ -1,6 +1,7 @@
 // The browser driver ports: what the engine needs from one browser session, split into small
 // interfaces. Each driver package implements them; the engine never imports a driver.
 // See docs/specs/SPEC-06-cdp-driver.md and docs/specs/SPEC-27-shared-types-and-events.md.
+import type { DriverFeature } from './literal-steps.ts';
 import type { ActionStep, Locator, ResolvedLocator } from './plan.ts';
 import type { GuardVerdict } from './policy.ts';
 import type { Secret } from './secret.ts';
@@ -151,6 +152,10 @@ export type AdapterInfo = {
   // Inputs this adapter cannot pin, such as a browser it does not install itself. The run manifest
   // lists them under nonHermeticInputs.
   readonly cannotPin?: readonly string[];
+  // The optional plan features this adapter performs (DRIVER_FEATURES), such as positions and key
+  // chords. The run refuses a step that needs one it does not list with unsupported-step, before
+  // anything of the step reaches the adapter. Absent means none.
+  readonly performs?: readonly DriverFeature[];
 };
 
 export interface BrowserDriver {

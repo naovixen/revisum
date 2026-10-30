@@ -18,7 +18,8 @@ export const LOGGING_MANIFEST = {
   code: { type: 'string', why: 'Machine-readable failure code from a closed set.', retentionDays: 30 },
   detail: { type: 'string', why: 'Short diagnostic text. Always passed through the Redactor first.', retentionDays: 7 },
   artifact: { type: 'string', why: 'Name of an artefact produced by a capture step.', retentionDays: 30 },
-  sha256: { type: 'string', why: 'Content hash of an artefact or of a service call response body, for replay proofs. Never the body itself.', retentionDays: 30 },
+  sha256: { type: 'string', why: 'Content hash of an artefact, of a service call response body or of a remembered value, for replay proofs. Never the body or value itself.', retentionDays: 30 },
+  valueName: { type: 'string', why: 'Name of a run value a remember step read from the page. Never the value: its sha256 is logged instead.', retentionDays: 30 },
   findings: { type: 'number', why: 'Count of accessibility findings (rule ids live in the run result).', retentionDays: 30 },
   origin: { type: 'string', why: 'Origin (scheme, host, port) of a blocked request. Never path or query.', retentionDays: 7 },
   durationMilliseconds: { type: 'number', why: 'Step timing for performance budgets. Excluded from the result hash.', retentionDays: 30 },
@@ -28,7 +29,8 @@ export type LogField = keyof typeof LOGGING_MANIFEST;
 type FieldValue<Field extends LogField> = (typeof LOGGING_MANIFEST)[Field]['type'] extends 'number' ? number : string;
 
 // service.call: one request a declared call sent, by step, outcome, code, response sha256 and duration.
-export const EVENT_KINDS = ['run.state', 'step.start', 'step.end', 'artifact', 'audit', 'network.blocked', 'service.call'] as const;
+// value.remembered: a remember step kept a value from the page, by step, value name and sha256.
+export const EVENT_KINDS = ['run.state', 'step.start', 'step.end', 'artifact', 'audit', 'network.blocked', 'service.call', 'value.remembered'] as const;
 export type EventKind = (typeof EVENT_KINDS)[number];
 
 // What a caller may log: a kind plus any subset of the manifest fields.
@@ -52,6 +54,9 @@ export interface RunEventSink {
 }
 
 const FIELDS = new Set<string>(Object.keys(LOGGING_MANIFEST));
+// A sha256 field holding a hex digest carries no personal data, and a redaction pattern matching a
+// run of its digits, as the phone pattern can, would break the hash a replay proof compares.
+const HEX_DIGEST = /^[0-9a-f]{64}$/;
 
 export class LoggingManifestViolation extends Error {}
 
@@ -63,7 +68,7 @@ export function manifestLogger(sink: RunEventSink, redactor: Redactor, runId: st
       const kept: Record<string, string | number> = {};
       for (const [key, value] of Object.entries(record as Record<string, unknown>)) {
         if (!FIELDS.has(key) || key === 'runId' || key === 'sequence') throw new LoggingManifestViolation(`field not in LOGGING_MANIFEST: ${key}`);
-        if (typeof value === 'string') kept[key] = redactor.text(value);
+        if (typeof value === 'string') kept[key] = key === 'sha256' && HEX_DIGEST.test(value) ? value : redactor.text(value);
         else if (typeof value === 'number') kept[key] = value;
         else throw new LoggingManifestViolation(`field ${key} must be a string or number`);
       }
