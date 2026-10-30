@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Egress</title></head>
+<body>
+<main>
+  <h1>Egress</h1>
+  <!-- Each press fetches once and shows who answered. -->
+  <button type="button" id="stubbed">Fetch stubbed data</button>
+  <p data-testid="stubbed-source">No answer</p>
+  <p data-testid="stubbed-count">0</p>
+  <button type="button" id="real">Fetch real data</button>
+  <p data-testid="real-source">No answer</p>
+  <!-- An origin the browser lets through but the egress proxy does not allow. -->
+  <button type="button" id="outside">Fetch outside data</button>
+  <p data-testid="outside-state">Not tried</p>
+  <p data-testid="input-events">0</p>
+</main>
+<script src="counting.js"></script>
+<script src="egress.js"></script>
+</body>
+</html>

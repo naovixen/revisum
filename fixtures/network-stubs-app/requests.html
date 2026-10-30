@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Requests</title></head>
+<body>
+<main>
+  <h1>Requests</h1>
+  <!-- requests.js loads the schedule once as the page loads. -->
+  <p data-testid="schedule-state">Schedule not loaded</p>
+
+  <!-- Each press asks /api/sequence for one answer and adds it to the list, separated by spaces. -->
+  <button type="button" id="ask">Ask for the next answer</button>
+  <p data-testid="answers"></p>
+
+  <!-- Two GET requests to /api/items, the second 300 ms after the first and answered slowly, and
+       two requests that do not match: a GET to /api/items-archive and a POST to /api/items. -->
+  <button type="button" id="batches">Load two batches</button>
+  <p data-testid="batches-state">No batches</p>
+
+  <!-- The first item's name and how many items the latest /api/items answer held. -->
+  <button type="button" id="items">Load items</button>
+  <button type="button" id="next-page">Load the next page</button>
+  <p data-testid="first-item">No items</p>
+  <p data-testid="item-count">0</p>
+
+  <button type="button" id="big-items">Load big items</button>
+  <p data-testid="big-state">Big items not loaded</p>
+  <button type="button" id="plain-items">Load plain items</button>
+  <p data-testid="plain-state">Plain items not loaded</p>
+  <button type="button" id="missing-items">Load missing items</button>
+  <p data-testid="missing-state">Missing items not loaded</p>
+
+  <button type="button" id="continue">Continue</button>
+  <p data-testid="continue-state">Not continued</p>
+  <p data-testid="input-events">0</p>
+</main>
+<script src="counting.js"></script>
+<script src="continue.js"></script>
+<script src="requests.js"></script>
+</body>
+</html>

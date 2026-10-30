@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Service worker</title></head>
+<body>
+<main>
+  <h1>Service worker</h1>
+  <!-- workers.js registers service-worker.js, which answers /api/worker-items itself, and says
+       "Worker ready" once the worker controls this page. -->
+  <p data-testid="worker-state">Worker not ready</p>
+  <!-- Each press fetches /api/worker-items and shows who answered and how many answers came. -->
+  <button type="button" id="worker-items">Load worker items</button>
+  <p data-testid="items-source">No answer</p>
+  <p data-testid="answer-count">0</p>
+  <p data-testid="input-events">0</p>
+</main>
+<script src="counting.js"></script>
+<script src="workers.js"></script>
+</body>
+</html>

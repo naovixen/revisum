@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Account</title></head>
+<body>
+<main>
+  <h1>Account</h1>
+  <!-- The /account.html route puts a name made fresh for each harness in the data attribute
+       below. account.js keeps it in local storage under profile.name and shows it in a plain
+       paragraph, which is not marked as personal data. -->
+  <p data-testid="profile-name" data-name="PROFILE_NAME">not read</p>
+  <!-- Filled in from /api/profile and /api/token: personal data and a token, marked private. -->
+  <button type="button" id="profile">Load profile</button>
+  <p data-testid="profile-email" data-pii>not loaded</p>
+  <p data-testid="account-token" data-pii>not loaded</p>
+  <p data-testid="profile-state">Profile not loaded</p>
+  <p data-testid="input-events">0</p>
+</main>
+<script src="counting.js"></script>
+<script src="account.js"></script>
+</body>
+</html>

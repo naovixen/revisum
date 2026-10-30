@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Resources</title></head>
+<body>
+<main>
+  <h1>Resources</h1>
+  <!-- The notes: /api/notes, whose answer holds script markup in a JSON string. The page shows
+       what it received as text only, and the response's media type and nosniff header. -->
+  <button type="button" id="notes">Load notes</button>
+  <p data-testid="notes-kind">Notes not loaded</p>
+  <p data-testid="notes-type">none</p>
+  <p data-testid="notes-sniffing">none</p>
+  <!-- How many times script markup from anywhere ran in this page or a frame of it. -->
+  <p data-testid="script-runs">0</p>
+  <!-- Counter-example: the same bytes served as an HTML page in a frame, where the markup runs. -->
+  <button type="button" id="notes-page">Show the notes as a page</button>
+  <div id="notes-frame-holder"></div>
+
+  <!-- One request of each kind a stub must never answer, under /api/assets/, and two it does:
+       a fetch and an XHR. Each line says who answered. -->
+  <button type="button" id="resources">Load every resource</button>
+  <p data-testid="script-state">Script not loaded</p>
+  <p data-testid="style-state">Style not loaded</p>
+  <p data-testid="frame-state">Frame not loaded</p>
+  <p data-testid="worker-state">Worker not loaded</p>
+  <p data-testid="image-state">Image not loaded</p>
+  <p data-testid="fetch-state">Fetch not answered</p>
+  <p data-testid="xhr-state">XHR not answered</p>
+  <div id="styled">Styled box</div>
+  <div id="resource-holder"></div>
+
+  <button type="button" id="continue">Continue</button>
+  <p data-testid="continue-state">Not continued</p>
+  <p data-testid="input-events">0</p>
+</main>
+<script src="counting.js"></script>
+<script src="continue.js"></script>
+<script src="resources.js"></script>
+</body>
+</html>
