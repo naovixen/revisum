@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Animation loop</title></head>
+<body>
+<main>
+  <h1>Animation loop</h1>
+  <!-- animation-loop.js asks for an animation frame from every animation frame, for ever. -->
+  <p data-testid="frames-run">0</p>
+  <button type="button" id="continue">Continue</button>
+  <p data-testid="continue-state">Not continued</p>
+  <p data-testid="input-events">0</p>
+</main>
+<script src="counting.js"></script>
+<script src="continue.js"></script>
+<script src="show.js"></script>
+<script src="animation-loop.js"></script>
+</body>
+</html>

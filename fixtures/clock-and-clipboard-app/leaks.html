@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Copied secrets</title></head>
+<body>
+<main>
+  <h1>Copied secrets</h1>
+  <!-- The harness serves this page with the placeholder name below replaced by a canary made fresh per run. -->
+  <p data-testid="contact-name">CONTACT_NAME</p>
+  <button type="button" id="copy-contact">Copy contact name</button>
+  <label for="access-token">Access token</label>
+  <input id="access-token" type="password">
+  <button type="button" id="copy-token">Copy access token</button>
+  <label for="contact-field">Contact field</label>
+  <input id="contact-field" type="text">
+  <p data-testid="copy-state">Nothing copied</p>
+  <p data-testid="input-events">0</p>
+</main>
+<script src="counting.js"></script>
+<script src="show.js"></script>
+<script src="leaks.js"></script>
+</body>
+</html>

@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Session</title></head>
+<body>
+<main>
+  <h1>Session</h1>
+  <!-- session.js shows "Session expired" from a timer set for 10 minutes as the page loads. -->
+  <p data-testid="session-status">Session active</p>
+  <!-- "Show elapsed time" shows Date.now(), and how far Date.now() and performance.now() have
+       moved since the page loaded. -->
+  <button type="button" id="show-elapsed">Show elapsed time</button>
+  <p data-testid="date-now">not read</p>
+  <p data-testid="date-elapsed">not read</p>
+  <p data-testid="performance-elapsed">not read</p>
+  <button type="button" id="continue">Continue</button>
+  <p data-testid="continue-state">Not continued</p>
+  <p data-testid="input-events">0</p>
+</main>
+<script src="counting.js"></script>
+<script src="continue.js"></script>
+<script src="show.js"></script>
+<script src="session.js"></script>
+</body>
+</html>

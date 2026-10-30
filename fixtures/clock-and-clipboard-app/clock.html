@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Page clock</title></head>
+<body>
+<main>
+  <h1>Page clock</h1>
+  <!-- What the page's own Date.now() said as it loaded. -->
+  <p data-testid="page-now"></p>
+  <!-- What Date.now() says when "Show the time now" is pressed. -->
+  <button type="button" id="show-now">Show the time now</button>
+  <p data-testid="now-on-request">not read</p>
+  <p data-testid="input-events">0</p>
+</main>
+<script src="counting.js"></script>
+<script src="show.js"></script>
+<script src="clock.js"></script>
+</body>
+</html>

@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Clipboard</title></head>
+<body>
+<main>
+  <h1>Clipboard</h1>
+  <!-- Each button copies plain text with navigator.clipboard.writeText (clipboard.js). -->
+  <button type="button" id="copy-one-line">Copy invite code</button>
+  <button type="button" id="copy-address">Copy address</button>
+  <button type="button" id="copy-later">Copy late code</button>
+  <button type="button" id="copy-long">Copy long text</button>
+  <label for="invite-email">Email address</label>
+  <input id="invite-email" type="text">
+  <button type="button" id="copy-invite">Copy invite link</button>
+  <label for="pasted-link">Pasted link</label>
+  <input id="pasted-link" type="text">
+  <p data-testid="copy-state">Nothing copied</p>
+  <!-- The page's own attempt to read the clipboard, which the run must refuse. -->
+  <button type="button" id="read-clipboard">Read the clipboard</button>
+  <p data-testid="page-read">Not read</p>
+  <button type="button" id="continue">Continue</button>
+  <p data-testid="continue-state">Not continued</p>
+  <p data-testid="input-events">0</p>
+</main>
+<script src="counting.js"></script>
+<script src="continue.js"></script>
+<script src="show.js"></script>
+<script src="clipboard.js"></script>
+</body>
+</html>

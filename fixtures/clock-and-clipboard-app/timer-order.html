@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Timer order</title></head>
+<body>
+<main>
+  <h1>Timer order</h1>
+  <!-- Each callback as name@milliseconds since the page loaded, in the order they ran. -->
+  <p data-testid="timer-log">(none)</p>
+  <!-- How many times each callback ran, in a fixed order. -->
+  <p data-testid="timer-counts"></p>
+  <!-- The distinct page times at which callbacks ran. -->
+  <p data-testid="timer-times">(none)</p>
+  <button type="button" id="continue">Continue</button>
+  <p data-testid="continue-state">Not continued</p>
+  <p data-testid="input-events">0</p>
+</main>
+<script src="counting.js"></script>
+<script src="continue.js"></script>
+<script src="show.js"></script>
+<script src="timer-order.js"></script>
+</body>
+</html>
