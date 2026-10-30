@@ -140,6 +140,7 @@ Add to SPEC-27's unions and give each a heading in `docs/errors.md`: driver code
 
 - **M1, straight after SPEC-33:** grammar, parser, project limits, the pure engine functions and the bullets in SPEC-30's "1.2 (unreleased)" changelog entry. They land before the coverage study is re-run, so the frozen 1.2 grammar includes them.
 - **M2, with SPEC-06 and SPEC-08, after AC-SPEC-06-02:** the kit's timer tracking, `ClockPort` and `ClipboardPort`, and the host-isolation proof. Not part of the M2 alpha exit. Until then, runs report both steps as `unsupported-step`.
+  - **Driver parts** (alignment, 2026-10-30). They use SPEC-30's capability model: the engine refuses a step with `unsupported-step`, with no real wait and nothing dispatched, unless the driver declares the feature in `AdapterInfo.performs`. The new features are `clockControl` and `clipboard`; the CDP driver declares both, and the Playwright fallback declares neither (AC-12). Tests that touch the host's clipboard (AC-16) save its contents first and restore them afterwards, so the founder's clipboard is never lost.
 
 ## Satisfies
 
