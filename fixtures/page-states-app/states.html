@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Page states</title>
+<style>.active { font-weight: bold; } .is-pressed { background: #333; color: #fff; }</style>
+</head>
+<body>
+<main>
+  <h1>Page states</h1>
+  <!-- An ARIA tab list: Profile is selected, Billing is not. -->
+  <div role="tablist" aria-label="Settings sections">
+    <button type="button" role="tab" id="tab-profile" aria-selected="true" aria-controls="panel-profile">Profile</button>
+    <button type="button" role="tab" id="tab-billing" aria-selected="false" aria-controls="panel-billing" tabindex="-1">Billing</button>
+  </div>
+  <div role="tabpanel" id="panel-profile" aria-labelledby="tab-profile">Profile settings</div>
+  <div role="tabpanel" id="panel-billing" aria-labelledby="tab-billing" hidden>Billing settings</div>
+
+  <!-- Disclosure buttons: Shipping notes is open, Returns notes is closed until clicked (states.js). -->
+  <button type="button" data-testid="shipping-disclosure" aria-expanded="true" aria-controls="shipping-notes">Shipping notes</button>
+  <p id="shipping-notes">Leave parcels at the side door.</p>
+  <button type="button" data-testid="returns-disclosure" aria-expanded="false" aria-controls="returns-notes">Returns notes</button>
+  <p id="returns-notes" hidden>Returns are free within 30 days.</p>
+
+  <!-- Toggle buttons: Bold is pressed, Italic is not. -->
+  <button type="button" data-testid="bold-toggle" aria-pressed="true">Bold</button>
+  <button type="button" data-testid="italic-toggle" aria-pressed="false">Italic</button>
+
+  <!-- Navigation: Overview is the current page; Reports says explicitly that it is not. -->
+  <nav aria-label="Main">
+    <a href="/states.html" aria-current="page">Overview</a>
+    <a href="/links.html" aria-current="false">Reports</a>
+  </nav>
+
+  <!-- A native select: Large is the selected option, Small is not. -->
+  <label for="size">Size</label>
+  <select id="size">
+    <option data-testid="size-small">Small</option>
+    <option data-testid="size-large" selected>Large</option>
+  </select>
+
+  <!-- Native disclosures: Delivery is open, Warranty is closed. -->
+  <details open><summary data-testid="delivery-summary">Delivery</summary><p>Next-day delivery.</p></details>
+  <details><summary data-testid="warranty-summary">Warranty</summary><p>Two years.</p></details>
+
+  <!-- Elements that expose no state. Their look says "selected" or "pressed" only through a CSS
+       class, which no state check may read. -->
+  <div class="tabs">
+    <span class="tab active" data-testid="class-only-tab">Overview</span>
+    <span class="tab" data-testid="class-only-other-tab">History</span>
+  </div>
+  <button type="button" class="is-pressed" data-testid="class-only-toggle">Underline</button>
+  <button type="button" data-testid="plain-button">Plain action</button>
+  <p data-testid="plain-text">Plain text</p>
+
+  <button type="button">Continue</button>
+  <p data-testid="input-events">0</p>
+</main>
+<script src="counting.js"></script>
+<script src="states.js"></script>
+</body>
+</html>

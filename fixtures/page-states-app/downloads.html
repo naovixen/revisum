@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Downloads</title></head>
+<body>
+<main>
+  <h1>Downloads</h1>
+  <!-- Each link leads to a route of the test's fixture server that answers with a file to save
+       (Content-Disposition: attachment). See test/contract/page-states-support.ts. -->
+  <a href="/exports/projects.csv" data-testid="safe-export">Export CSV</a>
+  <a href="/exports/empty.csv">Export empty list</a>
+  <a href="/exports/oversize.csv">Export full history</a>
+  <a href="/exports/logo.png">Download logo</a>
+  <a href="/exports/invoices.csv">Export invoices</a>
+  <a href="/exports/contacts.csv">Export contacts</a>
+  <!-- The same CSV behind a control whose accessible name is an irreversible action. -->
+  <a href="/exports/projects.csv" data-testid="danger-export">Delete account</a>
+  <!-- Files whose server-sent names are hostile: a parent path, an absolute path, device names. -->
+  <a href="/exports/hostile/parent-path">Export parent path</a>
+  <a href="/exports/hostile/parent-escape">Export escaping name</a>
+  <a href="/exports/hostile/absolute-path">Export absolute path</a>
+  <a href="/exports/hostile/device-con">Export device name</a>
+  <a href="/exports/hostile/device-nul">Export null device name</a>
+  <!-- A click that starts no download: it only changes the status text. -->
+  <button type="button" id="prepare">Prepare export</button>
+  <!-- A click that opens a popup instead of a download. -->
+  <button type="button" id="popup">Open help</button>
+  <button type="button">Continue</button>
+  <p data-testid="download-status">Ready</p>
+  <p data-testid="popup-state">none</p>
+  <p data-testid="input-events">0</p>
+</main>
+<script src="counting.js"></script>
+<script src="popup.js"></script>
+<script>
+  document.getElementById('prepare').addEventListener('click', () => {
+    document.querySelector('[data-testid="download-status"]').textContent = 'Preparing';
+  });
+</script>
+</body>
+</html>

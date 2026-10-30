@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Signed in</title></head>
+<body>
+<main>
+  <h1>Signed in</h1>
+  <p data-testid="sign-in-status">Signed in</p>
+  <button type="button" id="count-tabs">Count other tabs</button>
+  <p data-testid="other-tabs">not counted</p>
+  <p data-testid="input-events">0</p>
+</main>
+<script>
+  // What signing in keeps in the browser besides the session cookie: a name in local storage.
+  localStorage.setItem('displayName', 'Ada');
+</script>
+<script src="counting.js"></script>
+<script src="tabs.js"></script>
+</body>
+</html>

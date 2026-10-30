@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Spring sale</title>
+<meta property="og:title" content="Spring sale (server)">
+<meta name="description" content="Garden tools at half price.">
+<link rel="canonical" href="/head.html?view=canonical">
+</head>
+<body>
+<main>
+  <h1>Spring sale</h1>
+  <!-- How many of this page's scripts ran: the inline one below and head.js each add one. The
+       server sends 0, so a page loaded with scripts off keeps showing 0. -->
+  <p data-testid="script-runs">0</p>
+  <button type="button">Continue</button>
+  <p data-testid="input-events">0</p>
+</main>
+<script>
+  const scriptRuns = document.querySelector('[data-testid="script-runs"]');
+  scriptRuns.textContent = String(Number(scriptRuns.textContent) + 1);
+</script>
+<script src="counting.js"></script>
+<script src="head.js"></script>
+</body>
+</html>

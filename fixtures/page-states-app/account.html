@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Your account</title></head>
+<body>
+<main>
+  <h1>Your account</h1>
+  <!-- The /account route fills in SESSION_STATE from the Cookie header the browser sent:
+       "Signed in" when it carried the session cookie, "Signed out" otherwise. -->
+  <p data-testid="session-cookie">SESSION_STATE</p>
+  <!-- account.js fills these in: the name signing in kept in local storage, and the page's clock. -->
+  <p data-testid="stored-name">not read</p>
+  <p data-testid="page-now">not read</p>
+  <!-- A request to an origin no project allows, which egress control must block. -->
+  <img src="https://tab-tracker.example/pixel.png" alt="">
+  <button type="button" id="count-tabs">Count other tabs</button>
+  <p data-testid="other-tabs">not counted</p>
+  <button type="button" id="popup">Open help</button>
+  <p data-testid="popup-state">none</p>
+  <p data-testid="input-events">0</p>
+</main>
+<script src="counting.js"></script>
+<script src="tabs.js"></script>
+<script src="popup.js"></script>
+<script src="account.js"></script>
+</body>
+</html>

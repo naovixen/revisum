@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Link targets</title></head>
+<body>
+<main>
+  <h1>Link targets</h1>
+  <!-- Relative links. Late fees resolves against this page's URL to /billing/fees.html?tab=2;
+       its dot segments mean the attribute text is not the resolved URL. Neither page exists, so a
+       link that was followed would show as a request the server answered with 404. -->
+  <a href="help/../billing/fees.html?tab=2">Late fees</a>
+  <a href="./guide.html">Guide</a>
+  <button type="button">Continue</button>
+  <p data-testid="input-events">0</p>
+</main>
+<script src="counting.js"></script>
+</body>
+</html>
