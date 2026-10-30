@@ -46,7 +46,10 @@ export async function actionability(element: Element): Promise<string> {
   await nextFrame();
   const after = element.getBoundingClientRect();
   const stable = before.x === after.x && before.y === after.y && before.width === after.width && before.height === after.height;
-  const centre = { x: after.x + after.width / 2, y: after.y + after.height / 2 };
+  // An inline element that wraps onto a second line has one box per line, and the centre of the
+  // box around them all may fall between them; the centre of its first box is on the element.
+  const firstBox = Array.from(element.getClientRects()).find((box) => box.width > 0 && box.height > 0) ?? after;
+  const centre = { x: firstBox.x + firstBox.width / 2, y: firstBox.y + firstBox.height / 2 };
   const hit = document.elementFromPoint(centre.x, centre.y);
   const viaLabel = hit !== null && hit.closest('label') !== null && (hit.closest('label') as HTMLLabelElement).control === element;
   const receivesEvents = hit !== null && (hit === element || element.contains(hit) || viaLabel);
@@ -158,8 +161,42 @@ export async function fontsReady(): Promise<string> {
   return document.fonts.status;
 }
 
+// The page's URL and title, and what its head says about it: every <meta> with a content and a
+// name or property (once for each), and the resolved href of its canonical link, or null.
 export function pageInfo(): string {
-  return JSON.stringify({ url: location.href, title: document.title });
+  const meta: { name: string; content: string }[] = [];
+  for (const tag of Array.from(document.querySelectorAll('meta[content]'))) {
+    const content = tag.getAttribute('content') ?? '';
+    for (const attribute of ['name', 'property']) {
+      const name = tag.getAttribute(attribute);
+      if (name !== null && name !== '') meta.push({ name, content });
+    }
+  }
+  const canonical = Array.from(document.querySelectorAll('link[href]'))
+    .find((link) => link instanceof HTMLLinkElement && link.relList.contains('canonical'));
+  return JSON.stringify({
+    url: location.href, title: document.title, meta, canonicalUrl: canonical instanceof HTMLLinkElement ? canonical.href : null,
+  });
+}
+
+// What a probe reads besides the accessibility tree, as JSON: the absolute href of the link the
+// element is, or is in (null outside a link), and its aria-current state. Any aria-current value but
+// "false" (or empty) is current. With none, a link or a control is not current; any other element
+// does not expose the state ("none").
+export function linkAndCurrent(element: Element): string {
+  const link = element.closest('a[href], area[href]');
+  const href = link instanceof HTMLAnchorElement || link instanceof HTMLAreaElement ? link.href : null;
+  const CONTROL_ROLES = ['link', 'button', 'tab', 'menuitem', 'menuitemcheckbox', 'menuitemradio', 'option', 'treeitem', 'gridcell', 'row',
+    'checkbox', 'radio', 'switch'];
+  const declared = element.getAttribute('aria-current');
+  let current: string;
+  if (declared !== null) current = declared.trim() === '' || declared.trim().toLowerCase() === 'false' ? 'false' : 'true';
+  else {
+    const role = (element.getAttribute('role') ?? '').trim().split(/\s+/)[0] ?? '';
+    const control = element.matches('a[href], area[href], button, input, select, textarea, summary, option') || CONTROL_ROLES.includes(role);
+    current = control ? 'false' : 'none';
+  }
+  return JSON.stringify({ href, current });
 }
 
 // Focuses an element and selects its contents, ready for a fill.

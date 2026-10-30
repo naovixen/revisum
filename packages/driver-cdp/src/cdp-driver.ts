@@ -7,15 +7,18 @@ import {
 import { realpathSync } from 'node:fs';
 import { isAbsolute, relative, resolve } from 'node:path';
 import { chromiumBuild } from './browser-build.ts';
-import { SESSION_FEATURES, buildSession, errorText } from './browser-session.ts';
+import { SESSION_FEATURES, buildSession, errorText, type SessionDetails } from './browser-session.ts';
 import { CdpConnection } from './cdp-connection.ts';
 import { QUIET_CHROME_FLAGS, proxyFlags } from './chrome-flags.ts';
+import { DownloadFolder } from './downloads.ts';
 import { EgressRecorder } from './egress-records.ts';
 import { launchChromium, type LaunchedChromium } from './chromium-launcher.ts';
 import { focusAndSelect, focusElement, frameContentOffset } from './in-page.ts';
 import type { HeldModifierKey } from './modifier-keys.ts';
-import type { DriverSession, OwnBrowserDriver, PageArgument, PageFunction, PageOperations, Point, RoleAndName } from './page-operations.ts';
-import { PageWatch } from './page-watch.ts';
+import type {
+  DriverSession, ExposedStates, OwnBrowserDriver, PageArgument, PageFunction, PageOperations, Point, RoleAndName,
+} from './page-operations.ts';
+import { PageWatch, type AttachedPage } from './page-watch.ts';
 
 export const CDP_ADAPTER_VERSION = '0.1.0';
 const COMMAND_TIMEOUT_MILLISECONDS = 30_000;
@@ -101,11 +104,13 @@ type RemoteObject = { readonly type: string; readonly subtype?: string; readonly
 type CallResult = { readonly result: RemoteObject; readonly exceptionDetails?: { readonly text: string; readonly exception?: RemoteObject } };
 type CallArgument = { readonly value?: unknown; readonly objectId?: string };
 type AccessibilityValue = { readonly type: string; readonly value?: unknown };
+type AccessibilityProperty = { readonly name: string; readonly value: AccessibilityValue };
 type AccessibilityNode = {
   readonly nodeId: string;
   readonly ignored: boolean;
   readonly role?: AccessibilityValue;
   readonly name?: AccessibilityValue;
+  readonly properties?: readonly AccessibilityProperty[];
   readonly childIds?: readonly string[];
   readonly parentId?: string;
   readonly backendDOMNodeId?: number;
@@ -178,6 +183,23 @@ export function cdpDriver(options: CdpDriverOptions): OwnBrowserDriver {
   };
 }
 
+// What every page of one session shares: the browser's own context, the target and environment it
+// emulates, the egress allow-list's record of blocked origins, the egress recorder and the
+// download folder.
+type SessionBrowser = {
+  readonly connection: CdpConnection;
+  readonly browserContextId: string;
+  readonly userAgent: string;
+  readonly target: Target;
+  readonly environment: SessionEnvironment;
+  readonly blocked: string[];
+  readonly recorder: EgressRecorder;
+  readonly downloads: DownloadFolder;
+};
+
+// How long a new tab is given to attach after the browser creates it.
+const TAB_ATTACH_TIMEOUT_MILLISECONDS = 10_000;
+
 async function createSession(
   launched: LaunchedChromium, target: Target, environment: SessionEnvironment, fixturesFolder: string | undefined,
 ): Promise<DriverSession> {
@@ -186,22 +208,54 @@ async function createSession(
   const { browserContextId } = await connection.send<{ browserContextId: string }>(undefined, 'Target.createBrowserContext', { disposeOnDetach: true });
   const { targetId } = await connection.send<{ targetId: string }>(undefined, 'Target.createTarget', { url: 'about:blank', browserContextId });
   const { sessionId } = await connection.send<{ sessionId: string }>(undefined, 'Target.attachToTarget', { targetId, flatten: true });
-  const page = connection.session(sessionId);
+  const browser: SessionBrowser = {
+    connection, browserContextId, userAgent: version.userAgent, target, environment, blocked: [],
+    // Every request's origin and channel, for the run's egress events.
+    recorder: new EgressRecorder(connection),
+    downloads: new DownloadFolder(connection, browserContextId),
+  };
 
-  const profile = deviceProfile(target);
-  await page.send('Page.enable');
-  // Every request's origin and channel, for the run's egress events.
-  const recorder = new EgressRecorder(connection);
-  const watch = new PageWatch(connection, { browserContextId, targetId, sessionId }, (url) => recorder.record(url, 'popup'));
+  await connection.send(sessionId, 'Page.enable');
+  const watch = new PageWatch(connection, { browserContextId, targetId, sessionId }, {
+    onPopupRequest: (url) => browser.recorder.record(url, 'popup'), ownsBrowserContext: true, claimsDownload: (event) => browser.downloads.claims(event),
+  });
   await watch.start();
-  await recorder.start(sessionId);
+  await browser.recorder.start(sessionId);
+  browser.downloads.watchResponses(sessionId);
+  await preparePage(browser, sessionId);
+
+  const operations = new CdpPage(connection, sessionId, watch, null);
+  const details: SessionDetails = {
+    browser: { name: 'chromium', version: /\/(\S+)$/.exec(version.product)?.[1] ?? version.product },
+    processId: launched.browserProcess.pid ?? -1,
+    blockedOrigins: () => browser.blocked,
+    egressRecords: () => browser.recorder.records(),
+    // The download folder goes once the browser can no longer write into it.
+    close: async () => {
+      try { await launched.stop(); } finally { browser.downloads.remove(); }
+    },
+    events: watch,
+    fixturePath: (fixture) => fixtureFilePath(fixturesFolder, fixture),
+    downloads: browser.downloads,
+    openTab: () => openTab(browser, watch, details),
+  };
+  return buildSession(operations, environment, details);
+}
+
+// Makes a page of the session hermetic and repeatable before it loads anything: the target's
+// device, locale, time zone, colour scheme and motion, the determinism script, and the egress
+// allow-list, whose refusals join the session's blocked origins.
+async function preparePage(browser: SessionBrowser, sessionId: string): Promise<void> {
+  const { connection, target, environment } = browser;
+  const page = connection.session(sessionId);
+  const profile = deviceProfile(target);
   await page.send('Emulation.setDeviceMetricsOverride', { width: profile.width, height: profile.height, deviceScaleFactor: profile.scale, mobile: profile.mobile });
   // The quoted key is the protocol's own parameter name.
   if (profile.touch) await page.send('Emulation.setTouchEmulationEnabled', { enabled: true, 'maxTouchPoints': 5 });
   await page.send('Emulation.setLocaleOverride', { locale: target.locale });
   await page.send('Emulation.setTimezoneOverride', { timezoneId: target.timezone });
   // navigator.language follows Accept-Language, so the locale needs both overrides.
-  await page.send('Emulation.setUserAgentOverride', { userAgent: version.userAgent, acceptLanguage: target.locale });
+  await page.send('Emulation.setUserAgentOverride', { userAgent: browser.userAgent, acceptLanguage: target.locale });
   await page.send('Emulation.setEmulatedMedia', { features: [
     { name: 'prefers-reduced-motion', value: target.reducedMotion },
     { name: 'prefers-color-scheme', value: target.colorScheme },
@@ -209,14 +263,13 @@ async function createSession(
   await page.send('Page.addScriptToEvaluateOnNewDocument', { source: determinismScript(environment.seed, environment.fixedTimeMilliseconds) });
 
   // Every request is paused and either let through (allowed origin) or failed and recorded.
-  const blocked: string[] = [];
   page.on('Fetch.requestPaused', (parameters) => {
     const paused = parameters as RequestPaused;
     let allowed = false;
     try {
       const url = new URL(paused.request.url);
       allowed = environment.allowedOrigins.includes(url.origin) || LOCAL_SCHEMES.includes(url.protocol);
-      if (!allowed) blocked.push(url.origin);
+      if (!allowed) browser.blocked.push(url.origin);
     } catch { /* a URL that cannot be parsed is blocked */ }
     const decision = allowed
       ? page.send('Fetch.continueRequest', { requestId: paused.requestId })
@@ -224,28 +277,72 @@ async function createSession(
     decision.catch(() => undefined);
   });
   await page.send('Fetch.enable', { patterns: [{ urlPattern: '*', requestStage: 'Request' }] });
-
-  const operations = new CdpPage(connection, sessionId, watch, null);
-  return buildSession(operations, environment, {
-    browser: { name: 'chromium', version: /\/(\S+)$/.exec(version.product)?.[1] ?? version.product },
-    processId: launched.browserProcess.pid ?? -1,
-    blockedOrigins: () => blocked,
-    egressRecords: () => recorder.records(),
-    close: () => launched.stop(),
-    events: watch,
-    fixturePath: (fixture) => fixtureFilePath(fixturesFolder, fixture),
-  });
 }
 
-// Where a CdpPage's document is when it is an iframe's: the frame's id, its element in the parent
-// document, and the isolated script world it is read through. The page's own scripts cannot see
-// or change that world; it shares only the document.
+// Opens a second tab in the session's own browser context, so it shares cookies and storage. The
+// first page's watch hands the tab over still paused; it is prepared exactly as the first page
+// was, then let run on about:blank. Closing it closes only the tab.
+async function openTab(browser: SessionBrowser, firstWatch: PageWatch, firstDetails: SessionDetails): Promise<Result<DriverSession, DriverError>> {
+  const { connection, browserContextId } = browser;
+  const attaching = firstWatch.nextTab(TAB_ATTACH_TIMEOUT_MILLISECONDS);
+  let attached: AttachedPage;
+  try {
+    await connection.send(undefined, 'Target.createTarget', { url: 'about:blank', browserContextId });
+    attached = await attaching.promise;
+  } catch (error) {
+    attaching.cancel();
+    return failure({ code: 'navigation-failed', detail: `the new tab did not open: ${errorText(error)}` });
+  }
+  const watch = new PageWatch(connection, { browserContextId, targetId: attached.targetId, sessionId: attached.sessionId }, {
+    onPopupRequest: (url) => browser.recorder.record(url, 'popup'), ownsBrowserContext: false, claimsDownload: (event) => browser.downloads.claims(event),
+  });
+  let stopResponses = (): void => undefined;
+  const close = async (): Promise<void> => {
+    watch.stop();
+    stopResponses();
+    await connection.send(undefined, 'Target.closeTarget', { targetId: attached.targetId }).catch(() => undefined);
+  };
+  try {
+    await connection.send(attached.sessionId, 'Page.enable');
+    await watch.start();
+    await browser.recorder.start(attached.sessionId);
+    stopResponses = browser.downloads.watchResponses(attached.sessionId);
+    await preparePage(browser, attached.sessionId);
+    await connection.send(attached.sessionId, 'Runtime.runIfWaitingForDebugger');
+  } catch (error) {
+    await close();
+    return failure({ code: 'navigation-failed', detail: `the new tab could not be prepared: ${errorText(error)}` });
+  }
+  const operations = new CdpPage(connection, attached.sessionId, watch, null);
+  // A tab opens no tab of its own: newTab is allowed only at the top level of a plan.
+  return success(buildSession(operations, browser.environment, {
+    browser: firstDetails.browser, processId: firstDetails.processId, blockedOrigins: firstDetails.blockedOrigins,
+    egressRecords: firstDetails.egressRecords, fixturePath: firstDetails.fixturePath, downloads: browser.downloads, events: watch, close,
+  }));
+}
+
+// An isolated script world of one frame: the page's own scripts cannot see or change it; it shares
+// only the document. The driver reads an iframe's document through one, and the top document
+// through one while the page's scripts are off, since timers do not run in the page's own world then.
+type IsolatedWorld = { readonly frameId: string; executionContextId: number };
+
+// Where a CdpPage's document is when it is an iframe's: its element in the parent document, and
+// the isolated world it is read through.
 type FrameScope = {
   readonly parent: CdpPage;
   readonly frameElement: string;
-  readonly frameId: string;
-  executionContextId: number;
+  readonly world: IsolatedWorld;
 };
+
+// The accessibility properties that hold an element's selected, expanded and pressed states.
+const EXPOSED_STATE_PROPERTIES = ['selected', 'expanded', 'pressed'] as const;
+
+// A state property's value: a boolean, or a tristate text. "mixed" (partly pressed) counts as on.
+function stateValue(value: unknown): boolean | null {
+  if (value === true || value === 'true' || value === 'mixed') return true;
+  if (value === false || value === 'false') return false;
+  return null;
+}
 
 // The name of the isolated script world the driver reads a frame's document through.
 const FRAME_WORLD_NAME = 'driver-frame';
@@ -263,6 +360,9 @@ class CdpPage implements PageOperations<string> {
   readonly #sessionId: string;
   readonly #watch: PageWatch;
   readonly #frame: FrameScope | null;
+  // For the top document: whether the page's scripts are off, and the world it is read through then.
+  #scriptsDisabled = false;
+  #scriptsOffWorld: IsolatedWorld | null = null;
 
   constructor(connection: CdpConnection, sessionId: string, watch: PageWatch, frame: FrameScope | null) {
     this.#connection = connection;
@@ -289,8 +389,23 @@ class CdpPage implements PageOperations<string> {
     }
   }
 
-  async navigate(url: string, timeoutMilliseconds: number): Promise<void> {
-    const frameId = this.#frame?.frameId;
+  // The isolated world this document is read through, or null for the page's own world.
+  #world(): IsolatedWorld | null {
+    return this.#frame?.world ?? this.#scriptsOffWorld;
+  }
+
+  async navigate(url: string, timeoutMilliseconds: number, scripts: 'enabled' | 'disabled'): Promise<void> {
+    const frameId = this.#frame?.world.frameId;
+    // Script execution is a setting of the whole page, so only the top document's navigate changes
+    // it; it stays as set until the next one.
+    if (frameId === undefined) {
+      const disable = scripts === 'disabled';
+      if (disable !== this.#scriptsDisabled) {
+        await this.#send('Emulation.setScriptExecutionDisabled', { value: disable });
+        this.#scriptsDisabled = disable;
+      }
+      this.#scriptsOffWorld = null;
+    }
     // The top document has loaded at its load event; a frame once it stops loading.
     const loaded = frameId === undefined
       ? this.#connection.once(this.#sessionId, 'Page.loadEventFired', timeoutMilliseconds)
@@ -304,6 +419,10 @@ class CdpPage implements PageOperations<string> {
       await loaded.promise;
     } finally {
       loaded.cancel();
+    }
+    if (frameId === undefined && this.#scriptsDisabled) {
+      const { frameTree } = await this.#send<{ frameTree: FrameTree }>('Page.getFrameTree');
+      this.#scriptsOffWorld = { frameId: frameTree.frame.id, executionContextId: await this.#isolatedWorld(frameTree.frame.id) };
     }
   }
 
@@ -322,20 +441,20 @@ class CdpPage implements PageOperations<string> {
     return { promise, cancel: () => { clearTimeout(timer); stopListening(); } };
   }
 
-  // The document object: the top document's, in the page's main world, or the frame's, in its
-  // isolated world. A frame that has navigated since has lost its world, so a new one is made.
+  // The document object: in the page's main world, or in this document's isolated world when it
+  // has one. A frame that has navigated since has lost its world, so a new one is made.
   async #documentObject(): Promise<string> {
-    const frame = this.#frame;
+    const world = this.#world();
     let evaluated: CallResult;
-    if (frame === null) {
+    if (world === null) {
       evaluated = await this.#send<CallResult>('Runtime.evaluate', { expression: 'document' });
     } else {
       try {
-        evaluated = await this.#send<CallResult>('Runtime.evaluate', { expression: 'document', contextId: frame.executionContextId });
+        evaluated = await this.#send<CallResult>('Runtime.evaluate', { expression: 'document', contextId: world.executionContextId });
       } catch (error) {
         if (!LOST_CONTEXT.test(errorText(error)) || this.#watch.crashed()) throw error;
-        frame.executionContextId = await this.#isolatedWorld(frame.frameId);
-        evaluated = await this.#send<CallResult>('Runtime.evaluate', { expression: 'document', contextId: frame.executionContextId });
+        world.executionContextId = await this.#isolatedWorld(world.frameId);
+        evaluated = await this.#send<CallResult>('Runtime.evaluate', { expression: 'document', contextId: world.executionContextId });
       }
     }
     if (evaluated.result.objectId === undefined) throw new Error('no document');
@@ -373,6 +492,7 @@ class CdpPage implements PageOperations<string> {
 
   async byRole(role: string, name: string): Promise<string[]> {
     const frame = this.#frame;
+    const world = this.#world();
     const root = frame === null
       ? (await this.#send<{ root: { backendNodeId: number } }>('DOM.getDocument', { depth: 0 })).root.backendNodeId
       : (await this.#send<DescribedNode>('DOM.describeNode', { objectId: await this.#documentObject() })).node.backendNodeId;
@@ -383,7 +503,7 @@ class CdpPage implements PageOperations<string> {
     for (const node of queried.nodes) {
       if (node.ignored || node.backendDOMNodeId === undefined) continue;
       const resolved = await this.#send<{ object: { objectId?: string } }>('DOM.resolveNode', {
-        backendNodeId: node.backendDOMNodeId, ...(frame === null ? {} : { executionContextId: frame.executionContextId }),
+        backendNodeId: node.backendDOMNodeId, ...(world === null ? {} : { executionContextId: world.executionContextId }),
       });
       if (resolved.object.objectId) handles.push(resolved.object.objectId);
     }
@@ -399,8 +519,18 @@ class CdpPage implements PageOperations<string> {
     return { role: role === null ? null : ROLE_NAMES[role] ?? role, name };
   }
 
+  async exposedStates(element: string): Promise<ExposedStates> {
+    const { nodes } = await this.#send<{ nodes: AccessibilityNode[] }>('Accessibility.getPartialAXTree', { objectId: element, fetchRelatives: false });
+    const properties = nodes[0]?.properties ?? [];
+    const read = (name: (typeof EXPOSED_STATE_PROPERTIES)[number]): boolean | null => {
+      const property = properties.find((candidate) => candidate.name === name);
+      return property === undefined ? null : stateValue(property.value.value);
+    };
+    return { selected: read('selected'), expanded: read('expanded'), pressed: read('pressed') };
+  }
+
   async accessibilityTree(): Promise<A11yNode> {
-    const frameId = this.#frame?.frameId;
+    const frameId = this.#frame?.world.frameId;
     const { nodes } = await this.#send<{ nodes: AccessibilityNode[] }>('Accessibility.getFullAXTree', frameId === undefined ? {} : { frameId });
     const byId = new Map(nodes.map((node) => [node.nodeId, node]));
     const build = (node: AccessibilityNode): A11yNode[] => {
@@ -492,12 +622,12 @@ class CdpPage implements PageOperations<string> {
       if (this.#watch.crashed()) throw error;
       return null;
     }
-    return new CdpPage(this.#connection, this.#sessionId, this.#watch, { parent: this, frameElement: element, frameId, executionContextId });
+    return new CdpPage(this.#connection, this.#sessionId, this.#watch, { parent: this, frameElement: element, world: { frameId, executionContextId } });
   }
 
   async unreachableUrl(): Promise<string | null> {
     const { frameTree } = await this.#send<{ frameTree: FrameTree }>('Page.getFrameTree');
-    const frameId = this.#frame?.frameId;
+    const frameId = this.#frame?.world.frameId;
     const find = (tree: FrameTree): FrameTree | undefined =>
       (frameId === undefined || tree.frame.id === frameId ? tree : (tree.childFrames ?? []).map(find).find((found) => found !== undefined));
     return find(frameTree)?.frame.unreachableUrl ?? null;

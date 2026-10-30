@@ -1,7 +1,9 @@
 // The seam each browser protocol implements once. buildSession (browser-session.ts) turns a
 // PageOperations into a Session, so auto-waiting, probes and audits behave the same on every
 // protocol. One PageOperations serves one document: the page's top document, or an iframe's.
-import type { A11yNode, BrowserDriver, BrowserRequestRecord, Key, Result, Session, SessionEnvironment, Target, Unavailable } from '@revisum/contracts';
+import type {
+  A11yNode, BrowserDriver, BrowserRequestRecord, DownloadedFile, DriverError, Key, Result, Session, SessionEnvironment, Target, Unavailable,
+} from '@revisum/contracts';
 import type { HeldModifierKey } from './modifier-keys.ts';
 import type { AuditRuleResult } from './page-audit.ts';
 
@@ -19,7 +21,9 @@ export interface PageOperations<Handle> {
   readonly protocol: ProtocolId;
   // Where accessibilityTree() comes from, for notes in the manifest.
   readonly accessibilityTreeSource: 'browser' | 'in-page-approximation';
-  navigate(url: string, timeoutMilliseconds: number): Promise<void>;
+  // With scripts 'disabled', the page loads with script execution off until the next navigate,
+  // and the page is read through an isolated script world, where the driver's own reads still run.
+  navigate(url: string, timeoutMilliseconds: number, scripts: 'enabled' | 'disabled'): Promise<void>;
   // Calls a page function that returns a string (JSON where structured). Promises are awaited.
   callForString(pageFunction: PageFunction, inputs: readonly PageArgument<Handle>[]): Promise<string>;
   // Calls a page function that returns Element[], and returns their handles.
@@ -30,6 +34,9 @@ export interface PageOperations<Handle> {
   // The element's role and accessible name, as the browser's accessibility engine computes them;
   // null for one it does not expose.
   roleAndName(element: Handle): Promise<RoleAndName>;
+  // The selected, expanded and pressed states the browser's accessibility engine exposes for the
+  // element; null for each it does not expose.
+  exposedStates(element: Handle): Promise<ExposedStates>;
   // Points are in this document's viewport.
   click(element: Handle, at: Point): Promise<void>;
   hover(at: Point): Promise<void>;
@@ -50,6 +57,23 @@ export interface PageOperations<Handle> {
 }
 
 export type RoleAndName = { readonly role: string | null; readonly name: string | null };
+export type ExposedStates = { readonly selected: boolean | null; readonly expanded: boolean | null; readonly pressed: boolean | null };
+
+// The browser's downloads for one session and its tabs: saved into a folder of the session's own,
+// and refused at every other time.
+export interface DownloadCapture {
+  // Lets the browser save the next download the session starts, and claims it for the caller.
+  arm(): Promise<ArmedDownload>;
+}
+export interface ArmedDownload {
+  // Waits up to `beginTimeoutMilliseconds` for the claimed download to start (no-download), then
+  // for its last byte. A file over `maximumBytes` is cancelled and its bytes deleted
+  // (download-too-large).
+  finish(maximumBytes: number, beginTimeoutMilliseconds: number): Promise<Result<DownloadedFile, DriverError>>;
+  // Refuses downloads again. Unless `keep` is true and the file finished, the download is
+  // cancelled and its bytes deleted; a kept file stays until the session closes.
+  release(keep: boolean): Promise<void>;
+}
 
 // What a session learns from the browser about its page outside any one command.
 export interface PageEvents {

@@ -2,7 +2,7 @@
 // interfaces. Each driver package implements them; the engine never imports a driver.
 // See docs/specs/SPEC-06-cdp-driver.md and docs/specs/SPEC-27-shared-types-and-events.md.
 import type { DriverFeature } from './literal-steps.ts';
-import type { ActionStep, Locator, ResolvedLocator } from './plan.ts';
+import type { ActionStep, DownloadStep, Locator, ResolvedLocator } from './plan.ts';
 import type { GuardVerdict } from './policy.ts';
 import type { Secret } from './secret.ts';
 import type { Result } from './result.ts';
@@ -46,6 +46,18 @@ export type BuildFailure = { readonly code: BuildFailureCode; readonly detail: s
 // A rectangle in CSS pixels.
 export type Box = { readonly x: number; readonly y: number; readonly width: number; readonly height: number };
 
+// The states an element exposes to assistive technology, read from the browser's accessibility
+// tree: aria-selected, aria-expanded, aria-pressed and aria-current, and their native equivalents
+// (a selected <option>, the <summary> of an open <details>). Null means the element does not expose
+// that state at all, such as a tab whose selection is shown only by a CSS class, so a check of it
+// can never pass. Current is false, not null, on a link or control that carries no aria-current.
+export type AccessibleStates = {
+  readonly selected: boolean | null;
+  readonly expanded: boolean | null;
+  readonly pressed: boolean | null;
+  readonly current: boolean | null;
+};
+
 // A read-only look at the element a locator matches. A count other than 1 means not found or ambiguous.
 export type ElementProbe = {
   readonly count: number;
@@ -56,8 +68,37 @@ export type ElementProbe = {
   // True when the element, an ancestor or a descendant matches a sensitive (personal data) selector.
   readonly sensitive: boolean;
   readonly box: Box | null;
+  // Present when the driver reads accessibility states (the pageStates feature).
+  readonly states?: AccessibleStates;
+  // The absolute URL of the link the element is, or is in, resolved against the page's URL; null
+  // when it is in no link. Present when the driver reads link targets (the linkTargets feature).
+  readonly href?: string | null;
 };
-export type PageProbe = { readonly url: string; readonly title: string };
+// One <meta> tag of the document head: its name or property attribute, and its content.
+export type PageMetaTag = { readonly name: string; readonly content: string };
+export type PageProbe = {
+  readonly url: string;
+  readonly title: string;
+  // Present when the driver reads the document head (the pageMetadata feature): every <meta> with a
+  // name or property and a content, once per attribute, and the resolved href of
+  // <link rel="canonical">, or null when the head has none.
+  readonly meta?: readonly PageMetaTag[];
+  readonly canonicalUrl?: string | null;
+};
+
+// A file a download step saved. The name is the server's suggested name as text only, with path
+// separators and control characters replaced: the driver never stores the file under it. The
+// bytes stay in memory for the run's checks; only the name, media type, size and sha256 are kept.
+export type DownloadedFile = {
+  readonly fileName: string;
+  readonly mediaType: string;
+  readonly bytes: Uint8Array;
+  readonly sha256: string;
+};
+
+// How a navigate loads its page. 'disabled' turns script execution off for that page, until the
+// next navigate, so checks see what the server sent (the scriptsDisabled feature).
+export type NavigateOptions = { readonly scripts: 'enabled' | 'disabled' };
 
 // The element a step's locator resolved to, as the policy gate's runtime guard sees it just before
 // the action. A null field is one the page does not show, such as a control with no accessible name.
@@ -97,7 +138,8 @@ export type SessionEnvironment = {
 };
 
 export interface PageNavigator {
-  navigate(url: string): Promise<Result<void, DriverError>>;
+  // Without options, scripts run as usual.
+  navigate(url: string, options?: NavigateOptions): Promise<Result<void, DriverError>>;
   page(): Promise<PageProbe>;
 }
 export interface ActionRunner {
@@ -134,6 +176,12 @@ export interface DocumentSession extends PageNavigator, ActionRunner, Prober, Ca
   // True once the page's renderer has died. A check waiting on a crashed page then fails with
   // target-crashed rather than waiting out its timeout. A driver without it never reports a crash.
   crashed?(): boolean;
+  // Clicks the step's element, asking the guard first as a click does, and waits for exactly one
+  // download to start within the step timeout and to finish. A click that starts none fails with
+  // no-download; a file over maximumBytes is cancelled, its partial bytes deleted, and fails with
+  // download-too-large; a popup the click opens fails with unsupported-step. A driver without it
+  // does not perform downloads (the downloads feature).
+  download?(step: DownloadStep, maximumBytes: number, guard?: ActionGuard): Promise<Result<DownloadedFile, DriverError>>;
 }
 
 // One open browser session: every driver port together.
@@ -143,6 +191,11 @@ export interface Session extends DocumentSession {
   blockedOrigins(): readonly string[];
   // Ends the session; every process it started exits.
   close(): Promise<void>;
+  // Opens the URL in a new tab of the session's own browser context, so it shares cookies and
+  // storage, with the same environment, egress control and determinism script as the first tab.
+  // The tab's close() closes only the tab; its blocked origins join this session's. A driver
+  // without it does not open tabs (the newTabs feature).
+  newTab?(url: string): Promise<Result<Session, DriverError>>;
 }
 
 export type AdapterInfo = {

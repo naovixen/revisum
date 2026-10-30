@@ -284,6 +284,8 @@ export type StepType = Step['type'];
 export type ActionStep = Extract<Step, { type: 'click' | 'hover' | 'fill' | 'select' | 'upload' | 'press' | 'download' | 'dialog' }>;
 // Accepts or dismisses the next dialog the page opens.
 export type DialogStep = Extract<Step, { type: 'dialog' }>;
+// A click that must start exactly one download, which the driver's download port performs.
+export type DownloadStep = Extract<Step, { type: 'download' }>;
 // Lines of a multi-line fill with every value reference replaced by its text.
 export type ResolvedMultiLineText = { readonly lines: readonly SafeText[] };
 // An action step with every value reference replaced by its text, as the engine hands it to a

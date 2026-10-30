@@ -3,17 +3,17 @@
 // See docs/specs/SPEC-06-cdp-driver.md.
 import {
   DEFAULT_TEST_ID_ATTRIBUTE, DRIVER_FEATURES, failure, literalActionStep, literalText, performableLocator, reveal, success,
-  type ActionGuard, type ActionStep, type BrowserRequestRecord, type DialogStep, type DocumentSession, type DriverError, type DriverFeature,
-  type ElementProbe, type Locator, type PageProbe, type Position, type ResolvedActionStep, type ResolvedElement, type ResolvedLocator, type Result,
-  type Secret, type SessionEnvironment,
+  type ActionGuard, type ActionStep, type BrowserRequestRecord, type DialogStep, type DocumentSession, type DownloadedFile, type DownloadStep,
+  type DriverError, type DriverFeature, type ElementProbe, type Locator, type PageMetaTag, type PageProbe, type Position, type ResolvedActionStep,
+  type ResolvedElement, type ResolvedLocator, type Result, type Secret, type SessionEnvironment,
 } from '@revisum/contracts';
 import {
   actionability, afterTwoFrames, armHitCheck, findByLabel, findByTestId, findByText, fontsReady, guardDetails, inDocumentOrder, inThisDocument,
-  maskElements, pageInfo, probeElement, readHitCheck, selectOption, unmaskElements,
+  linkAndCurrent, maskElements, pageInfo, probeElement, readHitCheck, selectOption, unmaskElements,
 } from './in-page.ts';
 import { heldModifierKeys } from './modifier-keys.ts';
 import { pageAudit, parseAudit, toFindings, type AuditRuleResult } from './page-audit.ts';
-import type { Actionability, DriverSession, PageEvents, PageFunction, PageOperations } from './page-operations.ts';
+import type { Actionability, DownloadCapture, DriverSession, PageEvents, PageFunction, PageOperations } from './page-operations.ts';
 
 export const NO_ELEMENT: ElementProbe = { count: 0, visible: false, enabled: false, text: '', value: null, sensitive: false, box: null };
 const POLL_INTERVAL_MILLISECONDS = 50;
@@ -34,6 +34,11 @@ export type SessionDetails = {
   readonly events: PageEvents;
   // The absolute path of a declared upload fixture, or why it cannot be sent.
   readonly fixturePath: (fixture: string) => Result<string, DriverError>;
+  // Where a download step's file is saved. Without it, the session refuses download steps.
+  readonly downloads?: DownloadCapture;
+  // Opens a second tab of the session's browser context, still on about:blank. Without it, the
+  // session opens no tabs.
+  readonly openTab?: () => Promise<Result<DriverSession, DriverError>>;
 };
 
 // The scheme of the page the browser shows in place of one it could not show.
@@ -143,6 +148,31 @@ async function waitUntilFound<Handle>(
   }
 }
 
+// Decodes what linkAndCurrent (in-page.ts) reports. A field of another shape is read as not shown.
+function decodeLinkAndCurrent(text: string): { readonly href: string | null; readonly current: boolean | null } {
+  const parsed: unknown = JSON.parse(text);
+  const fields = typeof parsed === 'object' && parsed !== null ? parsed as Record<string, unknown> : {};
+  const href = fields['href'];
+  const current = fields['current'];
+  return { href: typeof href === 'string' ? href : null, current: current === 'true' ? true : current === 'false' ? false : null };
+}
+
+// Decodes what pageInfo (in-page.ts) reports. The page's own scripts may have changed what the
+// browser hands back, so every field is checked; a meta tag of another shape is left out.
+function decodePageInfo(text: string): PageProbe {
+  const parsed: unknown = JSON.parse(text);
+  const fields = typeof parsed === 'object' && parsed !== null ? parsed as Record<string, unknown> : {};
+  const [url, title, meta, canonicalUrl] = [fields['url'], fields['title'], fields['meta'], fields['canonicalUrl']];
+  if (typeof url !== 'string' || typeof title !== 'string') throw new Error('the page did not report its URL and title');
+  const tags: PageMetaTag[] = [];
+  for (const tag of Array.isArray(meta) ? meta : []) {
+    const tagFields = typeof tag === 'object' && tag !== null ? tag as Record<string, unknown> : {};
+    const [name, content] = [tagFields['name'], tagFields['content']];
+    if (typeof name === 'string' && typeof content === 'string') tags.push({ name, content });
+  }
+  return { url, title, meta: tags, canonicalUrl: typeof canonicalUrl === 'string' ? canonicalUrl : null };
+}
+
 // Decodes what guardDetails (in-page.ts) reports. A field of another shape is read as not shown.
 function decodeGuardDetails(text: string): Omit<ResolvedElement, 'role' | 'name'> {
   const parsed: unknown = JSON.parse(text);
@@ -180,10 +210,12 @@ const textToFill = (value: Extract<ResolvedActionStep, { type: 'fill' }>['value'
   (typeof value === 'string' ? value : 'lines' in value ? value.lines.join('\n') : '');
 
 // The ports of one document. `masked` lists the documents a screenshot masks: this one and every
-// document it is framed in, so a capture from inside a frame hides what the top page hides.
+// document it is framed in, so a capture from inside a frame hides what the top page hides. The
+// first of them is the top document.
 function documentPorts<Handle>(
   operations: PageOperations<Handle>, masked: readonly PageOperations<Handle>[], environment: SessionEnvironment, details: SessionDetails,
 ): DocumentPorts {
+  const isTopDocument = masked.length === 1;
   const events = details.events;
   const crashed = (): boolean => events.crashed();
   const timeout = environment.timeoutMilliseconds;
@@ -197,7 +229,12 @@ function documentPorts<Handle>(
     const element = found[0];
     if (found.length !== 1 || element === undefined) return { ...NO_ELEMENT, count: found.length };
     try {
-      return JSON.parse(await operations.callForString(probeElement, [{ element }, environment.sensitiveSelectors])) as ElementProbe;
+      const shown = JSON.parse(await operations.callForString(probeElement, [{ element }, environment.sensitiveSelectors])) as ElementProbe;
+      // The link target and aria-current come from the document, the other states from the
+      // browser's accessibility engine, as assistive technology reads them.
+      const { href, current } = decodeLinkAndCurrent(await operations.callForString(linkAndCurrent, [{ element }]));
+      const exposed = await operations.exposedStates(element);
+      return { ...shown, states: { ...exposed, current }, href };
     } catch {
       return NO_ELEMENT;
     }
@@ -318,18 +355,48 @@ function documentPorts<Handle>(
     return acted;
   };
 
-  const ports: DocumentPorts = {
-    async navigate(url) {
+  // A download step: the click, guarded as any click, with the browser armed to save the one
+  // download it starts. A popup the click opens, or a second download, fails the step with
+  // unsupported-step and nothing of it is kept.
+  const download = async (step: DownloadStep, maximumBytes: number, guard?: ActionGuard): Promise<Result<DownloadedFile, DriverError>> => {
+    if (crashed()) return failure(CRASHED);
+    const capture = details.downloads;
+    const locator = performableLocator(step.locator, SESSION_FEATURES);
+    if (capture === undefined || locator === undefined) return failure({ code: 'unsupported-step', detail: 'this driver does not perform this download step' });
+    if (events.openDialog() !== null) return failure({ code: 'not-actionable', detail: 'a dialog is open: a dialog step must answer it first' });
+    const openingsBefore = events.unsupportedOpenings();
+    const armed = await capture.arm();
+    let kept = false;
+    try {
+      const clicked = await act({ type: 'click', locator }, guard);
+      if (!clicked.ok) return clicked;
+      const saved = await armed.finish(maximumBytes, timeout);
       if (crashed()) return failure(CRASHED);
+      if (events.unsupportedOpenings() > openingsBefore) {
+        return failure({ code: 'unsupported-step', detail: 'the click opened a popup or a second page, or started a second download' });
+      }
+      kept = saved.ok;
+      return saved;
+    } finally {
+      await armed.release(kept);
+    }
+  };
+
+  const ports: DocumentPorts = {
+    async navigate(url, options) {
+      if (crashed()) return failure(CRASHED);
+      const scripts = options?.scripts ?? 'enabled';
+      // Scripts are a setting of the whole page, so only the top document's navigate turns them off.
+      if (scripts === 'disabled' && !isTopDocument) return failure({ code: 'unsupported-step', detail: 'scripts can be turned off only for the top document' });
       try {
-        await operations.navigate(url, Math.max(timeout, 10_000));
+        await operations.navigate(url, Math.max(timeout, 10_000), scripts);
         return success(undefined);
       } catch (error) {
         return failure(crashed() ? CRASHED : { code: 'navigation-failed', detail: errorText(error) });
       }
     },
     async page(): Promise<PageProbe> {
-      const shown = JSON.parse(await operations.callForString(pageInfo, [])) as PageProbe;
+      const shown = decodePageInfo(await operations.callForString(pageInfo, []));
       // In place of a page it could not show, the browser shows its own error page at an internal
       // URL; the page's URL is still the one navigated to, as the address bar shows.
       if (!shown.url.startsWith(BROWSER_ERROR_PAGE)) return shown;
@@ -337,6 +404,7 @@ function documentPorts<Handle>(
     },
     act,
     probe,
+    download,
     async screenshot(mask) {
       await operations.callForString(fontsReady, []);
       for (const framed of masked) await framed.callForString(maskElements, [mask]);
@@ -372,9 +440,22 @@ function documentPorts<Handle>(
   return ports;
 }
 
+// Opens a second tab and loads the URL in it. A tab whose page does not load is closed at once.
+async function newTabAt(openTab: () => Promise<Result<DriverSession, DriverError>>, url: string): Promise<Result<DriverSession, DriverError>> {
+  const opened = await openTab();
+  if (!opened.ok) return opened;
+  const tab = opened.value;
+  const navigated = await tab.navigate(url);
+  if (navigated.ok) return success(tab);
+  await tab.close();
+  return navigated;
+}
+
 export function buildSession<Handle>(operations: PageOperations<Handle>, environment: SessionEnvironment, details: SessionDetails): DriverSession {
+  const openTab = details.openTab;
   return {
     ...documentPorts(operations, [operations], environment, details),
+    ...(openTab === undefined ? {} : { newTab: (url: string) => newTabAt(openTab, url) }),
     browser: details.browser,
     processId: details.processId,
     blockedOrigins: details.blockedOrigins,

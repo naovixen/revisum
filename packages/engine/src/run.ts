@@ -7,8 +7,9 @@
 import {
   needsDriverFeatures,
   type A11yFinding, type ActionGuard, type ApprovalLabel, type ArtifactReference, type ArtifactStore, type Authorised,
-  type BrowserDriver, type Clock, type DocumentSession, type DriverFeature, type LockEntry, type DialogStep, type ElementProbe, type EventSink, type GuardVerdict, type Plan, type PolicyRuleId, type Redactor,
-  type ResolvedElement, type Result, type SafeText, type SecretStore, type ServiceCaller, type Session, type Step, type Target, type TargetId,
+  type BrowserDriver, type Clock, type DocumentSession, type DownloadedFile, type DownloadName, type DriverFeature, type LockEntry, type DialogStep, type ElementProbe,
+  type EventSink, type GuardVerdict, type PageAssertion, type Plan, type PolicyRuleId, type Redactor,
+  type DownloadStep, type ResolvedElement, type Result, type SafeText, type SecretStore, type ServiceCaller, type Session, type Step, type Target, type TargetId,
   type Unavailable, type ValueName, type GuaranteeStatement, type RunMode, type SuiteFinding, type SuiteName, type SuitePass,
   type SuiteTestId, type SuiteTestResult, type UnsafeFeature,
 } from '@revisum/contracts';
@@ -97,9 +98,20 @@ export type StepResult = {
   readonly serviceCall?: ServiceCallRecord;
   // A remember step's record: the value's name and the sha256 of its text, never the text.
   readonly remembered?: RememberedValueRecord;
+  // A download step's record: the file's name, media type, size and sha256, never its content.
+  readonly download?: DownloadRecord;
 };
 
 export type RememberedValueRecord = { readonly valueName: ValueName; readonly sha256: string };
+// What a run keeps of a downloaded file. The server's name and media type are kept redacted; the
+// content is never kept (until privacy masking, whatever evidence.keepDownloads says).
+export type DownloadRecord = {
+  readonly downloadName: DownloadName;
+  readonly fileName: string;
+  readonly mediaType: string;
+  readonly size: number;
+  readonly sha256: string;
+};
 
 // Something a run found that a person should look at, whatever the verdict: a cleanup call that
 // failed, so test data may be left behind; or a suite test's criterion annotation whose
@@ -200,6 +212,11 @@ type RunContext = {
   readonly rememberedTexts: Set<string>;
   // The optional plan features the session's driver performs; none until a session is open.
   readonly performs: readonly DriverFeature[];
+  // The open session, whose newTab port a newTab step uses; null until a session is open.
+  readonly session: Session | null;
+  // The files download steps saved, by the name the plan gives each, for later checks. The bytes
+  // stay in memory for the run only.
+  readonly downloads: Map<DownloadName, DownloadedFile>;
   // What the call steps use, when the run has a service caller.
   readonly calls: CallStepContext | undefined;
 };
@@ -231,7 +248,7 @@ export async function run(given: RunInputs, ports: RunPorts): Promise<RunResult>
   };
   const context: RunContext = {
     inputs, ports, logger, gate, denials: [], redactor, secrets, isShortSecret: shortSecretObservation(secrets), secretFilledFields: new Set(), values, calls,
-    rememberedTexts: new Set(), performs: [],
+    rememberedTexts: new Set(), performs: [], session: null, downloads: new Map(),
   };
 
   if (target === undefined || !declared) {
@@ -295,7 +312,7 @@ export async function run(given: RunInputs, ports: RunPorts): Promise<RunResult>
   }
   const { session, driver, unpinned } = opened.value;
   // From here on, a step needing an optional feature is refused only when this driver lacks it.
-  const stepContext: RunContext = { ...context, performs: driver.info.performs ?? [] };
+  const stepContext: RunContext = { ...context, performs: driver.info.performs ?? [], session };
   const manifest = buildManifest({
     plan: inputs.plan, target, adapter: driver.info, browser: session.browser,
     seed: inputs.seed, fixedTimeMilliseconds: inputs.fixedTimeMilliseconds, fixtures: inputs.fixtures, host: inputs.host,
@@ -504,7 +521,9 @@ async function executeStep(step: Step, index: number, session: DocumentSession, 
       }
       const url = new URL(path, context.inputs.baseUrl);
       if (!context.inputs.project.origins.some((origin) => origin === url.origin)) return { ...base, outcome: 'failed', code: 'origin-not-allowed' };
-      const navigated = await session.navigate(url.href);
+      // Scripts are named only when they are off, so a driver that never loads a page without them
+      // is called exactly as before.
+      const navigated = step.scripts === 'disabled' ? await session.navigate(url.href, { scripts: 'disabled' }) : await session.navigate(url.href);
       return navigated.ok ? { ...base, outcome: 'passed' } : { ...base, outcome: 'failed', code: navigated.error.code };
     }
     case 'click':
@@ -551,9 +570,9 @@ async function executeStep(step: Step, index: number, session: DocumentSession, 
       return { ...base, outcome: 'passed' };
     }
     case 'remember': return rememberFromPage(step, index, session, context);
-    case 'download':
-    case 'expectDownload':
-    case 'newTab':
+    case 'download': return downloadFile(step, index, session, target, context);
+    case 'expectDownload': return checkDownload(step, index, context);
+    case 'newTab': return runInNewTab(step, index, target, context);
     // The driver's network and storage ports come with the CDP driver; isUnsupported refused these above.
     case 'stub': case 'resetRequests': case 'expectRequests': case 'expectResponse':
     case 'setStorage': case 'removeStorage': case 'expectStorage':
@@ -572,7 +591,7 @@ async function executeStep(step: Step, index: number, session: DocumentSession, 
       let last: ElementProbe | null = null;
       const verdict = await poll(context, session, async () => {
         last = await session.probe(locator.value);
-        return checkElement(assertion.value, last);
+        return checkElement(assertion.value, last, context.inputs.baseUrl);
       });
       if (verdict.code === TARGET_CRASHED) return { ...base, outcome: 'failed', code: TARGET_CRASHED };
       return verdict.pass
@@ -580,11 +599,13 @@ async function executeStep(step: Step, index: number, session: DocumentSession, 
         : { ...base, outcome: 'failed', code: verdict.code ?? 'assertion-failed', observed: observe(last, context, context.secretFilledFields.has(canonicalJson(locator.value))) };
     }
     case 'expectPage': {
+      const assertion = resolvePageAssertion(step.assert, context);
+      if (!assertion.ok) return { ...base, outcome: 'failed', code: assertion.error };
       let title = '';
       const verdict = await poll(context, session, async () => {
         const page = await session.page();
         title = page.title;
-        return checkPage(step.assert, page);
+        return checkPage(assertion.value, page, context.inputs.baseUrl);
       });
       if (verdict.code === TARGET_CRASHED) return { ...base, outcome: 'failed', code: TARGET_CRASHED };
       return verdict.pass
@@ -645,6 +666,113 @@ async function rememberFromPage(step: Extract<Step, { type: 'remember' }>, index
   const digest = sha256(safe);
   context.logger.log({ kind: 'value.remembered', stepIndex: index, valueName: step.name, sha256: digest });
   return { ...base, outcome: 'passed', remembered: { valueName: step.name, sha256: digest } };
+}
+
+// A page check with a meta tag's expected content resolved, when it is a value reference.
+function resolvePageAssertion(assertion: PageAssertion, context: RunContext): Result<PageAssertion, string> {
+  if (assertion.kind !== 'metaContent') return { ok: true, value: assertion };
+  const expected = resolveText(assertion.value, context.values, context.inputs.project.limits.maximumTextLength);
+  return expected.ok ? { ok: true, value: { ...assertion, value: expected.value } } : expected;
+}
+
+// A download step: the driver clicks the element, asking the runtime guard first as for any click,
+// and saves the one file the click starts, within the project's maximumDownloadBytes. The file is
+// kept in memory under the plan's name for the checks after it; the result keeps only its name,
+// media type, size and sha256.
+async function downloadFile(step: DownloadStep, index: number, session: DocumentSession, target: Target, context: RunContext): Promise<StepResult> {
+  const base = { index, type: step.type } as const;
+  if (session.download === undefined) return { ...base, outcome: 'failed', code: 'unsupported-step' };
+  const locator = resolveLocator(step.locator, context.values, context.inputs.project);
+  if (!locator.ok) return { ...base, outcome: 'failed', code: locator.error };
+  const resolved: DownloadStep = { ...step, locator: locator.value };
+  const saved = await session.download(resolved, context.inputs.project.limits.maximumDownloadBytes, guardFor(resolved, index, target, context));
+  if (!saved.ok) return { ...base, outcome: 'failed', code: saved.error.code };
+  const file = saved.value;
+  context.downloads.set(step.name, file);
+  const record: DownloadRecord = {
+    downloadName: step.name, fileName: keptText(file.fileName, context), mediaType: keptText(file.mediaType, context),
+    size: file.bytes.length, sha256: file.sha256,
+  };
+  return { ...base, outcome: 'passed', download: record };
+}
+
+// Text the server chose that a result keeps, such as a file name: redacted and capped.
+const keptText = (text: string, context: RunContext): string => (context.isShortSecret(text) ? SECRET_PLACEHOLDER : context.redactor.text(text).slice(0, 200));
+
+// A media type's essence, such as "text/csv" for "text/csv; charset=utf-8", in lower case.
+const mediaTypeEssence = (mediaType: string): string => (mediaType.split(';')[0] ?? '').trim().toLowerCase();
+
+// The file's bytes as text, or undefined when they are not UTF-8 text: invalid UTF-8, or a NUL
+// byte, which no text file holds.
+function downloadText(bytes: Uint8Array): string | undefined {
+  try {
+    const text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+    return text.includes('\u0000') ? undefined : text;
+  } catch {
+    return undefined;
+  }
+}
+
+// Checks a file an earlier download step saved. None of its text is ever kept: a failed check
+// keeps only its code.
+function checkDownload(step: Extract<Step, { type: 'expectDownload' }>, index: number, context: RunContext): StepResult {
+  const base = { index, type: step.type } as const;
+  // The parser rejects a check of a download no earlier step defined, and a failed download skips
+  // every later step, so the file is always there.
+  const file = context.downloads.get(step.download);
+  if (file === undefined) return { ...base, outcome: 'failed', code: 'no-download' };
+  const verdict = (pass: boolean): StepResult => (pass ? { ...base, outcome: 'passed' } : { ...base, outcome: 'failed', code: 'assertion-failed' });
+  const assertion = step.assert;
+  switch (assertion.kind) {
+    case 'sizeAtMost': return verdict(file.bytes.length <= assertion.value);
+    case 'sizeAtLeast': return verdict(file.bytes.length >= assertion.value);
+    case 'mediaTypeEquals': return verdict(mediaTypeEssence(file.mediaType) === mediaTypeEssence(assertion.value));
+    case 'fileNameEquals': case 'contentContains': case 'contentExcludes': {
+      const expected = resolveText(assertion.value, context.values, context.inputs.project.limits.maximumTextLength);
+      if (!expected.ok) return { ...base, outcome: 'failed', code: expected.error };
+      if (assertion.kind === 'fileNameEquals') return verdict(file.fileName === expected.value);
+      const text = downloadText(file.bytes);
+      if (text === undefined) return { ...base, outcome: 'failed', code: 'download-not-text' };
+      // An empty file proves nothing about what it holds or leaves out, so it fails both.
+      if (text === '') return verdict(false);
+      return verdict(assertion.kind === 'contentContains' ? text.includes(expected.value) : !text.includes(expected.value));
+    }
+  }
+}
+
+// A newTab step: opens its URL in a second tab of the session's browser context, runs its steps
+// there in order and closes the tab, whatever they did. The steps have no results of their own:
+// the first that fails fails the newTab step, with its code.
+async function runInNewTab(step: Extract<Step, { type: 'newTab' }>, index: number, target: Target, context: RunContext): Promise<StepResult> {
+  const base = { index, type: step.type } as const;
+  const session = context.session;
+  if (session === null || session.newTab === undefined) return { ...base, outcome: 'failed', code: 'unsupported-step' };
+  let path = step.url;
+  if (typeof path !== 'string') {
+    // As for a navigate: a path template's values are only known now, so the guard checks the final URL.
+    const resolved = resolvePathTemplate(path, context.values, context.inputs.project);
+    if (!resolved.ok) return { ...base, outcome: 'failed', code: resolved.error };
+    path = resolved.value;
+    const verdict = context.gate.guardAction({ type: 'navigate', url: path }, index, NO_ELEMENT, null, target.locale);
+    if (verdict.kind === 'deny') {
+      keepDenial(verdict, context);
+      return { ...base, outcome: 'failed', code: 'policy-denied' };
+    }
+  }
+  const url = new URL(path, context.inputs.baseUrl);
+  if (!context.inputs.project.origins.some((origin) => origin === url.origin)) return { ...base, outcome: 'failed', code: 'origin-not-allowed' };
+  const opened = await session.newTab(url.href);
+  if (!opened.ok) return { ...base, outcome: 'failed', code: opened.error.code };
+  const tab = opened.value;
+  try {
+    for (const inner of step.steps) {
+      const done = await executeStep(inner, index, tab, target, context);
+      if (done.outcome !== 'passed') return { ...done, type: step.type };
+    }
+    return { ...base, outcome: 'passed' };
+  } finally {
+    await tab.close();
+  }
 }
 
 // A dialog step with its expected text's value references replaced, as a driver must receive it.
