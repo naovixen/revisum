@@ -75,7 +75,8 @@ await tryFetch('node-fetch', 'http://fetch.invalid/collect');
 await trySocket('raw-socket', 'socket.invalid', 443);
 await tryFetch('metadata-name', 'http://metadata.google.internal/computeMetadata/v1/');
 await tryFetch('metadata-address', 'http://169.254.169.254/latest/meta-data/');
-await tryFetch('ipv6-loopback', 'http://[::ffff:127.0.0.1]:9/');
+// Port 8080, not a port fetch refuses itself (such as 9), so the request really leaves the process.
+await tryFetch('ipv6-loopback', 'http://[::ffff:127.0.0.1]:8080/');
 await tryFetch('own-app', `${local}/health`);
 
 const root = checkoutRoot();

@@ -11,7 +11,7 @@ import { Buffer } from 'node:buffer';
 import { randomBytes } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { isAbsolute, resolve } from 'node:path';
+import { basename, isAbsolute, resolve } from 'node:path';
 import { test } from 'node:test';
 import { parseSuiteTrace, type EvidenceLimits, type SuiteDecodeError } from '@revisum/engine';
 import { evidenceLimits } from './evidence-examples.ts';
@@ -86,6 +86,8 @@ for (const { title, name } of ESCAPING_NAMES) {
     assert.equal(error.code, 'trace-invalid');
     assert.ok(!JSON.stringify(error).includes(file), `the refusal echoes the entry name: ${JSON.stringify(error)}`);
     const unixName = entryName.replaceAll('\\', '/');
+    // A bare '..' names the parent folder itself, which always exists; there is no file to look for.
+    if (basename(unixName) === '..') return;
     for (const target of [resolve(unixName), resolve(tmpdir(), unixName), ...(isAbsolute(unixName) ? [unixName] : [])]) {
       assert.equal(existsSync(target), false, `a file was written at ${target}`);
     }
