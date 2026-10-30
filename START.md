@@ -42,7 +42,7 @@ M2, driver and isolation (alpha):
 - [x] SPEC-05 target matrix and lock
 - [x] SPEC-06 CDP driver, with SPEC-03's guard wired in
 - [x] SPEC-07 isolated runner and egress
-- [ ] SPEC-35 workload runner: suite run, egress, traces and manifest; zero-test suites end Failed, expected failures raise a review item
+- [x] SPEC-35 workload runner: suite run, egress, traces and manifest; zero-test suites end Failed, expected failures raise a review item
 - [ ] SPEC-28 `draft` (route c), with SPEC-37's planner adapters; moved from M4 (founder, 2026-10-29: `docs/decisions/drafting-earlier.md`)
 - [ ] SPEC-37 explore to draft: `draft --explore`, crawl, page map, locator check
 - [ ] SPEC-30 to 34 and SPEC-36 driver and runner parts (states, downloads, tab, real service caller, stubs, storage, clock, clipboard, CSS, XPath, DOM checks, page scripts, then database commands)
