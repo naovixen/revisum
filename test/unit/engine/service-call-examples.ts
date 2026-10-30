@@ -274,6 +274,9 @@ export type CallRunOptions = {
   readonly standing?: PlanStanding;
   // False runs with no `services` port at all, as a run whose caller is not wired in.
   readonly withCaller?: boolean;
+  // A caller to run with in place of the fake, such as runner's real one. `route` is then unused,
+  // and the run's `requests` stay empty, since the fake saw nothing.
+  readonly caller?: ServiceCaller;
 };
 
 export type CallRun = {
@@ -303,7 +306,7 @@ export async function runWithCalls(raw: unknown, options: CallRunOptions = {}): 
     ...(options.standing === undefined ? {} : { standing: options.standing }),
   }, {
     drivers: new Map([[driver.info.id, driver]]), clock, artifacts: memoryArtifactStore(), redactor: defaultRedactor(), audit: memoryEventSink(), events,
-    secrets: environmentSecretStore(options.environment ?? SECRET_VALUES), ...(options.withCaller === false ? {} : { services: caller }),
+    secrets: environmentSecretStore(options.environment ?? SECRET_VALUES), ...(options.withCaller === false ? {} : { services: options.caller ?? caller }),
   });
   const logged = events.read();
   return { result, recording, requests, events: logged, clock, everything: `${JSON.stringify(result)}\n${JSON.stringify(logged)}` };
