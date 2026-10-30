@@ -4,11 +4,13 @@
 // refuse on undefined, so no step is ever performed in part.
 // Some features of plan language 1.2 are optional for a driver: positions, test-id attributes
 // other than data-testid, key chords, multi-line fills, remembered values, accessibility states,
-// link targets, head metadata, pages loaded with scripts off, downloads and second tabs. A driver
-// declares the ones it performs in its AdapterInfo; the run refuses a step needing one its driver
-// does not declare with unsupported-step, before anything of it reaches the driver.
+// link targets, head metadata, pages loaded with scripts off, downloads, second tabs, network
+// stubs, request checks and web storage. A driver declares the ones it performs in its
+// AdapterInfo; the run refuses a step needing one its driver does not declare with
+// unsupported-step, before anything of it reaches the driver.
 // See docs/specs/SPEC-30-plan-values-positions-and-keys.md and
-// docs/specs/SPEC-31-page-states-metadata-downloads-and-tabs.md.
+// docs/specs/SPEC-31-page-states-metadata-downloads-and-tabs.md and
+// docs/specs/SPEC-33-network-stubs-request-checks-and-storage.md.
 import { DOM_CHECK_KINDS } from './plan.ts';
 import type {
   ActionStep, ElementAssertion, Locator, PageAssertion, ResolvedActionStep, ResolvedLocator, SafeText, Step, TextOrValue, ValueName,
@@ -29,10 +31,17 @@ export const DEFAULT_TEST_ID_ATTRIBUTE = 'data-testid';
 //   pageMetadata      reports the head's meta tags and canonical link in its page probe;
 //   scriptsDisabled   loads a page with script execution off, until the next navigate;
 //   downloads         performs a download step through its download port;
-//   newTabs           opens a second tab of the session's browser context.
+//   newTabs           opens a second tab of the session's browser context;
+//   networkStubs      answers the page's fetch and XHR requests with a declared stub's responses,
+//                     through its network port;
+//   requestChecks     records the exchanges of the requests a plan names, through its network port,
+//                     so a plan may count them and check or remember their latest response;
+//   storage           writes, removes and reads local and session storage entries, through its
+//                     storage port.
 export const DRIVER_FEATURES = [
   'positions', 'testIdAttributes', 'keyChords', 'multiLineFills', 'rememberedValues',
   'pageStates', 'linkTargets', 'pageMetadata', 'scriptsDisabled', 'downloads', 'newTabs',
+  'networkStubs', 'requestChecks', 'storage',
 ] as const;
 export type DriverFeature = (typeof DRIVER_FEATURES)[number];
 
@@ -80,13 +89,12 @@ const isMultiLine = (value: Extract<Step, { type: 'fill' }>['value']): boolean =
 
 // True when the step needs what its driver does not perform: an optional feature above that
 // `performs` does not list (an accessibility state, a link target, the document head, a page
-// loaded with scripts off, a download or a check of one, a second tab among them), a CSS or
-// XPath locator, a check no probe decides, the driver's network
-// and storage ports (stubs, request checks, response checks and reads, and web storage), or its
-// clock and clipboard ports (clock advances, clipboard checks and reads). The run reports such a
-// step as unsupported-step before anything of it reaches the driver. Hover, select and upload go
-// to the driver, which refuses them with unsupported-step when it does not perform them; a frame
-// step goes to the driver's frame port. A dialog step goes to the driver, so the runtime guard
+// loaded with scripts off, a download or a check of one, a second tab, a stub, a request or
+// response check or read, a storage step among them), a CSS or XPath locator, a check no probe
+// decides, or the driver's clock and clipboard ports (clock advances, clipboard checks and
+// reads). The run reports such a step as unsupported-step before anything of it reaches the
+// driver. Hover, select and upload go to the driver, which refuses them with unsupported-step
+// when it does not perform them; a frame step goes to the driver's frame port. A dialog step goes to the driver, so the runtime guard
 // sees the dialog's text before anything answers it.
 export function needsDriverFeatures(step: Step, performs: readonly DriverFeature[] = NO_FEATURES): boolean {
   const lacks = (feature: DriverFeature): boolean => !performs.includes(feature);
@@ -104,16 +112,18 @@ export function needsDriverFeatures(step: Step, performs: readonly DriverFeature
     case 'expectDownload': return lacks('downloads');
     // The tab's own steps are checked one by one as they run, as a frame's are.
     case 'newTab': return lacks('newTabs');
-    // The CDP driver's network and storage ports carry these out (docs/specs/SPEC-06-cdp-driver.md).
-    case 'stub': case 'resetRequests': case 'expectRequests': case 'expectResponse':
-    case 'setStorage': case 'removeStorage': case 'expectStorage': return true;
+    // The driver's network and storage ports carry these out.
+    case 'stub': return lacks('networkStubs');
+    case 'resetRequests': case 'expectRequests': case 'expectResponse': return lacks('requestChecks');
+    case 'setStorage': case 'removeStorage': case 'expectStorage': return lacks('storage');
     // The CDP driver's clock and clipboard ports carry these out, with the determinism kit's timer
     // tracking (docs/specs/SPEC-34-clock-advance-and-clipboard.md).
     case 'advanceClock': case 'expectClipboard': return true;
     // Reading an element's text or value needs only the prober, of a driver that declares it reads
-    // values for later steps. Reading a response field needs the network port, reading the
-    // clipboard the clipboard port and reading an attribute the DOM reads.
+    // values for later steps. Reading a response field needs the request checks of the network
+    // port; reading the clipboard needs the clipboard port and reading an attribute the DOM reads.
     case 'remember':
+      if ('response' in step.from) return lacks('requestChecks');
       if (!('element' in step.from) || step.from.read === 'attribute') return true;
       return lacks('rememberedValues') || needsLocatorFeatures(step.from.element, performs);
     case 'dialog': case 'a11yAudit': case 'capture': return false;

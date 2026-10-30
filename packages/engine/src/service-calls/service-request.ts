@@ -6,7 +6,7 @@
 // See docs/specs/SPEC-32-declared-service-calls.md.
 import {
   failure, isSecret, success,
-  type CallArgument, type CallArguments, type CallDeclaration, type JsonTemplate, type Origin, type ParameterType, type Result,
+  type CallArgument, type CallArguments, type CallDeclaration, type JsonTemplate, type Origin, type ParameterName, type ParameterType, type Result,
   type JsonBodyWithSecrets, type Secret, type SecretStore, type ServiceRequest, type ServiceRequestHeader,
 } from '@revisum/contracts';
 import { resolveText, type RunValues } from '../run-values.ts';
@@ -28,7 +28,7 @@ const JSON_MEDIA_TYPE = 'application/json';
 type Filled = { readonly kind: 'value'; readonly value: ArgumentValue } | { readonly kind: 'secret'; readonly secret: Secret };
 type Built<Value> = Result<Value, RequestBuildError>;
 // A JSON value whose leaves may be secrets, as a body is once its parameters fill it.
-type JsonWithSecrets = null | boolean | number | string | Secret | readonly JsonWithSecrets[] | { readonly [key: string]: JsonWithSecrets };
+export type JsonWithSecrets = null | boolean | number | string | Secret | readonly JsonWithSecrets[] | { readonly [key: string]: JsonWithSecrets };
 
 // Appends the JSON text of `value` to `parts`, structurally, with each secret left as an opaque
 // part that runner's caller writes as one JSON string. Text parts are written as JSON.stringify
@@ -51,7 +51,7 @@ function writeJson(value: JsonWithSecrets, parts: (string | Secret)[]): void {
 }
 
 // The body in parts, adjacent text parts joined, so a body with no secret is one text part.
-function bodyOf(value: JsonWithSecrets): JsonBodyWithSecrets {
+export function bodyOf(value: JsonWithSecrets): JsonBodyWithSecrets {
   const written: (string | Secret)[] = [];
   writeJson(value, written);
   const jsonParts: (string | Secret)[] = [];
@@ -180,18 +180,39 @@ function buildHeaders(declaration: CallDeclaration, secrets: SecretStore): Built
   return success(headers);
 }
 
+// The arguments filled into their declared parameters, each checked against its type.
+function fillParameters(
+  parameters: Readonly<Record<ParameterName, ParameterType>>, callArguments: CallArguments, values: RunValues, secrets: SecretStore,
+): Built<ReadonlyMap<string, Filled>> {
+  const given = new Map<string, CallArgument>(Object.entries(callArguments));
+  const filled = new Map<string, Filled>();
+  for (const [name, type] of Object.entries(parameters)) {
+    const parameter = fill(type, given.get(name), values, secrets);
+    if (!parameter.ok) return parameter;
+    filled.set(name, parameter.value);
+  }
+  return success(filled);
+}
+
+// Pure. A declared JSON template, such as a stub's body or a storage entry's value, filled from a
+// step's arguments by the declaration's parameters: a JSON value whose secret leaves stay opaque.
+// See docs/specs/SPEC-33-network-stubs-request-checks-and-storage.md.
+export function filledTemplate(
+  template: JsonTemplate, parameters: Readonly<Record<ParameterName, ParameterType>>, callArguments: CallArguments,
+  values: RunValues, secrets: SecretStore,
+): Result<JsonWithSecrets, RequestBuildError> {
+  const filled = fillParameters(parameters, callArguments, values, secrets);
+  return filled.ok ? fillTemplate(template, filled.value) : filled;
+}
+
 // Pure. The request for one call: refused with parameter-invalid when an argument does not fit its
 // parameter, and with secret-missing when the store lacks a secret the call needs.
 export function buildServiceRequest(
   declaration: CallDeclaration, service: { readonly origin: Origin }, callArguments: CallArguments, values: RunValues, secrets: SecretStore,
 ): Result<ServiceRequest, RequestBuildError> {
-  const given = new Map<string, CallArgument>(Object.entries(callArguments));
-  const filled = new Map<string, Filled>();
-  for (const [name, type] of Object.entries(declaration.parameters)) {
-    const parameter = fill(type, given.get(name), values, secrets);
-    if (!parameter.ok) return parameter;
-    filled.set(name, parameter.value);
-  }
+  const parameters = fillParameters(declaration.parameters, callArguments, values, secrets);
+  if (!parameters.ok) return parameters;
+  const filled = parameters.value;
   const headers = buildHeaders(declaration, secrets);
   if (!headers.ok) return headers;
   const path = buildPath(declaration.path, filled);

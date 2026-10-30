@@ -10,7 +10,8 @@
 //     check, and write or remove only when the declaration gives readWrite access.
 //
 // The port types (NetworkPort, StoragePort) live here so drivers need nothing from the engine.
-// The engine resolves templates and arguments; a driver receives finished bytes.
+// The engine resolves templates and arguments; a driver receives finished bytes, or the name of a
+// fixture it reads from its own fixtures folder.
 // See docs/specs/SPEC-33-network-stubs-request-checks-and-storage.md.
 import type { Brand } from './brand.ts';
 import type { DriverError } from './browser-driver.ts';
@@ -136,16 +137,23 @@ export type NetworkAndStorageStep =
   | StubStep | ResetRequestsStep | ExpectRequestsStep | ExpectResponseStep | SetStorageStep | RemoveStorageStep | ExpectStorageStep;
 
 // ---- The driver ports -------------------------------------------------------------------------
-// The CDP driver implements these with SPEC-06; until then a run reports every step above as
-// unsupported-step and nothing of it reaches a driver.
+// A driver that declares networkStubs or requestChecks offers the network port, and one that
+// declares storage the storage port; a run refuses these steps with unsupported-step otherwise.
 
+// A stub response as the driver serves it. The engine has filled every template, so the body is
+// finished bytes, or a file from the project's fixtures folder, which the driver reads itself and
+// never from outside that folder. The driver adds the media type as content-type and always sends
+// X-Content-Type-Options: nosniff.
 export type ResolvedStubResponse = {
   readonly status: number;
   readonly mediaType: StubMediaType;
   readonly headers: readonly (readonly [string, string])[];
-  readonly body: Uint8Array;
+  readonly body: Uint8Array | { readonly fixture: FixtureName };
 };
 export type ResolvedStub = { readonly name: StubName; readonly request: RequestMatcher; readonly responses: readonly ResolvedStubResponse[] };
+// Which stub answered one request, and with which of its responses, counted from 1. The last
+// response repeats, so every answer after it gives its number again.
+export type StubAnswer = { readonly stub: StubName; readonly responseIndex: number };
 // One recorded request and its response. The body is kept only when the declaration names fields,
 // up to its size cap.
 export type ObservedExchange = {
@@ -158,15 +166,26 @@ export type ObservedExchange = {
   readonly stubbed: StubName | null;
 };
 export interface NetworkPort {
+  // Starts answering the requests the stub matches; a stub started again starts from its first
+  // response. Only fetch and XHR requests are answered: every other request goes to the network.
   startStub(stub: ResolvedStub): Promise<Result<void, DriverError>>;
   stopStub(name: StubName): Promise<Result<void, DriverError>>;
+  // Every answer the session's stubs gave, in the order they gave them.
+  stubAnswers(): readonly StubAnswer[];
+  // Starts recording the exchanges the matcher matches, or, for a name already recorded, starts
+  // again from nothing: a reset. Without a size cap no body is kept.
   observe(name: RequestName, matcher: RequestMatcher, maximumResponseBytes: number | null): Promise<Result<void, DriverError>>;
-  // Since the plan's start or the last reset.
+  // The finished exchanges since the observation started or was last reset, in the order they
+  // finished. A body over the cap is kept only up to one byte past it, so a reader can tell.
   exchanges(name: RequestName): readonly ObservedExchange[];
+  // Resolves once no matching request has been in flight for quietMilliseconds, counted from the
+  // call at the earliest; fails with timeout after timeoutMilliseconds.
   quiet(name: RequestName, quietMilliseconds: number, timeoutMilliseconds: number): Promise<Result<void, DriverError>>;
 }
 export interface StoragePort {
+  // Fails with storage-origin-mismatch, writing nothing, when the session's page is not on the origin.
   write(area: StorageArea, origin: Origin, key: string, value: string): Promise<Result<void, DriverError>>;
   remove(area: StorageArea, origin: Origin, key: string): Promise<Result<void, DriverError>>;
+  // Null when the entry is absent.
   read(area: StorageArea, origin: Origin, key: string): Promise<Result<string | null, DriverError>>;
 }

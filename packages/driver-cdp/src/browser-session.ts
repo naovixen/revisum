@@ -5,7 +5,7 @@ import {
   DEFAULT_TEST_ID_ATTRIBUTE, DRIVER_FEATURES, failure, literalActionStep, literalText, performableLocator, reveal, success,
   type ActionGuard, type ActionStep, type BrowserRequestRecord, type DialogStep, type DocumentSession, type DownloadedFile, type DownloadStep,
   type DriverError, type DriverFeature, type ElementProbe, type Locator, type PageMetaTag, type PageProbe, type Position, type ResolvedActionStep,
-  type ResolvedElement, type ResolvedLocator, type Result, type Secret, type SessionEnvironment,
+  type NetworkPort, type ResolvedElement, type ResolvedLocator, type Result, type Secret, type SessionEnvironment, type StoragePort,
 } from '@revisum/contracts';
 import {
   actionability, afterTwoFrames, armHitCheck, findByLabel, findByTestId, findByText, fontsReady, guardDetails, inDocumentOrder, inThisDocument,
@@ -39,6 +39,10 @@ export type SessionDetails = {
   // Opens a second tab of the session's browser context, still on about:blank. Without it, the
   // session opens no tabs.
   readonly openTab?: () => Promise<Result<DriverSession, DriverError>>;
+  // Stubs and request checks for the whole browser context. Without it, the session has none.
+  readonly network?: NetworkPort;
+  // The page's local and session storage. Without it, the session has none.
+  readonly storage?: StoragePort;
 };
 
 // The scheme of the page the browser shows in place of one it could not show.
@@ -456,6 +460,8 @@ export function buildSession<Handle>(operations: PageOperations<Handle>, environ
   return {
     ...documentPorts(operations, [operations], environment, details),
     ...(openTab === undefined ? {} : { newTab: (url: string) => newTabAt(openTab, url) }),
+    ...(details.network === undefined ? {} : { network: details.network }),
+    ...(details.storage === undefined ? {} : { storage: details.storage }),
     browser: details.browser,
     processId: details.processId,
     blockedOrigins: details.blockedOrigins,

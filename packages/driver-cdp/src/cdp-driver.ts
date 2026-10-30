@@ -4,21 +4,23 @@ import {
   determinismScript, deviceProfile, failure, success,
   type A11yNode, type DriverError, type Key, type Result, type SessionEnvironment, type Target,
 } from '@revisum/contracts';
-import { realpathSync } from 'node:fs';
+import { readFileSync, realpathSync } from 'node:fs';
 import { isAbsolute, relative, resolve } from 'node:path';
 import { chromiumBuild } from './browser-build.ts';
 import { SESSION_FEATURES, buildSession, errorText, type SessionDetails } from './browser-session.ts';
-import { CdpConnection } from './cdp-connection.ts';
+import { CdpConnection, type CdpSessionClient } from './cdp-connection.ts';
 import { QUIET_CHROME_FLAGS, proxyFlags } from './chrome-flags.ts';
 import { DownloadFolder } from './downloads.ts';
 import { EgressRecorder } from './egress-records.ts';
 import { launchChromium, type LaunchedChromium } from './chromium-launcher.ts';
+import { BrowserNetwork, atResponseStage, type HeldRequest } from './network-stubs.ts';
 import { focusAndSelect, focusElement, frameContentOffset } from './in-page.ts';
 import type { HeldModifierKey } from './modifier-keys.ts';
 import type {
   DriverSession, ExposedStates, OwnBrowserDriver, PageArgument, PageFunction, PageOperations, Point, RoleAndName,
 } from './page-operations.ts';
 import { PageWatch, type AttachedPage } from './page-watch.ts';
+import { PageStorage } from './web-storage.ts';
 
 export const CDP_ADAPTER_VERSION = '0.1.0';
 const COMMAND_TIMEOUT_MILLISECONDS = 30_000;
@@ -115,20 +117,32 @@ type AccessibilityNode = {
   readonly parentId?: string;
   readonly backendDOMNodeId?: number;
 };
-type RequestPaused = { readonly requestId: string; readonly request: { readonly url: string } };
+type RequestPaused = HeldRequest & { readonly requestId: string };
 type FrameTree = { readonly frame: { readonly id: string; readonly unreachableUrl?: string }; readonly childFrames?: readonly FrameTree[] };
 type DescribedNode = { readonly node: { readonly backendNodeId: number; readonly frameId?: string } };
 
 export type CdpDriverOptions = {
   readonly executablePath: string;
   readonly launchTimeoutMilliseconds?: number;
-  // The project's fixtures folder. An upload step sends a declared fixture from here, and never a
-  // file outside it. Without it, the driver refuses every upload.
+  // The project's fixtures folder. An upload step sends a declared fixture from here, and a stub
+  // serves one from here, never a file outside it. Without it, the driver refuses every upload and
+  // every stub with a fixture body.
   readonly fixturesFolder?: string;
   // The egress proxy every request goes through, such as the isolated runner's. includeLoopback
   // sends requests to 127.0.0.1 and localhost through it too; without it they go direct.
   readonly proxy?: { readonly server: string; readonly includeLoopback: boolean };
 };
+
+// The bytes of a declared fixture inside the fixtures folder, for a stub's body.
+function readFixture(fixturesFolder: string | undefined, fixture: string): Result<Uint8Array, DriverError> {
+  const path = fixtureFilePath(fixturesFolder, fixture);
+  if (!path.ok) return path;
+  try {
+    return success(readFileSync(path.value));
+  } catch (error) {
+    return failure({ code: 'not-found', detail: `the fixture could not be read: ${errorText(error)}` });
+  }
+}
 
 // The absolute path of a declared fixture inside the fixtures folder. A name that leads out of the
 // folder, by "..", an absolute path or a link, is refused, as is a file that is not there.
@@ -184,8 +198,8 @@ export function cdpDriver(options: CdpDriverOptions): OwnBrowserDriver {
 }
 
 // What every page of one session shares: the browser's own context, the target and environment it
-// emulates, the egress allow-list's record of blocked origins, the egress recorder and the
-// download folder.
+// emulates, the egress allow-list's record of blocked origins, the egress recorder, the download
+// folder, and the stubs and request checks, which reach every tab.
 type SessionBrowser = {
   readonly connection: CdpConnection;
   readonly browserContextId: string;
@@ -195,6 +209,7 @@ type SessionBrowser = {
   readonly blocked: string[];
   readonly recorder: EgressRecorder;
   readonly downloads: DownloadFolder;
+  readonly network: BrowserNetwork;
 };
 
 // How long a new tab is given to attach after the browser creates it.
@@ -208,11 +223,15 @@ async function createSession(
   const { browserContextId } = await connection.send<{ browserContextId: string }>(undefined, 'Target.createBrowserContext', { disposeOnDetach: true });
   const { targetId } = await connection.send<{ targetId: string }>(undefined, 'Target.createTarget', { url: 'about:blank', browserContextId });
   const { sessionId } = await connection.send<{ sessionId: string }>(undefined, 'Target.attachToTarget', { targetId, flatten: true });
+  // Every request's origin and channel, for the run's egress events.
+  const recorder = new EgressRecorder(connection);
   const browser: SessionBrowser = {
-    connection, browserContextId, userAgent: version.userAgent, target, environment, blocked: [],
-    // Every request's origin and channel, for the run's egress events.
-    recorder: new EgressRecorder(connection),
+    connection, browserContextId, userAgent: version.userAgent, target, environment, blocked: [], recorder,
     downloads: new DownloadFolder(connection, browserContextId),
+    network: new BrowserNetwork(connection, {
+      readFixture: (fixture) => readFixture(fixturesFolder, fixture),
+      onAnsweredInBrowser: (requestId) => recorder.answeredInBrowser(requestId),
+    }),
   };
 
   await connection.send(sessionId, 'Page.enable');
@@ -221,6 +240,7 @@ async function createSession(
   });
   await watch.start();
   await browser.recorder.start(sessionId);
+  await browser.network.watchPage(sessionId);
   browser.downloads.watchResponses(sessionId);
   await preparePage(browser, sessionId);
 
@@ -238,6 +258,8 @@ async function createSession(
     fixturePath: (fixture) => fixtureFilePath(fixturesFolder, fixture),
     downloads: browser.downloads,
     openTab: () => openTab(browser, watch, details),
+    network: browser.network,
+    storage: pageStorage(watch),
   };
   return buildSession(operations, environment, details);
 }
@@ -262,21 +284,42 @@ async function preparePage(browser: SessionBrowser, sessionId: string): Promise<
   ] });
   await page.send('Page.addScriptToEvaluateOnNewDocument', { source: determinismScript(environment.seed, environment.fixedTimeMilliseconds) });
 
-  // Every request is paused and either let through (allowed origin) or failed and recorded.
+  // Every request is paused and either let through (allowed origin) or failed and recorded. An
+  // allowed fetch or XHR request an active stub matches is answered by the stub instead. A request
+  // whose response fields a plan may read is held again once its response is in, for its body.
   page.on('Fetch.requestPaused', (parameters) => {
     const paused = parameters as RequestPaused;
+    if (atResponseStage(paused)) { void takeResponseBody(page, browser.network, paused); return; }
     let allowed = false;
     try {
       const url = new URL(paused.request.url);
       allowed = environment.allowedOrigins.includes(url.origin) || LOCAL_SCHEMES.includes(url.protocol);
       if (!allowed) browser.blocked.push(url.origin);
     } catch { /* a URL that cannot be parsed is blocked */ }
-    const decision = allowed
-      ? page.send('Fetch.continueRequest', { requestId: paused.requestId })
-      : page.send('Fetch.failRequest', { requestId: paused.requestId, errorReason: 'BlockedByClient' });
+    const stubbed = allowed ? browser.network.answer(paused) : null;
+    const decision = stubbed !== null
+      ? page.send('Fetch.fulfillRequest', { requestId: paused.requestId, ...stubbed })
+      : allowed
+        ? page.send('Fetch.continueRequest', { requestId: paused.requestId, ...(browser.network.wantsResponseBody(paused) ? { interceptResponse: true } : {}) })
+        : page.send('Fetch.failRequest', { requestId: paused.requestId, errorReason: 'BlockedByClient' });
     decision.catch(() => undefined);
   });
   await page.send('Fetch.enable', { patterns: [{ urlPattern: '*', requestStage: 'Request' }] });
+}
+
+type FetchedBody = { readonly body: string; readonly base64Encoded: boolean };
+
+// Takes the body of a response held at the response stage, for the request check that reads its
+// fields, then lets the page have it unchanged. A body that cannot be taken is left out: the
+// exchange still counts, with no body to read.
+async function takeResponseBody(page: CdpSessionClient, network: BrowserNetwork, held: RequestPaused): Promise<void> {
+  if (held.responseErrorReason === undefined && held.networkId !== undefined) {
+    try {
+      const fetched = await page.send<FetchedBody>('Fetch.getResponseBody', { requestId: held.requestId });
+      network.keepResponseBody(held.networkId, Buffer.from(fetched.body, fetched.base64Encoded ? 'base64' : 'utf8'));
+    } catch { /* the response had no body to take */ }
+  }
+  await page.send('Fetch.continueRequest', { requestId: held.requestId }).catch(() => undefined);
 }
 
 // Opens a second tab in the session's own browser context, so it shares cookies and storage. The
@@ -297,15 +340,18 @@ async function openTab(browser: SessionBrowser, firstWatch: PageWatch, firstDeta
     onPopupRequest: (url) => browser.recorder.record(url, 'popup'), ownsBrowserContext: false, claimsDownload: (event) => browser.downloads.claims(event),
   });
   let stopResponses = (): void => undefined;
+  let stopNetwork = (): void => undefined;
   const close = async (): Promise<void> => {
     watch.stop();
     stopResponses();
+    stopNetwork();
     await connection.send(undefined, 'Target.closeTarget', { targetId: attached.targetId }).catch(() => undefined);
   };
   try {
     await connection.send(attached.sessionId, 'Page.enable');
     await watch.start();
     await browser.recorder.start(attached.sessionId);
+    stopNetwork = await browser.network.watchPage(attached.sessionId);
     stopResponses = browser.downloads.watchResponses(attached.sessionId);
     await preparePage(browser, attached.sessionId);
     await connection.send(attached.sessionId, 'Runtime.runIfWaitingForDebugger');
@@ -318,8 +364,13 @@ async function openTab(browser: SessionBrowser, firstWatch: PageWatch, firstDeta
   return success(buildSession(operations, browser.environment, {
     browser: firstDetails.browser, processId: firstDetails.processId, blockedOrigins: firstDetails.blockedOrigins,
     egressRecords: firstDetails.egressRecords, fixturePath: firstDetails.fixturePath, downloads: browser.downloads, events: watch, close,
+    network: browser.network, storage: pageStorage(watch),
   }));
 }
+
+// The storage port of one page, whose commands fail at once once its renderer has died.
+const pageStorage = (watch: PageWatch): PageStorage =>
+  new PageStorage((method, parameters) => watch.command(method, parameters), () => watch.crashed());
 
 // An isolated script world of one frame: the page's own scripts cannot see or change it; it shares
 // only the document. The driver reads an iframe's document through one, and the top document

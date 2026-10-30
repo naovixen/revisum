@@ -2,10 +2,13 @@
 // redaction and leak scanning cannot work without the value: they look for it, and for each form
 // in which it can echo, in text a run keeps or wrote. Everything here returns redacted text, forms
 // found, whether a text is a secret, a mode or a hash, never the value itself. A declared call's header scheme is applied here
-// too, inside a new opaque Secret.
+// too, inside a new opaque Secret. The one exception is what the browser itself must receive: a
+// stub's body or a storage entry's value, written here with its secret arguments in place just
+// before the run hands it to the driver, which never reports it back.
 // See docs/specs/SPEC-04-secrets-and-redaction.md.
 import {
-  MINIMUM_SECRET_LENGTH, createSecret, reveal, type HeaderScheme, type LeakForm, type RedactionMode, type Secret,
+  MINIMUM_SECRET_LENGTH, createSecret, isSecret, reveal,
+  type HeaderScheme, type JsonBodyWithSecrets, type LeakForm, type RedactionMode, type Secret,
 } from '@revisum/contracts';
 import { sha256 } from '../hashing.ts';
 
@@ -249,3 +252,14 @@ export function headerSecret(secret: Secret, scheme: HeaderScheme): Secret {
     case 'token': case 'raw': return secret;
   }
 }
+
+// ---- Stubs and web storage --------------------------------------------------------------------
+
+// A JSON text with each secret part written as a JSON string, as a stub's JSON body is served.
+export const jsonTextWithSecrets = (body: JsonBodyWithSecrets): string =>
+  body.jsonParts.map((part) => (typeof part === 'string' ? part : JSON.stringify(reveal(part)))).join('');
+
+// A storage entry's value: a secret as it is, like any other string; anything else is the JSON text
+// given, with its secret parts written as JSON strings.
+export const storedTextWithSecrets = (value: Secret | JsonBodyWithSecrets): string =>
+  (isSecret(value) ? reveal(value) : jsonTextWithSecrets(value));

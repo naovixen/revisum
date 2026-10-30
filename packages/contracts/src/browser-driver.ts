@@ -2,6 +2,7 @@
 // interfaces. Each driver package implements them; the engine never imports a driver.
 // See docs/specs/SPEC-06-cdp-driver.md and docs/specs/SPEC-27-shared-types-and-events.md.
 import type { DriverFeature } from './literal-steps.ts';
+import type { NetworkPort, StoragePort } from './network-and-storage.ts';
 import type { ActionStep, DownloadStep, Locator, ResolvedLocator } from './plan.ts';
 import type { GuardVerdict } from './policy.ts';
 import type { Secret } from './secret.ts';
@@ -196,6 +197,11 @@ export interface Session extends DocumentSession {
   // The tab's close() closes only the tab; its blocked origins join this session's. A driver
   // without it does not open tabs (the newTabs feature).
   newTab?(url: string): Promise<Result<Session, DriverError>>;
+  // Stubs and request checks for the whole browser context, so they reach every tab and frame. A
+  // driver without it declares neither networkStubs nor requestChecks.
+  readonly network?: NetworkPort;
+  // Local and session storage of the session's page. A driver without it does not declare storage.
+  readonly storage?: StoragePort;
 }
 
 export type AdapterInfo = {

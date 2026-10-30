@@ -2,8 +2,10 @@
 // parser made and the policy gate authorised, walks the typed lifecycle, never substitutes a
 // target, and hashes everything except wall-clock timings. Declared service calls go through the
 // run's ServiceCaller port; a failed call ends the run Errored, since it could not test, and the
-// plan's cleanup calls run after the steps whatever the outcome.
-// See docs/specs/SPEC-32-declared-service-calls.md for calls.
+// plan's cleanup calls run after the steps whatever the outcome. Stubs, request checks and web
+// storage go through the session's network and storage ports.
+// See docs/specs/SPEC-32-declared-service-calls.md for calls and
+// docs/specs/SPEC-33-network-stubs-request-checks-and-storage.md for stubs, checks and storage.
 import {
   needsDriverFeatures,
   type A11yFinding, type ActionGuard, type ApprovalLabel, type ArtifactReference, type ArtifactStore, type Authorised,
@@ -11,17 +13,22 @@ import {
   type EventSink, type GuardVerdict, type PageAssertion, type Plan, type PolicyRuleId, type Redactor,
   type DownloadStep, type ResolvedElement, type Result, type SafeText, type SecretStore, type ServiceCaller, type Session, type Step, type Target, type TargetId,
   type Unavailable, type ValueName, type GuaranteeStatement, type RunMode, type SuiteFinding, type SuiteName, type SuitePass,
-  type SuiteTestId, type SuiteTestResult, type UnsafeFeature,
+  type StubAnswer, type StubName, type SuiteTestId, type SuiteTestResult, type UnsafeFeature,
 } from '@revisum/contracts';
 import { approvalLabel, ownStanding, type PlanStanding } from './approval/plan-standing.ts';
 import { guaranteeStatement } from './guarantees.ts';
 import { canonicalJson, sha256 } from './hashing.ts';
 import * as lifecycle from './lifecycle.ts';
 import { manifestLogger, type Logger, type RunEventSink } from './logging.ts';
+import {
+  checkRequests, checkResponse, checkStorage, observedRequestNames, rememberFromResponse, resetRequests, runStubStep, startObserving, writeStorage,
+  type NetworkStepContext,
+} from './network-and-storage/network-and-storage-steps.ts';
 import { buildManifest, manifestHash, unsafeFeatureRecord, type FixtureReference, type HostInfo, type RunManifest } from './manifest.ts';
 import { checkElement, checkPage, normalise, type Verdict } from './oracle.ts';
 import type { SuiteDecodeError } from './evidence/suite-report.ts';
 import { runTimeText, type PlanError } from './plan/plan-decoders.ts';
+import { ASSERTION_STEP_TYPES } from './plan/plan-grammar.ts';
 import { assertBranded } from './plan/plan-parser.ts';
 import { unsafeFeaturesOf } from './plan/unsafe-features.ts';
 import { assertAuthorised, policyGate, type PolicyGate } from './policy/policy-gate.ts';
@@ -33,7 +40,8 @@ import {
   generateRunValues, resolveActionStep, resolveElementAssertion, resolveLocator, resolvePathTemplate, resolvePlanClock, resolveText,
 } from './run-values.ts';
 import {
-  NO_SECRETS, resolvePlanSecrets, resolvedSecretStore, secretRecords, shortSecretObservation, withSecretRedaction, type ResolvedSecrets,
+  NO_SECRETS, resolvePlanSecrets, resolvedSecretStore, secretRecords, shortSecretObservation, stubAndStorageSecretStore, withSecretRedaction,
+  type ResolvedSecrets,
 } from './secrets/secret-resolution.ts';
 import { SECRET_PLACEHOLDER } from './secrets/secret-values.ts';
 import { adapterRegistry } from './target/adapter-registry.ts';
@@ -100,6 +108,9 @@ export type StepResult = {
   readonly remembered?: RememberedValueRecord;
   // A download step's record: the file's name, media type, size and sha256, never its content.
   readonly download?: DownloadRecord;
+  // An assertion's record of the stubs active while it ran, sorted by name, so a report can say it
+  // checked a faked answer and not the real backend. Absent when no stub was active.
+  readonly activeStubs?: readonly StubName[];
 };
 
 export type RememberedValueRecord = { readonly valueName: ValueName; readonly sha256: string };
@@ -180,6 +191,9 @@ export type RunResult = {
   readonly cleanup?: readonly CleanupResult[];
   // Present when the run raised something for a person to look at.
   readonly reviewItems?: readonly RunReviewItem[];
+  // Present when a stub answered a request: which stub and which of its responses (counted from 1)
+  // answered each, in the order they were answered.
+  readonly stubAnswers?: readonly StubAnswer[];
   // Hash of everything above except the manifest body, which its own hash covers. Timings are excluded.
   readonly resultHash: string;
   readonly timings: { readonly totalMilliseconds: number; readonly stepMilliseconds: readonly number[] };
@@ -219,6 +233,8 @@ type RunContext = {
   readonly downloads: Map<DownloadName, DownloadedFile>;
   // What the call steps use, when the run has a service caller.
   readonly calls: CallStepContext | undefined;
+  // The stubs started and not yet stopped.
+  readonly activeStubs: Set<StubName>;
 };
 
 const POLL_INTERVAL_MILLISECONDS = 50;
@@ -248,7 +264,7 @@ export async function run(given: RunInputs, ports: RunPorts): Promise<RunResult>
   };
   const context: RunContext = {
     inputs, ports, logger, gate, denials: [], redactor, secrets, isShortSecret: shortSecretObservation(secrets), secretFilledFields: new Set(), values, calls,
-    rememberedTexts: new Set(), performs: [], session: null, downloads: new Map(),
+    rememberedTexts: new Set(), performs: [], session: null, downloads: new Map(), activeStubs: new Set(),
   };
 
   if (target === undefined || !declared) {
@@ -327,13 +343,20 @@ export async function run(given: RunInputs, ports: RunPorts): Promise<RunResult>
   logger.log({ kind: 'run.state', state: running.state, targetId: target.id });
   const steps: StepResult[] = [];
   const stepMilliseconds: number[] = [];
+  let stubAnswers: readonly StubAnswer[] = [];
   let finished: lifecycle.Finished<'Passed' | 'Failed' | 'Errored'> | lifecycle.DeniedRun;
   try {
+    // The requests the plan checks are observed from its start, so what a page sends as it loads
+    // counts too. A driver refused request checks observes nothing: those steps fail on their own.
+    if (stepContext.performs.includes('requestChecks')) {
+      const observing = await startObserving(observedRequestNames(inputs.plan), networkContext(stepContext));
+      if (!observing.ok) throw new Error(`the requests the plan checks could not be observed: ${observing.error}`);
+    }
     for (const [index, step] of inputs.plan.steps.entries()) {
       if (steps.some((done) => done.outcome === 'failed')) { steps.push({ index, type: step.type, outcome: 'skipped' }); continue; }
       const stepStartedAt = ports.clock.now();
       logger.log({ kind: 'step.start', stepIndex: index, stepType: step.type });
-      const result = await executeStep(step, index, session, target, stepContext);
+      const result = withActiveStubs(step, await executeStep(step, index, session, target, stepContext), context.activeStubs);
       stepMilliseconds.push(ports.clock.now() - stepStartedAt);
       steps.push(result);
       logger.log({
@@ -354,6 +377,8 @@ export async function run(given: RunInputs, ports: RunPorts): Promise<RunResult>
     logger.log({ kind: 'step.end', outcome: 'failed', code: 'adapter-error', detail: errorText(error) });
     finished = lifecycle.finish(running, 'Errored');
   } finally {
+    // Read before the browser goes, with every answer the stubs gave.
+    stubAnswers = session.network?.stubAnswers() ?? [];
     await session.close();
   }
   // Whatever the outcome. A failing cleanup step never changes the verdict; it raises a review item.
@@ -369,6 +394,7 @@ export async function run(given: RunInputs, ports: RunPorts): Promise<RunResult>
     state: finished.state, targetId: target.id, manifest, manifestHash: finished.manifestHash,
     steps, blockedOrigins: blocked, unavailable: null, ...(finished.state === 'Denied' ? { denial: finished.denial } : {}),
     ...(cleanup === undefined ? {} : { cleanup }), ...(reviewItems.length === 0 ? {} : { reviewItems }),
+    ...(stubAnswers.length === 0 ? {} : { stubAnswers: [...stubAnswers] }),
     timings: { totalMilliseconds: ports.clock.now() - startedAt, stepMilliseconds },
   }, inputs);
 }
@@ -493,6 +519,21 @@ function isUnsupported(step: Step, performs: readonly DriverFeature[]): boolean 
   }
 }
 
+// An assertion's result with the stubs active while it ran, so a report can tell a check of a faked
+// answer from a check of the real backend. A stub step never checks anything, so the stubs active
+// as the step ends are the ones active while it ran.
+function withActiveStubs(step: Step, result: StepResult, activeStubs: ReadonlySet<StubName>): StepResult {
+  if (activeStubs.size === 0 || !ASSERTION_STEP_TYPES.includes(step.type)) return result;
+  return { ...result, activeStubs: [...activeStubs].sort() };
+}
+
+// What the stub, request-check and storage steps use: the run's session, values and the secrets
+// resolved for stub starts and storage writes.
+const networkContext = (context: RunContext): NetworkStepContext => ({
+  project: context.inputs.project, session: context.session, values: context.values, rememberedTexts: context.rememberedTexts,
+  secrets: stubAndStorageSecretStore(context.secrets), clock: context.ports.clock, logger: context.logger, activeStubs: context.activeStubs,
+});
+
 // What the runtime guard is given for a step that acts on no element.
 const NO_ELEMENT: ResolvedElement = { role: null, name: null, box: null, formSubmitName: null, linkUrl: null };
 
@@ -569,13 +610,19 @@ async function executeStep(step: Step, index: number, session: DocumentSession, 
       }
       return { ...base, outcome: 'passed' };
     }
-    case 'remember': return rememberFromPage(step, index, session, context);
+    case 'remember':
+      if ('response' in step.from) return { ...base, ...(await rememberFromResponse(step, index, networkContext(context))) };
+      return rememberFromPage(step, index, session, context);
     case 'download': return downloadFile(step, index, session, target, context);
     case 'expectDownload': return checkDownload(step, index, context);
     case 'newTab': return runInNewTab(step, index, target, context);
-    // The driver's network and storage ports come with the CDP driver; isUnsupported refused these above.
-    case 'stub': case 'resetRequests': case 'expectRequests': case 'expectResponse':
-    case 'setStorage': case 'removeStorage': case 'expectStorage':
+    // The session's network and storage ports carry these out, for a driver that declares them.
+    case 'stub': return { ...base, ...(await runStubStep(step, networkContext(context))) };
+    case 'resetRequests': return { ...base, ...(await resetRequests(step, networkContext(context))) };
+    case 'expectRequests': return { ...base, ...(await checkRequests(step, networkContext(context))) };
+    case 'expectResponse': return { ...base, ...(await checkResponse(step, networkContext(context))) };
+    case 'setStorage': case 'removeStorage': return { ...base, ...(await writeStorage(step, networkContext(context))) };
+    case 'expectStorage': return { ...base, ...(await checkStorage(step, networkContext(context))) };
     // The driver's clock and clipboard ports come with the CDP driver; isUnsupported refused these
     // above, so an advance never becomes a real wait.
     case 'advanceClock': case 'expectClipboard':

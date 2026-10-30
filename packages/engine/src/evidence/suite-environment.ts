@@ -7,7 +7,7 @@ import {
   failure, success,
   type EvidenceSuiteDeclaration, type Redactor, type Result, type Secret, type SecretName, type SecretStore, type WorkloadVariable,
 } from '@revisum/contracts';
-import { withSecretRedaction } from '../secrets/secret-resolution.ts';
+import { NO_SECRETS, withSecretRedaction } from '../secrets/secret-resolution.ts';
 
 export type SuiteEnvironment = { readonly variables: readonly WorkloadVariable[]; readonly secrets: readonly Secret[] };
 
@@ -30,4 +30,4 @@ export function suiteEnvironment(suite: EvidenceSuiteDeclaration, store: SecretS
 
 // The caller's redactor with every echo of the suite's secrets removed first.
 export const suiteRedactor = (redactor: Redactor, secrets: readonly Secret[]): Redactor =>
-  withSecretRedaction(redactor, { fills: new Map(), storageState: null, services: new Map(secrets.map((secret) => [secret.name, secret])) });
+  withSecretRedaction(redactor, { ...NO_SECRETS, services: new Map(secrets.map((secret) => [secret.name, secret])) });
