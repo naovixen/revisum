@@ -70,10 +70,14 @@ const PROBE_TIMEOUT_MILLISECONDS = 4_000;
 export type DockerOutcome = { readonly status: number; readonly stdout: string; readonly stderr: string };
 
 // Runs the Docker client with these arguments, without a shell. Status -1 means it could not run
-// or ran out of time.
-export function runDocker(words: readonly string[], timeoutMilliseconds: number | null = DOCKER_COMMAND_TIMEOUT_MILLISECONDS): Promise<DockerOutcome> {
+// or ran out of time. Values in `environment` reach the client through its own environment, never
+// its command line, which other users of the host can read.
+export function runDocker(
+  words: readonly string[], timeoutMilliseconds: number | null = DOCKER_COMMAND_TIMEOUT_MILLISECONDS,
+  environment: Readonly<Record<string, string>> = {},
+): Promise<DockerOutcome> {
   return new Promise((resolve) => {
-    const child = spawn('docker', [...words], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
+    const child = spawn('docker', [...words], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true, ['env']: { ...process.env, ...environment } });
     const stdout: Buffer[] = [];
     const stderr: Buffer[] = [];
     let kept = 0;
@@ -101,7 +105,8 @@ function mountArgument(mount: ContainerMount): string {
   return `type=${type},source=${mount.source},target=${mount.target}${mount.writable === true ? '' : ',readonly'}`;
 }
 
-// The Docker arguments that create, but do not start, a hardened container.
+// The Docker arguments that create, but do not start, a hardened container. Each variable is named
+// with no value, so Docker copies it from the client's environment and no secret is on the command line.
 export function createArguments(options: ContainerOptions): readonly string[] {
   const [firstNetwork = 'none'] = options.networks;
   return [
@@ -112,7 +117,7 @@ export function createArguments(options: ContainerOptions): readonly string[] {
     '--workdir', options.workingFolder,
     ...(options.entrypoint === undefined ? [] : ['--entrypoint', options.entrypoint]),
     ...(options.dns ?? []).flatMap((address) => ['--dns', address]),
-    ...Object.entries(options.environment).flatMap(([name, value]) => ['--env', `${name}=${value}`]),
+    ...Object.keys(options.environment).flatMap((name) => ['--env', name]),
     ...options.mounts.flatMap((mount) => ['--mount', mountArgument(mount)]),
     options.image, ...options.command,
   ];
@@ -157,7 +162,7 @@ export function dockerCliEngine(): ContainerEngine {
       await runDocker(['network', 'rm', name]);
     },
     async startContainer(options) {
-      const created = await runDocker(createArguments(options));
+      const created = await runDocker(createArguments(options), DOCKER_COMMAND_TIMEOUT_MILLISECONDS, options.environment);
       if (created.status !== 0) return failure(problem(created));
       const containerId = created.stdout.trim();
       for (const network of options.networks.slice(1)) {
