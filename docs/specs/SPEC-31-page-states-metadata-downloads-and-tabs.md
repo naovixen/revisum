@@ -88,6 +88,10 @@ export type DownloadedFile = { readonly fileName: string; readonly mediaType: st
 - **`canonicalUrl`.** It may name another origin, because it is compared, never visited.
 - **Project settings in M1.** `limits.maximumDownloadBytes` (default 5 MiB, at most 100 MiB) and `evidence.keepDownloads` (default false) are parsed now and read by the driver parts later.
 - **Literal steps.** New steps and assertions go through `packages/contracts/src/literal-steps.ts`. That module decides what drivers can do yet, so runs report them as `unsupported-step` until SPEC-06, with nothing dispatched.
+- **Driver parts** (alignment, 2026-10-30). They use SPEC-30's capability model: the engine refuses a step with `unsupported-step`, dispatching nothing, unless the driver declares the feature in `AdapterInfo.performs`. The new features are `pageStates`, `linkTargets`, `pageMetadata`, `scriptsDisabled`, `downloads` and `newTabs`. The CDP driver declares all six; the Playwright fallback declares none (AC-15).
+  - Downloads go to a per-run folder that the driver creates and removes. Each file is stored under a generated name, and the server's name is kept only as text after decoding. Partial bytes over the limit are deleted.
+  - A `newTab` opens a target in the session's own browser context, so it shares cookies and storage. It is closed in a `finally`, and its blocked origins join the session's.
+  - AC-14's 20 replays run in `npm run check:linux` on `cdp-chromium`.
 
 ## Acceptance criteria
 
