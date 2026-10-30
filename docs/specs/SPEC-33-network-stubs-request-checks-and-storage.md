@@ -174,6 +174,7 @@ Add to SPEC-27's unions and give each a heading in `docs/errors.md`: driver code
 
 - **M1, with SPEC-32:** declarations, project parser rules, grammar and policy additions.
 - **M2, with SPEC-06 and after SPEC-07:** the driver's network and storage ports, so the egress criteria can be checked. Not part of the M2 alpha exit.
+  - **Driver parts** (alignment, 2026-10-30). They use SPEC-30's capability model: the engine refuses a step with `unsupported-step`, dispatching nothing, unless the driver declares the feature in `AdapterInfo.performs`. The new features are `networkStubs`, `requestChecks` and `storage`; the CDP driver declares them, and the Playwright fallback declares none (AC-15). Stubs answer through CDP `Fetch` by resource type (`fetch` and `xhr` only). Exchanges and their bodies are observed through `Network`, with `setBypassServiceWorker` while a stub or check is active, and storage is written and read through `DOMStorage`. The egress criteria (05) run with SPEC-07's in-process proxy and a real Chromium, in `npm run check`.
 
 ## Satisfies
 
