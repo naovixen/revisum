@@ -42,6 +42,7 @@ The seeded `contracts` code wins where it differs from the block above: `Service
 - **Proxy** (`runner`, in-process capable, so AC-01, AC-02 and AC-07 run in `npm run check` with a real Chromium and no container).
   - It allows only the policy's origins and services. A blocked request gets a 403 for plain HTTP, or a refused `CONNECT` for HTTPS, and is recorded.
   - It records `{ origin, decision }`. Over HTTPS it sees only the host and port, so the channel comes from the browser.
+- **The proxy's own answers** (addition, 2026-10-30, with SPEC-32's real caller). The proxy marks its own refusals (403, 400) with `x-egress-decision: blocked`, and its failures to connect (502) with `unreachable`. It strips that header from every service response, so a service can't forge it. The caller maps the marks to `egress-blocked` and `service-unreachable`, and returns the service's own statuses as received.
 - **Channels** (AC-01). The CDP driver already sees each request's type through the `Network` domain, with auto-attach to workers and popups. It records each request's origin and channel: `websocket` for `Network.webSocketCreated`, `beacon` for type `Ping`, `redirect` for a request with a `redirectResponse`, `worker` and `popup` for requests from those targets, and `page` otherwise.
   - The run joins the browser's records with the proxy's decisions by origin, in order, to make `EgressEvent`s.
   - A decision the browser never reported gets the channel `unattributed` (addition), never a guess.

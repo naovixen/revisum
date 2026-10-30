@@ -61,6 +61,12 @@ export type EgressProxy = {
 };
 
 const UPSTREAM_TIMEOUT_MILLISECONDS = 30_000;
+// The header on every answer the proxy writes itself, rather than passes on from a service, so a
+// client such as runner's service caller can tell the proxy's refusal or failure from a status the
+// service sent. The proxy strips it from every service response, so a service cannot forge it.
+export const EGRESS_DECISION_HEADER = 'x-egress-decision';
+// What the header says: the proxy refused the request, or could not get an answer from the service.
+export type EgressDecisionMark = 'blocked' | 'unreachable';
 // Headers that describe one connection, not the request, so they are never forwarded.
 const HOP_BY_HOP_HEADERS = new Set([
   'connection', 'proxy-connection', 'keep-alive', 'proxy-authorization', 'proxy-authenticate', 'te', 'trailer', 'transfer-encoding', 'upgrade',
@@ -100,10 +106,18 @@ function forwardedHeaders(headers: IncomingHttpHeaders, host: string, rewriting:
   return forwarded;
 }
 
+// The headers passed back from a service: its own, less the hop-by-hop ones and the proxy's mark.
 function answerHeaders(headers: IncomingHttpHeaders): IncomingHttpHeaders {
   const answered: IncomingHttpHeaders = {};
-  for (const [name, value] of Object.entries(headers)) if (!HOP_BY_HOP_HEADERS.has(name) && value !== undefined) answered[name] = value;
+  for (const [name, value] of Object.entries(headers)) {
+    if (!HOP_BY_HOP_HEADERS.has(name) && name !== EGRESS_DECISION_HEADER && value !== undefined) answered[name] = value;
+  }
   return answered;
+}
+
+// Writes an answer of the proxy's own, marked as such.
+function answerFromProxy(response: ServerResponse, status: number, mark: EgressDecisionMark, text: string): void {
+  response.writeHead(status, { 'content-type': 'text/plain', [EGRESS_DECISION_HEADER]: mark }).end(text);
 }
 
 export async function startProxyServer(rules: ProxyRules, options: ProxyServerOptions = {}): Promise<EgressProxy> {
@@ -143,18 +157,18 @@ export async function startProxyServer(rules: ProxyRules, options: ProxyServerOp
     try {
       url = new URL(incoming.url ?? '');
     } catch {
-      response.writeHead(400).end();
+      answerFromProxy(response, 400, 'blocked', 'not a request the egress proxy forwards');
       return;
     }
     if (url.protocol !== 'http:') {
-      response.writeHead(400).end();
+      answerFromProxy(response, 400, 'blocked', 'not a request the egress proxy forwards');
       return;
     }
     const origin = url.origin;
     const address = await vettedAddress(url.hostname, allowed.has(origin), privateOrigins.has(origin));
     if (address === null) {
       record(origin, 'blocked');
-      response.writeHead(403, { 'content-type': 'text/plain' }).end('blocked by the egress proxy');
+      answerFromProxy(response, 403, 'blocked', 'blocked by the egress proxy');
       return;
     }
     record(origin, 'allowed');
@@ -166,9 +180,13 @@ export async function startProxyServer(rules: ProxyRules, options: ProxyServerOp
     });
     upstream.on('timeout', () => upstream.destroy(new Error('the upstream server did not answer')));
     upstream.on('error', () => {
-      if (!response.headersSent) response.writeHead(502).end();
+      if (response.destroyed) return;
+      if (!response.headersSent) answerFromProxy(response, 502, 'unreachable', 'the service did not answer');
       else response.destroy();
     });
+    // A client that leaves early, such as one that stops reading at its size cap or gives up at its
+    // timeout, ends the service's connection too, so the service stops sending.
+    response.on('close', () => { if (!response.writableFinished) upstream.destroy(); });
     upstream.on('response', (answer) => {
       if (rewrites.length === 0) {
         response.writeHead(answer.statusCode ?? 502, answerHeaders(answer.headers));
