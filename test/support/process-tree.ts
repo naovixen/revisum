@@ -8,7 +8,10 @@ import { spawnSync } from 'node:child_process';
 import { readdirSync, readFileSync } from 'node:fs';
 import { platform } from 'node:os';
 
-export type RunningProcess = { readonly processId: number; readonly parentProcessId: number; readonly commandLine: string };
+// startedAt, where the system gives it, is the start time in Windows file-time units (100 ns).
+export type RunningProcess = {
+  readonly processId: number; readonly parentProcessId: number; readonly commandLine: string; readonly startedAt?: number;
+};
 
 // The fields of /proc/<id>/stat after the command name, which is in brackets and may itself hold
 // spaces or brackets: state, then the parent process id.
@@ -36,12 +39,13 @@ function linuxProcesses(): RunningProcess[] {
   return processes;
 }
 
-type WindowsProcess = { readonly ProcessId?: unknown; readonly ParentProcessId?: unknown; readonly CommandLine?: unknown };
+type WindowsProcess = { readonly ProcessId?: unknown; readonly ParentProcessId?: unknown; readonly CommandLine?: unknown; readonly Started?: unknown };
 
 // 'maxBuffer' is Node's own option name.
 function windowsProcesses(): RunningProcess[] {
   const query = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
-    'Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,CommandLine | ConvertTo-Json -Compress'],
+    'Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,CommandLine,'
+      + '@{n="Started";e={$_.CreationDate.ToFileTimeUtc()}} | ConvertTo-Json -Compress'],
   { encoding: 'utf8', windowsHide: true, ['maxBuffer']: 64 * 1024 * 1024 });
   if (query.status !== 0) throw new Error(`listing processes failed: ${query.stderr}`);
   const parsed: unknown = JSON.parse(query.stdout);
@@ -50,6 +54,7 @@ function windowsProcesses(): RunningProcess[] {
     processId: Number(entry.ProcessId),
     parentProcessId: Number(entry.ParentProcessId),
     commandLine: typeof entry.CommandLine === 'string' ? entry.CommandLine : '',
+    ...(typeof entry.Started === 'number' ? { startedAt: entry.Started } : {}),
   }));
 }
 
@@ -69,7 +74,9 @@ export function listProcesses(): RunningProcess[] {
   return otherProcesses();
 }
 
-// The process and every process below it, the process itself first.
+// The process and every process below it, the process itself first. Windows keeps a process's
+// parent id after the parent exits and may give that id to a new process, so a process that
+// started before the one now holding its parent's id is not that process's child.
 export function processTree(rootProcessId: number, processes: readonly RunningProcess[] = listProcesses()): RunningProcess[] {
   const tree = processes.filter((candidate) => candidate.processId === rootProcessId);
   const seen = new Set(tree.map((member) => member.processId));
@@ -77,7 +84,8 @@ export function processTree(rootProcessId: number, processes: readonly RunningPr
     const parent = tree[index];
     if (parent === undefined) continue;
     for (const candidate of processes) {
-      if (candidate.parentProcessId === parent.processId && !seen.has(candidate.processId)) {
+      const startedFirst = candidate.startedAt !== undefined && parent.startedAt !== undefined && candidate.startedAt < parent.startedAt;
+      if (candidate.parentProcessId === parent.processId && !startedFirst && !seen.has(candidate.processId)) {
         seen.add(candidate.processId);
         tree.push(candidate);
       }
