@@ -135,6 +135,7 @@ export type StepErrorCode = 'value-empty' | 'value-unsafe' | 'value-too-long';
 - **Capture names.** A capture name that isn't text is `wrong_type`, as every other field's is, not `unknown_value`.
 - **Function keys.** The naming lint allows the key names `F1` to `F12` as string values. They are keyboard keys, not research ids.
 - **Deferred to SPEC-06.** `remember` (AC-SPEC-30-09, 10) and the browser halves of AC-SPEC-30-06, 11 to 16.
+- **Driver parts** (alignment, 2026-10-30). The CDP driver performs them: `remember` through `Prober`, positions, attribute matching, chords and multi-line fills. The engine stops reporting them as `unsupported-step`. The Playwright fallback refuses `remember`, positioned locators and chords with `unsupported-step`, dispatching nothing, as it does for SPEC-06's steps. Browser tests run on `cdp-chromium`; the 20 clock replays (AC-06) run on `cdp-chromium` and `cdp-chromium-headless-shell`.
 
 ## Acceptance criteria
 
