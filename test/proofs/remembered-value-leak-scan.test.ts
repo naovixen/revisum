@@ -23,7 +23,7 @@ import {
 import { echoesIn, resolvedSecret } from '../unit/engine/secret-examples.ts';
 
 // The canary text the fixture page shows, exactly as remember.html holds it.
-const CANARY = 'RememberedCanaryQwXpLmZrTkVbNsHd';
+const CANARY = 'CanaryQwXpLmZrTkVbNsHd';
 const VALUE_NAME = 'accountReference';
 const TIMEOUT = 120_000;
 
