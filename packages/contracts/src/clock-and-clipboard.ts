@@ -7,10 +7,13 @@
 //   - expectClipboard checks the plain text of the run's own in-memory clipboard, and a remember
 //     step may read that text into a run value. The text is page content: compared, never recorded.
 //
-// The driver ports that carry these out come with the CDP driver; until then a run reports both
-// steps, and a remember from the clipboard, as unsupported-step.
+// A driver that declares clockControl offers the clock port, and one that declares clipboard the
+// clipboard port; a run refuses these steps, and a remember from the clipboard, with
+// unsupported-step otherwise, and never falls back to a real wait.
 // See docs/specs/SPEC-34-clock-advance-and-clipboard.md.
+import type { DriverError } from './browser-driver.ts';
 import type { CriterionId, MultiLineText, TextOrValue } from './plan.ts';
+import type { Result } from './result.ts';
 
 // The units an advance may be written in. A day is 86,400,000 ms of elapsed time; wall-clock
 // dates follow from the new instant, so a daylight-saving change needs no special case. There is
@@ -42,3 +45,20 @@ export type ClipboardRead = (typeof CLIPBOARD_READS)[number];
 export type AdvanceClockStep = { readonly type: 'advanceClock'; readonly by: ClockAdvance; readonly mode?: ClockAdvanceMode };
 export type ExpectClipboardStep = { readonly type: 'expectClipboard'; readonly assert: ClipboardAssertion; readonly criterionId: CriterionId };
 export type ClockAndClipboardStep = AdvanceClockStep | ExpectClipboardStep;
+
+// ---- The driver ports -------------------------------------------------------------------------
+// The engine converts and bounds an advance's amount; a driver receives milliseconds.
+
+export interface ClockPort {
+  // Moves the virtual time of every frame and tab of the session forward; documents loaded later
+  // start at the new time. Fails with clock-runaway once more than maximumTimers callbacks would
+  // fire in this one advance, so a timer loop cannot hang a run.
+  advance(milliseconds: number, mode: ClockAdvanceMode, maximumTimers: number): Promise<Result<void, DriverError>>;
+}
+
+export interface ClipboardPort {
+  // The plain text of the run's own clipboard, line endings normalised to "\n", and "" when it is
+  // empty. Gives at most maximumCharacters + 1 characters, so the engine can tell the limit was
+  // passed. Fails with clipboard-unavailable when the browser cannot keep its clipboard in memory.
+  readText(maximumCharacters: number): Promise<Result<string, DriverError>>;
+}

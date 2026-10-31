@@ -3,9 +3,11 @@
 // target, and hashes everything except wall-clock timings. Declared service calls go through the
 // run's ServiceCaller port; a failed call ends the run Errored, since it could not test, and the
 // plan's cleanup calls run after the steps whatever the outcome. Stubs, request checks and web
-// storage go through the session's network and storage ports.
-// See docs/specs/SPEC-32-declared-service-calls.md for calls and
-// docs/specs/SPEC-33-network-stubs-request-checks-and-storage.md for stubs, checks and storage.
+// storage go through the session's network and storage ports; clock advances and clipboard reads
+// through its clock and clipboard ports.
+// See docs/specs/SPEC-32-declared-service-calls.md for calls,
+// docs/specs/SPEC-33-network-stubs-request-checks-and-storage.md for stubs, checks and storage and
+// docs/specs/SPEC-34-clock-advance-and-clipboard.md for the clock and the clipboard.
 import {
   needsDriverFeatures,
   type A11yFinding, type ActionGuard, type ApprovalLabel, type ArtifactReference, type ArtifactStore, type Authorised,
@@ -16,6 +18,8 @@ import {
   type StubAnswer, type StubName, type SuiteTestId, type SuiteTestResult, type UnsafeFeature,
 } from '@revisum/contracts';
 import { approvalLabel, ownStanding, type PlanStanding } from './approval/plan-standing.ts';
+import { totalClockAdvanceMilliseconds } from './clock-advance.ts';
+import { advanceClock, checkClipboard, rememberFromClipboard, type ClockAndClipboardContext } from './clock-and-clipboard-steps.ts';
 import { guaranteeStatement } from './guarantees.ts';
 import { canonicalJson, sha256 } from './hashing.ts';
 import * as lifecycle from './lifecycle.ts';
@@ -499,6 +503,9 @@ async function openSession(planned: lifecycle.Planned, context: RunContext): Pro
     fixedTimeMilliseconds: resolvePlanClock(context.inputs.plan.clock, context.inputs.fixedTimeMilliseconds, planned.target.timezone),
     sensitiveSelectors: context.ports.redactor.selectors,
     timeoutMilliseconds: context.inputs.project.limits.stepTimeoutMilliseconds,
+    // Only a plan that advances the clock puts the page's timers on virtual time; every other plan
+    // keeps real-time timers, as pages that wait on their own timers need.
+    ...(totalClockAdvanceMilliseconds(context.inputs.plan) > 0 ? { virtualTimers: true } : {}),
   });
   return opened.ok ? { ok: true, value: { session: opened.value, driver, unpinned } } : opened;
 }
@@ -532,6 +539,12 @@ function withActiveStubs(step: Step, result: StepResult, activeStubs: ReadonlySe
 const networkContext = (context: RunContext): NetworkStepContext => ({
   project: context.inputs.project, session: context.session, values: context.values, rememberedTexts: context.rememberedTexts,
   secrets: stubAndStorageSecretStore(context.secrets), clock: context.ports.clock, logger: context.logger, activeStubs: context.activeStubs,
+});
+
+// What the clock and clipboard steps use: the run's session and values.
+const clockAndClipboardContext = (context: RunContext): ClockAndClipboardContext => ({
+  project: context.inputs.project, session: context.session, values: context.values, rememberedTexts: context.rememberedTexts,
+  clock: context.ports.clock, logger: context.logger,
 });
 
 // What the runtime guard is given for a step that acts on no element.
@@ -612,6 +625,7 @@ async function executeStep(step: Step, index: number, session: DocumentSession, 
     }
     case 'remember':
       if ('response' in step.from) return { ...base, ...(await rememberFromResponse(step, index, networkContext(context))) };
+      if ('clipboard' in step.from) return { ...base, ...(await rememberFromClipboard(step, index, clockAndClipboardContext(context))) };
       return rememberFromPage(step, index, session, context);
     case 'download': return downloadFile(step, index, session, target, context);
     case 'expectDownload': return checkDownload(step, index, context);
@@ -623,9 +637,10 @@ async function executeStep(step: Step, index: number, session: DocumentSession, 
     case 'expectResponse': return { ...base, ...(await checkResponse(step, networkContext(context))) };
     case 'setStorage': case 'removeStorage': return { ...base, ...(await writeStorage(step, networkContext(context))) };
     case 'expectStorage': return { ...base, ...(await checkStorage(step, networkContext(context))) };
-    // The driver's clock and clipboard ports come with the CDP driver; isUnsupported refused these
-    // above, so an advance never becomes a real wait.
-    case 'advanceClock': case 'expectClipboard':
+    // The session's clock and clipboard ports carry these out, for a driver that declares them;
+    // isUnsupported refused them above otherwise, so an advance never becomes a real wait.
+    case 'advanceClock': return { ...base, ...(await advanceClock(step, clockAndClipboardContext(context))) };
+    case 'expectClipboard': return { ...base, ...(await checkClipboard(step, clockAndClipboardContext(context))) };
     // Page scripts need the driver's script port and database commands the workload runner;
     // isUnsupported refused these above, so nothing of them runs.
     case 'evaluate': case 'expectScript': case 'database': case 'expectDatabase':

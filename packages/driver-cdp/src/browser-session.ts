@@ -5,7 +5,7 @@ import {
   DEFAULT_TEST_ID_ATTRIBUTE, DRIVER_FEATURES, failure, literalActionStep, literalText, performableLocator, reveal, success,
   type ActionGuard, type ActionStep, type BrowserRequestRecord, type DialogStep, type DocumentSession, type DownloadedFile, type DownloadStep,
   type DriverError, type DriverFeature, type ElementProbe, type Locator, type PageMetaTag, type PageProbe, type Position, type ResolvedActionStep,
-  type NetworkPort, type ResolvedElement, type ResolvedLocator, type Result, type Secret, type SessionEnvironment, type StoragePort,
+  type ClipboardPort, type ClockPort, type NetworkPort, type ResolvedElement, type ResolvedLocator, type Result, type Secret, type SessionEnvironment, type StoragePort,
 } from '@revisum/contracts';
 import {
   actionability, afterTwoFrames, armHitCheck, findByLabel, findByTestId, findByText, fontsReady, guardDetails, inDocumentOrder, inThisDocument,
@@ -43,6 +43,10 @@ export type SessionDetails = {
   readonly network?: NetworkPort;
   // The page's local and session storage. Without it, the session has none.
   readonly storage?: StoragePort;
+  // The session's virtual clock, shared by every tab. Without it, the session advances no clock.
+  readonly clock?: ClockPort;
+  // The browser's own clipboard. Without it, the session reads no clipboard.
+  readonly clipboard?: ClipboardPort;
 };
 
 // The scheme of the page the browser shows in place of one it could not show.
@@ -462,6 +466,8 @@ export function buildSession<Handle>(operations: PageOperations<Handle>, environ
     ...(openTab === undefined ? {} : { newTab: (url: string) => newTabAt(openTab, url) }),
     ...(details.network === undefined ? {} : { network: details.network }),
     ...(details.storage === undefined ? {} : { storage: details.storage }),
+    ...(details.clock === undefined ? {} : { clock: details.clock }),
+    ...(details.clipboard === undefined ? {} : { clipboard: details.clipboard }),
     browser: details.browser,
     processId: details.processId,
     blockedOrigins: details.blockedOrigins,

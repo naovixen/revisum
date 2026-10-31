@@ -279,6 +279,25 @@ export function inThisDocument(element: Element): string {
   return element.ownerDocument === document ? 'yes' : 'no';
 }
 
+// Advances this document's virtual clock to `target` milliseconds after the frozen start, through
+// the determinism kit's advance controller in the page's main world, where the page's timers are.
+// A document without the controller, such as one loaded with scripts off, fires nothing. Gives
+// how many callbacks fired and whether the limit stopped it.
+export async function advanceDocumentClock(controllerKey: string, target: number, mode: string, maximumCallbacks: number): Promise<unknown> {
+  type Controller = { advanceTo(target: number, mode: string, maximumCallbacks: number): Promise<unknown> };
+  const controller = (window as unknown as Record<symbol, Controller | undefined>)[Symbol.for(controllerKey)];
+  if (controller === undefined) return { fired: 0, runaway: false };
+  return controller.advanceTo(target, mode, maximumCallbacks);
+}
+
+// The run's clipboard as plain text, line endings normalised to "\n", cut after
+// maximumCharacters + 1 characters. Called in an isolated world, only while the driver holds the
+// clipboard-read permission, so the page's own scripts never see the read.
+export async function readClipboardText(maximumCharacters: number): Promise<string> {
+  const text = await navigator.clipboard.readText();
+  return text.replace(/\r\n?/g, '\n').slice(0, maximumCharacters + 1);
+}
+
 // Waits two animation frames, so whatever an action started (a popup, a download) has reached
 // the browser before the driver looks.
 export async function afterTwoFrames(): Promise<string> {

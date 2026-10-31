@@ -5,12 +5,13 @@
 // Some features of plan language 1.2 are optional for a driver: positions, test-id attributes
 // other than data-testid, key chords, multi-line fills, remembered values, accessibility states,
 // link targets, head metadata, pages loaded with scripts off, downloads, second tabs, network
-// stubs, request checks and web storage. A driver declares the ones it performs in its
-// AdapterInfo; the run refuses a step needing one its driver does not declare with
+// stubs, request checks, web storage, clock advances and the clipboard. A driver declares the ones
+// it performs in its AdapterInfo; the run refuses a step needing one its driver does not declare with
 // unsupported-step, before anything of it reaches the driver.
 // See docs/specs/SPEC-30-plan-values-positions-and-keys.md and
 // docs/specs/SPEC-31-page-states-metadata-downloads-and-tabs.md and
-// docs/specs/SPEC-33-network-stubs-request-checks-and-storage.md.
+// docs/specs/SPEC-33-network-stubs-request-checks-and-storage.md and
+// docs/specs/SPEC-34-clock-advance-and-clipboard.md.
 import { DOM_CHECK_KINDS } from './plan.ts';
 import type {
   ActionStep, ElementAssertion, Locator, PageAssertion, ResolvedActionStep, ResolvedLocator, SafeText, Step, TextOrValue, ValueName,
@@ -37,11 +38,14 @@ export const DEFAULT_TEST_ID_ATTRIBUTE = 'data-testid';
 //   requestChecks     records the exchanges of the requests a plan names, through its network port,
 //                     so a plan may count them and check or remember their latest response;
 //   storage           writes, removes and reads local and session storage entries, through its
-//                     storage port.
+//                     storage port;
+//   clockControl      runs the page's timers on the run's virtual clock and moves that clock forward,
+//                     through its clock port;
+//   clipboard         reads the plain text of the run's own in-memory clipboard, through its clipboard port.
 export const DRIVER_FEATURES = [
   'positions', 'testIdAttributes', 'keyChords', 'multiLineFills', 'rememberedValues',
   'pageStates', 'linkTargets', 'pageMetadata', 'scriptsDisabled', 'downloads', 'newTabs',
-  'networkStubs', 'requestChecks', 'storage',
+  'networkStubs', 'requestChecks', 'storage', 'clockControl', 'clipboard',
 ] as const;
 export type DriverFeature = (typeof DRIVER_FEATURES)[number];
 
@@ -90,12 +94,12 @@ const isMultiLine = (value: Extract<Step, { type: 'fill' }>['value']): boolean =
 // True when the step needs what its driver does not perform: an optional feature above that
 // `performs` does not list (an accessibility state, a link target, the document head, a page
 // loaded with scripts off, a download or a check of one, a second tab, a stub, a request or
-// response check or read, a storage step among them), a CSS or XPath locator, a check no probe
-// decides, or the driver's clock and clipboard ports (clock advances, clipboard checks and
-// reads). The run reports such a step as unsupported-step before anything of it reaches the
-// driver. Hover, select and upload go to the driver, which refuses them with unsupported-step
-// when it does not perform them; a frame step goes to the driver's frame port. A dialog step goes to the driver, so the runtime guard
-// sees the dialog's text before anything answers it.
+// response check or read, a storage step, a clock advance, a clipboard check or read among them),
+// a CSS or XPath locator, or a check no probe decides. The run reports such a step as
+// unsupported-step before anything of it reaches the driver. Hover, select and upload go to the
+// driver, which refuses them with unsupported-step when it does not perform them; a frame step
+// goes to the driver's frame port. A dialog step goes to the driver, so the runtime guard sees the
+// dialog's text before anything answers it.
 export function needsDriverFeatures(step: Step, performs: readonly DriverFeature[] = NO_FEATURES): boolean {
   const lacks = (feature: DriverFeature): boolean => !performs.includes(feature);
   switch (step.type) {
@@ -116,14 +120,15 @@ export function needsDriverFeatures(step: Step, performs: readonly DriverFeature
     case 'stub': return lacks('networkStubs');
     case 'resetRequests': case 'expectRequests': case 'expectResponse': return lacks('requestChecks');
     case 'setStorage': case 'removeStorage': case 'expectStorage': return lacks('storage');
-    // The CDP driver's clock and clipboard ports carry these out, with the determinism kit's timer
-    // tracking (docs/specs/SPEC-34-clock-advance-and-clipboard.md).
-    case 'advanceClock': case 'expectClipboard': return true;
+    // The driver's clock and clipboard ports carry these out.
+    case 'advanceClock': return lacks('clockControl');
+    case 'expectClipboard': return lacks('clipboard');
     // Reading an element's text or value needs only the prober, of a driver that declares it reads
     // values for later steps. Reading a response field needs the request checks of the network
     // port; reading the clipboard needs the clipboard port and reading an attribute the DOM reads.
     case 'remember':
       if ('response' in step.from) return lacks('requestChecks');
+      if ('clipboard' in step.from) return lacks('clipboard');
       if (!('element' in step.from) || step.from.read === 'attribute') return true;
       return lacks('rememberedValues') || needsLocatorFeatures(step.from.element, performs);
     case 'dialog': case 'a11yAudit': case 'capture': return false;

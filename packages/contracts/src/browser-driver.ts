@@ -1,6 +1,7 @@
 // The browser driver ports: what the engine needs from one browser session, split into small
 // interfaces. Each driver package implements them; the engine never imports a driver.
 // See docs/specs/SPEC-06-cdp-driver.md and docs/specs/SPEC-27-shared-types-and-events.md.
+import type { ClipboardPort, ClockPort } from './clock-and-clipboard.ts';
 import type { DriverFeature } from './literal-steps.ts';
 import type { NetworkPort, StoragePort } from './network-and-storage.ts';
 import type { ActionStep, DownloadStep, Locator, ResolvedLocator } from './plan.ts';
@@ -136,6 +137,10 @@ export type SessionEnvironment = {
   readonly fixedTimeMilliseconds: number;
   readonly sensitiveSelectors: readonly string[];
   readonly timeoutMilliseconds: number;
+  // True when the plan advances the clock: the page's timers and animation frames then run only
+  // when the clock port moves the run's virtual time. Without it they run in real time, while Date
+  // and performance.now() stay frozen.
+  readonly virtualTimers?: boolean;
 };
 
 export interface PageNavigator {
@@ -202,6 +207,10 @@ export interface Session extends DocumentSession {
   readonly network?: NetworkPort;
   // Local and session storage of the session's page. A driver without it does not declare storage.
   readonly storage?: StoragePort;
+  // The run's virtual clock, shared by every tab and frame. A driver without it does not declare clockControl.
+  readonly clock?: ClockPort;
+  // The run's own in-memory clipboard. A driver without it does not declare clipboard.
+  readonly clipboard?: ClipboardPort;
 }
 
 export type AdapterInfo = {

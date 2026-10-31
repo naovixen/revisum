@@ -25,9 +25,13 @@ export const ISOLATED_CHROMIUM_ARGUMENTS: readonly string[] = [
   `--disable-features=${PORT_RANDOMISATION_FEATURE}`,
 ];
 
+// Added to every launch, even when the caller passes its own flags, so no caller can open a
+// visible window or play sound on the person's machine.
+const ALWAYS_HEADLESS_AND_MUTED: readonly string[] = ['--headless=new', '--mute-audio'];
+
 export type LaunchOptions = ConnectOptions & {
-  // Flags passed to Chromium. The launcher always adds the DevTools port, the profile folder and
-  // a blank first page.
+  // Flags passed to Chromium. The launcher always adds headless mode, muted audio, the DevTools
+  // port, the profile folder and a blank first page.
   readonly arguments?: readonly string[];
   readonly launchTimeoutMilliseconds?: number;
   readonly profilePrefix?: string;
@@ -100,8 +104,10 @@ async function endProcessGroup(groupId: number | undefined): Promise<void> {
 
 export function launchChromium(executablePath: string, options: LaunchOptions = {}): Promise<LaunchedChromium> {
   const userDataFolder = mkdtempSync(join(tmpdir(), options.profilePrefix ?? 'chromium-profile-'));
+  const chosen = options.arguments ?? ISOLATED_CHROMIUM_ARGUMENTS;
   const flags = [
-    ...(options.arguments ?? ISOLATED_CHROMIUM_ARGUMENTS),
+    ...chosen,
+    ...ALWAYS_HEADLESS_AND_MUTED.filter((flag) => !chosen.some((given) => given.startsWith(flag.split('=')[0] ?? flag))),
     '--remote-debugging-port=0', `--user-data-dir=${userDataFolder}`, 'about:blank',
   ];
   // 'detached' starts the browser as the leader of a new process group outside Windows.
