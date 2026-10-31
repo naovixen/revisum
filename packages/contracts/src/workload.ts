@@ -7,6 +7,7 @@ import type { ImageDigest } from './evidence-mode.ts';
 import type { EgressEvent, EgressPolicy } from './isolated-runner.ts';
 import type { Result } from './result.ts';
 import type { Secret } from './secret.ts';
+import type { DeclaredService } from './service-calls.ts';
 
 // Where the workload container sees the repository under test (read-only) and Revisum's output
 // folder (the only writable mount apart from a private /tmp). An argument vector or variable that
@@ -29,6 +30,14 @@ export type WorkloadRequest = {
   readonly timeoutMilliseconds: number;
   // The host folder Revisum owns for the workload's output, mounted at WORKLOAD_OUTPUT_PATH.
   readonly outputDirectory: string;
+  // The declared services the policy's allowTcpServices name, so the proxy knows each one's address
+  // and port. Absent: none.
+  readonly services?: readonly DeclaredService[];
+  // False for a command that speaks only TCP, such as a database client: its environment then holds
+  // no proxy variables. True when absent.
+  readonly httpProxyVariables?: boolean;
+  // Each captured stream is cut here (CapturedOutput.truncated); 1 MiB when absent.
+  readonly maximumOutputBytes?: number;
 };
 
 // What a process printed on one stream, cut at the runner's limit. `truncated` says it was cut.

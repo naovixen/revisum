@@ -31,10 +31,14 @@ export type RunValues = ReadonlyMap<ValueName, SafeText>;
 //                      within the step timeout;
 //   script-result-too-large  a page script's result text is over its maximumResultBytes;
 //   script-result-invalid    a page script's result text is not JSON, or nests deeper than the
-//                      depth limit.
+//                      depth limit;
+//   command-failed     a database command exited with a code its declaration does not count as success;
+//   command-timeout    a database command ran past its timeout and was stopped;
+//   command-output-invalid  a database command printed more than its maximumOutputBytes, or output
+//                      that is not one JSON value when its declaration reads JSON.
 export type StepErrorCode =
   | 'value-empty' | 'value-unsafe' | 'value-too-long' | 'state-not-exposed' | 'download-not-text' | 'request-not-seen'
-  | 'script-result-too-large' | 'script-result-invalid';
+  | 'script-result-too-large' | 'script-result-invalid' | 'command-failed' | 'command-timeout' | 'command-output-invalid';
 
 const UNIQUE_PART_LENGTH = 10;
 const BASE_36 = 36;

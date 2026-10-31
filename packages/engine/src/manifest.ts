@@ -125,6 +125,9 @@ export const planHash = (plan: Plan): string => sha256(canonicalJson(plan));
 
 // The non-hermetic input of a run that calls declared services: their responses.
 export const SERVICE_CALLS_INPUT = 'service-calls';
+// The non-hermetic input of a run that runs database commands: their outputs, and the state of the
+// database they ran against, which no manifest can pin.
+export const DATABASE_COMMANDS_INPUT = 'database-commands';
 
 // What the manifest records about the plan's unsafe features: the features, and each declaration
 // the plan names, with its sha256. Undefined for a closed plan. A named script whose source the run

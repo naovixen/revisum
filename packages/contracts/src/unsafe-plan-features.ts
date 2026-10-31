@@ -10,6 +10,9 @@
 // Plan language 1.3 holds them; a plan declaring an older version cannot.
 // See docs/specs/SPEC-36-unsafe-plan-features.md.
 import type { Brand } from './brand.ts';
+import type { EgressPolicy } from './isolated-runner.ts';
+import type { Result } from './result.ts';
+import type { WorkloadErrorCode, WorkloadOutcome, WorkloadVariable } from './workload.ts';
 import type { EnvironmentValue, ImageDigest } from './evidence-mode.ts';
 import type { CriterionId, SafeText, TextOrValue, ValueName } from './plan.ts';
 import type { BackendAssertion, CallEffect, FieldName, JsonPointer, ParameterName, ParameterType, ServiceName } from './service-calls.ts';
@@ -125,3 +128,25 @@ export type ExpectDatabaseStep = {
 };
 export type PageScriptStep = EvaluateStep | ExpectScriptStep;
 export type DatabaseCommandStep = DatabaseStep | ExpectDatabaseStep;
+
+// ---- The database-command port -------------------------------------------------------------------
+
+// One run of a declared database command, built by the engine from the declaration alone. Each
+// argument is whole: the runner hands the vector to the program with no shell, so nothing is split
+// or joined. A secret in the environment stays an opaque Secret until the runner writes the
+// container's environment. The policy reaches only the command's own service, over TCP.
+export type DatabaseCommandRequest = {
+  readonly image: ImageDigest;
+  readonly argv: readonly string[];
+  readonly environment: readonly WorkloadVariable[];
+  readonly policy: EgressPolicy;
+  readonly timeoutMilliseconds: number;
+  // The most the command may print on standard output; more fails the step.
+  readonly maximumOutputBytes: number;
+};
+
+// Runs a database command in a workload container. cli wires it to runner's WorkloadRunner, so the
+// engine never imports runner. The reply is the workload runner's own; the engine judges it.
+export interface DatabaseCommandRunner {
+  run(request: DatabaseCommandRequest): Promise<Result<WorkloadOutcome, WorkloadErrorCode>>;
+}

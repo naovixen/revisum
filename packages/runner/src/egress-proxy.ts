@@ -7,13 +7,18 @@
 // Plain HTTP arrives as an absolute-form request and is forwarded; HTTPS and WebSockets arrive as
 // CONNECT tunnels, of which the proxy sees only the host and port. On a declared fixture origin it
 // can apply a browser mutant's rewrite to a plain-HTTP response body.
+//
+// For a database command it also relays plain TCP: one port per service the policy allows over
+// TCP, the service's own declared port, to that service's address and nothing else. Each
+// connection is vetted like a request (resolved by the proxy, metadata addresses refused) and
+// recorded as a decision on "host:port".
 // It runs in-process for tests and, in a run, in its own container (proxy-container.ts).
 // See docs/specs/SPEC-07-isolated-runner-and-egress.md.
 import type { AppliedRewrite, DeclaredService, EgressPolicy, ProxyDecision, ResponseRewrite } from '@revisum/contracts';
 import { lookup } from 'node:dns/promises';
 import { createServer, request, type IncomingHttpHeaders, type IncomingMessage, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { connect as connectSocket, isIP, type Socket } from 'node:net';
+import { connect as connectSocket, createServer as createTcpServer, isIP, type Server as TcpServer, type Socket } from 'node:net';
 import type { Duplex } from 'node:stream';
 import { checkResolvedAddress } from './address-check.ts';
 import { hostAndPort } from './egress-events.ts';
@@ -24,6 +29,9 @@ export type AddressResolver = (hostname: string) => Promise<readonly string[]>;
 export type AddressConnector = (address: string, port: number) => Socket;
 
 export type RewriteRule = { readonly origin: string; readonly rewrite: ResponseRewrite };
+// A TCP port the proxy relays: it listens on `port` and connects each client to `host` at the same
+// port. `private` says the host may resolve to a private address, as for a service declared private.
+export type TcpRelay = { readonly host: string; readonly port: number; readonly private: boolean };
 
 // What the proxy enforces, as plain text, so the proxy container can read it from its settings.
 export type ProxyRules = {
@@ -32,6 +40,8 @@ export type ProxyRules = {
   // The origins of services declared private, which may resolve to private addresses.
   readonly privateOrigins: readonly string[];
   readonly rewrites: readonly RewriteRule[];
+  // Present only when the policy allows a service over TCP.
+  readonly tcpRelays?: readonly TcpRelay[];
 };
 
 export type ProxyServerOptions = {
@@ -74,15 +84,28 @@ const HOP_BY_HOP_HEADERS = new Set([
 const AUTHORITY = /^(\[[0-9a-fA-F:.%a-zA-Z]+\]|[^:[\]/\s]+):(\d{1,5})$/;
 
 // The proxy's rules for a policy: its origins, the origins of the services it allows, which of
-// those services are private, and its rewrites.
+// those services are private, its rewrites, and a TCP relay for each service it allows over TCP
+// that declares a port.
 export function proxyRules(policy: EgressPolicy, services: readonly DeclaredService[] = []): ProxyRules {
   const allowedServices = services.filter((service) => policy.allowServices.includes(service.name));
+  const tcpRelays = tcpRelaysFor(policy, services);
   return {
     allowedOrigins: [...new Set([...policy.allowOrigins, ...allowedServices.map((service) => service.origin)])],
     privateOrigins: allowedServices.filter((service) => service.private).map((service) => service.origin),
     rewrites: (policy.responseRewrites ?? []).map((entry) => ({ origin: entry.origin, rewrite: entry.rewrite })),
+    ...(tcpRelays.length === 0 ? {} : { tcpRelays }),
   };
 }
+
+// The services a policy allows over TCP, each by the host its origin names and its declared port.
+export function tcpRelaysFor(policy: EgressPolicy, services: readonly DeclaredService[]): readonly TcpRelay[] {
+  return services.flatMap((service) => (policy.allowTcpServices.includes(service.name) && service.port !== undefined
+    ? [{ host: withoutBrackets(new URL(service.origin).hostname), port: service.port, private: service.private }]
+    : []));
+}
+
+// How a relay's decisions name what was reached: "host:port", an IPv6 host in brackets.
+export const relayOrigin = (relay: TcpRelay): string => `${relay.host.includes(':') ? `[${relay.host}]` : relay.host}:${relay.port}`;
 
 export function startEgressProxy(options: EgressProxyOptions): Promise<EgressProxy> {
   return startProxyServer(proxyRules(options.policy, options.services), options);
@@ -263,9 +286,51 @@ export async function startProxyServer(rules: ProxyRules, options: ProxyServerOp
     client.on('close', () => upstream.destroy());
   }
 
+  // A TCP relay: the client's bytes go, unread, to the vetted address of the relay's host.
+  async function relay(client: Socket, target: TcpRelay): Promise<void> {
+    openSockets.add(client);
+    client.on('close', () => openSockets.delete(client));
+    client.on('error', () => client.destroy());
+    const seen = relayOrigin(target);
+    const address = await vettedAddress(target.host, true, target.private);
+    if (address === null) {
+      record(seen, 'blocked');
+      client.destroy();
+      return;
+    }
+    record(seen, 'allowed');
+    const upstream = connect(address, target.port);
+    openSockets.add(upstream);
+    upstream.on('close', () => { openSockets.delete(upstream); client.destroy(); });
+    upstream.on('error', () => upstream.destroy());
+    upstream.setTimeout(UPSTREAM_TIMEOUT_MILLISECONDS, () => upstream.destroy());
+    upstream.once('connect', () => {
+      upstream.setTimeout(0);
+      upstream.pipe(client);
+      client.pipe(upstream);
+    });
+    client.on('close', () => upstream.destroy());
+  }
+
+  // Each relay listens before the proxy's own port does, so a proxy that answers relays too.
+  const relayServers: TcpServer[] = [];
+  const listenHost = options.listenHost ?? '127.0.0.1';
+  try {
+    for (const target of rules.tcpRelays ?? []) {
+      const relayServer = createTcpServer((client) => { void relay(client, target); });
+      relayServers.push(relayServer);
+      await new Promise<void>((resolveListening, reject) => {
+        relayServer.once('error', reject);
+        relayServer.listen(target.port, listenHost, () => { relayServer.off('error', reject); resolveListening(); });
+      });
+    }
+  } catch (error) {
+    for (const relayServer of relayServers) relayServer.close();
+    throw error;
+  }
+
   const server = createServer((incoming, response) => { void forward(incoming, response); });
   server.on('connect', (incoming: IncomingMessage, client: Duplex, head: Buffer) => { void tunnel(incoming, client, head); });
-  const listenHost = options.listenHost ?? '127.0.0.1';
   await new Promise<void>((resolveListening, reject) => {
     server.once('error', reject);
     server.listen(options.port ?? 0, listenHost, () => { server.off('error', reject); resolveListening(); });
@@ -277,6 +342,7 @@ export async function startProxyServer(rules: ProxyRules, options: ProxyServerOp
     rewritesApplied: () => [...applied.values()],
     close: () => new Promise<void>((resolveClosed) => {
       for (const socket of openSockets) socket.destroy();
+      for (const relayServer of relayServers) relayServer.close();
       server.closeAllConnections();
       server.close(() => resolveClosed());
     }),

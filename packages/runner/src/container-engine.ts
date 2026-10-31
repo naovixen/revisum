@@ -33,7 +33,12 @@ export type ContainerOptions = {
   // The name servers its lookups are forwarded to, by address. Docker's own resolver still answers
   // for the containers on its networks first.
   readonly dns?: readonly string[];
+  // Host names its own lookups answer with a fixed address, before any name server is asked, such
+  // as a declared service's name mapped to the proxy that relays to it.
+  readonly hosts?: readonly HostEntry[];
 };
+
+export type HostEntry = { readonly name: string; readonly address: string };
 
 export type EngineProblem = { readonly detail: string };
 export type ProbeTarget = { readonly host: string; readonly port: number };
@@ -117,6 +122,7 @@ export function createArguments(options: ContainerOptions): readonly string[] {
     '--workdir', options.workingFolder,
     ...(options.entrypoint === undefined ? [] : ['--entrypoint', options.entrypoint]),
     ...(options.dns ?? []).flatMap((address) => ['--dns', address]),
+    ...(options.hosts ?? []).flatMap((entry) => ['--add-host', `${entry.name}:${entry.address}`]),
     ...Object.keys(options.environment).flatMap((name) => ['--env', name]),
     ...options.mounts.flatMap((mount) => ['--mount', mountArgument(mount)]),
     options.image, ...options.command,

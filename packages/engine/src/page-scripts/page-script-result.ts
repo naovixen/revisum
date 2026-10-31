@@ -18,7 +18,8 @@ export type ScriptResultErrorCode = 'script-result-too-large' | 'script-result-i
 
 // The deepest nesting of lists and objects in JSON text, counting only brackets outside strings.
 // It stops counting once past `limit`, so a long run of brackets costs no more than the limit.
-function nestingDepth(text: string, limit: number): number {
+// A database command's output is scanned the same way.
+export function nestingDepth(text: string, limit: number): number {
   let depth = 0;
   let deepest = 0;
   let inString = false;

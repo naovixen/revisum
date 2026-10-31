@@ -14,7 +14,14 @@
 // name lookups are forwarded to the proxy container, which answers none and records each, so a
 // process that ignores the proxy is still seen (channel process). The command runs through exec,
 // as an argument vector, never through a shell; at its timeout the container is removed.
-// See docs/specs/SPEC-35-evidence-mode.md and docs/specs/SPEC-07-isolated-runner-and-egress.md.
+//
+// A database command's request names the one service its policy allows over TCP. The proxy relays
+// that service's port to the service's address, and the team's container maps the service's name
+// (and its origin's host name, when that is a name) to the proxy, so the command connects by name.
+// Every other address still has no route. Such a request asks for no proxy variables, since the
+// command speaks TCP, not HTTP.
+// See docs/specs/SPEC-35-evidence-mode.md, docs/specs/SPEC-36-unsafe-plan-features.md and
+// docs/specs/SPEC-07-isolated-runner-and-egress.md.
 import {
   PRODUCT, WORKLOAD_CHECKOUT_PATH, WORKLOAD_OUTPUT_PATH, failure, success,
   type CapturedOutput, type EgressEvent, type EgressPolicy, type ExecOutcome, type ProxyDecision, type Result, type WorkloadErrorCode,
@@ -23,10 +30,13 @@ import {
 import { Buffer } from 'node:buffer';
 import { randomBytes } from 'node:crypto';
 import { chmodSync, mkdirSync, readdirSync } from 'node:fs';
+import { isIP } from 'node:net';
 import { platform } from 'node:os';
 import { isAbsolute, join } from 'node:path';
-import type { ContainerEngine, ContainerMount, EngineProblem } from './container-engine.ts';
+import type { ContainerEngine, ContainerMount, EngineProblem, HostEntry } from './container-engine.ts';
 import { hostAndPort, joinEgressEvents } from './egress-events.ts';
+import { relayOrigin, tcpRelaysFor } from './egress-proxy.ts';
+import { PROXY_PORT } from './proxy-container.ts';
 import {
   DEFAULT_BRIDGE_NETWORK, OUTSIDE_PROBE_TARGETS, SECCOMP_PROFILE, dependenciesVolumeFor, proxyContainer, proxyReadyScript, proxyUrl,
   readDecisions, readLookups, repositoryFolder, revisumMounts, runImageContainer,
@@ -63,11 +73,22 @@ const KEEP_ALIVE = { entrypoint: 'sleep', command: ['infinity'] } as const;
 const isRoot = (user: string): boolean => /^(root|0)(:|$)/.test(user.trim());
 
 // What a stream printed, cut at the limit.
-function captured(text: string): CapturedOutput {
+function captured(text: string, limit: number): CapturedOutput {
   const bytes = Buffer.from(text, 'utf8');
-  return bytes.length <= OUTPUT_LIMIT_BYTES
+  return bytes.length <= limit
     ? { bytes: new Uint8Array(bytes), truncated: false }
-    : { bytes: new Uint8Array(bytes.subarray(0, OUTPUT_LIMIT_BYTES)), truncated: true };
+    : { bytes: new Uint8Array(bytes.subarray(0, limit)), truncated: true };
+}
+
+// The names the team's container resolves to the proxy, one per relayed service: the service's
+// own name, and its origin's host when that is a name rather than an address.
+function relayedHostNames(request: WorkloadRequest): readonly string[] {
+  const relayed = (request.services ?? []).filter((service) => request.policy.allowTcpServices.includes(service.name) && service.port !== undefined);
+  const names = relayed.flatMap((service) => {
+    const host = new URL(service.origin).hostname;
+    return isIP(host.replace(/^\[(.*)\]$/, '$1')) === 0 ? [service.name, host] : [service.name];
+  });
+  return [...new Set<string>(names)];
 }
 
 // The host part of an origin the proxy decided on, so a lookup of the same name is not counted twice.
@@ -145,6 +166,14 @@ export function workloadRunner(options: WorkloadRunnerOptions): WorkloadRunner {
     if (!isAbsolute(request.outputDirectory) || MOUNT_UNSAFE.test(request.outputDirectory) || MOUNT_UNSAFE.test(checkout) || MOUNT_UNSAFE.test(root)) {
       return refuse('workload-start-failed', 'the output folder, checkout or repository path cannot be mounted');
     }
+    const outputLimit = request.maximumOutputBytes ?? OUTPUT_LIMIT_BYTES;
+    if (!Number.isSafeInteger(outputLimit) || outputLimit < 0) return refuse('workload-start-failed', 'the output limit is not a whole number of bytes');
+    // Each relay listens on its service's own port, so two cannot share one, nor take the proxy's.
+    const relays = tcpRelaysFor(request.policy, request.services ?? []);
+    const relayPorts = relays.map((relay) => relay.port);
+    if (new Set(relayPorts).size !== relayPorts.length || relayPorts.includes(PROXY_PORT)) {
+      return refuse('workload-start-failed', 'two services allowed over TCP share a port, or one uses the proxy\'s own port');
+    }
 
     // ---- The images. The team's image is never pulled: it must be here, with the pinned id. ----
     const runImage = await engine.imageId(RUN_IMAGE_TAG);
@@ -178,7 +207,7 @@ export function workloadRunner(options: WorkloadRunnerOptions): WorkloadRunner {
 
       const proxyName = `${runId}-proxy`;
       const proxy = await engine.startContainer(proxyContainer(root, {
-        name: proxyName, image: runImage, networks: [network, DEFAULT_BRIDGE_NETWORK], policy: request.policy,
+        name: proxyName, image: runImage, networks: [network, DEFAULT_BRIDGE_NETWORK], policy: request.policy, services: request.services,
         mounts: revisumMounts(root, dependenciesVolume), recordLookups: true,
       }));
       if (!proxy.ok) return unenforceable(`the proxy container did not start: ${proxy.error.detail}`);
@@ -203,7 +232,7 @@ export function workloadRunner(options: WorkloadRunnerOptions): WorkloadRunner {
       containers.splice(containers.indexOf(probe.value), 1);
 
       // ---- The team's container ----
-      const environment = workloadEnvironment(request.environment, proxyUrl(proxyName));
+      const environment = workloadEnvironment(request.environment, proxyUrl(proxyName), request.httpProxyVariables !== false);
       if (environment === null) return refuse('workload-start-failed', 'a declared variable has a name an environment cannot hold');
       const mounts = checkoutMounts(checkout, log);
       if (mounts === null) return refuse('workload-start-failed', 'the checkout cannot be read');
@@ -211,6 +240,12 @@ export function workloadRunner(options: WorkloadRunnerOptions): WorkloadRunner {
       const imageUser = await engine.imageUser?.(request.image) ?? null;
       const proxyAddress = await engine.containerAddress?.(proxyId, network) ?? null;
       if (proxyAddress === null) log({ code: 'notice', detail: 'the proxy has no address on the run\'s network, so lookups are not recorded' });
+      // A relayed service is reached by name at the proxy, so without the proxy's address it cannot be reached.
+      const relayedNames = relayedHostNames(request);
+      if (relayedNames.length > 0 && proxyAddress === null) {
+        return refuse('workload-start-failed', 'the proxy has no address on the run\'s network, so the service allowed over TCP cannot be reached');
+      }
+      const hosts: HostEntry[] = proxyAddress === null ? [] : relayedNames.map((name) => ({ name, address: proxyAddress }));
 
       const team = await engine.startContainer({
         name: `${runId}-workload`, image: request.image, networks: [network],
@@ -221,6 +256,7 @@ export function workloadRunner(options: WorkloadRunnerOptions): WorkloadRunner {
         mounts: [...mounts, { kind: 'folder', source: request.outputDirectory, target: WORKLOAD_OUTPUT_PATH, writable: true }],
         ...KEEP_ALIVE,
         ...(proxyAddress === null ? {} : { dns: [proxyAddress] }),
+        ...(hosts.length === 0 ? {} : { hosts }),
       });
       if (!team.ok) return refuse('workload-start-failed', `the workload container did not start: ${team.error.detail}`);
       containers.push(team.value);
@@ -243,12 +279,19 @@ export function workloadRunner(options: WorkloadRunnerOptions): WorkloadRunner {
 
       const decisions = await readDecisions(engine, proxyId) ?? [];
       const lookups = await readLookups(engine, proxyId);
+      // A relayed connection is the command's own, not a browser's: its channel is process.
+      const relayed = new Set(relays.map(relayOrigin));
+      const relayEvents = decisions.filter((decision) => relayed.has(decision.origin))
+        .map((decision): EgressEvent => ({ origin: decision.origin, channel: 'process', decision: decision.decision }));
       return success({
         exitCode: printed.exitCode,
         timedOut: first === 'timed-out',
-        egressEvents: [...joinEgressEvents([], decisions), ...processEvents(lookups, decisions, request.policy)],
-        stdout: captured(printed.stdout),
-        stderr: captured(printed.stderr),
+        egressEvents: [
+          ...joinEgressEvents([], decisions.filter((decision) => !relayed.has(decision.origin))), ...relayEvents,
+          ...processEvents(lookups, decisions, request.policy),
+        ],
+        stdout: captured(printed.stdout, outputLimit),
+        stderr: captured(printed.stderr, outputLimit),
       });
     }
   }

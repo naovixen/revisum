@@ -45,6 +45,9 @@ export type EgressPolicy = {
   readonly allowOrigins: readonly Origin[];
   // Declared services; their calls go through the same proxy.
   readonly allowServices: readonly ServiceName[];
+  // Declared services a database command reaches over plain TCP, each at its one declared port.
+  // The proxy relays that port to the service's address and nothing else; empty for every other run.
+  readonly allowTcpServices: readonly ServiceName[];
   // Private, loopback, link-local and metadata addresses are refused at resolve time, except for a
   // service declared private, which still never reaches a metadata address.
   readonly denyPrivateRanges: true;

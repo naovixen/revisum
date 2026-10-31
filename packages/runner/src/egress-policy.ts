@@ -6,6 +6,8 @@ import { failure, success, type EgressPolicy, type FixtureRewrite, type Origin, 
 export type EgressPolicyInput = {
   readonly allowOrigins: readonly Origin[];
   readonly allowServices: readonly ServiceName[];
+  // Services a database command reaches over TCP; none when absent.
+  readonly allowTcpServices?: readonly ServiceName[];
   // Origins that serve the project's own fixture apps, the only ones a rewrite may change.
   readonly fixtureOrigins?: readonly Origin[];
   readonly responseRewrites?: readonly FixtureRewrite[];
@@ -21,6 +23,7 @@ export function buildEgressPolicy(input: EgressPolicyInput): Result<EgressPolicy
   return success({
     allowOrigins: [...input.allowOrigins],
     allowServices: [...input.allowServices],
+    allowTcpServices: [...(input.allowTcpServices ?? [])],
     denyPrivateRanges: true,
     ...(rewrites.length === 0 ? {} : { responseRewrites: [...rewrites] }),
   });

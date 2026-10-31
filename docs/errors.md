@@ -235,6 +235,18 @@ Step error. A page script's result, written as JSON, is larger than its `maximum
 
 Step and driver error. A page script's result is not JSON the run can read. The driver reports it when the result is `undefined`, a function or a symbol, or a cyclic value or one holding a bigint, which JSON cannot write. The engine reports it when the result text does not parse, or nests lists and objects deeper than 64. The step fails, nothing of the result is kept, and the run ends `Errored`. Return a plain object holding the declared fields.
 
+## command-failed
+
+Step error. A database command exited with a code its declaration's `successExitCodes` does not list (`[0]` unless the declaration sets them). Nothing of its output is read or kept; the result records its exit code and the sha256 of what it printed. The run ends `Errored`, later steps are skipped and cleanup still runs. A `write` command is never run again. Check the command's own log in its image, or list the exit code if it means success.
+
+## command-timeout
+
+Step error. A database command ran past its declaration's `timeoutMilliseconds` (60 seconds unless the declaration sets it) and its container was removed. What it printed is not read, the run ends `Errored`, later steps are skipped and cleanup still runs. A `write` command that timed out ran exactly once and is never repeated, so check the database before running the plan again. Raise the timeout in the trusted project if the command needs longer.
+
+## command-output-invalid
+
+Step error. A database command printed more on standard output than its declaration's `maximumOutputBytes` (1 MiB unless the declaration sets it), or, for a command whose `output` is `json`, printed something that is not exactly one JSON value: nothing, plain text or two values. Nothing of the output is read or kept, the run ends `Errored`, later steps are skipped and cleanup still runs. Print one JSON object holding the declared fields, and send logging to standard error.
+
 ## response-not-json
 
 Service call error. A call that remembers a field, or a backend check, got a response that is not JSON: its media type is not `application/json` (or a `+json` type), or its body does not parse. A call that remembers nothing never reads the body, so any declared status passes. Check that the declaration's path reaches the API rather than a page, or drop the field.

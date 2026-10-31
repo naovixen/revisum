@@ -4,15 +4,17 @@
 // run's ServiceCaller port; a failed call ends the run Errored, since it could not test, and the
 // plan's cleanup calls run after the steps whatever the outcome. Stubs, request checks and web
 // storage go through the session's network and storage ports; clock advances and clipboard reads
-// through its clock and clipboard ports; page scripts through its script port.
+// through its clock and clipboard ports; page scripts through its script port. Database commands
+// go through the run's DatabaseCommandRunner port, which runs each in a workload container.
 // See docs/specs/SPEC-32-declared-service-calls.md for calls,
 // docs/specs/SPEC-33-network-stubs-request-checks-and-storage.md for stubs, checks and storage,
 // docs/specs/SPEC-34-clock-advance-and-clipboard.md for the clock and the clipboard and
-// docs/specs/SPEC-36-unsafe-plan-features.md for CSS and XPath locators, DOM checks and page scripts.
+// docs/specs/SPEC-36-unsafe-plan-features.md for CSS and XPath locators, DOM checks, page scripts and
+// database commands.
 import {
   needsDriverFeatures,
   type A11yFinding, type ActionGuard, type ApprovalLabel, type ArtifactReference, type ArtifactStore, type Authorised,
-  type BrowserDriver, type Clock, type DocumentSession, type DomRead, type DownloadedFile, type DownloadName, type DriverFeature, type LockEntry, type DialogStep, type ElementProbe,
+  type BrowserDriver, type Clock, type DatabaseCommandRunner, type DocumentSession, type DomRead, type DownloadedFile, type DownloadName, type DriverFeature, type LockEntry, type DialogStep, type ElementProbe,
   type EventSink, type GuardVerdict, type PageAssertion, type Plan, type PolicyRuleId, type Redactor,
   type DownloadStep, type ResolvedElement, type Result, type SafeText, type SecretStore, type ServiceCaller, type Session, type Step, type Target, type TargetId,
   type Unavailable, type ValueName, type GuaranteeStatement, type RunMode, type SuiteFinding, type SuiteName, type SuitePass,
@@ -20,6 +22,9 @@ import {
 } from '@revisum/contracts';
 import { approvalLabel, ownStanding, type PlanStanding } from './approval/plan-standing.ts';
 import { totalClockAdvanceMilliseconds } from './clock-advance.ts';
+import {
+  COMMAND_ERROR_CODES, runDatabaseCheck, runDatabaseStep, type DatabaseCommandContext, type DatabaseCommandRecord,
+} from './database-commands/database-command-steps.ts';
 import { advanceClock, checkClipboard, rememberFromClipboard, type ClockAndClipboardContext } from './clock-and-clipboard-steps.ts';
 import { guaranteeStatement } from './guarantees.ts';
 import { canonicalJson, sha256 } from './hashing.ts';
@@ -29,7 +34,7 @@ import {
   checkRequests, checkResponse, checkStorage, observedRequestNames, rememberFromResponse, resetRequests, runStubStep, startObserving, writeStorage,
   type NetworkStepContext,
 } from './network-and-storage/network-and-storage-steps.ts';
-import { buildManifest, manifestHash, unsafeFeatureRecord, type FixtureReference, type HostInfo, type RunManifest } from './manifest.ts';
+import { DATABASE_COMMANDS_INPUT, buildManifest, manifestHash, unsafeFeatureRecord, type FixtureReference, type HostInfo, type RunManifest } from './manifest.ts';
 import { checkElement, checkPage, domReadFor, normalise, type Verdict } from './oracle.ts';
 import { runEvaluate, runScriptCheck, type PageScriptContext, type PageScriptRecord } from './page-scripts/page-script-steps.ts';
 import type { SuiteDecodeError } from './evidence/suite-report.ts';
@@ -46,7 +51,7 @@ import {
   generateRunValues, resolveActionStep, resolveElementAssertion, resolveLocator, resolvePathTemplate, resolvePlanClock, resolveText,
 } from './run-values.ts';
 import {
-  NO_SECRETS, resolvePlanSecrets, resolvedSecretStore, secretRecords, shortSecretObservation, stubAndStorageSecretStore, withSecretRedaction,
+  NO_SECRETS, commandSecretStore, resolvePlanSecrets, resolvedSecretStore, secretRecords, shortSecretObservation, stubAndStorageSecretStore, withSecretRedaction,
   type ResolvedSecrets,
 } from './secrets/secret-resolution.ts';
 import { SECRET_PLACEHOLDER } from './secrets/secret-values.ts';
@@ -96,6 +101,9 @@ export type RunPorts = {
   // Sends the requests of the plan's declared calls: runner's caller, through the egress proxy.
   // Without one, a plan that calls a service is refused before any side effect.
   readonly services?: ServiceCaller;
+  // Runs the plan's database commands, each in a workload container: cli's wiring of runner's
+  // workload runner. Without one, every database step fails with unsupported-step and nothing runs.
+  readonly databaseCommands?: DatabaseCommandRunner;
 };
 
 export type StepOutcome = 'passed' | 'failed' | 'skipped';
@@ -117,6 +125,8 @@ export type StepResult = {
   readonly rememberedValues?: readonly RememberedValueRecord[];
   // A page-script step's record: the script, how often it ran and its result's sha256, never the result.
   readonly pageScript?: PageScriptRecord;
+  // A database step's record: the command, its service, exit code and output sha256, never the output.
+  readonly databaseCommand?: DatabaseCommandRecord;
   // A download step's record: the file's name, media type, size and sha256, never its content.
   readonly download?: DownloadRecord;
   // An assertion's record of the stubs active while it ran, sorted by name, so a report can say it
@@ -244,6 +254,8 @@ type RunContext = {
   readonly downloads: Map<DownloadName, DownloadedFile>;
   // What the call steps use, when the run has a service caller.
   readonly calls: CallStepContext | undefined;
+  // What the database steps use, when the run has a database-command port.
+  readonly commands: DatabaseCommandContext | undefined;
   // The stubs started and not yet stopped.
   readonly activeStubs: Set<StubName>;
 };
@@ -262,7 +274,9 @@ export async function run(given: RunInputs, ports: RunPorts): Promise<RunResult>
   const runId = sha256(`${sha256(canonicalJson(inputs.plan))}:${inputs.targetId}:${inputs.seed}`).slice(0, 16);
   // Resolving reads only the store, so it can come first: the run's redactor needs the secrets
   // before anything is logged. A missing secret refuses the run below, before any driver call.
-  const resolution = resolvePlanSecrets(inputs.plan, ports.secrets, inputs.project.calls);
+  // A command's secrets are needed only by a run that can run commands.
+  const commandDeclarations = ports.databaseCommands === undefined ? {} : declaredCommands(inputs.project.unsafeFeatures);
+  const resolution = resolvePlanSecrets(inputs.plan, ports.secrets, inputs.project.calls, commandDeclarations);
   const secrets = resolution.ok ? resolution.value : NO_SECRETS;
   const redactor = withSecretRedaction(ports.redactor, secrets);
   const logger = manifestLogger(ports.events, redactor, runId);
@@ -273,9 +287,13 @@ export async function run(given: RunInputs, ports: RunPorts): Promise<RunResult>
   const calls: CallStepContext | undefined = ports.services === undefined ? undefined : {
     caller: ports.services, project: inputs.project, values, secrets: resolvedSecretStore(secrets), clock: ports.clock, logger,
   };
+  const rememberedTexts = new Set<string>();
+  const commands: DatabaseCommandContext | undefined = ports.databaseCommands === undefined ? undefined : {
+    runner: ports.databaseCommands, project: inputs.project, values, rememberedTexts, secrets: commandSecretStore(secrets), clock: ports.clock, logger,
+  };
   const context: RunContext = {
     inputs, ports, logger, gate, denials: [], redactor, secrets, isShortSecret: shortSecretObservation(secrets), secretFilledFields: new Set(), values, calls,
-    rememberedTexts: new Set(), performs: [], session: null, downloads: new Map(), activeStubs: new Set(),
+    commands, rememberedTexts, performs: [], session: null, downloads: new Map(), activeStubs: new Set(),
   };
 
   if (target === undefined || !declared) {
@@ -337,7 +355,9 @@ export async function run(given: RunInputs, ports: RunPorts): Promise<RunResult>
     const unavailable = lifecycle.targetUnavailable(planned, opened.error);
     return unavailableResult(target.id, unavailable.unavailable, context, startedAt);
   }
-  const { session, driver, unpinned } = opened.value;
+  const { session, driver } = opened.value;
+  // A database command's output, and the database it ran against, cannot be pinned.
+  const unpinned = [...opened.value.unpinned, ...(runsDatabaseCommands(inputs.plan) ? [DATABASE_COMMANDS_INPUT] : [])];
   // From here on, a step needing an optional feature is refused only when this driver lacks it.
   const stepContext: RunContext = { ...context, performs: driver.info.performs ?? [], session };
   const manifest = buildManifest({
@@ -382,7 +402,7 @@ export async function run(given: RunInputs, ports: RunPorts): Promise<RunResult>
     const denial = context.denials[0];
     finished = denial !== undefined && steps.some((done) => done.code === 'policy-denied')
       ? lifecycle.deny(running, denial)
-      : steps.some((done) => done.outcome === 'failed' && (SETUP_STEP_TYPES.includes(done.type) || SCRIPT_ERROR_CODES.includes(done.code ?? '')))
+      : steps.some((done) => done.outcome === 'failed' && (SETUP_STEP_TYPES.includes(done.type) || UNUSABLE_RESULT_CODES.includes(done.code ?? '')))
         ? lifecycle.finish(running, 'Errored')
         : lifecycle.finish(running, steps.every((done) => done.outcome === 'passed') ? 'Passed' : 'Failed');
   } catch (error) {
@@ -394,7 +414,7 @@ export async function run(given: RunInputs, ports: RunPorts): Promise<RunResult>
     await session.close();
   }
   // Whatever the outcome. A failing cleanup step never changes the verdict; it raises a review item.
-  const cleanup = inputs.plan.cleanup === undefined ? undefined : await runCleanup(inputs.plan.cleanup, inputs.plan.steps.length, calls);
+  const cleanup = inputs.plan.cleanup === undefined ? undefined : await runCleanup(inputs.plan.cleanup, inputs.plan.steps.length, calls, commands);
   const reviewItems = (cleanup ?? []).flatMap((done): RunReviewItem[] => (done.outcome === 'failed' ? [{ code: 'cleanup-failed', cleanupIndex: done.index }] : []));
   const blocked = [...new Set(session.blockedOrigins())].sort();
   for (const origin of blocked) logger.log({ kind: 'network.blocked', origin });
@@ -440,12 +460,19 @@ const productionAllowed = (inputs: RunInputs): boolean =>
 
 // The steps that set up or reach what the test needs: when one fails, the run could not test.
 const SETUP_STEP_TYPES: readonly Step['type'][] = ['call', 'evaluate', 'database'];
-// The codes of a page script that could not give a result to check, in whatever step it ran.
-const SCRIPT_ERROR_CODES: readonly string[] = ['script-failed', 'script-timeout', 'script-result-invalid', 'script-result-too-large'];
+// The codes of a page script or a database command that could not give a result to check, in
+// whatever step it ran: the run could not test, which is not a product failure.
+const UNUSABLE_RESULT_CODES: readonly string[] = [
+  'script-failed', 'script-timeout', 'script-result-invalid', 'script-result-too-large', ...COMMAND_ERROR_CODES,
+];
 
 // True when the plan calls a declared service, in its steps or its cleanup.
 const callsServices = (plan: Plan): boolean =>
   [...plan.steps, ...(plan.cleanup ?? [])].some((step) => step.type === 'call' || step.type === 'expectBackend');
+
+// True when the plan runs a database command, in its steps or its cleanup.
+const runsDatabaseCommands = (plan: Plan): boolean =>
+  [...plan.steps, ...(plan.cleanup ?? [])].some((step) => step.type === 'database' || step.type === 'expectDatabase');
 
 // The origins of the services the plan's calls and database commands reach, its cleanup included.
 function serviceOrigins(inputs: RunInputs): string[] {
@@ -525,11 +552,10 @@ async function openSession(planned: lifecycle.Planned, context: RunContext): Pro
 // relies on one cannot report a pass it did not earn or act in part. Hover, select and upload go
 // to the driver, which refuses them the same way when it does not perform them; a frame step needs
 // the driver's frame port.
-function isUnsupported(step: Step, performs: readonly DriverFeature[]): boolean {
+function isUnsupported(step: Step, performs: readonly DriverFeature[], commandsWired: boolean): boolean {
   switch (step.type) {
-    // Database commands run in a workload container, which comes with the isolated runner
-    // (docs/specs/SPEC-36-unsafe-plan-features.md).
-    case 'database': case 'expectDatabase': return true;
+    // Database commands run in a workload container through the run's port, not in the browser.
+    case 'database': case 'expectDatabase': return !commandsWired;
     // What a step needs from a driver, and which of it is optional, is decided in one place, in
     // contracts; the driver declares the optional features it performs.
     default: return needsDriverFeatures(step, performs);
@@ -570,7 +596,7 @@ const NO_ELEMENT: ResolvedElement = { role: null, name: null, box: null, formSub
 // frame step, which report under the frame step's own index.
 async function executeStep(step: Step, index: number, session: DocumentSession, target: Target, context: RunContext): Promise<StepResult> {
   const base = { index, type: step.type } as const;
-  if (isUnsupported(step, context.performs)) return { ...base, outcome: 'failed', code: 'unsupported-step' };
+  if (isUnsupported(step, context.performs, context.commands !== undefined)) return { ...base, outcome: 'failed', code: 'unsupported-step' };
   // No driver loads saved storage state into its session yet (that comes with the CDP driver's
   // session environment). A plan that names it relies on being signed in, so its first step fails
   // and nothing reaches the driver, rather than running without the state the plan declared.
@@ -661,9 +687,13 @@ async function executeStep(step: Step, index: number, session: DocumentSession, 
     // that declares them; isUnsupported refused them above otherwise.
     case 'evaluate': return { ...base, ...(await runEvaluate(step, index, session, pageScriptContext(context))) };
     case 'expectScript': return { ...base, ...(await runScriptCheck(step, index, session, pageScriptContext(context))) };
-    // Database commands need the workload runner; isUnsupported refused these above, so nothing of them runs.
-    case 'database': case 'expectDatabase':
-      return { ...base, outcome: 'failed', code: 'unsupported-step' };
+    // Database commands run through the run's port; isUnsupported refused them above without one.
+    case 'database':
+    case 'expectDatabase': {
+      if (context.commands === undefined) return { ...base, outcome: 'failed', code: 'unsupported-step' };
+      const done = step.type === 'database' ? await runDatabaseStep(step, index, context.commands) : await runDatabaseCheck(step, index, context.commands);
+      return { ...base, ...done };
+    }
     case 'expect': {
       const locator = resolveLocator(step.locator, context.values, context.inputs.project);
       if (!locator.ok) return { ...base, outcome: 'failed', code: locator.error };

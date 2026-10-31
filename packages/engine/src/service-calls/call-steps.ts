@@ -3,19 +3,20 @@
 //     response fields the step names as run values; a write is never retried;
 //   - a backend check repeats its read call until the field passes the check or the project's
 //     backend check timeout runs out, which covers background jobs;
-//   - cleanup calls run in order after the steps, whatever the outcome. One that needs a value
-//     never set, because the run stopped first, is skipped; one that fails is recorded and raises
-//     a review item, and never changes the verdict.
+//   - cleanup calls and cleanup database commands run in order after the steps, whatever the
+//     outcome. One that needs a value never set, because the run stopped first, is skipped; one
+//     that fails is recorded and raises a review item, and never changes the verdict.
 // Each request sent is logged by step, outcome, code, response sha256 and duration only: never an
 // argument, a header or the response itself.
 // See docs/specs/SPEC-32-declared-service-calls.md.
 import {
   failure, success,
-  type CallDeclaration, type CallName, type CallStep, type CleanupStep, type Clock, type CommandName, type DeclaredService, type HttpMethod, type JsonPointer, type Result,
+  type CallArguments, type CallDeclaration, type CallName, type CallStep, type CleanupStep, type Clock, type CommandName, type DeclaredService, type HttpMethod, type JsonPointer, type Result,
   type SafeText,
-  type SecretStore, type ServiceCallErrorCode, type ServiceCaller, type ServiceName, type ServiceRequest, type ServiceResponse, type Step,
-  type ValueName,
+  type ScriptArguments, type SecretStore, type ServiceCallErrorCode, type ServiceCaller, type ServiceName, type ServiceRequest, type ServiceResponse,
+  type Step, type ValueName,
 } from '@revisum/contracts';
+import { runDatabaseStep, type DatabaseCommandContext, type DatabaseStepCode } from '../database-commands/database-command-steps.ts';
 import { sha256 } from '../hashing.ts';
 import type { Logger } from '../logging.ts';
 import { runTimeText } from '../plan/plan-decoders.ts';
@@ -54,7 +55,7 @@ export type CleanupResult = {
   readonly index: number;
   readonly outcome: 'passed' | 'failed' | 'skipped';
   readonly code?: 'cleanup-failed';
-  readonly cause?: CallStepCode | 'unsupported-step';
+  readonly cause?: CallStepCode | DatabaseStepCode | 'unsupported-step';
 } & ({ readonly call: CallName } | { readonly command: CommandName });
 
 // What the run hands these steps. `values` is the run's own map: a call adds what it remembers.
@@ -187,27 +188,33 @@ export async function runBackendCheck(step: Extract<Step, { type: 'expectBackend
   }
 }
 
-// True when the call names a run value that has no text, because the step that would have
+// True when the step names a run value that has no text, because the step that would have
 // remembered it never ran.
-const needsUnsetValue = (step: CallStep, values: ReadonlyMap<ValueName, SafeText>): boolean =>
-  Object.values(step.arguments).some((argument) => typeof argument === 'object' && 'valueName' in argument && !values.has(argument.valueName));
+const needsUnsetValue = (stepArguments: CallArguments | ScriptArguments, values: ReadonlyMap<ValueName, SafeText>): boolean =>
+  Object.values(stepArguments).some((argument) => typeof argument === 'object' && 'valueName' in argument && !values.has(argument.valueName));
 
 // The cleanup steps, in order, each recorded. They are numbered after the plan's steps in the log.
-// A run that calls services always has a context: run() refused it before any step otherwise.
+// A run that calls services always has a call context: run() refused it before any step otherwise.
+// A run with no database-command port records each cleanup command as failed, raising a review
+// item, since its test data may be left behind.
 export async function runCleanup(
-  cleanup: readonly CleanupStep[], firstIndex: number, context: CallStepContext | undefined,
+  cleanup: readonly CleanupStep[], firstIndex: number, context: CallStepContext | undefined, commands?: DatabaseCommandContext,
 ): Promise<readonly CleanupResult[]> {
   const results: CleanupResult[] = [];
   for (const [index, step] of cleanup.entries()) {
-    // Database commands run in a workload container, which comes with the isolated runner, so a
-    // cleanup command is recorded as failed and raises a review item: its test data may be left.
     if (step.type === 'database') {
-      results.push({ index, command: step.command, outcome: 'failed', code: 'cleanup-failed', cause: 'unsupported-step' });
+      const base = { index, command: step.command } as const;
+      if (commands === undefined) { results.push({ ...base, outcome: 'failed', code: 'cleanup-failed', cause: 'unsupported-step' }); continue; }
+      if (needsUnsetValue(step.arguments, commands.values)) { results.push({ ...base, outcome: 'skipped' }); continue; }
+      const done = await runDatabaseStep(step, firstIndex + index, commands);
+      results.push(done.outcome === 'passed'
+        ? { ...base, outcome: 'passed' }
+        : { ...base, outcome: 'failed', code: 'cleanup-failed', ...(done.code === undefined ? {} : { cause: done.code }) });
       continue;
     }
     const base = { index, call: step.call } as const;
     if (context === undefined) { results.push({ ...base, outcome: 'failed', code: 'cleanup-failed', cause: 'service-unreachable' }); continue; }
-    if (needsUnsetValue(step, context.values)) { results.push({ ...base, outcome: 'skipped' }); continue; }
+    if (needsUnsetValue(step.arguments, context.values)) { results.push({ ...base, outcome: 'skipped' }); continue; }
     let outcome: CallStepOutcome;
     try {
       outcome = await runCallStep(step, firstIndex + index, context);
