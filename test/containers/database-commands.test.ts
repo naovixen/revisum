@@ -3,13 +3,16 @@
 //   - Arguments holding shell syntax, and a remembered value holding a line break, reach the
 //     program as literal single arguments, with no shell, and an argument starting with "-" after
 //     a declared literal "--" reaches it too (AC-12).
-//   - The command reaches its own service's address and port, and nothing else: the internet, the
+//   - The command reaches its own service's port by the service's declared name, which the
+//     workload maps to the proxy's relay, and nothing else: the internet, the
 //     metadata address, another declared service and the Docker host (the CI host) are all
 //     blocked. Attempts by a name the proxy sees are recorded as blocked egress events (AC-13).
 //   - Its environment holds only the declared variables, the image's own and the container's
 //     own HOSTNAME and HOME: no proxy variable and nothing from the host (AC-13).
 // The services are containers on Docker's default bridge, declared by address, so the tests run
-// the same on Docker Desktop and on Linux CI.
+// the same on Docker Desktop and on Linux CI. A raw address can't be redirected to the relay without
+// network-admin rights in the container, so a command connects by the service's name (founder,
+// 2026-10-31).
 // The engine's half of each rule, against a fake port, is in test/unit/engine/database-command-*.
 // See docs/specs/SPEC-36-unsafe-plan-features.md ("Database commands" under "Milestone").
 import assert from 'node:assert/strict';
@@ -19,7 +22,7 @@ import { fakeSecretValue } from '../unit/engine/secret-examples.ts';
 import { hostOf } from '../unit/runner/runner-examples.ts';
 import { DISTINCTIVE_HOST_VALUES } from '../unit/runner/workload-examples.ts';
 import {
-  DATABASE_BANNER, DATABASE_NAME, DECLARED_VARIABLES, bridgeGateway, commandProjectFile, fixtureCommandImage, onlyOutcome,
+  DATABASE_BANNER, DATABASE_NAME, DATABASE_SERVICE_NAME, DECLARED_VARIABLES, bridgeGateway, commandProjectFile, fixtureCommandImage, onlyOutcome,
   printedJson, runCommandStep, runCommandSteps, startFixtureService, type Listeners,
 } from './database-command-run.ts';
 import { imageEnvironmentNames } from './workload-run.ts';
@@ -78,7 +81,7 @@ let attempts: Attempts | undefined;
 async function reachAttempts(): Promise<Attempts> {
   if (attempts === undefined) {
     const ran = await runCommandStep(commandProjectFile(image, listeners), step('reachAttempts', {
-      databaseAddress: listeners.database.address, otherAddress: listeners.otherService.address, hostAddress: dockerHost,
+      databaseAddress: DATABASE_SERVICE_NAME, otherAddress: listeners.otherService.address, hostAddress: dockerHost,
     }), fakeSecretValue());
     const outcome = onlyOutcome(ran);
     assert.equal(outcome.exitCode, 0, `the reach attempts failed to run: ${JSON.stringify(outcome)}`);
@@ -92,7 +95,7 @@ async function reachAttempts(): Promise<Attempts> {
 const eventsFor = (events: readonly EgressEvent[], host: string): readonly EgressEvent[] =>
   events.filter((event) => hostOf(String(event.origin)) === host);
 
-test('counter-example: the command reaches its own service\'s declared address and port', { criterion: 'AC-SPEC-36-13', timeout: TIMEOUT }, async () => {
+test('counter-example: the command reaches its own service\'s declared port, by the service\'s name', { criterion: 'AC-SPEC-36-13', timeout: TIMEOUT }, async () => {
   const { seen } = await reachAttempts();
   assert.equal(seen['declared-database'], `reached:${DATABASE_BANNER}`);
   assert.ok(await listeners.database.connections() >= 1, 'the declared database saw no connection');
