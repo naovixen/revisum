@@ -30,7 +30,7 @@ const ERROR_CODES: Readonly<Record<string, readonly string[]>> = {
   ],
   step: [
     'value-empty', 'value-unsafe', 'value-too-long', 'state-not-exposed', 'download-not-text', 'request-not-seen', 'script-result-too-large',
-    'script-result-invalid',
+    'script-result-invalid', 'command-failed', 'command-timeout', 'command-output-invalid',
   ],
   serviceCall: [
     'response-not-json', 'response-too-large', 'field-missing', 'service-unreachable', 'call-timeout', 'unexpected-status',

@@ -93,6 +93,7 @@ export function describeStepError(code: StepErrorCode): string {
   switch (code) {
     case 'value-empty': case 'value-unsafe': case 'value-too-long': case 'state-not-exposed': case 'download-not-text':
     case 'request-not-seen': case 'script-result-too-large': case 'script-result-invalid':
+    case 'command-failed': case 'command-timeout': case 'command-output-invalid':
       return 'step failed';
     default:
       return unreachable(code);
@@ -102,6 +103,7 @@ export function describeStepErrorForgettingOne(code: StepErrorCode): string {
   switch (code) {
     case 'value-empty': case 'value-too-long': case 'state-not-exposed': case 'download-not-text': case 'request-not-seen':
     case 'script-result-too-large': case 'script-result-invalid':
+    case 'command-failed': case 'command-timeout': case 'command-output-invalid':
       return 'step failed';
     default:
       // @ts-expect-error 'value-unsafe' is not handled, so the code does not narrow to never
