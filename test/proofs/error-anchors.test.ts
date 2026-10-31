@@ -28,7 +28,10 @@ const ERROR_CODES: Readonly<Record<string, readonly string[]>> = {
   suiteDecode: [
     'suite-report-missing', 'suite-report-invalid', 'suite-report-unsupported', 'trace-invalid', 'trace-unsupported', 'too-large',
   ],
-  step: ['value-empty', 'value-unsafe', 'value-too-long', 'state-not-exposed', 'download-not-text', 'request-not-seen'],
+  step: [
+    'value-empty', 'value-unsafe', 'value-too-long', 'state-not-exposed', 'download-not-text', 'request-not-seen', 'script-result-too-large',
+    'script-result-invalid',
+  ],
   serviceCall: [
     'response-not-json', 'response-too-large', 'field-missing', 'service-unreachable', 'call-timeout', 'unexpected-status',
     'egress-blocked', 'parameter-invalid', 'cleanup-failed',
@@ -36,6 +39,7 @@ const ERROR_CODES: Readonly<Record<string, readonly string[]>> = {
   driver: [
     'not-found', 'ambiguous', 'not-actionable', 'timeout', 'navigation-failed', 'policy-denied', 'no-download', 'download-too-large',
     'storage-origin-mismatch', 'clock-runaway', 'clipboard-unavailable', 'target-crashed', 'unsupported-step', 'assertion-failed',
+    'selector-invalid', 'script-failed', 'script-timeout', 'script-result-invalid',
   ],
   runner: ['image-missing', 'image-digest-mismatch', 'egress-unenforceable', 'start-failed'],
   recorder: ['no-reason', 'unknown-item', 'already-decided', 'sink-failed'],

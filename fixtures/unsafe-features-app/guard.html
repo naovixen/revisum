@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Account settings</title></head>
+<body>
+<main>
+  <h1>Account settings</h1>
+  <!-- Found by structure only: the CSS classes and the section order say nothing about what each button does. -->
+  <section class="account">
+    <h2>Danger zone</h2>
+    <button type="button" class="danger">Delete account</button>
+    <button type="button" class="safe">Show details</button>
+  </section>
+  <!-- Two icon buttons with no accessible name: the icons are hidden from assistive technology. -->
+  <section class="toolbar">
+    <button type="button" class="icon-close" style="width: 32px; height: 32px"><svg aria-hidden="true" width="12" height="12"><path d="M0 0L12 12M12 0L0 12" stroke="black"/></svg></button>
+    <button type="button" class="icon-menu" style="width: 32px; height: 32px"><svg aria-hidden="true" width="12" height="12"><path d="M0 2H12M0 6H12M0 10H12" stroke="black"/></svg></button>
+  </section>
+  <p data-testid="account-state">Account kept</p>
+  <p data-testid="details-state">Details hidden</p>
+  <p data-testid="toolbar-state">Toolbar untouched</p>
+  <p data-testid="input-events">0</p>
+</main>
+<script src="counting.js"></script>
+<script src="guard.js"></script>
+</body>
+</html>

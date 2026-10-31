@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Orders</title></head>
+<body>
+<main>
+  <h1>Orders</h1>
+  <!-- The harness serves this page with the placeholder below replaced by a canary order id made fresh per run. -->
+  <table>
+    <tr data-testid="order-row" data-order-id="ORDER_ID"><td>Order for Ada Lovelace</td><td>3 items</td></tr>
+  </table>
+  <label for="order-reference">Order reference</label>
+  <input id="order-reference" type="text">
+  <p data-testid="input-events">0</p>
+</main>
+<script src="counting.js"></script>
+</body>
+</html>

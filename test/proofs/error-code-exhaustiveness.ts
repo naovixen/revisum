@@ -92,7 +92,7 @@ export function describeSuiteDecodeErrorForgettingOne(code: SuiteDecodeErrorCode
 export function describeStepError(code: StepErrorCode): string {
   switch (code) {
     case 'value-empty': case 'value-unsafe': case 'value-too-long': case 'state-not-exposed': case 'download-not-text':
-    case 'request-not-seen':
+    case 'request-not-seen': case 'script-result-too-large': case 'script-result-invalid':
       return 'step failed';
     default:
       return unreachable(code);
@@ -101,6 +101,7 @@ export function describeStepError(code: StepErrorCode): string {
 export function describeStepErrorForgettingOne(code: StepErrorCode): string {
   switch (code) {
     case 'value-empty': case 'value-too-long': case 'state-not-exposed': case 'download-not-text': case 'request-not-seen':
+    case 'script-result-too-large': case 'script-result-invalid':
       return 'step failed';
     default:
       // @ts-expect-error 'value-unsafe' is not handled, so the code does not narrow to never
@@ -114,6 +115,7 @@ export function describeDriverError(code: DriverErrorCode): string {
     case 'not-found': case 'ambiguous': case 'not-actionable': case 'timeout': case 'navigation-failed':
     case 'policy-denied': case 'no-download': case 'download-too-large': case 'storage-origin-mismatch':
     case 'clock-runaway': case 'clipboard-unavailable': case 'target-crashed': case 'unsupported-step': case 'assertion-failed':
+    case 'selector-invalid': case 'script-failed': case 'script-timeout': case 'script-result-invalid':
       return 'driver failed';
     default:
       return unreachable(code);
@@ -124,6 +126,7 @@ export function describeDriverErrorForgettingOne(code: DriverErrorCode): string 
     case 'not-found': case 'ambiguous': case 'not-actionable': case 'timeout': case 'policy-denied':
     case 'no-download': case 'download-too-large': case 'storage-origin-mismatch': case 'clock-runaway': case 'clipboard-unavailable':
     case 'target-crashed': case 'unsupported-step': case 'assertion-failed':
+    case 'selector-invalid': case 'script-failed': case 'script-timeout': case 'script-result-invalid':
       return 'driver failed';
     default:
       // @ts-expect-error 'navigation-failed' is not handled, so the code does not narrow to never

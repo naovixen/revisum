@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Cart badges</title></head>
+<body>
+<main>
+  <h1>Cart badges</h1>
+  <!-- Two twins that differ only in what the DOM checks read: one class, one computed colour, one
+       attribute value and one attribute's presence. Every check passes on the matching twin and
+       fails on the mismatched one. -->
+  <section data-testid="matching-twin">
+    <span data-testid="matching-badge" class="badge is-active" style="background-color: rgb(220, 38, 38)">3 items</span>
+    <button type="button" data-testid="matching-sort" aria-sort="ascending">Sort by price</button>
+    <button type="button" data-testid="matching-checkout">Check out</button>
+  </section>
+  <section data-testid="mismatched-twin">
+    <span data-testid="mismatched-badge" class="badge is-empty" style="background-color: rgb(22, 163, 74)">3 items</span>
+    <button type="button" data-testid="mismatched-sort" aria-sort="descending">Sort by price</button>
+    <button type="button" data-testid="mismatched-checkout" disabled>Check out</button>
+  </section>
+  <p data-testid="input-events">0</p>
+</main>
+<script src="counting.js"></script>
+</body>
+</html>
