@@ -94,6 +94,35 @@ revisum draft --explore <url> [--from <spec.md>] [--after <approved.plan>] [--ma
 
 `ExploreDriver` names methods the CDP driver has or gains. Where the built driver names them differently, the code follows the driver, as a marked addition.
 
+### Build notes (alignment, 2026-10-31)
+
+Criterion 13 was built with SPEC-28's draft command (`docs/specs/SPEC-28-plan-authoring.md`, alignment of 2026-10-31). Where the block above differs from the built code, the code wins and the notes below say how. Marked additions are new with this spec.
+
+- **Driver port.** The built session names its reads `navigate`, `page()` (whose `title` is the title) and `accessibilitySnapshot()`. `DocumentSession` (`contracts`) gains an optional `linkTargets?(): Promise<readonly string[]>`, as the other optional features do; the CDP driver implements it and declares it in its feature list (addition: a `linkTargets` feature). `ExploreDriver` lives in `contracts`: `Pick<DocumentSession, 'navigate' | 'page' | 'accessibilitySnapshot'> & { linkTargets(): Promise<readonly string[]> }`. The crawl navigates with scripts enabled, as a person's browser would.
+- **Types.** `ExploreOptions`, `PageMapNode`, `PageMapEntry`, `PageMap`, `DraftWarning` and `ExploreErrorCode` live in `contracts`. The three new codes (`explore-origin-refused`, `after-plan-unapproved`, `explore-runner-unavailable`) and one addition, `explore-start-unreachable` (the start page did not load; no draft is written), join the pinned error-code lists under the standing exception. `PLAN_SOURCES` gains `explore-draft`, so `CoreRouteSource` gains it too.
+- **Option bounds.** `--max-pages` 1 to 100, `--max-depth` 0 to 5; anything else is a usage error before any browser starts.
+- **Page map** (`engine`, pure).
+  - Kept roles: `banner`, `main`, `navigation`, `contentinfo`, `complementary`, `region`, `search`, `form`, `heading`, `link`, `button`, `textbox`, `searchbox`, `checkbox`, `radio`, `combobox`, `listbox`, `option`, `slider`, `spinbutton`, `switch`, `list`, `listitem`, `table`, `row`, `cell`, `columnheader`, `rowheader`, `dialog`, `alertdialog`, `tab`, `tablist`, `tabpanel`, `menu`, `menubar`, `menuitem`, `menuitemcheckbox`, `menuitemradio`. A node with any other role is dropped and its kept descendants take its place, in order.
+  - Each name is redacted first and then cut to 80 characters. The redactor is the engine's `defaultRedactor()` (its email, phone and card rules) wrapped with `withSecretRedaction` for the project's resolved secrets. `A11yNode` carries no values, so none can be read.
+  - Written as canonical JSON (sorted keys, no spaces, UTF-8, final newline) to `<out without .plan>.pages.json`. The provenance reference is `sha256:` followed by the file's hex sha256.
+- **Crawl order.** Breadth first from the start page at depth 0. A page's link targets are kept when they are on the start origin; each is reduced to its path (no query or fragment), de-duplicated against every path already seen, and queued in sorted order. Pages are opened at origin plus path. `truncated` is true when a same-origin path was left unvisited because of `maxPages` or `maxDepth`. A page other than the start page that fails to load is left out and not counted; a start page that fails gives `explore-start-unreachable`.
+- **Placement.**
+  - `DraftCommandPorts` gains `browser?: BrowserDriver` (host crawl) and `isolatedRunner?: { runner: Runner; image: ImageDigest }`.
+  - **Isolated:** the command starts a run container through `Runner.start` with an egress policy allowing only the start origin, and runs the crawl inside it through `RunnerHandle.exec`, with a `cli` entry module that prints the page map as JSON. The host treats that output as outside data and decodes it with an engine decoder (`decodePageMap`) before use. No runner, a failed start, or `guaranteeLevel()` other than `isolated` gives `explore-runner-unavailable` unless `--host` is given.
+  - `RunnerHandle.exec` gains an optional list of environment variable names, copied from the client's environment as the workload container does, so a secret an `--after` plan types is never on a command line.
+  - **Host** (`--host`): a session from `browser` with `allowedOrigins` set to the start origin; the map says `guaranteeLevel: 'host'`, the result `egressEnforced: false`, and the human output says egress was not enforced.
+- **`--after`.** The plan file is read from the working tree; its approval is checked against the trusted approvals from the protected branch, as a run checks them, before any browser or runner starts. It then runs through the engine's normal run path, with the policy gate, in the crawl's session, writing no result file; its events go to the command's event sink, redacted. The crawl lives in its own `cli` module, which may call the run function for that approved plan only. `draft-command.ts` stays route code and still never imports `run`.
+- **Planner request.** `DraftRequest` gains `pages?: readonly PageMapEntry[]`; `criteria` may be empty only when `pages` is given. The engine's fixed prompt adds the page map as quoted JSON data, marked as untrusted page content, when `pages` is present. A request without `pages` is byte-identical to SPEC-28's, so criterion 13's golden bodies stay unchanged.
+- **Draft output.** The draft goes through `admitCoreDraft` with source `explore-draft` and the page map's reference. The command writes this fixed notice as the draft's first three lines, before the model's text, and the reported error and warning lines count them:
+  ```
+  # Draft from explored pages: it checks what the pages do now, which may include bugs.
+  # Review each Expect line before you approve this plan.
+  #
+  ```
+- **Locator check.** A step is checked when it follows a `Go to` whose URL is on the start origin and whose path is in the map, and comes before the first click, press, select, upload or dialog step after that `Go to`. Role locators match nodes of that role whose name matches as the driver's role locator matches; label locators match form-control nodes by name in the same way. A cut or redacted map name counts as a possible match, so it never gives `locator-not-on-page`. Other locator kinds, and steps on pages not in the map, are not checked.
+- **`--json`.** `DraftCommandData` gains `pageMapPath`, `warnings`, `egressEnforced` and `crawledOrigin`; `calledOrigins` stays the planner's. Paths are relative to the project folder, so the output is byte-identical across runs.
+- **Tests** use a local fixture site and the fake planner server from SPEC-28, in host mode or with a fake `Runner`. A real-container crawl joins `check:containers`.
+
 ## Acceptance criteria
 
 - AC-SPEC-37-01: When the start URL is on an undeclared origin or in `productionOrigins`, the command shall stop with `explore-origin-refused` before any browser starts. During a crawl, a link to another origin shall never be followed (oracle: specified; fixture site with cross-origin and production links).
