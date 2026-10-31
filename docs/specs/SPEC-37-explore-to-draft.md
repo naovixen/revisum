@@ -122,6 +122,14 @@ Criterion 13 was built with SPEC-28's draft command (`docs/specs/SPEC-28-plan-au
 - **Locator check.** A step is checked when it follows a `Go to` whose URL is on the start origin and whose path is in the map, and comes before the first click, press, select, upload or dialog step after that `Go to`. Role locators match nodes of that role whose name matches as the driver's role locator matches; label locators match form-control nodes by name in the same way. A cut or redacted map name counts as a possible match, so it never gives `locator-not-on-page`. Other locator kinds, and steps on pages not in the map, are not checked.
 - **`--json`.** `DraftCommandData` gains `pageMapPath`, `warnings`, `egressEnforced` and `crawledOrigin`; `calledOrigins` stays the planner's. Paths are relative to the project folder, so the output is byte-identical across runs.
 - **Tests** use a local fixture site and the fake planner server from SPEC-28, in host mode or with a fake `Runner`. A real-container crawl joins `check:containers`.
+- **Settled with the tests** (2026-10-31, commit 03138a2).
+  - The naming lint refuses `maxPages`, `maxDepth` and `pageTimeoutMs`, so the options are `maximumPages`, `maximumDepth` and `pageTimeoutMilliseconds`.
+  - `crawlSite(driver, project, options, redactor)` takes the redactor as its fourth argument.
+  - `DraftCommandPorts` gains `approvals: ApprovalStore`, from which `--after`'s approval is read.
+  - `RunnerHandle.exec(command, environmentNames?)` takes the copied variable names as its second argument.
+  - Link targets are sorted per page, as each page is read, not per level.
+  - A name is cut to exactly its first 80 characters, with no ellipsis.
+  - The four new codes join `CliErrorCode`, with headings in `docs/errors.md`. A bad bound's usage error names its flag. The `--host` human output says "egress was not enforced".
 
 ## Acceptance criteria
 
