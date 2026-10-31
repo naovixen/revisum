@@ -1,15 +1,17 @@
 // Turns any protocol's PageOperations into a Session. Auto-waiting, the runtime guard, probing,
 // masking and auditing live here once, so every protocol behaves the same way.
-// See docs/specs/SPEC-06-cdp-driver.md.
+// See docs/specs/SPEC-06-cdp-driver.md, and docs/specs/SPEC-36-unsafe-plan-features.md for CSS
+// and XPath locators, DOM reads and page scripts.
 import {
   DEFAULT_TEST_ID_ATTRIBUTE, DRIVER_FEATURES, failure, literalActionStep, literalText, performableLocator, reveal, success,
-  type ActionGuard, type ActionStep, type BrowserRequestRecord, type DialogStep, type DocumentSession, type DownloadedFile, type DownloadStep,
-  type DriverError, type DriverFeature, type ElementProbe, type Locator, type PageMetaTag, type PageProbe, type Position, type ResolvedActionStep,
+  type ActionGuard, type ActionStep, type BrowserRequestRecord, type DialogStep, type DocumentSession, type DomRead, type DomValue, type DownloadedFile,
+  type DownloadStep, type DriverError, type DriverFeature, type ElementProbe, type Locator, type PageScriptCall, type PageMetaTag, type PageProbe, type Position, type ResolvedActionStep,
   type ClipboardPort, type ClockPort, type NetworkPort, type ResolvedElement, type ResolvedLocator, type Result, type Secret, type SessionEnvironment, type StoragePort,
 } from '@revisum/contracts';
 import {
-  actionability, afterTwoFrames, armHitCheck, findByLabel, findByTestId, findByText, fontsReady, guardDetails, inDocumentOrder, inThisDocument,
-  linkAndCurrent, maskElements, pageInfo, probeElement, readHitCheck, selectOption, unmaskElements,
+  actionability, afterTwoFrames, armHitCheck, findByLabel, findByTestId, findByText, findStructural, fontsReady, guardDetails, inDocumentOrder,
+  inThisDocument, linkAndCurrent, maskElements, pageInfo, probeElement, readDomValue, readHitCheck, selectOption, structuralSelectorValidity,
+  unmaskElements,
 } from './in-page.ts';
 import { heldModifierKeys } from './modifier-keys.ts';
 import { pageAudit, parseAudit, toFindings, type AuditRuleResult } from './page-audit.ts';
@@ -53,10 +55,11 @@ export type SessionDetails = {
 const BROWSER_ERROR_PAGE = 'chrome-error:';
 
 const CRASHED: DriverError = { code: 'target-crashed', detail: 'the page\'s renderer died' };
+const SELECTOR_INVALID: DriverError = { code: 'selector-invalid', detail: 'the browser rejects a CSS selector or XPath expression of the locator' };
 
 // The optional plan features every session buildSession makes performs, whatever its protocol:
-// positions and test-id attributes in locate, chords and multi-line text in perform, and the
-// probe a remember step reads through.
+// positions, test-id attributes and CSS and XPath selectors in locate, chords and multi-line text
+// in perform, the probe a remember step and a DOM check read through, and the script runner.
 export const SESSION_FEATURES: readonly DriverFeature[] = DRIVER_FEATURES;
 
 // Finds the elements a locator matches. An error while the page navigates counts as "nothing found yet".
@@ -75,7 +78,26 @@ async function matches<Handle>(operations: PageOperations<Handle>, locator: Reso
     case 'label': return operations.callForElements(findByLabel, [locator.label]);
     case 'text': return operations.callForElements(findByText, [locator.text]);
     case 'testId': return operations.callForElements(findByTestId, [locator.testId, locator.attribute ?? DEFAULT_TEST_ID_ATTRIBUTE]);
+    case 'css': case 'xpath': {
+      // Inside another locator, the selector is evaluated in the one element that one finds, or nowhere.
+      const scope = locator.inside === undefined ? [] : await locate(operations, locator.inside);
+      if (locator.inside !== undefined && scope.length !== 1) return [];
+      const text = locator.by === 'css' ? locator.selector : locator.expression;
+      return operations.callForElements(findStructural, [locator.by, text, locator.hasText ?? '', ...scope.map((element) => ({ element }))]);
+    }
   }
+}
+
+// True when the browser rejects a CSS selector or XPath expression of the locator or of a locator
+// it is inside. A page that cannot answer, such as one navigating, is taken to accept it: matching
+// then finds nothing yet, as for any locator.
+async function rejectsSelector<Handle>(operations: PageOperations<Handle>, locator: ResolvedLocator): Promise<boolean> {
+  if (locator.by !== 'css' && locator.by !== 'xpath') return false;
+  const text = locator.by === 'css' ? locator.selector : locator.expression;
+  let validity = 'valid';
+  try { validity = await operations.callForString(structuralSelectorValidity, [locator.by, text]); } catch { /* taken as accepted */ }
+  if (validity === 'invalid') return true;
+  return locator.inside !== undefined && rejectsSelector(operations, locator.inside);
 }
 
 // The one match at the position, counted in document order, or none when there are fewer matches.
@@ -198,6 +220,22 @@ function decodeGuardDetails(text: string): Omit<ResolvedElement, 'role' | 'name'
   };
 }
 
+// Decodes what readDomValue (in-page.ts) reports, keeping it only when it is the read asked for.
+function decodeDomValue(text: string, read: DomRead): DomValue | undefined {
+  const parsed: unknown = JSON.parse(text);
+  const fields = typeof parsed === 'object' && parsed !== null ? parsed as Record<string, unknown> : {};
+  const [classes, value] = [fields['classes'], fields['value']];
+  switch (read.kind) {
+    case 'classes':
+      return Array.isArray(classes) && classes.every((token) => typeof token === 'string') ? { kind: 'classes', classes: [...classes] } : undefined;
+    case 'computedStyle': return typeof value === 'string' ? { kind: 'computedStyle', value } : undefined;
+    case 'attribute': return typeof value === 'string' || value === null ? { kind: 'attribute', value } : undefined;
+  }
+}
+
+// The style property or attribute a DOM read names; empty for the class list.
+const domReadName = (read: DomRead): string => (read.kind === 'computedStyle' ? read.property : read.kind === 'attribute' ? read.name : '');
+
 // The element as the runtime guard sees it.
 async function resolvedElement<Handle>(operations: PageOperations<Handle>, element: Handle): Promise<ResolvedElement> {
   const { role, name } = await operations.roleAndName(element);
@@ -228,11 +266,12 @@ function documentPorts<Handle>(
   const crashed = (): boolean => events.crashed();
   const timeout = environment.timeoutMilliseconds;
 
-  const probe = async (planLocator: Locator): Promise<ElementProbe> => {
+  const probe = async (planLocator: Locator, read?: DomRead): Promise<ElementProbe> => {
     // A value reference, or a locator this session cannot resolve, matches nothing.
     const locator = performableLocator(planLocator, SESSION_FEATURES);
     // An open dialog stops the page's scripts, so nothing can be read until it is answered.
     if (locator === undefined || events.openDialog() !== null) return NO_ELEMENT;
+    if (await rejectsSelector(operations, locator)) return { ...NO_ELEMENT, selectorInvalid: true };
     const found = await locate(operations, locator);
     const element = found[0];
     if (found.length !== 1 || element === undefined) return { ...NO_ELEMENT, count: found.length };
@@ -242,7 +281,9 @@ function documentPorts<Handle>(
       // browser's accessibility engine, as assistive technology reads them.
       const { href, current } = decodeLinkAndCurrent(await operations.callForString(linkAndCurrent, [{ element }]));
       const exposed = await operations.exposedStates(element);
-      return { ...shown, states: { ...exposed, current }, href };
+      // A DOM check's read: a class list, a computed style or an attribute, read from the document.
+      const dom = read === undefined ? undefined : decodeDomValue(await operations.callForString(readDomValue, [{ element }, read.kind, domReadName(read)]), read);
+      return { ...shown, states: { ...exposed, current }, href, ...(dom === undefined ? {} : { dom }) };
     } catch {
       return NO_ELEMENT;
     }
@@ -340,6 +381,7 @@ function documentPorts<Handle>(
     // Anything this driver cannot perform in full is refused before it touches the page.
     const action = literalActionStep(step, SESSION_FEATURES);
     if (action === undefined) return failure({ code: 'unsupported-step', detail: `this driver does not perform this ${step.type} step yet` });
+    if (await rejectsSelector(operations, action.locator)) return failure(SELECTOR_INVALID);
     // A secret reference arrives with the secret the engine resolved for it. Without that secret
     // there is nothing to type, and typing nothing could pass a step that should fail.
     const typed = action.type === 'fill' ? action.value : '';
@@ -371,6 +413,7 @@ function documentPorts<Handle>(
     const capture = details.downloads;
     const locator = performableLocator(step.locator, SESSION_FEATURES);
     if (capture === undefined || locator === undefined) return failure({ code: 'unsupported-step', detail: 'this driver does not perform this download step' });
+    if (await rejectsSelector(operations, locator)) return failure(SELECTOR_INVALID);
     if (events.openDialog() !== null) return failure({ code: 'not-actionable', detail: 'a dialog is open: a dialog step must answer it first' });
     const openingsBefore = events.unsupportedOpenings();
     const armed = await capture.arm();
@@ -387,6 +430,37 @@ function documentPorts<Handle>(
       return saved;
     } finally {
       await armed.release(kept);
+    }
+  };
+
+  // A page script, raced against its timeout in real time. A script that never settles is left to
+  // the page: the run ends without it, and closing the session ends the page.
+  const runScript = async (call: PageScriptCall): Promise<Result<string, DriverError>> => {
+    if (crashed()) return failure(CRASHED);
+    if (events.openDialog() !== null) return failure({ code: 'not-actionable', detail: 'a dialog is open: a dialog step must answer it first' });
+    const openingsBefore = events.unsupportedOpenings();
+    const called = operations.callScript(call.source, call.arguments, call.maximumResultBytes);
+    called.catch(() => undefined);
+    let timer: NodeJS.Timeout | undefined;
+    const timedOut = new Promise<'timed-out'>((resolveTimeout) => { timer = setTimeout(() => resolveTimeout('timed-out'), call.timeoutMilliseconds); });
+    let ended: Awaited<typeof called> | 'timed-out';
+    try {
+      ended = await Promise.race([called, timedOut]);
+    } catch (error) {
+      return failure(crashed() ? CRASHED : { code: 'script-failed', detail: errorText(error) });
+    } finally {
+      clearTimeout(timer);
+    }
+    if (crashed()) return failure(CRASHED);
+    if (ended === 'timed-out') return failure({ code: 'script-timeout', detail: `the script did not settle within ${call.timeoutMilliseconds} ms` });
+    // A popup, second page or download the script started is closed or cancelled, as for an action.
+    if (events.unsupportedOpenings() > openingsBefore) {
+      return failure({ code: 'unsupported-step', detail: 'the script opened a popup or a second page, or started a download' });
+    }
+    switch (ended.kind) {
+      case 'result': return success(ended.text);
+      case 'threw': return failure({ code: 'script-failed', detail: 'the script threw or its promise was rejected' });
+      case 'not-json': return failure({ code: 'script-result-invalid', detail: 'the script\'s result is not a value JSON can write' });
     }
   };
 
@@ -413,6 +487,7 @@ function documentPorts<Handle>(
     act,
     probe,
     download,
+    runScript,
     async screenshot(mask) {
       await operations.callForString(fontsReady, []);
       for (const framed of masked) await framed.callForString(maskElements, [mask]);
@@ -431,6 +506,7 @@ function documentPorts<Handle>(
     accessibilitySnapshot: () => operations.accessibilityTree(),
     async frame(locator) {
       if (crashed()) return failure(CRASHED);
+      if (await rejectsSelector(operations, locator)) return failure(SELECTOR_INVALID);
       const found = await waitUntilFound(operations, locator, timeout, crashed);
       if (!found.ok) return found;
       let inner: PageOperations<Handle> | null;

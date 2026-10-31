@@ -28,8 +28,13 @@ export type RunValues = ReadonlyMap<ValueName, SafeText>;
 //                      tree, such as a tab whose selection is shown only by a CSS class;
 //   download-not-text  a content check's download is not UTF-8 text;
 //   request-not-seen   a response check or a remember from a response found no matching exchange
-//                      within the step timeout.
-export type StepErrorCode = 'value-empty' | 'value-unsafe' | 'value-too-long' | 'state-not-exposed' | 'download-not-text' | 'request-not-seen';
+//                      within the step timeout;
+//   script-result-too-large  a page script's result text is over its maximumResultBytes;
+//   script-result-invalid    a page script's result text is not JSON, or nests deeper than the
+//                      depth limit.
+export type StepErrorCode =
+  | 'value-empty' | 'value-unsafe' | 'value-too-long' | 'state-not-exposed' | 'download-not-text' | 'request-not-seen'
+  | 'script-result-too-large' | 'script-result-invalid';
 
 const UNIQUE_PART_LENGTH = 10;
 const BASE_36 = 36;
@@ -112,10 +117,9 @@ export function resolveText(text: TextOrValue, values: RunValues, maximumLength:
   return success(value);
 }
 
-// The locator a driver matches, with its value references replaced. A CSS or XPath locator has no
-// resolved form until the drivers resolve them, so it is unsupported here; the run reports such a
-// step before it gets this far.
-export function resolveLocator(locator: Locator, values: RunValues, project: Project): Result<ResolvedLocator, StepErrorCode | 'unsupported-step'> {
+// The locator a driver matches, with its value references replaced. A CSS or XPath locator's
+// selector is always literal; only its hasText, and the locators it is inside, may hold a reference.
+export function resolveLocator(locator: Locator, values: RunValues, project: Project): Result<ResolvedLocator, StepErrorCode> {
   switch (locator.by) {
     case 'role': {
       const name = resolveText(locator.name, values, project.limits.maximumTextLength);
@@ -133,20 +137,31 @@ export function resolveLocator(locator: Locator, values: RunValues, project: Pro
       const testId = resolveText(locator.testId, values, project.limits.maximumTextLength);
       return testId.ok ? success({ ...locator, testId: testId.value }) : testId;
     }
-    case 'css': case 'xpath':
-      return failure('unsupported-step');
+    case 'css': case 'xpath': {
+      const hasText = locator.hasText === undefined ? undefined : resolveText(locator.hasText, values, project.limits.maximumTextLength);
+      if (hasText !== undefined && !hasText.ok) return hasText;
+      const inside = locator.inside === undefined ? undefined : resolveLocator(locator.inside, values, project);
+      if (inside !== undefined && !inside.ok) return inside;
+      const optional = {
+        ...(hasText === undefined ? {} : { hasText: hasText.value }), ...(inside === undefined ? {} : { inside: inside.value }),
+        ...(locator.position === undefined ? {} : { position: locator.position }),
+      };
+      return success(locator.by === 'css' ? { by: 'css', selector: locator.selector, ...optional } : { by: 'xpath', expression: locator.expression, ...optional });
+    }
   }
 }
 
-// The check the oracle compares against, with its expected text final. A DOM check has no oracle
-// form until the drivers read classes, styles and attributes, so it is unsupported here; the run
-// reports such a step before it gets this far.
+// The check the oracle compares against, with its expected text final.
 export function resolveElementAssertion(
   assertion: ElementAssertion, values: RunValues, project: Project,
-): Result<ResolvedElementAssertion, StepErrorCode | 'unsupported-step'> {
+): Result<ResolvedElementAssertion, StepErrorCode> {
   switch (assertion.kind) {
-    case 'hasClass': case 'lacksClass': case 'computedStyleEquals': case 'attributeEquals': case 'attributeAbsent':
-      return failure('unsupported-step');
+    case 'hasClass': case 'lacksClass': case 'computedStyleEquals': case 'attributeAbsent':
+      return success(assertion);
+    case 'attributeEquals': {
+      const value = resolveText(assertion.value, values, project.limits.maximumTextLength);
+      return value.ok ? success({ kind: assertion.kind, name: assertion.name, value: value.value }) : value;
+    }
     case 'countEquals':
       return success(assertion);
     case 'textEquals': case 'textContains': case 'valueEquals': case 'valueContains': case 'hrefEquals': {
@@ -176,7 +191,7 @@ function resolveLines(lines: readonly TextOrValue[], values: RunValues, project:
 // The action a driver performs, with every value replaced.
 export function resolveActionStep(
   step: Extract<Step, { type: ResolvedActionStep['type'] }>, values: RunValues, project: Project,
-): Result<ResolvedActionStep, StepErrorCode | 'unsupported-step'> {
+): Result<ResolvedActionStep, StepErrorCode> {
   const locator = resolveLocator(step.locator, values, project);
   if (!locator.ok) return locator;
   switch (step.type) {

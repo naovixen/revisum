@@ -14,10 +14,10 @@ import { DownloadFolder } from './downloads.ts';
 import { EgressRecorder } from './egress-records.ts';
 import { launchChromium, type LaunchedChromium } from './chromium-launcher.ts';
 import { BrowserNetwork, atResponseStage, type HeldRequest } from './network-stubs.ts';
-import { focusAndSelect, focusElement, frameContentOffset } from './in-page.ts';
+import { focusAndSelect, focusElement, frameContentOffset, scriptResultText } from './in-page.ts';
 import type { HeldModifierKey } from './modifier-keys.ts';
 import type {
-  DriverSession, ExposedStates, OwnBrowserDriver, PageArgument, PageFunction, PageOperations, Point, RoleAndName,
+  DriverSession, ExposedStates, OwnBrowserDriver, PageArgument, PageFunction, PageOperations, Point, RoleAndName, ScriptCallOutcome,
 } from './page-operations.ts';
 import { PageWatch, type AttachedPage } from './page-watch.ts';
 import { RunClipboard, allowRunClipboard } from './run-clipboard.ts';
@@ -104,9 +104,11 @@ const ROLE_NAMES: Readonly<Record<string, string>> = { RootWebArea: 'document', 
 const TRANSPARENT_ROLES = new Set(['none', 'generic', 'StaticText', 'InlineTextBox', 'LineBreak', 'ignored', 'presentation']);
 
 // Chrome DevTools Protocol shapes this driver reads.
-type RemoteObject = { readonly type: string; readonly subtype?: string; readonly value?: unknown; readonly objectId?: string };
+type RemoteObject = {
+  readonly type: string; readonly subtype?: string; readonly value?: unknown; readonly unserializableValue?: string; readonly objectId?: string;
+};
 type CallResult = { readonly result: RemoteObject; readonly exceptionDetails?: { readonly text: string; readonly exception?: RemoteObject } };
-type CallArgument = { readonly value?: unknown; readonly objectId?: string };
+type CallArgument = { readonly value?: unknown; readonly unserializableValue?: string; readonly objectId?: string };
 type AccessibilityValue = { readonly type: string; readonly value?: unknown };
 type AccessibilityProperty = { readonly name: string; readonly value: AccessibilityValue };
 type AccessibilityNode = {
@@ -121,7 +123,27 @@ type AccessibilityNode = {
 };
 type RequestPaused = HeldRequest & { readonly requestId: string };
 type FrameTree = { readonly frame: { readonly id: string; readonly unreachableUrl?: string }; readonly childFrames?: readonly FrameTree[] };
-type DescribedNode = { readonly node: { readonly backendNodeId: number; readonly frameId?: string } };
+type DescribedNode = {
+  readonly node: { readonly backendNodeId: number; readonly frameId?: string; readonly contentDocument?: { readonly backendNodeId: number } };
+};
+
+// The remote objects a page script's call makes, released together once its result is written.
+const SCRIPT_OBJECT_GROUP = 'driver-page-script';
+
+// A remote value passed back to the page as a call argument: by reference, as a value JSON cannot
+// carry (NaN, a bigint), or as undefined, which an empty argument stands for.
+function callArgumentOf(remote: RemoteObject): CallArgument {
+  if (remote.objectId !== undefined) return { objectId: remote.objectId };
+  if (remote.unserializableValue !== undefined) return { unserializableValue: remote.unserializableValue };
+  return remote.type === 'undefined' ? {} : { value: remote.value };
+}
+
+// Decodes what scriptResultText (in-page.ts) gives. Anything of another shape, such as from a page
+// that replaced JSON.stringify, is a result JSON cannot write.
+function decodeScriptResult(value: unknown): ScriptCallOutcome {
+  if (Array.isArray(value) && value.length === 2 && value[0] === 'text' && typeof value[1] === 'string') return { kind: 'result', text: value[1] };
+  return { kind: 'not-json' };
+}
 
 export type CdpDriverOptions = {
   readonly executablePath: string;
@@ -714,6 +736,43 @@ class CdpPage implements PageOperations<string> {
     const find = (tree: FrameTree): FrameTree | undefined =>
       (frameId === undefined || tree.frame.id === frameId ? tree : (tree.childFrames ?? []).map(find).find((found) => found !== undefined));
     return find(frameTree)?.frame.unreachableUrl ?? null;
+  }
+
+  // This document's object in the page's own main world, where page scripts run: the top
+  // document's default world, or the main world of the iframe's document, which the browser
+  // resolves a node in when given no world.
+  async #mainWorldDocument(): Promise<string> {
+    const frame = this.#frame;
+    if (frame === null) {
+      const evaluated = await this.#send<CallResult>('Runtime.evaluate', { expression: 'document', objectGroup: SCRIPT_OBJECT_GROUP });
+      if (evaluated.result.objectId === undefined) throw new Error('no document');
+      return evaluated.result.objectId;
+    }
+    const described = await this.#send<DescribedNode>('DOM.describeNode', { objectId: frame.frameElement });
+    const backendNodeId = described.node.contentDocument?.backendNodeId;
+    if (backendNodeId === undefined) throw new Error('the frame has no document');
+    const resolved = await this.#send<{ object: { objectId?: string } }>('DOM.resolveNode', { backendNodeId, objectGroup: SCRIPT_OBJECT_GROUP });
+    if (resolved.object.objectId === undefined) throw new Error('no document');
+    return resolved.object.objectId;
+  }
+
+  // The source is compiled by the browser as the function it declares and called once with the
+  // arguments object, never spliced into other text; then its result is written as JSON in the page.
+  async callScript(source: string, scriptArguments: Readonly<Record<string, string | number | boolean>>, maximumResultBytes: number): Promise<ScriptCallOutcome> {
+    try {
+      const objectId = await this.#mainWorldDocument();
+      const called = await this.#send<CallResult>('Runtime.callFunctionOn', {
+        functionDeclaration: source, objectId, arguments: [{ value: scriptArguments }], awaitPromise: true, returnByValue: false, objectGroup: SCRIPT_OBJECT_GROUP,
+      });
+      if (called.exceptionDetails) return { kind: 'threw' };
+      const written = await this.#send<CallResult>('Runtime.callFunctionOn', {
+        functionDeclaration: scriptResultText.toString(), objectId, arguments: [callArgumentOf(called.result), { value: maximumResultBytes }],
+        returnByValue: true, objectGroup: SCRIPT_OBJECT_GROUP,
+      });
+      return written.exceptionDetails ? { kind: 'not-json' } : decodeScriptResult(written.result.value);
+    } finally {
+      await this.#send('Runtime.releaseObjectGroup', { objectGroup: SCRIPT_OBJECT_GROUP }).catch(() => undefined);
+    }
   }
 
   async screenshotPng(): Promise<Uint8Array> {

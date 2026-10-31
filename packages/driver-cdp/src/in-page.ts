@@ -311,3 +311,65 @@ export async function afterTwoFrames(): Promise<string> {
   await nextFrame();
   return 'ok';
 }
+
+// 'valid' when the browser accepts the CSS selector or XPath expression, 'invalid' when it rejects
+// it, or when the XPath expression gives no list of nodes (such as count()), so a locator holding
+// it can never match anything.
+export function structuralSelectorValidity(kind: string, text: string): string {
+  try {
+    if (kind === 'css') document.createDocumentFragment().querySelector(text);
+    else document.evaluate(text, document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
+    return 'valid';
+  } catch {
+    return 'invalid';
+  }
+}
+
+// The elements a CSS selector or XPath expression matches, in document order, inside the one
+// scope element when one is given and in the whole document otherwise. Inside a scope, an XPath
+// expression starting with "/" is read from the scope (".//x"), as Playwright reads it, so it
+// cannot reach outside. With hasText, only the elements whose text content, white space
+// collapsed, contains it, ignoring case, as Playwright's hasText.
+export function findStructural(kind: string, text: string, hasText: string, ...scope: Element[]): Element[] {
+  const scopeElement = scope[0];
+  const root: Document | Element = scopeElement ?? document;
+  const found: Element[] = [];
+  if (kind === 'css') {
+    found.push(...Array.from(root.querySelectorAll(text)));
+  } else {
+    const expression = scopeElement !== undefined && text.startsWith('/') ? `.${text}` : text;
+    const snapshot = document.evaluate(expression, root, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
+    for (let index = 0; index < snapshot.snapshotLength; index++) {
+      const node = snapshot.snapshotItem(index);
+      if (node instanceof Element) found.push(node);
+    }
+  }
+  if (hasText === '') return found;
+  const normalise = (value: string): string => value.replace(/\s+/g, ' ').trim().toLowerCase();
+  const wanted = normalise(hasText);
+  return found.filter((element) => normalise(element.textContent ?? '').includes(wanted));
+}
+
+// One DOM read of the element, as JSON in the shape of DomValue: its class tokens, the computed
+// value of the style property `name`, or the value of the attribute `name` (null when absent).
+export function readDomValue(element: Element, kind: string, name: string): string {
+  if (kind === 'classes') return JSON.stringify({ kind, classes: Array.from(element.classList) });
+  if (kind === 'computedStyle') return JSON.stringify({ kind, value: getComputedStyle(element).getPropertyValue(name) });
+  return JSON.stringify({ kind: 'attribute', value: element.getAttribute(name) });
+}
+
+// A page script's result written as JSON text, as ['text', text], or ['not-json'] when JSON cannot
+// write it: undefined, a function or a symbol, or a value that is cyclic or holds a bigint. UTF-8
+// never takes fewer bytes than the text has UTF-16 code units, so text longer than the byte limit
+// in code units is over it in bytes too: only one code unit past the limit is sent back.
+export function scriptResultText(value: unknown, maximumResultBytes: number): string[] {
+  if (value === undefined || typeof value === 'function' || typeof value === 'symbol') return ['not-json'];
+  let text: unknown;
+  try {
+    text = JSON.stringify(value);
+  } catch {
+    return ['not-json'];
+  }
+  if (typeof text !== 'string') return ['not-json'];
+  return ['text', text.length > maximumResultBytes ? text.slice(0, maximumResultBytes + 1) : text];
+}

@@ -227,6 +227,14 @@ Step error. A content check (`contentContains` or `contentExcludes`) reads a dow
 
 Step error. An `expectResponse` check, or a `remember` that reads a response field, found no exchange matching the declared request within the step timeout. Nothing is compared or remembered. Check that the page sends the request, that the declaration's matcher (origin, method, path and match) names it, and that no `resetRequests` step cleared it first.
 
+## script-result-too-large
+
+Step error. A page script's result, written as JSON, is larger than its `maximumResultBytes` (256 KiB unless the script's declaration sets it; an inline script always has 256 KiB). The step fails, nothing of the result is read or kept, and the run ends `Errored`: the script could not give a result to use. Return only the fields the declaration names, or raise the declaration's limit in the trusted project.
+
+## script-result-invalid
+
+Step and driver error. A page script's result is not JSON the run can read. The driver reports it when the result is `undefined`, a function or a symbol, or a cyclic value or one holding a bigint, which JSON cannot write. The engine reports it when the result text does not parse, or nests lists and objects deeper than 64. The step fails, nothing of the result is kept, and the run ends `Errored`. Return a plain object holding the declared fields.
+
 ## response-not-json
 
 Service call error. A call that remembers a field, or a backend check, got a response that is not JSON: its media type is not `application/json` (or a `+json` type), or its body does not parse. A call that remembers nothing never reads the body, so any declared status passes. Check that the declaration's path reaches the API rather than a page, or drop the field.
@@ -318,6 +326,18 @@ Driver error. The step needs something this run cannot do yet: the driver does n
 ## assertion-failed
 
 Driver error. A `dialog` step's `expectText` is not the text of the dialog the page opened, so nothing answered the dialog. Check the expected text, or the step before it that opens the dialog.
+
+## selector-invalid
+
+Driver error. The browser rejects a CSS selector or XPath expression in the step's locator, or in a locator it is `inside`, or the XPath expression gives no list of nodes (such as `count(//li)`). No element can ever match, so the step fails at once, with no input sent, and every later step is skipped. Fix the selector; an XPath expression must select elements.
+
+## script-failed
+
+Driver error. A page script threw, its promise was rejected, or its source is not one function expression, such as `(args) => ({ count: args.limit })`. The step fails, every later step is skipped, and the run ends `Errored`: the script could not set up or check what the test needs. The error is never echoed, since it may hold page data.
+
+## script-timeout
+
+Driver error. A page script did not settle within its `timeoutMilliseconds` (5 seconds unless its declaration sets it), measured in real time. The step fails, every later step is skipped, and the run ends `Errored`. Make the script's promise settle, or raise the declaration's timeout in the trusted project.
 
 ## image-missing
 

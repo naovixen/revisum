@@ -4,14 +4,15 @@
 // run's ServiceCaller port; a failed call ends the run Errored, since it could not test, and the
 // plan's cleanup calls run after the steps whatever the outcome. Stubs, request checks and web
 // storage go through the session's network and storage ports; clock advances and clipboard reads
-// through its clock and clipboard ports.
+// through its clock and clipboard ports; page scripts through its script port.
 // See docs/specs/SPEC-32-declared-service-calls.md for calls,
-// docs/specs/SPEC-33-network-stubs-request-checks-and-storage.md for stubs, checks and storage and
-// docs/specs/SPEC-34-clock-advance-and-clipboard.md for the clock and the clipboard.
+// docs/specs/SPEC-33-network-stubs-request-checks-and-storage.md for stubs, checks and storage,
+// docs/specs/SPEC-34-clock-advance-and-clipboard.md for the clock and the clipboard and
+// docs/specs/SPEC-36-unsafe-plan-features.md for CSS and XPath locators, DOM checks and page scripts.
 import {
   needsDriverFeatures,
   type A11yFinding, type ActionGuard, type ApprovalLabel, type ArtifactReference, type ArtifactStore, type Authorised,
-  type BrowserDriver, type Clock, type DocumentSession, type DownloadedFile, type DownloadName, type DriverFeature, type LockEntry, type DialogStep, type ElementProbe,
+  type BrowserDriver, type Clock, type DocumentSession, type DomRead, type DownloadedFile, type DownloadName, type DriverFeature, type LockEntry, type DialogStep, type ElementProbe,
   type EventSink, type GuardVerdict, type PageAssertion, type Plan, type PolicyRuleId, type Redactor,
   type DownloadStep, type ResolvedElement, type Result, type SafeText, type SecretStore, type ServiceCaller, type Session, type Step, type Target, type TargetId,
   type Unavailable, type ValueName, type GuaranteeStatement, type RunMode, type SuiteFinding, type SuiteName, type SuitePass,
@@ -29,7 +30,8 @@ import {
   type NetworkStepContext,
 } from './network-and-storage/network-and-storage-steps.ts';
 import { buildManifest, manifestHash, unsafeFeatureRecord, type FixtureReference, type HostInfo, type RunManifest } from './manifest.ts';
-import { checkElement, checkPage, normalise, type Verdict } from './oracle.ts';
+import { checkElement, checkPage, domReadFor, normalise, type Verdict } from './oracle.ts';
+import { runEvaluate, runScriptCheck, type PageScriptContext, type PageScriptRecord } from './page-scripts/page-script-steps.ts';
 import type { SuiteDecodeError } from './evidence/suite-report.ts';
 import { runTimeText, type PlanError } from './plan/plan-decoders.ts';
 import { ASSERTION_STEP_TYPES } from './plan/plan-grammar.ts';
@@ -108,8 +110,13 @@ export type StepResult = {
   readonly findings?: readonly A11yFinding[];
   // A call or backend check's record: status and response sha256, never a header or the body.
   readonly serviceCall?: ServiceCallRecord;
-  // A remember step's record: the value's name and the sha256 of its text, never the text.
+  // A remember step's record: the value's name and the sha256 of its text, never the text. An
+  // evaluate that remembers one value records it here too; one that remembers several records
+  // them in rememberedValues.
   readonly remembered?: RememberedValueRecord;
+  readonly rememberedValues?: readonly RememberedValueRecord[];
+  // A page-script step's record: the script, how often it ran and its result's sha256, never the result.
+  readonly pageScript?: PageScriptRecord;
   // A download step's record: the file's name, media type, size and sha256, never its content.
   readonly download?: DownloadRecord;
   // An assertion's record of the stubs active while it ran, sorted by name, so a report can say it
@@ -370,11 +377,12 @@ export async function run(given: RunInputs, ports: RunPorts): Promise<RunResult>
     }
     // A denied action failed its step, so every later step was skipped and nothing ran after it.
     // A failed call, page script or database command could not set up or reach what the test
-    // needs, which is not a product failure.
+    // needs, and a page script that threw, hung or gave no usable result could not check it,
+    // which is not a product failure.
     const denial = context.denials[0];
     finished = denial !== undefined && steps.some((done) => done.code === 'policy-denied')
       ? lifecycle.deny(running, denial)
-      : steps.some((done) => SETUP_STEP_TYPES.includes(done.type) && done.outcome === 'failed')
+      : steps.some((done) => done.outcome === 'failed' && (SETUP_STEP_TYPES.includes(done.type) || SCRIPT_ERROR_CODES.includes(done.code ?? '')))
         ? lifecycle.finish(running, 'Errored')
         : lifecycle.finish(running, steps.every((done) => done.outcome === 'passed') ? 'Passed' : 'Failed');
   } catch (error) {
@@ -432,6 +440,8 @@ const productionAllowed = (inputs: RunInputs): boolean =>
 
 // The steps that set up or reach what the test needs: when one fails, the run could not test.
 const SETUP_STEP_TYPES: readonly Step['type'][] = ['call', 'evaluate', 'database'];
+// The codes of a page script that could not give a result to check, in whatever step it ran.
+const SCRIPT_ERROR_CODES: readonly string[] = ['script-failed', 'script-timeout', 'script-result-invalid', 'script-result-too-large'];
 
 // True when the plan calls a declared service, in its steps or its cleanup.
 const callsServices = (plan: Plan): boolean =>
@@ -547,6 +557,12 @@ const clockAndClipboardContext = (context: RunContext): ClockAndClipboardContext
   clock: context.ports.clock, logger: context.logger,
 });
 
+// What the page-script steps use: the run's values and the declared scripts' sources.
+const pageScriptContext = (context: RunContext): PageScriptContext => ({
+  project: context.inputs.project, scriptSources: context.inputs.scriptSources ?? {}, values: context.values,
+  rememberedTexts: context.rememberedTexts, clock: context.ports.clock, logger: context.logger,
+});
+
 // What the runtime guard is given for a step that acts on no element.
 const NO_ELEMENT: ResolvedElement = { role: null, name: null, box: null, formSubmitName: null, linkUrl: null };
 
@@ -641,18 +657,23 @@ async function executeStep(step: Step, index: number, session: DocumentSession, 
     // isUnsupported refused them above otherwise, so an advance never becomes a real wait.
     case 'advanceClock': return { ...base, ...(await advanceClock(step, clockAndClipboardContext(context))) };
     case 'expectClipboard': return { ...base, ...(await checkClipboard(step, clockAndClipboardContext(context))) };
-    // Page scripts need the driver's script port and database commands the workload runner;
-    // isUnsupported refused these above, so nothing of them runs.
-    case 'evaluate': case 'expectScript': case 'database': case 'expectDatabase':
+    // Page scripts run through the script port of the document the step stands in, for a driver
+    // that declares them; isUnsupported refused them above otherwise.
+    case 'evaluate': return { ...base, ...(await runEvaluate(step, index, session, pageScriptContext(context))) };
+    case 'expectScript': return { ...base, ...(await runScriptCheck(step, index, session, pageScriptContext(context))) };
+    // Database commands need the workload runner; isUnsupported refused these above, so nothing of them runs.
+    case 'database': case 'expectDatabase':
       return { ...base, outcome: 'failed', code: 'unsupported-step' };
     case 'expect': {
       const locator = resolveLocator(step.locator, context.values, context.inputs.project);
       if (!locator.ok) return { ...base, outcome: 'failed', code: locator.error };
       const assertion = resolveElementAssertion(step.assert, context.values, context.inputs.project);
       if (!assertion.ok) return { ...base, outcome: 'failed', code: assertion.error };
+      // A DOM check asks the probe to read the class, style or attribute it compares.
+      const read = domReadFor(assertion.value);
       let last: ElementProbe | null = null;
       const verdict = await poll(context, session, async () => {
-        last = await session.probe(locator.value);
+        last = read === undefined ? await session.probe(locator.value) : await session.probe(locator.value, read);
         return checkElement(assertion.value, last, context.inputs.baseUrl);
       });
       if (verdict.code === TARGET_CRASHED) return { ...base, outcome: 'failed', code: TARGET_CRASHED };
@@ -697,26 +718,34 @@ async function executeStep(step: Step, index: number, session: DocumentSession, 
 }
 
 // Reads a remember step's value from the page through the prober, waiting as a check waits until
-// the locator matches one element with non-empty text (or input value), whitespace normalised.
+// the locator matches one element with non-empty text (or input value), whitespace normalised, or
+// with a non-empty attribute, taken exactly as the page holds it.
 // The text must be safe text no longer than the project's maximumTextLength. Only the value's name
 // and sha256 are kept in the result and the events, never the text.
 async function rememberFromPage(step: Extract<Step, { type: 'remember' }>, index: number, session: DocumentSession, context: RunContext): Promise<StepResult> {
   const base = { index, type: step.type } as const;
   const from = step.from;
   // isUnsupported refused every other source before the step got here.
-  if (!('element' in from) || from.read === 'attribute') return { ...base, outcome: 'failed', code: 'unsupported-step' };
+  if (!('element' in from)) return { ...base, outcome: 'failed', code: 'unsupported-step' };
   const locator = resolveLocator(from.element, context.values, context.inputs.project);
   if (!locator.ok) return { ...base, outcome: 'failed', code: locator.error };
-  const textOf = (probe: ElementProbe): string => normalise(from.read === 'value' ? probe.value ?? '' : probe.text);
+  const read: DomRead | undefined = from.read === 'attribute' ? { kind: 'attribute', name: from.attribute } : undefined;
+  const textOf = (probe: ElementProbe): string => {
+    if (from.read === 'attribute') return probe.dom?.kind === 'attribute' ? probe.dom.value ?? '' : '';
+    return normalise(from.read === 'value' ? probe.value ?? '' : probe.text);
+  };
   const seen: { probe: ElementProbe | null } = { probe: null };
   const verdict = await poll(context, session, async (): Promise<Verdict> => {
-    const probe = await session.probe(locator.value);
+    const probe = read === undefined ? await session.probe(locator.value) : await session.probe(locator.value, read);
     seen.probe = probe;
+    if (probe.selectorInvalid === true) return { pass: false, code: 'selector-invalid' };
     if (probe.count === 0) return { pass: false, code: 'not-found' };
     if (probe.count > 1) return { pass: false, code: 'ambiguous' };
     return textOf(probe) === '' ? { pass: false, code: null } : { pass: true, code: null };
   });
-  if (verdict.code === TARGET_CRASHED || verdict.code === 'not-found' || verdict.code === 'ambiguous') return { ...base, outcome: 'failed', code: verdict.code };
+  if (verdict.code === TARGET_CRASHED || verdict.code === 'not-found' || verdict.code === 'ambiguous' || verdict.code === 'selector-invalid') {
+    return { ...base, outcome: 'failed', code: verdict.code };
+  }
   const text = seen.probe === null ? '' : textOf(seen.probe);
   if (text === '') return { ...base, outcome: 'failed', code: 'value-empty' };
   const maximumLength = context.inputs.project.limits.maximumTextLength;
@@ -878,7 +907,8 @@ async function poll(context: RunContext, session: DocumentSession, check: () => 
       if (crashed()) return { pass: false, code: TARGET_CRASHED };
       throw error;
     }
-    if (verdict.pass) return verdict;
+    // A selector the browser rejects will never match: waiting cannot change that.
+    if (verdict.pass || verdict.code === 'selector-invalid') return verdict;
     if (crashed()) return { pass: false, code: TARGET_CRASHED };
     if (context.ports.clock.now() >= deadline) return verdict;
     await context.ports.clock.sleep(POLL_INTERVAL_MILLISECONDS);

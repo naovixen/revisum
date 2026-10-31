@@ -23,10 +23,16 @@ import type { AdapterId, Target } from './target.ts';
 // with nothing of it kept, so the step never passes with a partial result.
 // assertion-failed: a dialog step's expected text is not the open dialog's text, so nothing
 // answered the dialog.
+// selector-invalid: the browser rejects a CSS selector or XPath expression the step's locator
+// holds, or the XPath expression selects no nodes at all (such as count()), so nothing was sent.
+// script-failed: a page script threw, its promise rejected, or its source is not one function.
+// script-timeout: a page script did not settle within its timeout.
+// script-result-invalid: a page script's result is not JSON: undefined, a function, or a cyclic value.
 export type DriverErrorCode =
   | 'not-found' | 'ambiguous' | 'not-actionable' | 'timeout' | 'navigation-failed' | 'policy-denied'
   | 'no-download' | 'download-too-large' | 'storage-origin-mismatch' | 'clock-runaway' | 'clipboard-unavailable'
-  | 'target-crashed' | 'unsupported-step' | 'assertion-failed';
+  | 'target-crashed' | 'unsupported-step' | 'assertion-failed'
+  | 'selector-invalid' | 'script-failed' | 'script-timeout' | 'script-result-invalid';
 export type DriverError = { readonly code: DriverErrorCode; readonly detail: string };
 
 // Why a declared target cannot run. A driver explains a "no"; it never substitutes another target.
@@ -75,7 +81,26 @@ export type ElementProbe = {
   // The absolute URL of the link the element is, or is in, resolved against the page's URL; null
   // when it is in no link. Present when the driver reads link targets (the linkTargets feature).
   readonly href?: string | null;
+  // What the probe was asked to read of the element's DOM, for a DOM check or a remember from an
+  // attribute. Present when the driver reads them (the domChecks feature) and one was asked.
+  readonly dom?: DomValue;
+  // True when the browser rejects a CSS selector or XPath expression of the locator: nothing it
+  // could ever match, so a check fails with selector-invalid rather than waiting.
+  readonly selectorInvalid?: true;
 };
+// What a probe reads of the element's DOM besides what it always reads: its class tokens, the
+// computed value of one style property (a lowercase CSS property name), or one attribute's value
+// (by its lowercase name). See docs/specs/SPEC-36-unsafe-plan-features.md.
+export type DomRead =
+  | { readonly kind: 'classes' }
+  | { readonly kind: 'computedStyle'; readonly property: string }
+  | { readonly kind: 'attribute'; readonly name: string };
+// What it read: the class tokens in order; the text getComputedStyle gives, such as
+// "rgb(220, 38, 38)"; the attribute's value, or null when the element has no such attribute.
+export type DomValue =
+  | { readonly kind: 'classes'; readonly classes: readonly string[] }
+  | { readonly kind: 'computedStyle'; readonly value: string }
+  | { readonly kind: 'attribute'; readonly value: string | null };
 // One <meta> tag of the document head: its name or property attribute, and its content.
 export type PageMetaTag = { readonly name: string; readonly content: string };
 export type PageProbe = {
@@ -159,9 +184,25 @@ export interface ActionRunner {
   act(step: ActionStep, guard?: ActionGuard, secret?: Secret): Promise<Result<void, DriverError>>;
 }
 export interface Prober {
-  // The engine replaces a locator's value references with their text before it probes.
-  probe(locator: Locator): Promise<ElementProbe>;
+  // The engine replaces a locator's value references with their text before it probes. Given a
+  // DOM read, a driver that declares domChecks reads that too, into the probe's `dom`.
+  probe(locator: Locator, read?: DomRead): Promise<ElementProbe>;
 }
+
+// One run of a page script, as the engine hands it to a driver. The source is one function
+// expression, from a declared file or the plan, passed unchanged: the driver never builds it from
+// plan values. The driver calls the function once, in the main world of the document, with one
+// argument: an object holding the named arguments as JSON values. It may return a promise, which
+// is awaited. Arguments are never secrets.
+export type PageScriptCall = {
+  readonly source: string;
+  readonly arguments: Readonly<Record<string, string | number | boolean>>;
+  // Enforced by the driver in real time: past it, the step fails with script-timeout.
+  readonly timeoutMilliseconds: number;
+  // The driver may stop reading the result text once it is longer than this many bytes: the
+  // engine refuses any text over it with script-result-too-large all the same.
+  readonly maximumResultBytes: number;
+};
 export interface Camera {
   // PNG bytes of the viewport, with every element matching `mask` painted solid black, so
   // personal data never reaches an image. See docs/specs/SPEC-09-privacy-masking.md.
@@ -188,6 +229,12 @@ export interface DocumentSession extends PageNavigator, ActionRunner, Prober, Ca
   // download-too-large; a popup the click opens fails with unsupported-step. A driver without it
   // does not perform downloads (the downloads feature).
   download?(step: DownloadStep, maximumBytes: number, guard?: ActionGuard): Promise<Result<DownloadedFile, DriverError>>;
+  // Runs a page script in this document and gives its result written as JSON text in the page.
+  // The text is outside data: the engine decodes it under its own size and depth limits and reads
+  // only the declared fields. A throw or a rejection is script-failed, a value JSON cannot write
+  // (undefined, a function, a cycle) is script-result-invalid, and a script that does not settle
+  // in time is script-timeout. A driver without it does not run page scripts (the pageScripts feature).
+  runScript?(call: PageScriptCall): Promise<Result<string, DriverError>>;
 }
 
 // One open browser session: every driver port together.

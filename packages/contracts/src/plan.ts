@@ -101,8 +101,8 @@ export type StructuralLocatorWith<Text> =
 export type LocatorWith<Text> = SemanticLocatorWith<Text> | StructuralLocatorWith<Text>;
 export type Locator = LocatorWith<TextOrValue>;
 // A locator whose value references the run has replaced with their text: what a driver receives.
-// Drivers resolve semantic locators only, until CSS and XPath resolution lands with the CDP driver.
-export type ResolvedLocator = SemanticLocatorWith<SafeText>;
+// A driver resolves a CSS or XPath one only when it declares the structuralLocators feature.
+export type ResolvedLocator = LocatorWith<SafeText>;
 export const LOCATOR_KINDS = ['role', 'label', 'text', 'testId'] as const;
 export const STRUCTURAL_LOCATOR_KINDS = ['css', 'xpath'] as const;
 export type StructuralLocatorKind = (typeof STRUCTURAL_LOCATOR_KINDS)[number];
@@ -158,9 +158,9 @@ export type DomCheckWith<Text> =
   | { readonly kind: 'attributeAbsent'; readonly name: SafeText };
 export type ElementAssertionWith<Text> = ObservableElementAssertionWith<Text> | DomCheckWith<Text>;
 export type ElementAssertion = ElementAssertionWith<TextOrValue>;
-// An element assertion whose expected text is final: what the oracle compares against. The oracle
-// decides observable checks only, until DOM reads land with the CDP driver.
-export type ResolvedElementAssertion = ObservableElementAssertionWith<SafeText>;
+// An element assertion whose expected text is final: what the oracle compares against. A DOM check
+// is decided on what the driver's probe read of the element's classes, style or attribute.
+export type ResolvedElementAssertion = ElementAssertionWith<SafeText>;
 
 export const PAGE_TEXT_KINDS = ['urlPath', 'title'] as const;
 export type PageAssertion =

@@ -1,16 +1,52 @@
 // The assertion oracle: pure functions from a probe to a verdict. It lives in the engine so that
 // neither a driver nor an AI can change what "passed" means.
-import { literalText, type AccessibleStates, type ElementProbe, type PageAssertion, type PageProbe, type ResolvedElementAssertion } from '@revisum/contracts';
+import {
+  literalText, type AccessibleStates, type DomCheckWith, type DomRead, type ElementProbe, type PageAssertion, type PageProbe,
+  type ResolvedElementAssertion, type SafeText,
+} from '@revisum/contracts';
 
 // state-not-exposed: the element does not expose the state a check asks about, so the check can
 // neither pass nor fail on its merits.
-export type Verdict = { readonly pass: boolean; readonly code: 'not-found' | 'ambiguous' | 'assertion-failed' | 'state-not-exposed' | null };
+// selector-invalid: the browser rejects the locator's CSS selector or XPath expression, so no
+// element can ever match and waiting is pointless.
+export type Verdict = {
+  readonly pass: boolean;
+  readonly code: 'not-found' | 'ambiguous' | 'assertion-failed' | 'state-not-exposed' | 'selector-invalid' | null;
+};
 
 const PASSED: Verdict = { pass: true, code: null };
 const FAILED: Verdict = { pass: false, code: 'assertion-failed' };
 const NOT_FOUND: Verdict = { pass: false, code: 'not-found' };
 const AMBIGUOUS: Verdict = { pass: false, code: 'ambiguous' };
 const STATE_NOT_EXPOSED: Verdict = { pass: false, code: 'state-not-exposed' };
+const SELECTOR_INVALID: Verdict = { pass: false, code: 'selector-invalid' };
+
+// What a DOM check needs the probe to read of the element; undefined for every other check.
+export function domReadFor(assertion: ResolvedElementAssertion): DomRead | undefined {
+  switch (assertion.kind) {
+    case 'hasClass': case 'lacksClass': return { kind: 'classes' };
+    case 'computedStyleEquals': return { kind: 'computedStyle', property: assertion.property };
+    case 'attributeEquals': case 'attributeAbsent': return { kind: 'attribute', name: assertion.name };
+    default: return undefined;
+  }
+}
+
+// A DOM check on the one element found. A probe that read nothing, or read something else, fails
+// the check: it never passes by accident. Values are compared exactly, as the page holds them;
+// only a computed style has its white space normalised, since browsers space their own text.
+function checkDom(assertion: DomCheckWith<SafeText>, probe: ElementProbe): Verdict {
+  const read = probe.dom;
+  switch (assertion.kind) {
+    case 'hasClass': case 'lacksClass': {
+      if (read?.kind !== 'classes') return FAILED;
+      return read.classes.includes(assertion.value) === (assertion.kind === 'hasClass') ? PASSED : FAILED;
+    }
+    case 'computedStyleEquals':
+      return read?.kind === 'computedStyle' && normalise(read.value) === normalise(assertion.value) ? PASSED : FAILED;
+    case 'attributeEquals': return read?.kind === 'attribute' && read.value === assertion.value ? PASSED : FAILED;
+    case 'attributeAbsent': return read?.kind === 'attribute' && read.value === null ? PASSED : FAILED;
+  }
+}
 
 // Collapses runs of white space and trims, so layout white space never decides a text check.
 export const normalise = (text: string): string => text.replace(/\s+/g, ' ').trim();
@@ -53,6 +89,8 @@ function sameUrl(expected: string, actual: string | null | undefined, baseUrl: s
 // The assertion's expected text is final: the run replaces value references before checking.
 // `baseUrl` is the run's base URL, which an expected link target given as a path is resolved on.
 export function checkElement(assertion: ResolvedElementAssertion, probe: ElementProbe, baseUrl?: string): Verdict {
+  // A selector the browser rejects matches nothing, absent included: the plan is wrong, not the page.
+  if (probe.selectorInvalid === true) return SELECTOR_INVALID;
   // Checks on how many elements match come before the single-element rule below.
   if (assertion.kind === 'absent') return probe.count === 0 ? PASSED : FAILED;
   if (assertion.kind === 'countEquals') return probe.count === assertion.value ? PASSED : FAILED;
@@ -78,6 +116,8 @@ export function checkElement(assertion: ResolvedElementAssertion, probe: Element
     // accident. The run refuses them before probing; see needsDriverFeatures in the contracts package.
     case 'checked': case 'unchecked': case 'focused':
       return FAILED;
+    case 'hasClass': case 'lacksClass': case 'computedStyleEquals': case 'attributeEquals': case 'attributeAbsent':
+      return checkDom(assertion, probe);
   }
 }
 

@@ -54,7 +54,15 @@ export interface PageOperations<Handle> {
   // The URL the browser could not show, while it shows its own error page in its place, such as
   // for an HTTP error status with an empty body; null otherwise.
   unreachableUrl(): Promise<string | null>;
+  // Calls a page script's source, one function expression, once in this document's main world
+  // with one argument, the arguments object; awaits it and writes its result as JSON text in the
+  // page (scriptResultText in in-page.ts). It never times out by itself: the session races it.
+  callScript(source: string, scriptArguments: Readonly<Record<string, string | number | boolean>>, maximumResultBytes: number): Promise<ScriptCallOutcome>;
 }
+
+// How one call of a page script ended: with its result as JSON text, with a throw or a rejection,
+// or with a result JSON cannot write.
+export type ScriptCallOutcome = { readonly kind: 'result'; readonly text: string } | { readonly kind: 'threw' } | { readonly kind: 'not-json' };
 
 export type RoleAndName = { readonly role: string | null; readonly name: string | null };
 export type ExposedStates = { readonly selected: boolean | null; readonly expanded: boolean | null; readonly pressed: boolean | null };
