@@ -32,6 +32,7 @@ export const KNOWN_MALFORMED_COMMITS: readonly { readonly commit: string; readon
   { commit: 'd2f2afb3e32ce939dd7df11643fe42028190bf60', reason: 'Spec trailer lists several specs on one line; one Spec line per spec is required (SPEC-02, SPEC-03, SPEC-00)' },
   { commit: '4f0473cac1d0ff61e962a7ab73b48c31dae2a1b9', reason: 'Spec trailer lists several specs on one line; one Spec line per spec is required (SPEC-02, SPEC-03, SPEC-00)' },
   { commit: '701099c381859adc6bdef8c58308e1d2a92290ef', reason: 'Wrong message and Spec trailer (reads as the SPEC-33 record); the commit holds the SPEC-34 driver-parts alignment note' },
+  { commit: '2a1df21b5930457d4412bdcaa00e73618c2fb929', reason: 'Agent trailer has no version (claude-code); the commit holds the SPEC-36 page-parts alignment note' },
 ];
 
 // The run as SPEC-27's RunRecord in contracts describes it. Tools are compiled apart from the
