@@ -43,6 +43,13 @@ export function fakeSecretValue(): string {
   }
 }
 
+// A fresh run of `length` lower-case letters, for a canary's unique part. Letters only, so the
+// default PII redaction never reads part of a canary as a phone or card number and hides it.
+export function letterNonce(length: number): string {
+  const letters = 'abcdefghijklmnopqrstuvwxyz';
+  return [...randomBytes(length)].map((byte) => letters[byte % letters.length]).join('');
+}
+
 // A fresh fake secret of exactly `length` characters, letters and digits only.
 export function fakeSecretOfLength(length: number): string {
   let value = '';

@@ -24,7 +24,6 @@
 // JSON arguments.
 // See docs/specs/SPEC-36-unsafe-plan-features.md.
 import assert from 'node:assert/strict';
-import { randomBytes } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { arch, platform } from 'node:os';
 import { join } from 'node:path';
@@ -42,6 +41,7 @@ import {
 } from '../support/memory-ports.ts';
 import { authorise, trustedProjectFrom } from '../support/policy-clearance.ts';
 import { FIXTURES } from '../support/repository.ts';
+import { letterNonce } from '../unit/engine/secret-examples.ts';
 import { sessionWith, wrappingSessions } from './clock-and-clipboard-support.ts';
 import type { JsonRecord } from './plan-values-support.ts';
 
@@ -273,7 +273,7 @@ export type UnsafePageHarness = {
 export type UnsafePageHarnessOptions = { readonly extraOrigins?: readonly string[] };
 
 export async function unsafePageHarness(options: UnsafePageHarnessOptions = {}): Promise<UnsafePageHarness> {
-  const nonce = randomBytes(5).toString('hex');
+  const nonce = letterNonce(10);
   const canaries: Canaries = { orderId: `Zqorder${nonce}ref${nonce}`, sessionCookie: `Zqsession${nonce}cookie` };
   const requested: string[] = [];
   const server = await startFixtureServer(FIXTURE_FOLDER, (path) => { requested.push(path); }, routesFor(canaries));
