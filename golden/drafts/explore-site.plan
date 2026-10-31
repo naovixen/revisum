@@ -1,0 +1,18 @@
+# Draft from explored pages: it checks what the pages do now, which may include bugs.
+# Review each Expect line before you approve this plan.
+#
+Plan: Browse the Lantern Books pages
+Feature: EXPLORE-1
+Spec: pages/lantern-books
+Version: 1.1
+Targets: explore-chromium
+Go to /
+Criterion: AC-1
+Expect heading "Lantern Books" is visible
+Expect link "About us" is visible
+Go to /about.html
+Criterion: AC-2
+Expect heading "About Lantern Books" is visible
+Go to /pricing.html
+Criterion: AC-3
+Expect heading "Pricing" is visible

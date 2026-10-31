@@ -220,6 +220,7 @@ export function describeCliError(code: CliErrorCode): string {
     case 'usage': case 'config-invalid': case 'untrusted-source': case 'plan-rejected': case 'target-unavailable':
     case 'lock-download-failed': case 'lock-offline': case 'approval-refused': case 'replay-mismatch': case 'internal':
     case 'planner-endpoint-not-loopback': case 'planner-call-failed':
+    case 'explore-origin-refused': case 'after-plan-unapproved': case 'explore-runner-unavailable': case 'explore-start-unreachable':
       return 'command failed';
     default:
       return unreachable(code);
@@ -230,6 +231,7 @@ export function describeCliErrorForgettingOne(code: CliErrorCode): string {
     case 'usage': case 'config-invalid': case 'untrusted-source': case 'plan-rejected': case 'target-unavailable':
     case 'lock-download-failed': case 'lock-offline': case 'approval-refused': case 'replay-mismatch':
     case 'planner-endpoint-not-loopback': case 'planner-call-failed':
+    case 'explore-origin-refused': case 'after-plan-unapproved': case 'explore-runner-unavailable': case 'explore-start-unreachable':
       return 'command failed';
     default:
       // @ts-expect-error 'internal' is not handled, so the code does not narrow to never

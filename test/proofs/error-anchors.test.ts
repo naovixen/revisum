@@ -47,6 +47,7 @@ const ERROR_CODES: Readonly<Record<string, readonly string[]>> = {
   cli: [
     'usage', 'config-invalid', 'untrusted-source', 'plan-rejected', 'target-unavailable', 'lock-download-failed',
     'lock-offline', 'approval-refused', 'replay-mismatch', 'internal', 'planner-endpoint-not-loopback', 'planner-call-failed',
+    'explore-origin-refused', 'after-plan-unapproved', 'explore-runner-unavailable', 'explore-start-unreachable',
   ],
   approval: [
     'self-approval', 'bot-or-app', 'not-code-owner', 'stale-commit', 'unknown-key', 'bad-signature', 'no-user-presence',

@@ -228,6 +228,9 @@ export type WorkspaceOptions = {
   readonly workingTreeProject?: JsonRecord;
   // The spec's text; the sign-up spec unless given.
   readonly spec?: string;
+  // The whole protected project.json, for a test whose project is not the sign-up one, such as
+  // explore mode's with its fixture site's origins; projectFile(planner) unless given.
+  readonly project?: JsonRecord;
 };
 
 export function draftWorkspace(options: WorkspaceOptions): DraftWorkspace {
@@ -237,7 +240,7 @@ export function draftWorkspace(options: WorkspaceOptions): DraftWorkspace {
     mkdirSync(dirname(path), { recursive: true });
     writeFileSync(path, content);
   };
-  const protectedProject = projectFile(options.planner);
+  const protectedProject = options.project ?? projectFile(options.planner);
   write('project.json', `${JSON.stringify(options.workingTreeProject ?? protectedProject, null, 2)}\n`);
   write(SPEC_PATH, options.spec ?? SIGNUP_SPEC);
   write(EXISTING_PLAN_PATH, EXISTING_PLAN);

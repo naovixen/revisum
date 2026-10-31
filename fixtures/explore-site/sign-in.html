@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8">
+  <title>Sign in</title>
+</head>
+<body>
+  <main>
+    <h1>Sign in</h1>
+    <form id="sign-in-form" aria-label="Sign in form">
+      <label for="name">Name</label>
+      <input id="name" type="text" autocomplete="off">
+      <button type="submit">Sign in</button>
+    </form>
+  </main>
+  <script>
+    // Signing in keeps the typed name in a cookie for every page of the site, and says so.
+    document.getElementById('sign-in-form').addEventListener('submit', function (event) {
+      event.preventDefault();
+      document.cookie = 'explore-name=' + encodeURIComponent(document.getElementById('name').value) + '; path=/';
+      var heading = document.createElement('h2');
+      heading.textContent = 'Signed in';
+      document.querySelector('main').appendChild(heading);
+    });
+  </script>
+</body>
+</html>

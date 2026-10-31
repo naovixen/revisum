@@ -1,0 +1,15 @@
+{
+  "command": "draft",
+  "ok": true,
+  "data": {
+    "draftPath": "plans/explore.plan",
+    "provenance": { "source": "explore-draft", "basis": "core-recorded", "reference": "<sha256 of the page map file>" },
+    "errors": [],
+    "approved": false,
+    "pageMapPath": "plans/explore.pages.json",
+    "warnings": [],
+    "egressEnforced": false,
+    "crawledOrigin": "<fixture site origin>",
+    "calledOrigins": ["<planner origin>"]
+  }
+}

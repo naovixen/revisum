@@ -37,7 +37,9 @@ import { ORIGIN, accountClosurePlan, defaultParser, signupPlan, testProject, tes
 
 type Route = { readonly format: PlanFormat; readonly basis: ProvenanceBasis; readonly reference?: string };
 
-const ROUTES: { readonly [Source in PlanSource]: Route } = {
+// 'explore-draft' is SPEC-37's route (docs/specs/SPEC-37-explore-to-draft.md); it is named beside
+// PlanSource so this file compiles before and after the source joins PLAN_SOURCES.
+const ROUTES: { readonly [Source in PlanSource | 'explore-draft']: Route } = {
   'hand-written': { format: 'text', basis: 'declared' },
   'customer-llm': { format: 'json', basis: 'declared' },
   'draft-command': { format: 'text', basis: 'core-recorded', reference: 'specs/signup.md' },
@@ -45,6 +47,7 @@ const ROUTES: { readonly [Source in PlanSource]: Route } = {
   'builder': { format: 'text', basis: 'core-recorded', reference: 'builder-session-1' },
   'recorder': { format: 'text', basis: 'core-recorded', reference: 'recorder-session-1' },
   'chat': { format: 'json', basis: 'core-recorded', reference: 'conversation-7' },
+  'explore-draft': { format: 'text', basis: 'core-recorded', reference: `sha256:${'c'.repeat(64)}` },
 };
 const isSource = (key: string): key is PlanSource => Object.hasOwn(ROUTES, key);
 const SOURCES: readonly PlanSource[] = Object.keys(ROUTES).filter(isSource);
