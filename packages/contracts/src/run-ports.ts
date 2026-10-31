@@ -1,5 +1,7 @@
 // The other ports a run needs from outside: time, randomness, artefact storage, redaction and
 // the optional AI helpers. AI output is typed `unknown`, so it is usable only after parsing.
+import type { DraftRequest } from './plan-drafts.ts';
+
 export interface Clock {
   now(): number;
   sleep(milliseconds: number): Promise<void>;
@@ -26,6 +28,13 @@ export type SpecInput = { readonly specReference: string; readonly text: string 
 // Returns unknown: the only way to use the output is to pass it through the plan parser.
 export interface AiPlanner {
   propose(spec: SpecInput): Promise<unknown>;
+}
+// The draft command's planner. It answers with the planner's reply as received, typed unknown: the
+// engine decodes it, and only its text, once bounded, becomes a draft. A call that fails (the
+// network, the egress proxy or the planner's status) rejects, carrying nothing from the reply.
+// See docs/specs/SPEC-28-plan-authoring.md.
+export interface DraftPlanner {
+  draft(request: DraftRequest): Promise<unknown>;
 }
 // Returns unknown: the output is only ever stored as a suggestion beside the deterministic draft.
 export interface AiWriter {

@@ -28,15 +28,22 @@ export {
   type DraftError, type NoReadableForm, type TextErrorCode, type TextPosition, type TextReading, type TextWarning,
 } from './plan/readable/plan-text.ts';
 export { writePlanJson } from './plan/plan-json.ts';
-export { admitDraft, type PlanParse } from './plan/plan-drafts.ts';
+export { admitCoreDraft, admitDraft, type PlanParse } from './plan/plan-drafts.ts';
 export { parseAiText, type AiText } from './ai-text.ts';
+// The draft command's pure parts: the criteria it reads, the prompt it sends and the wire formats.
+export { extractCriteria } from './drafting/spec-criteria.ts';
+export { READABLE_GRAMMAR_VERSION, plannerPrompt } from './drafting/planner-prompt.ts';
+export {
+  ANTHROPIC_API_VERSION, MAXIMUM_PLANNER_REPLY_BYTES, PLANNER_TIMEOUT_MILLISECONDS, plannerReplyText, plannerRequestBody,
+} from './drafting/planner-wire.ts';
 export * from './coverage-study.ts';
 export * from './logging.ts';
 export { jsonLinesEventSink } from './event-sink.ts';
 export * from './redaction.ts';
 export { environmentSecretStore } from './secrets/secret-store.ts';
 export { leakScanner } from './secrets/leak-scanner.ts';
-export { SECRET_PLACEHOLDER } from './secrets/secret-values.ts';
+// headerSecret wraps a secret in its header scheme, such as "Bearer <value>", still opaque.
+export { SECRET_PLACEHOLDER, headerSecret } from './secrets/secret-values.ts';
 export * from './random.ts';
 export * from './hashing.ts';
 export * from './manifest.ts';

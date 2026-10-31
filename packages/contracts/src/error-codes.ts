@@ -12,4 +12,7 @@ export type RecorderError = { readonly code: 'no-reason' | 'unknown-item' | 'alr
 // Why a command-line invocation failed. Each maps to one exit status.
 export type CliErrorCode =
   | 'usage' | 'config-invalid' | 'untrusted-source' | 'plan-rejected' | 'target-unavailable'
-  | 'lock-download-failed' | 'lock-offline' | 'approval-refused' | 'replay-mismatch' | 'internal';
+  | 'lock-download-failed' | 'lock-offline' | 'approval-refused' | 'replay-mismatch' | 'internal'
+  // The draft command's planner: a local endpoint off the loopback interface, and a call that
+  // failed on the network, at the egress proxy or with the planner's status.
+  | 'planner-endpoint-not-loopback' | 'planner-call-failed';

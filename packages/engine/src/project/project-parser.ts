@@ -4,9 +4,9 @@
 // policy gate applies, written by a person. AI output never reaches this type. The person declares
 // every target; the engine never invents one.
 import {
-  COLOR_SCHEMES, DEFAULT_TEST_ID_ATTRIBUTE, DEVICE_PROFILES, ENGINES, FIDELITIES, MOTION_PREFERENCES, TARGET_KINDS, TARGET_PROVIDERS, success, failure,
+  COLOR_SCHEMES, DEFAULT_TEST_ID_ATTRIBUTE, DEVICE_PROFILES, ENGINES, FIDELITIES, MOTION_PREFERENCES, PLANNER_WIRES, TARGET_KINDS, TARGET_PROVIDERS, success, failure,
   type Brand, type CallDeclaration, type CallName, type DeclaredService, type DeviceProfileId, type FixtureName, type IrreversiblePatterns, type Locale, type Origin, type Result,
-  type EmailDomain, type EvidenceMode, type SafeText, type SecretName, type Target, type TestIdAttribute, type TimeZone,
+  type EmailDomain, type EvidenceMode, type PlannerEndpoint, type SafeText, type SecretName, type Target, type TestIdAttribute, type TimeZone,
   type ObservedRequestDeclaration, type RequestName, type StorageEntryDeclaration, type StorageEntryName, type StubDeclaration, type StubName,
   type UnsafeFeaturesDeclaration, type VendorExtensionKey,
 } from '@revisum/contracts';
@@ -129,6 +129,8 @@ export type ProjectData = {
   // The unsafe plan features a person turned on, and the page scripts and database commands a plan
   // may then name. Absent means every unsafe feature is off: nothing else can turn one on.
   readonly unsafeFeatures?: UnsafeFeaturesDeclaration;
+  // The planner the draft command calls. Absent means the project has none, and the command stops.
+  readonly planner?: PlannerEndpoint;
 };
 export type Project = Brand<ProjectData, 'Project'>;
 
@@ -441,13 +443,75 @@ function readEvidence(input: unknown, path: string, issues: Issues): Parsed<Evid
   return { keepDownloads };
 }
 
+const PLANNER_KINDS = ['customer-key', 'local'] as const;
+// A model name as the planner's API takes it, such as "claude-sonnet-4-5" or "llama3.1:8b".
+const MAXIMUM_MODEL_LENGTH = 200;
+
+// The planner endpoint. A customer-key endpoint sends the customer's key, so it must be https: a
+// key never travels in plain text. A local endpoint may be http:; the draft command keeps it to
+// the loopback interface. The key is a declared secret, named, never written here.
+function readPlannerEndpoint(input: unknown, issues: Issues, secretNames: readonly SecretName[]): Parsed<PlannerEndpoint | undefined> {
+  if (input === undefined) return undefined;
+  const path = '$.planner';
+  // The kind is read first, because it decides whether the key is required.
+  const shape = peekRecord(input, path, issues);
+  if (shape === INVALID) return INVALID;
+  const kind = readOneOf(shape['kind'], `${path}.kind`, issues, PLANNER_KINDS);
+  if (kind === INVALID) return INVALID;
+  const keys = ['kind', 'url', 'model', 'wire', 'apiKey'];
+  const fields = readRecord(input, path, issues, keys, kind === 'customer-key' ? keys : ['kind', 'url', 'model', 'wire']);
+  if (fields === INVALID) return INVALID;
+  const url = readPlannerUrl(fields['url'], `${path}.url`, issues, kind === 'customer-key');
+  const model = readText(fields['model'], `${path}.model`, issues, MAXIMUM_MODEL_LENGTH);
+  const wire = readOneOf(fields['wire'], `${path}.wire`, issues, PLANNER_WIRES);
+  const apiKey = fields['apiKey'] === undefined ? undefined : readPlannerKey(fields['apiKey'], `${path}.apiKey`, issues, secretNames);
+  if (url === INVALID || model === INVALID || wire === INVALID || apiKey === INVALID) return INVALID;
+  if (kind === 'customer-key') {
+    // readRecord has already required the key, so it is present here.
+    return apiKey === undefined ? INVALID : { kind, url, model, wire, apiKey };
+  }
+  return { kind, url, model, wire, ...(apiKey === undefined ? {} : { apiKey }) };
+}
+
+// The address a request is posted to, kept as written: http or https, with no user name, password
+// or fragment. `secureOnly` refuses http, for an endpoint that sends a key.
+function readPlannerUrl(input: unknown, path: string, issues: Issues, secureOnly: boolean): Parsed<string> {
+  const text = readText(input, path, issues, MAXIMUM_URL_LENGTH);
+  if (text === INVALID) return INVALID;
+  let url: URL;
+  try { url = new URL(text); } catch { issues.push({ code: 'invalid_url', path }); return INVALID; }
+  if (url.protocol !== 'https:' && (secureOnly || url.protocol !== 'http:')) { issues.push({ code: 'scheme_not_allowed', path }); return INVALID; }
+  if (url.username !== '' || url.password !== '' || url.hash !== '') { issues.push({ code: 'invalid_url', path }); return INVALID; }
+  return text;
+}
+
+function readPlannerKey(input: unknown, path: string, issues: Issues, secretNames: readonly SecretName[]): Parsed<{ readonly secretName: SecretName }> {
+  const fields = readRecord(input, path, issues, ['secretName']);
+  if (fields === INVALID) return INVALID;
+  const at = `${path}.secretName`;
+  if (typeof fields['secretName'] !== 'string') { issues.push({ code: 'wrong_type', path: at }); return INVALID; }
+  const found = secretNames.find((name) => name === fields['secretName']);
+  if (found === undefined) { issues.push({ code: 'unknown_value', path: at }); return INVALID; }
+  return { secretName: found };
+}
+
+// The origin a planner endpoint's requests go to, which the egress proxy allows and nothing else.
+// Undefined for an address that is not a URL, which the project parser never lets through.
+export function plannerOrigin(endpoint: PlannerEndpoint): Origin | undefined {
+  try {
+    return brand<string, 'Origin'>(new URL(endpoint.url).origin);
+  } catch {
+    return undefined;
+  }
+}
+
 export function parseProject(input: unknown): Result<Project, readonly PlanError[]> {
   const issues: Issues = [];
   const fields = readRecord(
     input, '$', issues,
     [
       'origins', 'productionOrigins', 'matrix', 'limits', 'secretNames', 'fixtures', 'policy', 'testIdAttributes', 'generatedEmailDomains',
-      'evidence', 'services', 'calls', 'stubs', 'observedRequests', 'storageEntries', 'evidenceMode', 'unsafeFeatures',
+      'evidence', 'services', 'calls', 'stubs', 'observedRequests', 'storageEntries', 'evidenceMode', 'unsafeFeatures', 'planner',
     ],
     ['origins', 'matrix'],
   );
@@ -490,6 +554,8 @@ export function parseProject(input: unknown): Result<Project, readonly PlanError
   const unsafeFeatures = readUnsafeFeatures(fields['unsafeFeatures'], {
     issues, services: services === INVALID ? [] : services, secretNames: secretNames === INVALID ? [] : secretNames,
   });
+  // The planner's key names a declared secret, so the secrets are read first.
+  const planner = readPlannerEndpoint(fields['planner'], issues, secretNames === INVALID ? [] : secretNames);
   const matrix = rawMatrix === INVALID ? [] : rawMatrix.map((target, index) => readTarget(target, `$.matrix[${index}]`, issues));
   const seen = new Set<string>();
   matrix.forEach((target, index) => {
@@ -501,12 +567,13 @@ export function parseProject(input: unknown): Result<Project, readonly PlanError
     || productionOrigins === INVALID || policy === INVALID || testIdAttributes === INVALID || generatedEmailDomains === INVALID
     || evidence === INVALID || services === INVALID || calls === INVALID
     || stubs === INVALID || observedRequests === INVALID || storageEntries === INVALID || evidenceMode === INVALID
-    || unsafeFeatures === INVALID || !allValid(origins) || !allValid(matrix)) return failure(issues);
+    || unsafeFeatures === INVALID || planner === INVALID || !allValid(origins) || !allValid(matrix)) return failure(issues);
   // Left out when absent, so a project without evidence mode or unsafe features parses exactly as
   // it did before.
   return success(brand<ProjectData, 'Project'>({
     origins, productionOrigins, matrix, limits, secretNames, fixtures, policy, testIdAttributes, generatedEmailDomains, evidence,
     services, calls, stubs, observedRequests, storageEntries, ...(evidenceMode === undefined ? {} : { evidenceMode }),
     ...(unsafeFeatures === undefined ? {} : { unsafeFeatures }),
+    ...(planner === undefined ? {} : { planner }),
   }));
 }

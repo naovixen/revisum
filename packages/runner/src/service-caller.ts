@@ -16,7 +16,7 @@ import {
 } from '@revisum/contracts';
 import { request as sendHttpRequest, type ClientRequest, type IncomingMessage, type OutgoingHttpHeaders } from 'node:http';
 import { isIP, type Socket } from 'node:net';
-import { connect as connectSecurely } from 'node:tls';
+import { connect as connectSecurely, rootCertificates } from 'node:tls';
 import { EGRESS_DECISION_HEADER, type EgressProxy } from './egress-proxy.ts';
 
 // The request's headers as name and value text, in the declaration's order, for writing on the wire.
@@ -45,6 +45,9 @@ export type ServiceCallerOptions = {
   // The running egress proxy; only its address is used.
   readonly proxy: Pick<EgressProxy, 'url'>;
   readonly timeouts?: ServiceCallerTimeouts;
+  // PEM certificates trusted for HTTPS besides the system's own, such as a test certificate
+  // authority. None unless given.
+  readonly trustedCertificates?: readonly string[];
 };
 
 const LONGEST_CALL_MILLISECONDS = 120_000;
@@ -53,6 +56,9 @@ type CallResult = Result<ServiceResponse, ServiceCallErrorCode>;
 
 // Where the proxy listens: its host, without IPv6 brackets, and its port.
 type ProxyAddress = { readonly host: string; readonly port: number };
+// The certificate authorities TLS checks a service against: the system's own unless more are
+// given, since naming any replaces the system's list.
+type TrustedAuthorities = readonly string[] | undefined;
 
 const withoutBrackets = (hostname: string): string => hostname.replace(/^\[(.*)\]$/, '$1');
 
@@ -60,7 +66,9 @@ export function serviceCaller(options: ServiceCallerOptions): ServiceCaller {
   const proxyUrl = new URL(options.proxy.url);
   const proxy: ProxyAddress = { host: withoutBrackets(proxyUrl.hostname), port: Number(proxyUrl.port === '' ? 80 : proxyUrl.port) };
   const longest = options.timeouts?.longestCallMilliseconds ?? LONGEST_CALL_MILLISECONDS;
-  return { call: (request) => sendOnce(request, proxy, Math.min(request.timeoutMilliseconds, longest)) };
+  const authorities: TrustedAuthorities = options.trustedCertificates === undefined || options.trustedCertificates.length === 0
+    ? undefined : [...rootCertificates, ...options.trustedCertificates];
+  return { call: (request) => sendOnce(request, proxy, Math.min(request.timeoutMilliseconds, longest), authorities) };
 }
 
 // The headers written on the wire: the declared ones, then the Host the origin names, and the JSON
@@ -79,7 +87,7 @@ function wireHeaders(request: ServiceRequest, target: URL, body: string | null):
 // Sends `request` once through the proxy and reads the answer, settling exactly once: with the
 // response, or with the first failure, whichever comes first. Settling closes every connection it
 // opened, so a timed-out or oversized answer stops arriving.
-function sendOnce(request: ServiceRequest, proxy: ProxyAddress, timeoutMilliseconds: number): Promise<CallResult> {
+function sendOnce(request: ServiceRequest, proxy: ProxyAddress, timeoutMilliseconds: number, authorities: TrustedAuthorities): Promise<CallResult> {
   return new Promise<CallResult>((resolve) => {
     const opened: (ClientRequest | Socket)[] = [];
     let settled = false;
@@ -124,7 +132,7 @@ function sendOnce(request: ServiceRequest, proxy: ProxyAddress, timeoutMilliseco
         outgoing.on('response', onResponse);
         outgoing.end(body ?? undefined);
       } else if (target.protocol === 'https:') {
-        sendThroughTunnel(request, target, headers, body, proxy, track, onResponse, finish);
+        sendThroughTunnel(request, target, headers, body, { proxy, authorities }, track, onResponse, finish);
       } else {
         // The proxy forwards only HTTP and HTTPS, so any other scheme is refused here.
         finish(failure('egress-blocked'));
@@ -141,10 +149,12 @@ function sendOnce(request: ServiceRequest, proxy: ProxyAddress, timeoutMilliseco
 // end with the service. Every answer to CONNECT is the proxy's own: 403 is its refusal, anything
 // else but 200 is its failure to connect.
 function sendThroughTunnel(
-  request: ServiceRequest, target: URL, headers: OutgoingHttpHeaders, body: string | null, proxy: ProxyAddress,
+  request: ServiceRequest, target: URL, headers: OutgoingHttpHeaders, body: string | null,
+  route: { readonly proxy: ProxyAddress; readonly authorities: TrustedAuthorities },
   track: (connection: ClientRequest | Socket) => void, onResponse: (answer: IncomingMessage) => void, finish: (result: CallResult) => void,
 ): void {
   const authority = `${target.hostname}:${target.port === '' ? '443' : target.port}`;
+  const { proxy, authorities } = route;
   const tunnelRequest = sendHttpRequest({ host: proxy.host, port: proxy.port, method: 'CONNECT', path: authority, headers: { host: authority }, agent: false });
   track(tunnelRequest);
   tunnelRequest.on('connect', (answer: IncomingMessage, tunnel: Socket) => {
@@ -155,7 +165,9 @@ function sendThroughTunnel(
     }
     try {
       const hostname = withoutBrackets(target.hostname);
-      const secure = connectSecurely({ socket: tunnel, host: hostname, ...(isIP(hostname) === 0 ? { servername: hostname } : {}) });
+      const secure = connectSecurely({
+        socket: tunnel, host: hostname, ...(isIP(hostname) === 0 ? { servername: hostname } : {}), ...(authorities === undefined ? {} : { ca: [...authorities] }),
+      });
       track(secure);
       const outgoing = sendHttpRequest({ method: request.method, path: request.pathAndQuery, headers, createConnection: () => secure });
       track(outgoing);

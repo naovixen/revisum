@@ -455,6 +455,14 @@ Command-line error. The plan's approval was refused, so the plan was not run.
 
 Command-line error. Replaying a recorded run gave a different result hash from the recorded one.
 
+## planner-endpoint-not-loopback
+
+Command-line error, from `draft`. The project's `planner` is a `local` endpoint whose host is not on the loopback interface (`127.0.0.1`, `::1` or `localhost`). Nothing was sent. Serve the local model on loopback, or declare a `customer-key` endpoint over `https:`.
+
+## planner-call-failed
+
+Command-line error, from `draft`. The planner could not be reached, the egress proxy refused its address, it did not answer in time, its reply was over 1 MiB, or it answered with a status other than success. The error never holds the planner's reply or the key. Check the endpoint's `url`, the key's secret and the planner's own logs.
+
 ## replay-not-claimed
 
 Replay error. The manifest is an evidence run's. Its suite code, the suite's own browser and the app server the suite starts cannot be pinned, so no replay is claimed identical. The manifest can still be used to run the suite again.

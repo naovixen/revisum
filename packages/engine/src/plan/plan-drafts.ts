@@ -6,12 +6,14 @@
 // Provenance is recorded and never trusted. A draft that declares none is hand-written, basis
 // declared. A caller may declare hand-written or customer-llm; a claim that core produced the
 // draft is refused with untrusted-source before the parser, since only core's own routes record
-// that basis.
+// that basis. Core's own routes admit their drafts through admitCoreDraft, which records the route
+// as the source, basis core-recorded, under an actor of the engine's choosing.
 // See docs/specs/SPEC-28-plan-authoring.md.
 import {
   DECLARABLE_PLAN_SOURCES, failure, success,
-  type DerivedActor, type EventSink, type Plan, type PlanDraft, type PlanProvenance, type Result,
+  type DerivedActor, type EventSink, type Plan, type PlanDraft, type PlanProvenance, type PlanSource, type Result,
 } from '@revisum/contracts';
+import { deriveActor, sourceActorId } from '../actor.ts';
 import { planHash } from '../manifest.ts';
 import { LIMIT_CEILINGS } from '../project/project-parser.ts';
 import { isUnsafeText, type PlanError } from './plan-decoders.ts';
@@ -26,6 +28,10 @@ const PROVENANCE_FIELDS = ['source', 'basis', 'reference'];
 // A spec path, issue id or session id, never content, so it is short.
 const MAXIMUM_REFERENCE_LENGTH = 200;
 
+// A reference is a spec path, issue id or session id: short, plain text.
+const usableReference = (reference: string): boolean =>
+  reference !== '' && reference.length <= MAXIMUM_REFERENCE_LENGTH && !isUnsafeText(reference);
+
 // The provenance to record for what a draft declares, or undefined when it may not declare it.
 function declaredProvenance(declared: unknown): PlanProvenance | undefined {
   if (declared === undefined) return HAND_WRITTEN;
@@ -34,8 +40,7 @@ function declaredProvenance(declared: unknown): PlanProvenance | undefined {
   if (source === undefined || declared['basis'] !== 'declared') return undefined;
   const reference = declared['reference'];
   if (reference === undefined) return { source, basis: 'declared' };
-  const usable = typeof reference === 'string' && reference !== '' && reference.length <= MAXIMUM_REFERENCE_LENGTH && !isUnsafeText(reference);
-  return usable ? { source, basis: 'declared', reference } : undefined;
+  return typeof reference === 'string' && usableReference(reference) ? { source, basis: 'declared', reference } : undefined;
 }
 
 type DraftInput = { readonly json: unknown; readonly positions: ReadonlyMap<string, TextPosition> | null };
@@ -65,6 +70,30 @@ export function admitDraft(draft: PlanDraft, parsePlan: PlanParse, events: Event
     events.append({ kind: 'plan.rejected' }, actor);
     return failure([{ stage: 'source', code: 'untrusted-source', position: null }]);
   }
+  return admitWithProvenance(draft, provenance, parsePlan, events, actor);
+}
+
+// The sources only core's own routes record: every source an author may not declare.
+export type CoreRouteSource = Exclude<PlanSource, (typeof DECLARABLE_PLAN_SOURCES)[number]>;
+// The core route a draft came by, and what it drafted from, such as the spec's path.
+export type CoreRoute = { readonly source: CoreRouteSource; readonly reference?: string };
+
+// Admits a draft one of core's own routes produced, such as the draft command's. The route, not
+// the draft, says where it came from: any provenance the draft carries is ignored, and the source
+// is recorded with basis core-recorded. A reference that is not short plain text is left out. The
+// actor is the route itself, an agent, since a route drafts by machine and no person stands
+// behind the draft until one approves it.
+export function admitCoreDraft(draft: PlanDraft, route: CoreRoute, parsePlan: PlanParse, events: EventSink): Result<Plan, readonly DraftError[]> {
+  const provenance: PlanProvenance = {
+    source: route.source, basis: 'core-recorded',
+    ...(route.reference !== undefined && usableReference(route.reference) ? { reference: route.reference } : {}),
+  };
+  return admitWithProvenance(draft, provenance, parsePlan, events, deriveActor(sourceActorId(`${route.source} route`), 'agent'));
+}
+
+function admitWithProvenance(
+  draft: PlanDraft, provenance: PlanProvenance, parsePlan: PlanParse, events: EventSink, actor: DerivedActor,
+): Result<Plan, readonly DraftError[]> {
   const reject = (errors: readonly DraftError[]): Result<Plan, readonly DraftError[]> => {
     events.append({ kind: 'plan.rejected', planProvenance: provenance }, actor);
     return failure(errors);

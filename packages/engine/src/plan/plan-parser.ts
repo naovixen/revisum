@@ -39,6 +39,7 @@ import { brand } from '../brand.ts';
 import { clockAdvanceMilliseconds } from '../clock-advance.ts';
 import { readFields } from '../project/call-declarations.ts';
 import { DEFAULT_TEST_ID_ATTRIBUTES, readId, type Limits, type Project } from '../project/project-parser.ts';
+import type { TrustedProject } from '../project/trusted-project.ts';
 import { declaredCommands, declaredScripts, enabledUnsafeFeatures } from '../project/unsafe-feature-declarations.ts';
 import {
   INVALID, allValid, isOneOf, isUnsafeSource, peekRecord, readInteger, readList, readOneOf, readRecord, readText,
@@ -105,7 +106,7 @@ type ParseContext = {
   readonly clockAdvance: { milliseconds: number; limitPassed: boolean };
 };
 
-const rulesOf = (project: Project): PlanRules => ({
+const rulesOf = (project: Project | TrustedProject): PlanRules => ({
   origins: project.origins, targetIds: project.matrix.map((target) => target.id),
   secretNames: project.secretNames, fixtures: project.fixtures, limits: project.limits,
   testIdAttributes: project.testIdAttributes, emailDomains: project.generatedEmailDomains, calls: project.calls,
@@ -424,6 +425,12 @@ function readPageAssertion(input: unknown, path: string, context: ParseContext):
   // A page may have an empty title, so an empty expected title or path is a real check.
   const value = readPlanText(head['value'], `${path}.value`, context, context.rules.limits.maximumTextLength, 0);
   return value === INVALID ? INVALID : { kind, value };
+}
+
+// A criterion id as a plan may write it, such as "AC-3", or undefined when the text is not one. The
+// draft command reads a spec's criterion ids with it, so a draft names them as a plan can.
+export function criterionIdFrom(text: string): CriterionId | undefined {
+  return CRITERION_ID.test(text) && !looksLikeCredential(text) ? brand<string, 'CriterionId'>(text) : undefined;
 }
 
 // Every assertion names the acceptance criterion it checks. Without one, a passing check would
@@ -1402,7 +1409,8 @@ function deepFreeze<Value>(value: Value): Value {
 }
 
 // Builds the parser for one trusted project.
-export function planParser(project: Project): (input: unknown) => Result<Plan, readonly PlanError[]> {
+// A project read by the project parser, or the trusted project read from the protected branch.
+export function planParser(project: Project | TrustedProject): (input: unknown) => Result<Plan, readonly PlanError[]> {
   const rules = rulesOf(project);
   return function parsePlan(input) {
     const read = readPlanData(input, rules);
