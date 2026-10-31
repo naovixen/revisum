@@ -1,0 +1,17 @@
+{
+  "method": "POST",
+  "path": "/v1/messages",
+  "headers": {
+    "anthropic-version": "2023-06-01",
+    "content-type": "application/json"
+  },
+  "body": {
+    "model": "claude-test-model",
+    "max_tokens": 4096,
+    "temperature": 0,
+    "system": "<prompt>",
+    "messages": [
+      { "role": "user", "content": "<prompt>" }
+    ]
+  }
+}

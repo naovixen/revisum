@@ -46,7 +46,7 @@ const ERROR_CODES: Readonly<Record<string, readonly string[]>> = {
   sink: ['not-append-only', 'write-failed'],
   cli: [
     'usage', 'config-invalid', 'untrusted-source', 'plan-rejected', 'target-unavailable', 'lock-download-failed',
-    'lock-offline', 'approval-refused', 'replay-mismatch', 'internal',
+    'lock-offline', 'approval-refused', 'replay-mismatch', 'internal', 'planner-endpoint-not-loopback', 'planner-call-failed',
   ],
   approval: [
     'self-approval', 'bot-or-app', 'not-code-owner', 'stale-commit', 'unknown-key', 'bad-signature', 'no-user-presence',

@@ -1,0 +1,18 @@
+{
+  "id": "message-recorded-1",
+  "type": "message",
+  "role": "assistant",
+  "model": "claude-test-model",
+  "content": [
+    {
+      "type": "text",
+      "text": "Plan: Sign up with an email address\nFeature: SIGNUP-1\nSpec: specs/signup.md\nVersion: 1.1\nTargets: chromium-stable\nGo to /signup\nCriterion: AC-3\nExpect button \"Create account\" is disabled\nType \"ada@example.test\" into label \"Email\"\nClick button \"Create account\"\nCriterion: AC-1\nExpect heading \"Welcome\" is visible\n"
+    }
+  ],
+  "stop_reason": "end_turn",
+  "stop_sequence": null,
+  "usage": {
+    "input_tokens": 812,
+    "output_tokens": 164
+  }
+}

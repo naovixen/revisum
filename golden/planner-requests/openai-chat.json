@@ -1,0 +1,16 @@
+{
+  "method": "POST",
+  "path": "/v1/chat/completions",
+  "headers": {
+    "content-type": "application/json"
+  },
+  "body": {
+    "model": "gpt-test-model",
+    "max_tokens": 4096,
+    "temperature": 0,
+    "messages": [
+      { "role": "system", "content": "<prompt>" },
+      { "role": "user", "content": "<prompt>" }
+    ]
+  }
+}

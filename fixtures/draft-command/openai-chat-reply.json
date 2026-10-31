@@ -1,0 +1,21 @@
+{
+  "id": "chat-completion-recorded-1",
+  "object": "chat.completion",
+  "created": 1793433600,
+  "model": "gpt-test-model",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "Plan: Sign up with an email address\nFeature: SIGNUP-1\nSpec: specs/signup.md\nVersion: 1.1\nTargets: chromium-stable\nGo to /signup\nCriterion: AC-3\nExpect button \"Create account\" is disabled\nType \"ada@example.test\" into label \"Email\"\nClick button \"Create account\"\nCriterion: AC-1\nExpect heading \"Welcome\" is visible\n"
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 812,
+    "completion_tokens": 164,
+    "total_tokens": 976
+  }
+}

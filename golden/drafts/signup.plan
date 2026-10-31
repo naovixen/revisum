@@ -1,0 +1,12 @@
+Plan: Sign up with an email address
+Feature: SIGNUP-1
+Spec: specs/signup.md
+Version: 1.1
+Targets: chromium-stable
+Go to /signup
+Criterion: AC-3
+Expect button "Create account" is disabled
+Type "ada@example.test" into label "Email"
+Click button "Create account"
+Criterion: AC-1
+Expect heading "Welcome" is visible
