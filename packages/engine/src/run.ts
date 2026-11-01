@@ -15,7 +15,7 @@ import {
   needsDriverFeatures,
   type A11yFinding, type ActionGuard, type ApprovalLabel, type ArtifactReference, type ArtifactStore, type Authorised,
   type BrowserDriver, type Clock, type DatabaseCommandRunner, type DocumentSession, type DomRead, type DownloadedFile, type DownloadName, type DriverFeature, type LockEntry, type DialogStep, type ElementProbe,
-  type EventSink, type GuardVerdict, type PageAssertion, type Plan, type PolicyRuleId, type Redactor,
+  type EventSink, type GuaranteeLevel, type GuardVerdict, type PageAssertion, type Plan, type PolicyRuleId, type Redactor,
   type DownloadStep, type ResolvedElement, type Result, type SafeText, type SecretStore, type ServiceCaller, type Session, type Step, type Target, type TargetId,
   type Unavailable, type ValueName, type GuaranteeStatement, type RunMode, type SuiteFinding, type SuiteName, type SuitePass,
   type StubAnswer, type StubName, type SuiteTestId, type SuiteTestResult, type UnsafeFeature,
@@ -91,6 +91,11 @@ export type RunInputs = {
   // hashes of the redactor, rule set, baselines and fonts, the run image and the commit. Given, the
   // manifest records each, with the project's hash and limits; absent, it records none of them.
   readonly pins?: RunPins;
+  // How strongly the run is isolated, set by whoever started it from Runner.guaranteeLevel(). Only
+  // 'isolated' makes the result state that egress was enforced; absent means 'host', so no run can
+  // claim isolation by leaving it out. The manifest does not record it, so a replay of an isolated
+  // run must be given it too, or its result hash differs and the replay is a mismatch.
+  readonly guaranteeLevel?: GuaranteeLevel;
 };
 
 export type RunPorts = {
@@ -1008,11 +1013,11 @@ function unavailableResult(targetId: string, unavailable: Unavailable, context: 
 
 // What a plan run vouches for: decided by the plan's unsafe features, the run's isolation and the
 // target's adapter alone, never by what the run happened to do, so two runs of one plan say the
-// same. Until the isolated runner (SPEC-07) runs plans behind its egress proxy, a plan run runs on
-// the host, so egress, credentials and replay are not claimed.
-const planRunGuarantees = (unsafeFeatures: readonly UnsafeFeature[], determinismUnpinned: boolean): GuaranteeStatement =>
+// same. Egress, credentials and replay are claimed only for a run whose starter says the isolated
+// runner enforced egress (RunInputs.guaranteeLevel); any other run counts as running on the host.
+const planRunGuarantees = (unsafeFeatures: readonly UnsafeFeature[], egressEnforced: boolean, determinismUnpinned: boolean): GuaranteeStatement =>
   guaranteeStatement({
-    mode: 'plan', egressEnforced: false, unmaskedScreenshotsKept: false, unsafeFeatures, ...(determinismUnpinned ? { determinismUnpinned } : {}),
+    mode: 'plan', egressEnforced, unmaskedScreenshotsKept: false, unsafeFeatures, ...(determinismUnpinned ? { determinismUnpinned } : {}),
   });
 
 // Adds the run mode, the guarantee statement, the unsafe label (for a plan using unsafe features),
@@ -1024,7 +1029,7 @@ function seal(
   const standing = context.inputs.standing;
   const unsafeFeatures = unsafeFeaturesOf(context.inputs.plan);
   const labelled = {
-    ...outcome, mode: 'plan' as const, guarantees: planRunGuarantees(unsafeFeatures, context.determinismUnpinned),
+    ...outcome, mode: 'plan' as const, guarantees: planRunGuarantees(unsafeFeatures, context.inputs.guaranteeLevel === 'isolated', context.determinismUnpinned),
     ...(unsafeFeatures.length === 0 ? {} : { unsafeFeatures }),
   };
   return withResultHash(standing?.mode === 'approved' ? { ...labelled, approvalLabel: approvalLabel(standing.approval) } : labelled);

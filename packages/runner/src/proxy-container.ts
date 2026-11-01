@@ -1,16 +1,17 @@
 // The egress proxy as the main process of a run's proxy container. The runner passes the proxy's
 // rules in one environment variable; the proxy listens on every interface of the container and
-// appends each decision as a JSON line to a file in the container's private /tmp, which the runner
-// reads back. For a workload's run it also answers name lookups and records them the same way.
-// Both the rules and the decision lines cross a process boundary, so each is decoded here before
-// use. See docs/specs/SPEC-07-isolated-runner-and-egress.md and docs/specs/SPEC-35-evidence-mode.md.
-import type { ProxyDecision, ResponseRewrite } from '@revisum/contracts';
+// appends each decision and each applied rewrite as a JSON line to a file in the container's private
+// /tmp, which the runner reads back. For a workload's run it also answers name lookups and records
+// them the same way. The rules and those lines all cross a process boundary, so each is decoded here
+// before use. See docs/specs/SPEC-07-isolated-runner-and-egress.md and docs/specs/SPEC-35-evidence-mode.md.
+import type { AppliedRewrite, ProxyDecision, ResponseRewrite } from '@revisum/contracts';
 import { appendFileSync } from 'node:fs';
 import { startProxyServer, type ProxyRules, type RewriteRule, type TcpRelay } from './egress-proxy.ts';
 import { startLookupRecorder } from './lookup-recorder.ts';
 
 export const PROXY_PORT = 3128;
 export const DECISIONS_FILE = '/tmp/egress-decisions.jsonl';
+export const REWRITES_FILE = '/tmp/egress-rewrites.jsonl';
 export const RULES_VARIABLE = 'EGRESS_PROXY_RULES';
 // Set for a workload's proxy: it also answers the run network's name lookups and records each name
 // in LOOKUPS_FILE, one JSON line each (lookup-recorder.ts).
@@ -97,6 +98,20 @@ export function readProxyDecision(line: string): ProxyDecision | null {
   return { origin, decision };
 }
 
+// One applied-rewrite line written by the proxy container, or null when the line is anything else.
+export function readAppliedRewrite(line: string): AppliedRewrite | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(line);
+  } catch {
+    return null;
+  }
+  const origin = readOrigin(field(parsed, 'origin'));
+  const name = field(parsed, 'name');
+  if (origin === null || typeof name !== 'string' || name === '') return null;
+  return { origin, name };
+}
+
 async function main(): Promise<number> {
   const rules = readProxyRules(process.env[RULES_VARIABLE] ?? '');
   if (rules === null) {
@@ -104,7 +119,9 @@ async function main(): Promise<number> {
     return 2;
   }
   const proxy = await startProxyServer(rules, {
-    listenHost: '0.0.0.0', port: PROXY_PORT, onDecision: (decision) => appendFileSync(DECISIONS_FILE, `${JSON.stringify(decision)}\n`),
+    listenHost: '0.0.0.0', port: PROXY_PORT,
+    onDecision: (decision) => appendFileSync(DECISIONS_FILE, `${JSON.stringify(decision)}\n`),
+    onRewriteApplied: (applied) => appendFileSync(REWRITES_FILE, `${JSON.stringify(applied)}\n`),
   });
   console.log(`egress proxy listening at ${proxy.url}`);
   if (process.env[LOOKUPS_VARIABLE] === '1') {

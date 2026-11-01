@@ -371,15 +371,23 @@ Run refusal, for an evidence run (`run --suite`): Revisum never runs a team's ow
 
 ## workload-start-failed
 
-Workload runner error and run refusal, for an evidence run. The workload container did not start, or the request could not be run: a working directory outside the checkout, an empty command, a variable name no environment can hold, or a path Docker cannot mount. No suite code ran. The runner's log says which.
+Workload runner error and run refusal, for an evidence run. The workload container did not start, or the request could not be run: a working directory outside the checkout, an empty command, a variable name no environment can hold, a path Docker cannot mount, or no Docker daemon to answer. No suite code ran. The runner's log says which.
 
 ## start-failed
 
-Runner error. The isolated run environment did not start.
+Runner error. The isolated run environment did not start, or no Docker daemon answered, which says nothing about whether the run image exists. The runner's log says which.
 
 ## rewrite-origin-not-fixture
 
 Egress policy error. A browser mutant's response rewrite names an origin that is not a declared fixture origin. A rewrite may change only the project's own fixture apps, never the app under test or a third party, so the whole policy is refused.
+
+## fixture-origin-undeclared
+
+Egress policy error. A fixture origin is not among the policy's declared origins. A fixture is the project's own app, so the project must declare it. The whole policy is refused.
+
+## fixture-origin-not-plain-http
+
+Egress policy error. A fixture origin is not served over plain HTTP. The proxy sees only the host and port of anything else, so it could never apply a rewrite there. The whole policy is refused.
 
 ## base-image-unpinned
 

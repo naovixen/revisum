@@ -69,6 +69,12 @@ function ipv6Verdict(groups: readonly number[], privateService: boolean): Addres
   const embedded = (high: number, low: number): number => high * 65536 + low;
   const zeroUpTo = (count: number): boolean => groups.slice(0, count).every((group) => group === 0);
   if (groupsText(groups) === METADATA_IPV6) return 'refused';
+  // Translation and tunnelling ranges refused whatever they hold, for a private service too: what
+  // lies behind them is decided elsewhere, so no check here can vouch for it. IPv4-translated
+  // (::ffff:0:0/96), local NAT64 (64:ff9b:1::/48) and Teredo (2001::/32).
+  if (zeroUpTo(4) && groups[4] === 0xffff && groups[5] === 0) return 'refused';
+  if (first === 0x64 && second === 0xff9b && third === 1) return 'refused';
+  if (first === 0x2001 && second === 0) return 'refused';
   // Forms that carry an IPv4 address are judged by that address, metadata included.
   if (zeroUpTo(5) && groups[5] === 0xffff) return ipv4Verdict(embedded(groups[6] ?? 0, groups[7] ?? 0), privateService);
   if (first === 0x64 && second === 0xff9b && groups.slice(2, 6).every((group) => group === 0)) {

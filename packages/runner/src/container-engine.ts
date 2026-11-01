@@ -41,14 +41,29 @@ export type ContainerOptions = {
 export type HostEntry = { readonly name: string; readonly address: string };
 
 export type EngineProblem = { readonly detail: string };
-export type ProbeTarget = { readonly host: string; readonly port: number };
+export type ProbeTarget = {
+  readonly host: string;
+  readonly port: number;
+  // For an address that should have nothing behind it: a refused connection still shows a machine
+  // answered there, even with no service on this port. Elsewhere a refusal means not reached.
+  readonly refusalCountsAsReached?: true;
+};
 
 export interface ContainerEngine {
-  // The id ("sha256:…") of the local image with this reference, or null when there is none.
+  // The id ("sha256:…") of the local image with this reference, or null when there is none, which
+  // is also what an engine with no daemon to ask would say.
   imageId(reference: string): Promise<string | null>;
-  // internal: a network with no route out of the host.
+  // Why the engine's daemon does not answer, or null when it does, so a missing image can be told
+  // from a stopped daemon. Optional: without it a missing image is taken at its word.
+  daemonProblem?(): Promise<EngineProblem | null>;
+  // internal: a network with no route out of the host and no gateway to the Docker host.
   createNetwork(name: string, options: { readonly internal: boolean }): Promise<Result<void, EngineProblem>>;
   removeNetwork(name: string): Promise<void>;
+  // Where a gateway to the Docker host would be on this network, for a probe to try: the first
+  // address of its IPv4 subnet. Null when there is nothing to try, because a container on the network
+  // holds that address, which Docker gives out only to a network with no gateway. A problem when the
+  // network cannot be read. Optional: without it no gateway is probed.
+  networkGatewayAddress?(network: string): Promise<Result<string | null, EngineProblem>>;
   // Starts a container and returns its id.
   startContainer(options: ContainerOptions): Promise<Result<string, EngineProblem>>;
   // Runs an argument vector inside a running container, without a shell. Each variable named in
@@ -73,6 +88,9 @@ export interface ContainerEngine {
 const OUTPUT_LIMIT_BYTES = 16 * 1024 * 1024;
 const DOCKER_COMMAND_TIMEOUT_MILLISECONDS = 120_000;
 const PROBE_TIMEOUT_MILLISECONDS = 4_000;
+// An --internal network alone keeps a gateway, through which its containers can reach a service on
+// the Docker host. This takes the gateway away and leaves the network's peers connected.
+const NO_GATEWAY_OPTION = 'com.docker.network.bridge.inhibit_ipv4=true';
 
 export type DockerOutcome = { readonly status: number; readonly stdout: string; readonly stderr: string };
 
@@ -131,7 +149,8 @@ export function createArguments(options: ContainerOptions): readonly string[] {
   ];
 }
 
-// Prints "reached" when a direct connection to any target succeeds within the timeout, else "blocked".
+// Prints "reached" when a direct connection to any target succeeds within the timeout, or is refused
+// by a target that counts a refusal, else "blocked".
 const probeScript = (targets: readonly ProbeTarget[]): string => `
   const { connect } = require('node:net');
   const targets = ${JSON.stringify(targets)};
@@ -141,7 +160,7 @@ const probeScript = (targets: readonly ProbeTarget[]): string => `
     const socket = connect({ host: target.host, port: target.port });
     const settle = () => { socket.destroy(); open -= 1; if (open === 0) done('blocked'); };
     socket.setTimeout(${PROBE_TIMEOUT_MILLISECONDS}, settle);
-    socket.on('error', settle);
+    socket.on('error', (error) => { if (target.refusalCountsAsReached === true && error.code === 'ECONNREFUSED') done('reached'); else settle(); });
     socket.on('connect', () => done('reached'));
   }
   if (open === 0) done('blocked');`;
@@ -162,12 +181,20 @@ export function dockerCliEngine(): ContainerEngine {
       const id = outcome.stdout.trim();
       return outcome.status === 0 && id !== '' ? id : null;
     },
+    async daemonProblem() {
+      const outcome = await runDocker(['version', '--format', '{{.Server.Version}}']);
+      return outcome.status === 0 ? null : problem(outcome);
+    },
     async createNetwork(name, options) {
-      const outcome = await runDocker(['network', 'create', ...(options.internal ? ['--internal'] : []), name]);
+      const outcome = await runDocker(['network', 'create', ...(options.internal ? ['--internal', '--opt', NO_GATEWAY_OPTION] : []), name]);
       return outcome.status === 0 ? success(undefined) : failure(problem(outcome));
     },
     async removeNetwork(name) {
       await runDocker(['network', 'rm', name]);
+    },
+    async networkGatewayAddress(network) {
+      const outcome = await runDocker(['network', 'inspect', '--format', '{{json .}}', network]);
+      return outcome.status === 0 ? gatewayAddressIn(outcome.stdout) : failure(problem(outcome));
     },
     async startContainer(options) {
       const created = await runDocker(createArguments(options), DOCKER_COMMAND_TIMEOUT_MILLISECONDS, options.environment);
@@ -205,6 +232,42 @@ export function dockerCliEngine(): ContainerEngine {
       return networkAddress(outcome.stdout, network);
     },
   };
+}
+
+const fieldOf = (value: unknown, name: string): unknown =>
+  (typeof value === 'object' && value !== null ? Object.getOwnPropertyDescriptor(value, name)?.value : undefined);
+
+const IPV4_SUBNET = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})\/(\d{1,2})$/;
+
+// The first address of an IPv4 subnet such as "172.18.0.0/16", or null for anything else.
+function firstAddressOf(subnet: unknown): string | null {
+  const parts = typeof subnet === 'string' ? IPV4_SUBNET.exec(subnet) : null;
+  if (parts === null) return null;
+  const address = parts.slice(1, 5).reduce((total, part) => total * 256 + Number(part), 0);
+  const size = 2 ** (32 - Number(parts[5]));
+  const first = address - address % size + 1;
+  return [24, 16, 8, 0].map((shift) => Math.floor(first / 2 ** shift) % 256).join('.');
+}
+
+// See networkGatewayAddress, from Docker's JSON description of the network.
+function gatewayAddressIn(description: string): Result<string | null, EngineProblem> {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(description);
+  } catch {
+    return failure({ detail: 'Docker\'s description of the network is not JSON' });
+  }
+  const pools = fieldOf(fieldOf(parsed, 'IPAM'), 'Config');
+  if (!Array.isArray(pools)) return failure({ detail: 'Docker\'s description of the network names no address pools' });
+  const pool: unknown[] = pools;
+  const first = pool.map((entry) => firstAddressOf(fieldOf(entry, 'Subnet'))).find((address) => address !== null) ?? null;
+  const containers = fieldOf(parsed, 'Containers');
+  const members: unknown[] = typeof containers === 'object' && containers !== null ? Object.values(containers) : [];
+  const held = members.some((member) => {
+    const address = fieldOf(member, 'IPv4Address');
+    return typeof address === 'string' && address.split('/')[0] === first;
+  });
+  return success(held ? null : first);
 }
 
 // A container's IPv4 address on `network`, from Docker's JSON listing of its networks.

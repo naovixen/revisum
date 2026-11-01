@@ -1,6 +1,6 @@
 # runner
 
-The isolated runner. A run starts in hardened containers from the run image (`image/Dockerfile`, built by `prepareRunImage` and pinned by its id), on a Docker network with no route out, behind the egress proxy that allows only declared origins and services and checks every resolved address.
+The isolated runner. A run starts in hardened containers from the run image (`image/Dockerfile`, built by `prepareRunImage` and pinned by its id), on a Docker network with no route out and no gateway, behind the egress proxy that allows only declared origins and services and checks every resolved address.
 
 - `startEgressProxy` runs the proxy in-process; `proxy-container.ts` runs it as a proxy container's main process.
 - `serviceCaller` sends a declared service call through the proxy, once, never following a redirect and reading no more than the size cap. The proxy marks its own refusals and failures with an `x-egress-decision` header, so the caller reports them as `egress-blocked` or `service-unreachable`, not as the service's status.

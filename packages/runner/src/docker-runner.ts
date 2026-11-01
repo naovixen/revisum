@@ -3,24 +3,25 @@
 // image, that joins it and the default bridge and runs the egress proxy. The browser is pointed at
 // the proxy, so a request that bypasses it has nowhere to go.
 //
-// The runner claims the isolated guarantee level only once all three have started and a direct
-// connection from inside the run container to an address outside has failed. Otherwise the run
-// still starts, at the host level, and logs egress-unenforceable, so no report claims isolation.
+// The runner claims the isolated guarantee level only once all three have started and direct
+// connections from inside the run container, to addresses outside and to the Docker host through
+// any gateway the network kept, have failed. Otherwise the run still starts, at the host level, and
+// logs egress-unenforceable, so no report claims isolation.
 // Nothing reaches the containers from the host's environment: each environment is built from an
 // empty list, and only the code, dependencies and browsers the run needs are mounted, read-only.
 // See docs/specs/SPEC-07-isolated-runner-and-egress.md.
 import {
   PRODUCT, failure, success,
-  type DeclaredService, type EgressPolicy, type ExecOutcome, type GuaranteeLevel, type ImageDigest, type ProxyDecision, type Result, type Runner, type RunnerError,
-  type RunnerHandle,
+  type AppliedRewrite, type DeclaredService, type EgressPolicy, type ExecOutcome, type GuaranteeLevel, type ImageDigest, type ProxyDecision, type Result, type Runner,
+  type RunnerError, type RunnerHandle,
 } from '@revisum/contracts';
 import { randomBytes } from 'node:crypto';
 import { join } from 'node:path';
 import type { ContainerEngine, ContainerMount } from './container-engine.ts';
 import { joinEgressEvents } from './egress-events.ts';
 import {
-  DEFAULT_BRIDGE_NETWORK, OUTSIDE_PROBE_TARGETS, WORKSPACE, dependenciesVolumeFor, proxyContainer, proxyReadyScript, proxyUrl, readDecisions,
-  repositoryFolder, revisumMounts, runImageContainer,
+  DEFAULT_BRIDGE_NETWORK, WORKSPACE, dependenciesVolumeFor, ownCodeMounts, probeRunNetwork, proxyContainer, proxyReadyScript, proxyUrl,
+  readAppliedRewrites, readDecisions, repositoryFolder, runImageContainer,
 } from './run-containers.ts';
 import { RUN_IMAGE_TAG } from './run-image.ts';
 
@@ -50,12 +51,18 @@ export function dockerRunner(options: DockerRunnerOptions): Runner {
   const dependenciesVolume = dependenciesVolumeFor(options.dependenciesVolume);
   let level: GuaranteeLevel = 'host';
 
-  const sharedMounts = (): ContainerMount[] => revisumMounts(root, dependenciesVolume);
+  const sharedMounts = (): ContainerMount[] => ownCodeMounts(root, dependenciesVolume);
 
   async function start(image: ImageDigest, policy: EgressPolicy): Promise<Result<RunnerHandle, RunnerError>> {
     level = 'host';
     const localId = await engine.imageId(RUN_IMAGE_TAG);
-    if (localId === null) return failure({ code: 'image-missing' });
+    if (localId === null) {
+      // A daemon that does not answer says nothing about whether the image exists.
+      const unanswered = await engine.daemonProblem?.() ?? null;
+      if (unanswered === null) return failure({ code: 'image-missing' });
+      log({ code: 'start-failed', detail: `Docker did not answer: ${unanswered.detail}` });
+      return failure({ code: 'start-failed' });
+    }
     if (localId !== image) return failure({ code: 'image-digest-mismatch' });
     const inputs: string[] = [];
     for (const input of options.inputs ?? []) {
@@ -126,32 +133,38 @@ export function dockerRunner(options: DockerRunnerOptions): Runner {
       return refuse(`the run container cannot reach its proxy: ${ready.ok ? ready.value.stderr.trim() : ready.error.detail}`);
     }
 
-    if (unenforceable === null && await engine.probeEgress(runContainerId, OUTSIDE_PROBE_TARGETS) === 'reached') {
-      unenforceable = 'a connection from inside the run container reached an address outside without the proxy';
+    if (unenforceable === null && await probeRunNetwork(engine, runContainerId, network) === 'reached') {
+      unenforceable = 'a connection from inside the run container reached an address outside, or the Docker host, without the proxy';
     }
     if (unenforceable === null) level = 'isolated';
     else log({ code: 'egress-unenforceable', detail: unenforceable });
 
     let decisions: readonly ProxyDecision[] = [];
-    // Reads the proxy's decisions back from its container.
-    const refreshDecisions = async (): Promise<void> => {
-      decisions = await readDecisions(engine, proxyId) ?? decisions;
+    let rewrites: readonly AppliedRewrite[] = [];
+    // Reads the proxy's files back from its container. A read that fails keeps what the last one
+    // found, since each file only grows.
+    const refreshEvidence = async (): Promise<void> => {
+      const [readNow, appliedNow] = await Promise.all([readDecisions(engine, proxyId), readAppliedRewrites(engine, proxyId)]);
+      decisions = readNow ?? decisions;
+      rewrites = appliedNow ?? rewrites;
     };
     let stopped = false;
     const handle: RunnerHandle = {
       runId,
-      egressEvents: () => joinEgressEvents([], decisions),
+      egressEvents: (records = [], directOrigins = []) => joinEgressEvents(records, decisions, directOrigins),
+      proxyDecisions: () => decisions,
+      rewritesApplied: () => rewrites,
       async exec(command, environmentNames = []): Promise<ExecOutcome> {
         // A name that is not a plain variable name could be read by Docker as NAME=value.
         if (!environmentNames.every((name) => VARIABLE_NAME.test(name))) return { exitCode: -1, stdout: '', stderr: 'an environment variable name is not a plain name' };
         const outcome = await engine.exec(runContainerId, command, environmentNames);
-        await refreshDecisions();
+        await refreshEvidence();
         return outcome.ok ? outcome.value : { exitCode: -1, stdout: '', stderr: outcome.error.detail };
       },
       async stop() {
         if (stopped) return;
         stopped = true;
-        await refreshDecisions();
+        await refreshEvidence();
         await removeAll();
       },
     };

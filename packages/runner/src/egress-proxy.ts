@@ -21,7 +21,7 @@ import type { AddressInfo } from 'node:net';
 import { connect as connectSocket, createServer as createTcpServer, isIP, type Server as TcpServer, type Socket } from 'node:net';
 import type { Duplex } from 'node:stream';
 import { checkResolvedAddress } from './address-check.ts';
-import { hostAndPort } from './egress-events.ts';
+import { hostAndPort, isPlainHttpOrigin } from './egress-events.ts';
 
 // Resolves a host name to every address it has. Tests pass a fake that never touches the network.
 export type AddressResolver = (hostname: string) => Promise<readonly string[]>;
@@ -52,6 +52,8 @@ export type ProxyServerOptions = {
   readonly port?: number;
   // Called with each decision as it is made, such as to write it where the runner can read it.
   readonly onDecision?: (decision: ProxyDecision) => void;
+  // Called once per origin and mutant, the first time a rewrite changes a response.
+  readonly onRewriteApplied?: (applied: AppliedRewrite) => void;
 };
 
 export type EgressProxyOptions = ProxyServerOptions & {
@@ -82,6 +84,9 @@ const HOP_BY_HOP_HEADERS = new Set([
   'connection', 'proxy-connection', 'keep-alive', 'proxy-authorization', 'proxy-authenticate', 'te', 'trailer', 'transfer-encoding', 'upgrade',
 ]);
 const AUTHORITY = /^(\[[0-9a-fA-F:.%a-zA-Z]+\]|[^:[\]/\s]+):(\d{1,5})$/;
+// How a decision names a request too malformed to name an origin. The reader of the proxy's file
+// drops a decision with no origin, and the request's own text could hold anything, so neither is used.
+const MALFORMED_REQUEST_ORIGIN = 'malformed-request';
 
 // The proxy's rules for a policy: its origins, the origins of the services it allows, which of
 // those services are private, its rewrites, and a TCP relay for each service it allows over TCP
@@ -150,6 +155,9 @@ export async function startProxyServer(rules: ProxyRules, options: ProxyServerOp
   const privateOrigins = new Set(rules.privateOrigins);
   const allowedHosts = new Set(rules.allowedOrigins.map(hostAndPort));
   const privateHosts = new Set(rules.privateOrigins.map(hostAndPort));
+  // EgressPolicy is not branded, so a policy built by hand gets here without the builder's checks.
+  const refusedRewrite = rules.rewrites.find((rule) => !allowed.has(rule.origin) || !isPlainHttpOrigin(rule.origin));
+  if (refusedRewrite !== undefined) throw new Error(`a response rewrite may change only a declared plain-HTTP origin, not ${refusedRewrite.origin}`);
   const decided: ProxyDecision[] = [];
   const applied = new Map<string, AppliedRewrite>();
   const openSockets = new Set<Duplex>();
@@ -180,10 +188,13 @@ export async function startProxyServer(rules: ProxyRules, options: ProxyServerOp
     try {
       url = new URL(incoming.url ?? '');
     } catch {
+      record(MALFORMED_REQUEST_ORIGIN, 'blocked');
       answerFromProxy(response, 400, 'blocked', 'not a request the egress proxy forwards');
       return;
     }
     if (url.protocol !== 'http:') {
+      // The URL parser writes "null" as the origin of a scheme it does not know.
+      record(url.origin === 'null' ? MALFORMED_REQUEST_ORIGIN : url.origin, 'blocked');
       answerFromProxy(response, 400, 'blocked', 'not a request the egress proxy forwards');
       return;
     }
@@ -237,7 +248,10 @@ export async function startProxyServer(rules: ProxyRules, options: ProxyServerOp
       if (rewrite.find === '' || !text.includes(rewrite.find)) continue;
       text = text.split(rewrite.find).join(rewrite.replace);
       const key = `${origin}\n${rewrite.name}`;
-      if (!applied.has(key)) applied.set(key, { origin, name: rewrite.name });
+      if (applied.has(key)) continue;
+      const entry: AppliedRewrite = { origin, name: rewrite.name };
+      applied.set(key, entry);
+      options.onRewriteApplied?.(entry);
     }
     return text === original ? body : Buffer.from(text, 'utf8');
   }
@@ -255,6 +269,7 @@ export async function startProxyServer(rules: ProxyRules, options: ProxyServerOp
       hostname = '';
     }
     if (hostname === '' || port < 1 || port > 65_535) {
+      record(hostname === '' ? MALFORMED_REQUEST_ORIGIN : `${hostname}:${port}`, 'blocked');
       client.end('HTTP/1.1 400 Bad Request\r\n\r\n');
       return;
     }

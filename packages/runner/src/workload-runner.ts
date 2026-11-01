@@ -5,8 +5,8 @@
 //
 // Unlike a plan run, a workload never falls back to the host level. Suite code is the team's own,
 // so unless the internal network exists, the proxy answers and a probe container on the network
-// fails to reach an address outside, run() returns egress-unenforceable before any container of
-// the team's image is started.
+// fails to reach an address outside or the Docker host, run() returns egress-unenforceable before
+// any container of the team's image is started.
 //
 // The team's container never runs as root, joins only the run's network, gets the checkout
 // read-only without .git and Revisum's output folder as its only writable mount, and an
@@ -38,8 +38,8 @@ import { hostAndPort, joinEgressEvents } from './egress-events.ts';
 import { relayOrigin, tcpRelaysFor } from './egress-proxy.ts';
 import { PROXY_PORT } from './proxy-container.ts';
 import {
-  DEFAULT_BRIDGE_NETWORK, OUTSIDE_PROBE_TARGETS, SECCOMP_PROFILE, dependenciesVolumeFor, proxyContainer, proxyReadyScript, proxyUrl,
-  readDecisions, readLookups, repositoryFolder, revisumMounts, runImageContainer,
+  DEFAULT_BRIDGE_NETWORK, SECCOMP_PROFILE, dependenciesVolumeFor, isGitFolderName, ownCodeMounts, probeRunNetwork, proxyContainer, proxyReadyScript, proxyUrl,
+  readDecisions, readLookups, repositoryFolder, runImageContainer,
 } from './run-containers.ts';
 import { RUN_IMAGE_TAG } from './run-image.ts';
 import { workloadEnvironment } from './workload-environment.ts';
@@ -120,7 +120,7 @@ function checkoutMounts(checkout: string, log: (entry: WorkloadLogEntry) => void
   }
   const mounts: ContainerMount[] = [];
   for (const entry of entries) {
-    if (entry.name === '.git' || entry.isSymbolicLink()) continue;
+    if (isGitFolderName(entry.name) || entry.isSymbolicLink()) continue;
     if (MOUNT_UNSAFE.test(entry.name)) {
       log({ code: 'notice', detail: 'a top-level entry of the checkout has a name Docker cannot mount; it is left out' });
       continue;
@@ -176,10 +176,15 @@ export function workloadRunner(options: WorkloadRunnerOptions): WorkloadRunner {
     }
 
     // ---- The images. The team's image is never pulled: it must be here, with the pinned id. ----
+    // A daemon that does not answer says nothing about whether an image exists.
+    const imageAbsent = async (detail: string): Promise<Outcome> => {
+      const unanswered = await engine.daemonProblem?.() ?? null;
+      return unanswered === null ? refuse('image-missing', detail) : refuse('workload-start-failed', `Docker did not answer: ${unanswered.detail}`);
+    };
     const runImage = await engine.imageId(RUN_IMAGE_TAG);
-    if (runImage === null) return refuse('image-missing', `the run image ${RUN_IMAGE_TAG} is not on this host`);
+    if (runImage === null) return imageAbsent(`the run image ${RUN_IMAGE_TAG} is not on this host`);
     const teamImage = await engine.imageId(request.image);
-    if (teamImage === null) return refuse('image-missing', 'the workload image is not on this host');
+    if (teamImage === null) return imageAbsent('the workload image is not on this host');
     if (teamImage !== request.image) return refuse('image-digest-mismatch', 'the local workload image has another id than the request pins');
 
     const runId = `${PRODUCT.name}-workload-${randomBytes(6).toString('hex')}`;
@@ -208,7 +213,7 @@ export function workloadRunner(options: WorkloadRunnerOptions): WorkloadRunner {
       const proxyName = `${runId}-proxy`;
       const proxy = await engine.startContainer(proxyContainer(root, {
         name: proxyName, image: runImage, networks: [network, DEFAULT_BRIDGE_NETWORK], policy: request.policy, services: request.services,
-        mounts: revisumMounts(root, dependenciesVolume), recordLookups: true,
+        mounts: ownCodeMounts(root, dependenciesVolume), recordLookups: true,
       }));
       if (!proxy.ok) return unenforceable(`the proxy container did not start: ${proxy.error.detail}`);
       containers.push(proxy.value);
@@ -225,8 +230,8 @@ export function workloadRunner(options: WorkloadRunnerOptions): WorkloadRunner {
       if (!ready.ok || ready.value.exitCode !== 0) {
         return unenforceable(`the run's network cannot reach its proxy: ${ready.ok ? ready.value.stderr.trim() : ready.error.detail}`);
       }
-      if (await engine.probeEgress(probe.value, OUTSIDE_PROBE_TARGETS) === 'reached') {
-        return unenforceable('a connection from inside the run\'s network reached an address outside without the proxy');
+      if (await probeRunNetwork(engine, probe.value, network) === 'reached') {
+        return unenforceable('a connection from inside the run\'s network reached an address outside, or the Docker host, without the proxy');
       }
       await engine.removeContainer(probe.value);
       containers.splice(containers.indexOf(probe.value), 1);

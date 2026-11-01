@@ -38,8 +38,10 @@ export type FixtureRewrite = { readonly origin: Origin; readonly rewrite: Respon
 // A rewrite the proxy actually applied, by origin and mutant name, for the run manifest.
 export type AppliedRewrite = { readonly origin: SeenOrigin; readonly name: string };
 
-// What a run may reach. Built only by the runner's policy builder, which refuses a rewrite on any
-// origin that is not a declared fixture origin.
+// What a run may reach. The runner's policy builder refuses a fixture origin that is undeclared or
+// not plain HTTP, and a rewrite on any origin but a fixture origin. Only the builder knows which
+// origins are fixtures. The type is not branded, so the egress proxy also refuses, when it starts,
+// a rewrite whose origin is undeclared or not plain HTTP.
 export type EgressPolicy = {
   // The trusted project's origins.
   readonly allowOrigins: readonly Origin[];
@@ -60,8 +62,15 @@ export type ExecOutcome = { readonly exitCode: number; readonly stdout: string; 
 
 export interface RunnerHandle {
   readonly runId: string;
-  // Every request the proxy decided on so far, as egress events.
-  egressEvents(): readonly EgressEvent[];
+  // Every request the proxy decided on so far, as egress events. Only a process inside the run
+  // container sees what the browser reported, so whoever runs it hands those records in. They give
+  // each event its channel; with none, every decision is unattributed. `directOrigins` are the
+  // declared origins the run knows the browser sends past the proxy, such as its own loopback.
+  egressEvents(records?: readonly BrowserRequestRecord[], directOrigins?: readonly SeenOrigin[]): readonly EgressEvent[];
+  // Every decision read back from the proxy so far, in the order made. They outlive the run's containers.
+  proxyDecisions(): readonly ProxyDecision[];
+  // Each browser mutant's rewrite the proxy applied so far, read back from it, for the run manifest.
+  rewritesApplied(): readonly AppliedRewrite[];
   // Runs an argument vector inside the run container, without a shell. Each variable named in
   // `environmentNames` is copied into the command's environment from the container client's own,
   // by name only, so a secret is never on a command line.

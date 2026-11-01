@@ -3,12 +3,14 @@
 // enforced, and the hardening every container gets. Both runners build their networks from these,
 // so a plan run and an evidence run are isolated the same way.
 // See docs/specs/SPEC-07-isolated-runner-and-egress.md and docs/specs/SPEC-35-evidence-mode.md.
-import { PRODUCT, type DeclaredService, type EgressPolicy, type ProxyDecision } from '@revisum/contracts';
+import { PRODUCT, type AppliedRewrite, type DeclaredService, type EgressPolicy, type ProxyDecision } from '@revisum/contracts';
 import { platform } from 'node:os';
 import { isAbsolute, join, normalize, sep } from 'node:path';
 import type { ContainerEngine, ContainerMount, ContainerOptions, ProbeTarget } from './container-engine.ts';
 import { proxyRules } from './egress-proxy.ts';
-import { DECISIONS_FILE, LOOKUPS_FILE, LOOKUPS_VARIABLE, RULES_VARIABLE, PROXY_PORT, readProxyDecision } from './proxy-container.ts';
+import {
+  DECISIONS_FILE, LOOKUPS_FILE, LOOKUPS_VARIABLE, REWRITES_FILE, RULES_VARIABLE, PROXY_PORT, readAppliedRewrite, readProxyDecision,
+} from './proxy-container.ts';
 
 // Where Revisum's own files appear inside the run image's containers.
 export const WORKSPACE = '/workspace';
@@ -20,7 +22,21 @@ export const DEFAULT_BRIDGE_NETWORK = 'bridge';
 const PROXY_READY_SECONDS = 30;
 // Public addresses that answer from any ordinary network. A probe from inside a container on the
 // run's network must reach none of them.
-export const OUTSIDE_PROBE_TARGETS: readonly ProbeTarget[] = [{ host: '1.1.1.1', port: 443 }, { host: '8.8.8.8', port: 53 }];
+const OUTSIDE_PROBE_TARGETS: readonly ProbeTarget[] = [{ host: '1.1.1.1', port: 443 }, { host: '8.8.8.8', port: 53 }];
+// Any port will do for a gateway, since its refusal counts as reaching it.
+const GATEWAY_PROBE_PORT = 80;
+
+// Tries, from a container on the run's network, to get out without the proxy: to public addresses,
+// and to the Docker host through the network's gateway, which a Docker that ignores the option to
+// remove it would keep. 'reached' too when the network cannot be read, so an unknown is never taken
+// for 'blocked'.
+export async function probeRunNetwork(engine: ContainerEngine, containerId: string, network: string): Promise<'reached' | 'blocked'> {
+  const gateway = await engine.networkGatewayAddress?.(network);
+  if (gateway === undefined) return engine.probeEgress(containerId, OUTSIDE_PROBE_TARGETS);
+  if (!gateway.ok) return 'reached';
+  const gatewayTargets: readonly ProbeTarget[] = gateway.value === null ? [] : [{ host: gateway.value, port: GATEWAY_PROBE_PORT, refusalCountsAsReached: true }];
+  return engine.probeEgress(containerId, [...OUTSIDE_PROBE_TARGETS, ...gatewayTargets]);
+}
 
 // Waits until the proxy accepts connections, trying once a second.
 export const proxyReadyScript = (host: string): string => `
@@ -33,10 +49,13 @@ export const proxyReadyScript = (host: string): string => `
   };
   attempt();`;
 
+// True for a name that is the .git folder however it is written, since Windows ignores case.
+export const isGitFolderName = (name: string): boolean => name.toLowerCase() === '.git';
+
 // A repository-relative folder, refused when it leads out of the repository or into .git.
 export function repositoryFolder(input: string): string | null {
   const path = normalize(input);
-  if (path === '' || path === '.' || isAbsolute(path) || path.split(/[\\/]/).some((part) => part === '..' || part === '.git')) return null;
+  if (path === '' || path === '.' || isAbsolute(path) || path.split(/[\\/]/).some((part) => part === '..' || isGitFolderName(part))) return null;
   return path.split(sep).join('/');
 }
 
@@ -46,7 +65,7 @@ export const dependenciesVolumeFor = (chosen: string | null | undefined): string
   chosen === undefined ? (platform() === 'linux' ? null : DEV_CONTAINER_DEPENDENCIES_VOLUME) : chosen;
 
 // Revisum's own code and dependencies, read-only, for the run image's containers.
-export const revisumMounts = (root: string, dependenciesVolume: string | null): ContainerMount[] => [
+export const ownCodeMounts = (root: string, dependenciesVolume: string | null): ContainerMount[] => [
   { kind: 'folder', source: join(root, 'packages'), target: `${WORKSPACE}/packages` },
   { kind: 'file', source: join(root, 'package.json'), target: `${WORKSPACE}/package.json` },
   dependenciesVolume === null
@@ -83,18 +102,27 @@ export const proxyContainer = (root: string, fields: ProxyContainerFields): Cont
 
 export const proxyUrl = (proxyName: string): string => `http://${proxyName}:${PROXY_PORT}`;
 
-// The lines of a file inside a container, or null when it cannot be read. A file not yet written
-// reads as no lines, since the proxy writes each file only once it has something to record.
+// The lines of a file inside a container, or null when it cannot be read, so a caller can keep what
+// it read before. A file not yet written reads as no lines, since the proxy writes each file only
+// once it has something to record. Only the message tells that apart: a stopped container exits
+// with the same status.
 async function linesOf(engine: ContainerEngine, containerId: string, file: string): Promise<readonly string[] | null> {
   const read = await engine.exec(containerId, ['cat', file]);
   if (!read.ok) return null;
-  return read.value.exitCode === 0 ? read.value.stdout.split('\n') : [];
+  if (read.value.exitCode === 0) return read.value.stdout.split('\n');
+  return read.value.stderr.includes('No such file') ? [] : null;
 }
 
 // The proxy's decisions so far, read back from its container, or null when they cannot be read.
 export async function readDecisions(engine: ContainerEngine, proxyId: string): Promise<readonly ProxyDecision[] | null> {
   const lines = await linesOf(engine, proxyId, DECISIONS_FILE);
   return lines === null ? null : lines.map(readProxyDecision).filter((decision) => decision !== null);
+}
+
+// The rewrites the proxy has applied so far, read back from its container, or null when they cannot be read.
+export async function readAppliedRewrites(engine: ContainerEngine, proxyId: string): Promise<readonly AppliedRewrite[] | null> {
+  const lines = await linesOf(engine, proxyId, REWRITES_FILE);
+  return lines === null ? null : lines.map(readAppliedRewrite).filter((applied) => applied !== null);
 }
 
 // The names looked up on the run's network so far, as the proxy container recorded them.
