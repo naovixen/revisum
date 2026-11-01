@@ -76,6 +76,12 @@ AC-SPEC-32-13 and AC-SPEC-36-15 are built with this spec. Where the block above 
 - **AC-07 and AC-08**, checked before any driver call. `decodeManifest` refuses with `version-unsupported` when the schema is not `revisum.run-manifest/v1` or a key is unknown; the recording is checked the same way. A fixture missing or with a different sha256 gives `{ code: 'replay-mismatch', fixture: path }`; a known field of the wrong shape gives `replay-mismatch` with its JSON path.
 - **Error codes.** `ReplayErrorCode` becomes `'replay-not-claimed' | 'replay-mismatch' | 'version-unsupported'`. `docs/errors.md` gains `## version-unsupported`, apart from the plan error `version_unsupported`; the `replay-mismatch` entry widens to input mismatches. A `replay` union joins the pinned lists in `test/proofs/error-code-exhaustiveness.ts` and `test/proofs/error-anchors.test.ts` under the standing exception.
 
+- **Settled with the tests** (2026-11-01, commit 3c6bfdf).
+  - A run that recorded its replies says so in its manifest with an optional `recordedReplies: true` (addition), present only then, so other manifests and their hashes are unchanged. `replayManifest(manifest)` refuses a manifest whose `nonHermeticInputs` list `service-calls` or `database-commands` without it, with `replay-not-claimed`.
+  - Writing no recording without the setting is `cli`'s job and is tested with SPEC-16's `run`; here only the refusal is tested.
+  - The shapes the tests assume, in the header of `test/unit/engine/replay-examples.ts`, stand: `recordingPorts` returns the wrapped ports and `recording(manifestHash)`; a recording has a `schema`; an unused reply's position is the count of replies used; matching inputs with another result hash give `mismatch`; `tools/benchmark.ts` takes `--samples` and `--baseline`.
+  - AC-06's golden is a `playwright-chromium` run, which has no `executableSha256`. It is remade on Windows, as its README says, whenever the engine version, the Playwright adapter or the result's shape changes.
+
 ## Acceptance criteria
 
 - AC-SPEC-08-01: When the same manifest is replayed 20 times in the pinned Linux image, every result hash shall be identical (oracle: regression; extends AC-p4-18 and AC-p7-33).
