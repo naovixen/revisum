@@ -86,8 +86,10 @@ export type GuaranteeId = (typeof GUARANTEE_IDS)[number];
 // Why a guarantee does not hold.
 //   evidence-mode: the run executed the team's own test code, which Revisum cannot vouch for.
 //   egress-unenforceable: the run was not inside the isolated runner, so egress was not enforced.
+//   determinism-unpinned: the target's adapter cannot pin the clock, the time zone or randomness,
+//     so running the manifest again may give another result.
 //   an unsafe feature's name: the plan uses that feature, which gives the guarantee up.
-export type GuaranteeLossReason = 'evidence-mode' | 'egress-unenforceable' | UnsafeFeature;
+export type GuaranteeLossReason = 'evidence-mode' | 'egress-unenforceable' | 'determinism-unpinned' | UnsafeFeature;
 // The level is the summary: 'isolated' only when every guarantee holds.
 export type GuaranteeStatement = {
   readonly level: GuaranteeLevel;

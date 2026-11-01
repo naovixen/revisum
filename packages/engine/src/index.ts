@@ -58,6 +58,18 @@ export { SECRET_PLACEHOLDER, headerSecret } from './secrets/secret-values.ts';
 export * from './random.ts';
 export * from './hashing.ts';
 export * from './manifest.ts';
+// Replay from a manifest, and the recorded replies of calls and commands it feeds back.
+export { MANIFEST_SCHEMA, decodeManifest, type DecodeError } from './replay/manifest-decoder.ts';
+export {
+  RECORDING_SCHEMA, decodeRecording, recordingPorts, replayedDatabaseCommands, replayedServices,
+  type RecordedBytes, type RecordedCommandReply, type RecordedReplyKind, type RecordedServiceReply, type RecordingPorts, type RepliedPorts,
+  type ReplayedPort, type RunRecording,
+} from './replay/run-recording.ts';
+export {
+  PER_ENVIRONMENT_INPUTS, replay,
+  type FixtureReader, type ReplayError, type ReplayOutcome, type ReplayPorts, type ReplayRequest, type ReplayVerdict,
+} from './replay/replay.ts';
+export type { SecretEcho, WrappingScheme } from './secrets/secret-values.ts';
 export * from './oracle.ts';
 export * as lifecycle from './lifecycle.ts';
 export * from './run.ts';

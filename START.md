@@ -65,7 +65,7 @@ M3, evidence:
 
 M4, launch (beta):
 
-- [ ] SPEC-16 CLI and GitHub Action, with SPEC-35's `run --suite` and Action input
+- [ ] SPEC-16 CLI and GitHub Action, with SPEC-35's `run --suite` and Action input, and writing SPEC-08's opt-in recording file from `run`
 - [ ] SPEC-17 release artefacts and claims (marketing render target and claim lint), with SPEC-36's `doctor` checks and claim wording
 - [ ] M4 exit
 

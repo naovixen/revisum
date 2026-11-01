@@ -25,6 +25,34 @@ export type UnsafeDeclarationRecord = { readonly kind: 'script' | 'command'; rea
 // What a run of a plan using unsafe features records beside its plan hash.
 export type UnsafeFeatureRecord = { readonly unsafeFeatures: readonly UnsafeFeature[]; readonly unsafeDeclarations: readonly UnsafeDeclarationRecord[] };
 
+// The versions of what decides a run besides the engine and the adapter: Revisum itself (the cli
+// package), the ACT rule set, axe-core, Node, and each installed pack as "name@version", sorted.
+export type RunVersions = {
+  readonly core: string;
+  readonly act: string;
+  readonly axe: string;
+  readonly node: string;
+  readonly packs: readonly string[];
+};
+
+// What cli's runPins() gathers about the machine and the repository a run starts on, which the
+// engine cannot see for itself. The manifest copies each into the field of the same name.
+export type RunPins = {
+  readonly versions: RunVersions;
+  // The sha256 of the PII patterns and mask selectors (the secrets themselves are in `secrets`).
+  readonly redactor: string;
+  // The sha256 of the own accessibility engine's rule ids and probe settings.
+  readonly rulesetHash: string;
+  // The sha256 of the sorted { path, sha256 } of every baseline the plan reads.
+  readonly baselinesHash: string;
+  // The run image's id. A run on the host has none, and its manifest lists run-image as unpinned.
+  readonly imageDigest?: string;
+  // The sha256 of every system font file's path and content hash, sorted.
+  readonly fontsSha256: string;
+  // The repository's HEAD commit, or null outside a Git checkout.
+  readonly commit: string | null;
+};
+
 export type RunManifest = {
   readonly schema: string;
   readonly engineVersion: string;
@@ -57,6 +85,23 @@ export type RunManifest = {
   readonly responseRewrites?: readonly AppliedRewrite[];
   // Present only for an evidence run, so a plan run's manifest and hash stay exactly as they were.
   readonly evidence?: EvidenceManifestRecord;
+  // The sha256 of the browser executable core launched, hashed by core itself before the browser
+  // opened, never taken from what the adapter reports. Present only for an adapter that reports
+  // its build; a run on any other has none, so its manifest and hash stay as they were.
+  readonly executableSha256?: string;
+  // Present only when the run was given its pins (RunInputs.pins), each copied from them, so a run
+  // without pins has a manifest, and a hash, exactly as before. `projectHash` is the sha256 of the
+  // canonical project without its evidence-mode and planner sections, which a plan run never
+  // reads; `limits` is the sha256 of the project's run limits.
+  readonly projectHash?: string;
+  readonly versions?: RunVersions;
+  readonly redactor?: string;
+  readonly limits?: string;
+  readonly baselinesHash?: string;
+  readonly rulesetHash?: string;
+  readonly imageDigest?: string;
+  readonly fontsSha256?: string;
+  readonly commit?: string | null;
 };
 
 // What pins an evidence run, as far as anything can: the suite's files, its commands and its image.
@@ -110,15 +155,38 @@ export function evidenceManifest(inputs: EvidenceManifestInputs): RunManifest {
   };
 }
 
-// Why a manifest cannot be replayed.
-//   replay-not-claimed: it is an evidence run's, whose suite code, browser and app server no
-//     manifest can pin. It can still be run again from the manifest, but not claimed identical.
-export type ReplayErrorCode = 'replay-not-claimed';
+// Why a manifest cannot be replayed, or why its replay is not a pass.
+//   replay-not-claimed: no replay of this run may be claimed identical. It is an evidence run's,
+//     whose suite code, browser and app server no manifest can pin; or its adapter could not pin
+//     the clock, the time zone or randomness; or it called services or ran database commands
+//     without recording their replies, which a replay never sends again.
+//   replay-mismatch: what the replay was given does not match the manifest (a fixture, the plan,
+//     the target, a field of the wrong shape or a recorded reply), so it never ran as a pass.
+//   version-unsupported: the manifest or recording is of a schema version, or holds a key, this
+//     engine does not read.
+export type ReplayErrorCode = 'replay-not-claimed' | 'replay-mismatch' | 'version-unsupported';
 
-// The manifest a replay would run, or why none may. The replay itself, which runs the manifest
-// again and compares result hashes, is SPEC-08's.
-export function replayManifest(manifest: RunManifest): Result<RunManifest, { readonly code: ReplayErrorCode }> {
-  return manifest.evidence === undefined ? success(manifest) : failure({ code: 'replay-not-claimed' });
+// The inputs an adapter may be unable to pin (AdapterInfo.cannotPin). A run whose adapter cannot
+// pin any of them is never replay-claimed.
+export const DETERMINISM_INPUTS: readonly string[] = ['clock', 'time-zone', 'randomness'];
+
+// The non-hermetic input of a run whose pins name no run image: it ran on the host.
+export const RUN_IMAGE_INPUT = 'run-image';
+
+// Listed beside service-calls or database-commands when the project records their replies
+// (replay.recordReplies): those inputs are still not pinned by the manifest, but a replay can feed
+// them from the run's recording. Without it, such a run is never replay-claimed.
+export const RECORDED_REPLIES_INPUT = 'recorded-replies';
+
+// The manifest a replay may run, or why none may: a replay of it could never be claimed identical.
+// The replay itself, which runs the manifest again and compares result hashes, is replay().
+export function replayManifest(manifest: RunManifest): Result<RunManifest, { readonly code: 'replay-not-claimed' }> {
+  if (manifest.evidence !== undefined) return failure({ code: 'replay-not-claimed' });
+  const unpinned = manifest.nonHermeticInputs;
+  if (unpinned.some((input) => DETERMINISM_INPUTS.includes(input))) return failure({ code: 'replay-not-claimed' });
+  const needsReplies = unpinned.includes(SERVICE_CALLS_INPUT) || unpinned.includes(DATABASE_COMMANDS_INPUT);
+  if (needsReplies && !unpinned.includes(RECORDED_REPLIES_INPUT)) return failure({ code: 'replay-not-claimed' });
+  return success(manifest);
 }
 
 export const planHash = (plan: Plan): string => sha256(canonicalJson(plan));
@@ -158,6 +226,28 @@ function nonHermeticInputs(callsServices: boolean, others: readonly string[]): r
   return callsServices ? [SERVICE_CALLS_INPUT, ...rest] : rest;
 }
 
+// The project as its hash covers it: everything but the evidence-mode and planner sections, which a
+// plan run never reads, so turning either on leaves a plan run's manifest unchanged.
+export function projectHash(project: Project): string {
+  const { evidenceMode: _evidenceRunsOnly, planner: _draftingOnly, ...read } = project;
+  return sha256(canonicalJson(read));
+}
+
+// The manifest fields a run's pins give, with the project's hash and limits.
+function pinnedFields(pins: RunPins, project: Project): Partial<RunManifest> {
+  return {
+    projectHash: projectHash(project),
+    versions: { ...pins.versions, packs: [...pins.versions.packs].sort() },
+    redactor: pins.redactor,
+    limits: sha256(canonicalJson(project.limits)),
+    baselinesHash: pins.baselinesHash,
+    rulesetHash: pins.rulesetHash,
+    ...(pins.imageDigest === undefined ? {} : { imageDigest: pins.imageDigest }),
+    fontsSha256: pins.fontsSha256,
+    commit: pins.commit,
+  };
+}
+
 export function buildManifest(inputs: {
   readonly plan: Plan; readonly target: Target; readonly adapter: AdapterInfo;
   readonly browser: { readonly name: string; readonly version: string };
@@ -172,7 +262,20 @@ export function buildManifest(inputs: {
   readonly unpinned?: readonly string[];
   // The browser mutants' rewrites the egress proxy applied (EgressProxy.rewritesApplied).
   readonly responseRewrites?: readonly AppliedRewrite[];
+  // The sha256 of the browser executable core hashed before launching it.
+  readonly executableSha256?: string;
+  // The run's pins and its project. Without pins, none of the fields they give is recorded.
+  readonly pins?: { readonly pins: RunPins; readonly project: Project };
+  // True when the project records the replies of the run's calls and commands.
+  readonly recordsReplies?: boolean;
 }): RunManifest {
+  const pinned = inputs.pins === undefined ? undefined : pinnedFields(inputs.pins.pins, inputs.pins.project);
+  const unpinned = [
+    ...(inputs.adapter.cannotPin ?? []), ...(inputs.unpinned ?? []),
+    ...(inputs.pins !== undefined && inputs.pins.pins.imageDigest === undefined ? [RUN_IMAGE_INPUT] : []),
+  ];
+  const needsReplies = inputs.callsServices === true || unpinned.includes(DATABASE_COMMANDS_INPUT);
+  const recorded = inputs.recordsReplies === true && needsReplies ? [RECORDED_REPLIES_INPUT] : [];
   const secrets = inputs.secrets === undefined || inputs.secrets.length === 0
     ? {}
     : { secrets: [...inputs.secrets].sort((left, right) => (left.name < right.name ? -1 : left.name > right.name ? 1 : 0)) };
@@ -187,7 +290,7 @@ export function buildManifest(inputs: {
     clock: { fixedTimeMilliseconds: inputs.fixedTimeMilliseconds },
     fixtures: [...inputs.fixtures].sort((left, right) => (left.path < right.path ? -1 : 1)),
     host: inputs.host,
-    nonHermeticInputs: nonHermeticInputs(inputs.callsServices === true, [...(inputs.adapter.cannotPin ?? []), ...(inputs.unpinned ?? [])]),
+    nonHermeticInputs: nonHermeticInputs(inputs.callsServices === true, [...unpinned, ...recorded]),
     ...secrets,
     ...(inputs.storageState === undefined ? {} : { storageState: inputs.storageState }),
     ...(inputs.unsafe === undefined ? {} : inputs.unsafe),
@@ -195,6 +298,8 @@ export function buildManifest(inputs: {
       responseRewrites: inputs.responseRewrites.map((applied) => ({ origin: applied.origin, name: applied.name }))
         .sort((left, right) => (left.origin === right.origin ? (left.name < right.name ? -1 : 1) : (left.origin < right.origin ? -1 : 1))),
     }),
+    ...(inputs.executableSha256 === undefined ? {} : { executableSha256: inputs.executableSha256 }),
+    ...pinned,
   };
 }
 

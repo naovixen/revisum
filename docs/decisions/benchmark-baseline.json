@@ -1,0 +1,6 @@
+{
+  "linux-x64": {
+    "setupMedianMilliseconds": 1000,
+    "peakMemoryMegabytes": 400
+  }
+}

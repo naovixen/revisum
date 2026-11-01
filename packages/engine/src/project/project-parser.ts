@@ -96,6 +96,14 @@ export type EvidenceSettings = {
 };
 export const DEFAULT_EVIDENCE: EvidenceSettings = { keepDownloads: false };
 
+// How runs of this project can be replayed. See docs/specs/SPEC-08-manifest-and-replay.md.
+export type ReplaySettings = {
+  // Whether a run keeps the replies of its service calls and database commands in a recording
+  // beside its result, so a replay can feed them back without sending anything. Off unless the
+  // project turns it on: the replies may hold personal data, which nothing masks until SPEC-09.
+  readonly recordReplies: boolean;
+};
+
 export type ProjectData = {
   readonly origins: readonly Origin[];
   // Origins that serve real users. A plan with no approval runs only as a proposal, and a proposal
@@ -131,6 +139,8 @@ export type ProjectData = {
   readonly unsafeFeatures?: UnsafeFeaturesDeclaration;
   // The planner the draft command calls. Absent means the project has none, and the command stops.
   readonly planner?: PlannerEndpoint;
+  // How runs are replayed. Absent means replies are not recorded.
+  readonly replay?: ReplaySettings;
 };
 export type Project = Brand<ProjectData, 'Project'>;
 
@@ -241,7 +251,7 @@ function readOptional<Value>(
   return Object.hasOwn(fields, key) ? read(fields[key], `${path}.${key}`, issues) : undefined;
 }
 
-function readTarget(input: unknown, path: string, issues: Issues): Parsed<Target> {
+export function readTarget(input: unknown, path: string, issues: Issues): Parsed<Target> {
   const fields = readRecord(input, path, issues, [...REQUIRED_TARGET_KEYS, ...OPTIONAL_TARGET_KEYS], REQUIRED_TARGET_KEYS);
   if (fields === INVALID) return INVALID;
   const parts = [
@@ -432,6 +442,24 @@ function readPolicy(input: unknown, path: string, issues: Issues, limits: Parsed
   return { irreversiblePatterns, allowedIrreversibleNames, destructiveUrlPatterns, unnamedControlsAllowedByTestId, allowProductionForApprovedPlans };
 }
 
+// A secret's name, as the project declares it and a run manifest records it.
+export function readSecretName(input: unknown, path: string, issues: Issues): Parsed<SecretName> {
+  if (typeof input !== 'string') { issues.push({ code: 'wrong_type', path }); return INVALID; }
+  if (!SECRET_NAME.test(input)) { issues.push({ code: 'unknown_value', path }); return INVALID; }
+  return brand<string, 'SecretName'>(input);
+}
+
+// The replay section: recordReplies, true or false. The section is closed.
+function readReplaySettings(input: unknown, issues: Issues): Parsed<ReplaySettings | undefined> {
+  if (input === undefined) return undefined;
+  const path = '$.replay';
+  const fields = readRecord(input, path, issues, ['recordReplies']);
+  if (fields === INVALID) return INVALID;
+  const recordReplies = fields['recordReplies'];
+  if (typeof recordReplies !== 'boolean') { issues.push({ code: 'wrong_type', path: `${path}.recordReplies` }); return INVALID; }
+  return { recordReplies };
+}
+
 // Every field is optional; a missing one keeps the default. The section is closed.
 function readEvidence(input: unknown, path: string, issues: Issues): Parsed<EvidenceSettings> {
   if (input === undefined) return DEFAULT_EVIDENCE;
@@ -512,6 +540,7 @@ export function parseProject(input: unknown): Result<Project, readonly PlanError
     [
       'origins', 'productionOrigins', 'matrix', 'limits', 'secretNames', 'fixtures', 'policy', 'testIdAttributes', 'generatedEmailDomains',
       'evidence', 'services', 'calls', 'stubs', 'observedRequests', 'storageEntries', 'evidenceMode', 'unsafeFeatures', 'planner',
+      'replay',
     ],
     ['origins', 'matrix'],
   );
@@ -556,6 +585,7 @@ export function parseProject(input: unknown): Result<Project, readonly PlanError
   });
   // The planner's key names a declared secret, so the secrets are read first.
   const planner = readPlannerEndpoint(fields['planner'], issues, secretNames === INVALID ? [] : secretNames);
+  const replay = readReplaySettings(fields['replay'], issues);
   const matrix = rawMatrix === INVALID ? [] : rawMatrix.map((target, index) => readTarget(target, `$.matrix[${index}]`, issues));
   const seen = new Set<string>();
   matrix.forEach((target, index) => {
@@ -567,7 +597,7 @@ export function parseProject(input: unknown): Result<Project, readonly PlanError
     || productionOrigins === INVALID || policy === INVALID || testIdAttributes === INVALID || generatedEmailDomains === INVALID
     || evidence === INVALID || services === INVALID || calls === INVALID
     || stubs === INVALID || observedRequests === INVALID || storageEntries === INVALID || evidenceMode === INVALID
-    || unsafeFeatures === INVALID || planner === INVALID || !allValid(origins) || !allValid(matrix)) return failure(issues);
+    || unsafeFeatures === INVALID || planner === INVALID || replay === INVALID || !allValid(origins) || !allValid(matrix)) return failure(issues);
   // Left out when absent, so a project without evidence mode or unsafe features parses exactly as
   // it did before.
   return success(brand<ProjectData, 'Project'>({
@@ -575,5 +605,6 @@ export function parseProject(input: unknown): Result<Project, readonly PlanError
     services, calls, stubs, observedRequests, storageEntries, ...(evidenceMode === undefined ? {} : { evidenceMode }),
     ...(unsafeFeatures === undefined ? {} : { unsafeFeatures }),
     ...(planner === undefined ? {} : { planner }),
+    ...(replay === undefined ? {} : { replay }),
   }));
 }

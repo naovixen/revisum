@@ -2,13 +2,15 @@
 // redaction and leak scanning cannot work without the value: they look for it, and for each form
 // in which it can echo, in text a run keeps or wrote. Everything here returns redacted text, forms
 // found, whether a text is a secret, a mode or a hash, never the value itself. A declared call's header scheme is applied here
-// too, inside a new opaque Secret. The one exception is what the browser itself must receive: a
+// too, inside a new opaque Secret. The exceptions are what the browser itself must receive: a
 // stub's body or a storage entry's value, written here with its secret arguments in place just
-// before the run hands it to the driver, which never reports it back.
+// before the run hands it to the driver, which never reports it back; and a recorded reply, whose
+// secret echoes are cut out when it is recorded and put back from the replay's own store just
+// before a replay hands the reply to the engine.
 // See docs/specs/SPEC-04-secrets-and-redaction.md.
 import {
   MINIMUM_SECRET_LENGTH, createSecret, isSecret, reveal,
-  type HeaderScheme, type JsonBodyWithSecrets, type LeakForm, type RedactionMode, type Secret,
+  type HeaderScheme, type JsonBodyWithSecrets, type LeakForm, type RedactionMode, type Secret, type SecretName,
 } from '@revisum/contracts';
 import { sha256 } from '../hashing.ts';
 
@@ -247,10 +249,235 @@ export function storageStateSecrets(storageState: Secret): readonly Secret[] {
 // and token and raw are the value as it is.
 export function headerSecret(secret: Secret, scheme: HeaderScheme): Secret {
   switch (scheme) {
-    case 'bearer': return createSecret(secret.name, `Bearer ${reveal(secret)}`);
-    case 'basic': return createSecret(secret.name, `Basic ${Buffer.from(reveal(secret), 'utf8').toString('base64')}`);
     case 'token': case 'raw': return secret;
+    case 'bearer': case 'basic': {
+      const made = createSecret(secret.name, headerValue(reveal(secret), scheme));
+      HEADER_SOURCES.set(made, { source: secret, scheme });
+      return made;
+    }
   }
+}
+
+// The schemes that write a secret into a header value of its own.
+export type WrappingScheme = 'bearer' | 'basic';
+
+const headerValue = (value: string, scheme: WrappingScheme): string =>
+  (scheme === 'bearer' ? `Bearer ${value}` : `Basic ${Buffer.from(value, 'utf8').toString('base64')}`);
+
+// The secret each header value headerSecret made was made from, and the scheme that made it, so an
+// echo of the bare value is cut from a recording too, and a replay can make the header value again
+// from its own store.
+const HEADER_SOURCES = new WeakMap<Secret, { readonly source: Secret; readonly scheme: WrappingScheme }>();
+
+// ---- Recorded replies --------------------------------------------------------------------------------
+
+// One echo of a secret cut out of a recorded reply, and how to put it back: at `offset` in the
+// kept text, the value of the secret named, written in `form`. Nothing here is the value.
+//   scheme: the echo was of the header value "Bearer <value>" or "Basic <base64>", not the value.
+//   characters: for a prefix, how many of the value's characters were echoed.
+//   spelling: for an echo written character by character, one letter per character when any is
+//     not as typed: "." as typed, "u" or "l" upper- or lower-cased, "e" or "E" percent-escaped with
+//     lower- or upper-case hex digits, "+" a space written as "+".
+//   alignment: for a base64 echo, which of the three byte positions the value started at inside
+//     the encoded text. Only the characters wholly decided by the value are cut; the partial ones
+//     at each end stay in the kept text.
+//   approximate: the echo was written in a way the fields above cannot describe. It is cut all the
+//     same, and put back as typed, so the replay gives another result and is never a pass.
+export type SecretEcho = {
+  readonly offset: number;
+  readonly secretName: SecretName;
+  readonly form: LeakForm;
+  readonly scheme?: WrappingScheme;
+  readonly characters?: number;
+  readonly spelling?: string;
+  readonly alignment?: number;
+  readonly approximate?: true;
+};
+
+// A value searched for in a reply: a secret's own, or a header value made from it.
+type EchoCandidate = { readonly secretName: SecretName; readonly value: string; readonly scheme?: WrappingScheme };
+
+// What a reply's text becomes once every echo is cut out.
+export type CutText = { readonly kept: string; readonly echoes: readonly SecretEcho[] };
+
+// One stretch of a reply's text: kept as it is, or an echo cut out of it.
+type Piece = { readonly kept: string } | { readonly echo: Omit<SecretEcho, 'offset'> };
+
+// The secrets and header values to search a reply for, longest value first, so a longer one is
+// never left in part by a shorter one inside it. Values too short to search for are left out, as
+// the redactor leaves them out.
+function echoCandidates(secrets: readonly Secret[]): EchoCandidate[] {
+  const candidates: EchoCandidate[] = [];
+  for (const secret of secrets) {
+    const made = HEADER_SOURCES.get(secret);
+    if (made === undefined) {
+      candidates.push({ secretName: secret.name, value: reveal(secret) });
+    } else {
+      candidates.push({ secretName: made.source.name, value: reveal(secret), scheme: made.scheme });
+      candidates.push({ secretName: made.source.name, value: reveal(made.source) });
+    }
+  }
+  const seen = new Set<string>();
+  const distinct = candidates.filter((candidate) => {
+    if (candidate.value.length < MINIMUM_SECRET_LENGTH || seen.has(candidate.value)) return false;
+    seen.add(candidate.value);
+    return true;
+  });
+  return distinct.sort((left, right) => right.value.length - left.value.length);
+}
+
+// How `echo` writes the first characters of `value`, one letter per character (see SecretEcho),
+// or null when some character is written in another way.
+function describeSpelling(echo: string, value: string): { readonly characters: number; readonly spelling: string } | null {
+  let position = 0;
+  let spelling = '';
+  for (const character of value) {
+    if (position >= echo.length) break;
+    const rest = echo.slice(position);
+    const escaped = percentEscapes(character);
+    const upper = character.toUpperCase();
+    const lower = character.toLowerCase();
+    let written: { readonly letter: string; readonly text: string };
+    if (rest.startsWith(character)) written = { letter: '.', text: character };
+    else if (rest.startsWith(escaped)) written = { letter: 'e', text: escaped };
+    else if (rest.startsWith(escaped.toUpperCase())) written = { letter: 'E', text: escaped.toUpperCase() };
+    else if (character === ' ' && rest.startsWith('+')) written = { letter: '+', text: '+' };
+    else if (upper.length === character.length && rest.startsWith(upper)) written = { letter: 'u', text: upper };
+    else if (lower.length === character.length && rest.startsWith(lower)) written = { letter: 'l', text: lower };
+    else return null;
+    spelling += written.letter;
+    position += written.text.length;
+  }
+  return position === echo.length ? { characters: spelling.length, spelling } : null;
+}
+
+// The first `characters` characters of `value`, written as `spelling` says (all as typed without one).
+function spelled(value: string, characters: number, spelling: string | undefined): string {
+  return [...value].slice(0, characters).map((character, index) => {
+    switch (spelling?.[index] ?? '.') {
+      case 'u': return character.toUpperCase();
+      case 'l': return character.toLowerCase();
+      case 'e': return percentEscapes(character);
+      case 'E': return percentEscapes(character).toUpperCase();
+      case '+': return '+';
+      default: return character;
+    }
+  }).join('');
+}
+
+// The form a character-by-character echo of `value` takes, from its spelling.
+function spellingForm(characters: number, spelling: string, value: string): LeakForm {
+  if (characters < [...value].length) return 'prefix';
+  if (/[eE+]/.test(spelling)) return 'uri';
+  return /[ul]/.test(spelling) ? 'case' : 'raw';
+}
+
+// A character-by-character echo of `candidate`, described, or marked approximate.
+function spellingEcho(echoed: string, candidate: EchoCandidate, prefix: boolean): Omit<SecretEcho, 'offset'> {
+  const named = { secretName: candidate.secretName, ...(candidate.scheme === undefined ? {} : { scheme: candidate.scheme }) };
+  const described = describeSpelling(echoed, candidate.value);
+  if (described === null) {
+    return prefix
+      ? { ...named, form: 'prefix', characters: [...echoed].length, approximate: true }
+      : { ...named, form: 'uri', approximate: true };
+  }
+  const form = spellingForm(described.characters, described.spelling, candidate.value);
+  return {
+    ...named, form,
+    ...(form === 'prefix' ? { characters: described.characters } : {}),
+    ...(/^\.*$/.test(described.spelling) ? {} : { spelling: described.spelling }),
+  };
+}
+
+// The base64 characters wholly decided by `value` at `alignment`, in order, as `alphabet` writes them.
+function wholeEncodedCharacters(value: string, alignment: number, alphabet: string): string {
+  return encodedCharacters(Buffer.from(value, 'utf8'), alignment)
+    .filter((character) => character.knownBits === 0b111111)
+    .map((character) => alphabet[character.bits] ?? '')
+    .join('');
+}
+
+type Found = { readonly start: number; readonly end: number; readonly echo: Omit<SecretEcho, 'offset'> };
+
+// The echoes of `candidate` in `text` in one form, in order and apart: its base64 or base64url
+// forms first, then the value as typed, in another case or URL-encoded, then a prefix of it.
+function echoesOf(text: string, candidate: EchoCandidate): Found[] {
+  const named = { secretName: candidate.secretName, ...(candidate.scheme === undefined ? {} : { scheme: candidate.scheme }) };
+  for (const form of ['base64', 'base64url'] as const) {
+    const alphabet = BASE64_ALPHABETS[form];
+    const found: Found[] = [];
+    for (const match of text.matchAll(base64Pattern(candidate.value, alphabet))) {
+      // The whole characters sit together inside the match; the alignment says which they are.
+      for (const alignment of [0, 1, 2]) {
+        const whole = wholeEncodedCharacters(candidate.value, alignment, alphabet);
+        const at = match[0].indexOf(whole);
+        if (whole === '' || at === -1) continue;
+        found.push({ start: match.index + at, end: match.index + at + whole.length, echo: { ...named, form, alignment } });
+        break;
+      }
+    }
+    if (found.length > 0) return found;
+  }
+  const typed = [...text.matchAll(uriPattern(candidate.value))]
+    .map((match): Found => ({ start: match.index, end: match.index + match[0].length, echo: spellingEcho(match[0], candidate, false) }));
+  if (typed.length > 0) return typed;
+  return prefixRuns(foldCase(text), foldCase(candidate.value))
+    .map((run): Found => ({ start: run.start, end: run.end, echo: spellingEcho(text.slice(run.start, run.end), candidate, true) }));
+}
+
+// Cuts every echo of the given secrets out of a reply's text, in any form the leak scanner looks
+// for, and says where each goes back. One form is found at a time, so the search repeats on what
+// is left until nothing more is found.
+export function cutSecretEchoes(text: string, secrets: readonly Secret[]): CutText {
+  let pieces: Piece[] = [{ kept: text }];
+  for (const candidate of echoCandidates(secrets)) {
+    for (let changed = true; changed;) {
+      changed = false;
+      pieces = pieces.flatMap((piece): Piece[] => {
+        if (!('kept' in piece)) return [piece];
+        const found = echoesOf(piece.kept, candidate);
+        if (found.length === 0) return [piece];
+        changed = true;
+        const split: Piece[] = [];
+        let position = 0;
+        for (const echo of found) {
+          if (echo.start < position) continue;
+          split.push({ kept: piece.kept.slice(position, echo.start) }, { echo: echo.echo });
+          position = echo.end;
+        }
+        split.push({ kept: piece.kept.slice(position) });
+        return split;
+      });
+    }
+  }
+  let kept = '';
+  const echoes: SecretEcho[] = [];
+  for (const piece of pieces) {
+    if ('kept' in piece) kept += piece.kept;
+    else echoes.push({ offset: kept.length, ...piece.echo });
+  }
+  return { kept, echoes };
+}
+
+// The text one echo stood for, written again from `secret`'s value.
+function echoText(echo: SecretEcho, secret: Secret): string {
+  const value = echo.scheme === undefined ? reveal(secret) : headerValue(reveal(secret), echo.scheme);
+  if (echo.form === 'base64' || echo.form === 'base64url') return wholeEncodedCharacters(value, echo.alignment ?? 0, BASE64_ALPHABETS[echo.form]);
+  return spelled(value, echo.characters ?? [...value].length, echo.approximate === true ? undefined : echo.spelling);
+}
+
+// A recorded reply's text with each echo put back from `resolve`, the replay's own secret store.
+// An echo whose secret the store does not hold is left out, so the replay gives another result.
+// The echoes must be in offset order, each within the kept text, as cutSecretEchoes gives them.
+export function restoreSecretEchoes(kept: string, echoes: readonly SecretEcho[], resolve: (name: SecretName) => Secret | null): string {
+  let restored = '';
+  let position = 0;
+  for (const echo of echoes) {
+    const secret = resolve(echo.secretName);
+    restored += kept.slice(position, echo.offset) + (secret === null ? '' : echoText(echo, secret));
+    position = echo.offset;
+  }
+  return restored + kept.slice(position);
 }
 
 // ---- Stubs and web storage --------------------------------------------------------------------

@@ -147,7 +147,7 @@ function readSuite(input: unknown, path: string, context: SuiteContext): Parsed<
   };
 }
 
-function readSuiteName(input: unknown, path: string, issues: Issues): Parsed<SuiteName> {
+export function readSuiteName(input: unknown, path: string, issues: Issues): Parsed<SuiteName> {
   if (typeof input !== 'string') { issues.push({ code: 'wrong_type', path }); return INVALID; }
   if (!SUITE_NAME.test(input)) { issues.push({ code: 'unknown_value', path }); return INVALID; }
   return brand<string, 'SuiteName'>(input);

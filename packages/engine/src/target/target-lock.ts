@@ -10,7 +10,7 @@ import {
 } from '@revisum/contracts';
 import { createHash, randomUUID } from 'node:crypto';
 import { createReadStream } from 'node:fs';
-import { readFile, rename, rm, writeFile } from 'node:fs/promises';
+import { readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { canonicalJson } from '../hashing.ts';
 import { INVALID, allValid, readList, readRecord, type Issues, type Parsed, type PlanError } from '../plan/plan-decoders.ts';
@@ -173,19 +173,46 @@ export async function lockToFile(
 const runTimeReason = (code: BuildFailureCode): UnavailableReason =>
   (code === 'lock-download-failed' || code === 'lock-offline' ? 'launch-failed' : code);
 
-// Before a run opens a browser: when the lockfile pins the target, the adapter's build must have
-// the pinned version and executable hash, or the target is unavailable with build-mismatch.
-// 'unpinned' means the run goes ahead on a build nothing pinned: the lockfile has no entry for the
-// target, or the adapter cannot report its build.
+// What a run learns of the browser build before it opens the browser.
+//   executableSha256: the sha256 core took of the executable the adapter will launch; absent for an
+//     adapter that cannot report its build, such as Playwright, which launches its own browser.
+//   unpinned: a lockfile is in use but nothing in it pins this build, so the manifest lists
+//     browser-build as non-hermetic. Without a lockfile nothing is said about pinning.
+export type CheckedBuild = { readonly executableSha256?: string; readonly unpinned: boolean };
+
+// A file's sha256, kept per process by path, size and modification times: a run hashes the
+// browser it launches every time, and a browser executable can be hundreds of megabytes. A file
+// changed in place has another modification time, so it is hashed again.
+const launchedHashes = new Map<string, string>();
+async function hashLaunchedExecutable(path: string): Promise<Result<string, string>> {
+  let key: string;
+  try {
+    const status = await stat(path);
+    key = JSON.stringify([path, status.size, status.mtimeMs, status.ctimeMs]);
+  } catch (error) {
+    return failure(`cannot read the browser executable at ${path}: ${errorText(error)}`);
+  }
+  const known = launchedHashes.get(key);
+  if (known !== undefined) return success(known);
+  const hashed = await hashExecutable(path);
+  if (hashed.ok) launchedHashes.set(key, hashed.value);
+  return hashed;
+}
+
+// Before a run opens a browser, whenever the adapter reports its build: core hashes the executable
+// itself, rather than trusting the version the adapter reports, and an executable it cannot hash
+// is never launched. When a lockfile is given and pins the target, the build must have the pinned
+// version and executable hash, or the target is unavailable with build-mismatch.
 export async function checkPinnedBuild(
-  driver: BrowserDriver, target: Target, entries: readonly LockEntry[],
-): Promise<Result<'pinned' | 'unpinned', Unavailable>> {
-  const pinned = entries.find((entry) => entry.targetId === target.id);
-  if (pinned === undefined || driver.build === undefined) return success('unpinned');
+  driver: BrowserDriver, target: Target, entries: readonly LockEntry[] | undefined,
+): Promise<Result<CheckedBuild, Unavailable>> {
+  const pinned = entries?.find((entry) => entry.targetId === target.id);
+  if (driver.build === undefined) return success({ unpinned: entries !== undefined });
   const built = await driver.build(target);
   if (!built.ok) return failure({ reason: runTimeReason(built.error.code), detail: built.error.detail });
-  const hashed = await hashExecutable(built.value.executablePath);
+  const hashed = await hashLaunchedExecutable(built.value.executablePath);
   if (!hashed.ok) return failure({ reason: 'launch-failed', detail: hashed.error });
+  if (pinned === undefined) return success({ executableSha256: hashed.value, unpinned: entries !== undefined });
   if (built.value.version !== pinned.version || hashed.value !== pinned.executableSha256) {
     return failure({
       reason: 'build-mismatch',
@@ -193,5 +220,5 @@ export async function checkPinnedBuild(
         + `this machine has version ${built.value.version} with sha256 ${hashed.value}`,
     });
   }
-  return success('pinned');
+  return success({ executableSha256: hashed.value, unpinned: false });
 }

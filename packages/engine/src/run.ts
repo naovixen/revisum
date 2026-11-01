@@ -34,7 +34,10 @@ import {
   checkRequests, checkResponse, checkStorage, observedRequestNames, rememberFromResponse, resetRequests, runStubStep, startObserving, writeStorage,
   type NetworkStepContext,
 } from './network-and-storage/network-and-storage-steps.ts';
-import { DATABASE_COMMANDS_INPUT, buildManifest, manifestHash, unsafeFeatureRecord, type FixtureReference, type HostInfo, type RunManifest } from './manifest.ts';
+import {
+  DATABASE_COMMANDS_INPUT, DETERMINISM_INPUTS, buildManifest, manifestHash, unsafeFeatureRecord,
+  type FixtureReference, type HostInfo, type RunManifest, type RunPins,
+} from './manifest.ts';
 import { checkElement, checkPage, domReadFor, normalise, type Verdict } from './oracle.ts';
 import { runEvaluate, runScriptCheck, type PageScriptContext, type PageScriptRecord } from './page-scripts/page-script-steps.ts';
 import type { SuiteDecodeError } from './evidence/suite-report.ts';
@@ -84,6 +87,10 @@ export type RunInputs = {
   // browser opens, and a build other than the pinned one ends the run TargetUnavailable with
   // build-mismatch. Absent, no build is checked and nothing is recorded about pinning.
   readonly lockEntries?: readonly LockEntry[];
+  // What cli's runPins() gathered about the machine and repository the run starts on: versions,
+  // hashes of the redactor, rule set, baselines and fonts, the run image and the commit. Given, the
+  // manifest records each, with the project's hash and limits; absent, it records none of them.
+  readonly pins?: RunPins;
 };
 
 export type RunPorts = {
@@ -258,6 +265,9 @@ type RunContext = {
   readonly commands: DatabaseCommandContext | undefined;
   // The stubs started and not yet stopped.
   readonly activeStubs: Set<StubName>;
+  // True when the target's adapter cannot pin the clock, the time zone or randomness, so the run
+  // loses replay-identical. Known from the target alone, before anything runs.
+  readonly determinismUnpinned: boolean;
 };
 
 const POLL_INTERVAL_MILLISECONDS = 50;
@@ -294,6 +304,7 @@ export async function run(given: RunInputs, ports: RunPorts): Promise<RunResult>
   const context: RunContext = {
     inputs, ports, logger, gate, denials: [], redactor, secrets, isShortSecret: shortSecretObservation(secrets), secretFilledFields: new Set(), values, calls,
     commands, rememberedTexts, performs: [], session: null, downloads: new Map(), activeStubs: new Set(),
+    determinismUnpinned: target !== undefined && cannotPinDeterminism(ports.drivers, target),
   };
 
   if (target === undefined || !declared) {
@@ -313,7 +324,7 @@ export async function run(given: RunInputs, ports: RunPorts): Promise<RunResult>
     return seal({
       state: refused.state, targetId: target.id, manifest: null, manifestHash: null, steps: [], blockedOrigins: [],
       unavailable: null, refusal: refused.refusal, timings: { totalMilliseconds: ports.clock.now() - startedAt, stepMilliseconds: [] },
-    }, inputs);
+    }, context);
   }
 
   if (!resolution.ok) {
@@ -325,7 +336,7 @@ export async function run(given: RunInputs, ports: RunPorts): Promise<RunResult>
     return seal({
       state: refused.state, targetId: target.id, manifest: null, manifestHash: null, steps: [], blockedOrigins: [],
       unavailable: null, refusal: refused.refusal, timings: { totalMilliseconds: ports.clock.now() - startedAt, stepMilliseconds: [] },
-    }, inputs);
+    }, context);
   }
 
   // Refused before any side effect when the plan names a page script whose source the run was not
@@ -337,7 +348,7 @@ export async function run(given: RunInputs, ports: RunPorts): Promise<RunResult>
     return seal({
       state: refused.state, targetId: target.id, manifest: null, manifestHash: null, steps: [], blockedOrigins: [],
       unavailable: null, refusal: refused.refusal, timings: { totalMilliseconds: ports.clock.now() - startedAt, stepMilliseconds: [] },
-    }, inputs);
+    }, context);
   }
 
   // Refused before any side effect when the plan calls a service and no caller was wired in.
@@ -347,7 +358,7 @@ export async function run(given: RunInputs, ports: RunPorts): Promise<RunResult>
     return seal({
       state: refused.state, targetId: target.id, manifest: null, manifestHash: null, steps: [], blockedOrigins: [],
       unavailable: null, refusal: refused.refusal, timings: { totalMilliseconds: ports.clock.now() - startedAt, stepMilliseconds: [] },
-    }, inputs);
+    }, context);
   }
 
   const opened = await openSession(planned, context);
@@ -355,7 +366,7 @@ export async function run(given: RunInputs, ports: RunPorts): Promise<RunResult>
     const unavailable = lifecycle.targetUnavailable(planned, opened.error);
     return unavailableResult(target.id, unavailable.unavailable, context, startedAt);
   }
-  const { session, driver } = opened.value;
+  const { session, driver, executableSha256 } = opened.value;
   // A database command's output, and the database it ran against, cannot be pinned.
   const unpinned = [...opened.value.unpinned, ...(runsDatabaseCommands(inputs.plan) ? [DATABASE_COMMANDS_INPUT] : [])];
   // From here on, a step needing an optional feature is refused only when this driver lacks it.
@@ -366,6 +377,9 @@ export async function run(given: RunInputs, ports: RunPorts): Promise<RunResult>
     ...secretRecords(secrets), callsServices: callsServices(inputs.plan),
     ...(unsafe.value === undefined ? {} : { unsafe: unsafe.value }),
     ...(unpinned.length === 0 ? {} : { unpinned }),
+    ...(executableSha256 === undefined ? {} : { executableSha256 }),
+    ...(inputs.pins === undefined ? {} : { pins: { pins: inputs.pins, project: inputs.project } }),
+    recordsReplies: inputs.project.replay?.recordReplies === true,
   });
   const resolved = lifecycle.resolve(planned, session, manifest, manifestHash(manifest));
   logger.log({ kind: 'run.state', state: resolved.state, targetId: target.id, adapter: driver.info.id, sha256: resolved.manifestHash });
@@ -428,7 +442,7 @@ export async function run(given: RunInputs, ports: RunPorts): Promise<RunResult>
     ...(cleanup === undefined ? {} : { cleanup }), ...(reviewItems.length === 0 ? {} : { reviewItems }),
     ...(stubAnswers.length === 0 ? {} : { stubAnswers: [...stubAnswers] }),
     timings: { totalMilliseconds: ports.clock.now() - startedAt, stepMilliseconds },
-  }, inputs);
+  }, context);
 }
 
 // The only entry point for untrusted input, such as a plan an AI proposed. Parsing happens first,
@@ -518,20 +532,29 @@ type OpenedSession = {
   readonly driver: BrowserDriver;
   // Inputs the run could not pin, for the manifest's nonHermeticInputs.
   readonly unpinned: readonly string[];
+  // The sha256 of the executable the driver launched, when it reports its build.
+  readonly executableSha256?: string;
 };
 
+// True when the adapter the target names cannot pin the clock, the time zone or randomness.
+function cannotPinDeterminism(drivers: ReadonlyMap<string, BrowserDriver>, target: Target): boolean {
+  const cannotPin = adapterRegistry(drivers).find(target.adapter)?.info.cannotPin ?? [];
+  return cannotPin.some((input) => DETERMINISM_INPUTS.includes(input));
+}
+
 // Resolves the target in order, stopping at the first "no": only the adapter the target names is
-// asked, it is asked once, and nothing else is tried in its place. A pinned build is checked
-// before anything launches. See docs/specs/SPEC-05-target-matrix-and-lock.md.
+// asked, it is asked once, and nothing else is tried in its place. The build is hashed, and
+// checked against the lockfile when there is one, before anything launches.
+// See docs/specs/SPEC-05-target-matrix-and-lock.md and docs/specs/SPEC-08-manifest-and-replay.md.
 async function openSession(planned: lifecycle.Planned, context: RunContext): Promise<Result<OpenedSession, Unavailable>> {
   const driver = adapterRegistry(context.ports.drivers).find(planned.target.adapter);
   if (driver === null) return { ok: false, error: { reason: 'adapter-not-registered', detail: `no adapter '${planned.target.adapter}'` } };
   const supported = driver.supports(planned.target);
   if (!supported.ok) return supported;
-  const lockEntries = context.inputs.lockEntries;
-  const pinning = lockEntries === undefined ? undefined : await checkPinnedBuild(driver, planned.target, lockEntries);
-  if (pinning !== undefined && !pinning.ok) return pinning;
-  const unpinned = pinning?.value === 'unpinned' ? [BROWSER_BUILD_INPUT] : [];
+  const checked = await checkPinnedBuild(driver, planned.target, context.inputs.lockEntries);
+  if (!checked.ok) return checked;
+  const unpinned = checked.value.unpinned ? [BROWSER_BUILD_INPUT] : [];
+  const executableSha256 = checked.value.executableSha256;
   const opened = await driver.open(planned.target, {
     baseUrl: context.inputs.baseUrl,
     allowedOrigins: reachableOrigins(context.inputs),
@@ -544,7 +567,8 @@ async function openSession(planned: lifecycle.Planned, context: RunContext): Pro
     // keeps real-time timers, as pages that wait on their own timers need.
     ...(totalClockAdvanceMilliseconds(context.inputs.plan) > 0 ? { virtualTimers: true } : {}),
   });
-  return opened.ok ? { ok: true, value: { session: opened.value, driver, unpinned } } : opened;
+  if (!opened.ok) return opened;
+  return { ok: true, value: { session: opened.value, driver, unpinned, ...(executableSha256 === undefined ? {} : { executableSha256 }) } };
 }
 
 // Steps the plan language has but the run's driver does not perform. Each fails with
@@ -979,23 +1003,29 @@ function unavailableResult(targetId: string, unavailable: Unavailable, context: 
   return seal({
     state: 'TargetUnavailable', targetId, manifest: null, manifestHash: null, steps: [], blockedOrigins: [],
     unavailable, timings: { totalMilliseconds: context.ports.clock.now() - startedAt, stepMilliseconds: [] },
-  }, context.inputs);
+  }, context);
 }
 
-// What a plan run vouches for: decided by the plan's unsafe features and the run's isolation alone,
-// never by what the run happened to do, so two runs of one plan say the same. Until the isolated
-// runner (SPEC-07) runs plans behind its egress proxy, a plan run runs on the host, so egress,
-// credentials and replay are not claimed.
-const planRunGuarantees = (unsafeFeatures: readonly UnsafeFeature[]): GuaranteeStatement =>
-  guaranteeStatement({ mode: 'plan', egressEnforced: false, unmaskedScreenshotsKept: false, unsafeFeatures });
+// What a plan run vouches for: decided by the plan's unsafe features, the run's isolation and the
+// target's adapter alone, never by what the run happened to do, so two runs of one plan say the
+// same. Until the isolated runner (SPEC-07) runs plans behind its egress proxy, a plan run runs on
+// the host, so egress, credentials and replay are not claimed.
+const planRunGuarantees = (unsafeFeatures: readonly UnsafeFeature[], determinismUnpinned: boolean): GuaranteeStatement =>
+  guaranteeStatement({
+    mode: 'plan', egressEnforced: false, unmaskedScreenshotsKept: false, unsafeFeatures, ...(determinismUnpinned ? { determinismUnpinned } : {}),
+  });
 
 // Adds the run mode, the guarantee statement, the unsafe label (for a plan using unsafe features),
 // the approval label (for an approved plan) and the result hash.
-function seal(outcome: Omit<RunResult, 'resultHash' | 'approvalLabel' | 'mode' | 'guarantees' | 'unsafeFeatures'>, inputs: RunInputs): RunResult {
-  const standing = inputs.standing;
-  const unsafeFeatures = unsafeFeaturesOf(inputs.plan);
+function seal(
+  outcome: Omit<RunResult, 'resultHash' | 'approvalLabel' | 'mode' | 'guarantees' | 'unsafeFeatures'>,
+  context: Pick<RunContext, 'inputs' | 'determinismUnpinned'>,
+): RunResult {
+  const standing = context.inputs.standing;
+  const unsafeFeatures = unsafeFeaturesOf(context.inputs.plan);
   const labelled = {
-    ...outcome, mode: 'plan' as const, guarantees: planRunGuarantees(unsafeFeatures), ...(unsafeFeatures.length === 0 ? {} : { unsafeFeatures }),
+    ...outcome, mode: 'plan' as const, guarantees: planRunGuarantees(unsafeFeatures, context.determinismUnpinned),
+    ...(unsafeFeatures.length === 0 ? {} : { unsafeFeatures }),
   };
   return withResultHash(standing?.mode === 'approved' ? { ...labelled, approvalLabel: approvalLabel(standing.approval) } : labelled);
 }

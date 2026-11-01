@@ -16,6 +16,9 @@ export type GuaranteeConditions = {
   // The unsafe features the run's plan uses (unsafeFeaturesOf); empty for a closed plan and for an
   // evidence run.
   readonly unsafeFeatures: readonly UnsafeFeature[];
+  // True when the target's adapter cannot pin the clock, the time zone or randomness
+  // (AdapterInfo.cannotPin), so no replay of the run can be claimed identical. Absent means false.
+  readonly determinismUnpinned?: boolean;
 };
 
 // The guarantees each unsafe feature gives up, and only those. Egress control, no ambient
@@ -37,8 +40,15 @@ const LOST_TO_FEATURE: { readonly [Feature in UnsafeFeature]: readonly Guarantee
   'database-command': ['plan-closed', 'actions-guarded', 'replay-identical'],
 };
 
+// Why `guarantee` does not hold under the run's mode, isolation and adapter alone: empty when it holds.
+function conditionReasons(guarantee: GuaranteeId, conditions: GuaranteeConditions): GuaranteeLossReason[] {
+  const reason = isolationReason(guarantee, conditions);
+  const unpinned = guarantee === 'replay-identical' && conditions.mode === 'plan' && conditions.determinismUnpinned === true;
+  return [...(reason === undefined ? [] : [reason]), ...(unpinned ? ['determinism-unpinned' as const] : [])];
+}
+
 // Why `guarantee` does not hold under the run's mode and isolation alone, or undefined when it holds.
-function conditionReason(guarantee: GuaranteeId, conditions: GuaranteeConditions): GuaranteeLossReason | undefined {
+function isolationReason(guarantee: GuaranteeId, conditions: GuaranteeConditions): GuaranteeLossReason | undefined {
   switch (guarantee) {
     // The team's own test code drives the page, finds elements and decides what passes.
     case 'plan-closed': case 'actions-guarded': case 'semantic-locators': case 'observable-checks':
@@ -63,9 +73,8 @@ function conditionReason(guarantee: GuaranteeId, conditions: GuaranteeConditions
 // Every reason `guarantee` is lost: the run's conditions first, then each unsafe feature that
 // gives it up, in the order the features are given.
 function lossReasons(guarantee: GuaranteeId, conditions: GuaranteeConditions): GuaranteeLossReason[] {
-  const condition = conditionReason(guarantee, conditions);
   const features = conditions.unsafeFeatures.filter((feature) => LOST_TO_FEATURE[feature].includes(guarantee));
-  return [...(condition === undefined ? [] : [condition]), ...features];
+  return [...conditionReasons(guarantee, conditions), ...features];
 }
 
 export function guaranteeStatement(conditions: GuaranteeConditions): GuaranteeStatement {

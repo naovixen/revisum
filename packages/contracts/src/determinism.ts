@@ -1,5 +1,5 @@
 // The page-side determinism controls every driver injects before any page script runs: a frozen
-// clock, seeded randomness and no animation. It is a trusted constant; plans cannot add to it.
+// clock, seeded randomness (Math.random and crypto's random values) and no animation. It is a trusted constant; plans cannot add to it.
 // It lives here because every driver needs it and a driver may import only this package.
 //
 // The clock part is the run's virtual clock. Date.now() is the frozen start plus however far the
@@ -22,7 +22,8 @@ export const CLOCK_CONTROLLER_KEY = 'determinism-kit.clock-controller';
 const VIRTUAL_FRAME_MILLISECONDS = 16;
 
 // The source of a script that freezes Date at fixedTimeMilliseconds, seeds Math.random with the
-// same generator as the engine's seededRandom (mulberry32), disables animation, and installs the
+// same generator as the engine's seededRandom (mulberry32), draws crypto.getRandomValues and
+// crypto.randomUUID from that generator too, disables animation, and installs the
 // virtual clock's timer tracking and advance controller, turned off.
 //
 // The controller's advanceTo(target, mode, maximumCallbacks) moves the document's virtual time to
@@ -53,12 +54,39 @@ export function determinismScript(seed: number, fixedTimeMilliseconds: number): 
   const performanceNow = () => clock.elapsed - clock.documentStart;
   Object.defineProperty(performance, 'now', { value: performanceNow, configurable: true, writable: true });
   let state = ${seed >>> 0};
-  Math.random = () => {
+  // One generator feeds Math.random and crypto's random values, so a page that draws from both
+  // still gets one fixed sequence.
+  const nextWord = () => {
     state = (state + 0x6d2b79f5) | 0;
     let mixed = Math.imul(state ^ (state >>> 15), 1 | state);
     mixed = (mixed + Math.imul(mixed ^ (mixed >>> 7), 61 | mixed)) ^ mixed;
-    return ((mixed ^ (mixed >>> 14)) >>> 0) / 4294967296;
+    return (mixed ^ (mixed >>> 14)) >>> 0;
   };
+  Math.random = () => nextWord() / 4294967296;
+  // crypto.subtle is left alone: its keys and signatures are not test inputs a page shows.
+  if (typeof crypto === 'object' && crypto !== null) {
+    const realGetRandomValues = crypto.getRandomValues.bind(crypto);
+    const getRandomValues = (array) => {
+      // The real function still checks the argument (an integer typed array of at most 65536
+      // bytes) and throws as browsers do; its random bytes are then replaced.
+      realGetRandomValues(array);
+      const bytes = new Uint8Array(array.buffer, array.byteOffset, array.byteLength);
+      for (let index = 0; index < bytes.length; index++) bytes[index] = nextWord() & 0xff;
+      return array;
+    };
+    Object.defineProperty(crypto, 'getRandomValues', { value: getRandomValues, configurable: true, writable: true });
+    if (typeof crypto.randomUUID === 'function') {
+      const randomUUID = () => {
+        const bytes = getRandomValues(new Uint8Array(16));
+        // A version 4, variant 1 UUID, as the real function makes.
+        bytes[6] = (bytes[6] & 0x0f) | 0x40;
+        bytes[8] = (bytes[8] & 0x3f) | 0x80;
+        const hex = [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+        return hex.slice(0, 8) + '-' + hex.slice(8, 12) + '-' + hex.slice(12, 16) + '-' + hex.slice(16, 20) + '-' + hex.slice(20);
+      };
+      Object.defineProperty(crypto, 'randomUUID', { value: randomUUID, configurable: true, writable: true });
+    }
+  }
   const css = ${JSON.stringify(NO_MOTION_CSS)};
   const add = () => {
     const style = document.createElement('style');

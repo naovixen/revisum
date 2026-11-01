@@ -455,7 +455,14 @@ Command-line error. The plan's approval was refused, so the plan was not run.
 
 ## replay-mismatch
 
-Command-line error. Replaying a recorded run gave a different result hash from the recorded one.
+Replay error, and the command-line error `replay` reports for it. A replay did not reproduce the recorded run, or what it was given does not match the manifest, so it is never a pass:
+
+- the replay ran, but its result hash differs from the recorded one, as a `mismatch` or a `per-environment-baseline` (only the host, browser, its build, the run image, the fonts or versions differ);
+- a fixture the manifest names is missing, or its sha256 differs (`fixture` names it);
+- the plan does not hash to the manifest's plan hash, the target is not the manifest's, or a field of the manifest or recording has the wrong shape (`path` names it);
+- a recorded reply did not match (`kind` and `position` name it): a request whose hash differs, a request after the last recorded reply, a reply never used, or no recording for a run that recorded its replies.
+
+Nothing was sent to a declared service and no database command ran. Check the fixtures, plan and recording are the run's own.
 
 ## planner-endpoint-not-loopback
 
@@ -483,7 +490,15 @@ Command-line error, from `draft --explore`. The start page did not load within t
 
 ## replay-not-claimed
 
-Replay error. The manifest is an evidence run's. Its suite code, the suite's own browser and the app server the suite starts cannot be pinned, so no replay is claimed identical. The manifest can still be used to run the suite again.
+Replay error. No replay of this run can be claimed identical, so none is run:
+
+- the manifest is an evidence run's: its suite code, the suite's own browser and the app server the suite starts cannot be pinned. The manifest can still be used to run the suite again;
+- the target's adapter cannot pin the clock, the time zone or randomness (`nonHermeticInputs` lists them);
+- the run called declared services or ran database commands, and the project did not record their replies. A replay never sends a call or runs a command again. Set `replay: { "recordReplies": true }` in the trusted `project.json` to record them; recordings may hold personal data until privacy masking (SPEC-09).
+
+## version-unsupported
+
+Replay error. The run manifest or recording is of a schema version this engine does not read, such as `revisum.run-manifest/v2`, is another kind of file, or holds a key this version does not know. It is refused whole rather than replayed with an input ignored. Replay it with the engine version that wrote it. Not the plan error `version_unsupported`.
 
 ## internal
 

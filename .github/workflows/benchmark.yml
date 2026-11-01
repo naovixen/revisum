@@ -1,0 +1,41 @@
+# The performance benchmark: a weekly trend alarm, never a gate. tools/benchmark.ts runs the
+# sign-up plan 20 times on the CDP driver's headless shell and compares the median setup time and
+# peak memory with docs/decisions/benchmark-baseline.json. A median more than 30% over its baseline
+# prints a warning and a job-summary line; the tool always exits 0. It runs on a schedule and by
+# hand only, never on a push or a pull request, to keep CI minutes down, and in the same pinned
+# image as the "ci" workflow. ARM results are recorded only when someone runs the tool on an arm64
+# machine: there is no paid runner. See docs/specs/SPEC-08-manifest-and-replay.md.
+name: benchmark
+
+on:
+  schedule:
+    # Wednesdays at 05:00 UTC.
+    - cron: '0 5 * * 3'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - name: Benchmark the sign-up plan in the pinned image
+        run: |
+          # The container writes the job summary as "node", so the file must be writable by it.
+          chmod a+w "$GITHUB_STEP_SUMMARY"
+          # The profile lets Chrome's sandbox create its namespaces, as in the dev container.
+          docker run --rm \
+            --security-opt seccomp=.devcontainer/seccomp-chrome-sandbox.json \
+            --volume "$GITHUB_WORKSPACE:/workspace" --workdir /workspace \
+            --volume "$GITHUB_STEP_SUMMARY:/github/step-summary" --env GITHUB_STEP_SUMMARY=/github/step-summary \
+            mcr.microsoft.com/devcontainers/typescript-node:24-bookworm@sha256:970eebf5b82d3800bdd9f46680e1c4c664d365d18603148540788356700ce301 \
+            bash -euo pipefail -c '
+              npm ci
+              # The system libraries Chromium needs on Linux, installed as root.
+              node node_modules/playwright-core/cli.js install-deps chromium
+              # Chrome refuses to sandbox as root, so the browsers and the benchmark run as "node".
+              chown -R node:node /workspace
+              su node -c "npm run browsers && npm run benchmark"
+            '
