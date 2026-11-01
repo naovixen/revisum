@@ -379,7 +379,8 @@ export async function replayRun(ran: ScenarioRun, options: ReplayOptions = {}): 
     services: spyCaller.caller, databaseCommands: spyRunner.port,
   };
   const request = {
-    manifest: options.manifest ?? JSON.parse(JSON.stringify(ran.manifest)),
+    // Only a missing option means the run's own manifest: a test may pass null on purpose.
+    manifest: 'manifest' in options ? options.manifest : JSON.parse(JSON.stringify(ran.manifest)),
     recording: options.recording === undefined ? ran.recording : options.recording,
     recordedResultHash: options.recordedResultHash ?? ran.result.resultHash,
     inputs: options.host === undefined ? inputs : { ...inputs, host: options.host },
