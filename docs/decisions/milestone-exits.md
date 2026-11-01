@@ -63,3 +63,96 @@ One section per milestone exit: what `docs/system-design.md` §7 asked for, the 
 - camelCase splitting makes names like "PayPal" match "pay" (safe side; projects can allow names).
 - `fileAtCommit` is optional on the version-control port, since two committed test helpers build the port without it; a port lacking it refuses code-owner reviews. No test yet covers it being unavailable.
 - Branch protection waits for beta; until then the founder's push is the only gate.
+
+## M2, driver and isolation (2026-11-01)
+
+### In short
+
+- M2's specs are built, and the plan's three exit tests pass on the pinned Linux image. One part of §7's slice is proved only in pieces: no test runs a plan in the container and then replays that run (see the §7 slice below).
+- The cold review of SPEC-07 found 14 gaps, 3 of them high, and its new tests found a real hole: the run container could reach the Docker host through its network's gateway, so `isolated` overclaimed. All are fixed.
+- The isolation kill criterion stays open until CI's container step passes on the pushed gateway fix. That fix is verified only on Docker Desktop 29.8.2.
+
+### Decisions
+
+| Decision | By |
+|---|---|
+| Recordings of service and command replies are opt-in (`replay-recordings.md`) | Founder, 2026-10-31 |
+| Fix the committed test helper that replayed the real manifest in its `null` case (`0399830`) | Founder, 2026-11-01 |
+| The benchmark runs weekly and on manual dispatch, outside `check`; ARM results only if someone runs it on an arm64 machine, with no paid runner | Main session, 2026-10-31 |
+| Internal networks are created without a gateway, and the probe tries where it would be, so a Docker that keeps it gives `host` | Main session, 2026-11-01 |
+| An isolated plan with service calls and no recording loses `replay-identical`, with the reason `replies-not-recorded` | Main session, 2026-11-01 |
+| A refused or failed `--after` login stops with `plan-rejected`, with no new code. Open for the founder to confirm | Main session, 2026-11-01 |
+
+### Findings
+
+**Checks on the final code (`da4a7c8`):** each ran alone, one after another.
+
+| Check | Result |
+|---|---|
+| `npm run check`, Windows | 0 failures; 1 skip (`test` 3501 and 664, `proofs` 407 and 82, `replay` 1 and 5) |
+| `npm run check:containers`, Docker Desktop | 105 of 105 |
+| `npm run check:linux`, pinned image | 0 failures; 4 skips (same counts; 3 of the skips are in `proofs`) |
+
+The skips are `test/contract/dom-checks.test.ts:62` (a driver without `rememberedValues`) and, on Linux, the three clipboard-proof tests that need xclip.
+
+**§7 slice.**
+
+| Asked for | Status |
+|---|---|
+| A plan runs in the container, egress blocked | Met through a test-set script (`test/containers/`). The real `run` wiring is SPEC-16's |
+| Replay matches | Met on the pinned image: the sign-up plan on the headless shell, 20 replays, identical. **Not joined up:** an isolated replay is tested with fake ports only, and no test in `test/containers/` replays a run made in the container. SPEC-16's `run` is the first place to close this |
+| Workload runner: suite with egress, traces and manifest | Met; `check:containers` |
+| SPEC-36's driver parts, then database commands | Met; commands reach a service by name only |
+| `draft` and `draft --explore` | Met; the crawl runs in the container, and the page map matches the host's golden map apart from origin and level |
+
+**Plan's exit tests (`09` M2).**
+
+| Test | Status |
+|---|---|
+| Capability contract tests pass in 20 repeated Linux runs | Met: iframes, dialogs, uploads and a crashed tab each ran 20 times in the pinned image |
+| WebSocket, worker, popup, redirect and beacon egress blocked | Met with a real browser and the real proxy running in-process. In a real container, only page, WebSocket, beacon and raw-socket traffic are tested. Worker, popup and redirect are not. The proxy-only test covers every channel but popup, which the driver holds back before it loads |
+| Manifest-sufficiency passes | Met: one perturbation per manifest field, enforced by the type check |
+
+**Reviews, fixed** (SPEC-07; tests `3f1b8b1`, `6023ca9`; code `1b7b863`, `da4a7c8`):
+
+| Gap | Fix |
+|---|---|
+| Container runs could reach the Docker host through the network's gateway | No gateway on internal networks; the probe tries the address; an unknown counts as reached |
+| Applied rewrites never reached the manifest from a container | The proxy writes them to a file; `rewritesApplied()` on the handle |
+| Browser records with no decision were stamped blocked, even on allowed tunnels | New join rule; it never claims an unseen request was allowed |
+| Every container event was `unattributed` | Browser records from inside the container give the channel |
+| A failed read of the proxy's files lost earlier evidence | Decisions already read are kept |
+| A result could claim egress enforced whatever the runner said | `RunInputs.guaranteeLevel`, default `host` |
+| A hand-built policy could widen rewrites | The proxy refuses to start with an undeclared or non-HTTP rewrite origin |
+| IPv4-translated, local NAT64 and Teredo addresses were allowed | Refused |
+| Smaller: `.git` mount check's case, a refused malformed request left unrecorded, a stopped daemon reported as `image-missing`, the product name hard-coded in `runner` | Fixed |
+
+**Left as they are:** the `as TargetId` casts and two template strings in committed tests. No behaviour depends on them, and changing them would change committed tests.
+
+**A record written too early.** `71b0218` says SPEC-08 was green on Linux, but I wrote that row before reading the check, and that check had exited 1 because Docker Desktop was stopped, so no tests ran. I started Docker and re-ran it: green, on the same code, with no failures. The commit can't be amended, so the correction is here.
+
+**Kill criteria, as of 2026-11-01:**
+
+| Signal | Status |
+|---|---|
+| Driver parity, by 2027-03-17 | Passing on the pinned image. CI runs the same tests after the push |
+| Isolation, by 2027-03-17 | Open. CI's container step has passed on earlier pushes, but none includes the gateway fix. If this push fails it, egress is not proved in standard CI containers on the current code |
+| Language fit | Resolved by the founder's pivot at M1 |
+| Velocity, M1 | Met at M1's exit |
+| Problem fit, 5 of 15 calls by 2027-01-25 | No calls recorded in this repo; not due |
+| Upkeep, velocity at M3 and later signals | Not due |
+
+### Risks
+
+- **The isolated path is proved in pieces.** See the §7 slice and the egress test above. The alpha's claim should stay at what each piece shows until SPEC-16 joins them.
+- **Worker, popup and redirect blocking is not tested inside a real container.** The proxy code is the same, but the container path is not exercised for them.
+- The gateway fix relies on a Docker bridge option and is verified on one Docker version. Another Docker that keeps the gateway should give `host` by the probe, which is safe but loses the isolated claim.
+- A workload run reads its decisions once at the end, and a failed read gives `[]` with no notice. Carried to M3.
+- `cli`'s recording file and the `Runner` wiring for plan runs wait for SPEC-16.
+- Recordings may hold personal data until SPEC-09, and masking them may affect replay (`replay-recordings.md`).
+- Benchmark baseline values are placeholders until the first weekly run, so its alarm means nothing before then.
+- Stale `revisum-run-*` containers are not swept at start, and an interrupted run has left some behind.
+- The Linux half of the clipboard proof is skipped, as the image has no xclip.
+- Untested: `firstAddressOf`'s tightened octet and prefix limits, and a plan with both calls and commands losing the claim twice.
+- SPEC-35's spec text (line 91) lists an out-of-date loss-reason union.
+- AC-SPEC-08-06's Windows golden must be remade when the engine version, the Playwright adapter or the result's shape changes.

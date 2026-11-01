@@ -47,7 +47,7 @@ M2, driver and isolation (alpha):
 - [x] SPEC-37 explore to draft: `draft --explore`, crawl, page map, locator check (2026-11-01)
 - [x] SPEC-30 to 34 and SPEC-36 driver and runner parts (done 2026-10-31: states, downloads, tab, real service caller, stubs, storage, clock, clipboard, CSS, XPath, DOM checks, page scripts, database commands; replay of database commands comes with SPEC-08)
 - [x] SPEC-08 manifest and replay, with SPEC-32's call replay and SPEC-36's database-command replay (AC-SPEC-32-13, AC-SPEC-36-15; 2026-11-01)
-- [ ] M2 exit
+- [x] M2 exit (2026-11-01): `docs/decisions/milestone-exits.md`
 
 M3, evidence:
 
