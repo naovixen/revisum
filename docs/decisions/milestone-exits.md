@@ -70,7 +70,7 @@ One section per milestone exit: what `docs/system-design.md` §7 asked for, the 
 
 - M2's specs are built, and the plan's three exit tests pass on the pinned Linux image. One part of §7's slice is proved only in pieces: no test runs a plan in the container and then replays that run (see the §7 slice below).
 - The cold review of SPEC-07 found 14 gaps, 3 of them high, and its new tests found a real hole: the run container could reach the Docker host through its network's gateway, so `isolated` overclaimed. All are fixed.
-- The isolation kill criterion stays open until CI's container step passes on the pushed gateway fix. That fix is verified only on Docker Desktop 29.8.2.
+- The isolation kill criterion stays open until CI's container step is green. CI has now run the gateway fix and every blocking test passed; one counter-example's setup failed, and its fix waits for the next push.
 
 ### Decisions
 
@@ -78,6 +78,7 @@ One section per milestone exit: what `docs/system-design.md` §7 asked for, the 
 |---|---|
 | Recordings of service and command replies are opt-in (`replay-recordings.md`) | Founder, 2026-10-31 |
 | Fix the committed test helper that replayed the real manifest in its `null` case (`0399830`) | Founder, 2026-11-01 |
+| On Linux, the `host.docker.internal` tests use the service on the Docker host's own network, as CI's test process runs in a container (`27312b3`) | Founder, 2026-11-01 |
 | The benchmark runs weekly and on manual dispatch, outside `check`; ARM results only if someone runs it on an arm64 machine, with no paid runner | Main session, 2026-10-31 |
 | Internal networks are created without a gateway, and the probe tries where it would be, so a Docker that keeps it gives `host` | Main session, 2026-11-01 |
 | An isolated plan with service calls and no recording loses `replay-identical`, with the reason `replies-not-recorded` | Main session, 2026-11-01 |
@@ -135,8 +136,8 @@ The skips are `test/contract/dom-checks.test.ts:62` (a driver without `remembere
 
 | Signal | Status |
 |---|---|
-| Driver parity, by 2027-03-17 | Passing on the pinned image. CI runs the same tests after the push |
-| Isolation, by 2027-03-17 | Open. CI's container step has passed on earlier pushes, but none includes the gateway fix. If this push fails it, egress is not proved in standard CI containers on the current code |
+| Driver parity, by 2027-03-17 | Passing on the pinned image, locally and in CI on `7e78d28` |
+| Isolation, by 2027-03-17 | Open until CI's container step is green. On `7e78d28` it passed 104 of 105 with the gateway fix in: every blocking test passed, and the run reported `isolated`. The one failure was a counter-example's own setup, fixed in `27312b3`, which only CI can confirm because Docker Desktop doesn't take that path |
 | Language fit | Resolved by the founder's pivot at M1 |
 | Velocity, M1 | Met at M1's exit |
 | Problem fit, 5 of 15 calls by 2027-01-25 | No calls recorded in this repo; not due |
@@ -146,7 +147,7 @@ The skips are `test/contract/dom-checks.test.ts:62` (a driver without `remembere
 
 - **The isolated path is proved in pieces.** See the §7 slice and the egress test above. The alpha's claim should stay at what each piece shows until SPEC-16 joins them.
 - **Worker, popup and redirect blocking is not tested inside a real container.** The proxy code is the same, but the container path is not exercised for them.
-- The gateway fix relies on a Docker bridge option and is verified on one Docker version. Another Docker that keeps the gateway should give `host` by the probe, which is safe but loses the isolated claim.
+- The gateway fix relies on a Docker bridge option and is verified on Docker Desktop 29.8.2 and GitHub's runner. Another Docker that keeps the gateway should give `host` by the probe, which is safe but loses the isolated claim.
 - A workload run reads its decisions once at the end, and a failed read gives `[]` with no notice. Carried to M3.
 - `cli`'s recording file and the `Runner` wiring for plan runs wait for SPEC-16.
 - Recordings may hold personal data until SPEC-09, and masking them may affect replay (`replay-recordings.md`).
