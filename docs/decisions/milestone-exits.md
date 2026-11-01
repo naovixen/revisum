@@ -70,7 +70,7 @@ One section per milestone exit: what `docs/system-design.md` §7 asked for, the 
 
 - M2's specs are built, and the plan's three exit tests pass on the pinned Linux image. One part of §7's slice is proved only in pieces: no test runs a plan in the container and then replays that run (see the §7 slice below).
 - The cold review of SPEC-07 found 14 gaps, 3 of them high, and its new tests found a real hole: the run container could reach the Docker host through its network's gateway, so `isolated` overclaimed. All are fixed.
-- The isolation kill criterion stays open until CI's container step is green. CI has now run the gateway fix and every blocking test passed; one counter-example's setup failed, and its fix waits for the next push.
+- The isolation kill criterion is passing: CI's container step passed 105 of 105 on `55a0b5a`, with the gateway fix in.
 
 ### Decisions
 
@@ -137,7 +137,7 @@ The skips are `test/contract/dom-checks.test.ts:62` (a driver without `remembere
 | Signal | Status |
 |---|---|
 | Driver parity, by 2027-03-17 | Passing on the pinned image, locally and in CI on `7e78d28` |
-| Isolation, by 2027-03-17 | Open until CI's container step is green. On `7e78d28` it passed 104 of 105 with the gateway fix in: every blocking test passed, and the run reported `isolated`. The one failure was a counter-example's own setup, fixed in `27312b3`, which only CI can confirm because Docker Desktop doesn't take that path |
+| Isolation, by 2027-03-17 | Passing: CI's container step passed 105 of 105 on `55a0b5a` with the gateway fix in, on GitHub's runner. Before that, `7e78d28` passed 104 of 105; the one failure was a counter-example's own setup, fixed in `27312b3` |
 | Language fit | Resolved by the founder's pivot at M1 |
 | Velocity, M1 | Met at M1's exit |
 | Problem fit, 5 of 15 calls by 2027-01-25 | No calls recorded in this repo; not due |
