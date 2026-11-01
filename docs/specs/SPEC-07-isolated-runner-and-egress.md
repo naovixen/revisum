@@ -68,7 +68,7 @@ A cold review at the M2 exit found that a real container run's evidence could be
 - **Channels in a real container (AC-01).** `RunnerHandle` gains `proxyDecisions(): readonly ProxyDecision[]`, and `egressEvents(records = [], directOrigins = [])` takes the browser's records, printed by the process inside the container. A container test asserts a WebSocket's channel, not only its origin and decision.
 - **Evidence survives a failed read (AC-01).** A non-zero read of the proxy's files keeps the decisions already read, except when the file does not exist yet, which still reads as no lines.
 - **The result's claim follows the runner (AC-05).** `RunInputs.guaranteeLevel?: GuaranteeLevel`, default `host`, set by whoever started the run from `Runner.guaranteeLevel()`. Only `isolated` makes `run` state `egressEnforced: true`; the default keeps committed hashes as they are. A test observes the real result, both ways.
-- **Rewrite policy (AC-07).** The policy builder refuses a fixture origin that is undeclared or not plain HTTP. `startEgressProxy` refuses to start with a rewrite whose origin is undeclared or not plain HTTP, so a hand-built policy can't widen it. `EgressPolicy` stays unbranded, because committed tests build it directly; the builder alone knows which origins are fixtures.
+- **Rewrite policy (AC-07).** The policy builder refuses a fixture origin that is undeclared or not plain HTTP. `startProxyServer`, which both the in-process and the container proxy use, refuses to start with a rewrite whose origin is undeclared or not plain HTTP, so a hand-built policy can't widen it. `EgressPolicy` stays unbranded, because committed tests build it directly; the builder alone knows which origins are fixtures.
 - **Coverage (AC-01, AC-02).** New tests, with counter-examples:
   - a popup to a reachable host leaves that host's server with no request;
   - a private service never reaches a metadata address;
@@ -79,7 +79,9 @@ A cold review at the M2 exit found that a real container run's evidence could be
   - The `.git` mount check ignores case, since Windows does.
   - A refused malformed request (400) is recorded as a blocked decision.
   - A stopped Docker daemon gives `start-failed`, not `image-missing`.
-  - `runner`'s product name comes from `PRODUCT`, and its `as` casts to branded types become parser calls.
+  - `runner`'s product name comes from `PRODUCT`. `readImageDigest` stays the listed owner of its cast.
+- **No gateway to the Docker host (AC-04, AC-05).** Found with these tests: on an `--internal` network the run container could still reach a service on the Docker host through the network's gateway, so `isolated` overclaimed. Internal networks are now created with `-o com.docker.network.bridge.inhibit_ipv4=true`, which removes the gateway and leaves peers connected. The isolation probe also tries the network's first address, so a Docker that keeps the gateway gives `host`, not `isolated`. The run and workload networks share one `createNetwork`.
+- **Replaying an isolated run.** The manifest doesn't record the level. `guaranteeLevel` is one of a replay's `inputs`, so an isolated run replayed without it gives `mismatch`, never a pass.
 - **Left as they are.** The `as TargetId` casts and the two template strings in committed tests stay: no behaviour depends on them, and they are committed tests. `Runner` wiring for plan runs stays SPEC-16's.
 
 ## Acceptance criteria
