@@ -98,16 +98,30 @@ export type ExploreSite = {
   close(): Promise<void>;
 };
 
-export async function startExploreSite(): Promise<ExploreSite> {
+// Where the site listens, and who else hears of each request. The ports are free ones unless
+// given, as they are inside a run container (test/containers/explore-site-inside.ts).
+export type ExploreSiteOptions = {
+  readonly sitePort?: number;
+  readonly secondPort?: number;
+  readonly onRequest?: (server: 'site' | 'second', path: string) => void;
+};
+
+export async function startExploreSite(options: ExploreSiteOptions = {}): Promise<ExploreSite> {
   const secondRequested: string[] = [];
-  const second = await startFixtureServer(SITE_FOLDER, (path) => secondRequested.push(path));
+  const second = await startFixtureServer(SITE_FOLDER, (path) => {
+    secondRequested.push(path);
+    options.onRequest?.('second', path);
+  }, new Map(), options.secondPort);
   const requested: string[] = [];
   const home = readFileSync(join(SITE_FOLDER, 'index.html'), 'utf8').replaceAll('{{SECOND_ORIGIN}}', second.origin);
   const homeRoute: FixtureRoute = () => ({
     headers: { 'content-type': 'text/html; charset=utf-8', 'set-cookie': `shop-session=${CANARIES.cookie}; Path=/` },
     body: home,
   });
-  const first = await startFixtureServer(SITE_FOLDER, (path) => requested.push(path), new Map([['/index.html', homeRoute]]));
+  const first = await startFixtureServer(SITE_FOLDER, (path) => {
+    requested.push(path);
+    options.onRequest?.('site', path);
+  }, new Map([['/index.html', homeRoute]]), options.sitePort);
   return {
     origin: first.origin,
     secondOrigin: second.origin,
@@ -328,6 +342,10 @@ export type ExploreSetup = {
   // The browser the command may use; a fresh spy unless given. `false` gives the command none.
   readonly browser?: SpyBrowser | false;
   readonly runner?: (site: ExploreSite) => FakeRunner;
+  // A real isolated runner instead of the fake one, and the site it reaches, which then runs
+  // elsewhere (inside the run container) rather than on this machine's loopback.
+  readonly isolatedRunner?: (site: ExploreSite) => { readonly runner: Runner; readonly image: ImageDigest };
+  readonly site?: () => Promise<ExploreSite>;
   readonly approvals?: readonly Approval[] | ((project: JsonRecord) => Promise<readonly Approval[]>);
   // Files to write into the workspace before the run, by relative path.
   readonly files?: Readonly<Record<string, string>>;
@@ -368,7 +386,7 @@ export const exploreSecrets = (loginName: string): Readonly<Record<string, strin
 // Starts the site and a local fake planner, runs the command in a fresh workspace, hands the run
 // to `body`, then closes everything.
 export async function withExploreRun(setup: ExploreSetup, body: (run: ExploreRun) => Promise<void> | void): Promise<void> {
-  const site = await startExploreSite();
+  const site = await (setup.site ?? startExploreSite)();
   const planner = await startFakePlanner(setup.answer ?? recordedExploreAnswer());
   const project = exploreProjectFile(site, localPlanner(planner.origin));
   const workspace = draftWorkspace({ planner: undefined, project, ...(setup.spec === undefined ? {} : { spec: setup.spec }) });
@@ -390,6 +408,7 @@ export async function withExploreRun(setup: ExploreSetup, body: (run: ExploreRun
       resolve: resolver.resolve,
       ...(browser === undefined ? {} : { browser: browser.driver }),
       ...(runner === undefined ? {} : { isolatedRunner: { runner: runner.runner, image: runner.image } }),
+      ...(setup.isolatedRunner === undefined ? {} : { isolatedRunner: setup.isolatedRunner(site) }),
       ...(approvals === undefined ? {} : { approvals: approvalStore(approvals) }),
     };
     const command = await loadDraftCommand();

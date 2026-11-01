@@ -4,6 +4,8 @@
 // A test may also give routes: paths the server answers with a response the test builds, such as
 // a file download with a chosen Content-Disposition, a body streamed in chunks, or a page that
 // shows a cookie the browser sent. A route takes precedence over a file of the same path.
+// It listens on a free loopback port unless given one, as a server inside a run container is,
+// where the port must be known before the server starts.
 import { readdirSync, readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
@@ -30,7 +32,7 @@ export type FixtureRoute = (request: FixtureRequest) => FixtureResponse;
 export type FixtureServer = { readonly origin: string; readonly fixtures: readonly FixtureReference[]; close(): Promise<void> };
 
 export async function startFixtureServer(
-  folder: string, onRequest?: (path: string) => void, routes: ReadonlyMap<string, FixtureRoute> = new Map(),
+  folder: string, onRequest?: (path: string) => void, routes: ReadonlyMap<string, FixtureRoute> = new Map(), port = 0,
 ): Promise<FixtureServer> {
   const files = new Map<string, Buffer>();
   for (const name of readdirSync(folder)) files.set(`/${name}`, readFileSync(join(folder, name)));
@@ -62,10 +64,10 @@ export async function startFixtureServer(
     response.writeHead(200, { 'content-type': MEDIA_TYPES[extname(path)] ?? 'application/octet-stream', 'cache-control': 'no-store' });
     response.end(body);
   });
-  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
-  const { port } = server.address() as AddressInfo;
+  await new Promise<void>((resolve) => server.listen(port, '127.0.0.1', resolve));
+  const listening = (server.address() as AddressInfo).port;
   return {
-    origin: `http://127.0.0.1:${port}`,
+    origin: `http://127.0.0.1:${listening}`,
     fixtures: [...files].map(([path, body]) => ({ path, sha256: sha256(body) })),
     close: () => new Promise((resolve) => { server.closeAllConnections(); server.close(() => resolve()); }),
   };
