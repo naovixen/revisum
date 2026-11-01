@@ -147,6 +147,8 @@ function watchedRunner(image: ImageDigest, watch: RunnerWatch): { readonly runne
       const watched: RunnerHandle = {
         runId: handle.runId,
         egressEvents: () => handle.egressEvents(),
+        proxyDecisions: () => handle.proxyDecisions(),
+        rewritesApplied: () => handle.rewritesApplied(),
         async exec(command, environmentNames = []) {
           const outcome = await handle.exec(command, environmentNames);
           watch.execs.push({ command, environmentNames, outcome });

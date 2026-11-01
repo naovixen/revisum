@@ -271,6 +271,8 @@ export function fakeRunner(options: FakeRunnerOptions): FakeRunner {
   const handle: RunnerHandle = {
     runId: 'run-explore-fake',
     egressEvents: () => [],
+    proxyDecisions: () => [],
+    rewritesApplied: () => [],
     async exec(command: readonly string[], environmentNames?: unknown): Promise<ExecOutcome> {
       execs.push({ command, environmentNames });
       return { exitCode: 0, stdout: options.output ?? '', stderr: '' };

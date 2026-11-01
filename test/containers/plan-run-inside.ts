@@ -1,17 +1,20 @@
 // Runs inside the run container, started through RunnerHandle.exec by egress-enforcement.test.ts;
 // it is not a test file of its own. It serves the egress fixture app on the container's own
 // loopback, runs one plan on the CDP driver with the run's egress proxy (from HTTP_PROXY) for
-// everything that is not loopback, and prints the run's state as JSON on its last line.
+// everything that is not loopback, and prints the run's state as JSON on its last line. The line
+// before it holds what the browser recorded, and the fixture's origin, which the browser sends past
+// the proxy, because only this process can see them; a test outside hands them to the run's handle.
 // The plan opens a page whose WebSocket goes to an undeclared origin and passes only once the
 // page shows that WebSocket was closed.
 // See docs/specs/SPEC-07-isolated-runner-and-egress.md.
 import { arch, platform } from 'node:os';
 import { cdpDriver } from '@revisum/driver-cdp';
-import { defaultRedactor, parseProject, planParser, run, type BrowserDriver, type TargetId } from '@revisum/engine';
+import { defaultRedactor, parseProject, planParser, run, type BrowserDriver, type BrowserRequestRecord, type TargetId } from '@revisum/engine';
 import { BROWSERS } from '../support/browsers.ts';
 import { memoryArtifactStore, memoryEventSink, memoryRunEventSink, systemClock } from '../support/memory-ports.ts';
 import { authorise, trustedProjectFrom } from '../support/policy-clearance.ts';
 import { startEgressFixtureServer } from '../unit/runner/egress-fixture-server.ts';
+import { keepingBrowserRecords } from './keeping-browser-records.ts';
 
 const TARGET_ID = 'cdp-chromium';
 const SEED = 7;
@@ -49,8 +52,9 @@ async function main(): Promise<number> {
     const trusted = await trustedProjectFrom(projectFile);
     // The fixture app is on the container's own loopback, which the proxy, in another container,
     // cannot reach; everything else goes through the proxy.
+    const browserRecords: BrowserRequestRecord[] = [];
     const drivers = new Map<string, BrowserDriver>([
-      ['cdp', cdpDriver({ executablePath: BROWSERS.chrome, proxy: { server: proxyServer, includeLoopback: false } })],
+      ['cdp', keepingBrowserRecords(cdpDriver({ executablePath: BROWSERS.chrome, proxy: { server: proxyServer, includeLoopback: false } }), (kept) => { browserRecords.push(...kept); })],
     ]);
     // The target id comes from the project written just above, so it is used as the branded value directly.
     const result = await run({
@@ -59,6 +63,7 @@ async function main(): Promise<number> {
     }, {
       drivers, clock: systemClock, artifacts: memoryArtifactStore(), redactor: defaultRedactor(), audit: memoryEventSink(), events: memoryRunEventSink(),
     });
+    console.log(JSON.stringify({ browserRecords, fixtureOrigin: fixture.origin }));
     console.log(JSON.stringify({ state: result.state }));
     return 0;
   } finally {

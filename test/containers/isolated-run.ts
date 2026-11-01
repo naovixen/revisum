@@ -8,7 +8,7 @@
 // See docs/specs/SPEC-07-isolated-runner-and-egress.md.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import type { EgressPolicy, ImageDigest, Runner, RunnerHandle } from '@revisum/contracts';
+import type { DeclaredService, EgressPolicy, ImageDigest, Runner, RunnerHandle } from '@revisum/contracts';
 import { dockerCliEngine, dockerRunner, prepareRunImage, type ExecOutcome, type RunnerLogEntry } from '@revisum/runner';
 import { REPOSITORY_ROOT } from '../support/repository.ts';
 import { egressPolicy } from '../unit/runner/runner-examples.ts';
@@ -56,6 +56,8 @@ export type IsolatedRunOptions = {
   readonly policy?: EgressPolicy;
   // Repository-relative folders the run gets as read-only inputs, beside packages, node_modules and .browsers.
   readonly inputs?: readonly string[];
+  // The declared services the policy may name, such as a fixture server on a private address.
+  readonly services?: readonly DeclaredService[];
 };
 
 // Starts a run from the pinned image with the host's environment seeded with fake credentials,
@@ -67,6 +69,7 @@ export async function startIsolatedRun(options: IsolatedRunOptions = {}): Promis
   const logged: RunnerLogEntry[] = [];
   const runner = dockerRunner({
     engine: dockerCliEngine(), repositoryRoot: REPOSITORY_ROOT, inputs: options.inputs ?? [], log: (entry) => { logged.push(entry); },
+    ...(options.services === undefined ? {} : { services: options.services }),
   });
   const restore = (): void => {
     for (const [name, value] of previous) {
