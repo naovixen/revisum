@@ -179,6 +179,12 @@ export function pageInfo(): string {
   });
 }
 
+// The absolute URLs of the document's links, as JSON: every a and area element with an href, in
+// document order, as the browser resolves each against the page's URL. Nothing is clicked or changed.
+export function linkTargetList(): string {
+  return JSON.stringify(Array.from(document.links).map((link) => link.href));
+}
+
 // What a probe reads besides the accessibility tree, as JSON: the absolute href of the link the
 // element is, or is in (null outside a link), and its aria-current state. Any aria-current value but
 // "false" (or empty) is current. With none, a link or a control is not current; any other element

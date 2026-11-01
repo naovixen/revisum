@@ -20,16 +20,17 @@ export const cliError = (code: CliErrorCode, path?: string): CliError => ({ code
 
 // The exit code a failed command ends with, from the run's codes (0 passed, 1 failed, 2 plan
 // rejected, 3 a required target unavailable, 4 internal error, 5 needs review). A refused plan or
-// approval is 2 and an unavailable target 3; anything else that stops a command before it can do
-// its work is 4.
+// approval, or a plan with none, is 2 and an unavailable target 3; anything else that stops a
+// command before it can do its work is 4.
 export function exitCodeFor(code: CliErrorCode): ExitCode {
   switch (code) {
-    case 'plan-rejected': case 'approval-refused':
+    case 'plan-rejected': case 'approval-refused': case 'after-plan-unapproved':
       return 2;
     case 'target-unavailable':
       return 3;
     case 'usage': case 'config-invalid': case 'untrusted-source': case 'lock-download-failed': case 'lock-offline': case 'replay-mismatch':
     case 'internal': case 'planner-endpoint-not-loopback': case 'planner-call-failed':
+    case 'explore-origin-refused': case 'explore-runner-unavailable': case 'explore-start-unreachable':
       return 4;
   }
 }

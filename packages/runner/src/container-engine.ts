@@ -51,8 +51,10 @@ export interface ContainerEngine {
   removeNetwork(name: string): Promise<void>;
   // Starts a container and returns its id.
   startContainer(options: ContainerOptions): Promise<Result<string, EngineProblem>>;
-  // Runs an argument vector inside a running container, without a shell.
-  exec(containerId: string, command: readonly string[]): Promise<Result<ExecOutcome, EngineProblem>>;
+  // Runs an argument vector inside a running container, without a shell. Each variable named in
+  // `environmentNames` is passed by name only, so Docker copies its value from the client's own
+  // environment and no secret is ever on a command line.
+  exec(containerId: string, command: readonly string[], environmentNames?: readonly string[]): Promise<Result<ExecOutcome, EngineProblem>>;
   // Tries a direct connection from inside the container to each target. 'reached' when any one
   // answered, or when the probe itself could not run, so an unknown is never taken for 'blocked'.
   probeEgress(containerId: string, targets: readonly ProbeTarget[]): Promise<'reached' | 'blocked'>;
@@ -146,8 +148,8 @@ const probeScript = (targets: readonly ProbeTarget[]): string => `
 
 // The container engine over the Docker command-line client.
 export function dockerCliEngine(): ContainerEngine {
-  const exec = async (containerId: string, command: readonly string[]): Promise<Result<ExecOutcome, EngineProblem>> => {
-    const outcome = await runDocker(['exec', containerId, ...command], null);
+  const exec = async (containerId: string, command: readonly string[], environmentNames: readonly string[] = []): Promise<Result<ExecOutcome, EngineProblem>> => {
+    const outcome = await runDocker(['exec', ...environmentNames.flatMap((name) => ['--env', name]), containerId, ...command], null);
     if (outcome.status === -1) return failure(problem(outcome));
     return success({ exitCode: outcome.status, stdout: outcome.stdout, stderr: outcome.stderr });
   };

@@ -15,4 +15,6 @@ export type CliErrorCode =
   | 'lock-download-failed' | 'lock-offline' | 'approval-refused' | 'replay-mismatch' | 'internal'
   // The draft command's planner: a local endpoint off the loopback interface, and a call that
   // failed on the network, at the egress proxy or with the planner's status.
-  | 'planner-endpoint-not-loopback' | 'planner-call-failed';
+  | 'planner-endpoint-not-loopback' | 'planner-call-failed'
+  // The draft command's explore mode: see ExploreErrorCode.
+  | 'explore-origin-refused' | 'after-plan-unapproved' | 'explore-runner-unavailable' | 'explore-start-unreachable';

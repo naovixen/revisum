@@ -62,8 +62,10 @@ export interface RunnerHandle {
   readonly runId: string;
   // Every request the proxy decided on so far, as egress events.
   egressEvents(): readonly EgressEvent[];
-  // Runs an argument vector inside the run container, without a shell.
-  exec(command: readonly string[]): Promise<ExecOutcome>;
+  // Runs an argument vector inside the run container, without a shell. Each variable named in
+  // `environmentNames` is copied into the command's environment from the container client's own,
+  // by name only, so a secret is never on a command line.
+  exec(command: readonly string[], environmentNames?: readonly string[]): Promise<ExecOutcome>;
   // Removes the run's containers and network.
   stop(): Promise<void>;
 }

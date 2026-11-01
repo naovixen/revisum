@@ -10,7 +10,7 @@ import {
 } from '@revisum/contracts';
 import {
   actionability, afterTwoFrames, armHitCheck, findByLabel, findByTestId, findByText, findStructural, fontsReady, guardDetails, inDocumentOrder,
-  inThisDocument, linkAndCurrent, maskElements, pageInfo, probeElement, readDomValue, readHitCheck, selectOption, structuralSelectorValidity,
+  inThisDocument, linkAndCurrent, linkTargetList, maskElements, pageInfo, probeElement, readDomValue, readHitCheck, selectOption, structuralSelectorValidity,
   unmaskElements,
 } from './in-page.ts';
 import { heldModifierKeys } from './modifier-keys.ts';
@@ -185,6 +185,13 @@ function decodeLinkAndCurrent(text: string): { readonly href: string | null; rea
   const href = fields['href'];
   const current = fields['current'];
   return { href: typeof href === 'string' ? href : null, current: current === 'true' ? true : current === 'false' ? false : null };
+}
+
+// Decodes what linkTargetList (in-page.ts) reports. The page's own scripts may have changed what the
+// browser hands back, so an entry that is not text is left out.
+function decodeLinkTargets(text: string): readonly string[] {
+  const parsed: unknown = JSON.parse(text);
+  return Array.isArray(parsed) ? parsed.filter((target): target is string => typeof target === 'string') : [];
 }
 
 // Decodes what pageInfo (in-page.ts) reports. The page's own scripts may have changed what the
@@ -504,6 +511,9 @@ function documentPorts<Handle>(
       return parseAudit(await operations.callForString(pageAudit, []));
     },
     accessibilitySnapshot: () => operations.accessibilityTree(),
+    async linkTargets() {
+      return decodeLinkTargets(await operations.callForString(linkTargetList, []));
+    },
     async frame(locator) {
       if (crashed()) return failure(CRASHED);
       if (await rejectsSelector(operations, locator)) return failure(SELECTOR_INVALID);

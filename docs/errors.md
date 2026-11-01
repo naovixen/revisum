@@ -429,11 +429,13 @@ Command-line error, and trust error from the project loader. The project configu
 
 Command-line error, and trust error. The project configuration came from a branch other than the protected branch and has no approval, or the protected branch could not be read. Merge `project.json` to the protected branch.
 
-Plan draft error, too. A draft claims a source only core itself records: a `core-recorded` basis, or one of core's own routes (`draft-command`, `ticket`, `builder`, `recorder`, `chat`) as a declared source. Declare `hand-written` or `customer-llm`, or declare nothing.
+Plan draft error, too. A draft claims a source only core itself records: a `core-recorded` basis, or one of core's own routes (`draft-command`, `explore-draft`, `ticket`, `builder`, `recorder`, `chat`) as a declared source. Declare `hand-written` or `customer-llm`, or declare nothing.
 
 ## plan-rejected
 
 Command-line error. The plan parser rejected the plan. The output lists each plan error and where it is.
+
+From `draft`: the planner's reply was not text, looked like script or was too long, so no draft was written. From `draft --explore --after`: the `--after` plan was refused by the parser or the policy gate, does not name the crawl's target, or ran and did not pass, so nothing was crawled.
 
 ## target-unavailable
 
@@ -462,6 +464,22 @@ Command-line error, from `draft`. The project's `planner` is a `local` endpoint 
 ## planner-call-failed
 
 Command-line error, from `draft`. The planner could not be reached, the egress proxy refused its address, it did not answer in time, its reply was over 1 MiB, or it answered with a status other than success. The error never holds the planner's reply or the key. Check the endpoint's `url`, the key's secret and the planner's own logs.
+
+## explore-origin-refused
+
+Command-line error, from `draft --explore`. The start URL is not on an origin the protected `project.json` declares, is on one of its `productionOrigins`, or is not an `http:` or `https:` URL. Nothing was crawled: no browser or runner started. Start from a page of a declared, non-production origin.
+
+## after-plan-unapproved
+
+Command-line error, from `draft --explore --after`. The plan `--after` names has no approval for its exact hash on the protected branch. Nothing was crawled: no browser or runner started. Merge the plan to the protected branch, or name one already approved.
+
+## explore-runner-unavailable
+
+Command-line error, from `draft --explore`. The crawl runs in the isolated runner, but there is none, it did not start, it could not enforce egress, or the crawl inside it gave no usable page map. Nothing was drafted. Start Docker and pull the pinned run image, or give `--host` to crawl in a browser on this machine, where egress is not enforced.
+
+## explore-start-unreachable
+
+Command-line error, from `draft --explore`. The start page did not load within the page timeout, or redirected to another origin. No page map or draft was written. Check the app is running at the start URL.
 
 ## replay-not-claimed
 

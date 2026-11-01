@@ -36,6 +36,17 @@ export { READABLE_GRAMMAR_VERSION, plannerPrompt } from './drafting/planner-prom
 export {
   ANTHROPIC_API_VERSION, MAXIMUM_PLANNER_REPLY_BYTES, PLANNER_TIMEOUT_MILLISECONDS, plannerReplyText, plannerRequestBody,
 } from './drafting/planner-wire.ts';
+// Explore mode's pure parts and its crawl: the page map, the crawl with the browser session
+// injected, and the static locator check of a draft against the map.
+export {
+  MAXIMUM_EXPLORE_DEPTH, MAXIMUM_EXPLORE_PAGES, MAXIMUM_PAGE_MAP_NAME_LENGTH, PAGE_MAP_ROLES,
+  decodePageMap, pageMapEntry, pageMapReference, pageMapText, redactPageMap,
+} from './drafting/page-map.ts';
+export {
+  DEFAULT_EXPLORE_DEPTH, DEFAULT_EXPLORE_PAGES, DEFAULT_PAGE_TIMEOUT_MILLISECONDS, crawlSite, exploreStartOrigin,
+} from './drafting/site-crawl.ts';
+export { checkDraftLocators } from './drafting/draft-locator-check.ts';
+export { withDeclaredSecretRedaction } from './secrets/secret-resolution.ts';
 export * from './coverage-study.ts';
 export * from './logging.ts';
 export { jsonLinesEventSink } from './event-sink.ts';

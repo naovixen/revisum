@@ -235,6 +235,10 @@ export interface DocumentSession extends PageNavigator, ActionRunner, Prober, Ca
   // (undefined, a function, a cycle) is script-result-invalid, and a script that does not settle
   // in time is script-timeout. A driver without it does not run page scripts (the pageScripts feature).
   runScript?(call: PageScriptCall): Promise<Result<string, DriverError>>;
+  // The absolute URLs of this document's links (a and area elements with an href), in document
+  // order, as the browser resolves them. A read only: nothing on the page is touched. A driver
+  // without it cannot be crawled (the linkTargets feature).
+  linkTargets?(): Promise<readonly string[]>;
 }
 
 // One open browser session: every driver port together.

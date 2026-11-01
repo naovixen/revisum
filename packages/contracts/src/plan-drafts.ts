@@ -6,11 +6,13 @@
 // A draft's provenance says where it came from. It is recorded on the audit event and shown, but
 // never trusted: it changes no gate, approval or metric.
 // See docs/specs/SPEC-28-plan-authoring.md.
+import type { PageMapEntry } from './explore-mode.ts';
 import type { CriterionId, SecretName } from './plan.ts';
 import type { Origin, TargetId } from './target.ts';
 
 // Every route a draft may come by.
-export const PLAN_SOURCES = ['hand-written', 'customer-llm', 'draft-command', 'ticket', 'builder', 'recorder', 'chat'] as const;
+// explore-draft is the draft command's explore mode, which drafts from a crawl of the running app.
+export const PLAN_SOURCES = ['hand-written', 'customer-llm', 'draft-command', 'ticket', 'builder', 'recorder', 'chat', 'explore-draft'] as const;
 export type PlanSource = (typeof PLAN_SOURCES)[number];
 
 // The sources an author may name for a file. The others are core's own routes, which only core
@@ -40,13 +42,15 @@ export type PlanDraft = { readonly format: PlanFormat; readonly content: string;
 export type CriterionText = { readonly criterion: CriterionId; readonly text: string };
 
 // Everything a planner may see when it drafts a plan: the criteria's text, the readable grammar's
-// version, and the project's declared origins and targets. Never secrets, page content, artefacts
-// or any other text from the spec.
+// version, the project's declared origins and targets and, in explore mode, the crawl's page map.
+// Never secrets, cookies, storage, screenshots, typed values, artefacts or any other text from the
+// spec. `criteria` may be empty only when `pages` is given.
 export type DraftRequest = {
   readonly criteria: readonly CriterionText[];
   readonly grammarVersion: string;
   readonly origins: readonly Origin[];
   readonly targets: readonly TargetId[];
+  readonly pages?: readonly PageMapEntry[];
 };
 
 // The two request formats a planner endpoint may speak: Anthropic's Messages API, and the

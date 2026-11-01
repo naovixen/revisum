@@ -24,6 +24,9 @@ import {
 } from './run-containers.ts';
 import { RUN_IMAGE_TAG } from './run-image.ts';
 
+// A variable name Docker copies from the client's environment, never read as NAME=value.
+const VARIABLE_NAME = /^[A-Za-z_][A-Za-z0-9_]{0,127}$/;
+
 export type RunnerLogEntry = { readonly code: 'egress-unenforceable' | 'start-failed'; readonly detail: string };
 
 export type DockerRunnerOptions = {
@@ -138,8 +141,10 @@ export function dockerRunner(options: DockerRunnerOptions): Runner {
     const handle: RunnerHandle = {
       runId,
       egressEvents: () => joinEgressEvents([], decisions),
-      async exec(command): Promise<ExecOutcome> {
-        const outcome = await engine.exec(runContainerId, command);
+      async exec(command, environmentNames = []): Promise<ExecOutcome> {
+        // A name that is not a plain variable name could be read by Docker as NAME=value.
+        if (!environmentNames.every((name) => VARIABLE_NAME.test(name))) return { exitCode: -1, stdout: '', stderr: 'an environment variable name is not a plain name' };
+        const outcome = await engine.exec(runContainerId, command, environmentNames);
         await refreshDecisions();
         return outcome.ok ? outcome.value : { exitCode: -1, stdout: '', stderr: outcome.error.detail };
       },

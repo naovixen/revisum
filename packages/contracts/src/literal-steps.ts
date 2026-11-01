@@ -31,7 +31,8 @@ export const DEFAULT_TEST_ID_ATTRIBUTE = 'data-testid';
 //   rememberedValues  lets a remember step read an element's text or input value through its probe;
 //   pageStates        reports an element's accessibility states (selected, expanded, pressed,
 //                     current) in its probe;
-//   linkTargets       reports the resolved href of the link an element is in, in its probe;
+//   linkTargets       reports the resolved href of the link an element is in, in its probe, and
+//                     lists the document's link targets, which a crawl follows;
 //   pageMetadata      reports the head's meta tags and canonical link in its page probe;
 //   scriptsDisabled   loads a page with script execution off, until the next navigate;
 //   downloads         performs a download step through its download port;

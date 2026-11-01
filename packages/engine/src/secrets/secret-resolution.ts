@@ -123,6 +123,19 @@ export function withSecretRedaction(redactor: Redactor, secrets: ResolvedSecrets
   return { selectors: redactor.selectors, text: (value) => redactor.text(redactSecrets(value)) };
 }
 
+// The redactor for text read from pages outside a run, such as a crawl's page map: every declared
+// secret the store holds is removed first, wherever it appears, then the caller's personal-data
+// redaction runs. A declared secret the store lacks cannot be on the page from this store, so it is
+// skipped rather than refused.
+export function withDeclaredSecretRedaction(redactor: Redactor, secretNames: readonly SecretName[], store: SecretStore): Redactor {
+  const declared = new Map<SecretName, Secret>();
+  for (const name of secretNames) {
+    const secret = store.resolve(name);
+    if (secret !== null) declared.set(name, secret);
+  }
+  return withSecretRedaction(redactor, { ...NO_SECRETS, fills: declared });
+}
+
 // Whether a whole observed text is one of the run's short secrets, which redaction by value never
 // looks for: a failed check that observed exactly such a value keeps a placeholder instead.
 export const shortSecretObservation = (secrets: ResolvedSecrets): ((observed: string) => boolean) => shortSecretMatch(watchedSecrets(secrets));
