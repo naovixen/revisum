@@ -50,12 +50,12 @@ async function startDockerHostService(): Promise<DockerHostService> {
   assert.fail('the service on the Docker host never said it was listening');
 }
 
-// A service on the machine host.docker.internal names. Docker Desktop's name leads to the machine
-// running Docker Desktop, where a loopback listener answers it and raises no firewall prompt; on
-// Linux the name leads to the Docker host itself, whose bridge address only a wider listener hears.
+// A service on the machine host.docker.internal names under Docker Desktop: the machine running
+// Docker Desktop, where a loopback listener answers it and raises no firewall prompt. On Linux the
+// tests use the service on the Docker host's own network instead (see machineServicePort).
 async function startMachineService(): Promise<TcpServer> {
   const server = createTcpServer((socket) => socket.end());
-  await new Promise<void>((resolve) => server.listen(0, platform() === 'linux' ? '0.0.0.0' : '127.0.0.1', resolve));
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   return server;
 }
 
@@ -175,7 +175,11 @@ test('counter-example: an ordinary container on the default bridge does reach th
   assert.equal(JSON.parse(probed.stdout.trim()), 'reached', `${gateway}:${dockerHostService.port}`);
 });
 
-const machineServicePort = (): number => (machineService.address() as AddressInfo).port;
+// On Linux the name leads to the Docker host. The test process may itself be in a container, as in
+// CI, so only a service on the host's own network is sure to be there.
+const machineServicePort = (): number => (
+  platform() === 'linux' ? dockerHostService.port : (machineService.address() as AddressInfo).port
+);
 
 // A name that does not resolve counts as blocked too: the script's connection simply fails.
 test('a direct connection from inside to host.docker.internal does not reach a service on that machine', { criterion: 'AC-SPEC-07-02', timeout: TIMEOUT }, async () => {
