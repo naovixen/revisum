@@ -1011,14 +1011,18 @@ function unavailableResult(targetId: string, unavailable: Unavailable, context: 
   }, context);
 }
 
-// What a plan run vouches for: decided by the plan's unsafe features, the run's isolation and the
-// target's adapter alone, never by what the run happened to do, so two runs of one plan say the
-// same. Egress, credentials and replay are claimed only for a run whose starter says the isolated
-// runner enforced egress (RunInputs.guaranteeLevel); any other run counts as running on the host.
-const planRunGuarantees = (unsafeFeatures: readonly UnsafeFeature[], egressEnforced: boolean, determinismUnpinned: boolean): GuaranteeStatement =>
-  guaranteeStatement({
-    mode: 'plan', egressEnforced, unmaskedScreenshotsKept: false, unsafeFeatures, ...(determinismUnpinned ? { determinismUnpinned } : {}),
+// What a plan run vouches for: decided by the plan, its project's recording setting, the run's
+// isolation and the target's adapter alone, never by what the run happened to do, so two runs of one
+// plan say the same. Egress, credentials and replay are claimed only for a run whose starter says the
+// isolated runner enforced egress (RunInputs.guaranteeLevel); any other run counts as running on the host.
+const planRunGuarantees = (inputs: RunInputs, unsafeFeatures: readonly UnsafeFeature[], determinismUnpinned: boolean): GuaranteeStatement => {
+  const repliesNotRecorded = callsServices(inputs.plan) && inputs.project.replay?.recordReplies !== true;
+  return guaranteeStatement({
+    mode: 'plan', egressEnforced: inputs.guaranteeLevel === 'isolated', unmaskedScreenshotsKept: false, unsafeFeatures,
+    ...(determinismUnpinned ? { determinismUnpinned } : {}),
+    ...(repliesNotRecorded ? { repliesNotRecorded } : {}),
   });
+};
 
 // Adds the run mode, the guarantee statement, the unsafe label (for a plan using unsafe features),
 // the approval label (for an approved plan) and the result hash.
@@ -1029,7 +1033,7 @@ function seal(
   const standing = context.inputs.standing;
   const unsafeFeatures = unsafeFeaturesOf(context.inputs.plan);
   const labelled = {
-    ...outcome, mode: 'plan' as const, guarantees: planRunGuarantees(unsafeFeatures, context.inputs.guaranteeLevel === 'isolated', context.determinismUnpinned),
+    ...outcome, mode: 'plan' as const, guarantees: planRunGuarantees(context.inputs, unsafeFeatures, context.determinismUnpinned),
     ...(unsafeFeatures.length === 0 ? {} : { unsafeFeatures }),
   };
   return withResultHash(standing?.mode === 'approved' ? { ...labelled, approvalLabel: approvalLabel(standing.approval) } : labelled);

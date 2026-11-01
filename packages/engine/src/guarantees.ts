@@ -19,6 +19,9 @@ export type GuaranteeConditions = {
   // True when the target's adapter cannot pin the clock, the time zone or randomness
   // (AdapterInfo.cannotPin), so no replay of the run can be claimed identical. Absent means false.
   readonly determinismUnpinned?: boolean;
+  // True when the plan calls a declared service and the project does not record the replies, so
+  // replayManifest refuses the run. Absent means false.
+  readonly repliesNotRecorded?: boolean;
 };
 
 // The guarantees each unsafe feature gives up, and only those. Egress control, no ambient
@@ -40,11 +43,19 @@ const LOST_TO_FEATURE: { readonly [Feature in UnsafeFeature]: readonly Guarantee
   'database-command': ['plan-closed', 'actions-guarded', 'replay-identical'],
 };
 
-// Why `guarantee` does not hold under the run's mode, isolation and adapter alone: empty when it holds.
+// Why `guarantee` does not hold under the run's mode, isolation, adapter and recording setting alone:
+// empty when it holds. Unrecorded replies count only where egress is enforced: a run on the host has
+// already lost the claim to egress, and its statement, and so its committed hashes, stay as they were.
 function conditionReasons(guarantee: GuaranteeId, conditions: GuaranteeConditions): GuaranteeLossReason[] {
   const reason = isolationReason(guarantee, conditions);
-  const unpinned = guarantee === 'replay-identical' && conditions.mode === 'plan' && conditions.determinismUnpinned === true;
-  return [...(reason === undefined ? [] : [reason]), ...(unpinned ? ['determinism-unpinned' as const] : [])];
+  const replayOfPlan = guarantee === 'replay-identical' && conditions.mode === 'plan';
+  const unpinned = replayOfPlan && conditions.determinismUnpinned === true;
+  const notRecorded = replayOfPlan && conditions.egressEnforced && conditions.repliesNotRecorded === true;
+  return [
+    ...(reason === undefined ? [] : [reason]),
+    ...(unpinned ? ['determinism-unpinned' as const] : []),
+    ...(notRecorded ? ['replies-not-recorded' as const] : []),
+  ];
 }
 
 // Why `guarantee` does not hold under the run's mode and isolation alone, or undefined when it holds.

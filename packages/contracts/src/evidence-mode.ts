@@ -88,8 +88,10 @@ export type GuaranteeId = (typeof GUARANTEE_IDS)[number];
 //   egress-unenforceable: the run was not inside the isolated runner, so egress was not enforced.
 //   determinism-unpinned: the target's adapter cannot pin the clock, the time zone or randomness,
 //     so running the manifest again may give another result.
+//   replies-not-recorded: the plan calls declared services and the project does not record their
+//     replies, so a replay, which never sends a call again, has nothing to answer them with.
 //   an unsafe feature's name: the plan uses that feature, which gives the guarantee up.
-export type GuaranteeLossReason = 'evidence-mode' | 'egress-unenforceable' | 'determinism-unpinned' | UnsafeFeature;
+export type GuaranteeLossReason = 'evidence-mode' | 'egress-unenforceable' | 'determinism-unpinned' | 'replies-not-recorded' | UnsafeFeature;
 // The level is the summary: 'isolated' only when every guarantee holds.
 export type GuaranteeStatement = {
   readonly level: GuaranteeLevel;

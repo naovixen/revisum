@@ -28,8 +28,8 @@ const GATEWAY_PROBE_PORT = 80;
 
 // Tries, from a container on the run's network, to get out without the proxy: to public addresses,
 // and to the Docker host through the network's gateway, which a Docker that ignores the option to
-// remove it would keep. 'reached' too when the network cannot be read, so an unknown is never taken
-// for 'blocked'.
+// remove it would keep. 'reached' too when the network cannot be read or shows no IPv4 subnet, so an
+// unknown is never taken for 'blocked'.
 export async function probeRunNetwork(engine: ContainerEngine, containerId: string, network: string): Promise<'reached' | 'blocked'> {
   const gateway = await engine.networkGatewayAddress?.(network);
   if (gateway === undefined) return engine.probeEgress(containerId, OUTSIDE_PROBE_TARGETS);

@@ -62,7 +62,7 @@ export interface ContainerEngine {
   // Where a gateway to the Docker host would be on this network, for a probe to try: the first
   // address of its IPv4 subnet. Null when there is nothing to try, because a container on the network
   // holds that address, which Docker gives out only to a network with no gateway. A problem when the
-  // network cannot be read. Optional: without it no gateway is probed.
+  // network cannot be read or shows no IPv4 subnet. Optional: without it no gateway is probed.
   networkGatewayAddress?(network: string): Promise<Result<string | null, EngineProblem>>;
   // Starts a container and returns its id.
   startContainer(options: ContainerOptions): Promise<Result<string, EngineProblem>>;
@@ -239,12 +239,17 @@ const fieldOf = (value: unknown, name: string): unknown =>
 
 const IPV4_SUBNET = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})\/(\d{1,2})$/;
 
-// The first address of an IPv4 subnet such as "172.18.0.0/16", or null for anything else.
+// The first address of an IPv4 subnet such as "172.18.0.0/16", or null for anything else. That takes
+// in numbers out of range, which would name no real address, and a prefix over 30, which leaves no
+// address after the subnet's own for a gateway to take.
 function firstAddressOf(subnet: unknown): string | null {
   const parts = typeof subnet === 'string' ? IPV4_SUBNET.exec(subnet) : null;
   if (parts === null) return null;
-  const address = parts.slice(1, 5).reduce((total, part) => total * 256 + Number(part), 0);
-  const size = 2 ** (32 - Number(parts[5]));
+  const octets = parts.slice(1, 5).map(Number);
+  const prefix = Number(parts[5]);
+  if (octets.some((octet) => octet > 255) || prefix > 30) return null;
+  const address = octets.reduce((total, octet) => total * 256 + octet, 0);
+  const size = 2 ** (32 - prefix);
   const first = address - address % size + 1;
   return [24, 16, 8, 0].map((shift) => Math.floor(first / 2 ** shift) % 256).join('.');
 }
@@ -260,7 +265,10 @@ function gatewayAddressIn(description: string): Result<string | null, EngineProb
   const pools = fieldOf(fieldOf(parsed, 'IPAM'), 'Config');
   if (!Array.isArray(pools)) return failure({ detail: 'Docker\'s description of the network names no address pools' });
   const pool: unknown[] = pools;
-  const first = pool.map((entry) => firstAddressOf(fieldOf(entry, 'Subnet'))).find((address) => address !== null) ?? null;
+  const first = pool.map((entry) => firstAddressOf(fieldOf(entry, 'Subnet'))).find((address) => address !== null);
+  // Null below says a container holds the first address. With no IPv4 subnet that is unknown, and as
+  // null it would drop the gateway from the probe.
+  if (first === undefined) return failure({ detail: 'Docker\'s description of the network shows no IPv4 subnet' });
   const containers = fieldOf(parsed, 'Containers');
   const members: unknown[] = typeof containers === 'object' && containers !== null ? Object.values(containers) : [];
   const held = members.some((member) => {
