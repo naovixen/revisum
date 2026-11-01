@@ -44,7 +44,7 @@ describe('Using the test title rule', () => {
       test('then it should still read the title', () => {
         const source = `describe('Using the parser', () => {
           describe('when it is parsed', () => {
-            test('then it should pass', { criterion: 'AC-SPEC-01-03' }, () => {});
+            test('then it should pass', { criterion: 'a criterion' }, () => {});
           });
         });`;
         assert.deepEqual(findingsFor(source), []);
