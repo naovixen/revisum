@@ -7,7 +7,7 @@
 //   - one that leaves a code out. Its @ts-expect-error line must stay an error.
 // See docs/specs/SPEC-27-shared-types-and-events.md.
 import type { CliErrorCode, DriverErrorCode, RecorderError, RunnerError, ServiceCallErrorCode, SinkError } from '@revisum/contracts';
-import type { PlanErrorCode, StepErrorCode, SuiteDecodeErrorCode, TextErrorCode } from '@revisum/engine';
+import type { PlanErrorCode, ReplayErrorCode, StepErrorCode, SuiteDecodeErrorCode, TextErrorCode } from '@revisum/engine';
 
 // Only a value of type never may reach this, so every code must have been handled before it.
 const unreachable = (code: never): never => {
@@ -235,6 +235,25 @@ export function describeCliErrorForgettingOne(code: CliErrorCode): string {
       return 'command failed';
     default:
       // @ts-expect-error 'internal' is not handled, so the code does not narrow to never
+      return unreachable(code);
+  }
+}
+
+// ---- Replay errors (declared in engine beside the manifest and replay) -----------------------------
+export function describeReplayError(code: ReplayErrorCode): string {
+  switch (code) {
+    case 'replay-not-claimed': case 'replay-mismatch': case 'version-unsupported':
+      return 'replay refused';
+    default:
+      return unreachable(code);
+  }
+}
+export function describeReplayErrorForgettingOne(code: ReplayErrorCode): string {
+  switch (code) {
+    case 'replay-not-claimed': case 'replay-mismatch':
+      return 'replay refused';
+    default:
+      // @ts-expect-error 'version-unsupported' is not handled, so the code does not narrow to never
       return unreachable(code);
   }
 }

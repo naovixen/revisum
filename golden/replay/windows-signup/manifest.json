@@ -1,0 +1,58 @@
+{
+  "schema": "revisum.run-manifest/v1",
+  "engineVersion": "0.1.0",
+  "planHash": "a7a8fa1e7c9bcd8cb882be0f682f33ac84f2b57c993da624814971e514d41e29",
+  "target": {
+    "id": "playwright-chromium",
+    "adapter": "playwright",
+    "engine": "chromium",
+    "device": "desktop-1280",
+    "locale": "de-DE",
+    "timezone": "Asia/Tokyo",
+    "colorScheme": "dark",
+    "reducedMotion": "reduce"
+  },
+  "adapter": {
+    "id": "playwright",
+    "version": "1.64.1",
+    "protocol": "Playwright (CDP, Juggler, WebKit remote)",
+    "performs": [
+      "structuralLocators",
+      "domChecks",
+      "pageScripts"
+    ]
+  },
+  "browser": {
+    "name": "chromium",
+    "version": "156.0.8078.4"
+  },
+  "seeds": {
+    "random": 42
+  },
+  "clock": {
+    "fixedTimeMilliseconds": 1768473000000
+  },
+  "fixtures": [
+    {
+      "path": "/app.js",
+      "sha256": "7fcf8ba71f79719e9251a35529465f03a7cfbe6eef55ded021fecfec46f8fc72"
+    },
+    {
+      "path": "/index.html",
+      "sha256": "08ac094923543bbb0009998a92520546e0f1b7412dc37c85daa94a1ec6a3e6a5"
+    },
+    {
+      "path": "/logo.svg",
+      "sha256": "ad1065d74f8c0fa4881f4f97d62264cef423fec77efb06fd2701f57867db8000"
+    },
+    {
+      "path": "/styles.css",
+      "sha256": "bac35c24b84d8ac38bf8f4f5f7d4328f5668a363696816ffa61010123a8fea9b"
+    }
+  ],
+  "host": {
+    "platform": "win32",
+    "arch": "x64"
+  },
+  "nonHermeticInputs": []
+}

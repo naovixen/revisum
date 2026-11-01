@@ -54,6 +54,7 @@ const ERROR_CODES: Readonly<Record<string, readonly string[]>> = {
     'subject-mismatch', 'version-control-unavailable', 'not-maintainer', 'not-protected-branch', 'lockdown-not-declared',
   ],
   trust: ['untrusted-source', 'changed-with-code', 'no-approval'],
+  replay: ['replay-not-claimed', 'replay-mismatch', 'version-unsupported'],
   refusal: [
     'origin_not_allowed', 'secret-missing', 'services-unavailable', 'evidence-mode-disabled', 'suite-not-declared', 'egress-unenforceable',
   ],

@@ -1,0 +1,85 @@
+{
+  "platform": "linux-arm64",
+  "runs": [
+    {
+      "setupMilliseconds": 4920,
+      "peakMemoryMegabytes": 1992
+    },
+    {
+      "setupMilliseconds": 4940,
+      "peakMemoryMegabytes": 1994
+    },
+    {
+      "setupMilliseconds": 4960,
+      "peakMemoryMegabytes": 1996
+    },
+    {
+      "setupMilliseconds": 4980,
+      "peakMemoryMegabytes": 1998
+    },
+    {
+      "setupMilliseconds": 5000,
+      "peakMemoryMegabytes": 2000
+    },
+    {
+      "setupMilliseconds": 5010,
+      "peakMemoryMegabytes": 2001
+    },
+    {
+      "setupMilliseconds": 5030,
+      "peakMemoryMegabytes": 2003
+    },
+    {
+      "setupMilliseconds": 5050,
+      "peakMemoryMegabytes": 2005
+    },
+    {
+      "setupMilliseconds": 5070,
+      "peakMemoryMegabytes": 2007
+    },
+    {
+      "setupMilliseconds": 5090,
+      "peakMemoryMegabytes": 2009
+    },
+    {
+      "setupMilliseconds": 4910,
+      "peakMemoryMegabytes": 1991
+    },
+    {
+      "setupMilliseconds": 4930,
+      "peakMemoryMegabytes": 1993
+    },
+    {
+      "setupMilliseconds": 4950,
+      "peakMemoryMegabytes": 1995
+    },
+    {
+      "setupMilliseconds": 4970,
+      "peakMemoryMegabytes": 1997
+    },
+    {
+      "setupMilliseconds": 4990,
+      "peakMemoryMegabytes": 1999
+    },
+    {
+      "setupMilliseconds": 5000,
+      "peakMemoryMegabytes": 2000
+    },
+    {
+      "setupMilliseconds": 5020,
+      "peakMemoryMegabytes": 2002
+    },
+    {
+      "setupMilliseconds": 5040,
+      "peakMemoryMegabytes": 2004
+    },
+    {
+      "setupMilliseconds": 5060,
+      "peakMemoryMegabytes": 2006
+    },
+    {
+      "setupMilliseconds": 5080,
+      "peakMemoryMegabytes": 2008
+    }
+  ]
+}

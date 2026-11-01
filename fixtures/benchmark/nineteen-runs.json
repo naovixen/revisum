@@ -1,0 +1,81 @@
+{
+  "platform": "linux-x64",
+  "runs": [
+    {
+      "setupMilliseconds": 1320,
+      "peakMemoryMegabytes": 552
+    },
+    {
+      "setupMilliseconds": 1340,
+      "peakMemoryMegabytes": 554
+    },
+    {
+      "setupMilliseconds": 1360,
+      "peakMemoryMegabytes": 556
+    },
+    {
+      "setupMilliseconds": 1380,
+      "peakMemoryMegabytes": 558
+    },
+    {
+      "setupMilliseconds": 1400,
+      "peakMemoryMegabytes": 560
+    },
+    {
+      "setupMilliseconds": 1410,
+      "peakMemoryMegabytes": 561
+    },
+    {
+      "setupMilliseconds": 1430,
+      "peakMemoryMegabytes": 563
+    },
+    {
+      "setupMilliseconds": 1450,
+      "peakMemoryMegabytes": 565
+    },
+    {
+      "setupMilliseconds": 1470,
+      "peakMemoryMegabytes": 567
+    },
+    {
+      "setupMilliseconds": 1490,
+      "peakMemoryMegabytes": 569
+    },
+    {
+      "setupMilliseconds": 1310,
+      "peakMemoryMegabytes": 551
+    },
+    {
+      "setupMilliseconds": 1330,
+      "peakMemoryMegabytes": 553
+    },
+    {
+      "setupMilliseconds": 1350,
+      "peakMemoryMegabytes": 555
+    },
+    {
+      "setupMilliseconds": 1370,
+      "peakMemoryMegabytes": 557
+    },
+    {
+      "setupMilliseconds": 1390,
+      "peakMemoryMegabytes": 559
+    },
+    {
+      "setupMilliseconds": 1400,
+      "peakMemoryMegabytes": 560
+    },
+    {
+      "setupMilliseconds": 1420,
+      "peakMemoryMegabytes": 562
+    },
+    {
+      "setupMilliseconds": 1440,
+      "peakMemoryMegabytes": 564
+    },
+    {
+      "setupMilliseconds": 1460,
+      "peakMemoryMegabytes": 566
+    }
+  ]
+}
