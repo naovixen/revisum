@@ -82,7 +82,8 @@ One section per milestone exit: what `docs/system-design.md` §7 asked for, the 
 | The benchmark runs weekly and on manual dispatch, outside `check`; ARM results only if someone runs it on an arm64 machine, with no paid runner | Main session, 2026-10-31 |
 | Internal networks are created without a gateway, and the probe tries where it would be, so a Docker that keeps it gives `host` | Main session, 2026-11-01 |
 | An isolated plan with service calls and no recording loses `replay-identical`, with the reason `replies-not-recorded` | Main session, 2026-11-01 |
-| A refused or failed `--after` login stops with `plan-rejected`, with no new code. Open for the founder to confirm | Main session, 2026-11-01 |
+| A refused or failed `--after` login gets its own error code, `after-plan-failed`, with SPEC-16 (AC-SPEC-16-13); it stays `plan-rejected` until then | Founder, 2026-11-01 |
+| Joining the isolated path waits for SPEC-16 (AC-SPEC-16-11 and 12) rather than being done before M3 | Founder, 2026-11-01 |
 
 ### Findings
 
@@ -140,7 +141,7 @@ The skips are `test/contract/dom-checks.test.ts:62` (a driver without `remembere
 | Isolation, by 2027-03-17 | Passing: CI's container step passed 105 of 105 on `55a0b5a` with the gateway fix in, on GitHub's runner. Before that, `7e78d28` passed 104 of 105; the one failure was a counter-example's own setup, fixed in `27312b3` |
 | Language fit | Resolved by the founder's pivot at M1 |
 | Velocity, M1 | Met at M1's exit |
-| Problem fit, 5 of 15 calls by 2027-01-25 | No calls recorded in this repo; not due |
+| Problem fit, 5 of 15 calls by 2027-01-25 | Set aside by the founder (2026-11-01): the aim is a demo, to judge feasibility from seeing it work. It does not stop the build |
 | Upkeep, velocity at M3 and later signals | Not due |
 
 ### Risks

@@ -38,6 +38,9 @@ runs: { using: node24, main: dist/action.js }
 - AC-SPEC-16-08: When any command fails, its JSON output shall carry a `CliErrorCode` and a docs link that resolves; an unknown command or flag shall return `usage` (oracle: specified).
 - AC-SPEC-16-09: When `draft` runs with `--json`, its output shall carry the draft path, `PlanSource` `draft-command`, the errors by line and `approved: false`; no run, approval or trusted-file write shall follow from the command (oracle: specified; golden transcript with a recorded planner response).
 - AC-SPEC-16-10: When `convert` runs on each golden plan in either form, the output shall equal the stored golden file of the other form (oracle: regression).
+- AC-SPEC-16-11: When `run` runs a plan in the run container and its manifest is replayed at the same level, the verdict shall be `identical`; replayed at another level, it shall never be a pass (oracle: specified; carried from the M2 exit).
+- AC-SPEC-16-12: When a fixture page in a real run container starts a worker, opens a popup or follows a redirect to an undeclared origin, each shall be blocked and recorded as an `EgressEvent` with that channel (oracle: specified; carried from the M2 exit, extends AC-SPEC-07-01).
+- AC-SPEC-16-13: When a `draft --explore --after` plan is refused or fails, the command shall stop with `after-plan-failed`, not `plan-rejected`, and write no draft (oracle: specified; carried from the M2 exit).
 
 ## Dependencies
 

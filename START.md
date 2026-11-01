@@ -64,7 +64,7 @@ M3, evidence:
 
 M4, launch (beta):
 
-- [ ] SPEC-16 CLI and GitHub Action, with SPEC-35's `run --suite` and Action input, and writing SPEC-08's opt-in recording file from `run`
+- [ ] SPEC-16 CLI and GitHub Action, with SPEC-35's `run --suite` and Action input, writing SPEC-08's opt-in recording file from `run`, and the items carried from the M2 exit (AC-SPEC-16-11 to 13)
 - [ ] SPEC-17 release artefacts and claims (marketing render target and claim lint), with SPEC-36's `doctor` checks and claim wording
 - [ ] M4 exit
 
@@ -84,6 +84,7 @@ From `E:\core\docs\09-mvp-plan.md` §6, counted from the plan's day 0, 2026-11-0
 | Velocity | M3 not done | 2027-06-07 |
 
 - **Language fit: resolved, does not stop the build.** The share stays under 70% (36% fresh on 1.2). On 2026-10-29 the founder recorded evidence mode with opt-in unsafe features (`docs/decisions/language-fit-pivot.md`) as this signal's response, the one the MVP plan lists. The build goes on until it is demoable, so the founder can judge from use whether the product is worthwhile.
+- **Problem fit: set aside, does not stop the build.** On 2026-11-01 the founder said not to worry about discovery calls for now: the aim is a demo, to see it working and judge whether it is feasible.
 
 ## Setup reference
 
