@@ -46,8 +46,7 @@ M2, driver and isolation (alpha):
 - [x] SPEC-28 `draft` (route c), with SPEC-37's planner adapters (2026-10-31); moved from M4 (founder, 2026-10-29: `docs/decisions/drafting-earlier.md`)
 - [x] SPEC-37 explore to draft: `draft --explore`, crawl, page map, locator check (2026-11-01)
 - [x] SPEC-30 to 34 and SPEC-36 driver and runner parts (done 2026-10-31: states, downloads, tab, real service caller, stubs, storage, clock, clipboard, CSS, XPath, DOM checks, page scripts, database commands; replay of database commands comes with SPEC-08)
-- [ ] SPEC-08 manifest and replay, with SPEC-32's call replay and SPEC-36's database-command replay (AC-SPEC-32-13, AC-SPEC-36-15)
-  - **Paused 2026-11-01.** Alignment 8aca733 and a761bf4, tests 3c6bfdf, approved helper fix 0399830 are committed. The code is written but **uncommitted in the working tree**; its own tests passed singly. Next: run `npm run check` once with nothing else running, then `check:linux`, then commit the code (Spec SPEC-08, SPEC-32, SPEC-36). Record in SPEC-08's notes: no `recordedReplies` manifest field (the perturbation test forbids an uncased field); a run that recorded replies lists `recorded-replies` in `nonHermeticInputs`. Benchmark baseline values are placeholders until the first weekly run.
+- [x] SPEC-08 manifest and replay, with SPEC-32's call replay and SPEC-36's database-command replay (AC-SPEC-32-13, AC-SPEC-36-15; 2026-11-01)
 - [ ] M2 exit
 
 M3, evidence:
