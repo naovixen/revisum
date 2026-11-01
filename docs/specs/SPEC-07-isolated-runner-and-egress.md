@@ -55,6 +55,33 @@ The seeded `contracts` code wins where it differs from the block above: `Service
 - **Browser mutants** (AC-07): `EgressPolicy.responseRewrites?` (addition), a list of `{ origin, rewrite }`. The proxy applies a rewrite only to plain-HTTP responses from declared fixture origins, refuses any other origin when the policy is built, and the manifest records each rewrite applied.
 - **Running a plan in the container.** `RunnerHandle` gains `exec(argv)` (addition), which runs a command inside the run container without a shell. The container tests use it to inspect the user, seccomp mode, environment and files, and to run a plan through a test-set script. The `run` command's wiring is SPEC-16's.
 
+### Review fixes (M2 exit, 2026-11-01)
+
+A cold review at the M2 exit found that a real container run's evidence could be wrong or missing while the tests still passed. These are marked additions, tests first as usual. None loosens a refusal.
+
+- **Applied rewrites reach the manifest (AC-07).** The container proxy writes each applied rewrite to a file beside its decisions. `RunnerHandle` gains `rewritesApplied(): readonly AppliedRewrite[]`, so a mutated container run's manifest differs from a plain run's.
+- **Joining records and decisions (AC-01).** `joinEgressEvents(records, decisions, directOrigins = [])`. A browser record with no decision of its own is, in this order:
+  - `blocked` if its channel is `popup`, which the driver holds back before it loads;
+  - given the latest decision for the same host and port, since one tunnel carries many requests;
+  - `allowed` if its origin is in `directOrigins`, the declared origins the run knows the browser sends past the proxy (loopback);
+  - otherwise `blocked`. The fallback can over-report a block, but never claims an unseen request was allowed.
+- **Channels in a real container (AC-01).** `RunnerHandle` gains `proxyDecisions(): readonly ProxyDecision[]`, and `egressEvents(records = [], directOrigins = [])` takes the browser's records, printed by the process inside the container. A container test asserts a WebSocket's channel, not only its origin and decision.
+- **Evidence survives a failed read (AC-01).** A non-zero read of the proxy's files keeps the decisions already read, except when the file does not exist yet, which still reads as no lines.
+- **The result's claim follows the runner (AC-05).** `RunInputs.guaranteeLevel?: GuaranteeLevel`, default `host`, set by whoever started the run from `Runner.guaranteeLevel()`. Only `isolated` makes `run` state `egressEnforced: true`; the default keeps committed hashes as they are. A test observes the real result, both ways.
+- **Rewrite policy (AC-07).** The policy builder refuses a fixture origin that is undeclared or not plain HTTP. `startEgressProxy` refuses to start with a rewrite whose origin is undeclared or not plain HTTP, so a hand-built policy can't widen it. `EgressPolicy` stays unbranded, because committed tests build it directly; the builder alone knows which origins are fixtures.
+- **Coverage (AC-01, AC-02).** New tests, with counter-examples:
+  - a popup to a reachable host leaves that host's server with no request;
+  - a private service never reaches a metadata address;
+  - an allowed `CONNECT` succeeds, a refused one is recorded as blocked, and a rebinding name is refused for tunnels too;
+  - direct connections from the run container try metadata and the Docker gateway.
+- **More IPv6 forms refused (AC-02).** Also refused: IPv4-translated `::ffff:0:0/96`, local NAT64 `64:ff9b:1::/48` and Teredo `2001::/32`.
+- **Smaller fixes.**
+  - The `.git` mount check ignores case, since Windows does.
+  - A refused malformed request (400) is recorded as a blocked decision.
+  - A stopped Docker daemon gives `start-failed`, not `image-missing`.
+  - `runner`'s product name comes from `PRODUCT`, and its `as` casts to branded types become parser calls.
+- **Left as they are.** The `as TargetId` casts and the two template strings in committed tests stay: no behaviour depends on them, and they are committed tests. `Runner` wiring for plan runs stays SPEC-16's.
+
 ## Acceptance criteria
 
 - AC-SPEC-07-01: When a fixture page opens a WebSocket, starts a worker, opens a popup, follows a redirect or sends a beacon to an undeclared origin, the proxy shall block each and record an `EgressEvent` (oracle: specified).
