@@ -42,6 +42,7 @@ const ERROR_CODES: Readonly<Record<string, readonly string[]>> = {
     'selector-invalid', 'script-failed', 'script-timeout', 'script-result-invalid',
   ],
   runner: ['image-missing', 'image-digest-mismatch', 'egress-unenforceable', 'start-failed'],
+  egressPolicy: ['rewrite-origin-not-fixture', 'fixture-origin-undeclared', 'fixture-origin-not-plain-http'],
   recorder: ['no-reason', 'unknown-item', 'already-decided', 'sink-failed'],
   sink: ['not-append-only', 'write-failed'],
   cli: [

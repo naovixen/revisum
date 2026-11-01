@@ -29,6 +29,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import type { GuaranteeLevel } from '@revisum/contracts';
 import {
   defaultRedactor, environmentSecretStore, parseProject, planParser, run, sha256, success,
   type BrowserDriver, type FixtureReference, type Plan, type Project, type RunManifest, type RunResult, type ServiceRequest,
@@ -202,6 +203,8 @@ export type Scenario = {
   readonly pins: RunPins | null;
   readonly serviceRoute: Route;
   readonly commandRoute: CommandRoute;
+  // The level whoever started the run says the runner gave it; no level at all when absent.
+  readonly guaranteeLevel?: GuaranteeLevel;
 };
 
 export const fixtureReferences = (fixtures: readonly FixtureFile[]): FixtureReference[] =>
@@ -295,6 +298,7 @@ async function replayInputs(scenario: Scenario): Promise<{ readonly project: Pro
     plan: authorise(plan, trusted), project, targetId: project.matrix[0]?.id ?? assert.fail('no target'),
     baseUrl: scenario.baseUrl, host: scenario.host, scriptSources: scriptBytes(scenario.scriptSources),
     ...(scenario.pins === null ? {} : { pins: scenario.pins }),
+    ...(scenario.guaranteeLevel === undefined ? {} : { guaranteeLevel: scenario.guaranteeLevel }),
   };
   return { project, plan, inputs };
 }

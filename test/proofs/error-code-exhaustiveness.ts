@@ -8,6 +8,7 @@
 // See docs/specs/SPEC-27-shared-types-and-events.md.
 import type { CliErrorCode, DriverErrorCode, RecorderError, RunnerError, ServiceCallErrorCode, SinkError } from '@revisum/contracts';
 import type { PlanErrorCode, ReplayErrorCode, StepErrorCode, SuiteDecodeErrorCode, TextErrorCode } from '@revisum/engine';
+import type { EgressPolicyError } from '@revisum/runner';
 
 // Only a value of type never may reach this, so every code must have been handled before it.
 const unreachable = (code: never): never => {
@@ -172,6 +173,25 @@ export function describeRunnerErrorForgettingOne(code: RunnerError['code']): str
       return 'runner failed';
     default:
       // @ts-expect-error 'egress-unenforceable' is not handled, so the code does not narrow to never
+      return unreachable(code);
+  }
+}
+
+// ---- Egress policy errors (declared in runner beside the policy builder) ------------------------
+export function describeEgressPolicyError(code: EgressPolicyError['code']): string {
+  switch (code) {
+    case 'rewrite-origin-not-fixture': case 'fixture-origin-undeclared': case 'fixture-origin-not-plain-http':
+      return 'policy refused';
+    default:
+      return unreachable(code);
+  }
+}
+export function describeEgressPolicyErrorForgettingOne(code: EgressPolicyError['code']): string {
+  switch (code) {
+    case 'rewrite-origin-not-fixture': case 'fixture-origin-undeclared':
+      return 'policy refused';
+    default:
+      // @ts-expect-error 'fixture-origin-not-plain-http' is not handled, so the code does not narrow to never
       return unreachable(code);
   }
 }
