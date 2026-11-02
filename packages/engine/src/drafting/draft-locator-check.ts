@@ -10,7 +10,6 @@
 // name in the same way. A map name that was cut or redacted may hide the name, so it counts as a
 // possible match and never gives locator-not-on-page. Other locator kinds (text, test id, css,
 // XPath), names that are run values, and steps on pages not in the map are not checked. Pure.
-// See docs/specs/SPEC-37-explore-to-draft.md.
 import type { DraftWarning, Locator, PageMap, PageMapNode, Plan, Step } from '@revisum/contracts';
 import type { TextReading } from '../plan/readable/plan-text.ts';
 import { MAXIMUM_PAGE_MAP_NAME_LENGTH } from './page-map.ts';

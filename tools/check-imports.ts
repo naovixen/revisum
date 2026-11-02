@@ -7,7 +7,6 @@
 // a PlanDraft and nothing more, so it may not import the engine's run function (under any name)
 // or the brand constructor, nor import the engine whole, where either could hide. (A Plan made by
 // a cast is refused by tools/check-branded-casts.ts.)
-// See docs/specs/SPEC-00-repo-seed-and-gates.md and docs/specs/SPEC-28-plan-authoring.md.
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { readWorkspacePackages, reportProblems, type WorkspacePackage } from './workspace-packages.ts';

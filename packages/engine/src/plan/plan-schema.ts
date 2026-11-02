@@ -10,9 +10,6 @@
 // feature of 1.3 only when it declares "1.3" and its trusted project enables that feature. Passing
 // the schema is never a reason to trust a plan.
 // `npm run lint` checks that docs/plan-language/plan.schema.json is exactly this schema.
-// See docs/specs/SPEC-01-plan-language-and-parser.md, docs/specs/SPEC-30-plan-values-positions-and-keys.md
-// docs/specs/SPEC-31-page-states-metadata-downloads-and-tabs.md, docs/specs/SPEC-32-declared-service-calls.md
-// docs/specs/SPEC-34-clock-advance-and-clipboard.md and docs/specs/SPEC-36-unsafe-plan-features.md.
 import {
   AUDIT_MODES, BACKEND_ASSERTION_KINDS, CALL_EFFECTS, CLIPBOARD_ASSERTION_KINDS, CLIPBOARD_READS, CLOCK_ADVANCE_MODES, CLOCK_UNITS, DATE_ANCHORS,
   DATE_FORMATS, DIALOG_ACTIONS, DOWNLOAD_TEXT_KINDS, ELEMENT_STATE_KINDS, ELEMENT_TEXT_KINDS, KEYS,

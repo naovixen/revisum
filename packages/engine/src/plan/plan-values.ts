@@ -1,7 +1,6 @@
 // Decoders for the run values a plan declares (its `values`), the plan clock and value names.
 // They are part of the plan parser, which calls them with its own text reader, and the only
 // place a ValueName is made. Errors carry a code and a path, never a value.
-// See docs/specs/SPEC-30-plan-values-positions-and-keys.md.
 import {
   DATE_ANCHORS, DATE_FORMATS, GENERATED_VALUE_KINDS,
   type EmailDomain, type FieldName, type GeneratedValue, type PlanClock, type RelativeDay, type SafeText, type ValueName,

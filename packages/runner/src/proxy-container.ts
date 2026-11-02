@@ -3,7 +3,7 @@
 // appends each decision and each applied rewrite as a JSON line to a file in the container's private
 // /tmp, which the runner reads back. For a workload's run it also answers name lookups and records
 // them the same way. The rules and those lines all cross a process boundary, so each is decoded here
-// before use. See docs/specs/SPEC-07-isolated-runner-and-egress.md and docs/specs/SPEC-35-evidence-mode.md.
+// before use.
 import type { AppliedRewrite, ProxyDecision, ResponseRewrite } from '@revisum/contracts';
 import { appendFileSync } from 'node:fs';
 import { startProxyServer, type ProxyRules, type RewriteRule, type TcpRelay } from './egress-proxy.ts';

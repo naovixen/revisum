@@ -20,7 +20,7 @@ Create core's product repository, separate from the research repository, seeded 
     - Nothing is gated behind a second person (founder, 2026-10-27). If a second maintainer joins, code-owner review by their account becomes an optional verified route, never a required one.
   - CI with `tsc`, lints (including the naming lint), contract suites, proofs, replay and ACT re-score.
   - **A dependency review (the R11 keep/drop test)** per third-party component on the trust path.
-  - **Core's own metrics.** `agentAuthoredShare` and `specLinkedShare` from commit trailers; `tracedCriteriaShare` and `flakyRunRate` from CI.
+  - **Core's own metrics.** `agentAuthoredShare` and `specLinkedShare` from commit trailers; `flakyRunRate` from CI, and the criteria named in `Criteria:` trailers. (Changed by the founder, 2026-11-02: there is no `tracedCriteriaShare`, because tests no longer carry criterion tags.)
   - **A guarantee map.** Each phase-1 row of the published guarantee table (research `04` Finding 1; success criterion SC-2) is tied to a CI test.
   - **Naming rule.** It applies to every code identifier: types, functions, variables, constants, files, folders, packages, JSON keys, error codes, CLI flags and event names.
     1. **No research or process ids.** That bans:
@@ -34,10 +34,8 @@ Create core's product repository, separate from the research repository, seeded 
        - No single-letter names except loop indices and x/y coordinates.
        - No unexplained abbreviations. Allowed: id, url, uri, html, css, json, http, api, cli, ci, pr, cdp, bidi, wcag, act, a11y, pii, sha256, svg, png, dom, os.
        - Standard names that are always written as acronyms (ai, mcp, sarif, junit, oidc, jwt, lti) are allowed only with their expansion in the glossary.
-    3. **Comments say what and why in plain English and stand alone.** A comment may add "see `docs/specs/SPEC-nn-<name>.md`", but never as its only content. It never cites research docs, claim ids or spike names.
-    4. **Traceability lives in data, not names.** `AC-SPEC-nn-mm` ids appear only:
-       - as string values in test metadata (`criterion: 'AC-SPEC-01-03'`);
-       - in commit trailers and the trace index.
+    3. **Comments say what and why in plain English and stand alone.** A comment never cites a spec, research docs, claim ids or spike names. (Changed by the founder, 2026-11-02: a comment used to be allowed to add "see `docs/specs/SPEC-nn-<name>.md`".)
+    4. **Traceability lives in commit trailers, not in code.** `SPEC-nn` and `AC-SPEC-nn-mm` ids appear in commit trailers and in `docs/`, never in a name, a test, a comment or a string under `packages/`, `test/` or `tools/`. The tools that read specs and trailers are the exception. (Changed by the founder, 2026-11-02: test metadata `criterion: 'AC-SPEC-01-03'` is gone, and so is the trace index.)
     5. **A CI naming lint enforces rules 1–4** (`NamingLintConfig`). `docs/glossary.md` maps each domain term to its code name.
 - **Non-goals:** new features; Playwright on the default path; hosting; publishing to npm (SPEC-16); a hardware or signed key for core's own approvals.
 
@@ -102,7 +100,9 @@ export type NamingLintConfig = {
   readonly allowedAbbreviations: readonly string[];         // any other abbreviation fails code review
   readonly standardNames: Readonly<Record<string, string>>; // acronym -> full name; each also in docs/glossary.md
   readonly singleLetterNames: readonly string[];            // loop indices and coordinates; never exported
-  readonly criterionIdPattern: RegExp;                      // only in test-metadata strings, trailers and the trace index
+  readonly criterionIdPattern: RegExp;                      // this repository's own criterion ids may not appear in JSON data
+  readonly specReferencePattern: RegExp;                    // added 2026-11-02: SPEC-nn or AC-SPEC-nn-mm may not appear in TypeScript under packages, test and tools
+  readonly specReadingFiles: readonly string[];             // added 2026-11-02: the tools that read specs and trailers, exempt from it
 };
 export const NAMING_LINT: NamingLintConfig = {
   include: ['packages/**', 'test/**', 'proofs/**', 'fixtures/**', 'golden/**', 'scripts/**', '.github/**', '*.json'],
@@ -137,6 +137,8 @@ export const NAMING_LINT: NamingLintConfig = {
     junit: 'JUnit XML test-report format', oidc: 'OpenID Connect', jwt: 'JSON Web Token', lti: 'Learning Tools Interoperability' },
   singleLetterNames: ['i', 'j', 'k', 'x', 'y'],
   criterionIdPattern: /\bAC-SPEC-\d{2}-\d{2}\b/,
+  specReferencePattern: /\b(?:AC-)?SPEC-\d+/,  // added 2026-11-02
+  specReadingFiles: ['tools/spec-criteria.ts', 'tools/check-commit-trailers.ts', 'tools/project-metrics.ts', 'tools/lint-names.ts'],  // added 2026-11-02
 };
 
 // Dependency direction, enforced by TypeScript project references:
@@ -171,7 +173,7 @@ export const NAMING_LINT: NamingLintConfig = {
   - Cut-over. Commits up to and including the one that adds these notes carry no `Agent:` trailer and can't be rewritten (amending and rebasing are denied). The tool records that commit's hash. The malformed check and all three commit metrics cover only its descendants, and the output counts the earlier commits as `beforeTrailers`. From the next commit on, the main session adds all three trailers.
   - A malformed commit can't be amended. So the main session checks each message before committing (`node tools/check-commit-trailers.ts --message <file>`). A malformed commit already made is listed, with its reason, in a known-exceptions list in the tool by a later commit, which the founder reads.
   - `agentAuthoredShare` is commits with `Agent:` over commits since the cut-over; `specLinkedShare` is commits with `Spec:` or `Criteria:` over the same.
-  - `tracedCriteriaShare` is criterion ids in `docs/specs/` with at least one passing tagged test in this run, over all criterion ids in `docs/specs/`, with a per-spec breakdown.
+  - The criteria traced are the criterion ids in `docs/specs/` named in a `Criteria:` trailer since the trailer cut-over, over all criterion ids in `docs/specs/`. (Changed by the founder, 2026-11-02: this replaces `tracedCriteriaShare`, which counted passing tagged tests.)
   - `flakyRunRate` for one run is 0 or 1, as SPEC-27's `RunRecord.flakyPair`. When a test file fails, `run-test-folder` reruns it once, only to measure. The run still fails (no retries), and it is flaky if the rerun passes. Rates over many runs are SPEC-15's.
   - Output: `.test-results/project-metrics.json` (a `RunRecord`, the four metrics and `approvalStrength: 'declared'`) and a Markdown summary. The `ci` job checks out full history (`fetch-depth: 0`). On push to `main` it appends the summary to the job summary and uploads `.test-results/` as an artefact: action pinned by commit hash, kept 90 days, well inside the free quota.
   - Tests: scratch Git repositories built by the test, with fixture commits and a fixture results file. Each share equals a hand count; a malformed trailer fails.
@@ -202,7 +204,7 @@ export const NAMING_LINT: NamingLintConfig = {
 - **Criterion ids (AC-SPEC-00-15).**
   - Built: the naming lint rejects a criterion id anywhere but a test's `criterion` value.
   - Add: a `criterion` value must name a criterion in `docs/specs/`.
-  - The trace index is `.test-results/trace-index.json` (criterion, test ids, outcome), written by the gates step. It is generated, never committed, so the lint never reads it. Trailers live in Git, not in files.
+  - There is no trace index (changed by the founder, 2026-11-02). Trailers live in Git, not in files.
   - Tests: scratch-copy lint with an id planted in a code string and in a comment, and with a test naming `AC-SPEC-99-01`.
 - **Glossary (AC-SPEC-00-16).**
   - `tools/check-glossary.ts` runs in the lint. Code names are the backticked tokens in the "Code name" column of the Domain terms and Metrics tables.
@@ -235,7 +237,7 @@ export const NAMING_LINT: NamingLintConfig = {
 - AC-SPEC-00-05: When a pull request changes any file in `TEST_SET` and any file outside it, the required `tests-apart` check shall fail, and branch protection shall block the merge because the check is required (oracle: specified).
 - AC-SPEC-00-06: When the source is searched, the product name shall appear only in the `PRODUCT` constant (oracle: specified).
 - AC-SPEC-00-07: When CI finishes on the default branch, it shall record:
-  - core's own `tracedCriteriaShare` and `flakyRunRate` for the run;
+  - core's own criteria traced by trailers and `flakyRunRate` for the run;
   - `agentAuthoredShare` from `Agent:` trailers;
   - `specLinkedShare` from `Spec:` and `Criteria:` trailers.
 
@@ -250,7 +252,7 @@ export const NAMING_LINT: NamingLintConfig = {
 - AC-SPEC-00-12: When the naming lint runs over a fixture with one identifier per banned pattern, each shall fail with its `why`, and the same names spelt as domain words shall pass (oracle: specified). The fixture includes `R11Test`, `acId`, `p3Core`, `checkD14`, a JSON key `RC-04`, an error code `h12-failed` and a claim id.
 - AC-SPEC-00-13: When an exported name is a single letter, or a non-exported single-letter name (including a generic type parameter) is outside `singleLetterNames`, the lint shall fail. Loop indices `i`, `j`, `k` and coordinates `x`, `y` shall pass (oracle: specified).
 - AC-SPEC-00-14: When a comment cites a research doc, a claim id, a spike name or a research id, or consists only of a spec reference, the lint shall fail. A plain explanation followed by "see `docs/specs/SPEC-09-privacy-masking.md`" shall pass (oracle: specified).
-- AC-SPEC-00-15: When an id matching `criterionIdPattern` appears anywhere other than a test-metadata string value, a commit trailer or the trace index, the lint shall fail. Every test's `criterion` value shall name a criterion that exists in `docs/specs/` (oracle: specified).
+- AC-SPEC-00-15: When a spec number or criterion id appears in a comment or string of a TypeScript file under `packages/`, `test/` or `tools/`, apart from the tools that read specs and trailers, the lint shall fail (oracle: specified). Changed by the founder, 2026-11-02: it used to allow the id as a test's `criterion` value.
 - AC-SPEC-00-16: When CI runs, `docs/glossary.md` shall map each domain term to its code name (oracle: specified):
   - every code name it lists shall resolve to an exported declaration;
   - every exported type of the core package's public API shall appear in it;

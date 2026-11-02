@@ -1,7 +1,6 @@
 // Relative paths and globs from outside input: a suite's declared paths and working directory, and
 // the attachment paths in a suite's report. One rule decides whether such a path stays inside the
 // folder it is relative to, so the project parser and the report decoder can never disagree.
-// See docs/specs/SPEC-35-evidence-mode.md.
 
 // Forward slashes and no leading "./" or "/", so paths a version-control port reports compare the
 // same on every platform.

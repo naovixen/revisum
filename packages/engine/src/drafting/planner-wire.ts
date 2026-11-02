@@ -3,7 +3,6 @@
 // plannerReplyText decodes a reply, which is outside input, by hand and takes out its text, still
 // typed unknown, for parseAiText to bound. A reply that holds no text, such as a tool call, has
 // nothing to draft from.
-// See docs/specs/SPEC-28-plan-authoring.md and docs/specs/SPEC-37-explore-to-draft.md.
 import { failure, success, type PlannerWire, type Result } from '@revisum/contracts';
 import type { PlannerPrompt } from './planner-prompt.ts';
 

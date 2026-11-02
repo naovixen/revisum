@@ -3,8 +3,7 @@
 // then the suite through the workload runner, reads the JSON report and traces the suite wrote
 // into Revisum's output folder, and builds the result and its manifest. Every output of the suite
 // is decoded in engine before anything uses it; the secrets stay opaque until the runner writes
-// the container's environment. The `run --suite` command that calls this is SPEC-16's.
-// See docs/specs/SPEC-35-evidence-mode.md.
+// the container's environment. The `run --suite` command that calls this is not here.
 import { existsSync, lstatSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, posix } from 'node:path';
 import {

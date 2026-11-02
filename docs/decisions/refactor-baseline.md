@@ -52,6 +52,12 @@ Windows, this machine, Chrome for Testing 156. The second row's range comes from
 - 1,047 tests take the other 2,557 seconds.
 - 55 browser files run one at a time and take 1,604 seconds.
 
+### Tests removed since this baseline
+
+| File | Tests | Why |
+|---|---|---|
+| `test/proofs/criterion-id-lint.test.ts` | 5 recorded | Its lint checked the `{ criterion }` tag, which no longer exists |
+
 ### Coverage floor
 
 Unit tests only (`test/unit`), Node 24's `--experimental-test-coverage`, 3,624 tests in 92 seconds, all passing. Figures are per-file averages for each area, not weighted by lines.

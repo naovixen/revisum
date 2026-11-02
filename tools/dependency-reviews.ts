@@ -2,7 +2,6 @@
 // docs/decisions/browser-and-audit-dependencies.md. tools/check-dependency-reviews.ts keeps them
 // true against package-lock.json and the manifests. Add a review here, and its decision record in
 // docs/decisions/, before a package gains a new runtime dependency.
-// See docs/specs/SPEC-00-repo-seed-and-gates.md.
 import type { DependencyReview } from './check-dependency-reviews.ts';
 
 export const DEPENDENCY_REVIEWS: readonly DependencyReview[] = [

@@ -10,7 +10,6 @@
 // than the start page that does not load is left out and not counted; a start page that does not
 // load stops the crawl. `truncated` says whether a page on the start origin was left unvisited
 // because of maximumPages or maximumDepth.
-// See docs/specs/SPEC-37-explore-to-draft.md.
 import {
   failure, success,
   type CrawlErrorCode, type ExploreDriver, type ExploreOptions, type Origin, type PageMap, type PageMapEntry, type Redactor, type Result,

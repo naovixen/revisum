@@ -10,7 +10,6 @@
 // run meets every required gate.
 //   node tools/check-branch-gates.ts --rules <file> [--protection <file>] [--require-checks]
 // The live rules are read in CI once the repository goes public; until then, recorded JSON.
-// See docs/specs/SPEC-00-repo-seed-and-gates.md.
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 

@@ -5,7 +5,6 @@
 // Suites are not written: a suite passes only when its tests do. A file that fails before any of
 // its tests run (a syntax error, a missing import) is written as one failed test named after the
 // file. tools/run-test-folder.ts passes this module to `node --test --test-reporter`.
-// See docs/specs/SPEC-00-repo-seed-and-gates.md.
 import { relative, sep } from 'node:path';
 
 // One line of a results file, as tools/test-results.ts reads it back.

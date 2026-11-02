@@ -3,7 +3,6 @@
 // with no owners leaves the path unowned. Patterns follow the gitignore rules GitHub uses: a
 // leading "/" anchors at the repository root, a trailing "/" matches everything in a folder, "*"
 // matches within one path segment and "**" across segments.
-// See docs/specs/SPEC-02-project-trust-and-approval.md.
 
 export type CodeOwnerRule = { readonly pattern: RegExp; readonly owners: readonly string[] };
 

@@ -4,7 +4,6 @@
 // (`import { reveal as show }`), reads it from a namespace import (`contracts.reveal`), or
 // destructures it out of a namespace import or a dynamic import
 // (`const { reveal: show } = contracts`, `const { reveal } = await import('…')`).
-// See docs/specs/SPEC-04-secrets-and-redaction.md.
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Token } from './lint-names.ts';
@@ -21,7 +20,7 @@ const DEFINING_MODULE = 'packages/contracts/src/secret.ts';
 //     so has to know what to look for; it also applies a header scheme to a secret, inside a new
 //     opaque Secret;
 //   - runner's service caller, which writes a declared call's secret headers and body parts as it
-//     sends the request (docs/specs/SPEC-32-declared-service-calls.md).
+//     sends the request.
 // Add a module here only with a reason beside it.
 export const REVEAL_ALLOWED_MODULES: readonly string[] = [
   'packages/driver-cdp/src/browser-session.ts',

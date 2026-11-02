@@ -9,7 +9,7 @@
 //     `export *` into contracts) is not a code name in the glossary;
 //   - the Standard names table differs from standardNames in tools/naming-lint-config.ts.
 // Sources are read as text: the compiler has no stable API to ask.
-// Runs in `npm run lint`. See docs/specs/SPEC-00-repo-seed-and-gates.md.
+// Runs in `npm run lint`.
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { tokenize, type Token } from './lint-names.ts';

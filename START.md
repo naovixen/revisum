@@ -8,6 +8,8 @@ The founder's checklist and the build queue.
 
 **Spec work is paused for the architecture refactor (approved 2026-11-02).** On "Continue the build", take the next unchecked phase here. Spec work resumes after phase 5. Bugs found on the way go in `docs/decisions/refactor-defects.md`.
 
+**The refactor is on the branch `refactor/architecture`, not `main` (founder, 2026-11-02),** so it can be dropped if needed. Commit there. The founder pushes the branch to run CI, and merging it to `main` is the approval. The last commit before the refactor is `5a18cbf`.
+
 Architecture refactor:
 
 - [x] Phase 0: measure the baseline and set the written conventions (`docs/decisions/refactor-baseline.md`)

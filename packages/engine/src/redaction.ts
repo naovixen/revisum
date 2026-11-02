@@ -1,6 +1,5 @@
 // Privacy by default: elements matching personal-data selectors are masked in screenshots, and
 // personal-data patterns are replaced in any text the engine keeps.
-// See docs/specs/SPEC-09-privacy-masking.md.
 import type { Redactor } from '@revisum/contracts';
 
 export const DEFAULT_PII_SELECTORS: readonly string[] = [

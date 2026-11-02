@@ -7,7 +7,6 @@
 // There is no release build yet, so this runs in `npm run lint`.
 //   node tools/check-plan-schema.ts           check
 //   node tools/check-plan-schema.ts --write   regenerate the schema file and print its sha256
-// See docs/specs/SPEC-01-plan-language-and-parser.md.
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';

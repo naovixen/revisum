@@ -6,11 +6,6 @@
 // storage go through the session's network and storage ports; clock advances and clipboard reads
 // through its clock and clipboard ports; page scripts through its script port. Database commands
 // go through the run's DatabaseCommandRunner port, which runs each in a workload container.
-// See docs/specs/SPEC-32-declared-service-calls.md for calls,
-// docs/specs/SPEC-33-network-stubs-request-checks-and-storage.md for stubs, checks and storage,
-// docs/specs/SPEC-34-clock-advance-and-clipboard.md for the clock and the clipboard and
-// docs/specs/SPEC-36-unsafe-plan-features.md for css and XPath locators, DOM checks, page scripts and
-// database commands.
 import {
   needsDriverFeatures,
   type A11yFinding, type ActionGuard, type ApprovalLabel, type ArtifactReference, type ArtifactStore, type Authorised,
@@ -191,7 +186,7 @@ export type SuiteRunRecord = {
   readonly name: SuiteName;
   readonly tests: readonly SuiteTestResult[];
   readonly findings: readonly SuiteFinding[];
-  // Present when the recorded pages were audited (SPEC-10).
+  // Present when the recorded pages were audited.
   readonly accessibilityFindings?: readonly A11yFinding[];
 };
 
@@ -550,7 +545,6 @@ function cannotPinDeterminism(drivers: ReadonlyMap<string, BrowserDriver>, targe
 // Resolves the target in order, stopping at the first "no": only the adapter the target names is
 // asked, it is asked once, and nothing else is tried in its place. The build is hashed, and
 // checked against the lockfile when there is one, before anything launches.
-// See docs/specs/SPEC-05-target-matrix-and-lock.md and docs/specs/SPEC-08-manifest-and-replay.md.
 async function openSession(planned: lifecycle.Planned, context: RunContext): Promise<Result<OpenedSession, Unavailable>> {
   const driver = adapterRegistry(context.ports.drivers).find(planned.target.adapter);
   if (driver === null) return { ok: false, error: { reason: 'adapter-not-registered', detail: `no adapter '${planned.target.adapter}'` } };

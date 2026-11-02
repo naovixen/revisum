@@ -10,7 +10,6 @@
 // The result text is decoded by the engine, under its own limits, and only the declared fields
 // are read. Neither the text nor a field's value is kept: the result and the log record the
 // text's sha256, and a remembered value's name and sha256.
-// See docs/specs/SPEC-36-unsafe-plan-features.md.
 import {
   failure, success,
   type BackendAssertion, type CallEffect, type Clock, type DocumentSession, type EvaluateStep, type ExpectScriptStep, type FieldName,

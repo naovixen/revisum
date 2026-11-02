@@ -19,8 +19,6 @@
 // approved --after plan if one is named. The page map is written beside the draft and its sha256 is
 // the draft's provenance reference. The command writes a fixed notice above the model's text, and
 // warns, by line, of locators that are not on their page or match more than one element.
-// See docs/specs/SPEC-28-plan-authoring.md, docs/specs/SPEC-37-explore-to-draft.md and
-// docs/specs/SPEC-16-cli-and-github-action.md.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, relative, resolve } from 'node:path';
 import {

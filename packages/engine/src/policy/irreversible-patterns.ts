@@ -2,7 +2,6 @@
 // an account, paying, sending or revoking access. The engine ships a set per language and the
 // trusted project adds its own per locale. A locale with neither has no set at all, and the
 // policy gate denies every plan for it rather than guess.
-// See docs/specs/SPEC-03-policy-gate.md.
 import type { IrreversiblePatterns, Locale } from '@revisum/contracts';
 
 // Keyed by language, so a target in fr-FR or fr-CA uses the French set.

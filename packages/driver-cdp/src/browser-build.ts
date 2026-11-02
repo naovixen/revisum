@@ -1,6 +1,5 @@
 // Which Chromium build the CDP driver would launch, without launching it, so the engine can pin it
 // by hash. The driver runs the executable it was constructed with; it downloads nothing.
-// See docs/specs/SPEC-05-target-matrix-and-lock.md.
 import { failure, success, type BrowserBuild, type BuildFailure, type Result } from '@revisum/contracts';
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import { dirname } from 'node:path';

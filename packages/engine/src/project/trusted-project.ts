@@ -2,7 +2,6 @@
 // change under test cannot edit its own judge. project.json that exists only on another branch is
 // refused, and a trusted file the change edits is ignored in favour of the protected version and
 // raised for review.
-// See docs/specs/SPEC-02-project-trust-and-approval.md.
 import {
   failure, success, type Approval, type Brand, type EventSink, type Result, type TrustError, type VersionControlPort,
 } from '@revisum/contracts';

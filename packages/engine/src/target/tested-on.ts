@@ -1,6 +1,6 @@
 // What a report says a run was tested on, built only from the target and the build that ran it.
 // The wording names what was really there: an emulated phone viewport is never "a phone", and
-// Playwright's patched WebKit is never "Safari". See docs/specs/SPEC-05-target-matrix-and-lock.md.
+// Playwright's patched WebKit is never "Safari".
 import type { BrowserBuild, DeviceProfileId, Engine, Fidelity, Target } from '@revisum/contracts';
 import { targetFidelity } from './target-defaults.ts';
 

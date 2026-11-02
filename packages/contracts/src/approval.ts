@@ -3,7 +3,6 @@
 // against GitHub and the protected branch. Every gate, metric and level takes an Approval, never
 // a VerifiedApproval: a verified and a declared approval both pass, and strength only selects the
 // label shown beside a result. Agent, MCP and token sources never get an Approval at all.
-// See docs/specs/SPEC-02-project-trust-and-approval.md.
 import type { ActorId } from './audit-events.ts';
 import type { Brand } from './brand.ts';
 import type { Result } from './result.ts';

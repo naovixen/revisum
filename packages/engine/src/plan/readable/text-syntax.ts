@@ -7,7 +7,6 @@
 // Reading works on one line at a time, from a 0-based index. Tokens are separated by one or more
 // spaces. A failed reading says how far it got (`reach`); when several alternatives fail, the one
 // that got furthest explains the line best.
-// See docs/specs/SPEC-28-plan-authoring.md.
 
 // Why readable text was refused. None of them carries a value from the text.
 export type TextErrorCode = 'unknown-statement' | 'bad-locator' | 'bad-string' | 'bad-indent' | 'missing-header'

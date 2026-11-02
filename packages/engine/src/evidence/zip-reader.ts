@@ -3,7 +3,6 @@
 // node:zlib, under an entry count, a total size and a per-entry compression-ratio limit. It never
 // trusts a header's sizes, refuses any entry name that could leave the archive, and writes nothing
 // to disk. A refusal names an entry by its index, never by its name.
-// See docs/specs/SPEC-35-evidence-mode.md.
 import { Buffer } from 'node:buffer';
 import { crc32, inflateRawSync } from 'node:zlib';
 import { failure, success, type Result } from '@revisum/contracts';

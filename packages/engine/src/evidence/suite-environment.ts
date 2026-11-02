@@ -2,7 +2,6 @@
 // secret store and kept opaque, so only the workload runner ever reveals them, as it writes the
 // container's environment. The resolved secrets also give the suite run its redactor, so every
 // echo of them is removed from whatever the suite prints or reports.
-// See docs/specs/SPEC-35-evidence-mode.md and docs/specs/SPEC-04-secrets-and-redaction.md.
 import {
   failure, success,
   type EvidenceSuiteDeclaration, type Redactor, type Result, type Secret, type SecretName, type SecretStore, type WorkloadVariable,

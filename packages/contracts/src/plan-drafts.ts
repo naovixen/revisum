@@ -5,7 +5,6 @@
 //
 // A draft's provenance says where it came from. It is recorded on the audit event and shown, but
 // never trusted: it changes no gate, approval or metric.
-// See docs/specs/SPEC-28-plan-authoring.md.
 import type { PageMapEntry } from './explore-mode.ts';
 import type { CriterionId, SecretName } from './plan.ts';
 import type { Origin, TargetId } from './target.ts';

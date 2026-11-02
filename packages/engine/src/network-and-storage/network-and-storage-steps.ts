@@ -9,7 +9,6 @@
 //     kept: a failed check says only that the entry is present, absent or differs.
 // Field values, storage values and response bodies never reach the result or the log; a remembered
 // field is logged by its name and sha256 only.
-// See docs/specs/SPEC-33-network-stubs-request-checks-and-storage.md.
 import {
   failure, isSecret, success,
   type CallArguments, type Clock, type FieldName, type JsonPointer, type ObservedExchange, type Plan, type RequestName, type ResolvedStub,

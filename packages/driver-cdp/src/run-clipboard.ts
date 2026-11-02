@@ -7,7 +7,6 @@
 //   - A read grants clipboard-read to the page's current origin for that read only, denies it again
 //     straight after, and reads through an isolated world, so the page's scripts can neither see
 //     the read nor change what it returns.
-// See docs/specs/SPEC-34-clock-advance-and-clipboard.md.
 import { failure, success, type ClipboardPort, type DriverError, type Result } from '@revisum/contracts';
 import type { CdpConnection } from './cdp-connection.ts';
 import { readClipboardText } from './in-page.ts';

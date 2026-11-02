@@ -1,5 +1,5 @@
 // What the naming lint bans and allows. This file is excluded from the lint because it has to
-// spell out the very words it bans. See docs/specs/SPEC-00-repo-seed-and-gates.md for the rules.
+// spell out the very words it bans.
 
 export type NamingRule = { readonly pattern: RegExp; readonly why: string };
 
@@ -25,8 +25,12 @@ export type NamingLintConfig = {
   readonly standardNames: Readonly<Record<string, string>>;
   // The only single-letter names allowed, and never as exports.
   readonly singleLetterNames: readonly string[];
-  // Criterion ids may appear only as the value of a test's `criterion` option.
+  // This repository's own criterion ids may not appear in JSON data.
   readonly criterionIdPattern: RegExp;
+  // A spec number or criterion id may not appear in a comment or string of a TypeScript file.
+  readonly specReferencePattern: RegExp;
+  // The tools that read specs and commit trailers, which must name them.
+  readonly specReadingFiles: readonly string[];
 };
 
 export const NAMING_LINT: NamingLintConfig = {
@@ -82,4 +86,6 @@ export const NAMING_LINT: NamingLintConfig = {
   },
   singleLetterNames: ['i', 'j', 'k', 'x', 'y'],
   criterionIdPattern: /\bAC-SPEC-\d{2}-\d{2}\b/,
+  specReferencePattern: /\b(?:AC-)?SPEC-\d+/,
+  specReadingFiles: ['tools/spec-criteria.ts', 'tools/check-commit-trailers.ts', 'tools/project-metrics.ts', 'tools/lint-names.ts'],
 };

@@ -1,6 +1,5 @@
 // The browser driver ports: what the engine needs from one browser session, split into small
 // interfaces. Each driver package implements them; the engine never imports a driver.
-// See docs/specs/SPEC-06-cdp-driver.md and docs/specs/SPEC-27-shared-types-and-events.md.
 import type { ClipboardPort, ClockPort } from './clock-and-clipboard.ts';
 import type { DriverFeature } from './literal-steps.ts';
 import type { NetworkPort, StoragePort } from './network-and-storage.ts';
@@ -90,7 +89,7 @@ export type ElementProbe = {
 };
 // What a probe reads of the element's DOM besides what it always reads: its class tokens, the
 // computed value of one style property (a lowercase css property name), or one attribute's value
-// (by its lowercase name). See docs/specs/SPEC-36-unsafe-plan-features.md.
+// (by its lowercase name).
 export type DomRead =
   | { readonly kind: 'classes' }
   | { readonly kind: 'computedStyle'; readonly property: string }
@@ -205,7 +204,7 @@ export type PageScriptCall = {
 };
 export interface Camera {
   // PNG bytes of the viewport, with every element matching `mask` painted solid black, so
-  // personal data never reaches an image. See docs/specs/SPEC-09-privacy-masking.md.
+  // personal data never reaches an image.
   screenshot(mask: readonly string[]): Promise<Uint8Array>;
 }
 export interface Auditor {

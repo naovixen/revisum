@@ -3,7 +3,6 @@
 // run to the first step.start, and its peak memory, the highest combined resident memory of Node
 // and every process it started (Chromium), sampled from /proc every 100 ms. tools/benchmark.ts
 // calls this and compares the medians with the stored Linux baseline; it is never a gate.
-// See docs/specs/SPEC-08-manifest-and-replay.md.
 import { cdpDriver } from '@revisum/driver-cdp';
 import {
   defaultRedactor, failure, loadTrustedProject, parseProject, planParser, policyGate, run, sha256, success,

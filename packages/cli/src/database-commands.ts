@@ -4,7 +4,6 @@
 // The request's policy allows only the command's service over TCP; the declared services give the
 // runner that service's address and port. No proxy variable is set, since the command speaks TCP.
 // The engine judges the reply itself.
-// See docs/specs/SPEC-36-unsafe-plan-features.md ("Database commands" under "Milestone").
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

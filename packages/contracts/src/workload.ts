@@ -2,7 +2,6 @@
 // the same egress proxy and hardening as the isolated runner. Evidence mode runs a team's
 // Playwright suite through it. The types live here so cli can join engine and runner without
 // either importing the other.
-// See docs/specs/SPEC-35-evidence-mode.md and docs/specs/SPEC-07-isolated-runner-and-egress.md.
 import type { ImageDigest } from './evidence-mode.ts';
 import type { EgressEvent, EgressPolicy } from './isolated-runner.ts';
 import type { Result } from './result.ts';

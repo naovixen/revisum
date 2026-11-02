@@ -2,7 +2,6 @@
 // it runs only as a proposal, which never reaches production origins and never opens the merge
 // gate. Changing a plan by one byte changes its hash, so the approval it had no longer applies.
 // A declared approval opens the gate exactly as a verified one does: strength only picks the label.
-// See docs/specs/SPEC-02-project-trust-and-approval.md.
 import type { Approval, ApprovalLabel, ApprovalStore, ApprovalStrength, Plan } from '@revisum/contracts';
 import { planHash } from '../manifest.ts';
 

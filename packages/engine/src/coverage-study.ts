@@ -10,8 +10,6 @@
 // parses under its suite's project with or without them. A plan using a feature its suite does not
 // enable does not parse, so it counts toward neither. The language-fit kill criterion is decided by
 // the closed share alone.
-// See docs/specs/SPEC-01-plan-language-and-parser.md, docs/specs/SPEC-30-plan-values-positions-and-keys.md
-// and docs/specs/SPEC-36-unsafe-plan-features.md.
 import { failure, success, type Plan, type Result, type SafeText, type UnsafeFeature } from '@revisum/contracts';
 import { INVALID, allValid, peekRecord, readList, readOneOf, readRecord, readText, type Issues, type Parsed, type PlanError } from './plan/plan-decoders.ts';
 import { planParser } from './plan/plan-parser.ts';

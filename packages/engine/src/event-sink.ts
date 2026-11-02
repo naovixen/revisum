@@ -1,7 +1,6 @@
 // The audit event sink: one JSON Lines entry per event, appended, never rewritten. The audit log
-// (SPEC-14) later wraps it with a hash chain and an anchor; until then this sink alone guarantees
+// later wraps it with a hash chain and an anchor; until then this sink alone guarantees
 // that what it wrote stays as written.
-// See docs/specs/SPEC-27-shared-types-and-events.md.
 import { createHash, type Hash } from 'node:crypto';
 import { appendFileSync, readFileSync } from 'node:fs';
 import { failure, success, type DerivedActor, type EventInput, type EventSink, type Result, type SinkError } from '@revisum/contracts';

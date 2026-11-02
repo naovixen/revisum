@@ -24,7 +24,7 @@
 | Quoted keys | `quoteProps: preserve` | Some quoted keys are deliberate (`tools/check-seed-provenance.ts`) |
 | Mixed operators | Left to Prettier, which adds the parentheses | `no-mixed-operators` is deprecated in ESLint |
 
-**Rules that stay as Revisum already had them:** `unknown` at boundaries until a decoder parses it, generics such as `<Value>` not `<T>`, the abbreviation list in `CLAUDE.md`, tests in `test/` rather than beside the code, and the `{ criterion }` tag.
+**Rules that stay as Revisum already had them:** `unknown` at boundaries until a decoder parses it, generics such as `<Value>` not `<T>`, the abbreviation list in `CLAUDE.md`, and tests in `test/` rather than beside the code. The `{ criterion }` test tag and spec citations in comments were dropped on 2026-11-02: tests read standalone, and traceability lives in `Criteria:` commit trailers.
 
 **Left out because the reasoning has expired:** initialising `let` for browser optimisation, grouping `const` before `let`, no generators, symbol polyfills, IIFEs, hoisting tutorials, bundler loader syntax, and CSS preprocessor nesting.
 

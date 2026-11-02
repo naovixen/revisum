@@ -1,7 +1,7 @@
 // The isolated runner's port: a run starts in a container pinned by image digest, behind an egress
 // proxy that lets traffic reach only the origins and services the trusted project declares.
 // The types live here so the runner, the drivers and the engine agree on them without importing
-// one another. See docs/specs/SPEC-07-isolated-runner-and-egress.md.
+// one another.
 import type { RunnerError } from './error-codes.ts';
 import type { ImageDigest } from './evidence-mode.ts';
 import type { Result } from './result.ts';

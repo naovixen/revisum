@@ -2,7 +2,6 @@
 // response rewrite is accepted only on a declared fixture origin served over plain HTTP, so a mutant
 // can never change what the real app or a third party sends. Only this builder knows which origins
 // are fixtures; the proxy repeats what it can check when it starts, for a policy built by hand.
-// See docs/specs/SPEC-07-isolated-runner-and-egress.md.
 import { failure, success, type EgressPolicy, type FixtureRewrite, type Origin, type Result, type ServiceName } from '@revisum/contracts';
 import { isPlainHttpOrigin } from './egress-events.ts';
 

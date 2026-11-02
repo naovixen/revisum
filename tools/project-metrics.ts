@@ -2,24 +2,21 @@
 // tests (tools/run-test-folder.ts) have written their results to .test-results/:
 //   - agentAuthoredShare: commits with an Agent trailer over commits since the trailer cut-over;
 //   - specLinkedShare: commits with a Spec or Criteria trailer over the same commits;
-//   - tracedCriteriaShare: criteria defined in docs/specs/ with at least one passing tagged test
-//     in this run, over every criterion defined there, with a breakdown per spec;
 //   - flakyRunRate: 1 when a failed test file passed on its one measuring rerun, else 0.
 // The approval behind every commit is the founder's push under the agent lock-down, so the record
 // says `declared`, never verified. Commits up to and including the cut-over carry no trailers and
 // cannot be rewritten, so they are only counted (beforeTrailers). A later commit with a malformed
 // trailer fails the step, naming it, unless KNOWN_MALFORMED_COMMITS lists it.
-// Writes .test-results/project-metrics.json, .test-results/project-metrics.md (the summary) and
-// .test-results/trace-index.json (each criterion, its tests and their outcomes).
+// A criterion counts as traced when a commit since the cut-over names it in a Criteria trailer.
+// Writes .test-results/project-metrics.json and .test-results/project-metrics.md (the summary).
 //   node tools/project-metrics.ts [--cut-over <commit>]
 // The repository is the working folder; it must be a Git repository with its full history.
-// See docs/specs/SPEC-00-repo-seed-and-gates.md.
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { readCommitTrailers, readTargets } from './check-commit-trailers.ts';
 import { readSpecCriteria } from './spec-criteria.ts';
-import { criterionReader, failed, readTestResults, RESULTS_FOLDER, type TestResults } from './test-results.ts';
+import { failed, readTestResults, RESULTS_FOLDER } from './test-results.ts';
 
 // The commit that settled the trailer grammar; trailers are checked on its descendants only.
 export const TRAILER_CUT_OVER = '8165795feae3c457955329b5cdafa883a6e65f62';
@@ -35,7 +32,7 @@ export const KNOWN_MALFORMED_COMMITS: readonly { readonly commit: string; readon
   { commit: '2a1df21b5930457d4412bdcaa00e73618c2fb929', reason: 'Agent trailer has no version (claude-code); the commit holds the SPEC-36 page-parts alignment note' },
 ];
 
-// The run as SPEC-27's RunRecord in contracts describes it. Tools are compiled apart from the
+// The run as RunRecord in contracts describes it. Tools are compiled apart from the
 // packages, so the shape is repeated here rather than imported.
 export type ProjectRunRecord = {
   readonly runId: string;
@@ -49,12 +46,6 @@ export type ProjectRunRecord = {
   readonly decisions: readonly [];
 };
 
-export type TraceEntry = {
-  readonly criterion: string;
-  readonly traced: boolean;
-  readonly tests: readonly { readonly testId: string; readonly passed: boolean; readonly skipped: boolean }[];
-};
-
 export type ProjectMetrics = {
   readonly run: ProjectRunRecord;
   readonly approvalStrength: 'declared';
@@ -63,9 +54,7 @@ export type ProjectMetrics = {
   readonly commitsSinceCutOver: number;
   readonly agentAuthoredShare: number;
   readonly specLinkedShare: number;
-  readonly tracedCriteriaShare: number;
   readonly flakyRunRate: number;
-  readonly tracedBySpec: readonly { readonly spec: string; readonly traced: number; readonly total: number; readonly share: number }[];
   readonly resultsFiles: readonly string[];
 };
 
@@ -80,6 +69,7 @@ type CommitCounts = {
   readonly agentAuthored: number;
   readonly specLinked: number;
   readonly malformed: readonly string[];
+  readonly criteriaNamed: ReadonlySet<string>;
 };
 
 function countCommits(root: string, cutOver: string): CommitCounts {
@@ -93,34 +83,19 @@ function countCommits(root: string, cutOver: string): CommitCounts {
   let agentAuthored = 0;
   let specLinked = 0;
   const malformed: string[] = [];
+  const criteriaNamed = new Set<string>();
   for (const entry of commits) {
     const separator = entry.indexOf('\x1f');
     const commit = entry.slice(0, separator);
     const { trailers, problems } = readCommitTrailers(entry.slice(separator + 1), targets);
     if (trailers.agent !== null) agentAuthored += 1;
+    for (const criterion of trailers.criteria) criteriaNamed.add(criterion);
     if (trailers.specs.length > 0 || trailers.criteria.length > 0) specLinked += 1;
     if (problems.length > 0 && ![...known].some((exception) => commit.startsWith(exception))) {
       malformed.push(`${commit.slice(0, 12)}: ${problems.join('; ')}`);
     }
   }
-  return { beforeTrailers, since: commits.length, agentAuthored, specLinked, malformed };
-}
-
-function traceCriteria(root: string, results: TestResults): TraceEntry[] {
-  const specs = readSpecCriteria(root);
-  const criterionOf = criterionReader(root);
-  const testsByCriterion = new Map<string, TraceEntry['tests'][number][]>();
-  for (const test of results.tests.values()) {
-    const criterion = criterionOf(test);
-    if (criterion === undefined) continue;
-    const tests = testsByCriterion.get(criterion) ?? [];
-    tests.push({ testId: test.testId, passed: test.passed, skipped: test.skipped });
-    testsByCriterion.set(criterion, tests);
-  }
-  return [...specs.all].sort().map((criterion) => {
-    const tests = testsByCriterion.get(criterion) ?? [];
-    return { criterion, traced: tests.some((test) => test.passed), tests };
-  });
+  return { beforeTrailers, since: commits.length, agentAuthored, specLinked, malformed, criteriaNamed };
 }
 
 const percent = (share: number): string => `${(share * 100).toFixed(1)}%`;
@@ -133,7 +108,7 @@ function summary(metrics: ProjectMetrics): string {
     '',
     '| Metric | Value |',
     '|---|---|',
-    `| Traced criteria share | ${percent(metrics.tracedCriteriaShare)} (${metrics.run.criteriaTraced} of ${metrics.run.criteriaInScope}) |`,
+    `| Criteria named in a Criteria trailer | ${metrics.run.criteriaTraced} of ${metrics.run.criteriaInScope} |`,
     `| Flaky run rate | ${metrics.flakyRunRate} |`,
     `| Agent-authored share | ${percent(metrics.agentAuthoredShare)} of ${metrics.commitsSinceCutOver} commits since the trailer cut-over |`,
     `| Spec-linked share | ${percent(metrics.specLinkedShare)} of ${metrics.commitsSinceCutOver} commits since the trailer cut-over |`,
@@ -149,21 +124,15 @@ function summary(metrics: ProjectMetrics): string {
 export function recordProjectMetrics(root: string, cutOver: string): { readonly metrics: ProjectMetrics; readonly malformed: readonly string[] } {
   const commits = countCommits(root, cutOver);
   const results = readTestResults(root);
-  const trace = traceCriteria(root, results);
-  const traced = trace.filter((entry) => entry.traced).length;
+  const definedCriteria = readSpecCriteria(root).all;
+  const traced = [...commits.criteriaNamed].filter((criterion) => definedCriteria.has(criterion)).length;
   const flakyPair = results.reruns.some((rerun) => rerun.passed);
-  const specs = readSpecCriteria(root);
-  const tracedSet = new Set(trace.filter((entry) => entry.traced).map((entry) => entry.criterion));
-  const tracedBySpec = [...specs.bySpec].sort(([left], [right]) => left.localeCompare(right)).map(([spec, criteria]) => {
-    const count = criteria.filter((criterion) => tracedSet.has(criterion)).length;
-    return { spec: `SPEC-${spec}`, traced: count, total: criteria.length, share: shareOf(count, criteria.length) };
-  });
   const run: ProjectRunRecord = {
     runId: process.env['GITHUB_RUN_ID'] ?? `local-${Date.now()}`,
     changeClassId: 'project-build',
     commit: git(root, 'rev-parse', 'HEAD'),
     at: new Date().toISOString(),
-    criteriaInScope: trace.length,
+    criteriaInScope: definedCriteria.size,
     criteriaTraced: traced,
     passedFirstTime: ![...results.tests.values()].some(failed),
     flakyPair,
@@ -177,16 +146,13 @@ export function recordProjectMetrics(root: string, cutOver: string): { readonly 
     commitsSinceCutOver: commits.since,
     agentAuthoredShare: shareOf(commits.agentAuthored, commits.since),
     specLinkedShare: shareOf(commits.specLinked, commits.since),
-    tracedCriteriaShare: shareOf(traced, trace.length),
     flakyRunRate: flakyPair ? 1 : 0,
-    tracedBySpec,
     resultsFiles: results.files,
   };
   const folder = join(root, RESULTS_FOLDER);
   mkdirSync(folder, { recursive: true });
   writeFileSync(join(folder, 'project-metrics.json'), `${JSON.stringify(metrics, null, 2)}\n`);
   writeFileSync(join(folder, 'project-metrics.md'), summary(metrics));
-  writeFileSync(join(folder, 'trace-index.json'), `${JSON.stringify(trace, null, 2)}\n`);
   return { metrics, malformed: commits.malformed };
 }
 

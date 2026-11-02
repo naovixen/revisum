@@ -1,6 +1,5 @@
 // Decoders for the files the approval routes read from the protected branch: approvers.json, the
 // coding agent's deny-rules file and holdouts.json. Each is outside input until decoded here.
-// See docs/specs/SPEC-02-project-trust-and-approval.md.
 import type { AgentLockdown, AgentLockdownAction } from '@revisum/contracts';
 import { INVALID, allValid, readList, readOneOf, readRecord, type Issues, type Parsed } from '../plan/plan-decoders.ts';
 

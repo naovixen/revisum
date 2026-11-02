@@ -6,7 +6,6 @@
 // tree, and written byte for byte. When the commit lacks any listed file, seeding fails, naming
 // it, and writes nothing. The repository being seeded is the working folder; this tool names no
 // research path itself.
-// See docs/specs/SPEC-00-repo-seed-and-gates.md.
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';

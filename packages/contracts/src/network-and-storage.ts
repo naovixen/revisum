@@ -12,7 +12,6 @@
 // The port types (NetworkPort, StoragePort) live here so drivers need nothing from the engine.
 // The engine resolves templates and arguments; a driver receives finished bytes, or the name of a
 // fixture it reads from its own fixtures folder.
-// See docs/specs/SPEC-33-network-stubs-request-checks-and-storage.md.
 import type { Brand } from './brand.ts';
 import type { DriverError } from './browser-driver.ts';
 import type { CriterionId, FixtureName, SafeText, TextOrValue } from './plan.ts';

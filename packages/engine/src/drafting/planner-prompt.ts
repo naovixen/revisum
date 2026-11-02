@@ -7,7 +7,6 @@
 // page is written as one line of JSON inside the data: a name holding a line break or the end
 // marker stays escaped and can never close the data or start a line of its own. A request without
 // pages gives exactly the text it always gave.
-// See docs/specs/SPEC-28-plan-authoring.md and docs/specs/SPEC-37-explore-to-draft.md.
 import type { DraftRequest } from '@revisum/contracts';
 import { canonicalJson } from '../hashing.ts';
 

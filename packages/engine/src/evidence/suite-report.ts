@@ -7,7 +7,6 @@
 //
 // Every refusal is a bare code and JSON path. Neither ever holds text from the report: the paths
 // name only the fields this decoder reads, and any other key is written "*".
-// See docs/specs/SPEC-35-evidence-mode.md.
 import { Buffer } from 'node:buffer';
 import { failure, success, type Brand, type EvidenceLimits, type Result, type SuiteTestOutcome } from '@revisum/contracts';
 import { brand } from '../brand.ts';

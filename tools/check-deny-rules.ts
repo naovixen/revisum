@@ -5,7 +5,7 @@
 //   - this repository's history denials: amending a commit, skipping hooks, rebase, tag and hard
 //     reset. Ordinary commits stay allowed: the agent commits, the founder pushes.
 // The file is read from the working tree; on a push to main that is the default branch's copy.
-// Runs in `npm run lint`. See docs/specs/SPEC-00-repo-seed-and-gates.md.
+// Runs in `npm run lint`.
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { loadEngineFunction } from './engine-loader.ts';

@@ -2,7 +2,6 @@
 // every echo of the given secrets in them. Images are scanned as bytes, including the text chunks
 // a PNG may carry, compressed or not; text drawn as pixels is out of reach of any text scan.
 // The caller plants a canary secret in one file: a scan that does not find it is not to be trusted.
-// See docs/specs/SPEC-04-secrets-and-redaction.md.
 import { readFileSync } from 'node:fs';
 import { inflateSync } from 'node:zlib';
 import type { Leak, LeakForm, LeakScanner, Secret } from '@revisum/contracts';

@@ -1,7 +1,6 @@
 // Who did what: actors and the audit events recorded against them. The actor on every event is
 // derived by core from the approval proof, never declared by the caller, so an agent cannot
 // label its own work as a person's.
-// See docs/specs/SPEC-27-shared-types-and-events.md.
 import type { ApprovalErrorCode, ApprovalProof } from './approval.ts';
 import type { Brand } from './brand.ts';
 import type { PlanProvenance } from './plan-drafts.ts';
@@ -50,7 +49,7 @@ export type EventInput = {
 export type SinkError = { readonly code: 'not-append-only' | 'write-failed' };
 
 // The audit sink: append-only, one entry per event. The audit log later wraps it with a hash
-// chain and an anchor (SPEC-14). A run's step log (RunEventSink in engine) is separate.
+// chain and an anchor. A run's step log (RunEventSink in engine) is separate.
 export interface EventSink {
   append(event: EventInput, actor: DerivedActor): Result<{ readonly sequence: number }, SinkError>;
 }

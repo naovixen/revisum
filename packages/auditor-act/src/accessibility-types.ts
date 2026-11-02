@@ -1,6 +1,5 @@
 // The accessibility engine's types: outcomes and severities, the page snapshot the rules read,
 // the rule shapes, the Tab walk and the findings.
-// See docs/specs/SPEC-10-accessibility-audit.md.
 import type { Box } from '@revisum/contracts';
 
 // The four W3C ACT outcomes.

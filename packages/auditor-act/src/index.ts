@@ -1,5 +1,5 @@
 // Public entry point: the own accessibility engine, built from the W3C ACT rules, with
-// keyboard and pointer probes. See docs/specs/SPEC-10-accessibility-audit.md.
+// keyboard and pointer probes.
 export * from './accessibility-types.ts';
 export { ACT_RULESET_VERSION, ALL_RULES, scan, type ScanOptions } from './scan.ts';
 export { tabWalk, trapSet, type WalkOptions } from './tab-walk.ts';

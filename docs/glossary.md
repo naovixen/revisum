@@ -74,12 +74,12 @@
 | Tab walk | `tabWalk`, `TabWalk` | `auditor-act`, exists | Presses Tab through a page and records focus order, visible focus and occlusion |
 | Report input | `ReportInput`, `ValidReport`, made only by `parseReportInput` | `report`, exists | The data a visual evidence report is rendered from |
 | Seed provenance | `seed-provenance.json` (`SeedProvenance` shape) | repository root, shape in `tools/check-seed-provenance.ts`, exists | Where each seeded file came from: research commit, source path and SHA-256. The only file that names the research commit |
-| Acceptance criterion | `criterion` (`criterionId`, `CriterionId`, `criteriaInScope`) | test metadata; on every plan assertion, exists | One observable behaviour a spec promises. Earlier name: AC |
+| Acceptance criterion | `criterion` (`criterionId`, `CriterionId`, `criteriaInScope`) | on every plan assertion, exists | One observable behaviour a spec promises. Earlier name: AC |
 | Change class | `changeClass` (`changeClassId`) | planned | The kind of change a pull request makes, which sets how much review it needs |
 | Test set | `TEST_SET` | `tools/check-tests-apart.ts`, exists | Tests, proofs, fixtures and golden files: the paths that must change apart from code |
 | Dependency review | `DependencyReview` with `DependencyCheck` items, `DEPENDENCY_REVIEWS` | `tools/check-dependency-reviews.ts`, reviews in `tools/dependency-reviews.ts`, exists | The keep-or-drop test every third-party component on the trust path must pass. Earlier name: R11 test |
 | Guarantee map | `GuaranteeMap`, `GuaranteeRow`, `GUARANTEE_MAP` | `tools/guarantee-map.ts`, exists | Each published guarantee, the CI test that proves it, the class shown when the test passes and the weaker class shown when it does not. Published as `docs/guarantees.md` |
-| Test results, trace index | `tools/test-results-reporter.ts`, `readTestResults`, `TraceEntry` | `tools/`, exists | One JSON line per test in `.test-results/`; a test id is `<file>#<full name>`. The trace index lists each criterion with its tests and their outcomes |
+| Test results | `tools/test-results-reporter.ts`, `readTestResults` | `tools/`, exists | One JSON line per test in `.test-results/`; a test id is `<file>#<full name>`. |
 | Commit trailers | `readCommitTrailers`, `CommitTrailers`, `KNOWN_MALFORMED_COMMITS` | `tools/check-commit-trailers.ts` and `tools/project-metrics.ts`, exists | The `Agent:`, `Spec:` and `Criteria:` lines the project's own metrics are read from |
 | Hosted costs | `HostedCosts`, `docs/costs/hosted-costs.json` | `tools/cost-report.ts`, exists | The declared monthly record of hosted spend and customers; at zero customers spend stays at or under USD 5 |
 | Naming lint | `NamingLintConfig`, `NAMING_LINT`, `lintRepository` | `tools/`, exists | Enforces the naming rules in CI |
@@ -188,7 +188,7 @@
 
 | Term | Code name | Where | Earlier name |
 |---|---|---|---|
-| Share of criteria traced to a passing test | `tracedCriteriaShare` | `ThresholdMetric` in `contracts`; this repository's own in `tools/project-metrics.ts`, exists | T |
+| Share of criteria traced to a passing test | `tracedCriteriaShare` | `ThresholdMetric` in `contracts`, exists | T |
 | Share of runs that were flaky | `flakyRunRate` | `ThresholdMetric` in `contracts`; this repository's own in `tools/project-metrics.ts`, exists | F |
 | Share of results verified without human review | `verifiedWithoutReviewShare` | `ThresholdMetric` in `contracts`, exists; computed by SPEC-15, planned | V |
 | Share of commits authored by an agent | `agentAuthoredShare` | `ThresholdMetric` in `contracts`; this repository's own in `tools/project-metrics.ts`, exists | A |

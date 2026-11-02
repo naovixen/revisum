@@ -3,7 +3,6 @@
 // Dockerfile's hash and the base image in a file Git ignores. The image is rebuilt only when the
 // Dockerfile or the base image changed, or the recorded image is gone. A run is then started with
 // that id, and refused when the local image no longer has it.
-// See docs/specs/SPEC-07-isolated-runner-and-egress.md.
 import { PRODUCT, failure, success, type ImageDigest, type Result } from '@revisum/contracts';
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';

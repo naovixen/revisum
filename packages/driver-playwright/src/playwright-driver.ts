@@ -4,7 +4,7 @@
 // select, upload, frame and dialog) it refuses with unsupported-step, with nothing sent. Of the
 // optional plan features it performs only those of plan language 1.3's page parts: css and XPath
 // locators, DOM checks and page scripts.
-// See docs/decisions/browser-and-audit-dependencies.md and docs/specs/SPEC-36-unsafe-plan-features.md.
+// See docs/decisions/browser-and-audit-dependencies.md.
 import {
   determinismScript, deviceProfile, failure, literalActionStep, performableLocator, reveal, success,
   type ActionGuard, type ActionStep, type BrowserDriver, type DomRead, type DomValue, type DriverError, type DriverFeature, type ElementProbe, type Key,

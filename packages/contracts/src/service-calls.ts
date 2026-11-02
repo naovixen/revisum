@@ -6,7 +6,6 @@
 // The port types (ServiceCaller, ServiceRequest, ServiceResponse) live here so that runner, which
 // sends the requests through the egress proxy, needs nothing from the engine, and so that a later
 // protocol pack can reuse them without core importing the pack.
-// See docs/specs/SPEC-32-declared-service-calls.md.
 import type { Brand } from './brand.ts';
 import type { Result } from './result.ts';
 import type { SafeText, SecretName, SecretReference, TextOrValue } from './plan.ts';

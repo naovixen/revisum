@@ -1,7 +1,6 @@
 // Text an AI writer returns is outside input. parseAiText is the one way it becomes AiText, which
 // is only ever stored as a suggestion beside the deterministic output, never in its place. It uses
 // the plan parser's text rules and codes, but accepts tabs and line breaks, which prose needs.
-// See docs/specs/SPEC-01-plan-language-and-parser.md.
 import { failure, success, type Brand, type Result } from '@revisum/contracts';
 import { brand } from './brand.ts';
 import { isUnsafeProse, type PlanError } from './plan/plan-decoders.ts';

@@ -3,7 +3,6 @@
 // file, when code in packages/ or tools/ compares an actor type with 'person-verified' alone
 // (with ===, !==, == or !=, either way round, or a switch case with no 'person-declared' case
 // beside it), since such a gate would leave declared approvals out.
-// See docs/specs/SPEC-27-shared-types-and-events.md.
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Token } from './lint-names.ts';

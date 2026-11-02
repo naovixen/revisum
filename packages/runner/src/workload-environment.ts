@@ -2,7 +2,6 @@
 // revealed by service-caller.ts, runner's one module that may read one, then Revisum's own, which
 // always win.
 // Nothing comes from the host's environment: the list starts empty.
-// See docs/specs/SPEC-35-evidence-mode.md and docs/specs/SPEC-36-unsafe-plan-features.md.
 import type { WorkloadVariable } from '@revisum/contracts';
 import { variableFields } from './service-caller.ts';
 

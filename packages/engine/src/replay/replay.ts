@@ -9,7 +9,7 @@
 // fields differ, and a verdict. A replay whose only differences are the machine it ran on (host,
 // browser, its build, run image, fonts or versions) is a per-environment baseline; any other
 // difference is a mismatch. Neither is a pass.
-// Pure apart from calling run. See docs/specs/SPEC-08-manifest-and-replay.md.
+// Pure apart from calling run.
 import { failure, success, type DatabaseCommandRunner, type Result, type ServiceCaller } from '@revisum/contracts';
 import { canonicalJson, sha256 } from '../hashing.ts';
 import {

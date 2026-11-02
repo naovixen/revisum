@@ -2,14 +2,12 @@
 // call's request carries each secret header, and each secret in its JSON body, as an opaque Secret;
 // it is revealed only here, as the request is written for sending, so no other code holds the text.
 // A workload's declared secrets are revealed here too, as its container's environment is written
-// (docs/specs/SPEC-35-evidence-mode.md).
 //
 // serviceCaller() is the real caller. It sends every request through the egress proxy, so the
 // proxy's allow-list and resolve-time address check decide where a call may go; it never connects
 // to a service itself. It never follows a redirect, stops reading at the request's size cap, and
 // sends each request once: nothing here retries, so a write is never sent twice. No header value is
 // written anywhere but the wire, and a failure answers with its code alone.
-// See docs/specs/SPEC-32-declared-service-calls.md and docs/specs/SPEC-07-isolated-runner-and-egress.md.
 import {
   failure, reveal, success,
   type Result, type ServiceCallErrorCode, type ServiceCaller, type ServiceRequest, type ServiceRequestHeader, type ServiceResponse, type WorkloadVariable,

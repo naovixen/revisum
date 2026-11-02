@@ -13,7 +13,6 @@ export const ALL_RULES: Rule[] = [...STATIC_RULES, textContrastRule, ariaHiddenF
 
 // The version of this rule set, recorded in each run manifest. Raise it whenever a rule's or a
 // probe's logic changes, so a run on the old rules can never pass for one on the new.
-// See docs/specs/SPEC-08-manifest-and-replay.md.
 export const ACT_RULESET_VERSION = '1.0.0';
 
 export interface ScanOptions { rules?: readonly string[]; page: string }

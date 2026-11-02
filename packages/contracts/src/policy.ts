@@ -2,7 +2,6 @@
 // valid plan may do. It checks a plan before a run starts (origins, limits, and clicks on controls
 // whose names mark them as irreversible), and the driver asks it again just before every action,
 // once the page shows which element the action would touch.
-// See docs/specs/SPEC-03-policy-gate.md.
 import type { Locale } from './target.ts';
 import type { Plan } from './plan.ts';
 

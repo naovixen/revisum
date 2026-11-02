@@ -4,7 +4,6 @@
 //     passcode, token, secret or API key, in English, German or French;
 //   - text anywhere in the plan shaped like a credential: a JSON Web Token, a "Bearer" header
 //     value, or a key with a well-known issuer prefix.
-// See docs/specs/SPEC-04-secrets-and-redaction.md.
 import { literalText, type Locator } from '@revisum/contracts';
 
 // Words that name a field holding a credential.

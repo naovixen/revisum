@@ -2,12 +2,8 @@
 // back for the gates step. Each run of run-test-folder writes one results file for the folders it
 // ran, replacing that file's earlier version; the gates step reads them all.
 //   - A test id is "<file>#<full name>", the file relative to the repository with forward slashes.
-//   - A test's criterion is read from its source at the line Node reported, the way the naming
-//     lint reads it: the string after `criterion:` in the test's options.
-// See docs/specs/SPEC-00-repo-seed-and-gates.md.
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { tokenize, type Token } from './lint-names.ts';
 import type { TestResultLine } from './test-results-reporter.ts';
 
 export const RESULTS_FOLDER = '.test-results';
@@ -76,39 +72,3 @@ export function readTestResults(root: string): TestResults {
 
 // True when a test that ran in these results failed (skipped tests neither pass nor fail).
 export const failed = (test: TestResult): boolean => !test.passed && !test.skipped;
-
-// ---- Criteria in test metadata ------------------------------------------------------------------
-
-const isPunctuator = (token: Token | undefined, text: string): boolean => token?.kind === 'punctuator' && token.text === text;
-
-// The criterion id in the options of the test call that starts on `line`, or undefined. The scan
-// starts at that line and stops at the test's body: the first arrow or `function` keyword.
-export function criterionAt(tokens: readonly Token[], line: number): string | undefined {
-  const start = tokens.findIndex((token) => token.line >= line);
-  if (start === -1) return undefined;
-  for (let index = start; index < tokens.length; index++) {
-    const token = tokens[index];
-    if (token === undefined) break;
-    if (isPunctuator(token, '=') && isPunctuator(tokens[index + 1], '>')) break;
-    if (token.kind === 'identifier' && token.text === 'function') break;
-    const value = tokens[index + 2];
-    if (token.kind === 'identifier' && token.text === 'criterion' && isPunctuator(tokens[index + 1], ':') && value?.kind === 'string') {
-      return value.text;
-    }
-  }
-  return undefined;
-}
-
-// Reads criteria for test results, tokenizing each source file once.
-export function criterionReader(root: string): (test: TestResultLine) => string | undefined {
-  const tokensByFile = new Map<string, readonly Token[]>();
-  return (test) => {
-    let tokens = tokensByFile.get(test.file);
-    if (tokens === undefined) {
-      const path = join(root, test.file);
-      tokens = existsSync(path) ? tokenize(readFileSync(path, 'utf8')).filter((token) => token.kind !== 'comment') : [];
-      tokensByFile.set(test.file, tokens);
-    }
-    return criterionAt(tokens, test.line);
-  };
-}

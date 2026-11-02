@@ -9,7 +9,6 @@
 // logs egress-unenforceable, so no report claims isolation.
 // Nothing reaches the containers from the host's environment: each environment is built from an
 // empty list, and only the code, dependencies and browsers the run needs are mounted, read-only.
-// See docs/specs/SPEC-07-isolated-runner-and-egress.md.
 import {
   PRODUCT, failure, success,
   type AppliedRewrite, type DeclaredService, type EgressPolicy, type ExecOutcome, type GuaranteeLevel, type ImageDigest, type ProxyDecision, type Result, type Runner,

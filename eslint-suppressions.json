@@ -2672,14 +2672,6 @@
       "count": 3
     }
   },
-  "test/proofs/criterion-id-lint.test.ts": {
-    "revisum/file-name-matches-export": {
-      "count": 1
-    },
-    "revisum/test-title-format": {
-      "count": 5
-    }
-  },
   "test/proofs/database-command-dependencies.test.ts": {
     "@typescript-eslint/no-unsafe-assignment": {
       "count": 1
@@ -5949,7 +5941,7 @@
       "count": 1
     },
     "curly": {
-      "count": 10
+      "count": 6
     },
     "revisum/file-name-matches-export": {
       "count": 1

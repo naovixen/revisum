@@ -1,6 +1,6 @@
 // Turns what the browser saw and what the egress proxy decided into a run's egress events. Over
 // HTTPS and for WebSockets the proxy sees only a host and port, so the channel comes from the
-// browser. See docs/specs/SPEC-07-isolated-runner-and-egress.md.
+// browser.
 import type { BrowserRequestRecord, EgressDecision, EgressEvent, ProxyDecision, SeenOrigin } from '@revisum/contracts';
 
 const DEFAULT_PORTS: Readonly<Record<string, string>> = { 'http:': '80', 'ws:': '80', 'https:': '443', 'wss:': '443' };

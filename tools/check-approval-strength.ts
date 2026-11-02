@@ -9,7 +9,6 @@
 //     either way round), or switches on it, which decides a result by strength.
 // Choosing a label by looking the strength up in a table passes. Declaring VerifiedApproval, or
 // any narrowed type, passes too: only taking one as a parameter decides by strength.
-// See docs/specs/SPEC-02-project-trust-and-approval.md.
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Token } from './lint-names.ts';

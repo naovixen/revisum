@@ -4,7 +4,6 @@
 // gate again, opens a headless Chromium through the CDP driver behind the run's egress proxy
 // (HTTP_PROXY), runs the plan, crawls, and prints the page map as canonical JSON on standard
 // output. Secrets come from its environment, where the runner copied them by name.
-// See docs/specs/SPEC-37-explore-to-draft.md.
 import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { cdpDriver } from '@revisum/driver-cdp';

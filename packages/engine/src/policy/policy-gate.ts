@@ -16,7 +16,6 @@
 // one plan.denied audit event whose code is the rule, so a denial leaves a record even when
 // nothing ran; a denial the audit sink failed to record is marked unrecorded. An authorisation
 // holds only for the project it was cleared under: run() refuses it under any other.
-// See docs/specs/SPEC-03-policy-gate.md and docs/specs/SPEC-36-unsafe-plan-features.md.
 import { literalText } from '@revisum/contracts';
 import type {
   AllowedUrl, Authorised, DatabaseCommandStep, EventSink, GuardVerdict, Locale, Locator, PageScriptStep, PathTemplate, Plan, PolicyDecision,

@@ -6,7 +6,7 @@
 //     it of 7 or more characters, which Git would accept as naming it.
 // Every file is read, not only Git's tracked ones, so a scratch copy that is no repository is
 // checked the same way; installed packages, build output and test results are skipped.
-// Runs in `npm run lint`. See docs/specs/SPEC-00-repo-seed-and-gates.md.
+// Runs in `npm run lint`.
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { decodeSeedProvenance, PROVENANCE_PATH } from './check-seed-provenance.ts';

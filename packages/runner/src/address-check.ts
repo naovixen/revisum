@@ -2,7 +2,6 @@
 // address before it connects, so a declared name that points at the machine, the private network
 // or a cloud's metadata service is refused, however the address is written: a DNS name, an IPv4
 // literal or an IPv6 form that carries an IPv4 address inside.
-// See docs/specs/SPEC-07-isolated-runner-and-egress.md.
 import { isIPv4, isIPv6 } from 'node:net';
 
 export type AddressVerdict = 'allowed' | 'refused';

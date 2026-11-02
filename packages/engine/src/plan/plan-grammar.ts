@@ -1,8 +1,6 @@
 // The plan language's grammar as data: which fields each step and locator has, and the patterns
 // its ids follow. The plan parser reads these tables to decode a plan, and planJsonSchema() reads
 // the same tables to build the published JSON Schema, so the two cannot drift apart.
-// See docs/specs/SPEC-01-plan-language-and-parser.md, docs/specs/SPEC-30-plan-values-positions-and-keys.md,
-// docs/specs/SPEC-31-page-states-metadata-downloads-and-tabs.md and docs/specs/SPEC-34-clock-advance-and-clipboard.md.
 import {
   DOM_CHECK_KINDS, DOWNLOAD_SIZE_KINDS, DOWNLOAD_TEXT_KINDS, ELEMENT_STATE_KINDS, ELEMENT_TEXT_KINDS, KEYS, LOCATOR_KINDS, PAGE_TEXT_KINDS,
   PLAN_VERSION, REMEMBER_ATTRIBUTE_READ, REMEMBER_READS, STRUCTURAL_LOCATOR_KINDS,

@@ -2,7 +2,6 @@
 // every closed error-code union, so the link errors#<code> resolves. This check reads the codes
 // from the unions' declarations and fails, naming the code, when a heading is missing, or when a
 // heading names a code that no union holds any more.
-// See docs/specs/SPEC-27-shared-types-and-events.md.
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Token } from './lint-names.ts';

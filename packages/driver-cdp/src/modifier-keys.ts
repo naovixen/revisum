@@ -3,7 +3,6 @@
 // the driver runs on, so that machine's platform decides. Every other modifier is held as itself,
 // in the order the plan writes them; a key written twice through ControlOrMeta, such as Control
 // and ControlOrMeta off macOS, is held once, where it first appears.
-// See docs/specs/SPEC-30-plan-values-positions-and-keys.md.
 import type { Modifier } from '@revisum/contracts';
 
 export type HeldModifierKey = 'Alt' | 'Control' | 'Meta' | 'Shift';

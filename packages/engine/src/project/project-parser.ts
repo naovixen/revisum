@@ -69,7 +69,6 @@ export const DEFAULT_LIMITS: Limits = {
 export type PlanLimits = Pick<Limits, 'maximumPlanBytes' | 'maximumSteps' | 'maximumFrameDepth'>;
 
 // What the policy gate allows beyond its defaults, and what it denies beyond its built-in rules.
-// See docs/specs/SPEC-03-policy-gate.md.
 export type ProjectPolicy = {
   // Words the project adds, per locale, to the engine's irreversible patterns.
   readonly irreversiblePatterns: IrreversiblePatterns;
@@ -88,7 +87,7 @@ export const DEFAULT_POLICY: ProjectPolicy = {
   allowProductionForApprovedPlans: false,
 };
 
-// What a run keeps as evidence beyond its defaults. See docs/specs/SPEC-31-page-states-metadata-downloads-and-tabs.md.
+// What a run keeps as evidence beyond its defaults.
 export type EvidenceSettings = {
   // Whether a download's content is kept, as redacted text. Off unless the project turns it on;
   // a download's name, media type, size and sha256 are always kept.
@@ -96,11 +95,11 @@ export type EvidenceSettings = {
 };
 export const DEFAULT_EVIDENCE: EvidenceSettings = { keepDownloads: false };
 
-// How runs of this project can be replayed. See docs/specs/SPEC-08-manifest-and-replay.md.
+// How runs of this project can be replayed.
 export type ReplaySettings = {
   // Whether a run keeps the replies of its service calls and database commands in a recording
   // beside its result, so a replay can feed them back without sending anything. Off unless the
-  // project turns it on: the replies may hold personal data, which nothing masks until SPEC-09.
+  // project turns it on: the replies may hold personal data, which nothing masks until privacy masking.
   readonly recordReplies: boolean;
 };
 

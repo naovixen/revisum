@@ -8,7 +8,6 @@
 //     fails every check, so textExcludes cannot pass on nothing.
 //   - A remember from the clipboard keeps the text as a run value only when it passes the same
 //     rules as plan text; the result and the log keep its name and sha256 only.
-// See docs/specs/SPEC-34-clock-advance-and-clipboard.md.
 import type {
   AdvanceClockStep, ClipboardAssertion, Clock, DriverError, ExpectClipboardStep, Result, SafeText, Session, Step, ValueName,
 } from '@revisum/contracts';

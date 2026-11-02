@@ -1,5 +1,4 @@
 // The provisional maturity levels 0 to 5 and the metrics the metrics panel shows.
-// See docs/specs/SPEC-15-metrics-panel.md.
 import type { History, HistoryPeriod, Severity } from './model/report-model.ts';
 
 export type Level = 0 | 1 | 2 | 3 | 4 | 5;

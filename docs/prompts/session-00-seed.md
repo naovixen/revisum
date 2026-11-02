@@ -42,7 +42,7 @@ You are seeding the product repository for Revisum. It's a tool that independent
   - the P5 ACT re-score and its fixtures;
   - the P6 golden report.
 - Rename every identifier, file and test title to the naming rules. Keep assertions and expected values byte-identical.
-- Tag each test with its acceptance criterion where SPEC-00 names one: `{ criterion: 'AC-SPEC-00-01' }`.
+- Do not tag tests with criterion ids or cite SPEC-00 in code; the commit's `Criteria:` trailer carries the link.
 - Change nothing outside the test-set folders.
 
 **Exit:** the suites compile against the 0a skeleton. They are expected to fail until 0c; list which ones fail and why.

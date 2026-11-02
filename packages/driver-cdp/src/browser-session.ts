@@ -1,6 +1,6 @@
 // Turns any protocol's PageOperations into a Session. Auto-waiting, the runtime guard, probing,
 // masking and auditing live here once, so every protocol behaves the same way.
-// See docs/specs/SPEC-06-cdp-driver.md, and docs/specs/SPEC-36-unsafe-plan-features.md for css
+// for css
 // and XPath locators, DOM reads and page scripts.
 import {
   DEFAULT_TEST_ID_ATTRIBUTE, DRIVER_FEATURES, failure, literalActionStep, literalText, performableLocator, reveal, success,

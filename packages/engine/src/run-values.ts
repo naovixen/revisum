@@ -3,7 +3,6 @@
 // same seed, clock start, target and project always give the same values, and a new run (a new
 // seed or clock start) gives new unique ones. Substitution happens before the policy gate's
 // runtime guard, so the guard sees the final text and URL.
-// See docs/specs/SPEC-30-plan-values-positions-and-keys.md.
 import {
   failure, literalText, referencedValueName, success,
   type AllowedUrl, type ElementAssertion, type GeneratedValue, type Locator, type PathTemplate, type Plan,

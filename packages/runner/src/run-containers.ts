@@ -2,7 +2,6 @@
 // proxy container and how its decisions are read back, the waits and probes that show egress is
 // enforced, and the hardening every container gets. Both runners build their networks from these,
 // so a plan run and an evidence run are isolated the same way.
-// See docs/specs/SPEC-07-isolated-runner-and-egress.md and docs/specs/SPEC-35-evidence-mode.md.
 import { PRODUCT, type AppliedRewrite, type DeclaredService, type EgressPolicy, type ProxyDecision } from '@revisum/contracts';
 import { platform } from 'node:os';
 import { isAbsolute, join, normalize, sep } from 'node:path';

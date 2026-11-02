@@ -1,5 +1,5 @@
 // The own CDP driver: launches Chromium itself and speaks the Chrome DevTools Protocol over a
-// WebSocket, with no third-party automation library. See docs/specs/SPEC-06-cdp-driver.md.
+// WebSocket, with no third-party automation library.
 import {
   determinismScript, deviceProfile, failure, success,
   type A11yNode, type DriverError, type Key, type Result, type SessionEnvironment, type Target,

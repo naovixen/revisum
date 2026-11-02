@@ -9,7 +9,7 @@ ESLint enforces the title structure: `Using the X` > `given` > `and` > `when` > 
 
 - Test behaviour through the public API: trigger an action, check the reaction (return value, thrown error, call to a port). Never reach into privates.
 - Cover positive and negative paths. Don't add scenarios the types already rule out.
-- Set state before the action, in the `given` and `when` levels. Tag each test: `{ criterion: "AC-SPEC-nn-mm" }`.
+- Set state before the action, in the `given` and `when` levels.
 - Prefer real implementations. A stub must satisfy the port's type, or the test can pass falsely.
 - Check a spy's arguments and its call count.
 - Use `t.mock`, which is restored after each test. Top-level `mock` needs a manual reset.

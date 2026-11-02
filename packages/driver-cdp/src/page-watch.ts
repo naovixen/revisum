@@ -7,7 +7,6 @@
 // still paused, before it loads anything.
 // Once the page has crashed, every command to it fails at once: the browser never answers a
 // command sent to a dead renderer, so waiting would only run into each command's timeout.
-// See docs/specs/SPEC-06-cdp-driver.md.
 import { CdpError, type CdpConnection } from './cdp-connection.ts';
 import type { PageEvents } from './page-operations.ts';
 

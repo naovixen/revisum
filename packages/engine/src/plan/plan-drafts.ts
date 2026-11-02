@@ -8,7 +8,6 @@
 // draft is refused with untrusted-source before the parser, since only core's own routes record
 // that basis. Core's own routes admit their drafts through admitCoreDraft, which records the route
 // as the source, basis core-recorded, under an actor of the engine's choosing.
-// See docs/specs/SPEC-28-plan-authoring.md.
 import {
   DECLARABLE_PLAN_SOURCES, failure, success,
   type DerivedActor, type EventSink, type Plan, type PlanDraft, type PlanProvenance, type PlanSource, type Result,

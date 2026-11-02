@@ -3,7 +3,6 @@
 // headers or as arguments, the secrets its stub starts and storage writes pass as arguments, and the
 // secrets in the environments of the database commands it runs. The first name the store cannot resolve stops the run as secret-missing. The resolved secrets give the run its redaction and its manifest
 // records; their values stay inside the opaque Secret objects.
-// See docs/specs/SPEC-04-secrets-and-redaction.md.
 import {
   failure, success,
   type CallDeclaration, type CallName, type CommandName, type DatabaseCommandDeclaration, type Plan, type Redactor, type Result, type Secret, type SecretName, type SecretStore, type Step,

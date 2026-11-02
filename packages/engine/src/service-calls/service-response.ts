@@ -1,7 +1,6 @@
 // Reads a declared call's response: whether its status is one the declaration counts as success,
 // its JSON body within the size cap, and a field by its JSON pointer. Nothing here keeps the body:
-// a run records only its status and sha256 until redacted excerpts land (SPEC-09).
-// See docs/specs/SPEC-32-declared-service-calls.md.
+// a run records only its status and sha256 until redacted excerpts land.
 import {
   failure, success,
   type BackendAssertion, type CallDeclaration, type JsonPointer, type ResponseReadErrorCode, type Result, type SafeText, type ServiceResponse,

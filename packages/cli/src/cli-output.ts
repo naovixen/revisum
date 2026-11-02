@@ -1,8 +1,7 @@
 // What every command prints with --json: one CliOutput object, with the schema id, the command,
 // whether it succeeded, its data and its typed errors. Each error links to its heading in
-// docs/errors.md. The full command line is SPEC-16's; the types are here, in the package that owns
+// docs/errors.md. The full command line lives elsewhere; the types are here, in the package that owns
 // the command line.
-// See docs/specs/SPEC-16-cli-and-github-action.md.
 import { schemaId, type CliErrorCode, type ExitCode } from '@revisum/engine';
 
 export type Command = 'validate' | 'lock' | 'run' | 'export' | 'review' | 'approve' | 'doctor' | 'convert' | 'draft';

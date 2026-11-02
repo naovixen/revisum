@@ -10,7 +10,6 @@
 // In the run container the crawl is this package's explore-in-container.ts, started through
 // RunnerHandle.exec. Secrets reach it by variable name only, never on its command line, and the
 // page map it prints is outside data: the host decodes it with the engine's decodePageMap.
-// See docs/specs/SPEC-37-explore-to-draft.md.
 import { arch, platform } from 'node:os';
 import {
   crawlSite, decodePageMap, exploreStartOrigin, failure, redactPageMap, run, sha256, success,

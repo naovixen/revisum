@@ -1,5 +1,5 @@
 // The run manifest: every input that decides a run's result, hashed, so a run can be replayed and
-// compared. See docs/specs/SPEC-08-manifest-and-replay.md.
+// compared.
 import {
   failure, success,
   type AdapterInfo, type AppliedRewrite, type EvidenceSuiteDeclaration, type ImageDigest, type Plan, type RedactionMode, type Result, type SecretName,

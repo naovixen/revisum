@@ -7,7 +7,7 @@
 //     since the checkout is read-only;
 //   - one --project per declared project.
 // The runner runs the vector without a shell, so no argument is ever read as shell syntax. The
-// suite's timeout is the runner's to enforce. See docs/specs/SPEC-35-evidence-mode.md.
+// suite's timeout is the runner's to enforce.
 import type { EvidenceSuiteDeclaration } from '@revisum/contracts';
 
 // The report's file name, at the top of Revisum's output folder.

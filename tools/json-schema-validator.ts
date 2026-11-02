@@ -1,7 +1,6 @@
 // A small JSON Schema (2020-12) validator for the keywords the plan language's schema uses, so the
 // schema check needs no third-party package. A keyword it does not know is reported as a problem
 // rather than ignored, so the schema cannot quietly rely on a rule nothing checks.
-// See docs/specs/SPEC-01-plan-language-and-parser.md.
 import { isDeepStrictEqual } from 'node:util';
 
 type SchemaObject = Readonly<Record<string, unknown>>;

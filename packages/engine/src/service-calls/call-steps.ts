@@ -8,7 +8,6 @@
 //     that fails is recorded and raises a review item, and never changes the verdict.
 // Each request sent is logged by step, outcome, code, response sha256 and duration only: never an
 // argument, a header or the response itself.
-// See docs/specs/SPEC-32-declared-service-calls.md.
 import {
   failure, success,
   type CallArguments, type CallDeclaration, type CallName, type CallStep, type CleanupStep, type Clock, type CommandName, type DeclaredService, type HttpMethod, type JsonPointer, type Result,

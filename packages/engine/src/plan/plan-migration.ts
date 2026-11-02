@@ -3,7 +3,6 @@
 // as "$.steps[3]". The migration adds those ids and the new version and changes nothing else.
 // An assertion with no entry fails with no_criterion_id, so nothing migrates silently.
 // Version 1 plans are accepted this way for 12 months after version 1.1, and in no other way.
-// See docs/specs/SPEC-01-plan-language-and-parser.md.
 import { failure, type CriterionId, type PlanData, type Result } from '@revisum/contracts';
 import { DEFAULT_LIMITS } from '../project/project-parser.ts';
 import { INVALID, peekRecord, readList, readRecord, type Issues, type PlanError } from './plan-decoders.ts';

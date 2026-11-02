@@ -2,7 +2,7 @@
 // it needs (an image's id, a network, a hardened container, a command run inside one), so unit
 // tests can answer with a fake. Docker is driven through its command-line client, started with
 // spawn and never through a shell, so no argument is ever read as shell syntax; no Docker library
-// is needed. See docs/specs/SPEC-07-isolated-runner-and-egress.md.
+// is needed.
 import { failure, success, type ExecOutcome, type Result } from '@revisum/contracts';
 import { spawn } from 'node:child_process';
 

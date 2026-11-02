@@ -2,7 +2,6 @@
 // gives a bounded, redacted page map; the page map is the only page content a planner ever sees.
 // The crawl only navigates and reads: it never clicks, types, selects, submits or runs a script of
 // its own. These are the types the engine, the CDP driver and the command agree on.
-// See docs/specs/SPEC-37-explore-to-draft.md.
 import type { DocumentSession } from './browser-driver.ts';
 import type { GuaranteeLevel } from './run-ports.ts';
 import type { Origin } from './target.ts';

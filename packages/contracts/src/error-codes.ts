@@ -1,7 +1,6 @@
 // The closed error-code unions that have no other home yet. Each code has a heading in
 // docs/errors.md, so the link errors#<code> explains it. Plan errors live beside the plan parser
 // in engine; driver errors beside the driver ports; sink errors beside the event sink.
-// See docs/specs/SPEC-27-shared-types-and-events.md.
 
 // Why the isolated runner could not start a run.
 export type RunnerError = { readonly code: 'image-missing' | 'image-digest-mismatch' | 'egress-unenforceable' | 'start-failed' };

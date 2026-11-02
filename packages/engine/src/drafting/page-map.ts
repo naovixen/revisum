@@ -8,7 +8,6 @@
 //
 // A page map that comes back from the isolated runner is outside data: decodePageMap checks every
 // field and bound before the command uses it.
-// See docs/specs/SPEC-37-explore-to-draft.md.
 import {
   failure, success,
   type A11yNode, type Origin, type PageMap, type PageMapEntry, type PageMapNode, type Redactor, type Result,

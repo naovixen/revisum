@@ -16,7 +16,6 @@
 //     see the agent's environment, so this approval is always declared, never verified;
 //   - signed key (optional, not built): unknown keys and signatures without user presence are
 //     refused; until the route is built, no signature verifies.
-// See docs/specs/SPEC-02-project-trust-and-approval.md.
 import {
   failure, success,
   type ActorType, type Approval, type ApprovalErrorCode, type ApprovalFields, type ApprovalProof, type ApprovalStrength, type ApprovalSubject,

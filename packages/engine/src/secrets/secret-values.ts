@@ -7,7 +7,6 @@
 // before the run hands it to the driver, which never reports it back; and a recorded reply, whose
 // secret echoes are cut out when it is recorded and put back from the replay's own store just
 // before a replay hands the reply to the engine.
-// See docs/specs/SPEC-04-secrets-and-redaction.md.
 import {
   MINIMUM_SECRET_LENGTH, createSecret, isSecret, reveal,
   type HeaderScheme, type JsonBodyWithSecrets, type LeakForm, type RedactionMode, type Secret, type SecretName,

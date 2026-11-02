@@ -3,7 +3,6 @@
 // outside the browser sees only hosts and ports over HTTPS, so these records give its decisions
 // their channels. Only network schemes are recorded; data:, blob: and the like never leave, and
 // neither does a request a declared stub answered inside the browser, so it is left out.
-// See docs/specs/SPEC-07-isolated-runner-and-egress.md.
 import type { BrowserChannel, BrowserRequestRecord } from '@revisum/contracts';
 import type { CdpConnection } from './cdp-connection.ts';
 

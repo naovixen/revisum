@@ -5,7 +5,6 @@
 // whenever a paid service is added. Nothing here reads an account or an API.
 //   npm run cost-report     print the month's report; fail when over budget at zero customers
 // The lint runs the same check, so a committed record over budget fails CI.
-// See docs/specs/SPEC-00-repo-seed-and-gates.md.
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 

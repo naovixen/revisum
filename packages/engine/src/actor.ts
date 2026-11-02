@@ -1,9 +1,8 @@
 // The one module in core that builds a DerivedActor or an ActorId. Code that records an audit
 // event receives a DerivedActor and passes it on; it never builds one, so a caller cannot choose
-// its own actor type. The approval verifier (SPEC-02) builds them here from a checked approval
+// its own actor type. The approval verifier builds them here from a checked approval
 // proof. The engine's public entry point does not export this module, and the lint rejects the
 // DerivedActor brand applied anywhere else.
-// See docs/specs/SPEC-27-shared-types-and-events.md.
 import { createHmac } from 'node:crypto';
 import type { ActorId, ActorType, DerivedActor } from '@revisum/contracts';
 import { brand } from './brand.ts';

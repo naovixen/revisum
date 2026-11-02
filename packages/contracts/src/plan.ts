@@ -1,8 +1,6 @@
 // The plan language: a closed, versioned union of steps. An AI or a person may propose a plan,
 // but only the engine's plan parser can produce the branded Plan that the interpreter accepts.
 // The types live here because drivers act on steps and locators; the parser lives in the engine.
-// See docs/specs/SPEC-01-plan-language-and-parser.md, docs/specs/SPEC-30-plan-values-positions-and-keys.md
-// and docs/specs/SPEC-31-page-states-metadata-downloads-and-tabs.md.
 import type { Brand } from './brand.ts';
 import type { ClipboardRead, ClockAndClipboardStep } from './clock-and-clipboard.ts';
 import type { NetworkAndStorageStep, RequestName, ResponseRead } from './network-and-storage.ts';

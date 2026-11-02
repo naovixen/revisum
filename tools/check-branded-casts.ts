@@ -6,7 +6,6 @@
 // The same rule keeps DerivedActor, the actor recorded on every audit event, out of callers' hands:
 // only the engine's actor module and the approval verifier may build one, so no caller can choose
 // its own actor type. An Approval, likewise, comes only from the approval verifier.
-// See docs/specs/SPEC-27-shared-types-and-events.md.
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Token } from './lint-names.ts';

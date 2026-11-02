@@ -11,7 +11,6 @@
 // It prints the average fixHours over the first six Chrome majors, or the running average while
 // there are fewer, and exits 1 when it flags the fallback rule or a check fails. The session adds
 // a record when it moves the pin; the founder's push approves it. A weekly CI job runs this tool.
-// See docs/specs/SPEC-06-cdp-driver.md.
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { CHROME_FOR_TESTING_BUILD } from './install-browsers.ts';

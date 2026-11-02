@@ -13,7 +13,6 @@
 // The engine judges the reply itself: the exit code, the timeout, and the output, decoded here by
 // hand under the declaration's limits. Neither the output nor a field's value is kept: the result
 // and the log record the output's sha256, and a remembered value's name and sha256.
-// See docs/specs/SPEC-36-unsafe-plan-features.md ("Database commands" under "Milestone").
 import {
   failure, success,
   type CommandName, type Clock, type DatabaseCommandDeclaration, type DatabaseCommandRequest, type DatabaseCommandRunner, type DatabaseStep,

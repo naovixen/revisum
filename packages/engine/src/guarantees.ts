@@ -1,7 +1,6 @@
 // What a run vouches for. One function decides, for every run, which guarantees hold and why each
 // lost one is lost, so a plan run and an evidence run can never describe themselves differently
 // for the same conditions. The level is the summary: 'isolated' only when every guarantee holds.
-// See docs/specs/SPEC-35-evidence-mode.md and docs/specs/SPEC-36-unsafe-plan-features.md.
 import {
   GUARANTEE_IDS,
   type GuaranteeId, type GuaranteeLossReason, type GuaranteeStatement, type RunMode, type UnsafeFeature,

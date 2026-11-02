@@ -3,7 +3,6 @@
 // no flag, environment variable or plan can. The reader refuses a suite that could run something
 // other than Playwright Test, reach outside the repository, override what Revisum sets in the
 // suite's environment, or hold a secret, with the code and JSON path and never the value.
-// See docs/specs/SPEC-35-evidence-mode.md.
 import type {
   EnvironmentValue, EvidenceLimits, EvidenceMode, EvidenceSuiteDeclaration, ImageDigest, SafeText, SecretName, SuiteName,
 } from '@revisum/contracts';

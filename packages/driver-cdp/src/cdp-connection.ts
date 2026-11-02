@@ -1,7 +1,6 @@
 // A minimal Chrome DevTools Protocol client over Node's built-in WebSocket. One socket carries
 // every session ("flat" sessions, Target.attachToTarget with flatten: true); each command names
 // the session it is for, or none for the browser itself. Every command has a timeout.
-// See docs/specs/SPEC-06-cdp-driver.md.
 
 export const DEFAULT_COMMAND_TIMEOUT_MILLISECONDS = 15_000;
 const DEFAULT_CONNECT_TIMEOUT_MILLISECONDS = 15_000;

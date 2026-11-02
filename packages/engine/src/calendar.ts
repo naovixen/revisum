@@ -2,7 +2,6 @@
 // and locale data are fixed by the Node version the run manifest records, so no date library is
 // needed and the same inputs always give the same dates. Days are counted with Date.UTC as plain
 // calendar arithmetic, so 31 January plus one day is 1 February whatever the time zone.
-// See docs/specs/SPEC-30-plan-values-positions-and-keys.md.
 import type { DateAnchor, DateFormat, Locale, RelativeDay, TimeZone } from '@revisum/contracts';
 
 // A day on the calendar. month is 1 to 12.

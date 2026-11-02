@@ -1,7 +1,6 @@
 // How far advanceClock steps move the run's virtual clock, in milliseconds. Pure. The parser
 // bounds each advance and a plan's total with these, and the run hands the driver milliseconds,
 // so a unit is converted in this one place only.
-// See docs/specs/SPEC-34-clock-advance-and-clipboard.md.
 import type { ClockAdvance, ClockUnit, Plan, Step } from '@revisum/contracts';
 
 // Elapsed time, not calendar time: a day is always 86,400,000 ms, also across a daylight-saving change.

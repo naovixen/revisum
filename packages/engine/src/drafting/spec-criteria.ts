@@ -3,7 +3,6 @@
 // "Acceptance criteria", each written "- <criterion id>: <text>" on one line, until the next
 // heading. Everything else in the spec (background, notes, links to screenshots) is never read
 // into a criterion, so it can never reach a planner.
-// See docs/specs/SPEC-28-plan-authoring.md.
 import { failure, success, type CriterionText, type Result } from '@revisum/contracts';
 import { criterionIdFrom } from '../plan/plan-parser.ts';
 

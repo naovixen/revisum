@@ -9,11 +9,6 @@
 // locators, DOM checks and page scripts. A driver declares the ones it performs in its
 // AdapterInfo; the run refuses a step needing one its driver does not declare with
 // unsupported-step, before anything of it reaches the driver.
-// See docs/specs/SPEC-30-plan-values-positions-and-keys.md and
-// docs/specs/SPEC-31-page-states-metadata-downloads-and-tabs.md and
-// docs/specs/SPEC-33-network-stubs-request-checks-and-storage.md and
-// docs/specs/SPEC-34-clock-advance-and-clipboard.md and
-// docs/specs/SPEC-36-unsafe-plan-features.md.
 import { DOM_CHECK_KINDS } from './plan.ts';
 import type {
   ActionStep, ElementAssertion, Locator, PageAssertion, ResolvedActionStep, ResolvedLocator, SafeText, SemanticLocatorWith, Step, TextOrValue,

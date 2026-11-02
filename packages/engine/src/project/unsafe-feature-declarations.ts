@@ -7,7 +7,6 @@
 // reaches a page script, and reaches a command only through its declared environment), a command
 // whose service is not private with a port, a command whose program a plan could choose, and an
 // environment name Revisum sets itself, each with its code and JSON path and never the value.
-// See docs/specs/SPEC-36-unsafe-plan-features.md.
 import {
   CALL_EFFECTS, COMMAND_OUTPUTS, UNSAFE_FEATURES,
   type CommandArgument, type CommandName, type DatabaseCommandDeclaration, type DeclaredService, type PageScriptDeclaration,

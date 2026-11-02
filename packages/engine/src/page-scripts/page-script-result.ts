@@ -8,7 +8,6 @@
 //   - text that is not JSON is script-result-invalid.
 // The caller then reads only the declared fields, by JSON pointer. The text itself is never kept:
 // the run records its sha256.
-// See docs/specs/SPEC-36-unsafe-plan-features.md.
 import { failure, success, type Result } from '@revisum/contracts';
 
 // How deeply a script's result may nest lists and objects.

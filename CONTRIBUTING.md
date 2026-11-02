@@ -54,7 +54,7 @@ The founder drives one Claude Code session, which works through the spec queue i
 |---|---|---|---|
 | 1. Spec | Founder | Writes or approves the spec | `docs/specs/` |
 | 2. Types | Code helper | Adds the spec's types and ports, if they are new | `packages/`, `docs/` |
-| 3. Tests | Tests helper (`docs/prompts/session-tests.md`) | Writes at least one test per criterion, tagged `{ criterion: 'AC-SPEC-nn-mm' }`. Tests are expected to fail | `test/`, `proofs/`, `fixtures/`, `golden/` only |
+| 3. Tests | Tests helper (`docs/prompts/session-tests.md`) | Writes at least one test per criterion, with no reference to the spec. Tests are expected to fail | `test/`, `proofs/`, `fixtures/`, `golden/` only |
 | 4. Commit | Main session | Checks the change is tests only, then commits it alone | — |
 | 5. Code | Code helper (`docs/prompts/session-code.md`) | Implements the spec until the frozen tests pass. Never edits a test: if one looks wrong, stops and explains | `packages/`, `tools/`, `docs/` only |
 | 6. Commit | Main session | Runs `npm run check`, then commits the code | — |
@@ -68,7 +68,7 @@ The founder drives one Claude Code session, which works through the spec queue i
 
 A spec is done when all of these hold:
 
-1. Every acceptance criterion has at least one test tagged with its id, committed before the code, in its own commit.
+1. Every acceptance criterion has at least one test, committed before the code, in its own commit. The commits name the criteria in `Criteria:` trailers; no test, code or comment cites a spec.
 2. `npm run check` is green locally and in CI, on the pinned Linux image, with no retries and no skipped tests.
 3. The `tests-apart` check passed on the tests commit and on the code commit.
 4. No runtime dependency was added to `contracts` or `engine`. Any new third-party package elsewhere has a dependency review in `docs/decisions/`, written before it was added.
@@ -109,7 +109,7 @@ The code must read without any other document. File naming and the rest of the c
 - No research or process ids in identifiers, file or folder names, JSON keys, error codes or flags.
 - No single-letter names except loop indices `i`, `j`, `k` and coordinates `x`, `y`, and never as an export. That includes generic type parameters: write `<Value>`, not `<T>`.
 - No unexplained abbreviations. Allowed: id, url, uri, html, css, json, http, api, cli, ci, pr, cdp, bidi, wcag, act, a11y, pii, sha256, svg, png, dom, os. Standard names (ai, mcp, sarif, junit, oidc, jwt, lti) are spelt out in `docs/glossary.md`.
-- Prefer readable code to comments: rename or extract first. Comment only what the code can't say, such as why, in plain English. You may add "See `docs/specs/SPEC-nn-<name>.md`", but never as the only content.
+- Prefer readable code to comments: rename or extract first. Comment only what the code can't say, such as why, in plain English. Never cite a spec in a comment: code and tests read without the specs.
 - The product name is written once, in `PRODUCT` in `packages/contracts/src/product.ts`.
 - `docs/glossary.md` maps each domain term to its code name. Add a row when you add a term.
 - `npm run lint:names` enforces these rules. Its configuration is `tools/naming-lint-config.ts`.

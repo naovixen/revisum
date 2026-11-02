@@ -3,7 +3,6 @@
 // A parameter fills a whole path segment or query value, percent-encoded as one, or a whole JSON
 // value; it is written inside a string only for types that cannot hold quotes, spaces or
 // separators. Text is never spliced into the request, so no argument can change its shape.
-// See docs/specs/SPEC-32-declared-service-calls.md.
 import {
   failure, isSecret, success,
   type CallArgument, type CallArguments, type CallDeclaration, type JsonTemplate, type Origin, type ParameterName, type ParameterType, type Result,
@@ -196,7 +195,6 @@ function fillParameters(
 
 // Pure. A declared JSON template, such as a stub's body or a storage entry's value, filled from a
 // step's arguments by the declaration's parameters: a JSON value whose secret leaves stay opaque.
-// See docs/specs/SPEC-33-network-stubs-request-checks-and-storage.md.
 export function filledTemplate(
   template: JsonTemplate, parameters: Readonly<Record<ParameterName, ParameterType>>, callArguments: CallArguments,
   values: RunValues, secrets: SecretStore,

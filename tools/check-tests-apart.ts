@@ -5,7 +5,6 @@
 // On a push to main, where commits arrive without a pull request, it checks each commit of the
 // pushed range on its own, in the repository of the working folder:
 //   node tools/check-tests-apart.ts --commits <from>..<to>
-// See docs/specs/SPEC-00-repo-seed-and-gates.md.
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { matchesAny } from './glob.ts';

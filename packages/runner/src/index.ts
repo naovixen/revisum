@@ -1,7 +1,7 @@
 // Public entry point: the isolated runner and its egress proxy, the workload runner that runs a
 // team's own image behind the same proxy, the resolve-time address check,
 // the egress policy builder and how egress events are joined, and the real caller for declared
-// service calls, which sends each one through the egress proxy. See docs/specs/SPEC-07-isolated-runner-and-egress.md.
+// service calls, which sends each one through the egress proxy.
 export type { ExecOutcome, ResponseRewrite } from '@revisum/contracts';
 export { checkResolvedAddress, type AddressCheckOptions, type AddressVerdict } from './address-check.ts';
 export {

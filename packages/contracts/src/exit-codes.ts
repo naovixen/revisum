@@ -1,5 +1,5 @@
 // The process exit codes a run ends with. One run gives one code: when several apply, the first in
-// EXIT_PRECEDENCE wins. See docs/specs/SPEC-11-result-model-and-exporters.md.
+// EXIT_PRECEDENCE wins.
 
 // 0 passed, 1 failed, 2 plan rejected, 3 a required target unavailable, 4 internal error, 5 needs review.
 export type ExitCode = 0 | 1 | 2 | 3 | 4 | 5;

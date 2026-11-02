@@ -7,7 +7,6 @@
 // version in the lock file and in every manifest that names it; when a check fails and the
 // decision is `default`; or when evidence that is a repository path does not exist. A `partial`
 // result does not fail. The reviews are in tools/dependency-reviews.ts.
-// See docs/specs/SPEC-00-repo-seed-and-gates.md.
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { DEPENDENCY_REVIEWS } from './dependency-reviews.ts';

@@ -1,6 +1,5 @@
 // The report model. A ValidReport comes only from parseReportInput (report-parser.ts), and
 // generate() accepts nothing else, so unvalidated data cannot reach the renderer.
-// See docs/specs/SPEC-12-visual-report-and-pr-comment.md.
 import type { Box, Brand } from '@revisum/contracts';
 import { PRODUCT } from '@revisum/contracts';
 

@@ -2,7 +2,6 @@
 // gets. A suite's declared paths are trusted files: the gating pass always runs the protected
 // branch's version of them, and a change's own version runs only as a proposal pass, which never
 // opens the merge gate. So a change cannot make its run pass by editing its own tests.
-// See docs/specs/SPEC-35-evidence-mode.md.
 import { failure, success, type EvidenceMode, type EvidenceSuiteDeclaration, type Result, type SuitePass } from '@revisum/contracts';
 import type { EvidenceRefusal } from '../lifecycle.ts';
 import type { ProjectData } from '../project/project-parser.ts';

@@ -2,7 +2,6 @@
 // file can turn on, and wraps it with its evidence. Revisum cannot vouch for what the suite's code
 // checks, so every evidence result carries the `host` guarantee level and a statement of which
 // guarantees hold and which are lost.
-// See docs/specs/SPEC-35-evidence-mode.md.
 import type { Brand } from './brand.ts';
 import type { CriterionId, SafeText, SecretName } from './plan.ts';
 import type { ArtifactReference, GuaranteeLevel } from './run-ports.ts';

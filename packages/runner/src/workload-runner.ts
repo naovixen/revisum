@@ -20,8 +20,6 @@
 // (and its origin's host name, when that is a name) to the proxy, so the command connects by name.
 // Every other address still has no route. Such a request asks for no proxy variables, since the
 // command speaks TCP, not HTTP.
-// See docs/specs/SPEC-35-evidence-mode.md, docs/specs/SPEC-36-unsafe-plan-features.md and
-// docs/specs/SPEC-07-isolated-runner-and-egress.md.
 import {
   PRODUCT, WORKLOAD_CHECKOUT_PATH, WORKLOAD_OUTPUT_PATH, failure, success,
   type CapturedOutput, type EgressEvent, type EgressPolicy, type ExecOutcome, type ProxyDecision, type Result, type WorkloadErrorCode,

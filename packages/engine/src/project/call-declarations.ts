@@ -4,7 +4,6 @@
 // refuses a declaration that could reach an undeclared service, splice text into a string, set a
 // header that changes where or how a request travels, or read a field by a broken pointer, so
 // every declaration it accepts builds requests of one fixed shape.
-// See docs/specs/SPEC-32-declared-service-calls.md.
 import {
   CALL_EFFECTS, HEADER_SCHEMES, HTTP_METHODS, PARAMETER_KINDS,
   type Brand, type CallDeclaration, type CallName, type DeclaredService, type FieldName, type HeaderValue, type JsonPointer, type JsonTemplate,

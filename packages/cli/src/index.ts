@@ -1,6 +1,6 @@
 // Public entry point: the composition root. It runs a declared suite in evidence mode, wires
 // database commands to the workload runner and runs the draft command, with its explore mode; the
-// rest of the command line is SPEC-16's. It also gathers a run's pins and makes the benchmark's runs.
+// rest of the command line is not here. It also gathers a run's pins and makes the benchmark's runs.
 export { runSuite, type SuiteRunPorts } from './suite-run.ts';
 export { databaseCommandRunner, type DatabaseCommandRunnerOptions } from './database-commands.ts';
 export {

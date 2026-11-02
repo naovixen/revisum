@@ -15,7 +15,6 @@
 // that do not decode, the tool exits 0: it runs in its own weekly workflow and never fails a job.
 // The stored baseline's first values are provisional; replace them with the medians of the first
 // weekly run in the pinned image.
-// See docs/specs/SPEC-08-manifest-and-replay.md.
 import { appendFileSync, readFileSync } from 'node:fs';
 import { platform } from 'node:os';
 import { join } from 'node:path';

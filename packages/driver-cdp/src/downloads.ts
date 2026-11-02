@@ -5,7 +5,6 @@
 // separators and control characters replaced. A file over the step's byte limit is cancelled and
 // its partial bytes deleted; a second download in the same step is cancelled the same way. The
 // folder and every file in it are removed when the session closes.
-// See docs/specs/SPEC-31-page-states-metadata-downloads-and-tabs.md.
 import { failure, success, type DownloadedFile, type DriverError, type Result } from '@revisum/contracts';
 import { createHash } from 'node:crypto';
 import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs';

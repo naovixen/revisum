@@ -7,7 +7,6 @@
 // the language's own tables (roles, keys, states, units, formats), and each table of forms is typed
 // by the union it covers, so a step, check or value kind added to the language without a readable
 // form fails to compile.
-// See docs/specs/SPEC-28-plan-authoring.md ("Readable syntax for plan 1.2" and "for plan 1.3").
 import {
   AUDIT_MODES, CALL_EFFECTS, CLIPBOARD_READS, CLOCK_UNITS, DOM_CHECK_KINDS, ELEMENT_STATE_KINDS, KEYS, MODIFIERS, POSITION_WORDS,
   REMEMBER_ATTRIBUTE_READ, REMEMBER_READS, ROLES, STRUCTURAL_LOCATOR_KINDS,

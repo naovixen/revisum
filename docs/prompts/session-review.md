@@ -6,7 +6,7 @@ The main session replaces `<NN>` with the spec number and gives everything below
 
 Review the committed implementation of **SPEC-<NN>** as an independent reader. You get no notes from the authors.
 
-**Read:** `docs/specs/SPEC-<NN>-*.md`, then the tests tagged `AC-SPEC-<NN>-*`, then the code they exercise.
+**Read:** `docs/specs/SPEC-<NN>-*.md`, then find its tests by the behaviour they check, then the code they exercise.
 
 **Report** a table of findings, in at most 40 lines. For each: the criterion ID, the file and line, what is wrong, and a concrete failing input. Look for:
 - criteria whose test doesn't really check the observable: a tautology, or a mock that hides the behaviour;

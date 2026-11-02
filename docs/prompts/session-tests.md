@@ -10,7 +10,7 @@ Write the tests for **SPEC-<NN>**, before any implementation exists.
 
 **Do:**
 - Write one or more tests for every acceptance criterion in the spec. Each test asserts the criterion's observable behaviour, not a type, a constant or a tautology.
-- Tag each test with its criterion: `test("then it should <reaction>", { criterion: "AC-SPEC-<NN>-mm" }, …)`, inside `describe` blocks titled `Using the <subject>`, `given <context>` and `when <action>`.
+- Do not tag a test with a criterion or cite the spec in code or comments. Write `test("then it should <reaction>", …)` inside `describe` blocks titled `Using the <subject>`, `given <context>` and `when <action>`.
 - Word titles so that, merged, they read as one sentence saying what behaviour they check.
 - Use the criterion's oracle class:
   - **specified:** an exact expected value;

@@ -2,7 +2,6 @@
 // by version and the sha256 of the executable. `lock` works out the entries, `lockToFile` keeps
 // them in targets.lock.json beside project.json, and `checkPinnedBuild` refuses a run whose build
 // is not the pinned one. A build is never upgraded or swapped silently.
-// See docs/specs/SPEC-05-target-matrix-and-lock.md.
 import {
   failure, success,
   type AdapterRegistry, type BrowserDriver, type BuildFailureCode, type LockEntry, type LockFailure, type LockfileFailure, type Result,

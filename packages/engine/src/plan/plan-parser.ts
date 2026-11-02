@@ -10,14 +10,11 @@
 // likewise: a plan names a declaration and gives typed arguments, never a response, a matcher, a
 // storage key or a value to store. A clock advance is a bounded whole amount of a unit, never a
 // wait, and the clipboard can only be checked or remembered, never written.
-// See docs/specs/SPEC-01-plan-language-and-parser.md, docs/specs/SPEC-30-plan-values-positions-and-keys.md,
-// docs/specs/SPEC-31-page-states-metadata-downloads-and-tabs.md, docs/specs/SPEC-32-declared-service-calls.md,
-// docs/specs/SPEC-33-network-stubs-request-checks-and-storage.md and docs/specs/SPEC-34-clock-advance-and-clipboard.md.
 // The unsafe features of version 1.3 (css and XPath locators, DOM checks, page scripts and
 // database commands) are read only once the trusted project enables each one; a disabled one is
 // refused with unsafe_feature_disabled at the field that names it, every use of it, with nothing
 // under it read. A selector or expression is literal plan text, so what a locator can match is
-// fixed when the plan is approved. See docs/specs/SPEC-36-unsafe-plan-features.md.
+// fixed when the plan is approved.
 import {
   AUDIT_MODES, BACKEND_ASSERTION_KINDS, CALL_EFFECTS, CLIPBOARD_ASSERTION_KINDS, CLIPBOARD_READS, CLOCK_ADVANCE_MODES, CLOCK_UNITS, DIALOG_ACTIONS,
   DOM_CHECK_KINDS, DOWNLOAD_SIZE_KINDS, literalText, ELEMENT_STATE_KINDS, MODIFIERS, PAGE_TEXT_KINDS,
@@ -74,7 +71,7 @@ export type PlanRules = {
   readonly emailDomains: readonly EmailDomain[];
   // The calls a call step may name.
   readonly calls: Readonly<Record<CallName, CallDeclaration>>;
-  // The stubs, observed requests and storage entries the steps of SPEC-33 may name.
+  // The stubs, observed requests and storage entries the steps may name.
   readonly stubs: Readonly<Record<StubName, StubDeclaration>>;
   readonly observedRequests: Readonly<Record<RequestName, ObservedRequestDeclaration>>;
   readonly storageEntries: Readonly<Record<StorageEntryName, StorageEntryDeclaration>>;

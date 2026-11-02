@@ -62,9 +62,8 @@ The product name is Revisum (`revisum` for the repo, packages and CLI). It appea
 - No single-letter names, except loop indices and x/y. No unexplained abbreviations.
   - Allowed: id, url, uri, html, css, json, http, api, cli, ci, pr, cdp, bidi, wcag, act, a11y, pii, sha256, svg, png, dom, os.
   - Standard names, each spelled out in `docs/glossary.md`: ai, mcp, sarif, junit, oidc, jwt, lti.
-- Prefer readable code to comments: rename or extract first. Comment only what the code can't say, such as why, in plain English. You may add "See docs/specs/SPEC-nn-….md", but never as the only explanation.
-- Criterion IDs are data, never names:
-  - `test("then it should reject the plan", { criterion: "AC-SPEC-01-03" }, …)`.
+- Prefer readable code to comments: rename or extract first. Comment only what the code can't say, such as why, in plain English. Never cite a spec in a comment: code and tests read without the specs.
+- Spec and criterion IDs (`SPEC-nn`, `AC-SPEC-nn-mm`) never appear in code, tests or comments. Traceability lives in the `Spec:` and `Criteria:` commit trailers only. A customer's own criterion IDs in plans (`criterionId`) are product data, not names.
 - `npm run lint:names` must pass.
 
 ## Commands (from session 0a on)

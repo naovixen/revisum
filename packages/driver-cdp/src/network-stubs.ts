@@ -12,7 +12,6 @@
 //     stage, so it is there even when the page never reads it, and kept up to the declared cap.
 //   - While any stub or check is active, the pages bypass their service workers, so every matching
 //     request is seen and answered the same way, whatever a worker would have done with it.
-// See docs/specs/SPEC-33-network-stubs-request-checks-and-storage.md.
 import {
   failure, success,
   type DriverError, type NetworkPort, type ObservedExchange, type RequestMatcher, type RequestName, type ResolvedStub, type Result, type StubAnswer,

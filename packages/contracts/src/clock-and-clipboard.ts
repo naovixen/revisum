@@ -10,7 +10,6 @@
 // A driver that declares clockControl offers the clock port, and one that declares clipboard the
 // clipboard port; a run refuses these steps, and a remember from the clipboard, with
 // unsupported-step otherwise, and never falls back to a real wait.
-// See docs/specs/SPEC-34-clock-advance-and-clipboard.md.
 import type { DriverError } from './browser-driver.ts';
 import type { CriterionId, MultiLineText, TextOrValue } from './plan.ts';
 import type { Result } from './result.ts';

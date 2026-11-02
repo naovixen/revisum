@@ -6,8 +6,6 @@
 // is decided by the closed share alone. It is run by hand when the study changes, not by
 // `npm run check`.
 //   node tools/coverage-study.ts
-// See docs/specs/SPEC-01-plan-language-and-parser.md, docs/specs/SPEC-30-plan-values-positions-and-keys.md
-// and docs/specs/SPEC-36-unsafe-plan-features.md.
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { loadEngineFunction } from './engine-loader.ts';

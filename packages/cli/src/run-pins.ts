@@ -3,7 +3,6 @@
 // packs; hashes of the PII redactor, the rule set, the baselines the plan reads and the system
 // fonts; the run image's id; and the repository's commit. The run command passes them to every
 // run as RunInputs.pins.
-// See docs/specs/SPEC-08-manifest-and-replay.md ("New fields are optional").
 import { ACT_RULESET_VERSION, ALL_RULES, SCAN_VIEWPORT } from '@revisum/auditor-act';
 import { AXE_VERSION } from '@revisum/auditor-axe';
 import { DEFAULT_PII_PATTERNS, DEFAULT_PII_SELECTORS, canonicalJson, sha256, type RunPins } from '@revisum/engine';
@@ -114,7 +113,7 @@ function systemFontsHash(): Promise<string> {
 export async function runPins(options: RunPinsOptions): Promise<RunPins> {
   const imageDigest = runImageDigest(options.repositoryRoot);
   return {
-    // Packs come with SPEC-23; until then none is installed.
+    // Packs are not built yet; until then none is installed.
     versions: { core: coreVersion(), act: ACT_RULESET_VERSION, axe: AXE_VERSION, node: process.version, packs: [] },
     redactor: redactorHash(options.maskSelectors ?? []),
     rulesetHash: rulesetHash(),

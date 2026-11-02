@@ -3,7 +3,6 @@
 // repository, and reused criteria whose spec criteria are defined in docs/specs/. The hashes are
 // not compared with the files: seeded code has changed since, as code does; they are compared
 // only while seeding (tools/seed-from-research.ts). Runs in `npm run lint`.
-// See docs/specs/SPEC-00-repo-seed-and-gates.md.
 import { existsSync, readFileSync } from 'node:fs';
 import { isAbsolute, join } from 'node:path';
 import { readSpecCriteria } from './spec-criteria.ts';

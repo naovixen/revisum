@@ -13,7 +13,6 @@
 // connection is vetted like a request (resolved by the proxy, metadata addresses refused) and
 // recorded as a decision on "host:port".
 // It runs in-process for tests and, in a run, in its own container (proxy-container.ts).
-// See docs/specs/SPEC-07-isolated-runner-and-egress.md.
 import type { AppliedRewrite, DeclaredService, EgressPolicy, ProxyDecision, ResponseRewrite } from '@revisum/contracts';
 import { lookup } from 'node:dns/promises';
 import { createServer, request, type IncomingHttpHeaders, type IncomingMessage, type ServerResponse } from 'node:http';

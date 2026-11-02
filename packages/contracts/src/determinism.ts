@@ -9,7 +9,6 @@
 // animation frames wait for advances instead of real time, and the advance controller fires them.
 // The controller sits in the page's main world, beside the timers, so the page could call it; it
 // gives no new power, since a page could already replace its own Date and timers.
-// See docs/specs/SPEC-08-manifest-and-replay.md and docs/specs/SPEC-34-clock-advance-and-clipboard.md.
 
 // Removes animation, transitions and caret blink.
 export const NO_MOTION_CSS =

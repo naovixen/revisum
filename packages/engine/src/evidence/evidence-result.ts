@@ -3,7 +3,6 @@
 // "criterion" annotations, and the guarantee statement, which is always at the 'host' level. Every
 // text the report holds goes through the run's redactor and is kept only as safe text, or as its
 // sha256. A result built here is never verified evidence: it says what the suite reported.
-// See docs/specs/SPEC-35-evidence-mode.md.
 import {
   SUITE_CRITERION_LINK,
   type A11yFinding, type CriterionId, type EvidenceSuiteDeclaration, type Redactor, type SafeText, type SuiteFinding, type SuiteLocation,

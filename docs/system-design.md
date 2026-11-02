@@ -231,8 +231,8 @@ revisum/
 |---|---|---|
 | No research or process IDs in identifiers, files, folders, packages, JSON keys, error codes or flags (R1–R13, RC, FR, NFR, UP, SC, FD, H, P1–P7, job or claim IDs, doc numbers) | `R11Test`, `checkFr06`, `p4Driver` | `DependencyCheck`, `rejectSelfApproval`, `CdpDriver` |
 | Domain words, no single letters (except loop indices and x/y), no unexplained abbreviations | `T`, `V`, `acId`, `w` | `tracedCriteriaShare`, `verifiedWithoutReviewShare`, `criterionId`, `width` |
-| Comments explain what and why in plain English; a spec path may be added, never instead | `// see 04 Finding 1` | `// Deny by default: an unknown action could be destructive. See docs/specs/SPEC-03.` |
-| Traceability is data: criterion IDs appear only as test metadata, commit trailers and the trace index | `function ac_spec_01_03()` | `test('rejects unknown steps', { criterion: 'AC-SPEC-01-03' }, …)` |
+| Comments explain what and why in plain English and never cite a spec | `// see 04 Finding 1` | `// Deny by default: an unknown action could be destructive.` |
+| Traceability lives in commit trailers: spec and criterion IDs never appear in code, tests or comments | `function ac_spec_01_03()`, `// SPEC-03 says so` | `Criteria: AC-SPEC-01-03` in the commit message |
 | The product name appears once, in the `PRODUCT` constant | `'core-plan/v1'` scattered | `` `${PRODUCT.schemaNamespace}-plan/v1` `` |
 
 Allowed abbreviations: id, url, uri, html, css, json, http, api, cli, ci, pr, cdp, bidi, wcag, act, a11y, pii, sha256, svg, png, dom, os. Standard names, each spelled out in the glossary: ai, mcp, sarif, junit, oidc, jwt, lti.

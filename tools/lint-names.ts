@@ -6,14 +6,12 @@
 //   node tools/lint-names.ts [repository-root]   lint the repository (default: current folder)
 //   node tools/lint-names.ts --self-test          plant banned names in a scratch folder and
 //                                                 check that the lint rejects them
-// See docs/specs/SPEC-00-repo-seed-and-gates.md.
 
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { globToPattern } from './glob.ts';
 import { NAMING_LINT, type NamingLintConfig, type NamingRule } from './naming-lint-config.ts';
-import { readSpecCriteria } from './spec-criteria.ts';
 
 export type NamingViolation = {
   readonly file: string;
@@ -86,24 +84,27 @@ function withoutOpaqueIds(checker: Checker, name: string): string {
     .map((part) => (isOpaqueId(checker, part) ? ' ' : part)).join('-');
 }
 
+const SPEC_REFERENCE_WHY = 'spec or criterion id in code or a comment: tests and code read without the specs';
+
+// Only TypeScript under packages, test and tools: the specs and their ids stay in docs, in commit
+// trailers and in the tools that read them.
+function isSpecReferenceBanned(checker: Checker, file: string, text: string): boolean {
+  return /^(?:packages|test|tools)\/.*\.ts$/.test(file) && !checker.config.specReadingFiles.includes(file) && checker.config.specReferencePattern.test(text);
+}
+
 type Checker = {
   readonly config: NamingLintConfig;
   readonly include: readonly RegExp[];
   readonly exclude: readonly RegExp[];
   readonly spellOutWords: ReadonlyMap<string, string>;
-  // The criteria docs/specs/ defines, which a test's `criterion` value must name; undefined when
-  // the folder being linted has no specs (the self-test's scratch folder).
-  readonly definedCriteria: ReadonlySet<string> | undefined;
 };
 
-function createChecker(config: NamingLintConfig, root?: string): Checker {
-  const hasSpecs = root !== undefined && existsSync(join(root, 'docs', 'specs'));
+function createChecker(config: NamingLintConfig): Checker {
   return {
     config,
     include: config.include.map(globToPattern),
     exclude: config.exclude.map(globToPattern),
     spellOutWords: new Map(Object.entries(config.spellOut)),
-    definedCriteria: hasSpecs ? readSpecCriteria(root).all : undefined,
   };
 }
 
@@ -276,15 +277,14 @@ function lintComment(checker: Checker, file: string, line: number, comment: stri
   // A claim id is the more specific reason, so it is reported before the research-id patterns.
   const why = firstMatch(checker.config.bannedText, text) ?? firstMatch(checker.config.bannedInComments, text);
   if (why !== undefined) violations.push({ file, line, name: text.trim().slice(0, 80), why });
-  if (checker.config.criterionIdPattern.test(text)) {
-    violations.push({ file, line, name: text.trim().slice(0, 80), why: 'criterion id outside test metadata' });
+  if (isSpecReferenceBanned(checker, file, text)) {
+    violations.push({ file, line, name: text.trim().slice(0, 80), why: SPEC_REFERENCE_WHY });
   }
 }
 
 function lintCode(checker: Checker, file: string, source: string, violations: NamingViolation[]): void {
   const tokens = tokenize(source);
   const significant = tokens.filter((token) => token.kind !== 'comment');
-  const isTestFile = file.startsWith('test/');
   let insideExportList = false;
 
   // A run of "//" lines with no code between them is one comment.
@@ -310,12 +310,9 @@ function lintCode(checker: Checker, file: string, source: string, violations: Na
     if (token.kind === 'punctuator' && token.text === '}') insideExportList = false;
 
     if (token.kind === 'string' || token.kind === 'template') {
-      if (checker.config.criterionIdPattern.test(token.text)) {
-        const isTestMetadata = isTestFile && token.kind === 'string' && before?.text === ':' && twoBefore?.text === 'criterion';
-        if (!isTestMetadata) {
-          violations.push({ file, line: token.line, name: token.text, why: 'criterion id outside test metadata' });
-        } else if (checker.definedCriteria !== undefined && !checker.definedCriteria.has(token.text)) {
-          violations.push({ file, line: token.line, name: token.text, why: 'criterion that no spec in docs/specs/ defines' });
+      if (checker.config.specReferencePattern.test(token.text)) {
+        if (isSpecReferenceBanned(checker, file, token.text)) {
+          violations.push({ file, line: token.line, name: token.text, why: SPEC_REFERENCE_WHY });
         }
         continue;
       }
@@ -375,7 +372,7 @@ function lintJson(checker: Checker, file: string, source: string, violations: Na
   const visit = (value: unknown, userId = false): void => {
     if (typeof value === 'string') {
       if (checker.config.criterionIdPattern.test(value)) {
-        violations.push({ file, line: lineOf(value), name: value, why: 'criterion id outside test metadata' });
+        violations.push({ file, line: lineOf(value), name: value, why: 'criterion id of this repository\'s own specs in data' });
       }
       const problems = isNameLike(value) && !userId && !checker.config.allowedStringValues.includes(value)
         ? nameProblems(checker, value, false)
@@ -427,7 +424,7 @@ function listFiles(root: string, folder = ''): string[] {
 }
 
 export function lintRepository(root: string, config: NamingLintConfig = NAMING_LINT): NamingViolation[] {
-  const checker = createChecker(config, root);
+  const checker = createChecker(config);
   const violations: NamingViolation[] = [];
   const checkedFolders = new Set<string>();
 
@@ -491,13 +488,16 @@ const PLANTED_CASES: readonly PlantedCase[] = [
   { path: 'packages/demo/planted-criterion-elsewhere.json', source: '{ "name": "AC-3" }\n', expectedWhy: 'acceptance criterion: write "criterion"' },
   // Banned text is still caught in a criterionId value.
   { path: 'packages/demo/planted-criterion-claim.json', source: `{ "criterionId": "${PLANTED_CLAIM_ID}" }\n`, expectedWhy: 'claim id' },
+  // A spec or criterion id is a spec reference: it is caught in a comment and in a string of a TypeScript file.
+  { path: 'packages/demo/src/planted-spec-comment.ts', source: '// See docs/specs/SPEC-12-report.md.\nexport const value = 1;\n', expectedWhy: 'spec or criterion id' },
+  { path: 'packages/demo/src/planted-spec-string.ts', source: "export const note = 'AC-SPEC-12-03';\n", expectedWhy: 'spec or criterion id' },
 ];
 
 const CLEAN_FILES: readonly CleanFile[] = [
   {
     path: 'packages/demo/src/clean.ts',
     source: [
-      '// Deny by default: an unknown action could be destructive. See docs/specs/SPEC-09-privacy-masking.md',
+      '// Deny by default: an unknown action could be destructive.',
       'export const dependencyReview = { criterionId: "", width: 0 };',
       'for (let i = 0; i < 2; i++) dependencyReview.width += i;',
       '',
@@ -518,6 +518,11 @@ const CLEAN_FILES: readonly CleanFile[] = [
     // A plan check's criterionId holds the user's own id for a criterion of their spec.
     path: 'packages/demo/clean-criterion-id.json',
     source: '{ "steps": [{ "type": "expectPage", "criterionId": "AC-3" }] }\n',
+  },
+  {
+    // The specs folder, named without a spec number or criterion id, is not a spec reference.
+    path: 'packages/demo/src/clean-specs-folder.ts',
+    source: "// The criteria are read from docs/specs/ and nowhere else.\nexport const folder = 'docs/specs';\n",
   },
   {
     // The function keys F1 to F12 are keyboard keys when written as string values.

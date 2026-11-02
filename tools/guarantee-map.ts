@@ -12,7 +12,6 @@
 // Disclosed, not tested in phase 1: that a plan is semantically right and AI judgements are right
 // (statistical); that prompt injection is prevented (not achievable); HTTP and identity
 // allow-lists, retries and tokens (phase 2 protocol packs).
-// See docs/specs/SPEC-00-repo-seed-and-gates.md.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { failed, readTestResults, RESULTS_FOLDER, type TestResults } from './test-results.ts';

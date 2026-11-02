@@ -1,7 +1,6 @@
 // The own driver's storage port: local and session storage of the session's page, through CDP's
 // DOMStorage domain, so no script runs in the page. An entry belongs to one origin: a write or a
 // read while the page is on another origin fails with storage-origin-mismatch and touches nothing.
-// See docs/specs/SPEC-33-network-stubs-request-checks-and-storage.md.
 import {
   failure, success,
   type DriverError, type Origin, type Result, type StorageArea, type StoragePort,

@@ -7,7 +7,6 @@
 // x-api-key (as it is) for Anthropic, "Authorization: Bearer" for the OpenAI-compatible format. A
 // local endpoint may have none. A failed call rejects with its code alone, never the planner's
 // reply, which may echo the key.
-// See docs/specs/SPEC-28-plan-authoring.md and docs/specs/SPEC-37-explore-to-draft.md.
 import {
   ANTHROPIC_API_VERSION, MAXIMUM_PLANNER_REPLY_BYTES, PLANNER_TIMEOUT_MILLISECONDS, failure, headerSecret, plannerPrompt, plannerRequestBody, success,
   type DraftPlanner, type DraftRequest, type HeaderScheme, type Origin, type PlannerEndpoint, type PlannerWire, type Result, type SecretStore,

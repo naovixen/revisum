@@ -8,7 +8,6 @@
 //     vendor's release byte for byte (the sha256 the vendor publishes in its sri-history.json), or
 //     the installed package is not the pinned version, or a copy of it sits under packages/.
 // The installed-packages folder is node_modules unless `--modules <folder>` names another.
-// See docs/specs/SPEC-00-repo-seed-and-gates.md.
 import { createHash } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';

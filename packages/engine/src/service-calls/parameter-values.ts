@@ -2,7 +2,6 @@
 // about literal arguments, and reports the problem with a plan error code; the request builder
 // asks it about run values once their text is known, and refuses any problem as
 // parameter-invalid. Either way the same rules decide.
-// See docs/specs/SPEC-32-declared-service-calls.md.
 import type { ParameterType, SafeText } from '@revisum/contracts';
 
 // A value that fits its parameter: text, an integer or a boolean.

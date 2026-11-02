@@ -2,7 +2,7 @@
 // kept so a replay can feed the same replies to the engine without sending a call or running a
 // command. The result keeps only hashes of replies, so they are recorded apart from it, and only
 // when the trusted project sets replay.recordReplies: replies may hold personal data, which nothing
-// masks until SPEC-09.
+// masks until privacy masking.
 //   - recordingPorts wraps a run's service caller and command runner: each reply is kept, in
 //     order, with its request's sha256 (a secret counts by name only), and recording() makes the
 //     RunRecording once the run's manifest hash is known. Every echo of a secret the requests
@@ -11,7 +11,6 @@
 //     order, and send nothing. A request whose hash differs, one after the last recorded reply, or a
 //     reply never used is a mismatch at its position.
 // Stderr and egress events are dropped: the engine reads neither.
-// See docs/specs/SPEC-08-manifest-and-replay.md ("Recorded replies, opt-in").
 import {
   LEAK_FORMS, failure, isSecret, success,
   type DatabaseCommandRequest, type DatabaseCommandRunner, type Result, type Secret, type SecretStore, type ServiceCallErrorCode,

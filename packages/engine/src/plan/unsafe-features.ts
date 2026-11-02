@@ -4,7 +4,6 @@
 // Each construct is placed at the field that names its feature, the same path the plan parser
 // refuses a disabled one at: a locator's `by`, an assertion's `kind`, a remember source's `read`,
 // a step's `type`, and an inline script's `inline`.
-// See docs/specs/SPEC-36-unsafe-plan-features.md.
 import {
   DOM_CHECK_KINDS, UNSAFE_FEATURES,
   type CommandName, type Locator, type Plan, type ScriptName, type Step, type UnsafeFeature,

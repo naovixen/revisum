@@ -4,7 +4,6 @@
 // out anyway; its lookup is the only trace of its attempt, so it is recorded with channel process.
 // Queries arrive from code Revisum does not trust, so each is read by hand under fixed limits and
 // anything malformed is dropped unanswered.
-// See docs/specs/SPEC-35-evidence-mode.md.
 import { Buffer } from 'node:buffer';
 import { createSocket } from 'node:dgram';
 

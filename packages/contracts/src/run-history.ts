@@ -1,5 +1,5 @@
 // Run history and the ladder's thresholds, read by the review recorder, the metrics panel and the
-// maturity ladder. See docs/specs/SPEC-27-shared-types-and-events.md.
+// maturity ladder.
 import type { ActorType } from './audit-events.ts';
 
 // One finished run, as later runs and metrics see it.

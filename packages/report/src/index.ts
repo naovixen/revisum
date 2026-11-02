@@ -1,5 +1,4 @@
 // Public entry point: the visual evidence report, the pull-request comment and their model.
-// See docs/specs/SPEC-12-visual-report-and-pr-comment.md.
 export * from './model/report-model.ts';
 export { parseHistory, parseReportInput } from './model/report-parser.ts';
 export { generate, type Output, type ReportAssets } from './generate-report.ts';

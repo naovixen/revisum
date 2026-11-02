@@ -1,6 +1,5 @@
 // The lockfile's types: each target pinned to an exact browser build by version and executable
 // sha256, so a run on another build is refused rather than reported as the same test.
-// See docs/specs/SPEC-05-target-matrix-and-lock.md.
 import type { BuildFailureCode } from './browser-driver.ts';
 import type { TargetId } from './target.ts';
 

@@ -2,7 +2,6 @@
 // of another schema version, or with a key this version does not know, is refused as
 // version-unsupported: a newer engine may have recorded an input this one would silently ignore.
 // A known field of the wrong shape is a replay-mismatch at its JSON path. Nothing is guessed.
-// See docs/specs/SPEC-08-manifest-and-replay.md.
 import {
   DRIVER_FEATURES, UNSAFE_FEATURES, failure, success,
   type AdapterInfo, type Result,

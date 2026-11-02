@@ -6,7 +6,6 @@
 // reveal() is exported here so the drivers can type a secret without importing the engine, but
 // only the modules on the reveal allow-list may import it: REVEAL_ALLOWED_MODULES in
 // tools/check-secret-reveal.ts, which `npm run lint` runs.
-// See docs/specs/SPEC-04-secrets-and-redaction.md.
 import type { SecretName } from './plan.ts';
 
 // Below this length a value is too short to search for in outputs without matching ordinary text,

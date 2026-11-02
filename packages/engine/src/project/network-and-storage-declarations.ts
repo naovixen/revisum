@@ -5,7 +5,6 @@
 // is neither allowed nor a declared service's, a stub response that could carry code or change
 // how the browser treats it, and a fixture or parameter nobody declared, so every stub it accepts
 // serves data only.
-// See docs/specs/SPEC-33-network-stubs-request-checks-and-storage.md.
 import {
   HTTP_METHODS, PATH_MATCHES, STORAGE_ACCESS, STORAGE_AREAS, STUB_MEDIA_TYPES,
   type FixtureName, type JsonTemplate, type ObservedRequestDeclaration, type Origin, type ParameterName, type ParameterType,

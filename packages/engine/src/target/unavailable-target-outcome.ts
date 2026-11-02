@@ -1,6 +1,6 @@
 // What an unavailable target means for the whole run. A required target fails it with exit code 3;
 // an optional one is marked skipped with a warning that names it. Neither passes silently.
-// The JUnit exporter and the CLI read this. See docs/specs/SPEC-05-target-matrix-and-lock.md.
+// The JUnit exporter and the CLI read this.
 import type { Target, UnavailableTargetOutcome } from '@revisum/contracts';
 import { isRequiredTarget } from './target-defaults.ts';
 

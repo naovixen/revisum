@@ -9,7 +9,6 @@
 //     they opened, the top document first, then its frames in document order.
 //   - The callbacks every frame fires count against one limit; past it the advance fails with
 //     clock-runaway. Nothing here waits for real time.
-// See docs/specs/SPEC-34-clock-advance-and-clipboard.md.
 import {
   CLOCK_CONTROLLER_KEY, failure, success, virtualClockScript,
   type ClockAdvanceMode, type ClockPort, type DriverError, type Result,

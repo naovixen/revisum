@@ -6,7 +6,6 @@
 // an optional dependency. Type-only imports and exports, and dev dependencies, never run, so they
 // do not count; nor does a library's name written as data.
 //   node tools/check-runtime-imports.ts    (reads packages/ under the working folder)
-// See docs/specs/SPEC-06-cdp-driver.md.
 import { join } from 'node:path';
 import { readFileSync } from 'node:fs';
 import type { Token } from './lint-names.ts';
