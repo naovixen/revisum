@@ -43,6 +43,8 @@ Status is one of: `suspected`, `fixed`, `deferred`, `not a bug`.
 | 20 | `checked`, `unchecked` and `focused` can never pass on any driver, yet earlier steps still act before the step fails. The language accepts checks nothing can perform | `contracts/src/literal-steps.ts:116`, `engine/src/run.ts` | suspected | Phase 3: refuse in preflight, or remove from the language. Hash-visible, so a named fix commit |
 | 21 | No run reaches `secretRecords`' storage-state branch any more, so only `buildManifest` tests that record | `engine/src/run.ts` | deferred | Restore a run-level test when a driver loads saved state |
 | 22 | Some run-time codes have no union or docs heading (`a11y-violations`, `adapter-error`, `expected-failure`, `spec-ambiguous`, Unavailable reasons such as `launch-failed`), and `assertion-failed`'s heading covers only the dialog case | `docs/errors.md`, `engine/src/run.ts` | suspected | Phase 3, with finding 8 |
+| 23 | The export cleanup removed `Success` and `Failure` from the public API, though `Result` is built from them and SPEC-27 declares them. Its check covered only M3 and M4 specs. Only the full run caught it | `contracts/src/index.ts` | fixed | Exports restored. Other removals could share this gap: phase 3's review checks them against every built spec |
+| 24 | `test/proofs/shared-types.test.ts` reads a spec's type block, so a proof depends on a spec document, against the rule that tests stand alone | `test/proofs/shared-types.test.ts` | suspected | Phase 3: pin the public types directly |
 
 ## Risks
 

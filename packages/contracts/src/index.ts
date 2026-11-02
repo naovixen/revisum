@@ -3,7 +3,7 @@
 // opaque Secret wrapper, which drivers need without importing the engine.
 export { PRODUCT } from './product.ts';
 export type { Brand } from './brand.ts';
-export { failure, success, type Result } from './result.ts';
+export { failure, success, type Failure, type Result, type Success } from './result.ts';
 export * from './target.ts';
 export * from './plan.ts';
 export * from './plan-drafts.ts';
