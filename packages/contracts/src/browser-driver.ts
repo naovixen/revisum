@@ -15,8 +15,9 @@ import type { AdapterId, Target } from './target.ts';
 // storage-origin-mismatch: a storage write's page is not on the entry's declared origin, so nothing was written.
 // clock-runaway: one clock advance would fire more timer callbacks than the project's maximumTimersPerAdvance.
 // clipboard-unavailable: the browser cannot keep the clipboard in its own memory, so it is never read.
-// target-crashed: the page's renderer died, or its target closed, while the step ran. The step
-// fails, the rest of the run is skipped, and close() still ends every process.
+// target-crashed: the page's renderer died, its target closed, the browser died or the connection
+// to it closed, while the step ran. The step fails, the rest of the run is skipped, and close()
+// still ends every process.
 // unsupported-step: the driver does not perform this kind of step, or the step made the page open
 // a popup or a second page, or start a download. The popup is closed and the download cancelled,
 // with nothing of it kept, so the step never passes with a partial result.
@@ -27,12 +28,24 @@ import type { AdapterId, Target } from './target.ts';
 // script-failed: a page script threw, its promise rejected, or its source is not one function.
 // script-timeout: a page script did not settle within its timeout.
 // script-result-invalid: a page script's result is not JSON: undefined, a function, or a cyclic value.
+// page-unreadable: every read of the page threw until a check's timeout, so nothing is known of it.
+// dialog-open: a dialog holds the page, so a check could not read it. Only a dialog step can free it.
 export type DriverErrorCode =
   | 'not-found' | 'ambiguous' | 'not-actionable' | 'timeout' | 'navigation-failed' | 'policy-denied'
   | 'no-download' | 'download-too-large' | 'storage-origin-mismatch' | 'clock-runaway' | 'clipboard-unavailable'
   | 'target-crashed' | 'unsupported-step' | 'assertion-failed'
-  | 'selector-invalid' | 'script-failed' | 'script-timeout' | 'script-result-invalid';
+  | 'selector-invalid' | 'script-failed' | 'script-timeout' | 'script-result-invalid'
+  | 'page-unreadable' | 'dialog-open';
 export type DriverError = { readonly code: DriverErrorCode; readonly detail: string };
+
+// Why a probe could not read the page. It is never a count of 0, which a check of absence passes
+// on: a page the run cannot read must not look like an empty page. Each value is also the code the
+// check fails with.
+export const UnreadablePage = {
+  ReadFailed: 'page-unreadable',
+  DialogOpen: 'dialog-open',
+} as const satisfies Record<string, DriverErrorCode>;
+export type UnreadablePage = (typeof UnreadablePage)[keyof typeof UnreadablePage];
 
 // Why a declared target cannot run. A driver explains a "no"; it never substitutes another target.
 // provider-unavailable: the cloud or device provider could not supply the target.
@@ -65,8 +78,26 @@ export type AccessibleStates = {
   readonly current: boolean | null;
 };
 
-// A read-only look at the element a locator matches. A count other than 1 means not found or ambiguous.
-export type ElementProbe = {
+// A read-only look at the element a locator matches. A count other than 1 means not found or
+// ambiguous. A count that is no number means the page could not be read, and nothing else in the
+// probe says anything: `count` cannot be compared as a number until that is ruled out.
+export type ElementProbe = ElementsRead | UnreadablePageProbe;
+
+type UnreadablePageProbe = {
+  readonly count: UnreadablePage;
+  readonly visible: false;
+  readonly enabled: false;
+  readonly text: '';
+  readonly value: null;
+  readonly sensitive: false;
+  readonly box: null;
+  readonly states?: never;
+  readonly href?: never;
+  readonly dom?: never;
+  readonly selectorInvalid?: never;
+};
+
+type ElementsRead = {
   readonly count: number;
   readonly visible: boolean;
   readonly enabled: boolean;
@@ -219,8 +250,9 @@ export interface DocumentSession extends PageNavigator, ActionRunner, Prober, Ca
   // element. Steps given to it act and check inside that frame only. A driver without it does not
   // run frame steps, and the run fails them with unsupported-step.
   frame?(locator: ResolvedLocator): Promise<Result<DocumentSession, DriverError>>;
-  // True once the page's renderer has died. A check waiting on a crashed page then fails with
-  // target-crashed rather than waiting out its timeout. A driver without it never reports a crash.
+  // True once the page's renderer or browser has died, or the connection to it has closed. A check
+  // on a crashed page then fails with target-crashed rather than waiting out its timeout, whatever
+  // its last read saw. A driver without it never reports a crash.
   crashed?(): boolean;
   // Clicks the step's element, asking the guard first as a click does, and waits for exactly one
   // download to start within the step timeout and to finish. A click that starts none fails with

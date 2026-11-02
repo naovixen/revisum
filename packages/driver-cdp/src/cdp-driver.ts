@@ -520,7 +520,7 @@ class CdpPage implements PageOperations<string> {
       // An HTTP error status with an empty body is a page the server did send: the browser shows
       // its own error page for it, and the plan's checks decide what that means.
       if (navigated.errorText && navigated.errorText !== HTTP_ERROR_STATUS) throw new Error(navigated.errorText);
-      await loaded.promise;
+      await this.#watch.failingOnCrash('Page.navigate', loaded.promise);
     } finally {
       loaded.cancel();
     }
@@ -587,7 +587,8 @@ class CdpPage implements PageOperations<string> {
 
   async callForElements(pageFunction: PageFunction, inputs: readonly PageArgument<string>[]): Promise<string[]> {
     const list = (await this.#call(pageFunction, inputs, false)).result.objectId;
-    if (list === undefined) return [];
+    // Every function called here returns an array, so no object means the page got in the way.
+    if (list === undefined) throw new Error('the page gave no list of elements');
     const properties = await this.#send<{ result: { name: string; value?: { objectId?: string } }[] }>('Runtime.getProperties', { objectId: list, ownProperties: true });
     return properties.result
       .filter((property) => /^\d+$/.test(property.name))

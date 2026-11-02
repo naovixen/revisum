@@ -84,7 +84,8 @@ export interface ArmedDownload {
 
 // What a session learns from the browser about its page outside any one command.
 export interface PageEvents {
-  // True once the page's renderer has died or its target has closed.
+  // True once the page's renderer or browser has died, its target has closed, or the connection to
+  // the browser has closed.
   crashed(): boolean;
   // The text of the dialog the page has open, or null when none is open.
   openDialog(): string | null;

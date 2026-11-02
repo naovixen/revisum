@@ -2,16 +2,17 @@
 // neither a driver nor an AI can change what "passed" means.
 import {
   literalText, type AccessibleStates, type DomCheckWith, type DomRead, type ElementProbe, type PageAssertion, type PageProbe,
-  type ResolvedElementAssertion, type SafeText,
+  type ResolvedElementAssertion, type SafeText, type UnreadablePage,
 } from '@revisum/contracts';
 
 // state-not-exposed: the element does not expose the state a check asks about, so the check can
 // neither pass nor fail on its merits.
 // selector-invalid: the browser rejects the locator's css selector or XPath expression, so no
 // element can ever match and waiting is pointless.
+// page-unreadable and dialog-open: the probe could not read the page, so nothing is known of it.
 export type Verdict = {
   readonly pass: boolean;
-  readonly code: 'not-found' | 'ambiguous' | 'assertion-failed' | 'state-not-exposed' | 'selector-invalid' | null;
+  readonly code: 'not-found' | 'ambiguous' | 'assertion-failed' | 'state-not-exposed' | 'selector-invalid' | UnreadablePage | null;
 };
 
 const PASSED: Verdict = { pass: true, code: null };
@@ -89,6 +90,9 @@ function sameUrl(expected: string, actual: string | null | undefined, baseUrl: s
 // The assertion's expected text is final: the run replaces value references before checking.
 // `baseUrl` is the run's base URL, which an expected link target given as a path is resolved on.
 export function checkElement(assertion: ResolvedElementAssertion, probe: ElementProbe, baseUrl?: string): Verdict {
+  if (typeof probe.count === 'string') {
+    return { pass: false, code: probe.count };
+  }
   // A selector the browser rejects matches nothing, absent included: the plan is wrong, not the page.
   if (probe.selectorInvalid === true) return SELECTOR_INVALID;
   // Checks on how many elements match come before the single-element rule below.

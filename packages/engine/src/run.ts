@@ -7,7 +7,7 @@
 // through its clock and clipboard ports; page scripts through its script port. Database commands
 // go through the run's DatabaseCommandRunner port, which runs each in a workload container.
 import {
-  needsDriverFeatures,
+  needsDriverFeatures, UnreadablePage,
   type A11yFinding, type ActionGuard, type ApprovalLabel, type ArtifactReference, type ArtifactStore, type Authorised,
   type BrowserDriver, type Clock, type DatabaseCommandRunner, type DocumentSession, type DomRead, type DownloadedFile, type DownloadName, type DriverFeature, type LockEntry, type DialogStep, type ElementProbe,
   type EventSink, type GuaranteeLevel, type GuardVerdict, type PageAssertion, type Plan, type PolicyRuleId, type Redactor,
@@ -789,12 +789,16 @@ async function rememberFromPage(step: Extract<Step, { type: 'remember' }>, index
   const verdict = await poll(context, session, async (): Promise<Verdict> => {
     const probe = read === undefined ? await session.probe(locator.value) : await session.probe(locator.value, read);
     seen.probe = probe;
+    if (typeof probe.count === 'string') {
+      return { pass: false, code: probe.count };
+    }
     if (probe.selectorInvalid === true) return { pass: false, code: 'selector-invalid' };
     if (probe.count === 0) return { pass: false, code: 'not-found' };
     if (probe.count > 1) return { pass: false, code: 'ambiguous' };
     return textOf(probe) === '' ? { pass: false, code: null } : { pass: true, code: null };
   });
-  if (verdict.code === TARGET_CRASHED || verdict.code === 'not-found' || verdict.code === 'ambiguous' || verdict.code === 'selector-invalid') {
+  if (verdict.code === TARGET_CRASHED || verdict.code === 'not-found' || verdict.code === 'ambiguous' || verdict.code === 'selector-invalid'
+    || verdict.code === UnreadablePage.ReadFailed || verdict.code === UnreadablePage.DialogOpen) {
     return { ...base, outcome: 'failed', code: verdict.code };
   }
   const text = seen.probe === null ? '' : textOf(seen.probe);
@@ -945,7 +949,8 @@ const TARGET_CRASHED = 'target-crashed';
 type PollVerdict = Verdict | { readonly pass: false; readonly code: typeof TARGET_CRASHED };
 
 // Repeats a check until it passes or the step timeout runs out. A page that crashes stops the
-// wait at once: nothing on it can change any more.
+// wait at once: nothing on it can change any more. A read that threw is tried again, since the page
+// may be between two documents.
 async function poll(context: RunContext, session: DocumentSession, check: () => Promise<Verdict>): Promise<PollVerdict> {
   const crashed = (): boolean => session.crashed?.() === true;
   const deadline = context.ports.clock.now() + context.inputs.project.limits.stepTimeoutMilliseconds;
@@ -958,9 +963,10 @@ async function poll(context: RunContext, session: DocumentSession, check: () => 
       if (crashed()) return { pass: false, code: TARGET_CRASHED };
       throw error;
     }
-    // A selector the browser rejects will never match: waiting cannot change that.
-    if (verdict.pass || verdict.code === 'selector-invalid') return verdict;
+    // Looked at before a pass is accepted: what a dying page last showed proves nothing.
     if (crashed()) return { pass: false, code: TARGET_CRASHED };
+    // Waiting cannot change a selector the browser rejects, or a dialog, which only a later step can answer.
+    if (verdict.pass || verdict.code === 'selector-invalid' || verdict.code === UnreadablePage.DialogOpen) return verdict;
     if (context.ports.clock.now() >= deadline) return verdict;
     await context.ports.clock.sleep(POLL_INTERVAL_MILLISECONDS);
   }
@@ -970,6 +976,12 @@ async function poll(context: RunContext, session: DocumentSession, check: () => 
 // field a secret was typed into, and no text that is a whole short secret.
 function observe(probe: ElementProbe | null, context: RunContext, filledFromSecret: boolean): string {
   if (probe === null || probe.count === 0) return '(no element)';
+  if (probe.count === UnreadablePage.ReadFailed) {
+    return '(page unreadable)';
+  }
+  if (probe.count === UnreadablePage.DialogOpen) {
+    return '(a dialog is open)';
+  }
   if (probe.count > 1) return `(${probe.count} elements)`;
   if (probe.sensitive) return SENSITIVE_PLACEHOLDER;
   const seen = normalise(probe.value ?? probe.text);

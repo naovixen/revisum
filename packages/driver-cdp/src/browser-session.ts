@@ -7,6 +7,7 @@ import {
   type ActionGuard, type ActionStep, type BrowserRequestRecord, type DialogStep, type DocumentSession, type DomRead, type DomValue, type DownloadedFile,
   type DownloadStep, type DriverError, type DriverFeature, type ElementProbe, type Locator, type PageScriptCall, type PageMetaTag, type PageProbe, type Position, type ResolvedActionStep,
   type ClipboardPort, type ClockPort, type NetworkPort, type ResolvedElement, type ResolvedLocator, type Result, type Secret, type SessionEnvironment, type StoragePort,
+  UnreadablePage,
 } from '@revisum/contracts';
 import {
   actionability, afterTwoFrames, armHitCheck, findByLabel, findByTestId, findByText, findStructural, fontsReady, guardDetails, inDocumentOrder,
@@ -17,7 +18,9 @@ import { heldModifierKeys } from './modifier-keys.ts';
 import { pageAudit, parseAudit, toFindings } from './page-audit.ts';
 import type { Actionability, DownloadCapture, DriverSession, PageEvents, PageFunction, PageOperations } from './page-operations.ts';
 
-export const NO_ELEMENT: ElementProbe = { count: 0, visible: false, enabled: false, text: '', value: null, sensitive: false, box: null };
+const NOTHING_READ = { visible: false, enabled: false, text: '', value: null, sensitive: false, box: null } as const;
+const READ_FAILED: ElementProbe = { ...NOTHING_READ, count: UnreadablePage.ReadFailed };
+const DIALOG_HOLDS_PAGE: ElementProbe = { ...NOTHING_READ, count: UnreadablePage.DialogOpen };
 const POLL_INTERVAL_MILLISECONDS = 50;
 // What the runtime guard is told for a dialog step, which acts on no element.
 const NO_RESOLVED_ELEMENT: ResolvedElement = { role: null, name: null, box: null, formSubmitName: null, linkUrl: null };
@@ -62,11 +65,18 @@ const SELECTOR_INVALID: DriverError = { code: 'selector-invalid', detail: 'the b
 // in perform, the probe a remember step and a DOM check read through, and the script runner.
 export const SESSION_FEATURES: readonly DriverFeature[] = DRIVER_FEATURES;
 
-// Finds the elements a locator matches. An error while the page navigates counts as "nothing found yet".
+// The elements a locator matches. Throws when the page cannot answer, which says nothing about
+// what is on it.
+async function findElements<Handle>(operations: PageOperations<Handle>, locator: ResolvedLocator): Promise<Handle[]> {
+  const found = await matches(operations, locator);
+  return locator.position === undefined ? found : atPosition(operations, found, locator.position);
+}
+
+// For an action, which only waits for an element to act on: an error while the page navigates
+// counts as "nothing found yet". A check reads through findElements, since finding nothing can pass it.
 async function locate<Handle>(operations: PageOperations<Handle>, locator: ResolvedLocator): Promise<Handle[]> {
   try {
-    const found = await matches(operations, locator);
-    return locator.position === undefined ? found : await atPosition(operations, found, locator.position);
+    return await findElements(operations, locator);
   } catch {
     return [];
   }
@@ -80,7 +90,7 @@ async function matches<Handle>(operations: PageOperations<Handle>, locator: Reso
     case 'testId': return operations.callForElements(findByTestId, [locator.testId, locator.attribute ?? DEFAULT_TEST_ID_ATTRIBUTE]);
     case 'css': case 'xpath': {
       // Inside another locator, the selector is evaluated in the one element that one finds, or nowhere.
-      const scope = locator.inside === undefined ? [] : await locate(operations, locator.inside);
+      const scope = locator.inside === undefined ? [] : await findElements(operations, locator.inside);
       if (locator.inside !== undefined && scope.length !== 1) return [];
       const text = locator.by === 'css' ? locator.selector : locator.expression;
       return operations.callForElements(findStructural, [locator.by, text, locator.hasText ?? '', ...scope.map((element) => ({ element }))]);
@@ -272,16 +282,19 @@ function documentPorts<Handle>(
   const timeout = environment.timeoutMilliseconds;
 
   const probe = async (planLocator: Locator, read?: DomRead): Promise<ElementProbe> => {
-    // A value reference, or a locator this session cannot resolve, matches nothing.
+    // A value reference, or a locator this session cannot resolve, says nothing about the page.
     const locator = performableLocator(planLocator, SESSION_FEATURES);
+    if (locator === undefined || crashed()) return READ_FAILED;
     // An open dialog stops the page's scripts, so nothing can be read until it is answered.
-    if (locator === undefined || events.openDialog() !== null) return NO_ELEMENT;
-    if (await rejectsSelector(operations, locator)) return { ...NO_ELEMENT, selectorInvalid: true };
-    const found = await locate(operations, locator);
-    const element = found[0];
-    if (found.length !== 1 || element === undefined) return { ...NO_ELEMENT, count: found.length };
+    if (events.openDialog() !== null) {
+      return DIALOG_HOLDS_PAGE;
+    }
     try {
-      const shown = JSON.parse(await operations.callForString(probeElement, [{ element }, environment.sensitiveSelectors])) as ElementProbe;
+      if (await rejectsSelector(operations, locator)) return { ...NOTHING_READ, count: 0, selectorInvalid: true };
+      const found = await findElements(operations, locator);
+      const element = found[0];
+      if (found.length !== 1 || element === undefined) return { ...NOTHING_READ, count: found.length };
+      const shown = JSON.parse(await operations.callForString(probeElement, [{ element }, environment.sensitiveSelectors])) as Extract<ElementProbe, { readonly count: number }>;
       // The link target and aria-current come from the document, the other states from the
       // browser's accessibility engine, as assistive technology reads them.
       const { href, current } = decodeLinkAndCurrent(await operations.callForString(linkAndCurrent, [{ element }]));
@@ -290,7 +303,8 @@ function documentPorts<Handle>(
       const dom = read === undefined ? undefined : decodeDomValue(await operations.callForString(readDomValue, [{ element }, read.kind, domReadName(read)]), read);
       return { ...shown, states: { ...exposed, current }, href, ...(dom === undefined ? {} : { dom }) };
     } catch {
-      return NO_ELEMENT;
+      // A dialog that opens during a read holds it up until the command times out.
+      return events.openDialog() === null ? READ_FAILED : DIALOG_HOLDS_PAGE;
     }
   };
 
@@ -530,9 +544,9 @@ function documentPorts<Handle>(
 }
 
 // Opens a second tab and loads the URL in it. A tab whose page does not load is closed at once.
-async function newTabAt(openTab: () => Promise<Result<DriverSession, DriverError>>, url: string): Promise<Result<DriverSession, DriverError>> {
+async function newTabAt(openTab: () => Promise<Result<DriverSession, DriverError>>, url: string, crashed: () => boolean): Promise<Result<DriverSession, DriverError>> {
   const opened = await openTab();
-  if (!opened.ok) return opened;
+  if (!opened.ok) return crashed() ? failure(CRASHED) : opened;
   const tab = opened.value;
   const navigated = await tab.navigate(url);
   if (navigated.ok) return success(tab);
@@ -544,7 +558,7 @@ export function buildSession<Handle>(operations: PageOperations<Handle>, environ
   const openTab = details.openTab;
   return {
     ...documentPorts(operations, [operations], environment, details),
-    ...(openTab === undefined ? {} : { newTab: (url: string) => newTabAt(openTab, url) }),
+    ...(openTab === undefined ? {} : { newTab: (url: string) => newTabAt(openTab, url, () => details.events.crashed()) }),
     ...(details.network === undefined ? {} : { network: details.network }),
     ...(details.storage === undefined ? {} : { storage: details.storage }),
     ...(details.clock === undefined ? {} : { clock: details.clock }),

@@ -120,6 +120,7 @@ export function launchChromium(executablePath: string, options: LaunchOptions = 
   void exited.then(() => removeFolder(userDataFolder));
 
   const stop = async (connection: CdpConnection | null): Promise<void> => {
+    connection?.expectClose();
     if (connection !== null) await connection.send(undefined, 'Browser.close', {}, 5_000).catch(() => undefined);
     // Wait for a clean exit first; force the process after a grace period.
     const force = setTimeout(() => { try { browserProcess.kill(); } catch { /* already gone */ } }, 3_000);

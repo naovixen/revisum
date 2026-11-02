@@ -32,6 +32,7 @@ export class CdpConnection {
   private nextId = 1;
   private readonly pending = new Map<number, PendingCommand>();
   private readonly listeners = new Map<string, Set<(parameters: unknown) => void>>();
+  readonly #lostHandlers = new Set<() => void>();
   private closed = false;
 
   private constructor(socket: WebSocket, commandTimeoutMilliseconds: number) {
@@ -99,6 +100,18 @@ export class CdpConnection {
     return { promise, cancel: () => { clearTimeout(timer); stopListening(); } };
   }
 
+  // Calls handler if the connection closes before expectClose: the browser died or the socket
+  // dropped. Stops when the returned function is called.
+  onLost(handler: () => void): () => void {
+    this.#lostHandlers.add(handler);
+    return () => { this.#lostHandlers.delete(handler); };
+  }
+
+  // From now on the connection closing is the caller's doing, so nothing counts it as lost.
+  expectClose(): void {
+    this.#lostHandlers.clear();
+  }
+
   session(sessionId: string | undefined): CdpSessionClient {
     return {
       send: <Value = unknown>(method: string, parameters?: Record<string, unknown>, timeoutMilliseconds?: number) =>
@@ -108,6 +121,7 @@ export class CdpConnection {
   }
 
   close(): void {
+    this.expectClose();
     this.closed = true;
     try { this.socket.close(); } catch { /* already closed */ }
   }
@@ -130,6 +144,10 @@ export class CdpConnection {
 
   private failAll(reason: string): void {
     this.closed = true;
+    // Told before any command fails, so whoever sees a failed command already knows why.
+    for (const handler of [...this.#lostHandlers]) {
+      handler();
+    }
     for (const command of this.pending.values()) {
       clearTimeout(command.timer);
       command.reject(new CdpError(command.method, reason));

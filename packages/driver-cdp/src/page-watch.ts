@@ -6,7 +6,8 @@
 // download a download step claimed, and the tab a newTab step asked for, which is handed over
 // still paused, before it loads anything.
 // Once the page has crashed, every command to it fails at once: the browser never answers a
-// command sent to a dead renderer, so waiting would only run into each command's timeout.
+// command sent to a dead renderer, so waiting would only run into each command's timeout. A browser
+// that dies or a connection that closes takes the page with it, so both count as a crash.
 import { CdpError, type CdpConnection } from './cdp-connection.ts';
 import type { PageEvents } from './page-operations.ts';
 
@@ -68,6 +69,7 @@ export class PageWatch implements PageEvents {
     const listen = (listenedSession: string | undefined, event: string, handler: (parameters: unknown) => void): void => {
       this.#stopListening.push(connection.on(listenedSession, event, handler));
     };
+    this.#stopListening.push(connection.onLost(() => this.#crash()));
     listen(sessionId, 'Inspector.targetCrashed', () => this.#crash());
     listen(undefined, 'Target.targetCrashed', (parameters) => {
       if ((parameters as TargetCrashed).targetId === targetId) this.#crash();
@@ -161,14 +163,21 @@ export class PageWatch implements PageEvents {
   // crashes while it waits.
   command<Value = Record<string, unknown>>(method: string, parameters: Record<string, unknown> = {}): Promise<Value> {
     if (this.#crashed) return Promise.reject(new CdpError(method, 'the page\'s renderer died'));
-    const sent = this.#connection.send<Value>(this.#page.sessionId, method, parameters);
+    return this.failingOnCrash(method, this.#connection.send<Value>(this.#page.sessionId, method, parameters));
+  }
+
+  // Waits for what the browser is doing on the page's behalf, for at most as long as the page lives.
+  failingOnCrash<Value>(method: string, waited: Promise<Value>): Promise<Value> {
+    if (this.#crashed) {
+      return Promise.reject(new CdpError(method, 'the page\'s renderer died'));
+    }
     let stopWatching = (): void => undefined;
     const crash = new Promise<never>((_resolve, reject) => {
       const fail = (): void => reject(new CdpError(method, 'the page\'s renderer died'));
       stopWatching = () => { this.#onCrash.delete(fail); };
       this.#onCrash.add(fail);
     });
-    return Promise.race([sent, crash]).finally(stopWatching);
+    return Promise.race([waited, crash]).finally(stopWatching);
   }
 
   // A popup that can reach its opener shares the opener's renderer process, so while it waits to

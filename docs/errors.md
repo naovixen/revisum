@@ -323,7 +323,7 @@ Driver error. The browser cannot keep the clipboard inside its own memory, so th
 
 ## target-crashed
 
-Driver error. The page's renderer died, or its browser target closed, while the step ran. The step fails, every later step is skipped, and the session still closes and ends every browser process. Run the plan again; if it keeps crashing, the page itself may exhaust the renderer's memory.
+Driver error. The page's renderer died, its browser target closed, the browser died or the connection to it closed, while the step ran. The step fails, every later step is skipped, and the session still closes and ends every browser process. Run the plan again; if it keeps crashing, the page itself may exhaust the renderer's memory.
 
 ## unsupported-step
 
@@ -344,6 +344,14 @@ Driver error. A page script threw, its promise was rejected, or its source is no
 ## script-timeout
 
 Driver error. A page script did not settle within its `timeoutMilliseconds` (5 seconds unless its declaration sets it), measured in real time. The step fails, every later step is skipped, and the run ends `Errored`. Make the script's promise settle, or raise the declaration's timeout in the trusted project.
+
+## page-unreadable
+
+Driver error. A check could not read the page: every read threw until the step timeout, so nothing is known about what is on it. The check fails rather than passes, `absent` and `hidden` included, because a page the run cannot read is not an empty page. Every later step is skipped. Look for page scripts that replace DOM functions such as `querySelectorAll`, or a frame the page has removed.
+
+## dialog-open
+
+Driver error. A check ran while an `alert`, `confirm` or `prompt` dialog held the page, so it could not be read. The check fails at once rather than passes, `absent` and `hidden` included, and every later step is skipped. Add a `dialog` step to answer the dialog before the check.
 
 ## image-missing
 
