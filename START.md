@@ -14,7 +14,7 @@ Architecture refactor:
 
 - [x] Phase 0: measure the baseline and set the written conventions (`docs/decisions/refactor-baseline.md`)
 - [x] Phase 1: cut, reset the goldens once, then freeze them
-- [ ] Phase 2: fast tests
+- [x] Phase 2: fast tests
 - [ ] Phase 3: cold bug review, fixes, then ground the core; the founder pushes and CI takes 10 minutes or less (moved from phase 2, founder, 2026-11-02)
 - [ ] Phase 4: move files, constants for magic strings, formatting
 - [ ] Phase 5: docs and final trust-path review; the founder pushes

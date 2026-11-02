@@ -124,7 +124,12 @@ export function launchChromium(executablePath: string, options: LaunchOptions = 
     if (connection !== null) await connection.send(undefined, 'Browser.close', {}, 5_000).catch(() => undefined);
     // Wait for a clean exit first; force the process after a grace period.
     const force = setTimeout(() => { try { browserProcess.kill(); } catch { /* already gone */ } }, 3_000);
-    if (!hasExited(browserProcess)) await Promise.race([exited, new Promise((resolve) => setTimeout(resolve, 5_000))]);
+    let gracePeriod: NodeJS.Timeout | undefined;
+    if (!hasExited(browserProcess)) {
+      await Promise.race([exited, new Promise((resolve) => { gracePeriod = setTimeout(resolve, 5_000); })]);
+    }
+    // A pending timer would keep this process alive after the browser has gone.
+    clearTimeout(gracePeriod);
     clearTimeout(force);
     if (!hasExited(browserProcess)) {
       browserProcess.kill();
