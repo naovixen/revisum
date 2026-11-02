@@ -7,7 +7,7 @@ import { setTimeout as pause } from "node:timers/promises";
 import { after, before, describe, test, type TestContext } from "node:test";
 import type { DriverSession, OwnBrowserDriver } from "@revisum/driver-cdp";
 import type { RunResult, SessionEnvironment, Target } from "@revisum/engine";
-import { outcomes } from "#test-support/browser/BrowserHarness.ts";
+import { outcomes, stepMilliseconds } from "#test-support/browser/BrowserHarness.ts";
 import { BrowserTarget, DriverAdapter } from "#test-support/browser/BrowserTarget.ts";
 import {
     click,
@@ -29,6 +29,7 @@ import {
 } from "#test-support/capability-harness.ts";
 import { endAtOnce, rendererProcesses } from "#test-support/process-tree.ts";
 import { CRASH_READY_PATH, crashWhenRequested } from "#test-support/tab-crash.ts";
+import { assertStepFailedWith } from "./AssertStepFailedWith.ts";
 import {
     ANSWERED_DIALOG_PATH,
     BOX_READ_THROWS_PATH,
@@ -42,6 +43,8 @@ import {
 const CRASH_STEP_TIMEOUT_MILLISECONDS = 8000;
 const CRASH_NOTICE_MILLISECONDS = 5000;
 const CRASH_NOTICE_POLL_MILLISECONDS = 20;
+// Where a check that gives up at once must end, against a step timeout of 8 seconds.
+const AT_ONCE_MILLISECONDS = 4000;
 
 const TARGET = BrowserTarget.Chrome;
 
@@ -70,7 +73,7 @@ let waitingLong: CapabilityHarness;
 let waitingBriefly: CapabilityHarness;
 
 before(async () => {
-    waitingLong = await capabilityHarness(CRASH_STEP_TIMEOUT_MILLISECONDS);
+    waitingLong = await capabilityHarness(CRASH_STEP_TIMEOUT_MILLISECONDS, UNREADABLE_PAGES);
     waitingBriefly = await capabilityHarness(undefined, UNREADABLE_PAGES);
 });
 after(async () => {
@@ -185,16 +188,6 @@ function assertSecondStepCrashed(result: RunResult, skippedSteps: readonly numbe
     );
 }
 
-function assertStepDidNotPass(result: RunResult, index: number): void {
-    const stepsBefore = result.steps.slice(0, index).map((step) => step.outcome);
-    assert.ok(
-        stepsBefore.every((outcome) => outcome === "passed"),
-        `the plan reached the check: ${JSON.stringify(result.steps)}`,
-    );
-    assert.notEqual(result.state, "Passed", JSON.stringify(result.steps));
-    assert.notEqual(result.steps[index]?.outcome, "passed", JSON.stringify(result.steps));
-}
-
 function assertEveryStepPassed(result: RunResult): void {
     assert.equal(result.state, "Passed", JSON.stringify(result.steps));
 }
@@ -266,51 +259,61 @@ describe("Using a run in a real browser", () => {
 
             describe("and a click has opened a confirm dialog that nothing answers", () => {
                 describe("when the run ends", () => {
-                    test("then it should not pass the check or the run", async () => {
-                        const result = await runBriefly([
-                            navigate("/dialog.html"),
-                            click(role("button", "Ask a question")),
-                            negativeCheck(check, DIALOG_STATUS),
-                        ]);
-                        assertStepDidNotPass(result, 2);
+                    test("then it should fail the check with dialog-open, at once", async () => {
+                        const plan = waitingLong.plan(
+                            capabilityPlan(TARGET, [
+                                navigate("/dialog.html"),
+                                click(role("button", "Ask a question")),
+                                negativeCheck(check, DIALOG_STATUS),
+                            ]),
+                        );
+                        const { result } = await waitingLong.run(plan, TARGET);
+                        assertStepFailedWith(result, 2, "dialog-open");
+                        assert.ok(stepMilliseconds(result, 2) < AT_ONCE_MILLISECONDS);
                     });
                 });
             });
 
             describe("and the page's querySelectorAll throws, so the element can't be found", () => {
                 describe("when the run ends", () => {
-                    test("then it should not pass the check or the run", async () => {
+                    test("then it should fail the check with page-unreadable, at the timeout", async () => {
                         const result = await runBriefly([
                             navigate(QUERY_THROWS_PATH),
                             negativeCheck(check, testId("shown-note")),
                         ]);
-                        assertStepDidNotPass(result, 1);
+                        assertStepFailedWith(result, 1, "page-unreadable");
+                        assert.ok(
+                            stepMilliseconds(result, 1) >=
+                                waitingBriefly.stepTimeoutMilliseconds / 2,
+                        );
                     });
                 });
             });
 
             describe("and the page's getBoundingClientRect throws, so the element can't be read", () => {
                 describe("when the run ends", () => {
-                    test("then it should not pass the check or the run", async () => {
+                    test("then it should fail the check with page-unreadable, at the timeout", async () => {
                         const result = await runBriefly([
                             navigate(BOX_READ_THROWS_PATH),
                             negativeCheck(check, testId("shown-note")),
                         ]);
-                        assertStepDidNotPass(result, 1);
+                        assertStepFailedWith(result, 1, "page-unreadable");
+                        assert.ok(
+                            stepMilliseconds(result, 1) >=
+                                waitingBriefly.stepTimeoutMilliseconds / 2,
+                        );
                     });
                 });
             });
 
             describe("and a healthy page that shows the element", () => {
                 describe("when the run ends", () => {
-                    test("then it should fail the check, and not call it a crash", async () => {
+                    test("then it should fail the check with assertion-failed", async () => {
                         const result = await runBriefly([
                             navigate(NOTES_PATH),
                             negativeCheck(check, testId("shown-note")),
                         ]);
-                        assert.equal(result.state, "Failed", JSON.stringify(result.steps));
-                        assert.equal(result.steps[1]?.outcome, "failed");
-                        assert.notEqual(result.steps[1]?.code, "target-crashed");
+                        assertStepFailedWith(result, 1, "assertion-failed");
                     });
                 });
             });

@@ -40,6 +40,7 @@ const ERROR_CODES: Readonly<Record<string, readonly string[]>> = {
     'not-found', 'ambiguous', 'not-actionable', 'timeout', 'navigation-failed', 'policy-denied', 'no-download', 'download-too-large',
     'storage-origin-mismatch', 'clock-runaway', 'clipboard-unavailable', 'target-crashed', 'unsupported-step', 'assertion-failed',
     'selector-invalid', 'script-failed', 'script-timeout', 'script-result-invalid',
+    'dialog-open', 'page-unreadable',
   ],
   runner: ['image-missing', 'image-digest-mismatch', 'egress-unenforceable', 'start-failed'],
   egressPolicy: ['rewrite-origin-not-fixture', 'fixture-origin-undeclared', 'fixture-origin-not-plain-http'],

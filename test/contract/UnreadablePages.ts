@@ -15,6 +15,12 @@ export const NOTES_PATH = "/notes.html";
 export const QUERY_THROWS_PATH = "/query-throws.html";
 export const BOX_READ_THROWS_PATH = "/box-read-throws.html";
 export const ANSWERED_DIALOG_PATH = "/answered-dialog.html";
+export const SLOW_LOAD_PATH = "/slow-load.html";
+export const REMOVABLE_FRAME_PATH = "/removable-frame.html";
+const REMOVABLE_FRAME_CONTENT_PATH = "/removable-frame-content.html";
+
+// Longer than the step timeout of the tests that use it, so the page never finishes loading.
+const SLOW_LOAD_PAUSE_MILLISECONDS = 10_000;
 
 export const UNREADABLE_PAGES: ReadonlyMap<string, FixtureRoute> = new Map([
     [NOTES_PATH, htmlPage("", `${SHOWN_NOTE}<p data-testid="hidden-note" hidden>Hidden</p>`)],
@@ -45,6 +51,36 @@ export const UNREADABLE_PAGES: ReadonlyMap<string, FixtureRoute> = new Map([
                  document.querySelector('[data-testid="removed-note"]').remove();
                  document.querySelector('[data-testid="hidden-note"]').hidden = true;
                });
+             </script>`,
+        ),
+    ],
+    [
+        SLOW_LOAD_PATH,
+        () => ({
+            headers: { "content-type": "text/html; charset=utf-8" },
+            chunks: [
+                Buffer.from(
+                    '<!doctype html><html lang="en"><head><title>Slow</title></head><body>',
+                ),
+                Buffer.from("<p>Loaded at last</p></body></html>"),
+            ],
+            chunkPauseMilliseconds: SLOW_LOAD_PAUSE_MILLISECONDS,
+        }),
+    ],
+    [
+        REMOVABLE_FRAME_PATH,
+        htmlPage(
+            "",
+            `<iframe data-testid="removable-frame" title="Removable" src="${REMOVABLE_FRAME_CONTENT_PATH}" width="400" height="200"></iframe>`,
+        ),
+    ],
+    [
+        REMOVABLE_FRAME_CONTENT_PATH,
+        htmlPage(
+            "",
+            `<button type="button" id="remove">Remove this frame</button>
+             <script>
+               document.getElementById('remove').addEventListener('click', () => frameElement.remove());
              </script>`,
         ),
     ],
