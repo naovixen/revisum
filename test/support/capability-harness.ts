@@ -23,6 +23,7 @@ import {
 } from "./browser/CreateBrowserDriver.ts";
 import { rawPlan, testId, type JsonRecord } from "./browser/RawPlan.ts";
 import { driverWith, sessionWith } from "./browser/WrappingSessions.ts";
+import type { FixtureRoute } from "./fixture-server.ts";
 import { processTree, stillRunning, type RunningProcess } from "./process-tree.ts";
 import { FIXTURES } from "./repository.ts";
 
@@ -155,10 +156,12 @@ export type CapabilityHarness = BrowserHarness & {
 
 export async function capabilityHarness(
     stepTimeoutMilliseconds = 2000,
+    routes: ReadonlyMap<string, FixtureRoute> = new Map(),
 ): Promise<CapabilityHarness> {
     const drivers = capabilityDrivers();
     const harness = await startBrowserHarness({
         fixtureFolder: join(FIXTURES, "capability-app"),
+        routes,
         projectFile: (origin) => capabilityProjectFile(origin, stepTimeoutMilliseconds),
         seed: SEED,
         fixedTimeMilliseconds: FIXED_TIME_MILLISECONDS,
