@@ -56,7 +56,7 @@ export const isRecord = (value: unknown): value is Readonly<Fields> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
 // True when two plain JSON values are the same, whatever the order of their keys.
-export function sameJson(left: unknown, right: unknown): boolean {
+function sameJson(left: unknown, right: unknown): boolean {
   if (Array.isArray(left)) return Array.isArray(right) && left.length === right.length && left.every((item, index) => sameJson(item, right[index]));
   if (isRecord(left)) {
     if (!isRecord(right) || Object.keys(left).length !== Object.keys(right).length) return false;

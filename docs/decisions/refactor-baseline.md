@@ -65,6 +65,13 @@ Windows, this machine, Chrome for Testing 156. The second row's range comes from
 | `test/proofs/page-script-driver-dependencies.test.ts` | -3 | Tests of the Playwright driver |
 | Per-target loops in contract and proof files | Varies | Loops lost their Playwright targets; the CDP cases stay |
 
+| `plan-migration`, `plan-version-compatibility`, `unsafe-feature-previous-versions`, `page-checks-previous-version` (unit) | 27 test calls | One plan language version: nothing older to migrate or accept |
+| Parts of `clock-and-clipboard-plans`, `service-call-plans`, `stub-and-storage-plans`, `unsafe-readable-errors` (unit) | -5 | Same |
+| Parts of `plan-schema-newer-version`, `plan-schema-clock-and-clipboard`, `plan-schema-unsafe-features` (proofs) | -4 | Same |
+| `coverage-study`, `coverage-study-suites`, `coverage-study-unsafe-features` (unit), `coverage-study-kill-criterion` (proof) | 33 test calls | Tool removed: language fit is resolved |
+| `research-links-lint`, `seed-provenance-lint`, `seed-from-research` | 19 test calls | Tools removed: the seeding is finished |
+| `branch-gates`, `cost-report` | 20 test calls | Tools removed: no CI use, and no hosted costs yet |
+
 Real-driver `unsupported-step` checks for plan values, page states, network stubs and the clock were kept, re-expressed with `cdpWithout`.
 
 ### Coverage floor

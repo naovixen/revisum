@@ -21,7 +21,7 @@
 | Records | Bracket access allowed on index signatures | Decoders read unverified keys from `Record<string, unknown>` that way on purpose |
 | Boolean names | `is`, `has`, `can`, `should`, `was`, `did` on variables and parameters | The rule can't read a function's return type, so functions are in `.claude/rules/typescript.md` |
 | Field names | Object and type properties aren't name-checked | Results, plan schemas, events and CDP calls have published or external names |
-| Quoted keys | `quoteProps: preserve` | Some quoted keys are deliberate (`tools/check-seed-provenance.ts`) |
+| Quoted keys | `quoteProps: preserve` | Some quoted keys are deliberate (the JSON Schema keywords in `packages/engine/src/plan/plan-schema.ts`) |
 | Mixed operators | Left to Prettier, which adds the parentheses | `no-mixed-operators` is deprecated in ESLint |
 
 **Rules that stay as Revisum already had them:** `unknown` at boundaries until a decoder parses it, generics such as `<Value>` not `<T>`, the abbreviation list in `CLAUDE.md`, and tests in `test/` rather than beside the code. The `{ criterion }` test tag and spec citations in comments were dropped on 2026-11-02: tests read standalone, and traceability lives in `Criteria:` commit trailers.
@@ -42,7 +42,7 @@
 Hazards for the refactor:
 
 - **Test titles:** `tools/guarantee-map.ts`, `tools/dependency-reviews.ts` and `docs/guarantees.md` reference tests as `file#title`. Retitling or moving a test means updating them.
-- **File paths:** named in `seed-provenance.json` (`to`), `package.json` scripts, CI workflows, `CODEOWNERS`, `docs/specs/`, `docs/system-design.md` and `docs/glossary.md`.
+- **File paths:** named in `package.json` scripts, CI workflows, `CODEOWNERS`, `docs/specs/`, `docs/system-design.md` and `docs/glossary.md`.
 - **Page functions:** the `in-page` functions are sent with `.toString()` (`packages/driver-cdp/src/cdp-driver.ts:578`). They must stay self-contained when long functions are broken up.
 - **Source-reading tests:** some tests read source text. After the double-quote reformat, `/from 'node:os'/` in `test/unit/report/report-generator.test.ts` would keep passing while proving nothing, so it must match both quote styles. `test/proofs/page-script-driver-dependencies.test.ts` and `test/proofs/service-call-isolation.test.ts` have the same quote assumption but fail loudly.
 - **Naming lint:** check that `tools/lint-names.ts` accepts PascalCase file names before renaming.

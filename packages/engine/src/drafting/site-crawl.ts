@@ -23,7 +23,7 @@ export const DEFAULT_EXPLORE_DEPTH = 3;
 export const DEFAULT_PAGE_TIMEOUT_MILLISECONDS = 15_000;
 
 // What a crawl needs of the trusted project: where it may go.
-export type CrawlProject = { readonly origins: readonly Origin[]; readonly productionOrigins: readonly Origin[] };
+type CrawlProject = { readonly origins: readonly Origin[]; readonly productionOrigins: readonly Origin[] };
 
 // The declared origin a crawl may start from at this URL, or undefined when it may not start
 // there: a URL that is not http or https, carries credentials, or is on an origin the project does

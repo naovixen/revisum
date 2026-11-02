@@ -17,8 +17,8 @@ import { readBuildVersion, readId } from '../project/project-parser.ts';
 import type { TrustedProject } from '../project/trusted-project.ts';
 import { schemaId } from '../version.ts';
 
-export const LOCKFILE_NAME = 'targets.lock.json';
-export const LOCKFILE_SCHEMA = schemaId('targets-lock', 1);
+const LOCKFILE_NAME = 'targets.lock.json';
+const LOCKFILE_SCHEMA = schemaId('targets-lock', 1);
 // What a run's manifest lists under nonHermeticInputs when a lockfile is in use but the target's
 // browser build could not be pinned.
 export const BROWSER_BUILD_INPUT = 'browser-build';
@@ -63,7 +63,7 @@ function readLockEntry(input: unknown, path: string, issues: Issues): Parsed<Loc
 
 // The lockfile's content, parsed by hand: unknown keys, another schema, a malformed hash or a
 // target pinned twice are all rejected, each at its JSON path.
-export function parseLockfile(input: unknown): Result<readonly LockEntry[], readonly PlanError[]> {
+function parseLockfile(input: unknown): Result<readonly LockEntry[], readonly PlanError[]> {
   const issues: Issues = [];
   const fields = readRecord(input, '$', issues, ['schema', 'entries']);
   if (fields === INVALID) return failure(issues);
@@ -83,11 +83,11 @@ export function parseLockfile(input: unknown): Result<readonly LockEntry[], read
 
 // The file's exact text: canonical JSON, entries sorted by target id, and a final newline, so the
 // same entries always give the same bytes.
-export const lockfileText = (entries: readonly LockEntry[]): string =>
+const lockfileText = (entries: readonly LockEntry[]): string =>
   `${canonicalJson({ schema: LOCKFILE_SCHEMA, entries: [...entries].sort(byTargetId) })}\n`;
 
 // The entries of the lockfile in `folder`; none when there is no lockfile yet.
-export async function readLockfile(folder: string): Promise<Result<readonly LockEntry[], LockfileFailure>> {
+async function readLockfile(folder: string): Promise<Result<readonly LockEntry[], LockfileFailure>> {
   let text: string;
   try {
     text = await readFile(join(folder, LOCKFILE_NAME), 'utf8');

@@ -2,7 +2,7 @@
 // from one it cannot. The engine replaces every value reference before a step reaches a driver;
 // drivers call literalActionStep and performableLocator once, with the features they declare, and
 // refuse on undefined, so no step is ever performed in part.
-// Some features of plan languages 1.2 and 1.3 are optional for a driver: positions, test-id
+// Some features of the plan language are optional for a driver: positions, test-id
 // attributes other than data-testid, key chords, multi-line fills, remembered values, accessibility
 // states, link targets, head metadata, pages loaded with scripts off, downloads, second tabs,
 // network stubs, request checks, web storage, clock advances, the clipboard, css and XPath
@@ -103,7 +103,7 @@ function locatorFeatures(locator: Locator): DriverFeature[] {
 
 // True when the driver cannot resolve the locator: it uses an optional feature, such as a css or
 // XPath selector, that `performs` does not list.
-export const needsLocatorFeatures = (locator: Locator, performs: readonly DriverFeature[] = NO_FEATURES): boolean =>
+const needsLocatorFeatures = (locator: Locator, performs: readonly DriverFeature[] = NO_FEATURES): boolean =>
   locatorFeatures(locator).some((feature) => !performs.includes(feature));
 
 // Element checks no driver's probe decides yet: it reports no checked or focused state, so these

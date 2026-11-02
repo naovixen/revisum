@@ -41,7 +41,7 @@ export function parseCodeOwners(text: string): readonly CodeOwnerRule[] {
 }
 
 // The owners the last matching rule names for `path`, lowercased; empty when no rule matches.
-export function ownersOf(rules: readonly CodeOwnerRule[], path: string): readonly string[] {
+function ownersOf(rules: readonly CodeOwnerRule[], path: string): readonly string[] {
   const match = rules.findLast((rule) => rule.pattern.test(path));
   return match === undefined ? [] : match.owners.map((owner) => owner.toLowerCase());
 }

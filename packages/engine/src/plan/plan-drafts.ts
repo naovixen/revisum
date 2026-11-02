@@ -73,9 +73,9 @@ export function admitDraft(draft: PlanDraft, parsePlan: PlanParse, events: Event
 }
 
 // The sources only core's own routes record: every source an author may not declare.
-export type CoreRouteSource = Exclude<PlanSource, (typeof DECLARABLE_PLAN_SOURCES)[number]>;
+type CoreRouteSource = Exclude<PlanSource, (typeof DECLARABLE_PLAN_SOURCES)[number]>;
 // The core route a draft came by, and what it drafted from, such as the spec's path.
-export type CoreRoute = { readonly source: CoreRouteSource; readonly reference?: string };
+type CoreRoute = { readonly source: CoreRouteSource; readonly reference?: string };
 
 // Admits a draft one of core's own routes produced, such as the draft command's. The route, not
 // the draft, says where it came from: any provenance the draft carries is ignored, and the source

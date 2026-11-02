@@ -43,7 +43,7 @@ export type NetworkStepContext = {
 };
 
 // What one of these steps gives its step result.
-export type NetworkStepOutcome = {
+type NetworkStepOutcome = {
   readonly outcome: 'passed' | 'failed';
   readonly code?: string;
   // Only a count, or "present", "absent" or "differs": never a value read from the page or a response.

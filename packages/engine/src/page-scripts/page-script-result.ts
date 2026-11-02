@@ -13,7 +13,7 @@ import { failure, success, type Result } from '@revisum/contracts';
 // How deeply a script's result may nest lists and objects.
 export const MAXIMUM_SCRIPT_RESULT_DEPTH = 64;
 
-export type ScriptResultErrorCode = 'script-result-too-large' | 'script-result-invalid';
+type ScriptResultErrorCode = 'script-result-too-large' | 'script-result-invalid';
 
 // The deepest nesting of lists and objects in JSON text, counting only brackets outside strings.
 // It stops counting once past `limit`, so a long run of brackets costs no more than the limit.

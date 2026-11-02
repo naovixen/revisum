@@ -8,11 +8,9 @@ import type { BackendAssertion, CallArguments, CallName, FieldName } from './ser
 import type { TargetId } from './target.ts';
 import type { DatabaseCommandStep, DatabaseStep, PageScriptStep } from './unsafe-plan-features.ts';
 
-// The language version the running engine parses. A plan declares it as text, "1.3", "1.2" or
-// "1.1": each is a subset of the next, so a plan declaring an older version parses exactly as it
-// always did. 1.2 is the closed language; 1.3 adds only the unsafe features a trusted project may
-// enable (unsafe-plan-features.ts). Plans of version 1 reach the engine only through its
-// migration, which adds what version 1 lacked.
+// The one language version the running engine parses. A plan declares it as text, "1.3", and any
+// other version is refused. An unsafe feature needs the trusted project to enable it, not a version
+// (unsafe-plan-features.ts).
 export const PLAN_VERSION = { major: 1, minor: 3 } as const;
 
 // Text that passed the engine's safety rules: no control or bidirectional-override characters
@@ -111,8 +109,7 @@ export type StructuralLocatorKind = (typeof STRUCTURAL_LOCATOR_KINDS)[number];
 // iOS targets and Control on every other target.
 export const MODIFIERS = ['Alt', 'Control', 'Meta', 'Shift', 'ControlOrMeta'] as const;
 export type Modifier = (typeof MODIFIERS)[number];
-// The keys a press step may name: the 14 of language 1.1 first, then letters, digits,
-// punctuation keys (by their physical key name) and the function keys.
+// The keys a press step may name: named keys first, then letters, digits, punctuation keys (by their physical key name) and the function keys.
 export const KEYS = [
   'Enter', 'Space', 'Tab', 'Escape', 'Backspace', 'Delete', 'Home', 'End', 'PageUp', 'PageDown',
   'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
@@ -297,7 +294,7 @@ export type ResolvedActionStep =
   | { readonly type: 'press'; readonly locator: ResolvedLocator; readonly key: Key; readonly modifiers?: readonly Modifier[] };
 // A step that calls a declared service.
 export type CallStep = Extract<Step, { type: 'call' }>;
-// What a plan's cleanup list holds: calls, and from 1.3 database commands.
+// What a plan's cleanup list holds: calls and database commands.
 export type CleanupStep = CallStep | DatabaseStep;
 export type ServiceCallStep = Extract<Step, { type: 'call' | 'expectBackend' }>;
 export const DIALOG_ACTIONS = ['accept', 'dismiss'] as const;

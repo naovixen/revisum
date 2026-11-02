@@ -42,7 +42,7 @@ export type ServiceCallRecord = {
 // Why a call or backend-check step failed: a service call error, a run value with no text or
 // unsafe text, a secret the run never resolved, or a check that did not pass.
 export type CallStepCode = ServiceCallErrorCode | StepErrorCode | 'secret-missing' | 'assertion-failed';
-export type CallStepOutcome = {
+type CallStepOutcome = {
   readonly outcome: 'passed' | 'failed';
   readonly code?: CallStepCode;
   readonly serviceCall?: ServiceCallRecord;

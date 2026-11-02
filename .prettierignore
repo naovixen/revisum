@@ -4,7 +4,6 @@ golden/
 docs/
 *.md
 package-lock.json
-seed-provenance.json
 licences.json
 eslint-suppressions.json
 *.schema.json

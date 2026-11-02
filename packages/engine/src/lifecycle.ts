@@ -12,7 +12,7 @@
 import type { Plan, PolicyRuleId, SecretName, Session, Target, Unavailable } from '@revisum/contracts';
 import type { RunManifest } from './manifest.ts';
 
-export type Transitions = {
+type Transitions = {
   readonly Planned: 'Resolved' | 'TargetUnavailable' | 'Refused';
   readonly Resolved: 'Running' | 'Errored';
   readonly Running: 'Passed' | 'Failed' | 'Errored' | 'Denied';
@@ -23,7 +23,7 @@ export type Transitions = {
   readonly Refused: never;
   readonly Denied: never;
 };
-export type RunState = keyof Transitions;
+type RunState = keyof Transitions;
 export type TerminalState = { [State in RunState]: Transitions[State] extends never ? State : never }[RunState];
 
 // A type-level guard for logging state changes: only legal (from, to) pairs compile.
@@ -35,7 +35,7 @@ export type Resolved = Omit<Planned, 'state'> & {
 };
 export type Running = Omit<Resolved, 'state'> & { readonly state: 'Running' };
 export type Finished<State extends 'Passed' | 'Failed' | 'Errored'> = Omit<Running, 'state' | 'session'> & { readonly state: State };
-export type TargetUnavailableRun = Omit<Planned, 'state'> & { readonly state: 'TargetUnavailable'; readonly unavailable: Unavailable };
+type TargetUnavailableRun = Omit<Planned, 'state'> & { readonly state: 'TargetUnavailable'; readonly unavailable: Unavailable };
 
 // Why a run was refused before any driver call.
 //   origin_not_allowed: the run would reach one of the project's production origins, which only an
@@ -66,7 +66,7 @@ export type EvidenceRefusal = {
   readonly code: Extract<RefusalCode, 'evidence-mode-disabled' | 'suite-not-declared' | 'egress-unenforceable' | 'image-missing'
     | 'image-digest-mismatch' | 'workload-start-failed'>;
 };
-export type RefusedRun = Omit<Planned, 'state'> & { readonly state: 'Refused'; readonly refusal: Refusal };
+type RefusedRun = Omit<Planned, 'state'> & { readonly state: 'Refused'; readonly refusal: Refusal };
 
 // Which policy rule stopped the run, and at which step. `unrecorded` is present when the audit sink
 // failed to record the denial, so the result differs from one whose denial was recorded.
@@ -95,8 +95,3 @@ export function deny(run: Running, denial: Denial): DeniedRun {
   return { ...rest, state: 'Denied', denial };
 }
 
-// Resolved can only end as Errored without running, for example when setup failed.
-export function abort(run: Resolved): Finished<'Errored'> {
-  const { session: _closedSeparately, ...rest } = run;
-  return { ...rest, state: 'Errored' };
-}

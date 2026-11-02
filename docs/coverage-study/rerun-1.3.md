@@ -1,5 +1,7 @@
 # Coverage study: re-run on plan language 1.3 with unsafe features
 
+The tool that produced this, `tools/coverage-study.ts`, was removed on 2026-11-02. It is in git history.
+
 ## In short
 
 - Shares, as `node tools/coverage-study.ts` reports them:

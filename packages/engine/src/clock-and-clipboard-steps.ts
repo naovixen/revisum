@@ -34,7 +34,7 @@ export type ClockAndClipboardContext = {
 };
 
 // What one of these steps gives its step result.
-export type ClockAndClipboardOutcome = {
+type ClockAndClipboardOutcome = {
   readonly outcome: 'passed' | 'failed';
   readonly code?: string;
   // Only "empty" or "differs": never the clipboard's text.

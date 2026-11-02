@@ -6,8 +6,7 @@
 // and a call open only at the top level, that a call and its arguments and fields fit the
 // project's declarations, that each stub, observed request, storage entry and field is one the
 // project declares, that each clock advance and the plan's advances together fit the project's
-// limits, that a plan declaring "1.1" uses nothing 1.2 added, and that a plan uses an unsafe
-// feature of 1.3 only when it declares "1.3" and its trusted project enables that feature. Passing
+// limits, and that a plan uses an unsafe feature only when its trusted project enables it. Passing
 // the schema is never a reason to trust a plan.
 // `npm run lint` checks that docs/plan-language/plan.schema.json is exactly this schema.
 import {
@@ -19,12 +18,12 @@ import {
 } from '@revisum/contracts';
 import { schemaId } from '../version.ts';
 import {
-  ALL_LOCATOR_KINDS, ATTRIBUTE_NAME, CLASS_TOKEN, CLOSED_PLAN_VERSION, DECLARED_NAME, CAPTURE_NAME, CLOCK_TIME, CRITERION_FIELD, CRITERION_ID,
+  ALL_LOCATOR_KINDS, ATTRIBUTE_NAME, CLASS_TOKEN, DECLARED_NAME, CAPTURE_NAME, CLOCK_TIME, CRITERION_FIELD, CRITERION_ID,
   CURRENT_PLAN_VERSION, DOWNLOAD_NAME, EMAIL_LOCAL_PREFIX, FEATURE_ID, FROM_FIELD,
   LARGEST_DOWNLOAD_BYTES, LOCATOR_FIELDS, LOWERCASE_ID, MAXIMUM_DAY_OFFSET, MAXIMUM_EXPECTED_COUNT, MAXIMUM_INLINE_SCRIPT_LENGTH,
   MAXIMUM_META_NAME_LENGTH, MAXIMUM_MODIFIERS, MAXIMUM_PATH_SEGMENTS, MAXIMUM_POSITION, MAXIMUM_SELECTOR_LENGTH,
   MAXIMUM_SPEC_REFERENCE_LENGTH, MAXIMUM_STYLE_VALUE_LENGTH, MAXIMUM_TEST_ID_LENGTH, MAXIMUM_TITLE_LENGTH, MAXIMUM_URL_LENGTH, MAXIMUM_VALUE_PREFIX_LENGTH,
-  META_FIELDS, OPTIONAL_LOCATOR_FIELDS, PLAN_FIELDS, PREVIOUS_PLAN_VERSION, QUERY_KEY, RESPONSE_STATUS, STEP_FIELDS, STEP_TYPES, STYLE_PROPERTY,
+  META_FIELDS, OPTIONAL_LOCATOR_FIELDS, PLAN_FIELDS, QUERY_KEY, RESPONSE_STATUS, STEP_FIELDS, STEP_TYPES, STYLE_PROPERTY,
   UNIQUE_NUMBER_DIGITS, VALUE_NAME, type LocatorKind,
 } from './plan-grammar.ts';
 
@@ -101,7 +100,7 @@ const STEP_FIELD_SCHEMAS: Readonly<Record<string, JsonSchema>> = {
     oneOf: [
       closedObject({ clipboard: { enum: [...CLIPBOARD_READS] } }, ['clipboard']),
       closedObject({ element: reference('locator'), read: { enum: [...REMEMBER_READS] } }, ['element', 'read']),
-      // An element's attribute: a DOM check, an unsafe feature of 1.3.
+      // An element's attribute: a DOM check, an unsafe feature.
       closedObject({
         element: reference('locator'), read: { const: REMEMBER_ATTRIBUTE_READ }, attribute: { type: 'string', pattern: ATTRIBUTE_NAME.source },
       }, ['element', 'read', 'attribute']),
@@ -125,7 +124,7 @@ const STEP_FIELD_SCHEMAS: Readonly<Record<string, JsonSchema>> = {
   count: reference('requestCount'),
   // A whole amount of at least 1 of a unit. The parser checks it against the project's limits.
   by: closedObject({ amount: { type: 'integer', minimum: 1 }, unit: { enum: [...CLOCK_UNITS] } }, ['amount', 'unit']),
-  // Unsafe features of 1.3: a page script and a database command, each as the project declares it.
+  // Unsafe features: a page script and a database command, each as the project declares it.
   script: SCRIPT_CHOICE,
   command: { type: 'string', pattern: DECLARED_NAME.source },
 };
@@ -166,7 +165,7 @@ const LOCATOR_FIELD_SCHEMAS: Readonly<Record<string, JsonSchema>> = {
   // The project declares which attributes; the parser checks the name against that list.
   attribute: { type: 'string', 'minLength': 1 },
   position: { oneOf: [{ enum: [...POSITION_WORDS] }, integer(1, MAXIMUM_POSITION)] },
-  // css and XPath locators: unsafe features of 1.3. Only hasText may hold a value reference.
+  // css and XPath locators: unsafe features. Only hasText may hold a value reference.
   selector: SELECTOR_TEXT,
   expression: SELECTOR_TEXT,
   hasText: textOrValue(1),
@@ -205,15 +204,15 @@ export function planJsonSchema(): JsonSchema {
     $id: schemaId('plan', 1),
     title: `Plan language ${CURRENT_PLAN_VERSION}`,
     description: 'A closed, versioned test plan. Every assertion names the acceptance criterion it checks. '
-      + `A plan declaring "${PREVIOUS_PLAN_VERSION}" or "${CLOSED_PLAN_VERSION}" may use only what that version had. `
-      + `The unsafe features of "${CURRENT_PLAN_VERSION}" (CSS and XPath locators, DOM checks, page scripts and database commands) `
+      + `A plan must declare "${CURRENT_PLAN_VERSION}"; any other version is refused. `
+      + 'The unsafe features (CSS and XPath locators, DOM checks, page scripts and database commands) '
       + 'parse only when the trusted project enables each one, and a run using any of them is labelled unsafe. '
       + 'Fitting this schema is necessary, not sufficient: the plan parser also checks the project\'s allow-list, '
       + 'matrix, declared secrets, fixtures, test-id attributes and email domains, its limits, its text safety rules '
       + 'that every value and download is defined before it is used, that a second tab and a call stand only at the top level, '
       + 'and that each call, stub, observed request, storage entry, argument and field is one the project declares.',
     ...closedObject({
-      version: { enum: [PREVIOUS_PLAN_VERSION, CLOSED_PLAN_VERSION, CURRENT_PLAN_VERSION] },
+      version: { enum: [CURRENT_PLAN_VERSION] },
       meta: closedObject({
         featureId: { type: 'string', pattern: FEATURE_ID.source },
         specReference: text(1, MAXIMUM_SPEC_REFERENCE_LENGTH),
@@ -241,7 +240,7 @@ export function planJsonSchema(): JsonSchema {
           closedObject({ kind: { enum: [...ELEMENT_TEXT_KINDS] }, value: textOrValue(1) }, ['kind', 'value']),
           closedObject({ kind: { const: 'countEquals' }, value: integer(0, MAXIMUM_EXPECTED_COUNT) }, ['kind', 'value']),
           closedObject({ kind: { const: 'hrefEquals' }, value: { oneOf: [reference('comparedUrl'), reference('valueReference')] } }, ['kind', 'value']),
-          // DOM checks: an unsafe feature of 1.3.
+          // DOM checks: an unsafe feature.
           closedObject({ kind: { enum: ['hasClass', 'lacksClass'] }, value: { type: 'string', pattern: CLASS_TOKEN.source } }, ['kind', 'value']),
           closedObject({
             kind: { const: 'computedStyleEquals' }, property: { type: 'string', pattern: STYLE_PROPERTY.source }, value: text(1, MAXIMUM_STYLE_VALUE_LENGTH),

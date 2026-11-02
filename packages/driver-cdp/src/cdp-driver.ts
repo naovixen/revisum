@@ -24,7 +24,7 @@ import { RunClipboard, allowRunClipboard } from './run-clipboard.ts';
 import { BrowserClock } from './virtual-clock.ts';
 import { PageStorage } from './web-storage.ts';
 
-export const CDP_ADAPTER_VERSION = '0.1.0';
+const CDP_ADAPTER_VERSION = '0.1.0';
 const COMMAND_TIMEOUT_MILLISECONDS = 30_000;
 // Schemes the page may load without an allow-list check: they never reach the network.
 const LOCAL_SCHEMES = ['data:', 'about:', 'blob:', 'chrome-error:'];
@@ -170,7 +170,7 @@ function readFixture(fixturesFolder: string | undefined, fixture: string): Resul
 
 // The absolute path of a declared fixture inside the fixtures folder. A name that leads out of the
 // folder, by "..", an absolute path or a link, is refused, as is a file that is not there.
-export function fixtureFilePath(fixturesFolder: string | undefined, fixture: string): Result<string, DriverError> {
+function fixtureFilePath(fixturesFolder: string | undefined, fixture: string): Result<string, DriverError> {
   if (fixturesFolder === undefined) return failure({ code: 'unsupported-step', detail: 'this driver was given no fixtures folder to upload from' });
   let folder: string;
   let file: string;

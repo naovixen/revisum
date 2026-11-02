@@ -10,7 +10,7 @@ import type { SuiteDecodeError, SuiteTrace } from './suite-report.ts';
 import { readZip } from './zip-reader.ts';
 
 // The trace format versions this decoder reads: what the repository's pinned Playwright writes.
-export const SUPPORTED_TRACE_VERSIONS: readonly number[] = [10];
+const SUPPORTED_TRACE_VERSIONS: readonly number[] = [10];
 const TRACE_ENTRY = /\.trace$/;
 const CONTEXT_OPTIONS = 'context-options';
 const ACTION_START = 'before';

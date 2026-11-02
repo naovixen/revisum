@@ -12,8 +12,6 @@ export const PLAN_ERROR_CODES = [
   'version_unsupported', 'empty',
   // A check that would pass on anything, such as an expected text that is empty.
   'vacuous',
-  // A version 1 assertion that the migration's mapping gives no criterion id.
-  'no_criterion_id',
   // A secret written into the plan: literal text in a sensitive field, credential-shaped text, or
   // saved storage state itself. A plan names secrets with { secretName }.
   'literal_secret',

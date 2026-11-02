@@ -8,8 +8,7 @@ The coverage study found 38 of 100 sampled test intents expressible in plan v1.1
 
 - **In:**
   - **Version 1.2.** This spec owns the bump of `PLAN_VERSION` to 1.2, the regeneration of `docs/plan-language/plan.schema.json` and the changelog entry. It opens an entry "1.2 (unreleased)" at the top of `docs/plan-language/CHANGELOG.md`. SPEC-31, SPEC-32 and SPEC-33 each add their bullets to that entry and record the new schema hash in it. The entry is dated when the last of their parser parts lands.
-    - A plan declaring `"1.2"` may use every 1.2 feature. A plan declaring `"1.1"` parses exactly as it did under 1.1, with no migration, because 1.1 is a subset of 1.2. A 1.2 field or step in a plan that declares `"1.1"` is rejected with the code a 1.1 parser gives (`unknown_field`, `unknown_step` or `unknown_value`).
-    - Version 1 plans are still accepted only through `migratePlan` (SPEC-01), which now outputs a 1.1 plan, still accepted.
+    - Changed by the founder, 2026-11-02: the language has one version, `"1.3"`, and any other is refused with `version_unsupported`. The earlier rules that a `"1.1"` plan parses unchanged and that version 1 plans migrate are withdrawn.
   - **Run values.** A plan may name values and use them where it would write literal text:
     - *generated values*, declared in the plan's `values`: unique text, a unique email address, a unique number, or a date relative to the frozen clock. Each derives from the run's seed and clock start, which the manifest records (SPEC-08). The same manifest gives the same values, and a new run gives new ones;
     - *remembered values*, read by a `remember` step from one element's text or input value, then reused by later steps;
@@ -35,7 +34,7 @@ The coverage study found 38 of 100 sampled test intents expressible in plan v1.1
 
 ```ts
 // contracts. Shapes not shown are as in plan 1.1 (SPEC-01).
-export const PLAN_VERSION = { major: 1, minor: 2 } as const;       // plans declaring "1.1" still parse unchanged
+export const PLAN_VERSION = { major: 1, minor: 2 } as const;       // now 1.3, the only version a plan may declare
 
 export type ValueName = Brand<string, 'ValueName'>;                // ^[a-z][A-Za-z0-9]{0,63}$, defined once per plan
 export type ValueReference = { readonly valueName: ValueName };
@@ -123,7 +122,7 @@ export type StepErrorCode = 'value-empty' | 'value-unsafe' | 'value-too-long';
 **Build notes.** Points the criteria leave open, settled while building (2026-10-28; `docs/decisions/answers.md`):
 
 - **Version test.** SPEC-01's future-version example moves from `1.2` to `1.3` (founder, 2026-10-28).
-- **Coverage study input (AC-SPEC-30-18).** `intents.json` gains `suites: { <suite name>: { project } }`. Each intent gains `sample: 'original' | 'fresh'`. `assessCoverage` reports one share per sample, plus the combined share.
+- **Coverage study input (AC-SPEC-30-18).** Changed by the founder, 2026-11-02: `assessCoverage` is removed; the data stays in `docs/coverage-study/`. `intents.json` gains `suites: { <suite name>: { project } }`. Each intent gains `sample: 'original' | 'fresh'`. `assessCoverage` reports one share per sample, plus the combined share.
 - **Manifest.** The plan clock is recorded in the existing `clock.fixedTimeMilliseconds`, not a new `clockStartMilliseconds`. The Intl data version (Node and ICU) joins the manifest with SPEC-08, which owns its fields. Until then AC-SPEC-30-20 checks only the dependency rule.
 - **Values.**
   - A date's `timestamp` and `epochMilliseconds` name midnight at the start of that day in the plan clock's time zone.
@@ -139,8 +138,8 @@ export type StepErrorCode = 'value-empty' | 'value-unsafe' | 'value-too-long';
 
 ## Acceptance criteria
 
-- AC-SPEC-30-01: When every 1.1 golden plan is parsed by the 1.2 parser, each shall give a `Plan` deep-equal to its 1.1 result. When a plan declaring `"1.1"` uses any 1.2 field or step, it shall be rejected with the code and path a 1.1 parser gives (oracle: regression).
-- AC-SPEC-30-02: When the schema is regenerated, it shall validate every 1.1 golden plan and one new 1.2 golden plan per feature in this spec. The "1.2" changelog entry shall name its sha256, and a schema change without an entry update shall fail `npm run lint` (oracle: specified; extends AC-SPEC-01-10).
+- AC-SPEC-30-01: Withdrawn. Changed by the founder, 2026-11-02: there is no 1.1 parser to match, and a plan declaring `"1.1"` is refused with `version_unsupported`.
+- AC-SPEC-30-02: When the schema is regenerated, it shall validate every golden plan, with one golden plan per feature in this spec. The newest changelog entry shall name its sha256, and a schema change without an entry update shall fail `npm run lint` (oracle: specified; extends AC-SPEC-01-10).
 - AC-SPEC-30-03: When a plan's generated values are computed twice from the same seed, clock start, target and project, they shall be identical. When the seed or the clock start differs, every unique value shall differ. Across 10,000 seeds no two `uniqueText` values shall collide (oracle: metamorphic).
 - AC-SPEC-30-04: When a `uniqueEmail` names a domain the project does not declare, the parser shall reject it with `unknown_value` and its path. Every generated email shall be `<localPrefix>-<unique part>@<domain>` and pass the `SafeText` rules (oracle: specified).
 - AC-SPEC-30-05: When date values are computed from the fixture table of clock starts, time zones, locales, anchors and offsets, each shall equal its expected text. The table includes a daylight-saving change, 31 January plus one month, 29 February, week starts and `Asia/Tokyo` against `America/Los_Angeles` across midnight (oracle: specified).
@@ -156,7 +155,7 @@ export type StepErrorCode = 'value-empty' | 'value-unsafe' | 'value-too-long';
 - AC-SPEC-30-15: When a plan presses Control+Enter or Shift+Enter in a form whose submit control matches an irreversible pattern, the runtime guard shall deny it with `irreversible-submit` and dispatch nothing (oracle: specified; extends AC-SPEC-03-07).
 - AC-SPEC-30-16: When a `fill` has more lines than `maximumFillLines`, a line with a control character, or a total over `maximumFillCharacters`, the parser shall reject it with `too_large`, `unsafe_text` or `too_long`. A valid multi-line fill shall leave the field's value equal to the lines joined by "\n", with no Enter key event dispatched (oracle: specified).
 - AC-SPEC-30-17: When `urlPathStartsWith` has a value not starting with "/", the parser shall reject it with `invalid_url`. Otherwise the oracle shall pass exactly when the page's path starts with the value (oracle: specified).
-- AC-SPEC-30-18: When the coverage study runs, each intent's plan shall be parsed with its suite's project from `intents.json`. The report shall give the expressible share separately for the original 100 intents and for a fresh sample of at least 50, drawn by continuing the sampling rule after the 1.2 grammar is frozen and judged before any further language change (oracle: specified; extends AC-SPEC-01-01).
+- AC-SPEC-30-18: When the coverage study runs, each intent's plan shall be parsed with its suite's project from `intents.json`. The report shall give the expressible share separately for the original 100 intents and for a fresh sample of at least 50, drawn by continuing the sampling rule after the 1.2 grammar is frozen and judged before any further language change (oracle: specified; extends AC-SPEC-01-01). Changed by the founder, 2026-11-02: met and recorded in `docs/coverage-study/`; the tool is removed.
 - AC-SPEC-30-19: When a run uses a 1.2 feature its adapter does not implement, the step shall fail with `unsupported-step`, never with a partial action. The Playwright fallback may answer `unsupported-step` for every feature in this spec (oracle: specified).
 - AC-SPEC-30-20: When `contracts` and `engine` are built, neither shall have a new runtime dependency. Dates shall use Node's built-in `Intl`, whose data version is fixed by the Node version in the manifest (oracle: specified).
 

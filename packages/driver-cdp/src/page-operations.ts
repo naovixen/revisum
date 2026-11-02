@@ -5,13 +5,12 @@ import type {
   A11yNode, BrowserDriver, BrowserRequestRecord, DownloadedFile, DriverError, Key, Result, Session, SessionEnvironment, Target, Unavailable,
 } from '@revisum/contracts';
 import type { HeldModifierKey } from './modifier-keys.ts';
-import type { AuditRuleResult } from './page-audit.ts';
 
 export type Point = { readonly x: number; readonly y: number };
-export type ProtocolId = 'cdp' | 'webdriver-bidi' | 'webdriver-classic';
+type ProtocolId = 'cdp' | 'webdriver-bidi' | 'webdriver-classic';
 
 // An element handle wrapped so that it can never be mistaken for a string argument.
-export type ElementArgument<Handle> = { readonly element: Handle };
+type ElementArgument<Handle> = { readonly element: Handle };
 export type PageArgument<Handle> = string | number | boolean | readonly string[] | ElementArgument<Handle>;
 // A self-contained page function, sent with toString().
 export type PageFunction = (...inputs: never[]) => unknown;
@@ -107,7 +106,6 @@ export type Actionability = {
 
 // A Session plus what evidence and measurement need from the own drivers.
 export interface DriverSession extends Session {
-  auditDetailed(): Promise<readonly AuditRuleResult[]>;
   // The root process the driver started.
   readonly processId: number;
   // Evaluates a self-contained page function that returns a string (tests and evidence only).

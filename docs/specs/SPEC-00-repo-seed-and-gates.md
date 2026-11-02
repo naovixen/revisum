@@ -70,7 +70,7 @@ export const TEST_SET = ['test/**', 'proofs/**', 'fixtures/**', 'golden/**'] as 
 //   Spec: SPEC-nn                    one per spec the commit implements; feeds specLinkedShare
 //   Criteria: AC-SPEC-nn-mm[, AC-SPEC-nn-mm]
 
-// Where each seeded file came from. The only file in the product repo that points at the research repo.
+// Changed by the founder, 2026-11-02: removed after seeding. Where each seeded file came from.
 export type SeedProvenance = {
   readonly researchRepoCommit: string;
   readonly files: readonly { readonly from: string; readonly to: string; readonly sourceSha256: string }[];
@@ -151,7 +151,7 @@ export const NAMING_LINT: NamingLintConfig = {
   - Checks that read only files go in `npm run lint`, so the scratch-copy lint tests in `test/proofs/` exercise them. They must not need Git: the scratch copy is not a repository.
   - Checks that need test outcomes or Git history run in a new last step of `npm run check`, `npm run gates`, after `npm run replay`.
   - Test outcomes: `tools/run-test-folder.ts` adds a reporter module from `tools/` that writes one JSON line per test (file, full name with suite names joined by ` > `, line, passed, duration) to `.test-results/`, which Git ignores. A test id is `<file>#<full name>`. A test's criterion is read from its source at the reported line, as the naming lint reads it.
-  - `DependencyReview`, `DependencyCheck`, `GuaranteeRow`, `GuaranteeMap` and `SeedProvenance` live in `tools/`, beside the checks that use them: they describe this repository's build, and no package imports them. `TEST_SET` stays in `tools/check-tests-apart.ts`.
+  - `DependencyReview`, `DependencyCheck`, `GuaranteeRow` and `GuaranteeMap` live in `tools/`, beside the checks that use them: they describe this repository's build, and no package imports them. `TEST_SET` stays in `tools/check-tests-apart.ts`.
   - The root configuration the gates need (`package.json` scripts, `.gitignore`, `licences.json`, `.github/workflows/ci.yml`) changes in the code commit, as earlier specs' code commits did. CODEOWNERS gives `.github/` to the founder, who reads it before pushing.
   - Tests never write to the real `node_modules`: the scratch copy links it.
 - **Dependency reviews (AC-SPEC-00-04).**
@@ -163,7 +163,7 @@ export const NAMING_LINT: NamingLintConfig = {
   - Built: `tools/check-tests-apart.ts` and the pull-request job.
   - Add a mode that checks each commit of a range on its own (`--commits <from>..<to>`). CI runs it on every push to `main`, because commits reach `main` without a pull request. No commit in history mixes the two today.
   - Tests: mixed, tests-only and code-only path lists, and a scratch Git repository holding one mixed commit.
-  - Waits for beta: branch protection can't require the check on GitHub Free. Until then the branch-gates check (AC-SPEC-00-20) proves, on recorded JSON, that `ci` and `tests-apart` are both required.
+  - Waits for beta: branch protection can't require the check on GitHub Free. Changed by the founder, 2026-11-02: the branch-gates check that proved this on recorded JSON is removed, so nothing proves it until beta.
 - **Commit trailers and metrics (AC-SPEC-00-07).**
   - Grammar. Keys are exact, one value per line, in Git's trailer block:
     - `Agent: claude-code/<version>`, at most once. The version is the one `claude --version` prints, such as `2.1.312`. The tool part matches `[a-z][a-z0-9-]*`; the version is semantic.
@@ -184,6 +184,7 @@ export const NAMING_LINT: NamingLintConfig = {
   - axe-core is pinned at 4.14.0. `licences.json` records the sha256 of its MPL-2.0 files `axe.js` and `axe.min.js`, as the vendor publishes them in `sri-history.json` for 4.14.0. The check fails when an installed file's hash differs, when the installed version is not the pinned one, or when a file under `packages/` is a copy of an `axe*.js` file. The installed files match today.
   - The check takes the installed-packages folder as an option (default `node_modules`), so tests point it at a fixture folder holding an edited copy.
 - **Cost report (AC-SPEC-00-09).**
+  - Changed by the founder, 2026-11-02: removed. `tools/cost-report.ts`, `docs/costs/` and `npm run cost-report` are gone: nothing hosted is billed, so the record only restated zero. The rest of this entry is what was built, and it is in git history.
   - There is no hosted service and no billing access, so spend is a declared record: `docs/costs/hosted-costs.json` holds the month, the customer count (0) and one line per hosted service (service, plan, monthly USD, `source: 'declared'`). Today: GitHub Free, private repository, Actions inside the free minutes, USD 0.
   - `npm run cost-report` (`node tools/cost-report.ts`) prints the month's report and fails when the total is over USD 5 while customers is 0. The lint runs the same check, so a committed record over budget fails CI. Nothing reads an account or an API.
   - The founder updates the record monthly and whenever a paid service is added.
@@ -197,6 +198,7 @@ export const NAMING_LINT: NamingLintConfig = {
   - Those three rows are marked pending, each with the specs that will give it a test (founder, 2026-10-29). A pending row shows its weaker class and doesn't fail the gates step until every one of its specs is ticked in `START.md`; from then on it fails like any other row when its test is missing or fails. A pending mark on a row whose specs are all ticked fails the step, so the mark can't outlive its reason.
   - Tests: a fixture results file where one mapped test fails, and one missing a mapped id. Both fail, and the run's table shows the weaker class. A pending row with an unticked spec passes and shows its weaker class; the same row once its specs are ticked fails.
 - **Seeding (AC-SPEC-00-11).**
+  - Changed by the founder, 2026-11-02: done once and removed. `tools/seed-from-research.ts`, `tools/check-seed-provenance.ts` and `seed-provenance.json` are gone, and the repo records only that it was seeded from `E:\core`. The rest of this entry is what was built, and it is in git history.
   - Seeded 2026-10-28; `seed-provenance.json` records 676 sources for 672 files. Four files were merged from two prototype files each; the second source sits in that entry's `mergedFrom` list, so every seeded prototype file stays on record and `to` stays unique. Seeded code has changed since (60 package files differ from their source hash), so hashes are compared only while seeding.
   - Add `tools/seed-from-research.ts --research <repository> --commit <hash> --files <list>`. It copies each file from that commit with `git show`, writes `seed-provenance.json`, and fails, naming the file, when the commit lacks it. It names no research path itself; the repository is an argument.
   - The lint adds a shape check of `seed-provenance.json`: a 40-hex commit, 64-hex hashes (including `mergedFrom` sources), unique `to` paths inside this repository, and `reusedCriteria` spec ids that exist in `docs/specs/`.
@@ -214,6 +216,7 @@ export const NAMING_LINT: NamingLintConfig = {
   - The Standard names table must equal `standardNames` in `tools/naming-lint-config.ts`.
   - Tests: scratch-copy lint with a row naming a missing export, an exported engine type taken out of the glossary, and a standard name dropped.
 - **Research links (AC-SPEC-00-17).**
+  - Changed by the founder, 2026-11-02: `tools/check-research-links.ts` is removed. The naming lint still bans research ids and citations. The rest of this entry is what was built, and it is in git history.
   - Built: the naming lint bans spike names and research citations in comments.
   - Add `tools/check-research-links.ts` to the lint. It fails when a tracked file other than `*.md`, `docs/**` and `seed-provenance.json` holds `docs/research/`, a path into the research repository (`E:\core`, `E:/core`) or any `from` path of the record. It also fails when any tracked file except `seed-provenance.json`, docs included, holds the research commit or a prefix of it of 7 or more characters. Both pass today.
   - Tests: scratch-copy lint planting each.
@@ -223,6 +226,7 @@ export const NAMING_LINT: NamingLintConfig = {
   - Declared: `project-metrics.json` carries `approvalStrength: 'declared'`, and the summary says the approval is the founder's push under the agent lock-down, declared and not verified.
   - Tests: scratch-copy lint with each required denial removed in turn.
 - **Branch gates (AC-SPEC-00-20).**
+  - Changed by the founder, 2026-11-02: removed. `tools/check-branch-gates.ts` and `fixtures/branch-gates/` are gone: `main` has neither rules nor protection, so the check only read recorded JSON. The rest of this entry is what was built, and it is in git history.
   - `tools/check-branch-gates.ts --rules <file> [--protection <file>] [--require-checks]` reads GitHub's JSON for a branch's rules and its classic protection.
   - It fails when any rule or protection requires an approving review (a count of 1 or more), a code-owner review or last-push approval, or requires a status check that `ci.yml` doesn't produce. With `--require-checks` it also fails unless `ci` and `tests-apart` are required (AC-SPEC-00-05).
   - Fixtures in `fixtures/branch-gates/`: the planned beta ruleset (passes), and one each with a review count of 1, a code-owner review and an unknown required check (each fails). `main` has neither rules nor protection today, so empty JSON passes.
@@ -246,9 +250,9 @@ export const NAMING_LINT: NamingLintConfig = {
   - schemas, SDKs, drivers and adapters shall carry Apache-2.0;
   - the engine shall carry FSL-1.1-ALv2 (Functional Source License 1.1, converting to Apache-2.0);
   - axe-core's MPL-2.0 files shall be byte-identical to the pinned release.
-- AC-SPEC-00-09: When the monthly cost report runs at zero customers, hosted spend shall be at most USD 5 (oracle: specified; the research cost model, `06`, estimates about USD 1).
+- AC-SPEC-00-09: Withdrawn. Changed by the founder, 2026-11-02: the declared cost record and its check are removed.
 - AC-SPEC-00-10: When CI runs, every `GuaranteeRow` shall map to a test id that exists and passes. A row with no test, or a failing one, shall fail CI, and the published table shall show the row's weaker class (oracle: specified).
-- AC-SPEC-00-11: When the repo is seeded, every spike file a spec names shall be copied, with the research-repo commit and its source hash recorded in `SeedProvenance`. Seeding shall fail if that commit does not contain the file (oracle: specified).
+- AC-SPEC-00-11: When the repo is seeded, every spike file a spec names shall be copied, with the research-repo commit and its source hash recorded in `SeedProvenance`. Seeding shall fail if that commit does not contain the file (oracle: specified). Changed by the founder, 2026-11-02: met once; the tool and `SeedProvenance` are removed.
 - AC-SPEC-00-12: When the naming lint runs over a fixture with one identifier per banned pattern, each shall fail with its `why`, and the same names spelt as domain words shall pass (oracle: specified). The fixture includes `R11Test`, `acId`, `p3Core`, `checkD14`, a JSON key `RC-04`, an error code `h12-failed` and a claim id.
 - AC-SPEC-00-13: When an exported name is a single letter, or a non-exported single-letter name (including a generic type parameter) is outside `singleLetterNames`, the lint shall fail. Loop indices `i`, `j`, `k` and coordinates `x`, `y` shall pass (oracle: specified).
 - AC-SPEC-00-14: When a comment cites a research doc, a claim id, a spike name or a research id, or consists only of a spec reference, the lint shall fail. A plain explanation followed by "see `docs/specs/SPEC-09-privacy-masking.md`" shall pass (oracle: specified).
@@ -257,15 +261,15 @@ export const NAMING_LINT: NamingLintConfig = {
   - every code name it lists shall resolve to an exported declaration;
   - every exported type of the core package's public API shall appear in it;
   - every `standardNames` entry shall appear with its full name.
-- AC-SPEC-00-17: When CI searches the product repo, no code, test, script, config or CI file shall read, import or link a file that exists only in the research repo, and `SeedProvenance` shall be the only file naming the research-repo commit (oracle: specified).
+- AC-SPEC-00-17: When CI searches the product repo, no code, test, script, config or CI file shall read, import or link a file that exists only in the research repo, and `SeedProvenance` shall be the only file naming the research-repo commit (oracle: specified). Changed by the founder, 2026-11-02: the check over tracked files is removed, and only the naming lint's ban on research ids and citations remains.
 - AC-SPEC-00-18: When the repo is seeded (oracle: specified):
   - `docs/specs/` shall hold SPEC-00 to SPEC-29 with every AC id unchanged, beside `docs/system-design.md` and `docs/glossary.md`;
   - every seeded spike file shall pass the naming lint;
-  - spike criterion ids shall survive only in `SeedProvenance.reusedCriteria`.
+  - spike criterion ids shall survive only in `SeedProvenance.reusedCriteria`. Changed by the founder, 2026-11-02: met once; `SeedProvenance` is removed.
 - AC-SPEC-00-19: When CI runs on core's own protected default branch (oracle: specified):
   - it shall check that the agent's deny-rules file there denies commit, push, merge and pull-request approval;
   - core's own approvals and the metrics resting on them shall be recorded and shown as `declared`, not `verified`.
-- AC-SPEC-00-20: When CI reads the branch protection and rulesets of core's own default branch, none shall require an approving review from another account, and a merge by the founder under the agent lock-down shall satisfy every required gate (oracle: specified; founder decision 2026-10-27, "don't gate anything behind a second person").
+- AC-SPEC-00-20: When CI reads the branch protection and rulesets of core's own default branch, none shall require an approving review from another account, and a merge by the founder under the agent lock-down shall satisfy every required gate (oracle: specified; founder decision 2026-10-27, "don't gate anything behind a second person"). Changed by the founder, 2026-11-02: the check is removed; the rule stands as a founder decision.
 
 ## Dependencies
 

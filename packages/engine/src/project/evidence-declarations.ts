@@ -27,7 +27,7 @@ const RESERVED_ENVIRONMENT_NAMES: readonly string[] = ['PATH', 'HOME', 'NODE_OPT
 const RESERVED_ENVIRONMENT_PREFIXES: readonly string[] = ['PLAYWRIGHT_', 'PW_', 'GITHUB_'];
 const RESERVED_ENVIRONMENT_SUFFIX = '_PROXY';
 
-export function isReservedEnvironmentName(name: string): boolean {
+function isReservedEnvironmentName(name: string): boolean {
   const upper = name.toUpperCase();
   return RESERVED_ENVIRONMENT_NAMES.includes(upper) || upper.endsWith(RESERVED_ENVIRONMENT_SUFFIX)
     || RESERVED_ENVIRONMENT_PREFIXES.some((prefix) => upper.startsWith(prefix));
@@ -54,7 +54,7 @@ const DEFAULT_SUITE_TIMEOUT_MILLISECONDS = 30 * MINUTE_IN_MILLISECONDS;
 const MAXIMUM_SUITE_TIMEOUT_MILLISECONDS = 6 * 60 * MINUTE_IN_MILLISECONDS;
 const MEBIBYTE = 1024 * 1024;
 
-export const DEFAULT_EVIDENCE_LIMITS: EvidenceLimits = {
+const DEFAULT_EVIDENCE_LIMITS: EvidenceLimits = {
   maximumReportBytes: 50 * MEBIBYTE, maximumTests: 5000, maximumTraceBytes: 100 * MEBIBYTE, maximumTraceEntries: 20_000,
   maximumAuditedPages: 200,
 };

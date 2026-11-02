@@ -30,8 +30,8 @@ import {
 } from './approvers-file.ts';
 import { isCodeOwner, parseCodeOwners, type CodeOwnerRule } from './code-owners.ts';
 
-export const APPROVERS_FILE = 'approvers.json';
-export const HOLDOUTS_FILE = 'holdouts.json';
+const APPROVERS_FILE = 'approvers.json';
+const HOLDOUTS_FILE = 'holdouts.json';
 
 export type VerifiedOutcome = { readonly approval: Approval; readonly actor: DerivedActor };
 export type VerifierResult = Result<VerifiedOutcome, ApprovalErrorCode>;

@@ -119,7 +119,7 @@ export type EvidenceManifestRecord = {
 
 // Inputs an evidence run can never pin: the team's test code, the browser its suite brings, and
 // the app server the suite starts.
-export const EVIDENCE_NON_HERMETIC_INPUTS: readonly string[] = ['app-server', 'suite-browser', 'suite-code'];
+const EVIDENCE_NON_HERMETIC_INPUTS: readonly string[] = ['app-server', 'suite-browser', 'suite-code'];
 
 // A file of the suite, by repository-relative path and content.
 export type SuiteFile = { readonly path: string; readonly bytes: Uint8Array };
@@ -171,12 +171,12 @@ export type ReplayErrorCode = 'replay-not-claimed' | 'replay-mismatch' | 'versio
 export const DETERMINISM_INPUTS: readonly string[] = ['clock', 'time-zone', 'randomness'];
 
 // The non-hermetic input of a run whose pins name no run image: it ran on the host.
-export const RUN_IMAGE_INPUT = 'run-image';
+const RUN_IMAGE_INPUT = 'run-image';
 
 // Listed beside service-calls or database-commands when the project records their replies
 // (replay.recordReplies): those inputs are still not pinned by the manifest, but a replay can feed
 // them from the run's recording. Without it, such a run is never replay-claimed.
-export const RECORDED_REPLIES_INPUT = 'recorded-replies';
+const RECORDED_REPLIES_INPUT = 'recorded-replies';
 
 // The manifest a replay may run, or why none may: a replay of it could never be claimed identical.
 // The replay itself, which runs the manifest again and compares result hashes, is replay().

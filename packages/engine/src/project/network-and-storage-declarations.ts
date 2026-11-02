@@ -18,7 +18,7 @@ import { HEADER_NAME, readDeclarationSection, readFields, readJsonTemplate, read
 import { readOrigin } from './project-parser.ts';
 
 // What a declaration may refer to: the origins a matcher may name, and the fixture files a stub may serve.
-export type NetworkDeclarationContext = {
+type NetworkDeclarationContext = {
   readonly issues: Issues;
   // The project's allowed origins. A storage entry must be on one of these.
   readonly origins: readonly Origin[];

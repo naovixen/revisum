@@ -297,7 +297,7 @@ export type SecretEcho = {
 type EchoCandidate = { readonly secretName: SecretName; readonly value: string; readonly scheme?: WrappingScheme };
 
 // What a reply's text becomes once every echo is cut out.
-export type CutText = { readonly kept: string; readonly echoes: readonly SecretEcho[] };
+type CutText = { readonly kept: string; readonly echoes: readonly SecretEcho[] };
 
 // One stretch of a reply's text: kept as it is, or an echo cut out of it.
 type Piece = { readonly kept: string } | { readonly echo: Omit<SecretEcho, 'offset'> };

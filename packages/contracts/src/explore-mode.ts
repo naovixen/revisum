@@ -41,7 +41,7 @@ export type PageMap = {
 // enforce egress, and --host was not given.
 // explore-start-unreachable: the start page did not load.
 // planner-endpoint-not-loopback, planner-call-failed: as for the draft command's planner.
-export type ExploreErrorCode =
+type ExploreErrorCode =
   | 'explore-origin-refused' | 'after-plan-unapproved' | 'explore-runner-unavailable' | 'explore-start-unreachable'
   | 'planner-endpoint-not-loopback' | 'planner-call-failed';
 // The two a crawl itself can stop with.

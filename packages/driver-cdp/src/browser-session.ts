@@ -14,7 +14,7 @@ import {
   unmaskElements,
 } from './in-page.ts';
 import { heldModifierKeys } from './modifier-keys.ts';
-import { pageAudit, parseAudit, toFindings, type AuditRuleResult } from './page-audit.ts';
+import { pageAudit, parseAudit, toFindings } from './page-audit.ts';
 import type { Actionability, DownloadCapture, DriverSession, PageEvents, PageFunction, PageOperations } from './page-operations.ts';
 
 export const NO_ELEMENT: ElementProbe = { count: 0, visible: false, enabled: false, text: '', value: null, sensitive: false, box: null };
@@ -63,7 +63,7 @@ const SELECTOR_INVALID: DriverError = { code: 'selector-invalid', detail: 'the b
 export const SESSION_FEATURES: readonly DriverFeature[] = DRIVER_FEATURES;
 
 // Finds the elements a locator matches. An error while the page navigates counts as "nothing found yet".
-export async function locate<Handle>(operations: PageOperations<Handle>, locator: ResolvedLocator): Promise<Handle[]> {
+async function locate<Handle>(operations: PageOperations<Handle>, locator: ResolvedLocator): Promise<Handle[]> {
   try {
     const found = await matches(operations, locator);
     return locator.position === undefined ? found : await atPosition(operations, found, locator.position);
@@ -126,7 +126,7 @@ const neverStops = (): boolean => false;
 // Auto-wait: exactly one match that is attached, visible, stable, enabled and hit by a pointer at
 // its centre. Never the first of several matches; a typed failure at the deadline, or at once when
 // `crashed` says the page has died.
-export async function waitUntilActionable<Handle>(
+async function waitUntilActionable<Handle>(
   operations: PageOperations<Handle>, locator: ResolvedLocator, timeoutMilliseconds: number, crashed: () => boolean = neverStops,
 ): Promise<Actionable<Handle>> {
   const deadline = Date.now() + timeoutMilliseconds;
@@ -256,8 +256,6 @@ async function denial<Handle>(operations: PageOperations<Handle>, element: Handl
   return verdict.kind === 'deny' ? { code: 'policy-denied', detail: `denied by the ${verdict.rule} rule` } : null;
 }
 
-type DocumentPorts = DocumentSession & { auditDetailed(): Promise<readonly AuditRuleResult[]> };
-
 // The text a fill of literal text or of lines types; a secret reference is revealed elsewhere.
 const textToFill = (value: Extract<ResolvedActionStep, { type: 'fill' }>['value']): string =>
   (typeof value === 'string' ? value : 'lines' in value ? value.lines.join('\n') : '');
@@ -267,7 +265,7 @@ const textToFill = (value: Extract<ResolvedActionStep, { type: 'fill' }>['value'
 // first of them is the top document.
 function documentPorts<Handle>(
   operations: PageOperations<Handle>, masked: readonly PageOperations<Handle>[], environment: SessionEnvironment, details: SessionDetails,
-): DocumentPorts {
+): DocumentSession {
   const isTopDocument = masked.length === 1;
   const events = details.events;
   const crashed = (): boolean => events.crashed();
@@ -471,7 +469,7 @@ function documentPorts<Handle>(
     }
   };
 
-  const ports: DocumentPorts = {
+  const ports: DocumentSession = {
     async navigate(url, options) {
       if (crashed()) return failure(CRASHED);
       const scripts = options?.scripts ?? 'enabled';
@@ -506,9 +504,6 @@ function documentPorts<Handle>(
     },
     async audit() {
       return toFindings(parseAudit(await operations.callForString(pageAudit, [])));
-    },
-    async auditDetailed() {
-      return parseAudit(await operations.callForString(pageAudit, []));
     },
     accessibilitySnapshot: () => operations.accessibilityTree(),
     async linkTargets() {

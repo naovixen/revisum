@@ -24,7 +24,7 @@ export type SuiteDecodeErrorCode =
 export type SuiteDecodeError = { readonly code: SuiteDecodeErrorCode; readonly path: string };
 
 // How deeply a report may nest when the project sets no maximumReportDepth.
-export const DEFAULT_REPORT_DEPTH = 64;
+const DEFAULT_REPORT_DEPTH = 64;
 
 export type SuiteAnnotation = { readonly type: string; readonly description?: string };
 export type SuiteErrorLocation = { readonly file: string; readonly line: number; readonly column: number };

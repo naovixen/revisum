@@ -3,21 +3,19 @@
 // script-like text, vacuous checks and oversized or too deeply nested input, before any side
 // effect. Literal secrets are refused: a fill of literal text into a sensitive field, and
 // credential-shaped text anywhere. A plan it accepts is frozen and remembered, so run() can tell it from a look-alike.
-// The grammar is the one of the version the plan declares: a plan declaring "1.1" is read with
-// everything 1.2 added switched off, so it parses exactly as it always did.
 // Calls name a declaration of the trusted project, with arguments typed by it; nothing a plan
 // writes can name a URL, a method, a header or a body. Stubs, request checks and storage entries
 // likewise: a plan names a declaration and gives typed arguments, never a response, a matcher, a
 // storage key or a value to store. A clock advance is a bounded whole amount of a unit, never a
 // wait, and the clipboard can only be checked or remembered, never written.
-// The unsafe features of version 1.3 (css and XPath locators, DOM checks, page scripts and
+// The unsafe features (css and XPath locators, DOM checks, page scripts and
 // database commands) are read only once the trusted project enables each one; a disabled one is
 // refused with unsafe_feature_disabled at the field that names it, every use of it, with nothing
 // under it read. A selector or expression is literal plan text, so what a locator can match is
 // fixed when the plan is approved.
 import {
   AUDIT_MODES, BACKEND_ASSERTION_KINDS, CALL_EFFECTS, CLIPBOARD_ASSERTION_KINDS, CLIPBOARD_READS, CLOCK_ADVANCE_MODES, CLOCK_UNITS, DIALOG_ACTIONS,
-  DOM_CHECK_KINDS, DOWNLOAD_SIZE_KINDS, literalText, ELEMENT_STATE_KINDS, MODIFIERS, PAGE_TEXT_KINDS,
+  DOM_CHECK_KINDS, DOWNLOAD_SIZE_KINDS, literalText, ELEMENT_STATE_KINDS, KEYS, MODIFIERS, PAGE_TEXT_KINDS,
   POSITION_WORDS, REMEMBER_ATTRIBUTE_READ, REMEMBER_READS, REQUEST_COUNT_KINDS, RESPONSE_ASSERTION_KINDS, RESPONSE_FIELD_PRESENCE_KINDS, RESPONSE_READS,
   ROLES, SCRIPT_MODES, STORAGE_ASSERTION_KINDS, STRUCTURAL_LOCATOR_KINDS, STUB_ACTIONS,
   failure, success,
@@ -35,7 +33,7 @@ import {
 import { brand } from '../brand.ts';
 import { clockAdvanceMilliseconds } from '../clock-advance.ts';
 import { readFields } from '../project/call-declarations.ts';
-import { DEFAULT_TEST_ID_ATTRIBUTES, readId, type Limits, type Project } from '../project/project-parser.ts';
+import { readId, type Limits, type Project } from '../project/project-parser.ts';
 import type { TrustedProject } from '../project/trusted-project.ts';
 import { declaredCommands, declaredScripts, enabledUnsafeFeatures } from '../project/unsafe-feature-declarations.ts';
 import {
@@ -43,13 +41,14 @@ import {
   type Issues, type Parsed, type PlanError,
 } from './plan-decoders.ts';
 import {
-  ALL_ELEMENT_KINDS, ASSERTION_STEP_TYPES, ATTRIBUTE_NAME, CAPTURE_NAME, CLASS_TOKEN, CLEANUP_STEP_TYPES, CRITERION_FIELD, CRITERION_ID, CURRENT_GRAMMAR,
-  DATABASE_COMMAND_FEATURE, DOM_CHECKS_FEATURE, DOWNLOAD_KINDS, DOWNLOAD_NAME, FEATURE_ID,
+  ALL_LOCATOR_KINDS, ASSERTION_STEP_TYPES, ATTRIBUTE_NAME, CAPTURE_NAME, CLASS_TOKEN, CLEANUP_STEP_TYPES, CRITERION_FIELD, CRITERION_ID, CURRENT_PLAN_VERSION,
+  DATABASE_COMMAND_FEATURE, DOM_CHECKS_FEATURE, DOWNLOAD_KINDS, DOWNLOAD_NAME, ELEMENT_KINDS, FEATURE_ID,
   FROM_FIELD, INLINE_SCRIPT_FEATURE, LARGEST_DOWNLOAD_BYTES, LOCATOR_FEATURES, LOCATOR_FIELDS, MAXIMUM_EXPECTED_COUNT, MAXIMUM_INLINE_SCRIPT_LENGTH,
   MAXIMUM_INSIDE_DEPTH, MAXIMUM_META_NAME_LENGTH, MAXIMUM_MODIFIERS, MAXIMUM_PATH_SEGMENTS, MAXIMUM_POSITION, MAXIMUM_QUERY_VALUES,
   MAXIMUM_SELECTOR_LENGTH, MAXIMUM_SPEC_REFERENCE_LENGTH, MAXIMUM_STYLE_VALUE_LENGTH, MAXIMUM_TEST_ID_LENGTH, MAXIMUM_TITLE_LENGTH, MAXIMUM_URL_LENGTH,
-  META_FIELDS, NAMED_SCRIPT_FEATURE, PLAN_FIELDS, QUERY_KEY, RESPONSE_STATUS, SELECTOR_FORBIDDEN_CHARACTERS, STYLE_PROPERTY, TOP_LEVEL_STEP_TYPES,
-  grammarFor, isDatabaseCommandStepType, isPageScriptStepType, type Grammar,
+  META_FIELDS, NAMED_SCRIPT_FEATURE, OPTIONAL_LOCATOR_FIELDS, OPTIONAL_PLAN_FIELDS, PAGE_KINDS, PLAN_FIELDS, QUERY_KEY, RESPONSE_STATUS,
+  SELECTOR_FORBIDDEN_CHARACTERS, STEP_FIELDS, STEP_TYPES, STYLE_PROPERTY, TOP_LEVEL_STEP_TYPES,
+  isDatabaseCommandStepType, isPageScriptStepType,
 } from './plan-grammar.ts';
 import { readGeneratedValues, readPlanClock, readValueName, type ValueContext } from './plan-values.ts';
 import { looksLikeCredential, namesSensitiveField } from './literal-secrets.ts';
@@ -58,12 +57,10 @@ import { argumentProblem } from '../service-calls/parameter-values.ts';
 // A base used only to tell whether a URL is relative to the app under test.
 const RELATIVE_BASE = new URL('https://relative.invalid');
 
-// What a plan may refer to. planParser takes it from the trusted project. The version 1
-// migration has no project, so it checks the language only: any http or https origin, any
-// well-formed target id. Its output is PlanData, never a Plan, and still has to pass planParser.
-export type PlanRules = {
-  readonly origins: readonly Origin[] | 'any';
-  readonly targetIds: readonly TargetId[] | 'any';
+// What a plan may refer to, taken from the trusted project.
+type PlanRules = {
+  readonly origins: readonly Origin[];
+  readonly targetIds: readonly TargetId[];
   readonly secretNames: readonly SecretName[];
   readonly fixtures: readonly FixtureName[];
   readonly limits: Limits;
@@ -85,8 +82,6 @@ export type PlanRules = {
 type ParseContext = {
   readonly rules: PlanRules;
   readonly issues: Issues;
-  // The grammar of the version the plan declares.
-  readonly grammar: Grammar;
   // The run values defined so far, in document order: the plan's values, then each remember
   // step's name once that step has been read. A reference to any other name is undefined.
   readonly defined: Set<string>;
@@ -141,9 +136,9 @@ function readValueReference(input: unknown, path: string, context: ParseContext)
   return { valueName };
 }
 
-// Text the plan writes for the page: literal text, or, from version 1.2, a value reference.
+// Text the plan writes for the page: literal text, or a value reference.
 function readTextOrValue(input: unknown, path: string, context: ParseContext, maximumLength: number, minimumLength = 1): Parsed<TextOrValue> {
-  if (context.grammar.runValues && isPlainObject(input)) return readValueReference(input, path, context);
+  if (isPlainObject(input)) return readValueReference(input, path, context);
   return readPlanText(input, path, context, maximumLength, minimumLength);
 }
 
@@ -158,8 +153,7 @@ function readUrl(input: unknown, path: string, context: ParseContext): Parsed<Al
     if (!text.startsWith('/')) { context.issues.push({ code: 'invalid_url', path }); return INVALID; }
     return brand<string, 'AllowedUrl'>(url.pathname + url.search + url.hash);
   }
-  const { origins } = context.rules;
-  if (origins !== 'any' && !origins.some((origin) => origin === url.origin)) {
+  if (!context.rules.origins.some((origin) => origin === url.origin)) {
     context.issues.push({ code: 'origin_not_allowed', path });
     return INVALID;
   }
@@ -201,9 +195,9 @@ function readPathTemplate(input: unknown, path: string, context: ParseContext): 
   return { segments, query: Object.fromEntries(entries) };
 }
 
-// Where a navigate step goes: a URL, or, from version 1.2, a path template.
+// Where a navigate step goes: a URL, or a path template.
 function readNavigation(input: unknown, path: string, context: ParseContext): Parsed<AllowedUrl | PathTemplate> {
-  if (context.grammar.runValues && isPlainObject(input)) return readPathTemplate(input, path, context);
+  if (isPlainObject(input)) return readPathTemplate(input, path, context);
   return readUrl(input, path, context);
 }
 
@@ -229,12 +223,12 @@ function readLocator(input: unknown, path: string, context: ParseContext, inside
   const longest = context.rules.limits.maximumTextLength;
   const head = peekRecord(input, path, context.issues);
   if (head === INVALID) return INVALID;
-  const by = readOneOf(head['by'], `${path}.by`, context.issues, context.grammar.locatorKinds);
+  const by = readOneOf(head['by'], `${path}.by`, context.issues, ALL_LOCATOR_KINDS);
   if (by === INVALID) return INVALID;
   if (isStructuralKind(by) && !featureEnabled(LOCATOR_FEATURES[by], `${path}.by`, context)) return INVALID;
-  const allowed = [...LOCATOR_FIELDS[by], ...context.grammar.optionalLocatorFields[by]];
+  const allowed = [...LOCATOR_FIELDS[by], ...OPTIONAL_LOCATOR_FIELDS[by]];
   if (readRecord(input, path, context.issues, allowed, LOCATOR_FIELDS[by]) === INVALID) return INVALID;
-  // Optional fields are left out when absent, so a 1.1 locator stays exactly as it was.
+  // Optional fields are left out when absent, so a plan without them hashes the same.
   const position = Object.hasOwn(head, 'position') ? readPosition(head['position'], `${path}.position`, context) : undefined;
   const positioned = position === undefined || position === INVALID ? {} : { position };
   switch (by) {
@@ -326,10 +320,8 @@ function readLinkTarget(input: unknown, path: string, context: ParseContext): Pa
 function readElementAssertion(input: unknown, path: string, context: ParseContext): Parsed<ElementAssertion> {
   const head = readAssertionHead(input, path, context);
   if (head === INVALID) return INVALID;
-  const kind = readOneOf(head['kind'], `${path}.kind`, context.issues, ALL_ELEMENT_KINDS);
+  const kind = readOneOf(head['kind'], `${path}.kind`, context.issues, ELEMENT_KINDS);
   if (kind === INVALID) return INVALID;
-  // A kind the declared version does not have is refused as that version's parser refuses it.
-  if (!context.grammar.elementKinds.includes(kind)) { context.issues.push({ code: 'unknown_value', path: `${path}.kind` }); return INVALID; }
   if (isOneOf(DOM_CHECK_KINDS, kind)) return featureEnabled(DOM_CHECKS_FEATURE, `${path}.kind`, context) ? readDomCheck(kind, head, path, context) : INVALID;
   if (isOneOf(ELEMENT_STATE_KINDS, kind)) return readRecord(input, path, context.issues, ['kind']) === INVALID ? INVALID : { kind };
   if (readRecord(input, path, context.issues, ['kind', 'value']) === INVALID) return INVALID;
@@ -393,7 +385,7 @@ function readDomCheck(
 function readPageAssertion(input: unknown, path: string, context: ParseContext): Parsed<PageAssertion> {
   const head = readAssertionHead(input, path, context);
   if (head === INVALID) return INVALID;
-  const kind = readOneOf(head['kind'], `${path}.kind`, context.issues, context.grammar.pageKinds);
+  const kind = readOneOf(head['kind'], `${path}.kind`, context.issues, PAGE_KINDS);
   if (kind === INVALID) return INVALID;
   if (kind === 'metaContent') {
     if (readRecord(input, path, context.issues, ['kind', 'name', 'value']) === INVALID) return INVALID;
@@ -464,12 +456,12 @@ function readMultiLineText(input: unknown, path: string, context: ParseContext):
   return { lines };
 }
 
-// A fill value: literal text, a reference to a secret the project declares, and from version 1.2
-// a value reference or lines of text.
+// A fill value: literal text, a reference to a secret the project declares, a value reference or
+// lines of text.
 function readFillValue(input: unknown, path: string, context: ParseContext): Parsed<TextOrValue | SecretReference | MultiLineText> {
   if (!isPlainObject(input)) return readPlanText(input, path, context, context.rules.limits.maximumTextLength, 0);
-  if (context.grammar.runValues && Object.hasOwn(input, 'lines')) return readMultiLineText(input, path, context);
-  if (context.grammar.runValues && Object.hasOwn(input, 'valueName')) return readValueReference(input, path, context);
+  if (Object.hasOwn(input, 'lines')) return readMultiLineText(input, path, context);
+  if (Object.hasOwn(input, 'valueName')) return readValueReference(input, path, context);
   const fields = readRecord(input, path, context.issues, ['secretName']);
   if (fields === INVALID) return INVALID;
   const secretName = readDeclared(fields['secretName'], `${path}.secretName`, context, context.rules.secretNames);
@@ -524,7 +516,7 @@ function readRememberSource(input: unknown, path: string, context: ParseContext)
     return field === INVALID || read === INVALID ? INVALID : { response: named[0], field, read };
   }
   // One of an element's attributes: a DOM check, so read only once the project enables them.
-  if (isPlainObject(input) && input['read'] === REMEMBER_ATTRIBUTE_READ && context.grammar.elementReads.includes(REMEMBER_ATTRIBUTE_READ)) {
+  if (isPlainObject(input) && input['read'] === REMEMBER_ATTRIBUTE_READ) {
     if (!featureEnabled(DOM_CHECKS_FEATURE, `${path}.read`, context)) return INVALID;
     const fields = readRecord(input, path, issues, ['element', 'read', 'attribute']);
     if (fields === INVALID) return INVALID;
@@ -1098,7 +1090,7 @@ function readCleanup(input: unknown, context: ParseContext): Parsed<readonly Cle
     const path = `$.cleanup[${index}]`;
     const head = peekRecord(entry, path, context.issues);
     if (head === INVALID) return INVALID;
-    const type = readOneOf(head['type'], `${path}.type`, context.issues, context.grammar.stepTypes, 'unknown_step');
+    const type = readOneOf(head['type'], `${path}.type`, context.issues, STEP_TYPES, 'unknown_step');
     if (type === INVALID) return INVALID;
     // Nothing inside a misplaced step is read.
     if (!CLEANUP_STEP_TYPES.includes(type)) { context.issues.push({ code: 'misplaced_step', path }); return INVALID; }
@@ -1111,7 +1103,7 @@ function readCleanup(input: unknown, context: ParseContext): Parsed<readonly Cle
 function readStep(input: unknown, path: string, context: ParseContext): Parsed<Step> {
   const head = peekRecord(input, path, context.issues);
   if (head === INVALID) return INVALID;
-  const type = readOneOf(head['type'], `${path}.type`, context.issues, context.grammar.stepTypes, 'unknown_step');
+  const type = readOneOf(head['type'], `${path}.type`, context.issues, STEP_TYPES, 'unknown_step');
   if (type === INVALID) return INVALID;
   // A second tab opens only from the plan's own list of steps, so a tab never holds another tab
   // and a frame never opens one. Nothing inside a misplaced tab is read.
@@ -1120,7 +1112,7 @@ function readStep(input: unknown, path: string, context: ParseContext): Parsed<S
   // so neither a frame nor a second tab may hold one.
   if (TOP_LEVEL_STEP_TYPES.includes(type) && !context.topLevel) { context.issues.push({ code: 'misplaced_step', path }); return INVALID; }
   if (!unsafeStepEnabled(type, head, path, context)) return INVALID;
-  const fields = context.grammar.stepFields[type];
+  const fields = STEP_FIELDS[type];
   // The criterion id is checked on its own below, so that a missing one is reported as vacuous.
   const required = fields.required.filter((field) => field !== CRITERION_FIELD);
   if (readRecord(input, path, context.issues, [...fields.required, ...fields.optional], required) === INVALID) return INVALID;
@@ -1161,7 +1153,7 @@ function readStep(input: unknown, path: string, context: ParseContext): Parsed<S
       return allValid(parts) ? { type, locator: parts[0], fixture: parts[1] } : INVALID;
     }
     case 'press': {
-      const parts = [locator(), readOneOf(head['key'], `${path}.key`, context.issues, context.grammar.keys)] as const;
+      const parts = [locator(), readOneOf(head['key'], `${path}.key`, context.issues, KEYS)] as const;
       if (!Object.hasOwn(head, 'modifiers')) return allValid(parts) ? { type, locator: parts[0], key: parts[1] } : INVALID;
       const modifiers = readModifiers(head['modifiers'], `${path}.modifiers`, context);
       return allValid(parts) && modifiers !== INVALID ? { type, locator: parts[0], key: parts[1], modifiers } : INVALID;
@@ -1271,13 +1263,13 @@ function readMeta(input: unknown, path: string, context: ParseContext): Parsed<P
 
 function readTargetIds(input: unknown, context: ParseContext): Parsed<readonly TargetId[]> {
   const { targetIds } = context.rules;
-  const raw = readList(input, '$.targets', context.issues, targetIds === 'any' ? 64 : Math.max(1, targetIds.length));
+  const raw = readList(input, '$.targets', context.issues, Math.max(1, targetIds.length));
   if (raw === INVALID) return INVALID;
   const ids = raw.map((value, index) => {
     const path = `$.targets[${index}]`;
     const targetId = readId<'TargetId'>(value, path, context.issues);
     if (targetId === INVALID) return INVALID;
-    if (targetIds !== 'any' && !targetIds.some((known) => known === targetId)) {
+    if (!targetIds.some((known) => known === targetId)) {
       context.issues.push({ code: 'target_not_in_matrix', path });
       return INVALID;
     }
@@ -1351,23 +1343,19 @@ function tooDeepFrame(input: unknown, maximumDepth: number): string | undefined 
 
 // Reads a plan under `rules`. Size and frame depth are checked first, so an oversized plan gets
 // one error, too_large, and nothing inside it is walked.
-export function readPlanData(input: unknown, rules: PlanRules): Result<PlanData, readonly PlanError[]> {
+function readPlanData(input: unknown, rules: PlanRules): Result<PlanData, readonly PlanError[]> {
   if (sizeInBytes(input) > rules.limits.maximumPlanBytes) return failure([{ code: 'too_large', path: '$' }]);
   const tooDeep = tooDeepFrame(input, rules.limits.maximumFrameDepth);
   if (tooDeep !== undefined) return failure([{ code: 'too_large', path: tooDeep }]);
-  // The declared version decides the grammar. A version this engine does not read is refused
-  // below; the current grammar reads the rest so every other problem is reported too.
-  const declaredGrammar = grammarFor(plainFields(input)?.['version']);
-  const grammar = declaredGrammar ?? CURRENT_GRAMMAR;
   const context: ParseContext = {
-    rules, issues: [], grammar, defined: new Set(), downloads: new Set(), topLevel: true, startedStubs: new Set(),
+    rules, issues: [], defined: new Set(), downloads: new Set(), topLevel: true, startedStubs: new Set(),
     clockAdvance: { milliseconds: 0, limitPassed: false },
   };
-  const fields = readRecord(input, '$', context.issues, [...PLAN_FIELDS, ...grammar.optionalPlanFields], PLAN_FIELDS);
+  const fields = readRecord(input, '$', context.issues, [...PLAN_FIELDS, ...OPTIONAL_PLAN_FIELDS], PLAN_FIELDS);
   if (fields === INVALID) return failure(context.issues);
-  // A plan for a newer language is refused outright: running it with the unknown parts skipped
-  // would turn a skipped check into a silent pass.
-  if (declaredGrammar === undefined) context.issues.push({ code: 'version_unsupported', path: '$.version' });
+  // Any other version is refused outright, with every other problem still reported: running a plan
+  // with the parts this parser does not know skipped would turn a skipped check into a silent pass.
+  if (fields['version'] !== CURRENT_PLAN_VERSION) context.issues.push({ code: 'version_unsupported', path: '$.version' });
   const meta = readMeta(fields['meta'], '$.meta', context);
   const targets = readTargetIds(fields['targets'], context);
   // The plan's values come before every step, so every step may use them.
@@ -1385,7 +1373,7 @@ export function readPlanData(input: unknown, rules: PlanRules): Result<PlanData,
     || values === INVALID || clock === INVALID || cleanup === INVALID) return failure(context.issues);
   // Optional fields are left out when absent, so a plan without them hashes as it always did.
   return success({
-    version: grammar.version, meta, targets, steps,
+    version: CURRENT_PLAN_VERSION, meta, targets, steps,
     ...(storageState === undefined ? {} : { storageState }),
     ...(values === undefined ? {} : { values }),
     ...(clock === undefined ? {} : { clock }),
@@ -1418,13 +1406,6 @@ export function planParser(project: Project | TrustedProject): (input: unknown) 
     return success(plan);
   };
 }
-
-// The rules the version 1 migration reads its output under: the language only, with the
-// project-independent defaults. Version 1 had no secrets, fixtures, frames or run values.
-export const languageOnlyRules = (limits: Limits): PlanRules => ({
-  origins: 'any', targetIds: 'any', secretNames: [], fixtures: [], limits, testIdAttributes: DEFAULT_TEST_ID_ATTRIBUTES, emailDomains: [],
-  calls: {}, stubs: {}, observedRequests: {}, storageEntries: {}, unsafeFeatures: [], pageScripts: {}, databaseCommands: {},
-});
 
 // The run-time half of the brand: the type system stops a forged Plan at compile time, but a cast
 // defeats it. run() calls this first, so an object the parser did not make is refused before any

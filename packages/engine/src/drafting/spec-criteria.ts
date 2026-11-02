@@ -13,7 +13,7 @@ const CRITERION_ITEM = /^\s*[-*]\s+([^\s:]+):\s+(\S.*)$/;
 // A criterion is one line of a spec, so a far longer one is not a criterion at all.
 const MAXIMUM_CRITERION_LENGTH = 2000;
 
-export type CriteriaError = { readonly code: 'no-criteria' };
+type CriteriaError = { readonly code: 'no-criteria' };
 
 export function extractCriteria(markdown: string): Result<readonly CriterionText[], CriteriaError> {
   const lines = markdown.split(/\r?\n/);

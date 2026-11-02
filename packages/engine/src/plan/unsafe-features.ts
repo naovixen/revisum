@@ -60,7 +60,7 @@ const listConstructs = (steps: readonly Step[], path: string): UnsafeConstruct[]
 
 // Every use of an unsafe feature in the plan, in document order: its steps, frames and second tabs
 // included, then its cleanup. Empty for a closed plan.
-export const unsafeConstructsOf = (plan: Plan): readonly UnsafeConstruct[] =>
+const unsafeConstructsOf = (plan: Plan): readonly UnsafeConstruct[] =>
   [...listConstructs(plan.steps, '$.steps'), ...listConstructs(plan.cleanup ?? [], '$.cleanup')];
 
 // The unsafe features the plan uses, each once, sorted. Empty for a closed plan. A plan whose only

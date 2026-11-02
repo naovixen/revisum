@@ -7,12 +7,12 @@ import type { ParameterType, SafeText } from '@revisum/contracts';
 // A value that fits its parameter: text, an integer or a boolean.
 export type ArgumentValue = SafeText | number | boolean;
 // Why a value does not fit: it is of another type, too long, or not one of the values allowed.
-export type ArgumentProblem = 'wrong_type' | 'too_long' | 'unknown_value';
+type ArgumentProblem = 'wrong_type' | 'too_long' | 'unknown_value';
 
 // A letter or "_", then up to 62 letters, digits or "_".
-export const IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]{0,62}$/;
+const IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]{0,62}$/;
 // A day written year, month and day, such as "2026-11-02".
-export const YEAR_MONTH_DAY = /^([0-9]{4})-([0-9]{2})-([0-9]{2})$/;
+const YEAR_MONTH_DAY = /^([0-9]{4})-([0-9]{2})-([0-9]{2})$/;
 // A local part, "@" and a domain of at least two labels, with no spaces. Deliberately loose:
 // it tells an address from other text, not a deliverable address from an undeliverable one.
 const EMAIL = /^[^\s@]{1,64}@[^\s@.]+(\.[^\s@.]+)+$/;
@@ -21,7 +21,7 @@ const MAXIMUM_EMAIL_LENGTH = 254;
 const DECIMAL_INTEGER = /^-?[0-9]{1,15}$/;
 
 // True for a real calendar day, so "2026-02-30" is refused.
-export function isCalendarDay(text: string): boolean {
+function isCalendarDay(text: string): boolean {
   const parts = YEAR_MONTH_DAY.exec(text);
   if (parts === null) return false;
   const [year, month, day] = [Number(parts[1]), Number(parts[2]), Number(parts[3])];

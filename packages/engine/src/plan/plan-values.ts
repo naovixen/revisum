@@ -12,7 +12,7 @@ import {
 } from './plan-grammar.ts';
 
 // Reads plan text under the parser's rules (safe text, no credential shapes).
-export type TextReader = (input: unknown, path: string, maximumLength: number) => Parsed<SafeText>;
+type TextReader = (input: unknown, path: string, maximumLength: number) => Parsed<SafeText>;
 
 // What the value decoders need from the parser: where to record errors, how it reads text, and
 // the email domains the trusted project declares.
@@ -29,7 +29,7 @@ export function readValueName(input: unknown, path: string, issues: Issues): Par
   return brand<string, 'ValueName'>(input);
 }
 
-export function readRelativeDay(input: unknown, path: string, issues: Issues): Parsed<RelativeDay> {
+function readRelativeDay(input: unknown, path: string, issues: Issues): Parsed<RelativeDay> {
   const fields = readRecord(input, path, issues, [FROM_FIELD, 'addDays']);
   if (fields === INVALID) return INVALID;
   const parts = [

@@ -5,7 +5,7 @@
 import type { DateAnchor, DateFormat, Locale, RelativeDay, TimeZone } from '@revisum/contracts';
 
 // A day on the calendar. month is 1 to 12.
-export type CalendarDay = { readonly year: number; readonly month: number; readonly day: number };
+type CalendarDay = { readonly year: number; readonly month: number; readonly day: number };
 type WallTime = CalendarDay & { readonly hour: number; readonly minute: number; readonly second: number };
 
 const MILLISECONDS_PER_SECOND = 1000;
@@ -49,7 +49,7 @@ export function instantOf(day: CalendarDay, hour: number, minute: number, timezo
   return asIfUtc - zoneOffset(firstGuess, timezone);
 }
 
-export function calendarDayAt(instant: number, timezone: TimeZone): CalendarDay {
+function calendarDayAt(instant: number, timezone: TimeZone): CalendarDay {
   const { year, month, day } = wallTimeAt(instant, timezone);
   return { year, month, day };
 }

@@ -2,18 +2,13 @@
 // its ids follow. The plan parser reads these tables to decode a plan, and planJsonSchema() reads
 // the same tables to build the published JSON Schema, so the two cannot drift apart.
 import {
-  DOM_CHECK_KINDS, DOWNLOAD_SIZE_KINDS, DOWNLOAD_TEXT_KINDS, ELEMENT_STATE_KINDS, ELEMENT_TEXT_KINDS, KEYS, LOCATOR_KINDS, PAGE_TEXT_KINDS,
-  PLAN_VERSION, REMEMBER_ATTRIBUTE_READ, REMEMBER_READS, STRUCTURAL_LOCATOR_KINDS,
-  type DatabaseCommandStep, type Key, type PageScriptStep, type StepType, type StructuralLocatorKind, type UnsafeFeature,
+  DOM_CHECK_KINDS, DOWNLOAD_SIZE_KINDS, DOWNLOAD_TEXT_KINDS, ELEMENT_STATE_KINDS, ELEMENT_TEXT_KINDS, LOCATOR_KINDS, PAGE_TEXT_KINDS,
+  PLAN_VERSION, STRUCTURAL_LOCATOR_KINDS,
+  type DatabaseCommandStep, type PageScriptStep, type StepType, type StructuralLocatorKind, type UnsafeFeature,
 } from '@revisum/contracts';
 
-// The version text a current plan declares, such as "1.3".
+// The one version text a plan may declare. Anything else is refused, so no plan partly runs.
 export const CURRENT_PLAN_VERSION: `${number}.${number}` = `${PLAN_VERSION.major}.${PLAN_VERSION.minor}`;
-// The closed language: everything but the unsafe features. Its plans still parse exactly as they
-// always did, and a plan that uses an unsafe feature must declare the current version.
-export const CLOSED_PLAN_VERSION = '1.2';
-// The version before the closed language, whose plans still parse exactly as they always did.
-export const PREVIOUS_PLAN_VERSION = '1.1';
 
 // The field every assertion step carries: the acceptance criterion it checks. A missing one makes
 // the assertion vacuous rather than merely incomplete, so the parser reports it as such.
@@ -24,9 +19,9 @@ export const CRITERION_FIELD = 'criterionId';
 // quotation mark for an import.
 export const FROM_FIELD = `from`;
 
-export type StepFields = { readonly required: readonly string[]; readonly optional: readonly string[] };
+type StepFields = { readonly required: readonly string[]; readonly optional: readonly string[] };
 
-// Every step's fields in the current language. `type` is always required; no other field is allowed.
+// Every step's fields. `type` is always required; no other field is allowed.
 export const STEP_FIELDS: { readonly [Type in StepType]: StepFields } = {
   navigate: { required: ['type', 'url'], optional: ['scripts'] },
   click: { required: ['type', 'locator'], optional: [] },
@@ -70,17 +65,12 @@ const NETWORK_AND_STORAGE_STEP_TYPES: readonly StepType[] = [
 ];
 // Advancing the run's virtual clock and checking the clipboard, which need no declaration.
 const CLOCK_AND_CLIPBOARD_STEP_TYPES: readonly StepType[] = ['advanceClock', 'expectClipboard'];
-// The unsafe features' steps, which only a plan declaring the current version may hold, and only
-// once its project enables their feature.
+// The unsafe features' steps, which a plan may hold only once its project enables their feature.
 export const UNSAFE_STEP_TYPES: readonly StepType[] = ['evaluate', 'expectScript', 'database', 'expectDatabase'];
 export const STEP_TYPES: readonly StepType[] = [
   'navigate', 'click', 'hover', 'fill', 'select', 'upload', 'press', 'frame', 'dialog', 'expect', 'expectPage', 'a11yAudit', 'capture',
   'remember', 'download', 'expectDownload', 'newTab', 'call', 'expectBackend', ...NETWORK_AND_STORAGE_STEP_TYPES, ...CLOCK_AND_CLIPBOARD_STEP_TYPES,
   ...UNSAFE_STEP_TYPES,
-];
-// The steps language 1.2 added, which a plan declaring "1.1" cannot use.
-const NEWER_STEP_TYPES: readonly StepType[] = [
-  'remember', 'download', 'expectDownload', 'newTab', 'call', 'expectBackend', ...NETWORK_AND_STORAGE_STEP_TYPES, ...CLOCK_AND_CLIPBOARD_STEP_TYPES,
 ];
 // The steps that check something. A plan needs at least one, or it would pass without proving
 // anything. A clock advance checks nothing.
@@ -89,7 +79,7 @@ export const ASSERTION_STEP_TYPES: readonly StepType[] = [
   'expectScript', 'expectDatabase',
 ];
 // The steps that call a declared service.
-export const SERVICE_CALL_STEP_TYPES: readonly StepType[] = ['call', 'expectBackend'];
+const SERVICE_CALL_STEP_TYPES: readonly StepType[] = ['call', 'expectBackend'];
 // Steps that set up or check the whole test, not act in a page: only the plan's own list of steps
 // may hold them, never a frame or a second tab.
 export const TOP_LEVEL_STEP_TYPES: readonly StepType[] = [...SERVICE_CALL_STEP_TYPES, 'database', 'expectDatabase'];
@@ -120,7 +110,7 @@ export const LOCATOR_FIELDS = {
   css: ['by', 'selector'],
   xpath: ['by', 'expression'],
 } as const;
-// The fields a locator may add in the current language.
+// The fields a locator may add.
 export const OPTIONAL_LOCATOR_FIELDS = {
   role: ['position'],
   label: ['position'],
@@ -130,7 +120,7 @@ export const OPTIONAL_LOCATOR_FIELDS = {
   xpath: ['hasText', 'inside', 'position'],
 } as const;
 export type LocatorKind = keyof typeof LOCATOR_FIELDS;
-// Every locator kind of the current language.
+// Every locator kind.
 export const ALL_LOCATOR_KINDS: readonly LocatorKind[] = [...LOCATOR_KINDS, ...STRUCTURAL_LOCATOR_KINDS];
 // How many `inside` links a css or XPath locator may chain: the fourth is refused.
 export const MAXIMUM_INSIDE_DEPTH = 3;
@@ -147,86 +137,8 @@ export const PLAN_FIELDS = ['version', 'meta', 'targets', 'steps'] as const;
 export const OPTIONAL_PLAN_FIELDS = ['storageState', 'values', 'clock', 'cleanup'] as const;
 export const META_FIELDS = ['featureId', 'specReference', 'title'] as const;
 export const PAGE_KINDS = [...PAGE_TEXT_KINDS, 'url', 'urlPathStartsWith', 'metaContent', 'canonicalUrl'] as const;
-// The element checks of the closed language, and every element check of the current one.
-export const ELEMENT_KINDS = [...ELEMENT_STATE_KINDS, ...ELEMENT_TEXT_KINDS, 'countEquals', 'hrefEquals'] as const;
-export const ALL_ELEMENT_KINDS = [...ELEMENT_KINDS, ...DOM_CHECK_KINDS] as const;
-// What a remember step may read from an element in the closed language, and in the current one.
-const CLOSED_ELEMENT_READS: readonly string[] = REMEMBER_READS;
-const ALL_ELEMENT_READS: readonly string[] = [...REMEMBER_READS, REMEMBER_ATTRIBUTE_READ];
+export const ELEMENT_KINDS = [...ELEMENT_STATE_KINDS, ...ELEMENT_TEXT_KINDS, 'countEquals', 'hrefEquals', ...DOM_CHECK_KINDS] as const;
 export const DOWNLOAD_KINDS = [...DOWNLOAD_TEXT_KINDS, 'mediaTypeEquals', ...DOWNLOAD_SIZE_KINDS] as const;
-// The 8 state checks of language 1.1 lead the list of state checks.
-const PREVIOUS_STATE_COUNT = 8;
-
-// What one language version allows. Each version is a subset of the next: a plan declaring "1.2"
-// is read with the unsafe features switched off, and one declaring "1.1" with everything 1.2 added
-// switched off too, so each is accepted or refused exactly as that version's parser would, with
-// the same codes and paths.
-export type Grammar = {
-  readonly version: `${number}.${number}`;
-  readonly stepTypes: readonly StepType[];
-  readonly stepFields: { readonly [Type in StepType]: StepFields };
-  readonly locatorKinds: readonly LocatorKind[];
-  readonly optionalLocatorFields: { readonly [Kind in LocatorKind]: readonly string[] };
-  readonly optionalPlanFields: readonly string[];
-  readonly keys: readonly Key[];
-  readonly elementKinds: readonly string[];
-  readonly pageKinds: readonly string[];
-  // What a remember step may read from an element.
-  readonly elementReads: readonly string[];
-  // Value references, multi-line fills and path templates: the object forms text may take.
-  readonly runValues: boolean;
-};
-
-// The 14 keys of language 1.1 lead the list of keys.
-const PREVIOUS_KEY_COUNT = 14;
-
-// Language 1.3: the closed language and the unsafe features, each usable only once the trusted
-// project enables it.
-export const CURRENT_GRAMMAR: Grammar = {
-  version: CURRENT_PLAN_VERSION,
-  stepTypes: STEP_TYPES,
-  stepFields: STEP_FIELDS,
-  locatorKinds: ALL_LOCATOR_KINDS,
-  optionalLocatorFields: OPTIONAL_LOCATOR_FIELDS,
-  optionalPlanFields: OPTIONAL_PLAN_FIELDS,
-  keys: KEYS,
-  elementKinds: ALL_ELEMENT_KINDS,
-  pageKinds: PAGE_KINDS,
-  elementReads: ALL_ELEMENT_READS,
-  runValues: true,
-};
-
-// Language 1.2, the closed language: everything but the unsafe features.
-export const CLOSED_GRAMMAR: Grammar = {
-  ...CURRENT_GRAMMAR,
-  version: CLOSED_PLAN_VERSION,
-  stepTypes: STEP_TYPES.filter((type) => !UNSAFE_STEP_TYPES.includes(type)),
-  locatorKinds: LOCATOR_KINDS,
-  elementKinds: ELEMENT_KINDS,
-  elementReads: CLOSED_ELEMENT_READS,
-};
-
-export const PREVIOUS_GRAMMAR: Grammar = {
-  version: PREVIOUS_PLAN_VERSION,
-  stepTypes: CLOSED_GRAMMAR.stepTypes.filter((type) => !NEWER_STEP_TYPES.includes(type)),
-  stepFields: {
-    ...STEP_FIELDS,
-    navigate: { required: STEP_FIELDS.navigate.required, optional: [] },
-    press: { required: STEP_FIELDS.press.required, optional: [] },
-  },
-  locatorKinds: LOCATOR_KINDS,
-  optionalLocatorFields: { role: [], label: [], text: [], testId: [], css: [], xpath: [] },
-  optionalPlanFields: ['storageState'],
-  keys: KEYS.slice(0, PREVIOUS_KEY_COUNT),
-  elementKinds: [...ELEMENT_STATE_KINDS.slice(0, PREVIOUS_STATE_COUNT), ...ELEMENT_TEXT_KINDS, 'countEquals'],
-  pageKinds: [...PAGE_TEXT_KINDS, 'url'],
-  elementReads: CLOSED_ELEMENT_READS,
-  runValues: false,
-};
-
-// The grammar for the version a plan declares, or undefined for a version this engine does not read.
-export const grammarFor = (version: unknown): Grammar | undefined =>
-  [CURRENT_GRAMMAR, CLOSED_GRAMMAR, PREVIOUS_GRAMMAR].find((grammar) => grammar.version === version);
 
 export const FEATURE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 export const CAPTURE_NAME = /^[a-z0-9][a-z0-9-]{0,63}$/;

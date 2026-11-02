@@ -85,4 +85,4 @@ The product name is Revisum (`revisum` for the repo, packages and CLI). It appea
 
 ## Provenance
 
-Seeded from the research repo `E:\core`. `seed-provenance.json` records the research commit and each seeded file's source hash; it is the only file that names that commit. The research itself is not part of this repo.
+Seeded from the research repo `E:\core`. The research itself is not part of this repo.

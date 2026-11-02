@@ -93,14 +93,14 @@ export function readServices(input: unknown, issues: Issues): Parsed<readonly De
 // ---- Calls ------------------------------------------------------------------------------------
 
 // What a declaration may refer to: the project's services and secret names.
-export type DeclarationContext = {
+type DeclarationContext = {
   readonly issues: Issues;
   readonly services: readonly DeclaredService[];
   readonly secretNames: readonly SecretName[];
 };
 
 // What a declared name must be: it matches `pattern` and, when given, passes `allowed`.
-export type DeclaredNameRule = { readonly pattern: RegExp; readonly allowed?: (name: string) => boolean };
+type DeclaredNameRule = { readonly pattern: RegExp; readonly allowed?: (name: string) => boolean };
 const DECLARED_NAME_RULE: DeclaredNameRule = { pattern: DECLARED_NAME };
 
 // A project section of named declarations, such as `calls`, `stubs` or a suite's `environment`,

@@ -22,12 +22,12 @@ type RequestPaused = { readonly request: { readonly url: string } };
 // popup is closed. A popup opened with no address asks for nothing and is closed after this wait.
 const POPUP_REQUEST_WAIT_MILLISECONDS = 1_000;
 
-export type WatchedPage = { readonly browserContextId: string; readonly targetId: string; readonly sessionId: string };
+type WatchedPage = { readonly browserContextId: string; readonly targetId: string; readonly sessionId: string };
 
 // A page the browser attached, still paused before it loads anything.
 export type AttachedPage = { readonly targetId: string; readonly sessionId: string };
 
-export type PageWatchOptions = {
+type PageWatchOptions = {
   // Told the address each held-back popup asked for.
   readonly onPopupRequest?: (url: string) => void;
   // True for the session's first page, which sets up what the whole browser context shares:

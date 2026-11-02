@@ -28,8 +28,8 @@ import { checkBackendField, fieldAt, fieldText } from '../service-calls/service-
 import { decodeScriptResult } from './page-script-result.ts';
 
 // A declared script's limits when its declaration sets none: 5 seconds and 256 KiB.
-export const DEFAULT_SCRIPT_TIMEOUT_MILLISECONDS = 5000;
-export const DEFAULT_MAXIMUM_SCRIPT_RESULT_BYTES = 256 * 1024;
+const DEFAULT_SCRIPT_TIMEOUT_MILLISECONDS = 5000;
+const DEFAULT_MAXIMUM_SCRIPT_RESULT_BYTES = 256 * 1024;
 // How long a script check waits between two runs of its script.
 const SCRIPT_CHECK_INTERVAL_MILLISECONDS = 100;
 
@@ -54,7 +54,7 @@ type RememberedRecord = { readonly valueName: ValueName; readonly sha256: string
 // What one of these steps gives its step result. An evaluate that remembers one value records it
 // as `remembered`, as a remember step does; one that remembers several records them all in
 // `rememberedValues`, in the order the plan names them.
-export type PageScriptOutcome = {
+type PageScriptOutcome = {
   readonly outcome: 'passed' | 'failed';
   readonly code?: string;
   readonly pageScript?: PageScriptRecord;

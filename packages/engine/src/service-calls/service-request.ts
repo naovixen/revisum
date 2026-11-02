@@ -15,8 +15,8 @@ import { argumentProblem, argumentText, runValueArgument, type ArgumentValue } f
 export type RequestBuildError = 'parameter-invalid' | 'secret-missing';
 
 // What a declaration that sets no limits of its own gets: 10 s and 1 MiB.
-export const DEFAULT_CALL_TIMEOUT_MILLISECONDS = 10_000;
-export const DEFAULT_MAXIMUM_RESPONSE_BYTES = 1024 * 1024;
+const DEFAULT_CALL_TIMEOUT_MILLISECONDS = 10_000;
+const DEFAULT_MAXIMUM_RESPONSE_BYTES = 1024 * 1024;
 
 // A "{name}" placeholder in a path segment or an interpolated string.
 const PLACEHOLDER = /\{([^{}]*)\}/g;

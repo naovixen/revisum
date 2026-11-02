@@ -29,7 +29,7 @@ const MEGABYTE = 1024 * 1024;
 
 // The sign-up plan the driver contract runs, without its captures, on the headless shell.
 const SIGNUP_PLAN = {
-  version: '1.1',
+  version: '1.3',
   meta: { featureId: 'SIGNUP-1', specReference: 'specs/signup.md#happy-path', title: 'Sign-up happy path' },
   targets: [TARGET_ID],
   steps: [

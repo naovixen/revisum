@@ -3,7 +3,7 @@
 import type { AgentLockdown, AgentLockdownAction } from '@revisum/contracts';
 import { INVALID, allValid, readList, readOneOf, readRecord, type Issues, type Parsed } from '../plan/plan-decoders.ts';
 
-export type SigningKey = { readonly keyId: string; readonly publicKey: string };
+type SigningKey = { readonly keyId: string; readonly publicKey: string };
 export type ApproversFile = { readonly agentLockdown: AgentLockdown | null; readonly signingKeys: readonly SigningKey[] };
 
 const LOCKDOWN_ACTIONS: readonly AgentLockdownAction[] = ['commit', 'push', 'merge', 'approve-pull-request'];

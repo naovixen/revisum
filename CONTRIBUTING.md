@@ -82,7 +82,7 @@ A spec is done when all of these hold:
 | `npm run check` | Everything below, in order. Must be green before you finish |
 | `npm run check:linux` | `npm run check` on CI's pinned Linux image, in Docker. Needs Docker Desktop running |
 | `npm run typecheck` | `tsc --build` over every package and `tools/`. A wrong-way import between packages fails here |
-| `npm run lint` | Checks that read only files: licences and roles, folder layout, imports, dependency reviews, the cost record, the seed record, research links, deny rules and the glossary |
+| `npm run lint` | Checks that read only files: licences and roles, folder layout, imports, dependency reviews, deny rules and the glossary |
 | `npm run lint:code` | ESLint's code rules, straight after `npm run lint`. Its config and local rules are in `tools/eslint/`; code that predates them is baselined in `eslint-suppressions.json` |
 | `npm run format` | Prettier over packages, tools and tests |
 | `npm run lint:names` | The naming lint's self-test, then the naming lint over the repository |
@@ -90,7 +90,6 @@ A spec is done when all of these hold:
 | `npm run proofs` | Hostile plans, secret leaks, egress, PII and audit-chain proofs (`test/proofs/`) |
 | `npm run replay` | Golden runs replayed and compared by hash (`test/replay/`) |
 | `npm run gates` | After the tests: the project's metrics and trace index from commit trailers and test results, and the guarantee map. CI runs it even when a test failed |
-| `npm run cost-report` | The month's declared hosted costs; fails over USD 5 at zero customers |
 | `npm test -w <package>` | Tests for one package, once it has a `test` script |
 
 ## Code rules

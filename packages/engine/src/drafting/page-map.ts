@@ -16,7 +16,7 @@ import { canonicalJson, sha256 } from '../hashing.ts';
 
 // The roles a page map keeps. A node of any other role is dropped and its kept descendants take
 // its place, in order.
-export const PAGE_MAP_ROLES: readonly string[] = [
+const PAGE_MAP_ROLES: readonly string[] = [
   'banner', 'main', 'navigation', 'contentinfo', 'complementary', 'region', 'search', 'form', 'heading', 'link', 'button', 'textbox',
   'searchbox', 'checkbox', 'radio', 'combobox', 'listbox', 'option', 'slider', 'spinbutton', 'switch', 'list', 'listitem', 'table',
   'row', 'cell', 'columnheader', 'rowheader', 'dialog', 'alertdialog', 'tab', 'tablist', 'tabpanel', 'menu', 'menubar', 'menuitem',
@@ -76,7 +76,7 @@ export const pageMapReference = (text: string): string => `sha256:${sha256(new T
 // ---- Decoding a page map from outside --------------------------------------------------------------
 
 // Why a page map from outside was refused: the JSON path of the first field that is wrong.
-export type PageMapDecodeError = { readonly code: 'page-map-invalid'; readonly path: string };
+type PageMapDecodeError = { readonly code: 'page-map-invalid'; readonly path: string };
 
 const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);

@@ -32,7 +32,7 @@ import { checkBackendField, fieldAt, fieldText } from '../service-calls/service-
 
 // A declared command's limits when its declaration sets none: 60 seconds and 1 MiB.
 export const DEFAULT_COMMAND_TIMEOUT_MILLISECONDS = 60_000;
-export const DEFAULT_MAXIMUM_COMMAND_OUTPUT_BYTES = 1024 * 1024;
+const DEFAULT_MAXIMUM_COMMAND_OUTPUT_BYTES = 1024 * 1024;
 // How long a database check waits between two runs of its command.
 const COMMAND_CHECK_INTERVAL_MILLISECONDS = 250;
 // The argument that, by common convention, ends a program's options: what follows is never one.
@@ -66,7 +66,7 @@ type RememberedRecord = { readonly valueName: ValueName; readonly sha256: string
 
 // What one of these steps gives its step result. A step that remembers one value records it as
 // `remembered`; one that remembers several records them all in `rememberedValues`.
-export type DatabaseStepOutcome = {
+type DatabaseStepOutcome = {
   readonly outcome: 'passed' | 'failed';
   readonly code?: DatabaseStepCode;
   readonly databaseCommand?: DatabaseCommandRecord;

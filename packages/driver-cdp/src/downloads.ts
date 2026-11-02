@@ -63,7 +63,7 @@ function decodeResponse(event: unknown): { readonly url: string; readonly mediaT
 
 // The server's suggested name as text only: no path separator or control character survives, so
 // it can be compared but could never lead anywhere if someone did use it as a path.
-export function downloadFileName(suggested: string): string {
+function downloadFileName(suggested: string): string {
   const replaced = suggested.replace(/[\\/\u0000-\u001f\u007f]/g, '_').slice(0, LONGEST_FILE_NAME);
   return replaced === '' ? 'download' : replaced;
 }

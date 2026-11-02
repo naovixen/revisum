@@ -10,8 +10,7 @@
 import type { DraftRequest } from '@revisum/contracts';
 import { canonicalJson } from '../hashing.ts';
 
-// The readable plan grammar's version. It stays "v1" until the readable format's first release;
-// the plan 1.2 and 1.3 forms are part of v1.
+// The readable plan grammar's version. It stays "v1" until the readable format's first release.
 export const READABLE_GRAMMAR_VERSION = 'v1';
 
 // The two texts every wire format carries: the instructions, sent as the system text, and the
@@ -22,7 +21,7 @@ const READABLE_SYNTAX = [
   'Plan: <title>                                  header, required',
   'Feature: <feature id>                          header, required',
   'Spec: <spec reference>                         header, required',
-  'Version: 1.1                                   header, required',
+  'Version: 1.3                                   header, required',
   'Targets: <target>[, <target>]                  header, required',
   'Criterion: <criterion id>                      sets the criterion id of the Expect lines that follow',
   'Go to <absolute url | /path>',

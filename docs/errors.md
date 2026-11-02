@@ -73,7 +73,7 @@ Plan error. A target is listed twice, two capture steps share a name, a run valu
 
 ## version_unsupported
 
-Plan error. The plan's `version` is not one this engine reads. A current plan declares `"1.2"`, and a plan declaring `"1.1"` still parses exactly as it did. A version 1 plan is accepted only through `migratePlan`, which adds a criterion id to each assertion; a plan for a newer version is refused rather than run with parts skipped.
+Plan error. The plan's `version` is not the one this engine reads. A plan declares `"1.3"`; any other version, older or newer, is refused rather than run with parts skipped, and nothing migrates a plan to it.
 
 ## empty
 
@@ -121,11 +121,7 @@ Project error. An evidence-mode suite's `paths` entry or `workingDirectory` is a
 
 ## unsafe_feature_disabled
 
-Plan error. A plan declaring `"1.3"` uses an unsafe feature its trusted `project.json` does not enable: a CSS or XPath locator (reported at the locator's `by`), a DOM check (at the assertion's `kind`, or a `remember` source's `read`), a named page script or a database command (at the step's `type`), or an inline script (at its `script.inline`). Every use is reported, and nothing under it is read or echoed. A person turns a feature on under `unsafeFeatures` in `project.json` on the protected branch; a change that turns one on in its own `project.json` runs without it until the change is approved and merged. Inline scripts need `pageScripts.allowInline: true` too. Runs using any unsafe feature are labelled unsafe and never count as verified evidence.
-
-## no_criterion_id
-
-Migration error. A version 1 plan has an assertion with no entry in the criterion mapping, so the migration cannot say which acceptance criterion it checks. Add the criterion id to the mapping, keyed by the assertion step's JSON path, such as `$.steps[3]`.
+Plan error. A plan uses an unsafe feature its trusted `project.json` does not enable: a CSS or XPath locator (reported at the locator's `by`), a DOM check (at the assertion's `kind`, or a `remember` source's `read`), a named page script or a database command (at the step's `type`), or an inline script (at its `script.inline`). Every use is reported, and nothing under it is read or echoed. A person turns a feature on under `unsafeFeatures` in `project.json` on the protected branch; a change that turns one on in its own `project.json` runs without it until the change is approved and merged. Inline scripts need `pageScripts.allowInline: true` too. Runs using any unsafe feature are labelled unsafe and never count as verified evidence.
 
 ## unknown-statement
 

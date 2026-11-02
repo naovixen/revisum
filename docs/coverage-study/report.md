@@ -1,5 +1,7 @@
 # Coverage study
 
+The tool that produced this, `tools/coverage-study.ts`, was removed on 2026-11-02. It is in git history.
+
 ## Sample
 
 - Date: 2026-10-29. Plan language 1.3, with each suite's project enabling only the unsafe features its expressible intents need. Files read at the pinned commit linked from each intent. See `rerun-1.3.md` for what changed, and `rerun-1.2.md` for the closed-language re-run.

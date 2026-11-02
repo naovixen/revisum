@@ -11,7 +11,7 @@
 // gives no new power, since a page could already replace its own Date and timers.
 
 // Removes animation, transitions and caret blink.
-export const NO_MOTION_CSS =
+const NO_MOTION_CSS =
   '*,*::before,*::after{animation:none!important;transition:none!important;caret-color:transparent!important;scroll-behavior:auto!important}';
 
 // The name, given to Symbol.for, of the window property that holds the advance controller.

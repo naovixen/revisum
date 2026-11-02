@@ -82,7 +82,7 @@ export type ProjectPolicy = {
   // Production origins are denied to every plan unless this is true, and then only to approved plans.
   readonly allowProductionForApprovedPlans: boolean;
 };
-export const DEFAULT_POLICY: ProjectPolicy = {
+const DEFAULT_POLICY: ProjectPolicy = {
   irreversiblePatterns: {}, allowedIrreversibleNames: [], destructiveUrlPatterns: [], unnamedControlsAllowedByTestId: [],
   allowProductionForApprovedPlans: false,
 };
@@ -93,7 +93,7 @@ export type EvidenceSettings = {
   // a download's name, media type, size and sha256 are always kept.
   readonly keepDownloads: boolean;
 };
-export const DEFAULT_EVIDENCE: EvidenceSettings = { keepDownloads: false };
+const DEFAULT_EVIDENCE: EvidenceSettings = { keepDownloads: false };
 
 // How runs of this project can be replayed.
 export type ReplaySettings = {
@@ -155,7 +155,6 @@ const EMAIL_DOMAIN = /^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]
 const DEFAULT_EMAIL_DOMAIN = 'example.com';
 // What a project that declares no test-id attributes allows, and what a testId locator without
 // an attribute matches.
-export const DEFAULT_TEST_ID_ATTRIBUTES: readonly TestIdAttribute[] = [brand<string, 'TestIdAttribute'>(DEFAULT_TEST_ID_ATTRIBUTE)];
 
 // A lowercase id such as a target or adapter id.
 export function readId<Name extends string>(input: unknown, path: string, issues: Issues): Parsed<Brand<string, Name>> {
@@ -174,7 +173,7 @@ export function readOrigin(input: unknown, path: string, issues: Issues): Parsed
   return brand<string, 'Origin'>(input);
 }
 
-export function readLocale(input: unknown, path: string, issues: Issues): Parsed<Locale> {
+function readLocale(input: unknown, path: string, issues: Issues): Parsed<Locale> {
   if (typeof input !== 'string') { issues.push({ code: 'wrong_type', path }); return INVALID; }
   try {
     if (Intl.getCanonicalLocales(input)[0] === input) return brand<string, 'Locale'>(input);

@@ -9,7 +9,7 @@ The coverage study's remaining gaps are the escape hatches the closed language l
 - **In:**
   - **Version 1.3.** This spec owns the bump of `PLAN_VERSION` to 1.3, the schema regeneration and a "1.3 (unreleased)" changelog entry. Before opening it, the first commit dates the "1.2 (unreleased)" entry, because every 1.2 parser part has landed (SPEC-30 to SPEC-34).
     - 1.3 is 1.2 plus the features below and nothing else.
-    - A plan declaring `"1.2"` or `"1.1"` parses exactly as before. An unsafe feature in it is refused with the code that version's parser gives (`unknown_value`, `unknown_field` or `unknown_step`).
+    - Changed by the founder, 2026-11-02: `"1.3"` is the only version a plan may declare, and any other is refused with `version_unsupported`. An unsafe feature is gated only by the trusted project.
     - **Why 1.3 and not 1.2:** 1.2 is the closed language the coverage study measured, and its share must stay comparable. Its features are all parsed and its entry is ready to date. The unsafe features are a different kind of addition, opt-in and weaker. A separate version keeps "1.2" meaning "closed" in every changelog, schema and study report. It also lets a reader see at a glance that a plan below 1.3 can't hold one.
   - **Six features**, each off unless the trusted `project.json` enables it under `unsafeFeatures`:
     1. `css-locator`: `{ "by": "css", "selector" }`;
@@ -78,7 +78,7 @@ The coverage study's remaining gaps are the escape hatches the closed language l
 
 ```ts
 // contracts. Plan 1.3 additions; shapes not shown are as in plan 1.2 (SPEC-30 to SPEC-34).
-export const PLAN_VERSION = { major: 1, minor: 3 } as const;       // "1.2" and "1.1" plans parse unchanged
+export const PLAN_VERSION = { major: 1, minor: 3 } as const;       // the only version a plan may declare
 
 export const UNSAFE_FEATURES = ['css-locator', 'xpath-locator', 'dom-checks', 'page-script',
   'inline-page-script', 'database-command'] as const;
@@ -195,8 +195,8 @@ export function unsafeFeaturesOf(plan: Plan): readonly UnsafeFeature[];   // sor
 ## Acceptance criteria
 
 - AC-SPEC-36-01: When a plan declaring `"1.3"` uses a feature its project does not enable, the parser shall refuse it with `unsafe_feature_disabled` at every path where a disabled feature appears, echo no value and make zero driver, script or command calls (oracle: specified; one hostile plan per feature, and one using all six).
-- AC-SPEC-36-02: When a plan declaring `"1.2"` or `"1.1"` uses any 1.3 feature, it shall be refused with the code and path that version's parser gives, even when the project enables the feature (oracle: regression; extends AC-SPEC-30-01).
-- AC-SPEC-36-03: When a project enables no unsafe feature, every 1.1 and 1.2 golden plan shall parse to the same `Plan`, and every golden run, report and replay hash shall be byte-identical to before this spec (oracle: regression).
+- AC-SPEC-36-02: Withdrawn. Changed by the founder, 2026-11-02: a plan declaring `"1.2"` or `"1.1"` is refused with `version_unsupported`.
+- AC-SPEC-36-03: When a project enables no unsafe feature, every golden plan in `golden/plans/` shall parse to the same `Plan`, and every golden run, report and replay hash shall be byte-identical to the recorded one (oracle: regression). Changed by the founder, 2026-11-02: the recorded hashes were reset once when the plans moved to `"1.3"`.
 - AC-SPEC-36-04: When the change under test adds or widens `unsafeFeatures`, or edits a script under `plans/scripts/`, the run shall use the protected-branch versions and raise `changed-with-code` naming each file. A plan in that change using the new feature shall be refused with `unsafe_feature_disabled` (oracle: specified; hostile fixture repository; extends AC-SPEC-02-02).
 - AC-SPEC-36-05: When a CSS or XPath locator holds a value reference, a line break, `{`, `}`, `;` or `@`, more than 512 characters, or an `inside` chain deeper than 3, the parser shall refuse it with `wrong_type`, `unsafe_text`, `too_long` or `too_large` and its path (oracle: specified).
 - AC-SPEC-36-06: When a CSS or XPath locator resolves an element for an action, the runtime guard shall judge it as any other (oracle: specified; extends AC-SPEC-03-01 and AC-SPEC-03-10):
@@ -214,7 +214,7 @@ export function unsafeFeaturesOf(plan: Plan): readonly UnsafeFeature[];   // sor
 - AC-SPEC-36-16: When a run uses any unsafe feature, it shall carry the `unsafe` label and the features it used on every output (oracle: specified). The outputs are result JSON, JUnit, SARIF, job summary, report banner, PR comment verdict line and manifest. Its guarantee statement shall have level `host` and list exactly the lost guarantees in this spec's table. The claim lint shall fail a template that applies "verified" or "closed language" to such a run.
 - AC-SPEC-36-17: When a plan's unsafe features or a declaration it uses change, the manifest hash shall change. That covers adding a feature, one byte of a named script's source, or a command's argument vector. Two runs of one plan shall carry the same features and guarantee statement (oracle: metamorphic; extends AC-SPEC-08-02).
 - AC-SPEC-36-18: When a fixture history mixes closed and unsafe runs, `verifiedWithoutReviewShare`, `tracedCriteriaShare` and `levelAt` shall be computed over the closed runs only, and the unsafe runs' counts shall be reported beside them (oracle: specified).
-- AC-SPEC-36-19: When the coverage study runs, it shall report the closed-language share and the "1.3 with unsafe features" share side by side, overall and per sample (oracle: specified; extends AC-SPEC-01-01). Every intent counted by the second share shall have a 1.3 plan that parses under its suite's project. The kill-criterion line shall use the closed share.
+- AC-SPEC-36-19: When the coverage study runs, it shall report the closed-language share and the "1.3 with unsafe features" share side by side, overall and per sample (oracle: specified; extends AC-SPEC-01-01). Every intent counted by the second share shall have a 1.3 plan that parses under its suite's project. The kill-criterion line shall use the closed share. Changed by the founder, 2026-11-02: met and recorded in `docs/coverage-study/rerun-1.3.md`; the tool is removed.
 - AC-SPEC-36-20: When `contracts`, `engine`, `runner` and the drivers are built, none shall gain a runtime dependency (oracle: specified). `reveal`'s allow-list shall gain only runner's workload-environment module, and no driver module shall pass a `Secret` to a page script.
 
 ## Dependencies

@@ -38,7 +38,7 @@ export type HeldRequest = {
   readonly responseErrorReason?: string;
 };
 // What a stub answers a held request with, as Fetch.fulfillRequest takes it.
-export type StubbedResponse = {
+type StubbedResponse = {
   readonly responseCode: number;
   readonly responseHeaders: readonly { readonly name: string; readonly value: string }[];
   readonly body: string;
@@ -52,7 +52,7 @@ const pause = (milliseconds: number): Promise<void> => new Promise((resolve) => 
 
 // True when the request is one the matcher names: the same origin and method, and the same path,
 // exactly or as a prefix, without the query.
-export function matchesRequest(matcher: RequestMatcher, method: string, url: string): boolean {
+function matchesRequest(matcher: RequestMatcher, method: string, url: string): boolean {
   let parsed: URL;
   try { parsed = new URL(url); } catch { return false; }
   if (parsed.origin !== matcher.origin || method.toUpperCase() !== matcher.method) return false;
@@ -90,7 +90,7 @@ type PendingExchange = {
   readonly observers: readonly { readonly observation: Observation; readonly generation: number }[];
 };
 
-export type BrowserNetworkOptions = {
+type BrowserNetworkOptions = {
   // The bytes of a declared fixture from the project's fixtures folder, never from outside it.
   readonly readFixture: (fixture: string) => Result<Uint8Array, DriverError>;
   // Told the Network domain's id of each request a stub answered inside the browser.

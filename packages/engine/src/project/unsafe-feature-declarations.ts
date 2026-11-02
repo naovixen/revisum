@@ -20,7 +20,7 @@ import { readDeclarationSection, readFields, readParameters } from './call-decla
 import { readEnvironmentVariables, readImageDigest } from './evidence-declarations.ts';
 
 // What the section may refer to: the project's services and secret names.
-export type UnsafeFeaturesContext = {
+type UnsafeFeaturesContext = {
   readonly issues: Issues;
   readonly services: readonly DeclaredService[];
   readonly secretNames: readonly SecretName[];

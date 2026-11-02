@@ -31,14 +31,14 @@ function variants(key: string, forms: Readonly<Record<string, readonly RecordPar
 
 // Page-facing text: quoted text, or a reference to a run value. The parser decides where a
 // reference may stand.
-export const TEXT = choice(QUOTED, REFERENCE);
+const TEXT = choice(QUOTED, REFERENCE);
 
 // Several lines of text, as a multi-line fill or an expected clipboard text.
 const LINES = record([words('lines'), field('lines', list(TEXT))]);
 
 // Header text, for Plan: and Spec:, is the rest of the line as it stands. Text that starts or ends
 // with white space, or starts with a quote, is written quoted instead, so it reads back exactly.
-export const HEADER_TEXT: Syntax = {
+const HEADER_TEXT: Syntax = {
   read(line, index) {
     const start = skipSpaces(line, index);
     if (line[start] === '"') return QUOTED.read(line, start);
@@ -110,7 +110,7 @@ const holdsStructuralLocator = (locator: unknown): boolean =>
 
 // Only a css or XPath locator has an `inside`, so `inside` after a role, label, text or test-id
 // locator is bad-locator, at that word, rather than an unknown statement.
-export const LOCATOR: Syntax = {
+const LOCATOR: Syntax = {
   read(line, index) {
     const reading = ANY_LOCATOR.read(line, index);
     if (!reading.ok || holdsStructuralLocator(reading.value)) return reading;
@@ -403,7 +403,7 @@ export type StatementBlock = 'steps' | 'source';
 // A step statement: the step type it reads, its syntax as a whole line (without the ":" that opens
 // a block), and the block it opens, if any. A step type may have several, such as a named and an
 // inline page script.
-export type StepStatement = { readonly type: StepType; readonly syntax: Syntax; readonly opens: StatementBlock | undefined };
+type StepStatement = { readonly type: StepType; readonly syntax: Syntax; readonly opens: StatementBlock | undefined };
 
 const opensSteps = (type: StepType): boolean => STEP_FIELDS[type].required.includes('steps');
 
@@ -443,7 +443,7 @@ export const CLEANUP_LINE = record([words('Clean up:'), END]);
 
 // A header: its name, where its value goes in the plan's JSON, and the syntax of that value. A
 // header with no path is read but never written: Origin: only resolves paths in Go to lines.
-export type Header = { readonly name: string; readonly path: readonly string[] | null; readonly required: boolean; readonly line: Syntax };
+type Header = { readonly name: string; readonly path: readonly string[] | null; readonly required: boolean; readonly line: Syntax };
 const header = (name: string, path: readonly string[] | null, value: Syntax, required = false): Header =>
   ({ name, path, required, line: record([words(name), field('value', value), END]) });
 

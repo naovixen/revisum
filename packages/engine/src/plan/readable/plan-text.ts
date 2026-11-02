@@ -300,7 +300,7 @@ const valueAt = (value: unknown, path: readonly string[]): unknown =>
   path.reduce<unknown>((holder, key) => (isRecord(holder) ? holder[key] : undefined), value);
 
 // Why a plan has no readable text: it holds a construct the readable format has no form for, at
-// that construct's path, so it stays JSON. Every construct of plan language 1.3 has a form, so no
+// that construct's path, so it stays JSON. Every construct of the plan language has a form, so no
 // plan gets this today; it is kept for a construct that reaches the language before its form does.
 export type NoReadableForm = { readonly code: Extract<TextErrorCode, 'no-readable-form'>; readonly path: string };
 

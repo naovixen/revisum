@@ -711,14 +711,6 @@
       "count": 1
     }
   },
-  "packages/engine/src/coverage-study.ts": {
-    "curly": {
-      "count": 11
-    },
-    "revisum/file-name-matches-export": {
-      "count": 1
-    }
-  },
   "packages/engine/src/database-commands/database-command-steps.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 1
@@ -893,10 +885,10 @@
   },
   "packages/engine/src/lifecycle.ts": {
     "@typescript-eslint/naming-convention": {
-      "count": 3
+      "count": 2
     },
     "@typescript-eslint/no-unused-vars": {
-      "count": 3
+      "count": 2
     },
     "revisum/file-name-matches-export": {
       "count": 1
@@ -1022,14 +1014,6 @@
     }
   },
   "packages/engine/src/plan/plan-json.ts": {
-    "revisum/file-name-matches-export": {
-      "count": 1
-    }
-  },
-  "packages/engine/src/plan/plan-migration.ts": {
-    "curly": {
-      "count": 5
-    },
     "revisum/file-name-matches-export": {
       "count": 1
     }
@@ -2508,20 +2492,6 @@
       "count": 12
     }
   },
-  "test/proofs/branch-gates.test.ts": {
-    "@typescript-eslint/naming-convention": {
-      "count": 1
-    },
-    "curly": {
-      "count": 2
-    },
-    "revisum/file-name-matches-export": {
-      "count": 1
-    },
-    "revisum/test-title-format": {
-      "count": 13
-    }
-  },
   "test/proofs/browser-upkeep.test.ts": {
     "@typescript-eslint/strict-boolean-expressions": {
       "count": 1
@@ -2589,31 +2559,6 @@
     },
     "revisum/file-name-matches-export": {
       "count": 1
-    }
-  },
-  "test/proofs/cost-report.test.ts": {
-    "@typescript-eslint/no-unsafe-assignment": {
-      "count": 3
-    },
-    "revisum/file-name-matches-export": {
-      "count": 1
-    },
-    "revisum/test-title-format": {
-      "count": 7
-    }
-  },
-  "test/proofs/coverage-study-kill-criterion.test.ts": {
-    "@typescript-eslint/naming-convention": {
-      "count": 1
-    },
-    "@typescript-eslint/no-unsafe-return": {
-      "count": 1
-    },
-    "revisum/file-name-matches-export": {
-      "count": 1
-    },
-    "revisum/test-title-format": {
-      "count": 3
     }
   },
   "test/proofs/database-command-dependencies.test.ts": {
@@ -2869,7 +2814,7 @@
       "count": 1
     },
     "revisum/test-title-format": {
-      "count": 8
+      "count": 7
     }
   },
   "test/proofs/plan-schema-newer-version.test.ts": {
@@ -2889,7 +2834,7 @@
       "count": 1
     },
     "revisum/test-title-format": {
-      "count": 8
+      "count": 6
     }
   },
   "test/proofs/plan-schema-page-checks.test.ts": {
@@ -2925,7 +2870,7 @@
       "count": 1
     },
     "revisum/test-title-format": {
-      "count": 3
+      "count": 2
     }
   },
   "test/proofs/policy-brand-and-audit-guarantees.test.ts": {
@@ -2984,20 +2929,6 @@
     },
     "revisum/test-title-format": {
       "count": 2
-    }
-  },
-  "test/proofs/research-links-lint.test.ts": {
-    "@typescript-eslint/no-unsafe-assignment": {
-      "count": 1
-    },
-    "@typescript-eslint/no-unsafe-member-access": {
-      "count": 1
-    },
-    "revisum/file-name-matches-export": {
-      "count": 1
-    },
-    "revisum/test-title-format": {
-      "count": 9
     }
   },
   "test/proofs/run-guarantees.test.ts": {
@@ -3129,31 +3060,6 @@
     },
     "revisum/test-title-format": {
       "count": 5
-    }
-  },
-  "test/proofs/seed-from-research.test.ts": {
-    "@typescript-eslint/naming-convention": {
-      "count": 1
-    },
-    "@typescript-eslint/no-unsafe-assignment": {
-      "count": 1
-    },
-    "revisum/file-name-matches-export": {
-      "count": 1
-    },
-    "revisum/test-title-format": {
-      "count": 4
-    }
-  },
-  "test/proofs/seed-provenance-lint.test.ts": {
-    "curly": {
-      "count": 3
-    },
-    "revisum/file-name-matches-export": {
-      "count": 1
-    },
-    "revisum/test-title-format": {
-      "count": 6
     }
   },
   "test/proofs/service-call-isolation.test.ts": {
@@ -3673,7 +3579,7 @@
       "count": 1
     },
     "revisum/test-title-format": {
-      "count": 26
+      "count": 24
     }
   },
   "test/unit/engine/code-owner-approval.test.ts": {
@@ -3696,45 +3602,6 @@
     },
     "revisum/test-title-format": {
       "count": 7
-    }
-  },
-  "test/unit/engine/coverage-study-suites.test.ts": {
-    "@typescript-eslint/no-unsafe-return": {
-      "count": 1
-    },
-    "revisum/file-name-matches-export": {
-      "count": 1
-    },
-    "revisum/test-title-format": {
-      "count": 10
-    }
-  },
-  "test/unit/engine/coverage-study-unsafe-features.test.ts": {
-    "@typescript-eslint/naming-convention": {
-      "count": 2
-    },
-    "@typescript-eslint/no-unsafe-return": {
-      "count": 1
-    },
-    "revisum/file-name-matches-export": {
-      "count": 1
-    },
-    "revisum/test-title-format": {
-      "count": 6
-    }
-  },
-  "test/unit/engine/coverage-study.test.ts": {
-    "@typescript-eslint/no-unsafe-return": {
-      "count": 1
-    },
-    "curly": {
-      "count": 1
-    },
-    "revisum/file-name-matches-export": {
-      "count": 1
-    },
-    "revisum/test-title-format": {
-      "count": 14
     }
   },
   "test/unit/engine/database-command-arguments.test.ts": {
@@ -4030,14 +3897,6 @@
       "count": 42
     }
   },
-  "test/unit/engine/page-checks-previous-version.test.ts": {
-    "revisum/file-name-matches-export": {
-      "count": 1
-    },
-    "revisum/test-title-format": {
-      "count": 3
-    }
-  },
   "test/unit/engine/page-map-entry.test.ts": {
     "curly": {
       "count": 2
@@ -4147,23 +4006,6 @@
       "count": 9
     }
   },
-  "test/unit/engine/plan-migration.test.ts": {
-    "@typescript-eslint/naming-convention": {
-      "count": 1
-    },
-    "@typescript-eslint/no-unused-vars": {
-      "count": 1
-    },
-    "curly": {
-      "count": 3
-    },
-    "revisum/file-name-matches-export": {
-      "count": 1
-    },
-    "revisum/test-title-format": {
-      "count": 12
-    }
-  },
   "test/unit/engine/plan-references.test.ts": {
     "revisum/file-name-matches-export": {
       "count": 1
@@ -4181,14 +4023,6 @@
     },
     "revisum/test-title-format": {
       "count": 14
-    }
-  },
-  "test/unit/engine/plan-version-compatibility.test.ts": {
-    "revisum/file-name-matches-export": {
-      "count": 1
-    },
-    "revisum/test-title-format": {
-      "count": 8
     }
   },
   "test/unit/engine/plan-versions.test.ts": {
@@ -4676,7 +4510,7 @@
       "count": 1
     },
     "revisum/test-title-format": {
-      "count": 22
+      "count": 21
     }
   },
   "test/unit/engine/service-call-runs.test.ts": {
@@ -4804,7 +4638,7 @@
       "count": 1
     },
     "revisum/test-title-format": {
-      "count": 20
+      "count": 19
     }
   },
   "test/unit/engine/subject-kind-gates.test.ts": {
@@ -4978,14 +4812,6 @@
       "count": 23
     }
   },
-  "test/unit/engine/unsafe-feature-previous-versions.test.ts": {
-    "revisum/file-name-matches-export": {
-      "count": 1
-    },
-    "revisum/test-title-format": {
-      "count": 4
-    }
-  },
   "test/unit/engine/unsafe-feature-readable-text.test.ts": {
     "revisum/file-name-matches-export": {
       "count": 1
@@ -5043,13 +4869,13 @@
   },
   "test/unit/engine/unsafe-readable-errors.test.ts": {
     "curly": {
-      "count": 4
+      "count": 3
     },
     "revisum/file-name-matches-export": {
       "count": 1
     },
     "revisum/test-title-format": {
-      "count": 26
+      "count": 25
     }
   },
   "test/unit/engine/unsafe-readable-examples.ts": {
@@ -5556,17 +5382,6 @@
       "count": 1
     }
   },
-  "tools/check-branch-gates.ts": {
-    "@typescript-eslint/naming-convention": {
-      "count": 1
-    },
-    "curly": {
-      "count": 15
-    },
-    "revisum/file-name-matches-export": {
-      "count": 1
-    }
-  },
   "tools/check-branded-casts.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 2
@@ -5679,14 +5494,6 @@
       "count": 1
     }
   },
-  "tools/check-research-links.ts": {
-    "curly": {
-      "count": 10
-    },
-    "revisum/file-name-matches-export": {
-      "count": 1
-    }
-  },
   "tools/check-runtime-imports.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 1
@@ -5709,39 +5516,9 @@
       "count": 1
     }
   },
-  "tools/check-seed-provenance.ts": {
-    "curly": {
-      "count": 14
-    },
-    "revisum/file-name-matches-export": {
-      "count": 1
-    }
-  },
   "tools/check-tests-apart.ts": {
     "curly": {
       "count": 2
-    },
-    "revisum/file-name-matches-export": {
-      "count": 1
-    }
-  },
-  "tools/cost-report.ts": {
-    "curly": {
-      "count": 9
-    },
-    "revisum/file-name-matches-export": {
-      "count": 1
-    }
-  },
-  "tools/coverage-study.ts": {
-    "@typescript-eslint/naming-convention": {
-      "count": 1
-    },
-    "@typescript-eslint/no-base-to-string": {
-      "count": 1
-    },
-    "curly": {
-      "count": 7
     },
     "revisum/file-name-matches-export": {
       "count": 1
@@ -5837,14 +5614,6 @@
   "tools/run-test-folder.ts": {
     "curly": {
       "count": 11
-    },
-    "revisum/file-name-matches-export": {
-      "count": 1
-    }
-  },
-  "tools/seed-from-research.ts": {
-    "curly": {
-      "count": 4
     },
     "revisum/file-name-matches-export": {
       "count": 1

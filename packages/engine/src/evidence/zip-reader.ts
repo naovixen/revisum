@@ -8,13 +8,13 @@ import { crc32, inflateRawSync } from 'node:zlib';
 import { failure, success, type Result } from '@revisum/contracts';
 import { staysInside } from '../relative-paths.ts';
 
-export type ZipLimits = {
+type ZipLimits = {
   readonly maximumEntries: number;
   // The archive's own size, and separately the size of all its entries inflated.
   readonly maximumTotalBytes: number;
 };
-export type ZipEntryData = { readonly name: string; readonly data: Uint8Array };
-export type ZipProblem = { readonly code: 'too-large' | 'invalid'; readonly path: string };
+type ZipEntryData = { readonly name: string; readonly data: Uint8Array };
+type ZipProblem = { readonly code: 'too-large' | 'invalid'; readonly path: string };
 
 const LOCAL_HEADER_SIGNATURE = 0x04034b50;
 const CENTRAL_HEADER_SIGNATURE = 0x02014b50;

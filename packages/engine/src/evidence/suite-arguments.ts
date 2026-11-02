@@ -13,8 +13,8 @@ import type { EvidenceSuiteDeclaration } from '@revisum/contracts';
 // The report's file name, at the top of Revisum's output folder.
 export const SUITE_REPORT_FILE = 'report.json';
 // The folder, inside Revisum's output folder, where Playwright writes traces and attachments.
-export const SUITE_RESULTS_FOLDER = 'test-results';
-export const REPORT_PATH_VARIABLE = 'PLAYWRIGHT_JSON_OUTPUT_NAME';
+const SUITE_RESULTS_FOLDER = 'test-results';
+const REPORT_PATH_VARIABLE = 'PLAYWRIGHT_JSON_OUTPUT_NAME';
 
 export type SuiteArguments = {
   readonly argv: readonly string[];

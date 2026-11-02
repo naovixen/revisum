@@ -37,8 +37,6 @@ export const NAMING_LINT: NamingLintConfig = {
   include: ['packages/**', 'tools/**', 'test/**', 'proofs/**', 'fixtures/**', 'golden/**', 'scripts/**', '.github/**', '*.json'],
   exclude: [
     'docs/**',
-    'seed-provenance.json',
-    'seed/provenance.json',
     'package-lock.json',
     'tools/naming-lint-config.ts',
     // ESLint's own rule names break the rules below, such as `max-lines`.

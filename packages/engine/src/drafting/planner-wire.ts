@@ -32,7 +32,7 @@ export function plannerRequestBody(wire: PlannerWire, model: string, prompt: Pla
   }
 }
 
-export type PlannerReplyError = { readonly code: 'reply-not-json' | 'no-text' };
+type PlannerReplyError = { readonly code: 'reply-not-json' | 'no-text' };
 
 const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);

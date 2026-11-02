@@ -7,7 +7,6 @@
 //   - page-script runs a script the project declares, by name, in the page;
 //   - inline-page-script runs a script whose text is in the plan itself (it needs page-script);
 //   - database-command runs a command the project declares, by name, against a declared database.
-// Plan language 1.3 holds them; a plan declaring an older version cannot.
 import type { Brand } from './brand.ts';
 import type { EgressPolicy } from './isolated-runner.ts';
 import type { Result } from './result.ts';

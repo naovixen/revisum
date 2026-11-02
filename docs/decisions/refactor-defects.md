@@ -36,6 +36,9 @@ Status is one of: `suspected`, `fixed`, `deferred`, `not a bug`.
 | 13 | The pure code that decides pass or fail has 23.9% branch coverage from unit tests, so its verdicts rely on slow browser tests, if they're tested at all | `engine/src/oracle.ts` | suspected | Phase 3: review first, then add fast unit tests |
 
 | 14 | With Playwright gone, `device-not-supported` can't happen in real code; only a fake covers it | `test/unit/engine/target-resolution.test.ts:122-156`, `driver-cdp/src/cdp-driver.ts:194-202` | suspected | Phase 3: keep for SPEC-19 or remove |
+| 15 | `Resolved -> Errored` stays in the lifecycle table with nothing using it, now that the dead `lifecycle.abort` is gone | `engine/src/lifecycle.ts` | suspected | Phase 3 |
+| 16 | A target's `kind` and `provider` still parse, but nothing reads them | `engine/src/project/project-parser.ts` | suspected | Phase 3 |
+| 17 | `assertion-values.test.ts` named a target no longer in the matrix, so its 13 tests failed after Playwright's removal until repointed | `test/unit/engine/assertion-values.test.ts` | fixed | Repointed at `cdp-chromium` in the plan-version commit. The Playwright helper's list missed it, so **a full run is needed to catch others** |
 
 ## Risks
 
