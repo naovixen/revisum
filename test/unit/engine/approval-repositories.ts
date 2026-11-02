@@ -8,7 +8,9 @@
 //     commit in it that touched each path;
 //   - filesAtCommits (optional): the files a commit holds where they differ from the protected
 //     branch, by commit then path. Any other file at any commit is served as the protected
-//     branch's, as if every reviewed commit had already landed unchanged.
+//     branch's, as if every reviewed commit had already landed unchanged;
+//   - lastCommitsOnProtectedBranch (optional): the last commit that touched a file on the protected
+//     branch, by path, where it is not protectedCommit. The port serves it with the file.
 // Every repository also gets the sign-up plan at plans/signup.json and a holdouts.json that lists
 // one holdout plan's hash, so each subject kind has something on the protected branch.
 //
@@ -67,6 +69,7 @@ export type FixtureRepository = {
   landings: Landing[];
   pullRequests: Record<string, PullRequest>;
   filesAtCommits?: Record<string, Record<string, unknown>>;
+  lastCommitsOnProtectedBranch?: Record<string, string>;
 };
 
 export type RepositoryName = 'solo' | 'team' | 'red-team';
@@ -170,8 +173,10 @@ export function openRepository(name: RepositoryName, edit: (fixture: FixtureRepo
       async protectedFile(path) {
         calls.push(`protectedFile ${path}`);
         if (down.has('protectedFile')) return failure('unavailable');
-        const content = fixture.protectedFiles[repositoryFile(path)];
-        return content === undefined ? failure('not-found') : success({ bytes: fileBytes(content), commit: fixture.protectedCommit });
+        const file = repositoryFile(path);
+        const content = fixture.protectedFiles[file];
+        const commit = fixture.lastCommitsOnProtectedBranch?.[file] ?? fixture.protectedCommit;
+        return content === undefined ? failure('not-found') : success({ bytes: fileBytes(content), commit });
       },
       async reviews(number) {
         calls.push(`reviews ${number}`);
