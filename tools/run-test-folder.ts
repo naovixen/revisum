@@ -4,7 +4,8 @@
 // Files that drive a real browser run one at a time, after the rest have run in parallel: the
 // test project gives each step 2 seconds, and with several browsers and the other tests sharing
 // the CPU a browser's own click or page load can take longer. A browser test is one that imports
-// the shared browser module, directly or through other test files; that one rule decides it.
+// the shared browser module, directly or through other test files, by relative path or through the
+// #test-support/* import; that one rule decides it.
 // Every test's outcome is written to .test-results/tests-<folders>.jsonl for the gates step
 // (tools/test-results-reporter.ts). A file that fails is run once more, only to measure whether
 // the run was flaky: the run still fails, whatever the second attempt does.
@@ -18,19 +19,27 @@ import { pathToFileURL } from 'node:url';
 import { RESULTS_FOLDER, type RerunLine } from './test-results.ts';
 
 const BROWSER_MODULE = resolve('test/support/browsers.ts');
-const RELATIVE_IMPORT = /\bfrom\s+['"](\.{1,2}\/[^'"]+)['"]/g;
+// A relative import, or one through the package's #test-support/* subpath, which names test/support/.
+const TEST_IMPORT = /\bfrom\s+['"](\.{1,2}\/[^'"]+|#test-support\/[^'"]+)['"]/g;
+const TEST_SUPPORT_PREFIX = '#test-support/';
 const REPORTER = pathToFileURL(join(import.meta.dirname, 'test-results-reporter.ts')).href;
 
-// Whether the file imports the browser module, following relative imports.
+// Whether the file imports the browser module, following its imports of other test files.
 function drivesBrowser(file: string, seen = new Set<string>()): boolean {
   const path = resolve(file);
   if (path === BROWSER_MODULE) return true;
   if (seen.has(path) || !existsSync(path)) return false;
   seen.add(path);
   const source = readFileSync(path, 'utf8');
-  for (const match of source.matchAll(RELATIVE_IMPORT)) {
+  for (const match of source.matchAll(TEST_IMPORT)) {
     const imported = match[1];
-    if (imported !== undefined && drivesBrowser(join(dirname(path), imported), seen)) return true;
+    if (imported === undefined) {
+      continue;
+    }
+    const importedPath = imported.startsWith(TEST_SUPPORT_PREFIX)
+      ? resolve('test/support', imported.slice(TEST_SUPPORT_PREFIX.length))
+      : join(dirname(path), imported);
+    if (drivesBrowser(importedPath, seen)) return true;
   }
   return false;
 }

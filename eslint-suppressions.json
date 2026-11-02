@@ -1950,7 +1950,7 @@
       "count": 1
     },
     "revisum/test-title-format": {
-      "count": 20
+      "count": 19
     }
   },
   "test/contract/cdp-clipboard-checks.test.ts": {
@@ -2035,7 +2035,7 @@
       "count": 1
     },
     "revisum/test-title-format": {
-      "count": 25
+      "count": 24
     }
   },
   "test/contract/cdp-new-tabs.test.ts": {
@@ -2065,7 +2065,7 @@
       "count": 1
     },
     "revisum/test-title-format": {
-      "count": 7
+      "count": 6
     }
   },
   "test/contract/cdp-positions-and-test-ids.test.ts": {
@@ -2147,16 +2147,7 @@
   },
   "test/contract/clock-and-clipboard-support.ts": {
     "@typescript-eslint/no-unsafe-return": {
-      "count": 6
-    },
-    "@typescript-eslint/strict-boolean-expressions": {
       "count": 1
-    },
-    "@typescript-eslint/unbound-method": {
-      "count": 2
-    },
-    "curly": {
-      "count": 8
     },
     "revisum/file-name-matches-export": {
       "count": 1
@@ -2238,9 +2229,6 @@
     }
   },
   "test/contract/network-stubs-driver-support.test.ts": {
-    "@typescript-eslint/no-unsafe-return": {
-      "count": 1
-    },
     "revisum/file-name-matches-export": {
       "count": 1
     },
@@ -2250,18 +2238,6 @@
   },
   "test/contract/network-stubs-support.ts": {
     "@typescript-eslint/naming-convention": {
-      "count": 1
-    },
-    "@typescript-eslint/no-unsafe-return": {
-      "count": 2
-    },
-    "@typescript-eslint/strict-boolean-expressions": {
-      "count": 1
-    },
-    "curly": {
-      "count": 15
-    },
-    "max-lines-per-function": {
       "count": 1
     },
     "revisum/file-name-matches-export": {
@@ -2317,18 +2293,6 @@
   },
   "test/contract/page-states-support.ts": {
     "@typescript-eslint/naming-convention": {
-      "count": 3
-    },
-    "@typescript-eslint/no-unsafe-return": {
-      "count": 2
-    },
-    "@typescript-eslint/strict-boolean-expressions": {
-      "count": 1
-    },
-    "curly": {
-      "count": 9
-    },
-    "max-lines-per-function": {
       "count": 1
     },
     "revisum/file-name-matches-export": {
@@ -2344,18 +2308,6 @@
     }
   },
   "test/contract/plan-values-support.ts": {
-    "@typescript-eslint/no-unsafe-return": {
-      "count": 4
-    },
-    "@typescript-eslint/require-await": {
-      "count": 1
-    },
-    "@typescript-eslint/strict-boolean-expressions": {
-      "count": 1
-    },
-    "curly": {
-      "count": 9
-    },
     "revisum/file-name-matches-export": {
       "count": 1
     }
@@ -2419,15 +2371,6 @@
     }
   },
   "test/contract/unsafe-page-support.ts": {
-    "@typescript-eslint/no-unsafe-return": {
-      "count": 1
-    },
-    "@typescript-eslint/strict-boolean-expressions": {
-      "count": 1
-    },
-    "curly": {
-      "count": 2
-    },
     "revisum/file-name-matches-export": {
       "count": 1
     }
@@ -3176,16 +3119,7 @@
     }
   },
   "test/support/capability-harness.ts": {
-    "@typescript-eslint/no-unsafe-return": {
-      "count": 2
-    },
     "@typescript-eslint/strict-boolean-expressions": {
-      "count": 2
-    },
-    "curly": {
-      "count": 6
-    },
-    "max-lines-per-function": {
       "count": 1
     },
     "revisum/file-name-matches-export": {
@@ -3290,9 +3224,6 @@
     }
   },
   "test/support/signup-harness.ts": {
-    "curly": {
-      "count": 2
-    },
     "revisum/file-name-matches-export": {
       "count": 1
     }
