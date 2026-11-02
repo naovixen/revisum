@@ -102,7 +102,7 @@ test('a plan refused for a disabled feature opens no browser, makes no call and 
   const spy = spyDriver();
   const { caller, requests } = fakeServiceCaller();
   const ports = {
-    drivers: new Map([['playwright', spy]]), clock: systemClock, artifacts: memoryArtifactStore(), redactor: defaultRedactor(), audit: memoryEventSink(),
+    drivers: new Map([['cdp', spy]]), clock: systemClock, artifacts: memoryArtifactStore(), redactor: defaultRedactor(), audit: memoryEventSink(),
     events: memoryRunEventSink(), services: caller,
   };
   const base = { project, baseUrl: ORIGIN, seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() } };

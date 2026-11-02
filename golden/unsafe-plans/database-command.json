@@ -6,7 +6,7 @@
     "title": "Orders seeded and counted by database commands"
   },
   "targets": [
-    "playwright-chromium"
+    "cdp-chromium"
   ],
   "steps": [
     {

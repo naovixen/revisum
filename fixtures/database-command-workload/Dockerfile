@@ -4,7 +4,6 @@
 # installs nothing. The tests pass the run image's tag in as RUN_IMAGE.
 #
 # It adds one file, the fixture program every declared command runs.
-# See docs/specs/SPEC-36-unsafe-plan-features.md.
 ARG RUN_IMAGE
 FROM ${RUN_IMAGE}
 COPY database-fixture.mjs /opt/database-fixture/database-fixture.mjs

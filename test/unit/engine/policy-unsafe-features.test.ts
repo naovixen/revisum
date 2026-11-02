@@ -26,7 +26,7 @@ import {
 // The shared unsafe project, every feature on, with its one target in British English so the
 // engine's English irreversible patterns apply.
 const ENGLISH_TARGET: JsonRecord = {
-  id: TARGET_ID, adapter: 'playwright', engine: 'chromium', device: 'desktop-1280',
+  id: TARGET_ID, adapter: 'cdp', engine: 'chromium', device: 'desktop-1280',
   locale: 'en-GB', timezone: 'Europe/London', colorScheme: 'light', reducedMotion: 'reduce',
 };
 const PROJECT = unsafeProjectFile(FEATURES, { matrix: [ENGLISH_TARGET] });
@@ -107,7 +107,7 @@ test('the same write script and write command in an approved plan are allowed', 
 test('a plan the gate denies for any of these rules opens no browser, so no script or command runs', async () => {
   const project = parserProject(PROJECT);
   const spy = spyDriver();
-  const ports = { drivers: new Map([['playwright', spy]]), clock: systemClock, artifacts: memoryArtifactStore(), redactor: defaultRedactor(), audit: memoryEventSink(), events: memoryRunEventSink() };
+  const ports = { drivers: new Map([['cdp', spy]]), clock: systemClock, artifacts: memoryArtifactStore(), redactor: defaultRedactor(), audit: memoryEventSink(), events: memoryRunEventSink() };
   const base = { project, baseUrl: ORIGIN, seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() } };
   const parse = (raw: unknown) => ({ ok: true as const, value: parsedPlan(raw as JsonRecord, PROJECT) });
   const rules: string[] = [];
@@ -149,7 +149,7 @@ test('a database command whose service is on a production origin is denied in an
 
 test('a production command is denied before anything starts: no browser is opened', async () => {
   const spy = spyDriver();
-  const ports = { drivers: new Map([['playwright', spy]]), clock: systemClock, artifacts: memoryArtifactStore(), redactor: defaultRedactor(), audit: memoryEventSink(), events: memoryRunEventSink() };
+  const ports = { drivers: new Map([['cdp', spy]]), clock: systemClock, artifacts: memoryArtifactStore(), redactor: defaultRedactor(), audit: memoryEventSink(), events: memoryRunEventSink() };
   const base = {
     project: parserProject(PRODUCTION_PROJECT), baseUrl: ORIGIN, seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() },
   };

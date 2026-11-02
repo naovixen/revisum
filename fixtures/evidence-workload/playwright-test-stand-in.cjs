@@ -8,7 +8,6 @@
 // A spec module exports `describe`, its describe block's title, and `tests`, a list of
 // { title, annotations?, run }. `run` is given the process's environment; a test fails when it
 // throws, and its error message is the thrown error's.
-// See docs/specs/SPEC-35-evidence-mode.md.
 'use strict';
 const { mkdirSync, readdirSync, writeFileSync } = require('node:fs');
 const { dirname, join } = require('node:path');

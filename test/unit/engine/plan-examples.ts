@@ -8,7 +8,7 @@ import { parseProject, planParser, type Project } from '@revisum/engine';
 import { GOLDEN } from '../../support/repository.ts';
 
 export const ORIGIN = 'http://127.0.0.1:4173';
-export const TARGET_ID = 'playwright-chromium';
+export const TARGET_ID = 'cdp-chromium';
 // The one version a plan may declare.
 export const CURRENT_VERSION = '1.3';
 
@@ -114,7 +114,7 @@ export const testProjectInput = (limits: Readonly<Record<string, number>> = {}, 
   origins: [ORIGIN],
   limits: { stepTimeoutMilliseconds: 2000, ...limits },
   matrix: [{
-    id: TARGET_ID, adapter: 'playwright', engine: 'chromium', device: 'desktop-1280',
+    id: TARGET_ID, adapter: 'cdp', engine: 'chromium', device: 'desktop-1280',
     locale: 'de-DE', timezone: 'Asia/Tokyo', colorScheme: 'dark', reducedMotion: 'reduce',
   }],
   services: [TEST_SERVICE],

@@ -2,7 +2,7 @@ Plan: First transaction by record-id prefix
 Feature: CART-1
 Spec: specs/cart.md#css-locator
 Version: 1.3
-Targets: playwright-chromium
+Targets: cdp-chromium
 Go to /cart
 Criterion: cart.item-shown
 Unsafe: Expect first css "[data-test^=\"transaction-item-\"]" is visible

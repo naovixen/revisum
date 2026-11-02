@@ -3,8 +3,8 @@
 // and sends the input event only on an allow. Each acting step's input events are counted, so a
 // test can show that a denied step sent none.
 //
-// Used to run plans through run() and runUntrusted() end to end. The real CDP and Playwright
-// drivers do not call the guard yet (the CDP driver does not wire it in yet), so they are not tested here.
+// Used to run plans through run() and runUntrusted() end to end. The real CDP
+// driver does not wire the guard in yet, so it is not tested here.
 //
 // A dialog step acts on no element: the driver asks the guard with an element whose fields are all
 // null, and passes the open dialog's text as the guard's second argument.

@@ -1,7 +1,7 @@
 {
   "version": "1.3",
   "meta": { "featureId": "TEAM-2", "specReference": "specs/team.md#invite-links", "title": "Copy buttons put the invite link and the address on the clipboard" },
-  "targets": ["playwright-chromium"],
+  "targets": ["cdp-chromium"],
   "values": { "invitee": { "kind": "uniqueEmail", "localPrefix": "invitee" } },
   "steps": [
     { "type": "navigate", "url": "/team/invite" },

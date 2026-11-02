@@ -6,7 +6,7 @@
     "title": "Determinism controls are applied"
   },
   "targets": [
-    "playwright-chromium"
+    "cdp-chromium"
   ],
   "steps": [
     {

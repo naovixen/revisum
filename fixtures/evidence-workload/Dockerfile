@@ -7,7 +7,6 @@
 # The repository's lockfile holds playwright-core but not Playwright Test, and the image is built
 # with no network, so the stand-in runs the fixture suite with the checkout's own playwright-core.
 # The browsers and node_modules come from the checkout, which the workload runner mounts read-only.
-# See docs/specs/SPEC-35-evidence-mode.md.
 ARG RUN_IMAGE
 FROM ${RUN_IMAGE}
 COPY --chmod=755 playwright-test-stand-in.cjs /usr/local/bin/playwright

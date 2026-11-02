@@ -6,7 +6,7 @@
     "title": "Editor blocks read by an inline script"
   },
   "targets": [
-    "playwright-chromium"
+    "cdp-chromium"
   ],
   "steps": [
     {

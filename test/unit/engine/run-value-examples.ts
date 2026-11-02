@@ -115,7 +115,7 @@ export function recordingDriver(performs?: readonly DriverFeature[]): { readonly
     close: async () => undefined,
   };
   const driver: BrowserDriver = {
-    info: { id: 'playwright', version: 'recording', protocol: 'none', ...(performs === undefined ? {} : { performs }) },
+    info: { id: 'cdp', version: 'recording', protocol: 'none', ...(performs === undefined ? {} : { performs }) },
     supports: () => ({ ok: true, value: true }),
     open: async (_target, environment) => { recording.environments.push(environment); return { ok: true, value: session }; },
   };

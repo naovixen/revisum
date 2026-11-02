@@ -1,7 +1,7 @@
 {
   "version": "1.3",
   "meta": { "featureId": "ACCOUNT-3", "specReference": "specs/account.md#closure", "title": "Closing an account" },
-  "targets": ["playwright-chromium"],
+  "targets": ["cdp-chromium"],
   "steps": [
     { "type": "navigate", "url": "/account" },
     { "type": "hover", "locator": { "by": "role", "role": "button", "name": "Help" } },

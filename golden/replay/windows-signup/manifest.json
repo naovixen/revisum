@@ -1,10 +1,10 @@
 {
   "schema": "revisum.run-manifest/v1",
   "engineVersion": "0.1.0",
-  "planHash": "a7a8fa1e7c9bcd8cb882be0f682f33ac84f2b57c993da624814971e514d41e29",
+  "planHash": "9145b01ecc23b23d0aae4fcdef7dc26dc88c6a33d5dd062315a193e79332d0ab",
   "target": {
-    "id": "playwright-chromium",
-    "adapter": "playwright",
+    "id": "cdp-chromium",
+    "adapter": "cdp",
     "engine": "chromium",
     "device": "desktop-1280",
     "locale": "de-DE",
@@ -13,18 +13,13 @@
     "reducedMotion": "reduce"
   },
   "adapter": {
-    "id": "playwright",
-    "version": "1.64.1",
-    "protocol": "Playwright (CDP, Juggler, WebKit remote)",
-    "performs": [
-      "structuralLocators",
-      "domChecks",
-      "pageScripts"
-    ]
+    "id": "cdp",
+    "version": "0.1.0",
+    "protocol": "Chrome DevTools Protocol (raw WebSocket)"
   },
   "browser": {
     "name": "chromium",
-    "version": "156.0.8078.4"
+    "version": "156.0.8078.47"
   },
   "seeds": {
     "random": 42
@@ -54,5 +49,6 @@
     "platform": "win32",
     "arch": "x64"
   },
-  "nonHermeticInputs": []
+  "nonHermeticInputs": [],
+  "executableSha256": "5af44a250a2139d4e0864c07227bf0687a6d12655bab9682a5be784b41bc82e1"
 }

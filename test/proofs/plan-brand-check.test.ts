@@ -39,7 +39,7 @@ function watchedPorts(): Watched {
   let driverCalls = 0;
   let storeWrites = 0;
   const spy: BrowserDriver = {
-    info: { id: 'playwright', version: 'spy', protocol: 'none' },
+    info: { id: 'cdp', version: 'spy', protocol: 'none' },
     supports() { driverCalls++; return { ok: true, value: true }; },
     async open() { driverCalls++; return failure({ reason: 'launch-failed', detail: 'the spy never launches' }); },
   };
@@ -47,7 +47,7 @@ function watchedPorts(): Watched {
   const events = memoryRunEventSink();
   return {
     ports: {
-      drivers: new Map([['playwright', spy]]), clock: systemClock, redactor: defaultRedactor(), audit: memoryEventSink(), events,
+      drivers: new Map([['cdp', spy]]), clock: systemClock, redactor: defaultRedactor(), audit: memoryEventSink(), events,
       artifacts: { put: async (name, bytes, mediaType) => { storeWrites++; return store.put(name, bytes, mediaType); } },
     },
     driverCalls: () => driverCalls,

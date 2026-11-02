@@ -1,7 +1,7 @@
 {
   "version": "1.3",
   "meta": { "featureId": "SIGNUP-2", "specReference": "specs/signup.md#unique-account", "title": "Sign-up with values unique to the run" },
-  "targets": ["playwright-chromium"],
+  "targets": ["cdp-chromium"],
   "values": {
     "displayName": { "kind": "uniqueText", "prefix": "Tester" },
     "contact": { "kind": "uniqueEmail", "localPrefix": "ada" },

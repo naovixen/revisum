@@ -124,7 +124,7 @@ export const localPlanner = (origin: string, wire: WireFormat = 'openai-chat'): 
 export const projectFile = (planner: JsonRecord | undefined): JsonRecord => ({
   origins: [APP_ORIGIN, SECOND_APP_ORIGIN],
   matrix: [{
-    id: TARGET, adapter: 'playwright', engine: 'chromium', device: 'desktop-1280', locale: 'en-GB',
+    id: TARGET, adapter: 'cdp', engine: 'chromium', device: 'desktop-1280', locale: 'en-GB',
     timezone: 'Europe/London', colorScheme: 'light', reducedMotion: 'reduce',
   }],
   secretNames: [DECLARED_SECRET, PLANNER_KEY_NAME],

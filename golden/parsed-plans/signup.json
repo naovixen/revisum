@@ -6,7 +6,7 @@
     "title": "Sign-up happy path"
   },
   "targets": [
-    "playwright-chromium"
+    "cdp-chromium"
   ],
   "steps": [
     {

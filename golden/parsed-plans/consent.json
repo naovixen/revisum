@@ -6,7 +6,7 @@
     "title": "Terms must be accepted first"
   },
   "targets": [
-    "playwright-chromium"
+    "cdp-chromium"
   ],
   "steps": [
     {

@@ -2,7 +2,6 @@
 // the other receives the declared secret SHOP_API_TOKEN and, as a careless or hostile test might,
 // writes it to standard output and standard error and puts it in its error message, raw and in
 // the encoded forms a leak can take. Revisum must keep none of them.
-// See docs/specs/SPEC-35-evidence-mode.md.
 export const describe = 'Checkout';
 
 // Text the error message keeps around the secret, so a test can see the message reached the result.

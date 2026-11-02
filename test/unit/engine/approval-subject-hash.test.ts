@@ -104,7 +104,7 @@ type CountingDriver = BrowserDriver & { calls: number };
 
 function countingDriver(): CountingDriver {
   const driver: CountingDriver = {
-    info: { id: 'playwright', version: 'test', protocol: 'none' },
+    info: { id: 'cdp', version: 'test', protocol: 'none' },
     calls: 0,
     supports() { driver.calls += 1; return success(true as const); },
     async open() {
@@ -116,7 +116,7 @@ function countingDriver(): CountingDriver {
 }
 
 const runPorts = (driver: BrowserDriver) => ({
-  drivers: new Map([['playwright', driver]]), clock: systemClock, artifacts: memoryArtifactStore(),
+  drivers: new Map([['cdp', driver]]), clock: systemClock, artifacts: memoryArtifactStore(),
   redactor: defaultRedactor(), audit: memoryEventSink(), events: memoryRunEventSink(),
 });
 

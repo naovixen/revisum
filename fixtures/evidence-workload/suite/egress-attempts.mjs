@@ -5,7 +5,6 @@
 // ends in .invalid, which never resolves, apart from the real metadata name. It also serves its
 // own app on loopback, which must keep working, as Playwright's webServer does. It prints what
 // each attempt saw, as JSON, on its last line.
-// See docs/specs/SPEC-35-evidence-mode.md.
 import { existsSync, readdirSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { createRequire } from 'node:module';

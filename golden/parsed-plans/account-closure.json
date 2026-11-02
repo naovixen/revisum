@@ -6,7 +6,7 @@
     "title": "Closing an account"
   },
   "targets": [
-    "playwright-chromium"
+    "cdp-chromium"
   ],
   "steps": [
     {

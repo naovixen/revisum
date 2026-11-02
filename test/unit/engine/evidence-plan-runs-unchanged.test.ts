@@ -1,5 +1,5 @@
 // Turning evidence mode on changes nothing on the safe path. A project that declares a suite
-// parses every golden plan to exactly what it gave before, the stored 1.1 parse results included,
+// parses every golden plan to exactly what it gave before, the stored parse results included,
 // and runs a plan to the same result hash, manifest hash and guarantee statement as the same
 // project without evidence mode.
 import assert from 'node:assert/strict';
@@ -19,7 +19,7 @@ const storedNames = (): string[] =>
 const withoutEvidence = planParser(parsedProject(projectFileWith()));
 const withEvidence = planParser(parsedProject(projectFileWithEvidence()));
 
-test('the stored 1.1 parse results are still there to compare against', () => {
+test('the stored parse results are still there to compare against', () => {
   assert.ok(storedNames().length >= 4, `only ${storedNames().length} stored parse results`);
 });
 

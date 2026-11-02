@@ -1,17 +1,19 @@
-// The unsafe features change nothing for a closed plan, one that uses none of them. With no unsafe
-// feature enabled, every golden plan parses to the recorded plan, byte for byte, and a run of a
-// closed plan gives the recorded result hash and manifest hash. The hashes in
-// golden/closed-language/hashes.json are the plan hash of each golden plan, parsed against the shared test project, and the result and
-// manifest hashes of four runs on the recording driver (run-value-examples.ts). The golden report
-// replay (test/replay/golden-report.test.ts) covers the report and its replay hashes.
+// Plans that use no unsafe features keep their recorded hashes. Every golden plan parses to the
+// recorded plan, byte for byte, and a run of such a plan gives the recorded result hash and manifest
+// hash. golden/closed-language/hashes.json holds the plan hash of each golden plan, parsed against
+// the shared test project, and the result and manifest hashes of four runs on the recording driver
+// (run-value-examples.ts); `npm run goldens:record` remakes it, and a commit changing it must name
+// a defect. The golden report replay (test/replay/golden-report.test.ts) covers the report and its
+// replay hashes.
 //
-// A change that makes a closed plan's result or manifest carry an unsafe field, even an empty
-// list, changes these hashes, so the unsafe fields must be absent from closed runs.
+// A change that makes such a plan's result or manifest carry an unsafe field, even an empty list,
+// changes these hashes, so the unsafe fields must be absent from those runs.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { planHash } from '@revisum/engine';
+import { RECORDED_RUNS } from '../../support/ClosedLanguageGolden.ts';
 import { GOLDEN } from '../../support/repository.ts';
 import { defaultParser, goldenPlan, goldenPlanNames } from './plan-examples.ts';
 import { OPEN_ORDERS, planOf, runPlan, type JsonRecord } from './run-value-examples.ts';
@@ -45,14 +47,6 @@ test('every golden plan keeps the current version once parsed', () => {
     assert.equal(parsed.value.version, declared, name);
   }
 });
-
-// The runs whose hashes were recorded, by name.
-const RECORDED_RUNS: Readonly<Record<string, () => JsonRecord>> = {
-  'open-orders': () => planOf([OPEN_ORDERS]),
-  signup: () => goldenPlan('signup'),
-  'order-page-by-path': () => goldenPlan('order-page-by-path'),
-  'order-backend-state': () => goldenPlan('order-backend-state'),
-};
 
 test('a run hash is recorded for every run below', () => {
   assert.deepEqual(Object.keys(recorded().runs).sort(), Object.keys(RECORDED_RUNS).sort());

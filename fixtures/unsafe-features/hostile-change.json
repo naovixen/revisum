@@ -7,8 +7,8 @@
       "limits": { "stepTimeoutMilliseconds": 2000 },
       "matrix": [
         {
-          "id": "playwright-chromium",
-          "adapter": "playwright",
+          "id": "cdp-chromium",
+          "adapter": "cdp",
           "engine": "chromium",
           "device": "desktop-1280",
           "locale": "de-DE",
@@ -38,7 +38,7 @@
     "plans/cart.json": {
       "version": "1.3",
       "meta": { "featureId": "CART-1", "specReference": "specs/cart.md#totals", "title": "Cart totals" },
-      "targets": ["playwright-chromium"],
+      "targets": ["cdp-chromium"],
       "steps": [
         { "type": "navigate", "url": "/cart" },
         { "type": "expect", "locator": { "by": "css", "selector": "ul.cart > li.item", "position": "first" }, "assert": { "kind": "visible" }, "criterionId": "cart.item-shown" },

@@ -78,13 +78,13 @@ test('a plan without newer steps keeps every step, in order', () => {
 test('a run of a plan with a newer step is refused before any driver is touched', async () => {
   let calls = 0;
   const spy: BrowserDriver = {
-    info: { id: 'playwright', version: 'spy', protocol: 'none' },
+    info: { id: 'cdp', version: 'spy', protocol: 'none' },
     supports() { calls++; return { ok: true, value: true }; },
     async open() { calls++; return failure({ reason: 'launch-failed', detail: 'the spy never launches' }); },
   };
   const project = testProject();
   const ports = {
-    drivers: new Map([['playwright', spy]]), clock: systemClock, artifacts: memoryArtifactStore(),
+    drivers: new Map([['cdp', spy]]), clock: systemClock, artifacts: memoryArtifactStore(),
     redactor: defaultRedactor(), audit: memoryEventSink(), events: memoryRunEventSink(),
   };
   const base = {

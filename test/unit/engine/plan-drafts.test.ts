@@ -111,7 +111,7 @@ function spyParser(log: CallLog, inner: PlanParse = defaultParser()) {
 // A driver that logs each call and opens no browser.
 function loggingDriver(log: CallLog): BrowserDriver {
   return {
-    info: { id: 'playwright', version: 'test', protocol: 'none' },
+    info: { id: 'cdp', version: 'test', protocol: 'none' },
     supports() { log.push('driver'); return success(true as const); },
     async open() {
       log.push('driver');
@@ -131,7 +131,7 @@ async function runAdmitted(plan: Plan, log: CallLog): Promise<void> {
     plan: authorised, project: testProject(), targetId, baseUrl: ORIGIN, seed: 7, fixedTimeMilliseconds: 0,
     fixtures: [], host: { platform: 'test', arch: 'test' },
   }, {
-    drivers: new Map([['playwright', loggingDriver(log)]]), clock: systemClock, artifacts: memoryArtifactStore(),
+    drivers: new Map([['cdp', loggingDriver(log)]]), clock: systemClock, artifacts: memoryArtifactStore(),
     redactor: defaultRedactor(), audit: memoryEventSink(), events: memoryRunEventSink(),
   });
 }

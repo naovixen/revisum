@@ -94,7 +94,7 @@ test('a denial reaches the JSON Lines sink as a plan.denied entry carrying the r
 // patterns of the sign-up plan's target, so the approved sign-up plan is denied there.
 const signupProjectInput = () => policyProjectInput({
   matrix: [{
-    id: TARGET_ID, adapter: 'playwright', engine: 'chromium', device: 'desktop-1280',
+    id: TARGET_ID, adapter: 'cdp', engine: 'chromium', device: 'desktop-1280',
     locale: 'de-DE', timezone: 'Asia/Tokyo', colorScheme: 'dark', reducedMotion: 'reduce',
   }],
   policy: { ...POLICY, irreversiblePatterns: { 'de-DE': ['create'] } },

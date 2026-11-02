@@ -6,7 +6,7 @@
     "title": "Badge classes, style and attributes"
   },
   "targets": [
-    "playwright-chromium"
+    "cdp-chromium"
   ],
   "steps": [
     {

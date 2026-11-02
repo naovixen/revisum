@@ -243,12 +243,12 @@ test('an assertion step of this spec without a criterion id is refused', () => {
 test('a refused plan reaches no driver method, and nothing is logged', async () => {
   let driverCalls = 0;
   const spy: BrowserDriver = {
-    info: { id: 'playwright', version: 'spy', protocol: 'none' },
+    info: { id: 'cdp', version: 'spy', protocol: 'none' },
     supports() { driverCalls++; return { ok: true, value: true }; },
     async open() { driverCalls++; return failure({ reason: 'launch-failed', detail: 'the spy never launches' }); },
   };
   const events = memoryRunEventSink();
-  const ports = { drivers: new Map([['playwright', spy]]), clock: systemClock, artifacts: memoryArtifactStore(), redactor: defaultRedactor(), audit: memoryEventSink(), events };
+  const ports = { drivers: new Map([['cdp', spy]]), clock: systemClock, artifacts: memoryArtifactStore(), redactor: defaultRedactor(), audit: memoryEventSink(), events };
   const base = { project: stubProject(), baseUrl: ORIGIN, seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() } };
   for (const refused of REFUSED) {
     const outcome = await runUntrusted(refused.plan, parsePlan, base, ports);
@@ -262,11 +262,11 @@ test('a refused plan reaches no driver method, and nothing is logged', async () 
 test('counter-example: an accepted plan with a stub step does reach the driver', async () => {
   let opens = 0;
   const spy: BrowserDriver = {
-    info: { id: 'playwright', version: 'spy', protocol: 'none' },
+    info: { id: 'cdp', version: 'spy', protocol: 'none' },
     supports() { return { ok: true, value: true }; },
     async open() { opens++; return failure({ reason: 'launch-failed', detail: 'the spy never launches' }); },
   };
-  const ports = { drivers: new Map([['playwright', spy]]), clock: systemClock, artifacts: memoryArtifactStore(), redactor: defaultRedactor(), audit: memoryEventSink(), events: memoryRunEventSink() };
+  const ports = { drivers: new Map([['cdp', spy]]), clock: systemClock, artifacts: memoryArtifactStore(), redactor: defaultRedactor(), audit: memoryEventSink(), events: memoryRunEventSink() };
   const base = { project: stubProject(), baseUrl: ORIGIN, seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() } };
   await runUntrusted(planOf([OPEN_LOGIN, startStub('cartEmpty')]), parsePlan, base, ports);
   assert.equal(opens, 1);

@@ -259,14 +259,14 @@ test('a cleanup call naming a value no step defines is refused with undefined_va
 test('a refused plan reaches neither the service caller nor the driver, and nothing is logged', async () => {
   let driverCalls = 0;
   const spy: BrowserDriver = {
-    info: { id: 'playwright', version: 'spy', protocol: 'none' },
+    info: { id: 'cdp', version: 'spy', protocol: 'none' },
     supports() { driverCalls++; return { ok: true, value: true }; },
     async open() { driverCalls++; return failure({ reason: 'launch-failed', detail: 'the spy never launches' }); },
   };
   const { caller, requests } = fakeServiceCaller();
   const events = memoryRunEventSink();
   const ports = {
-    drivers: new Map([['playwright', spy]]), clock: systemClock, artifacts: memoryArtifactStore(), redactor: defaultRedactor(), audit: memoryEventSink(), events,
+    drivers: new Map([['cdp', spy]]), clock: systemClock, artifacts: memoryArtifactStore(), redactor: defaultRedactor(), audit: memoryEventSink(), events,
     services: caller,
   };
   const base = { project: callProject(), baseUrl: ORIGIN, seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() } };

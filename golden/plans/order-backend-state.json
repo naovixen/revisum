@@ -1,7 +1,7 @@
 {
   "version": "1.3",
   "meta": { "featureId": "ORDERS-3", "specReference": "specs/orders.md#backend-state", "title": "A new order is paid in the backend and cleaned up" },
-  "targets": ["playwright-chromium"],
+  "targets": ["cdp-chromium"],
   "steps": [
     { "type": "call", "call": "createOrder", "arguments": { "customerName": "Ada Lovelace", "contactEmail": "ada@example.com", "quantity": 2, "region": "eu", "giftWrap": false, "deliveryDay": "2026-11-02" }, "remember": { "orderId": "orderId" } },
     { "type": "navigate", "url": { "segments": ["orders", { "valueName": "orderId" }] } },

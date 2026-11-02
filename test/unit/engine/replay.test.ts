@@ -132,7 +132,7 @@ test('a replay given another plan than the manifest\'s ends replay-mismatch, bef
 
 test('a replay whose manifest names another target ends replay-mismatch, before any driver call', async () => {
   const ran = await runScenario(CLOSED);
-  const manifest = manifestJson(ran, (copy) => { copy['target'] = { ...Object(copy['target']), id: 'playwright-firefox' }; });
+  const manifest = manifestJson(ran, (copy) => { copy['target'] = { ...Object(copy['target']), id: 'cdp-firefox' }; });
   const replay = await replayRun(ran, { manifest });
   assert.equal(refused(replay.answer).code, 'replay-mismatch');
   assertNoDriverCall(replay);

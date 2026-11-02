@@ -57,7 +57,7 @@ type CountingDriver = BrowserDriver & { calls: number };
 
 function countingDriver(): CountingDriver {
   const driver: CountingDriver = {
-    info: { id: 'playwright', version: 'test', protocol: 'none' },
+    info: { id: 'cdp', version: 'test', protocol: 'none' },
     calls: 0,
     supports() { driver.calls += 1; return success(true as const); },
     async open() {
@@ -82,7 +82,7 @@ async function runPlan(plan: Plan, standing: ReturnType<typeof planStanding>, ba
     plan: authorised, project: projectWithProduction(policy), targetId: TARGET_ID as TargetId, baseUrl, seed: 7, fixedTimeMilliseconds: 0,
     fixtures: [], host: { platform: 'test', arch: 'test' }, standing,
   }, {
-    drivers: new Map([['playwright', driver]]), clock: systemClock, artifacts: memoryArtifactStore(),
+    drivers: new Map([['cdp', driver]]), clock: systemClock, artifacts: memoryArtifactStore(),
     redactor: defaultRedactor(), audit: memoryEventSink(), events: memoryRunEventSink(),
   });
   return { result, driverCalls: driver.calls };

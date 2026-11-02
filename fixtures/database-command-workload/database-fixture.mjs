@@ -15,7 +15,6 @@
 // The tests also run it, outside any workload, as the TCP services the commands try to reach:
 //   serve <banner>          listens on port 5432, sends each connection the banner and a line
 //                           break, and prints "connection" for each, so the test can count them.
-// See docs/specs/SPEC-36-unsafe-plan-features.md.
 import { connect, createServer } from 'node:net';
 
 const SERVICE_PORT = 5432;

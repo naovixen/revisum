@@ -6,7 +6,7 @@
     "title": "First transaction by record-id prefix"
   },
   "targets": [
-    "playwright-chromium"
+    "cdp-chromium"
   ],
   "steps": [
     {

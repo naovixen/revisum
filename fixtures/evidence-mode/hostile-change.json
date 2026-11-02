@@ -7,8 +7,8 @@
       "limits": { "stepTimeoutMilliseconds": 2000 },
       "matrix": [
         {
-          "id": "playwright-chromium",
-          "adapter": "playwright",
+          "id": "cdp-chromium",
+          "adapter": "cdp",
           "engine": "chromium",
           "device": "desktop-1280",
           "locale": "de-DE",

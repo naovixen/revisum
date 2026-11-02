@@ -98,7 +98,7 @@ const builderInputs = async (): Promise<{
 }> => {
   const base = await runScenario(POPULATED);
   return {
-    plan: base.plan, target: base.project.matrix[0] ?? assert.fail('no target'), adapter: { id: 'playwright', version: 'recording', protocol: 'none' },
+    plan: base.plan, target: base.project.matrix[0] ?? assert.fail('no target'), adapter: { id: 'cdp', version: 'recording', protocol: 'none' },
     browser: { name: 'recording-browser', version: '1.0' }, seed: POPULATED.seed, fixedTimeMilliseconds: POPULATED.clockStartMilliseconds,
     fixtures: [], host: POPULATED.host,
   };
@@ -141,7 +141,7 @@ const PERTURBATIONS: { readonly [Field in keyof Required<ManifestUnderTest>]: Pe
     ...scenario,
     projectFile: populatedProjectFile({
       matrix: [{
-        id: 'playwright-chromium', adapter: 'playwright', engine: 'chromium', device: 'desktop-1280',
+        id: 'cdp-chromium', adapter: 'cdp', engine: 'chromium', device: 'desktop-1280',
         locale: 'de-DE', timezone: 'Asia/Tokyo', colorScheme: 'light', reducedMotion: 'reduce',
       }],
     }),

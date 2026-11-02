@@ -12,7 +12,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { arch, platform } from 'node:os';
 import { join } from 'node:path';
-import { after, before, test } from 'node:test';
+import { after, before, describe, test } from 'node:test';
 import {
   defaultRedactor, hashExecutable, type RunResult, type TargetId,
 } from '@revisum/engine';
@@ -134,6 +134,23 @@ test('the Windows-made manifest, replayed here, states whether the hashes match 
     assert.deepEqual(outcome.differingInputs.filter((field) => !PER_ENVIRONMENT_FIELDS.some((allowed) => allowed === field)), []);
     assert.equal(outcome.verdict, 'per-environment-baseline');
   }
+});
+
+describe('Using a replay of the Windows-made golden', () => {
+  describe('given a manifest from another host and browser build', () => {
+    describe('when it is replayed here', () => {
+      test('then it should report a per-environment baseline and never a pass', { timeout: 120_000 }, async () => {
+        const golden = goldenRecord();
+        const elsewhere = { ...golden.manifest, host: { platform: 'other-platform', arch: 'other-arch' }, executableSha256: '0'.repeat(64) };
+        const outcome = replayed(await replaySignup(golden.plan, 'cdp-chromium', elsewhere, golden.resultHash));
+        assert.equal(outcome.identical, false, JSON.stringify(outcome));
+        assert.ok(outcome.differingInputs.includes('host'), JSON.stringify(outcome.differingInputs));
+        assert.ok(outcome.differingInputs.includes('executableSha256'), JSON.stringify(outcome.differingInputs));
+        assert.deepEqual(outcome.differingInputs.filter((field) => !PER_ENVIRONMENT_FIELDS.some((allowed) => allowed === field)), []);
+        assert.equal(outcome.verdict, 'per-environment-baseline');
+      });
+    });
+  });
 });
 
 test('counter-example: the Windows-made manifest from another engine version is a mismatch on any machine', { timeout: 120_000 }, async () => {

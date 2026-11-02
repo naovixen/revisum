@@ -84,12 +84,12 @@ test('a value remembered inside a frame is visible to the steps after the frame'
 test('a plan with an undefined or duplicate value is refused before any driver is touched', async () => {
   let calls = 0;
   const spy: BrowserDriver = {
-    info: { id: 'playwright', version: 'spy', protocol: 'none' },
+    info: { id: 'cdp', version: 'spy', protocol: 'none' },
     supports() { calls++; return { ok: true, value: true }; },
     async open() { calls++; return failure({ reason: 'launch-failed', detail: 'the spy never launches' }); },
   };
   const events = memoryRunEventSink();
-  const ports = { drivers: new Map([['playwright', spy]]), clock: systemClock, artifacts: memoryArtifactStore(), redactor: defaultRedactor(), audit: memoryEventSink(), events };
+  const ports = { drivers: new Map([['cdp', spy]]), clock: systemClock, artifacts: memoryArtifactStore(), redactor: defaultRedactor(), audit: memoryEventSink(), events };
   const base = {
     project: projectWith(PROJECT_FIELDS), baseUrl: ORIGIN, seed: 42, fixedTimeMilliseconds: 0, fixtures: [],
     host: { platform: platform(), arch: arch() },

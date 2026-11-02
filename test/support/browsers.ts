@@ -1,8 +1,7 @@
 // The pinned browser builds the browser tests drive, always headless.
 // Chrome for Testing and its headless shell (the same build without a window system) are read from
 // the cache layout of @puppeteer/browsers under .browsers/ at the repository root; CHROME_PATH and
-// CHROME_HEADLESS_SHELL_PATH override them. The Playwright fallback driver uses the browsers that
-// match its own pinned version.
+// CHROME_HEADLESS_SHELL_PATH override them.
 import { platform } from 'node:os';
 import { join } from 'node:path';
 import { REPOSITORY_ROOT } from './repository.ts';
