@@ -4,14 +4,14 @@
 // `versions`, `seeds` and `clock`, so a new field without a case fails to compile
 // (manifest-perturbation-guarantees.ts shows it).
 //
-// Each case starts from a fully populated manifest: a 1.3 plan that fills a secret, names saved
-// storage state, calls a declared service, runs a database command, uses a css locator and a page
-// script, run with a driver that has a build port and with every pin. The fields only other kinds of
-// run have (an evidence run's record, a browser mutant's rewrites) start from their own builders.
+// Each case starts from a fully populated manifest: a 1.3 plan that fills a secret, calls a declared
+// service, runs a database command, uses a css locator and a page script, run with a driver that has
+// a build port and with every pin. The fields no such run has (an evidence run's record, a browser
+// mutant's rewrites, and saved storage state, whose run is refused for now) start from their own builders.
 // Each case checks its own field changed, so a case that perturbs the wrong input fails.
 import assert from 'node:assert/strict';
 import { after, test } from 'node:test';
-import { buildManifest, canonicalJson, evidenceManifest, manifestHash, sha256, type AdapterInfo, type RunManifest } from '@revisum/engine';
+import { buildManifest, canonicalJson, evidenceManifest, manifestHash, sha256, type AdapterInfo, type Plan, type RunManifest, type Target } from '@revisum/engine';
 import { declaredCheckoutSuite } from './evidence-examples.ts';
 import { TEST_SERVICE_SECRET_NAMES } from './plan-examples.ts';
 import {
@@ -19,7 +19,7 @@ import {
   type ManifestUnderTest, type RunPins, type Scenario,
 } from './replay-examples.ts';
 import { call, orderArguments } from './service-call-examples.ts';
-import { fakeSecretOfLength, fakeSecretValue, fakeStorageState } from './secret-examples.ts';
+import { fakeSecretOfLength, fakeSecretValue, fakeStorageState, secretName } from './secret-examples.ts';
 import {
   CSS_CHECK, DATABASE_SECRET, OPEN_CART, SCRIPT_SOURCES, SEED_EDITOR, SEED_EDITOR_FILE, SEED_ORDERS, XPATH_CHECK, unsafePlan, unsafeProjectFile,
   type JsonRecord,
@@ -34,7 +34,7 @@ const TOKEN = 'SHOP_API_TOKEN';
 
 const populatedProjectFile = (fields: JsonRecord = {}): JsonRecord =>
   unsafeProjectFile(['css-locator', 'xpath-locator', 'page-script', 'database-command'], {
-    secretNames: [...TEST_SERVICE_SECRET_NAMES, DATABASE_SECRET, SAVED_STATE], ...fields,
+    secretNames: [...TEST_SERVICE_SECRET_NAMES, DATABASE_SECRET], ...fields,
   });
 
 const POPULATED_STEPS: readonly JsonRecord[] = [
@@ -46,12 +46,12 @@ const POPULATED_STEPS: readonly JsonRecord[] = [
   SEED_EDITOR,
 ];
 const populatedPlan = (steps: readonly JsonRecord[] = POPULATED_STEPS, title = 'Cart totals'): JsonRecord => {
-  const plan = unsafePlan(steps, { storageState: { secretName: SAVED_STATE } });
+  const plan = unsafePlan(steps);
   return { ...plan, meta: { featureId: 'CART-1', specReference: 'specs/cart.md#totals', title } };
 };
 
 const ENVIRONMENT: Readonly<Record<string, string>> = {
-  [TOKEN]: fakeSecretValue(), [DATABASE_SECRET]: fakeSecretValue(), [SAVED_STATE]: fakeStorageState().json,
+  [TOKEN]: fakeSecretValue(), [DATABASE_SECRET]: fakeSecretValue(),
 };
 
 const POPULATED: Scenario = {
@@ -91,20 +91,36 @@ const ofManifest = (change: (manifest: ManifestUnderTest) => ManifestUnderTest):
   return { before, after: change(before) };
 };
 
+// What the manifest builder needs, for a case the populated run can't reach.
+const builderInputs = async (): Promise<{
+  readonly plan: Plan; readonly target: Target; readonly adapter: AdapterInfo; readonly browser: { readonly name: string; readonly version: string };
+  readonly seed: number; readonly fixedTimeMilliseconds: number; readonly fixtures: readonly []; readonly host: Scenario['host'];
+}> => {
+  const base = await runScenario(POPULATED);
+  return {
+    plan: base.plan, target: base.project.matrix[0] ?? assert.fail('no target'), adapter: { id: 'playwright', version: 'recording', protocol: 'none' },
+    browser: { name: 'recording-browser', version: '1.0' }, seed: POPULATED.seed, fixedTimeMilliseconds: POPULATED.clockStartMilliseconds,
+    fixtures: [], host: POPULATED.host,
+  };
+};
+
 // A browser mutant's rewrites reach the manifest only through the isolated runner's proxy, which a
 // unit run has not got, so this case starts from the manifest builder itself.
 const ofRewrites: Perturbation = async () => {
-  const base = await runScenario(POPULATED);
-  const target = base.project.matrix[0] ?? assert.fail('no target');
-  const adapter: AdapterInfo = { id: 'playwright', version: 'recording', protocol: 'none' };
-  const inputs = {
-    plan: base.plan, target, adapter, browser: { name: 'recording-browser', version: '1.0' }, seed: POPULATED.seed,
-    fixedTimeMilliseconds: POPULATED.clockStartMilliseconds, fixtures: [], host: POPULATED.host,
-  };
+  const inputs = await builderInputs();
   return {
     before: buildManifest({ ...inputs, responseRewrites: [{ origin: 'http://127.0.0.1:4310', name: 'heading-changed' }] }),
     after: buildManifest({ ...inputs, responseRewrites: [{ origin: 'http://127.0.0.1:4310', name: 'status-flipped' }] }),
   };
+};
+
+// A run of a plan naming saved storage state is refused until a driver can load it, so it makes no
+// manifest, and this case starts from the builder too.
+const ofStorageState: Perturbation = async () => {
+  const inputs = await builderInputs();
+  const manifestWith = (stateJson: string): RunManifest =>
+    buildManifest({ ...inputs, storageState: { name: secretName(SAVED_STATE), sha256: sha256(stateJson) } });
+  return { before: manifestWith(fakeStorageState().json), after: manifestWith(fakeStorageState().json) };
 };
 
 // An evidence run's record starts from the evidence manifest; one byte of one suite file changes it.
@@ -139,7 +155,7 @@ const PERTURBATIONS: { readonly [Field in keyof Required<ManifestUnderTest>]: Pe
   nonHermeticInputs: ofInput((scenario) => ({ ...scenario, cannotPin: ['randomness'] })),
   // A secret too short to search for is redacted by key only: same name, another mode.
   secrets: ofInput((scenario) => ({ ...scenario, environment: { ...scenario.environment, [TOKEN]: fakeSecretOfLength(4) } })),
-  storageState: ofInput((scenario) => ({ ...scenario, environment: { ...scenario.environment, [SAVED_STATE]: fakeStorageState().json } })),
+  storageState: ofStorageState,
   unsafeFeatures: ofInput((scenario) => ({ ...scenario, plan: populatedPlan([...POPULATED_STEPS, XPATH_CHECK]) })),
   unsafeDeclarations: ofInput((scenario) => ({
     ...scenario, scriptSources: { ...scenario.scriptSources, [SEED_EDITOR_FILE]: `${SCRIPT_SOURCES[SEED_EDITOR_FILE] ?? ''} ` },
@@ -192,7 +208,7 @@ async function assertPerturbationShows(path: readonly string[], perturbation: Pe
 
 test('the fully populated run records every manifest field a plan run can have', async () => {
   const manifest = await populatedManifest();
-  const onlyOtherRuns = new Set(['responseRewrites', 'evidence']);
+  const onlyOtherRuns = new Set(['responseRewrites', 'evidence', 'storageState']);
   const absent = Object.keys(PERTURBATIONS).filter((field) => !onlyOtherRuns.has(field) && !Object.hasOwn(manifest, field));
   assert.deepEqual(absent, [], `fields missing from the populated manifest: ${JSON.stringify(manifest)}`);
 });

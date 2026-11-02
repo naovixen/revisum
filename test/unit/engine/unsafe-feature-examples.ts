@@ -12,18 +12,19 @@
 //   - run() takes the named scripts' sources as `scriptSources`, keyed by each declared file path;
 //   - a closed plan's result and manifest carry no unsafe field at all, so their hashes are those
 //     of before plan 1.3 (unsafe-feature-closed-plans-unchanged.test.ts);
-//   - in M1 a run of a plan with page scripts or database commands still builds its manifest, and
-//     reports those steps as unsupported-step.
+//   - a run on the recording driver, which declares no page scripts, still builds its manifest, and
+//     reports those steps as unsupported-step. Its database commands go to a fake runner.
 import assert from 'node:assert/strict';
 import {
-  defaultRedactor, guaranteeStatement, parseProject, planParser, run, unsafeFeaturesOf,
+  defaultRedactor, environmentSecretStore, guaranteeStatement, parseProject, planParser, run, unsafeFeaturesOf,
   type GuaranteeId, type GuaranteeStatement, type Plan, type PlanError, type PlanStanding, type Project, type Result, type RunResult,
   type UnsafeFeature,
 } from '@revisum/engine';
 import { memoryArtifactStore, memoryEventSink, memoryRunEventSink, systemClock } from '../../support/memory-ports.ts';
 import { authorise, trustedProjectFrom } from '../../support/policy-clearance.ts';
+import { DATABASE_PASSWORD, fakeCommandRunner } from './database-command-examples.ts';
 import { DEFAULT_CLOCK_START, DEFAULT_SEED, recordingDriver, type Recording } from './run-value-examples.ts';
-import { FEATURES, ORIGIN, SCRIPT_SOURCES, unsafeProjectFile, type FeatureName, type JsonRecord } from './unsafe-feature-steps.ts';
+import { DATABASE_SECRET, FEATURES, ORIGIN, SCRIPT_SOURCES, unsafeProjectFile, type FeatureName, type JsonRecord } from './unsafe-feature-steps.ts';
 
 export type ParsePlan = (input: unknown) => Result<Plan, readonly PlanError[]>;
 
@@ -108,7 +109,7 @@ export type UnsafeRunOptions = {
 };
 
 // Parses `raw` against the project file (every feature enabled by default), clears it through the
-// policy gate and runs it on the project's target with a fresh recording driver.
+// policy gate and runs it on the project's target with a fresh recording driver and a fake command runner.
 export async function runUnsafePlan(raw: unknown, options: UnsafeRunOptions = {}): Promise<{ readonly result: RunResult; readonly recording: Recording }> {
   const projectFile = options.projectFile ?? unsafeProjectFile();
   const project = parsedProject(projectFile);
@@ -125,6 +126,7 @@ export async function runUnsafePlan(raw: unknown, options: UnsafeRunOptions = {}
   }, {
     drivers: new Map([[driver.info.id, driver]]), clock: systemClock, artifacts: memoryArtifactStore(),
     redactor: defaultRedactor(), audit: memoryEventSink(), events: memoryRunEventSink(),
+    secrets: environmentSecretStore({ [DATABASE_SECRET]: DATABASE_PASSWORD }), databaseCommands: fakeCommandRunner().port,
   });
   return { result, recording };
 }

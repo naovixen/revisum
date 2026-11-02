@@ -1,17 +1,17 @@
 // Saved browser storage state is a secret written by a person. A plan names it in a top-level
 // `storageState: { secretName }`; the secret's value is the storage-state JSON. Core resolves it
-// through the SecretStore like any secret, records only its name and sha256 in the manifest, and
-// no cookie or token value from it reaches any output. Loading it into a real browser session
-// comes with the CDP driver, so it is not tested here.
+// through the SecretStore like any secret, and no cookie or token value from it reaches any output.
+// Until a driver can load it into a session, every run of such a plan is refused (RunRefusals.test.ts),
+// so what the manifest will record is checked on the manifest builder.
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, test } from 'node:test';
-import { leakScanner, planParser, sha256 } from '@revisum/engine';
+import { buildManifest, decodeManifest, leakScanner, manifestHash, planParser, sha256, type Plan } from '@revisum/engine';
 import {
-  echoesIn, fakeSecretValue, fakeStorageState, manifestField, quietDriver, resolvedSecret, runWithSecrets, secretFillPlan,
-  secretProject, spyDriver,
+  FAKE_TARGET, echoesIn, fakeSecretValue, fakeStorageState, parsedPlan, quietDriver, resolvedSecret, runWithSecrets, secretFillPlan,
+  secretName, secretProject, spyDriver,
 } from './secret-examples.ts';
 
 const SAVED = 'SAVED_SESSION';
@@ -51,20 +51,32 @@ test('a plan holding literal storage-state JSON, as an object or as text, is rej
 
 // ---- Resolution and the manifest ----------------------------------------------------------------
 
-test('the manifest records the storage state by name and sha256 only', async () => {
+// The manifest of a plan naming storage state with this content, as the builder writes it.
+const manifestRecording = (stateJson: string) => {
+  const project = secretProject([SAVED]);
+  const plan: Plan = parsedPlan(project, withStorageState(SAVED));
+  const target = project.matrix.find((candidate) => candidate.id === FAKE_TARGET) ?? assert.fail('no target');
+  return buildManifest({
+    plan, target, adapter: { id: 'fake', version: '1.0', protocol: 'none' }, browser: { name: 'fake-browser', version: '1.0' },
+    seed: 7, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: 'test', arch: 'test' },
+    storageState: { name: secretName(SAVED), sha256: sha256(stateJson) },
+  });
+};
+
+test('the manifest records the storage state by name and sha256 only, and reads back the same', () => {
   const state = fakeStorageState();
-  const ran = await runWithSecrets([SAVED], withStorageState(SAVED), { [SAVED]: state.json }, quietDriver());
-  assert.ok(ran.result.manifest, 'the run reached its manifest');
-  assert.deepEqual(manifestField(ran.result, 'storageState'), { name: SAVED, sha256: sha256(state.json) });
-  const manifest = JSON.stringify(ran.result.manifest);
-  assert.deepEqual([...echoesIn(manifest, state.cookieValue), ...echoesIn(manifest, state.tokenValue)], []);
+  const manifest = manifestRecording(state.json);
+  assert.deepEqual(Reflect.get(manifest, 'storageState'), { name: SAVED, sha256: sha256(state.json) });
+  assert.deepEqual(decodeManifest(JSON.parse(JSON.stringify(manifest))), { ok: true, value: manifest });
+  const written = JSON.stringify(manifest);
+  assert.deepEqual([...echoesIn(written, state.cookieValue), ...echoesIn(written, state.tokenValue)], []);
 });
 
-test('a different storage state under the same name changes the recorded sha256', async () => {
-  const first = await runWithSecrets([SAVED], withStorageState(SAVED), { [SAVED]: fakeStorageState().json }, quietDriver());
-  const second = await runWithSecrets([SAVED], withStorageState(SAVED), { [SAVED]: fakeStorageState().json }, quietDriver());
-  assert.notDeepEqual(manifestField(first.result, 'storageState'), manifestField(second.result, 'storageState'));
-  assert.notEqual(first.result.manifestHash, second.result.manifestHash);
+test('a different storage state under the same name changes the recorded sha256 and the manifest hash', () => {
+  const first = manifestRecording(fakeStorageState().json);
+  const second = manifestRecording(fakeStorageState().json);
+  assert.notDeepEqual(Reflect.get(first, 'storageState'), Reflect.get(second, 'storageState'));
+  assert.notEqual(manifestHash(first), manifestHash(second));
 });
 
 test('storage state the store cannot resolve ends the run with secret-missing before any driver opens', async () => {
@@ -89,7 +101,7 @@ test('the leak scan finds its canary and no cookie or token value from the stora
     [SAVED, 'ACCOUNT_TOKEN'], secretFillPlan(['ACCOUNT_TOKEN'], { storageState: { secretName: SAVED } }),
     { [SAVED]: state.json, ACCOUNT_TOKEN: fakeSecretValue() }, quietDriver(),
   );
-  assert.ok(ran.result.manifest, 'the run reached its manifest');
+  assert.equal(ran.result.refusal?.code, 'storage-state-unsupported');
   const resultPath = join(folder, 'result.json');
   const eventsPath = join(folder, 'events.jsonl');
   const canaryPath = join(folder, 'canary.json');

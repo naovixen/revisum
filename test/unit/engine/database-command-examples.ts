@@ -19,7 +19,7 @@
 //     as { name, value } entries or a record by name, a secret still an opaque Secret), `policy`
 //     (an EgressPolicy with allowTcpServices), `timeoutMilliseconds` and `maximumOutputBytes`;
 //   - run() takes the port in RunPorts, as `databaseCommands`, beside `services`;
-//   - a run without the port reports its database steps as unsupported-step (M1 behaviour).
+//   - a run without the port refuses a plan with a database command before any side effect.
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { success, type EgressEvent, type WorkloadErrorCode, type WorkloadOutcome } from '@revisum/contracts';

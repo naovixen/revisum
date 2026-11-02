@@ -149,7 +149,7 @@ test("a cleared plan run with another plan's standing is refused the production 
   const driver = countingDriver();
   const result = await run({ ...runBase(standingOfPlanA), plan: authorise(planB, trusted), targetId: TARGET_ID as TargetId }, runPorts(driver));
   assert.equal(driver.calls, 0, `plan B reached a driver on the production origin: ${JSON.stringify(result)}`);
-  assert.ok(JSON.stringify(result).includes('origin_not_allowed'), JSON.stringify(result));
+  assert.equal(result.refusal?.code, 'origin-not-allowed', JSON.stringify(result));
   assert.equal(result.approvalLabel, undefined, "plan B's result carries plan A's approval label");
 });
 

@@ -56,7 +56,8 @@ const ERROR_CODES: Readonly<Record<string, readonly string[]>> = {
   trust: ['untrusted-source', 'changed-with-code', 'no-approval'],
   replay: ['replay-not-claimed', 'replay-mismatch', 'version-unsupported'],
   refusal: [
-    'origin_not_allowed', 'secret-missing', 'services-unavailable', 'evidence-mode-disabled', 'suite-not-declared', 'egress-unenforceable',
+    'origin-not-allowed', 'secret-missing', 'services-unavailable', 'storage-state-unsupported', 'database-commands-unavailable',
+    'evidence-mode-disabled', 'suite-not-declared', 'egress-unenforceable',
   ],
   policy: [
     'irreversible-action', 'irreversible-submit', 'destructive-navigation', 'irreversible-dialog', 'unnamed-control',

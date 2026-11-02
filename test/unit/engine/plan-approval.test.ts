@@ -115,10 +115,10 @@ test('with its own approval the plan stands approved and opens the merge gate', 
   assert.equal(mergeGateOpen(standing), true);
 });
 
-test('a proposal run on a production origin is refused with origin_not_allowed before any driver call', async () => {
+test('a proposal run on a production origin is refused with origin-not-allowed before any driver call', async () => {
   const { result, driverCalls } = await runPlan(parsedSignupPlan(), { mode: 'proposal' }, PRODUCTION_ORIGIN);
   assert.equal(driverCalls, 0, 'the driver was called for a proposal on a production origin');
-  assert.ok(JSON.stringify(result).includes('origin_not_allowed'), JSON.stringify(result));
+  assert.equal(result.refusal?.code, 'origin-not-allowed', JSON.stringify(result));
 });
 
 test('a proposal run on a non-production origin goes ahead', async () => {
@@ -132,7 +132,7 @@ test('the same plan, approved, may run on the production origin', async () => {
   // Production is denied to every plan unless the project allows it for approved plans.
   const { result, driverCalls } = await runPlan(parsedSignupPlan(), { mode: 'approved', approval }, PRODUCTION_ORIGIN, { allowProductionForApprovedPlans: true });
   assert.ok(driverCalls > 0, 'an approved plan was not run');
-  assert.ok(!JSON.stringify(result).includes('origin_not_allowed'), JSON.stringify(result));
+  assert.equal(result.refusal, undefined, JSON.stringify(result));
 });
 
 // ---- One byte changed ---------------------------------------------------------------------------

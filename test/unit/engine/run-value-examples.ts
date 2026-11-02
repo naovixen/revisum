@@ -10,7 +10,7 @@
 import assert from 'node:assert/strict';
 import {
   defaultRedactor, parseProject, planParser, run,
-  type ActionStep, type BrowserDriver, type ElementProbe, type GeneratedValue, type Plan, type PlanError, type Project,
+  type ActionStep, type BrowserDriver, type DriverFeature, type ElementProbe, type GeneratedValue, type Plan, type PlanError, type Project,
   type Result, type RunResult, type Session, type SessionEnvironment, type ValueName,
 } from '@revisum/engine';
 import { memoryArtifactStore, memoryEventSink, memoryRunEventSink, systemClock } from '../../support/memory-ports.ts';
@@ -99,8 +99,8 @@ const SHOWN: ElementProbe = { count: 1, visible: true, enabled: true, text: 'Rea
 export const PAGE_TITLE = 'Orders';
 
 // A driver whose page accepts every action, shows one element for every locator and records
-// every call. Its adapter id is the shared test project's.
-export function recordingDriver(): { readonly driver: BrowserDriver; readonly recording: Recording } {
+// every call. Its adapter id is the shared test project's. `performs` is what it says it can do.
+export function recordingDriver(performs?: readonly DriverFeature[]): { readonly driver: BrowserDriver; readonly recording: Recording } {
   const recording: Recording = { environments: [], navigations: [], actions: [], probes: 0 };
   const session: Session = {
     browser: { name: 'recording-browser', version: '1.0' },
@@ -115,7 +115,7 @@ export function recordingDriver(): { readonly driver: BrowserDriver; readonly re
     close: async () => undefined,
   };
   const driver: BrowserDriver = {
-    info: { id: 'playwright', version: 'recording', protocol: 'none' },
+    info: { id: 'playwright', version: 'recording', protocol: 'none', ...(performs === undefined ? {} : { performs }) },
     supports: () => ({ ok: true, value: true }),
     open: async (_target, environment) => { recording.environments.push(environment); return { ok: true, value: session }; },
   };
@@ -127,6 +127,7 @@ export type RunOptions = {
   readonly seed?: number;
   readonly clockStartMilliseconds?: number;
   readonly baseUrl?: string;
+  readonly performs?: readonly DriverFeature[];
 };
 
 export const DEFAULT_SEED = 7;
@@ -143,7 +144,7 @@ export async function runPlan(raw: unknown, options: RunOptions = {}): Promise<{
   const trusted = await trustedProjectFrom(projectFile);
   const target = project.matrix[0];
   assert.ok(target !== undefined, 'the test project has a target');
-  const { driver, recording } = recordingDriver();
+  const { driver, recording } = recordingDriver(options.performs);
   const result = await run({
     plan: authorise(plan, trusted), project, targetId: target.id, baseUrl: options.baseUrl ?? ORIGIN,
     seed: options.seed ?? DEFAULT_SEED, fixedTimeMilliseconds: options.clockStartMilliseconds ?? DEFAULT_CLOCK_START,
