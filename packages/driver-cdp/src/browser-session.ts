@@ -55,7 +55,7 @@ export type SessionDetails = {
 const BROWSER_ERROR_PAGE = 'chrome-error:';
 
 const CRASHED: DriverError = { code: 'target-crashed', detail: 'the page\'s renderer died' };
-const SELECTOR_INVALID: DriverError = { code: 'selector-invalid', detail: 'the browser rejects a css selector or XPath expression of the locator' };
+const SELECTOR_INVALID: DriverError = { code: 'selector-invalid', detail: 'the browser rejects a CSS selector or XPath expression of the locator' };
 
 // The optional plan features every session buildSession makes performs, whatever its protocol:
 // positions, test-id attributes and css and XPath selectors in locate, chords and multi-line text
@@ -88,7 +88,7 @@ async function matches<Handle>(operations: PageOperations<Handle>, locator: Reso
   }
 }
 
-// True when the browser rejects a css selector or XPath expression of the locator or of a locator
+// True when the browser rejects a CSS selector or XPath expression of the locator or of a locator
 // it is inside. A page that cannot answer, such as one navigating, is taken to accept it: matching
 // then finds nothing yet, as for any locator.
 async function rejectsSelector<Handle>(operations: PageOperations<Handle>, locator: ResolvedLocator): Promise<boolean> {

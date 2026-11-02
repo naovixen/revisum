@@ -23,7 +23,7 @@ import type { AdapterId, Target } from './target.ts';
 // with nothing of it kept, so the step never passes with a partial result.
 // assertion-failed: a dialog step's expected text is not the open dialog's text, so nothing
 // answered the dialog.
-// selector-invalid: the browser rejects a css selector or XPath expression the step's locator
+// selector-invalid: the browser rejects a CSS selector or XPath expression the step's locator
 // holds, or the XPath expression selects no nodes at all (such as count()), so nothing was sent.
 // script-failed: a page script threw, its promise rejected, or its source is not one function.
 // script-timeout: a page script did not settle within its timeout.
@@ -84,7 +84,7 @@ export type ElementProbe = {
   // What the probe was asked to read of the element's DOM, for a DOM check or a remember from an
   // attribute. Present when the driver reads them (the domChecks feature) and one was asked.
   readonly dom?: DomValue;
-  // True when the browser rejects a css selector or XPath expression of the locator: nothing it
+  // True when the browser rejects a CSS selector or XPath expression of the locator: nothing it
   // could ever match, so a check fails with selector-invalid rather than waiting.
   readonly selectorInvalid?: true;
 };

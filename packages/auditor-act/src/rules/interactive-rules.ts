@@ -114,7 +114,7 @@ function reorderCause(snapshot: PageSnapshot, from: SnapshotNode, to: SnapshotNo
     ...toChain.slice(0, common ? toChain.indexOf(common) : undefined),
   ];
   for (const node of chain) {
-    if ((node.style?.['order'] ?? '0') !== '0') return 'css order';
+    if ((node.style?.['order'] ?? '0') !== '0') return 'CSS order';
     if ((node.style?.['flex-direction'] ?? '').endsWith('reverse') && /flex/.test(node.style?.['display'] ?? '')) return 'reversed flex direction';
   }
   return null;
@@ -176,11 +176,11 @@ export const keyboardReachProbe: InteractiveRule = {
   },
 };
 
-// WCAG 2.2 success criterion 2.5.8 Target Size (Minimum): 24 by 24 css pixels, or spaced so that
+// WCAG 2.2 success criterion 2.5.8 Target Size (Minimum): 24 by 24 CSS pixels, or spaced so that
 // 24-pixel circles centred on the targets do not intersect.
 const NATIVE_CONTROLS = new Set(['input', 'select', 'button', 'textarea', 'summary']);
 export const targetSizeProbe: InteractiveRule = {
-  meta: probeMeta('page-target-size', 'Pointer target is at least 24 by 24 css pixels or adequately spaced', ['2.5.8'], 'P3', WCAG_UNDERSTANDING + 'target-size-minimum'),
+  meta: probeMeta('page-target-size', 'Pointer target is at least 24 by 24 CSS pixels or adequately spaced', ['2.5.8'], 'P3', WCAG_UNDERSTANDING + 'target-size-minimum'),
   needsWalk: true,
   async run(page, snapshot, walk) {
     const clickable = snapshotExtras(snapshot).clickable;
@@ -232,7 +232,7 @@ export const targetSizeProbe: InteractiveRule = {
 // horizontal scrolling, except parts that need two-dimensional layout (left as cantTell).
 const TWO_DIMENSIONAL = new Set(['table', 'pre', 'code', 'img', 'video', 'canvas', 'svg', 'iframe', 'map', 'math', 'object', 'embed']);
 export const reflowProbe: InteractiveRule = {
-  meta: probeMeta('page-reflow', 'Content reflows at 320 css px without horizontal scrolling', ['1.4.10'], 'P2', WCAG_UNDERSTANDING + 'reflow'),
+  meta: probeMeta('page-reflow', 'Content reflows at 320 CSS px without horizontal scrolling', ['1.4.10'], 'P2', WCAG_UNDERSTANDING + 'reflow'),
   needsWalk: false,
   async run(page, snapshot) {
     const root = snapshot.nodes.find((node) => node.nodeType === 1 && node.name === 'html' && node.document === 0);

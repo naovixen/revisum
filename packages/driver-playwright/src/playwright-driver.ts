@@ -54,7 +54,7 @@ function launchSettings(engine: Target['engine']): LaunchSettings {
 // punctuation keys (such as Backquote) and F1 to F12.
 const keyName = (key: Key): string => key;
 const NO_ELEMENT: ElementProbe = { count: 0, visible: false, enabled: false, text: '', value: null, sensitive: false, box: null };
-const SELECTOR_INVALID: DriverError = { code: 'selector-invalid', detail: 'the browser rejects a css selector or XPath expression of the locator' };
+const SELECTOR_INVALID: DriverError = { code: 'selector-invalid', detail: 'the browser rejects a CSS selector or XPath expression of the locator' };
 
 // The optional plan features this fallback performs: css and XPath locators, DOM checks and page
 // scripts. It declares no feature of plan language 1.2's, such as positions or remembered values.
@@ -195,7 +195,7 @@ async function locate(page: Page, locator: ResolvedLocator): Promise<PlaywrightL
   }
 }
 
-// True when the browser rejects a css selector or XPath expression of the locator or of a locator
+// True when the browser rejects a CSS selector or XPath expression of the locator or of a locator
 // it is inside.
 async function rejectsSelector(page: Page, locator: ResolvedLocator): Promise<boolean> {
   if (locator.by !== 'css' && locator.by !== 'xpath') return false;
