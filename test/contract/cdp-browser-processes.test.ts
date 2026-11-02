@@ -9,6 +9,7 @@
 import assert from 'node:assert/strict';
 import { basename } from 'node:path';
 import { after, before, describe, test } from 'node:test';
+import { allowEveryAction } from '#test-support/browser/AllowEveryAction.ts';
 import { fullTierOnly, onTarget } from '#test-support/TestTier.ts';
 import { BrowserTarget } from '#test-support/browser/BrowserTarget.ts';
 import { click, navigate, role, testId, textEquals } from '#test-support/browser/RawPlan.ts';
@@ -100,7 +101,7 @@ for (const targetId of Object.values(BrowserTarget)) {
         const renderers = rendererProcesses(session.processId);
         assert.ok(renderers.length > 0, 'the page has a renderer');
         for (const renderer of renderers) endAtOnce(renderer.processId);
-        const acted = await session.act(capability.actionStep(click(role('button', 'Ask a question'))));
+        const acted = await session.act(capability.actionStep(click(role('button', 'Ask a question'))), allowEveryAction);
         assert.equal(acted.ok ? 'passed' : acted.error.code, 'target-crashed');
       } finally {
         await session.close();
@@ -162,7 +163,7 @@ for (const targetId of Object.values(BrowserTarget)) {
       try {
         assert.ok((await session.navigate(capability.url('/dialog.html'))).ok);
         // The click opens a confirm dialog that nothing answers.
-        assert.ok((await session.act(capability.actionStep(click(role('button', 'Ask a question'))))).ok);
+        assert.ok((await session.act(capability.actionStep(click(role('button', 'Ask a question'))), allowEveryAction)).ok);
         tree = processTree(session.processId);
       } finally {
         await session.close();

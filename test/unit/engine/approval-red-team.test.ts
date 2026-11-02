@@ -8,7 +8,7 @@ import {
   PERSON_ACTOR_TYPES, approvalFor, mergeGateOpen, planStanding, unverified, type Approval, type ApprovalErrorCode, type ApprovalProof,
 } from '@revisum/engine';
 import {
-  APPROVERS_PATH, approversOf, assertRefused, memoryApprovalStore, parsedSignupPlan, withRepository,
+  APPROVERS_PATH, PLAN_PATH, approversOf, assertRefused, memoryApprovalStore, parsedSignupPlan, withRepository,
   type FixtureRepository, type TestRepository,
 } from './approval-repositories.ts';
 
@@ -104,6 +104,7 @@ test('the same lock-down, with a person as maintainer who merged, does approve',
     const lockdown = approversOf(fixture).agentLockdown;
     if (lockdown !== undefined) lockdown.maintainer = 'maintainer-mia';
     fixture.landings.push({ commit: 'commit-person-merge', branch: 'main', login: 'maintainer-mia', type: 'user', at: '2026-10-25T09:00:00Z' });
+    fixture.lastCommitsOnProtectedBranch = { [PLAN_PATH]: 'commit-person-merge' };
     if (fixture.protectedFiles[APPROVERS_PATH] === undefined) throw new Error('the red-team repository has no approvers.json');
   });
 });

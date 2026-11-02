@@ -5,6 +5,7 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import { defaultRedactor, seededRandom, type A11yNode, type Session, type SessionEnvironment, type Step } from '@revisum/engine';
+import { allowEveryAction } from '#test-support/browser/AllowEveryAction.ts';
 import { onTarget } from '#test-support/TestTier.ts';
 import type { BrowserHarness } from '#test-support/browser/BrowserHarness.ts';
 import { CONTRACT_TARGETS, EMAIL, FIXED_TIME_MILLISECONDS, LOCALE, SEED, TIMEZONE, environmentPlan, signupHarness, makeDrivers, signupPlan, stepsPlan } from '#test-support/signup-harness.ts';
@@ -108,7 +109,7 @@ for (const targetId of CONTRACT_TARGETS) {
       const probe = await withSession(targetId, async (session) => {
         assert.ok((await session.navigate(`${testHarness.server.origin}/`)).ok);
         const fill = parsedStep({ type: 'fill', locator: { by: 'label', label: 'Email' }, value: EMAIL }, 'fill');
-        const filled = await session.act(fill);
+        const filled = await session.act(fill, allowEveryAction);
         assert.ok(filled.ok);
         return session.probe(fill.locator);
       });

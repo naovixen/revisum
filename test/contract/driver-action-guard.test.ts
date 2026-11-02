@@ -11,6 +11,7 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import type { ActionGuard, GuardVerdict, ResolvedElement, Session } from '@revisum/engine';
+import { allowEveryAction } from '#test-support/browser/AllowEveryAction.ts';
 import { BrowserTarget } from '#test-support/browser/BrowserTarget.ts';
 import { click, label, navigate, role, testId, textEquals, type JsonRecord } from '#test-support/browser/RawPlan.ts';
 import { UPLOAD_FIXTURE, capabilityCdpDriver, capabilityDrivers, capabilityHarness, capabilityPlan, shownText, watchedDriver, type CapabilityHarness } from '#test-support/capability-harness.ts';
@@ -134,7 +135,7 @@ describe(`the runtime guard on dialogs: ${BrowserTarget.Chrome}`, () => {
   test('a denied dialog answer ends with policy-denied; the guard gets the dialog text and an empty element', async () => {
     const { guard, calls } = spyGuard({ kind: 'deny', rule: 'irreversible-dialog', stepIndex: 2 });
     await withGuardPage(BrowserTarget.Chrome, async (session) => {
-      assert.ok((await session.act(capability.actionStep(click(role('button', 'Ask a question'))))).ok, 'the click opens the dialog');
+      assert.ok((await session.act(capability.actionStep(click(role('button', 'Ask a question'))), allowEveryAction)).ok, 'the click opens the dialog');
       const answered = await session.act(capability.actionStep({ type: 'dialog', action: 'accept', expectText: 'Keep the draft?' }), guard);
       assert.equal(answered.ok ? 'passed' : answered.error.code, 'policy-denied');
     });
@@ -145,7 +146,7 @@ describe(`the runtime guard on dialogs: ${BrowserTarget.Chrome}`, () => {
   test('counter-example: an allowed dialog answer accepts the dialog', async () => {
     const { guard, calls } = spyGuard(ALLOW);
     await withGuardPage(BrowserTarget.Chrome, async (session) => {
-      assert.ok((await session.act(capability.actionStep(click(role('button', 'Ask a question'))))).ok);
+      assert.ok((await session.act(capability.actionStep(click(role('button', 'Ask a question'))), allowEveryAction)).ok);
       const answered = await session.act(capability.actionStep({ type: 'dialog', action: 'accept', expectText: 'Keep the draft?' }), guard);
       assert.ok(answered.ok, answered.ok ? '' : `${answered.error.code}: ${answered.error.detail}`);
       assert.equal(await shownText(capability, session, 'dialog-status'), 'Kept');

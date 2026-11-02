@@ -7,6 +7,7 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import type { DriverSession } from '@revisum/driver-cdp';
+import { allowEveryAction } from '#test-support/browser/AllowEveryAction.ts';
 import { isTargetRunning, onTarget } from '#test-support/TestTier.ts';
 import { BrowserTarget } from '#test-support/browser/BrowserTarget.ts';
 import { click, role } from '#test-support/browser/RawPlan.ts';
@@ -48,7 +49,7 @@ for (const targetId of Object.values(BrowserTarget)) {
     const clickContinue = async (scenario: string) => {
       assert.ok((await session.navigate(capability.url(`/auto-wait-${scenario}.html`))).ok, `the ${scenario} page loads`);
       const started = Date.now();
-      const acted = await session.act(capability.actionStep(click(role('button', 'Continue'))));
+      const acted = await session.act(capability.actionStep(click(role('button', 'Continue'))), allowEveryAction);
       return { acted, elapsed: Date.now() - started, shown: await shownText(capability, session, 'result') };
     };
 

@@ -127,7 +127,7 @@ const WENT_THROUGH = { state: "Passed", shown: CLICKED };
 
 // Stands for a caller the type system cannot stop, so it still compiles once the guard is required.
 const actWithoutGuard = (session: Session, step: ActionStep): ReturnType<Session["act"]> =>
-    Reflect.apply(session.act.bind(session), undefined, [step]);
+    Reflect.apply(session.act.bind(session), undefined, [step]) as ReturnType<Session["act"]>;
 
 async function withPlainPage<Value>(use: (session: Session) => Promise<Value>): Promise<Value> {
     const session = await harness.open(TARGET);

@@ -11,6 +11,7 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import type { Session } from '@revisum/engine';
+import { allowEveryAction } from '#test-support/browser/AllowEveryAction.ts';
 import { outcomes } from '#test-support/browser/BrowserHarness.ts';
 import { BrowserTarget } from '#test-support/browser/BrowserTarget.ts';
 import { click, fill, label, navigate, newTab, role, testId, textEquals } from '#test-support/browser/RawPlan.ts';
@@ -83,7 +84,7 @@ describe('a newTab whose step fails', () => {
     const counted: { shown: string | null } = { shown: null };
     // Asks the first tab, as the session closes, how many other pages of the origin answer.
     const countAtClose = async (session: Session): Promise<void> => {
-      const acted = await session.act(harness.actionStep(COUNT_TABS));
+      const acted = await session.act(harness.actionStep(COUNT_TABS), allowEveryAction);
       assert.ok(acted.ok, `the count could be asked: ${acted.ok ? '' : acted.error.code}`);
       counted.shown = await settledText(harness, session, 'other-tabs', 'counting');
     };

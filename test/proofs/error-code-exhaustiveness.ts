@@ -93,7 +93,7 @@ export function describeStepError(code: StepErrorCode): string {
   switch (code) {
     case 'value-empty': case 'value-unsafe': case 'value-too-long': case 'state-not-exposed': case 'download-not-text':
     case 'request-not-seen': case 'script-result-too-large': case 'script-result-invalid':
-    case 'command-failed': case 'command-timeout': case 'command-output-invalid':
+    case 'command-failed': case 'command-timeout': case 'command-output-invalid': case 'value-holds-secret': case 'capture-left-out':
       return 'step failed';
     default:
       return unreachable(code);
@@ -103,7 +103,7 @@ export function describeStepErrorForgettingOne(code: StepErrorCode): string {
   switch (code) {
     case 'value-empty': case 'value-too-long': case 'state-not-exposed': case 'download-not-text': case 'request-not-seen':
     case 'script-result-too-large': case 'script-result-invalid':
-    case 'command-failed': case 'command-timeout': case 'command-output-invalid':
+    case 'command-failed': case 'command-timeout': case 'command-output-invalid': case 'value-holds-secret': case 'capture-left-out':
       return 'step failed';
     default:
       // @ts-expect-error 'value-unsafe' is not handled, so the code does not narrow to never
@@ -284,7 +284,7 @@ export function describeRefusal(code: lifecycle.RefusalCode): string {
   switch (code) {
     case 'origin-not-allowed': case 'secret-missing': case 'services-unavailable': case 'storage-state-unsupported':
     case 'database-commands-unavailable': case 'evidence-mode-disabled': case 'suite-not-declared': case 'egress-unenforceable':
-    case 'script-source-missing': case 'image-missing': case 'image-digest-mismatch': case 'workload-start-failed':
+    case 'script-source-missing': case 'image-missing': case 'image-digest-mismatch': case 'workload-start-failed': case 'clearance-standing-mismatch':
       return 'run refused';
     default:
       return unreachable(code);
@@ -294,7 +294,7 @@ export function describeRefusalForgettingOne(code: lifecycle.RefusalCode): strin
   switch (code) {
     case 'origin-not-allowed': case 'secret-missing': case 'services-unavailable': case 'storage-state-unsupported':
     case 'evidence-mode-disabled': case 'suite-not-declared': case 'egress-unenforceable':
-    case 'script-source-missing': case 'image-missing': case 'image-digest-mismatch': case 'workload-start-failed':
+    case 'script-source-missing': case 'image-missing': case 'image-digest-mismatch': case 'workload-start-failed': case 'clearance-standing-mismatch':
       return 'run refused';
     default:
       // @ts-expect-error 'database-commands-unavailable' is not handled, so the code does not narrow to never

@@ -30,7 +30,7 @@ const ERROR_CODES: Readonly<Record<string, readonly string[]>> = {
   ],
   step: [
     'value-empty', 'value-unsafe', 'value-too-long', 'state-not-exposed', 'download-not-text', 'request-not-seen', 'script-result-too-large',
-    'script-result-invalid', 'command-failed', 'command-timeout', 'command-output-invalid',
+    'script-result-invalid', 'command-failed', 'command-timeout', 'command-output-invalid', 'value-holds-secret', 'capture-left-out',
   ],
   serviceCall: [
     'response-not-json', 'response-too-large', 'field-missing', 'service-unreachable', 'call-timeout', 'unexpected-status',
@@ -59,7 +59,7 @@ const ERROR_CODES: Readonly<Record<string, readonly string[]>> = {
   replay: ['replay-not-claimed', 'replay-mismatch', 'version-unsupported'],
   refusal: [
     'origin-not-allowed', 'secret-missing', 'services-unavailable', 'storage-state-unsupported', 'database-commands-unavailable',
-    'evidence-mode-disabled', 'suite-not-declared', 'egress-unenforceable',
+    'evidence-mode-disabled', 'suite-not-declared', 'egress-unenforceable', 'clearance-standing-mismatch',
   ],
   policy: [
     'irreversible-action', 'irreversible-submit', 'destructive-navigation', 'irreversible-dialog', 'unnamed-control',

@@ -89,7 +89,7 @@ function driverThatDiesAfterTheHover(death: Death | null) {
                 return opened;
             }
             const session = opened.value;
-            const act = async (step: ActionStep, guard?: ActionGuard, secret?: Secret) => {
+            const act = async (step: ActionStep, guard: ActionGuard, secret?: Secret) => {
                 const acted = await session.act(step, guard, secret);
                 if (step.type === "hover" && death !== null) {
                     await dieIn(session, death);

@@ -163,6 +163,7 @@ test('the same maintainer, once named in approvers.json on the protected branch,
     const lockdown = approversOf(fixture).agentLockdown;
     if (lockdown !== undefined) lockdown.maintainer = 'agent-account';
     fixture.landings.push({ commit: 'commit-agent-merge', branch: 'main', login: 'agent-account', type: 'user', at: '2026-10-25T09:00:00Z' });
+    fixture.lastCommitsOnProtectedBranch = { [PLAN_PATH]: 'commit-agent-merge' };
   });
 });
 

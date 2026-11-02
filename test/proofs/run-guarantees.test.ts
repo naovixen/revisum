@@ -7,6 +7,7 @@ import {
   planWithAi, releaseNoteDraft, runUntrusted, writeReleaseNotes,
   type AiPlanner, type AiWriter, type Box, type BrowserDriver, type RunResult, type Step,
 } from '@revisum/engine';
+import { allowEveryAction } from '#test-support/browser/AllowEveryAction.ts';
 import { hostilePlans } from '#test-support/hostile-plans.ts';
 import { memoryArtifactStore, memoryEventSink, memoryRunEventSink, systemClock } from '#test-support/memory-ports.ts';
 import { decodePng } from '#test-support/png-decoder.ts';
@@ -164,7 +165,7 @@ describe('(d) redaction by default', () => {
         assert.ok((await session.navigate(`${testHarness.server.origin}/`)).ok);
         // Steps 1 and 2 are the two fills; the probe plan adds a final check after them.
         for (const step of plan.steps.slice(1, 3) as Extract<Step, { type: 'fill' }>[]) {
-          assert.ok((await session.act(step)).ok);
+          assert.ok((await session.act(step, allowEveryAction)).ok);
         }
         const boxes = await Promise.all(plan.steps.slice(1, 3).map(async (step) => (await session.probe((step as Extract<Step, { type: 'fill' }>).locator)).box));
         const masked = await session.screenshot(redactor.selectors);

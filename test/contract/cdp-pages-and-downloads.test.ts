@@ -8,6 +8,7 @@ import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, describe, test } from 'node:test';
+import { allowEveryAction } from '#test-support/browser/AllowEveryAction.ts';
 import { onTarget } from '#test-support/TestTier.ts';
 import { BrowserTarget } from '#test-support/browser/BrowserTarget.ts';
 import { click, navigate, role, testId, textEquals } from '#test-support/browser/RawPlan.ts';
@@ -68,7 +69,7 @@ for (const targetId of Object.values(BrowserTarget)) {
       const session = await capability.openOwn(targetId);
       try {
         assert.ok((await session.navigate(capability.url('/pages.html'))).ok);
-        const acted = await session.act(capability.actionStep(click(role('button', 'Open help'))));
+        const acted = await session.act(capability.actionStep(click(role('button', 'Open help'))), allowEveryAction);
         assert.equal(acted.ok ? 'passed' : acted.error.code, 'unsupported-step');
         // The page checks its own handle on the popup every 50 ms.
         let popupState = '';

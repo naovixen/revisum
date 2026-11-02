@@ -11,6 +11,7 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import type { DriverSession } from '@revisum/driver-cdp';
+import { allowEveryAction } from '#test-support/browser/AllowEveryAction.ts';
 import { createBrowserDriver } from '#test-support/browser/CreateBrowserDriver.ts';
 import { defaultRedactor, type SessionEnvironment } from '@revisum/engine';
 import { joinEgressEvents, startEgressProxy, type EgressProxy } from '@revisum/runner';
@@ -78,7 +79,7 @@ async function sendThrough(channel: ChannelName): Promise<{ readonly events: rea
   const host = CHANNEL_HOSTS[channel];
   const navigated = await session.navigate(fixture.url(CHANNEL_PAGES[channel]));
   assert.ok(navigated.ok, JSON.stringify(navigated));
-  if (channel === 'popup') await session.act(capability.actionStep(click(role('button', 'Open the partner site'))));
+  if (channel === 'popup') await session.act(capability.actionStep(click(role('button', 'Open the partner site'))), allowEveryAction);
   await waitFor(() => eventsOf(session).some((event) => event.channel === channel && hostOf(String(event.origin)) === host));
   return { events: eventsOf(session), session };
 }

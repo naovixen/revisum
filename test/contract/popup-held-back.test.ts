@@ -10,6 +10,7 @@ import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { after, before, test } from 'node:test';
 import type { DriverSession } from '@revisum/driver-cdp';
+import { allowEveryAction } from '#test-support/browser/AllowEveryAction.ts';
 import { createBrowserDriver } from '#test-support/browser/CreateBrowserDriver.ts';
 import { defaultRedactor, type SessionEnvironment } from '@revisum/engine';
 import { joinEgressEvents, startEgressProxy, type EgressProxy } from '@revisum/runner';
@@ -83,7 +84,7 @@ async function openSession(): Promise<DriverSession> {
 async function openPopup(session: DriverSession): Promise<void> {
   const navigated = await session.navigate(`${opener.origin}/`);
   assert.ok(navigated.ok, JSON.stringify(navigated));
-  await session.act(capability.actionStep(click(role('button', OPEN_BUTTON))));
+  await session.act(capability.actionStep(click(role('button', OPEN_BUTTON))), allowEveryAction);
   const deadline = Date.now() + WAIT_MILLISECONDS;
   const reported = (): boolean => session.egressRecords().some((entry) => entry.channel === 'popup' && entry.origin === reachable.origin);
   while (!reported() && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, POLL_MILLISECONDS));

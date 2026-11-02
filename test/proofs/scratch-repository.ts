@@ -44,7 +44,7 @@ const RULES_TOOL = 'tools/RunRepositoryRules.ts';
 // More than half the repository's files, and no lint rule's input: no rule reads what's in them,
 // and no glossary row or dependency review cites a path there. A rule that started to would fail
 // every control in the copy, loudly.
-const FOLDERS_NO_RULE_READS = ['fixtures/'];
+const FOLDERS_NO_RULE_READS = ['fixtures/', '.claude/worktrees/'];
 
 function repositoryFiles(): string[] {
   const listed = execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard', '-z'], {

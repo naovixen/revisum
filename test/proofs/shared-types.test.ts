@@ -1,7 +1,7 @@
-// The shared types compile as the spec describes them: every error-code union is closed, and
-// every type the spec declares resolves to a declaration in core.
+// The shared types stay as pinned: every error-code union is closed, and every shared type resolves
+// to a declaration in core with the shape SharedTypePins.ts holds for it.
 import assert from 'node:assert/strict';
-import { readdirSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { REPOSITORY_ROOT } from '../support/repository.ts';
@@ -34,62 +34,24 @@ test('removing the expected-error markers makes every switch that forgets a code
   assert.equal(compiled.errors.length, markers, compiled.output);
 });
 
-// ---- Every declared type resolves to core -------------------------------------------------------
+// ---- Every shared type stays as pinned -----------------------------------------------------------
 
-function specTypeBlock(): string {
-  const specs = join(REPOSITORY_ROOT, 'docs', 'specs');
-  const file = readdirSync(specs).find((name) => name.endsWith('-shared-types-and-events.md'));
-  assert.ok(file !== undefined, 'the shared-types spec is in docs/specs');
-  const text = readFileSync(join(specs, file), 'utf8');
-  const section = text.slice(text.indexOf('## Interfaces and types'));
-  const block = /```ts\r?\n([\s\S]*?)```/.exec(section);
-  assert.ok(block?.[1] !== undefined, 'the spec has a TypeScript block under "Interfaces and types"');
-  return block[1];
-}
+const PINS_FILE = join(REPOSITORY_ROOT, 'test', 'proofs', 'SharedTypePins.ts');
 
-// The names the spec's TypeScript block declares, skipping those marked as additions: each of
-// those lands with the later spec that first uses it.
-function declaredNames(block: string): string[] {
-  const lines = block.split(/\r?\n/);
-  const names: string[] = [];
-  lines.forEach((line, index) => {
-    const declaration = /^export\s+(?:type|interface|const)\s+([A-Za-z][A-Za-z0-9_]*)/.exec(line);
-    if (declaration?.[1] === undefined) return;
-    const markedOnLine = /\/\/\s*addition\b/i.test(line);
-    // The comment block directly above the declaration may open with "Addition:".
-    let above = index - 1;
-    let markedAbove = false;
-    while (above >= 0 && /^\s*\/\//.test(lines[above] ?? '')) {
-      if (/^\s*\/\/\s*Addition\b/.test(lines[above] ?? '')) markedAbove = true;
-      above -= 1;
-    }
-    if (!markedOnLine && !markedAbove) names.push(declaration[1]);
-  });
-  return names;
-}
+const pinsWithChange = (from: string, to: string) => {
+  const source = readFileSync(PINS_FILE, 'utf8');
+  assert.ok(source.includes(from), `the pins hold: ${from}`);
+  return { name: 'shared-type-pins-mutant.ts', source: source.replace(from, to) };
+};
 
-// Plan types the block names without declaring: they are declared with the plan language in core.
-const NAMED_PLAN_TYPES = ['Locator', 'ActionStep'];
-
-const reexportFile = (names: readonly string[]) => ({
-  name: 'shared-type-names.ts',
-  source: `export type {\n  ${names.join(',\n  ')},\n} from '@revisum/engine';\n`,
-});
-
-test('every type the spec declares resolves to a declaration exported by core', { timeout: 300_000 }, () => {
-  const names = declaredNames(specTypeBlock());
-  // A floor, so a change to the spec's layout cannot silently empty the list.
-  for (const expected of ['Result', 'Session', 'DerivedActor', 'EventSink', 'PERSON_ACTOR_TYPES', 'Thresholds', 'SinkError', 'CliErrorCode', 'GuaranteeLevel']) {
-    assert.ok(names.includes(expected), `${expected} was not found in the spec's type block`);
-  }
-  const compiled = compileFiles([reexportFile([...names, ...NAMED_PLAN_TYPES])]);
+test('every shared type resolves to a declaration exported by core, with the shape pinned for it', { timeout: 300_000 }, () => {
+  const compiled = compileFiles([PINS_FILE]);
   assert.equal(compiled.passed, true, compiled.output);
 });
 
 test('a type name that core does not declare fails the resolution check', { timeout: 300_000 }, () => {
   // The counter-example: one invented name among the real ones must fail, and be named.
-  const names = [...declaredNames(specTypeBlock()), ...NAMED_PLAN_TYPES, 'NoSuchSharedType'];
-  const compiled = compileFiles([reexportFile(names)]);
+  const compiled = compileFiles([pinsWithChange('    ActionStep,', '    ActionStep,\n    NoSuchSharedType,')]);
   assert.equal(compiled.passed, false, 'an undeclared name resolved');
   assert.ok(compiled.errors.some((line) => line.includes('NoSuchSharedType')), compiled.output);
 });

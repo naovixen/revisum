@@ -16,6 +16,7 @@ import {
     type ObservedExchange,
     type RunEventSink,
     type RunResult,
+    type SecretStore,
     type Session,
     type StepResult,
 } from "@revisum/engine";
@@ -94,6 +95,7 @@ export type FakeRunOptions = {
     readonly serviceRoute?: Route;
     readonly commandRoute?: CommandRoute;
     readonly events?: RunEventSink;
+    readonly secrets?: SecretStore;
 };
 
 export type FakeRun = {
@@ -140,7 +142,8 @@ export async function runOnFakeSession(
             redactor: defaultRedactor(),
             audit,
             events,
-            secrets: environmentSecretStore({ [DATABASE_SECRET]: DATABASE_PASSWORD }),
+            secrets:
+                options.secrets ?? environmentSecretStore({ [DATABASE_SECRET]: DATABASE_PASSWORD }),
             services: fakeServiceCaller(options.serviceRoute).caller,
             databaseCommands: fakeCommandRunner(options.commandRoute).port,
         },
