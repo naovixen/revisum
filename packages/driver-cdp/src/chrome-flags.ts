@@ -30,8 +30,12 @@ export const QUIET_CHROME_FLAGS: readonly string[] = [
   '--use-mock-keychain',
 ];
 
+// The egress proxy every request goes through, such as the isolated runner's. includeLoopback
+// sends requests to 127.0.0.1 and localhost through it too; without it they go direct.
+export type ProxySettings = { readonly server: string; readonly includeLoopback: boolean };
+
 // Flags that send every request through an HTTP proxy. Chromium sends 127.0.0.1 and localhost
 // direct unless "<-loopback>" removes them from its built-in bypass list.
-export function proxyFlags(proxy: { readonly server: string; readonly includeLoopback: boolean }): readonly string[] {
+export function proxyFlags(proxy: ProxySettings): readonly string[] {
   return [`--proxy-server=${proxy.server}`, ...(proxy.includeLoopback ? ['--proxy-bypass-list=<-loopback>'] : [])];
 }

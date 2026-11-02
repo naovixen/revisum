@@ -8,11 +8,10 @@ import { readFileSync, realpathSync } from 'node:fs';
 import { isAbsolute, relative, resolve } from 'node:path';
 import { chromiumBuild } from './browser-build.ts';
 import { SESSION_FEATURES, buildSession, errorText, type SessionDetails } from './browser-session.ts';
-import { CdpConnection, type CdpSessionClient } from './cdp-connection.ts';
-import { QUIET_CHROME_FLAGS, proxyFlags } from './chrome-flags.ts';
+import type { CdpConnection, CdpSessionClient } from './cdp-connection.ts';
+import type { ProxySettings } from './chrome-flags.ts';
 import { DownloadFolder } from './downloads.ts';
 import { EgressRecorder } from './egress-records.ts';
-import { launchChromium, type LaunchedChromium } from './chromium-launcher.ts';
 import { BrowserNetwork, atResponseStage, type HeldRequest } from './network-stubs.ts';
 import { focusAndSelect, focusElement, frameContentOffset, scriptResultText } from './in-page.ts';
 import type { HeldModifierKey } from './modifier-keys.ts';
@@ -20,12 +19,12 @@ import type {
   DriverSession, ExposedStates, OwnBrowserDriver, PageArgument, PageFunction, PageOperations, Point, RoleAndName, ScriptCallOutcome,
 } from './page-operations.ts';
 import { PageWatch, type AttachedPage } from './page-watch.ts';
-import { RunClipboard, allowRunClipboard } from './run-clipboard.ts';
+import { RunClipboard, SHARED_BROWSER_CLIPBOARD, allowRunClipboard } from './run-clipboard.ts';
+import { attachToSharedBrowser, launchOwnBrowser, type AttachedBrowser, type BrowserSource } from './SharedBrowser.ts';
 import { BrowserClock } from './virtual-clock.ts';
 import { PageStorage } from './web-storage.ts';
 
 const CDP_ADAPTER_VERSION = '0.1.0';
-const COMMAND_TIMEOUT_MILLISECONDS = 30_000;
 // Schemes the page may load without an allow-list check: they never reach the network.
 const LOCAL_SCHEMES = ['data:', 'about:', 'blob:', 'chrome-error:'];
 
@@ -152,9 +151,10 @@ export type CdpDriverOptions = {
   // serves one from here, never a file outside it. Without it, the driver refuses every upload and
   // every stub with a fixture body.
   readonly fixturesFolder?: string;
-  // The egress proxy every request goes through, such as the isolated runner's. includeLoopback
-  // sends requests to 127.0.0.1 and localhost through it too; without it they go direct.
-  readonly proxy?: { readonly server: string; readonly includeLoopback: boolean };
+  readonly proxy?: ProxySettings;
+  // Where sessions get a browser someone else launched. Without it, as in production, every session
+  // launches a browser of its own and ends it on close.
+  readonly browserSource?: BrowserSource;
 };
 
 // The bytes of a declared fixture inside the fixtures folder, for a stub's body.
@@ -200,21 +200,21 @@ export function cdpDriver(options: CdpDriverOptions): OwnBrowserDriver {
     },
     async open(target, environment) {
       if (target.engine !== 'chromium') return failure({ reason: 'engine-not-supported', detail: 'CDP drives Chromium only' });
-      let launched: LaunchedChromium;
+      const settings = { executablePath: options.executablePath, locale: target.locale, proxy: options.proxy };
+      let attached: AttachedBrowser;
       try {
-        launched = await launchChromium(options.executablePath, {
-          arguments: [...QUIET_CHROME_FLAGS, `--lang=${target.locale}`, ...(options.proxy === undefined ? [] : proxyFlags(options.proxy))],
-          launchTimeoutMilliseconds: options.launchTimeoutMilliseconds ?? 30_000,
-          commandTimeoutMilliseconds: COMMAND_TIMEOUT_MILLISECONDS,
-          profilePrefix: 'cdp-driver-',
-        });
+        attached = options.browserSource === undefined
+          ? await launchOwnBrowser(settings, options.launchTimeoutMilliseconds)
+          : await attachToSharedBrowser(await options.browserSource(target.locale), settings);
       } catch (error) {
         return failure({ reason: 'launch-failed', detail: errorText(error) });
       }
       try {
-        return success(await createSession(launched, target, environment, options.fixturesFolder));
+        return success(await createSession(attached, target, environment, options.fixturesFolder));
       } catch (error) {
-        await launched.stop();
+        // A shared browser that keeps this context stays refused to later sessions, so what to
+        // report here is what stopped this one opening.
+        await attached.close().catch(() => undefined);
         return failure({ reason: 'launch-failed', detail: errorText(error) });
       }
     },
@@ -241,9 +241,9 @@ type SessionBrowser = {
 const TAB_ATTACH_TIMEOUT_MILLISECONDS = 10_000;
 
 async function createSession(
-  launched: LaunchedChromium, target: Target, environment: SessionEnvironment, fixturesFolder: string | undefined,
+  attached: AttachedBrowser, target: Target, environment: SessionEnvironment, fixturesFolder: string | undefined,
 ): Promise<DriverSession> {
-  const connection = launched.connection;
+  const connection = attached.connection;
   const version = await connection.send<{ product: string; userAgent: string }>(undefined, 'Browser.getVersion');
   const { browserContextId } = await connection.send<{ browserContextId: string }>(undefined, 'Target.createBrowserContext', { disposeOnDetach: true });
   const { targetId } = await connection.send<{ targetId: string }>(undefined, 'Target.createTarget', { url: 'about:blank', browserContextId });
@@ -275,12 +275,14 @@ async function createSession(
   const operations = new CdpPage(connection, sessionId, watch, null, environment.virtualTimers === true);
   const details: SessionDetails = {
     browser: { name: 'chromium', version: /\/(\S+)$/.exec(version.product)?.[1] ?? version.product },
-    processId: launched.browserProcess.pid ?? -1,
+    processId: attached.processId,
     blockedOrigins: () => browser.blocked,
     egressRecords: () => browser.recorder.records(),
-    // The download folder goes once the browser can no longer write into it.
+    // The download folder goes once the browser can no longer write into it. A shared browser that
+    // keeps the session's context rejects here, and the folder stays for the same reason.
     close: async () => {
-      try { await launched.stop(); } finally { browser.downloads.remove(); }
+      await attached.close();
+      browser.downloads.remove();
     },
     events: watch,
     fixturePath: (fixture) => fixtureFilePath(fixturesFolder, fixture),
@@ -289,7 +291,9 @@ async function createSession(
     network: browser.network,
     storage: pageStorage(watch),
     clock: browser.clock,
-    clipboard: new RunClipboard(connection, browserContextId, (method, parameters) => watch.command(method, parameters), () => watch.crashed()),
+    clipboard: attached.isShared
+      ? SHARED_BROWSER_CLIPBOARD
+      : new RunClipboard(connection, browserContextId, (method, parameters) => watch.command(method, parameters), () => watch.crashed()),
   };
   return buildSession(operations, environment, details);
 }

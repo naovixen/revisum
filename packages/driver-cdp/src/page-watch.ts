@@ -82,9 +82,10 @@ export class PageWatch implements PageEvents {
       for (const notify of [...this.#onDialog]) notify();
     });
     listen(sessionId, 'Page.javascriptDialogClosed', () => { this.#dialog = null; });
-    // Every new page is attached paused, before it loads anything. One in the session's own
-    // browser context is a popup or a second page, and is closed, unless it is the tab a newTab
-    // step is waiting for; any other page is let run.
+    // Every new page in the browser is attached paused, before it loads anything. One in the
+    // session's own browser context is a popup or a second page, and is closed, unless it is the
+    // tab a newTab step is waiting for. A page of another context is never let run from here: that
+    // would start it before its own session has made it hold back its requests.
     listen(undefined, 'Target.attachedToTarget', (parameters) => {
       const attached = parameters as AttachedToTarget;
       const info = attached.targetInfo;
@@ -99,7 +100,7 @@ export class PageWatch implements PageEvents {
         void this.#closePopup(attached.sessionId, info.targetId);
         return;
       }
-      if (attached.waitingForDebugger) connection.send(attached.sessionId, 'Runtime.runIfWaitingForDebugger').catch(() => undefined);
+      if (attached.waitingForDebugger && info.browserContextId === browserContextId) connection.send(attached.sessionId, 'Runtime.runIfWaitingForDebugger').catch(() => undefined);
     });
     listen(undefined, 'Browser.downloadWillBegin', (parameters) => {
       if (!this.#claimsDownload(parameters)) this.#openings += 1;

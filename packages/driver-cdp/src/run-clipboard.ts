@@ -1,6 +1,7 @@
 // The own driver's clipboard port: the plain text of the headless browser's own in-memory
-// clipboard. Each session launches its own browser, so the clipboard starts empty and goes with it;
-// it is never the host's.
+// clipboard. A session that launches its own browser has a clipboard that starts empty and goes
+// with it; it is never the host's. A session on a shared browser reads no clipboard at all, since
+// what it would read may be another session's.
 //   - The session's browser context grants clipboard writes, so a page's copy lands, and denies
 //     clipboard reads, so the page's own script never reads what was copied (allowRunClipboard).
 //     Each page emulates focus, which the clipboard needs in a headless browser.
@@ -27,6 +28,10 @@ export async function allowRunClipboard(connection: CdpConnection, browserContex
   await connection.send(undefined, 'Browser.setPermission', { permission: CLIPBOARD_WRITE, setting: 'granted', browserContextId });
   await connection.send(undefined, 'Browser.setPermission', { permission: CLIPBOARD_READ, setting: 'denied', browserContextId });
 }
+
+export const SHARED_BROWSER_CLIPBOARD: ClipboardPort = {
+  readText: () => Promise.resolve(failure({ code: 'clipboard-unavailable', detail: 'a browser shared between sessions has one clipboard for all of them, so it is never read' })),
+};
 
 // True for an origin a permission can be granted to: a web origin, not an opaque one.
 const isWebOrigin = (origin: string | undefined): origin is string => origin !== undefined && /^https?:\/\/[^/]+$/.test(origin);

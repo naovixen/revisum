@@ -1,0 +1,204 @@
+// How a session gets its browser: one it launches for itself, or one shared with sessions that ran
+// before it. A session on a shared browser has its own connection and browser context, and closing
+// that connection makes the browser dispose of the context, its pages and every setting the session
+// made. The browser's process, launch flags and clipboard stay, so sessions run strictly one at a
+// time, a browser only takes the settings it was launched with, and a session reads no clipboard.
+// A key press can still paste what an earlier session copied, so tests that copy or paste keep to a
+// browser of their own.
+import { CdpConnection } from "./cdp-connection.ts";
+import { QUIET_CHROME_FLAGS, proxyFlags, type ProxySettings } from "./chrome-flags.ts";
+import { launchChromium, type LaunchedChromium } from "./chromium-launcher.ts";
+
+const COMMAND_TIMEOUT_MILLISECONDS = 30_000;
+const DEFAULT_LAUNCH_TIMEOUT_MILLISECONDS = 30_000;
+// Disposing of a context takes tens of milliseconds, even with a dialog open or a page stuck in a loop.
+const CONTEXT_GONE_TIMEOUT_MILLISECONDS = 10_000;
+const CONTEXT_POLL_MILLISECONDS = 5;
+
+// What a browser is launched with and cannot change for one browser context.
+type LaunchSettings = {
+    readonly executablePath: string;
+    readonly locale: string;
+    readonly proxy: ProxySettings | undefined;
+};
+
+export type SharedBrowser = LaunchSettings & {
+    readonly webSocketUrl: string;
+    readonly processId: number;
+    isAlive(): boolean;
+};
+
+export type LaunchedSharedBrowser = SharedBrowser & {
+    // Ends the browser and removes its profile. Nothing else ends it, so an unstopped one outlives
+    // the tests and keeps their process from exiting.
+    stop(): Promise<void>;
+};
+
+// Asked once per session for a browser launched for that locale. The executable and proxy are the
+// driver's own, so a source serves one driver's settings and keeps a browser per locale.
+export type BrowserSource = (locale: string) => Promise<SharedBrowser>;
+
+// The browser a session runs on, however it got it.
+export type AttachedBrowser = {
+    readonly connection: CdpConnection;
+    readonly processId: number;
+    readonly isShared: boolean;
+    // Ends the session's use of the browser. Once it resolves, nothing of the session runs.
+    close(): Promise<void>;
+};
+
+const launchDriverChromium = (
+    settings: LaunchSettings,
+    launchTimeoutMilliseconds = DEFAULT_LAUNCH_TIMEOUT_MILLISECONDS,
+): Promise<LaunchedChromium> =>
+    launchChromium(settings.executablePath, {
+        arguments: [
+            ...QUIET_CHROME_FLAGS,
+            `--lang=${settings.locale}`,
+            ...(settings.proxy === undefined ? [] : proxyFlags(settings.proxy)),
+        ],
+        launchTimeoutMilliseconds,
+        commandTimeoutMilliseconds: COMMAND_TIMEOUT_MILLISECONDS,
+        profilePrefix: "cdp-driver-",
+    });
+
+export async function launchOwnBrowser(
+    settings: LaunchSettings,
+    launchTimeoutMilliseconds?: number,
+): Promise<AttachedBrowser> {
+    const launched = await launchDriverChromium(settings, launchTimeoutMilliseconds);
+    return {
+        connection: launched.connection,
+        processId: launched.browserProcess.pid ?? -1,
+        isShared: false,
+        close: () => launched.stop(),
+    };
+}
+
+export async function launchSharedBrowser(
+    settings: LaunchSettings,
+    launchTimeoutMilliseconds?: number,
+): Promise<LaunchedSharedBrowser> {
+    const launched = await launchDriverChromium(settings, launchTimeoutMilliseconds);
+    const { browserProcess } = launched;
+    return {
+        ...settings,
+        webSocketUrl: launched.webSocketUrl,
+        processId: browserProcess.pid ?? -1,
+        isAlive: () => browserProcess.exitCode === null && browserProcess.signalCode === null,
+        stop: () => launched.stop(),
+    };
+}
+
+// Browsers with a session on them. A session that never closes, or whose context never went, keeps
+// its browser here, so no later session can run alongside what is left of it.
+const browsersInUse = new WeakSet<SharedBrowser>();
+
+const isSameProxy = (
+    first: ProxySettings | undefined,
+    second: ProxySettings | undefined,
+): boolean =>
+    first?.server === second?.server && first?.includeLoopback === second?.includeLoopback;
+
+function whyRefused(shared: SharedBrowser, wanted: LaunchSettings): string | null {
+    if (!shared.isAlive()) {
+        return "the shared browser has died";
+    }
+    if (shared.executablePath !== wanted.executablePath) {
+        return "the shared browser runs another executable";
+    }
+    if (shared.locale !== wanted.locale) {
+        return `the shared browser was launched for locale ${shared.locale}, not ${wanted.locale}`;
+    }
+    if (!isSameProxy(shared.proxy, wanted.proxy)) {
+        return "the shared browser was launched with another proxy";
+    }
+    if (browsersInUse.has(shared)) {
+        return "another session has not finished closing on the shared browser";
+    }
+    return null;
+}
+
+const browserContexts = async (connection: CdpConnection): Promise<readonly string[]> => {
+    const { browserContextIds } = await connection.send<{ browserContextIds: readonly string[] }>(
+        undefined,
+        "Target.getBrowserContexts",
+    );
+    return browserContextIds;
+};
+
+export async function attachToSharedBrowser(
+    shared: SharedBrowser,
+    wanted: LaunchSettings,
+): Promise<AttachedBrowser> {
+    const refusal = whyRefused(shared, wanted);
+    if (refusal !== null) {
+        throw new Error(refusal);
+    }
+    browsersInUse.add(shared);
+    let connection: CdpConnection | undefined;
+    try {
+        connection = await CdpConnection.open(shared.webSocketUrl, {
+            commandTimeoutMilliseconds: COMMAND_TIMEOUT_MILLISECONDS,
+        });
+        if ((await browserContexts(connection)).length > 0) {
+            throw new Error("the shared browser already has a session's browser context in it");
+        }
+    } catch (error) {
+        connection?.close();
+        browsersInUse.delete(shared);
+        throw error;
+    }
+    const opened = connection;
+    let closing: Promise<void> | undefined;
+    return {
+        connection: opened,
+        processId: shared.processId,
+        isShared: true,
+        close: () => {
+            closing ??= closeSharedSession(shared, opened);
+            return closing;
+        },
+    };
+}
+
+// The closing connection is deliberate, so the session's pages do not count it as a crash. It makes
+// the browser dispose of the session's context, without the session being able to see that happen.
+async function closeSharedSession(shared: SharedBrowser, connection: CdpConnection): Promise<void> {
+    connection.close();
+    await waitUntilContextsAreGone(shared);
+    browsersInUse.delete(shared);
+}
+
+// Asks over a new connection, since the session's own has gone. A browser that has died has no
+// contexts left, and the next session on it is refused.
+async function waitUntilContextsAreGone(shared: SharedBrowser): Promise<void> {
+    const giveUpAt = Date.now() + CONTEXT_GONE_TIMEOUT_MILLISECONDS;
+    const options = {
+        connectTimeoutMilliseconds: CONTEXT_GONE_TIMEOUT_MILLISECONDS,
+        commandTimeoutMilliseconds: CONTEXT_GONE_TIMEOUT_MILLISECONDS,
+    };
+    let control: CdpConnection | undefined;
+    try {
+        while (shared.isAlive()) {
+            if (Date.now() >= giveUpAt) {
+                throw new Error(
+                    `the shared browser kept the session's browser context for ${CONTEXT_GONE_TIMEOUT_MILLISECONDS} ms; stop it and launch another`,
+                );
+            }
+            try {
+                control ??= await CdpConnection.open(shared.webSocketUrl, options);
+                if ((await browserContexts(control)).length === 0) {
+                    return;
+                }
+            } catch {
+                // The browser is dying or the connection dropped: isAlive and the limit decide.
+                control?.close();
+                control = undefined;
+            }
+            await new Promise((resolve) => setTimeout(resolve, CONTEXT_POLL_MILLISECONDS));
+        }
+    } finally {
+        control?.close();
+    }
+}
