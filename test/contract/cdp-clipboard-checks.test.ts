@@ -233,23 +233,28 @@ describe('the page reading the clipboard itself', () => {
       await launched.connection.send(undefined, 'Browser.grantPermissions', {
         origin: harness.origin, permissions: ['clipboardReadWrite', 'clipboardSanitizedWrite'],
       });
-      const { targetId } = await launched.connection.send<{ targetId: string }>(undefined, 'Target.createTarget', { url: harness.url('/clipboard.html') });
+      const { targetId } = await launched.connection.send<{ targetId: string }>(undefined, 'Target.createTarget', { url: 'about:blank' });
       const { sessionId } = await launched.connection.send<{ sessionId: string }>(undefined, 'Target.attachToTarget', { targetId, flatten: true });
       const page = launched.connection.session(sessionId);
+      await page.send('Page.enable');
       await page.send('Emulation.setFocusEmulationEnabled', { enabled: true });
+      // Wait for the real page: the blank first document also reads as complete, and has no button.
+      const loaded = launched.connection.once(sessionId, 'Page.loadEventFired', 10_000);
+      await page.send('Page.navigate', { url: harness.url('/clipboard.html') });
+      await loaded.promise;
       // Click as a person would (with a user gesture), then wait for the page to show what it read.
       const expression = `new Promise((resolve) => {
-        const start = () => {
-          document.getElementById('read-clipboard').click();
-          const poll = () => {
-            const shown = document.querySelector('[data-testid="page-read"]').textContent;
-            if (shown === 'Not read') setTimeout(poll, 50); else resolve(shown);
-          };
-          poll();
+        document.getElementById('read-clipboard').click();
+        const poll = () => {
+          const shown = document.querySelector('[data-testid="page-read"]').textContent;
+          if (shown === 'Not read') setTimeout(poll, 50); else resolve(shown);
         };
-        if (document.readyState === 'complete') start(); else addEventListener('load', start);
+        poll();
       })`;
-      const evaluated = await page.send<{ result: { value?: unknown } }>('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true, userGesture: true });
+      const evaluated = await page.send<{ result: { value?: unknown }; exceptionDetails?: unknown }>('Runtime.evaluate', {
+        expression, awaitPromise: true, returnByValue: true, userGesture: true,
+      });
+      assert.equal(evaluated.exceptionDetails, undefined, JSON.stringify(evaluated.exceptionDetails));
       assert.match(String(evaluated.result.value), /^Read \d+ characters, attempt 1$/);
     } finally {
       await launched.stop();
