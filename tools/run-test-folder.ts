@@ -18,7 +18,7 @@ import { pathToFileURL } from 'node:url';
 import { RESULTS_FOLDER, type RerunLine } from './test-results.ts';
 
 const BROWSER_MODULE = resolve('test/support/browsers.ts');
-const RELATIVE_IMPORT = /\bfrom\s+'(\.{1,2}\/[^']+)'/g;
+const RELATIVE_IMPORT = /\bfrom\s+['"](\.{1,2}\/[^'"]+)['"]/g;
 const REPORTER = pathToFileURL(join(import.meta.dirname, 'test-results-reporter.ts')).href;
 
 // Whether the file imports the browser module, following relative imports.

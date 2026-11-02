@@ -1,0 +1,13 @@
+# Hash-compared or generated: reformatting would change what they prove.
+fixtures/
+golden/
+docs/
+*.md
+package-lock.json
+seed-provenance.json
+licences.json
+eslint-suppressions.json
+*.schema.json
+dist/
+.browsers/
+temp/

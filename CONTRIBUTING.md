@@ -83,6 +83,8 @@ A spec is done when all of these hold:
 | `npm run check:linux` | `npm run check` on CI's pinned Linux image, in Docker. Needs Docker Desktop running |
 | `npm run typecheck` | `tsc --build` over every package and `tools/`. A wrong-way import between packages fails here |
 | `npm run lint` | Checks that read only files: licences and roles, folder layout, imports, dependency reviews, the cost record, the seed record, research links, deny rules and the glossary |
+| `npm run lint:code` | ESLint's code rules, straight after `npm run lint`. Its config and local rules are in `tools/eslint/`; code that predates them is baselined in `eslint-suppressions.json` |
+| `npm run format` | Prettier over packages, tools and tests |
 | `npm run lint:names` | The naming lint's self-test, then the naming lint over the repository |
 | `npm test` | Unit and contract tests (`test/unit/`, `test/contract/`) |
 | `npm run proofs` | Hostile plans, secret leaks, egress, PII and audit-chain proofs (`test/proofs/`) |
@@ -101,7 +103,7 @@ A spec is done when all of these hold:
 
 ## Naming rules
 
-The code must read without any other document.
+The code must read without any other document. File naming and the rest of the conventions are in `.claude/rules/`, and why they were chosen is in `docs/decisions/code-conventions.md`.
 
 - Name things after what they are or do, in words a new developer knows: `evaluatePolicy`, `DependencyReview`, `tracedCriteriaShare`.
 - No research or process ids in identifiers, file or folder names, JSON keys, error codes or flags.

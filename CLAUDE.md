@@ -50,6 +50,7 @@ The product name is Revisum (`revisum` for the repo, packages and CLI). It appea
 - **TypeScript:** strict, erasable syntax only (no enums, no namespaces, no parameter properties). Run on Node 24.
 - **Browsers run headless**, always.
 - Never kill processes you didn't start.
+- **Conventions.** Prettier owns layout and ESLint owns code rules; don't work round either. The rest is in `.claude/rules/`, which loads by path: read the matching file first if you create code without reading a neighbour. Why: `docs/decisions/code-conventions.md`.
 
 ## Naming: the code must read without any other document
 
@@ -63,7 +64,7 @@ The product name is Revisum (`revisum` for the repo, packages and CLI). It appea
   - Standard names, each spelled out in `docs/glossary.md`: ai, mcp, sarif, junit, oidc, jwt, lti.
 - Comments explain what and why in plain English. You may add "See docs/specs/SPEC-nn-….md", but never as the only explanation.
 - Criterion IDs are data, never names:
-  - `test('rejects unknown steps', { criterion: 'AC-SPEC-01-03' }, …)`.
+  - `test("then it should reject the plan", { criterion: "AC-SPEC-01-03" }, …)`.
 - `npm run lint:names` must pass.
 
 ## Commands (from session 0a on)
@@ -71,6 +72,8 @@ The product name is Revisum (`revisum` for the repo, packages and CLI). It appea
 | Command | Does |
 |---|---|
 | `npm run check` | `tsc`, lint, naming lint, unit and contract tests, proofs, replay. It must be green before you finish |
+| `npm run lint:code` | ESLint, part of `npm run check` |
+| `npm run format` | Prettier, across packages, tools and tests |
 | `npm test -w <package>` | Tests for one package |
 | `npm run proofs` | Hostile plans, secret leaks, egress, PII, audit chain |
 | `npm run replay` | Golden runs, compared by hash |

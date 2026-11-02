@@ -8,7 +8,7 @@ import { readWorkspacePackages, reportProblems } from './workspace-packages.ts';
 
 const SOURCE_EXTENSIONS = /\.(ts|mts|cts|js|mjs|cjs)$/;
 const TEST_FILE = /\.test\.(ts|mts|js|mjs)$/;
-const SOURCE_FOLDERS = ['packages/*/src/**', 'tools/*.ts'];
+const SOURCE_FOLDERS = ['packages/*/src/**', 'tools/*.ts', 'tools/eslint/*'];
 // Test sites and recorded runs may hold scripts of their own.
 const TEST_FOLDERS = ['test/**', 'proofs/**', 'fixtures/**', 'golden/**'];
 // Installed tools and browsers (.browsers holds the pinned Chrome for Testing build) are not ours to lay out.

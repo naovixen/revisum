@@ -37,6 +37,10 @@ export const NAMING_LINT: NamingLintConfig = {
     'seed/provenance.json',
     'package-lock.json',
     'tools/naming-lint-config.ts',
+    // ESLint's own rule names break the rules below, such as `max-lines`.
+    'tools/eslint/eslint.config.js',
+    'tools/eslint/package-lock.json',
+    'eslint-suppressions.json',
     'fixtures/naming-lint/**',
     '**/node_modules/**',
     '**/dist/**',
