@@ -32,6 +32,7 @@ import {
 } from '@revisum/contracts';
 import { brand } from '../brand.ts';
 import { clockAdvanceMilliseconds } from '../clock-advance.ts';
+import { normalise } from '../oracle.ts';
 import { readFields } from '../project/call-declarations.ts';
 import { readId, type Limits, type Project } from '../project/project-parser.ts';
 import type { TrustedProject } from '../project/trusted-project.ts';
@@ -220,7 +221,6 @@ const isStructuralKind = (kind: string): kind is StructuralLocatorKind => isOneO
 // A locator. `insideDepth` counts the `inside` links above it: a css or XPath locator chains at
 // most MAXIMUM_INSIDE_DEPTH of them, and the one past the limit is refused, with nothing under it read.
 function readLocator(input: unknown, path: string, context: ParseContext, insideDepth = 0): Parsed<Locator> {
-  const longest = context.rules.limits.maximumTextLength;
   const head = peekRecord(input, path, context.issues);
   if (head === INVALID) return INVALID;
   const by = readOneOf(head['by'], `${path}.by`, context.issues, ALL_LOCATOR_KINDS);
@@ -235,16 +235,16 @@ function readLocator(input: unknown, path: string, context: ParseContext, inside
     case 'role': {
       const parts = [
         readOneOf(head['role'], `${path}.role`, context.issues, ROLES),
-        readTextOrValue(head['name'], `${path}.name`, context, longest),
+        readWantedText(head['name'], `${path}.name`, context),
       ] as const;
       return allValid(parts) && position !== INVALID ? { by, role: parts[0], name: parts[1], ...positioned } : INVALID;
     }
     case 'label': {
-      const label = readTextOrValue(head['label'], `${path}.label`, context, longest);
+      const label = readWantedText(head['label'], `${path}.label`, context);
       return label === INVALID || position === INVALID ? INVALID : { by, label, ...positioned };
     }
     case 'text': {
-      const text = readTextOrValue(head['text'], `${path}.text`, context, longest);
+      const text = readWantedText(head['text'], `${path}.text`, context);
       return text === INVALID || position === INVALID ? INVALID : { by, text, ...positioned };
     }
     case 'testId': {
@@ -257,7 +257,7 @@ function readLocator(input: unknown, path: string, context: ParseContext, inside
     case 'css': case 'xpath': {
       const textField = by === 'css' ? 'selector' : 'expression';
       const selector = readSelectorText(head[textField], `${path}.${textField}`, context);
-      const hasText = Object.hasOwn(head, 'hasText') ? readTextOrValue(head['hasText'], `${path}.hasText`, context, longest) : undefined;
+      const hasText = Object.hasOwn(head, 'hasText') ? readWantedText(head['hasText'], `${path}.hasText`, context) : undefined;
       const inside = Object.hasOwn(head, 'inside') ? readInside(head['inside'], `${path}.inside`, context, insideDepth) : undefined;
       if (selector === INVALID || hasText === INVALID || inside === INVALID || position === INVALID) return INVALID;
       // Optional fields are left out when absent.
@@ -291,10 +291,20 @@ function readAssertionHead(input: unknown, path: string, context: ParseContext):
   return head;
 }
 
-// Expected text for a text check. Empty text would match any element, so the check proves nothing.
+// True for text a plan writes that holds nothing once its white space is collapsed.
+const isBlankText = (value: TextOrValue): boolean => typeof value === 'string' && normalise(value) === '';
+
+// Expected text for a text check. Blank text is found inside any text, so the check proves nothing.
 function readExpectedText(input: unknown, path: string, context: ParseContext): Parsed<TextOrValue> {
   const value = readTextOrValue(input, path, context, context.rules.limits.maximumTextLength, 0);
-  if (value === '') { context.issues.push({ code: 'vacuous', path }); return INVALID; }
+  if (value !== INVALID && isBlankText(value)) { context.issues.push({ code: 'vacuous', path }); return INVALID; }
+  return value;
+}
+
+// Text a locator looks for on the page. Blank text names nothing, so an absent check of it proves nothing.
+function readWantedText(input: unknown, path: string, context: ParseContext): Parsed<TextOrValue> {
+  const value = readTextOrValue(input, path, context, context.rules.limits.maximumTextLength);
+  if (value !== INVALID && isBlankText(value)) { context.issues.push({ code: 'vacuous', path }); return INVALID; }
   return value;
 }
 
@@ -1053,11 +1063,11 @@ function readAdvanceClock(head: Readonly<Record<string, unknown>>, path: string,
   return { type: 'advanceClock', by, ...(mode === undefined ? {} : { mode }) };
 }
 
-// Expected clipboard text written as lines, within the fill limits. A single empty line is empty
-// text, which would make the check vacuous.
+// Expected clipboard text written as lines, within the fill limits. Lines that are all blank are
+// blank text, which would make the check vacuous.
 function readExpectedLines(input: unknown, path: string, context: ParseContext): Parsed<MultiLineText> {
   const lines = readMultiLineText(input, path, context);
-  if (lines !== INVALID && lines.lines.length === 1 && lines.lines[0] === '') { context.issues.push({ code: 'vacuous', path }); return INVALID; }
+  if (lines !== INVALID && lines.lines.every(isBlankText)) { context.issues.push({ code: 'vacuous', path }); return INVALID; }
   return lines;
 }
 

@@ -80,10 +80,15 @@ function declared(call: CallName, project: Project): Declared | undefined {
 const failedWith = (code: CallStepCode, serviceCall?: ServiceCallRecord): CallStepOutcome =>
   ({ outcome: 'failed', code, ...(serviceCall === undefined ? {} : { serviceCall }) });
 
+// What one request came to: the judgement, and the response itself even when its status failed
+// the judgement, since that call is the one a person most needs the record of. A body over the
+// cap was cut short, so it has no record: its sha256 would not be the response's.
+type SentRequest = { readonly judged: Result<ServiceResponse, ServiceCallErrorCode>; readonly received: ServiceResponse | null };
+
 // Sends one request, logs it, and judges its status.
 async function send(
   request: ServiceRequest, found: Declared, stepIndex: number, stepType: Step['type'], context: CallStepContext,
-): Promise<Result<ServiceResponse, ServiceCallErrorCode>> {
+): Promise<SentRequest> {
   const startedAt = context.clock.now();
   const answered = await context.caller.call(request);
   // The caller stops reading at the cap; a body over it is refused here as well.
@@ -96,11 +101,11 @@ async function send(
     ...(answered.ok ? { sha256: sha256(answered.value.body) } : {}),
     durationMilliseconds: context.clock.now() - startedAt,
   });
-  return response;
+  const isWithinCap = response.ok || response.error === 'unexpected-status';
+  return { judged: response, received: answered.ok && isWithinCap ? answered.value : null };
 }
 
-function record(step: { readonly call: CallName }, found: Declared, answered: Result<ServiceResponse, ServiceCallErrorCode> | null, attempts: number): ServiceCallRecord {
-  const response = answered === null ? null : answered.ok ? answered.value : null;
+function record(step: { readonly call: CallName }, found: Declared, response: ServiceResponse | null, attempts: number): ServiceCallRecord {
   return {
     call: step.call, service: found.service.name, method: found.declaration.method,
     status: response?.status ?? null, responseSha256: response === null ? null : sha256(response.body), attempts,
@@ -142,8 +147,9 @@ export async function runCallStep(step: CallStep, stepIndex: number, context: Ca
   if (found === undefined) return failedWith('egress-blocked');
   const request = buildServiceRequest(found.declaration, found.service, step.arguments, context.values, context.secrets);
   if (!request.ok) return failedWith(request.error, record(step, found, null, 0));
-  const answered = await send(request.value, found, stepIndex, step.type, context);
-  const serviceCall = record(step, found, answered, 1);
+  const sent = await send(request.value, found, stepIndex, step.type, context);
+  const answered = sent.judged;
+  const serviceCall = record(step, found, sent.received, 1);
   if (!answered.ok) return failedWith(answered.error, serviceCall);
   const remembered = rememberedValues(step, found.declaration, answered.value, request.value.maximumResponseBytes, context.project);
   if (!remembered.ok) return failedWith(remembered.error, serviceCall);
@@ -166,8 +172,9 @@ export async function runBackendCheck(step: Extract<Step, { type: 'expectBackend
   if (pointer === undefined) return failedWith('field-missing', record(step, found, null, 0));
   const deadline = context.clock.now() + context.project.limits.backendCheckTimeoutMilliseconds;
   for (let attempts = 1; ; attempts++) {
-    const answered = await send(request.value, found, stepIndex, step.type, context);
-    const serviceCall = record(step, found, answered, attempts);
+    const sent = await send(request.value, found, stepIndex, step.type, context);
+    const answered = sent.judged;
+    const serviceCall = record(step, found, sent.received, attempts);
     let code: CallStepCode;
     if (!answered.ok) {
       code = answered.error;

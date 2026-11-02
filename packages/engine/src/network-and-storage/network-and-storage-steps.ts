@@ -3,8 +3,9 @@
 // finished bytes and text; it never sees a template, a parameter or a plan.
 //   - A stub start answers matching fetch and XHR requests with the declared responses; the run
 //     keeps the names of the stubs active, so each check can say it ran against a faked answer.
-//   - A request check counts the exchanges an observed request saw, waiting for the project's quiet
-//     window before an equals or atMost count, and reads fields of the latest response.
+//   - A request check counts the exchanges an observed request saw, and must hold on both counts:
+//     atLeast counts responses, atMost counts attempts, and equals needs both to equal it. An equals
+//     or atMost count, and every read of the latest response, waits for the project's quiet window.
 //   - A storage step writes, removes or checks one declared entry. A value read is compared, never
 //     kept: a failed check says only that the entry is present, absent or differs.
 // Field values, storage values and response bodies never reach the result or the log; a remembered
@@ -116,23 +117,29 @@ async function poll<Seen extends { readonly pass: boolean; readonly final?: bool
   }
 }
 
-// atLeast passes as soon as enough exchanges were seen. equals and atMost wait first until no
-// matching request has been in flight for the quiet window, so a request still to come is counted.
+// What a failed count check saw, in words a person can follow when the two counts differ.
+const countObservation = (responses: number, attempts: number): string =>
+  (responses === attempts ? `${attempts} matching requests` : `${responses} answered of ${attempts} matching requests`);
+
+// A refused connection is an attempt that got no response. atLeast passes as soon as enough
+// responses arrived: the page must have reached the API. atMost counts attempts: the page still
+// tried. equals needs both counts to equal it. equals and atMost wait first until no matching request
+// has been in flight for the quiet window, so a request still to come is counted.
 export async function checkRequests(step: Extract<Step, { type: 'expectRequests' }>, context: NetworkStepContext): Promise<NetworkStepOutcome> {
   const network = context.session?.network;
   if (network === undefined) return UNSUPPORTED;
-  const count = (): number => network.exchanges(step.request).length;
+  const attempts = (): number => network.exchanges(step.request).length;
+  const responses = (): number => network.exchanges(step.request).filter((exchange) => exchange.status !== null).length;
   const expected = step.count;
   if ('atLeast' in expected) {
-    const seen = await poll(context, async () => ({ pass: count() >= expected.atLeast, count: count() }));
-    return seen.pass ? passed : failedWith('assertion-failed', `${seen.count} matching requests`);
+    const seen = await poll(context, async () => ({ pass: responses() >= expected.atLeast, responses: responses(), attempts: attempts() }));
+    return seen.pass ? passed : failedWith('assertion-failed', countObservation(seen.responses, seen.attempts));
   }
   const limits = context.project.limits;
   const quiet = await network.quiet(step.request, limits.requestQuietMilliseconds, limits.stepTimeoutMilliseconds);
   if (!quiet.ok) return failedWith(quiet.error.code);
-  const seen = count();
-  const pass = 'equals' in expected ? seen === expected.equals : seen <= expected.atMost;
-  return pass ? passed : failedWith('assertion-failed', `${seen} matching requests`);
+  const pass = 'equals' in expected ? attempts() === expected.equals && responses() === expected.equals : attempts() <= expected.atMost;
+  return pass ? passed : failedWith('assertion-failed', countObservation(responses(), attempts()));
 }
 
 // The JSON pointer an observed request's declaration gives a field.
@@ -152,13 +159,29 @@ function readField(exchange: ObservedExchange, pointer: JsonPointer | undefined,
   return success(found.ok ? { value: found.value } : undefined);
 }
 
-// The latest exchange of a request, or request-not-seen when there is none yet.
-function latestExchange(context: NetworkStepContext, request: RequestName): Result<ObservedExchange, string> {
-  const latest = context.session?.network?.exchanges(request).at(-1);
-  return latest === undefined ? failure('request-not-seen') : success(latest);
+const REQUEST_NOT_SEEN = 'request-not-seen';
+
+// The latest exchange of a request, once no matching request has been in flight for the quiet
+// window: "latest" means the latest the page asked for, not the latest answered so far, which a
+// newer request in flight is about to replace. request-not-seen when there is none yet.
+async function latestSettledExchange(context: NetworkStepContext, request: RequestName): Promise<Result<ObservedExchange, string>> {
+  const network = context.session?.network;
+  if (network === undefined) {
+    return failure('unsupported-step');
+  }
+  const limits = context.project.limits;
+  const quiet = await network.quiet(request, limits.requestQuietMilliseconds, limits.stepTimeoutMilliseconds);
+  if (!quiet.ok) {
+    return failure(quiet.error.code);
+  }
+  const latest = network.exchanges(request).at(-1);
+  return latest === undefined ? failure(REQUEST_NOT_SEEN) : success(latest);
 }
 
-type Look = { readonly pass: boolean; readonly code: string };
+// Only no exchange yet is worth another look: a wait for quiet that failed has used up the timeout.
+const isWorthAnotherLook = (error: string): boolean => error === REQUEST_NOT_SEEN;
+
+type Look = { readonly pass: boolean; readonly code: string; readonly final?: boolean };
 
 // Whether the latest exchange passes the check. Backend data is not rendered text, so a field is
 // compared exactly, spaces and case included.
@@ -191,8 +214,8 @@ export async function checkResponse(step: Extract<Step, { type: 'expectResponse'
     expected = resolved.value;
   }
   const seen = await poll(context, async (): Promise<Look> => {
-    const latest = latestExchange(context, step.request);
-    return latest.ok ? judgeResponse(assertion, latest.value, step.request, expected, context) : { pass: false, code: latest.error };
+    const latest = await latestSettledExchange(context, step.request);
+    return latest.ok ? judgeResponse(assertion, latest.value, step.request, expected, context) : { pass: false, code: latest.error, final: !isWorthAnotherLook(latest.error) };
   });
   return seen.pass ? passed : failedWith(seen.code);
 }
@@ -215,10 +238,10 @@ export async function rememberFromResponse(
   const cap = declaredIn(context.project.observedRequests, from.response)?.maximumResponseBytes ?? 0;
   const pointer = pointerOf(context.project, from.response, from.field);
   const seen = await poll(context, async () => {
-    const latest = latestExchange(context, from.response);
+    const latest = await latestSettledExchange(context, from.response);
     const field = latest.ok ? readField(latest.value, pointer, cap) : latest;
     const text = field.ok ? rememberedText(field.value, from.read) : field;
-    return { pass: text.ok, text };
+    return { pass: text.ok, text, final: !latest.ok && !isWorthAnotherLook(latest.error) };
   });
   if (!seen.text.ok) return failedWith(seen.text.error);
   const maximumLength = context.project.limits.maximumTextLength;

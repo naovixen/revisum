@@ -79,7 +79,7 @@ Plan error. Required text or a required list is empty.
 
 ## vacuous
 
-Plan error. A check would pass on anything, or proves nothing traceable: a plan with no assertion, an empty assertion (`assert: {}`), a text or value assertion whose expected text is empty, a request count of `atLeast` 0, or an assertion without a `criterionId`. Give each assertion its expected text and the id of the acceptance criterion it checks.
+Plan error. A check would pass on anything, or proves nothing traceable: a plan with no assertion, an empty assertion (`assert: {}`), a text or value assertion whose expected text is blank (empty or only white space), a locator looking for blank text, a request count of `atLeast` 0, or an assertion without a `criterionId`. Give each assertion its expected text and the id of the acceptance criterion it checks.
 
 Evidence run outcome. The suite's report holds no tests, so the run checked nothing. It ends `Failed`, whatever the suite's exit code, and never opens the merge gate. Check the suite's paths, projects and `testMatch`.
 
@@ -197,11 +197,11 @@ Readable plan error. The plan holds a construct the readable `.plan` format has 
 
 ## value-empty
 
-Step error. A run value used by the step is empty where text is needed, or has no text yet. The step fails at run time, before anything is sent to the page, and every later step is skipped.
+Step error. A run value used by the step is blank where text is needed (empty, or only white space, which any text contains, so a check against it proves nothing), or has no text yet. The step fails at run time, before anything is sent to the page, and every later step is skipped. Blank text written in a plan's check or locator is refused earlier, as `vacuous`.
 
 ## value-unsafe
 
-Step error. A run value used by the step breaks the safe-text rules, or is `""`, `.` or `..` where a path template uses it as a segment, which would drop or climb a segment. The step fails before any navigation or input.
+Step error. A run value used by the step breaks the safe-text rules, or is `.` or `..` where a path template uses it as a segment, which would climb a segment. The step fails before any navigation or input.
 
 ## value-too-long
 
@@ -295,7 +295,7 @@ Driver error. The browser did not finish the operation within the session's time
 
 ## navigation-failed
 
-Driver error. The browser could not load the page.
+Driver error. The browser could not load the page. An `expectPage` check fails with it too when the browser shows its own error page in place of the page, whatever the address bar says: the server refused the connection, the allow-list blocked it, or an HTTP error status came with an empty body, which Chromium also replaces with its error page, so a person would see that and not the application's page. A page that sends a body with its error status is a page that loaded.
 
 ## policy-denied
 

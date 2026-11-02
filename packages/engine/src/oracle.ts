@@ -10,9 +10,10 @@ import {
 // selector-invalid: the browser rejects the locator's css selector or XPath expression, so no
 // element can ever match and waiting is pointless.
 // page-unreadable and dialog-open: the probe could not read the page, so nothing is known of it.
+// navigation-failed: the browser shows its own error page, so the page never loaded.
 export type Verdict = {
   readonly pass: boolean;
-  readonly code: 'not-found' | 'ambiguous' | 'assertion-failed' | 'state-not-exposed' | 'selector-invalid' | UnreadablePage | null;
+  readonly code: 'not-found' | 'ambiguous' | 'assertion-failed' | 'state-not-exposed' | 'selector-invalid' | 'navigation-failed' | UnreadablePage | null;
 };
 
 const PASSED: Verdict = { pass: true, code: null };
@@ -21,6 +22,7 @@ const NOT_FOUND: Verdict = { pass: false, code: 'not-found' };
 const AMBIGUOUS: Verdict = { pass: false, code: 'ambiguous' };
 const STATE_NOT_EXPOSED: Verdict = { pass: false, code: 'state-not-exposed' };
 const SELECTOR_INVALID: Verdict = { pass: false, code: 'selector-invalid' };
+const NAVIGATION_FAILED: Verdict = { pass: false, code: 'navigation-failed' };
 
 // What a DOM check needs the probe to read of the element; undefined for every other check.
 export function domReadFor(assertion: ResolvedElementAssertion): DomRead | undefined {
@@ -130,6 +132,9 @@ const sameMetaName = (left: string, right: string): boolean => left.toLowerCase(
 
 // `baseUrl` is the run's base URL, which an expected canonical URL given as a path is resolved on.
 export function checkPage(assertion: PageAssertion, probe: PageProbe, baseUrl?: string): Verdict {
+  if (probe.browserErrorPage === true) {
+    return NAVIGATION_FAILED;
+  }
   switch (assertion.kind) {
     case 'urlPath': return new URL(probe.url).pathname === assertion.value ? PASSED : FAILED;
     case 'title': return normalise(probe.title) === normalise(assertion.value) ? PASSED : FAILED;

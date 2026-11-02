@@ -175,7 +175,8 @@ export interface NetworkPort {
   // again from nothing: a reset. Without a size cap no body is kept.
   observe(name: RequestName, matcher: RequestMatcher, maximumResponseBytes: number | null): Promise<Result<void, DriverError>>;
   // The finished exchanges since the observation started or was last reset, in the order they
-  // finished. A body over the cap is kept only up to one byte past it, so a reader can tell.
+  // finished. One that got no response, such as a refused connection, has a null status: the page
+  // still sent it. A body over the cap is kept only up to one byte past it, so a reader can tell.
   exchanges(name: RequestName): readonly ObservedExchange[];
   // Resolves once no matching request has been in flight for quietMilliseconds, counted from the
   // call at the earliest; fails with timeout after timeoutMilliseconds.

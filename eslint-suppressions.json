@@ -930,7 +930,7 @@
       "count": 3
     },
     "@typescript-eslint/require-await": {
-      "count": 3
+      "count": 1
     },
     "curly": {
       "count": 38
@@ -1311,7 +1311,7 @@
       "count": 1
     },
     "curly": {
-      "count": 70
+      "count": 67
     },
     "max-lines": {
       "count": 1
@@ -1372,7 +1372,7 @@
       "count": 18
     },
     "no-nested-ternary": {
-      "count": 4
+      "count": 3
     },
     "revisum/file-name-matches-export": {
       "count": 1

@@ -101,16 +101,17 @@ export function readHitCheck(): string {
 // Elements labelled exactly `label`: label[for], a wrapping label, aria-label or aria-labelledby.
 export function findByLabel(label: string): Element[] {
   const normalise = (text: string): string => text.replace(/\s+/g, ' ').trim();
+  const wanted = normalise(label);
   const found = new Set<Element>();
   for (const labelElement of Array.from(document.querySelectorAll('label'))) {
-    if (labelElement.control && normalise(labelElement.textContent ?? '') === label) found.add(labelElement.control);
+    if (labelElement.control && normalise(labelElement.textContent ?? '') === wanted) found.add(labelElement.control);
   }
   for (const element of Array.from(document.querySelectorAll('[aria-label]'))) {
-    if (normalise(element.getAttribute('aria-label') ?? '') === label) found.add(element);
+    if (normalise(element.getAttribute('aria-label') ?? '') === wanted) found.add(element);
   }
   for (const element of Array.from(document.querySelectorAll('[aria-labelledby]'))) {
     const ids = (element.getAttribute('aria-labelledby') ?? '').split(/\s+/);
-    if (normalise(ids.map((id) => document.getElementById(id)?.textContent ?? '').join(' ')) === label) found.add(element);
+    if (normalise(ids.map((id) => document.getElementById(id)?.textContent ?? '').join(' ')) === wanted) found.add(element);
   }
   return Array.from(found);
 }
@@ -118,8 +119,9 @@ export function findByLabel(label: string): Element[] {
 // The deepest elements whose rendered text is exactly `text`.
 export function findByText(text: string): Element[] {
   const normalise = (value: string): string => value.replace(/\s+/g, ' ').trim();
+  const wanted = normalise(text);
   const matches = Array.from(document.body.querySelectorAll('*')).filter(
-    (element) => !['SCRIPT', 'STYLE', 'TEMPLATE'].includes(element.tagName) && normalise((element as HTMLElement).innerText ?? '') === text,
+    (element) => !['SCRIPT', 'STYLE', 'TEMPLATE'].includes(element.tagName) && normalise((element as HTMLElement).innerText ?? '') === wanted,
   );
   return matches.filter((element) => !matches.some((other) => other !== element && element.contains(other)));
 }

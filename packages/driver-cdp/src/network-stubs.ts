@@ -7,7 +7,9 @@
 //     treats it as code. An answered request never leaves the browser, so the egress recorder is
 //     told to leave it out of the session's egress records.
 //   - A request check records the exchanges its matcher matches from CDP's Network domain. An
-//     exchange counts once its response has arrived: a page need not read a body for it to count.
+//     exchange finishes once its response has arrived, and a page need not read a body for that, or
+//     once the request failed, such as a refused connection, with a null status. The engine counts
+//     the second kind as an attempt and never as a response.
 //     When the plan may read fields, the body is taken as the response is held at Fetch's response
 //     stage, so it is there even when the page never reads it, and kept up to the declared cap.
 //   - While any stub or check is active, the pages bypass their service workers, so every matching

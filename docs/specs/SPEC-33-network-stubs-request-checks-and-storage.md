@@ -14,6 +14,7 @@ Some tests in the coverage study fake a failing endpoint, count the requests a p
   - **Request checks.** A declaration names a matcher and optional response fields (JSON pointers). From the start of the plan, the driver records each matching exchange: method, URL, status, media type and, only when fields are declared, a size-capped body.
     - The plan may reset the count, check it (`equals`, `atLeast`, `atMost`), check the latest response's status or a field, and remember a field as a SPEC-30 value: its text, or the length of an array.
     - `equals` and `atMost` wait until no matching request has been in flight for `requestQuietMilliseconds`, then compare.
+    - **Amendment (2026-11-02).** A count must hold on both counts: `atLeast n` counts responses, `atMost n` counts attempts including refused connections, and `equals n` needs both to equal `n`.
   - **Web storage.** A declaration names an area (`local` or `session`), an allowed origin, a key and an access level (`read` or `readWrite`). For `readWrite` it also gives a value template with typed parameters.
     - The plan may write or remove a `readWrite` entry, and check that any declared entry is present, absent or equal to a value.
     - Writes go to the current page's storage through CDP's DOM storage domain, so they need no page script. The page must be on the declared origin.

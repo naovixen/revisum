@@ -140,6 +140,11 @@ export type StepResult = {
   // An assertion's record of the stubs active while it ran, sorted by name, so a report can say it
   // checked a faked answer and not the real backend. Absent when no stub was active.
   readonly activeStubs?: readonly StubName[];
+  // A frame or newTab step's record of the passed steps inside it that left a record of their own,
+  // in order, each under the frame or newTab step's index. Absent when none did, so a frame of
+  // plain actions and checks keeps its result, and its hash, exactly as they were. The step that
+  // failed a frame or newTab step is not here: its code and records are the frame or newTab step's.
+  readonly innerSteps?: readonly StepResult[];
 };
 
 export type RememberedValueRecord = { readonly valueName: ValueName; readonly sha256: string };
@@ -269,6 +274,9 @@ type RunContext = {
   // True when the target's adapter cannot pin the clock, the time zone or randomness, so the run
   // loses replay-identical. Known from the target alone, before anything runs.
   readonly determinismUnpinned: boolean;
+  // The plan steps whose frame or second tab holds a setup step that failed. A frame or newTab step
+  // reports under its own type, so its type alone cannot say the run could not test.
+  readonly setupFailedInside: Set<number>;
 };
 
 const POLL_INTERVAL_MILLISECONDS = 50;
@@ -304,7 +312,7 @@ export async function run(given: RunInputs, ports: RunPorts): Promise<RunResult>
   };
   const context: RunContext = {
     inputs, ports, logger, gate, denials: [], redactor, secrets, isShortSecret: shortSecretObservation(secrets), secretFilledFields: new Set(), values, calls,
-    commands, rememberedTexts, performs: [], session: null, downloads: new Map(), activeStubs: new Set(),
+    commands, rememberedTexts, performs: [], session: null, downloads: new Map(), activeStubs: new Set(), setupFailedInside: new Set(),
     determinismUnpinned: target !== undefined && cannotPinDeterminism(ports.drivers, target),
   };
 
@@ -371,17 +379,16 @@ export async function run(given: RunInputs, ports: RunPorts): Promise<RunResult>
   let stubAnswers: readonly StubAnswer[] = [];
   let finished: lifecycle.Finished<'Passed' | 'Failed' | 'Errored'> | lifecycle.DeniedRun;
   try {
-    // The requests the plan checks are observed from its start, so what a page sends as it loads
-    // counts too. A driver refused request checks observes nothing: those steps fail on their own.
-    if (stepContext.performs.includes('requestChecks')) {
-      const observing = await startObserving(observedRequestNames(inputs.plan), networkContext(stepContext));
-      if (!observing.ok) throw new Error(`the requests the plan checks could not be observed: ${observing.error}`);
-    }
+    const notObserved = await failureToObserveRequests(session, stepContext);
     for (const [index, step] of inputs.plan.steps.entries()) {
       if (steps.some((done) => done.outcome === 'failed')) { steps.push({ index, type: step.type, outcome: 'skipped' }); continue; }
       const stepStartedAt = ports.clock.now();
       logger.log({ kind: 'step.start', stepIndex: index, stepType: step.type });
-      const result = withActiveStubs(step, await executeStep(step, index, session, target, stepContext), context.activeStubs);
+      // The first step stands for what could not be started, so the result says why nothing ran.
+      const done = index === 0 && notObserved !== undefined ? failedStep(step, index, notObserved) : await runStep(step, index, session, target, stepContext);
+      // With no later step to notice, a crash the last step did not report would go unseen.
+      const isLastStep = index === inputs.plan.steps.length - 1;
+      const result = isLastStep && done.outcome === 'passed' && isCrashed(session) ? failedStep(step, index, TARGET_CRASHED) : done;
       stepMilliseconds.push(ports.clock.now() - stepStartedAt);
       steps.push(result);
       logger.log({
@@ -396,16 +403,24 @@ export async function run(given: RunInputs, ports: RunPorts): Promise<RunResult>
     const denial = context.denials[0];
     finished = denial !== undefined && steps.some((done) => done.code === 'policy-denied')
       ? lifecycle.deny(running, denial)
-      : steps.some((done) => done.outcome === 'failed' && (SETUP_STEP_TYPES.includes(done.type) || UNUSABLE_RESULT_CODES.includes(done.code ?? '')))
+      : steps.some((done) => couldNotTest(done, stepContext))
         ? lifecycle.finish(running, 'Errored')
         : lifecycle.finish(running, steps.every((done) => done.outcome === 'passed') ? 'Passed' : 'Failed');
-  } catch (error) {
-    logger.log({ kind: 'step.end', outcome: 'failed', code: 'adapter-error', detail: errorText(error) });
+  } catch {
+    // A step's own failures never get here, so only the log or the clock can have failed. The result
+    // still accounts for every step.
+    const [unfinished, ...unreached] = inputs.plan.steps.slice(steps.length);
+    if (unfinished !== undefined) {
+      steps.push(failedStep(unfinished, steps.length, ADAPTER_ERROR));
+    }
+    for (const step of unreached) {
+      steps.push({ index: steps.length, type: step.type, outcome: 'skipped' });
+    }
     finished = lifecycle.finish(running, 'Errored');
   } finally {
     // Read before the browser goes, with every answer the stubs gave.
     stubAnswers = session.network?.stubAnswers() ?? [];
-    await session.close();
+    await closeKeepingTheResult(session, logger);
   }
   // Whatever the outcome. A failing cleanup step never changes the verdict; it raises a review item.
   const cleanup = inputs.plan.cleanup === undefined ? undefined : await runCleanup(inputs.plan.cleanup, inputs.plan.steps.length, calls, commands);
@@ -454,11 +469,20 @@ const productionAllowed = (inputs: RunInputs): boolean =>
 
 // The steps that set up or reach what the test needs: when one fails, the run could not test.
 const SETUP_STEP_TYPES: readonly Step['type'][] = ['call', 'evaluate', 'database'];
+// A step the adapter threw on: what it saw is unknown, which is not a product failure either. The
+// code stands for the failure and its text stays out of the result, since it could hold page
+// content or a secret.
+const ADAPTER_ERROR = 'adapter-error';
 // The codes of a page script or a database command that could not give a result to check, in
-// whatever step it ran: the run could not test, which is not a product failure.
+// whatever step it ran, and of an adapter that threw: the run could not test, which is not a
+// product failure.
 const UNUSABLE_RESULT_CODES: readonly string[] = [
-  'script-failed', 'script-timeout', 'script-result-invalid', 'script-result-too-large', ...COMMAND_ERROR_CODES,
+  'script-failed', 'script-timeout', 'script-result-invalid', 'script-result-too-large', ADAPTER_ERROR, ...COMMAND_ERROR_CODES,
 ];
+
+// True when a failed step means the run could not test, wherever in the plan the step stands.
+const couldNotTest = (done: StepResult, context: RunContext): boolean =>
+  done.outcome === 'failed' && (SETUP_STEP_TYPES.includes(done.type) || UNUSABLE_RESULT_CODES.includes(done.code ?? '') || context.setupFailedInside.has(done.index));
 
 // True when the plan calls a declared service, anywhere in it.
 const callsServices = (plan: Plan): boolean => everyPlanStep(plan).some((step) => step.type === 'call' || step.type === 'expectBackend');
@@ -580,6 +604,100 @@ async function openSession(planned: lifecycle.Planned, context: RunContext): Pro
   return { ok: true, value: { session: opened.value, driver, unpinned, ...(executableSha256 === undefined ? {} : { executableSha256 }) } };
 }
 
+// A failed step's result that holds only its code.
+const failedStep = (step: Step, index: number, code: string): StepResult => ({ index, type: step.type, outcome: 'failed', code });
+
+const isCrashed = (session: DocumentSession): boolean => session.crashed?.() === true;
+
+// The code for something that threw, whose text goes only to the log, which redacts it. A throw from
+// a dead page is the crash.
+function codeForThrow(error: unknown, session: DocumentSession, logger: Logger): string {
+  const code = isCrashed(session) ? TARGET_CRASHED : ADAPTER_ERROR;
+  logger.log({ kind: 'step.end', outcome: 'failed', code, detail: errorText(error) });
+  return code;
+}
+
+// The requests the plan checks are observed from its start, so what a page sends as it loads counts
+// too. A driver refused request checks observes nothing: those steps fail on their own. Gives the
+// code for what stopped it, or undefined when nothing did.
+async function failureToObserveRequests(session: Session, context: RunContext): Promise<string | undefined> {
+  if (!context.performs.includes('requestChecks')) {
+    return undefined;
+  }
+  try {
+    const observing = await startObserving(observedRequestNames(context.inputs.plan), networkContext(context));
+    if (observing.ok) {
+      return undefined;
+    }
+    return codeForThrow(`the requests the plan checks could not be observed: ${observing.error}`, session, context.logger);
+  } catch (error) {
+    return codeForThrow(error, session, context.logger);
+  }
+}
+
+// A session that will not close, such as a browser profile Windows still holds, says nothing about
+// what the steps found. It stays out of the result, whose hash a replay on a calmer machine must match.
+async function closeKeepingTheResult(session: Session, logger: Logger): Promise<void> {
+  try {
+    await session.close();
+  } catch (error) {
+    logger.log({ kind: 'step.end', outcome: 'failed', code: 'session-close-failed', detail: errorText(error) });
+  }
+}
+
+// One step, wherever in the plan it stands, with what its driver alone cannot be trusted to report:
+// a browser already dead, a check that passed from memory while it died, a throw, and a denial.
+async function runStep(step: Step, index: number, session: DocumentSession, target: Target, context: RunContext): Promise<StepResult> {
+  const denialsBefore = context.denials.length;
+  const result = await runStepOnLivePage(step, index, session, target, context);
+  // The audit log holds this denial, so whatever the driver reported from the same moment must not
+  // turn the verdict into an ordinary failure.
+  if (context.denials.length > denialsBefore) {
+    return failedStep(step, index, 'policy-denied');
+  }
+  return withActiveStubs(step, result, context.activeStubs);
+}
+
+async function runStepOnLivePage(step: Step, index: number, session: DocumentSession, target: Target, context: RunContext): Promise<StepResult> {
+  if (isCrashed(session)) {
+    return failedStep(step, index, TARGET_CRASHED);
+  }
+  try {
+    const done = await executeStep(step, index, session, target, context);
+    const isUnfoundedPass = done.outcome === 'passed' && ASSERTION_STEP_TYPES.includes(step.type) && isCrashed(session);
+    return isUnfoundedPass ? failedStep(step, index, TARGET_CRASHED) : done;
+  } catch (error) {
+    return failedStep(step, index, codeForThrow(error, session, context.logger));
+  }
+}
+
+// True when a passed step left something beyond its outcome for a person to read.
+const holdsARecord = (done: StepResult): boolean => Object.keys(done).some((key) => key !== 'index' && key !== 'type' && key !== 'outcome');
+
+// The steps of a frame or newTab step, in order, in the document they stand in. They have no results
+// of their own in the plan's list: the first that fails fails the frame or newTab step, with its code,
+// observation and records, and the records of those before it are kept beside them.
+async function runInnerSteps(
+  container: Extract<Step, { type: 'frame' | 'newTab' }>, index: number, session: DocumentSession, target: Target, context: RunContext,
+): Promise<StepResult> {
+  const kept: StepResult[] = [];
+  const withKept = (result: StepResult, nested: readonly StepResult[] = []): StepResult =>
+    (kept.length + nested.length === 0 ? result : { ...result, innerSteps: [...kept, ...nested] });
+  for (const inner of container.steps) {
+    const done = await runStep(inner, index, session, target, context);
+    if (done.outcome !== 'passed') {
+      if (SETUP_STEP_TYPES.includes(inner.type)) {
+        context.setupFailedInside.add(index);
+      }
+      return withKept({ ...done, type: container.type }, done.innerSteps);
+    }
+    if (holdsARecord(done)) {
+      kept.push(done);
+    }
+  }
+  return withKept({ index, type: container.type, outcome: 'passed' });
+}
+
 // An assertion's result with the stubs active while it ran, so a report can tell a check of a faked
 // answer from a check of the real backend. A stub step never checks anything, so the stubs active
 // as the step ends are the ones active while it ran.
@@ -672,18 +790,12 @@ async function executeStep(step: Step, index: number, session: DocumentSession, 
       return acted.ok ? { ...base, outcome: 'passed' } : { ...base, outcome: 'failed', code: acted.error.code };
     }
     case 'frame': {
-      // The frame's steps run in order inside the iframe's document. They have no results of their
-      // own: the first that fails fails the frame step, with its code and observation.
       if (session.frame === undefined) return { ...base, outcome: 'failed', code: 'unsupported-step' };
       const locator = resolveLocator(step.locator, context.values, context.inputs.project);
       if (!locator.ok) return { ...base, outcome: 'failed', code: locator.error };
       const entered = await session.frame(locator.value);
       if (!entered.ok) return { ...base, outcome: 'failed', code: entered.error.code };
-      for (const inner of step.steps) {
-        const done = await executeStep(inner, index, entered.value, target, context);
-        if (done.outcome !== 'passed') return { ...done, type: step.type };
-      }
-      return { ...base, outcome: 'passed' };
+      return runInnerSteps(step, index, entered.value, target, context);
     }
     case 'remember':
       if ('response' in step.from) return { ...base, ...(await rememberFromResponse(step, index, networkContext(context))) };
@@ -744,7 +856,7 @@ async function executeStep(step: Step, index: number, session: DocumentSession, 
       if (verdict.code === TARGET_CRASHED) return { ...base, outcome: 'failed', code: TARGET_CRASHED };
       return verdict.pass
         ? { ...base, outcome: 'passed' }
-        : { ...base, outcome: 'failed', code: 'assertion-failed', observed: context.isShortSecret(title) ? SECRET_PLACEHOLDER : context.redactor.text(title) };
+        : { ...base, outcome: 'failed', code: verdict.code ?? 'assertion-failed', observed: context.isShortSecret(title) ? SECRET_PLACEHOLDER : context.redactor.text(title) };
     }
     case 'a11yAudit': {
       const findings = [...(await session.audit())].sort((left, right) => (left.ruleId < right.ruleId ? -1 : left.ruleId > right.ruleId ? 1 : 0));
@@ -887,8 +999,8 @@ function checkDownload(step: Extract<Step, { type: 'expectDownload' }>, index: n
 }
 
 // A newTab step: opens its URL in a second tab of the session's browser context, runs its steps
-// there in order and closes the tab, whatever they did. The steps have no results of their own:
-// the first that fails fails the newTab step, with its code.
+// there in order and closes the tab, whatever they did. A tab that will not close fails a step that
+// had passed, and never takes the place of a real failure.
 async function runInNewTab(step: Extract<Step, { type: 'newTab' }>, index: number, target: Target, context: RunContext): Promise<StepResult> {
   const base = { index, type: step.type } as const;
   const session = context.session;
@@ -910,14 +1022,13 @@ async function runInNewTab(step: Extract<Step, { type: 'newTab' }>, index: numbe
   const opened = await session.newTab(url.href);
   if (!opened.ok) return { ...base, outcome: 'failed', code: opened.error.code };
   const tab = opened.value;
+  const done = await runInnerSteps(step, index, tab, target, context);
   try {
-    for (const inner of step.steps) {
-      const done = await executeStep(inner, index, tab, target, context);
-      if (done.outcome !== 'passed') return { ...done, type: step.type };
-    }
-    return { ...base, outcome: 'passed' };
-  } finally {
     await tab.close();
+    return done;
+  } catch (error) {
+    const code = codeForThrow(error, tab, context.logger);
+    return done.outcome === 'passed' ? { ...done, outcome: 'failed', code } : done;
   }
 }
 
@@ -965,8 +1076,9 @@ async function poll(context: RunContext, session: DocumentSession, check: () => 
     }
     // Looked at before a pass is accepted: what a dying page last showed proves nothing.
     if (crashed()) return { pass: false, code: TARGET_CRASHED };
-    // Waiting cannot change a selector the browser rejects, or a dialog, which only a later step can answer.
-    if (verdict.pass || verdict.code === 'selector-invalid' || verdict.code === UnreadablePage.DialogOpen) return verdict;
+    // Waiting cannot change a selector the browser rejects, a dialog, which only a later step can
+    // answer, or the browser's own error page, which runs no script that could leave it.
+    if (verdict.pass || verdict.code === 'selector-invalid' || verdict.code === UnreadablePage.DialogOpen || verdict.code === 'navigation-failed') return verdict;
     if (context.ports.clock.now() >= deadline) return verdict;
     await context.ports.clock.sleep(POLL_INTERVAL_MILLISECONDS);
   }

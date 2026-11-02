@@ -136,6 +136,10 @@ export type PageMetaTag = { readonly name: string; readonly content: string };
 export type PageProbe = {
   readonly url: string;
   readonly title: string;
+  // Present when the browser shows its own error page in place of the page: the server refused the
+  // connection, the allow-list blocked it, or an HTTP error status came with an empty body. The URL
+  // is then the one the browser wanted, so it says nothing about having arrived.
+  readonly browserErrorPage?: true;
   // Present when the driver reads the document head (the pageMetadata feature): every <meta> with a
   // name or property and a content, once per attribute, and the resolved href of
   // <link rel="canonical">, or null when the head has none.

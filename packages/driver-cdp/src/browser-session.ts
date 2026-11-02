@@ -84,7 +84,8 @@ async function locate<Handle>(operations: PageOperations<Handle>, locator: Resol
 
 async function matches<Handle>(operations: PageOperations<Handle>, locator: ResolvedLocator): Promise<Handle[]> {
   switch (locator.by) {
-    case 'role': return ownElements(operations, await operations.byRole(locator.role, locator.name));
+    // The browser compares names with their white space collapsed, so a plan's name must be too.
+    case 'role': return ownElements(operations, await operations.byRole(locator.role, normalise(locator.name)));
     case 'label': return operations.callForElements(findByLabel, [locator.label]);
     case 'text': return operations.callForElements(findByText, [locator.text]);
     case 'testId': return operations.callForElements(findByTestId, [locator.testId, locator.attribute ?? DEFAULT_TEST_ID_ATTRIBUTE]);
@@ -413,6 +414,10 @@ function documentPorts<Handle>(
     } catch (error) {
       acted = failure({ code: 'not-actionable', detail: errorText(error) });
     }
+    // The audit log holds this denial, so nothing noticed in the same moment may take its place.
+    if (!acted.ok && acted.error.code === 'policy-denied') {
+      return acted;
+    }
     // Whatever the action started reaches the browser within a frame or two; then the driver looks.
     if (acted.ok && events.openDialog() === null) {
       try { await operations.callForString(afterTwoFrames, []); } catch { /* the page navigated or died: looked at below */ }
@@ -499,9 +504,9 @@ function documentPorts<Handle>(
     async page(): Promise<PageProbe> {
       const shown = decodePageInfo(await operations.callForString(pageInfo, []));
       // In place of a page it could not show, the browser shows its own error page at an internal
-      // URL; the page's URL is still the one navigated to, as the address bar shows.
+      // URL. The address bar still shows the URL it wanted, which is not a page that loaded.
       if (!shown.url.startsWith(BROWSER_ERROR_PAGE)) return shown;
-      return { ...shown, url: await operations.unreachableUrl() ?? shown.url };
+      return { ...shown, url: await operations.unreachableUrl() ?? shown.url, browserErrorPage: true };
     },
     act,
     probe,
@@ -550,7 +555,8 @@ async function newTabAt(openTab: () => Promise<Result<DriverSession, DriverError
   const tab = opened.value;
   const navigated = await tab.navigate(url);
   if (navigated.ok) return success(tab);
-  await tab.close();
+  // Why the tab could not load is the step's failure; a tab that also fails to close must not replace it.
+  await tab.close().catch(() => undefined);
   return navigated;
 }
 

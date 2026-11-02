@@ -12,6 +12,7 @@ import {
 import { brand } from './brand.ts';
 import { formatCalendarDay, instantOf, relativeCalendarDay } from './calendar.ts';
 import { sha256 } from './hashing.ts';
+import { normalise } from './oracle.ts';
 import { runTimeText } from './plan/plan-decoders.ts';
 import { generatedValueEntries } from './plan/plan-values.ts';
 import type { Project } from './project/project-parser.ts';
@@ -20,8 +21,8 @@ import type { Project } from './project/project-parser.ts';
 export type RunValues = ReadonlyMap<ValueName, SafeText>;
 
 // Run-time step failures the engine decides, as opposed to driver errors:
-//   value-empty        a value is empty where text is needed, or has no text yet;
-//   value-unsafe       a value breaks the safe-text rules, or is "", "." or ".." as a path segment;
+//   value-empty        a value is blank where text is needed, or has no text yet;
+//   value-unsafe       a value breaks the safe-text rules, or is "." or ".." as a path segment;
 //   value-too-long     a value is longer than the project's maximumTextLength;
 //   state-not-exposed  a state check's element does not expose that state in the accessibility
 //                      tree, such as a tab whose selection is shown only by a css class;
@@ -109,13 +110,14 @@ type Resolved<Value> = Result<Value, StepErrorCode>;
 
 // The one place a value reference is resolved: the text a plan writes, or the text of the value it
 // names, held to `maximumLength`. A value with no text yet, such as one a step that never ran
-// would have remembered, is value-empty.
+// would have remembered, is value-empty. So is a blank one, which any text contains, so that a
+// check against it can prove nothing. A plan's own blank text stays, since a fill may mean it.
 export function resolveText(text: TextOrValue, values: RunValues, maximumLength: number): Resolved<SafeText> {
   const literal = literalText(text);
   if (literal !== undefined) return success(literal);
   const name = referencedValueName(text);
   const value = name === undefined ? undefined : values.get(name);
-  if (value === undefined) return failure('value-empty');
+  if (value === undefined || normalise(value) === '') return failure('value-empty');
   if (value.length > maximumLength) return failure('value-too-long');
   return success(value);
 }
