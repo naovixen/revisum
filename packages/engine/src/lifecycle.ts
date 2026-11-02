@@ -4,8 +4,8 @@
 //   Planned ──► Resolved ──► Running ──► Passed | Failed | Errored | Denied
 //      │            └──────────────────► Errored
 //      ├──► TargetUnavailable   (explicit; the engine never substitutes a target)
-//      └──► Refused             (production it may not reach, a secret the store lacks, or service calls with no
-//                                caller; no driver is called and no call is made)
+//      └──► Refused             (production it may not reach, a secret the store lacks, or something the plan needs
+//                                that this run can't do; no driver is called and no call is made)
 //
 // A plan reaches Planned only once the policy gate has authorised it. Denied is the run the gate's
 // runtime guard stopped before an action; the denied action sent no input event.
@@ -38,11 +38,14 @@ export type Finished<State extends 'Passed' | 'Failed' | 'Errored'> = Omit<Runni
 type TargetUnavailableRun = Omit<Planned, 'state'> & { readonly state: 'TargetUnavailable'; readonly unavailable: Unavailable };
 
 // Why a run was refused before any driver call.
-//   origin_not_allowed: the run would reach one of the project's production origins, which only an
+//   origin-not-allowed: the run would reach one of the project's production origins, which only an
 //     approved plan may reach, and only when the project allows production for approved plans.
 //   secret-missing: the plan names a secret, or makes a call that needs one, that the secret store
 //     cannot resolve. The refusal names the secret, never a value.
 //   services-unavailable: the plan calls a declared service, but the run was given no service caller.
+//   storage-state-unsupported: the plan names saved storage state, which no driver can load yet.
+//   database-commands-unavailable: the plan runs a database command, in its steps or its cleanup, but
+//     the run was given no command runner.
 //   script-source-missing: the plan names a page script whose source the run was not given, so the
 //     manifest could not record what would run.
 // And why an evidence run (`run --suite`) was refused before any container started:
@@ -53,12 +56,13 @@ type TargetUnavailableRun = Omit<Planned, 'state'> & { readonly state: 'TargetUn
 //   workload-start-failed: the workload container did not start, so no suite code ran.
 // A suite whose declared secret the store cannot resolve is refused with secret-missing, as a plan is.
 export type RefusalCode =
-  | 'origin_not_allowed' | 'secret-missing' | 'services-unavailable' | 'evidence-mode-disabled' | 'suite-not-declared' | 'egress-unenforceable'
-  | 'script-source-missing' | 'image-missing' | 'image-digest-mismatch' | 'workload-start-failed';
+  | 'origin-not-allowed' | 'secret-missing' | 'services-unavailable' | 'storage-state-unsupported' | 'database-commands-unavailable'
+  | 'evidence-mode-disabled' | 'suite-not-declared' | 'egress-unenforceable' | 'script-source-missing' | 'image-missing' | 'image-digest-mismatch'
+  | 'workload-start-failed';
 export type Refusal =
-  | { readonly code: Extract<RefusalCode, 'origin_not_allowed'>; readonly origin: string }
+  | { readonly code: Extract<RefusalCode, 'origin-not-allowed'>; readonly origin: string }
   | { readonly code: Extract<RefusalCode, 'secret-missing'>; readonly secretName: SecretName }
-  | { readonly code: Extract<RefusalCode, 'services-unavailable'> }
+  | { readonly code: Extract<RefusalCode, 'services-unavailable' | 'storage-state-unsupported' | 'database-commands-unavailable'> }
   // The plan names a page script whose source file the run was not given, by its declared path.
   | { readonly code: Extract<RefusalCode, 'script-source-missing'>; readonly file: string }
   | EvidenceRefusal;

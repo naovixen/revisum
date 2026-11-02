@@ -193,9 +193,9 @@ const needsUnsetValue = (stepArguments: CallArguments | ScriptArguments, values:
   Object.values(stepArguments).some((argument) => typeof argument === 'object' && 'valueName' in argument && !values.has(argument.valueName));
 
 // The cleanup steps, in order, each recorded. They are numbered after the plan's steps in the log.
-// A run that calls services always has a call context: run() refused it before any step otherwise.
-// A run with no database-command port records each cleanup command as failed, raising a review
-// item, since its test data may be left behind.
+// A run that calls services always has a call context, and one that runs database commands a
+// command context: run() refused it before any step otherwise. Without one, a cleanup step is
+// recorded as failed, raising a review item, since its test data may be left behind.
 export async function runCleanup(
   cleanup: readonly CleanupStep[], firstIndex: number, context: CallStepContext | undefined, commands?: DatabaseCommandContext,
 ): Promise<readonly CleanupResult[]> {

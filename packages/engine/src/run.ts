@@ -38,7 +38,7 @@ import { runEvaluate, runScriptCheck, type PageScriptContext, type PageScriptRec
 import type { SuiteDecodeError } from './evidence/suite-report.ts';
 import { runTimeText, type PlanError } from './plan/plan-decoders.ts';
 import { ASSERTION_STEP_TYPES } from './plan/plan-grammar.ts';
-import { assertBranded } from './plan/plan-parser.ts';
+import { assertBranded, everyPlanStep } from './plan/plan-parser.ts';
 import { unsafeFeaturesOf } from './plan/unsafe-features.ts';
 import { assertAuthorised, policyGate, type PolicyGate } from './policy/policy-gate.ts';
 import type { Project } from './project/project-parser.ts';
@@ -109,7 +109,8 @@ export type RunPorts = {
   // Without one, a plan that calls a service is refused before any side effect.
   readonly services?: ServiceCaller;
   // Runs the plan's database commands, each in a workload container: cli's wiring of runner's
-  // workload runner. Without one, every database step fails with unsupported-step and nothing runs.
+  // workload runner. Without one, a plan with a database command, cleanup included, is refused
+  // before any side effect.
   readonly databaseCommands?: DatabaseCommandRunner;
 };
 
@@ -319,46 +320,25 @@ export async function run(given: RunInputs, ports: RunPorts): Promise<RunResult>
   // Refused before any driver call if the run would reach a production origin it may not.
   const productionOrigin = productionAllowed(inputs) ? undefined : productionOriginReached(inputs);
   if (productionOrigin !== undefined) {
-    const refused = lifecycle.refuse(planned, { code: 'origin_not_allowed', origin: productionOrigin });
-    logger.log({ kind: 'run.state', state: refused.state, targetId: target.id, code: refused.refusal.code, origin: productionOrigin });
-    return seal({
-      state: refused.state, targetId: target.id, manifest: null, manifestHash: null, steps: [], blockedOrigins: [],
-      unavailable: null, refusal: refused.refusal, timings: { totalMilliseconds: ports.clock.now() - startedAt, stepMilliseconds: [] },
-    }, context);
+    return refusedResult(planned, { code: 'origin-not-allowed', origin: productionOrigin }, context, startedAt, { origin: productionOrigin });
   }
 
   if (!resolution.ok) {
-    const refused = lifecycle.refuse(planned, { code: 'secret-missing', secretName: resolution.error });
-    logger.log({
-      kind: 'run.state', state: refused.state, targetId: target.id, code: refused.refusal.code,
+    return refusedResult(planned, { code: 'secret-missing', secretName: resolution.error }, context, startedAt, {
       detail: `the secret store has no secret named ${resolution.error}`,
     });
-    return seal({
-      state: refused.state, targetId: target.id, manifest: null, manifestHash: null, steps: [], blockedOrigins: [],
-      unavailable: null, refusal: refused.refusal, timings: { totalMilliseconds: ports.clock.now() - startedAt, stepMilliseconds: [] },
-    }, context);
   }
 
   // Refused before any side effect when the plan names a page script whose source the run was not
   // given: the manifest could not record what would run.
   const unsafe = unsafeFeatureRecord(inputs.plan, inputs.project, inputs.scriptSources ?? {});
   if (!unsafe.ok) {
-    const refused = lifecycle.refuse(planned, { code: 'script-source-missing', file: unsafe.error });
-    logger.log({ kind: 'run.state', state: refused.state, targetId: target.id, code: refused.refusal.code });
-    return seal({
-      state: refused.state, targetId: target.id, manifest: null, manifestHash: null, steps: [], blockedOrigins: [],
-      unavailable: null, refusal: refused.refusal, timings: { totalMilliseconds: ports.clock.now() - startedAt, stepMilliseconds: [] },
-    }, context);
+    return refusedResult(planned, { code: 'script-source-missing', file: unsafe.error }, context, startedAt);
   }
 
-  // Refused before any side effect when the plan calls a service and no caller was wired in.
-  if (callsServices(inputs.plan) && calls === undefined) {
-    const refused = lifecycle.refuse(planned, { code: 'services-unavailable' });
-    logger.log({ kind: 'run.state', state: refused.state, targetId: target.id, code: refused.refusal.code });
-    return seal({
-      state: refused.state, targetId: target.id, manifest: null, manifestHash: null, steps: [], blockedOrigins: [],
-      unavailable: null, refusal: refused.refusal, timings: { totalMilliseconds: ports.clock.now() - startedAt, stepMilliseconds: [] },
-    }, context);
+  const beyondThisRun = refusalOfWhatThisRunCannotDo(inputs.plan, context);
+  if (beyondThisRun !== undefined) {
+    return refusedResult(planned, beyondThisRun, context, startedAt);
   }
 
   const opened = await openSession(planned, context);
@@ -480,13 +460,43 @@ const UNUSABLE_RESULT_CODES: readonly string[] = [
   'script-failed', 'script-timeout', 'script-result-invalid', 'script-result-too-large', ...COMMAND_ERROR_CODES,
 ];
 
-// True when the plan calls a declared service, in its steps or its cleanup.
-const callsServices = (plan: Plan): boolean =>
-  [...plan.steps, ...(plan.cleanup ?? [])].some((step) => step.type === 'call' || step.type === 'expectBackend');
+// True when the plan calls a declared service, anywhere in it.
+const callsServices = (plan: Plan): boolean => everyPlanStep(plan).some((step) => step.type === 'call' || step.type === 'expectBackend');
 
-// True when the plan runs a database command, in its steps or its cleanup.
-const runsDatabaseCommands = (plan: Plan): boolean =>
-  [...plan.steps, ...(plan.cleanup ?? [])].some((step) => step.type === 'database' || step.type === 'expectDatabase');
+// True when the plan runs a database command, anywhere in it.
+const runsDatabaseCommands = (plan: Plan): boolean => everyPlanStep(plan).some((step) => step.type === 'database' || step.type === 'expectDatabase');
+
+// Why this run could not do all the plan asks, known from the plan and the run's ports alone, so
+// nothing has acted yet. A plan that needs one of these relies on it to mean anything: stopping
+// part way would leave test data behind or report on a run that never had what it declared.
+function refusalOfWhatThisRunCannotDo(plan: Plan, context: RunContext): lifecycle.Refusal | undefined {
+  if (callsServices(plan) && context.calls === undefined) {
+    return { code: 'services-unavailable' };
+  }
+  // A plan that names it relies on being signed in. Loading it comes with the driver's session
+  // environment; until then no run can honour it, so the plan parses and every run of it is refused.
+  if (plan.storageState !== undefined) {
+    return { code: 'storage-state-unsupported' };
+  }
+  // Cleanup counts too: with no way to run it, the steps would leave their test data behind.
+  if (runsDatabaseCommands(plan) && context.commands === undefined) {
+    return { code: 'database-commands-unavailable' };
+  }
+  return undefined;
+}
+
+// The run refused, before any driver call. `logged` adds what the event log says beyond the code.
+function refusedResult(
+  planned: lifecycle.Planned, refusal: lifecycle.Refusal, context: RunContext, startedAt: number,
+  logged: { readonly origin?: string; readonly detail?: string } = {},
+): RunResult {
+  const refused = lifecycle.refuse(planned, refusal);
+  context.logger.log({ kind: 'run.state', state: refused.state, targetId: planned.target.id, code: refused.refusal.code, ...logged });
+  return seal({
+    state: refused.state, targetId: planned.target.id, manifest: null, manifestHash: null, steps: [], blockedOrigins: [],
+    unavailable: null, refusal: refused.refusal, timings: { totalMilliseconds: context.ports.clock.now() - startedAt, stepMilliseconds: [] },
+  }, context);
+}
 
 // The origins of the services the plan's calls and database commands reach, its cleanup included.
 function serviceOrigins(inputs: RunInputs): string[] {
@@ -570,21 +580,6 @@ async function openSession(planned: lifecycle.Planned, context: RunContext): Pro
   return { ok: true, value: { session: opened.value, driver, unpinned, ...(executableSha256 === undefined ? {} : { executableSha256 }) } };
 }
 
-// Steps the plan language has but the run's driver does not perform. Each fails with
-// unsupported-step, never passes or is skipped, and nothing of it reaches the driver, so a plan that
-// relies on one cannot report a pass it did not earn or act in part. Hover, select and upload go
-// to the driver, which refuses them the same way when it does not perform them; a frame step needs
-// the driver's frame port.
-function isUnsupported(step: Step, performs: readonly DriverFeature[], commandsWired: boolean): boolean {
-  switch (step.type) {
-    // Database commands run in a workload container through the run's port, not in the browser.
-    case 'database': case 'expectDatabase': return !commandsWired;
-    // What a step needs from a driver, and which of it is optional, is decided in one place, in
-    // contracts; the driver declares the optional features it performs.
-    default: return needsDriverFeatures(step, performs);
-  }
-}
-
 // An assertion's result with the stubs active while it ran, so a report can tell a check of a faked
 // answer from a check of the real backend. A stub step never checks anything, so the stubs active
 // as the step ends are the ones active while it ran.
@@ -619,11 +614,13 @@ const NO_ELEMENT: ResolvedElement = { role: null, name: null, box: null, formSub
 // frame step, which report under the frame step's own index.
 async function executeStep(step: Step, index: number, session: DocumentSession, target: Target, context: RunContext): Promise<StepResult> {
   const base = { index, type: step.type } as const;
-  if (isUnsupported(step, context.performs, context.commands !== undefined)) return { ...base, outcome: 'failed', code: 'unsupported-step' };
-  // No driver loads saved storage state into its session yet (that comes with the CDP driver's
-  // session environment). A plan that names it relies on being signed in, so its first step fails
-  // and nothing reaches the driver, rather than running without the state the plan declared.
-  if (context.inputs.plan.storageState !== undefined) return { ...base, outcome: 'failed', code: 'unsupported-step' };
+  // Steps the plan language has but the run's driver does not perform. Each fails with
+  // unsupported-step, never passes or is skipped, and nothing of it reaches the driver, so a plan
+  // that relies on one cannot report a pass it did not earn or act in part. What a step needs from
+  // a driver, and which of it is optional, is decided in one place, in contracts; the driver declares
+  // the optional features it performs. Hover, select and upload go to the driver, which refuses them
+  // the same way when it does not perform them; a frame step needs the driver's frame port.
+  if (needsDriverFeatures(step, context.performs)) return { ...base, outcome: 'failed', code: 'unsupported-step' };
   switch (step.type) {
     case 'navigate': {
       let path = step.url;
@@ -703,14 +700,15 @@ async function executeStep(step: Step, index: number, session: DocumentSession, 
     case 'setStorage': case 'removeStorage': return { ...base, ...(await writeStorage(step, networkContext(context))) };
     case 'expectStorage': return { ...base, ...(await checkStorage(step, networkContext(context))) };
     // The session's clock and clipboard ports carry these out, for a driver that declares them;
-    // isUnsupported refused them above otherwise, so an advance never becomes a real wait.
+    // needsDriverFeatures refused them above otherwise, so an advance never becomes a real wait.
     case 'advanceClock': return { ...base, ...(await advanceClock(step, clockAndClipboardContext(context))) };
     case 'expectClipboard': return { ...base, ...(await checkClipboard(step, clockAndClipboardContext(context))) };
     // Page scripts run through the script port of the document the step stands in, for a driver
-    // that declares them; isUnsupported refused them above otherwise.
+    // that declares them; needsDriverFeatures refused them above otherwise.
     case 'evaluate': return { ...base, ...(await runEvaluate(step, index, session, pageScriptContext(context))) };
     case 'expectScript': return { ...base, ...(await runScriptCheck(step, index, session, pageScriptContext(context))) };
-    // Database commands run through the run's port; isUnsupported refused them above without one.
+    // Database commands run in a workload container through the run's port, not in the browser. A
+    // run that runs them always has a runner: run() refused it before any step otherwise.
     case 'database':
     case 'expectDatabase': {
       if (context.commands === undefined) return { ...base, outcome: 'failed', code: 'unsupported-step' };
@@ -778,7 +776,7 @@ async function executeStep(step: Step, index: number, session: DocumentSession, 
 async function rememberFromPage(step: Extract<Step, { type: 'remember' }>, index: number, session: DocumentSession, context: RunContext): Promise<StepResult> {
   const base = { index, type: step.type } as const;
   const from = step.from;
-  // isUnsupported refused every other source before the step got here.
+  // needsDriverFeatures refused every other source before the step got here.
   if (!('element' in from)) return { ...base, outcome: 'failed', code: 'unsupported-step' };
   const locator = resolveLocator(from.element, context.values, context.inputs.project);
   if (!locator.ok) return { ...base, outcome: 'failed', code: locator.error };

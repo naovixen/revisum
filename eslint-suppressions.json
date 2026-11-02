@@ -1305,13 +1305,13 @@
   },
   "packages/engine/src/run.ts": {
     "@typescript-eslint/naming-convention": {
-      "count": 7
+      "count": 6
     },
     "@typescript-eslint/strict-boolean-expressions": {
       "count": 1
     },
     "curly": {
-      "count": 71
+      "count": 70
     },
     "max-lines": {
       "count": 1
@@ -4577,17 +4577,9 @@
       "count": 18
     }
   },
-  "test/unit/engine/storage-state-unsupported.test.ts": {
-    "revisum/file-name-matches-export": {
-      "count": 1
-    },
-    "revisum/test-title-format": {
-      "count": 2
-    }
-  },
   "test/unit/engine/storage-state.test.ts": {
     "@typescript-eslint/strict-boolean-expressions": {
-      "count": 3
+      "count": 1
     },
     "curly": {
       "count": 3

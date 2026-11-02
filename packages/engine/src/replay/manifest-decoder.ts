@@ -2,10 +2,7 @@
 // of another schema version, or with a key this version does not know, is refused as
 // version-unsupported: a newer engine may have recorded an input this one would silently ignore.
 // A known field of the wrong shape is a replay-mismatch at its JSON path. Nothing is guessed.
-import {
-  DRIVER_FEATURES, UNSAFE_FEATURES, failure, success,
-  type AdapterInfo, type Result,
-} from '@revisum/contracts';
+import { UNSAFE_FEATURES, failure, success, type Result } from '@revisum/contracts';
 import type {
   EvidenceManifestRecord, FixtureReference, HostInfo, RunManifest, RunVersions, SecretRecord, StorageStateRecord, UnsafeDeclarationRecord,
 } from '../manifest.ts';
@@ -75,8 +72,8 @@ function readEach<Value>(
 const readSafeInteger = (input: unknown, path: string, issues: Issues): Parsed<number> =>
   readInteger(input, path, issues, Number.MIN_SAFE_INTEGER, Number.MAX_SAFE_INTEGER);
 
-function readAdapter(input: unknown, path: string, issues: Issues): Parsed<AdapterInfo> {
-  const fields = readRecord(input, path, issues, ['id', 'version', 'protocol', 'cannotPin', 'performs'], ['id', 'version', 'protocol']);
+function readAdapter(input: unknown, path: string, issues: Issues): Parsed<NonNullable<RunManifest['adapter']>> {
+  const fields = readRecord(input, path, issues, ['id', 'version', 'protocol', 'cannotPin'], ['id', 'version', 'protocol']);
   if (fields === INVALID) return INVALID;
   const parts = [
     readString(fields['id'], `${path}.id`, issues),
@@ -84,11 +81,9 @@ function readAdapter(input: unknown, path: string, issues: Issues): Parsed<Adapt
     readString(fields['protocol'], `${path}.protocol`, issues),
   ] as const;
   const cannotPin = fields['cannotPin'] === undefined ? undefined : readStrings(fields['cannotPin'], `${path}.cannotPin`, issues);
-  const performs = fields['performs'] === undefined ? undefined
-    : readEach(fields['performs'], `${path}.performs`, issues, (entry, at, found) => readOneOf(entry, at, found, DRIVER_FEATURES));
-  if (!allValid(parts) || cannotPin === INVALID || performs === INVALID) return INVALID;
+  if (!allValid(parts) || cannotPin === INVALID) return INVALID;
   const [id, version, protocol] = parts;
-  return { id, version, protocol, ...(cannotPin === undefined ? {} : { cannotPin }), ...(performs === undefined ? {} : { performs }) };
+  return { id, version, protocol, ...(cannotPin === undefined ? {} : { cannotPin }) };
 }
 
 function readNamedVersion(input: unknown, path: string, issues: Issues): Parsed<{ readonly name: string; readonly version: string }> {

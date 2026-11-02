@@ -1300,6 +1300,9 @@ function everyStep(steps: readonly Step[]): Step[] {
   return steps.flatMap((step) => (step.type === 'frame' || step.type === 'newTab' ? [step, ...everyStep(step.steps)] : [step]));
 }
 
+// Everything the plan may do: every step, as above, and its cleanup.
+export const everyPlanStep = (plan: Plan): readonly Step[] => [...everyStep(plan.steps), ...(plan.cleanup ?? [])];
+
 // Checks across the whole plan once every step has been read: capture names are unique, and the
 // plan checks at least one thing.
 function checkWholePlan(steps: readonly Step[], context: ParseContext): void {

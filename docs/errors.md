@@ -47,8 +47,6 @@ Plan error. A URL uses a scheme other than `http` or `https`.
 
 Plan error. An absolute URL's origin is not on the project's allow-list. Use a path, or add the origin to the trusted project configuration. In the project itself: a stub's or observed request's matcher names an origin that is neither allowed nor a declared service's, or a storage entry names an origin that is not allowed.
 
-As a run refusal, the run would reach one of the project's production origins, which only an approved plan may reach, and only when the project allows production for approved plans. No browser was opened.
-
 ## target_not_in_matrix
 
 Plan error. A plan names a target the project's matrix does not declare. Nothing is substituted: declare the target, or remove it from the plan.
@@ -608,6 +606,12 @@ Policy error. A plan with no approval makes a `write` call, in its steps or its 
 
 Policy error. A plan with no approval holds an inline page script: its source and its claimed effect are the plan's own, and no person declared them, so it runs only once the plan is approved. Approve the plan, or move the script into a file under `plans/scripts/` and declare it under `unsafeFeatures.pageScripts.scripts`.
 
+## origin-not-allowed
+
+Run refusal. The run would reach one of the project's production origins, which only an approved plan may reach, and only when the project allows production for approved plans. The refusal names the origin. No browser was opened. Not the plan error `origin_not_allowed`.
+
+Step error, too. A `navigate` or `newTab` step's final URL is on an origin the project does not allow, so nothing was loaded and every later step is skipped. Use a path on an allowed origin, or add the origin to the trusted project configuration.
+
 ## secret-missing
 
 Run refusal. The plan names a secret, in a fill, in `storageState` or as a call's argument, or makes a call whose declaration sends one in a header, that the secret store cannot resolve, or the run was given no secret store at all. The run ends `Refused` before any browser opens or any call is made; the refusal names the secret, never a value. Set the CI secret or environment variable of that exact name (an empty value counts as missing).
@@ -615,6 +619,14 @@ Run refusal. The plan names a secret, in a fill, in `storageState` or as a call'
 ## services-unavailable
 
 Run refusal. The plan makes a `call` or `expectBackend`, or has `cleanup` calls, but the run was given no service caller. The run ends `Refused` before any browser opens or any call is made. Run it where the service caller is wired in; until the isolated runner lands, only a caller a test supplies is available.
+
+## storage-state-unsupported
+
+Run refusal. The plan names saved browser storage state in `storageState`, and no driver can load it into a session yet. A plan that names it relies on being signed in, so the run ends `Refused` before any browser opens, rather than running without it. Sign in through the plan's own steps for now.
+
+## database-commands-unavailable
+
+Run refusal. The plan has a `database` or `expectDatabase` step, or a `database` step in its `cleanup`, but the run was given no database command runner. The run ends `Refused` before any browser opens or any command runs, so no test data is left behind. Run it where the command runner is wired in.
 
 ## script-source-missing
 

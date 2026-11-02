@@ -62,7 +62,10 @@ export type RunManifest = {
   // The target, adapter and browser of a plan run. An evidence run has none of its own: the
   // suite's own browser is self-reported in its evidence record.
   readonly target?: Target;
-  readonly adapter?: AdapterInfo;
+  // The driver, without the features it performs, which are not an input of their own: a step that
+  // needs one shows the answer in the result, so a driver that gains one leaves other plans' hashes
+  // as they were.
+  readonly adapter?: Omit<AdapterInfo, 'performs'>;
   readonly browser?: { readonly name: string; readonly version: string };
   // An evidence run fixes neither, so both are 0 for it; its evidence record says why.
   readonly seeds: { readonly random: number };
@@ -270,6 +273,7 @@ export function buildManifest(inputs: {
   readonly recordsReplies?: boolean;
 }): RunManifest {
   const pinned = inputs.pins === undefined ? undefined : pinnedFields(inputs.pins.pins, inputs.pins.project);
+  const { id, version, protocol, cannotPin } = inputs.adapter;
   const unpinned = [
     ...(inputs.adapter.cannotPin ?? []), ...(inputs.unpinned ?? []),
     ...(inputs.pins !== undefined && inputs.pins.pins.imageDigest === undefined ? [RUN_IMAGE_INPUT] : []),
@@ -284,7 +288,7 @@ export function buildManifest(inputs: {
     engineVersion: ENGINE_VERSION,
     planHash: planHash(inputs.plan),
     target: inputs.target,
-    adapter: inputs.adapter,
+    adapter: { id, version, protocol, ...(cannotPin === undefined ? {} : { cannotPin }) },
     browser: inputs.browser,
     seeds: { random: inputs.seed },
     clock: { fixedTimeMilliseconds: inputs.fixedTimeMilliseconds },
