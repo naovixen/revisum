@@ -70,13 +70,14 @@ The product name is Revisum (`revisum` for the repo, packages and CLI). It appea
 
 | Command | Does |
 |---|---|
-| `npm run check` | `tsc`, lint, naming lint, unit and contract tests, proofs, replay. It must be green before you finish |
+| `npm run check` | The fast checks: `tsc`, lint, naming lint, unit and contract tests that need no browser. It must be green before you finish |
+| `npm run check:push` | What CI runs on push: `npm run check`, browser tests, proofs, replay, gates. Real-container tests stay in `npm run check:containers`, because they need Docker |
 | `npm run lint:code` | ESLint, part of `npm run check` |
 | `npm run format` | Prettier, across packages, tools and tests |
 | `npm test -w <package>` | Tests for one package |
 | `npm run proofs` | Hostile plans, secret leaks, egress, PII, audit chain |
 | `npm run replay` | Golden runs, compared by hash |
-| `npm run check:linux` | `npm run check` on CI's pinned Linux image, in Docker. Run it before reporting a step done when screenshots, fonts or replay hashes are involved |
+| `npm run check:linux` | `npm run check:push` on CI's pinned Linux image, in Docker. Run it before reporting a step done when screenshots, fonts or replay hashes are involved |
 
 ## When you finish
 

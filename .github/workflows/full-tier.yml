@@ -1,0 +1,19 @@
+# The full test tier, weekly and by hand: what a push leaves out, such as repeated runs and the
+# headless-shell target. It calls the "ci" workflow, so it runs every check a push does and the same
+# gates judge it. A pushed-commit check needs a push, so those two run only on a push.
+name: full-tier
+
+on:
+  schedule:
+    # Saturdays at 04:00 UTC.
+    - cron: '0 4 * * 6'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  full-tier:
+    uses: ./.github/workflows/ci.yml
+    with:
+      tier: full

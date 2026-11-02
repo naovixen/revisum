@@ -1,6 +1,7 @@
 // The results of the test runs, as tools/run-test-folder.ts leaves them in .test-results/, read
-// back for the gates step. Each run of run-test-folder writes one results file for the folders it
-// ran, replacing that file's earlier version; the gates step reads them all.
+// back for the gates step. Each run of run-test-folder writes one results file for the folders and
+// shard it ran, replacing that file's earlier version; the gates step reads them all, so CI gathers
+// every job's files into .test-results/ first.
 //   - A test id is "<file>#<full name>", the file relative to the repository with forward slashes.
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';

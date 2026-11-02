@@ -3,7 +3,7 @@
 # installs the new build and its headless shell and re-runs the contract and capability suites on
 # them. Then tools/browser-upkeep.ts reports the average fix hours per major, flags the kill
 # criterion when they are over the limit, and fails when the new major has no upkeep record.
-# Runs in the same pinned image as the "ci" workflow. See docs/specs/SPEC-06-cdp-driver.md.
+# Runs in the same pinned image as the "ci" workflow.
 name: browser-upkeep
 
 on:

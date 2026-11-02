@@ -4,7 +4,7 @@
 # prints a warning and a job-summary line; the tool always exits 0. It runs on a schedule and by
 # hand only, never on a push or a pull request, to keep CI minutes down, and in the same pinned
 # image as the "ci" workflow. ARM results are recorded only when someone runs the tool on an arm64
-# machine: there is no paid runner. See docs/specs/SPEC-08-manifest-and-replay.md.
+# machine: there is no paid runner.
 name: benchmark
 
 on:
