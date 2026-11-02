@@ -62,8 +62,8 @@ function admittedErrors(text: string, parsePlan: ParsePlan): readonly DraftError
 
 // Lines of the golden texts that hold an unsafe construct, with the mark the spec requires.
 const MARKED_LINES: readonly { readonly feature: FeatureName; readonly construct: string; readonly statement: string }[] = [
-  { feature: 'css-locator', construct: 'a CSS locator', statement: 'Unsafe: Expect first css "[data-test^=\\"transaction-item-\\"]" is visible' },
-  { feature: 'css-locator', construct: 'a CSS locator inside a CSS locator', statement: 'Unsafe: Click css "button" containing text "Add" inside 2nd css "li.product"' },
+  { feature: 'css-locator', construct: 'a css locator', statement: 'Unsafe: Expect first css "[data-test^=\\"transaction-item-\\"]" is visible' },
+  { feature: 'css-locator', construct: 'a css locator inside a css locator', statement: 'Unsafe: Click css "button" containing text "Add" inside 2nd css "li.product"' },
   { feature: 'xpath-locator', construct: 'an XPath locator', statement: 'Unsafe: Expect xpath "//main//li[2]" has text containing "Total"' },
   { feature: 'dom-checks', construct: 'a class check', statement: 'Unsafe: Expect test id "cart-badge" has class "is-active"' },
   { feature: 'dom-checks', construct: 'a computed style check', statement: 'Unsafe: Expect test id "cart-badge" computed style background-color is "rgb(220, 38, 38)"' },
@@ -92,7 +92,7 @@ test('a database command in Clean up: without the mark is missing-unsafe-mark at
   assertTextError(textErrorsOf(withLineReplaced(original, line, '  Run database command seedOrders with count 3')), 'missing-unsafe-mark', line, 1, 1);
 });
 
-test('a frame found by CSS without the mark is missing-unsafe-mark at the frame\'s line and column 1', { criterion: 'AC-SPEC-28-05' }, () => {
+test('a frame found by css without the mark is missing-unsafe-mark at the frame\'s line and column 1', { criterion: 'AC-SPEC-28-05' }, () => {
   const original = unsafeGoldenText('xpath-locator');
   const line = lineOf(original, 'Go to /cart') + 1;
   const text = withLineInserted(withLineInserted(original, line, 'In frame css "iframe.editor":'), line + 1, '  Click button "Save"');

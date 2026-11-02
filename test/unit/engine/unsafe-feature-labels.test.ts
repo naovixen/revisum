@@ -98,11 +98,11 @@ test('PII masking holds for every feature but page scripts', { criterion: 'AC-SP
 
 // ---- Labels on the run result ---------------------------------------------------------------------------
 
-// CSS, DOM checks, a page-script check and a database check: four features a proposal may run.
+// css, DOM checks, a page-script check and a database check: four features a proposal may run.
 const FOUR_FEATURES_PLAN = (): JsonRecord => unsafePlan([OPEN_CART, CSS_CHECK, CLASS_CHECK, CART_COUNT_CHECK, ORDER_COUNT_CHECK]);
 const FOUR_FEATURES: readonly FeatureName[] = ['css-locator', 'database-command', 'dom-checks', 'page-script'];
 
-test('a run of a plan using CSS locators carries the unsafe label, naming css-locator, in its result JSON', { criterion: 'AC-SPEC-36-16' }, async () => {
+test('a run of a plan using css locators carries the unsafe label, naming css-locator, in its result JSON', { criterion: 'AC-SPEC-36-16' }, async () => {
   const { result } = await runUnsafePlan(unsafePlan([OPEN_CART, CSS_CHECK]));
   assert.deepEqual(result.unsafeFeatures, ['css-locator']);
   const written: JsonRecord = JSON.parse(JSON.stringify(result));

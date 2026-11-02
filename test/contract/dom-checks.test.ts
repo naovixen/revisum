@@ -3,7 +3,7 @@
 // one attribute value and one attribute's presence. Each check passes on its matching twin and
 // fails on its mismatched twin; the same check, with only the twin swapped, flips its outcome, so
 // neither a check that always passes nor one that always fails can satisfy both.
-// The elements are found by test id, and once more by a CSS locator inside a twin, so the checks
+// The elements are found by test id, and once more by a css locator inside a twin, so the checks
 // are shown to read the element the locator resolves.
 // The remembered attribute's leak scan is in test/proofs/unsafe-page-leak-scan.test.ts.
 // See docs/specs/SPEC-36-unsafe-plan-features.md.
@@ -42,7 +42,7 @@ for (const targetId of BOTH_TARGETS) {
       });
     }
 
-    test('the class and colour checks read the element a CSS locator inside each twin resolves', { criterion: 'AC-SPEC-36-07' }, async () => {
+    test('the class and colour checks read the element a css locator inside each twin resolves', { criterion: 'AC-SPEC-36-07' }, async () => {
       const inTwin = (twin: Twin): JsonRecord => css('.badge', { inside: testId(`${twin}-twin`) });
       const matching = await harness.runSteps(targetId, [
         navigate('/dom-checks.html'),

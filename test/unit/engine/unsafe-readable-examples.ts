@@ -78,9 +78,9 @@ const reference = (valueName: string): JsonRecord => ({ valueName });
 const withMeta = (plan: JsonRecord, featureId: string, title: string): JsonRecord =>
   ({ ...plan, meta: { featureId, specReference: `specs/${featureId.toLowerCase()}.md#unsafe`, title } });
 
-// CSS and XPath locators in every place and form: positions, containing text, inside chains of one,
+// css and XPath locators in every place and form: positions, containing text, inside chains of one,
 // two and three links mixing both kinds, a selector holding quotes, a backslash, "#", ":" and ",",
-// a frame found by CSS holding closed and unsafe steps, a closed frame holding an unsafe step, and a
+// a frame found by css holding closed and unsafe steps, a closed frame holding an unsafe step, and a
 // second tab.
 function structuralLocators(): JsonRecord {
   return withMeta(unsafePlan([
@@ -112,7 +112,7 @@ function structuralLocators(): JsonRecord {
 }
 
 // Every DOM check, on closed and structural locators, an expected attribute value that is the word
-// "absent", a value reference, and remembering an attribute through a CSS locator.
+// "absent", a value reference, and remembering an attribute through a css locator.
 function domChecks(): JsonRecord {
   return withMeta(unsafePlan([
     OPEN_CART,

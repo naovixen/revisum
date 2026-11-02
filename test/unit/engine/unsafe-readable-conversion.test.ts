@@ -218,7 +218,7 @@ for (const { name, plan } of EXAMPLES) {
 
 // The new grammar words in another case, on the golden texts. Only words outside quoted text change.
 const WORD_CASE_CHANGES: readonly { readonly feature: (typeof FEATURES)[number]; readonly from: string; readonly to: string }[] = [
-  { feature: 'css-locator', from: 'Unsafe: Expect first css "', to: 'Unsafe: Expect FIRST CSS "' },
+  { feature: 'css-locator', from: 'Unsafe: Expect first css "', to: 'Unsafe: Expect FIRST css "' },
   { feature: 'css-locator', from: '" containing text "Add" inside 2nd css "', to: '" Containing Text "Add" INSIDE 2nd Css "' },
   { feature: 'xpath-locator', from: 'Unsafe: Expect xpath "', to: 'Unsafe: expect XPATH "' },
   { feature: 'dom-checks', from: '" has class "', to: '" HAS CLASS "' },

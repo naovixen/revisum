@@ -1,12 +1,12 @@
-// Shared setup for the browser tests of plan language 1.3's page parts: CSS and XPath locators, DOM
+// Shared setup for the browser tests of plan language 1.3's page parts: css and XPath locators, DOM
 // checks and page scripts, carried out by the own CDP driver and by the Playwright fallback.
 //
 // It serves the unsafe-features fixture app (fixtures/unsafe-features-app/). Beside the app's files
 // it answers two routes: /orders.html, whose order row carries a canary order id made fresh for the
 // harness, and /leaks.html, served with a session cookie, readable by scripts, holding a canary.
 //
-// The trusted project enables CSS locators, XPath locators, DOM checks, named page scripts and
-// inline scripts, and lists one CSS selector, button.icon-close, that may resolve a control with no
+// The trusted project enables css locators, XPath locators, DOM checks, named page scripts and
+// inline scripts, and lists one css selector, button.icon-close, that may resolve a control with no
 // accessible name. Its named scripts are the files under the fixture project's plans/scripts/
 // folder (fixtures/unsafe-features-project/), passed to the run as its script sources, keyed by
 // each declared file path. Its targets are the own CDP driver on Chrome for Testing and the

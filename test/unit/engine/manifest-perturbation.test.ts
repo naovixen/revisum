@@ -5,7 +5,7 @@
 // (manifest-perturbation-guarantees.ts shows it).
 //
 // Each case starts from a fully populated manifest: a 1.3 plan that fills a secret, names saved
-// storage state, calls a declared service, runs a database command, uses a CSS locator and a page
+// storage state, calls a declared service, runs a database command, uses a css locator and a page
 // script, run with a driver that has a build port and with every pin. The fields only other kinds of
 // run have (an evidence run's record, a browser mutant's rewrites) start from their own builders.
 // Each case checks its own field changed, so a case that perturbs the wrong input fails.

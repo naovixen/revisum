@@ -1,4 +1,4 @@
-// The runtime guard judges every element a CSS or XPath locator resolves for an action, as it
+// The runtime guard judges every element a css or XPath locator resolves for an action, as it
 // judges any other, in a real browser on both drivers (fixtures/unsafe-features-app/guard.html):
 //   - a button named "Delete account", found by its class, its place in the page, or by hasText
 //     inside a section, ends the run Denied with irreversible-action, and the page receives no
@@ -81,7 +81,7 @@ for (const targetId of BOTH_TARGETS) {
   });
 
   describe(`unnamed controls found by structure: ${targetId}`, () => {
-    test('an icon button with no accessible name found by an unlisted CSS selector is denied unnamed-control with zero input events', { criterion: 'AC-SPEC-36-06' }, async () => {
+    test('an icon button with no accessible name found by an unlisted css selector is denied unnamed-control with zero input events', { criterion: 'AC-SPEC-36-06' }, async () => {
       const ran = await clickOnGuardPage(targetId, css('button.icon-menu'), textEquals(testId('toolbar-state'), 'Toolbar untouched', 'guard.toolbar-untouched'));
       assertDenied(ran, 'unnamed-control');
       assert.equal(ran.atClose?.shown['toolbar-state'], 'Toolbar untouched');

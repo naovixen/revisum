@@ -26,15 +26,15 @@ type PreviousCase = {
 const withStep = (step: JsonRecord) => (version: string): JsonRecord => planIn(version, [OPEN_CART, step]);
 
 const PREVIOUS_CASES: readonly PreviousCase[] = [
-  { construct: 'a CSS locator', plan: withStep(CSS_CHECK), errors: { '1.2': ['unknown_value $.steps[1].locator.by'], '1.1': ['unknown_value $.steps[1].locator.by'] } },
+  { construct: 'a css locator', plan: withStep(CSS_CHECK), errors: { '1.2': ['unknown_value $.steps[1].locator.by'], '1.1': ['unknown_value $.steps[1].locator.by'] } },
   {
-    construct: 'a CSS locator with hasText and inside',
+    construct: 'a css locator with hasText and inside',
     plan: withStep({ type: 'click', locator: css('button', { hasText: 'Add', inside: css('li.product') }) }),
     errors: { '1.2': ['unknown_value $.steps[1].locator.by'], '1.1': ['unknown_value $.steps[1].locator.by'] },
   },
   { construct: 'an XPath locator', plan: withStep(XPATH_CHECK), errors: { '1.2': ['unknown_value $.steps[1].locator.by'], '1.1': ['unknown_value $.steps[1].locator.by'] } },
   {
-    construct: 'a CSS frame holding an XPath check',
+    construct: 'a css frame holding an XPath check',
     plan: withStep({ type: 'frame', locator: css('iframe.editor-canvas'), steps: [XPATH_CHECK] }),
     errors: {
       '1.2': ['unknown_value $.steps[1].locator.by', 'unknown_value $.steps[1].steps[0].locator.by'],

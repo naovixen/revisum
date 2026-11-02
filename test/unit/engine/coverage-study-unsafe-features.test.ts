@@ -3,8 +3,8 @@
 // unsafe features" share, of intents whose plan parses under its suite's project with or without
 // them. An intent counts toward the second share only if its plan parses, so a feature its suite
 // does not enable counts for nothing. The fixture is fixtures/coverage-study/unsafe-features.json:
-//   0 shop, original: a closed 1.2 plan;            1 shop, original: a CSS plan (shop enables CSS);
-//   2 shop, original: not expressible, no plan;     3 docs, original: a CSS plan (docs enables nothing);
+//   0 shop, original: a closed 1.2 plan;            1 shop, original: a css plan (shop enables css);
+//   2 shop, original: not expressible, no plan;     3 docs, original: a css plan (docs enables nothing);
 //   4 shop, fresh: a class check (shop enables it); 5 docs, fresh: a closed plan written in 1.3.
 // The study report names the second share's fields shareWithUnsafeFeatures and
 // shareWithUnsafeFeaturesBySample; only this file reads them.
@@ -47,9 +47,9 @@ test('an intent whose plan uses a feature its suite does not enable counts towar
   assert.ok(intent.reason.includes('unsafe_feature_disabled'), intent.reason);
 });
 
-// Metamorphic: moving that intent to the suite that enables CSS makes it count, in the second
+// Metamorphic: moving that intent to the suite that enables css makes it count, in the second
 // share only; nothing in its plan changes.
-test('moving it to the suite that enables CSS counts it toward the share with unsafe features, and not the closed share', { criterion: 'AC-SPEC-36-19' }, () => {
+test('moving it to the suite that enables css counts it toward the share with unsafe features, and not the closed share', { criterion: 'AC-SPEC-36-19' }, () => {
   const moved = shares(assessed(withValue(study(), ['intents', 3, 'suite'], 'example-shop')));
   assert.deepEqual(moved.closed, { overall: 2 / 6, original: 1 / 4, fresh: 1 / 2 });
   assert.deepEqual(moved.withUnsafeFeatures, { overall: 5 / 6, original: 3 / 4, fresh: 2 / 2 });
@@ -57,7 +57,7 @@ test('moving it to the suite that enables CSS counts it toward the share with un
 
 test('turning a suite\'s features off in its project removes its unsafe intents from the second share', { criterion: 'AC-SPEC-36-19' }, () => {
   const closedShop = withValue(study(), ['suites', 'example-shop', 'project', 'unsafeFeatures'], { cssLocators: true });
-  // Intent 4's class check now fails to parse; intent 1's CSS locator still does.
+  // Intent 4's class check now fails to parse; intent 1's css locator still does.
   assert.deepEqual(shares(assessed(closedShop)).withUnsafeFeatures, { overall: 3 / 6, original: 2 / 4, fresh: 1 / 2 });
 });
 

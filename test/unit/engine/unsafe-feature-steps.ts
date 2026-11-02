@@ -4,7 +4,7 @@
 // values before any 1.3 code existed.
 //
 // Plan language 1.3 adds six features, each off unless the trusted project.json enables it under
-// `unsafeFeatures`: CSS locators, XPath locators, DOM checks, named page scripts, inline page
+// `unsafeFeatures`: css locators, XPath locators, DOM checks, named page scripts, inline page
 // scripts (which need named page scripts too) and database commands.
 // See docs/specs/SPEC-36-unsafe-plan-features.md.
 import { ORIGIN, TARGET_ID, TEST_SERVICE, TEST_SERVICE_SECRET_NAMES, testProjectInput, type JsonRecord } from './plan-examples.ts';
@@ -132,7 +132,7 @@ export const DATABASE_COMMANDS: JsonRecord = {
   }),
 };
 
-// The one CSS selector the project allows to resolve a control with no accessible name.
+// The one css selector the project allows to resolve a control with no accessible name.
 export const ALLOWED_UNNAMED_SELECTOR = 'button.icon-close';
 
 // The unsafeFeatures section enabling exactly `enabled`. Inline scripts ride on the pageScripts
@@ -189,7 +189,7 @@ export const FEATURE_EXAMPLES: readonly FeatureExample[] = [
   { feature: 'database-command', steps: [OPEN_CART, ORDER_COUNT_CHECK], path: '$.steps[1].type' },
 ];
 
-// A frame found by CSS, holding a named page-script check: page scripts may stand in a frame.
+// A frame found by css, holding a named page-script check: page scripts may stand in a frame.
 export const CSS_FRAME: JsonRecord = { type: 'frame', locator: css('iframe.editor-canvas'), steps: [CART_COUNT_CHECK] };
 
 // A plan that uses all six features, some of them twice, with the path of every use.

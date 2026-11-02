@@ -1,4 +1,4 @@
-// Field names in code style still name sensitive fields. A locator written as a test id or a CSS
+// Field names in code style still name sensitive fields. A locator written as a test id or a css
 // selector names its field the way the page's code does: "authToken", "client_secret",
 // "#access_token". Literal text filled into such a field is a literal secret, just as it is for a
 // field labelled "Access token", and the parser rejects it with literal_secret without echoing the
@@ -28,7 +28,7 @@ const closedFill = (locator: unknown) => ({
     { type: 'expect', locator: { by: 'testId', testId: 'status' }, assert: { kind: 'visible' }, criterionId: 'secrets.status-shown' },
   ],
 });
-// A 1.3 plan, with CSS locators enabled, that fills `locator` with literal text.
+// A 1.3 plan, with css locators enabled, that fills `locator` with literal text.
 const cssFill = (selector: string) => unsafePlan([OPEN_CART, { type: 'fill', locator: css(selector), value: LITERAL }]);
 
 type FieldCase = { readonly title: string; readonly parse: Parse; readonly plan: unknown };
@@ -37,16 +37,16 @@ const SENSITIVE: readonly FieldCase[] = [
   { title: 'a test id "authToken"', parse: parseClosed, plan: closedFill({ by: 'testId', testId: 'authToken' }) },
   { title: 'a test id "client_secret"', parse: parseClosed, plan: closedFill({ by: 'testId', testId: 'client_secret' }) },
   { title: 'a test id "userPassword"', parse: parseClosed, plan: closedFill({ by: 'testId', testId: 'userPassword' }) },
-  { title: 'a CSS selector input[name="client_secret"]', parse: parseWithCss, plan: cssFill('input[name="client_secret"]') },
-  { title: 'a CSS selector #access_token', parse: parseWithCss, plan: cssFill('#access_token') },
-  { title: 'a CSS selector input[name="apiKey"]', parse: parseWithCss, plan: cssFill('input[name="apiKey"]') },
+  { title: 'a css selector input[name="client_secret"]', parse: parseWithCss, plan: cssFill('input[name="client_secret"]') },
+  { title: 'a css selector #access_token', parse: parseWithCss, plan: cssFill('#access_token') },
+  { title: 'a css selector input[name="apiKey"]', parse: parseWithCss, plan: cssFill('input[name="apiKey"]') },
 ];
 
 const ORDINARY: readonly FieldCase[] = [
   { title: 'a test id "username"', parse: parseClosed, plan: closedFill({ by: 'testId', testId: 'username' }) },
   { title: 'a test id "displayName"', parse: parseClosed, plan: closedFill({ by: 'testId', testId: 'displayName' }) },
-  { title: 'a CSS selector input[name="first_name"]', parse: parseWithCss, plan: cssFill('input[name="first_name"]') },
-  { title: 'a CSS selector #postal_code', parse: parseWithCss, plan: cssFill('#postal_code') },
+  { title: 'a css selector input[name="first_name"]', parse: parseWithCss, plan: cssFill('input[name="first_name"]') },
+  { title: 'a css selector #postal_code', parse: parseWithCss, plan: cssFill('#postal_code') },
 ];
 
 for (const field of SENSITIVE) {

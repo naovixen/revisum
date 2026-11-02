@@ -2,7 +2,7 @@
 // approval) that holds an inline script (inline-script-in-proposal), or a write script or write
 // database command whose declaration does not allow it in proposals (side-effect-in-proposal), and
 // any database command whose service is on a production origin (production-origin). A denied plan
-// runs no script and no command. The runtime guard judges every element a CSS or XPath locator
+// runs no script and no command. The runtime guard judges every element a css or XPath locator
 // resolves, as it judges any other: a control named "Delete account" is irreversible whatever
 // selector found it, and a control with no accessible name is refused unless the project lists
 // that exact selector or expression in unnamedControlsAllowed.
@@ -165,7 +165,7 @@ test('the same command on the test database is allowed in the same project', { c
   assert.deepEqual((await decide(unsafePlan([OPEN_CART, ORDER_COUNT_CHECK]), { projectFile: PRODUCTION_PROJECT })).decision, ALLOWED);
 });
 
-// ---- The runtime guard on CSS and XPath locators -------------------------------------------------------
+// ---- The runtime guard on css and XPath locators -------------------------------------------------------
 
 // The gate, a plan clicking `locator` as step 1, and the guard's verdict on the element it resolves.
 async function guardClick(locator: JsonRecord, resolved: Parameters<typeof element>[0]) {
@@ -199,7 +199,7 @@ test('button.danger resolving a button named "Show details" is allowed', { crite
   assert.deepEqual(verdict, ALLOWED);
 });
 
-test('an unnamed control found by a CSS selector the project does not list is denied unnamed-control', { criterion: 'AC-SPEC-36-06' }, async () => {
+test('an unnamed control found by a css selector the project does not list is denied unnamed-control', { criterion: 'AC-SPEC-36-06' }, async () => {
   const { verdict } = await guardClick(css('button.icon-trash'), { role: 'button', name: null });
   assert.deepEqual(verdict, { kind: 'deny', rule: 'unnamed-control', stepIndex: 1 });
 });

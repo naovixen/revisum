@@ -58,7 +58,7 @@ test('an intent marked expressible whose plan does not parse counts as not expre
   assert.equal(theme.verdict, 'not-expressible');
   assert.equal(typeof theme.reason, 'string');
   assert.ok(theme.reason.length > 0, 'the reason is recorded');
-  assert.notEqual(theme.reason, 'Wrongly marked: the plan needs a CSS selector, which the language does not have', 'the claimed reason is not kept for an overturned verdict');
+  assert.notEqual(theme.reason, 'Wrongly marked: the plan needs a css selector, which the language does not have', 'the claimed reason is not kept for an overturned verdict');
 });
 
 test('every plan of an intent marked expressible goes through the plan parser', { criterion: 'AC-SPEC-01-01' }, () => {

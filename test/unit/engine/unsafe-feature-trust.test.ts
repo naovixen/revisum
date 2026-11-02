@@ -31,7 +31,7 @@ const unsafeSectionOf = (project: JsonRecord): JsonRecord => project['unsafeFeat
 
 const applyHostileChange = (fixture: FixtureRepository): void => { Object.assign(fixture.workingCopy, hostileChange().workingCopy); };
 
-// A plan of the change's with `steps` between its navigation and its CSS check, in place of its
+// A plan of the change's with `steps` between its navigation and its css check, in place of its
 // page-script check. Step 1 is the first of `steps`.
 const planWith = (steps: readonly JsonRecord[]): JsonRecord => {
   const plan = changedPlan();
@@ -70,7 +70,7 @@ async function loadedFor(fixtureEdit: (fixture: FixtureRepository) => void, chan
 
 // ---- A change that turns features on ---------------------------------------------------------------
 
-test('a change that turns on CSS locators and page scripts in its own project.json is refused its own CSS plan with unsafe_feature_disabled', { criterion: 'AC-SPEC-36-04' }, async () => {
+test('a change that turns on css locators and page scripts in its own project.json is refused its own css plan with unsafe_feature_disabled', { criterion: 'AC-SPEC-36-04' }, async () => {
   const { parse } = await loadedFor(applyHostileChange);
   const errors = errorsOf(parse, changedPlan());
   assert.deepEqual(disabledPaths(errors), ['$.steps[1].locator.by', '$.steps[2].type']);
@@ -103,7 +103,7 @@ test('the same unsafeFeatures section, once on the protected branch, lets the ch
 // The protected branch already enables what the hostile change enables.
 const protectChangedProject = (fixture: FixtureRepository): void => { fixture.protectedFiles[PROJECT_PATH] = changedProject(); };
 
-test('a change that adds XPath locators to protected CSS locators is refused its XPath plan, while its CSS plan still parses', { criterion: 'AC-SPEC-36-04' }, async () => {
+test('a change that adds XPath locators to protected css locators is refused its XPath plan, while its css plan still parses', { criterion: 'AC-SPEC-36-04' }, async () => {
   const widened = changedProject();
   unsafeSectionOf(widened)['xpathLocators'] = true;
   const { parse, reviewPaths } = await loadedFor((fixture) => {
@@ -112,7 +112,7 @@ test('a change that adds XPath locators to protected CSS locators is refused its
   }, [PROJECT_PATH]);
   assert.deepEqual(reviewPaths, [PROJECT_PATH]);
   assert.deepEqual(disabledPaths(errorsOf(parse, planWith([XPATH_STEP]))), ['$.steps[1].locator.by']);
-  assert.ok(parse(changedPlan()).ok, 'the protected CSS and page-script features were lost');
+  assert.ok(parse(changedPlan()).ok, 'the protected css and page-script features were lost');
 });
 
 test('a change that turns inline scripts on over protected page scripts is refused its inline script at .script.inline', { criterion: 'AC-SPEC-36-04' }, async () => {

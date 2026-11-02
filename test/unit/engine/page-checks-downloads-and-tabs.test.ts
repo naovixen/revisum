@@ -48,7 +48,7 @@ for (const kind of NEW_STATES) {
   });
 }
 
-// Counter-example: a state the language does not have, such as a CSS class's "active", is refused.
+// Counter-example: a state the language does not have, such as a css class's "active", is refused.
 test('a state the language does not have, such as "active" or "highlighted", is refused at the kind', { criterion: 'AC-SPEC-31-02' }, () => {
   for (const kind of ['active', 'highlighted', 'open', 'aria-selected']) {
     assert.deepEqual(rejection(parsePlan, planOf([OPEN_ORDERS, expectOn(BILLING_TAB, { kind })])), ['unknown_value $.steps[1].assert.kind'], kind);

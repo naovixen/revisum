@@ -18,7 +18,7 @@ const REPORT_SOURCES = join(PACKAGES, 'report', 'src');
 const sourceFiles = (folder: string): string[] => readdirSync(folder, { withFileTypes: true })
   .flatMap((entry) => (entry.isDirectory() ? sourceFiles(join(folder, entry.name)) : entry.name.endsWith('.ts') ? [join(folder, entry.name)] : []));
 
-test('each HTML file is self-contained: inline CSS, no script, no handler, no external reference', () => {
+test('each HTML file is self-contained: inline css, no script, no handler, no external reference', () => {
   for (const kind of ALL_KINDS) {
     const html = reportHtml(byKind(kind));
     assert.equal((html.match(/<style>/g) ?? []).length, 1);

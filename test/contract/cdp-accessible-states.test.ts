@@ -2,7 +2,7 @@
 // (fixtures/page-states-app/states.html) holds an ARIA tab list, disclosure buttons, toggle
 // buttons, a navigation with aria-current, a native select and native details. Each state check
 // passes on an element in that state, and its opposite fails there with assertion-failed.
-// An element that does not expose the property, including one whose state is shown only by a CSS
+// An element that does not expose the property, including one whose state is shown only by a css
 // class, fails every check of that property with state-not-exposed: never a pass, whichever of the
 // pair is asked. The counter-example shows an element that exposes the property fails the wrong
 // state with assertion-failed instead, so the two codes are told apart.
@@ -91,9 +91,9 @@ describe('each state check on an element in that state', () => {
 type HiddenStateCase = { readonly element: string; readonly locator: JsonRecord; readonly kinds: readonly string[] };
 
 const NOT_EXPOSED: readonly HiddenStateCase[] = [
-  { element: 'a tab shown as selected only by a CSS class', locator: testId('class-only-tab'), kinds: ['selected', 'unselected'] },
-  { element: 'a tab shown as not selected only by a missing CSS class', locator: testId('class-only-other-tab'), kinds: ['selected', 'unselected'] },
-  { element: 'a button shown as pressed only by a CSS class', locator: testId('class-only-toggle'), kinds: ['pressed', 'unpressed'] },
+  { element: 'a tab shown as selected only by a css class', locator: testId('class-only-tab'), kinds: ['selected', 'unselected'] },
+  { element: 'a tab shown as not selected only by a missing css class', locator: testId('class-only-other-tab'), kinds: ['selected', 'unselected'] },
+  { element: 'a button shown as pressed only by a css class', locator: testId('class-only-toggle'), kinds: ['pressed', 'unpressed'] },
   { element: 'a button with no aria-expanded', locator: testId('plain-button'), kinds: ['expanded', 'collapsed'] },
   { element: 'a button with no aria-pressed', locator: testId('plain-button'), kinds: ['pressed', 'unpressed'] },
   { element: 'a paragraph of text', locator: testId('plain-text'), kinds: ['selected', 'unselected', 'expanded', 'collapsed', 'pressed', 'unpressed'] },

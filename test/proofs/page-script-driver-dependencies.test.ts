@@ -1,4 +1,4 @@
-// Running CSS and XPath locators, DOM checks and page scripts adds no runtime dependency to either
+// Running css and XPath locators, DOM checks and page scripts adds no runtime dependency to either
 // driver, and no driver module passes a secret to a page script.
 //   - Dependencies: the own CDP driver's manifest declares none, and the Playwright fallback's
 //     declares exactly the two it had before (Playwright and axe-core, at the same versions). Every

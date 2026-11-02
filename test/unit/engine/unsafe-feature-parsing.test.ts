@@ -1,7 +1,7 @@
 // The one plan parser reads which unsafe features the trusted project enables. A 1.3 plan that uses
 // a feature its project leaves off is refused with unsafe_feature_disabled at every path where the
 // feature appears, echoing nothing from the plan, and nothing runs. Inline scripts need both page
-// scripts and inline scripts enabled. A CSS selector or XPath expression is literal, single-line
+// scripts and inline scripts enabled. A css selector or XPath expression is literal, single-line
 // plan text of at most 512 characters with no "{", "}", ";" or "@", and an `inside` chain is at
 // most 3 deep, so what a locator can match is fixed when the plan is approved.
 // See docs/specs/SPEC-36-unsafe-plan-features.md.
@@ -182,7 +182,7 @@ test('a selector error inside an inside locator is reported at its own path', { 
 
 // ---- The inside chain ------------------------------------------------------------------------------
 
-// A CSS locator nested `depth` times through `inside`, alternating CSS and XPath and ending in a
+// A css locator nested `depth` times through `inside`, alternating css and XPath and ending in a
 // role locator, so every kind of locator may stand inside.
 function nested(depth: number): JsonRecord {
   let locator: JsonRecord = { by: 'role', role: 'region', name: 'Products' };
