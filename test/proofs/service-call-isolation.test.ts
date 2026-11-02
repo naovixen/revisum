@@ -11,6 +11,7 @@ import { join, relative } from 'node:path';
 import { after, before, test } from 'node:test';
 import { changelogEntry } from '../support/plan-changelog.ts';
 import { PACKAGES, REPOSITORY_ROOT } from '../support/repository.ts';
+import { RepositoryRuleName } from '../../tools/RunRepositoryRules.ts';
 import { copyRepository, type ScratchRepository } from './scratch-repository.ts';
 
 const TIMEOUT = 300_000;
@@ -111,12 +112,14 @@ test('the reveal allow-list gains exactly one module, and it is in runner', () =
   assert.deepEqual(EARLIER_ALLOWED.filter((path) => !allowed.includes(path)), [], 'an earlier module left the allow-list');
 });
 
+const ONLY_THE_RULE = { rule: RepositoryRuleName.SecretReveal };
+
 let scratch: ScratchRepository;
 before(() => { scratch = copyRepository(); });
 after(() => { scratch.dispose(); });
 
 function assertLintFailsOn(relativePath: string, lines: readonly string[]): void {
-  const outcome = scratch.lintWith(relativePath, [...lines, ''].join('\n'));
+  const outcome = scratch.lintWith(relativePath, [...lines, ''].join('\n'), ONLY_THE_RULE);
   assert.equal(outcome.passed, false, `the lint accepted ${relativePath}`);
   const fileName = relativePath.split('/').at(-1) ?? relativePath;
   assert.ok(outcome.failureOutput.includes(fileName), `the lint failed, but did not name ${fileName}:\n${outcome.failureOutput}`);

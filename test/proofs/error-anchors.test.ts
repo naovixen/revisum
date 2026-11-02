@@ -6,6 +6,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { after, before, test } from 'node:test';
 import { REPOSITORY_ROOT } from '../support/repository.ts';
+import { RepositoryRuleName } from '../../tools/RunRepositoryRules.ts';
 import { copyRepository, type ScratchRepository } from './scratch-repository.ts';
 
 const ERRORS_PAGE = 'docs/errors.md';
@@ -72,6 +73,8 @@ const headingsIn = (text: string): Set<string> =>
     return heading?.[1] === undefined ? [] : [heading[1]];
   }));
 
+const ONLY_THE_RULE = { rule: RepositoryRuleName.ErrorAnchors };
+
 let scratch: ScratchRepository;
 before(() => { scratch = copyRepository(); });
 after(() => { scratch.dispose(); });
@@ -91,17 +94,17 @@ test('the unchanged copy of the repository, with every anchor present, passes th
 });
 
 test('removing the not-append-only heading makes the lint fail and name that code', { timeout: TIMEOUT }, () => {
-  assert.ok(existsSync(join(scratch.root, ERRORS_PAGE)), `${ERRORS_PAGE} does not exist`);
+  assert.ok(existsSync(join(scratch.root(), ERRORS_PAGE)), `${ERRORS_PAGE} does not exist`);
   const outcome = scratch.lintWithEdit(ERRORS_PAGE, (text) =>
-    text.split('\n').filter((line) => !/^##\s+not-append-only\s*$/.test(line)).join('\n'));
+    text.split('\n').filter((line) => !/^##\s+not-append-only\s*$/.test(line)).join('\n'), ONLY_THE_RULE);
   assert.equal(outcome.passed, false, 'the lint passed with the not-append-only anchor missing');
   assert.ok(outcome.failureOutput.includes('not-append-only'), `the lint failed, but did not name the code:\n${outcome.failureOutput}`);
 });
 
 test('removing the vacuous heading makes the lint fail and name that code', { timeout: TIMEOUT }, () => {
-  assert.ok(existsSync(join(scratch.root, ERRORS_PAGE)), `${ERRORS_PAGE} does not exist`);
+  assert.ok(existsSync(join(scratch.root(), ERRORS_PAGE)), `${ERRORS_PAGE} does not exist`);
   const outcome = scratch.lintWithEdit(ERRORS_PAGE, (text) =>
-    text.split('\n').filter((line) => !/^##\s+vacuous\s*$/.test(line)).join('\n'));
+    text.split('\n').filter((line) => !/^##\s+vacuous\s*$/.test(line)).join('\n'), ONLY_THE_RULE);
   assert.equal(outcome.passed, false, 'the lint passed with the vacuous anchor missing');
   assert.ok(outcome.failureOutput.includes('vacuous'), `the lint failed, but did not name the code:\n${outcome.failureOutput}`);
 });

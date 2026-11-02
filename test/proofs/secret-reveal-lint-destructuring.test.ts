@@ -7,7 +7,10 @@
 // reveal, not for the file's shape.
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
+import { RepositoryRuleName } from '../../tools/RunRepositoryRules.ts';
 import { copyRepository, type ScratchRepository } from './scratch-repository.ts';
+
+const ONLY_THE_RULE = { rule: RepositoryRuleName.SecretReveal };
 
 let scratch: ScratchRepository;
 before(() => { scratch = copyRepository(); });
@@ -33,7 +36,7 @@ const DYNAMIC_DESTRUCTURE = (exported: string) => [
 // The lint fails, and some line of its output names both the file and reveal.
 function assertRevealReported(relativePath: string, lines: readonly string[]): void {
   const source = [...lines, ''].join('\n');
-  const outcome = scratch.lintWith(relativePath, source);
+  const outcome = scratch.lintWith(relativePath, source, ONLY_THE_RULE);
   assert.equal(outcome.passed, false, `the lint accepted ${relativePath}:\n${source}`);
   const fileName = relativePath.split('/').at(-1) ?? relativePath;
   const reported = outcome.failureOutput.split('\n').some((line) => line.includes(fileName) && line.includes('reveal'));

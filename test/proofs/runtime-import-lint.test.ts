@@ -12,6 +12,7 @@ import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:f
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
+import { RepositoryRuleName, REPOSITORY_RULES } from '../../tools/RunRepositoryRules.ts';
 import { FIXTURES, REPOSITORY_ROOT } from '../support/repository.ts';
 import { describeRun, runTool, type ToolRun } from '../support/tool-runs.ts';
 
@@ -60,7 +61,8 @@ test('npm run check runs the runtime import lint', () => {
   // `check` runs `check:tests`, which runs `lint`.
   assert.ok(scripts['check']?.includes('check:tests'), 'check runs check:tests');
   assert.ok(scripts['check:tests']?.includes('npm run lint'), 'check:tests runs lint');
-  assert.ok(scripts['lint']?.includes(`node tools/${TOOL}`), `lint runs tools/${TOOL}`);
+  assert.equal(scripts['lint'], 'node tools/RunRepositoryRules.ts', 'lint runs every repository rule');
+  assert.equal(REPOSITORY_RULES[RepositoryRuleName.RuntimeImports].file, TOOL, `the runtime imports rule runs tools/${TOOL}`);
 });
 
 test('every banned import in the set is reported, by package and library', () => {

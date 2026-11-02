@@ -2,28 +2,31 @@
 // adapters carry Apache-2.0; the engine carries FSL-1.1-ALv2; product packages may carry either.
 // Every published JSON Schema is listed as Apache-2.0. axe-core's MPL-2.0 files must be the pinned
 // release byte for byte, at the pinned version, and never copied into a package.
-// Each test plants one change in a throw-away copy of the repository and runs the lint commands.
+// Each test plants one change in a throw-away copy of the repository and runs the lint.
 // A licence change is planted in both licences.json and the package's manifest, so the two still
-// agree and only the role rule can catch it. For axe-core the copy gets its own installed-packages
-// folder: every package links to the real one, except axe-core, which is copied and then edited.
-import { cpSync, copyFileSync, mkdirSync, readdirSync, readFileSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs';
+// agree and only the role rule can catch it. For axe-core the lint gets its own installed-packages
+// folder, holding a copy of axe-core to edit.
+import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, test } from 'node:test';
 import { REPOSITORY_ROOT } from '../support/repository.ts';
-import { copyRepository, type LintOutcome, type ScratchRepository } from './scratch-repository.ts';
+import { RepositoryRuleName } from '../../tools/RunRepositoryRules.ts';
+import { copyRepository, type LintChoice, type LintOutcome, type ScratchRepository } from './scratch-repository.ts';
 import { assertLintFails, assertLintPasses, editJson, lintWithEdits } from './scratch-edits.ts';
 
-const LICENCE_CHECK = 'check-licences';
 const APACHE = 'Apache-2.0';
 const FSL = 'FSL-1.1-ALv2';
 const TIMEOUT = 300_000;
+
+const ONLY_THE_RULE = { rule: RepositoryRuleName.Licences };
 
 let scratch: ScratchRepository;
 before(() => { scratch = copyRepository(); });
 after(() => { scratch.dispose(); });
 
 // Gives a package another licence in licences.json and in its own manifest.
-function relicense(folder: string, licence: string): LintOutcome {
+function relicense(folder: string, licence: string, choice?: LintChoice): LintOutcome {
   return lintWithEdits(scratch, {
     'licences.json': editJson((map) => {
       const packages = map['packages'];
@@ -31,7 +34,7 @@ function relicense(folder: string, licence: string): LintOutcome {
       Object.assign(packages, { [folder]: licence });
     }),
     [`packages/${folder}/package.json`]: editJson((manifest) => { manifest['license'] = licence; }),
-  });
+  }, choice);
 }
 
 test('control: the unchanged copy of the repository passes every lint command', { timeout: TIMEOUT }, () => {
@@ -42,12 +45,12 @@ test('control: the unchanged copy of the repository passes every lint command', 
 
 for (const [folder, role] of [['contracts', 'schema'], ['driver-cdp', 'driver'], ['report', 'adapter'], ['auditor-axe', 'adapter']] as const) {
   test(`the licence check fails when ${folder}, a ${role} package, carries the engine licence`, { timeout: TIMEOUT }, () => {
-    assertLintFails(relicense(folder, FSL), [folder], LICENCE_CHECK);
+    assertLintFails(relicense(folder, FSL, ONLY_THE_RULE), [folder]);
   });
 }
 
 test('the licence check fails when the engine carries Apache-2.0', { timeout: TIMEOUT }, () => {
-  assertLintFails(relicense('engine', APACHE), ['engine'], LICENCE_CHECK);
+  assertLintFails(relicense('engine', APACHE, ONLY_THE_RULE), ['engine']);
 });
 
 test('counter-example: a product package may carry Apache-2.0 instead of the engine licence', { timeout: TIMEOUT }, () => {
@@ -57,45 +60,23 @@ test('counter-example: a product package may carry Apache-2.0 instead of the eng
 test('the licence check fails on a published JSON Schema that licences.json does not list', { timeout: TIMEOUT }, () => {
   const outcome = lintWithEdits(scratch, {
     'docs/plan-language/project.schema.json': '{ "$schema": "https://json-schema.org/draft/2020-12/schema", "type": "object" }\n',
-  });
-  assertLintFails(outcome, ['project.schema.json'], LICENCE_CHECK);
+  }, ONLY_THE_RULE);
+  assertLintFails(outcome, ['project.schema.json']);
 });
 
 // ---- axe-core's files are the pinned release ----------------------------------------------------
 
-// Gives the copy its own node_modules in place of the link to the real one: every entry links to
-// the real entry, except axe-core, which is copied so `edit` can change it. The link to the
-// real node_modules is put back afterwards; nothing under the real folder is ever written.
-function lintWithInstalledAxe(edit: (axeFolder: string) => void): LintOutcome {
-  const realModules = join(REPOSITORY_ROOT, 'node_modules');
-  const modules = join(scratch.root, 'node_modules');
-  unlinkSync(modules);
-  mkdirSync(modules);
-  const linked: string[] = [];
-  const copied: string[] = [];
+// Runs the lint with an installed-packages folder that holds only a copy of axe-core, which `edit`
+// may change. Nothing under the real node_modules is ever written. Omit `choice` for every command.
+function lintWithInstalledAxe(edit: (axeFolder: string) => void, choice: LintChoice = {}): LintOutcome {
+  const modulesFolder = mkdtempSync(join(tmpdir(), 'installed-packages-'));
   try {
-    for (const entry of readdirSync(realModules, { withFileTypes: true })) {
-      const source = join(realModules, entry.name);
-      const target = join(modules, entry.name);
-      if (entry.name === 'axe-core') {
-        cpSync(source, target, { recursive: true });
-        copied.push(target);
-      } else if (entry.isFile()) {
-        copyFileSync(source, target);
-        copied.push(target);
-      } else {
-        symlinkSync(source, target, 'junction');
-        linked.push(target);
-      }
-    }
-    edit(join(modules, 'axe-core'));
-    return scratch.lint();
+    const axeFolder = join(modulesFolder, 'axe-core');
+    cpSync(join(REPOSITORY_ROOT, 'node_modules', 'axe-core'), axeFolder, { recursive: true });
+    edit(axeFolder);
+    return scratch.lint({ ...choice, modulesFolder });
   } finally {
-    // Links first, so removing the copies can never reach the real packages.
-    for (const target of linked) unlinkSync(target);
-    for (const target of copied) rmSync(target, { recursive: true, force: true });
-    rmSync(modules, { recursive: true, force: true });
-    symlinkSync(realModules, modules, 'junction');
+    rmSync(modulesFolder, { recursive: true, force: true });
   }
 }
 
@@ -108,8 +89,8 @@ for (const file of ['axe.min.js', 'axe.js']) {
     const outcome = lintWithInstalledAxe((folder) => {
       const path = join(folder, file);
       writeFileSync(path, `${readFileSync(path, 'utf8')} `);
-    });
-    assertLintFails(outcome, [file], LICENCE_CHECK);
+    }, ONLY_THE_RULE);
+    assertLintFails(outcome, [file]);
   });
 }
 
@@ -118,12 +99,12 @@ test('the licence check fails when the installed axe-core is not the pinned vers
     const path = join(folder, 'package.json');
     const manifest: Record<string, unknown> = JSON.parse(readFileSync(path, 'utf8'));
     writeFileSync(path, `${JSON.stringify({ ...manifest, version: '4.13.0' }, null, 2)}\n`);
-  });
-  assertLintFails(outcome, ['axe-core', '4.13.0'], LICENCE_CHECK);
+  }, ONLY_THE_RULE);
+  assertLintFails(outcome, ['axe-core', '4.13.0']);
 });
 
 test('the licence check fails when a package holds a copy of axe.min.js', { timeout: TIMEOUT }, () => {
   const axe = readFileSync(join(REPOSITORY_ROOT, 'node_modules', 'axe-core', 'axe.min.js'), 'utf8');
-  const outcome = lintWithEdits(scratch, { 'packages/auditor-axe/src/axe.min.js': axe });
-  assertLintFails(outcome, ['axe.min.js'], LICENCE_CHECK);
+  const outcome = lintWithEdits(scratch, { 'packages/auditor-axe/src/axe.min.js': axe }, ONLY_THE_RULE);
+  assertLintFails(outcome, ['axe.min.js']);
 });

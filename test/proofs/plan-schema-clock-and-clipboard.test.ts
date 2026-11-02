@@ -11,6 +11,7 @@ import { parseProject, planParser } from '@revisum/engine';
 import { testProjectInput } from '../unit/engine/plan-examples.ts';
 import { changelogEntry } from '../support/plan-changelog.ts';
 import { GOLDEN, REPOSITORY_ROOT } from '../support/repository.ts';
+import { RepositoryRuleName } from '../../tools/RunRepositoryRules.ts';
 import { copyRepository, type LintOutcome, type ScratchRepository } from './scratch-repository.ts';
 
 const CLOCK_PLAN_PATH = 'golden/plans/session-expiry-clock.json';
@@ -92,6 +93,8 @@ test('the 1.2 changelog entry names each new step, mode, unit, check, source, li
 
 // ---- The lint check ---------------------------------------------------------------------------------
 
+const ONLY_THE_RULE = { rule: RepositoryRuleName.PlanSchema };
+
 let scratch: ScratchRepository;
 before(() => { scratch = copyRepository(); });
 after(() => { scratch.dispose(); });
@@ -116,13 +119,13 @@ const firstAdvance = (plan: JsonRecord): JsonRecord => {
 test('the lint fails when a golden plan advances the clock by an unknown unit', { timeout: TIMEOUT }, () => {
   const plan = planAt(CLOCK_PLAN_PATH);
   firstAdvance(plan)['by'] = { amount: 1, unit: 'weeks' };
-  assertFailsNaming(scratch.lintWith('golden/plans/planted-clock-unit.json', `${JSON.stringify(plan, null, 2)}\n`), 'planted-clock-unit.json');
+  assertFailsNaming(scratch.lintWith('golden/plans/planted-clock-unit.json', `${JSON.stringify(plan, null, 2)}\n`, ONLY_THE_RULE), 'planted-clock-unit.json');
 });
 
 test('the lint fails when a golden plan gives an advance a real wait', { timeout: TIMEOUT }, () => {
   const plan = planAt(CLOCK_PLAN_PATH);
   firstAdvance(plan)['sleep'] = 1000;
-  assertFailsNaming(scratch.lintWith('golden/plans/planted-clock-sleep.json', `${JSON.stringify(plan, null, 2)}\n`), 'planted-clock-sleep.json');
+  assertFailsNaming(scratch.lintWith('golden/plans/planted-clock-sleep.json', `${JSON.stringify(plan, null, 2)}\n`, ONLY_THE_RULE), 'planted-clock-sleep.json');
 });
 
 test('the lint fails when a golden plan remembers the clipboard as HTML', { timeout: TIMEOUT }, () => {
@@ -130,7 +133,7 @@ test('the lint fails when a golden plan remembers the clipboard as HTML', { time
   const remember = stepsOf(plan).find(remembersClipboard);
   assert.ok(remember !== undefined);
   remember['from'] = { clipboard: 'html' };
-  assertFailsNaming(scratch.lintWith('golden/plans/planted-clipboard-html.json', `${JSON.stringify(plan, null, 2)}\n`), 'planted-clipboard-html.json');
+  assertFailsNaming(scratch.lintWith('golden/plans/planted-clipboard-html.json', `${JSON.stringify(plan, null, 2)}\n`, ONLY_THE_RULE), 'planted-clipboard-html.json');
 });
 
 // Counter-example: a valid copy of the clipboard plan, with an advance added, passes, so the

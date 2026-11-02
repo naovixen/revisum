@@ -7,7 +7,10 @@
 // shown to fail for `reveal`, not for the file.
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
+import { RepositoryRuleName } from '../../tools/RunRepositoryRules.ts';
 import { copyRepository, type ScratchRepository } from './scratch-repository.ts';
+
+const ONLY_THE_RULE = { rule: RepositoryRuleName.SecretReveal };
 
 let scratch: ScratchRepository;
 before(() => { scratch = copyRepository(); });
@@ -19,7 +22,7 @@ const REVEAL_MODULE = '@revisum/contracts';
 
 function assertLintFailsOn(relativePath: string, lines: readonly string[]): void {
   const source = [...lines, ''].join('\n');
-  const outcome = scratch.lintWith(relativePath, source);
+  const outcome = scratch.lintWith(relativePath, source, ONLY_THE_RULE);
   assert.equal(outcome.passed, false, `the lint accepted ${relativePath}:\n${source}`);
   const fileName = relativePath.split('/').at(-1) ?? relativePath;
   assert.ok(outcome.failureOutput.includes(fileName), `the lint failed, but did not name ${fileName}:\n${outcome.failureOutput}`);

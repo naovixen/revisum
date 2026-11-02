@@ -11,6 +11,7 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { after, before, test } from 'node:test';
+import { RepositoryRuleName } from '../../tools/RunRepositoryRules.ts';
 import { copyRepository, type ScratchRepository } from './scratch-repository.ts';
 import { assertLintFails, assertLintPasses, editJson, lintWithEdits } from './scratch-edits.ts';
 
@@ -25,6 +26,8 @@ const PLANTED_LOCK_ENTRY = {
   license: 'WTFPL',
 };
 const TIMEOUT = 300_000;
+
+const ONLY_THE_RULE = { rule: RepositoryRuleName.DependencyReviews };
 
 let scratch: ScratchRepository;
 before(() => { scratch = copyRepository(); });
@@ -80,7 +83,7 @@ test('control: the unchanged copy of the repository passes every lint command', 
 // ---- A component with no review -----------------------------------------------------------------
 
 test('the lint fails when a workspace package gains a runtime dependency that has no review', { timeout: TIMEOUT }, () => {
-  assertLintFails(lintWithEdits(scratch, runtimeDependencyEdits), [PLANTED_PACKAGE]);
+  assertLintFails(lintWithEdits(scratch, runtimeDependencyEdits, ONLY_THE_RULE), [PLANTED_PACKAGE]);
 });
 
 test('counter-example: the same package as a development dependency needs no review', { timeout: TIMEOUT }, () => {
@@ -90,7 +93,7 @@ test('counter-example: the same package as a development dependency needs no rev
 // ---- A failing check on the default path --------------------------------------------------------
 
 test('the lint fails when the default axe-core review is given a failing check', { timeout: TIMEOUT }, () => {
-  const outcome = lintWithEdits(scratch, { [REVIEWS_PATH]: replaceResultAfter('axe-core', 'pass', 'fail') });
+  const outcome = lintWithEdits(scratch, { [REVIEWS_PATH]: replaceResultAfter('axe-core', 'pass', 'fail') }, ONLY_THE_RULE);
   assertLintFails(outcome, ['axe-core']);
 });
 
@@ -101,7 +104,7 @@ test('counter-example: a partial result on the default path passes', { timeout: 
 // ---- The review matches what is installed, and its evidence exists ------------------------------
 
 test('the lint fails when a review names a version other than the one installed', { timeout: TIMEOUT }, () => {
-  const outcome = lintWithEdits(scratch, { [REVIEWS_PATH]: (text) => text.replace('4.14.0', '4.13.0') });
+  const outcome = lintWithEdits(scratch, { [REVIEWS_PATH]: (text) => text.replace('4.14.0', '4.13.0') }, ONLY_THE_RULE);
   assertLintFails(outcome, ['axe-core']);
 });
 
@@ -111,10 +114,10 @@ test('the lint fails when a review cites a repository path that does not exist',
       // The first quoted repository path the reviews cite as evidence.
       const cited = [...text.matchAll(/(['"])([\w.-]+(?:\/[\w.-]+)+\.\w+)\1/g)]
         .map((match) => match[2] ?? '')
-        .find((path) => path !== '' && existsSync(join(scratch.root, path)));
+        .find((path) => path !== '' && existsSync(join(scratch.root(), path)));
       if (cited === undefined) throw new Error(`${REVIEWS_PATH} cites no repository path as evidence`);
       return text.split(cited).join('docs/decisions/missing-dependency-review.md');
     },
-  });
+  }, ONLY_THE_RULE);
   assertLintFails(outcome, ['missing-dependency-review.md']);
 });

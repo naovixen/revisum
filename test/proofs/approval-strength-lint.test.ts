@@ -6,7 +6,10 @@
 //   - choosing a label by strength passes, so the lint fails for the planted reason only.
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
+import { RepositoryRuleName } from '../../tools/RunRepositoryRules.ts';
 import { copyRepository, type ScratchRepository } from './scratch-repository.ts';
+
+const ONLY_THE_RULE = { rule: RepositoryRuleName.ApprovalStrength };
 
 let scratch: ScratchRepository;
 before(() => { scratch = copyRepository(); });
@@ -15,7 +18,7 @@ after(() => { scratch.dispose(); });
 const TIMEOUT = 300_000;
 
 function assertLintFailsOn(relativePath: string, source: string): void {
-  const outcome = scratch.lintWith(relativePath, source);
+  const outcome = scratch.lintWith(relativePath, source, ONLY_THE_RULE);
   assert.equal(outcome.passed, false, `the lint accepted ${relativePath}:\n${source}`);
   const fileName = relativePath.split('/').at(-1) ?? relativePath;
   assert.ok(outcome.failureOutput.includes(fileName), `the lint failed, but did not name ${fileName}:\n${outcome.failureOutput}`);

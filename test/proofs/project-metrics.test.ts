@@ -71,6 +71,9 @@ const PASSING_TESTS = [
   '',
 ].join('\n');
 
+// The test runner refuses a repository without the browser module.
+const FIXTURE_BROWSER_MODULE = { 'test/support/browsers.ts': 'export {};\n' };
+
 let repository: GitRepository;
 let cutOver: string;
 
@@ -78,7 +81,7 @@ before(() => {
   repository = createGitRepository();
   // Before the cut-over a Claude co-author without an Agent trailer is not malformed: those
   // commits can't be rewritten, so they are only counted.
-  repository.commit({ files: { ...FIXTURE_SPECS, ...FIXTURE_MANIFEST }, message: message('Seed the fixture project', CO_AUTHOR_CLAUDE) });
+  repository.commit({ files: { ...FIXTURE_SPECS, ...FIXTURE_MANIFEST, ...FIXTURE_BROWSER_MODULE }, message: message('Seed the fixture project', CO_AUTHOR_CLAUDE) });
   cutOver = repository.commit({ files: { 'README.md': '# Fixture project\n' }, message: message('Settle the trailer grammar') });
   // Six commits after the cut-over: four carry Agent, three carry Spec or Criteria.
   repository.commit({

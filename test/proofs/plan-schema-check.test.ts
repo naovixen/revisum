@@ -10,12 +10,15 @@ import { join } from 'node:path';
 import { after, before, test } from 'node:test';
 import { planJsonSchema } from '@revisum/engine';
 import { REPOSITORY_ROOT } from '../support/repository.ts';
+import { RepositoryRuleName } from '../../tools/RunRepositoryRules.ts';
 import { copyRepository, type LintOutcome, type ScratchRepository } from './scratch-repository.ts';
 
 const SCHEMA_PATH = 'docs/plan-language/plan.schema.json';
 const CHANGELOG_PATH = 'docs/plan-language/CHANGELOG.md';
 const GOLDEN_SIGNUP_PATH = 'golden/plans/signup.json';
 const TIMEOUT = 300_000;
+
+const ONLY_THE_RULE = { rule: RepositoryRuleName.PlanSchema };
 
 let scratch: ScratchRepository;
 before(() => { scratch = copyRepository(); });
@@ -57,14 +60,14 @@ test('the lint fails when the committed schema is stale', { timeout: TIMEOUT }, 
   const outcome = scratch.lintWithEdit(SCHEMA_PATH, (text) => {
     const schema: Record<string, unknown> = JSON.parse(text);
     return `${JSON.stringify({ ...schema, description: `${String(schema['description'] ?? '')} (edited by hand)` }, null, 2)}\n`;
-  });
+  }, ONLY_THE_RULE);
   assertFailsNaming(outcome, 'plan.schema.json');
 });
 
 test('the lint fails when a golden plan does not validate against the schema', { timeout: TIMEOUT }, () => {
   const plan: { steps: unknown[] } = JSON.parse(readFileSync(join(REPOSITORY_ROOT, GOLDEN_SIGNUP_PATH), 'utf8'));
   plan.steps.push({ type: 'eval', code: 'fetch("/admin")' });
-  const outcome = scratch.lintWith('golden/plans/planted-invalid.json', `${JSON.stringify(plan, null, 2)}\n`);
+  const outcome = scratch.lintWith('golden/plans/planted-invalid.json', `${JSON.stringify(plan, null, 2)}\n`, ONLY_THE_RULE);
   assertFailsNaming(outcome, 'planted-invalid.json');
 });
 
@@ -73,13 +76,13 @@ test('the lint fails when a golden plan lacks a criterion id on an assertion', {
   const assertion = plan.steps.find((step) => step['type'] === 'expect');
   assert.ok(assertion);
   delete assertion['criterionId'];
-  const outcome = scratch.lintWith('golden/plans/planted-untraced.json', `${JSON.stringify(plan, null, 2)}\n`);
+  const outcome = scratch.lintWith('golden/plans/planted-untraced.json', `${JSON.stringify(plan, null, 2)}\n`, ONLY_THE_RULE);
   assertFailsNaming(outcome, 'planted-untraced.json');
 });
 
 test('the lint fails when the newest changelog entry does not name the schema\'s sha256', { timeout: TIMEOUT }, () => {
-  const hash = sha256Of(readFileSync(join(scratch.root, SCHEMA_PATH), 'utf8'));
-  const outcome = scratch.lintWithEdit(CHANGELOG_PATH, (text) => text.replaceAll(hash, '0'.repeat(64)));
+  const hash = sha256Of(readFileSync(join(scratch.root(), SCHEMA_PATH), 'utf8'));
+  const outcome = scratch.lintWithEdit(CHANGELOG_PATH, (text) => text.replaceAll(hash, '0'.repeat(64)), ONLY_THE_RULE);
   assertFailsNaming(outcome, 'CHANGELOG.md');
 });
 

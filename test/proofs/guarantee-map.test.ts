@@ -40,6 +40,7 @@ const WEAKER_CLASS = 'claimed, not proven by CI';
 const RUN_TABLE = '.test-results/guarantees.md';
 // The folders whose tests are replaced by stand-ins in the copy.
 const TEST_FOLDERS: readonly string[] = ['test', 'proofs'];
+const BROWSER_MODULE = 'test/support/browsers.ts';
 const TIMEOUT = 300_000;
 
 let scratch: ScratchRepository;
@@ -66,7 +67,7 @@ async function readMappedTests(root: string): Promise<ReadonlyMap<GuaranteeRow, 
 
 before(async () => {
   scratch = copyRepository();
-  mappedTests = await readMappedTests(scratch.root);
+  mappedTests = await readMappedTests(scratch.root());
 });
 after(() => { scratch.dispose(); });
 
@@ -90,8 +91,8 @@ function runGates(outcomes: Readonly<Partial<Record<GuaranteeRow, Outcome>>>): {
   }
   const topFolders = [...new Set([...byFile.keys()].map((file) => file.split('/')[0] ?? file))];
   assert.ok(topFolders.every((folder) => TEST_FOLDERS.includes(folder)), `a mapped test lies outside ${TEST_FOLDERS.join(' and ')}: ${topFolders.join(', ')}`);
-  for (const folder of TEST_FOLDERS) rmSync(join(scratch.root, folder), { recursive: true, force: true });
-  rmSync(join(scratch.root, '.test-results'), { recursive: true, force: true });
+  for (const folder of TEST_FOLDERS) rmSync(join(scratch.root(), folder), { recursive: true, force: true });
+  rmSync(join(scratch.root(), '.test-results'), { recursive: true, force: true });
 
   for (const [file, tests] of byFile) {
     const lines = ["import { describe, test } from 'node:test';"];
@@ -103,15 +104,19 @@ function runGates(outcomes: Readonly<Partial<Record<GuaranteeRow, Outcome>>>): {
       const opening = parts.map((suite) => `describe(${JSON.stringify(suite)}, () => { `).join('');
       lines.push(`${opening}test(${JSON.stringify(testName)}, ${body});${' });'.repeat(parts.length)}`);
     }
-    const path = join(scratch.root, file);
+    const path = join(scratch.root(), file);
     mkdirSync(dirname(path), { recursive: true });
     writeFileSync(path, `${lines.join('\n')}\n`);
   }
 
-  runTool(join(scratch.root, 'tools', 'run-test-folder.ts'), topFolders, { cwd: scratch.root, timeout: TIMEOUT });
-  const gates = runTool(join(scratch.root, 'tools', 'guarantee-map.ts'), [], { cwd: scratch.root, timeout: TIMEOUT });
+  // The test runner refuses a repository without the browser module, and the stand-ins replaced it.
+  mkdirSync(dirname(join(scratch.root(), BROWSER_MODULE)), { recursive: true });
+  writeFileSync(join(scratch.root(), BROWSER_MODULE), 'export {};\n');
+
+  runTool(join(scratch.root(), 'tools', 'run-test-folder.ts'), topFolders, { cwd: scratch.root(), timeout: TIMEOUT });
+  const gates = runTool(join(scratch.root(), 'tools', 'guarantee-map.ts'), [], { cwd: scratch.root(), timeout: TIMEOUT });
   let table = '';
-  try { table = readFileSync(join(scratch.root, RUN_TABLE), 'utf8'); } catch { table = ''; }
+  try { table = readFileSync(join(scratch.root(), RUN_TABLE), 'utf8'); } catch { table = ''; }
   return { gates, table };
 }
 
@@ -137,7 +142,7 @@ test('when every mapped test passes, the gates step passes and the run matches t
   const { gates, table } = runGates({});
   assert.equal(gates.passed, true, describeRun(gates));
   assert.ok(!rowLine(table, PROVEN_ROW).includes(WEAKER_CLASS), `a passing row shows its weaker class:\n${table}`);
-  const published = readFileSync(join(scratch.root, 'docs', 'guarantees.md'), 'utf8');
+  const published = readFileSync(join(scratch.root(), 'docs', 'guarantees.md'), 'utf8');
   for (const row of GUARANTEE_ROWS) assert.ok(published.includes(row), `the published table has no row ${row}`);
 });
 
@@ -163,7 +168,7 @@ test('when a mapped test is in no result, the gates step fails and the run shows
 });
 
 test('the gates step fails when the published table differs from what a green run generates', { timeout: TIMEOUT }, () => {
-  const { gates } = withEdits(scratch.root, {
+  const { gates } = withEdits(scratch.root(), {
     'docs/guarantees.md': (text) => text.replace(WEAKER_CLASS, 'proven by CI'),
   }, () => runGates({}));
   assert.equal(gates.passed, false, describeRun(gates));
@@ -181,18 +186,18 @@ test('a pending row whose specs are unticked passes and shows its weaker class',
 });
 
 test('a pending row still passes while one of its two specs is unticked', { timeout: TIMEOUT }, () => {
-  const { gates } = withEdits(scratch.root, { 'START.md': tickSpecs([9]) }, () => runGates({}));
+  const { gates } = withEdits(scratch.root(), { 'START.md': tickSpecs([9]) }, () => runGates({}));
   assert.equal(gates.passed, true, describeRun(gates));
 });
 
 test('a pending row fails once all its specs are ticked', { timeout: TIMEOUT }, () => {
-  const { gates } = withEdits(scratch.root, { 'START.md': tickSpecs([9, 12]) }, () => runGates({}));
+  const { gates } = withEdits(scratch.root(), { 'START.md': tickSpecs([9, 12]) }, () => runGates({}));
   assert.equal(gates.passed, false, describeRun(gates));
   assert.ok(gates.output.includes('no-pii-in-reports'), describeRun(gates));
 });
 
 test('ticking the spec two pending rows wait for fails both rows', { timeout: TIMEOUT }, () => {
-  const { gates } = withEdits(scratch.root, { 'START.md': tickSpecs([14]) }, () => runGates({}));
+  const { gates } = withEdits(scratch.root(), { 'START.md': tickSpecs([14]) }, () => runGates({}));
   assert.equal(gates.passed, false, describeRun(gates));
   assert.ok(gates.output.includes('actions-tamper-evident') && gates.output.includes('spec-to-commit-trace'), describeRun(gates));
 });

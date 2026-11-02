@@ -9,6 +9,7 @@ import { join } from 'node:path';
 import { after, before, test } from 'node:test';
 import { changelogEntry } from '../support/plan-changelog.ts';
 import { GOLDEN, REPOSITORY_ROOT } from '../support/repository.ts';
+import { RepositoryRuleName } from '../../tools/RunRepositoryRules.ts';
 import { copyRepository, type LintOutcome, type ScratchRepository } from './scratch-repository.ts';
 
 const STUB_PLAN_PATH = 'golden/plans/login-code-stub.json';
@@ -89,6 +90,8 @@ test('the 1.2 changelog entry names each new step, check, section, setting and e
 
 // ---- The lint check ---------------------------------------------------------------------------------
 
+const ONLY_THE_RULE = { rule: RepositoryRuleName.PlanSchema };
+
 let scratch: ScratchRepository;
 before(() => { scratch = copyRepository(); });
 after(() => { scratch.dispose(); });
@@ -110,7 +113,7 @@ test('the lint fails when a golden plan gives a stub an action the language does
   const stub = stepsOf(plan).find((step) => step['type'] === 'stub');
   assert.ok(stub !== undefined);
   stub['action'] = 'pause';
-  assertFailsNaming(scratch.lintWith('golden/plans/planted-stub-action.json', `${JSON.stringify(plan, null, 2)}\n`), 'planted-stub-action.json');
+  assertFailsNaming(scratch.lintWith('golden/plans/planted-stub-action.json', `${JSON.stringify(plan, null, 2)}\n`, ONLY_THE_RULE), 'planted-stub-action.json');
 });
 
 test('the lint fails when a golden plan writes its own response into a stub step', { timeout: TIMEOUT }, () => {
@@ -118,7 +121,7 @@ test('the lint fails when a golden plan writes its own response into a stub step
   const stub = stepsOf(plan).find((step) => step['type'] === 'stub');
   assert.ok(stub !== undefined);
   stub['responses'] = [{ status: 200, mediaType: 'text/html', body: { text: 'hello' } }];
-  assertFailsNaming(scratch.lintWith('golden/plans/planted-stub-response.json', `${JSON.stringify(plan, null, 2)}\n`), 'planted-stub-response.json');
+  assertFailsNaming(scratch.lintWith('golden/plans/planted-stub-response.json', `${JSON.stringify(plan, null, 2)}\n`, ONLY_THE_RULE), 'planted-stub-response.json');
 });
 
 test('the lint fails when a golden plan names its own storage key in a setStorage', { timeout: TIMEOUT }, () => {
@@ -126,7 +129,7 @@ test('the lint fails when a golden plan names its own storage key in a setStorag
   const write = stepsOf(plan).find((step) => step['type'] === 'setStorage');
   assert.ok(write !== undefined);
   write['key'] = 'auth.token';
-  assertFailsNaming(scratch.lintWith('golden/plans/planted-storage-key.json', `${JSON.stringify(plan, null, 2)}\n`), 'planted-storage-key.json');
+  assertFailsNaming(scratch.lintWith('golden/plans/planted-storage-key.json', `${JSON.stringify(plan, null, 2)}\n`, ONLY_THE_RULE), 'planted-storage-key.json');
 });
 
 // Counter-example: a valid copy of the storage plan, with a stub added, passes, so the failures

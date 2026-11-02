@@ -10,6 +10,7 @@ import { parseProject, planParser } from '@revisum/engine';
 import { CURRENT_VERSION, testProjectInput } from '../unit/engine/plan-examples.ts';
 import { CHANGELOG_PATH, withoutNewestEntry } from '../support/plan-changelog.ts';
 import { GOLDEN, REPOSITORY_ROOT } from '../support/repository.ts';
+import { RepositoryRuleName } from '../../tools/RunRepositoryRules.ts';
 import { copyRepository, type LintOutcome, type ScratchRepository } from './scratch-repository.ts';
 
 const TIMEOUT = 300_000;
@@ -21,6 +22,8 @@ const readText = (relativePath: string): string => readFileSync(join(REPOSITORY_
 const goldenPlans = (): { readonly name: string; readonly plan: JsonRecord }[] =>
   readdirSync(join(GOLDEN, 'plans')).filter((name) => name.endsWith('.json')).sort()
     .map((name) => ({ name, plan: JSON.parse(readFileSync(join(GOLDEN, 'plans', name), 'utf8')) }));
+
+const ONLY_THE_RULE = { rule: RepositoryRuleName.PlanSchema };
 
 let scratch: ScratchRepository;
 before(() => { scratch = copyRepository(); });
@@ -84,7 +87,7 @@ test('the lint fails when a golden plan puts a value reference where the schema 
   const assertion = steps.find((step) => step['type'] === 'expect');
   assert.ok(assertion);
   assertion['criterionId'] = { valueName: 'paletteName' };
-  assertFailsNaming(scratch.lintWith('golden/plans/planted-reference.json', `${JSON.stringify(plan, null, 2)}\n`), 'planted-reference.json');
+  assertFailsNaming(scratch.lintWith('golden/plans/planted-reference.json', `${JSON.stringify(plan, null, 2)}\n`, ONLY_THE_RULE), 'planted-reference.json');
 });
 
 test('the lint fails when a golden plan presses an unknown modifier', { timeout: TIMEOUT }, () => {
@@ -93,7 +96,7 @@ test('the lint fails when a golden plan presses an unknown modifier', { timeout:
   const chord = steps.find((step) => Array.isArray(step['modifiers']));
   assert.ok(chord);
   chord['modifiers'] = ['Hyper'];
-  assertFailsNaming(scratch.lintWith('golden/plans/planted-modifier.json', `${JSON.stringify(plan, null, 2)}\n`), 'planted-modifier.json');
+  assertFailsNaming(scratch.lintWith('golden/plans/planted-modifier.json', `${JSON.stringify(plan, null, 2)}\n`, ONLY_THE_RULE), 'planted-modifier.json');
 });
 
 // Counter-example: a valid copy of a golden plan passes, so the failures above come from the
@@ -108,6 +111,6 @@ test('the lint accepts a new golden plan that validates', { timeout: TIMEOUT }, 
 // The newest entry is the one that must name the committed schema's hash, so removing it, whichever
 // version it is for, leaves a changelog the lint refuses.
 test('the lint fails, naming the changelog, when the newest entry is removed', { timeout: TIMEOUT }, () => {
-  const outcome = scratch.lintWithEdit(CHANGELOG_PATH, withoutNewestEntry);
+  const outcome = scratch.lintWithEdit(CHANGELOG_PATH, withoutNewestEntry, ONLY_THE_RULE);
   assertFailsNaming(outcome, 'CHANGELOG.md');
 });

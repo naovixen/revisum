@@ -5,11 +5,14 @@
 // from the working tree; each test removes one denial, in every shell, from a throw-away copy of
 // the repository and expects the lint to fail naming it.
 import { after, before, test } from 'node:test';
+import { RepositoryRuleName } from '../../tools/RunRepositoryRules.ts';
 import { copyRepository, type ScratchRepository } from './scratch-repository.ts';
 import { assertLintFails, assertLintPasses, editJson, lintWithEdits } from './scratch-edits.ts';
 
 const SETTINGS_PATH = '.claude/settings.json';
 const TIMEOUT = 300_000;
+
+const ONLY_THE_RULE = { rule: RepositoryRuleName.DenyRules };
 
 let scratch: ScratchRepository;
 before(() => { scratch = copyRepository(); });
@@ -44,7 +47,7 @@ test('control: the unchanged copy of the repository passes every lint command', 
 
 for (const { action, matches, named } of REQUIRED_DENIALS) {
   test(`the lint fails when the deny rules no longer deny ${action}`, { timeout: TIMEOUT }, () => {
-    const outcome = lintWithEdits(scratch, { [SETTINGS_PATH]: withoutDenials(matches) });
+    const outcome = lintWithEdits(scratch, { [SETTINGS_PATH]: withoutDenials(matches) }, ONLY_THE_RULE);
     assertLintFails(outcome, ['settings.json']);
     if (!named.test(outcome.failureOutput)) {
       throw new Error(`the lint failed, but did not name the missing denial (${action}):\n${outcome.failureOutput}`);

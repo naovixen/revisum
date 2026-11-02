@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import type { LintOutcome, ScratchRepository } from './scratch-repository.ts';
+import type { LintChoice, LintOutcome, ScratchRepository } from './scratch-repository.ts';
 
 // A new file's text, or a function from the current text to the new text.
 export type FileEdit = string | ((text: string) => string);
@@ -30,8 +30,8 @@ export function withEdits<Result>(root: string, edits: Readonly<Record<string, F
   }
 }
 
-export function lintWithEdits(scratch: ScratchRepository, edits: Readonly<Record<string, FileEdit>>): LintOutcome {
-  return withEdits(scratch.root, edits, () => scratch.lint());
+export function lintWithEdits(scratch: ScratchRepository, edits: Readonly<Record<string, FileEdit>>, choice?: LintChoice): LintOutcome {
+  return withEdits(scratch.root(), edits, () => scratch.lint(choice));
 }
 
 // Rewrites a JSON file through a function on its parsed value, keeping two-space indentation.
@@ -47,16 +47,10 @@ export function assertLintPasses(outcome: LintOutcome): void {
   assert.equal(outcome.passed, true, `the lint failed:\n${outcome.failureOutput}`);
 }
 
-// The lint failed, and its failure output names every one of `expected`. When `tool` is given,
-// the command that runs that tool is one of those that failed.
-export function assertLintFails(outcome: LintOutcome, expected: readonly string[], tool?: string): void {
+// The lint failed, and its failure output names every one of `expected`.
+export function assertLintFails(outcome: LintOutcome, expected: readonly string[]): void {
   assert.equal(outcome.passed, false, 'the lint passed');
   for (const text of expected) {
     assert.ok(outcome.failureOutput.includes(text), `the lint failed, but its output does not name "${text}":\n${outcome.failureOutput}`);
-  }
-  if (tool !== undefined) {
-    const failedCommands = outcome.commands.filter((command) => command.status !== 0).map((command) => command.command);
-    assert.ok(failedCommands.some((command) => command.includes(tool)),
-      `the lint failed, but not in ${tool}; failed commands: ${failedCommands.join(', ')}\n${outcome.failureOutput}`);
   }
 }

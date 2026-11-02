@@ -8,6 +8,7 @@ import { join } from 'node:path';
 import { after, before, test } from 'node:test';
 import { changelogEntry } from '../support/plan-changelog.ts';
 import { GOLDEN, REPOSITORY_ROOT } from '../support/repository.ts';
+import { RepositoryRuleName } from '../../tools/RunRepositoryRules.ts';
 import { copyRepository, type LintOutcome, type ScratchRepository } from './scratch-repository.ts';
 
 const DOWNLOAD_PLAN_PATH = 'golden/plans/export-download.json';
@@ -67,6 +68,8 @@ test('the 1.2 changelog entry names each new step, check, setting and error code
 
 // ---- The lint check -------------------------------------------------------------------------------
 
+const ONLY_THE_RULE = { rule: RepositoryRuleName.PlanSchema };
+
 let scratch: ScratchRepository;
 before(() => { scratch = copyRepository(); });
 after(() => { scratch.dispose(); });
@@ -88,7 +91,7 @@ test('the lint fails when a golden plan turns scripts "enabled" on a navigate', 
   const opening = stepsOf(plan)[0];
   assert.ok(opening !== undefined && opening['type'] === 'navigate');
   opening['scripts'] = 'enabled';
-  assertFailsNaming(scratch.lintWith('golden/plans/planted-scripts.json', `${JSON.stringify(plan, null, 2)}\n`), 'planted-scripts.json');
+  assertFailsNaming(scratch.lintWith('golden/plans/planted-scripts.json', `${JSON.stringify(plan, null, 2)}\n`, ONLY_THE_RULE), 'planted-scripts.json');
 });
 
 test('the lint fails when a golden plan checks a download with a kind the language does not have', { timeout: TIMEOUT }, () => {
@@ -96,7 +99,7 @@ test('the lint fails when a golden plan checks a download with a kind the langua
   const check = stepsOf(plan).find((step) => step['type'] === 'expectDownload');
   assert.ok(check !== undefined);
   check['assert'] = { kind: 'pageCountEquals', value: 3 };
-  assertFailsNaming(scratch.lintWith('golden/plans/planted-download-check.json', `${JSON.stringify(plan, null, 2)}\n`), 'planted-download-check.json');
+  assertFailsNaming(scratch.lintWith('golden/plans/planted-download-check.json', `${JSON.stringify(plan, null, 2)}\n`, ONLY_THE_RULE), 'planted-download-check.json');
 });
 
 // Counter-example: a valid copy of the download plan passes, so the failures above come from the

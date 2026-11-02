@@ -7,13 +7,15 @@
 //   - the Standard names table equals the naming lint's standardNames.
 // Each test changes the glossary in a throw-away copy of the repository and runs the lint.
 import { after, before, test } from 'node:test';
+import { RepositoryRuleName } from '../../tools/RunRepositoryRules.ts';
 import { copyRepository, type ScratchRepository } from './scratch-repository.ts';
 import { assertLintFails, assertLintPasses, lintWithEdits } from './scratch-edits.ts';
 
 const GLOSSARY_PATH = 'docs/glossary.md';
-const GLOSSARY_CHECK = 'check-glossary';
 const ANCHOR_ROW = '| Engine | `engine` package |';
 const TIMEOUT = 300_000;
+
+const ONLY_THE_RULE = { rule: RepositoryRuleName.Glossary };
 
 let scratch: ScratchRepository;
 before(() => { scratch = copyRepository(); });
@@ -40,22 +42,22 @@ test('control: the unchanged copy of the repository passes every lint command', 
 test('the lint fails on a row whose code name is no exported declaration', { timeout: TIMEOUT }, () => {
   const outcome = lintWithEdits(scratch, {
     [GLOSSARY_PATH]: withRow('| Planted term | `plantedMissingExport` | `engine`, exists | A term whose code name names nothing |'),
-  });
-  assertLintFails(outcome, ['plantedMissingExport'], GLOSSARY_CHECK);
+  }, ONLY_THE_RULE);
+  assertLintFails(outcome, ['plantedMissingExport']);
 });
 
 test('the lint fails on a partly planned row whose existing code name is missing', { timeout: TIMEOUT }, () => {
   const outcome = lintWithEdits(scratch, {
     [GLOSSARY_PATH]: withRow('| Planted term | `plantedMissingExport` | `engine`, exists; driver planned | A term whose code name names nothing |'),
-  });
-  assertLintFails(outcome, ['plantedMissingExport'], GLOSSARY_CHECK);
+  }, ONLY_THE_RULE);
+  assertLintFails(outcome, ['plantedMissingExport']);
 });
 
 test('the lint fails on a row whose code name is a path that does not exist', { timeout: TIMEOUT }, () => {
   const outcome = lintWithEdits(scratch, {
     [GLOSSARY_PATH]: withRow('| Planted tool | `tools/planted-missing-tool.ts` | `tools`, exists | A tool that is not there |'),
-  });
-  assertLintFails(outcome, ['tools/planted-missing-tool.ts'], GLOSSARY_CHECK);
+  }, ONLY_THE_RULE);
+  assertLintFails(outcome, ['tools/planted-missing-tool.ts']);
 });
 
 test('counter-example: a row whose "Where" says only "planned" is not checked', { timeout: TIMEOUT }, () => {
@@ -69,25 +71,25 @@ test('counter-example: a row whose "Where" says only "planned" is not checked', 
 test('the lint fails when an exported engine type is taken out of the glossary', { timeout: TIMEOUT }, () => {
   const outcome = lintWithEdits(scratch, {
     [GLOSSARY_PATH]: (text) => text.split('\n').filter((line) => !line.includes('`AiText`')).join('\n'),
-  });
-  assertLintFails(outcome, ['AiText'], GLOSSARY_CHECK);
+  }, ONLY_THE_RULE);
+  assertLintFails(outcome, ['AiText']);
 });
 
 test('the lint fails when a contracts type the engine re-exports is taken out of the glossary', { timeout: TIMEOUT }, () => {
-  const outcome = lintWithEdits(scratch, { [GLOSSARY_PATH]: without('`LeakScanner`, ') });
-  assertLintFails(outcome, ['LeakScanner'], GLOSSARY_CHECK);
+  const outcome = lintWithEdits(scratch, { [GLOSSARY_PATH]: without('`LeakScanner`, ') }, ONLY_THE_RULE);
+  assertLintFails(outcome, ['LeakScanner']);
 });
 
 // ---- Standard names -----------------------------------------------------------------------------
 
 test('the lint fails when a standard name is dropped from the glossary', { timeout: TIMEOUT }, () => {
-  const outcome = lintWithEdits(scratch, { [GLOSSARY_PATH]: without('| mcp | Model Context Protocol |\n') });
-  assertLintFails(outcome, ['mcp'], GLOSSARY_CHECK);
+  const outcome = lintWithEdits(scratch, { [GLOSSARY_PATH]: without('| mcp | Model Context Protocol |\n') }, ONLY_THE_RULE);
+  assertLintFails(outcome, ['mcp']);
 });
 
 test('the lint fails when a standard name is given another full name', { timeout: TIMEOUT }, () => {
   const outcome = lintWithEdits(scratch, {
     [GLOSSARY_PATH]: (text) => without('| jwt | JSON Web Token |')(text).replace('| oidc | OpenID Connect |', '| oidc | OpenID Connect |\n| jwt | JSON Web Tokens |'),
-  });
-  assertLintFails(outcome, ['jwt'], GLOSSARY_CHECK);
+  }, ONLY_THE_RULE);
+  assertLintFails(outcome, ['jwt']);
 });

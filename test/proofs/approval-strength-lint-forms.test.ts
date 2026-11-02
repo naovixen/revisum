@@ -5,7 +5,10 @@
 // over it. Taking any Approval, under an alias or narrowed on another field, still passes.
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
+import { RepositoryRuleName } from '../../tools/RunRepositoryRules.ts';
 import { copyRepository, type ScratchRepository } from './scratch-repository.ts';
+
+const ONLY_THE_RULE = { rule: RepositoryRuleName.ApprovalStrength };
 
 let scratch: ScratchRepository;
 before(() => { scratch = copyRepository(); });
@@ -17,7 +20,7 @@ const CHECK_NAME = 'approval strength check: ';
 
 // The lint fails, and the approval strength check itself names the planted file.
 function assertStrengthCheckFailsOn(relativePath: string, source: string): void {
-  const outcome = scratch.lintWith(relativePath, source);
+  const outcome = scratch.lintWith(relativePath, source, ONLY_THE_RULE);
   assert.equal(outcome.passed, false, `the lint accepted ${relativePath}:\n${source}`);
   const fileName = relativePath.split('/').at(-1) ?? relativePath;
   const reported = outcome.failureOutput.split('\n').some((line) => line.includes(CHECK_NAME) && line.includes(fileName));

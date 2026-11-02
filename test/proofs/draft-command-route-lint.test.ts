@@ -9,6 +9,7 @@ import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { after, before, test } from 'node:test';
+import { RepositoryRuleName } from '../../tools/RunRepositoryRules.ts';
 import { copyRepository, type ScratchRepository } from './scratch-repository.ts';
 
 const DRAFT_COMMAND_MODULE = 'packages/cli/src/draft-command.ts';
@@ -22,21 +23,21 @@ after(() => { scratch.dispose(); });
 // The module with `lines` put before its own text.
 const withLinesFirst = (lines: readonly string[]) => (text: string): string => `${lines.join('\n')}\n${text}`;
 
-function assertLintFailsNamingTheModule(lines: readonly string[]): void {
-  assert.ok(existsSync(join(scratch.root, DRAFT_COMMAND_MODULE)), `${DRAFT_COMMAND_MODULE} does not exist`);
-  const outcome = scratch.lintWithEdit(DRAFT_COMMAND_MODULE, withLinesFirst(lines));
+function assertLintFailsNamingTheModule(rule: RepositoryRuleName, lines: readonly string[]): void {
+  assert.ok(existsSync(join(scratch.root(), DRAFT_COMMAND_MODULE)), `${DRAFT_COMMAND_MODULE} does not exist`);
+  const outcome = scratch.lintWithEdit(DRAFT_COMMAND_MODULE, withLinesFirst(lines), { rule });
   assert.equal(outcome.passed, false, `the lint accepted the draft command module with:\n${lines.join('\n')}`);
   assert.ok(outcome.failureOutput.includes(DRAFT_COMMAND_FILE), `the lint failed, but did not name ${DRAFT_COMMAND_FILE}:\n${outcome.failureOutput}`);
 }
 
 test('control: the draft command module exists and the unchanged copy passes every lint command', { timeout: TIMEOUT }, () => {
-  assert.ok(existsSync(join(scratch.root, DRAFT_COMMAND_MODULE)), `${DRAFT_COMMAND_MODULE} does not exist`);
+  assert.ok(existsSync(join(scratch.root(), DRAFT_COMMAND_MODULE)), `${DRAFT_COMMAND_MODULE} does not exist`);
   const outcome = scratch.lint();
   assert.equal(outcome.passed, true, outcome.failureOutput);
 });
 
 test('the lint fails when the draft command module imports the engine\'s run function', { timeout: TIMEOUT }, () => {
-  assertLintFailsNamingTheModule([
+  assertLintFailsNamingTheModule(RepositoryRuleName.Imports, [
     "import { run } from '@revisum/engine';",
     '// Runs the draft straight away, skipping approval.',
     'export const runDraftAtOnce = run;',
@@ -44,14 +45,14 @@ test('the lint fails when the draft command module imports the engine\'s run fun
 });
 
 test('the lint fails when the draft command module imports run under another name', { timeout: TIMEOUT }, () => {
-  assertLintFailsNamingTheModule([
+  assertLintFailsNamingTheModule(RepositoryRuleName.Imports, [
     "import { run as startRun } from '@revisum/engine';",
     'export const startDraftRun = startRun;',
   ]);
 });
 
 test('the lint fails when the draft command module makes a Plan by a cast', { timeout: TIMEOUT }, () => {
-  assertLintFailsNamingTheModule([
+  assertLintFailsNamingTheModule(RepositoryRuleName.BrandedCasts, [
     "import type { Plan } from '@revisum/contracts';",
     '// Treats the planner\'s reply as a plan, skipping the parser.',
     'export const plannedAsPlan = (reply: unknown): Plan => reply as Plan;',
