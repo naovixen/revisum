@@ -1,8 +1,8 @@
 # Weekly browser upkeep for the own CDP driver. It reads the latest Stable Chrome for Testing
 # version from Google's public version list. When that major is newer than the pinned build, it
 # installs the new build and its headless shell and re-runs the contract and capability suites on
-# them. Then tools/browser-upkeep.ts reports the average fix hours per major, flags the Playwright
-# fallback rule when they are over the limit, and fails when the new major has no upkeep record.
+# them. Then tools/browser-upkeep.ts reports the average fix hours per major, flags the kill
+# criterion when they are over the limit, and fails when the new major has no upkeep record.
 # Runs in the same pinned image as the "ci" workflow. See docs/specs/SPEC-06-cdp-driver.md.
 name: browser-upkeep
 
@@ -30,7 +30,7 @@ jobs:
             bash -euo pipefail -c '
               npm ci
               # The system libraries the browsers need on Linux, installed as root.
-              node node_modules/playwright-core/cli.js install-deps chromium firefox webkit
+              bash tools/install-system-libraries.sh
               chown -R node:node /workspace
               su node -c "bash -euo pipefail" <<"UPKEEP"
                 npm run browsers

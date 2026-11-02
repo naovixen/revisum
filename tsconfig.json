@@ -11,9 +11,6 @@
       "path": "packages/driver-cdp"
     },
     {
-      "path": "packages/driver-playwright"
-    },
-    {
       "path": "packages/auditor-axe"
     },
     {
@@ -27,9 +24,6 @@
     },
     {
       "path": "packages/cli"
-    },
-    {
-      "path": "packages/action"
     },
     {
       "path": "tools"

@@ -11,7 +11,6 @@
   // keep their sandbox. Chrome refuses to sandbox as root; checks run as the image's "node" user.
   "runArgs": ["--security-opt", "seccomp=${localWorkspaceFolder}/.devcontainer/seccomp-chrome-sandbox.json"],
   "containerEnv": {
-    "MOZ_HEADLESS": "1",
     "GIT_TERMINAL_PROMPT": "0"
   },
   // Linux needs its own node_modules: some packages, TypeScript among them, install a different
@@ -19,9 +18,9 @@
   "mounts": [
     "source=revisum-node-modules,target=${containerWorkspaceFolder}/node_modules,type=volume"
   ],
-  // The volume starts owned by root. The browsers need system libraries, as in CI. The repo folder
+  // The volume starts owned by root. Chromium needs system libraries, installed as in CI. The repo folder
   // is owned by the Windows user, so git needs safe.directory to read it; that grants no push access.
-  "postCreateCommand": "sudo chown node node_modules && npm ci && sudo node node_modules/playwright-core/cli.js install-deps chromium firefox webkit && git config --global --add safe.directory ${containerWorkspaceFolder} && (git config --global --unset-all credential.helper || true)",
+  "postCreateCommand": "sudo chown node node_modules && npm ci && sudo bash tools/install-system-libraries.sh && git config --global --add safe.directory ${containerWorkspaceFolder} && (git config --global --unset-all credential.helper || true)",
   "customizations": {
     "vscode": {
       "settings": {

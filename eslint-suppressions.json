@@ -1,9 +1,4 @@
 {
-  "packages/action/src/index.ts": {
-    "no-restricted-syntax": {
-      "count": 1
-    }
-  },
   "packages/auditor-act/src/accessibility-types.ts": {
     "@typescript-eslint/no-unnecessary-type-assertion": {
       "count": 2
@@ -625,51 +620,6 @@
   },
   "packages/driver-cdp/src/web-storage.ts": {
     "curly": {
-      "count": 2
-    },
-    "revisum/file-name-matches-export": {
-      "count": 1
-    }
-  },
-  "packages/driver-playwright/src/axe-audit.ts": {
-    "revisum/file-name-matches-export": {
-      "count": 1
-    }
-  },
-  "packages/driver-playwright/src/in-page.ts": {
-    "@typescript-eslint/naming-convention": {
-      "count": 3
-    },
-    "@typescript-eslint/no-unsafe-call": {
-      "count": 1
-    },
-    "@typescript-eslint/strict-boolean-expressions": {
-      "count": 4
-    },
-    "curly": {
-      "count": 17
-    },
-    "no-eval": {
-      "count": 1
-    },
-    "no-nested-ternary": {
-      "count": 4
-    },
-    "revisum/file-name-matches-export": {
-      "count": 1
-    }
-  },
-  "packages/driver-playwright/src/playwright-driver.ts": {
-    "@typescript-eslint/no-unsafe-return": {
-      "count": 1
-    },
-    "curly": {
-      "count": 17
-    },
-    "max-lines-per-function": {
-      "count": 1
-    },
-    "no-nested-ternary": {
       "count": 2
     },
     "revisum/file-name-matches-export": {
@@ -2113,9 +2063,6 @@
     }
   },
   "test/contract/cdp-pages-and-downloads.test.ts": {
-    "@typescript-eslint/naming-convention": {
-      "count": 1
-    },
     "curly": {
       "count": 1
     },
@@ -2123,7 +2070,7 @@
       "count": 1
     },
     "revisum/test-title-format": {
-      "count": 12
+      "count": 6
     }
   },
   "test/contract/cdp-plan-clock.test.ts": {
@@ -2193,17 +2140,14 @@
     "@typescript-eslint/strict-boolean-expressions": {
       "count": 1
     },
-    "@typescript-eslint/unbound-method": {
-      "count": 1
-    },
     "curly": {
-      "count": 2
+      "count": 1
     },
     "revisum/file-name-matches-export": {
       "count": 1
     },
     "revisum/test-title-format": {
-      "count": 9
+      "count": 7
     }
   },
   "test/contract/clock-and-clipboard-driver-support.test.ts": {
@@ -2476,7 +2420,7 @@
       "count": 1
     },
     "revisum/test-title-format": {
-      "count": 4
+      "count": 3
     }
   },
   "test/contract/unsafe-page-driver-support.test.ts": {
@@ -2698,9 +2642,6 @@
     }
   },
   "test/proofs/dependency-review-lint.test.ts": {
-    "@typescript-eslint/naming-convention": {
-      "count": 1
-    },
     "curly": {
       "count": 4
     },
@@ -2711,7 +2652,7 @@
       "count": 1
     },
     "revisum/test-title-format": {
-      "count": 8
+      "count": 7
     }
   },
   "test/proofs/download-file-names.test.ts": {
@@ -5751,7 +5692,7 @@
       "count": 1
     },
     "curly": {
-      "count": 6
+      "count": 5
     },
     "revisum/file-name-matches-export": {
       "count": 1

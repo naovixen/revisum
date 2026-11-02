@@ -43,3 +43,28 @@
 ## Risks
 
 - Lint reads the code with TypeScript 6 while `tsc` uses 7, so a type-aware rule could rarely disagree with the build. `tsc --build` remains the authority.
+
+# Development dependencies: playwright-core
+
+Changed by the founder, 2026-11-02.
+
+## In short
+
+- `playwright-core` 1.64.1 is pinned as a root `devDependency` only. It is not in any package, not on the trust path, and `tools/check-runtime-imports.ts` still bans it from every package under `packages/`.
+- It stays because evidence mode's test workload really uses it: `fixtures/evidence-workload/suite/egress-attempts.mjs` launches the pinned Chrome headless shell through it, and `test/containers/workload-isolation.test.ts` runs that script in the isolated workload.
+
+## Decisions
+
+| Package | Version | Why | Decision |
+|---|---|---|---|
+| `playwright-core` | 1.64.1, exact, root | Drives the fixture suite in the workload image. Licence Apache-2.0 | Keep, development only |
+
+## Findings
+
+- The workload image installs nothing. The runner mounts the checkout read-only, so the suite resolves `playwright-core` from the checkout's `node_modules` (see `fixtures/evidence-workload/Dockerfile`).
+- No Playwright-owned browser is needed: the suite launches the headless shell in `.browsers/`, which `npm run browsers` installs. `npm run browsers` no longer installs Playwright's Chromium, Firefox or WebKit.
+- The earlier dependency review of `playwright-core` (decision `optional-adapter`) is removed with `driver-playwright`; a development-only package needs no review.
+
+## Risks
+
+- The pinned `playwright-core` expects a particular Chromium build; the fixture uses the pinned Chrome for Testing headless shell, so a Chrome major bump may need a `playwright-core` bump.

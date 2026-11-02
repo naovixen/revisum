@@ -57,6 +57,15 @@ Windows, this machine, Chrome for Testing 156. The second row's range comes from
 | File | Tests | Why |
 |---|---|---|
 | `test/proofs/criterion-id-lint.test.ts` | 5 recorded | Its lint checked the `{ criterion }` tag, which no longer exists |
+| `test/contract/cdp-pages-and-downloads.test.ts` | -5 | Hover, select, upload, dialog and frame refusals were Playwright's limitations; fakes in unit tests still cover `unsupported-step` |
+| `test/contract/chromium-disabled-features.test.ts` | -1 | Checked Playwright's default features |
+| `test/contract/target-refusals.test.ts` | -2, +1 | The device refusal pair needed Playwright; a new test covers `adapter-not-registered` |
+| `test/proofs/dependency-review-lint.test.ts` | -1 | Its example moved `playwright-core` onto the default set |
+| `test/proofs/licence-roles.test.ts` | -2 | The `action` and `driver-playwright` packages are gone |
+| `test/proofs/page-script-driver-dependencies.test.ts` | -3 | Tests of the Playwright driver |
+| Per-target loops in contract and proof files | Varies | Loops lost their Playwright targets; the CDP cases stay |
+
+Real-driver `unsupported-step` checks for plan values, page states, network stubs and the clock were kept, re-expressed with `cdpWithout`.
 
 ### Coverage floor
 

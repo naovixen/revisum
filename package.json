@@ -34,6 +34,7 @@
   "devDependencies": {
     "@puppeteer/browsers": "3.2.6",
     "@types/node": "24.19.2",
+    "playwright-core": "1.64.1",
     "prettier": "3.9.10",
     "typescript": "7.0.2"
   }

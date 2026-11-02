@@ -35,6 +35,8 @@ Status is one of: `suspected`, `fixed`, `deferred`, `not a bug`.
 | 12 | Explore returns `plan-rejected` where SPEC-16 needs `after-plan-failed` | `cli/src/explore-crawl.ts:90` | suspected | SPEC-16 |
 | 13 | The pure code that decides pass or fail has 23.9% branch coverage from unit tests, so its verdicts rely on slow browser tests, if they're tested at all | `engine/src/oracle.ts` | suspected | Phase 3: review first, then add fast unit tests |
 
+| 14 | With Playwright gone, `device-not-supported` can't happen in real code; only a fake covers it | `test/unit/engine/target-resolution.test.ts:122-156`, `driver-cdp/src/cdp-driver.ts:194-202` | suspected | Phase 3: keep for SPEC-19 or remove |
+
 ## Risks
 
 - A review can miss a real bug. Cold reviews, a mutation spot-check on the trust path and a final trust-path review reduce that risk but don't remove it.

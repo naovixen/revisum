@@ -19,7 +19,7 @@ import { failed, readTestResults, RESULTS_FOLDER, type TestResults } from './tes
 export type GuaranteeRow =
   | 'ai-output-only-as-plan' | 'known-actions-only' | 'lifecycle-no-skip' | 'declared-log-fields' | 'targets-not-substituted'
   | 'browser-egress-allow-list' | 'secrets-absent' | 'pii-masked-in-pixels' | 'no-pii-in-reports' | 'same-inputs-same-result'
-  | 'adapters-substitutable' | 'report-runs-no-content' | 'actions-tamper-evident' | 'spec-to-commit-trace' | 'person-approval';
+  | 'report-runs-no-content' | 'actions-tamper-evident' | 'spec-to-commit-trace' | 'person-approval';
 
 export type GuaranteeEntry = {
   // The test that proves the row, as "<file>#<full name>"; null while the row is pending.
@@ -59,7 +59,7 @@ export const GUARANTEE_MAP: GuaranteeMap = {
     provenClass: 'structural, for field names only', weakerClass: NOT_PROVEN,
   },
   'targets-not-substituted': {
-    testId: `${RUN_GUARANTEES}#(e) targets are never substituted > unsupported device and unregistered adapter become explicit TargetUnavailable results`,
+    testId: `${RUN_GUARANTEES}#(e) targets are never substituted > an unregistered adapter becomes an explicit TargetUnavailable result`,
     provenClass: 'runtime, partial', weakerClass: NOT_PROVEN,
   },
   'browser-egress-allow-list': {
@@ -80,10 +80,6 @@ export const GUARANTEE_MAP: GuaranteeMap = {
   'same-inputs-same-result': {
     testId: `${RUN_GUARANTEES}#(a) replay: same manifest, same result hash > cdp-chromium: two runs give identical manifest, result hash and event log`,
     provenClass: 'runtime, partial', weakerClass: NOT_PROVEN,
-  },
-  'adapters-substitutable': {
-    testId: `${DRIVER_CONTRACT}#contract: cdp-chromium > runs the sign-up flow to Passed and captures two PNGs`,
-    provenClass: 'runtime', weakerClass: NOT_PROVEN,
   },
   'report-runs-no-content': {
     testId: 'test/unit/report/report-generator.test.ts#each HTML file is self-contained: inline css, no script, no handler, no external reference',
@@ -155,6 +151,9 @@ export function guaranteeTable(outcomes: readonly RowOutcome[]): string {
     '',
     'Disclosed, not tested in phase 1: that a plan is semantically right and that AI judgements are right (statistical);',
     'that prompt injection is prevented (not achievable); HTTP and identity allow-lists, retries and tokens (phase 2).',
+    '',
+    'Withdrawn: `adapters-substitutable`. Only the CDP driver is registered, so the driver contract no longer shows that',
+    'drivers are substitutable. It returns with the second driver.',
     '',
   ].join('\n');
 }

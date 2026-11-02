@@ -1,6 +1,6 @@
 // Browser upkeep: what each new Chrome for Testing major costs to re-validate the own CDP driver,
-// and when that cost says to return to the Playwright fallback (the rule in the MVP plan's kill
-// criteria: over 1.8 hours of fixes per major, on average, across the first six majors).
+// and when that cost trips the rule in the MVP plan's kill
+// criteria (over 1.8 hours of fixes per major, on average, across the first six majors).
 //   node tools/browser-upkeep.ts [--records <file>] [--versions <file>] [--pinned <build>]
 //     --records   the upkeep records, a JSON list of { browser, major, fixHours, revalidatedAt };
 //                 by default docs/decisions/browser-upkeep.json under the working folder.
@@ -9,7 +9,7 @@
 //                 major with no upkeep record fails.
 //     --pinned    the pinned build; by default CHROME_FOR_TESTING_BUILD in tools/install-browsers.ts.
 // It prints the average fixHours over the first six Chrome majors, or the running average while
-// there are fewer, and exits 1 when it flags the fallback rule or a check fails. The session adds
+// there are fewer, and exits 1 when it flags the kill criterion or a check fails. The session adds
 // a record when it moves the pin; the founder's push approves it. A weekly CI job runs this tool.
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -83,16 +83,16 @@ export type UpkeepSummary = {
   // Null while there is no Chrome record.
   readonly averageFixHours: number | null;
   // True only once six Chrome majors average over the limit.
-  readonly fallbackFlagged: boolean;
+  readonly killCriterionFlagged: boolean;
 };
 
 export function summariseUpkeep(records: readonly UpkeepRecord[]): UpkeepSummary {
   const first = records.filter((record) => record.browser === 'chrome')
     .toSorted((left, right) => left.major - right.major)
     .slice(0, MAJORS_COUNTED);
-  if (first.length === 0) return { majorsCovered: 0, averageFixHours: null, fallbackFlagged: false };
+  if (first.length === 0) return { majorsCovered: 0, averageFixHours: null, killCriterionFlagged: false };
   const average = first.reduce((total, record) => total + record.fixHours, 0) / first.length;
-  return { majorsCovered: first.length, averageFixHours: average, fallbackFlagged: first.length === MAJORS_COUNTED && average > MAXIMUM_AVERAGE_FIX_HOURS };
+  return { majorsCovered: first.length, averageFixHours: average, killCriterionFlagged: first.length === MAJORS_COUNTED && average > MAXIMUM_AVERAGE_FIX_HOURS };
 }
 
 const majorOf = (build: string): number | null => {
@@ -164,10 +164,10 @@ function main(words: readonly string[], root: string): number {
       ? `the first ${MAJORS_COUNTED} Chrome majors`
       : `${summary.majorsCovered} Chrome major(s) so far (running average; the rule needs ${MAJORS_COUNTED})`;
     console.log(`browser upkeep: average fix hours ${average} over ${scope}; the limit is ${MAXIMUM_AVERAGE_FIX_HOURS.toFixed(2)}.`);
-    if (summary.fallbackFlagged) {
+    if (summary.killCriterionFlagged) {
       console.error(`browser upkeep: FLAG: fixes average ${average} hours per major, over ${MAXIMUM_AVERAGE_FIX_HOURS}, across the first `
-        + `${MAJORS_COUNTED} Chrome majors. The Playwright fallback rule in the MVP plan's kill criteria applies: decide whether to return `
-        + 'to the Playwright fallback adapter.');
+        + `${MAJORS_COUNTED} Chrome majors. The MVP plan's browser-upkeep kill criterion applies: decide whether the own CDP driver `
+        + 'is still worth its upkeep. (The Playwright fallback adapter was removed on 2026-11-02, so there is nothing to return to.)');
       status = 1;
     }
   }

@@ -7,7 +7,7 @@
 
 ## In short
 
-- **One TypeScript monorepo on Node 24 with ten phase-1 packages.** A zero-dependency engine sits in the middle. Drivers, auditors, renderers, the runner and the CLI plug into it through typed ports. The compiler rejects any import in the wrong direction.
+- **One TypeScript monorepo on Node 24 with eight phase-1 packages (changed by the founder, 2026-11-02: `driver-playwright` and the stub `action` were removed; SPEC-16 recreates `action`).** A zero-dependency engine sits in the middle. Drivers, auditors, renderers, the runner and the CLI plug into it through typed ports. The compiler rejects any import in the wrong direction.
 - **One run is a straight pipeline:** parse the plan, then check trust and policy, resolve targets, run in an isolated container, capture masked evidence, audit accessibility with two engines, and decide with a pure oracle. The run ends by writing a hashed result, report, PR comment and review queue.
 - **AI never reaches execution unparsed.** Plans arrive as `unknown` and become typed only through the engine's parser. Every human decision goes into a hash-chained audit log.
 - **The closed plan language is the default.** Evidence mode (a team's own Playwright suite, wrapped with Revisum's evidence) and unsafe plan features are opt-in in the trusted project file, and every output resting on them is labelled `host` (`docs/decisions/language-fit-pivot.md`).
@@ -21,7 +21,7 @@
 | TypeScript on Node 24 LTS, erasable syntax only, `tsc` as a required gate | Node strips types but checks nothing [C-R10-001][C-R10-002]; the P3 core ran this way with 0 [spike:p3_core_runtime_deps] runtime dependencies (`06`) | high |
 | One repo, npm workspaces, one package per port family; TypeScript project references make wrong-way imports a compile error | `04` Finding 5 and `06` Finding 1 ask for compiler-enforced direction; SPEC-00 AC-02 | high |
 | Public contracts live in an Apache-2.0 `contracts` package; the engine, runner, own accessibility engine and CLI are FSL-1.1 | Adapters must not depend on FSL code; the layer split follows `07` Finding 3; where the CLI and Action fall is a design call | med |
-| Own CDP driver on Chromium; the Playwright adapter stays the fallback until the capability tests pass | Own drivers passed 32 [spike:p4_contract_passed] of 32 contract tests with 0 [spike:p4_adapter_runtime_deps] runtime dependencies; iframes, dialogs, uploads and crash recovery are unbuilt (`12`) | med |
+| Own CDP driver on Chromium, the only driver in phase 1 (changed by the founder, 2026-11-02: the Playwright fallback adapter was removed; Firefox comes through BiDi in SPEC-19) | Own drivers passed 32 [spike:p4_contract_passed] of 32 contract tests with 0 [spike:p4_adapter_runtime_deps] runtime dependencies; iframes, dialogs, uploads and crash recovery are unbuilt (`12`) | med |
 | axe-core 4.14.0 and core's own ACT engine run side by side; axe is the reference the own engine is measured against | axe covers 8 [calc:f2_a11y_sc_axe_only] criteria the own engine doesn't (`12`); founder decision, 2026-10-27 | high |
 | Runs execute in a container pinned by digest, with an egress proxy outside the browser; the same image is the dev container | Container digests pin OS and fonts [C-R13-004]; in-browser routing leaks [C-F1-005]; one image keeps local and CI runs equal | med |
 | Tests, proofs, fixtures and golden files live in top-level folders that code owners hold, apart from the code | Models edit tests to pass [C-R13-062]; SPEC-00 AC-05 | high |
@@ -81,23 +81,19 @@ flowchart TB
   contracts[contracts<br/>Apache-2.0<br/>types, JSON Schema, ports]
   engine[engine<br/>FSL<br/>parser, trust, policy, lifecycle,<br/>interpreter, oracle, manifest,<br/>redaction, audit log, review queue, metrics]
   cdp[driver-cdp<br/>Apache-2.0]
-  pw[driver-playwright<br/>Apache-2.0, fallback]
   axe[auditor-axe<br/>Apache-2.0]
   act[auditor-act<br/>FSL, own engine]
   runner[runner<br/>FSL<br/>container, egress proxy]
   report[report<br/>Apache-2.0<br/>HTML, PR image, JUnit, SARIF]
   cli[cli<br/>FSL<br/>composition root]
-  action[action<br/>Apache-2.0]
   engine --> contracts
   cdp --> contracts
-  pw --> contracts
   axe --> contracts
   act --> contracts
   act --> cdp
   runner --> contracts
   report --> contracts
-  cli --> engine & cdp & pw & axe & act & runner & report
-  action --> cli
+  cli --> engine & cdp & axe & act & runner & report
 ```
 
 | Package | Job | Seeded from | Spec |
@@ -105,15 +101,13 @@ flowchart TB
 | `contracts` | Shared types, plan and result schemas, port interfaces | P7 core types, P3 `ports.ts` | SPEC-27, SPEC-01 |
 | `engine` | Everything trusted: parse (readable and JSON plans), trust, policy, lifecycle, interpret, decide, hash, redact, record; decode suite reports and traces | P3 `src/core` | SPEC-01 to 05, 08, 11, 13 to 15, 28, 35, 36 |
 | `driver-cdp` | Drive Chromium over CDP | P4 `src/drivers/cdp` and `shared` | SPEC-06 |
-| `driver-playwright` | Fallback Chromium driver | P3 `src/adapters/playwright` | SPEC-06 |
 | `auditor-axe` | Run axe-core in the page | P3 `src/adapters/shared/axe.ts` | SPEC-10 |
 | `auditor-act` | Core's own ACT-rule engine | P5 `src` | SPEC-10 |
 | `runner` | Start the pinned container and egress proxy; the workload runner starts team images by digest | New | SPEC-07, SPEC-35 |
 | `report` | Report, PR image and exporters | P6 `src/render`, `src/model` | SPEC-11, SPEC-12 |
 | `cli` | Commands `validate`, `lock`, `run`, `draft`, `export`, `review`, `approve`, `doctor` | P6 `cli.ts` (shape only) | SPEC-16, SPEC-28 |
-| `action` | GitHub Action wrapper | New | SPEC-16 |
 
-Evidence mode and unsafe features add no package (SPEC-35, SPEC-36). Phase 2 adds `driver-bidi` (Firefox, from P4), `mcp-server`, `tracker-github` and protocol packs under `packs/` (from P7).
+Evidence mode and unsafe features add no package (SPEC-35, SPEC-36). SPEC-16 creates the `action` package (the GitHub Action wrapper). Phase 2 adds `driver-bidi` (Firefox, from P4), `mcp-server`, `tracker-github` and protocol packs under `packs/` (from P7).
 
 **Action:** create exactly these packages at M0; a new package needs a spec that names its port.
 
@@ -204,8 +198,8 @@ revisum/
 │  ├─ decisions/           one short record per design decision
 │  └─ specs/               SPEC-00 … SPEC-27
 ├─ packages/
-│  ├─ contracts/   engine/   driver-cdp/   driver-playwright/
-│  ├─ auditor-axe/ auditor-act/  runner/   report/   cli/   action/
+│  ├─ contracts/   engine/   driver-cdp/   auditor-axe/
+│  ├─ auditor-act/  runner/   report/   cli/
 │  │   each: src/, package.json, tsconfig.json, README.md
 ├─ test/
 │  ├─ contract/            one suite every driver and auditor must pass unchanged

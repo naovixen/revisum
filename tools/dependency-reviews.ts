@@ -29,26 +29,4 @@ export const DEPENDENCY_REVIEWS: readonly DependencyReview[] = [
       'test/proofs/licence-roles.test.ts',
     ],
   },
-  {
-    component: 'playwright-core',
-    version: '1.64.1',
-    results: {
-      licenceAllowsUse: 'pass',
-      // No branded Safari or Firefox, and no real iOS devices.
-      reachesAllTargets: 'fail',
-      // Exact version; it pins its own browser builds.
-      versionPinned: 'pass',
-      // Its Firefox and WebKit builds are patched.
-      stockBrowsersOnly: 'fail',
-      // It is a driver, not an accessibility engine.
-      gapsClosable: 'pass',
-      // One vendor controls it, and it has dropped platforms before.
-      roadmapFits: 'partial',
-    },
-    decision: 'optional-adapter',
-    evidence: [
-      'docs/decisions/browser-and-audit-dependencies.md',
-      'test/contract/driver-contract.test.ts',
-    ],
-  },
 ];

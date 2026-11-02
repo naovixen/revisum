@@ -44,3 +44,12 @@ Evidence:
 - **CI needs the browsers.** CI and `npm run check:linux` install Playwright's system libraries, then run `npm run browsers` before `npm run check`. Chrome's sandbox needs a seccomp profile there; see `docs/decisions/chrome-sandbox-in-containers.md`.
 - **The browser downloads are not hashed by us.** `@puppeteer/browsers` and Playwright fetch from their vendors' storage over HTTPS. The executable hash is not yet recorded in a lock file (SPEC-05).
 - **MPL-2.0 file-level copyleft.** If anyone edits `axe.min.js`, the edited file must be published under MPL-2.0. The rule is: never edit it, only pin a new release.
+
+## Update, 2026-11-02: the Playwright fallback is removed
+
+Changed by the founder, 2026-11-02. This record is kept as it was written; read it with these changes.
+
+- `driver-playwright` is deleted. Chromium only in phase 1; SPEC-19 adds Firefox through BiDi later. `playwright-core` is no longer an optional adapter and has no dependency review: it is a root dev dependency only, for evidence mode's test workload (`docs/decisions/dev-dependencies.md`).
+- `axe-core` stays pinned in `auditor-axe` alone; the Playwright driver's own copy of the audit step is gone.
+- `npm run browsers` installs only Chrome for Testing and its headless shell. CI, the weekly upkeep job and the dev container install Chromium's system libraries with `tools/install-system-libraries.sh`, not with Playwright's installer.
+- The driver contract now runs on the CDP driver only (two Chromium builds), so the `adapters-substitutable` guarantee is withdrawn until SPEC-19 brings a second driver.

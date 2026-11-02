@@ -32,7 +32,7 @@ jobs:
               node --version | grep -q "^v24\." || { echo "Node 24 required, found $(node --version)"; exit 1; }
               npm ci
               # The system libraries the browsers need on Linux, installed as root.
-              node node_modules/playwright-core/cli.js install-deps chromium firefox webkit
+              bash tools/install-system-libraries.sh
               # Chrome refuses to sandbox as root, so the browsers and the check run as "node".
               chown -R node:node /workspace
               su node -c "npm run browsers && npm run check:tests"
