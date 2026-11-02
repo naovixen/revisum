@@ -74,6 +74,24 @@ Windows, this machine, Chrome for Testing 156. The second row's range comes from
 
 Real-driver `unsupported-step` checks for plan values, page states, network stubs and the clock were kept, re-expressed with `cdpWithout`.
 
+### Golden reset
+
+The one reviewed reset, after the plan-version, Playwright, feature-list and refusal-code changes. From here goldens are frozen: `tools/CheckGoldenChanges.ts` fails a commit that changes one without a `Defect: <number>` trailer. Remake them with `npm run goldens:record`.
+
+Every change is one of these, and all were recomputed from the old content:
+
+| Category | Count | What changed | Evidence |
+|---|---|---|---|
+| Plan hashes | 25 | `version` (21 from 1.2, 4 from 1.1, all to 1.3) and the target `playwright-chromium` to `cdp-chromium` | Old plan with those two fields changed gives each new hash. New parse with them put back gives each old hash |
+| Run result hashes, recording driver | 4 | The target and driver's id, the plan hash and the manifest hash | Same state in all 4. Renames put back into today's result give each old hash exactly |
+| Run manifest hashes, recording driver | 3 | Same. The fourth run is refused and has no manifest | Same |
+| Replay plan | 1 | `version` from 1.1, and the target | No other field differs |
+| Replay manifest | 9 fields | `planHash`, `target.id`, `target.adapter`, `adapter.id`, `.version` and `.protocol`, `adapter.performs` removed, `browser.version` (156.0.8078.4 to the pinned 156.0.8078.47), `executableSha256` added | Field-by-field comparison. Seeds, clock, fixtures, host and the rest are unchanged |
+| Replay result hash | 1 | Only the manifest hash, plan hash and target | Renames put back into a new CDP run's result give the old Playwright run's result hash, so both drivers recorded the same steps |
+| Target renamed in other goldens | 16 | `golden/parsed-plans` 4, `unsafe-plans` 6, `readable-unsafe-plans` 6 | One line each |
+
+`golden/report` didn't change. Fixtures aren't goldens, but moved too: six named the target or adapter, and six lost a spec reference in a comment, none of them hash-compared.
+
 ### Coverage floor
 
 Unit tests only (`test/unit`), Node 24's `--experimental-test-coverage`, 3,624 tests in 92 seconds, all passing. Figures are per-file averages for each area, not weighted by lines.

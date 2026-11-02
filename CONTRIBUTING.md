@@ -89,6 +89,7 @@ A spec is done when all of these hold:
 | `npm test` | Unit and contract tests (`test/unit/`, `test/contract/`) |
 | `npm run proofs` | Hostile plans, secret leaks, egress, PII and audit-chain proofs (`test/proofs/`) |
 | `npm run replay` | Golden runs replayed and compared by hash (`test/replay/`) |
+| `npm run goldens:record` | Remakes `golden/closed-language` and, on Windows x64 only, `golden/replay/windows-signup`. Not part of `npm run check` |
 | `npm run gates` | After the tests: the project's metrics and trace index from commit trailers and test results, and the guarantee map. CI runs it even when a test failed |
 | `npm test -w <package>` | Tests for one package, once it has a `test` script |
 
@@ -121,8 +122,10 @@ Whoever commits adds these; they feed the project's own metrics:
 Agent: <tool>/<version>       when an agent wrote the change
 Spec: SPEC-nn                 one per spec the commit implements
 Criteria: AC-SPEC-nn-mm, AC-SPEC-nn-mm
+Defect: <number>              when the commit changes a file under golden/
 ```
 
 - Keys are exact, one value per line, in the message's last paragraph. `Agent:` appears at most once, as `claude-code/<version>`; each `Spec:` and criterion id must exist in `docs/specs/`. A `Co-Authored-By:` naming Claude needs an `Agent:` line.
+- Goldens are frozen from the reset commit on. `Defect:` must name a row in `docs/decisions/refactor-defects.md`; CI checks each pushed commit with `node tools/CheckGoldenChanges.ts --commits <from>..<to>`.
 - A commit can't be amended, so check the message first: `node tools/check-commit-trailers.ts --message <file>`.
 - `npm run gates` fails on a malformed commit after the trailer cut-over (`TRAILER_CUT_OVER` in `tools/project-metrics.ts`). One already made is listed with its reason in `KNOWN_MALFORMED_COMMITS` by a later commit.

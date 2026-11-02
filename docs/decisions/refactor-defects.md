@@ -3,7 +3,7 @@
 ## In short
 
 - The architecture refactor treats existing code and tests as evidence, not truth. Anything suspected of being wrong is recorded here with a decision, so it is neither carried over silently nor investigated twice.
-- A refactor commit may never change a golden. A fix commit may, and must name its defect here.
+- A refactor commit may never change a golden. A fix commit may, and must name its defect here, with a `Defect: <number>` trailer naming that row. `tools/CheckGoldenChanges.ts` enforces this in CI.
 
 ## Decisions
 

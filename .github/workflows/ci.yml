@@ -79,6 +79,21 @@ jobs:
             --env PUSHED_FROM --env PUSHED_TO \
             mcr.microsoft.com/devcontainers/typescript-node:24-bookworm@sha256:970eebf5b82d3800bdd9f46680e1c4c664d365d18603148540788356700ce301 \
             bash -euo pipefail -c 'chown -R node:node /workspace && su node -c "node tools/check-tests-apart.ts --commits $PUSHED_FROM..$PUSHED_TO"'
+      - name: Fail if a pushed commit changes a golden without naming a defect
+        if: always() && github.event_name == 'push'
+        env:
+          PUSHED_FROM: ${{ github.event.before }}
+          PUSHED_TO: ${{ github.sha }}
+        run: |
+          # A new branch has no "before" commit; then every commit it holds is checked.
+          if [ "$PUSHED_FROM" = "0000000000000000000000000000000000000000" ]; then
+            PUSHED_FROM="$(git rev-list --max-parents=0 "$PUSHED_TO" | tail -n 1)"
+          fi
+          docker run --rm \
+            --volume "$GITHUB_WORKSPACE:/workspace" --workdir /workspace \
+            --env PUSHED_FROM --env PUSHED_TO \
+            mcr.microsoft.com/devcontainers/typescript-node:24-bookworm@sha256:970eebf5b82d3800bdd9f46680e1c4c664d365d18603148540788356700ce301 \
+            bash -euo pipefail -c 'chown -R node:node /workspace && su node -c "node tools/CheckGoldenChanges.ts --commits $PUSHED_FROM..$PUSHED_TO"'
       - name: Add the project's metrics to the job summary
         if: always() && github.event_name == 'push'
         run: |

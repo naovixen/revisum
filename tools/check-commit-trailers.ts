@@ -6,7 +6,8 @@
 //   Criteria: <id>[, <id>]             criterion ids, each defined in docs/specs/
 // A message is malformed when a value breaks its grammar or names nothing, when a key is a near
 // miss of one of these ("agent:", "Specs:", "Criterion:"), or when a Co-Authored-By trailer names
-// Claude but there is no Agent trailer. Other trailers are ignored.
+// Claude but there is no Agent trailer. Other trailers are ignored here, such as Defect, which
+// tools/CheckGoldenChanges.ts reads.
 // A malformed commit cannot be amended, so the main session checks each message before
 // committing:
 //   node tools/check-commit-trailers.ts --message <file>
@@ -49,7 +50,7 @@ export function readTargets(root: string): TrailerTargets {
 }
 
 // The trailer block's "Key: value" pairs, or none when the message has no trailer block.
-function trailerBlock(message: string): readonly { readonly key: string; readonly value: string }[] {
+export function trailerBlock(message: string): readonly { readonly key: string; readonly value: string }[] {
   const paragraphs = message.replace(/\r\n/g, '\n').split(/\n\s*\n/).map((paragraph) => paragraph.trim()).filter((paragraph) => paragraph !== '');
   // The subject is never a trailer block, even when it looks like one.
   if (paragraphs.length < 2) return [];

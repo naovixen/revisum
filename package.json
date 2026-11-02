@@ -21,6 +21,7 @@
     "test": "node tools/run-test-folder.ts test/unit test/contract",
     "proofs": "node tools/run-test-folder.ts test/proofs",
     "replay": "node tools/run-test-folder.ts test/replay",
+    "goldens:record": "node tools/RecordGoldens.ts",
     "gates": "node tools/project-metrics.ts && node tools/guarantee-map.ts",
     "benchmark": "node tools/benchmark.ts",
     "check:tests": "npm run typecheck && npm run lint && npm run lint:code && npm run lint:names && npm test && npm run proofs && npm run replay",
