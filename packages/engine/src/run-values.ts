@@ -36,9 +36,13 @@ export type RunValues = ReadonlyMap<ValueName, SafeText>;
 //   command-timeout    a database command ran past its timeout and was stopped;
 //   command-output-invalid  a database command printed more than its maximumOutputBytes, or output
 //                      that is not one JSON value when its declaration reads JSON.
+//   value-holds-secret a remember step's element is a field a secret was typed into, or its text
+//                      holds a secret;
+//   capture-left-out   a capture took no image, since a field a secret was typed into cannot be masked.
 export type StepErrorCode =
   | 'value-empty' | 'value-unsafe' | 'value-too-long' | 'state-not-exposed' | 'download-not-text' | 'request-not-seen'
-  | 'script-result-too-large' | 'script-result-invalid' | 'command-failed' | 'command-timeout' | 'command-output-invalid';
+  | 'script-result-too-large' | 'script-result-invalid' | 'command-failed' | 'command-timeout' | 'command-output-invalid'
+  | 'value-holds-secret' | 'capture-left-out';
 
 const UNIQUE_PART_LENGTH = 10;
 const BASE_36 = 36;

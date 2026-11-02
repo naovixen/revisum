@@ -9,7 +9,8 @@ import type { Secret } from './secret.ts';
 import type { Result } from './result.ts';
 import type { AdapterId, Target } from './target.ts';
 
-// policy-denied: the policy gate's runtime guard refused the action, so no input event was sent.
+// policy-denied: the policy gate's runtime guard refused the action, or no guard was given to ask,
+// so no input event was sent.
 // no-download: a download step's click started no download within the step timeout.
 // download-too-large: the file grew past the project's maximumDownloadBytes; its partial bytes are deleted.
 // storage-origin-mismatch: a storage write's page is not on the entry's declared origin, so nothing was written.
@@ -44,6 +45,8 @@ export type DriverError = { readonly code: DriverErrorCode; readonly detail: str
 export const UnreadablePage = {
   ReadFailed: 'page-unreadable',
   DialogOpen: 'dialog-open',
+  // The browser shows its own error page, so the page the check is about never loaded.
+  BrowserErrorPage: 'navigation-failed',
 } as const satisfies Record<string, DriverErrorCode>;
 export type UnreadablePage = (typeof UnreadablePage)[keyof typeof UnreadablePage];
 
@@ -177,7 +180,9 @@ export type ResolvedElement = {
 };
 
 // Asked by a driver once it has resolved an action's element, before any input event. On a deny
-// the driver performs nothing and returns policy-denied. For a dialog step the element has every
+// the driver performs nothing and returns policy-denied. A click asks again on every attempt, and
+// about what the click would activate as well as the element the locator found: the element a
+// pointer would hit and the interactive element around it. For a dialog step the element has every
 // field null and `dialogText` is the open dialog's text, which decides whether accepting it is
 // irreversible; for every other step it is null.
 export type ActionGuard = (element: ResolvedElement, dialogText: string | null) => GuardVerdict;
@@ -208,14 +213,15 @@ export interface PageNavigator {
   page(): Promise<PageProbe>;
 }
 export interface ActionRunner {
-  // Given a guard, the driver resolves the step's element, asks the guard with it, and acts only
-  // on an allow; on a deny it sends no input event and returns policy-denied. The engine passes a
-  // guard with every action. A dialog step asks the guard with the open dialog's text.
+  // The driver resolves the step's element, asks the guard with it, and acts only on an allow; on
+  // a deny it sends no input event and returns policy-denied. A caller that gets past the type and
+  // gives no guard is refused the same way: no guard never means allow. A dialog step asks the
+  // guard with the open dialog's text.
   // A driver that does not perform a kind of step returns unsupported-step, with nothing sent.
   // For a fill whose value is a secret reference, the engine passes the resolved secret; the driver
   // reveals it only at the moment it types, and never reports it back. The engine replaces value
   // references before it acts; a driver refuses any step that still holds one.
-  act(step: ActionStep, guard?: ActionGuard, secret?: Secret): Promise<Result<void, DriverError>>;
+  act(step: ActionStep, guard: ActionGuard, secret?: Secret): Promise<Result<void, DriverError>>;
 }
 export interface Prober {
   // The engine replaces a locator's value references with their text before it probes. Given a
@@ -241,6 +247,11 @@ export interface Camera {
   // PNG bytes of the viewport, with every element matching `mask` painted solid black, so
   // personal data never reaches an image.
   screenshot(mask: readonly string[]): Promise<Uint8Array>;
+  // The same, with every element each of `fields` finds painted black too: the fields a secret was
+  // typed into, which no selector need match. A field that finds nothing, in this document or one
+  // it is framed in, gives not-found and no image, since what it holds may still be on screen. A
+  // driver without it cannot hide such a field, so a run takes no capture while there is one.
+  screenshotHidingFields?(mask: readonly string[], fields: readonly ResolvedLocator[]): Promise<Result<Uint8Array, DriverError>>;
 }
 export interface Auditor {
   audit(): Promise<readonly A11yFinding[]>;
@@ -263,7 +274,7 @@ export interface DocumentSession extends PageNavigator, ActionRunner, Prober, Ca
   // no-download; a file over maximumBytes is cancelled, its partial bytes deleted, and fails with
   // download-too-large; a popup the click opens fails with unsupported-step. A driver without it
   // does not perform downloads (the downloads feature).
-  download?(step: DownloadStep, maximumBytes: number, guard?: ActionGuard): Promise<Result<DownloadedFile, DriverError>>;
+  download?(step: DownloadStep, maximumBytes: number, guard: ActionGuard): Promise<Result<DownloadedFile, DriverError>>;
   // Runs a page script in this document and gives its result written as JSON text in the page.
   // The text is outside data: the engine decodes it under its own size and depth limits and reads
   // only the declared fields. A throw or a rejection is script-failed, a value JSON cannot write

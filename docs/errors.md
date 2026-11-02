@@ -209,6 +209,14 @@ Step error. A run value used by the step is longer than the project's `maximumTe
 
 The clipboard text an `expectClipboard` or a clipboard `remember` reads is also `value-too-long` when it is longer than the project's `limits.maximumClipboardCharacters` (20,000 unless the project sets it, at most 200,000). The text is never recorded.
 
+## value-holds-secret
+
+Step error. A `remember` step would have kept a secret: its element is a field a secret was typed into, or the text it read holds one of the plan's secrets, in any form the leak scan looks for. The step fails and every later step is skipped. No value is kept and no hash of it is recorded, since a hash of a short secret is as good as the secret. Remember something else; a plan never needs to read a secret it was given.
+
+## capture-left-out
+
+Step error, on a step that passes. A `capture` took no image, because a field a secret was typed into could not be found to mask it, so what it holds may still be on screen. Text drawn as pixels is out of reach of any later scan, so no image is kept rather than one that may show the secret. The step does not fail, because a capture checks nothing: the steps' verdict stands. Expect this after the field has gone, such as a capture after signing in, since the run cannot tell a field that has gone from one it can no longer find. Capture before typing the secret, or type plain text into that field first.
+
 ## state-not-exposed
 
 Step error. A state check (`selected`, `unselected`, `expanded`, `collapsed`, `pressed`, `unpressed` or `current`) targets an element that does not expose that state in the accessibility tree, for example a tab whose selection is shown only by a CSS class. The check fails rather than passes. Give the element the matching ARIA attribute (`aria-selected`, `aria-expanded`, `aria-pressed` or `aria-current`) or its native equivalent, or check another state.
@@ -279,7 +287,14 @@ Service call error. A cleanup call failed; its record keeps the cause. The verdi
 
 ## not-found
 
-Driver error. A locator matched no element on the page.
+Driver error. A locator matched no element on the page. Open shadow roots count as the page, nested ones too, for every locator kind but XPath, so counts include them, and masks and the sensitive read reach them.
+
+Two limits, where a person can see an element and a locator cannot. `absent`, `hidden` and `countEquals 0` still pass on such an element, so check it another way:
+
+- **A closed shadow root.** In-page code cannot enter one, so only a role locator sees inside it, through the browser's accessibility engine. A label, text, test id or css locator finds nothing there, and a mask cannot reach it.
+- **XPath.** An XPath expression never enters a shadow root, open or closed.
+
+A css selector matches within one root, as it does in the browser: `.panel .error` does not match across a shadow boundary, though `.error` alone finds the element. An aria-labelledby id names an element in the same root; only an element reference set by the page's script (`ariaLabelledByElements`) can reach out of one.
 
 ## ambiguous
 
@@ -297,9 +312,11 @@ Driver error. The browser did not finish the operation within the session's time
 
 Driver error. The browser could not load the page. An `expectPage` check fails with it too when the browser shows its own error page in place of the page, whatever the address bar says: the server refused the connection, the allow-list blocked it, or an HTTP error status came with an empty body, which Chromium also replaces with its error page, so a person would see that and not the application's page. A page that sends a body with its error status is a page that loaded.
 
+Every check of an element on such a page fails with it too, at once, `absent`, `hidden` and `countEquals 0` included, as does a `remember` read from it: the browser's own page holds nothing of the application, so nothing can be said about what the application shows.
+
 ## policy-denied
 
-Driver error. The policy gate's runtime guard refused the action once the driver had resolved its element, so no input event was sent. The run ends `Denied`, naming the policy rule; see that rule below.
+Driver error. The policy gate's runtime guard refused the action once the driver had resolved its element, so no input event was sent. The run ends `Denied`, naming the policy rule; see that rule below. A click is judged on every attempt, by the element found, the element the pointer would hit, and the interactive element around that: a wrapper or an icon cannot lend its name to a control it holds or sits in. A driver asked to act with no guard at all refuses the same way; a run always gives one.
 
 ## no-download
 
@@ -528,7 +545,7 @@ Approval error. The protected-branch code-owners file does not name the reviewer
 
 ## stale-commit
 
-Approval error. The review is on a commit older than the last commit that changed the subject. Ask for a review of the latest commit.
+Approval error. The review is on a commit older than the last commit that changed the subject, so ask for a review of the latest commit. Or, on the agent lock-down route, the proof names a commit other than the last one touching the subject on the protected branch, so land the subject through the maintainer and name that commit.
 
 ## unknown-key
 
@@ -544,7 +561,7 @@ Approval error. The signature was made without the user-presence flag. Sign agai
 
 ## subject-mismatch
 
-Approval error. The proof does not match the subject: the review is not an approval, the subject has no path, or the change does not touch the subject.
+Approval error. The proof does not match the subject: the review is not an approval, the reviewer's latest review of that commit requests changes, the subject has no path, a plan's path resolves outside `plans/`, or the change does not touch the subject. A holdout plan is judged on `holdouts.json`, whatever path it names.
 
 ## version-control-unavailable
 
@@ -596,7 +613,15 @@ Policy error. A target's locale has no irreversible pattern set: the engine ship
 
 ## undeclared-origin
 
-Policy error. The plan navigates to an origin the trusted project does not list in `origins`, although the project it was parsed against did. Plans are held to the trusted project: add the origin there, with an approval, or change the plan.
+Policy error. The plan navigates to an origin the trusted project does not list in `origins`, although the project it was parsed against did, or it names a call, command, stub, storage entry or page script the trusted project does not declare. Plans are held to the trusted project: add the origin or declaration there, with an approval, or change the plan.
+
+## unsafe-feature-disabled
+
+Policy error. The plan uses an unsafe feature that the project clearing it does not enable under `unsafeFeatures`, although the project it was parsed against did. This applies whatever the plan's standing, and nothing runs. Enable the feature in the trusted project, with an approval, or change the plan. Not the plan error `unsafe_feature_disabled`, which the parser gives.
+
+## undeclared-secret
+
+Policy error. The plan names a secret, in a fill, in `storageState` or as an argument, that the project clearing it does not list in `secretNames`, although the project it was parsed against did. This applies whatever the plan's standing, and nothing runs. Declare the name in the trusted project, with an approval, or change the plan.
 
 ## production-origin
 
@@ -639,6 +664,10 @@ Run refusal. The plan has a `database` or `expectDatabase` step, or a `database`
 ## script-source-missing
 
 Run refusal. The plan names a page script whose source file the run was not given, so the manifest could not record the sha256 of what would run. The run ends `Refused` before any browser opens. The refusal names the declared file, never its content. Run it where the protected branch's `plans/scripts/` files are supplied.
+
+## clearance-standing-mismatch
+
+Run refusal. The policy gate cleared the plan as approved and the run has no approval of it, or the other way round. What a plan may do depends on its standing, so a clearance holds only for the standing it was decided under; a standing lent from another plan counts as none. The run ends `Refused` before any browser opens. Decide and run with the same standing.
 
 ## evidence-mode-disabled
 

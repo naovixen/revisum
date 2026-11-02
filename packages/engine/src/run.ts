@@ -11,7 +11,7 @@ import {
   type A11yFinding, type ActionGuard, type ApprovalLabel, type ArtifactReference, type ArtifactStore, type Authorised,
   type BrowserDriver, type Clock, type DatabaseCommandRunner, type DocumentSession, type DomRead, type DownloadedFile, type DownloadName, type DriverFeature, type LockEntry, type DialogStep, type ElementProbe,
   type EventSink, type GuaranteeLevel, type GuardVerdict, type PageAssertion, type Plan, type PolicyRuleId, type Redactor,
-  type DownloadStep, type ResolvedElement, type Result, type SafeText, type SecretStore, type ServiceCaller, type Session, type Step, type Target, type TargetId,
+  type DownloadStep, type ResolvedElement, type ResolvedLocator, type Result, type SafeText, type SecretStore, type ServiceCaller, type Session, type Step, type Target, type TargetId,
   type Unavailable, type ValueName, type GuaranteeStatement, type RunMode, type SuiteFinding, type SuiteName, type SuitePass,
   type StubAnswer, type StubName, type SuiteTestId, type SuiteTestResult, type UnsafeFeature,
 } from '@revisum/contracts';
@@ -40,7 +40,7 @@ import { runTimeText, type PlanError } from './plan/plan-decoders.ts';
 import { ASSERTION_STEP_TYPES } from './plan/plan-grammar.ts';
 import { assertBranded, everyPlanStep } from './plan/plan-parser.ts';
 import { unsafeFeaturesOf } from './plan/unsafe-features.ts';
-import { assertAuthorised, policyGate, type PolicyGate } from './policy/policy-gate.ts';
+import { assertAuthorised, isClearedForStanding, policyGate, type PolicyGate } from './policy/policy-gate.ts';
 import type { Project } from './project/project-parser.ts';
 import { declaredCommands } from './project/unsafe-feature-declarations.ts';
 import { SENSITIVE_PLACEHOLDER } from './redaction.ts';
@@ -49,7 +49,7 @@ import {
   generateRunValues, resolveActionStep, resolveElementAssertion, resolveLocator, resolvePathTemplate, resolvePlanClock, resolveText,
 } from './run-values.ts';
 import {
-  NO_SECRETS, commandSecretStore, resolvePlanSecrets, resolvedSecretStore, secretRecords, shortSecretObservation, stubAndStorageSecretStore, withSecretRedaction,
+  NO_SECRETS, commandSecretStore, resolvePlanSecrets, resolvedSecretStore, secretEchoRemoval, secretRecords, shortSecretObservation, stubAndStorageSecretStore, withSecretRedaction,
   type ResolvedSecrets,
 } from './secrets/secret-resolution.ts';
 import { SECRET_PLACEHOLDER } from './secrets/secret-values.ts';
@@ -250,9 +250,12 @@ type RunContext = {
   readonly secrets: ResolvedSecrets;
   // Whether a whole observed text is a secret too short to search for by value.
   readonly isShortSecret: (observed: string) => boolean;
+  // Removes every echo of the plan's secrets, and nothing else, from text as the page wrote it.
+  readonly withoutSecrets: (text: string) => string;
   // The fields, by their resolved locator as canonical JSON, whose last fill typed a secret. What a
-  // check reads back from one is the secret, whatever its length, so it is never kept.
-  readonly secretFilledFields: Set<string>;
+  // check reads back from one is the secret, whatever its length, so it is never kept; a remember
+  // step may not read one; and a capture masks each.
+  readonly secretFilledFields: Map<string, ResolvedLocator>;
   // The run's values by name: the plan's generated values, the response fields calls remember and
   // the page texts remember steps read.
   readonly values: Map<ValueName, SafeText>;
@@ -286,7 +289,8 @@ export async function run(given: RunInputs, ports: RunPorts): Promise<RunResult>
   assertBranded(given.plan);
   // A standing lent from another plan is dropped here, so production, the origin allow-list and
   // the approval label all see the plan as the proposal it is.
-  const inputs: RunInputs = { ...given, standing: ownStanding(given.plan, given.standing) };
+  const standing = ownStanding(given.plan, given.standing);
+  const inputs: RunInputs = { ...given, standing };
   const startedAt = ports.clock.now();
   const target = inputs.project.matrix.find((candidate) => candidate.id === inputs.targetId);
   const declared = target !== undefined && inputs.plan.targets.includes(inputs.targetId);
@@ -311,7 +315,7 @@ export async function run(given: RunInputs, ports: RunPorts): Promise<RunResult>
     runner: ports.databaseCommands, project: inputs.project, values, rememberedTexts, secrets: commandSecretStore(secrets), clock: ports.clock, logger,
   };
   const context: RunContext = {
-    inputs, ports, logger, gate, denials: [], redactor, secrets, isShortSecret: shortSecretObservation(secrets), secretFilledFields: new Set(), values, calls,
+    inputs, ports, logger, gate, denials: [], redactor, secrets, isShortSecret: shortSecretObservation(secrets), withoutSecrets: secretEchoRemoval(secrets), secretFilledFields: new Map(), values, calls,
     commands, rememberedTexts, performs: [], session: null, downloads: new Map(), activeStubs: new Set(), setupFailedInside: new Set(),
     determinismUnpinned: target !== undefined && cannotPinDeterminism(ports.drivers, target),
   };
@@ -324,6 +328,10 @@ export async function run(given: RunInputs, ports: RunPorts): Promise<RunResult>
   assertAuthorised(inputs.plan, target.id, inputs.project);
   const planned = lifecycle.plan(inputs.plan, target);
   logger.log({ kind: 'run.state', state: planned.state, targetId: target.id });
+
+  if (!isClearedForStanding(inputs.plan, target.id, inputs.project, standing)) {
+    return refusedResult(planned, { code: 'clearance-standing-mismatch' }, context, startedAt);
+  }
 
   // Refused before any driver call if the run would reach a production origin it may not.
   const productionOrigin = productionAllowed(inputs) ? undefined : productionOriginReached(inputs);
@@ -419,24 +427,27 @@ export async function run(given: RunInputs, ports: RunPorts): Promise<RunResult>
     finished = lifecycle.finish(running, 'Errored');
   } finally {
     // Read before the browser goes, with every answer the stubs gave.
-    stubAnswers = session.network?.stubAnswers() ?? [];
+    stubAnswers = readKeepingTheResult(() => session.network?.stubAnswers() ?? [], [], logger);
     await closeKeepingTheResult(session, logger);
   }
   // Whatever the outcome. A failing cleanup step never changes the verdict; it raises a review item.
   const cleanup = inputs.plan.cleanup === undefined ? undefined : await runCleanup(inputs.plan.cleanup, inputs.plan.steps.length, calls, commands);
   const reviewItems = (cleanup ?? []).flatMap((done): RunReviewItem[] => (done.outcome === 'failed' ? [{ code: 'cleanup-failed', cleanupIndex: done.index }] : []));
-  const blocked = [...new Set(session.blockedOrigins())].sort();
-  for (const origin of blocked) logger.log({ kind: 'network.blocked', origin });
-  logger.log({
-    kind: 'run.state', state: finished.state, targetId: target.id,
-    ...(finished.state === 'Denied' ? { code: finished.denial.rule, stepIndex: finished.denial.stepIndex } : {}),
-  });
+  const blocked = readKeepingTheResult(() => [...new Set(session.blockedOrigins())].sort(), [], logger);
+  const endState = finished;
+  readKeepingTheResult(() => {
+    for (const origin of blocked) logger.log({ kind: 'network.blocked', origin });
+    logger.log({
+      kind: 'run.state', state: endState.state, targetId: target.id,
+      ...(endState.state === 'Denied' ? { code: endState.denial.rule, stepIndex: endState.denial.stepIndex } : {}),
+    });
+  }, undefined, logger);
   return seal({
     state: finished.state, targetId: target.id, manifest, manifestHash: finished.manifestHash,
     steps, blockedOrigins: blocked, unavailable: null, ...(finished.state === 'Denied' ? { denial: finished.denial } : {}),
     ...(cleanup === undefined ? {} : { cleanup }), ...(reviewItems.length === 0 ? {} : { reviewItems }),
     ...(stubAnswers.length === 0 ? {} : { stubAnswers: [...stubAnswers] }),
-    timings: { totalMilliseconds: ports.clock.now() - startedAt, stepMilliseconds },
+    timings: { totalMilliseconds: readKeepingTheResult(() => ports.clock.now() - startedAt, 0, logger), stepMilliseconds },
   }, context);
 }
 
@@ -635,13 +646,32 @@ async function failureToObserveRequests(session: Session, context: RunContext): 
   }
 }
 
+// By now the steps have a verdict, and a person needs it more than anything a broken session or log
+// has left to say. What cannot be read goes to the log, if the log still works, and takes `otherwise`.
+function readKeepingTheResult<Value>(read: () => Value, otherwise: Value, logger: Logger): Value {
+  try {
+    return read();
+  } catch (error) {
+    logFailureAfterTheVerdict('session-records-unread', error, logger);
+    return otherwise;
+  }
+}
+
+function logFailureAfterTheVerdict(code: string, error: unknown, logger: Logger): void {
+  try {
+    logger.log({ kind: 'step.end', outcome: 'failed', code, detail: errorText(error) });
+  } catch {
+    // The log is what failed, and the result is all that is left to say it with.
+  }
+}
+
 // A session that will not close, such as a browser profile Windows still holds, says nothing about
 // what the steps found. It stays out of the result, whose hash a replay on a calmer machine must match.
 async function closeKeepingTheResult(session: Session, logger: Logger): Promise<void> {
   try {
     await session.close();
   } catch (error) {
-    logger.log({ kind: 'step.end', outcome: 'failed', code: 'session-close-failed', detail: errorText(error) });
+    logFailureAfterTheVerdict('session-close-failed', error, logger);
   }
 }
 
@@ -776,7 +806,7 @@ async function executeStep(step: Step, index: number, session: DocumentSession, 
       // Marked before acting: a fill that fails part way may still have typed some of the secret.
       if (resolved.type === 'fill') {
         if (secret === undefined) context.secretFilledFields.delete(canonicalJson(resolved.locator));
-        else context.secretFilledFields.add(canonicalJson(resolved.locator));
+        else context.secretFilledFields.set(canonicalJson(resolved.locator), resolved.locator);
       }
       const acted = await session.act(resolved, guardFor(resolved, index, target, context), secret);
       return acted.ok ? { ...base, outcome: 'passed' } : { ...base, outcome: 'failed', code: acted.error.code };
@@ -872,13 +902,35 @@ async function executeStep(step: Step, index: number, session: DocumentSession, 
       return { ...base, ...done };
     }
     case 'capture': {
-      const png = await session.screenshot(context.ports.redactor.selectors);
+      const png = await pixelsWithSecretsHidden(session, context);
+      if (png === null) {
+        return { ...base, outcome: 'passed', code: 'capture-left-out' };
+      }
       const reference = await context.ports.artifacts.put(`${target.id}/${step.name}.png`, png, 'image/png');
       context.logger.log({ kind: 'artifact', stepIndex: index, artifact: reference.name, sha256: reference.sha256 });
       return { ...base, outcome: 'passed', artifact: reference };
     }
   }
 }
+
+// The viewport with personal data and every field a secret was typed into masked, or null when one
+// of those fields cannot be masked: text drawn as pixels is out of reach of any later scan, so no
+// image is better than an image that may show the secret.
+async function pixelsWithSecretsHidden(session: DocumentSession, context: RunContext): Promise<Uint8Array | null> {
+  const selectors = context.ports.redactor.selectors;
+  const fields = [...context.secretFilledFields.values()];
+  if (fields.length === 0) {
+    return session.screenshot(selectors);
+  }
+  if (session.screenshotHidingFields === undefined) {
+    return null;
+  }
+  const taken = await session.screenshotHidingFields(selectors, fields);
+  return taken.ok ? taken.value : null;
+}
+
+// True when a text read from the page holds one of the plan's secrets, in any form the run looks for.
+const isSecretEcho = (text: string, context: RunContext): boolean => context.isShortSecret(text) || context.withoutSecrets(text) !== text;
 
 // Reads a remember step's value from the page through the prober, waiting as a check waits until
 // the locator matches one element with non-empty text (or input value), whitespace normalised, or
@@ -892,6 +944,11 @@ async function rememberFromPage(step: Extract<Step, { type: 'remember' }>, index
   if (!('element' in from)) return { ...base, outcome: 'failed', code: 'unsupported-step' };
   const locator = resolveLocator(from.element, context.values, context.inputs.project);
   if (!locator.ok) return { ...base, outcome: 'failed', code: locator.error };
+  // A remembered value is hashed into the result and can be sent on by a later step, and a hash of
+  // a short secret is as good as the secret.
+  if (context.secretFilledFields.has(canonicalJson(locator.value))) {
+    return { ...base, outcome: 'failed', code: 'value-holds-secret' };
+  }
   const read: DomRead | undefined = from.read === 'attribute' ? { kind: 'attribute', name: from.attribute } : undefined;
   const textOf = (probe: ElementProbe): string => {
     if (from.read === 'attribute') return probe.dom?.kind === 'attribute' ? probe.dom.value ?? '' : '';
@@ -910,11 +967,15 @@ async function rememberFromPage(step: Extract<Step, { type: 'remember' }>, index
     return textOf(probe) === '' ? { pass: false, code: null } : { pass: true, code: null };
   });
   if (verdict.code === TARGET_CRASHED || verdict.code === 'not-found' || verdict.code === 'ambiguous' || verdict.code === 'selector-invalid'
-    || verdict.code === UnreadablePage.ReadFailed || verdict.code === UnreadablePage.DialogOpen) {
+    || verdict.code === UnreadablePage.ReadFailed || verdict.code === UnreadablePage.DialogOpen || verdict.code === UnreadablePage.BrowserErrorPage) {
     return { ...base, outcome: 'failed', code: verdict.code };
   }
   const text = seen.probe === null ? '' : textOf(seen.probe);
   if (text === '') return { ...base, outcome: 'failed', code: 'value-empty' };
+  // Another locator for a secret-filled field, or the page's own echo of a secret, reads the same.
+  if (isSecretEcho(text, context)) {
+    return { ...base, outcome: 'failed', code: 'value-holds-secret' };
+  }
   const maximumLength = context.inputs.project.limits.maximumTextLength;
   if (text.length > maximumLength) return { ...base, outcome: 'failed', code: 'value-too-long' };
   const safe = runTimeText(text, maximumLength);
@@ -1094,10 +1155,16 @@ function observe(probe: ElementProbe | null, context: RunContext, filledFromSecr
   if (probe.count === UnreadablePage.DialogOpen) {
     return '(a dialog is open)';
   }
+  if (probe.count === UnreadablePage.BrowserErrorPage) {
+    return '(the browser shows its own error page)';
+  }
   if (probe.count > 1) return `(${probe.count} elements)`;
   if (probe.sensitive) return SENSITIVE_PLACEHOLDER;
-  const seen = normalise(probe.value ?? probe.text);
-  if (filledFromSecret || context.isShortSecret(seen)) return SECRET_PLACEHOLDER;
+  const asWritten = probe.value ?? probe.text;
+  if (filledFromSecret || context.isShortSecret(asWritten)) return SECRET_PLACEHOLDER;
+  // Secrets go while the text is as the page wrote it. Collapsing first could join what a secret
+  // holds apart; personal-data patterns come after, as they read collapsed text.
+  const seen = normalise(context.withoutSecrets(asWritten));
   return context.redactor.text(withoutRememberedTexts(seen, context.rememberedTexts)).slice(0, 200);
 }
 

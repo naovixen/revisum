@@ -7,7 +7,9 @@
 //     proposal starts a stub or writes storage its declaration keeps out of proposals. For the
 //     unsafe plan features, it denies a proposal that holds an inline script or runs a write script
 //     or command its declaration keeps out of proposals, and any database command whose service is
-//     on a production origin. Only an allow decision carries an Authorised plan, the only kind run() accepts.
+//     on a production origin. Whatever its standing, a plan is held to the features, scripts and
+//     secrets this project declares, not those of the project it was parsed under. Only an allow
+//     decision carries an Authorised plan, the only kind run() accepts.
 //   - guardAction() is the runtime guard. The driver calls it just before every action, with the
 //     element the locator resolved to and any open dialog's text, so it sees what the plan alone
 //     cannot: the name behind a test id, the form a key press would submit, where a link leads.
@@ -15,20 +17,21 @@
 // Both are deterministic and read nothing but their arguments and the project. Each denial appends
 // one plan.denied audit event whose code is the rule, so a denial leaves a record even when
 // nothing ran; a denial the audit sink failed to record is marked unrecorded. An authorisation
-// holds only for the project it was cleared under: run() refuses it under any other.
+// holds only for the project and the standing it was cleared under: run() refuses it under any other.
 import { literalText } from '@revisum/contracts';
 import type {
-  AllowedUrl, Authorised, DatabaseCommandStep, EventSink, GuardVerdict, Locale, Locator, PageScriptStep, PathTemplate, Plan, PolicyDecision,
-  PolicyRuleId, RemoveStorageStep, ResolvedElement, ServiceCallStep, SetStorageStep, Step, StubStep, Target, TargetId,
+  AllowedUrl, Authorised, CallArgument, DatabaseCommandStep, EventSink, GuardVerdict, Locale, Locator, PageScriptStep, PathTemplate, Plan, PolicyDecision,
+  PolicyRuleId, RemoveStorageStep, ResolvedElement, SecretName, ServiceCallStep, SetStorageStep, Step, StubStep, Target, TargetId,
 } from '@revisum/contracts';
 import { deriveActor, sourceActorId } from '../actor.ts';
 import { ownStanding, type PlanStanding } from '../approval/plan-standing.ts';
 import { canonicalJson, sha256 } from '../hashing.ts';
 import { planHash } from '../manifest.ts';
+import { unsafeFeaturesOf } from '../plan/unsafe-features.ts';
 import type { Limits, Project, ProjectPolicy } from '../project/project-parser.ts';
 import type { TrustedProject } from '../project/trusted-project.ts';
-import { declaredCommands, declaredScripts } from '../project/unsafe-feature-declarations.ts';
-import { everyIrreversiblePattern, isAllowedName, matchesIrreversiblePattern, patternsForLocale } from './irreversible-patterns.ts';
+import { declaredCommands, declaredScripts, enabledUnsafeFeatures } from '../project/unsafe-feature-declarations.ts';
+import { everyIrreversiblePattern, isAllowedName, isBlankName, matchesIrreversiblePattern, patternsForLocale } from './irreversible-patterns.ts';
 
 export interface PolicyGate {
   // The static check of a whole plan for the targets it will run on. A missing standing, or one
@@ -58,9 +61,16 @@ const ACTIVATING_KEYS: readonly string[] = ['Enter', 'Space'];
 // Only used to read the path of a URL that is relative to the app under test.
 const RELATIVE_BASE = new URL('https://relative.invalid');
 
-// Every plan the gate authorised, with each project and target it authorised it for, so run() can
-// refuse a plan that was only cast to Authorised, or that was cleared under another project's
-// allowances. A WeakMap holds no plan alive and cannot be listed.
+// How many times a path is decoded before the gate stops trusting what it can read of it. Each
+// layer of encoding takes one round, and the last round only confirms nothing changed.
+const MAXIMUM_DECODING_ROUNDS = 5;
+const RUN_OF_ESCAPES = /(?:%[0-9a-f]{2})+/giu;
+const UTF8 = new TextDecoder();
+
+// Every plan the gate authorised, with each project, target and standing it authorised it for, so
+// run() can refuse a plan that was only cast to Authorised, or that was cleared under another
+// project's allowances or as a standing it no longer has. A WeakMap holds no plan alive and cannot
+// be listed.
 const AUTHORISED_CLEARANCES = new WeakMap<object, Set<string>>();
 
 // What a project allows, as one hash over everything the gate reads from it. Where the project was
@@ -71,12 +81,12 @@ function projectFingerprint(project: Project | TrustedProject): string {
   return sha256(canonicalJson(allowances));
 }
 
-const clearance = (projectHash: string, targetId: string): string => `${projectHash}:${targetId}`;
+const clearance = (projectHash: string, targetId: string, mode: PlanStanding['mode']): string => `${projectHash}:${targetId}:${mode}`;
 
 // The one place a plan becomes Authorised: after decide() found nothing to deny.
-function authorised(plan: Plan, targets: readonly Target[], projectHash: string): Authorised {
+function authorised(plan: Plan, targets: readonly Target[], projectHash: string, mode: PlanStanding['mode']): Authorised {
   const known = AUTHORISED_CLEARANCES.get(plan) ?? new Set<string>();
-  for (const target of targets) known.add(clearance(projectHash, target.id));
+  for (const target of targets) known.add(clearance(projectHash, target.id, mode));
   AUTHORISED_CLEARANCES.set(plan, known);
   return plan as Authorised;
 }
@@ -87,27 +97,47 @@ function authorised(plan: Plan, targets: readonly Target[], projectHash: string)
 // run under a project that does not allow it.
 export function assertAuthorised(plan: unknown, targetId: TargetId, project: Project | TrustedProject): asserts plan is Authorised {
   const known = typeof plan === 'object' && plan !== null ? AUTHORISED_CLEARANCES.get(plan) : undefined;
-  if (known === undefined || !known.has(clearance(projectFingerprint(project), targetId))) {
+  const projectHash = projectFingerprint(project);
+  if (known === undefined || !(known.has(clearance(projectHash, targetId, 'approved')) || known.has(clearance(projectHash, targetId, 'proposal')))) {
     throw new TypeError('refused a plan that the policy gate did not authorise for this target under this project');
   }
 }
 
+// True when the gate cleared this plan as this standing. A clearance as approved judged the plan's
+// writes, inline scripts and barred stubs as allowed, which holds for no other standing.
+export const isClearedForStanding = (plan: Authorised, targetId: TargetId, project: Project | TrustedProject, standing: PlanStanding): boolean =>
+  AUTHORISED_CLEARANCES.get(plan)?.has(clearance(projectFingerprint(project), targetId, standing.mode)) === true;
+
 // ---- Shared rules -------------------------------------------------------------------------------
 
-// A path compared the way servers commonly read it: percent-decoded, case-insensitive, with
-// repeated and trailing slashes removed, so "/Account//%64elete/" still reads as /account/delete.
-function comparablePath(path: string): string {
+// Each run of valid escapes decoded on its own, so a malformed escape stays as written and stops
+// nothing. Bytes that are not UTF-8 become U+FFFD.
+const withEscapesDecoded = (path: string): string =>
+  path.replace(RUN_OF_ESCAPES, (run) => UTF8.decode(Uint8Array.from(run.split('%').slice(1), (escape) => Number.parseInt(escape, 16))));
+
+// A path compared the way servers commonly read it: percent-decoded through every layer,
+// case-insensitive, with path parameters and repeated and trailing slashes removed, so
+// "/Account//%2564elete;x=1/" still reads as /account/delete. Null when it holds more layers than
+// the gate will read.
+function comparablePath(path: string): string | null {
   let decoded = path;
-  try { decoded = decodeURIComponent(path); } catch { /* malformed escapes: compare as written */ }
-  return decoded.toLowerCase().replace(/\/+/gu, '/').replace(/\/$/u, '');
+  for (let round = 0; round < MAXIMUM_DECODING_ROUNDS; round++) {
+    const next = withEscapesDecoded(decoded);
+    if (next === decoded) {
+      return decoded.toLowerCase().replace(/;[^/]*/gu, '').replace(/\/+/gu, '/').replace(/\/$/u, '');
+    }
+    decoded = next;
+  }
+  return null;
 }
 
-// True when `path` is a destructive path or continues one after a "/".
+// True when `path` is a destructive path or continues one after a "/". A path or pattern too deeply
+// encoded to read might be one, so it counts as one.
 function isDestructivePath(path: string, policy: ProjectPolicy): boolean {
   const visited = comparablePath(path);
-  return policy.destructiveUrlPatterns.some((pattern) => {
+  return visited === null || policy.destructiveUrlPatterns.some((pattern) => {
     const destructive = comparablePath(pattern);
-    return visited === destructive || visited.startsWith(`${destructive}/`);
+    return destructive === null || visited === destructive || visited.startsWith(`${destructive}/`);
   });
 }
 
@@ -121,7 +151,7 @@ function readUrl(url: string): { readonly origin: string | null; readonly path: 
   }
 }
 
-const isBlank = (text: string | null): boolean => text === null || text.trim() === '';
+const isBlank = (text: string | null): boolean => text === null || isBlankName(text);
 
 // The accessible name a locator asks for, when the plan itself says it. A test id names no text,
 // and a value reference has none until the run; the runtime guard then sees the element's name.
@@ -208,16 +238,18 @@ function commandRule(step: DatabaseCommandStep, context: StaticContext): PolicyR
 const externalCallRule = (step: ServiceCallStep | DatabaseCommandStep, context: StaticContext): PolicyRuleId | null =>
   (step.type === 'call' || step.type === 'expectBackend' ? callRule(step, context) : commandRule(step, context));
 
-// What a page script may not do in a proposal: be written into the plan, since its source and its
-// claimed effect are the plan's own and no person declared them; or change something unless its
-// declaration allows it in proposals. A script the project does not declare is no one's.
+// What a page script may not do: run undeclared, whatever the plan's standing, since a script the
+// project does not declare is no one's. And in a proposal: be written into the plan, since its source
+// and its claimed effect are the plan's own and no person declared them; or change something unless
+// its declaration allows it in proposals.
 function scriptRule(step: PageScriptStep, context: StaticContext): PolicyRuleId | null {
-  if (context.approved) return null;
-  if (typeof step.script !== 'string') return 'inline-script-in-proposal';
+  if (typeof step.script !== 'string') {
+    return context.approved ? null : 'inline-script-in-proposal';
+  }
   const name = step.script;
   const declaration = Object.entries(declaredScripts(context.project.unsafeFeatures)).find(([declared]) => declared === name)?.[1];
   if (declaration === undefined) return 'undeclared-origin';
-  return declaration.effect === 'write' && !declaration.allowInProposals ? 'side-effect-in-proposal' : null;
+  return !context.approved && declaration.effect === 'write' && !declaration.allowInProposals ? 'side-effect-in-proposal' : null;
 }
 
 type StaticContext = {
@@ -269,8 +301,41 @@ function staticRule(step: Step, context: StaticContext): PolicyRuleId | null {
   return null;
 }
 
+const secretNamesIn = (values: readonly (CallArgument | Extract<Step, { type: 'fill' }>['value'])[]): SecretName[] =>
+  values.flatMap((value) => (typeof value === 'object' && 'secretName' in value ? [value.secretName] : []));
+
+// The secrets the plan itself names, frames, second tabs and cleanup included. Those inside a
+// declaration were held to the project when it was parsed.
+function secretNamesOf(plan: Plan): readonly SecretName[] {
+  const steps = [...everyStep(plan.steps).map(({ step }) => step), ...(plan.cleanup ?? [])];
+  const named = steps.flatMap((step) => {
+    if (step.type === 'fill') {
+      return secretNamesIn([step.value]);
+    }
+    if (step.type === 'call' || step.type === 'expectBackend' || step.type === 'setStorage' || step.type === 'stub') {
+      return secretNamesIn(Object.values(step.arguments ?? {}));
+    }
+    return [];
+  });
+  return plan.storageState === undefined ? named : [...named, plan.storageState.secretName];
+}
+
+// The parser judged these against the project it was given, which may not be the one clearing the
+// plan. Plan-wide, before any step, so no standing can skip them.
+function undeclaredUseRule(plan: Plan, project: Project | TrustedProject): PolicyRuleId | null {
+  const enabled = enabledUnsafeFeatures(project.unsafeFeatures);
+  if (unsafeFeaturesOf(plan).some((feature) => !enabled.includes(feature))) {
+    return 'unsafe-feature-disabled';
+  }
+  return secretNamesOf(plan).some((name) => !project.secretNames.includes(name)) ? 'undeclared-secret' : null;
+}
+
 function staticDenial(plan: Plan, targets: readonly Target[], standing: PlanStanding, project: Project | TrustedProject): Denial | null {
   if (isOverLimit(plan, project.limits)) return { rule: 'over-limit', stepIndex: null };
+  const undeclaredUse = undeclaredUseRule(plan, project);
+  if (undeclaredUse !== null) {
+    return { rule: undeclaredUse, stepIndex: null };
+  }
   const patternSets = targets.map((target) => patternsForLocale(target.locale, project.policy.irreversiblePatterns));
   // With no targets no language is known, so every pattern applies: the engine's own never lapse.
   const patterns: string[] = targets.length === 0 ? [...everyIrreversiblePattern(project.policy.irreversiblePatterns)] : [];
@@ -370,8 +435,9 @@ export function policyGate(options: PolicyGateOptions): PolicyGate {
   return {
     decide(plan, targets, standing) {
       // A standing made for another plan is no standing: the plan is judged as a proposal.
-      const denial = staticDenial(plan, targets, ownStanding(plan, standing), project);
-      if (denial === null) return { kind: 'allow', plan: authorised(plan, targets, projectHash) };
+      const judged = ownStanding(plan, standing);
+      const denial = staticDenial(plan, targets, judged, project);
+      if (denial === null) return { kind: 'allow', plan: authorised(plan, targets, projectHash, judged.mode) };
       const recorded = record(denial.rule, plan);
       return { kind: 'deny', rule: denial.rule, stepIndex: denial.stepIndex, ...(recorded ? {} : UNRECORDED) };
     },

@@ -10,16 +10,18 @@
 //     for a subject whose hash matches the file at its path in that reviewed commit, so a review
 //     approves only the bytes the reviewer saw, before the change merges, and never a subject hash
 //     nobody reviewed;
-//   - agent lock-down (declared): the subject is on the protected branch through a commit that the
-//     maintainer named in protected-branch approvers.json landed, with the lock-down declared there
-//     and the agent's deny-rules file denying push, merge and pull-request approval. Core cannot
-//     see the agent's environment, so this approval is always declared, never verified;
+//   - agent lock-down (declared): the subject stands on the protected branch with the subject's
+//     bytes, and the last commit touching it there is one that the maintainer named in
+//     protected-branch approvers.json landed, with the lock-down declared there and the agent's
+//     deny-rules file denying push, merge and pull-request approval. Core cannot see the agent's
+//     environment, so this approval is always declared, never verified;
 //   - signed key (optional, not built): unknown keys and signatures without user presence are
 //     refused; until the route is built, no signature verifies.
+import { posix } from 'node:path';
 import {
   failure, success,
   type ActorType, type Approval, type ApprovalErrorCode, type ApprovalFields, type ApprovalProof, type ApprovalStrength, type ApprovalSubject,
-  type DerivedActor, type EventSink, type Result, type VersionControlAccount, type VersionControlPort,
+  type DerivedActor, type EventSink, type Result, type VersionControlAccount, type VersionControlPort, type VersionControlReview,
 } from '@revisum/contracts';
 import { deriveActor, pseudonymousActorId, sourceActorId } from '../actor.ts';
 import { brand } from '../brand.ts';
@@ -32,6 +34,7 @@ import { isCodeOwner, parseCodeOwners, type CodeOwnerRule } from './code-owners.
 
 const APPROVERS_FILE = 'approvers.json';
 const HOLDOUTS_FILE = 'holdouts.json';
+const PLANS_FOLDER = 'plans/';
 
 export type VerifiedOutcome = { readonly approval: Approval; readonly actor: DerivedActor };
 export type VerifierResult = Result<VerifiedOutcome, ApprovalErrorCode>;
@@ -74,6 +77,29 @@ function holdsSubject(subject: ApprovalSubject, bytes: Uint8Array): boolean {
   return sha256(bytes) === subject.hash || (decoded !== undefined && sha256(canonicalJson(decoded)) === subject.hash);
 }
 
+// The repository file an approval of this subject is about, or null when it can be about none. A
+// holdout plan is in no file of its own, so only holdouts.json can show it, whatever path the
+// caller gives. A plan must live in plans/ once any "." and ".." in its path are resolved.
+function subjectFile(subject: ApprovalSubject): string | null {
+  if (subject.kind === 'holdout-plan') {
+    return HOLDOUTS_FILE;
+  }
+  if (subject.path === undefined) {
+    return null;
+  }
+  const path = posix.normalize(repositoryPath(subject.path));
+  return subject.kind === 'plan' && !path.startsWith(PLANS_FOLDER) ? null : path;
+}
+
+// What a reviewer last said about a commit: their latest approval or request for changes. A comment
+// is neither, and on GitHub it leaves a review's standing as it was.
+function latestVerdict(reviews: readonly VersionControlReview[], reviewed: VersionControlReview): VersionControlReview {
+  const login = reviewed.reviewer.login.toLowerCase();
+  return reviews
+    .filter((candidate) => candidate.commit === reviewed.commit && candidate.reviewer.login.toLowerCase() === login && candidate.state !== 'commented')
+    .reduce((latest, candidate) => (Date.parse(latest.submittedAt) > Date.parse(candidate.submittedAt) ? latest : candidate), reviewed);
+}
+
 export function approvalVerifier(options: ApprovalVerifierOptions): ApprovalVerifier {
   const { events, actorKey } = options;
 
@@ -110,8 +136,13 @@ export function approvalVerifier(options: ApprovalVerifierOptions): ApprovalVeri
     if (review === undefined || review.state !== 'approved') return refusedBy('subject-mismatch', unknownReviewer);
     const reviewer = accountActor(review.reviewer);
     if (review.reviewer.type !== 'user') return refusedBy('bot-or-app', reviewer);
-    if (subject.path === undefined) return refusedBy('subject-mismatch', reviewer);
-    const path = repositoryPath(subject.path);
+    if (latestVerdict(reviews.value, review).state !== 'approved') {
+      return refusedBy('subject-mismatch', reviewer);
+    }
+    const path = subjectFile(subject);
+    if (path === null) {
+      return refusedBy('subject-mismatch', reviewer);
+    }
 
     const rules = await codeOwnerRules(versionControl, reviewer);
     if (!rules.ok) return rules;
@@ -138,15 +169,14 @@ export function approvalVerifier(options: ApprovalVerifierOptions): ApprovalVeri
     return passed({ login: review.reviewer.login, strength: 'verified', at: review.submittedAt });
   }
 
-  // The subject's file as the reviewed commit holds it must have the subject's hash. A holdout
-  // plan's hash is listed in holdouts.json at that commit instead.
+  // The subject's file as the reviewed commit holds it must have the subject's hash. For a holdout
+  // plan that file is holdouts.json, which lists the hash.
   async function reviewedBytes(
     subject: ApprovalSubject, path: string, commit: string, versionControl: VersionControlPort, actor: DerivedActor,
   ): Promise<Checked<true>> {
     // A port that cannot read a file at a commit cannot show what the reviewer saw.
     if (versionControl.fileAtCommit === undefined) return refusedBy('version-control-unavailable', actor);
-    const file = subject.kind === 'holdout-plan' ? HOLDOUTS_FILE : path;
-    const read = await versionControl.fileAtCommit(repositoryPath(file), commit);
+    const read = await versionControl.fileAtCommit(path, commit);
     if (!read.ok) return refusedBy(read.error === 'unavailable' ? 'version-control-unavailable' : 'subject-mismatch', actor);
     return holdsSubject(subject, read.value.bytes) ? passed(true) : refusedBy('subject-mismatch', actor);
   }
@@ -176,19 +206,27 @@ export function approvalVerifier(options: ApprovalVerifierOptions): ApprovalVeri
     const proofAgrees = landed.value.login.toLowerCase() === proof.mergedBy.toLowerCase();
     if (landed.value.type !== 'user' || !isMaintainer || !proofAgrees) return refusedBy('not-maintainer', lander);
 
-    const onBranch = await subjectOnProtectedBranch(subject, versionControl, lander);
+    const onBranch = await subjectOnProtectedBranch(subject, proof.commit, versionControl, lander);
     if (!onBranch.ok) return onBranch;
     return passed({ login: landed.value.login, strength: 'declared', at: landed.value.at });
   }
 
-  // The subject as it stands on the protected branch must have the subject's hash; a holdout plan
-  // is never in the repository, so holdouts.json must list its hash instead.
-  async function subjectOnProtectedBranch(subject: ApprovalSubject, versionControl: VersionControlPort, actor: DerivedActor): Promise<Checked<true>> {
-    const path = subject.kind === 'holdout-plan' ? HOLDOUTS_FILE : subject.path;
-    if (path === undefined) return refusedBy('subject-mismatch', actor);
-    const read = await versionControl.protectedFile(repositoryPath(path));
+  // The subject as it stands on the protected branch must have the subject's hash, and the proof's
+  // commit must be the last to touch it there: a commit the maintainer landed earlier says nothing
+  // about bytes someone else landed since. For a holdout plan the file is holdouts.json.
+  async function subjectOnProtectedBranch(
+    subject: ApprovalSubject, commit: string, versionControl: VersionControlPort, actor: DerivedActor,
+  ): Promise<Checked<true>> {
+    const path = subjectFile(subject);
+    if (path === null) {
+      return refusedBy('subject-mismatch', actor);
+    }
+    const read = await versionControl.protectedFile(path);
     if (!read.ok) return refusedBy(read.error === 'unavailable' ? 'version-control-unavailable' : 'not-protected-branch', actor);
-    return holdsSubject(subject, read.value.bytes) ? passed(true) : refusedBy('not-protected-branch', actor);
+    if (!holdsSubject(subject, read.value.bytes)) {
+      return refusedBy('not-protected-branch', actor);
+    }
+    return read.value.commit === commit ? passed(true) : refusedBy('stale-commit', actor);
   }
 
   async function checkSignature(

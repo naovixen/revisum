@@ -9,7 +9,7 @@ import type { Plan } from './plan.ts';
 export type PolicyRuleId =
   | 'irreversible-action' | 'irreversible-submit' | 'destructive-navigation' | 'irreversible-dialog'
   | 'unnamed-control' | 'no-locale-patterns' | 'undeclared-origin' | 'production-origin' | 'over-limit'
-  | 'side-effect-in-proposal' | 'inline-script-in-proposal';
+  | 'side-effect-in-proposal' | 'inline-script-in-proposal' | 'unsafe-feature-disabled' | 'undeclared-secret';
 
 // The key of the Authorised mark. It is a unique symbol that is declared here and never exported,
 // so no code outside this file can name the key, and an object written by hand, by spreading a

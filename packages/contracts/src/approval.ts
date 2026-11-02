@@ -89,6 +89,8 @@ export type VersionControlReview = {
 export interface VersionControlPort {
   // The protected default branch, the only branch whose files are trusted.
   readonly protectedBranch: string;
+  // The file as it stands on the protected branch, and the last commit on that branch that changed
+  // it: not the branch's head, which may have touched only other files.
   protectedFile(path: string): Promise<Result<{ readonly bytes: Uint8Array; readonly commit: string }, 'not-found' | 'unavailable'>>;
   reviews(pullRequest: number): Promise<Result<readonly VersionControlReview[], 'unavailable'>>;
   changedFiles(pullRequest: number): Promise<Result<readonly { readonly path: string; readonly authors: readonly string[] }[], 'unavailable'>>;

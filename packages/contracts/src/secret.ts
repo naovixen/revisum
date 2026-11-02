@@ -22,9 +22,10 @@ export interface SecretStore {
   resolve(name: SecretName): Secret | null;
 }
 
-// The forms in which a secret can echo into an output: as typed, URI-encoded, base64 or base64url
-// encoded, cut short to a prefix, or with its letters' case changed.
-export const LEAK_FORMS = ['raw', 'uri', 'base64', 'base64url', 'prefix', 'case'] as const;
+// The forms in which a secret can echo into an output: as typed, whatever its white space,
+// URI-encoded, base64 or base64url encoded, cut short to a prefix, with its letters' case changed,
+// or written with JSON escapes or HTML entities.
+export const LEAK_FORMS = ['raw', 'uri', 'base64', 'base64url', 'prefix', 'case', 'json', 'html'] as const;
 export type LeakForm = (typeof LEAK_FORMS)[number];
 export type Leak = { readonly file: string; readonly secret: SecretName; readonly form: LeakForm };
 

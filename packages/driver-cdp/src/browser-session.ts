@@ -6,21 +6,22 @@ import {
   DEFAULT_TEST_ID_ATTRIBUTE, DRIVER_FEATURES, failure, literalActionStep, literalText, performableLocator, reveal, success,
   type ActionGuard, type ActionStep, type BrowserRequestRecord, type DialogStep, type DocumentSession, type DomRead, type DomValue, type DownloadedFile,
   type DownloadStep, type DriverError, type DriverFeature, type ElementProbe, type Locator, type PageScriptCall, type PageMetaTag, type PageProbe, type Position, type ResolvedActionStep,
-  type ClipboardPort, type ClockPort, type NetworkPort, type ResolvedElement, type ResolvedLocator, type Result, type Secret, type SessionEnvironment, type StoragePort,
+  type ClipboardPort, type ClockPort, type GuardVerdict, type NetworkPort, type ResolvedElement, type ResolvedLocator, type Result, type Secret, type SessionEnvironment, type StoragePort,
   UnreadablePage,
 } from '@revisum/contracts';
 import {
-  actionability, afterTwoFrames, armHitCheck, findByLabel, findByTestId, findByText, findStructural, fontsReady, guardDetails, inDocumentOrder,
-  inThisDocument, linkAndCurrent, linkTargetList, maskElements, pageInfo, probeElement, readDomValue, readHitCheck, selectOption, structuralSelectorValidity,
-  unmaskElements,
+  actionability, afterTwoFrames, armHitCheck, documentUrl, fontsReady, guardDetails, inThisDocument, linkAndCurrent, linkTargetList, maskElements, maskGivenElements, pageInfo, probeElement, readDomValue, readHitCheck, selectOption,
+  structuralSelectorValidity, unmaskElements, whatAClickActivates,
 } from './in-page.ts';
+import { findByLabel, findByTestId, findByText, findStructural, inDocumentOrder } from './FindByLabel.ts';
 import { heldModifierKeys } from './modifier-keys.ts';
 import { pageAudit, parseAudit, toFindings } from './page-audit.ts';
-import type { Actionability, DownloadCapture, DriverSession, PageEvents, PageFunction, PageOperations } from './page-operations.ts';
+import type { Actionability, DownloadCapture, DriverSession, PageEvents, PageFunction, PageOperations, Point } from './page-operations.ts';
 
 const NOTHING_READ = { visible: false, enabled: false, text: '', value: null, sensitive: false, box: null } as const;
 const READ_FAILED: ElementProbe = { ...NOTHING_READ, count: UnreadablePage.ReadFailed };
 const DIALOG_HOLDS_PAGE: ElementProbe = { ...NOTHING_READ, count: UnreadablePage.DialogOpen };
+const ON_BROWSER_ERROR_PAGE: ElementProbe = { ...NOTHING_READ, count: UnreadablePage.BrowserErrorPage };
 const POLL_INTERVAL_MILLISECONDS = 50;
 // What the runtime guard is told for a dialog step, which acts on no element.
 const NO_RESOLVED_ELEMENT: ResolvedElement = { role: null, name: null, box: null, formSubmitName: null, linkUrl: null };
@@ -59,6 +60,7 @@ const BROWSER_ERROR_PAGE = 'chrome-error:';
 
 const CRASHED: DriverError = { code: 'target-crashed', detail: 'the page\'s renderer died' };
 const SELECTOR_INVALID: DriverError = { code: 'selector-invalid', detail: 'the browser rejects a CSS selector or XPath expression of the locator' };
+const NO_GUARD: DriverError = { code: 'policy-denied', detail: 'no runtime guard was given, so nothing can allow the action' };
 
 // The optional plan features every session buildSession makes performs, whatever its protocol:
 // positions, test-id attributes and css and XPath selectors in locate, chords and multi-line text
@@ -260,11 +262,40 @@ async function resolvedElement<Handle>(operations: PageOperations<Handle>, eleme
   return { role, name, ...decodeGuardDetails(await operations.callForString(guardDetails, [{ element }])) };
 }
 
-// Asks the guard, when there is one, about the resolved element. A denial is the step's error.
-async function denial<Handle>(operations: PageOperations<Handle>, element: Handle, guard: ActionGuard | undefined): Promise<DriverError | null> {
-  if (guard === undefined) return null;
-  const verdict = guard(await resolvedElement(operations, element), null);
+// A denial as the step's error, or null for an allow.
+function denialOf(verdict: GuardVerdict): DriverError | null {
   return verdict.kind === 'deny' ? { code: 'policy-denied', detail: `denied by the ${verdict.rule} rule` } : null;
+}
+
+// Asks the guard about the resolved element. A denial is the step's error.
+async function denial<Handle>(operations: PageOperations<Handle>, element: Handle, guard: ActionGuard): Promise<DriverError | null> {
+  return denialOf(guard(await resolvedElement(operations, element), null));
+}
+
+const isUnnamed = (element: ResolvedElement): boolean => element.name === null || element.name.trim() === '';
+
+// Asks the guard about a click at the point: the element found, then what the click would really
+// act on, since a press goes to whatever is under the pointer and on to the control around it. A
+// wrapper's or an icon's harmless name must not stand in for that control's. Most of what a pointer
+// lands on has no name of its own, which says nothing against the plan's element, so such an
+// element is judged only on the link it leads to, under the name of the element found.
+async function clickDenial<Handle>(operations: PageOperations<Handle>, element: Handle, at: Point, guard: ActionGuard): Promise<DriverError | null> {
+  const found = await resolvedElement(operations, element);
+  const denied = denialOf(guard(found, null));
+  if (denied !== null) {
+    return denied;
+  }
+  for (const activated of await operations.callForElements(whatAClickActivates, [{ element }, at.x, at.y])) {
+    const seen = await resolvedElement(operations, activated);
+    if (isUnnamed(seen) && (seen.linkUrl === null || seen.linkUrl === found.linkUrl)) {
+      continue;
+    }
+    const activatedDenial = denialOf(guard(isUnnamed(seen) ? { ...found, linkUrl: seen.linkUrl } : seen, null));
+    if (activatedDenial !== null) {
+      return activatedDenial;
+    }
+  }
+  return null;
 }
 
 // The text a fill of literal text or of lines types; a secret reference is revealed elsewhere.
@@ -293,6 +324,11 @@ function documentPorts<Handle>(
     try {
       if (await rejectsSelector(operations, locator)) return { ...NOTHING_READ, count: 0, selectorInvalid: true };
       const found = await findElements(operations, locator);
+      // Looked at after the search, so a navigation that fails during it cannot read as a page
+      // with nothing on it.
+      if ((await operations.callForString(documentUrl, [])).startsWith(BROWSER_ERROR_PAGE)) {
+        return ON_BROWSER_ERROR_PAGE;
+      }
       const element = found[0];
       if (found.length !== 1 || element === undefined) return { ...NOTHING_READ, count: found.length };
       const shown = JSON.parse(await operations.callForString(probeElement, [{ element }, environment.sensitiveSelectors])) as Extract<ElementProbe, { readonly count: number }>;
@@ -310,17 +346,16 @@ function documentPorts<Handle>(
   };
 
   // A click with a hit-target check: a click that lands on another element is swallowed in the
-  // page and retried. The guard is asked once, about the element first found ready.
-  const click = async (locator: ResolvedLocator, guard: ActionGuard | undefined): Promise<Result<void, DriverError>> => {
+  // page and retried. The guard is asked on every attempt: the page may have re-rendered, so the
+  // locator may now find another element than the guard last allowed.
+  const click = async (locator: ResolvedLocator, guard: ActionGuard): Promise<Result<void, DriverError>> => {
     const deadline = Date.now() + timeout;
-    let asked = false;
     for (;;) {
       const waited = await waitUntilActionable(operations, locator, Math.max(deadline - Date.now(), 0), crashed);
       if (!waited.ok) return waited;
-      if (!asked) {
-        asked = true;
-        const denied = await denial(operations, waited.value.element, guard);
-        if (denied !== null) return failure(denied);
+      const denied = await clickDenial(operations, waited.value.element, waited.value.at, guard);
+      if (denied !== null) {
+        return failure(denied);
       }
       await operations.callForString(armHitCheck, [{ element: waited.value.element }]);
       await operations.click(waited.value.element, waited.value.at);
@@ -336,7 +371,7 @@ function documentPorts<Handle>(
   };
 
   // The action itself, once the step is known to be performable.
-  const perform = async (action: ResolvedActionStep, guard: ActionGuard | undefined, typedSecret: Secret | null): Promise<Result<void, DriverError>> => {
+  const perform = async (action: ResolvedActionStep, guard: ActionGuard, typedSecret: Secret | null): Promise<Result<void, DriverError>> => {
     if (action.type === 'click') return click(action.locator, guard);
     if (action.type === 'upload') {
       const path = details.fixturePath(action.fixture);
@@ -371,7 +406,7 @@ function documentPorts<Handle>(
 
   // Answers the dialog the page has open, or opens within the timeout: its text is checked first,
   // then the guard is asked with it.
-  const answerDialog = async (step: DialogStep, guard: ActionGuard | undefined): Promise<Result<void, DriverError>> => {
+  const answerDialog = async (step: DialogStep, guard: ActionGuard): Promise<Result<void, DriverError>> => {
     const deadline = Date.now() + timeout;
     let text = events.openDialog();
     while (text === null) {
@@ -386,13 +421,19 @@ function documentPorts<Handle>(
       // The dialog's text is never echoed: it may hold personal data.
       if (normalise(expected) !== normalise(text)) return failure({ code: 'assertion-failed', detail: 'the open dialog does not say the expected text' });
     }
-    const verdict = guard?.(NO_RESOLVED_ELEMENT, text);
-    if (verdict?.kind === 'deny') return failure({ code: 'policy-denied', detail: `denied by the ${verdict.rule} rule` });
+    const denied = denialOf(guard(NO_RESOLVED_ELEMENT, text));
+    if (denied !== null) {
+      return failure(denied);
+    }
     await events.answerDialog(step.action === 'accept');
     return success(undefined);
   };
 
-  const act = async (step: ActionStep, guard?: ActionGuard, secret?: Secret): Promise<Result<void, DriverError>> => {
+  const act = async (step: ActionStep, guard: ActionGuard, secret?: Secret): Promise<Result<void, DriverError>> => {
+    // The type requires a guard, but what calls this may not be checked against the type.
+    if (typeof guard !== 'function') {
+      return failure(NO_GUARD);
+    }
     if (crashed()) return failure(CRASHED);
     if (step.type === 'dialog') {
       try { return await answerDialog(step, guard); } catch (error) { return failure(crashed() ? CRASHED : { code: 'not-actionable', detail: errorText(error) }); }
@@ -432,7 +473,10 @@ function documentPorts<Handle>(
   // A download step: the click, guarded as any click, with the browser armed to save the one
   // download it starts. A popup the click opens, or a second download, fails the step with
   // unsupported-step and nothing of it is kept.
-  const download = async (step: DownloadStep, maximumBytes: number, guard?: ActionGuard): Promise<Result<DownloadedFile, DriverError>> => {
+  const download = async (step: DownloadStep, maximumBytes: number, guard: ActionGuard): Promise<Result<DownloadedFile, DriverError>> => {
+    if (typeof guard !== 'function') {
+      return failure(NO_GUARD);
+    }
     if (crashed()) return failure(CRASHED);
     const capture = details.downloads;
     const locator = performableLocator(step.locator, SESSION_FEATURES);
@@ -488,6 +532,22 @@ function documentPorts<Handle>(
     }
   };
 
+  // What masks paint before the viewport is captured, then take away.
+  const maskedScreenshot = async (mask: readonly string[], paintBesides: () => Promise<void>): Promise<Uint8Array> => {
+    await operations.callForString(fontsReady, []);
+    for (const framed of masked) {
+      await framed.callForString(maskElements, [mask]);
+    }
+    try {
+      await paintBesides();
+      return await operations.screenshotPng();
+    } finally {
+      for (const framed of masked) {
+        await framed.callForString(unmaskElements, []);
+      }
+    }
+  };
+
   const ports: DocumentSession = {
     async navigate(url, options) {
       if (crashed()) return failure(CRASHED);
@@ -512,14 +572,26 @@ function documentPorts<Handle>(
     probe,
     download,
     runScript,
-    async screenshot(mask) {
-      await operations.callForString(fontsReady, []);
-      for (const framed of masked) await framed.callForString(maskElements, [mask]);
-      try {
-        return await operations.screenshotPng();
-      } finally {
-        for (const framed of masked) await framed.callForString(unmaskElements, []);
+    screenshot: (mask) => maskedScreenshot(mask, () => Promise.resolve()),
+    // Each field is found before anything is painted, so no image exists for a field that cannot be.
+    async screenshotHidingFields(mask, fields) {
+      const toPaint: { readonly framed: PageOperations<Handle>; readonly elements: readonly Handle[] }[] = [];
+      for (const field of fields) {
+        let isFound = false;
+        for (const framed of masked) {
+          const elements = await locate(framed, field);
+          isFound ||= elements.length > 0;
+          toPaint.push({ framed, elements });
+        }
+        if (!isFound) {
+          return failure({ code: 'not-found', detail: 'a field a secret was typed into cannot be found to hide it' });
+        }
       }
+      return success(await maskedScreenshot(mask, async () => {
+        for (const { framed, elements } of toPaint) {
+          await framed.callForString(maskGivenElements, elements.map((element) => ({ element })));
+        }
+      }));
     },
     async audit() {
       return toFindings(parseAudit(await operations.callForString(pageAudit, [])));

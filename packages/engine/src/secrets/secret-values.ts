@@ -12,6 +12,8 @@ import {
   type HeaderScheme, type JsonBodyWithSecrets, type LeakForm, type RedactionMode, type Secret, type SecretName,
 } from '@revisum/contracts';
 import { sha256 } from '../hashing.ts';
+import { normalise } from '../oracle.ts';
+import { htmlWritings, jsonWritings } from './JsonWritings.ts';
 
 // What replaces an echo of a secret in kept text.
 export const SECRET_PLACEHOLDER = '[redacted:secret]';
@@ -36,6 +38,24 @@ function foldCase(text: string): string {
 
 const escapeForPattern = (text: string): string => text.replace(/[\\^$.*+?()[\]{}|/-]/g, '\\$&');
 
+// ---- Written forms ------------------------------------------------------------------------------
+
+// A pattern for the value with each character written as itself or in any of the ways `writings`
+// gives, ignoring case: hex digits may be either case and a case-changed echo is caught too. A run
+// of white space may be any other run, whichever way each is written: a page may lay out or collapse
+// the spaces a secret holds, and the same words are the same secret.
+function writtenPattern(value: string, writings: (character: string) => readonly string[]): RegExp {
+  const eachWay = (character: string): string => [escapeForPattern(character), ...writings(character)].join('|');
+  const anyWhiteSpace = `(?:\\s|${WHITE_SPACE_CHARACTERS.flatMap((character) => writings(character)).join('|')})+`;
+  const pieces = value.split(/(\s+)/).filter((piece) => piece !== '').map((piece) =>
+    (piece.trim() === '' ? anyWhiteSpace : [...piece].map((character) => `(?:${eachWay(character)})`).join('')));
+  return new RegExp(pieces.join(''), 'gi');
+}
+
+// The white space that encoders write in ways a pattern has to know, so that a run of them can be
+// matched in any of those ways.
+const WHITE_SPACE_CHARACTERS: readonly string[] = [' ', '\t', '\n', '\r', '\u00a0'];
+
 // ---- URL and form encoding ------------------------------------------------------------------------
 
 // The percent escapes of one character's UTF-8 bytes: "%2f" for "/".
@@ -48,12 +68,7 @@ const percentEscapes = (character: string): string =>
 // does not), so every character may take either form. The pattern ignores case, so hex digits may
 // be upper or lower case and a case-changed echo is caught too.
 function uriPattern(value: string): RegExp {
-  const characters = [...value].map((character) => {
-    const options = [escapeForPattern(character), percentEscapes(character)];
-    if (character === ' ') options.push('\\+');
-    return `(?:${options.join('|')})`;
-  });
-  return new RegExp(characters.join(''), 'gi');
+  return writtenPattern(value, (character) => (character === ' ' ? [percentEscapes(character), '\\+'] : [percentEscapes(character)]));
 }
 
 // ---- Base64 inside longer text ---------------------------------------------------------------------
@@ -110,12 +125,15 @@ function base64Pattern(value: string, alphabet: string): RegExp {
 
 // ---- Finding and redacting echoes ------------------------------------------------------------------
 
-type EncodedEcho = { readonly form: 'uri' | 'base64' | 'base64url'; readonly pattern: RegExp };
+type EncodedEcho = { readonly form: 'uri' | 'json' | 'html' | 'base64' | 'base64url'; readonly pattern: RegExp };
 
-// Every encoded form of a value: URL and form encoding (whose pattern also matches the value as
-// typed, in any case), then base64 and base64url at every alignment.
+// Every encoded form of a value: URL and form encoding, JSON escapes and HTML entities (whose
+// patterns each also match the value as typed, in any case), then base64 and base64url at every
+// alignment.
 const encodedEchoes = (value: string): EncodedEcho[] => [
   { form: 'uri', pattern: uriPattern(value) },
+  { form: 'json', pattern: writtenPattern(value, jsonWritings) },
+  { form: 'html', pattern: writtenPattern(value, htmlWritings) },
   { form: 'base64', pattern: base64Pattern(value, BASE64_ALPHABETS.base64) },
   { form: 'base64url', pattern: base64Pattern(value, BASE64_ALPHABETS.base64url) },
 ];
@@ -131,17 +149,43 @@ function occurrences(text: string, search: string): Range[] {
   return found;
 }
 
+const isWhiteSpace = (character: string | undefined): boolean => character !== undefined && /\s/.test(character);
+
 // Runs in `foldedText` that match the start of `foldedValue` for at least the minimum secret
-// length: a value cut short, as a log line or a page that truncates a token would show it.
+// length: a value cut short, as a log line or a page that truncates a token would show it. A run of
+// white space in the value matches any run in the text, so a search neither misses a value the page
+// has collapsed nor stops at the value's first word.
 function prefixRuns(foldedText: string, foldedValue: string): Range[] {
   const runs: Range[] = [];
-  const head = foldedValue.slice(0, MINIMUM_SECRET_LENGTH);
-  if (head.length < MINIMUM_SECRET_LENGTH) return runs;
-  for (let index = foldedText.indexOf(head); index !== -1; index = foldedText.indexOf(head, index + 1)) {
-    let length = head.length;
-    while (length < foldedValue.length && foldedText[index + length] === foldedValue[length]) length++;
-    runs.push({ start: index, end: index + length });
-    index += length - 1;
+  const wanted = normalise(foldedValue);
+  const head = wanted.slice(0, MINIMUM_SECRET_LENGTH);
+  if (head.length < MINIMUM_SECRET_LENGTH) {
+    return runs;
+  }
+  const headPattern = new RegExp(escapeForPattern(head).replace(/ /g, '\\s+'), 'g');
+  for (let found = headPattern.exec(foldedText); found !== null; found = headPattern.exec(foldedText)) {
+    let position = found.index;
+    let end = position;
+    let matched = 0;
+    while (matched < wanted.length && position < foldedText.length) {
+      if (wanted[matched] === ' ') {
+        if (!isWhiteSpace(foldedText[position])) {
+          break;
+        }
+        while (isWhiteSpace(foldedText[position])) {
+          position++;
+        }
+      } else {
+        if (foldedText[position] !== wanted[matched]) {
+          break;
+        }
+        position++;
+        end = position;
+      }
+      matched++;
+    }
+    runs.push({ start: found.index, end });
+    headPattern.lastIndex = Math.max(end, found.index + 1);
   }
   return runs;
 }
@@ -187,15 +231,20 @@ export function secretRedaction(secrets: readonly Secret[]): (text: string) => s
 // given secrets redacted by key, in any case. Such a value is too short to search for inside longer
 // text, but a text that is nothing but the value is an echo of it.
 export function shortSecretMatch(secrets: readonly Secret[]): (text: string) => boolean {
-  const values = new Set(secrets.filter((secret) => redactionModeOf(secret) === 'key-only').map((secret) => foldCase(reveal(secret).trim())));
+  const values = new Set(secrets.filter((secret) => redactionModeOf(secret) === 'key-only').map((secret) => foldCase(normalise(reveal(secret)))));
   values.delete('');
-  return (text) => values.size > 0 && values.has(foldCase(text.trim()));
+  return (text) => values.size > 0 && values.has(foldCase(normalise(text)));
 }
 
+// True when two texts are the same words: no encoding, only case and white space, between them.
+const sameWords = (left: string, right: string): boolean => normalise(foldCase(left)) === normalise(foldCase(right));
+
 // The forms in which `secret` echoes in `text`. A value in another case counts only when it does
-// not also appear as typed, a URL or form encoding only when it differs from the value in more than
-// case, and a prefix only when the whole value does not appear in any case. A value below the
-// minimum length is not searched for, so it reports nothing.
+// not also appear as typed, a written form (URL or form encoding, JSON escapes, HTML entities) only
+// when it differs from the value in more than case and white space, and a prefix only when the whole
+// value does not appear in any case. A value with its white space changed counts as typed: spacing
+// is layout, not an encoding. A value below the minimum length is not searched for, so it reports
+// nothing.
 export function echoFormsIn(text: string, secret: Secret): readonly LeakForm[] {
   const value = reveal(secret);
   if (value.length < MINIMUM_SECRET_LENGTH) return [];
@@ -203,13 +252,22 @@ export function echoFormsIn(text: string, secret: Secret): readonly LeakForm[] {
   const foldedValue = foldCase(value);
   const forms = new Set<LeakForm>();
   if (text.includes(value)) forms.add('raw');
+  let isRespaced = false;
   for (const echo of encodedEchoes(value)) {
     const found = text.match(echo.pattern) ?? [];
-    const counts = echo.form === 'uri' ? found.some((match) => foldCase(match) !== foldedValue) : found.length > 0;
+    const isWritten = echo.form === 'uri' || echo.form === 'json' || echo.form === 'html';
+    const counts = isWritten ? found.some((match) => !sameWords(match, value)) : found.length > 0;
     if (counts) forms.add(echo.form);
+    isRespaced ||= isWritten && found.some((match) => sameWords(match, value) && foldCase(match) !== foldedValue);
   }
-  const wholeInAnyCase = foldedText.includes(foldedValue);
-  if (wholeInAnyCase && !forms.has('raw')) forms.add('case');
+  if (isRespaced) {
+    forms.add('raw');
+  }
+  const isInAnyCase = foldedText.includes(foldedValue);
+  const wholeInAnyCase = isInAnyCase || isRespaced;
+  if (isInAnyCase && !forms.has('raw')) {
+    forms.add('case');
+  }
   if (!wholeInAnyCase && prefixRuns(foldedText, foldedValue).length > 0) forms.add('prefix');
   return [...forms];
 }
@@ -280,8 +338,9 @@ const HEADER_SOURCES = new WeakMap<Secret, { readonly source: Secret; readonly s
 //   alignment: for a base64 echo, which of the three byte positions the value started at inside
 //     the encoded text. Only the characters wholly decided by the value are cut; the partial ones
 //     at each end stay in the kept text.
-//   approximate: the echo was written in a way the fields above cannot describe. It is cut all the
-//     same, and put back as typed, so the replay gives another result and is never a pass.
+//   approximate: the echo was written in a way the fields above cannot describe, such as with JSON
+//     escapes or HTML entities. It is cut all the same, and put back as typed, so the replay gives
+//     another result and is never a pass.
 export type SecretEcho = {
   readonly offset: number;
   readonly secretName: SecretName;
@@ -420,6 +479,15 @@ function echoesOf(text: string, candidate: EchoCandidate): Found[] {
   const typed = [...text.matchAll(uriPattern(candidate.value))]
     .map((match): Found => ({ start: match.index, end: match.index + match[0].length, echo: spellingEcho(match[0], candidate, false) }));
   if (typed.length > 0) return typed;
+  // Put back as typed, not as it was written, so a replay of it gives another result and is no pass.
+  for (const writings of [jsonWritings, htmlWritings]) {
+    const form = writings === jsonWritings ? 'json' : 'html';
+    const written = [...text.matchAll(writtenPattern(candidate.value, writings))]
+      .map((match): Found => ({ start: match.index, end: match.index + match[0].length, echo: { ...named, form, approximate: true } }));
+    if (written.length > 0) {
+      return written;
+    }
+  }
   return prefixRuns(foldCase(text), foldCase(candidate.value))
     .map((run): Found => ({ start: run.start, end: run.end, echo: spellingEcho(text.slice(run.start, run.end), candidate, true) }));
 }

@@ -212,7 +212,12 @@ export async function runCleanup(
       const base = { index, command: step.command } as const;
       if (commands === undefined) { results.push({ ...base, outcome: 'failed', code: 'cleanup-failed', cause: 'unsupported-step' }); continue; }
       if (needsUnsetValue(step.arguments, commands.values)) { results.push({ ...base, outcome: 'skipped' }); continue; }
-      const done = await runDatabaseStep(step, firstIndex + index, commands);
+      let done: Awaited<ReturnType<typeof runDatabaseStep>>;
+      try {
+        done = await runDatabaseStep(step, firstIndex + index, commands);
+      } catch {
+        done = { outcome: 'failed', code: 'command-failed' };
+      }
       results.push(done.outcome === 'passed'
         ? { ...base, outcome: 'passed' }
         : { ...base, outcome: 'failed', code: 'cleanup-failed', ...(done.code === undefined ? {} : { cause: done.code }) });

@@ -2,6 +2,8 @@
 // Functions that run inside the page. They are sent with toString(), so each must be
 // self-contained: no imports and no closures over Node values. Every protocol uses the same
 // functions, so a probe or an actionability check means the same thing everywhere.
+// What a person sees includes what is drawn in open shadow roots, so these functions look through
+// them too; FindByLabel.ts says how, and holds the functions that find a locator's elements.
 
 // A snapshot of one element as JSON, in the shape of ElementProbe.
 export function probeElement(element: Element, selectors: readonly string[]): string {
@@ -11,8 +13,39 @@ export function probeElement(element: Element, selectors: readonly string[]): st
   const disabled = (element as HTMLInputElement).disabled === true || element.getAttribute('aria-disabled') === 'true';
   const isField = element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement || element instanceof HTMLSelectElement;
   const selectorList = selectors.join(',');
-  const sensitive = selectorList !== ''
-    && (element.matches(selectorList) || element.closest(selectorList) !== null || element.querySelector(selectorList) !== null);
+  const parentOf = (node: Element): Element | null => {
+    if (node.assignedSlot !== null) {
+      return node.assignedSlot;
+    }
+    if (node.parentElement !== null) {
+      return node.parentElement;
+    }
+    const root = node.getRootNode();
+    return root instanceof ShadowRoot ? root.host : null;
+  };
+  const isInsideMatch = (): boolean => {
+    for (let node: Element | null = element; node !== null; node = parentOf(node)) {
+      if (node.matches(selectorList)) {
+        return true;
+      }
+    }
+    return false;
+  };
+  const hasMatchInside = (): boolean => {
+    const scopes: (Element | ShadowRoot)[] = element.shadowRoot === null ? [element] : [element, element.shadowRoot];
+    for (const scope of scopes) {
+      if (scope.querySelector(selectorList) !== null) {
+        return true;
+      }
+      for (const inner of Array.from(scope.querySelectorAll('*'))) {
+        if (inner.shadowRoot !== null) {
+          scopes.push(inner.shadowRoot);
+        }
+      }
+    }
+    return false;
+  };
+  const sensitive = selectorList !== '' && (isInsideMatch() || hasMatchInside());
   return JSON.stringify({
     count: 1, visible, enabled: !disabled,
     text: (element as HTMLElement).innerText ?? element.textContent ?? '',
@@ -50,9 +83,29 @@ export async function actionability(element: Element): Promise<string> {
   // box around them all may fall between them; the centre of its first box is on the element.
   const firstBox = Array.from(element.getClientRects()).find((box) => box.width > 0 && box.height > 0) ?? after;
   const centre = { x: firstBox.x + firstBox.width / 2, y: firstBox.y + firstBox.height / 2 };
-  const hit = document.elementFromPoint(centre.x, centre.y);
+  // The document answers with a shadow host; only its root can say what is drawn there.
+  let hit = document.elementFromPoint(centre.x, centre.y);
+  let inner = hit?.shadowRoot?.elementFromPoint(centre.x, centre.y) ?? null;
+  while (inner !== null && inner !== hit) {
+    hit = inner;
+    inner = hit.shadowRoot?.elementFromPoint(centre.x, centre.y) ?? null;
+  }
+  const parentOf = (node: Element): Element | null => {
+    if (node.assignedSlot !== null) {
+      return node.assignedSlot;
+    }
+    if (node.parentElement !== null) {
+      return node.parentElement;
+    }
+    const root = node.getRootNode();
+    return root instanceof ShadowRoot ? root.host : null;
+  };
+  let isHit = false;
+  for (let node = hit; node !== null && !isHit; node = parentOf(node)) {
+    isHit = node === element;
+  }
   const viaLabel = hit !== null && hit.closest('label') !== null && (hit.closest('label') as HTMLLabelElement).control === element;
-  const receivesEvents = hit !== null && (hit === element || element.contains(hit) || viaLabel);
+  const receivesEvents = isHit || viaLabel;
   return JSON.stringify({ attached: element.isConnected, visible: true, stable, enabled: !disabled, receivesEvents, centre });
 }
 
@@ -67,9 +120,13 @@ export function armHitCheck(element: Element): string {
   const eventTypes = ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'];
   const check: HitCheck = { state: 'none', disarm: () => { for (const eventType of eventTypes) window.removeEventListener(eventType, listen, true); } };
   function listen(event: Event): void {
-    const target = event.target instanceof Element ? event.target : null;
+    // Seen from the window, a target in a shadow root reads as its host; the composed path says
+    // what it really is, through every open root.
+    const path = event.composedPath();
+    const innermost = path[0];
+    const target = innermost instanceof Element ? innermost : null;
     const label = target?.closest('label') as HTMLLabelElement | null;
-    const onElement = target !== null && (target === element || element.contains(target) || label?.control === element);
+    const onElement = target !== null && (path.includes(element) || label?.control === element);
     // The click event ends the pointer sequence, so the check stops listening there. It must not
     // outlive the click: a dialog the click opens can stop the driver from reading it, and a
     // check left armed would swallow the page's own later clicks.
@@ -98,50 +155,81 @@ export function readHitCheck(): string {
   return check.state;
 }
 
-// Elements labelled exactly `label`: label[for], a wrapping label, aria-label or aria-labelledby.
-export function findByLabel(label: string): Element[] {
-  const normalise = (text: string): string => text.replace(/\s+/g, ' ').trim();
-  const wanted = normalise(label);
-  const found = new Set<Element>();
-  for (const labelElement of Array.from(document.querySelectorAll('label'))) {
-    if (labelElement.control && normalise(labelElement.textContent ?? '') === wanted) found.add(labelElement.control);
+// What a pointer press at the point would really act on, other than `element`: the element it would
+// hit, and what is interactive around that, up to and including the nearest control. A handler or a
+// tab stop does not end the search, since a press goes on to the control around it. A label's press
+// goes to its control. Controls beside the point are not there, so a card is not judged by a button
+// it also holds.
+export function whatAClickActivates(element: Element, x: number, y: number): Element[] {
+  const controls = 'a[href], area[href], button, input, select, textarea, summary, option, label, [role="button"], [role="link"], [role="checkbox"], '
+    + '[role="radio"], [role="switch"], [role="tab"], [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [role="option"], [role="treeitem"]';
+  let hit = document.elementFromPoint(x, y);
+  let inner = hit?.shadowRoot?.elementFromPoint(x, y) ?? null;
+  while (inner !== null && inner !== hit) {
+    hit = inner;
+    inner = hit.shadowRoot?.elementFromPoint(x, y) ?? null;
   }
-  for (const element of Array.from(document.querySelectorAll('[aria-label]'))) {
-    if (normalise(element.getAttribute('aria-label') ?? '') === wanted) found.add(element);
+  if (hit === null) {
+    return [];
   }
-  for (const element of Array.from(document.querySelectorAll('[aria-labelledby]'))) {
-    const ids = (element.getAttribute('aria-labelledby') ?? '').split(/\s+/);
-    if (normalise(ids.map((id) => document.getElementById(id)?.textContent ?? '').join(' ')) === wanted) found.add(element);
+  const parentOf = (node: Element): Element | null => {
+    if (node.assignedSlot !== null) {
+      return node.assignedSlot;
+    }
+    if (node.parentElement !== null) {
+      return node.parentElement;
+    }
+    const root = node.getRootNode();
+    return root instanceof ShadowRoot ? root.host : null;
+  };
+  const activated = new Set<Element>([hit]);
+  const addLabelled = (node: Element): void => {
+    if (node instanceof HTMLLabelElement && node.control !== null) {
+      activated.add(node.control);
+    }
+  };
+  addLabelled(hit);
+  for (let node = parentOf(hit); node !== null; node = parentOf(node)) {
+    addLabelled(node);
+    if (node.matches('[onclick], [tabindex]')) {
+      activated.add(node);
+    }
+    if (node.matches(controls)) {
+      activated.add(node);
+      break;
+    }
   }
-  return Array.from(found);
+  activated.delete(element);
+  return Array.from(activated);
 }
 
-// The deepest elements whose rendered text is exactly `text`.
-export function findByText(text: string): Element[] {
-  const normalise = (value: string): string => value.replace(/\s+/g, ' ').trim();
-  const wanted = normalise(text);
-  const matches = Array.from(document.body.querySelectorAll('*')).filter(
-    (element) => !['SCRIPT', 'STYLE', 'TEMPLATE'].includes(element.tagName) && normalise((element as HTMLElement).innerText ?? '') === wanted,
-  );
-  return matches.filter((element) => !matches.some((other) => other !== element && element.contains(other)));
-}
-
-// Elements whose `attribute` is exactly `testId`. Every element is compared by string equality, so
-// no selector is ever built from plan text and selector syntax in a test id matches only itself.
-export function findByTestId(testId: string, attribute: string): Element[] {
-  return Array.from(document.querySelectorAll('*')).filter((element) => element.getAttribute(attribute) === testId);
-}
-
-// The given elements in document order, for picking one by position.
-export function inDocumentOrder(...elements: Element[]): Element[] {
-  return elements.sort((left, right) => (left === right ? 0 : left.compareDocumentPosition(right) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1));
-}
-
-// Paints a solid black box over every element matching the selectors.
+// Paints a solid black box over every element matching the selectors, in any open shadow root too:
+// an element a locator can find must be one a mask can reach.
 export function maskElements(selectors: readonly string[]): string {
   const selectorList = selectors.join(',');
   if (selectorList === '') return '0';
-  const elements = Array.from(document.querySelectorAll(selectorList));
+  const elements: Element[] = [];
+  const roots: (Document | ShadowRoot)[] = [document];
+  for (const root of roots) {
+    elements.push(...Array.from(root.querySelectorAll(selectorList)));
+    for (const element of Array.from(root.querySelectorAll('*'))) {
+      if (element.shadowRoot !== null) {
+        roots.push(element.shadowRoot);
+      }
+    }
+  }
+  for (const element of elements) {
+    const rectangle = element.getBoundingClientRect();
+    const overlay = document.createElement('div');
+    overlay.setAttribute('data-mask-overlay', '');
+    overlay.style.cssText = `position:fixed;left:${rectangle.x}px;top:${rectangle.y}px;width:${rectangle.width}px;height:${rectangle.height}px;background:#000;z-index:2147483647;pointer-events:none`;
+    document.documentElement.appendChild(overlay);
+  }
+  return String(elements.length);
+}
+
+// Paints the same box over each of the given elements. unmaskElements takes these away too.
+export function maskGivenElements(...elements: Element[]): string {
   for (const element of elements) {
     const rectangle = element.getBoundingClientRect();
     const overlay = document.createElement('div');
@@ -155,6 +243,11 @@ export function maskElements(selectors: readonly string[]): string {
 export function unmaskElements(): string {
   for (const overlay of Array.from(document.querySelectorAll('[data-mask-overlay]'))) overlay.remove();
   return 'ok';
+}
+
+// The URL of the document this runs in: the browser's own internal one on its error page.
+export function documentUrl(): string {
+  return location.href;
 }
 
 // Waits for web fonts; returns the font set's status.
@@ -192,7 +285,18 @@ export function linkTargetList(): string {
 // "false" (or empty) is current. With none, a link or a control is not current; any other element
 // does not expose the state ("none").
 export function linkAndCurrent(element: Element): string {
-  const link = element.closest('a[href], area[href]');
+  const parentOf = (node: Element): Element | null => {
+    if (node.assignedSlot !== null) {
+      return node.assignedSlot;
+    }
+    if (node.parentElement !== null) {
+      return node.parentElement;
+    }
+    const root = node.getRootNode();
+    return root instanceof ShadowRoot ? root.host : null;
+  };
+  let link: Element | null = element;
+  while (link !== null && !link.matches('a[href], area[href]')) link = parentOf(link);
   const href = link instanceof HTMLAnchorElement || link instanceof HTMLAreaElement ? link.href : null;
   const CONTROL_ROLES = ['link', 'button', 'tab', 'menuitem', 'menuitemcheckbox', 'menuitemradio', 'option', 'treeitem', 'gridcell', 'row',
     'checkbox', 'radio', 'switch'];
@@ -229,7 +333,8 @@ export function guardDetails(element: Element): string {
     if (ariaLabel !== null && normalise(ariaLabel) !== '') return normalise(ariaLabel);
     const labelledBy = control.getAttribute('aria-labelledby');
     if (labelledBy !== null) {
-      const text = normalise(labelledBy.split(/\s+/).map((id) => document.getElementById(id)?.textContent ?? '').join(' '));
+      const root = control.getRootNode() as Document | ShadowRoot;
+      const text = normalise(labelledBy.split(/\s+/).map((id) => root.getElementById(id)?.textContent ?? '').join(' '));
       if (text !== '') return text;
     }
     if (control instanceof HTMLInputElement) return normalise(control.type === 'image' ? control.alt : control.value || 'Submit');
@@ -242,7 +347,18 @@ export function guardDetails(element: Element): string {
     (control instanceof HTMLButtonElement && control.type === 'submit')
     || (control instanceof HTMLInputElement && (control.type === 'submit' || control.type === 'image')));
   const submitName = submit === undefined ? '' : nameOf(submit);
-  const link = element.closest('a[href]');
+  const parentOf = (node: Element): Element | null => {
+    if (node.assignedSlot !== null) {
+      return node.assignedSlot;
+    }
+    if (node.parentElement !== null) {
+      return node.parentElement;
+    }
+    const root = node.getRootNode();
+    return root instanceof ShadowRoot ? root.host : null;
+  };
+  let link: Element | null = element;
+  while (link !== null && !link.matches('a[href]')) link = parentOf(link);
   return JSON.stringify({
     box: { x: rectangle.x, y: rectangle.y, width: rectangle.width, height: rectangle.height },
     formSubmitName: submitName === '' ? null : submitName,
@@ -331,31 +447,6 @@ export function structuralSelectorValidity(kind: string, text: string): string {
   } catch {
     return 'invalid';
   }
-}
-
-// The elements a css selector or XPath expression matches, in document order, inside the one
-// scope element when one is given and in the whole document otherwise. Inside a scope, an XPath
-// expression starting with "/" is read from the scope (".//x"), as Playwright reads it, so it
-// cannot reach outside. With hasText, only the elements whose text content, white space
-// collapsed, contains it, ignoring case, as Playwright's hasText.
-export function findStructural(kind: string, text: string, hasText: string, ...scope: Element[]): Element[] {
-  const scopeElement = scope[0];
-  const root: Document | Element = scopeElement ?? document;
-  const found: Element[] = [];
-  if (kind === 'css') {
-    found.push(...Array.from(root.querySelectorAll(text)));
-  } else {
-    const expression = scopeElement !== undefined && text.startsWith('/') ? `.${text}` : text;
-    const snapshot = document.evaluate(expression, root, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
-    for (let index = 0; index < snapshot.snapshotLength; index++) {
-      const node = snapshot.snapshotItem(index);
-      if (node instanceof Element) found.push(node);
-    }
-  }
-  if (hasText === '') return found;
-  const normalise = (value: string): string => value.replace(/\s+/g, ' ').trim().toLowerCase();
-  const wanted = normalise(hasText);
-  return found.filter((element) => normalise(element.textContent ?? '').includes(wanted));
 }
 
 // One DOM read of the element, as JSON in the shape of DomValue: its class tokens, the computed

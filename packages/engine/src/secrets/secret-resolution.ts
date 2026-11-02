@@ -112,6 +112,9 @@ function watchedSecrets(secrets: ResolvedSecrets): Secret[] {
   return [...secrets.fills.values(), ...secrets.services.values(), ...secrets.stubsAndStorage.values(), ...secrets.commands.values(), ...storage];
 }
 
+// Removes every echo of the resolved secrets from a text, and nothing else.
+export const secretEchoRemoval = (secrets: ResolvedSecrets): ((text: string) => string) => secretRedaction(watchedSecrets(secrets));
+
 // The run's redactor: the caller's personal-data redaction, with every echo of the resolved secrets
 // removed first, so a pattern match cannot split a secret and leave part of it behind. Saved
 // storage state is redacted as a whole and by each cookie and stored value inside it.
