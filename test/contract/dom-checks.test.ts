@@ -13,6 +13,9 @@ import { ADAPTER_OF_TARGET } from '#test-support/browser/BrowserTarget.ts';
 import { listedFeatures } from '#test-support/browser/DriversWithout.ts';
 import { navigate, reference, testId, type JsonRecord } from '#test-support/browser/RawPlan.ts';
 import { UNSAFE_PAGE_TARGETS, check, css, rememberAttribute, unsafePageDrivers, unsafePageHarness, type UnsafePageHarness } from './unsafe-page-support.ts';
+import { shareBrowserInThisFile } from '#test-support/browser/ShareBrowserInThisFile.ts';
+
+shareBrowserInThisFile();
 
 let harness: UnsafePageHarness;
 before(async () => { harness = await unsafePageHarness(); });

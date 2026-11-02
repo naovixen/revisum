@@ -3,9 +3,10 @@ import { cdpDriver, type CdpDriverOptions, type OwnBrowserDriver } from "@revisu
 import type { BrowserDriver } from "@revisum/engine";
 import { BROWSERS } from "../browsers.ts";
 import { ADAPTER_OF_TARGET, BrowserTarget } from "./BrowserTarget.ts";
+import { driverOnSharedBrowser, isSharingBrowserInThisFile } from "./ShareBrowserInThisFile.ts";
 
 export function createBrowserDriver(options: CdpDriverOptions): OwnBrowserDriver {
-    return cdpDriver(options);
+    return isSharingBrowserInThisFile() ? driverOnSharedBrowser(options) : cdpDriver(options);
 }
 
 const EXECUTABLE_OF_TARGET: Readonly<Record<BrowserTarget, string>> = {

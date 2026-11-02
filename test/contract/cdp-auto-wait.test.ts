@@ -11,6 +11,9 @@ import { isTargetRunning, onTarget } from '#test-support/TestTier.ts';
 import { BrowserTarget } from '#test-support/browser/BrowserTarget.ts';
 import { click, role } from '#test-support/browser/RawPlan.ts';
 import { capabilityHarness, shownText, type CapabilityHarness } from '#test-support/capability-harness.ts';
+import { shareBrowserInThisFile } from '#test-support/browser/ShareBrowserInThisFile.ts';
+
+shareBrowserInThisFile();
 
 const STEP_TIMEOUT_MILLISECONDS = 2000;
 const NEVER_ACTIONABLE_ALLOWANCE_MILLISECONDS = 1500;

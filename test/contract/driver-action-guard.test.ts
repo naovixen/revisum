@@ -15,6 +15,9 @@ import { BrowserTarget } from '#test-support/browser/BrowserTarget.ts';
 import { click, label, navigate, role, testId, textEquals, type JsonRecord } from '#test-support/browser/RawPlan.ts';
 import { UPLOAD_FIXTURE, capabilityCdpDriver, capabilityDrivers, capabilityHarness, capabilityPlan, shownText, watchedDriver, type CapabilityHarness } from '#test-support/capability-harness.ts';
 import { BROWSERS } from '#test-support/browsers.ts';
+import { shareBrowserInThisFile } from '#test-support/browser/ShareBrowserInThisFile.ts';
+
+shareBrowserInThisFile();
 
 let capability: CapabilityHarness;
 before(async () => { capability = await capabilityHarness(2000); });

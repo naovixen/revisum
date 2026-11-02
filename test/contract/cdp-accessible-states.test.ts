@@ -15,6 +15,9 @@ import { BrowserTarget } from '#test-support/browser/BrowserTarget.ts';
 import { click, navigate, role, testId, type JsonRecord } from '#test-support/browser/RawPlan.ts';
 import { reusedSessionDriver } from '#test-support/browser/ReusedSessionDriver.ts';
 import { expectState, pageStatesHarness, type PageStatesHarness } from './page-states-support.ts';
+import { shareBrowserInThisFile } from '#test-support/browser/ShareBrowserInThisFile.ts';
+
+shareBrowserInThisFile();
 
 let harness: PageStatesHarness;
 let closeShared: () => Promise<void>;

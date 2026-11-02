@@ -10,6 +10,9 @@ import { after, before, test } from 'node:test';
 import { BrowserTarget } from '#test-support/browser/BrowserTarget.ts';
 import { click, navigate, role, testId, textEquals } from '#test-support/browser/RawPlan.ts';
 import { expectRequests, expectResponse, networkHarness, startStub, stopStub, timesRequested, type NetworkHarness, type NetworkRun } from './network-stubs-support.ts';
+import { shareBrowserInThisFile } from '#test-support/browser/ShareBrowserInThisFile.ts';
+
+shareBrowserInThisFile();
 
 let harness: NetworkHarness;
 before(async () => { harness = await networkHarness(); });

@@ -22,6 +22,9 @@ import { fakeEnvironmentStore, fakeSecretValue } from '../unit/engine/secret-exa
 import { outcomes } from '#test-support/browser/BrowserHarness.ts';
 import { fill, label, navigate, secretValue, type JsonRecord } from '#test-support/browser/RawPlan.ts';
 import { UNSAFE_PAGE_TARGETS, ECHO_ARGUMENTS_FILE, ECHO_COUNT_MAXIMUM, ECHO_TEXT_MAXIMUM_LENGTH, PAGE_SECRET, expectScript, inlineScript, scriptFileText, unsafePageHarness, unsafePagePlan, type UnsafePageHarness } from './unsafe-page-support.ts';
+import { shareBrowserInThisFile } from '#test-support/browser/ShareBrowserInThisFile.ts';
+
+shareBrowserInThisFile();
 
 const TIMEOUT = 600_000;
 const ARGUMENT_SETS = 1000;

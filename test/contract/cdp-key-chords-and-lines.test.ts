@@ -15,6 +15,9 @@ import { outcomes, type BrowserHarness } from '#test-support/browser/BrowserHarn
 import { BrowserTarget } from '#test-support/browser/BrowserTarget.ts';
 import { fill, label, navigate, press, reference, remember, testId, textEquals } from '#test-support/browser/RawPlan.ts';
 import { planValuesHarness } from './plan-values-support.ts';
+import { shareBrowserInThisFile } from '#test-support/browser/ShareBrowserInThisFile.ts';
+
+shareBrowserInThisFile();
 
 let harness: BrowserHarness;
 before(async () => { harness = await planValuesHarness(); });

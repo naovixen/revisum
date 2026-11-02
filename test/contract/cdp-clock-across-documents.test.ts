@@ -11,6 +11,9 @@ import { outcomes, type BrowserRun } from '#test-support/browser/BrowserHarness.
 import { BrowserTarget } from '#test-support/browser/BrowserTarget.ts';
 import { click, navigate, newTab, role, testId, textEquals, type JsonRecord } from '#test-support/browser/RawPlan.ts';
 import { CLOCK_START_MILLISECONDS, HOUR, MINUTE, advanceClock, clockHarness, clockPlan, frame, type ClockHarness } from './clock-and-clipboard-support.ts';
+import { shareBrowserInThisFile } from '#test-support/browser/ShareBrowserInThisFile.ts';
+
+shareBrowserInThisFile();
 
 let harness: ClockHarness;
 before(async () => { harness = await clockHarness(); });

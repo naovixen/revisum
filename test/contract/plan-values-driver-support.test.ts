@@ -12,6 +12,9 @@ import { BrowserTarget } from '#test-support/browser/BrowserTarget.ts';
 import { cdpWithout } from '#test-support/browser/DriversWithout.ts';
 import { click, label, navigate, press, remember, role, testId, textEquals, type JsonRecord } from '#test-support/browser/RawPlan.ts';
 import { planValuesHarness } from './plan-values-support.ts';
+import { shareBrowserInThisFile } from '#test-support/browser/ShareBrowserInThisFile.ts';
+
+shareBrowserInThisFile();
 
 let harness: BrowserHarness;
 before(async () => { harness = await planValuesHarness(); });

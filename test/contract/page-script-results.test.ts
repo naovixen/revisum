@@ -14,6 +14,9 @@ import { after, before, describe, test } from 'node:test';
 import { outcomes, stepMilliseconds } from '#test-support/browser/BrowserHarness.ts';
 import { navigate } from '#test-support/browser/RawPlan.ts';
 import { UNSAFE_PAGE_TARGETS, HOSTILE_RESULT_MAXIMUM_BYTES, HOSTILE_RESULT_TIMEOUT_MILLISECONDS, STEP_TIMEOUT_MILLISECONDS, continueStep, continued, hostileResult, unsafePageHarness, type HostileResultKind, type UnsafePageHarness } from './unsafe-page-support.ts';
+import { shareBrowserInThisFile } from '#test-support/browser/ShareBrowserInThisFile.ts';
+
+shareBrowserInThisFile();
 
 let harness: UnsafePageHarness;
 before(async () => { harness = await unsafePageHarness(); });

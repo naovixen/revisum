@@ -15,6 +15,9 @@ import { outcomes, stepMilliseconds, type BrowserRun } from '#test-support/brows
 import { BrowserTarget } from '#test-support/browser/BrowserTarget.ts';
 import { click, navigate, role, testId, text, textEquals } from '#test-support/browser/RawPlan.ts';
 import { CLOCK_START_MILLISECONDS, MAXIMUM_ADVANCE_REAL_MILLISECONDS, MINUTE, STEP_TIMEOUT_MILLISECONDS, absent, advanceClock, clockHarness, type ClockHarness } from './clock-and-clipboard-support.ts';
+import { shareBrowserInThisFile } from '#test-support/browser/ShareBrowserInThisFile.ts';
+
+shareBrowserInThisFile();
 
 let harness: ClockHarness;
 before(async () => { harness = await clockHarness(); });

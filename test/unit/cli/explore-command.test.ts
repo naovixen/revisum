@@ -25,6 +25,9 @@ import {
   exploreDraftWithLine, exploreErrorCodes, fakeRunner, pageMapReference, pageMapText, plannerRequestTexts, writtenMap,
   withExploreRun, type ExploreRun, type ExploreSetup, type SessionCall,
 } from './explore-command-examples.ts';
+import { shareBrowserInThisFile } from '#test-support/browser/ShareBrowserInThisFile.ts';
+
+shareBrowserInThisFile();
 
 const home = (site: { readonly origin: string }): string => `${site.origin}/`;
 const hostRun = (extra: readonly string[] = []): ExploreSetup => ({ argv: (site) => exploreArguments(home(site), ['--host', '--json', ...extra]) });

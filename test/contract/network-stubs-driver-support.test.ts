@@ -12,6 +12,9 @@ import { BrowserTarget } from '#test-support/browser/BrowserTarget.ts';
 import { cdpWithout, listedFeatures } from '#test-support/browser/DriversWithout.ts';
 import { click, navigate, role, testId, textEquals, type JsonRecord } from '#test-support/browser/RawPlan.ts';
 import { expectRequests, expectResponse, expectStorage, networkHarness, rememberResponse, removeStorage, resetRequests, setStorage, startStub, timesRequested, type NetworkHarness } from './network-stubs-support.ts';
+import { shareBrowserInThisFile } from '#test-support/browser/ShareBrowserInThisFile.ts';
+
+shareBrowserInThisFile();
 
 let harness: NetworkHarness;
 before(async () => { harness = await networkHarness(); });

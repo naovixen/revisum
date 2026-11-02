@@ -11,6 +11,9 @@ import { outcomes } from '#test-support/browser/BrowserHarness.ts';
 import { BrowserTarget } from '#test-support/browser/BrowserTarget.ts';
 import { navigate, testId, textEquals } from '#test-support/browser/RawPlan.ts';
 import { expectStorage, networkHarness, removeStorage, setStorage, type NetworkHarness, type NetworkRun } from './network-stubs-support.ts';
+import { shareBrowserInThisFile } from '#test-support/browser/ShareBrowserInThisFile.ts';
+
+shareBrowserInThisFile();
 
 let harness: NetworkHarness;
 before(async () => { harness = await networkHarness(); });

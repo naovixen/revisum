@@ -15,6 +15,9 @@ import { outcomes } from '#test-support/browser/BrowserHarness.ts';
 import { BrowserTarget } from '#test-support/browser/BrowserTarget.ts';
 import { navigate, role, testId, textEquals } from '#test-support/browser/RawPlan.ts';
 import { canonicalUrl, hrefEquals, metaContent, navigateWithoutScripts, pageStatesHarness, type PageStatesHarness } from './page-states-support.ts';
+import { shareBrowserInThisFile } from '#test-support/browser/ShareBrowserInThisFile.ts';
+
+shareBrowserInThisFile();
 
 let harness: PageStatesHarness;
 before(async () => { harness = await pageStatesHarness(); });
