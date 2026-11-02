@@ -5,7 +5,7 @@
 // Some features of plan languages 1.2 and 1.3 are optional for a driver: positions, test-id
 // attributes other than data-testid, key chords, multi-line fills, remembered values, accessibility
 // states, link targets, head metadata, pages loaded with scripts off, downloads, second tabs,
-// network stubs, request checks, web storage, clock advances, the clipboard, CSS and XPath
+// network stubs, request checks, web storage, clock advances, the clipboard, css and XPath
 // locators, DOM checks and page scripts. A driver declares the ones it performs in its
 // AdapterInfo; the run refuses a step needing one its driver does not declare with
 // unsupported-step, before anything of it reaches the driver.
@@ -47,7 +47,7 @@ export const DEFAULT_TEST_ID_ATTRIBUTE = 'data-testid';
 //                     through its clock port;
 //   clipboard         reads the plain text of the run's own in-memory clipboard, through its clipboard port;
 //   structuralLocators
-//                     finds elements by a CSS selector or an XPath expression, with hasText and
+//                     finds elements by a css selector or an XPath expression, with hasText and
 //                     inside, and fails a selector the browser rejects with selector-invalid;
 //   domChecks         reads an element's classes, one computed style or one attribute in its probe,
 //                     for the DOM checks (a remember from an attribute needs rememberedValues too);
@@ -68,7 +68,7 @@ export const literalText = (text: TextOrValue): SafeText | undefined => (typeof 
 export const referencedValueName = (text: TextOrValue): ValueName | undefined => (typeof text === 'string' ? undefined : text.valueName);
 
 // A role, label, text or test-id locator with its texts typed as literal text, or undefined when a
-// value reference is left or when it is a CSS or XPath locator (performableLocator takes those).
+// value reference is left or when it is a css or XPath locator (performableLocator takes those).
 export function literalLocator(locator: Locator): SemanticLocatorWith<SafeText> | undefined {
   switch (locator.by) {
     case 'role': { const name = literalText(locator.name); return name === undefined ? undefined : { ...locator, name }; }
@@ -106,7 +106,7 @@ function locatorFeatures(locator: Locator): DriverFeature[] {
   return features;
 }
 
-// True when the driver cannot resolve the locator: it uses an optional feature, such as a CSS or
+// True when the driver cannot resolve the locator: it uses an optional feature, such as a css or
 // XPath selector, that `performs` does not list.
 export const needsLocatorFeatures = (locator: Locator, performs: readonly DriverFeature[] = NO_FEATURES): boolean =>
   locatorFeatures(locator).some((feature) => !performs.includes(feature));
@@ -126,7 +126,7 @@ const isMultiLine = (value: Extract<Step, { type: 'fill' }>['value']): boolean =
 // True when the step needs what its driver does not perform: an optional feature above that
 // `performs` does not list (an accessibility state, a link target, the document head, a page
 // loaded with scripts off, a download or a check of one, a second tab, a stub, a request or
-// response check or read, a storage step, a clock advance, a clipboard check or read, a CSS or
+// response check or read, a storage step, a clock advance, a clipboard check or read, a css or
 // XPath locator, a DOM check or a page script among them), or a check no probe decides. The run
 // reports such a step as unsupported-step before anything of it reaches the driver. Hover, select
 // and upload go to the driver, which refuses them with unsupported-step when it does not perform

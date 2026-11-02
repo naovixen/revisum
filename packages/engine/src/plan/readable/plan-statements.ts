@@ -81,11 +81,11 @@ const POSITION: Syntax = {
   },
 };
 
-// The locator a CSS or XPath locator is evaluated inside: any locator, so the locator syntax refers
+// The locator a css or XPath locator is evaluated inside: any locator, so the locator syntax refers
 // to itself. It is looked up when used, because LOCATOR is defined below.
 const INSIDE: Syntax = { read: (line, index) => LOCATOR.read(line, index), write: (value) => LOCATOR.write(value) };
 
-// A CSS or XPath locator: the selector or expression, then its own containing text, then the
+// A css or XPath locator: the selector or expression, then its own containing text, then the
 // locator it is inside. `inside` takes the whole rest of the locator, so a chain reads one way only,
 // and a containing text before an `inside` is always the outer locator's own.
 const structuralLocator = (kind: string, textKey: string): readonly RecordPart[] => [
@@ -105,11 +105,11 @@ const LOCATOR_FORMS: { readonly [Kind in Locator['by']]: readonly RecordPart[] }
 // Any locator that cannot be read is bad-locator, at the locator.
 const ANY_LOCATOR = reportedAs('bad-locator', variants('by', LOCATOR_FORMS, [optional(field('position', POSITION))]));
 
-// True for a CSS or XPath locator, or one evaluated inside one.
+// True for a css or XPath locator, or one evaluated inside one.
 const holdsStructuralLocator = (locator: unknown): boolean =>
   isRecord(locator) && (STRUCTURAL_LOCATOR_KINDS.some((kind) => kind === locator['by']) || holdsStructuralLocator(locator['inside']));
 
-// Only a CSS or XPath locator has an `inside`, so `inside` after a role, label, text or test-id
+// Only a css or XPath locator has an `inside`, so `inside` after a role, label, text or test-id
 // locator is bad-locator, at that word, rather than an unknown statement.
 export const LOCATOR: Syntax = {
   read(line, index) {
@@ -245,7 +245,7 @@ const ELEMENT_CHECK_FORMS: { readonly [Kind in Exclude<ElementAssertion['kind'],
   countEquals: [words('count is'), field('value', NUMBER)],
   hrefEquals: [words('links to'), field('value', TEXT)],
   // DOM checks. A class name is quoted, because a class token may hold quotes, braces and commas;
-  // CSS property and attribute names are bare words.
+  // css property and attribute names are bare words.
   hasClass: [words('has class'), field('value', TEXT)],
   lacksClass: [words('lacks class'), field('value', TEXT)],
   computedStyleEquals: [words('computed style'), field('property', BARE), words('is'), field('value', TEXT)],
@@ -421,7 +421,7 @@ export const STEP_STATEMENTS: readonly StepStatement[] = STEP_TYPES.flatMap((typ
 // read in any case, and written as shown followed by one space.
 export const UNSAFE_MARK = 'Unsafe:';
 
-// Whether a step statement's own fields hold an unsafe construct: a CSS or XPath locator anywhere
+// Whether a step statement's own fields hold an unsafe construct: a css or XPath locator anywhere
 // in it, a DOM check, remembering an attribute, a page script or a database command. A frame's or
 // second tab's steps are not its own: they carry their own marks. It works on plain JSON, so the
 // reader decides from the words it read and the writer from the parsed plan, by one rule.

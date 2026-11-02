@@ -160,7 +160,7 @@ export function parseStyleAttribute(value: string | undefined): { property: stri
   return declarations;
 }
 
-// A CSS pixel length such as "12px" as a number; NaN for anything else.
+// A css pixel length such as "12px" as a number; NaN for anything else.
 export const pixels = (value: string | undefined): number => {
   if (!value) return NaN;
   const match = value.match(/^(-?[\d.]+)px$/);

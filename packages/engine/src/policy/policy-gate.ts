@@ -297,7 +297,7 @@ function staticDenial(plan: Plan, targets: readonly Target[], standing: PlanStan
 // ---- The runtime guard --------------------------------------------------------------------------
 
 // A control with no accessible name could be anything, so it is acted on only when the project
-// allows it by test id, either the one the locator used or the element's own, or, for a CSS or
+// allows it by test id, either the one the locator used or the element's own, or, for a css or
 // XPath locator, by that exact selector or expression in its unsafe features' list.
 function isAllowedUnnamed(locator: Locator, element: ResolvedElement, project: Project | TrustedProject): boolean {
   const allowed = project.policy.unnamedControlsAllowedByTestId;

@@ -8,7 +8,7 @@
 // Role locators match map nodes of that role whose name matches as the driver's role locator
 // matches: exactly, with runs of white space folded. Label locators match form-control nodes by
 // name in the same way. A map name that was cut or redacted may hide the name, so it counts as a
-// possible match and never gives locator-not-on-page. Other locator kinds (text, test id, CSS,
+// possible match and never gives locator-not-on-page. Other locator kinds (text, test id, css,
 // XPath), names that are run values, and steps on pages not in the map are not checked. Pure.
 // See docs/specs/SPEC-37-explore-to-draft.md.
 import type { DraftWarning, Locator, PageMap, PageMapNode, Plan, Step } from '@revisum/contracts';

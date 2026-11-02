@@ -13,7 +13,7 @@
 // See docs/specs/SPEC-01-plan-language-and-parser.md, docs/specs/SPEC-30-plan-values-positions-and-keys.md,
 // docs/specs/SPEC-31-page-states-metadata-downloads-and-tabs.md, docs/specs/SPEC-32-declared-service-calls.md,
 // docs/specs/SPEC-33-network-stubs-request-checks-and-storage.md and docs/specs/SPEC-34-clock-advance-and-clipboard.md.
-// The unsafe features of version 1.3 (CSS and XPath locators, DOM checks, page scripts and
+// The unsafe features of version 1.3 (css and XPath locators, DOM checks, page scripts and
 // database commands) are read only once the trusted project enables each one; a disabled one is
 // refused with unsafe_feature_disabled at the field that names it, every use of it, with nothing
 // under it read. A selector or expression is literal plan text, so what a locator can match is
@@ -226,7 +226,7 @@ function readDeclared<Name extends string>(input: unknown, path: string, context
 
 const isStructuralKind = (kind: string): kind is StructuralLocatorKind => isOneOf(STRUCTURAL_LOCATOR_KINDS, kind);
 
-// A locator. `insideDepth` counts the `inside` links above it: a CSS or XPath locator chains at
+// A locator. `insideDepth` counts the `inside` links above it: a css or XPath locator chains at
 // most MAXIMUM_INSIDE_DEPTH of them, and the one past the limit is refused, with nothing under it read.
 function readLocator(input: unknown, path: string, context: ParseContext, insideDepth = 0): Parsed<Locator> {
   const longest = context.rules.limits.maximumTextLength;
@@ -276,7 +276,7 @@ function readLocator(input: unknown, path: string, context: ParseContext, inside
   }
 }
 
-// A CSS selector or XPath expression: literal plan text, never a value reference (wrong_type), of 1
+// A css selector or XPath expression: literal plan text, never a value reference (wrong_type), of 1
 // to MAXIMUM_SELECTOR_LENGTH characters, on one line and with none of "{", "}", ";" and "@"
 // (unsafe_text), so what it matches is fixed when the plan is approved.
 function readSelectorText(input: unknown, path: string, context: ParseContext): Parsed<SafeText> {
@@ -285,7 +285,7 @@ function readSelectorText(input: unknown, path: string, context: ParseContext): 
   return text;
 }
 
-// The locator a CSS or XPath locator is evaluated inside, unless the chain is already as deep as it
+// The locator a css or XPath locator is evaluated inside, unless the chain is already as deep as it
 // may be: then this link is refused with too_large, and nothing under it is read.
 function readInside(input: unknown, path: string, context: ParseContext, insideDepth: number): Parsed<Locator> {
   if (insideDepth >= MAXIMUM_INSIDE_DEPTH) { context.issues.push({ code: 'too_large', path }); return INVALID; }

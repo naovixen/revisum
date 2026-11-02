@@ -27,7 +27,7 @@ export interface PageDriver {
   screenshotClip(clip: Box): Promise<string>;
   // A base64 PNG of the viewport.
   screenshot(): Promise<string>;
-  // CSS properties set by author style sheets or the style attribute.
+  // css properties set by author style sheets or the style attribute.
   authorDeclaredProperties(backendId: number): Promise<string[]>;
   // Programmatic focus, for elements a Tab walk cannot reach.
   focusBackend(backendId: number): Promise<boolean>;

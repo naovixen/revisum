@@ -2,7 +2,7 @@
 // stays until the own drivers pass the capability contract tests. It clicks, fills and presses,
 // asking the policy gate's runtime guard first; the steps only the own CDP driver performs (hover,
 // select, upload, frame and dialog) it refuses with unsupported-step, with nothing sent. Of the
-// optional plan features it performs only those of plan language 1.3's page parts: CSS and XPath
+// optional plan features it performs only those of plan language 1.3's page parts: css and XPath
 // locators, DOM checks and page scripts.
 // See docs/decisions/browser-and-audit-dependencies.md and docs/specs/SPEC-36-unsafe-plan-features.md.
 import {
@@ -54,9 +54,9 @@ function launchSettings(engine: Target['engine']): LaunchSettings {
 // punctuation keys (such as Backquote) and F1 to F12.
 const keyName = (key: Key): string => key;
 const NO_ELEMENT: ElementProbe = { count: 0, visible: false, enabled: false, text: '', value: null, sensitive: false, box: null };
-const SELECTOR_INVALID: DriverError = { code: 'selector-invalid', detail: 'the browser rejects a CSS selector or XPath expression of the locator' };
+const SELECTOR_INVALID: DriverError = { code: 'selector-invalid', detail: 'the browser rejects a css selector or XPath expression of the locator' };
 
-// The optional plan features this fallback performs: CSS and XPath locators, DOM checks and page
+// The optional plan features this fallback performs: css and XPath locators, DOM checks and page
 // scripts. It declares no feature of plan language 1.2's, such as positions or remembered values.
 const PLAYWRIGHT_FEATURES: readonly DriverFeature[] = ['structuralLocators', 'domChecks', 'pageScripts'];
 
@@ -195,7 +195,7 @@ async function locate(page: Page, locator: ResolvedLocator): Promise<PlaywrightL
   }
 }
 
-// True when the browser rejects a CSS selector or XPath expression of the locator or of a locator
+// True when the browser rejects a css selector or XPath expression of the locator or of a locator
 // it is inside.
 async function rejectsSelector(page: Page, locator: ResolvedLocator): Promise<boolean> {
   if (locator.by !== 'css' && locator.by !== 'xpath') return false;

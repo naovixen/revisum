@@ -112,7 +112,7 @@ export function resolvedElement(element: Element): string {
   });
 }
 
-// 'valid' when the browser accepts the CSS selector or XPath expression, 'invalid' when it rejects
+// 'valid' when the browser accepts the css selector or XPath expression, 'invalid' when it rejects
 // it, or when the XPath expression gives no list of nodes (such as count()), so a locator holding
 // it can never match anything.
 export function structuralSelectorValidity([kind, text]: readonly [string, string]): string {

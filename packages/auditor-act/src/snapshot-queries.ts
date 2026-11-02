@@ -37,7 +37,7 @@ export function inSvg(snapshot: PageSnapshot, node: SnapshotNode): boolean {
   return ancestors(snapshot, node).some((ancestor) => ancestor.name === 'svg');
 }
 
-// ACT "programmatically hidden": hidden through CSS display or visibility, or aria-hidden, on itself or an ancestor.
+// ACT "programmatically hidden": hidden through css display or visibility, or aria-hidden, on itself or an ancestor.
 export function programmaticallyHidden(snapshot: PageSnapshot, node: SnapshotNode): boolean {
   if (node.attributes['aria-hidden'] === 'true') return true;
   for (const ancestor of ancestors(snapshot, node)) if (ancestor.attributes['aria-hidden'] === 'true') return true;

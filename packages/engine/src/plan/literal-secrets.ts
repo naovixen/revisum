@@ -37,7 +37,7 @@ const CREDENTIAL_SHAPES: readonly RegExp[] = [
 export const looksLikeCredential = (text: string): boolean => CREDENTIAL_SHAPES.some((shape) => shape.test(text));
 
 // The text a locator finds its element by, as the plan writes it: a value reference has no text
-// until the run, so it names no field here. A CSS selector or XPath expression names a field by
+// until the run, so it names no field here. A css selector or XPath expression names a field by
 // its structure, such as input[type=password], so its own text is judged, with any hasText.
 function locatorText(locator: Locator): string {
   switch (locator.by) {

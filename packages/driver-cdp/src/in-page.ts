@@ -318,7 +318,7 @@ export async function afterTwoFrames(): Promise<string> {
   return 'ok';
 }
 
-// 'valid' when the browser accepts the CSS selector or XPath expression, 'invalid' when it rejects
+// 'valid' when the browser accepts the css selector or XPath expression, 'invalid' when it rejects
 // it, or when the XPath expression gives no list of nodes (such as count()), so a locator holding
 // it can never match anything.
 export function structuralSelectorValidity(kind: string, text: string): string {
@@ -331,7 +331,7 @@ export function structuralSelectorValidity(kind: string, text: string): string {
   }
 }
 
-// The elements a CSS selector or XPath expression matches, in document order, inside the one
+// The elements a css selector or XPath expression matches, in document order, inside the one
 // scope element when one is given and in the whole document otherwise. Inside a scope, an XPath
 // expression starting with "/" is read from the scope (".//x"), as Playwright reads it, so it
 // cannot reach outside. With hasText, only the elements whose text content, white space

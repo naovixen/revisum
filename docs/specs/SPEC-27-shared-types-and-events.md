@@ -51,7 +51,7 @@ export type ElementAssertion =
 export type PageAssertion =
   | { readonly kind: 'urlPath' | 'title'; readonly value: SafeText }
   | { readonly kind: 'url'; readonly value: AllowedUrl };                                          // addition: the whole absolute URL
-export type Box = { readonly x: number; readonly y: number; readonly width: number; readonly height: number }; // CSS px, page coordinates
+export type Box = { readonly x: number; readonly y: number; readonly width: number; readonly height: number }; // css px, page coordinates
 // A stored artefact. mediaType is open: screenshots are image/png, release notes text/markdown.
 export type ArtifactReference = { readonly name: string; readonly mediaType: string; readonly sha256: string; readonly bytes: number };
 export type GuaranteeLevel = 'isolated' | 'host';                            // host: no egress enforcement, no replay claim

@@ -61,7 +61,7 @@ const recordOf = (keyPattern: RegExp, values: JsonSchema): JsonSchema =>
 // A reference to a secret the project declares, as a fill value or saved storage state.
 const SECRET_REFERENCE: JsonSchema = closedObject({ secretName: { type: 'string', 'minLength': 1 } }, ['secretName']);
 
-// A CSS selector or XPath expression: literal text on one line, with none of "{", "}", ";" and "@".
+// A css selector or XPath expression: literal text on one line, with none of "{", "}", ";" and "@".
 const SELECTOR_TEXT: JsonSchema = {
   type: 'string', 'minLength': 1, 'maxLength': MAXIMUM_SELECTOR_LENGTH, pattern: `^[^{};@${UNSAFE_CHARACTERS}]*$`,
 };
@@ -169,7 +169,7 @@ const LOCATOR_FIELD_SCHEMAS: Readonly<Record<string, JsonSchema>> = {
   // The project declares which attributes; the parser checks the name against that list.
   attribute: { type: 'string', 'minLength': 1 },
   position: { oneOf: [{ enum: [...POSITION_WORDS] }, integer(1, MAXIMUM_POSITION)] },
-  // CSS and XPath locators: unsafe features of 1.3. Only hasText may hold a value reference.
+  // css and XPath locators: unsafe features of 1.3. Only hasText may hold a value reference.
   selector: SELECTOR_TEXT,
   expression: SELECTOR_TEXT,
   hasText: textOrValue(1),

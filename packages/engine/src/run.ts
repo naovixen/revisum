@@ -9,7 +9,7 @@
 // See docs/specs/SPEC-32-declared-service-calls.md for calls,
 // docs/specs/SPEC-33-network-stubs-request-checks-and-storage.md for stubs, checks and storage,
 // docs/specs/SPEC-34-clock-advance-and-clipboard.md for the clock and the clipboard and
-// docs/specs/SPEC-36-unsafe-plan-features.md for CSS and XPath locators, DOM checks, page scripts and
+// docs/specs/SPEC-36-unsafe-plan-features.md for css and XPath locators, DOM checks, page scripts and
 // database commands.
 import {
   needsDriverFeatures,

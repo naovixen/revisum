@@ -260,7 +260,7 @@ function readExitCodes(input: unknown, path: string, issues: Issues): Parsed<rea
 
 // ---- Unnamed controls ---------------------------------------------------------------------------------
 
-// Exact CSS selectors or XPath expressions, under the rules a plan's selector follows, each once.
+// Exact css selectors or XPath expressions, under the rules a plan's selector follows, each once.
 function readSelectorList(input: unknown, path: string, issues: Issues): Parsed<readonly SafeText[]> {
   const raw = readList(input, path, issues, MAXIMUM_UNNAMED_CONTROLS, 0);
   if (raw === INVALID) return INVALID;

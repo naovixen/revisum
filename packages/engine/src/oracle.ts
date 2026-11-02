@@ -7,7 +7,7 @@ import {
 
 // state-not-exposed: the element does not expose the state a check asks about, so the check can
 // neither pass nor fail on its merits.
-// selector-invalid: the browser rejects the locator's CSS selector or XPath expression, so no
+// selector-invalid: the browser rejects the locator's css selector or XPath expression, so no
 // element can ever match and waiting is pointless.
 export type Verdict = {
   readonly pass: boolean;

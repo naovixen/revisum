@@ -27,7 +27,7 @@ export type GuaranteeConditions = {
 // The guarantees each unsafe feature gives up, and only those. Egress control, no ambient
 // credentials and secret redaction hold whatever a plan uses, and so does every person's approval
 // of the declarations it names.
-//   - CSS and XPath find elements by page structure, so a pass does not show a person or assistive
+//   - css and XPath find elements by page structure, so a pass does not show a person or assistive
 //     technology can find the control.
 //   - DOM checks read implementation details, not what a user perceives.
 //   - A page script runs arbitrary code in the page: it can act with synthetic events the runtime

@@ -7,7 +7,7 @@ import { IMPACTS, type A11yFinding, type Box, type Impact } from '@revisum/contr
 
 export type AuditNode = {
   readonly selector: string;
-  // Page CSS pixels at scroll position 0; null when the element has no box.
+  // Page css pixels at scroll position 0; null when the element has no box.
   readonly box: Box | null;
   // True when the box lies wholly outside the viewport, so it is not in the screenshot.
   readonly offscreen: boolean;

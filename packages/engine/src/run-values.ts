@@ -25,7 +25,7 @@ export type RunValues = ReadonlyMap<ValueName, SafeText>;
 //   value-unsafe       a value breaks the safe-text rules, or is "", "." or ".." as a path segment;
 //   value-too-long     a value is longer than the project's maximumTextLength;
 //   state-not-exposed  a state check's element does not expose that state in the accessibility
-//                      tree, such as a tab whose selection is shown only by a CSS class;
+//                      tree, such as a tab whose selection is shown only by a css class;
 //   download-not-text  a content check's download is not UTF-8 text;
 //   request-not-seen   a response check or a remember from a response found no matching exchange
 //                      within the step timeout;
@@ -121,7 +121,7 @@ export function resolveText(text: TextOrValue, values: RunValues, maximumLength:
   return success(value);
 }
 
-// The locator a driver matches, with its value references replaced. A CSS or XPath locator's
+// The locator a driver matches, with its value references replaced. A css or XPath locator's
 // selector is always literal; only its hasText, and the locators it is inside, may hold a reference.
 export function resolveLocator(locator: Locator, values: RunValues, project: Project): Result<ResolvedLocator, StepErrorCode> {
   switch (locator.by) {

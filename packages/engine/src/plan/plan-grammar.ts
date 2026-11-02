@@ -134,9 +134,9 @@ export const OPTIONAL_LOCATOR_FIELDS = {
 export type LocatorKind = keyof typeof LOCATOR_FIELDS;
 // Every locator kind of the current language.
 export const ALL_LOCATOR_KINDS: readonly LocatorKind[] = [...LOCATOR_KINDS, ...STRUCTURAL_LOCATOR_KINDS];
-// How many `inside` links a CSS or XPath locator may chain: the fourth is refused.
+// How many `inside` links a css or XPath locator may chain: the fourth is refused.
 export const MAXIMUM_INSIDE_DEPTH = 3;
-// A CSS selector or XPath expression: literal plan text of at most this many characters, on one
+// A css selector or XPath expression: literal plan text of at most this many characters, on one
 // line, with none of the characters below. "{", "}" and ";" would open declarations or rules, and
 // "@" at-rules or XPath attribute steps.
 export const MAXIMUM_SELECTOR_LENGTH = 512;
@@ -282,7 +282,7 @@ export const MAXIMUM_META_NAME_LENGTH = 128;
 
 // One class token, as hasClass and lacksClass name it: no white space, so it cannot be two classes.
 export const CLASS_TOKEN = /^[^\s]{1,256}$/;
-// A lowercase CSS property name, such as "background-color" or "-webkit-line-clamp".
+// A lowercase css property name, such as "background-color" or "-webkit-line-clamp".
 export const STYLE_PROPERTY = /^-?[a-z][a-z0-9-]{0,99}$/;
 // An attribute name: lowercase letters, digits and hyphens, starting with a letter.
 export const ATTRIBUTE_NAME = /^[a-z][a-z0-9-]{0,99}$/;

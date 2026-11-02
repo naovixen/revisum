@@ -89,7 +89,7 @@ export type GuaranteeRow =
 // prevented (not achievable); HTTP and identity allow-list, retries and tokens (phase 2 protocol packs).
 export type GuaranteeMap = Readonly<Record<GuaranteeRow, { testId: string }>>;
 
-// Naming lint, run in CI. Identifiers are split into words at case changes and at _ - . / ;
+// naming lint, run in CI. Identifiers are split into words at case changes and at _ - . / ;
 // a digit-only word is also tried joined to the word before it, so "step-12" and "Step12" both give "step12".
 export type NamingLintConfig = {
   readonly include: readonly string[];

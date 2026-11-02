@@ -87,7 +87,7 @@ export const GUARANTEE_MAP: GuaranteeMap = {
     provenClass: 'runtime', weakerClass: NOT_PROVEN,
   },
   'report-runs-no-content': {
-    testId: 'test/unit/report/report-generator.test.ts#each HTML file is self-contained: inline CSS, no script, no handler, no external reference',
+    testId: 'test/unit/report/report-generator.test.ts#each HTML file is self-contained: inline css, no script, no handler, no external reference',
     provenClass: 'type-level and runtime', weakerClass: NOT_PROVEN,
   },
   'actions-tamper-evident': {

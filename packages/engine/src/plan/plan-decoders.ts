@@ -35,7 +35,7 @@ export const PLAN_ERROR_CODES = [
   // A suite declaration's path or working directory that is absolute or leaves the repository, or
   // a page script declaration's file outside plans/scripts/.
   'path_not_allowed',
-  // An unsafe plan feature, such as a CSS locator or a page script, that the trusted project does
+  // An unsafe plan feature, such as a css locator or a page script, that the trusted project does
   // not enable. Reported at the field that names the feature, with nothing under it read.
   'unsafe_feature_disabled',
 ] as const;

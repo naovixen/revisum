@@ -83,7 +83,7 @@ export type UnsafeFeaturesDeclaration = {
   // Inline scripts ride on page scripts: allowInline turns them on.
   readonly pageScripts?: { readonly scripts: Readonly<Record<ScriptName, PageScriptDeclaration>>; readonly allowInline: boolean };
   readonly databaseCommands?: { readonly commands: Readonly<Record<CommandName, DatabaseCommandDeclaration>> };
-  // Exact CSS selectors or XPath expressions that may resolve a control with no accessible name.
+  // Exact css selectors or XPath expressions that may resolve a control with no accessible name.
   readonly unnamedControlsAllowed?: readonly SafeText[];
 };
 

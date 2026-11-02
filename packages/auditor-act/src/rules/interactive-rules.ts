@@ -98,7 +98,7 @@ export const focusNotObscuredProbe: InteractiveRule = {
 };
 
 // WCAG 2.2 success criterion 2.4.3 Focus Order. It decides only reordering the author caused:
-// a positive tabindex (WCAG failure technique F44) or CSS order and reversed flex direction (technique C27).
+// a positive tabindex (WCAG failure technique F44) or css order and reversed flex direction (technique C27).
 function onSameRow(first: Box, second: Box): boolean {
   const overlap = Math.min(first.y + first.height, second.y + second.height) - Math.max(first.y, second.y);
   return overlap >= 0.5 * Math.min(first.height, second.height);
@@ -114,7 +114,7 @@ function reorderCause(snapshot: PageSnapshot, from: SnapshotNode, to: SnapshotNo
     ...toChain.slice(0, common ? toChain.indexOf(common) : undefined),
   ];
   for (const node of chain) {
-    if ((node.style?.['order'] ?? '0') !== '0') return 'CSS order';
+    if ((node.style?.['order'] ?? '0') !== '0') return 'css order';
     if ((node.style?.['flex-direction'] ?? '').endsWith('reverse') && /flex/.test(node.style?.['display'] ?? '')) return 'reversed flex direction';
   }
   return null;
@@ -176,11 +176,11 @@ export const keyboardReachProbe: InteractiveRule = {
   },
 };
 
-// WCAG 2.2 success criterion 2.5.8 Target Size (Minimum): 24 by 24 CSS pixels, or spaced so that
+// WCAG 2.2 success criterion 2.5.8 Target Size (Minimum): 24 by 24 css pixels, or spaced so that
 // 24-pixel circles centred on the targets do not intersect.
 const NATIVE_CONTROLS = new Set(['input', 'select', 'button', 'textarea', 'summary']);
 export const targetSizeProbe: InteractiveRule = {
-  meta: probeMeta('page-target-size', 'Pointer target is at least 24 by 24 CSS pixels or adequately spaced', ['2.5.8'], 'P3', WCAG_UNDERSTANDING + 'target-size-minimum'),
+  meta: probeMeta('page-target-size', 'Pointer target is at least 24 by 24 css pixels or adequately spaced', ['2.5.8'], 'P3', WCAG_UNDERSTANDING + 'target-size-minimum'),
   needsWalk: true,
   async run(page, snapshot, walk) {
     const clickable = snapshotExtras(snapshot).clickable;
@@ -228,11 +228,11 @@ export const targetSizeProbe: InteractiveRule = {
   },
 };
 
-// WCAG 2.2 success criterion 1.4.10 Reflow: at 320 CSS pixels wide, content must not need
+// WCAG 2.2 success criterion 1.4.10 Reflow: at 320 css pixels wide, content must not need
 // horizontal scrolling, except parts that need two-dimensional layout (left as cantTell).
 const TWO_DIMENSIONAL = new Set(['table', 'pre', 'code', 'img', 'video', 'canvas', 'svg', 'iframe', 'map', 'math', 'object', 'embed']);
 export const reflowProbe: InteractiveRule = {
-  meta: probeMeta('page-reflow', 'Content reflows at 320 CSS px without horizontal scrolling', ['1.4.10'], 'P2', WCAG_UNDERSTANDING + 'reflow'),
+  meta: probeMeta('page-reflow', 'Content reflows at 320 css px without horizontal scrolling', ['1.4.10'], 'P2', WCAG_UNDERSTANDING + 'reflow'),
   needsWalk: false,
   async run(page, snapshot) {
     const root = snapshot.nodes.find((node) => node.nodeType === 1 && node.name === 'html' && node.document === 0);

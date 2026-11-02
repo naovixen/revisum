@@ -7,7 +7,7 @@ export const ENGINES = ['chromium', 'firefox', 'webkit'] as const;
 export type Engine = (typeof ENGINES)[number];
 
 // A closed set of device profiles owned by this package, so no vendor's device list decides
-// what a target looks like. Sizes are CSS pixels.
+// what a target looks like. Sizes are css pixels.
 export const DEVICE_PROFILES = {
   'desktop-1280': { width: 1280, height: 800, scale: 1, mobile: false, touch: false },
   'laptop-1024': { width: 1024, height: 768, scale: 1, mobile: false, touch: false },

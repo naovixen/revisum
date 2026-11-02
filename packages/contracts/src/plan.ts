@@ -84,7 +84,7 @@ export type SemanticLocatorWith<Text> =
   | { readonly by: 'label'; readonly label: Text; readonly position?: Position }
   | { readonly by: 'text'; readonly text: Text; readonly position?: Position }
   | { readonly by: 'testId'; readonly testId: Text; readonly attribute?: TestIdAttribute; readonly position?: Position };
-// CSS and XPath locators: unsafe features a trusted project may enable (unsafe-plan-features.ts).
+// css and XPath locators: unsafe features a trusted project may enable (unsafe-plan-features.ts).
 // They find elements by page structure. The selector or expression is literal plan text, never a
 // value reference, so what it can match is fixed when the plan is approved; only hasText may hold
 // a value reference. hasText keeps the matches whose normalised text contains it, and inside
@@ -101,7 +101,7 @@ export type StructuralLocatorWith<Text> =
 export type LocatorWith<Text> = SemanticLocatorWith<Text> | StructuralLocatorWith<Text>;
 export type Locator = LocatorWith<TextOrValue>;
 // A locator whose value references the run has replaced with their text: what a driver receives.
-// A driver resolves a CSS or XPath one only when it declares the structuralLocators feature.
+// A driver resolves a css or XPath one only when it declares the structuralLocators feature.
 export type ResolvedLocator = LocatorWith<SafeText>;
 export const LOCATOR_KINDS = ['role', 'label', 'text', 'testId'] as const;
 export const STRUCTURAL_LOCATOR_KINDS = ['css', 'xpath'] as const;

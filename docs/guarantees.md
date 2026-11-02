@@ -16,7 +16,7 @@ Each phase-1 guarantee, the class a green CI run shows for it, and the test that
 | `no-pii-in-reports` | claimed, not proven by CI (pending SPEC-09, SPEC-12) | no test yet |
 | `same-inputs-same-result` | runtime, partial | `test/proofs/run-guarantees.test.ts#(a) replay: same manifest, same result hash > cdp-chromium: two runs give identical manifest, result hash and event log` |
 | `adapters-substitutable` | runtime | `test/contract/driver-contract.test.ts#contract: cdp-chromium > runs the sign-up flow to Passed and captures two PNGs` |
-| `report-runs-no-content` | type-level and runtime | `test/unit/report/report-generator.test.ts#each HTML file is self-contained: inline CSS, no script, no handler, no external reference` |
+| `report-runs-no-content` | type-level and runtime | `test/unit/report/report-generator.test.ts#each HTML file is self-contained: inline css, no script, no handler, no external reference` |
 | `actions-tamper-evident` | claimed, not proven by CI (pending SPEC-14) | no test yet |
 | `spec-to-commit-trace` | claimed, not proven by CI (pending SPEC-14) | no test yet |
 | `person-approval` | runtime-checked, recorded as declared | `test/unit/engine/agent-lockdown-approval.test.ts#the maintainer's merge to the protected branch records a declared approval with a person-declared actor` |

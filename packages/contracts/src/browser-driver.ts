@@ -23,7 +23,7 @@ import type { AdapterId, Target } from './target.ts';
 // with nothing of it kept, so the step never passes with a partial result.
 // assertion-failed: a dialog step's expected text is not the open dialog's text, so nothing
 // answered the dialog.
-// selector-invalid: the browser rejects a CSS selector or XPath expression the step's locator
+// selector-invalid: the browser rejects a css selector or XPath expression the step's locator
 // holds, or the XPath expression selects no nodes at all (such as count()), so nothing was sent.
 // script-failed: a page script threw, its promise rejected, or its source is not one function.
 // script-timeout: a page script did not settle within its timeout.
@@ -51,13 +51,13 @@ export type BrowserBuild = { readonly version: string; readonly executablePath: 
 export type BuildFailureCode = 'lock-download-failed' | 'lock-offline' | UnavailableReason;
 export type BuildFailure = { readonly code: BuildFailureCode; readonly detail: string };
 
-// A rectangle in CSS pixels.
+// A rectangle in css pixels.
 export type Box = { readonly x: number; readonly y: number; readonly width: number; readonly height: number };
 
 // The states an element exposes to assistive technology, read from the browser's accessibility
 // tree: aria-selected, aria-expanded, aria-pressed and aria-current, and their native equivalents
 // (a selected <option>, the <summary> of an open <details>). Null means the element does not expose
-// that state at all, such as a tab whose selection is shown only by a CSS class, so a check of it
+// that state at all, such as a tab whose selection is shown only by a css class, so a check of it
 // can never pass. Current is false, not null, on a link or control that carries no aria-current.
 export type AccessibleStates = {
   readonly selected: boolean | null;
@@ -84,12 +84,12 @@ export type ElementProbe = {
   // What the probe was asked to read of the element's DOM, for a DOM check or a remember from an
   // attribute. Present when the driver reads them (the domChecks feature) and one was asked.
   readonly dom?: DomValue;
-  // True when the browser rejects a CSS selector or XPath expression of the locator: nothing it
+  // True when the browser rejects a css selector or XPath expression of the locator: nothing it
   // could ever match, so a check fails with selector-invalid rather than waiting.
   readonly selectorInvalid?: true;
 };
 // What a probe reads of the element's DOM besides what it always reads: its class tokens, the
-// computed value of one style property (a lowercase CSS property name), or one attribute's value
+// computed value of one style property (a lowercase css property name), or one attribute's value
 // (by its lowercase name). See docs/specs/SPEC-36-unsafe-plan-features.md.
 export type DomRead =
   | { readonly kind: 'classes' }
