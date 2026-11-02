@@ -12,7 +12,7 @@ Implement **SPEC-<NN>** so the tests committed at `<TESTS-COMMIT>` pass.
 - Write types first, in the spec's "Interfaces and types", in `packages/contracts` or the owning package. Then write the implementation.
 - Keep to the dependency direction and the naming rules. Every new name must make sense without reading any spec.
 - Parse every external input with a decoder. No `as` casts to branded types outside their parser.
-- Write short comments that explain why, in plain English.
+- Prefer readable code to comments. Comment only what the code can't say, such as why, briefly and in plain English.
 - Iterate with `npm test -w <package>` or a single test file. Run `npm run check` once at the end; it must be green, with no retries or skips.
 - For background, read only the sections of `E:\core\docs` that the spec cites, never whole research docs.
 

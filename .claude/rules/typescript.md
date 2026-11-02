@@ -36,4 +36,4 @@ Prettier owns layout and ESLint owns code rules. Run `npm run lint:code` before 
 
 ## Comments
 
-Comment only complexity, language or browser quirks, and useful `TODO:` or `FIXME:` notes. Never state what the code already says.
+Prefer readable code to comments. Before writing one, try a clearer name or extracting a function. Comment only what the code can't say: why a choice was made, security reasoning, language or browser quirks, and useful `TODO:` or `FIXME:` notes. Never state what the code already says.

@@ -109,7 +109,7 @@ The code must read without any other document. File naming and the rest of the c
 - No research or process ids in identifiers, file or folder names, JSON keys, error codes or flags.
 - No single-letter names except loop indices `i`, `j`, `k` and coordinates `x`, `y`, and never as an export. That includes generic type parameters: write `<Value>`, not `<T>`.
 - No unexplained abbreviations. Allowed: id, url, uri, html, css, json, http, api, cli, ci, pr, cdp, bidi, wcag, act, a11y, pii, sha256, svg, png, dom, os. Standard names (ai, mcp, sarif, junit, oidc, jwt, lti) are spelt out in `docs/glossary.md`.
-- Comments explain what and why in plain English. You may add "See `docs/specs/SPEC-nn-<name>.md`", but never as the only content.
+- Prefer readable code to comments: rename or extract first. Comment only what the code can't say, such as why, in plain English. You may add "See `docs/specs/SPEC-nn-<name>.md`", but never as the only content.
 - The product name is written once, in `PRODUCT` in `packages/contracts/src/product.ts`.
 - `docs/glossary.md` maps each domain term to its code name. Add a row when you add a term.
 - `npm run lint:names` enforces these rules. Its configuration is `tools/naming-lint-config.ts`.
