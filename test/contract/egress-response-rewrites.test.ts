@@ -7,11 +7,13 @@
 // counter-example, still shows the original.
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
-import { cdpDriver, type DriverSession } from '@revisum/driver-cdp';
+import type { DriverSession } from '@revisum/driver-cdp';
+import { createBrowserDriver } from '#test-support/browser/CreateBrowserDriver.ts';
 import { buildManifest, defaultRedactor, type SessionEnvironment } from '@revisum/engine';
 import { startEgressProxy, type EgressProxy, type ResponseRewrite } from '@revisum/runner';
-import { BROWSERS } from '../support/browsers.ts';
-import { CDP_TARGET, FIXED_TIME_MILLISECONDS, SEED, capabilityHarness, type CapabilityHarness } from '../support/capability-harness.ts';
+import { BROWSERS } from '#test-support/browsers.ts';
+import { BrowserTarget } from '#test-support/browser/BrowserTarget.ts';
+import { FIXED_TIME_MILLISECONDS, SEED, capabilityHarness, type CapabilityHarness } from '#test-support/capability-harness.ts';
 import { defaultParser, signupPlan } from '../unit/engine/plan-examples.ts';
 import { startEgressFixtureServer, type EgressFixtureServer } from '../unit/runner/egress-fixture-server.ts';
 import { declaredService, egressPolicy, fakeResolver, origin } from '../unit/runner/runner-examples.ts';
@@ -42,8 +44,8 @@ before(async () => {
     baseUrl: fixtureApp.origin, allowedOrigins: [fixtureApp.origin, secondApp.origin], seed: SEED,
     fixedTimeMilliseconds: FIXED_TIME_MILLISECONDS, sensitiveSelectors: defaultRedactor().selectors, timeoutMilliseconds: 5000,
   };
-  const driver = cdpDriver({ executablePath: BROWSERS.chrome, proxy: { server: proxy.url, includeLoopback: true } });
-  const opened = await driver.open(capability.target(CDP_TARGET), environment);
+  const driver = createBrowserDriver({ executablePath: BROWSERS.chrome, proxy: { server: proxy.url, includeLoopback: true } });
+  const opened = await driver.open(capability.target(BrowserTarget.Chrome), environment);
   assert.ok(opened.ok, `the session opens: ${opened.ok ? '' : JSON.stringify(opened.error)}`);
   session = opened.value;
 });
@@ -78,7 +80,7 @@ test('the run manifest records the rewrites the proxy applied', () => {
   const parsed = defaultParser()(signupPlan());
   assert.ok(parsed.ok);
   const manifest = buildManifest({
-    plan: parsed.value, target: capability.target(CDP_TARGET), adapter: { id: 'cdp', version: '0.1.0', protocol: 'Chrome DevTools Protocol (raw WebSocket)' },
+    plan: parsed.value, target: capability.target(BrowserTarget.Chrome), adapter: { id: 'cdp', version: '0.1.0', protocol: 'Chrome DevTools Protocol (raw WebSocket)' },
     browser: { name: 'chromium', version: '156.0.8078.47' }, seed: SEED, fixedTimeMilliseconds: FIXED_TIME_MILLISECONDS,
     fixtures: fixtureApp.fixtures, host: { platform: 'linux', arch: 'x64' }, responseRewrites: proxy.rewritesApplied(),
   });

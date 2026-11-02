@@ -7,9 +7,10 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import type { DriverSession } from '@revisum/driver-cdp';
-import {
-  CDP_TARGETS, capabilityHarness, click, role, shownText, type CapabilityHarness,
-} from '../support/capability-harness.ts';
+import { isTargetRunning, onTarget } from '#test-support/TestTier.ts';
+import { BrowserTarget } from '#test-support/browser/BrowserTarget.ts';
+import { click, role } from '#test-support/browser/RawPlan.ts';
+import { capabilityHarness, shownText, type CapabilityHarness } from '#test-support/capability-harness.ts';
 
 const STEP_TIMEOUT_MILLISECONDS = 2000;
 const NEVER_ACTIONABLE_ALLOWANCE_MILLISECONDS = 1500;
@@ -26,11 +27,20 @@ let capability: CapabilityHarness;
 before(async () => { capability = await capabilityHarness(STEP_TIMEOUT_MILLISECONDS); });
 after(async () => { await capability.close(); });
 
-for (const targetId of CDP_TARGETS) {
+for (const targetId of Object.values(BrowserTarget)) {
   describe(`auto-wait: ${targetId}`, () => {
     let session: DriverSession;
-    before(async () => { session = await capability.openOwn(targetId); });
-    after(async () => { await session.close(); });
+    // A hook runs even when every test is skipped, so it opens a browser only where the tests use it.
+    before(async () => {
+      if (isTargetRunning(targetId)) {
+        session = await capability.openOwn(targetId);
+      }
+    });
+    after(async () => {
+      if (isTargetRunning(targetId)) {
+        await session.close();
+      }
+    });
 
     const clickContinue = async (scenario: string) => {
       assert.ok((await session.navigate(capability.url(`/auto-wait-${scenario}.html`))).ok, `the ${scenario} page loads`);
@@ -40,7 +50,7 @@ for (const targetId of CDP_TARGETS) {
     };
 
     for (const [scenario, description] of ACTIONABLE_AFTER_400_MILLISECONDS) {
-      test(`a button ${description} for its first 400 ms gets one click, after it is ready`, async () => {
+      test(`a button ${description} for its first 400 ms gets one click, after it is ready`, onTarget(targetId), async () => {
         const { acted, shown } = await clickContinue(scenario);
         assert.ok(acted.ok, acted.ok ? '' : `${acted.error.code}: ${acted.error.detail}`);
         assert.equal(shown, LANDED_ONCE);
@@ -48,7 +58,7 @@ for (const targetId of CDP_TARGETS) {
     }
 
     for (const scenario of NEVER_ACTIONABLE) {
-      test(`a button that is ${scenario === 'never' ? 'never enabled' : 'always covered'} fails with not-actionable within the timeout plus 1,500 ms`, async () => {
+      test(`a button that is ${scenario === 'never' ? 'never enabled' : 'always covered'} fails with not-actionable within the timeout plus 1,500 ms`, onTarget(targetId), async () => {
         const { acted, elapsed, shown } = await clickContinue(scenario);
         assert.equal(acted.ok ? 'passed' : acted.error.code, 'not-actionable');
         assert.ok(elapsed <= STEP_TIMEOUT_MILLISECONDS + NEVER_ACTIONABLE_ALLOWANCE_MILLISECONDS, `took ${elapsed} ms`);
@@ -58,7 +68,7 @@ for (const targetId of CDP_TARGETS) {
 
     // Counter-example: the result line does count a click that lands too early, so the checks
     // above can fail. A page script clicks the button while it is still moving.
-    test('counter-example: a click while the button still moves is counted as early', async () => {
+    test('counter-example: a click while the button still moves is counted as early', onTarget(targetId), async () => {
       assert.ok((await session.navigate(capability.url('/auto-wait-moving.html'))).ok);
       const early = await session.evaluate(() => {
         const button = [...document.querySelectorAll('button')].find((candidate) => candidate.textContent === 'Continue');

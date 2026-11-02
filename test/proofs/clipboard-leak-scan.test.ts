@@ -17,10 +17,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, test } from 'node:test';
 import { leakScanner, sha256 } from '@revisum/engine';
-import {
-  CDP_TARGET, COPY_SECRET, capture, click, clockHarness, expectClipboard, fill, label, navigate, outcomes, reference, rememberClipboard, role,
-  secretValue, testId, textEquals, valueEquals, type ClockHarness, type ClockRun, type JsonRecord,
-} from '../contract/clock-and-clipboard-support.ts';
+import { outcomes, type BrowserRun } from '#test-support/browser/BrowserHarness.ts';
+import { BrowserTarget } from '#test-support/browser/BrowserTarget.ts';
+import { capture, click, fill, label, navigate, reference, role, secretValue, testId, textEquals, valueEquals, type JsonRecord } from '#test-support/browser/RawPlan.ts';
+import { COPY_SECRET, clockHarness, expectClipboard, rememberClipboard, type ClockHarness } from '../contract/clock-and-clipboard-support.ts';
 import { guardHostClipboard } from '../contract/host-clipboard.ts';
 import { echoesIn, fakeEnvironmentStore, fakeSecretValue, resolvedSecret } from '../unit/engine/secret-examples.ts';
 
@@ -44,12 +44,12 @@ after(async () => {
   await hostClipboard.restore();
 });
 
-const resultText = (ran: ClockRun): string => JSON.stringify(ran.result, null, 2);
-const eventLines = (ran: ClockRun): string => ran.events.read().map((event) => JSON.stringify(event)).join('\n');
-const auditLines = (ran: ClockRun): string => ran.audit.recorded.map((recorded) => JSON.stringify(recorded)).join('\n');
+const resultText = (ran: BrowserRun): string => JSON.stringify(ran.result, null, 2);
+const eventLines = (ran: BrowserRun): string => ran.events.read().map((event) => JSON.stringify(event)).join('\n');
+const auditLines = (ran: BrowserRun): string => ran.audit.recorded.map((recorded) => JSON.stringify(recorded)).join('\n');
 
 // Writes the run's result, event log, audit events and images to the scan folder and returns their paths.
-function writeOutputs(name: string, ran: ClockRun): string[] {
+function writeOutputs(name: string, ran: BrowserRun): string[] {
   const paths = [join(folder, `${name}.result.json`), join(folder, `${name}.events.jsonl`), join(folder, `${name}.audit.jsonl`)];
   writeFileSync(paths[0] ?? '', resultText(ran));
   writeFileSync(paths[1] ?? '', eventLines(ran));
@@ -99,7 +99,7 @@ test('the leak scan finds no copied secret or canary personal data in what runs 
   const outputs: string[] = [];
   const secrets = fakeEnvironmentStore({ [COPY_SECRET]: secretValueText });
   for (const { name, steps } of ENDINGS) {
-    const ran = await harness.runSteps(CDP_TARGET, leakSteps(steps), { secrets });
+    const ran = await harness.runSteps(BrowserTarget.Chrome, leakSteps(steps), { secrets });
     // The probe is live: both values were copied, the canary was remembered and used, and every
     // check before the last passed.
     const all = outcomes(ran.result);
@@ -129,7 +129,7 @@ test('the leak scan finds no copied secret or canary personal data in what runs 
 });
 
 test('a value remembered from the clipboard appears in the result and event log only as its name and sha256', { timeout: TIMEOUT, ...copying }, async () => {
-  const ran = await harness.runSteps(CDP_TARGET, [
+  const ran = await harness.runSteps(BrowserTarget.Chrome, [
     navigate('/leaks.html'),
     copyContact,
     expectClipboard('textContains', ' Ellery', 'leaks.contact-copied'),
@@ -148,7 +148,7 @@ test('a value remembered from the clipboard appears in the result and event log 
 // Control: the canary, observed by a failed check of the element that shows it, does reach the
 // result, and the scan finds it there.
 test('control: a failed check of the element showing the canary keeps it in the result, and the scan finds it', { timeout: TIMEOUT }, async () => {
-  const ran = await harness.runSteps(CDP_TARGET, [navigate('/leaks.html'), textEquals(testId('contact-name'), 'deliberately wrong', 'leaks.contact-shown')]);
+  const ran = await harness.runSteps(BrowserTarget.Chrome, [navigate('/leaks.html'), textEquals(testId('contact-name'), 'deliberately wrong', 'leaks.contact-shown')]);
   const check = ran.result.steps[1];
   assert.equal(check?.outcome, 'failed');
   assert.ok(check?.observed?.includes(harness.canaries.contactName), `the observation should hold the canary: ${check?.observed ?? '(none)'}`);

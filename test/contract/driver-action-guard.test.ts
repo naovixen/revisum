@@ -11,11 +11,10 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import type { ActionGuard, GuardVerdict, ResolvedElement, Session } from '@revisum/engine';
-import {
-  CDP_TARGET, UPLOAD_FIXTURE, capabilityCdpDriver, capabilityDrivers, capabilityHarness, capabilityPlan, click,
-  label, navigate, role, shownText, testId, textEquals, watchedDriver, type CapabilityHarness,
-} from '../support/capability-harness.ts';
-import { BROWSERS } from '../support/browsers.ts';
+import { BrowserTarget } from '#test-support/browser/BrowserTarget.ts';
+import { click, label, navigate, role, testId, textEquals, type JsonRecord } from '#test-support/browser/RawPlan.ts';
+import { UPLOAD_FIXTURE, capabilityCdpDriver, capabilityDrivers, capabilityHarness, capabilityPlan, shownText, watchedDriver, type CapabilityHarness } from '#test-support/capability-harness.ts';
+import { BROWSERS } from '#test-support/browsers.ts';
 
 let capability: CapabilityHarness;
 before(async () => { capability = await capabilityHarness(2000); });
@@ -45,7 +44,7 @@ const withGuardPage = async <Value>(targetId: string, use: (session: Session) =>
 // how the page shows the step's effect: untouched, and once the step has run.
 type GuardedAction = {
   readonly name: string;
-  readonly step: object;
+  readonly step: JsonRecord;
   readonly element: Partial<ResolvedElement>;
   readonly effect: { readonly read: (session: Session) => Promise<string>; readonly untouched: string; readonly done: string };
 };
@@ -78,7 +77,7 @@ const HOVER_SELECT_AND_UPLOAD: readonly GuardedAction[] = [
 ];
 
 const DRIVERS = [
-  { targetId: CDP_TARGET, actions: [...CLICK_FILL_AND_PRESS, ...HOVER_SELECT_AND_UPLOAD] },
+  { targetId: BrowserTarget.Chrome, actions: [...CLICK_FILL_AND_PRESS, ...HOVER_SELECT_AND_UPLOAD] },
 ] as const;
 
 for (const { targetId, actions } of DRIVERS) {
@@ -128,10 +127,10 @@ for (const { targetId, actions } of DRIVERS) {
   });
 }
 
-describe(`the runtime guard on dialogs: ${CDP_TARGET}`, () => {
+describe(`the runtime guard on dialogs: ${BrowserTarget.Chrome}`, () => {
   test('a denied dialog answer ends with policy-denied; the guard gets the dialog text and an empty element', async () => {
     const { guard, calls } = spyGuard({ kind: 'deny', rule: 'irreversible-dialog', stepIndex: 2 });
-    await withGuardPage(CDP_TARGET, async (session) => {
+    await withGuardPage(BrowserTarget.Chrome, async (session) => {
       assert.ok((await session.act(capability.actionStep(click(role('button', 'Ask a question'))))).ok, 'the click opens the dialog');
       const answered = await session.act(capability.actionStep({ type: 'dialog', action: 'accept', expectText: 'Keep the draft?' }), guard);
       assert.equal(answered.ok ? 'passed' : answered.error.code, 'policy-denied');
@@ -142,7 +141,7 @@ describe(`the runtime guard on dialogs: ${CDP_TARGET}`, () => {
 
   test('counter-example: an allowed dialog answer accepts the dialog', async () => {
     const { guard, calls } = spyGuard(ALLOW);
-    await withGuardPage(CDP_TARGET, async (session) => {
+    await withGuardPage(BrowserTarget.Chrome, async (session) => {
       assert.ok((await session.act(capability.actionStep(click(role('button', 'Ask a question'))))).ok);
       const answered = await session.act(capability.actionStep({ type: 'dialog', action: 'accept', expectText: 'Keep the draft?' }), guard);
       assert.ok(answered.ok, answered.ok ? '' : `${answered.error.code}: ${answered.error.detail}`);
@@ -152,12 +151,12 @@ describe(`the runtime guard on dialogs: ${CDP_TARGET}`, () => {
   });
 });
 
-describe(`the real policy gate, through a run: ${CDP_TARGET}`, () => {
+describe(`the real policy gate, through a run: ${BrowserTarget.Chrome}`, () => {
   // Reads the page's input-event count just before the run closes the session.
   const runReadingInputEvents = async (steps: readonly unknown[]) => {
     const watched = watchedDriver(capabilityCdpDriver(BROWSERS.chrome), (session) => shownText(capability, session, 'input-events'));
     const drivers = new Map([...capabilityDrivers(), ['cdp', watched.driver]]);
-    const ran = await capability.run(capability.plan(capabilityPlan(CDP_TARGET, steps)), CDP_TARGET, drivers);
+    const ran = await capability.run(capability.plan(capabilityPlan(BrowserTarget.Chrome, steps)), BrowserTarget.Chrome, { drivers });
     return { ...ran, inputEvents: watched.sessions[0]?.readBeforeClose ?? null };
   };
 

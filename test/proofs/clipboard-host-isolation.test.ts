@@ -12,10 +12,12 @@
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import { after, before, describe, test } from 'node:test';
-import {
-  CDP_TARGET, CDP_TARGETS, INVITE_CODE, click, clockHarness, expectClipboard, navigate, outcomes, portWith, rememberClipboard, role, sessionWith,
-  testId, textEquals, wrappingSessions, type ClockHarness, type JsonRecord,
-} from '../contract/clock-and-clipboard-support.ts';
+import { onTarget } from '#test-support/TestTier.ts';
+import { outcomes } from '#test-support/browser/BrowserHarness.ts';
+import { BrowserTarget } from '#test-support/browser/BrowserTarget.ts';
+import { click, navigate, role, testId, textEquals, type JsonRecord } from '#test-support/browser/RawPlan.ts';
+import { portWith, sessionWith, wrappingSessions } from '#test-support/browser/WrappingSessions.ts';
+import { INVITE_CODE, clockHarness, expectClipboard, rememberClipboard, type ClockHarness } from '../contract/clock-and-clipboard-support.ts';
 import { openHostClipboard, type HostClipboard } from '../contract/host-clipboard.ts';
 
 const TIMEOUT = 300_000;
@@ -39,8 +41,8 @@ describe('a canary on the host\'s clipboard', () => {
   });
   after(async () => { await hostClipboard.restore(); });
 
-  for (const targetId of CDP_TARGETS) {
-    test(`on ${targetId}, the plan sees an empty clipboard, and the canary is still on the host's clipboard after the page copies`, { timeout: TIMEOUT }, async (context) => {
+  for (const targetId of Object.values(BrowserTarget)) {
+    test(`on ${targetId}, the plan sees an empty clipboard, and the canary is still on the host's clipboard after the page copies`, { timeout: TIMEOUT, ...onTarget(targetId) }, async (context) => {
       if (hostClipboard.unavailableReason !== null) { context.skip(hostClipboard.unavailableReason); return; }
       await hostClipboard.write(canary);
       assert.equal(await hostClipboard.read(), canary, 'the canary is on the host\'s clipboard before the run');
@@ -98,7 +100,7 @@ describe('a browser build that cannot keep the clipboard in memory', () => {
 
   for (const { name, step } of CLIPBOARD_STEPS) {
     test(`${name} fails with clipboard-unavailable, and the rest of the run is skipped`, async () => {
-      const ran = await harness.runSteps(CDP_TARGET, [navigate('/clipboard.html'), step, continueStep, nothingCopied], {
+      const ran = await harness.runSteps(BrowserTarget.Chrome, [navigate('/clipboard.html'), step, continueStep, nothingCopied], {
         drivers: withoutMemoryClipboard(), read: ['continue-state'],
       });
       assert.deepEqual(outcomes(ran.result), [[0, 'passed', undefined], [1, 'failed', 'clipboard-unavailable'], [2, 'skipped', undefined], [3, 'skipped', undefined]], JSON.stringify(ran.result.steps));
@@ -109,12 +111,12 @@ describe('a browser build that cannot keep the clipboard in memory', () => {
   // No copy is needed: a remember of the empty clipboard fails with value-empty, not
   // clipboard-unavailable, on the driver as it is.
   test('counter-example: on the unchanged driver, the same remember reaches the clipboard and finds it empty', async () => {
-    const ran = await harness.runSteps(CDP_TARGET, [navigate('/clipboard.html'), rememberClipboard('inviteCode'), continueStep, nothingCopied]);
+    const ran = await harness.runSteps(BrowserTarget.Chrome, [navigate('/clipboard.html'), rememberClipboard('inviteCode'), continueStep, nothingCopied]);
     assert.deepEqual(outcomes(ran.result), [[0, 'passed', undefined], [1, 'failed', 'value-empty'], [2, 'skipped', undefined], [3, 'skipped', undefined]], JSON.stringify(ran.result.steps));
   });
 
   test('counter-example: on the unchanged driver, a check of the empty clipboard fails as a check, not as clipboard-unavailable', async () => {
-    const ran = await harness.runSteps(CDP_TARGET, [navigate('/clipboard.html'), expectClipboard('textExcludes', 'password', 'unavailable.empty-check')]);
+    const ran = await harness.runSteps(BrowserTarget.Chrome, [navigate('/clipboard.html'), expectClipboard('textExcludes', 'password', 'unavailable.empty-check')]);
     assert.deepEqual(outcomes(ran.result), [[0, 'passed', undefined], [1, 'failed', 'assertion-failed']], JSON.stringify(ran.result.steps));
   });
 });

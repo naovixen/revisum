@@ -9,16 +9,16 @@
 import assert from 'node:assert/strict';
 import { basename } from 'node:path';
 import { after, before, describe, test } from 'node:test';
-import {
-  CDP_TARGET, CDP_TARGETS, HEADLESS_SHELL_TARGET, capabilityDrivers, capabilityHarness, capabilityPlan, click, navigate, ownDriverFor,
-  role, testId, textEquals, watchedDriver, type CapabilityHarness,
-} from '../support/capability-harness.ts';
-import { endAtOnce, listProcesses, processTree, rendererProcesses, stillRunning } from '../support/process-tree.ts';
-import { CRASH_READY_PATH, crashWhenRequested } from '../support/tab-crash.ts';
+import { fullTierOnly, onTarget } from '#test-support/TestTier.ts';
+import { BrowserTarget } from '#test-support/browser/BrowserTarget.ts';
+import { click, navigate, role, testId, textEquals } from '#test-support/browser/RawPlan.ts';
+import { capabilityDrivers, capabilityHarness, capabilityPlan, ownDriverFor, watchedDriver, type CapabilityHarness } from '#test-support/capability-harness.ts';
+import { endAtOnce, listProcesses, processTree, rendererProcesses, stillRunning } from '#test-support/process-tree.ts';
+import { CRASH_READY_PATH, crashWhenRequested } from '#test-support/tab-crash.ts';
 
 // Long enough for the test to find and end the renderer while the step waits.
 const CRASH_STEP_TIMEOUT_MILLISECONDS = 8000;
-const ADAPTERS: Readonly<Record<string, string>> = { [CDP_TARGET]: 'cdp', [HEADLESS_SHELL_TARGET]: 'cdp-headless-shell' };
+const ADAPTERS: Readonly<Record<string, string>> = { [BrowserTarget.Chrome]: 'cdp', [BrowserTarget.HeadlessShell]: 'cdp-headless-shell' };
 
 let capability: CapabilityHarness;
 before(async () => { capability = await capabilityHarness(CRASH_STEP_TIMEOUT_MILLISECONDS); });
@@ -28,9 +28,9 @@ after(async () => { await capability.close(); });
 const executableName = (commandLine: string): string => basename(commandLine.replace(/^"([^"]+)".*$/, '$1').split(/\s+--/)[0] ?? '');
 
 describe('the headless shell target', () => {
-  test('runs the chrome-headless-shell build, and the Chrome for Testing target does not', async () => {
+  test('runs the chrome-headless-shell build, and the Chrome for Testing target does not', fullTierOnly('it proves the headless-shell target, which only the full tier runs'), async () => {
     const names: Record<string, string> = {};
-    for (const targetId of CDP_TARGETS) {
+    for (const targetId of Object.values(BrowserTarget)) {
       const session = await capability.openOwn(targetId);
       try {
         const browser = listProcesses().find((candidate) => candidate.processId === session.processId);
@@ -40,22 +40,22 @@ describe('the headless shell target', () => {
         await session.close();
       }
     }
-    assert.match(names[HEADLESS_SHELL_TARGET] ?? '', /^chrome-headless-shell(\.exe)?$/);
-    assert.match(names[CDP_TARGET] ?? '', /^chrome(\.exe)?$/);
+    assert.match(names[BrowserTarget.HeadlessShell] ?? '', /^chrome-headless-shell(\.exe)?$/);
+    assert.match(names[BrowserTarget.Chrome] ?? '', /^chrome(\.exe)?$/);
   });
 });
 
-for (const targetId of CDP_TARGETS) {
+for (const targetId of Object.values(BrowserTarget)) {
   describe(`a crashed tab: ${targetId}`, () => {
     const crashedRun = async (steps: readonly unknown[]) => {
       const watched = watchedDriver(ownDriverFor(targetId));
       const drivers = new Map([...capabilityDrivers(), [ADAPTERS[targetId] ?? '', watched.driver]]);
       const crashed = crashWhenRequested(capability, watched, CRASH_READY_PATH);
-      const ran = await capability.run(capability.plan(capabilityPlan(targetId, steps)), targetId, drivers);
+      const ran = await capability.run(capability.plan(capabilityPlan(targetId, steps)), targetId, { drivers });
       return { ...ran, endedRenderers: await crashed, watched };
     };
 
-    test('a crash while a click waits fails that step with target-crashed and skips the rest', async () => {
+    test('a crash while a click waits fails that step with target-crashed and skips the rest', onTarget(targetId), async () => {
       const { result, endedRenderers } = await crashedRun([
         navigate('/crash.html'),
         click(role('button', 'Start the report')),
@@ -66,7 +66,7 @@ for (const targetId of CDP_TARGETS) {
       assert.deepEqual(result.steps.map((step) => [step.outcome, step.code]), [['passed', undefined], ['failed', 'target-crashed'], ['skipped', undefined]]);
     });
 
-    test('a crash while a check waits fails that check with target-crashed', async () => {
+    test('a crash while a check waits fails that check with target-crashed', onTarget(targetId), async () => {
       const { result, endedRenderers } = await crashedRun([
         navigate('/crash.html'),
         textEquals(testId('crash-status'), 'Report ready', 'crash.report-ready'),
@@ -77,7 +77,7 @@ for (const targetId of CDP_TARGETS) {
       assert.deepEqual(result.steps.map((step) => [step.outcome, step.code]), [['passed', undefined], ['failed', 'target-crashed'], ['skipped', undefined]]);
     });
 
-    test('after a crash the run closes the session once, close() succeeds and every browser process exits', async () => {
+    test('after a crash the run closes the session once, close() succeeds and every browser process exits', onTarget(targetId), async () => {
       const { watched } = await crashedRun([
         navigate('/crash.html'),
         click(role('button', 'Start the report')),
@@ -91,7 +91,7 @@ for (const targetId of CDP_TARGETS) {
       assert.deepEqual(session.stillRunningAfterClose, []);
     });
 
-    test('an action on a crashed tab returns target-crashed, and close() still ends every process', async () => {
+    test('an action on a crashed tab returns target-crashed, and close() still ends every process', onTarget(targetId), async () => {
       const session = await capability.openOwn(targetId);
       let tree: ReturnType<typeof processTree> = [];
       try {
@@ -108,7 +108,7 @@ for (const targetId of CDP_TARGETS) {
       assert.deepEqual(stillRunning(tree), []);
     });
 
-    test('counter-example: the same click with no crash fails with not-actionable, not target-crashed', async () => {
+    test('counter-example: the same click with no crash fails with not-actionable, not target-crashed', onTarget(targetId), async () => {
       const quick = await capabilityHarness(500);
       try {
         const plan = quick.plan(capabilityPlan(targetId, [
@@ -125,7 +125,7 @@ for (const targetId of CDP_TARGETS) {
   });
 
   describe(`close() ends every process: ${targetId}`, () => {
-    test('after a direct session with a loaded page, no process of the browser is still running', async () => {
+    test('after a direct session with a loaded page, no process of the browser is still running', onTarget(targetId), async () => {
       const session = await capability.openOwn(targetId);
       let tree: ReturnType<typeof processTree> = [];
       try {
@@ -141,14 +141,14 @@ for (const targetId of CDP_TARGETS) {
       assert.deepEqual(stillRunning(tree), []);
     });
 
-    test('after a run, every process the driver started has exited when close() returns', async () => {
+    test('after a run, every process the driver started has exited when close() returns', onTarget(targetId), async () => {
       const watched = watchedDriver(ownDriverFor(targetId));
       const drivers = new Map([...capabilityDrivers(), [ADAPTERS[targetId] ?? '', watched.driver]]);
       const plan = capability.plan(capabilityPlan(targetId, [
         navigate('/dialog.html'),
         textEquals(testId('dialog-status'), 'Waiting', 'dialog.waiting'),
       ]));
-      const { result } = await capability.run(plan, targetId, drivers);
+      const { result } = await capability.run(plan, targetId, { drivers });
       assert.equal(result.state, 'Passed', JSON.stringify(result.steps));
       const session = watched.sessions[0];
       assert.ok(session !== undefined && session.closeCalls === 1);
@@ -156,7 +156,7 @@ for (const targetId of CDP_TARGETS) {
       assert.deepEqual(session.stillRunningAfterClose, []);
     });
 
-    test('with a dialog left open, close() still ends every process', async () => {
+    test('with a dialog left open, close() still ends every process', onTarget(targetId), async () => {
       const session = await capability.openOwn(targetId);
       let tree: ReturnType<typeof processTree> = [];
       try {

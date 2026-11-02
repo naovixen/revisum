@@ -10,14 +10,15 @@
 // counter-example that shows the proxy is not simply refusing everything.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
-import { cdpDriver, type DriverSession } from '@revisum/driver-cdp';
+import type { DriverSession } from '@revisum/driver-cdp';
+import { createBrowserDriver } from '#test-support/browser/CreateBrowserDriver.ts';
 import { defaultRedactor, type SessionEnvironment } from '@revisum/engine';
 import { joinEgressEvents, startEgressProxy, type EgressProxy } from '@revisum/runner';
 import type { EgressEvent } from '@revisum/contracts';
-import { BROWSERS } from '../support/browsers.ts';
-import {
-  CDP_TARGET, FIXED_TIME_MILLISECONDS, SEED, capabilityHarness, click, role, type CapabilityHarness,
-} from '../support/capability-harness.ts';
+import { BROWSERS } from '#test-support/browsers.ts';
+import { BrowserTarget } from '#test-support/browser/BrowserTarget.ts';
+import { click, role } from '#test-support/browser/RawPlan.ts';
+import { FIXED_TIME_MILLISECONDS, SEED, capabilityHarness, type CapabilityHarness } from '#test-support/capability-harness.ts';
 import { startEgressFixtureServer, type EgressFixtureServer } from '../unit/runner/egress-fixture-server.ts';
 import {
   CHANNEL_HOSTS, CHANNEL_NAMES, CHANNEL_PAGES, UNDECLARED_CHANNEL_ORIGINS, declaredService, egressPolicy, fakeResolver, hostOf,
@@ -57,8 +58,8 @@ const widenedEnvironment = (): SessionEnvironment => ({
 });
 
 async function openThroughProxy(): Promise<DriverSession> {
-  const driver = cdpDriver({ executablePath: BROWSERS.chrome, proxy: { server: proxy.url, includeLoopback: true } });
-  const opened = await driver.open(capability.target(CDP_TARGET), widenedEnvironment());
+  const driver = createBrowserDriver({ executablePath: BROWSERS.chrome, proxy: { server: proxy.url, includeLoopback: true } });
+  const opened = await driver.open(capability.target(BrowserTarget.Chrome), widenedEnvironment());
   assert.ok(opened.ok, `the session opens: ${opened.ok ? '' : JSON.stringify(opened.error)}`);
   return opened.value;
 }

@@ -18,10 +18,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, test } from 'node:test';
 import { leakScanner } from '@revisum/engine';
-import {
-  CDP_TARGET, STORAGE_SECRET, STUB_SECRET, click, expectResponse, expectStorage, navigate, networkHarness, outcomes, role, secretArgument,
-  setStorage, startStub, testId, textEquals, type JsonRecord, type NetworkHarness, type NetworkRun,
-} from '../contract/network-stubs-support.ts';
+import { outcomes } from '#test-support/browser/BrowserHarness.ts';
+import { BrowserTarget } from '#test-support/browser/BrowserTarget.ts';
+import { click, navigate, role, secretValue, testId, textEquals, type JsonRecord } from '#test-support/browser/RawPlan.ts';
+import { STORAGE_SECRET, STUB_SECRET } from '../contract/NetworkProjectFile.ts';
+import { expectResponse, expectStorage, networkHarness, setStorage, startStub, type NetworkHarness, type NetworkRun } from '../contract/network-stubs-support.ts';
 import { echoesIn, fakeEnvironmentStore, fakeSecretValue, resolvedSecret } from '../unit/engine/secret-examples.ts';
 
 const TIMEOUT = 300_000;
@@ -72,8 +73,8 @@ const plantedValues = (): readonly (readonly [string, string])[] => [
 // Uses all three powers, with every check passing, then ends with the one failed check given.
 const leakSteps = (lastCheck: JsonRecord): unknown[] => [
   navigate('/account.html'),
-  startStub('accountToken', { token: secretArgument(STUB_SECRET) }),
-  setStorage('sessionToken', { token: secretArgument(STORAGE_SECRET) }),
+  startStub('accountToken', { token: secretValue(STUB_SECRET) }),
+  setStorage('sessionToken', { token: secretValue(STORAGE_SECRET) }),
   click(role('button', 'Load profile')),
   textEquals(testId('profile-state'), 'Profile loaded', 'leaks.profile-loaded'),
   expectResponse('profile', { kind: 'fieldPresent', field: 'email' }, 'leaks.email-present'),
@@ -95,7 +96,7 @@ test('the leak scan finds no planted secret or canary personal data in what runs
   const outputs: string[] = [];
   const secrets = fakeEnvironmentStore({ [STUB_SECRET]: stubSecretValue, [STORAGE_SECRET]: storageSecretValue });
   for (const { name, check } of FAILED_CHECKS) {
-    const ran = await harness.runSteps(CDP_TARGET, leakSteps(check), { secrets });
+    const ran = await harness.runSteps(BrowserTarget.Chrome, leakSteps(check), { secrets });
     // The probe is live: every power was used and every check before the last passed.
     const all = outcomes(ran.result);
     const last = all.length - 1;
@@ -123,7 +124,7 @@ test('the leak scan finds no planted secret or canary personal data in what runs
 });
 
 test('a failed storage check says only that the value differs', { timeout: TIMEOUT }, async () => {
-  const ran = await harness.runSteps(CDP_TARGET, [
+  const ran = await harness.runSteps(BrowserTarget.Chrome, [
     navigate('/account.html'),
     expectStorage('profileName', { kind: 'equals', value: 'deliberately different' }, 'leaks.name-differs'),
   ]);
@@ -136,7 +137,7 @@ test('a failed storage check says only that the value differs', { timeout: TIMEO
 // Control: the canary name, observed by a failed check of the element that shows it, does reach
 // the result, and the scan finds it there.
 test('control: a failed check of the element showing the canary name keeps it in the result, and the scan finds it', { timeout: TIMEOUT }, async () => {
-  const ran = await harness.runSteps(CDP_TARGET, [
+  const ran = await harness.runSteps(BrowserTarget.Chrome, [
     navigate('/account.html'),
     textEquals(testId('profile-name'), 'deliberately wrong', 'leaks.name-shown'),
   ]);

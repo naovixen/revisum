@@ -11,12 +11,12 @@
 import assert from 'node:assert/strict';
 import { platform } from 'node:os';
 import { after, before, describe, test } from 'node:test';
-import {
-  CDP_TARGET, fill, label, navigate, outcomes, planValuesHarness, press, reference, remember, testId, textEquals,
-  type PlanValuesHarness,
-} from './plan-values-support.ts';
+import { outcomes, type BrowserHarness } from '#test-support/browser/BrowserHarness.ts';
+import { BrowserTarget } from '#test-support/browser/BrowserTarget.ts';
+import { fill, label, navigate, press, reference, remember, testId, textEquals } from '#test-support/browser/RawPlan.ts';
+import { planValuesHarness } from './plan-values-support.ts';
 
-let harness: PlanValuesHarness;
+let harness: BrowserHarness;
 before(async () => { harness = await planValuesHarness(); });
 after(async () => { await harness.close(); });
 
@@ -24,7 +24,7 @@ describe('key chords', () => {
   const OPEN_PAGE = navigate('/keys.html');
   const editor = label('Editor');
   const chordLogged = async (key: string, modifiers: readonly string[] | undefined, expectedLog: string): Promise<void> => {
-    const { result } = await harness.runSteps(CDP_TARGET, [OPEN_PAGE, press(editor, key, modifiers), textEquals(testId('key-log'), expectedLog, 'keys.chord-logged')]);
+    const { result } = await harness.runSteps(BrowserTarget.Chrome, [OPEN_PAGE, press(editor, key, modifiers), textEquals(testId('key-log'), expectedLog, 'keys.chord-logged')]);
     assert.equal(result.state, 'Passed', JSON.stringify(result.steps));
   };
 
@@ -62,7 +62,7 @@ describe('key chords and the runtime guard', () => {
 
   for (const modifier of ['Control', 'Shift']) {
     test(`${modifier}+Enter in a form whose submit control is "Delete account" ends the run Denied with nothing sent`, async () => {
-      const { result, atClose } = await harness.runSteps(CDP_TARGET, [
+      const { result, atClose } = await harness.runSteps(BrowserTarget.Chrome, [
         OPEN_PAGE, press(label('Reason'), 'Enter', [modifier]), textEquals(testId('submitted'), 'nothing', 'forms.nothing-submitted'),
       ], { read: READ_AT_CLOSE });
       assert.equal(result.state, 'Denied', JSON.stringify(result.steps));
@@ -76,7 +76,7 @@ describe('key chords and the runtime guard', () => {
     // Counter-example: the same chord in a form whose submit control is not irreversible reaches
     // the page, so the counters can move and the denial above is the guard's doing.
     test(`counter-example: ${modifier}+Enter in a form whose submit control is "Update profile" reaches the page`, async () => {
-      const { result, atClose } = await harness.runSteps(CDP_TARGET, [
+      const { result, atClose } = await harness.runSteps(BrowserTarget.Chrome, [
         OPEN_PAGE, press(label('Nickname'), 'Enter', [modifier]), textEquals(testId('nickname-enters'), '1', 'forms.enter-reached'),
       ]);
       assert.equal(result.state, 'Passed', JSON.stringify(result.steps));
@@ -90,7 +90,7 @@ describe('multi-line fills', () => {
   const message = label('Message');
 
   test('a three-line fill leaves the field holding the lines joined by line feeds, with no Enter key event', async () => {
-    const { result } = await harness.runSteps(CDP_TARGET, [
+    const { result } = await harness.runSteps(BrowserTarget.Chrome, [
       OPEN_PAGE,
       fill(message, { lines: ['Hello there', 'Second line', 'Third: done'] }),
       // The page shows the value as a JSON string, so each line feed reads as \n.
@@ -103,7 +103,7 @@ describe('multi-line fills', () => {
   });
 
   test('a line that is a remembered value is filled with that value\'s text', async () => {
-    const { result } = await harness.runSteps(CDP_TARGET, [
+    const { result } = await harness.runSteps(BrowserTarget.Chrome, [
       OPEN_PAGE,
       remember('orderNumber', testId('order-number')),
       fill(message, { lines: ['Order', reference('orderNumber')] }),
@@ -114,7 +114,7 @@ describe('multi-line fills', () => {
   });
 
   test('a multi-line fill replaces what the field held before', async () => {
-    const { result } = await harness.runSteps(CDP_TARGET, [
+    const { result } = await harness.runSteps(BrowserTarget.Chrome, [
       OPEN_PAGE,
       fill(message, 'Draft to replace'),
       fill(message, { lines: ['First', 'Second'] }),
@@ -126,7 +126,7 @@ describe('multi-line fills', () => {
   // Counter-example: pressing Enter in the box does count and send, so the checks above that no
   // Enter arrived can fail.
   test('counter-example: pressing Enter in the message box counts and sends it', async () => {
-    const { result } = await harness.runSteps(CDP_TARGET, [
+    const { result } = await harness.runSteps(BrowserTarget.Chrome, [
       OPEN_PAGE,
       fill(message, 'Hello there'),
       press(message, 'Enter'),

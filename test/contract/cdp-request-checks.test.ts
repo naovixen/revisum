@@ -15,10 +15,11 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import { sha256 } from '@revisum/engine';
-import {
-  CDP_TARGET, ITEM_NAMES, NEXT_PAGE_FIRST_ITEM, QUIET_MILLISECONDS, click, expectRequests, expectResponse, navigate, networkHarness, outcomes,
-  reference, rememberResponse, resetRequests, role, testId, textEquals, type JsonRecord, type NetworkHarness, type NetworkRun,
-} from './network-stubs-support.ts';
+import { outcomes } from '#test-support/browser/BrowserHarness.ts';
+import { BrowserTarget } from '#test-support/browser/BrowserTarget.ts';
+import { click, navigate, reference, role, testId, textEquals, type JsonRecord } from '#test-support/browser/RawPlan.ts';
+import { QUIET_MILLISECONDS } from './NetworkProjectFile.ts';
+import { ITEM_NAMES, NEXT_PAGE_FIRST_ITEM, expectRequests, expectResponse, networkHarness, rememberResponse, resetRequests, type NetworkHarness, type NetworkRun } from './network-stubs-support.ts';
 
 let harness: NetworkHarness;
 before(async () => { harness = await networkHarness(); });
@@ -39,7 +40,7 @@ const openRequests = () => navigate('/requests.html');
 
 describe('counting the requests an observed request saw', () => {
   test('equals 2 and atLeast 1 pass on a page that sent exactly two matching requests', async () => {
-    const ran = await harness.runSteps(CDP_TARGET, [
+    const ran = await harness.runSteps(BrowserTarget.Chrome, [
       openRequests(),
       loadTwoBatches(),
       textEquals(testId('batches-state'), 'Both batches loaded', 'counts.batches-loaded'),
@@ -53,7 +54,7 @@ describe('counting the requests an observed request saw', () => {
 
   for (const count of [{ equals: 1 }, { atMost: 1 }, { equals: 3 }]) {
     test(`${JSON.stringify(count)} fails on a page that sent exactly two matching requests`, async () => {
-      const ran = await harness.runSteps(CDP_TARGET, [
+      const ran = await harness.runSteps(BrowserTarget.Chrome, [
         openRequests(),
         loadTwoBatches(),
         textEquals(testId('batches-state'), 'Both batches loaded', 'counts.batches-loaded'),
@@ -64,7 +65,7 @@ describe('counting the requests an observed request saw', () => {
   }
 
   test('after resetRequests, equals 0 passes and atLeast 1 counts only what comes next', async () => {
-    const ran = await harness.runSteps(CDP_TARGET, [
+    const ran = await harness.runSteps(BrowserTarget.Chrome, [
       openRequests(),
       loadTwoBatches(),
       textEquals(testId('batches-state'), 'Both batches loaded', 'counts.batches-loaded'),
@@ -77,7 +78,7 @@ describe('counting the requests an observed request saw', () => {
   });
 
   test('counter-example: without resetRequests, equals 0 fails after the two requests', async () => {
-    const ran = await harness.runSteps(CDP_TARGET, [
+    const ran = await harness.runSteps(BrowserTarget.Chrome, [
       openRequests(),
       loadTwoBatches(),
       textEquals(testId('batches-state'), 'Both batches loaded', 'counts.batches-loaded'),
@@ -87,7 +88,7 @@ describe('counting the requests an observed request saw', () => {
   });
 
   test('requests the page sent while it loaded count from the start of the plan', async () => {
-    const ran = await harness.runSteps(CDP_TARGET, [
+    const ran = await harness.runSteps(BrowserTarget.Chrome, [
       openRequests(),
       expectRequests('scheduleLoads', { equals: 1 }, 'counts.loaded-with-page'),
     ]);
@@ -98,7 +99,7 @@ describe('counting the requests an observed request saw', () => {
   // later and is answered over 600 ms more. A count that did not wait for the quiet window would
   // see one request, so equals 2 would fail and atMost 1 would pass.
   test('equals 2 straight after the click waits for the quiet window, sees both requests and passes', async () => {
-    const ran = await harness.runSteps(CDP_TARGET, [
+    const ran = await harness.runSteps(BrowserTarget.Chrome, [
       openRequests(),
       loadTwoBatches(),
       expectRequests('items', { equals: 2 }, 'counts.quiet-equals'),
@@ -109,7 +110,7 @@ describe('counting the requests an observed request saw', () => {
   });
 
   test('atMost 1 straight after the click waits for the quiet window, sees both requests and fails', async () => {
-    const ran = await harness.runSteps(CDP_TARGET, [
+    const ran = await harness.runSteps(BrowserTarget.Chrome, [
       openRequests(),
       loadTwoBatches(),
       expectRequests('items', { atMost: 1 }, 'counts.quiet-at-most'),
@@ -123,7 +124,7 @@ const itemsShown = () => textEquals(testId('first-item'), ITEM_NAMES[0], 'respon
 
 describe('checking the latest response', () => {
   test('statusEquals, fieldEquals, fieldContains, fieldPresent and fieldAbsent pass on the latest exchange', async () => {
-    const ran = await harness.runSteps(CDP_TARGET, [
+    const ran = await harness.runSteps(BrowserTarget.Chrome, [
       openRequests(),
       loadItems(),
       itemsShown(),
@@ -140,7 +141,7 @@ describe('checking the latest response', () => {
   });
 
   test('statusEquals passes on a 404 answer that the page received', async () => {
-    const ran = await harness.runSteps(CDP_TARGET, [
+    const ran = await harness.runSteps(BrowserTarget.Chrome, [
       openRequests(),
       click(role('button', 'Load missing items')),
       textEquals(testId('missing-state'), 'Missing items answered 404', 'responses.missing-shown'),
@@ -201,7 +202,7 @@ describe('checking the latest response', () => {
 
   for (const failure of FAILURES) {
     test(failure.name, async () => {
-      const ran = await harness.runSteps(CDP_TARGET, [openRequests(), ...failure.steps()]);
+      const ran = await harness.runSteps(BrowserTarget.Chrome, [openRequests(), ...failure.steps()]);
       assertLastStepFailed(ran, failure.code);
     });
   }
@@ -209,7 +210,7 @@ describe('checking the latest response', () => {
   // Counter-example: the same field of a body under the cap is read, so the size failure above
   // comes from the cap, not from the field.
   test('counter-example: the same field check on a body under the cap passes', async () => {
-    const ran = await harness.runSteps(CDP_TARGET, [
+    const ran = await harness.runSteps(BrowserTarget.Chrome, [
       openRequests(), loadItems(), itemsShown(),
       expectResponse('items', { kind: 'fieldPresent', field: 'firstName' }, 'responses.under-cap'),
     ]);
@@ -224,7 +225,7 @@ const remembered = (ran: NetworkRun, index: number): JsonRecord | undefined => {
 
 describe('remembering a response field', () => {
   test('arrayLength remembers the decimal length of an array, which a later check uses', async () => {
-    const ran = await harness.runSteps(CDP_TARGET, [
+    const ran = await harness.runSteps(BrowserTarget.Chrome, [
       openRequests(), loadItems(), itemsShown(),
       rememberResponse('itemCount', 'items', 'itemList', 'arrayLength'),
       textEquals(testId('item-count'), reference('itemCount'), 'remember.count-shown'),
@@ -234,7 +235,7 @@ describe('remembering a response field', () => {
   });
 
   test('text remembers a field\'s text', async () => {
-    const ran = await harness.runSteps(CDP_TARGET, [
+    const ran = await harness.runSteps(BrowserTarget.Chrome, [
       openRequests(), loadItems(), itemsShown(),
       rememberResponse('firstItem', 'items', 'firstName', 'text'),
       textEquals(testId('first-item'), reference('firstItem'), 'remember.name-shown'),
@@ -245,7 +246,7 @@ describe('remembering a response field', () => {
 
   for (const field of ['firstName', 'total']) {
     test(`arrayLength of a field that is not an array (${field}) fails with field-missing`, async () => {
-      const ran = await harness.runSteps(CDP_TARGET, [
+      const ran = await harness.runSteps(BrowserTarget.Chrome, [
         openRequests(), loadItems(), itemsShown(),
         rememberResponse('notAList', 'items', field, 'arrayLength'),
         textEquals(testId('item-count'), reference('notAList'), 'remember.never-checked'),
@@ -255,7 +256,7 @@ describe('remembering a response field', () => {
   }
 
   test('a remember from a request the page never sent fails with request-not-seen', async () => {
-    const ran = await harness.runSteps(CDP_TARGET, [
+    const ran = await harness.runSteps(BrowserTarget.Chrome, [
       openRequests(), loadItems(), itemsShown(),
       rememberResponse('neverCount', 'neverSent', 'firstName', 'text'),
       textEquals(testId('item-count'), reference('neverCount'), 'remember.never-checked'),

@@ -15,9 +15,9 @@ import {
   defaultRedactor, failure, planParser, runUntrusted,
   type BrowserDriver, type Plan, type PlanError, type Result,
 } from '@revisum/engine';
-import { hostilePlans, type HostilePlan } from '../support/hostile-plans.ts';
-import { memoryArtifactStore, memoryEventSink, memoryRunEventSink, systemClock } from '../support/memory-ports.ts';
-import { makeProject, signupPlan } from '../support/signup-harness.ts';
+import { hostilePlans, type HostilePlan } from '#test-support/hostile-plans.ts';
+import { memoryArtifactStore, memoryEventSink, memoryRunEventSink, systemClock } from '#test-support/memory-ports.ts';
+import { makeProject, signupPlan } from '#test-support/signup-harness.ts';
 
 const ORIGIN = 'http://127.0.0.1:4173';
 const project = makeProject(ORIGIN);

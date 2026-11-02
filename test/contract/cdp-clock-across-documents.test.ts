@@ -7,16 +7,16 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import { resolvePlanClock } from '@revisum/engine';
-import {
-  CDP_TARGET, CLOCK_START_MILLISECONDS, HOUR, MINUTE, advanceClock, click, clockHarness, clockPlan, frame, navigate, newTab, outcomes, role,
-  testId, textEquals, type ClockHarness, type ClockRun, type JsonRecord,
-} from './clock-and-clipboard-support.ts';
+import { outcomes, type BrowserRun } from '#test-support/browser/BrowserHarness.ts';
+import { BrowserTarget } from '#test-support/browser/BrowserTarget.ts';
+import { click, navigate, newTab, role, testId, textEquals, type JsonRecord } from '#test-support/browser/RawPlan.ts';
+import { CLOCK_START_MILLISECONDS, HOUR, MINUTE, advanceClock, clockHarness, clockPlan, frame, type ClockHarness } from './clock-and-clipboard-support.ts';
 
 let harness: ClockHarness;
 before(async () => { harness = await clockHarness(); });
 after(async () => { await harness.close(); });
 
-const assertPassed = (ran: ClockRun): void => assert.equal(ran.result.state, 'Passed', JSON.stringify(ran.result.steps));
+const assertPassed = (ran: BrowserRun): void => assert.equal(ran.result.state, 'Passed', JSON.stringify(ran.result.steps));
 
 const FIRST_OF_NEXT_MONTH_AT_NINE: JsonRecord = { day: { from: 'startOfNextMonth', addDays: 0 }, time: '09:00' };
 // From 30 October 2026, 12:00 UTC, "the first of next month, 09:00" in London is 1 November,
@@ -31,14 +31,14 @@ const clockFrame = (steps: readonly unknown[]) => frame(testId('clock-frame'), s
 const withPlanClock = { fields: { clock: FIRST_OF_NEXT_MONTH_AT_NINE } };
 
 test('the plan clock the checks expect is resolvePlanClock\'s own answer', () => {
-  const plan = harness.plan(clockPlan(CDP_TARGET, [navigate('/clock.html'), loadedAt(PLAN_CLOCK, 'documents.plan-clock')], { clock: FIRST_OF_NEXT_MONTH_AT_NINE }));
+  const plan = harness.plan(clockPlan(BrowserTarget.Chrome, [navigate('/clock.html'), loadedAt(PLAN_CLOCK, 'documents.plan-clock')], { clock: FIRST_OF_NEXT_MONTH_AT_NINE }));
   assert.ok(plan.clock !== undefined);
-  assert.equal(resolvePlanClock(plan.clock, CLOCK_START_MILLISECONDS, harness.target(CDP_TARGET).timezone), PLAN_CLOCK);
+  assert.equal(resolvePlanClock(plan.clock, CLOCK_START_MILLISECONDS, harness.target(BrowserTarget.Chrome).timezone), PLAN_CLOCK);
 });
 
 describe('documents loaded after an advance', () => {
   test('a navigation, a newTab and a frame loaded after advances each start at the plan clock plus every earlier advance', async () => {
-    const ran = await harness.runSteps(CDP_TARGET, [
+    const ran = await harness.runSteps(BrowserTarget.Chrome, [
       navigate('/clock.html'),
       loadedAt(PLAN_CLOCK, 'documents.first-at-plan-clock'),
       advanceClock(1, 'hours'),
@@ -53,7 +53,7 @@ describe('documents loaded after an advance', () => {
   });
 
   test('an advance inside a newTab block moves the tab\'s clock and the first tab\'s clock, and a later navigation starts there', async () => {
-    const ran = await harness.runSteps(CDP_TARGET, [
+    const ran = await harness.runSteps(BrowserTarget.Chrome, [
       navigate('/clock.html'),
       newTab('/clock.html', [
         loadedAt(PLAN_CLOCK, 'documents.tab-at-plan-clock'),
@@ -70,7 +70,7 @@ describe('documents loaded after an advance', () => {
   });
 
   test('an advance moves a frame that loaded before it', async () => {
-    const ran = await harness.runSteps(CDP_TARGET, [
+    const ran = await harness.runSteps(BrowserTarget.Chrome, [
       navigate('/clock-frame.html'),
       clockFrame([loadedAt(PLAN_CLOCK, 'documents.frame-at-plan-clock')]),
       advanceClock(45, 'minutes'),
@@ -80,7 +80,7 @@ describe('documents loaded after an advance', () => {
   });
 
   test('without a plan clock, a document loaded after an advance starts at the run\'s clock start plus the advance', async () => {
-    const ran = await harness.runSteps(CDP_TARGET, [
+    const ran = await harness.runSteps(BrowserTarget.Chrome, [
       navigate('/clock.html'),
       loadedAt(CLOCK_START_MILLISECONDS, 'documents.first-at-clock-start'),
       advanceClock(20, 'minutes'),
@@ -93,7 +93,7 @@ describe('documents loaded after an advance', () => {
 
 describe('counter-examples', () => {
   test('without the advance inside the tab, the first tab still shows the plan clock, so the check for the moved clock fails', async () => {
-    const ran = await harness.runSteps(CDP_TARGET, [
+    const ran = await harness.runSteps(BrowserTarget.Chrome, [
       navigate('/clock.html'),
       newTab('/clock.html', [loadedAt(PLAN_CLOCK, 'documents.tab-unmoved')]),
       showNow,
@@ -103,7 +103,7 @@ describe('counter-examples', () => {
   });
 
   test('a newTab opened without an earlier advance starts at the plan clock, not later', async () => {
-    const ran = await harness.runSteps(CDP_TARGET, [
+    const ran = await harness.runSteps(BrowserTarget.Chrome, [
       navigate('/clock.html'),
       newTab('/clock.html', [loadedAt(PLAN_CLOCK + ADVANCED, 'documents.tab-not-advanced')]),
     ], withPlanClock);

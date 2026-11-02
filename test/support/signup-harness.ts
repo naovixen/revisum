@@ -1,156 +1,177 @@
 // Shared setup for the driver contract and the run guarantees: the trusted project, the driver
 // registry, the sign-up fixture app and the plans, written as raw JSON the way a person or an AI
 // planner would write them.
-import { arch, platform } from 'node:os';
-import { join } from 'node:path';
-import { cdpDriver } from '@revisum/driver-cdp';
+import { join } from "node:path";
+import { parseProject, type BrowserDriver, type Project } from "@revisum/engine";
+import { startBrowserHarness, type BrowserHarness } from "./browser/BrowserHarness.ts";
+import { ADAPTER_OF_TARGET, BrowserTarget } from "./browser/BrowserTarget.ts";
+import { driversForTargets } from "./browser/CreateBrowserDriver.ts";
 import {
-  defaultRedactor, parseProject, planParser, run,
-  type BrowserDriver, type Plan, type Project, type RunEventSink, type RunInputs, type RunResult, type TargetId,
-} from '@revisum/engine';
-import { BROWSERS } from './browsers.ts';
-import { authorise, trustedProjectFrom } from './policy-clearance.ts';
-import { startFixtureServer, type FixtureServer } from './fixture-server.ts';
-import { memoryArtifactStore, memoryEventSink, memoryRunEventSink, systemClock, type MemoryArtifactStore } from './memory-ports.ts';
-import { FIXTURES } from './repository.ts';
+    PLAN_LANGUAGE_VERSION,
+    label,
+    rawPlan,
+    role,
+    testId,
+    visible,
+    type JsonRecord,
+} from "./browser/RawPlan.ts";
+import { FIXTURES } from "./repository.ts";
 
 export const SEED = 42;
 export const FIXED_TIME_MILLISECONDS = Date.UTC(2026, 0, 15, 10, 30, 0);
-export const LOCALE = 'de-DE';
-export const TIMEZONE = 'Asia/Tokyo';
+export const LOCALE = "de-DE";
+export const TIMEZONE = "Asia/Tokyo";
 
 // Every driver must pass the contract unchanged on each of these targets. The own CDP driver runs
 // it twice: on Chrome for Testing and on its headless shell, the build CI uses.
-export const CONTRACT_TARGETS = ['cdp-chromium', 'cdp-chromium-headless-shell'] as const;
+export const CONTRACT_TARGETS = [BrowserTarget.Chrome, BrowserTarget.HeadlessShell] as const;
 
-const desktop = { device: 'desktop-1280', locale: LOCALE, timezone: TIMEZONE, colorScheme: 'dark', reducedMotion: 'reduce' } as const;
+const desktop = {
+    device: "desktop-1280",
+    locale: LOCALE,
+    timezone: TIMEZONE,
+    colorScheme: "dark",
+    reducedMotion: "reduce",
+} as const;
+
+const contractTarget = (target: BrowserTarget) => ({
+    id: target,
+    adapter: ADAPTER_OF_TARGET[target],
+    engine: "chromium",
+    ...desktop,
+});
 
 // The project file as a person writes it. Its targets' locale, de-DE, is covered by the engine's
 // built-in German irreversible patterns, so it needs no policy of its own.
 export const makeProjectFile = (origin: string) => ({
-  origins: [origin],
-  limits: { stepTimeoutMilliseconds: 2000 },
-  matrix: [
-    { id: 'cdp-chromium', adapter: 'cdp', engine: 'chromium', ...desktop },
-    // The same CDP driver, given the headless shell's executable instead of Chrome for Testing's.
-    { id: 'cdp-chromium-headless-shell', adapter: 'cdp-headless-shell', engine: 'chromium', ...desktop },
-    // A target no registered driver can serve, to prove it is reported and never substituted.
-    { id: 'appium-android', adapter: 'appium', engine: 'chromium', ...desktop, device: 'phone-390' },
-  ],
+    origins: [origin],
+    limits: { stepTimeoutMilliseconds: 2000 },
+    matrix: [
+        contractTarget(BrowserTarget.Chrome),
+        // The same CDP driver, given the headless shell's executable instead of Chrome for Testing's.
+        contractTarget(BrowserTarget.HeadlessShell),
+        // A target no registered driver can serve, to prove it is reported and never substituted.
+        {
+            id: "appium-android",
+            adapter: "appium",
+            engine: "chromium",
+            ...desktop,
+            device: "phone-390",
+        },
+    ],
 });
 
 export function makeProject(origin: string): Project {
-  const parsed = parseProject(makeProjectFile(origin));
-  if (!parsed.ok) throw new Error(`bad test project: ${JSON.stringify(parsed.error)}`);
-  return parsed.value;
+    const parsed = parseProject(makeProjectFile(origin));
+    if (!parsed.ok) {
+        throw new Error(`bad test project: ${JSON.stringify(parsed.error)}`);
+    }
+    return parsed.value;
 }
 
-export const makeDrivers = (): ReadonlyMap<string, BrowserDriver> => new Map<string, BrowserDriver>([
-  ['cdp', cdpDriver({ executablePath: BROWSERS.chrome })],
-  ['cdp-headless-shell', cdpDriver({ executablePath: BROWSERS.chromeHeadlessShell })],
-]);
+export const makeDrivers = (): ReadonlyMap<string, BrowserDriver> =>
+    driversForTargets(Object.values(BrowserTarget));
 
-export type Ran = { readonly result: RunResult; readonly events: RunEventSink; readonly store: MemoryArtifactStore };
+const meta = (title: string) => ({
+    featureId: "SIGNUP-1",
+    specReference: "specs/signup.md#happy-path",
+    title,
+});
 
-export type Harness = {
-  readonly server: FixtureServer;
-  readonly project: Project;
-  readonly parse: (input: unknown) => ReturnType<ReturnType<typeof planParser>>;
-  plan(raw: unknown): Plan;
-  base(): Omit<RunInputs, 'plan' | 'targetId'>;
-  run(plan: Plan, targetId: string, drivers?: ReadonlyMap<string, BrowserDriver>): Promise<Ran>;
-  close(): Promise<void>;
-};
+export const signupHarness = (): Promise<BrowserHarness> =>
+    startBrowserHarness({
+        fixtureFolder: join(FIXTURES, "signup-app"),
+        projectFile: makeProjectFile,
+        seed: SEED,
+        fixedTimeMilliseconds: FIXED_TIME_MILLISECONDS,
+        drivers: makeDrivers(),
+        planFor: (targetId, steps, fields) =>
+            rawPlan(meta("Contract probe"), targetId, steps, fields),
+    });
 
-export async function harness(): Promise<Harness> {
-  const server = await startFixtureServer(join(FIXTURES, 'signup-app'));
-  const project = makeProject(server.origin);
-  const trusted = await trustedProjectFrom(makeProjectFile(server.origin));
-  const parse = planParser(project);
-  const drivers = makeDrivers();
-  const base = (): Omit<RunInputs, 'plan' | 'targetId'> => ({
-    project, baseUrl: server.origin, seed: SEED, fixedTimeMilliseconds: FIXED_TIME_MILLISECONDS, fixtures: server.fixtures,
-    host: { platform: platform(), arch: arch() },
-  });
-  return {
-    server, project, parse, base,
-    plan(raw) {
-      const parsed = parse(raw);
-      if (!parsed.ok) throw new Error(`test plan rejected: ${JSON.stringify(parsed.error)}`);
-      return parsed.value;
-    },
-    async run(plan, targetId, chosenDrivers = drivers) {
-      const events = memoryRunEventSink();
-      const store = memoryArtifactStore();
-      // The target id comes from the trusted test project, so it is used as the branded value directly.
-      // Every run takes a plan the policy gate authorised.
-      const result = await run({ ...base(), plan: authorise(plan, trusted), targetId: targetId as TargetId }, {
-        drivers: chosenDrivers, clock: systemClock, artifacts: store, redactor: defaultRedactor(), audit: memoryEventSink(), events,
-      });
-      return { result, events, store };
-    },
-    close: () => server.close(),
-  };
-}
-
-// ---- Plans ------------------------------------------------------------------------------------
-
-const meta = (title: string) => ({ featureId: 'SIGNUP-1', specReference: 'specs/signup.md#happy-path', title });
-const role = (roleName: string, name: string) => ({ by: 'role', role: roleName, name });
-const label = (labelText: string) => ({ by: 'label', label: labelText });
-const testId = (id: string) => ({ by: 'testId', testId: id });
-
-export const NAME = 'Ada Lovelace';
-export const EMAIL = 'ada@example.test';
-
-// Plans are written in the one version of the plan language: every assertion carries the id of the
-// acceptance criterion it checks, and a plan with no assertion is rejected as vacuous.
-export const PLAN_LANGUAGE_VERSION = '1.3';
+export const NAME = "Ada Lovelace";
+export const EMAIL = "ada@example.test";
 
 export const signupPlan = (targets: readonly string[]) => ({
-  version: PLAN_LANGUAGE_VERSION,
-  meta: meta('Sign-up happy path'),
-  targets,
-  steps: [
-    { type: 'navigate', url: '/' },
-    { type: 'expect', locator: role('heading', 'Create your account'), assert: { kind: 'visible' }, criterionId: 'signup.heading-shown' },
-    { type: 'expectPage', assert: { kind: 'title', value: 'Sign up - Fixture' }, criterionId: 'signup.page-titled' },
-    { type: 'fill', locator: label('Full name'), value: NAME },
-    { type: 'fill', locator: label('Email'), value: EMAIL },
-    { type: 'expect', locator: label('Email'), assert: { kind: 'valueEquals', value: EMAIL }, criterionId: 'signup.email-kept' },
-    { type: 'capture', name: 'form-filled' },
-    { type: 'click', locator: role('checkbox', 'I agree to the terms') },
-    { type: 'click', locator: role('button', 'Create account') },
-    { type: 'expect', locator: testId('status'), assert: { kind: 'textContains', value: 'Welcome' }, criterionId: 'signup.welcome-shown' },
-    { type: 'expect', locator: testId('echo'), assert: { kind: 'textContains', value: 'Signed up as' }, criterionId: 'signup.address-echoed' },
-    { type: 'a11yAudit', mode: 'report' },
-    { type: 'capture', name: 'signed-up' },
-  ],
+    version: PLAN_LANGUAGE_VERSION,
+    meta: meta("Sign-up happy path"),
+    targets,
+    steps: [
+        { type: "navigate", url: "/" },
+        visible(role("heading", "Create your account"), "signup.heading-shown"),
+        {
+            type: "expectPage",
+            assert: { kind: "title", value: "Sign up - Fixture" },
+            criterionId: "signup.page-titled",
+        },
+        { type: "fill", locator: label("Full name"), value: NAME },
+        { type: "fill", locator: label("Email"), value: EMAIL },
+        {
+            type: "expect",
+            locator: label("Email"),
+            assert: { kind: "valueEquals", value: EMAIL },
+            criterionId: "signup.email-kept",
+        },
+        { type: "capture", name: "form-filled" },
+        { type: "click", locator: role("checkbox", "I agree to the terms") },
+        { type: "click", locator: role("button", "Create account") },
+        {
+            type: "expect",
+            locator: testId("status"),
+            assert: { kind: "textContains", value: "Welcome" },
+            criterionId: "signup.welcome-shown",
+        },
+        {
+            type: "expect",
+            locator: testId("echo"),
+            assert: { kind: "textContains", value: "Signed up as" },
+            criterionId: "signup.address-echoed",
+        },
+        { type: "a11yAudit", mode: "report" },
+        { type: "capture", name: "signed-up" },
+    ],
 });
 
-export const environmentPlan = (targets: readonly string[], expected: Readonly<Record<string, string>>) => ({
-  version: PLAN_LANGUAGE_VERSION,
-  meta: meta('Determinism controls are applied'),
-  targets,
-  steps: [
-    { type: 'navigate', url: '/' },
-    ...Object.entries(expected).map(([id, value]) => ({ type: 'expect', locator: testId(id), assert: { kind: 'textEquals', value }, criterionId: `environment.${id}-pinned` })),
-  ],
+export const environmentPlan = (
+    targets: readonly string[],
+    expected: Readonly<Record<string, string>>,
+) => ({
+    version: PLAN_LANGUAGE_VERSION,
+    meta: meta("Determinism controls are applied"),
+    targets,
+    steps: [
+        { type: "navigate", url: "/" },
+        ...Object.entries(expected).map(([id, value]) => ({
+            type: "expect",
+            locator: testId(id),
+            assert: { kind: "textEquals", value },
+            criterionId: `environment.${id}-pinned`,
+        })),
+    ],
 });
 
-const ASSERTION_TYPES: readonly unknown[] = ['expect', 'expectPage'];
-const isAssertion = (step: unknown): step is Record<string, unknown> =>
-  typeof step === 'object' && step !== null && ASSERTION_TYPES.includes((step as Record<string, unknown>)['type']);
+const ASSERTION_TYPES: readonly unknown[] = ["expect", "expectPage"];
+const isAssertion = (step: unknown): step is JsonRecord =>
+    typeof step === "object" &&
+    step !== null &&
+    ASSERTION_TYPES.includes(Reflect.get(step, "type"));
 
 // A probe plan: navigate, then the given steps. Each given assertion without a criterion id gets
 // one. A plan must assert something, so when the given steps hold no assertion, a check that the
 // sign-up form is shown is added last; it passes on the fixture app's first page.
 export const stepsPlan = (targets: readonly string[], steps: readonly unknown[]) => ({
-  version: PLAN_LANGUAGE_VERSION, meta: meta('Contract probe'), targets, steps: [
-    { type: 'navigate', url: '/' },
-    ...steps.map((step, index) => (isAssertion(step) && !('criterionId' in step) ? { ...step, criterionId: `probe.assertion-${index + 1}` } : step)),
-    ...(steps.some(isAssertion) ? [] : [
-      { type: 'expect', locator: role('heading', 'Create your account'), assert: { kind: 'visible' }, criterionId: 'probe.form-shown' },
-    ]),
-  ],
+    version: PLAN_LANGUAGE_VERSION,
+    meta: meta("Contract probe"),
+    targets,
+    steps: [
+        { type: "navigate", url: "/" },
+        ...steps.map((step, index) =>
+            isAssertion(step) && !("criterionId" in step)
+                ? { ...step, criterionId: `probe.assertion-${index + 1}` }
+                : step,
+        ),
+        ...(steps.some(isAssertion)
+            ? []
+            : [visible(role("heading", "Create your account"), "probe.form-shown")]),
+    ],
 });

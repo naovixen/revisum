@@ -4,10 +4,12 @@
 // the running browser, take that last flag, and check what it actually disables.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
-import { cdpDriver, launchChromium } from '@revisum/driver-cdp';
+import { launchChromium } from '@revisum/driver-cdp';
+import { createBrowserDriver } from '#test-support/browser/CreateBrowserDriver.ts';
 import { defaultRedactor, type SessionEnvironment, type Target } from '@revisum/engine';
-import { BROWSERS } from '../support/browsers.ts';
-import { FIXED_TIME_MILLISECONDS, SEED, harness, type Harness } from '../support/signup-harness.ts';
+import { BROWSERS } from '#test-support/browsers.ts';
+import type { BrowserHarness } from '#test-support/browser/BrowserHarness.ts';
+import { FIXED_TIME_MILLISECONDS, SEED, signupHarness } from '#test-support/signup-harness.ts';
 
 const PORT_RANDOMISATION_FEATURE = 'TcpPortRandomizationWin';
 const DISABLE_FEATURES = '--disable-features=';
@@ -35,8 +37,8 @@ const COMMAND_LINE_ELEMENT_ID = 'command_line';
 const readCommandLineText = (): string => document.getElementById('command_line')?.textContent ?? '';
 const splitCommandLine = (text: string): readonly string[] => text.split(/\s+/).filter((argument) => argument !== '');
 
-let testHarness: Harness;
-before(async () => { testHarness = await harness(); });
+let testHarness: BrowserHarness;
+before(async () => { testHarness = await signupHarness(); });
 after(async () => { await testHarness.close(); });
 
 function contractTarget(targetId: string): Target {
@@ -76,7 +78,7 @@ describe('Chromium port randomisation is off in every browser a driver starts', 
   });
 
   test('the CDP driver\'s browser disables port randomisation', async () => {
-    const driver = cdpDriver({ executablePath: BROWSERS.chrome });
+    const driver = createBrowserDriver({ executablePath: BROWSERS.chrome });
     const opened = await driver.open(contractTarget('cdp-chromium'), sessionEnvironment());
     assert.ok(opened.ok, 'session opens');
     const session = opened.value;

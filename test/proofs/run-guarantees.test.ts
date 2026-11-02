@@ -7,16 +7,15 @@ import {
   planWithAi, releaseNoteDraft, runUntrusted, writeReleaseNotes,
   type AiPlanner, type AiWriter, type Box, type BrowserDriver, type RunResult, type Step,
 } from '@revisum/engine';
-import { hostilePlans } from '../support/hostile-plans.ts';
-import { memoryArtifactStore, memoryEventSink, memoryRunEventSink, systemClock } from '../support/memory-ports.ts';
-import { decodePng } from '../support/png-decoder.ts';
-import {
-  CONTRACT_TARGETS, EMAIL, FIXED_TIME_MILLISECONDS, NAME, SEED,
-  harness, makeDrivers, signupPlan, stepsPlan, type Harness,
-} from '../support/signup-harness.ts';
+import { hostilePlans } from '#test-support/hostile-plans.ts';
+import { memoryArtifactStore, memoryEventSink, memoryRunEventSink, systemClock } from '#test-support/memory-ports.ts';
+import { decodePng } from '#test-support/png-decoder.ts';
+import { onTarget } from '#test-support/TestTier.ts';
+import type { BrowserHarness } from '#test-support/browser/BrowserHarness.ts';
+import { CONTRACT_TARGETS, EMAIL, FIXED_TIME_MILLISECONDS, NAME, SEED, signupHarness, makeDrivers, signupPlan, stepsPlan } from '#test-support/signup-harness.ts';
 
-let testHarness: Harness;
-before(async () => { testHarness = await harness(); });
+let testHarness: BrowserHarness;
+before(async () => { testHarness = await signupHarness(); });
 after(async () => { await testHarness.close(); });
 
 // A driver that counts every call. If containment works, it is never called.
@@ -38,7 +37,7 @@ const spyPorts = (drivers: ReadonlyMap<string, BrowserDriver>) => ({
 
 describe('(a) replay: same manifest, same result hash', () => {
   for (const targetId of CONTRACT_TARGETS) {
-    test(`${targetId}: two runs give identical manifest, result hash and event log`, async () => {
+    test(`${targetId}: two runs give identical manifest, result hash and event log`, onTarget(targetId), async () => {
       const plan = testHarness.plan(signupPlan([targetId]));
       const first = await testHarness.run(plan, targetId);
       const second = await testHarness.run(plan, targetId);
@@ -75,7 +74,7 @@ describe('(b) AI containment: hostile plans are rejected before any side effect'
     const ports = spyPorts(new Map(spies.map((spy) => [spy.info.id, spy])));
     const hostile = hostilePlans(testHarness.server.origin);
     for (const plan of hostile) {
-      const outcome = await runUntrusted(plan.input, testHarness.parse, testHarness.base(), ports);
+      const outcome = await runUntrusted(plan.input, testHarness.parse, testHarness.runInputs(), ports);
       assert.ok(!Array.isArray(outcome) && 'errors' in outcome, `${plan.name}: rejected`);
       assert.ok(outcome.errors.some((error) => error.code === plan.code), `${plan.name}: expected ${plan.code}, got ${JSON.stringify(outcome.errors)}`);
     }
@@ -86,7 +85,7 @@ describe('(b) AI containment: hostile plans are rejected before any side effect'
 
   test('positive control: a valid plan does reach the (spy) driver', async () => {
     const spy = spyDriver('cdp');
-    const outcome = await runUntrusted(signupPlan(['cdp-chromium']), testHarness.parse, testHarness.base(), spyPorts(new Map([['cdp', spy]])));
+    const outcome = await runUntrusted(signupPlan(['cdp-chromium']), testHarness.parse, testHarness.runInputs(), spyPorts(new Map([['cdp', spy]])));
     assert.ok(Array.isArray(outcome));
     assert.equal(outcome[0]?.state, 'TargetUnavailable');
     assert.equal(spy.calls, 2);
@@ -145,7 +144,7 @@ function blackFraction(png: Uint8Array, box: Box): number {
 
 describe('(d) redaction by default', () => {
   for (const targetId of CONTRACT_TARGETS) {
-    test(`${targetId}: PII fields are solid black in screenshots, and visible without the mask`, async () => {
+    test(`${targetId}: PII fields are solid black in screenshots, and visible without the mask`, onTarget(targetId), async () => {
       const target = testHarness.project.matrix.find((candidate) => candidate.id === targetId);
       assert.ok(target);
       const driver = makeDrivers().get(target.adapter);
@@ -180,7 +179,7 @@ describe('(d) redaction by default', () => {
       }
     });
 
-    test(`${targetId}: PII text never reaches events or results`, async () => {
+    test(`${targetId}: PII text never reaches events or results`, onTarget(targetId), async () => {
       const fill = [
         { type: 'fill', locator: { by: 'label', label: 'Full name' }, value: NAME },
         { type: 'fill', locator: { by: 'label', label: 'Email' }, value: EMAIL },

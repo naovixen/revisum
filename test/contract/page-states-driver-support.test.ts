@@ -7,10 +7,12 @@
 // reduced driver does run.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
-import {
-  CDP_TARGET, canonicalUrl, click, download, expectState, hrefEquals, metaContent, navigate, navigateWithoutScripts,
-  newTab, cdpWithout, outcomes, pageStatesHarness, role, testId, textEquals, type JsonRecord, type PageStatesFeature, type PageStatesHarness,
-} from './page-states-support.ts';
+import type { DriverFeature } from '@revisum/engine';
+import { outcomes } from '#test-support/browser/BrowserHarness.ts';
+import { BrowserTarget } from '#test-support/browser/BrowserTarget.ts';
+import { cdpWithout } from '#test-support/browser/DriversWithout.ts';
+import { click, navigate, newTab, role, testId, textEquals, type JsonRecord } from '#test-support/browser/RawPlan.ts';
+import { canonicalUrl, download, expectState, hrefEquals, metaContent, navigateWithoutScripts, pageStatesHarness, type PageStatesHarness } from './page-states-support.ts';
 
 let harness: PageStatesHarness;
 before(async () => { harness = await pageStatesHarness(); });
@@ -18,7 +20,7 @@ after(async () => { await harness.close(); });
 
 type Feature = {
   readonly name: string;
-  readonly listedAs: PageStatesFeature;
+  readonly listedAs: DriverFeature;
   readonly page: string;
   readonly withFeature: () => JsonRecord;
   readonly without: JsonRecord;
@@ -67,11 +69,11 @@ const FEATURES: readonly Feature[] = [
 // Open the page, use the feature, then send input and check the page.
 const stepsWith = (page: string, step: JsonRecord) => [navigate(page), step, click(role('button', 'Continue')), continueShown()];
 
-describe(`the own CDP driver with one feature taken off its list: ${CDP_TARGET}`, () => {
+describe(`the own CDP driver with one feature taken off its list: ${BrowserTarget.Chrome}`, () => {
   for (const feature of FEATURES) {
     test(`a run with ${feature.name} fails that step with unsupported-step, sends nothing and skips the rest`, async () => {
       const drivers = cdpWithout(harness, feature.listedAs);
-      const { result, atClose, requestedPaths } = await harness.runSteps(CDP_TARGET, stepsWith(feature.page, feature.withFeature()), { drivers });
+      const { result, atClose, requestedPaths } = await harness.runSteps(BrowserTarget.Chrome, stepsWith(feature.page, feature.withFeature()), { drivers });
       assert.equal(result.state, 'Failed');
       assert.deepEqual(outcomes(result), [[0, 'passed', undefined], [1, 'failed', 'unsupported-step'], [2, 'skipped', undefined], [3, 'skipped', undefined]]);
       assert.equal(atClose?.shown['input-events'], '0', 'no input event reached the page');
@@ -80,7 +82,7 @@ describe(`the own CDP driver with one feature taken off its list: ${CDP_TARGET}`
 
     test(`counter-example: the same run without ${feature.name} passes and sends its input`, async () => {
       const drivers = cdpWithout(harness, feature.listedAs);
-      const { result, atClose } = await harness.runSteps(CDP_TARGET, stepsWith(feature.page, feature.without), { drivers });
+      const { result, atClose } = await harness.runSteps(BrowserTarget.Chrome, stepsWith(feature.page, feature.without), { drivers });
       assert.equal(result.state, 'Passed', JSON.stringify(result.steps));
       assert.notEqual(atClose?.shown['input-events'], '0');
     });
@@ -88,7 +90,7 @@ describe(`the own CDP driver with one feature taken off its list: ${CDP_TARGET}`
 
   test('a run with a navigate whose scripts are disabled fails it with unsupported-step and never loads the page', async () => {
     const drivers = cdpWithout(harness, 'scriptsDisabled');
-    const { result, requestedPaths } = await harness.runSteps(CDP_TARGET, [
+    const { result, requestedPaths } = await harness.runSteps(BrowserTarget.Chrome, [
       navigate('/index.html'), navigateWithoutScripts('/head.html'), click(role('button', 'Continue')), continueShown(),
     ], { drivers });
     assert.deepEqual(outcomes(result), [[0, 'passed', undefined], [1, 'failed', 'unsupported-step'], [2, 'skipped', undefined], [3, 'skipped', undefined]]);
@@ -97,7 +99,7 @@ describe(`the own CDP driver with one feature taken off its list: ${CDP_TARGET}`
 
   test('counter-example: the same navigate without scripts disabled loads the page', async () => {
     const drivers = cdpWithout(harness, 'scriptsDisabled');
-    const { result, requestedPaths } = await harness.runSteps(CDP_TARGET, [
+    const { result, requestedPaths } = await harness.runSteps(BrowserTarget.Chrome, [
       navigate('/index.html'), navigate('/head.html'), click(role('button', 'Continue')), continueShown(),
     ], { drivers });
     assert.equal(result.state, 'Passed', JSON.stringify(result.steps));
@@ -105,16 +107,16 @@ describe(`the own CDP driver with one feature taken off its list: ${CDP_TARGET}`
   });
 });
 
-describe(`the own CDP driver: ${CDP_TARGET}`, () => {
+describe(`the own CDP driver: ${BrowserTarget.Chrome}`, () => {
   for (const feature of FEATURES) {
     test(`a run with ${feature.name} performs it and passes`, async () => {
-      const { result } = await harness.runSteps(CDP_TARGET, stepsWith(feature.page, feature.withFeature()));
+      const { result } = await harness.runSteps(BrowserTarget.Chrome, stepsWith(feature.page, feature.withFeature()));
       assert.equal(result.state, 'Passed', JSON.stringify(result.steps));
     });
   }
 
   test('a run with a navigate whose scripts are disabled performs it and passes', async () => {
-    const { result, requestedPaths } = await harness.runSteps(CDP_TARGET, [
+    const { result, requestedPaths } = await harness.runSteps(BrowserTarget.Chrome, [
       navigate('/index.html'), navigateWithoutScripts('/head.html'), click(role('button', 'Continue')), continueShown(),
     ]);
     assert.equal(result.state, 'Passed', JSON.stringify(result.steps));

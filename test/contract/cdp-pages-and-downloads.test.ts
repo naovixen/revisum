@@ -8,9 +8,10 @@ import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, describe, test } from 'node:test';
-import {
-  CDP_TARGETS, capabilityHarness, capabilityPlan, click, navigate, role, shownText, testId, textEquals, type CapabilityHarness,
-} from '../support/capability-harness.ts';
+import { onTarget } from '#test-support/TestTier.ts';
+import { BrowserTarget } from '#test-support/browser/BrowserTarget.ts';
+import { click, navigate, role, testId, textEquals } from '#test-support/browser/RawPlan.ts';
+import { capabilityHarness, capabilityPlan, shownText, type CapabilityHarness } from '#test-support/capability-harness.ts';
 
 let capability: CapabilityHarness;
 before(async () => { capability = await capabilityHarness(2000); });
@@ -30,10 +31,10 @@ const OPENERS = [
   { name: 'a download of a file from the server', locator: role('link', 'Download the report') },
 ] as const;
 
-for (const targetId of CDP_TARGETS) {
+for (const targetId of Object.values(BrowserTarget)) {
   describe(`pages and downloads: ${targetId}`, () => {
     for (const opener of OPENERS) {
-      test(`${opener.name} fails the step with unsupported-step and skips the rest`, async () => {
+      test(`${opener.name} fails the step with unsupported-step and skips the rest`, onTarget(targetId), async () => {
         const before = leftDownloads();
         const plan = capability.plan(capabilityPlan(targetId, [
           navigate('/pages.html'),
@@ -51,7 +52,7 @@ for (const targetId of CDP_TARGETS) {
       });
     }
 
-    test('counter-example: an ordinary click on the same page passes and the run goes on', async () => {
+    test('counter-example: an ordinary click on the same page passes and the run goes on', onTarget(targetId), async () => {
       const plan = capability.plan(capabilityPlan(targetId, [
         navigate('/pages.html'),
         click(role('button', 'Stay here')),
@@ -63,7 +64,7 @@ for (const targetId of CDP_TARGETS) {
       assert.equal(store.references().length, 1);
     });
 
-    test('the popup is closed and the session stays on the page that opened it', async () => {
+    test('the popup is closed and the session stays on the page that opened it', onTarget(targetId), async () => {
       const session = await capability.openOwn(targetId);
       try {
         assert.ok((await session.navigate(capability.url('/pages.html'))).ok);

@@ -13,11 +13,11 @@
 // test/unit/engine/policy-unsafe-features.test.ts.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
-import {
-  ADAPTER_OF, ALLOWED_UNNAMED_SELECTOR, CDP_TARGETS, click, css, listedFeatures, navigate, outcomes, testId, textEquals, unsafePageDrivers,
-  unsafePageHarness, xpath,
-  type JsonRecord, type UnsafePageHarness, type UnsafePageRun,
-} from './unsafe-page-support.ts';
+import { outcomes, type BrowserRun } from '#test-support/browser/BrowserHarness.ts';
+import { ADAPTER_OF_TARGET } from '#test-support/browser/BrowserTarget.ts';
+import { listedFeatures } from '#test-support/browser/DriversWithout.ts';
+import { click, navigate, testId, textEquals, type JsonRecord } from '#test-support/browser/RawPlan.ts';
+import { ALLOWED_UNNAMED_SELECTOR, UNSAFE_PAGE_TARGETS, css, unsafePageDrivers, unsafePageHarness, xpath, type UnsafePageHarness } from './unsafe-page-support.ts';
 
 let harness: UnsafePageHarness;
 before(async () => { harness = await unsafePageHarness(); });
@@ -27,19 +27,19 @@ const STATES = ['input-events', 'account-state', 'details-state', 'toolbar-state
 
 // Opens the guard page and clicks `locator`, then checks a state the click would change. Nothing
 // before the click sends input, so a denied click leaves the input counter at 0.
-const clickOnGuardPage = (targetId: string, locator: JsonRecord, followUp: JsonRecord): Promise<UnsafePageRun> =>
+const clickOnGuardPage = (targetId: string, locator: JsonRecord, followUp: JsonRecord): Promise<BrowserRun> =>
   harness.runSteps(targetId, [navigate('/guard.html'), click(locator), followUp], { read: STATES });
 
 const accountKept = (): JsonRecord => textEquals(testId('account-state'), 'Account kept', 'guard.account-kept');
 
-function assertDenied(ran: UnsafePageRun, rule: string): void {
+function assertDenied(ran: BrowserRun, rule: string): void {
   assert.equal(ran.result.state, 'Denied', JSON.stringify(ran.result.steps));
   assert.deepEqual(ran.result.denial, { rule, stepIndex: 1 });
   assert.equal(ran.result.steps[1]?.code, 'policy-denied');
   assert.equal(ran.atClose?.shown['input-events'], '0', 'no input event reached the page');
 }
 
-function assertClickReachedPage(ran: UnsafePageRun): void {
+function assertClickReachedPage(ran: BrowserRun): void {
   assert.equal(ran.result.state, 'Passed', JSON.stringify(ran.result.steps));
   assert.notEqual(ran.atClose?.shown['input-events'], '0', 'the click reached the page');
 }
@@ -54,8 +54,8 @@ const DELETE_ACCOUNT_LOCATORS: readonly { readonly name: string; readonly locato
   { name: 'a CSS selector with a position', locator: css('section.account button', { position: 'first' }), alsoNeeds: 'positions' },
 ];
 
-for (const targetId of CDP_TARGETS) {
-  const declaredBefore = listedFeatures(unsafePageDrivers().get(ADAPTER_OF[targetId] ?? ''));
+for (const targetId of UNSAFE_PAGE_TARGETS) {
+  const declaredBefore = listedFeatures(unsafePageDrivers().get(ADAPTER_OF_TARGET[targetId] ?? ''));
   const locators = DELETE_ACCOUNT_LOCATORS.filter((entry) => entry.alsoNeeds === undefined || declaredBefore.includes(entry.alsoNeeds));
 
   describe(`irreversible actions found by structure: ${targetId}`, () => {

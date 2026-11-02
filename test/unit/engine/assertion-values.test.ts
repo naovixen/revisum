@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { planParser } from '@revisum/engine';
-import { makeProject, signupPlan } from '../../support/signup-harness.ts';
+import { makeProject, signupPlan } from '#test-support/signup-harness.ts';
 
 const ORIGIN = 'http://127.0.0.1:4173';
 const TARGETS = ['cdp-chromium'];

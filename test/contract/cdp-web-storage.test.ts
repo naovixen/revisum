@@ -7,10 +7,10 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import type { Session } from '@revisum/engine';
-import {
-  CDP_TARGET, expectStorage, navigate, networkHarness, outcomes, removeStorage, setStorage, testId, textEquals,
-  type NetworkHarness, type NetworkRun,
-} from './network-stubs-support.ts';
+import { outcomes } from '#test-support/browser/BrowserHarness.ts';
+import { BrowserTarget } from '#test-support/browser/BrowserTarget.ts';
+import { navigate, testId, textEquals } from '#test-support/browser/RawPlan.ts';
+import { expectStorage, networkHarness, removeStorage, setStorage, type NetworkHarness, type NetworkRun } from './network-stubs-support.ts';
 
 let harness: NetworkHarness;
 before(async () => { harness = await networkHarness(); });
@@ -23,7 +23,7 @@ const greetingShown = (value: string, criterionId: string) => textEquals(testId(
 
 describe('writing, checking and removing a storage entry', () => {
   test('after setStorage, expectStorage sees the value and the page reads it; after removeStorage it is absent', async () => {
-    const ran = await harness.runSteps(CDP_TARGET, [
+    const ran = await harness.runSteps(BrowserTarget.Chrome, [
       openStorage(),
       dockedShown('(none)', 'storage.nothing-yet'),
       expectStorage('menuDocked', { kind: 'absent' }, 'storage.absent-at-first'),
@@ -40,7 +40,7 @@ describe('writing, checking and removing a storage entry', () => {
   });
 
   test('a string value is written to session storage as it is', async () => {
-    const ran = await harness.runSteps(CDP_TARGET, [
+    const ran = await harness.runSteps(BrowserTarget.Chrome, [
       openStorage(),
       setStorage('visitGreeting'),
       expectStorage('visitGreeting', { kind: 'equals', value: 'Welcome back' }, 'storage.session-equals'),
@@ -52,7 +52,7 @@ describe('writing, checking and removing a storage entry', () => {
   });
 
   test('a false argument is stored as false, and a later write replaces the value', async () => {
-    const ran = await harness.runSteps(CDP_TARGET, [
+    const ran = await harness.runSteps(BrowserTarget.Chrome, [
       openStorage(),
       setStorage('menuDocked', { docked: false }),
       expectStorage('menuDocked', { kind: 'equals', value: 'false' }, 'storage.false'),
@@ -84,7 +84,7 @@ describe('writing, checking and removing a storage entry', () => {
   ];
   for (const failing of FAILING) {
     test(`counter-example: expectStorage ${failing.name} fails`, async () => {
-      const ran = await harness.runSteps(CDP_TARGET, [openStorage(), ...failing.steps()]);
+      const ran = await harness.runSteps(BrowserTarget.Chrome, [openStorage(), ...failing.steps()]);
       const all = outcomes(ran.result);
       assert.deepEqual(all.at(-1), [all.length - 1, 'failed', 'assertion-failed'], JSON.stringify(ran.result.steps));
       assert.deepEqual(all.slice(0, -1).filter(([, outcome]) => outcome !== 'passed'), []);
@@ -100,11 +100,11 @@ describe('a write while the page is on another origin', () => {
       assert.ok(opened.ok, JSON.stringify(opened));
       seen.otherOrigin = await harness.shownOn(session, 'stored-docked');
     };
-    const ran = await harness.runSteps(CDP_TARGET, [
+    const ran = await harness.runSteps(BrowserTarget.Chrome, [
       openStorage(),
       setStorage('otherMenuDocked', { docked: true }),
       dockedShown('(none)', 'storage.never-reached'),
-    ], { read: ['stored-docked'], beforeClose: readOtherOrigin });
+    ], { read: ['stored-docked'], afterPageRead: readOtherOrigin });
     assert.equal(ran.result.state, 'Failed');
     assert.deepEqual(outcomes(ran.result), [[0, 'passed', undefined], [1, 'failed', 'storage-origin-mismatch'], [2, 'skipped', undefined]]);
     assert.equal(ran.atClose?.shown['stored-docked'], '(none)', 'nothing was written to the page\'s own origin');
@@ -112,7 +112,7 @@ describe('a write while the page is on another origin', () => {
   });
 
   test('counter-example: the same write with the page on the entry\'s origin succeeds, and that origin\'s page reads it', async () => {
-    const ran = await harness.runSteps(CDP_TARGET, [
+    const ran = await harness.runSteps(BrowserTarget.Chrome, [
       navigate(harness.otherUrl('/storage.html')),
       setStorage('otherMenuDocked', { docked: true }),
       expectStorage('otherMenuDocked', { kind: 'equals', value: 'true' }, 'storage.other-origin-equals'),

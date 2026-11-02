@@ -12,15 +12,15 @@
 // A script, style sheet, frame, worker or image that matches a stub also goes through the proxy.
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
-import { cdpDriver, type OwnBrowserDriver } from '@revisum/driver-cdp';
+import type { OwnBrowserDriver } from '@revisum/driver-cdp';
+import { createBrowserDriver } from '#test-support/browser/CreateBrowserDriver.ts';
 import type { BrowserDriver, BrowserRequestRecord, EgressEvent, SessionEnvironment, Target } from '@revisum/engine';
 import { hostAndPort, joinEgressEvents, startEgressProxy, type EgressProxy } from '@revisum/runner';
-import { BROWSERS } from '../support/browsers.ts';
+import { BROWSERS } from '#test-support/browsers.ts';
 import { declaredService, egressPolicy, fakeResolver, hostOf, type FakeResolver } from '../unit/runner/runner-examples.ts';
-import {
-  CDP_TARGET, FIXTURE_FOLDER, SERVER_ASSETS, click, navigate, networkHarness, role, startStub, stopStub, testId, textEquals, timesRequested,
-  type NetworkHarness, type NetworkRun,
-} from './network-stubs-support.ts';
+import { BrowserTarget } from '#test-support/browser/BrowserTarget.ts';
+import { click, navigate, role, testId, textEquals } from '#test-support/browser/RawPlan.ts';
+import { FIXTURE_FOLDER, SERVER_ASSETS, networkHarness, startStub, stopStub, timesRequested, type NetworkHarness, type NetworkRun } from './network-stubs-support.ts';
 
 const BLOCKED_ORIGIN = 'http://blocked.invalid';
 
@@ -75,10 +75,10 @@ type ProxiedRun = NetworkRun & { readonly egressEvents: readonly EgressEvent[] }
 // this run's proxy decisions only.
 async function runThroughProxy(steps: readonly unknown[]): Promise<ProxiedRun> {
   const records: BrowserRequestRecord[] = [];
-  const driver = cdpDriver({ executablePath: BROWSERS.chrome, fixturesFolder: FIXTURE_FOLDER, proxy: { server: proxy.url, includeLoopback: true } });
+  const driver = createBrowserDriver({ executablePath: BROWSERS.chrome, fixturesFolder: FIXTURE_FOLDER, proxy: { server: proxy.url, includeLoopback: true } });
   const drivers = new Map<string, BrowserDriver>([['cdp', keepingRecords(driver, (kept) => { records.push(...kept); })]]);
   const firstDecision = proxy.decisions().length;
-  const ran = await harness.runSteps(CDP_TARGET, steps, { drivers });
+  const ran = await harness.runSteps(BrowserTarget.Chrome, steps, { drivers });
   return { ...ran, egressEvents: joinEgressEvents(records, proxy.decisions().slice(firstDecision)) };
 }
 

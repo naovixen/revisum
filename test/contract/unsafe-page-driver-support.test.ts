@@ -5,11 +5,11 @@
 // ran. The same steps on the unchanged driver pass, so the counters are shown able to move.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
-import {
-  ADAPTER_OF, CDP_TARGETS, PAGE_PART_FEATURES, check, click, css, driversWithout, evaluate, expectScript, listedFeatures, navigate, outcomes,
-  rememberAttribute, stepMilliseconds, testId, unsafePageDrivers, unsafePageHarness, xpath,
-  type JsonRecord, type PagePartFeature, type UnsafePageHarness,
-} from './unsafe-page-support.ts';
+import { outcomes, stepMilliseconds } from '#test-support/browser/BrowserHarness.ts';
+import { ADAPTER_OF_TARGET } from '#test-support/browser/BrowserTarget.ts';
+import { driversWithout, listedFeatures } from '#test-support/browser/DriversWithout.ts';
+import { click, navigate, testId, type JsonRecord } from '#test-support/browser/RawPlan.ts';
+import { UNSAFE_PAGE_TARGETS, PAGE_PART_FEATURES, check, css, evaluate, expectScript, rememberAttribute, unsafePageDrivers, unsafePageHarness, xpath, type PagePartFeature, type UnsafePageHarness } from './unsafe-page-support.ts';
 
 let harness: UnsafePageHarness;
 before(async () => { harness = await unsafePageHarness(); });
@@ -44,8 +44,8 @@ const FEATURE_STEPS: readonly FeatureStep[] = [
 const READ = ['input-events', 'script-runs'];
 const pageShown = (): JsonRecord => check(testId('input-events'), { kind: 'visible' }, 'support.page-shown');
 
-for (const targetId of CDP_TARGETS) {
-  const adapter = ADAPTER_OF[targetId] ?? '';
+for (const targetId of UNSAFE_PAGE_TARGETS) {
+  const adapter = ADAPTER_OF_TARGET[targetId] ?? '';
   // The steps this driver can run once it declares this spec's features: each step's other
   // feature, if any, is one the driver declares already.
   const declaredBefore = listedFeatures(unsafePageDrivers().get(adapter));

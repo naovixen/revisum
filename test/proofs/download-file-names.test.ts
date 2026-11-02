@@ -14,10 +14,10 @@ import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { after, before, test } from 'node:test';
-import {
-  CDP_TARGET, download, expectDownload, navigate, pageStatesHarness, role, type PageStatesHarness,
-} from '../contract/page-states-support.ts';
-import { downloadSearchRoots, filesHolding, filesNamed, isDeviceName } from '../support/stored-files.ts';
+import { BrowserTarget } from '#test-support/browser/BrowserTarget.ts';
+import { navigate, role } from '#test-support/browser/RawPlan.ts';
+import { download, expectDownload, pageStatesHarness, type PageStatesHarness } from '../contract/page-states-support.ts';
+import { downloadSearchRoots, filesHolding, filesNamed, isDeviceName } from '#test-support/stored-files.ts';
 
 const TIMEOUT = 120_000;
 const SYSTEM_PASSWORD_FILE = '/etc/passwd';
@@ -54,12 +54,12 @@ for (const [index, described] of HOSTILE_NAMES.entries()) {
     assert.ok(file !== undefined);
     const passwordBefore = digestOf(SYSTEM_PASSWORD_FILE);
     const atClose: { stored: readonly string[] | null } = { stored: null };
-    const ran = await harness.runSteps(CDP_TARGET, [
+    const ran = await harness.runSteps(BrowserTarget.Chrome, [
       navigate('/downloads.html'),
       download('hostile-file', role('link', file.linkName)),
       expectDownload('hostile-file', { kind: 'contentContains', value: file.marker }, 'downloads.hostile-content-kept'),
       expectDownload('hostile-file', { kind: 'sizeAtLeast', value: file.bytes.length }, 'downloads.hostile-size-kept'),
-    ], { beforeClose: async (_session, startedAt) => { atClose.stored = filesHolding(file.marker, startedAt); } });
+    ], { beforePageRead: async (_session, startedAt) => { atClose.stored = filesHolding(file.marker, startedAt); } });
     assert.equal(ran.result.state, 'Passed', `${file.kind}: ${JSON.stringify(ran.result.steps)}`);
 
     // While the session was open: one stored copy, under a name the driver chose, in its own folder.

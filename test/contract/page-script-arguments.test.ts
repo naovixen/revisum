@@ -6,8 +6,9 @@
 // boolean it received, and the sha256 of its own source text as the page compiled it. One
 // expectScript step per argument set checks that report against the one the test computes from the
 // argument set itself and the declared file's bytes.
-// The relation checked over 1,000 generated argument sets (quotes, `"); fetch(`, template-literal
-// text, backslashes and non-Latin text) is identity: what the script receives is what the plan
+// The relation checked over generated argument sets (quotes, `"); fetch(`, template-literal text,
+// backslashes and non-Latin text; all 1,000 on the full tier, the named cases and the first of the
+// rest on push) is identity: what the script receives is what the plan
 // wrote, and the source the page ran is the file, whatever the arguments. The mutant shows a
 // driver that spliced the text into the source would fail it: the same sets, spliced, break the
 // script or change what it receives.
@@ -15,15 +16,17 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { runInNewContext } from 'node:vm';
 import { after, before, describe, test } from 'node:test';
+import { isFullTier } from '#test-support/TestTier.ts';
 import { approvedStanding } from '../unit/engine/policy-examples.ts';
 import { fakeEnvironmentStore, fakeSecretValue } from '../unit/engine/secret-examples.ts';
-import {
-  CDP_TARGETS, ECHO_ARGUMENTS_FILE, ECHO_COUNT_MAXIMUM, ECHO_TEXT_MAXIMUM_LENGTH, PAGE_SECRET, expectScript, fill, inlineScript, label,
-  navigate, outcomes, scriptFileText, secretValue, unsafePageHarness, unsafePagePlan, type JsonRecord, type UnsafePageHarness,
-} from './unsafe-page-support.ts';
+import { outcomes } from '#test-support/browser/BrowserHarness.ts';
+import { fill, label, navigate, secretValue, type JsonRecord } from '#test-support/browser/RawPlan.ts';
+import { UNSAFE_PAGE_TARGETS, ECHO_ARGUMENTS_FILE, ECHO_COUNT_MAXIMUM, ECHO_TEXT_MAXIMUM_LENGTH, PAGE_SECRET, expectScript, inlineScript, scriptFileText, unsafePageHarness, unsafePagePlan, type UnsafePageHarness } from './unsafe-page-support.ts';
 
 const TIMEOUT = 600_000;
 const ARGUMENT_SETS = 1000;
+// How many of them reach a browser. One run holds SETS_PER_RUN, so push takes one run.
+const BROWSER_ARGUMENT_SETS = isFullTier() ? ARGUMENT_SETS : 100;
 // Kept well under the project's maximumCalls of 200: every expectScript is one script call.
 const SETS_PER_RUN = 100;
 
@@ -137,12 +140,12 @@ test('mutant: splicing the same texts into the source breaks the script or chang
   assert.ok(changed.some((set) => set.text === '"); fetch('), 'the named "); fetch( set is among them');
 });
 
-for (const targetId of CDP_TARGETS) {
+for (const targetId of UNSAFE_PAGE_TARGETS) {
   describe(`named page script arguments: ${targetId}`, () => {
-    test(`each of ${ARGUMENT_SETS} generated argument sets reaches the script as one JSON object, and the page runs the file's exact source`, { timeout: TIMEOUT }, async () => {
+    test(`each of ${BROWSER_ARGUMENT_SETS} generated argument sets reaches the script as one JSON object, and the page runs the file's exact source`, { timeout: TIMEOUT }, async () => {
       const source = scriptFileText(ECHO_ARGUMENTS_FILE);
       let checked = 0;
-      for (const [batch, sets] of batches(ALL_SETS).entries()) {
+      for (const [batch, sets] of batches(ALL_SETS.slice(0, BROWSER_ARGUMENT_SETS)).entries()) {
         const first = batch * SETS_PER_RUN;
         const steps = [navigate('/'), ...sets.map((set, offset) => echoCheck('echoArguments', set, source, first + offset))];
         const ran = await harness.runSteps(targetId, steps);
@@ -151,7 +154,7 @@ for (const targetId of CDP_TARGETS) {
         assert.equal(ran.result.state, 'Passed');
         checked += sets.length;
       }
-      assert.equal(checked, ARGUMENT_SETS);
+      assert.equal(checked, BROWSER_ARGUMENT_SETS);
     });
 
     // Counter-example: the same check against a report computed for other arguments fails, so a

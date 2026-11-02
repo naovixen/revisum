@@ -2,18 +2,18 @@
 // match it, with data and nosniff, so script markup in its body stays text; a document, script,
 // style sheet, frame, worker or image request that matches goes to the server instead. Its
 // responses are served in order and the last repeats; after a stop, requests reach the server.
-// The result records which stub and which response answered each request, so 20 replays give one
+// The result records which stub and which response answered each request, so replays give one
 // result hash. Every assertion that runs while a stub is active lists the active stubs, so a
 // report can say the check ran against a faked response.
 // Each claim has its counter-example: the same bytes served as a page do run their script, and
 // without the stub the same requests reach the server.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
-import {
-  CDP_TARGET, SERVER_ASSETS, activeStubsOf, click, expectRequests, expectResponse, expectStorage, navigate, networkHarness, networkPlan,
-  outcomes, role, startStub, stopStub, stubbedAnswersIn, testId, textEquals, timesRequested, titleIs, visible,
-  type NetworkHarness, type NetworkRun,
-} from './network-stubs-support.ts';
+import { determinismRuns } from '#test-support/TestTier.ts';
+import { outcomes } from '#test-support/browser/BrowserHarness.ts';
+import { BrowserTarget } from '#test-support/browser/BrowserTarget.ts';
+import { click, navigate, role, testId, textEquals, visible } from '#test-support/browser/RawPlan.ts';
+import { SERVER_ASSETS, activeStubsOf, expectRequests, expectResponse, expectStorage, networkHarness, networkPlan, startStub, stopStub, stubbedAnswersIn, timesRequested, titleIs, type NetworkHarness, type NetworkRun } from './network-stubs-support.ts';
 
 let harness: NetworkHarness;
 before(async () => { harness = await networkHarness(); });
@@ -23,7 +23,7 @@ const assertPassed = (ran: NetworkRun): void => assert.equal(ran.result.state, '
 
 describe('a stub serves data only, to fetch and XHR only', () => {
   test('a fixture body holding script markup reaches the page\'s fetch as JSON with nosniff, and no script runs', async () => {
-    const ran = await harness.runSteps(CDP_TARGET, [
+    const ran = await harness.runSteps(BrowserTarget.Chrome, [
       navigate('/resources.html'),
       startStub('markupNotes'),
       click(role('button', 'Load notes')),
@@ -41,7 +41,7 @@ describe('a stub serves data only, to fetch and XHR only', () => {
   // Counter-example: the script counter is live. The same fixture bytes served as an HTML page in
   // a frame do run their markup, and the counter shows it.
   test('counter-example: the same bytes served as an HTML page in a frame run their script, and the counter shows it', async () => {
-    const ran = await harness.runSteps(CDP_TARGET, [
+    const ran = await harness.runSteps(BrowserTarget.Chrome, [
       navigate('/resources.html'),
       click(role('button', 'Show the notes as a page')),
       textEquals(testId('script-runs'), '1', 'stubs.page-script-ran'),
@@ -50,7 +50,7 @@ describe('a stub serves data only, to fetch and XHR only', () => {
   });
 
   test('counter-example: without the stub, the same fetch gets the server\'s notes', async () => {
-    const ran = await harness.runSteps(CDP_TARGET, [
+    const ran = await harness.runSteps(BrowserTarget.Chrome, [
       navigate('/resources.html'),
       click(role('button', 'Load notes')),
       textEquals(testId('notes-kind'), 'No markup received', 'stubs.server-notes'),
@@ -60,7 +60,7 @@ describe('a stub serves data only, to fetch and XHR only', () => {
   });
 
   test('a script, style sheet, frame, worker, image and document that match a stub go to the server; its fetch and XHR get the stub', async () => {
-    const ran = await harness.runSteps(CDP_TARGET, [
+    const ran = await harness.runSteps(BrowserTarget.Chrome, [
       navigate('/resources.html'),
       startStub('assetRequests'),
       click(role('button', 'Load every resource')),
@@ -84,7 +84,7 @@ describe('a stub serves data only, to fetch and XHR only', () => {
   });
 
   test('counter-example: without the stub, the same fetch and XHR reach the server', async () => {
-    const ran = await harness.runSteps(CDP_TARGET, [
+    const ran = await harness.runSteps(BrowserTarget.Chrome, [
       navigate('/resources.html'),
       click(role('button', 'Load every resource')),
       textEquals(testId('fetch-state'), 'Fetch: server answered', 'stubs.fetch-from-server'),
@@ -108,13 +108,13 @@ const sequenceSteps = (stubbedQuestions: number): unknown[] => {
 
 describe('a stub\'s responses are served in order, and the last repeats', () => {
   test('a stub with three responses answers five requests with responses 1, 2, 3, 3 and 3; after its stop the server answers', async () => {
-    const ran = await harness.runSteps(CDP_TARGET, sequenceSteps(5));
+    const ran = await harness.runSteps(BrowserTarget.Chrome, sequenceSteps(5));
     assertPassed(ran);
     assert.equal(timesRequested(ran.requestedPaths, '/api/sequence'), 1, 'only the request after the stop reached the server');
   });
 
   test('the result records the stub name and the response index of each stubbed request, and none for the request after the stop', async () => {
-    const ran = await harness.runSteps(CDP_TARGET, sequenceSteps(5));
+    const ran = await harness.runSteps(BrowserTarget.Chrome, sequenceSteps(5));
     assertPassed(ran);
     const answers = stubbedAnswersIn(ran.result);
     assert.deepEqual(answers.map((answer) => answer.stub), Array(5).fill('answerSequence'), JSON.stringify(answers));
@@ -124,11 +124,11 @@ describe('a stub\'s responses are served in order, and the last repeats', () => 
     assert.deepEqual(answers.map((answer) => answer.responseIndex - first), [0, 1, 2, 2, 2]);
   });
 
-  test('20 replays of the same stubbed plan give one result hash', { timeout: 600_000 }, async () => {
-    const plan = harness.plan(networkPlan(CDP_TARGET, sequenceSteps(5)));
+  test(`${determinismRuns()} replays of the same stubbed plan give one result hash`, { timeout: 600_000 }, async () => {
+    const plan = harness.plan(networkPlan(BrowserTarget.Chrome, sequenceSteps(5)));
     const hashes = new Set<string>();
-    for (let replay = 0; replay < 20; replay++) {
-      const ran = await harness.run(plan, CDP_TARGET);
+    for (let replay = 0; replay < determinismRuns(); replay++) {
+      const ran = await harness.run(plan, BrowserTarget.Chrome);
       assert.equal(ran.result.state, 'Passed', `replay ${replay}: ${JSON.stringify(ran.result.steps)}`);
       hashes.add(ran.result.resultHash);
     }
@@ -137,8 +137,8 @@ describe('a stub\'s responses are served in order, and the last repeats', () => 
 
   // Counter-example: one hash across the replays is not a hash that ignores the stubbed requests.
   test('counter-example: the plan with one stubbed request fewer gives another result hash', { timeout: 120_000 }, async () => {
-    const five = await harness.runSteps(CDP_TARGET, sequenceSteps(5));
-    const four = await harness.runSteps(CDP_TARGET, sequenceSteps(4));
+    const five = await harness.runSteps(BrowserTarget.Chrome, sequenceSteps(5));
+    const four = await harness.runSteps(BrowserTarget.Chrome, sequenceSteps(4));
     assertPassed(five);
     assertPassed(four);
     assert.deepEqual(stubbedAnswersIn(four.result).length, 4);
@@ -148,7 +148,7 @@ describe('a stub\'s responses are served in order, and the last repeats', () => 
 
 describe('assertions name the stubs active while they ran', () => {
   test('every kind of assertion lists the stubs active while it ran, and none once they are stopped', async () => {
-    const ran = await harness.runSteps(CDP_TARGET, [
+    const ran = await harness.runSteps(BrowserTarget.Chrome, [
       navigate('/requests.html'),
       textEquals(testId('schedule-state'), 'Schedule loaded', 'active.before-any-stub'),
       startStub('answerSequence'),
@@ -176,7 +176,7 @@ describe('assertions name the stubs active while they ran', () => {
   });
 
   test('a failed assertion while a stub is active lists it too', async () => {
-    const ran = await harness.runSteps(CDP_TARGET, [
+    const ran = await harness.runSteps(BrowserTarget.Chrome, [
       navigate('/requests.html'),
       startStub('answerSequence'),
       ask(),

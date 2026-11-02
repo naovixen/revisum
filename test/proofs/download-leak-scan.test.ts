@@ -14,9 +14,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, describe, test } from 'node:test';
 import { leakScanner, sha256 } from '@revisum/engine';
-import {
-  CDP_TARGET, download, expectDownload, navigate, outcomes, pageStatesHarness, role, type PageRun, type PageStatesHarness,
-} from '../contract/page-states-support.ts';
+import { outcomes, type BrowserRun } from '#test-support/browser/BrowserHarness.ts';
+import { BrowserTarget } from '#test-support/browser/BrowserTarget.ts';
+import { navigate, role } from '#test-support/browser/RawPlan.ts';
+import { download, expectDownload, pageStatesHarness, type PageStatesHarness } from '../contract/page-states-support.ts';
 import { echoesIn, fakeSecretValue, resolvedSecret } from '../unit/engine/secret-examples.ts';
 
 const TIMEOUT = 120_000;
@@ -52,13 +53,13 @@ after(async () => {
   rmSync(folder, { recursive: true, force: true });
 });
 
-const resultText = (ran: PageRun): string => JSON.stringify(ran.result, null, 2);
-const eventLines = (ran: PageRun): string => ran.events.read().map((event) => JSON.stringify(event)).join('\n');
-const auditLines = (ran: PageRun): string => ran.audit.recorded.map((recorded) => JSON.stringify(recorded)).join('\n');
-const everythingKept = (ran: PageRun): string => [resultText(ran), eventLines(ran), auditLines(ran)].join('\n');
+const resultText = (ran: BrowserRun): string => JSON.stringify(ran.result, null, 2);
+const eventLines = (ran: BrowserRun): string => ran.events.read().map((event) => JSON.stringify(event)).join('\n');
+const auditLines = (ran: BrowserRun): string => ran.audit.recorded.map((recorded) => JSON.stringify(recorded)).join('\n');
+const everythingKept = (ran: BrowserRun): string => [resultText(ran), eventLines(ran), auditLines(ran)].join('\n');
 
 // Writes the run's result, event log, audit events and images to the scan folder and returns their paths.
-function writeOutputs(name: string, ran: PageRun): string[] {
+function writeOutputs(name: string, ran: BrowserRun): string[] {
   const paths = [join(folder, `${name}.result.json`), join(folder, `${name}.events.jsonl`), join(folder, `${name}.audit.jsonl`)];
   writeFileSync(paths[0] ?? '', resultText(ran));
   writeFileSync(paths[1] ?? '', eventLines(ran));
@@ -75,7 +76,7 @@ function writeOutputs(name: string, ran: PageRun): string[] {
 
 // Asserts no form of any canary is in what the run kept, checked directly and by the engine's
 // scanner, which finds each canary in its planted file.
-function assertNoEcho(name: string, ran: PageRun): void {
+function assertNoEcho(name: string, ran: BrowserRun): void {
   for (const canary of CANARIES) {
     assert.deepEqual(echoesIn(resultText(ran), canary.value), [], `${canary.name} in the result`);
     assert.deepEqual(echoesIn(eventLines(ran), canary.value), [], `${canary.name} in the event log`);
@@ -90,7 +91,7 @@ function assertNoEcho(name: string, ran: PageRun): void {
   assert.deepEqual(leaks.filter((leak) => leak.file !== plantedPath).map((leak) => `${leak.secret} ${leak.form} ${leak.file}`), [], 'canaries only where planted');
 }
 
-const downloadAndCheck = (harness: PageStatesHarness, contentCheck: string) => harness.runSteps(CDP_TARGET, [
+const downloadAndCheck = (harness: PageStatesHarness, contentCheck: string) => harness.runSteps(BrowserTarget.Chrome, [
   navigate('/downloads.html'),
   download('contact-list', role('link', 'Export contacts')),
   expectDownload('contact-list', { kind: 'fileNameEquals', value: 'contacts.csv' }, 'contacts.file-name'),

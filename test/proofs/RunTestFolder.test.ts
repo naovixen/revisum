@@ -54,6 +54,49 @@ describe("Using the test runner", () => {
         });
     });
 
+    describe("given one test that reaches the browser module and one that doesn't", () => {
+        const browserTestImporting = (importPath: string): string =>
+            `import {} from '${importPath}';\nimport { test } from 'node:test';\ntest('uses a browser', () => {});\n`;
+        const plainTest =
+            "import { test } from 'node:test';\ntest('needs no browser', () => {});\n";
+
+        beforeEach(() => {
+            writeFileSync(join(root, BROWSER_MODULE), "export {};\n");
+            writeFileSync(
+                join(root, "package.json"),
+                JSON.stringify({
+                    type: "module",
+                    imports: { "#test-support/*": "./test/support/*" },
+                }),
+            );
+            // Sorted first, so only being told apart as a browser test can make it run second.
+            writeFileSync(join(root, "test", "proofs", "z-plain.test.ts"), plainTest);
+        });
+
+        for (const importPath of ["#test-support/browsers.ts", "../support/browsers.ts"]) {
+            describe(`and the browser test imports it as ${importPath}`, () => {
+                beforeEach(() => {
+                    writeFileSync(
+                        join(root, "test", "proofs", "a-browser.test.ts"),
+                        browserTestImporting(importPath),
+                    );
+                });
+
+                describe("when the folder runs", () => {
+                    test("then it should run the browser test after the other", () => {
+                        const run = runTool("run-test-folder.ts", ["test/proofs"], { cwd: root });
+                        assert.equal(run.status, 0, describeRun(run));
+                        assert.ok(
+                            run.output.indexOf("needs no browser") <
+                                run.output.indexOf("uses a browser"),
+                            describeRun(run),
+                        );
+                    });
+                });
+            });
+        }
+    });
+
     describe("given a folder with no tests yet", () => {
         describe("and the browser module is missing", () => {
             describe("when the folder runs", () => {

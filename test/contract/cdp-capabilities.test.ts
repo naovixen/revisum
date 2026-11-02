@@ -1,22 +1,22 @@
 // The capabilities the own CDP driver adds for the plan language: steps inside an iframe, answering
-// a dialog, uploading a declared fixture file, and a tab that crashes. Each capability test runs
-// 20 times in a row and every run must pass; the iframe, dialog and upload tests repeat their
-// steps 20 times in one plan, so one browser serves all 20 with a fresh page load each time, and
-// the crash test runs 20 plans, since a crashed tab ends its session.
+// a dialog, uploading a declared fixture file, and a tab that crashes. Each capability test repeats
+// determinismRuns() times in a row and every run must pass; the iframe, dialog and upload tests
+// repeat their steps in one plan, so one browser serves them all with a fresh page load each time,
+// and the crash test runs one plan per repetition, since a crashed tab ends its session.
 // Single-run tests below them pin what each capability means: a frame's steps reach only the
 // frame's document, a dialog is accepted or dismissed as asked and its text is checked, and the
 // uploaded file's name and bytes reach the page.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import type { RunResult } from '@revisum/engine';
-import { BROWSERS } from '../support/browsers.ts';
-import {
-  CDP_TARGET, UPLOAD_CONTENT, UPLOAD_FIXTURE, capabilityCdpDriver, capabilityDrivers, capabilityHarness, capabilityPlan, click, label,
-  navigate, role, testId, textEquals, watchedDriver, type CapabilityHarness,
-} from '../support/capability-harness.ts';
-import { CRASH_READY_PATH, crashWhenRequested } from '../support/tab-crash.ts';
+import { BROWSERS } from '#test-support/browsers.ts';
+import { BrowserTarget } from '#test-support/browser/BrowserTarget.ts';
+import { click, label, navigate, role, testId, textEquals } from '#test-support/browser/RawPlan.ts';
+import { UPLOAD_CONTENT, UPLOAD_FIXTURE, capabilityCdpDriver, capabilityDrivers, capabilityHarness, capabilityPlan, watchedDriver, type CapabilityHarness } from '#test-support/capability-harness.ts';
+import { CRASH_READY_PATH, crashWhenRequested } from '#test-support/tab-crash.ts';
+import { determinismRuns } from '#test-support/TestTier.ts';
 
-const REPETITIONS = 20;
+const REPETITIONS = determinismRuns();
 // Long enough for the test to find and end the renderer while the step waits, even where listing
 // processes takes a second or more.
 const CRASH_STEP_TIMEOUT_MILLISECONDS = 8000;
@@ -71,29 +71,29 @@ const CRASH_PLAN_STEPS = [
   { type: 'capture', name: 'after-crash' },
 ];
 
-describe('20 runs of each capability on Chrome for Testing', () => {
-  test('steps inside an iframe pass in all 20 runs', async () => {
-    const { result } = await capability.run(capability.plan(capabilityPlan(CDP_TARGET, repeated(FRAME_BLOCK))), CDP_TARGET);
+describe(`${REPETITIONS} runs of each capability on Chrome for Testing`, () => {
+  test(`steps inside an iframe pass in all ${REPETITIONS} runs`, async () => {
+    const { result } = await capability.run(capability.plan(capabilityPlan(BrowserTarget.Chrome, repeated(FRAME_BLOCK))), BrowserTarget.Chrome);
     assertEveryStepPassed(result, FRAME_BLOCK.length);
   });
 
-  test('accepting and dismissing a dialog pass in all 20 runs', async () => {
-    const { result } = await capability.run(capability.plan(capabilityPlan(CDP_TARGET, repeated(DIALOG_BLOCK))), CDP_TARGET);
+  test(`accepting and dismissing a dialog pass in all ${REPETITIONS} runs`, async () => {
+    const { result } = await capability.run(capability.plan(capabilityPlan(BrowserTarget.Chrome, repeated(DIALOG_BLOCK))), BrowserTarget.Chrome);
     assertEveryStepPassed(result, DIALOG_BLOCK.length);
   });
 
-  test('uploading the declared fixture file passes in all 20 runs', async () => {
-    const { result } = await capability.run(capability.plan(capabilityPlan(CDP_TARGET, repeated(UPLOAD_BLOCK))), CDP_TARGET);
+  test(`uploading the declared fixture file passes in all ${REPETITIONS} runs`, async () => {
+    const { result } = await capability.run(capability.plan(capabilityPlan(BrowserTarget.Chrome, repeated(UPLOAD_BLOCK))), BrowserTarget.Chrome);
     assertEveryStepPassed(result, UPLOAD_BLOCK.length);
   });
 
-  test('a tab that crashes mid-plan is reported as target-crashed and cleaned up in all 20 runs', async () => {
-    const plan = capability.plan(capabilityPlan(CDP_TARGET, CRASH_PLAN_STEPS));
+  test(`a tab that crashes mid-plan is reported as target-crashed and cleaned up in all ${REPETITIONS} runs`, async () => {
+    const plan = capability.plan(capabilityPlan(BrowserTarget.Chrome, CRASH_PLAN_STEPS));
     for (let repetition = 1; repetition <= REPETITIONS; repetition++) {
       const watched = watchedDriver(capabilityCdpDriver(BROWSERS.chrome));
       const drivers = new Map([...capabilityDrivers(), ['cdp', watched.driver]]);
       const crashed = crashWhenRequested(capability, watched, CRASH_READY_PATH);
-      const { result, store } = await capability.run(plan, CDP_TARGET, drivers);
+      const { result, store } = await capability.run(plan, BrowserTarget.Chrome, { drivers });
       const endedRenderers = await crashed;
       const context = `repetition ${repetition}`;
       assert.ok(endedRenderers > 0, `${context}: the test found a renderer to end`);
@@ -112,46 +112,46 @@ describe('20 runs of each capability on Chrome for Testing', () => {
 
 describe('what each capability does', () => {
   test('a frame step acts on the iframe document, not on the same-named control outside it', async () => {
-    const { result } = await capability.run(capability.plan(capabilityPlan(CDP_TARGET, FRAME_BLOCK)), CDP_TARGET);
+    const { result } = await capability.run(capability.plan(capabilityPlan(BrowserTarget.Chrome, FRAME_BLOCK)), BrowserTarget.Chrome);
     assert.equal(result.state, 'Passed', JSON.stringify(result.steps));
   });
 
   test('counter-example: the frame\'s status is not found from the outer document', async () => {
-    const plan = capability.plan(capabilityPlan(CDP_TARGET, [
+    const plan = capability.plan(capabilityPlan(BrowserTarget.Chrome, [
       navigate('/frame.html'),
       { type: 'expect', locator: testId('frame-status'), assert: { kind: 'visible' }, criterionId: 'frame.status-outside' },
     ]));
-    const { result } = await capability.run(plan, CDP_TARGET);
+    const { result } = await capability.run(plan, BrowserTarget.Chrome);
     assert.equal(result.state, 'Failed');
     assert.equal(result.steps[1]?.outcome, 'failed');
   });
 
   test('a failing check inside a frame fails the frame step', async () => {
-    const plan = capability.plan(capabilityPlan(CDP_TARGET, [
+    const plan = capability.plan(capabilityPlan(BrowserTarget.Chrome, [
       navigate('/frame.html'),
       { type: 'frame', locator: testId('checkout-frame'), steps: [textEquals(testId('frame-status'), 'Confirmed for nobody', 'frame.wrong-text')] },
       textEquals(testId('outer-status'), 'Not confirmed', 'frame.outer-untouched'),
     ]));
-    const { result } = await capability.run(plan, CDP_TARGET);
+    const { result } = await capability.run(plan, BrowserTarget.Chrome);
     assert.equal(result.state, 'Failed');
     assert.equal(result.steps[1]?.outcome, 'failed');
     assert.equal(result.steps[2]?.outcome, 'skipped');
   });
 
   test('a dialog whose text is not the expected text fails the dialog step and skips the rest', async () => {
-    const plan = capability.plan(capabilityPlan(CDP_TARGET, [
+    const plan = capability.plan(capabilityPlan(BrowserTarget.Chrome, [
       navigate('/dialog.html'),
       click(role('button', 'Ask a question')),
       { type: 'dialog', action: 'accept', expectText: 'Keep every draft?' },
       textEquals(testId('dialog-status'), 'Kept', 'dialog.accepted'),
     ]));
-    const { result } = await capability.run(plan, CDP_TARGET);
+    const { result } = await capability.run(plan, BrowserTarget.Chrome);
     assert.equal(result.state, 'Failed');
     assert.deepEqual(result.steps.map((step) => step.outcome), ['passed', 'passed', 'failed', 'skipped']);
   });
 
   test('the uploaded file reaches the page with its declared name and its bytes', async () => {
-    const { result } = await capability.run(capability.plan(capabilityPlan(CDP_TARGET, UPLOAD_BLOCK)), CDP_TARGET);
+    const { result } = await capability.run(capability.plan(capabilityPlan(BrowserTarget.Chrome, UPLOAD_BLOCK)), BrowserTarget.Chrome);
     assert.equal(result.state, 'Passed', JSON.stringify(result.steps));
   });
 });

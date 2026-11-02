@@ -26,17 +26,17 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { cdpDriver } from '@revisum/driver-cdp';
+import { createBrowserDriver } from '#test-support/browser/CreateBrowserDriver.ts';
 import {
   canonicalJson, environmentSecretStore, failure, planHash, planParser, readPlanText, sha256, success,
   type Approval, type ApprovalStore, type BrowserDriver, type EgressPolicy, type ExecOutcome, type GuaranteeLevel, type ImageDigest, type Plan,
   type Runner, type RunnerHandle, type Session, type SessionEnvironment,
 } from '@revisum/engine';
-import { BROWSERS } from '../../support/browsers.ts';
-import { startFixtureServer, type FixtureRoute } from '../../support/fixture-server.ts';
-import { memoryEventSink, type MemoryEventSink } from '../../support/memory-ports.ts';
-import { trustedProjectFrom } from '../../support/policy-clearance.ts';
-import { FIXTURES, GOLDEN } from '../../support/repository.ts';
+import { BROWSERS } from '#test-support/browsers.ts';
+import { startFixtureServer, type FixtureRoute } from '#test-support/fixture-server.ts';
+import { memoryEventSink, type MemoryEventSink } from '#test-support/memory-ports.ts';
+import { trustedProjectFrom } from '#test-support/policy-clearance.ts';
+import { FIXTURES, GOLDEN } from '#test-support/repository.ts';
 import { PLAN_PATH, openRepository } from '../engine/approval-repositories.ts';
 import { letterNonce } from '../engine/secret-examples.ts';
 import { consoleWrittenDuring, jsonAnswer, type Answer } from '../runner/local-service.ts';
@@ -226,7 +226,7 @@ function recordingSession(session: Session, calls: SessionCall[]): Session {
 }
 
 export function spyBrowser(): SpyBrowser {
-  const inner = cdpDriver({ executablePath: BROWSERS.chrome });
+  const inner = createBrowserDriver({ executablePath: BROWSERS.chrome });
   const opened: SessionEnvironment[] = [];
   const calls: SessionCall[] = [];
   const driver: BrowserDriver = {

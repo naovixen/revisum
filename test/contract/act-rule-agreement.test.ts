@@ -1,13 +1,15 @@
 // The accessibility engine's re-score against the W3C ACT test cases: every pinned case of every
 // implemented ACT rule is scanned, and the engine's outcome must match the expected outcome
-// (passed, failed or inapplicable) on at least 80% of them.
+// (passed, failed or inapplicable) on at least 80% of them. It scans every case in a real browser,
+// so it runs on the full tier only, even when packages/auditor-act/ changes.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { after, before, test } from 'node:test';
 import { ALL_RULES, launchBrowser, scan, type Browser, type Outcome, type PageDriver } from '@revisum/auditor-act';
-import { BROWSERS } from '../support/browsers.ts';
-import { ACT_CASE_PREFIX, ACT_TEST_CASES, startAccessibilityServer, type AccessibilityServer } from '../support/accessibility-server.ts';
+import { fullTierOnly, isFullTier } from '#test-support/TestTier.ts';
+import { BROWSERS } from '#test-support/browsers.ts';
+import { ACT_CASE_PREFIX, ACT_TEST_CASES, startAccessibilityServer, type AccessibilityServer } from '#test-support/accessibility-server.ts';
 
 type ActTestCase = {
   readonly ruleId: string; readonly expected: Outcome; readonly testcaseId: string;
@@ -45,10 +47,17 @@ async function scoreCases(browser: Browser, origin: string): Promise<CaseScore[]
 
 let server: AccessibilityServer;
 let browser: Browser;
-before(async () => { server = await startAccessibilityServer(); browser = await launchBrowser(BROWSERS.chrome); }, { timeout: 60_000 });
+const agreementOptions = fullTierOnly('the agreement with the W3C ACT cases takes about a minute; the rules have their own tests');
+// A hook runs even when every test is skipped, so it starts a browser only on the tier that uses it.
+before(async () => {
+  if (isFullTier()) {
+    server = await startAccessibilityServer();
+    browser = await launchBrowser(BROWSERS.chrome);
+  }
+}, { timeout: 60_000 });
 after(async () => { await browser?.close(); await server?.close(); });
 
-test('the own engine agrees with at least 80% of the W3C ACT test cases of its implemented rules', { timeout: 600_000 }, async () => {
+test('the own engine agrees with at least 80% of the W3C ACT test cases of its implemented rules', { timeout: 600_000, ...agreementOptions }, async () => {
   const scores = await scoreCases(browser, server.origin);
   const pinned = implementedCases().length;
   assert.equal(scores.length, pinned, 'every pinned case of every implemented rule is scored');

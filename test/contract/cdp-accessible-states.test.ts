@@ -10,10 +10,11 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import type { BrowserDriver } from '@revisum/engine';
-import {
-  CDP_TARGET, click, expectState, navigate, outcomes, pageStatesHarness, reusedSessionDriver, role, testId,
-  type JsonRecord, type PageStatesHarness,
-} from './page-states-support.ts';
+import { outcomes } from '#test-support/browser/BrowserHarness.ts';
+import { BrowserTarget } from '#test-support/browser/BrowserTarget.ts';
+import { click, navigate, role, testId, type JsonRecord } from '#test-support/browser/RawPlan.ts';
+import { reusedSessionDriver } from '#test-support/browser/ReusedSessionDriver.ts';
+import { expectState, pageStatesHarness, type PageStatesHarness } from './page-states-support.ts';
 
 let harness: PageStatesHarness;
 let closeShared: () => Promise<void>;
@@ -34,7 +35,7 @@ after(async () => {
 const OPEN_STATES = navigate('/states.html');
 const AFTER_CHECK = click(role('button', 'Continue'));
 
-const runChecks = (steps: readonly unknown[]) => harness.runSteps(CDP_TARGET, [OPEN_STATES, ...steps, AFTER_CHECK], { drivers });
+const runChecks = (steps: readonly unknown[]) => harness.runSteps(BrowserTarget.Chrome, [OPEN_STATES, ...steps, AFTER_CHECK], { drivers });
 
 type StateCase = { readonly element: string; readonly locator: JsonRecord; readonly holds: string; readonly opposite: string };
 

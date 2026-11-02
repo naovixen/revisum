@@ -8,10 +8,11 @@
 // The remembered attribute's leak scan is in test/proofs/unsafe-page-leak-scan.test.ts.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
-import {
-  ADAPTER_OF, CDP_TARGETS, check, css, listedFeatures, navigate, outcomes, reference, rememberAttribute, testId, unsafePageDrivers, unsafePageHarness,
-  type JsonRecord, type UnsafePageHarness,
-} from './unsafe-page-support.ts';
+import { outcomes } from '#test-support/browser/BrowserHarness.ts';
+import { ADAPTER_OF_TARGET } from '#test-support/browser/BrowserTarget.ts';
+import { listedFeatures } from '#test-support/browser/DriversWithout.ts';
+import { navigate, reference, testId, type JsonRecord } from '#test-support/browser/RawPlan.ts';
+import { UNSAFE_PAGE_TARGETS, check, css, rememberAttribute, unsafePageDrivers, unsafePageHarness, type UnsafePageHarness } from './unsafe-page-support.ts';
 
 let harness: UnsafePageHarness;
 before(async () => { harness = await unsafePageHarness(); });
@@ -29,7 +30,7 @@ const DOM_CHECKS: readonly DomCheck[] = [
   { name: 'attributeAbsent disabled', element: (twin) => testId(`${twin}-checkout`), assertion: { kind: 'attributeAbsent', name: 'disabled' } },
 ];
 
-for (const targetId of CDP_TARGETS) {
+for (const targetId of UNSAFE_PAGE_TARGETS) {
   describe(`DOM checks on twin elements: ${targetId}`, () => {
     for (const domCheck of DOM_CHECKS) {
       test(`${domCheck.name} passes on the matching twin and fails on the mismatched twin`, async () => {
@@ -57,7 +58,7 @@ for (const targetId of CDP_TARGETS) {
     });
 
     // A remember from an attribute also needs rememberedValues, which a driver may not declare.
-    const remembers = listedFeatures(unsafePageDrivers().get(ADAPTER_OF[targetId] ?? '')).includes('rememberedValues');
+    const remembers = listedFeatures(unsafePageDrivers().get(ADAPTER_OF_TARGET[targetId] ?? '')).includes('rememberedValues');
     test('an attribute remembered from one twin passes attributeEquals on that twin and fails it on the other', { skip: !remembers }, async () => {
       const ran = await harness.runSteps(targetId, [
         navigate('/dom-checks.html'),

@@ -21,10 +21,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, describe, test } from 'node:test';
 import { leakScanner, sha256 } from '@revisum/engine';
-import {
-  CDP_TARGETS, CDP_TARGET, PAGE_SECRET, capture, check, evaluate, expectScript, fill, label, navigate, outcomes, reference, rememberAttribute,
-  secretValue, testId, textEquals, unsafePageHarness, valueEquals, type JsonRecord, type UnsafePageHarness, type UnsafePageRun,
-} from '../contract/unsafe-page-support.ts';
+import { outcomes, type BrowserRun } from '#test-support/browser/BrowserHarness.ts';
+import { BrowserTarget } from '#test-support/browser/BrowserTarget.ts';
+import { capture, fill, label, navigate, reference, secretValue, testId, textEquals, valueEquals, type JsonRecord } from '#test-support/browser/RawPlan.ts';
+import { UNSAFE_PAGE_TARGETS, PAGE_SECRET, check, evaluate, expectScript, rememberAttribute, unsafePageHarness, type UnsafePageHarness } from '../contract/unsafe-page-support.ts';
 import { echoesIn, fakeEnvironmentStore, fakeSecretValue, resolvedSecret } from '../unit/engine/secret-examples.ts';
 
 const TIMEOUT = 300_000;
@@ -42,12 +42,12 @@ after(async () => {
   rmSync(folder, { recursive: true, force: true });
 });
 
-const resultText = (ran: UnsafePageRun): string => JSON.stringify(ran.result, null, 2);
-const eventLines = (ran: UnsafePageRun): string => ran.events.read().map((event) => JSON.stringify(event)).join('\n');
-const auditLines = (ran: UnsafePageRun): string => ran.audit.recorded.map((recorded) => JSON.stringify(recorded)).join('\n');
+const resultText = (ran: BrowserRun): string => JSON.stringify(ran.result, null, 2);
+const eventLines = (ran: BrowserRun): string => ran.events.read().map((event) => JSON.stringify(event)).join('\n');
+const auditLines = (ran: BrowserRun): string => ran.audit.recorded.map((recorded) => JSON.stringify(recorded)).join('\n');
 
 // Writes the run's result, event log, audit events and images to the scan folder and returns their paths.
-function writeOutputs(name: string, ran: UnsafePageRun): string[] {
+function writeOutputs(name: string, ran: BrowserRun): string[] {
   const paths = [join(folder, `${name}.result.json`), join(folder, `${name}.events.jsonl`), join(folder, `${name}.audit.jsonl`)];
   writeFileSync(paths[0] ?? '', resultText(ran));
   writeFileSync(paths[1] ?? '', eventLines(ran));
@@ -75,7 +75,7 @@ function assertFoundOnlyWherePlanted(name: string, outputs: readonly string[], p
   assert.deepEqual(leaks.filter((leak) => leak.file !== plantedPath).map((leak) => `${leak.secret} in ${leak.file}`), [], 'each value is found only where it was planted');
 }
 
-function assertNoEchoes(name: string, ran: UnsafePageRun, planted: readonly (readonly [string, string])[]): void {
+function assertNoEchoes(name: string, ran: BrowserRun, planted: readonly (readonly [string, string])[]): void {
   for (const [labelText, value] of planted) {
     assert.deepEqual(echoesIn(resultText(ran), value), [], `${name}: forms of ${labelText} in the result`);
     assert.deepEqual(echoesIn(eventLines(ran), value), [], `${name}: forms of ${labelText} in the event log`);
@@ -84,7 +84,7 @@ function assertNoEchoes(name: string, ran: UnsafePageRun, planted: readonly (rea
 }
 
 // Every step before the last passed, and the last failed as planned.
-function assertOnlyLastFailed(name: string, ran: UnsafePageRun): void {
+function assertOnlyLastFailed(name: string, ran: BrowserRun): void {
   const all = outcomes(ran.result);
   const last = all.length - 1;
   assert.deepEqual(all.slice(0, last).filter(([, outcome]) => outcome !== 'passed'), [], `${name}: ${JSON.stringify(ran.result.steps)}`);
@@ -115,12 +115,12 @@ const ORDER_ENDINGS: readonly { readonly name: string; readonly step: JsonRecord
 ];
 
 // A remember from an attribute needs rememberedValues too, which only the own CDP driver declares.
-describe(`an attribute remembered: ${CDP_TARGET}`, () => {
+describe(`an attribute remembered: ${BrowserTarget.Chrome}`, () => {
   test('the leak scan finds the remembered order id in no output of runs that type it, check it and fail a check', { timeout: TIMEOUT }, async () => {
     const planted = [['ORDER_ID_CANARY', harness.canaries.orderId]] as const;
     const outputs: string[] = [];
     for (const { name, step } of ORDER_ENDINGS) {
-      const ran = await harness.runSteps(CDP_TARGET, orderSteps(step));
+      const ran = await harness.runSteps(BrowserTarget.Chrome, orderSteps(step));
       assertOnlyLastFailed(name, ran);
       assertNoEchoes(name, ran, planted);
       outputs.push(...writeOutputs(`order-${name}`, ran));
@@ -129,7 +129,7 @@ describe(`an attribute remembered: ${CDP_TARGET}`, () => {
   });
 
   test('the remembered attribute appears in the result and event log only as its name and sha256', { timeout: TIMEOUT }, async () => {
-    const ran = await harness.runSteps(CDP_TARGET, orderSteps(check(orderRow, { kind: 'visible' }, 'orders.row-shown')));
+    const ran = await harness.runSteps(BrowserTarget.Chrome, orderSteps(check(orderRow, { kind: 'visible' }, 'orders.row-shown')));
     assert.equal(ran.result.state, 'Passed', JSON.stringify(ran.result.steps));
     const digest = sha256(harness.canaries.orderId);
     assert.deepEqual(ran.result.steps[1]?.remembered, { valueName: ORDER_VALUE, sha256: digest });
@@ -139,7 +139,7 @@ describe(`an attribute remembered: ${CDP_TARGET}`, () => {
   // Control: the canary, typed as plain plan text (not a remembered value) and observed by a failed
   // check of the field, does reach the result, and the scan finds it there.
   test('control: a failed check of the field holding the order id typed as plain text keeps it, and the scan finds it', { timeout: TIMEOUT }, async () => {
-    const ran = await harness.runSteps(CDP_TARGET, [
+    const ran = await harness.runSteps(BrowserTarget.Chrome, [
       navigate('/orders.html'),
       fill(orderField, harness.canaries.orderId),
       valueEquals(orderField, 'deliberately wrong', 'orders.reference-wrong'),
@@ -172,7 +172,7 @@ const SCRIPT_ENDINGS: readonly { readonly name: string; readonly step: JsonRecor
   { name: 'count-check-fails', step: expectScript('leakyResult', {}, 'itemCount', { kind: 'numberEquals', value: 4 }, 'leaks.item-count-wrong') },
 ];
 
-for (const targetId of CDP_TARGETS) {
+for (const targetId of UNSAFE_PAGE_TARGETS) {
   describe(`a page script returning a secret and a session cookie: ${targetId}`, () => {
     const planted = (): readonly (readonly [string, string])[] => [
       ['PAGE_SECRET_VALUE', secretValueText],

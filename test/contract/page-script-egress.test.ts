@@ -9,12 +9,16 @@
 // counter-example that shows the script's requests do go through the proxy.
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
-import { cdpDriver, type OwnBrowserDriver } from '@revisum/driver-cdp';
+import type { OwnBrowserDriver } from '@revisum/driver-cdp';
+import { createBrowserDriver } from '#test-support/browser/CreateBrowserDriver.ts';
 import type { BrowserDriver, BrowserRequestRecord, EgressEvent, SessionEnvironment, Target } from '@revisum/engine';
 import { hostAndPort, joinEgressEvents, startEgressProxy, type EgressProxy } from '@revisum/runner';
-import { BROWSERS } from '../support/browsers.ts';
+import { BROWSERS } from '#test-support/browsers.ts';
 import { declaredService, egressPolicy, fakeResolver, hostOf, type FakeResolver } from '../unit/runner/runner-examples.ts';
-import { CDP_TARGET, check, evaluate, navigate, testId, unsafePageHarness, type UnsafePageHarness, type UnsafePageRun } from './unsafe-page-support.ts';
+import type { BrowserRun } from '#test-support/browser/BrowserHarness.ts';
+import { BrowserTarget } from '#test-support/browser/BrowserTarget.ts';
+import { navigate, testId } from '#test-support/browser/RawPlan.ts';
+import { check, evaluate, unsafePageHarness, type UnsafePageHarness } from './unsafe-page-support.ts';
 
 const TIMEOUT = 120_000;
 const WAIT_MILLISECONDS = 10_000;
@@ -72,17 +76,17 @@ function keepingRecords(inner: OwnBrowserDriver, keep: (records: readonly Browse
   });
 }
 
-type ProxiedRun = UnsafePageRun & { readonly egressEvents: () => readonly EgressEvent[]; readonly decisions: () => ReturnType<EgressProxy['decisions']> };
+type ProxiedRun = BrowserRun & { readonly egressEvents: () => readonly EgressEvent[]; readonly decisions: () => ReturnType<EgressProxy['decisions']> };
 
 // Runs the hostile script through the proxy. The run's egress events join this run's browser
 // records with this run's proxy decisions only, read again on each call, since the proxy may decide
 // on a late beacon after the run.
 async function runHostileScript(): Promise<ProxiedRun> {
   const records: BrowserRequestRecord[] = [];
-  const driver = cdpDriver({ executablePath: BROWSERS.chrome, proxy: { server: proxy.url, includeLoopback: true } });
+  const driver = createBrowserDriver({ executablePath: BROWSERS.chrome, proxy: { server: proxy.url, includeLoopback: true } });
   const drivers = new Map<string, BrowserDriver>([['cdp', keepingRecords(driver, (kept) => { records.push(...kept); })]]);
   const firstDecision = proxy.decisions().length;
-  const ran = await harness.runSteps(CDP_TARGET, [navigate('/'), evaluate('hostileEgress', {}), check(testId('continue-state'), { kind: 'textEquals', value: 'Not continued' }, 'egress.page-untouched')], { drivers });
+  const ran = await harness.runSteps(BrowserTarget.Chrome, [navigate('/'), evaluate('hostileEgress', {}), check(testId('continue-state'), { kind: 'textEquals', value: 'Not continued' }, 'egress.page-untouched')], { drivers });
   const decisions = () => proxy.decisions().slice(firstDecision);
   return { ...ran, decisions, egressEvents: () => joinEgressEvents(records, decisions()) };
 }

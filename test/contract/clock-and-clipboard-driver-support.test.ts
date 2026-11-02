@@ -10,11 +10,11 @@
 // so the counters and the recording can be seen to move.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
-import {
-  CDP_TARGET, CLOCK_AND_CLIPBOARD_FEATURES, INVITE_CODE, advanceClock, cdpWithout, click, clockHarness, expectClipboard,
-  listedFeatures, navigate, outcomes, recordingSessionCalls, rememberClipboard, role, stepMilliseconds, testId, textEquals,
-  type ClockAndClipboardFeature, type ClockHarness, type JsonRecord,
-} from './clock-and-clipboard-support.ts';
+import { outcomes, stepMilliseconds } from '#test-support/browser/BrowserHarness.ts';
+import { BrowserTarget } from '#test-support/browser/BrowserTarget.ts';
+import { cdpWithout, listedFeatures } from '#test-support/browser/DriversWithout.ts';
+import { click, navigate, role, testId, textEquals, type JsonRecord } from '#test-support/browser/RawPlan.ts';
+import { CLOCK_AND_CLIPBOARD_FEATURES, INVITE_CODE, advanceClock, clockHarness, expectClipboard, recordingSessionCalls, rememberClipboard, type ClockAndClipboardFeature, type ClockHarness } from './clock-and-clipboard-support.ts';
 import { guardHostClipboard } from './host-clipboard.ts';
 
 const hostClipboard = await guardHostClipboard();
@@ -58,10 +58,10 @@ test('the own CDP driver declares clockControl and clipboard', () => {
   }
 });
 
-describe(`the own CDP driver with the step's feature taken off its list: ${CDP_TARGET}`, () => {
+describe(`the own CDP driver with the step's feature taken off its list: ${BrowserTarget.Chrome}`, () => {
   for (const { name, feature, step } of FEATURE_STEPS) {
     test(`a run with ${name} fails that step with unsupported-step, sends nothing, waits no real time and skips the rest`, async () => {
-      const ran = await harness.runSteps(CDP_TARGET, refusedSteps(step), { drivers: cdpWithout(harness, feature), read: ['input-events', 'continue-state'] });
+      const ran = await harness.runSteps(BrowserTarget.Chrome, refusedSteps(step), { drivers: cdpWithout(harness, feature), read: ['input-events', 'continue-state'] });
       assert.equal(ran.result.state, 'Failed');
       assert.deepEqual(outcomes(ran.result), [[0, 'passed', undefined], [1, 'failed', 'unsupported-step'], [2, 'skipped', undefined], [3, 'skipped', undefined]]);
       assert.ok(stepMilliseconds(ran.result, 1) < 1000, `the refused step took ${stepMilliseconds(ran.result, 1)} ms of real time`);
@@ -71,16 +71,16 @@ describe(`the own CDP driver with the step's feature taken off its list: ${CDP_T
   }
 
   test('counter-example: the same run without any of those steps passes and sends its input', async () => {
-    const ran = await harness.runSteps(CDP_TARGET, [navigate('/clipboard.html'), continueStep, continued()], { read: ['input-events'] });
+    const ran = await harness.runSteps(BrowserTarget.Chrome, [navigate('/clipboard.html'), continueStep, continued()], { read: ['input-events'] });
     assert.equal(ran.result.state, 'Passed', JSON.stringify(ran.result.steps));
     assert.notEqual(ran.atClose?.shown['input-events'], '0', 'the click reached the page');
   });
 });
 
-describe(`the own CDP driver: ${CDP_TARGET}`, () => {
+describe(`the own CDP driver: ${BrowserTarget.Chrome}`, () => {
   for (const { name, step } of FEATURE_STEPS) {
     test(`a run with ${name} performs it and passes`, { ...copying }, async () => {
-      const ran = await harness.runSteps(CDP_TARGET, performedSteps(step));
+      const ran = await harness.runSteps(BrowserTarget.Chrome, performedSteps(step));
       assert.equal(ran.result.state, 'Passed', JSON.stringify(ran.result.steps));
     });
   }
@@ -89,7 +89,7 @@ describe(`the own CDP driver: ${CDP_TARGET}`, () => {
     test(`with ${lacking} taken off its list, the driver is refused that feature's steps and still runs the others`, { timeout: 300_000, ...copying }, async () => {
       const drivers = cdpWithout(harness, lacking);
       for (const { name, feature, step } of FEATURE_STEPS) {
-        const ran = await harness.runSteps(CDP_TARGET, performedSteps(step), { drivers });
+        const ran = await harness.runSteps(BrowserTarget.Chrome, performedSteps(step), { drivers });
         if (feature === lacking) {
           assert.deepEqual(outcomes(ran.result).slice(2), [[2, 'failed', 'unsupported-step'], [3, 'skipped', undefined], [4, 'skipped', undefined]], `${name}: ${JSON.stringify(ran.result.steps)}`);
           assert.ok(stepMilliseconds(ran.result, 2) < 1000, `${name}: the refused step waited no real time`);
@@ -121,7 +121,7 @@ describe('during an advance', () => {
       const cdp = harness.drivers.get('cdp');
       assert.ok(cdp !== undefined);
       const recorder = recordingSessionCalls(cdp);
-      const ran = await harness.runSteps(CDP_TARGET, [
+      const ran = await harness.runSteps(BrowserTarget.Chrome, [
         navigate('/timer-order.html'),
         advanceClock(120, 'milliseconds', mode),
         textEquals(testId('timer-counts'), mode === 'runTimers'
@@ -138,7 +138,7 @@ describe('during an advance', () => {
     const cdp = harness.drivers.get('cdp');
     assert.ok(cdp !== undefined);
     const recorder = recordingSessionCalls(cdp);
-    const ran = await harness.runSteps(CDP_TARGET, [
+    const ran = await harness.runSteps(BrowserTarget.Chrome, [
       navigate('/timer-order.html'),
       continueStep,
       textEquals(testId('continue-state'), 'Continued', 'guard.first-click'),

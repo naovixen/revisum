@@ -7,10 +7,9 @@
 // server never sees the request, so the worker is live and the bypass is what the tests show.
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
-import {
-  CDP_TARGET, click, expectRequests, expectResponse, navigate, networkHarness, role, startStub, stopStub, testId, textEquals, timesRequested,
-  type NetworkHarness, type NetworkRun,
-} from './network-stubs-support.ts';
+import { BrowserTarget } from '#test-support/browser/BrowserTarget.ts';
+import { click, navigate, role, testId, textEquals } from '#test-support/browser/RawPlan.ts';
+import { expectRequests, expectResponse, networkHarness, startStub, stopStub, timesRequested, type NetworkHarness, type NetworkRun } from './network-stubs-support.ts';
 
 let harness: NetworkHarness;
 before(async () => { harness = await networkHarness(); });
@@ -28,13 +27,13 @@ const answered = (source: string, count: number, criterionId: string) => [
 ];
 
 test('counter-example: with no stub and no request check, the service worker answers the page and the server never sees the request', async () => {
-  const ran = await harness.runSteps(CDP_TARGET, [...openWorkerPage(), loadItems(), ...answered('service worker', 1, 'worker.answered-itself')]);
+  const ran = await harness.runSteps(BrowserTarget.Chrome, [...openWorkerPage(), loadItems(), ...answered('service worker', 1, 'worker.answered-itself')]);
   assertPassed(ran);
   assert.equal(timesRequested(ran.requestedPaths, '/api/worker-items'), 0);
 });
 
 test('an active stub answers every matching request of a page a service worker controls', async () => {
-  const ran = await harness.runSteps(CDP_TARGET, [
+  const ran = await harness.runSteps(BrowserTarget.Chrome, [
     ...openWorkerPage(),
     startStub('workerItems'),
     loadItems(), ...answered('stub', 1, 'worker.stub-first'),
@@ -47,7 +46,7 @@ test('an active stub answers every matching request of a page a service worker c
 });
 
 test('an active request check sees every matching request of a page a service worker controls', async () => {
-  const ran = await harness.runSteps(CDP_TARGET, [
+  const ran = await harness.runSteps(BrowserTarget.Chrome, [
     ...openWorkerPage(),
     loadItems(), ...answered('server', 1, 'worker.check-first'),
     loadItems(), ...answered('server', 2, 'worker.check-second'),
@@ -59,7 +58,7 @@ test('an active request check sees every matching request of a page a service wo
 });
 
 test('a stub and a request check together: the check counts each request the stub answered', async () => {
-  const ran = await harness.runSteps(CDP_TARGET, [
+  const ran = await harness.runSteps(BrowserTarget.Chrome, [
     ...openWorkerPage(),
     startStub('workerItems'),
     loadItems(), ...answered('stub', 1, 'worker.both-first'),

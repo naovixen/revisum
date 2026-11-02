@@ -9,11 +9,14 @@ import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { after, before, test } from 'node:test';
-import { cdpDriver, type DriverSession } from '@revisum/driver-cdp';
+import type { DriverSession } from '@revisum/driver-cdp';
+import { createBrowserDriver } from '#test-support/browser/CreateBrowserDriver.ts';
 import { defaultRedactor, type SessionEnvironment } from '@revisum/engine';
 import { joinEgressEvents, startEgressProxy, type EgressProxy } from '@revisum/runner';
-import { BROWSERS } from '../support/browsers.ts';
-import { CDP_TARGET, FIXED_TIME_MILLISECONDS, SEED, capabilityHarness, click, role, type CapabilityHarness } from '../support/capability-harness.ts';
+import { BROWSERS } from '#test-support/browsers.ts';
+import { BrowserTarget } from '#test-support/browser/BrowserTarget.ts';
+import { click, role } from '#test-support/browser/RawPlan.ts';
+import { FIXED_TIME_MILLISECONDS, SEED, capabilityHarness, type CapabilityHarness } from '#test-support/capability-harness.ts';
 import { declaredService, egressPolicy, fakeResolver } from '../unit/runner/runner-examples.ts';
 
 const WAIT_MILLISECONDS = 10_000;
@@ -69,8 +72,8 @@ async function openSession(): Promise<DriverSession> {
     baseUrl: opener.origin, allowedOrigins: [opener.origin, reachable.origin], seed: SEED, fixedTimeMilliseconds: FIXED_TIME_MILLISECONDS,
     sensitiveSelectors: defaultRedactor().selectors, timeoutMilliseconds: 5000,
   };
-  const driver = cdpDriver({ executablePath: BROWSERS.chrome, proxy: { server: proxy.url, includeLoopback: true } });
-  const opened = await driver.open(capability.target(CDP_TARGET), environment);
+  const driver = createBrowserDriver({ executablePath: BROWSERS.chrome, proxy: { server: proxy.url, includeLoopback: true } });
+  const opened = await driver.open(capability.target(BrowserTarget.Chrome), environment);
   assert.ok(opened.ok, `the session opens: ${opened.ok ? '' : JSON.stringify(opened.error)}`);
   return opened.value;
 }

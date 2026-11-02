@@ -11,10 +11,10 @@
 // (bare-head.html); the counter-examples pass on head.html.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
-import {
-  CDP_TARGET, canonicalUrl, hrefEquals, metaContent, navigate, navigateWithoutScripts, outcomes, pageStatesHarness, role, testId,
-  textEquals, type PageStatesHarness,
-} from './page-states-support.ts';
+import { outcomes } from '#test-support/browser/BrowserHarness.ts';
+import { BrowserTarget } from '#test-support/browser/BrowserTarget.ts';
+import { navigate, role, testId, textEquals } from '#test-support/browser/RawPlan.ts';
+import { canonicalUrl, hrefEquals, metaContent, navigateWithoutScripts, pageStatesHarness, type PageStatesHarness } from './page-states-support.ts';
 
 let harness: PageStatesHarness;
 before(async () => { harness = await pageStatesHarness(); });
@@ -32,7 +32,7 @@ describe('hrefEquals on a link with a relative href', () => {
   const followed = (paths: readonly string[]): readonly string[] => paths.filter((path) => LINK_TARGETS.includes(path));
 
   test('passes against the href resolved on the page URL, given as an absolute URL, and follows no link', async () => {
-    const { result, atClose, requestedPaths } = await harness.runSteps(CDP_TARGET, [
+    const { result, atClose, requestedPaths } = await harness.runSteps(BrowserTarget.Chrome, [
       OPEN_LINKS,
       hrefEquals(role('link', 'Late fees'), `${harness.origin}/billing/fees.html?tab=2`, 'links.fees-target'),
       hrefEquals(role('link', 'Guide'), `${harness.origin}/guide.html`, 'links.guide-target'),
@@ -44,7 +44,7 @@ describe('hrefEquals on a link with a relative href', () => {
   });
 
   test('passes against the resolved href given as a path starting with /', async () => {
-    const { result, requestedPaths } = await harness.runSteps(CDP_TARGET, [
+    const { result, requestedPaths } = await harness.runSteps(BrowserTarget.Chrome, [
       OPEN_LINKS, hrefEquals(role('link', 'Late fees'), '/billing/fees.html?tab=2', 'links.fees-path'),
     ]);
     assert.equal(result.state, 'Passed', JSON.stringify(result.steps));
@@ -55,7 +55,7 @@ describe('hrefEquals on a link with a relative href', () => {
   // not the link's target.
   for (const wrong of ['/help/billing/fees.html?tab=2', '/billing/fees.html?tab=3']) {
     test(`fails with assertion-failed against ${wrong}, and follows no link`, async () => {
-      const { result, atClose, requestedPaths } = await harness.runSteps(CDP_TARGET, [
+      const { result, atClose, requestedPaths } = await harness.runSteps(BrowserTarget.Chrome, [
         OPEN_LINKS, hrefEquals(role('link', 'Late fees'), `${harness.origin}${wrong}`, 'links.fees-wrong'), textEquals(testId('input-events'), '0', 'links.untouched'),
       ]);
       assert.deepEqual(outcomes(result), [[0, 'passed', undefined], [1, 'failed', 'assertion-failed'], [2, 'skipped', undefined]]);
@@ -69,7 +69,7 @@ describe('metaContent after a navigate with and without scripts', () => {
   const OPEN_HEAD = '/head.html';
 
   test('with scripts disabled, metaContent sees the og:title the server sent and no page script runs', async () => {
-    const { result, requestedPaths } = await harness.runSteps(CDP_TARGET, [
+    const { result, requestedPaths } = await harness.runSteps(BrowserTarget.Chrome, [
       navigateWithoutScripts(OPEN_HEAD),
       metaContent('og:title', SERVER_TITLE, 'head.server-title'),
       textEquals(testId('script-runs'), '0', 'head.no-script-ran'),
@@ -80,7 +80,7 @@ describe('metaContent after a navigate with and without scripts', () => {
   });
 
   test('without scripts disabled, metaContent sees the og:title the page script wrote, and both page scripts ran', async () => {
-    const { result, requestedPaths } = await harness.runSteps(CDP_TARGET, [
+    const { result, requestedPaths } = await harness.runSteps(BrowserTarget.Chrome, [
       navigate(OPEN_HEAD),
       metaContent('og:title', SCRIPT_TITLE, 'head.script-title'),
       textEquals(testId('script-runs'), '2', 'head.scripts-ran'),
@@ -92,17 +92,17 @@ describe('metaContent after a navigate with and without scripts', () => {
   // The two pairs below are the same check with the other run's value: each fails, so the
   // passes above are not constants of the page.
   test('with scripts disabled, metaContent expecting the script\'s og:title fails with assertion-failed', async () => {
-    const { result } = await harness.runSteps(CDP_TARGET, [navigateWithoutScripts(OPEN_HEAD), metaContent('og:title', SCRIPT_TITLE, 'head.script-title')]);
+    const { result } = await harness.runSteps(BrowserTarget.Chrome, [navigateWithoutScripts(OPEN_HEAD), metaContent('og:title', SCRIPT_TITLE, 'head.script-title')]);
     assert.deepEqual(outcomes(result), [[0, 'passed', undefined], [1, 'failed', 'assertion-failed']]);
   });
 
   test('without scripts disabled, metaContent expecting the server\'s og:title fails with assertion-failed', async () => {
-    const { result } = await harness.runSteps(CDP_TARGET, [navigate(OPEN_HEAD), metaContent('og:title', SERVER_TITLE, 'head.server-title')]);
+    const { result } = await harness.runSteps(BrowserTarget.Chrome, [navigate(OPEN_HEAD), metaContent('og:title', SERVER_TITLE, 'head.server-title')]);
     assert.deepEqual(outcomes(result), [[0, 'passed', undefined], [1, 'failed', 'assertion-failed']]);
   });
 
   test('scripts stay off only until the next navigate, which runs the page scripts again', async () => {
-    const { result, requestedPaths } = await harness.runSteps(CDP_TARGET, [
+    const { result, requestedPaths } = await harness.runSteps(BrowserTarget.Chrome, [
       navigateWithoutScripts(OPEN_HEAD),
       metaContent('og:title', SERVER_TITLE, 'head.server-title'),
       navigate(OPEN_HEAD),
@@ -116,7 +116,7 @@ describe('metaContent after a navigate with and without scripts', () => {
 
 describe('metaContent and canonicalUrl on a head without the tag', () => {
   test('metaContent fails with assertion-failed when no meta tag has the name', async () => {
-    const { result } = await harness.runSteps(CDP_TARGET, [
+    const { result } = await harness.runSteps(BrowserTarget.Chrome, [
       navigate('/bare-head.html'), metaContent('description', 'Garden tools at half price.', 'head.description'), textEquals(testId('input-events'), '0', 'head.shown'),
     ]);
     assert.deepEqual(outcomes(result), [[0, 'passed', undefined], [1, 'failed', 'assertion-failed'], [2, 'skipped', undefined]]);
@@ -124,21 +124,21 @@ describe('metaContent and canonicalUrl on a head without the tag', () => {
 
   // The page's own URL is not its canonical URL when the head names none.
   test('canonicalUrl fails with assertion-failed when the head has no canonical link, even against the page\'s own URL', async () => {
-    const { result } = await harness.runSteps(CDP_TARGET, [
+    const { result } = await harness.runSteps(BrowserTarget.Chrome, [
       navigate('/bare-head.html'), canonicalUrl(`${harness.origin}/bare-head.html`, 'head.canonical'), textEquals(testId('input-events'), '0', 'head.shown'),
     ]);
     assert.deepEqual(outcomes(result), [[0, 'passed', undefined], [1, 'failed', 'assertion-failed'], [2, 'skipped', undefined]]);
   });
 
   test('metaContent with a matching name but different content fails with assertion-failed', async () => {
-    const { result } = await harness.runSteps(CDP_TARGET, [navigate('/head.html'), metaContent('description', 'Garden tools at full price.', 'head.description')]);
+    const { result } = await harness.runSteps(BrowserTarget.Chrome, [navigate('/head.html'), metaContent('description', 'Garden tools at full price.', 'head.description')]);
     assert.deepEqual(outcomes(result), [[0, 'passed', undefined], [1, 'failed', 'assertion-failed']]);
   });
 
   // Counter-example: on head.html both tags are there, and the canonical link's relative href is
   // compared resolved.
   test('counter-example: on a head with both tags, metaContent and canonicalUrl pass', async () => {
-    const { result } = await harness.runSteps(CDP_TARGET, [
+    const { result } = await harness.runSteps(BrowserTarget.Chrome, [
       navigate('/head.html'),
       metaContent('description', 'Garden tools at half price.', 'head.description'),
       canonicalUrl(`${harness.origin}/head.html?view=canonical`, 'head.canonical'),

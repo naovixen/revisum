@@ -1,7 +1,7 @@
 // Replay in a real browser, on the sign-up fixture app.
-//   - AC-01: one run of the sign-up plan on the CDP driver's headless shell, then 20 replays of its
-//     manifest, each identical to the run. CI and `npm run check:linux` run this in the pinned Linux
-//     image, which is what the criterion claims.
+//   - AC-01: one run of the sign-up plan on the CDP driver's headless shell, then replays of its
+//     manifest, each identical to the run: 2 on push, and the criterion's 20 on the full tier. CI and
+//     `npm run check:linux` run this in the pinned Linux image, which is what the criterion claims.
 //   - AC-04: that run's manifest holds the sha256 of the headless-shell executable on disk.
 //   - AC-06: golden/replay/windows-signup/ holds a manifest and result hash made on Windows (its
 //     README says how). Replayed on a machine with the golden's platform and architecture it is
@@ -16,20 +16,22 @@ import { after, before, describe, test } from 'node:test';
 import {
   defaultRedactor, hashExecutable, type RunResult, type TargetId,
 } from '@revisum/engine';
-import { BROWSERS } from '../support/browsers.ts';
-import { memoryArtifactStore, memoryEventSink, memoryRunEventSink, systemClock } from '../support/memory-ports.ts';
-import { authorise, trustedProjectFrom } from '../support/policy-clearance.ts';
-import { FIXTURES, GOLDEN } from '../support/repository.ts';
-import { harness, makeDrivers, makeProjectFile, signupPlan, type Harness } from '../support/signup-harness.ts';
+import { BROWSERS } from '#test-support/browsers.ts';
+import { memoryArtifactStore, memoryEventSink, memoryRunEventSink, systemClock } from '#test-support/memory-ports.ts';
+import { authorise, trustedProjectFrom } from '#test-support/policy-clearance.ts';
+import { FIXTURES, GOLDEN } from '#test-support/repository.ts';
+import { determinismRuns } from '#test-support/TestTier.ts';
+import type { BrowserHarness } from '#test-support/browser/BrowserHarness.ts';
+import { signupHarness, makeDrivers, makeProjectFile, signupPlan } from '#test-support/signup-harness.ts';
 import { PER_ENVIRONMENT_FIELDS, engineFunction, replayAnswerOf, replayed, type ReplayAnswer } from '../unit/engine/replay-examples.ts';
 
-const REPLAYS = 20;
+const REPLAYS = determinismRuns();
 const HEADLESS_SHELL = 'cdp-chromium-headless-shell';
 const GOLDEN_RUN = join(GOLDEN, 'replay', 'windows-signup');
 const SIGNUP_APP = join(FIXTURES, 'signup-app');
 
-let testHarness: Harness;
-before(async () => { testHarness = await harness(); });
+let testHarness: BrowserHarness;
+before(async () => { testHarness = await signupHarness(); });
 after(async () => { await testHarness.close(); });
 
 // The fixture app's files, read by the paths the manifest names them by ("/app.js").
@@ -49,7 +51,7 @@ const targetOf = (id: string): TargetId => testHarness.project.matrix.find((targ
 // Replays `manifest` with the harness's project and fresh ports, on this machine.
 async function replaySignup(rawPlan: unknown, targetId: string, manifest: unknown, recordedResultHash: string): Promise<ReplayAnswer> {
   const trusted = await trustedProjectFrom(makeProjectFile(testHarness.server.origin));
-  const { seed: _seed, fixedTimeMilliseconds: _clock, fixtures: _fixtures, ...inputs } = testHarness.base();
+  const { seed: _seed, fixedTimeMilliseconds: _clock, fixtures: _fixtures, ...inputs } = testHarness.runInputs();
   const request = {
     manifest, recording: null, recordedResultHash,
     inputs: { ...inputs, plan: authorise(testHarness.plan(rawPlan), trusted), targetId: targetOf(targetId) },
@@ -73,7 +75,7 @@ async function signupRunOnHeadlessShell(): Promise<{ readonly plan: unknown; rea
   return headlessRun;
 }
 
-test('the sign-up run\'s manifest, replayed 20 times on the headless shell, gives an identical result hash every time', { timeout: 600_000 }, async () => {
+test(`the sign-up run's manifest, replayed ${REPLAYS} times on the headless shell, gives an identical result hash every time`, { timeout: 600_000 }, async () => {
   const { plan, result } = await signupRunOnHeadlessShell();
   const manifest: unknown = JSON.parse(JSON.stringify(result.manifest));
   for (let index = 0; index < REPLAYS; index++) {

@@ -11,10 +11,9 @@
 // and a plain result, and pass.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
-import {
-  CDP_TARGETS, HOSTILE_RESULT_MAXIMUM_BYTES, HOSTILE_RESULT_TIMEOUT_MILLISECONDS, STEP_TIMEOUT_MILLISECONDS, continueStep, continued, hostileResult,
-  navigate, outcomes, stepMilliseconds, unsafePageHarness, type HostileResultKind, type UnsafePageHarness,
-} from './unsafe-page-support.ts';
+import { outcomes, stepMilliseconds } from '#test-support/browser/BrowserHarness.ts';
+import { navigate } from '#test-support/browser/RawPlan.ts';
+import { UNSAFE_PAGE_TARGETS, HOSTILE_RESULT_MAXIMUM_BYTES, HOSTILE_RESULT_TIMEOUT_MILLISECONDS, STEP_TIMEOUT_MILLISECONDS, continueStep, continued, hostileResult, unsafePageHarness, type HostileResultKind, type UnsafePageHarness } from './unsafe-page-support.ts';
 
 let harness: UnsafePageHarness;
 before(async () => { harness = await unsafePageHarness(); });
@@ -48,7 +47,7 @@ const ACCEPTED: readonly { readonly name: string; readonly kind: HostileResultKi
 const scriptThenContinue = (kind: HostileResultKind, amount: number): unknown[] =>
   [navigate('/'), hostileResult(kind, amount), continueStep(), continued()];
 
-for (const targetId of CDP_TARGETS) {
+for (const targetId of UNSAFE_PAGE_TARGETS) {
   describe(`page script results: ${targetId}`, () => {
     for (const { name, kind, amount, code } of REFUSED) {
       test(`${name} fails the evaluate step with ${code}, ends the run Errored and skips the rest`, async () => {

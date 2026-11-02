@@ -15,10 +15,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, test } from 'node:test';
 import { leakScanner, sha256 } from '@revisum/engine';
-import {
-  CDP_TARGET, fill, label, navigate, planValuesHarness, reference, remember, testId, textEquals, valueEquals,
-  type PlanRun, type PlanValuesHarness,
-} from '../contract/plan-values-support.ts';
+import type { BrowserRun, BrowserHarness } from '#test-support/browser/BrowserHarness.ts';
+import { BrowserTarget } from '#test-support/browser/BrowserTarget.ts';
+import { fill, label, navigate, reference, remember, testId, textEquals, valueEquals } from '#test-support/browser/RawPlan.ts';
+import { planValuesHarness } from '../contract/plan-values-support.ts';
 import { echoesIn, resolvedSecret } from '../unit/engine/secret-examples.ts';
 
 // The canary text the fixture page shows, exactly as remember.html holds it.
@@ -26,7 +26,7 @@ const CANARY = 'CanaryQwXpLmZrTkVbNsHd';
 const VALUE_NAME = 'accountReference';
 const TIMEOUT = 120_000;
 
-let harness: PlanValuesHarness;
+let harness: BrowserHarness;
 let folder: string;
 before(async () => {
   harness = await planValuesHarness();
@@ -37,12 +37,12 @@ after(async () => {
   rmSync(folder, { recursive: true, force: true });
 });
 
-const resultText = (ran: PlanRun): string => JSON.stringify(ran.result, null, 2);
-const eventLines = (ran: PlanRun): string => ran.events.read().map((event) => JSON.stringify(event)).join('\n');
-const auditLines = (ran: PlanRun): string => ran.audit.recorded.map((recorded) => JSON.stringify(recorded)).join('\n');
+const resultText = (ran: BrowserRun): string => JSON.stringify(ran.result, null, 2);
+const eventLines = (ran: BrowserRun): string => ran.events.read().map((event) => JSON.stringify(event)).join('\n');
+const auditLines = (ran: BrowserRun): string => ran.audit.recorded.map((recorded) => JSON.stringify(recorded)).join('\n');
 
 // Writes the run's result, event log, audit events and images to the scan folder and returns their paths.
-function writeOutputs(name: string, ran: PlanRun): string[] {
+function writeOutputs(name: string, ran: BrowserRun): string[] {
   const paths = [join(folder, `${name}.result.json`), join(folder, `${name}.events.jsonl`), join(folder, `${name}.audit.jsonl`)];
   writeFileSync(paths[0] ?? '', resultText(ran));
   writeFileSync(paths[1] ?? '', eventLines(ran));
@@ -58,7 +58,7 @@ function writeOutputs(name: string, ran: PlanRun): string[] {
 }
 
 test('the leak scan finds a remembered canary only where it was planted; the run keeps its name and sha256', { timeout: TIMEOUT }, async () => {
-  const ran = await harness.runSteps(CDP_TARGET, [
+  const ran = await harness.runSteps(BrowserTarget.Chrome, [
     navigate('/remember.html'),
     remember(VALUE_NAME, testId('canary')),
     fill(label('Search'), reference(VALUE_NAME)),
@@ -93,7 +93,7 @@ test('the leak scan finds a remembered canary only where it was planted; the run
 // Control: the same page's canary, observed by a failed check without being remembered, does
 // reach the result, and the scan finds it there.
 test('control: a failed check of the canary element keeps it in the result, and the scan finds it', { timeout: TIMEOUT }, async () => {
-  const ran = await harness.runSteps(CDP_TARGET, [
+  const ran = await harness.runSteps(BrowserTarget.Chrome, [
     navigate('/remember.html'),
     textEquals(testId('canary'), 'deliberately wrong', 'remember.canary-checked'),
   ]);
