@@ -14,7 +14,8 @@
 | File size | `max-lines` 400, not counting blanks and comments | With exports sharing files, this keeps each one cheap to read. Not from the conventions; a judgement to revisit |
 | Interfaces | No `I` prefix | TypeScript's guidelines and Google's guide both advise against it |
 | Privates | `#private` | The JavaScript standard, and enforced at run time; TypeScript's `private` is checked only at compile time |
-| Enums | String-literal unions | Node runs the `.ts` files with no build step and errors on enums without an experimental flag. Unions also match the JSON plans and results |
+| Fixed sets of values | Constant objects with `as const` and a type of the same name, never magic strings (founder, 2026-11-02) | Node runs the `.ts` files with no build step and errors on `enum` without an experimental flag. The objects read like enums and give one place to find each value, and their string values still match the JSON plans and results |
+| Function style | `function` for hoisted declarations and anything relying on `this` or `arguments`; method shorthand for object methods; `class` for constructors; arrow functions elsewhere (founder, 2026-11-02) | Each form is used where it fits. ESLint enforces arrows for callbacks only, because the rest is a judgement call. Existing code isn't mass-converted |
 | Shorthand | `{ name }` required | The old ban assumed no type safety; TypeScript catches those renames |
 | Constants | `UPPER_CASE` allowed on top-level `const` | The repository's style, about 1,500 uses, and allowed by Google's guide |
 | Records | Bracket access allowed on index signatures | Decoders read unverified keys from `Record<string, unknown>` that way on purpose |

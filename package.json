@@ -8,6 +8,9 @@
   "workspaces": [
     "packages/*"
   ],
+  "imports": {
+    "#test-support/*": "./test/support/*"
+  },
   "scripts": {
     "browsers": "node tools/install-browsers.ts",
     "postinstall": "npm ci --prefix tools/eslint --no-audit --no-fund",

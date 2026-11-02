@@ -6,6 +6,18 @@ The founder's checklist and the build queue.
 
 ## Progress
 
+**Spec work is paused for the architecture refactor (approved 2026-11-02).** On "Continue the build", take the next unchecked phase here. Spec work resumes after phase 5. Bugs found on the way go in `docs/decisions/refactor-defects.md`.
+
+Architecture refactor:
+
+- [x] Phase 0: measure the baseline and set the written conventions (`docs/decisions/refactor-baseline.md`)
+- [ ] Phase 1: cut, reset the goldens once, then freeze them
+- [ ] Phase 2: fast tests; the founder pushes and CI takes 10 minutes or less
+- [ ] Phase 3: cold bug review, fixes, then ground the core
+- [ ] Phase 4: move files, constants for magic strings, formatting
+- [ ] Phase 5: docs and final trust-path review; the founder pushes
+- [ ] Phase 6: test titles and remaining suppressions (may run alongside M3)
+
 Setup and seed (done):
 
 - [x] Research committed in `E:\core`; research commit recorded

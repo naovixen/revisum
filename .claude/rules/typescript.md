@@ -28,11 +28,32 @@ Prettier owns layout and ESLint owns code rules. Run `npm run lint:code` before 
 
 ## Functions and data
 
+- Use `function` where it fits: named declarations that benefit from hoisting, and anything relying on its own `this` or `arguments`. In-page functions always need it, because they run with `this` set to the document.
+- Use method shorthand for object methods, and `class` for constructors and classes.
+- Use arrow functions elsewhere: callbacks, small local functions, and functions assigned to a declared function type.
 - Write pure functions by default. Mutate an argument only when the name says so and performance needs it.
 - Return an object for multiple values, not an array.
 - Destructure only when using many properties; otherwise use property access.
 - Prefer non-mutating forms: spread, `toSorted`, `structuredClone`. Mark shared data `readonly`.
 - Prefer composition to inheritance. Type a singleton as its interface.
+
+## Fixed sets of values
+
+No magic strings. Real `enum`s can't run under Node's type stripping, so a fixed set of values is a constant object with a type of the same name:
+
+```ts
+export const ClipboardAssertionKind = {
+    TextEquals: "textEquals",
+    TextContains: "textContains",
+} as const;
+
+export type ClipboardAssertionKind =
+    (typeof ClipboardAssertionKind)[keyof typeof ClipboardAssertionKind];
+```
+
+- Shared values go in `contracts`, one file per concept. Values used by one feature stay beside it.
+- Get a list with `Object.values(...)`; don't keep a parallel array.
+- Literals stay in JSON fixtures and goldens, in-page functions (they can't import anything), `typeof` results, `""`, test titles and log messages.
 
 ## Comments
 

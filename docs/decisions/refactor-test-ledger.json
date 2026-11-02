@@ -1,0 +1,979 @@
+{
+  "recorded": "2026-11-02",
+  "source": ".test-results from the last full local run",
+  "totalTests": 4687,
+  "files": {
+    "test/contract/act-rule-agreement.test.ts": {
+      "tests": 1,
+      "milliseconds": 47372
+    },
+    "test/contract/cdp-accessible-states.test.ts": {
+      "tests": 32,
+      "milliseconds": 62218
+    },
+    "test/contract/cdp-auto-wait.test.ts": {
+      "tests": 16,
+      "milliseconds": 13903
+    },
+    "test/contract/cdp-browser-processes.test.ts": {
+      "tests": 17,
+      "milliseconds": 30170
+    },
+    "test/contract/cdp-capabilities.test.ts": {
+      "tests": 9,
+      "milliseconds": 90427
+    },
+    "test/contract/cdp-clipboard-checks.test.ts": {
+      "tests": 35,
+      "milliseconds": 91047
+    },
+    "test/contract/cdp-clock-across-documents.test.ts": {
+      "tests": 7,
+      "milliseconds": 13381
+    },
+    "test/contract/cdp-clock-advance.test.ts": {
+      "tests": 15,
+      "milliseconds": 20793
+    },
+    "test/contract/cdp-download-and-tab-replays.test.ts": {
+      "tests": 2,
+      "milliseconds": 16371
+    },
+    "test/contract/cdp-downloads.test.ts": {
+      "tests": 20,
+      "milliseconds": 43507
+    },
+    "test/contract/cdp-key-chords-and-lines.test.ts": {
+      "tests": 13,
+      "milliseconds": 14858
+    },
+    "test/contract/cdp-link-targets-and-page-metadata.test.ts": {
+      "tests": 13,
+      "milliseconds": 28009
+    },
+    "test/contract/cdp-network-stubs.test.ts": {
+      "tests": 11,
+      "milliseconds": 46196
+    },
+    "test/contract/cdp-new-tabs.test.ts": {
+      "tests": 6,
+      "milliseconds": 10949
+    },
+    "test/contract/cdp-pages-and-downloads.test.ts": {
+      "tests": 18,
+      "milliseconds": 12589
+    },
+    "test/contract/cdp-plan-clock.test.ts": {
+      "tests": 6,
+      "milliseconds": 6339
+    },
+    "test/contract/cdp-positions-and-test-ids.test.ts": {
+      "tests": 15,
+      "milliseconds": 23523
+    },
+    "test/contract/cdp-remembered-values.test.ts": {
+      "tests": 11,
+      "milliseconds": 16332
+    },
+    "test/contract/cdp-request-checks.test.ts": {
+      "tests": 26,
+      "milliseconds": 113915
+    },
+    "test/contract/cdp-service-worker-bypass.test.ts": {
+      "tests": 4,
+      "milliseconds": 6751
+    },
+    "test/contract/cdp-web-storage.test.ts": {
+      "tests": 9,
+      "milliseconds": 29395
+    },
+    "test/contract/chromium-disabled-features.test.ts": {
+      "tests": 4,
+      "milliseconds": 2950
+    },
+    "test/contract/clock-and-clipboard-driver-support.test.ts": {
+      "tests": 22,
+      "milliseconds": 31195
+    },
+    "test/contract/dom-checks.test.ts": {
+      "tests": 14,
+      "milliseconds": 81101
+    },
+    "test/contract/driver-action-guard.test.ts": {
+      "tests": 34,
+      "milliseconds": 35010
+    },
+    "test/contract/driver-contract.test.ts": {
+      "tests": 40,
+      "milliseconds": 61774
+    },
+    "test/contract/egress-channels.test.ts": {
+      "tests": 13,
+      "milliseconds": 12587
+    },
+    "test/contract/egress-response-rewrites.test.ts": {
+      "tests": 4,
+      "milliseconds": 792
+    },
+    "test/contract/network-stubs-driver-support.test.ts": {
+      "tests": 22,
+      "milliseconds": 41518
+    },
+    "test/contract/page-script-arguments.test.ts": {
+      "tests": 11,
+      "milliseconds": 25927
+    },
+    "test/contract/page-script-egress.test.ts": {
+      "tests": 4,
+      "milliseconds": 2047
+    },
+    "test/contract/page-script-results.test.ts": {
+      "tests": 24,
+      "milliseconds": 19734
+    },
+    "test/contract/page-states-driver-support.test.ts": {
+      "tests": 21,
+      "milliseconds": 12889
+    },
+    "test/contract/plan-values-driver-support.test.ts": {
+      "tests": 9,
+      "milliseconds": 5494
+    },
+    "test/contract/popup-held-back.test.ts": {
+      "tests": 2,
+      "milliseconds": 6640
+    },
+    "test/contract/structural-locator-guard.test.ts": {
+      "tests": 23,
+      "milliseconds": 16549
+    },
+    "test/contract/stub-egress.test.ts": {
+      "tests": 4,
+      "milliseconds": 6555
+    },
+    "test/contract/target-refusals.test.ts": {
+      "tests": 4,
+      "milliseconds": 16
+    },
+    "test/contract/unsafe-page-driver-support.test.ts": {
+      "tests": 27,
+      "milliseconds": 38040
+    },
+    "test/proofs/action-guard-passing.test.ts": {
+      "tests": 2,
+      "milliseconds": 30
+    },
+    "test/proofs/approval-strength-lint-forms.test.ts": {
+      "tests": 7,
+      "milliseconds": 42752
+    },
+    "test/proofs/approval-strength-lint.test.ts": {
+      "tests": 7,
+      "milliseconds": 41948
+    },
+    "test/proofs/approval-type-guarantees.test.ts": {
+      "tests": 6,
+      "milliseconds": 3156
+    },
+    "test/proofs/benchmark.test.ts": {
+      "tests": 12,
+      "milliseconds": 1195
+    },
+    "test/proofs/branch-gates.test.ts": {
+      "tests": 13,
+      "milliseconds": 1562
+    },
+    "test/proofs/browser-upkeep.test.ts": {
+      "tests": 19,
+      "milliseconds": 3295
+    },
+    "test/proofs/clipboard-host-isolation.test.ts": {
+      "tests": 9,
+      "milliseconds": 17635
+    },
+    "test/proofs/clipboard-leak-scan.test.ts": {
+      "tests": 3,
+      "milliseconds": 19163
+    },
+    "test/proofs/clock-and-clipboard-dependencies.test.ts": {
+      "tests": 5,
+      "milliseconds": 771
+    },
+    "test/proofs/commit-trailers.test.ts": {
+      "tests": 15,
+      "milliseconds": 4027
+    },
+    "test/proofs/cost-report.test.ts": {
+      "tests": 7,
+      "milliseconds": 18585
+    },
+    "test/proofs/coverage-study-kill-criterion.test.ts": {
+      "tests": 3,
+      "milliseconds": 2422
+    },
+    "test/proofs/criterion-id-lint.test.ts": {
+      "tests": 5,
+      "milliseconds": 32302
+    },
+    "test/proofs/database-command-dependencies.test.ts": {
+      "tests": 7,
+      "milliseconds": 132
+    },
+    "test/proofs/deny-rules-lint.test.ts": {
+      "tests": 10,
+      "milliseconds": 61811
+    },
+    "test/proofs/dependency-review-lint.test.ts": {
+      "tests": 8,
+      "milliseconds": 49159
+    },
+    "test/proofs/download-file-names.test.ts": {
+      "tests": 7,
+      "milliseconds": 11892
+    },
+    "test/proofs/download-leak-scan.test.ts": {
+      "tests": 3,
+      "milliseconds": 7512
+    },
+    "test/proofs/draft-command-route-lint.test.ts": {
+      "tests": 5,
+      "milliseconds": 31320
+    },
+    "test/proofs/error-anchors.test.ts": {
+      "tests": 4,
+      "milliseconds": 17828
+    },
+    "test/proofs/evidence-mode-dependencies.test.ts": {
+      "tests": 5,
+      "milliseconds": 3589
+    },
+    "test/proofs/explore-hostile-page.test.ts": {
+      "tests": 5,
+      "milliseconds": 7907
+    },
+    "test/proofs/glossary-lint.test.ts": {
+      "tests": 9,
+      "milliseconds": 56831
+    },
+    "test/proofs/guarantee-map.test.ts": {
+      "tests": 9,
+      "milliseconds": 5620
+    },
+    "test/proofs/hostile-plan-rejection.test.ts": {
+      "tests": 6,
+      "milliseconds": 35
+    },
+    "test/proofs/licence-roles.test.ts": {
+      "tests": 15,
+      "milliseconds": 95319
+    },
+    "test/proofs/network-and-storage-leak-scan.test.ts": {
+      "tests": 3,
+      "milliseconds": 42451
+    },
+    "test/proofs/page-script-driver-dependencies.test.ts": {
+      "tests": 9,
+      "milliseconds": 423
+    },
+    "test/proofs/plan-brand-check.test.ts": {
+      "tests": 18,
+      "milliseconds": 130
+    },
+    "test/proofs/plan-cast-lint.test.ts": {
+      "tests": 7,
+      "milliseconds": 44828
+    },
+    "test/proofs/plan-schema-check.test.ts": {
+      "tests": 9,
+      "milliseconds": 38895
+    },
+    "test/proofs/plan-schema-clock-and-clipboard.test.ts": {
+      "tests": 15,
+      "milliseconds": 27349
+    },
+    "test/proofs/plan-schema-newer-version.test.ts": {
+      "tests": 19,
+      "milliseconds": 28890
+    },
+    "test/proofs/plan-schema-page-checks.test.ts": {
+      "tests": 23,
+      "milliseconds": 22640
+    },
+    "test/proofs/plan-schema-stubs-and-storage.test.ts": {
+      "tests": 23,
+      "milliseconds": 27267
+    },
+    "test/proofs/plan-schema-unsafe-features.test.ts": {
+      "tests": 3,
+      "milliseconds": 17
+    },
+    "test/proofs/policy-brand-and-audit-guarantees.test.ts": {
+      "tests": 6,
+      "milliseconds": 3827
+    },
+    "test/proofs/policy-type-guarantees.test.ts": {
+      "tests": 4,
+      "milliseconds": 2363
+    },
+    "test/proofs/project-metrics.test.ts": {
+      "tests": 9,
+      "milliseconds": 6358
+    },
+    "test/proofs/remembered-value-leak-scan.test.ts": {
+      "tests": 2,
+      "milliseconds": 7345
+    },
+    "test/proofs/research-links-lint.test.ts": {
+      "tests": 9,
+      "milliseconds": 51371
+    },
+    "test/proofs/run-guarantees.test.ts": {
+      "tests": 25,
+      "milliseconds": 63273
+    },
+    "test/proofs/runtime-dependencies.test.ts": {
+      "tests": 5,
+      "milliseconds": 1024
+    },
+    "test/proofs/runtime-import-lint.test.ts": {
+      "tests": 13,
+      "milliseconds": 4249
+    },
+    "test/proofs/secret-encoded-echo-scan.test.ts": {
+      "tests": 6,
+      "milliseconds": 93454
+    },
+    "test/proofs/secret-leak-scan.test.ts": {
+      "tests": 4,
+      "milliseconds": 52005
+    },
+    "test/proofs/secret-reveal-lint-destructuring.test.ts": {
+      "tests": 5,
+      "milliseconds": 37668
+    },
+    "test/proofs/secret-reveal-lint.test.ts": {
+      "tests": 5,
+      "milliseconds": 32753
+    },
+    "test/proofs/seed-from-research.test.ts": {
+      "tests": 4,
+      "milliseconds": 635
+    },
+    "test/proofs/seed-provenance-lint.test.ts": {
+      "tests": 6,
+      "milliseconds": 37653
+    },
+    "test/proofs/service-call-isolation.test.ts": {
+      "tests": 14,
+      "milliseconds": 16462
+    },
+    "test/proofs/shared-type-lints.test.ts": {
+      "tests": 14,
+      "milliseconds": 58283
+    },
+    "test/proofs/shared-types.test.ts": {
+      "tests": 4,
+      "milliseconds": 3760
+    },
+    "test/proofs/tests-apart-commits.test.ts": {
+      "tests": 9,
+      "milliseconds": 1379
+    },
+    "test/proofs/type-check.test.ts": {
+      "tests": 1,
+      "milliseconds": 3300
+    },
+    "test/proofs/unsafe-page-leak-scan.test.ts": {
+      "tests": 9,
+      "milliseconds": 46366
+    },
+    "test/replay/golden-report.test.ts": {
+      "tests": 1,
+      "milliseconds": 69
+    },
+    "test/replay/signup-replay.test.ts": {
+      "tests": 5,
+      "milliseconds": 33627
+    },
+    "test/unit/auditor-act/browser-scan.test.ts": {
+      "tests": 5,
+      "milliseconds": 4922
+    },
+    "test/unit/auditor-act/rule-set.test.ts": {
+      "tests": 7,
+      "milliseconds": 108
+    },
+    "test/unit/cli/draft-command.test.ts": {
+      "tests": 27,
+      "milliseconds": 1553
+    },
+    "test/unit/cli/explore-command.test.ts": {
+      "tests": 58,
+      "milliseconds": 57515
+    },
+    "test/unit/cli/planner-adapters.test.ts": {
+      "tests": 23,
+      "milliseconds": 1274
+    },
+    "test/unit/cli/suite-runs.test.ts": {
+      "tests": 27,
+      "milliseconds": 963
+    },
+    "test/unit/contracts/person-actor-types.test.ts": {
+      "tests": 4,
+      "milliseconds": 2
+    },
+    "test/unit/driver-cdp/modifier-keys.test.ts": {
+      "tests": 5,
+      "milliseconds": 2
+    },
+    "test/unit/engine/agent-lockdown-approval.test.ts": {
+      "tests": 35,
+      "milliseconds": 2167
+    },
+    "test/unit/engine/ai-text.test.ts": {
+      "tests": 17,
+      "milliseconds": 15
+    },
+    "test/unit/engine/approval-red-team.test.ts": {
+      "tests": 9,
+      "milliseconds": 525
+    },
+    "test/unit/engine/approval-subject-hash.test.ts": {
+      "tests": 7,
+      "milliseconds": 363
+    },
+    "test/unit/engine/assertion-values.test.ts": {
+      "tests": 13,
+      "milliseconds": 6
+    },
+    "test/unit/engine/clock-advance-limits.test.ts": {
+      "tests": 36,
+      "milliseconds": 99
+    },
+    "test/unit/engine/clock-advance-runs.test.ts": {
+      "tests": 8,
+      "milliseconds": 201
+    },
+    "test/unit/engine/clock-and-clipboard-plans.test.ts": {
+      "tests": 86,
+      "milliseconds": 140
+    },
+    "test/unit/engine/code-owner-approval.test.ts": {
+      "tests": 21,
+      "milliseconds": 1241
+    },
+    "test/unit/engine/code-owner-reviewed-bytes.test.ts": {
+      "tests": 7,
+      "milliseconds": 341
+    },
+    "test/unit/engine/coverage-study-suites.test.ts": {
+      "tests": 10,
+      "milliseconds": 22
+    },
+    "test/unit/engine/coverage-study-unsafe-features.test.ts": {
+      "tests": 6,
+      "milliseconds": 37
+    },
+    "test/unit/engine/coverage-study.test.ts": {
+      "tests": 14,
+      "milliseconds": 36
+    },
+    "test/unit/engine/database-command-arguments.test.ts": {
+      "tests": 26,
+      "milliseconds": 230
+    },
+    "test/unit/engine/database-command-runs.test.ts": {
+      "tests": 37,
+      "milliseconds": 231
+    },
+    "test/unit/engine/deny-rule-families.test.ts": {
+      "tests": 14,
+      "milliseconds": 116
+    },
+    "test/unit/engine/download-project-settings.test.ts": {
+      "tests": 7,
+      "milliseconds": 23
+    },
+    "test/unit/engine/draft-locator-check.test.ts": {
+      "tests": 17,
+      "milliseconds": 55
+    },
+    "test/unit/engine/encoded-secret-echoes.test.ts": {
+      "tests": 54,
+      "milliseconds": 7061
+    },
+    "test/unit/engine/evidence-plan-runs-unchanged.test.ts": {
+      "tests": 10,
+      "milliseconds": 4131
+    },
+    "test/unit/engine/evidence-results.test.ts": {
+      "tests": 25,
+      "milliseconds": 119
+    },
+    "test/unit/engine/evidence-suite-declarations.test.ts": {
+      "tests": 33,
+      "milliseconds": 58
+    },
+    "test/unit/engine/evidence-suite-trust.test.ts": {
+      "tests": 14,
+      "milliseconds": 439
+    },
+    "test/unit/engine/executable-hash.test.ts": {
+      "tests": 6,
+      "milliseconds": 67
+    },
+    "test/unit/engine/explore-draft-admission.test.ts": {
+      "tests": 5,
+      "milliseconds": 551
+    },
+    "test/unit/engine/explore-planner-request.test.ts": {
+      "tests": 4,
+      "milliseconds": 7
+    },
+    "test/unit/engine/json-lines-event-sink.test.ts": {
+      "tests": 8,
+      "milliseconds": 97
+    },
+    "test/unit/engine/leak-scanner.test.ts": {
+      "tests": 12,
+      "milliseconds": 98
+    },
+    "test/unit/engine/literal-secret-field-names.test.ts": {
+      "tests": 10,
+      "milliseconds": 13
+    },
+    "test/unit/engine/literal-secret.test.ts": {
+      "tests": 19,
+      "milliseconds": 18
+    },
+    "test/unit/engine/manifest-perturbation.test.ts": {
+      "tests": 39,
+      "milliseconds": 409
+    },
+    "test/unit/engine/page-checks-downloads-and-tabs.test.ts": {
+      "tests": 56,
+      "milliseconds": 45
+    },
+    "test/unit/engine/page-checks-previous-version.test.ts": {
+      "tests": 29,
+      "milliseconds": 41
+    },
+    "test/unit/engine/page-map-entry.test.ts": {
+      "tests": 15,
+      "milliseconds": 49
+    },
+    "test/unit/engine/path-templates.test.ts": {
+      "tests": 11,
+      "milliseconds": 2047
+    },
+    "test/unit/engine/plan-approval.test.ts": {
+      "tests": 17,
+      "milliseconds": 580
+    },
+    "test/unit/engine/plan-clock.test.ts": {
+      "tests": 9,
+      "milliseconds": 107
+    },
+    "test/unit/engine/plan-closed-language.test.ts": {
+      "tests": 51,
+      "milliseconds": 74
+    },
+    "test/unit/engine/plan-drafts.test.ts": {
+      "tests": 39,
+      "milliseconds": 881
+    },
+    "test/unit/engine/plan-limits.test.ts": {
+      "tests": 9,
+      "milliseconds": 41
+    },
+    "test/unit/engine/plan-migration.test.ts": {
+      "tests": 24,
+      "milliseconds": 35
+    },
+    "test/unit/engine/plan-references.test.ts": {
+      "tests": 14,
+      "milliseconds": 54
+    },
+    "test/unit/engine/plan-vacuity.test.ts": {
+      "tests": 14,
+      "milliseconds": 21
+    },
+    "test/unit/engine/plan-version-compatibility.test.ts": {
+      "tests": 26,
+      "milliseconds": 56
+    },
+    "test/unit/engine/plan-versions.test.ts": {
+      "tests": 12,
+      "milliseconds": 48
+    },
+    "test/unit/engine/planner-endpoint-declarations.test.ts": {
+      "tests": 3,
+      "milliseconds": 10
+    },
+    "test/unit/engine/policy-clock-and-clipboard.test.ts": {
+      "tests": 4,
+      "milliseconds": 78
+    },
+    "test/unit/engine/policy-denial-events.test.ts": {
+      "tests": 13,
+      "milliseconds": 201
+    },
+    "test/unit/engine/policy-determinism.test.ts": {
+      "tests": 24,
+      "milliseconds": 129
+    },
+    "test/unit/engine/policy-downloads-and-tabs.test.ts": {
+      "tests": 13,
+      "milliseconds": 101
+    },
+    "test/unit/engine/policy-key-chords.test.ts": {
+      "tests": 9,
+      "milliseconds": 49
+    },
+    "test/unit/engine/policy-red-team-runs.test.ts": {
+      "tests": 23,
+      "milliseconds": 121
+    },
+    "test/unit/engine/policy-red-team.test.ts": {
+      "tests": 27,
+      "milliseconds": 163
+    },
+    "test/unit/engine/policy-review-fixes.test.ts": {
+      "tests": 22,
+      "milliseconds": 156
+    },
+    "test/unit/engine/policy-runtime-guard.test.ts": {
+      "tests": 29,
+      "milliseconds": 132
+    },
+    "test/unit/engine/policy-service-calls.test.ts": {
+      "tests": 15,
+      "milliseconds": 259
+    },
+    "test/unit/engine/policy-static-check.test.ts": {
+      "tests": 39,
+      "milliseconds": 252
+    },
+    "test/unit/engine/policy-stubs-and-storage.test.ts": {
+      "tests": 10,
+      "milliseconds": 204
+    },
+    "test/unit/engine/policy-unsafe-features.test.ts": {
+      "tests": 24,
+      "milliseconds": 316
+    },
+    "test/unit/engine/positions-keys-and-text.test.ts": {
+      "tests": 52,
+      "milliseconds": 53
+    },
+    "test/unit/engine/readable-plan-conversion.test.ts": {
+      "tests": 448,
+      "milliseconds": 1322
+    },
+    "test/unit/engine/readable-plan-errors.test.ts": {
+      "tests": 34,
+      "milliseconds": 80
+    },
+    "test/unit/engine/readable-plan-example.test.ts": {
+      "tests": 5,
+      "milliseconds": 10
+    },
+    "test/unit/engine/readable-plan-hash.test.ts": {
+      "tests": 20,
+      "milliseconds": 706
+    },
+    "test/unit/engine/replay-claim-matches-replay.test.ts": {
+      "tests": 24,
+      "milliseconds": 185
+    },
+    "test/unit/engine/replay-isolated-level.test.ts": {
+      "tests": 7,
+      "milliseconds": 78
+    },
+    "test/unit/engine/replay.test.ts": {
+      "tests": 22,
+      "milliseconds": 214
+    },
+    "test/unit/engine/replayed-replies.test.ts": {
+      "tests": 19,
+      "milliseconds": 480
+    },
+    "test/unit/engine/response-rewrite-manifest.test.ts": {
+      "tests": 3,
+      "milliseconds": 33
+    },
+    "test/unit/engine/run-guarantee-level.test.ts": {
+      "tests": 5,
+      "milliseconds": 51
+    },
+    "test/unit/engine/run-values.test.ts": {
+      "tests": 73,
+      "milliseconds": 282
+    },
+    "test/unit/engine/secret-opacity.test.ts": {
+      "tests": 5,
+      "milliseconds": 20
+    },
+    "test/unit/engine/secret-resolution.test.ts": {
+      "tests": 10,
+      "milliseconds": 96
+    },
+    "test/unit/engine/service-call-declarations.test.ts": {
+      "tests": 70,
+      "milliseconds": 388
+    },
+    "test/unit/engine/service-call-plans.test.ts": {
+      "tests": 55,
+      "milliseconds": 24
+    },
+    "test/unit/engine/service-call-runs.test.ts": {
+      "tests": 48,
+      "milliseconds": 445
+    },
+    "test/unit/engine/service-request-building.test.ts": {
+      "tests": 28,
+      "milliseconds": 457
+    },
+    "test/unit/engine/short-secret-observations.test.ts": {
+      "tests": 5,
+      "milliseconds": 1054
+    },
+    "test/unit/engine/signed-approval.test.ts": {
+      "tests": 3,
+      "milliseconds": 179
+    },
+    "test/unit/engine/site-crawl.test.ts": {
+      "tests": 24,
+      "milliseconds": 45
+    },
+    "test/unit/engine/storage-state-unsupported.test.ts": {
+      "tests": 2,
+      "milliseconds": 36
+    },
+    "test/unit/engine/storage-state.test.ts": {
+      "tests": 8,
+      "milliseconds": 143
+    },
+    "test/unit/engine/stub-and-storage-declarations.test.ts": {
+      "tests": 74,
+      "milliseconds": 371
+    },
+    "test/unit/engine/stub-and-storage-plans.test.ts": {
+      "tests": 88,
+      "milliseconds": 66
+    },
+    "test/unit/engine/subject-kind-gates.test.ts": {
+      "tests": 5,
+      "milliseconds": 442
+    },
+    "test/unit/engine/suite-arguments.test.ts": {
+      "tests": 9,
+      "milliseconds": 37
+    },
+    "test/unit/engine/suite-outcome-rules.test.ts": {
+      "tests": 9,
+      "milliseconds": 45
+    },
+    "test/unit/engine/suite-report-decoding.test.ts": {
+      "tests": 34,
+      "milliseconds": 104
+    },
+    "test/unit/engine/suite-trace-decoding.test.ts": {
+      "tests": 20,
+      "milliseconds": 202
+    },
+    "test/unit/engine/target-lock.test.ts": {
+      "tests": 16,
+      "milliseconds": 463
+    },
+    "test/unit/engine/target-resolution.test.ts": {
+      "tests": 13,
+      "milliseconds": 126
+    },
+    "test/unit/engine/tested-on-wording.test.ts": {
+      "tests": 9,
+      "milliseconds": 5
+    },
+    "test/unit/engine/trusted-project.test.ts": {
+      "tests": 13,
+      "milliseconds": 794
+    },
+    "test/unit/engine/unavailable-target-outcome.test.ts": {
+      "tests": 5,
+      "milliseconds": 2
+    },
+    "test/unit/engine/unsafe-feature-closed-plans-unchanged.test.ts": {
+      "tests": 34,
+      "milliseconds": 4183
+    },
+    "test/unit/engine/unsafe-feature-labels.test.ts": {
+      "tests": 34,
+      "milliseconds": 112
+    },
+    "test/unit/engine/unsafe-feature-parsing.test.ts": {
+      "tests": 50,
+      "milliseconds": 85
+    },
+    "test/unit/engine/unsafe-feature-previous-versions.test.ts": {
+      "tests": 37,
+      "milliseconds": 17
+    },
+    "test/unit/engine/unsafe-feature-readable-text.test.ts": {
+      "tests": 14,
+      "milliseconds": 57
+    },
+    "test/unit/engine/unsafe-feature-trust.test.ts": {
+      "tests": 7,
+      "milliseconds": 466
+    },
+    "test/unit/engine/unsafe-golden-plans.test.ts": {
+      "tests": 13,
+      "milliseconds": 45
+    },
+    "test/unit/engine/unsafe-readable-conversion.test.ts": {
+      "tests": 172,
+      "milliseconds": 1353
+    },
+    "test/unit/engine/unsafe-readable-errors.test.ts": {
+      "tests": 69,
+      "milliseconds": 155
+    },
+    "test/unit/engine/unsafe-readable-hash.test.ts": {
+      "tests": 61,
+      "milliseconds": 178
+    },
+    "test/unit/engine/unsafe-readable-text-forms.test.ts": {
+      "tests": 34,
+      "milliseconds": 99
+    },
+    "test/unit/engine/unsupported-clock-and-clipboard.test.ts": {
+      "tests": 13,
+      "milliseconds": 101
+    },
+    "test/unit/engine/unsupported-features.test.ts": {
+      "tests": 9,
+      "milliseconds": 66
+    },
+    "test/unit/engine/unsupported-network-and-storage.test.ts": {
+      "tests": 12,
+      "milliseconds": 88
+    },
+    "test/unit/engine/unsupported-page-checks.test.ts": {
+      "tests": 26,
+      "milliseconds": 177
+    },
+    "test/unit/engine/unverified-decisions.test.ts": {
+      "tests": 7,
+      "milliseconds": 91
+    },
+    "test/unit/engine/value-references.test.ts": {
+      "tests": 31,
+      "milliseconds": 19
+    },
+    "test/unit/engine/working-copy-isolation.test.ts": {
+      "tests": 7,
+      "milliseconds": 444
+    },
+    "test/unit/report/report-generator.test.ts": {
+      "tests": 29,
+      "milliseconds": 254
+    },
+    "test/unit/report/report-model.test.ts": {
+      "tests": 8,
+      "milliseconds": 11
+    },
+    "test/unit/runner/docker-network-description.test.ts": {
+      "tests": 21,
+      "milliseconds": 525
+    },
+    "test/unit/runner/egress-events-unreported-records.test.ts": {
+      "tests": 15,
+      "milliseconds": 4
+    },
+    "test/unit/runner/egress-events.test.ts": {
+      "tests": 4,
+      "milliseconds": 2
+    },
+    "test/unit/runner/egress-proxy-addresses.test.ts": {
+      "tests": 38,
+      "milliseconds": 104
+    },
+    "test/unit/runner/egress-proxy-malformed-requests.test.ts": {
+      "tests": 6,
+      "milliseconds": 46
+    },
+    "test/unit/runner/egress-proxy-tunnels.test.ts": {
+      "tests": 7,
+      "milliseconds": 71
+    },
+    "test/unit/runner/fixture-origin-policy.test.ts": {
+      "tests": 18,
+      "milliseconds": 86
+    },
+    "test/unit/runner/fixture-origin-refusal-codes.test.ts": {
+      "tests": 8,
+      "milliseconds": 2
+    },
+    "test/unit/runner/git-mount-check.test.ts": {
+      "tests": 15,
+      "milliseconds": 16
+    },
+    "test/unit/runner/network-gateway-probe.test.ts": {
+      "tests": 21,
+      "milliseconds": 34
+    },
+    "test/unit/runner/private-service-metadata.test.ts": {
+      "tests": 25,
+      "milliseconds": 87
+    },
+    "test/unit/runner/refused-ipv6-forms.test.ts": {
+      "tests": 11,
+      "milliseconds": 61
+    },
+    "test/unit/runner/resolved-address-check.test.ts": {
+      "tests": 24,
+      "milliseconds": 7
+    },
+    "test/unit/runner/response-rewrite-policy.test.ts": {
+      "tests": 5,
+      "milliseconds": 2
+    },
+    "test/unit/runner/runner-guarantee-level.test.ts": {
+      "tests": 5,
+      "milliseconds": 8
+    },
+    "test/unit/runner/runner-handle-evidence.test.ts": {
+      "tests": 20,
+      "milliseconds": 33
+    },
+    "test/unit/runner/runner-image-pinning.test.ts": {
+      "tests": 4,
+      "milliseconds": 5
+    },
+    "test/unit/runner/runner-source-rules.test.ts": {
+      "tests": 4,
+      "milliseconds": 19
+    },
+    "test/unit/runner/service-caller-runs.test.ts": {
+      "tests": 17,
+      "milliseconds": 2400
+    },
+    "test/unit/runner/service-caller.test.ts": {
+      "tests": 34,
+      "milliseconds": 4662
+    },
+    "test/unit/runner/workload-runner.test.ts": {
+      "tests": 17,
+      "milliseconds": 43
+    },
+    "test/unit/tools/FileNameMatchesExport.test.ts": {
+      "tests": 14,
+      "milliseconds": 123
+    },
+    "test/unit/tools/TestTitleFormat.test.ts": {
+      "tests": 13,
+      "milliseconds": 131
+    }
+  }
+}
