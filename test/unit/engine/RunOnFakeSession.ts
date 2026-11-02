@@ -14,6 +14,7 @@ import {
     type ElementProbe,
     type NetworkPort,
     type ObservedExchange,
+    type RunEventSink,
     type RunResult,
     type Session,
     type StepResult,
@@ -92,9 +93,14 @@ export type FakeRunOptions = {
     readonly projectFile?: JsonRecord;
     readonly serviceRoute?: Route;
     readonly commandRoute?: CommandRoute;
+    readonly events?: RunEventSink;
 };
 
-export type FakeRun = { readonly result: RunResult; readonly audit: MemoryEventSink };
+export type FakeRun = {
+    readonly result: RunResult;
+    readonly audit: MemoryEventSink;
+    readonly events: RunEventSink;
+};
 
 export async function runOnFakeSession(
     raw: unknown,
@@ -114,6 +120,7 @@ export async function runOnFakeSession(
         open: () => Promise.resolve(success(session)),
     };
     const audit = memoryEventSink();
+    const events = options.events ?? memoryRunEventSink();
     const result = await run(
         {
             plan: authorise(parsed.value, trusted),
@@ -132,13 +139,13 @@ export async function runOnFakeSession(
             artifacts: memoryArtifactStore(),
             redactor: defaultRedactor(),
             audit,
-            events: memoryRunEventSink(),
+            events,
             secrets: environmentSecretStore({ [DATABASE_SECRET]: DATABASE_PASSWORD }),
             services: fakeServiceCaller(options.serviceRoute).caller,
             databaseCommands: fakeCommandRunner(options.commandRoute).port,
         },
     );
-    return { result, audit };
+    return { result, audit, events };
 }
 
 // Every value held under `key` anywhere in the step's result, however the result nests it, so a test

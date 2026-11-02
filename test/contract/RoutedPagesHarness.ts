@@ -83,6 +83,7 @@ export type RoutedPages = {
     readonly otherOrigins?: readonly string[];
     readonly observedRequests?: (origin: string) => JsonRecord;
     readonly unsafeFeatures?: JsonRecord;
+    readonly stepTimeoutMilliseconds?: number;
 };
 
 const routedPagesPlan = (
@@ -104,7 +105,7 @@ export function routedPagesHarness(pages: RoutedPages): Promise<BrowserHarness> 
         projectFile: (origin) => ({
             origins: [origin, ...(pages.otherOrigins ?? [])],
             limits: {
-                stepTimeoutMilliseconds: STEP_TIMEOUT_MILLISECONDS,
+                stepTimeoutMilliseconds: pages.stepTimeoutMilliseconds ?? STEP_TIMEOUT_MILLISECONDS,
                 requestQuietMilliseconds: QUIET_MILLISECONDS,
             },
             observedRequests: pages.observedRequests?.(origin) ?? {},

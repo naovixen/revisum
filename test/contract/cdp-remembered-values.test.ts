@@ -11,6 +11,7 @@ import { after, before, describe, test } from 'node:test';
 import { outcomes, type BrowserHarness } from '#test-support/browser/BrowserHarness.ts';
 import { BrowserTarget } from '#test-support/browser/BrowserTarget.ts';
 import { click, fill, label, navigate, pathStartsWith, reference, remember, role, testId, textEquals, valueEquals } from '#test-support/browser/RawPlan.ts';
+import type { FixtureRoute } from '#test-support/fixture-server.ts';
 import { planValuesHarness } from './plan-values-support.ts';
 import { shareBrowserInThisFile } from '#test-support/browser/ShareBrowserInThisFile.ts';
 
@@ -84,9 +85,19 @@ describe('a remember step whose text can be used', () => {
 
 describe('a remembered value as a path segment', () => {
   const HOSTILE = 'a/b?c#d %2F ../名前';
+  // Only this path is answered with a page: a value that left its segment reaches an empty 404, which
+  // the browser shows as its own error page, so the check of the URL fails.
+  const itemPath = `/items/${encodeURIComponent(HOSTILE)}/detail`;
+  const itemPage: FixtureRoute = () => ({
+    headers: { 'content-type': 'text/html; charset=utf-8' },
+    body: '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Item</title></head><body><main>Item</main></body></html>',
+  });
+  let harnessWithItemPage: BrowserHarness;
+  before(async () => { harnessWithItemPage = await planValuesHarness(new Map([[itemPath, itemPage]])); });
+  after(async () => { await harnessWithItemPage.close(); });
 
   test('a value holding "/", "?", "#", "%2F", ".." and non-Latin text stays one segment and one query value on the base URL\'s origin', async () => {
-    const { result, atClose, requestedPaths } = await harness.runSteps(BrowserTarget.Chrome, [
+    const { result, atClose, requestedPaths } = await harnessWithItemPage.runSteps(BrowserTarget.Chrome, [
       OPEN_PAGE, remember('segment', testId('hostile-segment')),
       navigate({ segments: ['items', reference('segment'), 'detail'], query: { search: reference('segment') } }),
       pathStartsWith('/items/', 'remember.items-page-opened'),
@@ -101,7 +112,7 @@ describe('a remembered value as a path segment', () => {
     assert.equal(segments[2], 'detail');
     assert.ok(atClose !== null, 'the page was read at close');
     const url = new URL(atClose.url);
-    assert.equal(url.origin, harness.origin, 'the browser stayed on the base URL\'s origin');
+    assert.equal(url.origin, harnessWithItemPage.origin, 'the browser stayed on the base URL\'s origin');
     assert.equal(url.searchParams.get('search'), HOSTILE, 'the value is one whole query value');
     assert.equal(url.hash, '', 'no value starts a fragment');
   });

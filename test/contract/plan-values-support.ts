@@ -13,6 +13,7 @@ import { startBrowserHarness, type BrowserHarness } from "#test-support/browser/
 import { BrowserTarget, englishMatrix } from "#test-support/browser/BrowserTarget.ts";
 import { driversForTargets } from "#test-support/browser/CreateBrowserDriver.ts";
 import { rawPlan, type JsonRecord } from "#test-support/browser/RawPlan.ts";
+import type { FixtureRoute } from "#test-support/fixture-server.ts";
 import { FIXTURES } from "#test-support/repository.ts";
 
 const SEED = 23;
@@ -45,9 +46,12 @@ export const planFor = (
         fields,
     );
 
-export const planValuesHarness = (): Promise<BrowserHarness> =>
+export const planValuesHarness = (
+    routes: ReadonlyMap<string, FixtureRoute> = new Map(),
+): Promise<BrowserHarness> =>
     startBrowserHarness({
         fixtureFolder: join(FIXTURES, "plan-values-app"),
+        routes,
         projectFile: planValuesProjectFile,
         seed: SEED,
         fixedTimeMilliseconds: CLOCK_START_MILLISECONDS,
