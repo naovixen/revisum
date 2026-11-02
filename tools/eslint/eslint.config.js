@@ -145,7 +145,8 @@ export default defineConfig([
                 {
                     selector: "variable",
                     modifiers: ["const", "global"],
-                    format: ["camelCase", "UPPER_CASE"],
+                    // PascalCase is for constant objects standing in for enums.
+                    format: ["camelCase", "UPPER_CASE", "PascalCase"],
                 },
                 {
                     selector: ["parameter", "variable"],

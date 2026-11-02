@@ -82,7 +82,7 @@ A spec is done when all of these hold:
 | `npm run check` | Everything below, in order. Must be green before you finish |
 | `npm run check:linux` | `npm run check` on CI's pinned Linux image, in Docker. Needs Docker Desktop running |
 | `npm run typecheck` | `tsc --build` over every package and `tools/`. A wrong-way import between packages fails here |
-| `npm run lint` | Checks that read only files: licences and roles, folder layout, imports, dependency reviews, deny rules and the glossary |
+| `npm run lint` | Checks that read only files, all in one process (`tools/RunRepositoryRules.ts`): licences and roles, folder layout, imports, dependency reviews, deny rules, the glossary and more. `node tools/RunRepositoryRules.ts --only <rule>[,<rule>]` runs just those |
 | `npm run lint:code` | ESLint's code rules, straight after `npm run lint`. Its config and local rules are in `tools/eslint/`; code that predates them is baselined in `eslint-suppressions.json` |
 | `npm run format` | Prettier over packages, tools and tests |
 | `npm run lint:names` | The naming lint's self-test, then the naming lint over the repository |

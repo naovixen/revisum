@@ -78,6 +78,7 @@
 | Guarantee map | `GuaranteeMap`, `GuaranteeRow`, `GUARANTEE_MAP` | `tools/guarantee-map.ts`, exists | Each published guarantee, the CI test that proves it, the class shown when the test passes and the weaker class shown when it does not. Published as `docs/guarantees.md` |
 | Test results | `tools/test-results-reporter.ts`, `readTestResults` | `tools/`, exists | One JSON line per test in `.test-results/`; a test id is `<file>#<full name>`. |
 | Commit trailers | `readCommitTrailers`, `CommitTrailers`, `KNOWN_MALFORMED_COMMITS` | `tools/check-commit-trailers.ts` and `tools/project-metrics.ts`, exists | The `Agent:`, `Spec:` and `Criteria:` lines the project's own metrics are read from |
+| Repository rule | `RepositoryRuleName`, `REPOSITORY_RULES`, `runRepositoryRules` | `tools/RunRepositoryRules.ts`, exists | One of the checks `npm run lint` runs, all in one process; trust rules stay here because an ESLint suppression would be an opt-out |
 | Naming lint | `NamingLintConfig`, `NAMING_LINT`, `lintRepository` | `tools/`, exists | Enforces the naming rules in CI |
 | Declared approval | `DeclaredApproval`, strength `declared` | `contracts`, exists | An approval resting on the founder's own push or merge under the agent lock-down; labelled "declared, not verified" |
 | Verified approval | `VerifiedApproval`, strength `verified` | `contracts`, exists | An optional approval by a code owner's review; never required. No gate, metric or level takes it (`tools/check-approval-strength.ts`) |

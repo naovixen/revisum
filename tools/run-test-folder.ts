@@ -96,6 +96,11 @@ function main(folders: readonly string[]): number {
     writeFileSync(resultsFile, '');
     return 0;
   }
+  // Without this file no test counts as a browser test, and every browser test would quietly run in parallel.
+  if (!existsSync(BROWSER_MODULE)) {
+    console.error(`${relative('.', BROWSER_MODULE)} does not exist, so browser tests can't be told from the rest; if it moved, update BROWSER_MODULE in tools/run-test-folder.ts`);
+    return 1;
+  }
   const scratchFolder = mkdtempSync(join(tmpdir(), 'test-results-'));
   try {
     const browserFiles = files.filter((file) => drivesBrowser(file));

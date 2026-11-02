@@ -2721,7 +2721,7 @@
       "count": 1
     },
     "curly": {
-      "count": 3
+      "count": 1
     },
     "revisum/file-name-matches-export": {
       "count": 1
@@ -2976,7 +2976,7 @@
       "count": 1
     },
     "@typescript-eslint/strict-boolean-expressions": {
-      "count": 3
+      "count": 2
     },
     "curly": {
       "count": 1
@@ -5325,9 +5325,6 @@
     }
   },
   "test/unit/tools/eslint-rule-harness.ts": {
-    "@typescript-eslint/naming-convention": {
-      "count": 1
-    },
     "@typescript-eslint/no-unsafe-assignment": {
       "count": 5
     },
