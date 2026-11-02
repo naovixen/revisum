@@ -1,4 +1,4 @@
-// Which driver performs the page parts of plan language 1.3. The own CDP driver declares
+// Which driver performs the page parts of the plan language. The own CDP driver declares
 // structuralLocators, domChecks and pageScripts. With one of them taken off a driver's list, and nothing else changed, the run
 // refuses every step that needs it with unsupported-step, before anything of it reaches the
 // driver: no input event reaches the page, and a script that counts its own runs on the page never

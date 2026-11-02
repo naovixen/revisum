@@ -127,7 +127,7 @@ export const SEED_ORDERS = database('seedOrders', { count: 3 });
 export const WIPE_ORDERS = database('wipeOrders');
 export const COUNT_ORDERS = database('countOrders');
 
-// A 1.3 plan: the given steps, then a check the recording driver always passes.
+// A plan: the given steps, then a check the recording driver always passes.
 export const commandPlan = (steps: readonly unknown[], cleanup?: readonly unknown[]): JsonRecord =>
   unsafePlan(steps, cleanup === undefined ? {} : { cleanup });
 

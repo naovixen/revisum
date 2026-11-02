@@ -118,7 +118,7 @@ export function secretProject(secretNames: readonly string[]): Project {
 // adds top-level fields, such as `storageState`.
 export const secretFillPlan = (secretNames: readonly string[], extra: Readonly<Record<string, unknown>> = {}) => ({
   ...extra,
-  version: '1.1',
+  version: '1.3',
   meta: { featureId: 'SECRETS-1', specReference: 'specs/secrets.md', title: 'Sign in with secrets' },
   targets: [FAKE_TARGET],
   steps: [

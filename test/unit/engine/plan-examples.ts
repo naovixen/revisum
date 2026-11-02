@@ -1,46 +1,35 @@
-// The plan examples the plan-language tests share, read from disk so every test sees the same
-// bytes:
-//   - golden/plans/*.json: plans in versions "1.1" and "1.2", in which every assertion carries
-//     the id of the acceptance criterion it checks;
-//   - fixtures/plan-migration/<name>.plan.json: the same plans as first written in version 1,
-//     before assertions carried criterion ids, with <name>.mapping.json giving each assertion's
-//     criterion id, keyed by the assertion step's JSON path.
+// The plan examples the plan-language tests share, read from disk so every test sees the same bytes:
+//   golden/plans/*.json: plans in which every assertion carries the id of the acceptance criterion
+//   it checks.
 // Each loader returns a fresh copy, so a test may change it freely.
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseProject, planParser, type Project } from '@revisum/engine';
-import { FIXTURES, GOLDEN } from '../../support/repository.ts';
+import { GOLDEN } from '../../support/repository.ts';
 
 export const ORIGIN = 'http://127.0.0.1:4173';
 export const TARGET_ID = 'playwright-chromium';
-// The version the first examples are written in; version 1.2 still parses them unchanged.
-export const CURRENT_VERSION = '1.1';
+// The one version a plan may declare.
+export const CURRENT_VERSION = '1.3';
 
 // A JSON object as read from disk, before any parsing.
 export type JsonRecord = Record<string, unknown>;
 
 const PLAN_FOLDER = join(GOLDEN, 'plans');
-const MIGRATION_FOLDER = join(FIXTURES, 'plan-migration');
 
 const readJson = (path: string): JsonRecord => JSON.parse(readFileSync(path, 'utf8'));
 
 export const goldenPlanNames = (): readonly string[] =>
   readdirSync(PLAN_FOLDER).filter((name) => name.endsWith('.json')).map((name) => name.slice(0, -'.json'.length)).sort();
 
-export const migrationExampleNames = (): readonly string[] =>
-  readdirSync(MIGRATION_FOLDER).filter((name) => name.endsWith('.plan.json')).map((name) => name.slice(0, -'.plan.json'.length)).sort();
-
 export const goldenPlan = (name: string): JsonRecord => readJson(join(PLAN_FOLDER, `${name}.json`));
-export const legacyPlan = (name: string): JsonRecord => readJson(join(MIGRATION_FOLDER, `${name}.plan.json`));
-export const criterionMapping = (name: string): Readonly<Record<string, string>> =>
-  readJson(join(MIGRATION_FOLDER, `${name}.mapping.json`)) as Record<string, string>;
 
-// The sign-up plan in the current language. Its steps, by index:
+// The sign-up plan. Its steps, by index:
 //   0 navigate, 1 expect (visible), 2 expectPage (title), 3 fill, 4 fill, 5 expect (valueEquals),
 //   6 capture, 7 click, 8 click, 9 expect (textContains), 10 expect (textContains), 11 a11yAudit, 12 capture.
 export const signupPlan = (): JsonRecord => goldenPlan('signup');
 
-// A plan that uses the steps the current language added. Its steps, by index:
+// A plan that hovers, selects, enters a frame and answers a dialog. Its steps, by index:
 //   0 navigate, 1 hover, 2 select, 3 frame (0 fill, 1 expect), 4 click, 5 dialog, 6 expect (absent), 7 expectPage.
 export const accountClosurePlan = (): JsonRecord => goldenPlan('account-closure');
 
@@ -85,7 +74,7 @@ export const TEST_SERVICE_CALLS: JsonRecord = {
   },
 };
 
-// The stub, observed request and storage entries the 1.2 golden plans name, copied from
+// The stub, observed request and storage entries the golden plans name, copied from
 // stub-and-storage-examples.ts. Each is on the allowed origin and names no fixture, secret or
 // service, so a test that replaces the fixtures, secret names or services still gets a project
 // that parses.

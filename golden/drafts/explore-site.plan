@@ -4,7 +4,7 @@
 Plan: Browse the Lantern Books pages
 Feature: EXPLORE-1
 Spec: pages/lantern-books
-Version: 1.1
+Version: 1.3
 Targets: explore-chromium
 Go to /
 Criterion: AC-1

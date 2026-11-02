@@ -15,7 +15,7 @@ import { authorise, trustedProjectFrom } from '../support/policy-clearance.ts';
 const ORIGIN = 'http://127.0.0.1:4173';
 // A one-check plan on one target, written as raw JSON the way a person writes it.
 const headingPlan = (targetId: string) => ({
-  version: '1.1',
+  version: '1.3',
   meta: { featureId: 'SIGNUP-1', specReference: 'specs/signup.md#happy-path', title: 'The sign-up form is shown' },
   targets: [targetId],
   steps: [

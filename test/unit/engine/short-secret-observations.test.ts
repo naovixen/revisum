@@ -18,7 +18,7 @@ const ACCESS_CODE = { by: 'label', label: 'Access code' };
 const NICKNAME = { by: 'label', label: 'Nickname' };
 
 const planOf = (steps: readonly unknown[]) => ({
-  version: '1.1',
+  version: '1.3',
   meta: { featureId: 'SECRETS-5', specReference: 'specs/secrets.md#short', title: 'Enter an access code' },
   targets: [FAKE_TARGET],
   steps: [{ type: 'navigate', url: '/' }, ...steps],

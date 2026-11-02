@@ -1,5 +1,5 @@
 {
-  "version": "1.2",
+  "version": "1.3",
   "meta": { "featureId": "LOGIN-4", "specReference": "specs/login.md#one-time-code", "title": "A login that needs a one-time code opens the code dialog" },
   "targets": ["playwright-chromium"],
   "steps": [

@@ -1,4 +1,4 @@
-// Shared setup for the browser tests of plan language 1.3's page parts: css and XPath locators, DOM
+// Shared setup for the browser tests of the plan language's page parts: css and XPath locators, DOM
 // checks and page scripts, carried out by the own CDP driver.
 //
 // It serves the unsafe-features fixture app (fixtures/unsafe-features-app/). Beside the app's files
@@ -179,7 +179,7 @@ export const hostileResult = (kind: HostileResultKind, amount = 0): JsonRecord =
 export const continueStep = (): JsonRecord => ({ type: 'click', locator: { by: 'role', role: 'button', name: 'Continue' } });
 export const continued = (): JsonRecord => check({ by: 'testId', testId: 'continue-state' }, { kind: 'textEquals', value: 'Continued' }, 'page.continued');
 
-// A raw 1.3 plan for one target. A plan must assert something; every test plan here does.
+// A raw plan for one target. A plan must assert something; every test plan here does.
 export const unsafePagePlan = (targetId: string, steps: readonly unknown[], fields: JsonRecord = {}): JsonRecord => ({
   version: PLAN_LANGUAGE_VERSION,
   meta: { featureId: 'UNSAFE-1', specReference: 'specs/unsafe-page-parts.md#driver', title: 'Unsafe page features in a browser' },

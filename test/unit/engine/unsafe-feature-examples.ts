@@ -1,4 +1,4 @@
-// Shared setup for the tests of plan language 1.3's unsafe features: projects that enable some of
+// Shared setup for the tests of the plan language's unsafe features: projects that enable some of
 // them, the plan parser for those projects, the gate's guarantee statement for a set of features,
 // and a run of an unsafe plan on a driver that needs no browser. The plan parts and declarations
 // themselves are in unsafe-feature-steps.ts.

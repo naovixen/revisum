@@ -1,7 +1,7 @@
 Plan: Sign up with an email address
 Feature: SIGNUP-1
 Spec: specs/signup.md
-Version: 1.1
+Version: 1.3
 Targets: chromium-stable
 Go to /signup
 Criterion: AC-3

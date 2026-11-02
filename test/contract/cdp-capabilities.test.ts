@@ -1,4 +1,4 @@
-// The capabilities the own CDP driver adds for plan language 1.1: steps inside an iframe, answering
+// The capabilities the own CDP driver adds for the plan language: steps inside an iframe, answering
 // a dialog, uploading a declared fixture file, and a tab that crashes. Each capability test runs
 // 20 times in a row and every run must pass; the iframe, dialog and upload tests repeat their
 // steps 20 times in one plan, so one browser serves all 20 with a fresh page load each time, and

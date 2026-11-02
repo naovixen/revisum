@@ -276,18 +276,6 @@ for (const feature of FEATURES) {
     assert.deepEqual(fromText, expected);
   });
 
-  for (const version of ['1.2', '1.1'] as const) {
-    test(`the ${feature} golden text declaring ${version} is refused as the ${version} parser refuses its JSON, on marked lines`, () => {
-      const original = unsafeGoldenText(feature);
-      const text = withLineReplaced(original, lineStartingWith(original, 'Version:'), `Version: ${version}`);
-      const fromJson = parseAll({ ...unsafeGoldenPlan(feature), version });
-      assert.equal(fromJson.ok, false, 'the JSON was accepted');
-      const expected = fromJson.ok ? [] : fromJson.error.map((error) => `${error.code} ${error.path}`);
-      const errors = admittedErrors(text, parseAll);
-      assert.deepEqual(errors.map((error) => `${error.code} ${error.stage === 'plan' ? error.path : error.stage}`), expected);
-      for (const error of errors) assert.match(lineAt(text, error.position?.line ?? 0), MARK_OR_CLEANUP, shown([error]));
-    });
-  }
 }
 
 // U+2028, U+2029 and U+0085 would show as line breaks in an editor, so the parser refuses them in a

@@ -16,9 +16,9 @@ const LITERAL = 'horse battery staple';
 const parseClosed: Parse = planParser(secretProject(['ACCOUNT_PASSWORD']));
 const parseWithCss: Parse = parserEnabling(['css-locator']);
 
-// A closed (1.1) plan that fills `locator` with literal text.
+// A closed plan that fills `locator` with literal text.
 const closedFill = (locator: unknown) => ({
-  version: '1.1',
+  version: '1.3',
   meta: { featureId: 'SECRETS-4', specReference: 'specs/secrets.md#field-names', title: 'Sign in' },
   targets: [FAKE_TARGET],
   steps: [
@@ -27,7 +27,7 @@ const closedFill = (locator: unknown) => ({
     { type: 'expect', locator: { by: 'testId', testId: 'status' }, assert: { kind: 'visible' }, criterionId: 'secrets.status-shown' },
   ],
 });
-// A 1.3 plan, with css locators enabled, that fills `locator` with literal text.
+// A plan, with css locators enabled, that fills `locator` with literal text.
 const cssFill = (selector: string) => unsafePlan([OPEN_CART, { type: 'fill', locator: css(selector), value: LITERAL }]);
 
 type FieldCase = { readonly title: string; readonly parse: Parse; readonly plan: unknown };

@@ -1,5 +1,5 @@
-// The page checks, downloads and second tab join plan language 1.2's published schema. golden/plans/
-// holds a 1.2 golden plan for each of them, `npm run lint` validates every golden plan against the
+// The page checks, downloads and second tab join the plan language's published schema. golden/plans/
+// holds a golden plan for each of them, `npm run lint` validates every golden plan against the
 // schema, and the changelog's one 1.2 entry names each new step, check, setting and error code.
 // The schema-hash and entry-format checks are in plan-schema-newer-version.test.ts.
 import assert from 'node:assert/strict';
@@ -17,10 +17,9 @@ type JsonRecord = Record<string, unknown>;
 
 const readText = (relativePath: string): string => readFileSync(join(REPOSITORY_ROOT, relativePath), 'utf8');
 
-const newerGoldenPlans = (): JsonRecord[] =>
+const goldenPlans = (): JsonRecord[] =>
   readdirSync(join(GOLDEN, 'plans')).filter((name) => name.endsWith('.json')).sort()
-    .map((name): JsonRecord => JSON.parse(readFileSync(join(GOLDEN, 'plans', name), 'utf8')))
-    .filter((plan) => plan['version'] === '1.2');
+    .map((name): JsonRecord => JSON.parse(readFileSync(join(GOLDEN, 'plans', name), 'utf8')));
 
 // Every object inside a JSON value, depth first.
 const objectsIn = (value: unknown): JsonRecord[] => {
@@ -48,8 +47,8 @@ const FEATURES: Readonly<Record<string, (plan: JsonRecord) => boolean>> = {
 };
 
 for (const [feature, uses] of Object.entries(FEATURES)) {
-  test(`a 1.2 golden plan uses ${feature}`, () => {
-    assert.ok(newerGoldenPlans().some(uses), `no golden plan declaring 1.2 uses ${feature}`);
+  test(`a golden plan uses ${feature}`, () => {
+    assert.ok(goldenPlans().some(uses), `no golden plan uses ${feature}`);
   });
 }
 
@@ -102,7 +101,7 @@ test('the lint fails when a golden plan checks a download with a kind the langua
 
 // Counter-example: a valid copy of the download plan passes, so the failures above come from the
 // planted problems.
-test('the lint accepts a new 1.2 golden plan with a download, a page check and a second tab', { timeout: TIMEOUT }, () => {
+test('the lint accepts a new golden plan with a download, a page check and a second tab', { timeout: TIMEOUT }, () => {
   const plan = downloadPlan();
   (plan['meta'] as JsonRecord)['title'] = 'Exporting the visible projects, second copy';
   stepsOf(plan).push({

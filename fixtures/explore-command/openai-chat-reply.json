@@ -8,7 +8,7 @@
       "index": 0,
       "message": {
         "role": "assistant",
-        "content": "Plan: Browse the Lantern Books pages\nFeature: EXPLORE-1\nSpec: pages/lantern-books\nVersion: 1.1\nTargets: explore-chromium\nGo to /\nCriterion: AC-1\nExpect heading \"Lantern Books\" is visible\nExpect link \"About us\" is visible\nGo to /about.html\nCriterion: AC-2\nExpect heading \"About Lantern Books\" is visible\nGo to /pricing.html\nCriterion: AC-3\nExpect heading \"Pricing\" is visible\n"
+        "content": "Plan: Browse the Lantern Books pages\nFeature: EXPLORE-1\nSpec: pages/lantern-books\nVersion: 1.3\nTargets: explore-chromium\nGo to /\nCriterion: AC-1\nExpect heading \"Lantern Books\" is visible\nExpect link \"About us\" is visible\nGo to /about.html\nCriterion: AC-2\nExpect heading \"About Lantern Books\" is visible\nGo to /pricing.html\nCriterion: AC-3\nExpect heading \"Pricing\" is visible\n"
       },
       "finish_reason": "stop"
     }

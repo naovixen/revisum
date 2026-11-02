@@ -38,7 +38,7 @@ async function main(): Promise<number> {
     const project = parseProject(projectFile);
     if (!project.ok) throw new Error(`bad project: ${JSON.stringify(project.error)}`);
     const parsed = planParser(project.value)({
-      version: '1.1',
+      version: '1.3',
       meta: { featureId: 'ISOLATION-1', specReference: 'specs/isolation.md#egress', title: 'An undeclared WebSocket is blocked' },
       targets: [TARGET_ID],
       steps: [

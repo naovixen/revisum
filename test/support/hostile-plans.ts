@@ -29,7 +29,7 @@ export function hostilePlans(allowedOrigin: string): readonly HostilePlan[] {
     { name: 'oversized plan (bytes)', input: withSteps(...Array.from({ length: 3000 }, () => click)), code: 'too_large' },
     { name: 'too many steps', input: withSteps(...Array.from({ length: 101 }, () => ({ type: 'capture', name: 'x' }))), code: 'too_large' },
     { name: 'missing locator', input: withSteps({ type: 'click' }), code: 'missing_field' },
-    { name: 'CSS selector instead of role locator', input: withSteps({ type: 'click', locator: { by: 'css', selector: '#submit' } }), code: 'unknown_value' },
+    { name: 'CSS selector instead of role locator', input: withSteps({ type: 'click', locator: { by: 'css', selector: '#submit' } }), code: 'unsafe_feature_disabled' },
     { name: 'invented ARIA role', input: withSteps({ type: 'click', locator: { by: 'role', role: 'superuser', name: 'x' } }), code: 'unknown_value' },
     { name: 'wrong type (steps as prose)', input: { ...valid(), steps: 'click the sign-up button' }, code: 'wrong_type' },
     { name: 'wrong type (number as fill value)', input: withSteps({ type: 'fill', locator: { by: 'label', label: 'Email' }, value: 42 }), code: 'wrong_type' },

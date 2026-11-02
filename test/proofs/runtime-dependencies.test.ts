@@ -1,4 +1,4 @@
-// Plan language 1.2 adds no runtime dependency to contracts or engine: dates are computed with
+// The plan language adds no runtime dependency to contracts or engine: dates are computed with
 // Node's built-in Intl, so their locale data is fixed by the Node version, not by a package.
 // Each package manifest declares no runtime dependency, and every import in their sources is
 // relative, a Node built-in or, for engine, contracts. A planted import shows the check can fail.

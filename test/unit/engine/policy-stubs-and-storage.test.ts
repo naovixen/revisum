@@ -39,7 +39,7 @@ const STORAGE_ENTRIES: JsonRecord = {
 const projectInput = (): JsonRecord =>
   policyProjectInput({ stubs: STUBS, observedRequests: OBSERVED_REQUESTS, storageEntries: STORAGE_ENTRIES });
 
-const newerPlan = (steps: readonly unknown[]): JsonRecord => ({ ...planOf(steps), version: '1.2' });
+const newerPlan = (steps: readonly unknown[]): JsonRecord => ({ ...planOf(steps), version: '1.3' });
 
 const startStub = (name: string): JsonRecord => ({ type: 'stub', stub: name, action: 'start' });
 const setStorage = (entry: string): JsonRecord => ({ type: 'setStorage', entry });

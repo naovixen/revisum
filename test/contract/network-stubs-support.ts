@@ -1,4 +1,4 @@
-// Shared setup for the browser tests of plan language 1.2's declared network stubs, request checks
+// Shared setup for the browser tests of the plan language's declared network stubs, request checks
 // and web storage: the driver parts of each, carried out by the own CDP driver over CDP's Fetch,
 // Network and DOMStorage domains.
 //
@@ -40,7 +40,7 @@ export { click, navigate, outcomes, reference, role, testId, textEquals, type Js
 export const SEED = 33;
 // The run's own clock start: 30 October 2026, 12:00 UTC.
 export const CLOCK_START_MILLISECONDS = Date.UTC(2026, 9, 30, 12, 0, 0);
-export const PLAN_LANGUAGE_VERSION = '1.2';
+export const PLAN_LANGUAGE_VERSION = '1.3';
 export const STEP_TIMEOUT_MILLISECONDS = 5000;
 // Longer than the 300 ms between the two requests "Load two batches" sends, so a count that waits
 // for quiet sees both.
@@ -172,7 +172,7 @@ export const visible = (locator: JsonRecord, criterionId: string): JsonRecord =>
 export const titleIs = (value: string, criterionId: string): JsonRecord => ({ type: 'expectPage', assert: { kind: 'title', value }, criterionId });
 export const secretArgument = (secretName: string): JsonRecord => ({ secretName });
 
-// A raw 1.2 plan for one target. `fields` adds top-level fields. A plan must assert something;
+// A raw plan for one target. `fields` adds top-level fields. A plan must assert something;
 // every test plan here does.
 export const networkPlan = (targetId: string, steps: readonly unknown[], fields: JsonRecord = {}): JsonRecord => ({
   version: PLAN_LANGUAGE_VERSION,

@@ -63,7 +63,7 @@ function encodableText(length: number): string {
 }
 
 const echoPlan = (targetId: string, echo: string, value: unknown, field: string) => ({
-  version: '1.1',
+  version: '1.3',
   meta: { featureId: 'SECRETS-7', specReference: 'specs/secrets.md#encoded-echoes', title: `Encoded echo: ${echo}` },
   targets: [targetId],
   steps: [

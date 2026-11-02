@@ -25,12 +25,12 @@ import {
 import { memoryArtifactStore, memoryEventSink, memoryRunEventSink } from '../../support/memory-ports.ts';
 import { authorise, trustedProjectFrom } from '../../support/policy-clearance.ts';
 import {
-  DEFAULT_CLOCK_START, DEFAULT_SEED, NEW_VERSION, ORIGIN, TARGET_ID, accepted, projectFileWith, recordingDriver,
+  DEFAULT_CLOCK_START, DEFAULT_SEED, CURRENT_VERSION, ORIGIN, TARGET_ID, accepted, projectFileWith, recordingDriver,
   type JsonRecord, type ParsePlan, type Recording,
 } from './run-value-examples.ts';
 import { fakeSecretValue } from './secret-examples.ts';
 
-export { NEW_VERSION, ORIGIN, TARGET_ID, type JsonRecord };
+export { CURRENT_VERSION, ORIGIN, TARGET_ID, type JsonRecord };
 
 // ---- The declared service and its secrets -------------------------------------------------------
 
@@ -311,12 +311,12 @@ export async function runWithCalls(raw: unknown, options: CallRunOptions = {}): 
   return { result, recording, requests, events: logged, clock, everything: `${JSON.stringify(result)}\n${JSON.stringify(logged)}` };
 }
 
-// A raw 1.2 plan: the given steps, then a check the recording driver always passes.
+// A raw plan: the given steps, then a check the recording driver always passes.
 export const CLOSING_CHECK: JsonRecord = {
   type: 'expect', locator: { by: 'testId', testId: 'status' }, assert: { kind: 'visible' }, criterionId: 'orders.status-shown',
 };
 export const callPlanOf = (steps: readonly unknown[], fields: JsonRecord = {}): JsonRecord => ({
-  version: NEW_VERSION,
+  version: CURRENT_VERSION,
   meta: { featureId: 'ORDERS-2', specReference: 'specs/orders.md#backend', title: 'Orders reach the backend' },
   targets: [TARGET_ID],
   steps: [...steps, CLOSING_CHECK],

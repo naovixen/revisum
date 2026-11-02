@@ -17,7 +17,7 @@ const chord = (key: string, modifiers: readonly string[]): JsonRecord => ({ type
 // Parses a 1.2 plan of [open the account page, `press`], then guards the press as a driver would.
 async function guardPress(press: JsonRecord, field: ResolvedElement) {
   const { gate, project } = await testGate();
-  const plan = parsedPlan({ ...planOf([OPEN_ACCOUNT_PAGE, press]), version: '1.2' });
+  const plan = parsedPlan({ ...planOf([OPEN_ACCOUNT_PAGE, press]), version: '1.3' });
   return gate.guardAction(stepAt(plan, 1), 1, field, null, localeOf(project, ENGLISH));
 }
 

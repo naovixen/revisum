@@ -6,7 +6,7 @@ import { planParser } from '@revisum/engine';
 import { makeProject, signupPlan } from '../../support/signup-harness.ts';
 
 const ORIGIN = 'http://127.0.0.1:4173';
-const TARGETS = ['playwright-chromium'];
+const TARGETS = ['cdp-chromium'];
 const parsePlan = planParser(makeProject(ORIGIN));
 const TEXT_VALUE_KINDS = ['textEquals', 'textContains', 'valueEquals', 'valueContains'] as const;
 

@@ -16,7 +16,7 @@ const ERROR_CODES: Readonly<Record<string, readonly string[]>> = {
   plan: [
     'not_object', 'unknown_field', 'missing_field', 'wrong_type', 'unknown_step', 'unknown_value', 'invalid_url',
     'scheme_not_allowed', 'origin_not_allowed', 'target_not_in_matrix', 'unsafe_text', 'too_large', 'too_long',
-    'duplicate', 'version_unsupported', 'empty', 'vacuous', 'no_criterion_id', 'literal_secret', 'undefined_value',
+    'duplicate', 'version_unsupported', 'empty', 'vacuous', 'literal_secret', 'undefined_value',
     'position_not_allowed', 'misplaced_step', 'unsafe_interpolation', 'header_not_allowed', 'command_not_allowed',
     'path_not_allowed', 'unsafe_feature_disabled',
   ],

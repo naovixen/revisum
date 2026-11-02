@@ -1,4 +1,4 @@
-// The plan grammar for declared calls (plan language 1.2). A plan may invoke a call only by the
+// The plan grammar for declared calls. A plan may invoke a call only by the
 // name the trusted project declares, with arguments typed by the declaration: literal values,
 // run values by name, and secrets only by name. `call` steps may remember response fields as run
 // values; `expectBackend` checks one field of a read call; a plan-level `cleanup` list holds calls
@@ -9,8 +9,8 @@ import { arch, platform } from 'node:os';
 import { test } from 'node:test';
 import { defaultRedactor, failure, runUntrusted, type BrowserDriver, type PlanErrorCode } from '@revisum/engine';
 import { memoryArtifactStore, memoryEventSink, memoryRunEventSink, systemClock } from '../../support/memory-ports.ts';
-import { defaultParser, PRIVATE_MARKER, signupPlan, stepsOf } from './plan-examples.ts';
-import { accepted, rejection, PREVIOUS_VERSION } from './run-value-examples.ts';
+import { PRIVATE_MARKER } from './plan-examples.ts';
+import { accepted, rejection } from './run-value-examples.ts';
 import {
   CREATE_ORDER, DELETE_ORDER, ORIGIN, RESET_SHOP, SECRET_VALUES, asJson, call, callParser, callPlanOf, callProject,
   expectBackend, fakeServiceCaller, orderArguments, withCleanup, type JsonRecord,
@@ -252,22 +252,6 @@ test('a remembered value with the name of a generated value is refused as duplic
 
 test('a cleanup call naming a value no step defines is refused with undefined_value', () => {
   assert.deepEqual(rejection(parsePlan, withCleanup(callPlanOf([RESET_SHOP]), [DELETE_ORDER])), ['undefined_value $.cleanup[0].arguments.orderId']);
-});
-
-// ---- Version 1.1 -----------------------------------------------------------------------------------
-
-// Recorded from the parser before calls existed, when it read them as a 1.1 parser does.
-test('a plan declaring 1.1 that uses a call, an expectBackend or cleanup is refused as a 1.1 parser refuses it', () => {
-  const parse = defaultParser();
-  const previousWith = (added: JsonRecord): JsonRecord => {
-    const steps = [...stepsOf(signupPlan())];
-    steps.splice(1, 0, added);
-    return { ...signupPlan(), steps };
-  };
-  assert.equal(signupPlan()['version'], PREVIOUS_VERSION);
-  assert.deepEqual(rejection(parse, previousWith(RESET_SHOP)), ['unknown_step $.steps[1].type']);
-  assert.deepEqual(rejection(parse, previousWith(READ_ORDER)), ['unknown_step $.steps[1].type']);
-  assert.deepEqual(rejection(parse, { ...signupPlan(), cleanup: [RESET_SHOP] }), ['unknown_field $.cleanup']);
 });
 
 // ---- No call is made for a refused plan -----------------------------------------------------------------

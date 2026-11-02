@@ -158,7 +158,7 @@ export type HandedCommand = { readonly request: unknown; readonly reply: Command
 
 export type RealCommandRun = { readonly result: RunResult; readonly handed: readonly HandedCommand[]; readonly runnerLog: string };
 
-// Parses `steps` into a 1.3 plan, clears it and runs it with cli's real port over runner's real
+// Parses `steps` into a plan, clears it and runs it with cli's real port over runner's real
 // workload runner, with the database secret's value and the host seeded with fake credentials.
 export async function runCommandSteps(projectFile: JsonRecord, steps: readonly JsonRecord[], secretValue: string): Promise<RealCommandRun> {
   const parsed = parseProject(projectFile);

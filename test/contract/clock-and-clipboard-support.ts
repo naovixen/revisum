@@ -1,4 +1,4 @@
-// Shared setup for the browser tests of plan language 1.2's clock advances and clipboard checks:
+// Shared setup for the browser tests of the plan language's clock advances and clipboard checks:
 // the driver parts of each, carried out by the own CDP driver's clock and clipboard ports.
 //
 // It serves the clock-and-clipboard fixture app (fixtures/clock-and-clipboard-app/). Beside the
@@ -41,7 +41,7 @@ export {
 export const SEED = 34;
 // The run's own clock start: 30 October 2026, 12:00 UTC.
 export const CLOCK_START_MILLISECONDS = Date.UTC(2026, 9, 30, 12, 0, 0);
-export const PLAN_LANGUAGE_VERSION = '1.2';
+export const PLAN_LANGUAGE_VERSION = '1.3';
 export const STEP_TIMEOUT_MILLISECONDS = 3000;
 // The longest real time one advanceClock step may take.
 export const MAXIMUM_ADVANCE_REAL_MILLISECONDS = 2000;
@@ -105,7 +105,7 @@ export const frame = (locator: JsonRecord, steps: readonly unknown[]): JsonRecor
 export const capture = (name: string): JsonRecord => ({ type: 'capture', name });
 export const secretValue = (secretName: string): JsonRecord => ({ secretName });
 
-// A raw 1.2 plan for one target. `fields` adds top-level fields, such as `values` or `clock`.
+// A raw plan for one target. `fields` adds top-level fields, such as `values` or `clock`.
 // A plan must assert something; every test plan here does.
 export const clockPlan = (targetId: string, steps: readonly unknown[], fields: JsonRecord = {}): JsonRecord => ({
   version: PLAN_LANGUAGE_VERSION,

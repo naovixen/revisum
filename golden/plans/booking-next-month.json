@@ -1,5 +1,5 @@
 {
-  "version": "1.2",
+  "version": "1.3",
   "meta": { "featureId": "BOOKING-1", "specReference": "specs/booking.md#first-slot", "title": "The first slot of the month can be booked" },
   "targets": ["playwright-chromium"],
   "clock": { "day": { "from": "startOfNextMonth", "addDays": 0 }, "time": "09:00" },

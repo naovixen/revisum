@@ -1,5 +1,5 @@
 {
-  "version": "1.2",
+  "version": "1.3",
   "meta": { "featureId": "EVENTS-1", "specReference": "specs/events.md#sharing", "title": "The event page sends its sharing title and canonical address from the server" },
   "targets": ["playwright-chromium"],
   "steps": [

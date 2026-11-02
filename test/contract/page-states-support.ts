@@ -1,4 +1,4 @@
-// Shared setup for the browser tests of plan language 1.2's page checks, downloads and second
+// Shared setup for the browser tests of the plan language's page checks, downloads and second
 // tab: accessibility states, link targets, head metadata, pages loaded with scripts off, the
 // download step and its checks, and newTab blocks.
 //
@@ -39,7 +39,7 @@ export {
 export const SEED = 31;
 // The run's own clock start: 30 October 2026, 12:00 UTC.
 export const CLOCK_START_MILLISECONDS = Date.UTC(2026, 9, 30, 12, 0, 0);
-export const PLAN_LANGUAGE_VERSION = '1.2';
+export const PLAN_LANGUAGE_VERSION = '1.3';
 export const STEP_TIMEOUT_MILLISECONDS = 2000;
 export const MAXIMUM_DOWNLOAD_BYTES = 64 * 1024;
 
@@ -81,7 +81,7 @@ export const expectDownload = (name: string, assertion: JsonRecord, criterionId:
   ({ type: 'expectDownload', download: name, assert: assertion, criterionId });
 export const newTab = (url: string, steps: readonly unknown[]): JsonRecord => ({ type: 'newTab', url, steps });
 
-// A raw 1.2 plan for one target. `fields` adds top-level fields. A plan must assert something;
+// A raw plan for one target. `fields` adds top-level fields. A plan must assert something;
 // every test plan here does.
 export const pagePlan = (targetId: string, steps: readonly unknown[], fields: JsonRecord = {}): JsonRecord => ({
   version: PLAN_LANGUAGE_VERSION,

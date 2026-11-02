@@ -62,7 +62,7 @@ export function parsedWith(parsePlan: ParsePlan, input: unknown, label: string):
 
 const META = (featureId: string, title: string): JsonRecord => ({ featureId, specReference: `specs/${featureId.toLowerCase()}.md#all`, title });
 const planOf = (featureId: string, title: string, steps: readonly unknown[], extra: JsonRecord = {}): JsonRecord =>
-  ({ version: '1.2', meta: META(featureId, title), targets: [TARGET_ID], ...extra, steps });
+  ({ version: '1.3', meta: META(featureId, title), targets: [TARGET_ID], ...extra, steps });
 
 const role = (name: unknown, roleName: string, position?: unknown): JsonRecord =>
   ({ by: 'role', role: roleName, name, ...(position === undefined ? {} : { position }) });
@@ -281,7 +281,7 @@ function networkStorageClockAndClipboard(): JsonRecord {
 // cleanup, an empty query, a call remembering nothing, and a header text that must be quoted.
 function emptyForms(): JsonRecord {
   return {
-    version: '1.2',
+    version: '1.3',
     meta: { featureId: 'EMPTY-1', specReference: ' specs/empty.md#padded ', title: '"Quoted" title with {braces}, commas: and # ' },
     targets: [TARGET_ID],
     values: {},

@@ -23,7 +23,7 @@ import type { Ran } from './signup-harness.ts';
 
 export const SEED = 11;
 export const FIXED_TIME_MILLISECONDS = Date.UTC(2026, 9, 29, 9, 0, 0);
-export const PLAN_LANGUAGE_VERSION = '1.1';
+export const PLAN_LANGUAGE_VERSION = '1.3';
 
 export const CDP_TARGET = 'cdp-chromium';
 export const HEADLESS_SHELL_TARGET = 'cdp-chromium-headless-shell';

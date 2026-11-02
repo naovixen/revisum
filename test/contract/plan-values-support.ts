@@ -1,4 +1,4 @@
-// Shared setup for the browser tests of plan language 1.2's driver parts: the plan clock,
+// Shared setup for the browser tests of the plan language's driver parts: the plan clock,
 // remembered values, positions, declared test-id attributes, key chords and multi-line fills.
 //
 // It serves the plan-values fixture app (fixtures/plan-values-app/), parses plans written as raw
@@ -31,7 +31,7 @@ import { FIXTURES } from '../support/repository.ts';
 export const SEED = 23;
 // The run's own clock start: 28 October 2026, 12:00 UTC.
 export const CLOCK_START_MILLISECONDS = Date.UTC(2026, 9, 28, 12, 0, 0);
-export const PLAN_LANGUAGE_VERSION = '1.2';
+export const PLAN_LANGUAGE_VERSION = '1.3';
 export const STEP_TIMEOUT_MILLISECONDS = 2000;
 
 export const CDP_TARGET = 'cdp-chromium';
@@ -85,7 +85,7 @@ export const valueEquals = (locator: JsonRecord, value: unknown, criterionId: st
 export const pathStartsWith = (value: string, criterionId: string): JsonRecord =>
   ({ type: 'expectPage', assert: { kind: 'urlPathStartsWith', value }, criterionId });
 
-// A raw 1.2 plan for one target. `fields` adds top-level fields, such as `values` or `clock`.
+// A raw plan for one target. `fields` adds top-level fields, such as `values` or `clock`.
 // A plan must assert something; every test plan here does.
 export const planFor = (targetId: string, steps: readonly unknown[], fields: JsonRecord = {}): JsonRecord => ({
   version: PLAN_LANGUAGE_VERSION,

@@ -65,9 +65,9 @@ test('a value remembered twice is refused as duplicate', () => {
   assert.deepEqual(errors.map((error) => error.split(' ')[0]), ['duplicate']);
 });
 
-test('a remember step may read only text or value', () => {
+test('a remember step may read only text or value, an attribute needing DOM checks enabled', () => {
   const plan = planOf([OPEN_ORDERS, { type: 'remember', name: 'orderNumber', from: { element: ORDER_FIELD, read: 'attribute' } }]);
-  assert.deepEqual(rejection(parsePlan, plan), ['unknown_value $.steps[1].from.read']);
+  assert.deepEqual(rejection(parsePlan, plan), ['unsafe_feature_disabled $.steps[1].from.read']);
 });
 
 // Counter-examples: the same plans in a valid order are accepted.

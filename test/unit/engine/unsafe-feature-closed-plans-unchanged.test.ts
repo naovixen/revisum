@@ -1,8 +1,7 @@
-// Plan language 1.3 changes nothing for a closed plan. With no unsafe feature enabled, every 1.1
-// and 1.2 golden plan parses to the plan it gave before 1.3 existed, byte for byte, and a run of a
-// closed plan gives the result hash and manifest hash it gave then. The hashes in
-// golden/closed-language/hashes.json were recorded from the 1.2 engine before any 1.3 code existed:
-// the plan hash of each golden plan, parsed against the shared test project, and the result and
+// The unsafe features change nothing for a closed plan, one that uses none of them. With no unsafe
+// feature enabled, every golden plan parses to the recorded plan, byte for byte, and a run of a
+// closed plan gives the recorded result hash and manifest hash. The hashes in
+// golden/closed-language/hashes.json are the plan hash of each golden plan, parsed against the shared test project, and the result and
 // manifest hashes of four runs on the recording driver (run-value-examples.ts). The golden report
 // replay (test/replay/golden-report.test.ts) covers the report and its replay hashes.
 //
@@ -31,20 +30,19 @@ test('a plan hash is recorded for every golden plan, and only for those', () => 
 });
 
 for (const name of goldenPlanNames()) {
-  test(`the golden plan "${name}" parses to exactly the plan it gave before 1.3, by plan hash`, () => {
+  test(`the golden plan "${name}" parses to exactly the recorded plan, by plan hash`, () => {
     const parsed = parsePlan(goldenPlan(name));
     assert.ok(parsed.ok, JSON.stringify(parsed));
     assert.equal(planHash(parsed.value), recorded().plans[name]);
   });
 }
 
-test('every golden plan keeps the version it declares once parsed', () => {
+test('every golden plan keeps the current version once parsed', () => {
   for (const name of goldenPlanNames()) {
     const declared = goldenPlan(name)['version'];
     const parsed = parsePlan(goldenPlan(name));
     assert.ok(parsed.ok, name);
     assert.equal(parsed.value.version, declared, name);
-    assert.ok(declared === '1.1' || declared === '1.2', `${name} declares ${String(declared)}: golden/plans/ holds closed plans only`);
   }
 });
 
@@ -61,7 +59,7 @@ test('a run hash is recorded for every run below', () => {
 });
 
 for (const [name, plan] of Object.entries(RECORDED_RUNS)) {
-  test(`a run of "${name}" gives the state, result hash and manifest hash it gave before 1.3`, async () => {
+  test(`a run of "${name}" gives the recorded state, result hash and manifest hash`, async () => {
     const { result } = await runPlan(plan());
     assert.deepEqual({ state: result.state, resultHash: result.resultHash, manifestHash: result.manifestHash }, recorded().runs[name]);
   });

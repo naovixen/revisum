@@ -204,7 +204,7 @@ test('a text draft the reader refuses never reaches the parser', () => {
   assert.deepEqual(log, []);
 });
 
-for (const content of ['{ "version": "1.2", ', 'not JSON at all', '']) {
+for (const content of ['{ "version": "1.3", ', 'not JSON at all', '']) {
   test(`a JSON draft that is not JSON (${JSON.stringify(content)}) is not_object at $, before the parser`, () => {
     const log: CallLog = [];
     const events = memoryEventSink();

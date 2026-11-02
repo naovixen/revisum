@@ -1,8 +1,8 @@
-// Shared setup for the tests of plan language 1.2: run values (generated and remembered), path
+// Shared setup for the tests of the plan language: run values (generated and remembered), path
 // templates, the plan clock, positions, declared test-id attributes, key chords, multi-line text
 // and the URL-prefix check.
 //
-//   - planOf() builds a raw plan declaring "1.2" around the given steps, ending with one check;
+//   - planOf() builds a raw plan around the given steps, ending with one check;
 //   - parserFor() parses against the shared test project (plan-examples.ts), with any 1.2
 //     project fields a test adds, such as testIdAttributes or generatedEmailDomains;
 //   - runPlan() runs a parsed plan through the policy gate and run() on a driver that needs no
@@ -19,20 +19,18 @@ import { ORIGIN, TARGET_ID, testProjectInput, type JsonRecord } from './plan-exa
 
 export { ORIGIN, TARGET_ID, type JsonRecord };
 
-// The language version that holds every feature below.
-export const NEW_VERSION = '1.2';
-// The version before it, which must parse exactly as it always did.
-export const PREVIOUS_VERSION = '1.1';
+// The one version a plan may declare.
+export const CURRENT_VERSION = '1.3';
 
 // The last step of every plan built here: a plan must check something.
 export const CLOSING_CHECK: JsonRecord = {
   type: 'expect', locator: { by: 'testId', testId: 'status' }, assert: { kind: 'visible' }, criterionId: 'orders.status-shown',
 };
 
-// A raw 1.2 plan: the given steps, then CLOSING_CHECK. `fields` adds or replaces top-level
+// A raw plan: the given steps, then CLOSING_CHECK. `fields` adds or replaces top-level
 // fields, such as `values` or `clock`. Step indexes are the given steps' indexes.
 export const planOf = (steps: readonly unknown[], fields: JsonRecord = {}): JsonRecord => ({
-  version: NEW_VERSION,
+  version: CURRENT_VERSION,
   meta: { featureId: 'ORDERS-1', specReference: 'specs/orders.md#new-order', title: 'New order' },
   targets: [TARGET_ID],
   steps: [...steps, CLOSING_CHECK],

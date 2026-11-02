@@ -8,7 +8,7 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import { GOLDEN } from '../../support/repository.ts';
 import { acceptedBy, allBut, disabledPaths, errorsOf, featuresOf, parserEnabling } from './unsafe-feature-examples.ts';
-import { FEATURES, UNSAFE_VERSION, type JsonRecord } from './unsafe-feature-steps.ts';
+import { CURRENT_VERSION, FEATURES, type JsonRecord } from './unsafe-feature-steps.ts';
 
 const FOLDER = join(GOLDEN, 'unsafe-plans');
 const unsafeGoldenPlan = (feature: string): JsonRecord => JSON.parse(readFileSync(join(FOLDER, `${feature}.json`), 'utf8'));
@@ -20,7 +20,7 @@ test('golden/unsafe-plans/ holds one plan per feature, and nothing else', () => 
 for (const feature of FEATURES) {
   test(`the ${feature} golden plan declares 1.3, parses against the unsafe project and uses exactly ${feature}`, () => {
     const raw = unsafeGoldenPlan(feature);
-    assert.equal(raw['version'], UNSAFE_VERSION);
+    assert.equal(raw['version'], CURRENT_VERSION);
     assert.deepEqual(featuresOf(acceptedBy(parserEnabling(FEATURES), raw)), [feature]);
   });
 

@@ -87,7 +87,7 @@ function currentLanguageCases(): readonly HostilePlan[] {
   return [
     { name: 'eval step hidden inside a frame', input: withSteps(frame({ type: 'eval', code: 'fetch("/admin")' })), code: 'unknown_step' },
     { name: 'exfiltrating navigation inside a frame', input: withSteps(frame(navigate('https://attacker.example/collect'))), code: 'origin_not_allowed' },
-    { name: 'CSS selector on a hover step', input: withSteps({ type: 'hover', locator: { by: 'css', selector: '#menu' } }), code: 'unknown_value' },
+    { name: 'CSS selector on a hover step', input: withSteps({ type: 'hover', locator: { by: 'css', selector: '#menu' } }), code: 'unsafe_feature_disabled' },
     { name: 'script in a select option', input: withSteps({ type: 'select', locator: { by: 'label', label: 'Country' }, option: '<script>steal()</script>' }), code: 'unsafe_text' },
     { name: 'bidirectional override in a dialog\'s expected text', input: withSteps({ type: 'dialog', action: 'accept', expectText: 'Delete‮ evil' }), code: 'unsafe_text' },
     { name: 'invented dialog action', input: withSteps({ type: 'dialog', action: 'type', expectText: 'Name?' }), code: 'unknown_value' },

@@ -38,7 +38,7 @@ const projectInput = (limits: Readonly<Record<string, number>> = {}, policy: Jso
   policyProjectInput({ services: SERVICES, calls: CALLS, limits: { stepTimeoutMilliseconds: 2000, ...limits }, policy: { ...POLICY, ...policy } });
 
 const newerPlan = (steps: readonly unknown[], cleanup?: readonly unknown[]): JsonRecord =>
-  ({ ...planOf(steps), version: '1.2', ...(cleanup === undefined ? {} : { cleanup }) });
+  ({ ...planOf(steps), version: '1.3', ...(cleanup === undefined ? {} : { cleanup }) });
 
 const call = (name: string): JsonRecord => ({ type: 'call', call: name, arguments: {} });
 const readOrderStatus: JsonRecord = {

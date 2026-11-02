@@ -39,10 +39,10 @@ test('the lint fails when engine code outside the parser casts plan data to Plan
 });
 
 test('the lint fails when engine code beside the parser brands a Plan with the brand helper', { timeout: TIMEOUT }, () => {
-  assertLintFailsOn('packages/engine/src/plan/planted-plan-migration.ts', [
+  assertLintFailsOn('packages/engine/src/plan/planted-plan-brand.ts', [
     "import type { PlanData } from '@revisum/contracts';",
     "import { brand } from '../brand.ts';",
-    "export const migratedPlan = (data: PlanData) => brand<PlanData, 'Plan'>(data);",
+    "export const brandedPlan = (data: PlanData) => brand<PlanData, 'Plan'>(data);",
   ]);
 });
 

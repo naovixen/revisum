@@ -106,7 +106,7 @@ export const CLOSING_CHECK: JsonRecord = {
 
 // A raw plan: the given steps, then CLOSING_CHECK. Step indexes are the given steps' indexes.
 export const planOf = (steps: readonly unknown[], targets: readonly string[] = [ENGLISH]): JsonRecord => ({
-  version: '1.1',
+  version: '1.3',
   meta: { featureId: 'ACCOUNT-1', specReference: 'specs/account.md#settings', title: 'Account settings' },
   targets,
   steps: [...steps, CLOSING_CHECK],

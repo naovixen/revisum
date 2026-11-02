@@ -1,5 +1,5 @@
 // Shared setup for the tests of advancing the run's virtual clock and checking the clipboard
-// (plan language 1.2):
+//:
 //
 //   - advanceClock() builds the step that moves the page's clock forward by a whole amount of a
 //     unit, in the default runTimers mode or in the mode given;
@@ -12,7 +12,7 @@
 import assert from 'node:assert/strict';
 import type { JsonRecord } from './run-value-examples.ts';
 
-export { NEW_VERSION, OPEN_ORDERS, ORIGIN, PREVIOUS_VERSION, accepted, parserFor, planOf, rejection, type JsonRecord, type ParsePlan } from './run-value-examples.ts';
+export { CURRENT_VERSION, OPEN_ORDERS, ORIGIN, accepted, parserFor, planOf, rejection, type JsonRecord, type ParsePlan } from './run-value-examples.ts';
 
 export const SECOND = 1000;
 export const MINUTE = 60 * SECOND;

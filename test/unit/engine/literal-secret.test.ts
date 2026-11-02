@@ -17,7 +17,7 @@ const parse = planParser(project);
 
 // A plan whose step 1 is `step`, with `meta` fields replaced by `metaFields`.
 const planWith = (step: unknown, metaFields: Readonly<Record<string, string>> = {}) => ({
-  version: '1.1',
+  version: '1.3',
   meta: { featureId: 'SECRETS-3', specReference: 'specs/secrets.md#literals', title: 'Sign in', ...metaFields },
   targets: [FAKE_TARGET],
   steps: [

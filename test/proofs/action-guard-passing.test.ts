@@ -31,7 +31,7 @@ const label = (text: string) => ({ by: 'label', label: text });
 const role = (roleName: string, name: string) => ({ by: 'role', role: roleName, name });
 
 const PLAN = {
-  version: '1.1',
+  version: '1.3',
   meta: { featureId: 'DRAFTS-1', specReference: 'specs/drafts.md#save', title: 'Save a draft' },
   targets: [TARGET_ID],
   steps: [

@@ -54,7 +54,7 @@ const DRAFT_LINES = [
   'Plan: Contact the shop',
   'Feature: EXPLORE-1',
   'Spec: pages/lantern-books',
-  'Version: 1.1',
+  'Version: 1.3',
   'Targets: explore-chromium',
   'Go to /contact',
   'Criterion: AC-1',
@@ -140,7 +140,7 @@ test('counter-example: the same missing locator before the click gives locator-n
 
 for (const changing of ['Press Enter in label "Display name"', 'Select "Reader" in label "Display name"', 'Accept dialog']) {
   test(`a locator after "${changing}" on the same page is not checked`, async () => {
-    const lines = ['Plan: After a change', 'Feature: EXPLORE-1', 'Spec: pages/lantern-books', 'Version: 1.1', 'Targets: explore-chromium', 'Go to /contact', changing, 'Criterion: AC-1', 'Expect button "Nowhere at all" is visible'];
+    const lines = ['Plan: After a change', 'Feature: EXPLORE-1', 'Spec: pages/lantern-books', 'Version: 1.3', 'Targets: explore-chromium', 'Go to /contact', changing, 'Criterion: AC-1', 'Expect button "Nowhere at all" is visible'];
     assert.deepEqual(await warningsFor(`${lines.join('\n')}\n`), []);
   });
 }

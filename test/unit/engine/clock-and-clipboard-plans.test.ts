@@ -1,4 +1,4 @@
-// The plan grammar for advancing the clock and checking the clipboard (plan language 1.2). A plan
+// The plan grammar for advancing the clock and checking the clipboard. A plan
 // may move the run's virtual clock forward by a whole amount of a unit, in runTimers or skipAhead
 // mode, check the clipboard's plain text with textEquals, textContains or textExcludes, and
 // remember it as a run value. Nothing a plan writes can sleep, wait real time, move the clock
@@ -10,11 +10,11 @@ import { arch, platform } from 'node:os';
 import { afterEach, beforeEach, test } from 'node:test';
 import { defaultRedactor, failure, runUntrusted, type BrowserDriver, type PlanErrorCode } from '@revisum/engine';
 import { memoryArtifactStore, memoryEventSink, memoryRunEventSink, systemClock } from '../../support/memory-ports.ts';
-import { PRIVATE_MARKER, defaultParser, signupPlan, stepsOf } from './plan-examples.ts';
+import { PRIVATE_MARKER } from './plan-examples.ts';
 import { projectWith } from './run-value-examples.ts';
 import { fakeServiceCaller } from './service-call-examples.ts';
 import {
-  COPY_LINK, OPEN_ORDERS, ORIGIN, PREVIOUS_VERSION, accepted, advanceClock, assertRefusedInside, expectClipboard, frame, newTab,
+  COPY_LINK, OPEN_ORDERS, ORIGIN, accepted, advanceClock, assertRefusedInside, expectClipboard, frame, newTab,
   parserFor, planOf, rejection, rememberClipboard, type JsonRecord,
 } from './clock-and-clipboard-examples.ts';
 
@@ -253,26 +253,6 @@ test('a clipboard value remembered under the name of a generated value is refuse
 // Counter-example for the refusals above: the closing check alone, with the page opened, parses.
 test('counter-example: the plan around every refused step parses without it', () => {
   accepted(parsePlan, planOf([OPEN_ORDERS]));
-});
-
-// ---- Version 1.1 ----------------------------------------------------------------------------------
-
-test('a plan declaring 1.1 that advances the clock, checks the clipboard or remembers it is refused as a 1.1 parser refuses it', () => {
-  const parse = defaultParser();
-  assert.equal(signupPlan()['version'], PREVIOUS_VERSION);
-  const previousWith = (added: JsonRecord): JsonRecord => {
-    const steps = [...stepsOf(signupPlan())];
-    steps.splice(1, 0, added);
-    return { ...signupPlan(), steps };
-  };
-  for (const step of [advanceClock(10, 'minutes'), advanceClock(10, 'minutes', 'skipAhead'), expectClipboard('textContains', '/invite/'), rememberClipboard('inviteLink')]) {
-    assert.deepEqual(rejection(parse, previousWith(step)), ['unknown_step $.steps[1].type'], JSON.stringify(step));
-  }
-});
-
-// Counter-example: the same 1.1 plan without the added step parses.
-test('counter-example: the 1.1 sign-up plan parses unchanged', () => {
-  accepted(defaultParser(), signupPlan());
 });
 
 // ---- No driver, network or service call for a refused plan -----------------------------------------

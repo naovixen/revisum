@@ -17,8 +17,8 @@ import {
 const EVIL_URL = `http://${EVIL_HOST}/collect`;
 
 // The recorded draft with lines added after its last check, and the written line of the first.
-function obeyingDraft(added: readonly string[], version = '1.1'): { readonly text: string; readonly line: number } {
-  const lines = PLANNER_DRAFT.replace('Version: 1.1', `Version: ${version}`).split('\n');
+function obeyingDraft(added: readonly string[]): { readonly text: string; readonly line: number } {
+  const lines = PLANNER_DRAFT.split('\n');
   const anchor = lines.indexOf('Expect heading "Pricing" is visible');
   assert.ok(anchor !== -1);
   lines.splice(anchor + 1, 0, ...added);
@@ -26,7 +26,7 @@ function obeyingDraft(added: readonly string[], version = '1.1'): { readonly tex
 }
 
 const GOES_ELSEWHERE = obeyingDraft([`Go to ${EVIL_URL}`, 'Criterion: AC-4', 'Expect heading "Collected" is visible']);
-const RUNS_SCRIPT = obeyingDraft(['Unsafe: Run page script readCookies'], '1.3');
+const RUNS_SCRIPT = obeyingDraft(['Unsafe: Run page script readCookies']);
 
 const hostile = (draft: string, extra: Partial<ExploreSetup> = {}): ExploreSetup => ({
   argv: (site) => exploreArguments(`${site.origin}/`, ['--host', '--json']),

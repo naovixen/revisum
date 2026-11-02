@@ -10,7 +10,7 @@ import {
   type JsonRecord,
 } from './policy-examples.ts';
 
-const newerPlan = (steps: readonly unknown[]): JsonRecord => ({ ...planOf(steps), version: '1.2' });
+const newerPlan = (steps: readonly unknown[]): JsonRecord => ({ ...planOf(steps), version: '1.3' });
 
 const ADVANCE: JsonRecord = { type: 'advanceClock', by: { amount: 10, unit: 'minutes' } };
 const SKIP_AHEAD: JsonRecord = { type: 'advanceClock', by: { amount: 1, unit: 'hours' }, mode: 'skipAhead' };

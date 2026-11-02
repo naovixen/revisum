@@ -14,10 +14,10 @@
 import assert from 'node:assert/strict';
 import { parseProject, planParser, type Project } from '@revisum/engine';
 import {
-  NEW_VERSION, ORIGIN, TARGET_ID, planOf, projectFileWith, type JsonRecord, type ParsePlan,
+  CURRENT_VERSION, ORIGIN, TARGET_ID, planOf, projectFileWith, type JsonRecord, type ParsePlan,
 } from './run-value-examples.ts';
 
-export { NEW_VERSION, ORIGIN, TARGET_ID, planOf, type JsonRecord };
+export { CURRENT_VERSION, ORIGIN, TARGET_ID, planOf, type JsonRecord };
 
 // The shared test project's shop service: a declared service, so a matcher may name its origin.
 export const SHOP_ORIGIN = 'http://127.0.0.1:4180';

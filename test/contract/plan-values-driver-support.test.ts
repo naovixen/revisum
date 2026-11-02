@@ -1,4 +1,4 @@
-// Which driver performs the driver parts of plan language 1.2. The own CDP driver performs a
+// Which driver performs the driver parts of the plan language. The own CDP driver performs a
 // remember step, a positioned locator and a key chord. With the feature taken off its list, and
 // nothing else changed, the run refuses each of them with unsupported-step, sending nothing: the
 // run fails that step and skips the rest, and the fixture page (fixtures/plan-values-app/remember.html)

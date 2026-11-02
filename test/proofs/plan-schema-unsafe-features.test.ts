@@ -1,5 +1,4 @@
-// Opening plan language 1.3 dates the 1.2 entry of the changelog, since every 1.2 parser part has
-// landed, and adds one "1.3" entry naming each new locator, check, step, project setting and error
+// The changelog has one "1.3" entry naming each new locator, check, step, project setting and error
 // code, in code type, with the schema's sha256. That the newest entry names the committed schema's
 // hash is checked in plan-schema-check.test.ts.
 import assert from 'node:assert/strict';
@@ -21,10 +20,6 @@ const NAMED_IN_ENTRY = [
   // Error codes.
   'unsafe_feature_disabled', 'inline-script-in-proposal', 'no-readable-form',
 ];
-
-test('the 1.2 changelog entry is dated once 1.3 is open', () => {
-  assert.match(changelogEntry('1.2'), /^## 1\.2 \(\d{4}-\d{2}-\d{2}/);
-});
 
 test('the changelog has one 1.3 entry, unreleased or dated, with a schema sha256', () => {
   const entry = changelogEntry('1.3');

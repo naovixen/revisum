@@ -1,4 +1,0 @@
-{
-  "$.steps[1]": "environment.locale-pinned",
-  "$.steps[2]": "environment.timezone-pinned"
-}

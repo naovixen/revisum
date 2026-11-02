@@ -62,7 +62,7 @@ function plant(content: string): string {
 // never equal, so the failed step keeps what it observed.
 async function observedAfterEcho(secretValue: string, text: string): Promise<{ readonly observed: string; readonly everything: string }> {
   const plan = {
-    version: '1.1',
+    version: '1.3',
     meta: { featureId: 'SECRETS-6', specReference: 'specs/secrets.md#encodings', title: 'Encoded echoes' },
     targets: [FAKE_TARGET],
     steps: [

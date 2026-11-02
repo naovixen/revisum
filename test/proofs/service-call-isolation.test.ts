@@ -152,17 +152,16 @@ test('the 1.2 changelog entry names the call steps, settings and codes, in code 
   assert.deepEqual(NAMED_IN_ENTRY.filter((name) => !entry.includes(`\`${name}\``)), [], 'names the 1.2 entry leaves out');
 });
 
-// ---- A 1.2 golden plan for calls --------------------------------------------------------------------
+// ---- A golden plan for calls --------------------------------------------------------------------
 
-test('a 1.2 golden plan uses a call that remembers a field, an expectBackend and cleanup', () => {
+test('a golden plan uses a call that remembers a field, an expectBackend and cleanup', () => {
   const folder = join(REPOSITORY_ROOT, 'golden', 'plans');
   const plans = readdirSync(folder).filter((name) => name.endsWith('.json'))
-    .map((name): Record<string, unknown> => JSON.parse(readFileSync(join(folder, name), 'utf8')))
-    .filter((plan) => plan['version'] === '1.2');
+    .map((name): Record<string, unknown> => JSON.parse(readFileSync(join(folder, name), 'utf8')));
   const stepsOf = (plan: Record<string, unknown>): Record<string, unknown>[] => (Array.isArray(plan['steps']) ? plan['steps'] : []);
   const uses = plans.filter((plan) =>
     stepsOf(plan).some((step) => step['type'] === 'call' && step['remember'] !== undefined)
     && stepsOf(plan).some((step) => step['type'] === 'expectBackend')
     && Array.isArray(plan['cleanup']) && plan['cleanup'].length > 0);
-  assert.ok(uses.length > 0, 'no 1.2 golden plan uses calls, a backend check and cleanup');
+  assert.ok(uses.length > 0, 'no golden plan uses calls, a backend check and cleanup');
 });

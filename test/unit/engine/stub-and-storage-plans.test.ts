@@ -1,4 +1,4 @@
-// The plan grammar for declared stubs, request checks and storage (plan language 1.2). A plan may
+// The plan grammar for declared stubs, request checks and storage. A plan may
 // start and stop a stub, reset and check the requests a declared matcher sees, check or remember a
 // field of the latest response, and write, remove or check a storage entry, each only by the name
 // the trusted project declares, with arguments typed by the declaration. Nothing a plan writes can
@@ -9,8 +9,8 @@ import { arch, platform } from 'node:os';
 import { test } from 'node:test';
 import { defaultRedactor, failure, runUntrusted, type BrowserDriver, type PlanErrorCode } from '@revisum/engine';
 import { memoryArtifactStore, memoryEventSink, memoryRunEventSink, systemClock } from '../../support/memory-ports.ts';
-import { PRIVATE_MARKER, defaultParser, signupPlan, stepsOf } from './plan-examples.ts';
-import { PREVIOUS_VERSION, accepted, rejection, type ParsePlan } from './run-value-examples.ts';
+import { PRIVATE_MARKER } from './plan-examples.ts';
+import { accepted, rejection, type ParsePlan } from './run-value-examples.ts';
 import {
   ORIGIN, TOKEN_SECRET, asJson, expectRequests, expectResponse, expectStorage, planOf, rememberResponse, removeStorage, resetRequests,
   setStorage, startStub, stopStub, stubParser, stubProject, type JsonRecord,
@@ -235,25 +235,6 @@ test('an assertion step of this spec without a criterion id is refused', () => {
     const { criterionId: _removed, ...untraced } = step;
     const errors = rejection(parsePlan, planOf([OPEN_LOGIN, untraced]));
     assertRefusedInside(errors, '$.steps[1]', String(step['type']));
-  }
-});
-
-// ---- Version 1.1 ----------------------------------------------------------------------------------
-
-test('a plan declaring 1.1 that uses any step of this spec is refused with unknown_step, as a 1.1 parser refuses it', () => {
-  const parse = defaultParser();
-  assert.equal(signupPlan()['version'], PREVIOUS_VERSION);
-  const previousWith = (added: JsonRecord): JsonRecord => {
-    const steps = [...stepsOf(signupPlan())];
-    steps.splice(1, 0, added);
-    return { ...signupPlan(), steps };
-  };
-  for (const step of [
-    startStub('cartEmpty'), stopStub('cartEmpty'), resetRequests('likes'), expectRequests('likes', { atLeast: 1 }),
-    expectResponse('likes', { kind: 'statusEquals', value: 200 }), rememberResponse('likeCount', 'likes', 'likeList', 'arrayLength'),
-    setStorage('pinnedMenu', { docked: true }), removeStorage('pinnedMenu'), expectStorage('privateKey', { kind: 'present' }),
-  ]) {
-    assert.deepEqual(rejection(parse, previousWith(step)), ['unknown_step $.steps[1].type'], String(step['type']));
   }
 });
 

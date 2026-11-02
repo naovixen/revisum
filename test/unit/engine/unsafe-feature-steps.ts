@@ -1,18 +1,12 @@
 // The plan parts and project declarations the unsafe-feature tests share, as plain JSON a person
-// writes. This module imports nothing the engine does not export today, so the recorded refusals of
-// the 1.2 and 1.1 parsers (unsafe-feature-previous-versions.test.ts) were taken from these exact
-// values before any 1.3 code existed.
+// writes.
 //
-// Plan language 1.3 adds six features, each off unless the trusted project.json enables it under
+// The plan language has six unsafe features, each off unless the trusted project.json enables it under
 // `unsafeFeatures`: css locators, XPath locators, DOM checks, named page scripts, inline page
 // scripts (which need named page scripts too) and database commands.
-import { ORIGIN, TARGET_ID, TEST_SERVICE, TEST_SERVICE_SECRET_NAMES, testProjectInput, type JsonRecord } from './plan-examples.ts';
+import { CURRENT_VERSION, ORIGIN, TARGET_ID, TEST_SERVICE, TEST_SERVICE_SECRET_NAMES, testProjectInput, type JsonRecord } from './plan-examples.ts';
 
-export { ORIGIN, TARGET_ID, type JsonRecord };
-
-// The language version that holds the unsafe features, and the two before it.
-export const UNSAFE_VERSION = '1.3';
-export const CLOSED_VERSIONS = ['1.2', '1.1'] as const;
+export { CURRENT_VERSION, ORIGIN, TARGET_ID, type JsonRecord };
 
 // The six features, as the spec names them, in the order it lists them.
 export const FEATURES = ['css-locator', 'xpath-locator', 'dom-checks', 'page-script', 'inline-page-script', 'database-command'] as const;
@@ -168,14 +162,13 @@ export const CLOSING_CHECK: JsonRecord = {
 
 // A raw plan declaring `version`: the given steps, then CLOSING_CHECK. Step indexes are the given
 // steps' indexes. `fields` adds or replaces top-level fields, such as `cleanup`.
-export const planIn = (version: string, steps: readonly unknown[], fields: JsonRecord = {}): JsonRecord => ({
-  version,
+export const unsafePlan = (steps: readonly unknown[], fields: JsonRecord = {}): JsonRecord => ({
+  version: CURRENT_VERSION,
   meta: { featureId: 'CART-1', specReference: 'specs/cart.md#totals', title: 'Cart totals' },
   targets: [TARGET_ID],
   steps: [...steps, CLOSING_CHECK],
   ...fields,
 });
-export const unsafePlan = (steps: readonly unknown[], fields: JsonRecord = {}): JsonRecord => planIn(UNSAFE_VERSION, steps, fields);
 
 // One plan per feature, using that feature and no other, with the JSON path of its one use.
 export type FeatureExample = { readonly feature: FeatureName; readonly steps: readonly JsonRecord[]; readonly path: string };

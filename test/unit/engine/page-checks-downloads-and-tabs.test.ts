@@ -1,4 +1,4 @@
-// The grammar of plan language 1.2's page checks, downloads and second tab: accessibility state
+// The grammar of the plan language's page checks, downloads and second tab: accessibility state
 // checks, the link-target check, head metadata with a server-rendered view, the download and
 // expectDownload steps, and newTab, which only the top level of a plan may hold. What a browser
 // does with them (the state read from the accessibility tree, the head the server sent, the

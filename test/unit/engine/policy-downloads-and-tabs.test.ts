@@ -11,8 +11,8 @@ import {
   parsedPlan, planOf, role, stepAt, testGate, testId, type JsonRecord,
 } from './policy-examples.ts';
 
-const NEW_VERSION = '1.2';
-const newerPlan = (steps: readonly unknown[]): JsonRecord => ({ ...planOf(steps), version: NEW_VERSION });
+const CURRENT_VERSION = '1.3';
+const newerPlan = (steps: readonly unknown[]): JsonRecord => ({ ...planOf(steps), version: CURRENT_VERSION });
 const download = (locator: JsonRecord): JsonRecord => ({ type: 'download', name: 'account-export', locator });
 const newTab = (url: string, steps: readonly unknown[]): JsonRecord => ({ type: 'newTab', url, steps });
 const TAB_CHECK: JsonRecord = {

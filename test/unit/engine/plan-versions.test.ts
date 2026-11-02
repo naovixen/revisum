@@ -1,5 +1,6 @@
-// A plan written for a newer language than the running engine knows is rejected, never run with
-// the unknown parts skipped: a skipped check would turn into a silent pass.
+// The plan language has one version. A plan declaring any other, older or newer, is rejected, never
+// run with the parts this engine reads differently skipped: a skipped check would turn into a
+// silent pass.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { arch, platform } from 'node:os';
@@ -18,7 +19,6 @@ const parsePlan = defaultParser();
 
 // Step types a later language version or a later phase may add. The running engine knows none.
 const NEWER_STEPS: readonly JsonRecord[] = [
-  { type: 'download', locator: { by: 'role', role: 'link', name: 'Export' } },
   { type: 'popup', locator: { by: 'role', role: 'button', name: 'Open help' } },
   { type: 'switchPage', index: 1 },
   { type: 'drag', locator: { by: 'label', label: 'Card' }, to: { by: 'label', label: 'Done' } },
@@ -30,10 +30,10 @@ const insertAt = (plan: JsonRecord, index: number, step: JsonRecord): JsonRecord
   return { ...plan, steps };
 };
 
-// ---- A newer declared version -------------------------------------------------------------------
+// ---- Any other declared version -----------------------------------------------------------------
 
-for (const version of futureVersions()) {
-  test(`rejects a plan that declares the newer version ${version} with version_unsupported`, () => {
+for (const version of [...futureVersions(), '1.2', '1.1', '1']) {
+  test(`rejects a plan that declares the version ${version} with version_unsupported`, () => {
     const parsed = parsePlan({ ...signupPlan(), version });
     assert.deepEqual(parsed, { ok: false, error: [{ code: 'version_unsupported', path: '$.version' }] });
   });
@@ -61,7 +61,7 @@ test('rejects a newer step nested inside a frame rather than skipping it', () =>
 
 test('rejects a newer step even when it comes after every assertion', () => {
   const plan = signupPlan();
-  const parsed = parsePlan(insertAt(plan, stepsOf(plan).length, { type: 'download', locator: { by: 'text', text: 'Receipt' } }));
+  const parsed = parsePlan(insertAt(plan, stepsOf(plan).length, { type: 'popup', locator: { by: 'text', text: 'Receipt' } }));
   assert.deepEqual(parsed, { ok: false, error: [{ code: 'unknown_step', path: `$.steps[${stepsOf(plan).length}].type` }] });
 });
 

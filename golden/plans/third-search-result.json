@@ -1,5 +1,5 @@
 {
-  "version": "1.2",
+  "version": "1.3",
   "meta": { "featureId": "DOCS-2", "specReference": "specs/search.md#results", "title": "Results open in the order listed" },
   "targets": ["playwright-chromium"],
   "steps": [

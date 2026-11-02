@@ -1,4 +1,4 @@
-// Which driver performs the page checks, downloads and second tab of plan language 1.2. The own
+// Which driver performs the page checks, downloads and second tab of the plan language. The own
 // CDP driver performs them all, so the same plans pass there. With the feature taken off its
 // list, and nothing else changed, a run with any of them fails that step with unsupported-step,
 // never a partial result, and skips the rest. Nothing of the step reaches the page: no input event

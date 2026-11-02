@@ -55,7 +55,7 @@ after(async () => {
 // Types `value` into the token field, shows the echoes, keeps a screenshot, then checks one echo
 // against a text it can never equal, so the failed step keeps what it observed.
 const echoPlan = (targetId: string, echo: string, value: unknown, field = 'Access token') => ({
-  version: '1.1',
+  version: '1.3',
   meta: { featureId: 'SECRETS-2', specReference: 'specs/secrets.md#echoes', title: `Token echo: ${echo}` },
   targets: [targetId],
   steps: [

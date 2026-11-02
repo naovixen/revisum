@@ -103,9 +103,9 @@ const testId = (id: string) => ({ by: 'testId', testId: id });
 export const NAME = 'Ada Lovelace';
 export const EMAIL = 'ada@example.test';
 
-// Plans are written in version "1.1" of the plan language: every assertion carries the id of the
+// Plans are written in the one version of the plan language: every assertion carries the id of the
 // acceptance criterion it checks, and a plan with no assertion is rejected as vacuous.
-export const PLAN_LANGUAGE_VERSION = '1.1';
+export const PLAN_LANGUAGE_VERSION = '1.3';
 
 export const signupPlan = (targets: readonly string[]) => ({
   version: PLAN_LANGUAGE_VERSION,

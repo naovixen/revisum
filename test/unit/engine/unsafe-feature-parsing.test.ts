@@ -1,4 +1,4 @@
-// The one plan parser reads which unsafe features the trusted project enables. A 1.3 plan that uses
+// The one plan parser reads which unsafe features the trusted project enables. A plan that uses
 // a feature its project leaves off is refused with unsafe_feature_disabled at every path where the
 // feature appears, echoing nothing from the plan, and nothing runs. Inline scripts need both page
 // scripts and inline scripts enabled. A css selector or XPath expression is literal, single-line

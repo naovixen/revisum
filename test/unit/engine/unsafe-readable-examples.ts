@@ -373,6 +373,6 @@ export function generatedUnsafePlans(firstSeed: number, count: number): readonly
 
 // ---- Small plans for the error tests ----------------------------------------------------------------
 
-// A 1.3 plan holding `steps`, then the closing check, under the shared headers.
+// A plan holding `steps`, then the closing check, under the shared headers.
 export const smallUnsafePlan = (steps: readonly unknown[], fields: JsonRecord = {}): JsonRecord => unsafePlan(steps, fields);
 export { CLOSING_CHECK, OPEN_CART };
