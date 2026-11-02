@@ -13,7 +13,7 @@ The founder's checklist and the build queue.
 Architecture refactor:
 
 - [x] Phase 0: measure the baseline and set the written conventions (`docs/decisions/refactor-baseline.md`)
-- [ ] Phase 1: cut, reset the goldens once, then freeze them
+- [x] Phase 1: cut, reset the goldens once, then freeze them
 - [ ] Phase 2: fast tests; the founder pushes and CI takes 10 minutes or less
 - [ ] Phase 3: cold bug review, fixes, then ground the core
 - [ ] Phase 4: move files, constants for magic strings, formatting

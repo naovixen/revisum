@@ -45,6 +45,7 @@ Status is one of: `suspected`, `fixed`, `deferred`, `not a bug`.
 | 22 | Some run-time codes have no union or docs heading (`a11y-violations`, `adapter-error`, `expected-failure`, `spec-ambiguous`, Unavailable reasons such as `launch-failed`), and `assertion-failed`'s heading covers only the dialog case | `docs/errors.md`, `engine/src/run.ts` | suspected | Phase 3, with finding 8 |
 | 23 | The export cleanup removed `Success` and `Failure` from the public API, though `Result` is built from them and SPEC-27 declares them. Its check covered only M3 and M4 specs. Only the full run caught it | `contracts/src/index.ts` | fixed | Exports restored. Other removals could share this gap: phase 3's review checks them against every built spec |
 | 24 | `test/proofs/shared-types.test.ts` reads a spec's type block, so a proof depends on a spec document, against the rule that tests stand alone | `test/proofs/shared-types.test.ts` | suspected | Phase 3: pin the public types directly |
+| 25 | The Linux half of the host clipboard proof has never run: it needs `xclip`, which nothing installed. CI now installs it, so the first push runs this proof on Linux for the first time | `test/contract/host-clipboard.ts:250-258`, `tools/install-system-libraries.sh` | suspected | Watch the first push; rebuild the dev container so `check:linux` runs it too |
 
 ## Risks
 
