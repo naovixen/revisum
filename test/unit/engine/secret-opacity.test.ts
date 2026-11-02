@@ -1,6 +1,5 @@
 // A Secret is opaque: serialising, printing or inspecting it gives "[secret]", never its value.
 // Only allow-listed modules may reveal it (secret-reveal-lint.test.ts in test/proofs).
-// See docs/specs/SPEC-04-secrets-and-redaction.md.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { format, inspect } from 'node:util';
@@ -8,7 +7,7 @@ import { echoesIn, fakeEnvironmentStore, fakeSecretValue, resolvedSecret, secret
 
 const PLACEHOLDER = '[secret]';
 
-test('JSON.stringify of a secret gives "[secret]", alone and inside other values', { criterion: 'AC-SPEC-04-01' }, () => {
+test('JSON.stringify of a secret gives "[secret]", alone and inside other values', () => {
   const value = fakeSecretValue();
   const secret = resolvedSecret('ACCOUNT_TOKEN', value);
   assert.equal(JSON.stringify(secret), JSON.stringify(PLACEHOLDER));
@@ -17,7 +16,7 @@ test('JSON.stringify of a secret gives "[secret]", alone and inside other values
   assert.equal(JSON.stringify({ token: secret }, null, 2).includes(value), false);
 });
 
-test('String() and template literals of a secret give "[secret]"', { criterion: 'AC-SPEC-04-01' }, () => {
+test('String() and template literals of a secret give "[secret]"', () => {
   const value = fakeSecretValue();
   const secret = resolvedSecret('ACCOUNT_TOKEN', value);
   assert.equal(String(secret), PLACEHOLDER);
@@ -26,7 +25,7 @@ test('String() and template literals of a secret give "[secret]"', { criterion: 
   assert.equal(secret.toString(), PLACEHOLDER);
 });
 
-test('util.inspect of a secret gives "[secret]", even with hidden properties shown at full depth', { criterion: 'AC-SPEC-04-01' }, () => {
+test('util.inspect of a secret gives "[secret]", even with hidden properties shown at full depth', () => {
   const value = fakeSecretValue();
   const secret = resolvedSecret('ACCOUNT_TOKEN', value);
   assert.equal(inspect(secret), PLACEHOLDER);
@@ -38,7 +37,7 @@ test('util.inspect of a secret gives "[secret]", even with hidden properties sho
   }
 });
 
-test('a secret exposes its name but no form of its value through its own properties', { criterion: 'AC-SPEC-04-01' }, () => {
+test('a secret exposes its name but no form of its value through its own properties', () => {
   const value = fakeSecretValue();
   const secret = resolvedSecret('ACCOUNT_TOKEN', value);
   assert.equal(secret.name, secretName('ACCOUNT_TOKEN'));
@@ -47,7 +46,7 @@ test('a secret exposes its name but no form of its value through its own propert
   assert.deepEqual(echoesIn(JSON.stringify(Object.entries(secret)), value), []);
 });
 
-test('control: the store does hold the value, so the checks above are not vacuous', { criterion: 'AC-SPEC-04-01' }, () => {
+test('control: the store does hold the value, so the checks above are not vacuous', () => {
   // The same environment variable resolves, and a different name does not: the store read the value.
   const value = fakeSecretValue();
   const store = fakeEnvironmentStore({ ACCOUNT_TOKEN: value });

@@ -8,7 +8,6 @@
 //   4 shop, fresh: a class check (shop enables it); 5 docs, fresh: a closed plan written in 1.3.
 // The study report names the second share's fields shareWithUnsafeFeatures and
 // shareWithUnsafeFeaturesBySample; only this file reads them.
-// See docs/specs/SPEC-36-unsafe-plan-features.md and docs/specs/SPEC-01-plan-language-and-parser.md.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -31,7 +30,7 @@ const shares = (report: CoverageReport) => ({
   withUnsafeFeatures: { overall: report.shareWithUnsafeFeatures, ...report.shareWithUnsafeFeaturesBySample },
 });
 
-test('the closed share and the share with unsafe features are reported side by side, overall and per sample', { criterion: 'AC-SPEC-36-19' }, () => {
+test('the closed share and the share with unsafe features are reported side by side, overall and per sample', () => {
   assert.deepEqual(shares(assessed(study())), {
     // Intents 0 and 5: a closed plan, whatever version it declares.
     closed: { overall: 2 / 6, original: 1 / 4, fresh: 1 / 2 },
@@ -40,7 +39,7 @@ test('the closed share and the share with unsafe features are reported side by s
   });
 });
 
-test('an intent whose plan uses a feature its suite does not enable counts toward neither share, with a new reason', { criterion: 'AC-SPEC-36-19' }, () => {
+test('an intent whose plan uses a feature its suite does not enable counts toward neither share, with a new reason', () => {
   const intent = assessed(study()).intents[3];
   assert.ok(intent !== undefined);
   assert.equal(intent.verdict, 'not-expressible');
@@ -49,19 +48,19 @@ test('an intent whose plan uses a feature its suite does not enable counts towar
 
 // Metamorphic: moving that intent to the suite that enables css makes it count, in the second
 // share only; nothing in its plan changes.
-test('moving it to the suite that enables css counts it toward the share with unsafe features, and not the closed share', { criterion: 'AC-SPEC-36-19' }, () => {
+test('moving it to the suite that enables css counts it toward the share with unsafe features, and not the closed share', () => {
   const moved = shares(assessed(withValue(study(), ['intents', 3, 'suite'], 'example-shop')));
   assert.deepEqual(moved.closed, { overall: 2 / 6, original: 1 / 4, fresh: 1 / 2 });
   assert.deepEqual(moved.withUnsafeFeatures, { overall: 5 / 6, original: 3 / 4, fresh: 2 / 2 });
 });
 
-test('turning a suite\'s features off in its project removes its unsafe intents from the second share', { criterion: 'AC-SPEC-36-19' }, () => {
+test('turning a suite\'s features off in its project removes its unsafe intents from the second share', () => {
   const closedShop = withValue(study(), ['suites', 'example-shop', 'project', 'unsafeFeatures'], { cssLocators: true });
   // Intent 4's class check now fails to parse; intent 1's css locator still does.
   assert.deepEqual(shares(assessed(closedShop)).withUnsafeFeatures, { overall: 3 / 6, original: 2 / 4, fresh: 1 / 2 });
 });
 
-test('a plan using unsafe features never raises the closed share, even marked expressible', { criterion: 'AC-SPEC-36-19' }, () => {
+test('a plan using unsafe features never raises the closed share, even marked expressible', () => {
   // Counter-example to a study talking the closed share up: dropping every unsafe intent leaves
   // the closed count unchanged, so they were never in it.
   const report = assessed(study());
@@ -70,7 +69,7 @@ test('a plan using unsafe features never raises the closed share, even marked ex
   assert.equal(Math.round(report.expressibleShare * 6), Math.round(closedReport.expressibleShare * 3));
 });
 
-test('with no unsafe plan in the study, the two shares are equal', { criterion: 'AC-SPEC-36-19' }, () => {
+test('with no unsafe plan in the study, the two shares are equal', () => {
   const closedOnly = { ...study(), intents: (study()['intents'] as JsonRecord[]).filter((_, index) => [0, 2, 5].includes(index)) };
   const { closed, withUnsafeFeatures } = shares(assessed(closedOnly));
   assert.deepEqual(withUnsafeFeatures, closed);

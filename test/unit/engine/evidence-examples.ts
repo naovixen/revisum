@@ -21,7 +21,6 @@
 //     the suite files it runs: the gating pass always the protected branch's, the proposal pass,
 //     when there is one, the change's own;
 //   - evidenceMergeGateOpen(result) says whether an evidence result may open the merge gate.
-// See docs/specs/SPEC-35-evidence-mode.md.
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import { readFileSync } from 'node:fs';

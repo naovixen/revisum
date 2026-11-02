@@ -7,7 +7,6 @@
 // (fixtures/plan-values-app/test-ids.html), a test id holding selector syntax matches only the
 // element whose attribute is exactly that text, and one that a built selector would widen to
 // another element matches nothing and sends nothing.
-// See docs/specs/SPEC-30-plan-values-positions-and-keys.md.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import {
@@ -31,7 +30,7 @@ describe('positions on a page with three matches', () => {
   ];
 
   for (const clicked of CLICKS) {
-    test(`a click on ${clicked.name} acts on the ${clicked.expected} button only`, { criterion: 'AC-SPEC-30-12' }, async () => {
+    test(`a click on ${clicked.name} acts on the ${clicked.expected} button only`, async () => {
       const { result, atClose } = await harness.runSteps(CDP_TARGET, [
         OPEN_PAGE, click(clicked.locator), textEquals(testId('opened'), clicked.expected, 'positions.opened'),
       ], { read: ['open-clicks'] });
@@ -40,14 +39,14 @@ describe('positions on a page with three matches', () => {
     });
   }
 
-  test('a fill of the field labelled "Quantity" at position 2 fills the second field only', { criterion: 'AC-SPEC-30-12' }, async () => {
+  test('a fill of the field labelled "Quantity" at position 2 fills the second field only', async () => {
     const { result } = await harness.runSteps(CDP_TARGET, [
       OPEN_PAGE, fill(label('Quantity', { position: 2 }), '5'), textEquals(testId('quantities'), '-,5,-', 'positions.second-quantity-filled'),
     ]);
     assert.equal(result.state, 'Passed', JSON.stringify(result.steps));
   });
 
-  test('a check on a positioned locator reads the element at that position', { criterion: 'AC-SPEC-30-12' }, async () => {
+  test('a check on a positioned locator reads the element at that position', async () => {
     const { result } = await harness.runSteps(CDP_TARGET, [
       OPEN_PAGE,
       textEquals(testId('order-row', { position: 'first' }), 'Row one', 'positions.first-row'),
@@ -57,7 +56,7 @@ describe('positions on a page with three matches', () => {
     assert.equal(result.state, 'Passed', JSON.stringify(result.steps));
   });
 
-  test('a click on button 4 of three fails with not-found and sends nothing', { criterion: 'AC-SPEC-30-12' }, async () => {
+  test('a click on button 4 of three fails with not-found and sends nothing', async () => {
     const { result, atClose } = await harness.runSteps(CDP_TARGET, [
       OPEN_PAGE, click(role('button', 'Open', { position: 4 })), textEquals(testId('opened'), 'none', 'positions.nothing-opened'),
     ], { read: ['input-events', 'opened'] });
@@ -69,7 +68,7 @@ describe('positions on a page with three matches', () => {
 
   // Counter-example: without a position the same locator matches all three, so it is the
   // position that picks one.
-  test('counter-example: the same locator without a position is ambiguous and sends nothing', { criterion: 'AC-SPEC-30-12' }, async () => {
+  test('counter-example: the same locator without a position is ambiguous and sends nothing', async () => {
     const { result, atClose } = await harness.runSteps(CDP_TARGET, [
       OPEN_PAGE, click(role('button', 'Open')), textEquals(testId('opened'), 'none', 'positions.nothing-opened'),
     ]);
@@ -86,7 +85,7 @@ describe('declared test-id attributes on a page of look-alikes', () => {
   // Holds '"]', ',' and '*'.
   const SELECTOR_SYNTAX = 'save"], button, [data-qa*="';
 
-  test('a test id holding "]", "," and "*" finds and clicks only the element whose data-qa is exactly that text', { criterion: 'AC-SPEC-30-13' }, async () => {
+  test('a test id holding "]", "," and "*" finds and clicks only the element whose data-qa is exactly that text', async () => {
     const { result, atClose } = await harness.runSteps(CDP_TARGET, [
       OPEN_PAGE,
       textEquals(qa(SELECTOR_SYNTAX), 'Exact selector text', 'test-ids.exact-found'),
@@ -99,7 +98,7 @@ describe('declared test-id attributes on a page of look-alikes', () => {
 
   // Built into [data-qa="…"], this test id would read [data-qa="nothing"], [data-qa="save"] and
   // match the Save button. Matched exactly, it matches nothing.
-  test('a test id that a built selector would widen to the Save button matches nothing: not-found, nothing sent', { criterion: 'AC-SPEC-30-13' }, async () => {
+  test('a test id that a built selector would widen to the Save button matches nothing: not-found, nothing sent', async () => {
     const { result, atClose } = await harness.runSteps(CDP_TARGET, clickAndCheck(qa('nothing"], [data-qa="save'), 'none'), { read: ['input-events', 'clicked'] });
     assert.equal(result.state, 'Failed');
     assert.deepEqual(outcomes(result), [[0, 'passed', undefined], [1, 'failed', 'not-found'], [2, 'skipped', undefined]]);
@@ -108,22 +107,22 @@ describe('declared test-id attributes on a page of look-alikes', () => {
   });
 
   // Counter-example: the look-alike itself is clickable, so the not-found above is the exact match's doing.
-  test('counter-example: the test id "save" clicks the Save button', { criterion: 'AC-SPEC-30-13' }, async () => {
+  test('counter-example: the test id "save" clicks the Save button', async () => {
     const { result } = await harness.runSteps(CDP_TARGET, clickAndCheck(qa('save'), 'save'));
     assert.equal(result.state, 'Passed', JSON.stringify(result.steps));
   });
 
-  test('a test id holding a backslash clicks the element whose data-qa holds it, not its look-alike', { criterion: 'AC-SPEC-30-13' }, async () => {
+  test('a test id holding a backslash clicks the element whose data-qa holds it, not its look-alike', async () => {
     const { result } = await harness.runSteps(CDP_TARGET, clickAndCheck(qa('a\\b'), 'backslash'));
     assert.equal(result.state, 'Passed', JSON.stringify(result.steps));
   });
 
-  test('the id attribute matches an id of "*" exactly', { criterion: 'AC-SPEC-30-13' }, async () => {
+  test('the id attribute matches an id of "*" exactly', async () => {
     const { result } = await harness.runSteps(CDP_TARGET, clickAndCheck(testId('*', { attribute: 'id' }), 'star'));
     assert.equal(result.state, 'Passed', JSON.stringify(result.steps));
   });
 
-  test('without an attribute a test id matches data-testid; naming data-qa matches data-qa instead', { criterion: 'AC-SPEC-30-13' }, async () => {
+  test('without an attribute a test id matches data-testid; naming data-qa matches data-qa instead', async () => {
     const { result } = await harness.runSteps(CDP_TARGET, [
       OPEN_PAGE,
       click(testId('shared')), textEquals(testId('clicked'), 'by-testid', 'test-ids.default-attribute'),

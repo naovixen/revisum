@@ -2,7 +2,6 @@
 // holds a 1.2 golden plan for each of them, `npm run lint` validates every golden plan against the
 // schema, and the changelog's one 1.2 entry names each new step, check, setting and error code.
 // The schema-hash and entry-format checks are in plan-schema-newer-version.test.ts.
-// See docs/specs/SPEC-31-page-states-metadata-downloads-and-tabs.md.
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -49,7 +48,7 @@ const FEATURES: Readonly<Record<string, (plan: JsonRecord) => boolean>> = {
 };
 
 for (const [feature, uses] of Object.entries(FEATURES)) {
-  test(`a 1.2 golden plan uses ${feature}`, { criterion: 'AC-SPEC-30-02' }, () => {
+  test(`a 1.2 golden plan uses ${feature}`, () => {
     assert.ok(newerGoldenPlans().some(uses), `no golden plan declaring 1.2 uses ${feature}`);
   });
 }
@@ -61,7 +60,7 @@ const NAMED_IN_ENTRY = [
   'maximumDownloadBytes', 'keepDownloads', 'misplaced_step', 'state-not-exposed', 'download-not-text', 'no-download', 'download-too-large',
 ];
 
-test('the 1.2 changelog entry names each new step, check, setting and error code, in code type', { criterion: 'AC-SPEC-30-02' }, () => {
+test('the 1.2 changelog entry names each new step, check, setting and error code, in code type', () => {
   const entry = changelogEntry('1.2');
   assert.match(entry, /^## 1\.2\b/);
   assert.deepEqual(NAMED_IN_ENTRY.filter((name) => !entry.includes(`\`${name}\``)), [], 'names the 1.2 entry leaves out');
@@ -85,7 +84,7 @@ const stepsOf = (plan: JsonRecord): JsonRecord[] => {
   return steps;
 };
 
-test('the lint fails when a golden plan turns scripts "enabled" on a navigate', { criterion: 'AC-SPEC-30-02', timeout: TIMEOUT }, () => {
+test('the lint fails when a golden plan turns scripts "enabled" on a navigate', { timeout: TIMEOUT }, () => {
   const plan = downloadPlan();
   const opening = stepsOf(plan)[0];
   assert.ok(opening !== undefined && opening['type'] === 'navigate');
@@ -93,7 +92,7 @@ test('the lint fails when a golden plan turns scripts "enabled" on a navigate', 
   assertFailsNaming(scratch.lintWith('golden/plans/planted-scripts.json', `${JSON.stringify(plan, null, 2)}\n`), 'planted-scripts.json');
 });
 
-test('the lint fails when a golden plan checks a download with a kind the language does not have', { criterion: 'AC-SPEC-30-02', timeout: TIMEOUT }, () => {
+test('the lint fails when a golden plan checks a download with a kind the language does not have', { timeout: TIMEOUT }, () => {
   const plan = downloadPlan();
   const check = stepsOf(plan).find((step) => step['type'] === 'expectDownload');
   assert.ok(check !== undefined);
@@ -103,7 +102,7 @@ test('the lint fails when a golden plan checks a download with a kind the langua
 
 // Counter-example: a valid copy of the download plan passes, so the failures above come from the
 // planted problems.
-test('the lint accepts a new 1.2 golden plan with a download, a page check and a second tab', { criterion: 'AC-SPEC-30-02', timeout: TIMEOUT }, () => {
+test('the lint accepts a new 1.2 golden plan with a download, a page check and a second tab', { timeout: TIMEOUT }, () => {
   const plan = downloadPlan();
   (plan['meta'] as JsonRecord)['title'] = 'Exporting the visible projects, second copy';
   stepsOf(plan).push({

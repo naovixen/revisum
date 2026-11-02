@@ -6,7 +6,6 @@
 // milliseconds (a day is 86,400,000 ms of elapsed time), and totalClockAdvanceMilliseconds sums a
 // plan's. The project also bounds the timers one advance may fire and the clipboard text a check
 // reads.
-// See docs/specs/SPEC-34-clock-advance-and-clipboard.md.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { clockAdvanceMilliseconds, parseProject, totalClockAdvanceMilliseconds, type Project } from '@revisum/engine';
@@ -31,13 +30,13 @@ const CONVERSIONS = [
 ] as const;
 
 for (const conversion of CONVERSIONS) {
-  test(`an advance of ${conversion.amount} ${conversion.unit} is ${conversion.milliseconds} ms`, { criterion: 'AC-SPEC-34-08' }, () => {
+  test(`an advance of ${conversion.amount} ${conversion.unit} is ${conversion.milliseconds} ms`, () => {
     assert.equal(clockAdvanceMilliseconds({ amount: conversion.amount, unit: conversion.unit }), conversion.milliseconds);
   });
 }
 
 // Metamorphic: the same span written in a smaller unit gives the same milliseconds.
-test('an advance written in a larger unit equals the same span written in the next smaller one', { criterion: 'AC-SPEC-34-08' }, () => {
+test('an advance written in a larger unit equals the same span written in the next smaller one', () => {
   for (const amount of [1, 7, 59, 120]) {
     assert.equal(clockAdvanceMilliseconds({ amount, unit: 'days' }), clockAdvanceMilliseconds({ amount: amount * 24, unit: 'hours' }));
     assert.equal(clockAdvanceMilliseconds({ amount, unit: 'hours' }), clockAdvanceMilliseconds({ amount: amount * 60, unit: 'minutes' }));
@@ -48,11 +47,11 @@ test('an advance written in a larger unit equals the same span written in the ne
 
 // ---- A plan's total ---------------------------------------------------------------------------------
 
-test('a plan with no advance has a total of 0 ms', { criterion: 'AC-SPEC-34-04' }, () => {
+test('a plan with no advance has a total of 0 ms', () => {
   assert.equal(totalClockAdvanceMilliseconds(accepted(parserFor(), planOf([OPEN_ORDERS]))), 0);
 });
 
-test('a plan\'s total adds every advance, those inside frames, a newTab and a frame inside the newTab included', { criterion: 'AC-SPEC-34-04' }, () => {
+test('a plan\'s total adds every advance, those inside frames, a newTab and a frame inside the newTab included', () => {
   const plan = accepted(parserFor(), planOf([
     advanceClock(1, 'seconds'), OPEN_ORDERS, advanceClock(10, 'minutes', 'skipAhead'),
     frame([advanceClock(250, 'milliseconds'), frame([advanceClock(2, 'minutes')])]),
@@ -63,7 +62,7 @@ test('a plan\'s total adds every advance, those inside frames, a newTab and a fr
 
 // ---- The step limit ---------------------------------------------------------------------------------
 
-test('with the default limits an advance of one hour is accepted and one of an hour and a millisecond is refused as too_large', { criterion: 'AC-SPEC-34-04' }, () => {
+test('with the default limits an advance of one hour is accepted and one of an hour and a millisecond is refused as too_large', () => {
   accepted(parserFor(), planOf([OPEN_ORDERS, advanceClock(DEFAULT_MAXIMUM_CLOCK_ADVANCE, 'milliseconds')]));
   for (const over of [advanceClock(DEFAULT_MAXIMUM_CLOCK_ADVANCE + 1, 'milliseconds'), advanceClock(61, 'minutes'), advanceClock(2, 'hours'), advanceClock(1, 'days')]) {
     const errors = rejection(parserFor(), planOf([OPEN_ORDERS, over]));
@@ -73,7 +72,7 @@ test('with the default limits an advance of one hour is accepted and one of an h
   }
 });
 
-test('a project step limit of one minute refuses a 61-second advance and accepts a 60-second one', { criterion: 'AC-SPEC-34-04' }, () => {
+test('a project step limit of one minute refuses a 61-second advance and accepts a 60-second one', () => {
   const tight = parserFor({}, { maximumClockAdvanceMilliseconds: MINUTE });
   accepted(tight, planOf([OPEN_ORDERS, advanceClock(60, 'seconds')]));
   const errors = rejection(tight, planOf([OPEN_ORDERS, advanceClock(61, 'seconds')]));
@@ -85,7 +84,7 @@ test('a project step limit of one minute refuses a 61-second advance and accepts
 // A step limit of one minute and a plan limit of two and a half minutes.
 const tightParser = () => parserFor({}, { maximumClockAdvanceMilliseconds: MINUTE, maximumTotalClockAdvanceMilliseconds: 150 * SECOND });
 
-test('advances that add up to exactly the plan limit are accepted', { criterion: 'AC-SPEC-34-04' }, () => {
+test('advances that add up to exactly the plan limit are accepted', () => {
   accepted(tightParser(), planOf([OPEN_ORDERS, advanceClock(1, 'minutes'), advanceClock(1, 'minutes'), advanceClock(30, 'seconds')]));
   accepted(tightParser(), planOf([OPEN_ORDERS, advanceClock(1, 'minutes'), frame([advanceClock(1, 'minutes')]), newTab([advanceClock(30, 'seconds')])]));
 });
@@ -129,19 +128,19 @@ const OVER_TOTAL = [
 ];
 
 for (const over of OVER_TOTAL) {
-  test(`a plan whose advances pass the plan limit is refused with too_large at ${over.name}`, { criterion: 'AC-SPEC-34-04' }, () => {
+  test(`a plan whose advances pass the plan limit is refused with too_large at ${over.name}`, () => {
     assert.deepEqual(rejection(tightParser(), planOf(over.steps)), [`too_large ${over.path}`]);
   });
 }
 
-test('with the default limits, 24 one-hour advances are accepted and a 25th is refused at its own step', { criterion: 'AC-SPEC-34-04' }, () => {
+test('with the default limits, 24 one-hour advances are accepted and a 25th is refused at its own step', () => {
   const hours = (count: number) => Array.from({ length: count }, () => advanceClock(1, 'hours'));
   accepted(parserFor(), planOf([OPEN_ORDERS, ...hours(24)]));
   assert.deepEqual(rejection(parserFor(), planOf([OPEN_ORDERS, ...hours(25)])), ['too_large $.steps[25]']);
 });
 
 // Counter-example: a clipboard check between advances adds nothing to the total.
-test('steps other than advances add nothing to the total', { criterion: 'AC-SPEC-34-04' }, () => {
+test('steps other than advances add nothing to the total', () => {
   const plan = accepted(tightParser(), planOf([
     OPEN_ORDERS, advanceClock(1, 'minutes'), expectClipboard('textContains', '/invite/'), advanceClock(1, 'minutes'), advanceClock(30, 'seconds'),
   ]));
@@ -182,16 +181,16 @@ const PROJECT_LIMITS = [
 ] as const;
 
 for (const limit of PROJECT_LIMITS) {
-  test(`a project that sets no ${limit.name} gets ${limit.defaultValue}`, { criterion: 'AC-SPEC-34-04' }, () => {
+  test(`a project that sets no ${limit.name} gets ${limit.defaultValue}`, () => {
     assert.equal(limitsOf(parsed())[limit.name], limit.defaultValue);
   });
 
-  test(`a project may set ${limit.name} up to ${limit.largest}`, { criterion: 'AC-SPEC-34-04' }, () => {
+  test(`a project may set ${limit.name} up to ${limit.largest}`, () => {
     assert.equal(limitsOf(parsed({ ...limit.with, [limit.name]: limit.largest }))[limit.name], limit.largest);
     assert.equal(limitsOf(parsed({ ...limit.with, [limit.name]: 1000 }))[limit.name], 1000);
   });
 
-  test(`${limit.name} over ${limit.largest}, negative, fractional or not a number is refused at the limit`, { criterion: 'AC-SPEC-34-04' }, () => {
+  test(`${limit.name} over ${limit.largest}, negative, fractional or not a number is refused at the limit`, () => {
     for (const value of [limit.largest + 1, -1, 1.5, '1000', null]) {
       const errors = refusal({ ...limit.with, [limit.name]: value });
       assert.deepEqual(errors.map((error) => error.split(' ')[1]), [`$.limits.${limit.name}`], JSON.stringify(value));
@@ -202,6 +201,6 @@ for (const limit of PROJECT_LIMITS) {
 }
 
 // Counter-example: a misspelt limit is a field the project file does not have.
-test('a misspelt clock limit is refused as unknown_field', { criterion: 'AC-SPEC-34-04' }, () => {
+test('a misspelt clock limit is refused as unknown_field', () => {
   assert.deepEqual(refusal({ maximumClockAdvanceMillis: HOUR }), ['unknown_field $.limits.maximumClockAdvanceMillis']);
 });

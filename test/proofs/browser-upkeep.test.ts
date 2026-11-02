@@ -13,7 +13,6 @@
 //     has no upkeep record.
 // A weekly scheduled CI job runs the tool and re-runs the contract and capability suites.
 // Every test reads fixture files under fixtures/browser-upkeep/; none uses the network.
-// See docs/specs/SPEC-06-cdp-driver.md.
 import assert from 'node:assert/strict';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -36,7 +35,7 @@ function assertPassesWithout(run: ToolRun, unwanted: RegExp): void {
 
 // ---- The average and the flag ------------------------------------------------------------------
 
-test('six Chrome majors averaging 2.00 fix hours flag the Playwright fallback rule and exit 1', { criterion: 'AC-SPEC-06-08' }, () => {
+test('six Chrome majors averaging 2.00 fix hours flag the Playwright fallback rule and exit 1', () => {
   const run = summary('six-majors-over-limit.json');
   assert.equal(run.status, 1, describeRun(run));
   assert.match(run.output, /\b2\.00\b/);
@@ -44,33 +43,33 @@ test('six Chrome majors averaging 2.00 fix hours flag the Playwright fallback ru
   assert.match(run.output, FALLBACK_FLAG);
 });
 
-test('six Chrome majors averaging 1.50 fix hours pass with no flag', { criterion: 'AC-SPEC-06-08' }, () => {
+test('six Chrome majors averaging 1.50 fix hours pass with no flag', () => {
   const run = summary('six-majors-under-limit.json');
   assertPassesWithout(run, FALLBACK_FLAG);
   assert.match(run.output, /\b1\.50\b/);
 });
 
-test('an average of exactly 1.8 hours is not over the limit, so it does not flag', { criterion: 'AC-SPEC-06-08' }, () => {
+test('an average of exactly 1.8 hours is not over the limit, so it does not flag', () => {
   const run = summary('six-majors-at-limit.json');
   assertPassesWithout(run, FALLBACK_FLAG);
   assert.match(run.output, /\b1\.80\b/);
 });
 
-test('only the first six Chrome majors count: later majors and Firefox records do not move the average', { criterion: 'AC-SPEC-06-08' }, () => {
+test('only the first six Chrome majors count: later majors and Firefox records do not move the average', () => {
   // All nine records would average 10.67 and flag; the six lowest Chrome majors average 1.00.
   const run = summary('later-majors-and-firefox.json');
   assertPassesWithout(run, FALLBACK_FLAG);
   assert.match(run.output, /\b1\.00\b/);
 });
 
-test('with fewer than six Chrome records the running average is reported and never flags', { criterion: 'AC-SPEC-06-08' }, () => {
+test('with fewer than six Chrome records the running average is reported and never flags', () => {
   const run = summary('four-majors.json');
   assertPassesWithout(run, FALLBACK_FLAG);
   assert.match(run.output, /\b5\.00\b/);
   assert.match(run.output, /\b4\b/);
 });
 
-test('with no records yet the tool passes, flags nothing and prints no number it cannot compute', { criterion: 'AC-SPEC-06-08' }, () => {
+test('with no records yet the tool passes, flags nothing and prints no number it cannot compute', () => {
   const run = summary('no-records.json');
   assertPassesWithout(run, FALLBACK_FLAG);
   assert.doesNotMatch(run.output, /NaN|Infinity/);
@@ -87,7 +86,7 @@ const INVALID_RECORDS = [
 ] as const;
 
 for (const invalid of INVALID_RECORDS) {
-  test(`records that do not decode (${invalid.file}) fail and name the fault, without a verdict`, { criterion: 'AC-SPEC-06-08' }, () => {
+  test(`records that do not decode (${invalid.file}) fail and name the fault, without a verdict`, () => {
     const run = summary(invalid.file);
     assert.equal(run.passed, false, describeRun(run));
     assert.match(run.output, invalid.fault, describeRun(run));
@@ -95,7 +94,7 @@ for (const invalid of INVALID_RECORDS) {
   });
 }
 
-test('the repository\'s own upkeep records decode', { criterion: 'AC-SPEC-06-08' }, () => {
+test('the repository\'s own upkeep records decode', () => {
   assert.ok(existsSync(join(REPOSITORY_ROOT, 'docs', 'decisions', 'browser-upkeep.json')), 'docs/decisions/browser-upkeep.json exists');
   const run = upkeep([]);
   // Passing, or flagging the fallback rule, are both verdicts on decoded records.
@@ -104,32 +103,32 @@ test('the repository\'s own upkeep records decode', { criterion: 'AC-SPEC-06-08'
 
 // ---- A new Chrome for Testing major -----------------------------------------------------------
 
-test('a newer Stable major with an upkeep record is named and passes', { criterion: 'AC-SPEC-06-08' }, () => {
+test('a newer Stable major with an upkeep record is named and passes', () => {
   const run = newMajorCheck('with-major-157.json', 'versions-stable-157.json');
   assert.equal(run.passed, true, describeRun(run));
   assert.match(run.output, /\b157\b/);
 });
 
-test('a newer Stable major with no upkeep record fails, naming the major', { criterion: 'AC-SPEC-06-08' }, () => {
+test('a newer Stable major with no upkeep record fails, naming the major', () => {
   const run = newMajorCheck('without-major-157.json', 'versions-stable-157.json');
   assert.equal(run.passed, false, describeRun(run));
   assert.match(run.output, /\b157\b/);
   assert.match(run.output, /upkeep record/i);
 });
 
-test('a newer build of the pinned major is not a new major, whatever Beta, Dev and Canary are', { criterion: 'AC-SPEC-06-08' }, () => {
+test('a newer build of the pinned major is not a new major, whatever Beta, Dev and Canary are', () => {
   const run = newMajorCheck('without-major-157.json', 'versions-stable-156-patch.json');
   assert.equal(run.passed, true, describeRun(run));
   assert.doesNotMatch(run.output, /\b15[789]\b/);
 });
 
-test('without --pinned the check compares with the build tools/install-browsers.ts pins', { criterion: 'AC-SPEC-06-08' }, () => {
+test('without --pinned the check compares with the build tools/install-browsers.ts pins', () => {
   const run = upkeep(['--records', fixture('with-major-157.json'), '--versions', fixture('versions-stable-999.json')]);
   assert.equal(run.passed, false, describeRun(run));
   assert.match(run.output, /\b999\b/);
 });
 
-test('a version list with no Stable version fails rather than passing', { criterion: 'AC-SPEC-06-08' }, () => {
+test('a version list with no Stable version fails rather than passing', () => {
   const run = newMajorCheck('with-major-157.json', 'versions-malformed.json');
   assert.equal(run.passed, false, describeRun(run));
   assert.match(run.output, /Stable/, 'the failure names the missing Stable version');
@@ -137,7 +136,7 @@ test('a version list with no Stable version fails rather than passing', { criter
 
 // ---- The weekly job ---------------------------------------------------------------------------
 
-test('a weekly scheduled CI job runs the upkeep check and re-runs the contract and capability suites', { criterion: 'AC-SPEC-06-08' }, () => {
+test('a weekly scheduled CI job runs the upkeep check and re-runs the contract and capability suites', () => {
   const folder = join(REPOSITORY_ROOT, '.github', 'workflows');
   const scheduled = readdirSync(folder)
     .filter((name) => /\.ya?ml$/.test(name))

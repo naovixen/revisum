@@ -5,7 +5,6 @@
 // The counter-example goes to the same server directly from the same page: the server gets its
 // request and the proxy allows it, so the server can be reached and the empty list above means
 // something. That allowed decision is then the popup origin's only one, and the popup stays blocked.
-// See docs/specs/SPEC-07-isolated-runner-and-egress.md and docs/specs/SPEC-06-cdp-driver.md.
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
@@ -89,7 +88,7 @@ async function openPopup(session: DriverSession): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, POPUP_SETTLE_MILLISECONDS));
 }
 
-test('a popup to a reachable host leaves that host\'s server with no request, and the proxy with no decision', { criterion: 'AC-SPEC-07-01' }, async () => {
+test('a popup to a reachable host leaves that host\'s server with no request, and the proxy with no decision', async () => {
   const session = await openSession();
   try {
     await openPopup(session);
@@ -102,7 +101,7 @@ test('a popup to a reachable host leaves that host\'s server with no request, an
   }
 });
 
-test('counter-example: the same server gets a direct request, and the popup that came first stays blocked', { criterion: 'AC-SPEC-07-01' }, async () => {
+test('counter-example: the same server gets a direct request, and the popup that came first stays blocked', async () => {
   const session = await openSession();
   try {
     await openPopup(session);

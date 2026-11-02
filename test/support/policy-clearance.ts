@@ -1,7 +1,6 @@
 // Clears a test plan through the policy gate, as every run must, before run(). A run takes only an
 // Authorised plan, and only the gate makes one. The project is trusted the way core trusts it:
 // read from a protected branch that holds just project.json.
-// See docs/specs/SPEC-03-policy-gate.md.
 import {
   failure, loadTrustedProject, policyGate, success,
   type Authorised, type EventSink, type Plan, type PlanStanding, type TrustedProject, type VersionControlPort,

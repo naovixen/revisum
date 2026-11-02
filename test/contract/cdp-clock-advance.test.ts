@@ -8,7 +8,6 @@
 //     fail with clock-runaway within the step timeout; the run stops there and sends no input.
 // Counter-examples show the checks can fail: the expiry check fails one second early, and a short
 // advance on the animation-frame page stays under the project's timer limit and passes.
-// See docs/specs/SPEC-34-clock-advance-and-clipboard.md.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import {
@@ -28,7 +27,7 @@ const status = (value: string, criterionId: string) => textEquals(testId('sessio
 
 for (const targetId of CDP_TARGETS) {
   describe(`a 10-minute session timer on ${targetId}`, () => {
-    test('9 minutes 59 seconds leave the session active; one more second expires it; both clocks moved by exactly the sum', { criterion: 'AC-SPEC-34-05' }, async () => {
+    test('9 minutes 59 seconds leave the session active; one more second expires it; both clocks moved by exactly the sum', async () => {
       const ran = await harness.runSteps(targetId, [
         navigate('/session.html'),
         status('Session active', 'session.active-at-load'),
@@ -55,7 +54,7 @@ for (const targetId of CDP_TARGETS) {
   });
 }
 
-test('without an advance, the page\'s clocks have not moved and the session is still active', { criterion: 'AC-SPEC-34-05' }, async () => {
+test('without an advance, the page\'s clocks have not moved and the session is still active', async () => {
   const ran = await harness.runSteps(CDP_TARGET, [
     navigate('/session.html'),
     showElapsed,
@@ -66,7 +65,7 @@ test('without an advance, the page\'s clocks have not moved and the session is s
   assertPassed(ran);
 });
 
-test('counter-example: checking for the expiry one second early fails', { criterion: 'AC-SPEC-34-05' }, async () => {
+test('counter-example: checking for the expiry one second early fails', async () => {
   const ran = await harness.runSteps(CDP_TARGET, [
     navigate('/session.html'), advanceClock(9, 'minutes'), advanceClock(59, 'seconds'), status('Session expired', 'session.too-early'),
   ]);
@@ -100,7 +99,7 @@ const NOTHING_RUN_COUNTS = counted({
 
 for (const targetId of CDP_TARGETS) {
   describe(`timer order on ${targetId}`, () => {
-    test('a 120 ms runTimers advance fires every due callback at its own time, in due-time order, ties in registration order', { criterion: 'AC-SPEC-34-06' }, async () => {
+    test('a 120 ms runTimers advance fires every due callback at its own time, in due-time order, ties in registration order', async () => {
       const ran = await harness.runSteps(targetId, [
         navigate('/timer-order.html'),
         timerLog('(none)', 'timers.none-before-advance'),
@@ -111,14 +110,14 @@ for (const targetId of CDP_TARGETS) {
       assertPassed(ran);
     });
 
-    test('an advance without a mode runs timers, as runTimers does', { criterion: 'AC-SPEC-34-06' }, async () => {
+    test('an advance without a mode runs timers, as runTimers does', async () => {
       const ran = await harness.runSteps(targetId, [
         navigate('/timer-order.html'), advanceClock(120, 'milliseconds'), timerLog(RUN_TIMERS_LOG, 'timers.default-mode-order'),
       ]);
       assertPassed(ran);
     });
 
-    test('a 120 ms skipAhead advance fires each due timer once at the new time, the interval included', { criterion: 'AC-SPEC-34-06' }, async () => {
+    test('a 120 ms skipAhead advance fires each due timer once at the new time, the interval included', async () => {
       const ran = await harness.runSteps(targetId, [
         navigate('/timer-order.html'),
         advanceClock(120, 'milliseconds', 'skipAhead'),
@@ -130,14 +129,14 @@ for (const targetId of CDP_TARGETS) {
   });
 }
 
-test('two advances of 60 ms give the same order as one of 120 ms: a timer not yet due keeps its remaining delay', { criterion: 'AC-SPEC-34-06' }, async () => {
+test('two advances of 60 ms give the same order as one of 120 ms: a timer not yet due keeps its remaining delay', async () => {
   const ran = await harness.runSteps(CDP_TARGET, [
     navigate('/timer-order.html'), advanceClock(60, 'milliseconds'), advanceClock(60, 'milliseconds'), timerLog(RUN_TIMERS_LOG, 'timers.split-order'),
   ]);
   assertPassed(ran);
 });
 
-test('counter-example: without an advance no timer has fired, so the order check fails', { criterion: 'AC-SPEC-34-06' }, async () => {
+test('counter-example: without an advance no timer has fired, so the order check fails', async () => {
   const ran = await harness.runSteps(CDP_TARGET, [
     navigate('/timer-order.html'), timerCounts(NOTHING_RUN_COUNTS, 'timers.nothing-run'), timerLog(RUN_TIMERS_LOG, 'timers.never-advanced'),
   ]);
@@ -152,7 +151,7 @@ const RUNAWAY_PAGES = [
 ] as const;
 
 for (const { name, path } of RUNAWAY_PAGES) {
-  test(`on ${name}, a one-hour runTimers advance fails with clock-runaway within the step timeout, and no later step sends input`, { criterion: 'AC-SPEC-34-07' }, async () => {
+  test(`on ${name}, a one-hour runTimers advance fails with clock-runaway within the step timeout, and no later step sends input`, async () => {
     const ran = await harness.runSteps(CDP_TARGET, [
       navigate(path),
       advanceClock(1, 'hours', 'runTimers'),
@@ -168,7 +167,7 @@ for (const { name, path } of RUNAWAY_PAGES) {
 }
 
 // One second is about 62 animation frames, far under the project's 10,000 callbacks per advance.
-test('counter-example: a one-second advance on the animation-frame page runs its frames and passes', { criterion: 'AC-SPEC-34-07' }, async () => {
+test('counter-example: a one-second advance on the animation-frame page runs its frames and passes', async () => {
   const ran = await harness.runSteps(CDP_TARGET, [
     navigate('/animation-loop.html'),
     advanceClock(1, 'seconds', 'runTimers'),

@@ -1,6 +1,5 @@
 // An element assertion that compares text must say what it compares against: no value is a
 // missing field, and an empty value is vacuous, since it would pass on any element.
-// See docs/specs/SPEC-27-shared-types-and-events.md.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { planParser } from '@revisum/engine';
@@ -29,13 +28,13 @@ function planWithAssertion(change: (assertion: Record<string, unknown>) => void)
   return { input: plan, path: `$.steps[${index}].assert.value` };
 }
 
-test('the unchanged sign-up plan parses, so each rejection below comes from the assertion alone', { criterion: 'AC-SPEC-27-07' }, () => {
+test('the unchanged sign-up plan parses, so each rejection below comes from the assertion alone', () => {
   const parsed = parsePlan(signupPlan(TARGETS));
   assert.equal(parsed.ok, true, JSON.stringify(parsed));
 });
 
 for (const kind of TEXT_VALUE_KINDS) {
-  test(`rejects a ${kind} assertion with no value as missing_field`, { criterion: 'AC-SPEC-27-07' }, () => {
+  test(`rejects a ${kind} assertion with no value as missing_field`, () => {
     const { input, path } = planWithAssertion((assertion) => {
       assertion['kind'] = kind;
       delete assertion['value'];
@@ -43,7 +42,7 @@ for (const kind of TEXT_VALUE_KINDS) {
     assert.deepEqual(parsePlan(input), { ok: false, error: [{ code: 'missing_field', path }] });
   });
 
-  test(`rejects a ${kind} assertion with an empty value as vacuous`, { criterion: 'AC-SPEC-27-07' }, () => {
+  test(`rejects a ${kind} assertion with an empty value as vacuous`, () => {
     const { input, path } = planWithAssertion((assertion) => {
       assertion['kind'] = kind;
       assertion['value'] = '';
@@ -52,7 +51,7 @@ for (const kind of TEXT_VALUE_KINDS) {
   });
 
   // The counter-example: the same assertion with a non-empty value is accepted.
-  test(`accepts a ${kind} assertion with a non-empty value`, { criterion: 'AC-SPEC-27-07' }, () => {
+  test(`accepts a ${kind} assertion with a non-empty value`, () => {
     const { input } = planWithAssertion((assertion) => {
       assertion['kind'] = kind;
       assertion['value'] = 'ada@example.test';

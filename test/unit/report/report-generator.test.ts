@@ -392,7 +392,7 @@ test('the PR comment has the verdict line, one image, a report link, at most 5 f
   assert.doesNotMatch(outputText(outputs(byKind('api')), 'top-finding.svg'), /<image /, 'the API comment image is a verdict card');
 });
 
-test('generating twice in one process gives byte-identical output for every file', { criterion: 'AC-SPEC-00-01' }, () => {
+test('generating twice in one process gives byte-identical output for every file', () => {
   for (const report of loaded.reports) {
     const first = generate(report.input, { png: report.assets }, loaded.history);
     const second = generate(report.input, { png: report.assets }, loaded.history);

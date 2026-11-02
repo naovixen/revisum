@@ -3,7 +3,6 @@
 // with each of those steps, in order, and every act() call carries a guard function. Hover,
 // select and upload now reach the driver instead of failing with unsupported-step.
 // A mutant shows the check finds an act() call made without a guard.
-// See docs/specs/SPEC-06-cdp-driver.md.
 import assert from 'node:assert/strict';
 import { arch, platform } from 'node:os';
 import { test } from 'node:test';
@@ -79,7 +78,7 @@ function recordingDriver(): { readonly driver: BrowserDriver; readonly calls: Ac
 // The act() calls that came without a guard function.
 const callsWithoutGuard = (calls: readonly ActCall[]): ActCall[] => calls.filter((call) => typeof call.guard !== 'function');
 
-test('every act() call of a run carries the runtime guard, for every kind of action step', { criterion: 'AC-SPEC-06-09' }, async () => {
+test('every act() call of a run carries the runtime guard, for every kind of action step', async () => {
   const parsedProject = parseProject(PROJECT_FILE);
   assert.ok(parsedProject.ok, JSON.stringify(parsedProject.ok ? null : parsedProject.error));
   const parsedPlan = planParser(parsedProject.value)(PLAN);
@@ -98,7 +97,7 @@ test('every act() call of a run carries the runtime guard, for every kind of act
   assert.deepEqual(callsWithoutGuard(calls), []);
 });
 
-test('mutant: the check finds an act() call made without a guard', { criterion: 'AC-SPEC-06-09' }, () => {
+test('mutant: the check finds an act() call made without a guard', () => {
   const guard: ActionGuard = () => ({ kind: 'allow' });
   const recorded: ActCall[] = [{ type: 'click', guard }, { type: 'hover', guard: undefined }, { type: 'dialog', guard }];
   assert.deepEqual(callsWithoutGuard(recorded).map((call) => call.type), ['hover']);

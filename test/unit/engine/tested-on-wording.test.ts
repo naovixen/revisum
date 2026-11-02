@@ -1,7 +1,6 @@
 // "Tested on" wording: what a report says a run was tested on comes from the target's engine,
 // version, device profile and fidelity, so an emulated phone viewport never reads as a phone and
 // a patched WebKit never reads as Safari.
-// See docs/specs/SPEC-05-target-matrix-and-lock.md.
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import { testedOn, type Target } from '@revisum/engine';
@@ -32,28 +31,28 @@ const misleadingWords = (wording: string): readonly string[] =>
   MISLEADING_WORDS.filter((pattern) => pattern.test(wording.replaceAll('not Safari', ''))).map(String);
 
 describe('the wording names engine, version, device and fidelity', () => {
-  test('a Chromium phone target reads "Chromium 156, phone viewport (emulated)"', { criterion: 'AC-SPEC-05-06' }, () => {
+  test('a Chromium phone target reads "Chromium 156, phone viewport (emulated)"', () => {
     assert.equal(testedOn(target('chromium-phone-390'), BUILD), 'Chromium 156, phone viewport (emulated)');
   });
 
-  test('the version may come from the target itself when no build is given', { criterion: 'AC-SPEC-05-06' }, () => {
+  test('the version may come from the target itself when no build is given', () => {
     assert.equal(testedOn(target('chromium-phone-versioned')), 'Chromium 156, phone viewport (emulated)');
   });
 
-  test('without a known version, the wording names no version', { criterion: 'AC-SPEC-05-06' }, () => {
+  test('without a known version, the wording names no version', () => {
     const wording = testedOn(target('chromium-phone-390'));
     assert.ok(wording.startsWith('Chromium'), wording);
     assert.ok(wording.endsWith('phone viewport (emulated)'), wording);
     assert.ok(!/\d{2,}/.test(wording), `no invented version: ${wording}`);
   });
 
-  test('a phone profile with no fidelity given reads exactly as one declared engine-emulated', { criterion: 'AC-SPEC-05-06' }, () => {
+  test('a phone profile with no fidelity given reads exactly as one declared engine-emulated', () => {
     for (const engine of ENGINE_NAMES) {
       assert.equal(testedOn(target(`${engine}-phone-390`), BUILD), testedOn(target(`${engine}-phone-engine-emulated`), BUILD));
     }
   });
 
-  test('engine fidelity adds nothing in brackets; any other fidelity adds its own bracketed note', { criterion: 'AC-SPEC-05-06' }, () => {
+  test('engine fidelity adds nothing in brackets; any other fidelity adds its own bracketed note', () => {
     const desktop = testedOn(target('chromium-desktop-1280'), BUILD);
     assert.ok(desktop.startsWith('Chromium 156, '), desktop);
     assert.ok(!desktop.includes('('), `no fidelity note on a desktop engine target: ${desktop}`);
@@ -65,13 +64,13 @@ describe('the wording names engine, version, device and fidelity', () => {
     assert.equal(new Set(notes).size, notes.length, 'each fidelity has its own note');
   });
 
-  test('the wording is a pure function of its inputs', { criterion: 'AC-SPEC-05-06' }, () => {
+  test('the wording is a pure function of its inputs', () => {
     for (const each of allTargets) assert.equal(testedOn(each, BUILD), testedOn(each, BUILD));
   });
 });
 
 describe('the wording never claims a device or browser that was not there', () => {
-  test('WebKit always reads "patched WebKit, not Safari"', { criterion: 'AC-SPEC-05-06' }, () => {
+  test('WebKit always reads "patched WebKit, not Safari"', () => {
     for (const each of allTargets.filter((candidate) => candidate.engine === 'webkit')) {
       for (const wording of [testedOn(each), testedOn(each, { version: '26.0', executablePath: '/browsers/webkit/run' })]) {
         assert.ok(wording.includes('patched WebKit'), `${each.id}: ${wording}`);
@@ -80,7 +79,7 @@ describe('the wording never claims a device or browser that was not there', () =
     }
   });
 
-  test('no target, with or without a build, reads as an Android phone, an iPhone, iOS or Safari', { criterion: 'AC-SPEC-05-06' }, () => {
+  test('no target, with or without a build, reads as an Android phone, an iPhone, iOS or Safari', () => {
     for (const each of allTargets) {
       for (const wording of [testedOn(each), testedOn(each, BUILD)]) {
         assert.deepEqual(misleadingWords(wording), [], `${each.id}: ${wording}`);
@@ -88,7 +87,7 @@ describe('the wording never claims a device or browser that was not there', () =
     }
   });
 
-  test('counter-example: the check catches the wording a silent stand-in would use', { criterion: 'AC-SPEC-05-06' }, () => {
+  test('counter-example: the check catches the wording a silent stand-in would use', () => {
     for (const wording of ['Chrome on Android phone', 'Safari 26, iPhone 15', 'WebKit on iOS', 'patched WebKit (Safari)']) {
       assert.notDeepEqual(misleadingWords(wording), [], wording);
     }

@@ -5,7 +5,6 @@
 // Controls: a plain named import is still reported; the same two forms in an allow-listed module
 // pass; and the same files destructuring another contracts export pass, so the lint fails for
 // reveal, not for the file's shape.
-// See docs/specs/SPEC-04-secrets-and-redaction.md.
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
 import { copyRepository, type ScratchRepository } from './scratch-repository.ts';
@@ -46,15 +45,15 @@ function assertLintPasses(relativePath: string, lines: readonly string[]): void 
   assert.equal(outcome.passed, true, `the lint rejected ${relativePath}:\n${outcome.failureOutput}`);
 }
 
-test('the lint fails when the command-line package destructures reveal out of a namespace import', { criterion: 'AC-SPEC-04-02', timeout: TIMEOUT }, () => {
+test('the lint fails when the command-line package destructures reveal out of a namespace import', { timeout: TIMEOUT }, () => {
   assertRevealReported('packages/cli/src/planted-namespace-reveal.ts', NAMESPACE_DESTRUCTURE('reveal'));
 });
 
-test('the lint fails when the command-line package destructures reveal out of a dynamic import', { criterion: 'AC-SPEC-04-02', timeout: TIMEOUT }, () => {
+test('the lint fails when the command-line package destructures reveal out of a dynamic import', { timeout: TIMEOUT }, () => {
   assertRevealReported('packages/cli/src/planted-dynamic-reveal.ts', DYNAMIC_DESTRUCTURE('reveal'));
 });
 
-test('control: the lint still fails when the command-line package imports reveal by name', { criterion: 'AC-SPEC-04-02', timeout: TIMEOUT }, () => {
+test('control: the lint still fails when the command-line package imports reveal by name', { timeout: TIMEOUT }, () => {
   assertRevealReported('packages/cli/src/planted-named-reveal.ts', [
     `import { reveal } from '${CONTRACTS}';`,
     '// Hands reveal on.',
@@ -62,12 +61,12 @@ test('control: the lint still fails when the command-line package imports reveal
   ]);
 });
 
-test('counter-example: the same namespace and dynamic forms with another contracts export pass the lint', { criterion: 'AC-SPEC-04-02', timeout: TIMEOUT }, () => {
+test('counter-example: the same namespace and dynamic forms with another contracts export pass the lint', { timeout: TIMEOUT }, () => {
   assertLintPasses('packages/cli/src/planted-namespace-success.ts', NAMESPACE_DESTRUCTURE('success'));
   assertLintPasses('packages/cli/src/planted-dynamic-success.ts', DYNAMIC_DESTRUCTURE('success'));
 });
 
-test('counter-example: an allow-listed module may destructure reveal out of a namespace or a dynamic import', { criterion: 'AC-SPEC-04-02', timeout: TIMEOUT }, () => {
+test('counter-example: an allow-listed module may destructure reveal out of a namespace or a dynamic import', { timeout: TIMEOUT }, () => {
   const outcome = scratch.lintWithEdit(ALLOWED_MODULE, (text) => [
     text.trimEnd(),
     '',

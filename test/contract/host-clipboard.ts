@@ -16,7 +16,6 @@
 // When the Windows clipboard holds data that cannot be copied whole, such as a format an
 // application renders only on request, nothing is written and the tests that would copy are
 // skipped with that reason, so the person's clipboard is never lost.
-// See docs/specs/SPEC-34-clock-advance-and-clipboard.md.
 import { spawn, spawnSync, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { platform } from 'node:os';

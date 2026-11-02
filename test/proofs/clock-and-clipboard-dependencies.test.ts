@@ -3,7 +3,6 @@
 // the determinism script, a trusted constant built only from integers. Each package manifest
 // declares no runtime dependency, and every import in their sources is relative, a Node built-in
 // or, for engine, contracts. A planted fake-timer or clipboard library shows the check can fail.
-// See docs/specs/SPEC-34-clock-advance-and-clipboard.md.
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -32,7 +31,7 @@ const PACKAGES_CHECKED = [
 ] as const;
 
 for (const checked of PACKAGES_CHECKED) {
-  test(`${checked.name}'s package manifest still declares no runtime dependency`, { criterion: 'AC-SPEC-34-19' }, () => {
+  test(`${checked.name}'s package manifest still declares no runtime dependency`, () => {
     const manifest: Record<string, unknown> = JSON.parse(readFileSync(join(PACKAGES, checked.name, 'package.json'), 'utf8'));
     const declared = DEPENDENCY_FIELDS.filter((field) => {
       const value = manifest[field];
@@ -41,7 +40,7 @@ for (const checked of PACKAGES_CHECKED) {
     assert.deepEqual(declared, []);
   });
 
-  test(`every import in ${checked.name}'s sources is still relative, a Node built-in or an allowed workspace package`, { criterion: 'AC-SPEC-34-19' }, () => {
+  test(`every import in ${checked.name}'s sources is still relative, a Node built-in or an allowed workspace package`, () => {
     const folder = join(PACKAGES, checked.name, 'src');
     const files = sourceFiles(folder);
     assert.ok(files.length > 0, `no sources under ${folder}`);
@@ -52,7 +51,7 @@ for (const checked of PACKAGES_CHECKED) {
 }
 
 // Mutant: the same check finds a fake-timer or clipboard library, written any of the usual ways.
-test('the import check reports a planted fake-timer library, clipboard library or dynamic import', { criterion: 'AC-SPEC-34-19' }, () => {
+test('the import check reports a planted fake-timer library, clipboard library or dynamic import', () => {
   const planted = [
     "import FakeTimers from '@sinonjs/fake-timers';",
     "export { read } from 'clipboardy';",

@@ -5,7 +5,6 @@
 // driver's page really keeps what was typed (echo-page-driver.ts), so a check reads the value back
 // as a browser would. Counter-examples show the run still keeps ordinary observations, and keeps
 // the same text when it was typed literally rather than from a secret.
-// See docs/specs/SPEC-04-secrets-and-redaction.md.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { MINIMUM_SECRET_LENGTH } from '@revisum/engine';
@@ -29,11 +28,11 @@ const fillCode = (value: unknown) => ({ type: 'fill', locator: ACCESS_CODE, valu
 const wrongCheck = (locator: unknown, kind: 'valueEquals' | 'textEquals') =>
   ({ type: 'expect', locator, assert: { kind, value: 'x' }, criterionId: 'secrets.code-checked' });
 
-test('setup: the access code is one character shorter than the minimum secret length', { criterion: 'AC-SPEC-04-05' }, () => {
+test('setup: the access code is one character shorter than the minimum secret length', () => {
   assert.equal(SHORT_VALUE.length, MINIMUM_SECRET_LENGTH - 1);
 });
 
-test('a failed check of a field filled from a short secret keeps no trace of the value in the result, the events or the manifest', { criterion: 'AC-SPEC-04-05' }, async () => {
+test('a failed check of a field filled from a short secret keeps no trace of the value in the result, the events or the manifest', async () => {
   const driver = echoPageDriver({ secretValues: { [SECRET]: SHORT_VALUE } });
   const ran = await runWithSecrets([SECRET], planOf([fillCode({ secretName: SECRET }), wrongCheck(ACCESS_CODE, 'valueEquals')]), { [SECRET]: SHORT_VALUE }, driver);
   // The probe is live: the page holds the secret and the check read it.
@@ -49,7 +48,7 @@ test('a failed check of a field filled from a short secret keeps no trace of the
   assert.deepEqual(manifestField(ran.result, 'secrets'), [{ name: SECRET, mode: 'key-only' }]);
 });
 
-test('a failed check whose observation is exactly a short secret, shown elsewhere on the page, keeps no trace of it', { criterion: 'AC-SPEC-04-05' }, async () => {
+test('a failed check whose observation is exactly a short secret, shown elsewhere on the page, keeps no trace of it', async () => {
   const driver = echoPageDriver({ secretValues: { [SECRET]: SHORT_VALUE }, texts: { 'shown-code': SHORT_VALUE } });
   const shownCode = { by: 'testId', testId: 'shown-code' };
   const ran = await runWithSecrets([SECRET], planOf([fillCode({ secretName: SECRET }), wrongCheck(shownCode, 'textEquals')]), { [SECRET]: SHORT_VALUE }, driver);
@@ -60,7 +59,7 @@ test('a failed check whose observation is exactly a short secret, shown elsewher
   assert.equal(ran.everything.includes(SHORT_VALUE), false, 'the short secret appears in the result or the event log');
 });
 
-test('counter-example: with a short secret in the run, a failed check of a field filled with ordinary text keeps that text', { criterion: 'AC-SPEC-04-05' }, async () => {
+test('counter-example: with a short secret in the run, a failed check of a field filled with ordinary text keeps that text', async () => {
   const driver = echoPageDriver({ secretValues: { [SECRET]: SHORT_VALUE } });
   const plan = planOf([fillCode({ secretName: SECRET }), { type: 'fill', locator: NICKNAME, value: 'Morning tea' }, wrongCheck(NICKNAME, 'valueEquals')]);
   const ran = await runWithSecrets([SECRET], plan, { [SECRET]: SHORT_VALUE }, driver);
@@ -69,7 +68,7 @@ test('counter-example: with a short secret in the run, a failed check of a field
   assert.equal(check?.observed, 'Morning tea');
 });
 
-test('counter-example: the same seven characters typed as literal text, with no secret in the run, are kept', { criterion: 'AC-SPEC-04-05' }, async () => {
+test('counter-example: the same seven characters typed as literal text, with no secret in the run, are kept', async () => {
   const driver = echoPageDriver({});
   const ran = await runWithSecrets([SECRET], planOf([fillCode(SHORT_VALUE), wrongCheck(ACCESS_CODE, 'valueEquals')]), { [SECRET]: SHORT_VALUE }, driver);
   const check = ran.result.steps[2];

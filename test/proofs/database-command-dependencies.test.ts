@@ -9,7 +9,6 @@
 //     secret into the container's environment as the container starts.
 // The driver half of this criterion is in page-script-driver-dependencies.test.ts. Planted sources
 // and lists show each check can fail.
-// See docs/specs/SPEC-36-unsafe-plan-features.md and docs/specs/SPEC-04-secrets-and-redaction.md.
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -67,12 +66,12 @@ const unexpectedAdditions = (after: readonly string[]): string[] =>
   after.filter((path) => !ALLOW_LIST_BEFORE.includes(path) && path !== WORKLOAD_ENVIRONMENT_MODULE);
 
 for (const packageName of ['contracts', 'engine', 'runner']) {
-  test(`the ${packageName} package manifest declares no runtime dependency`, { criterion: 'AC-SPEC-36-20' }, () => {
+  test(`the ${packageName} package manifest declares no runtime dependency`, () => {
     assert.deepEqual(declaredDependencies(packageName), {});
   });
 }
 
-test('every module runner\'s sources import or resolve is relative, a Node built-in or contracts', { criterion: 'AC-SPEC-36-20' }, () => {
+test('every module runner\'s sources import or resolve is relative, a Node built-in or contracts', () => {
   const files = sourceFiles(join(PACKAGES, 'runner', 'src'));
   assert.ok(files.length > 0, 'runner has no sources');
   const found = files.flatMap((file) =>
@@ -80,7 +79,7 @@ test('every module runner\'s sources import or resolve is relative, a Node built
   assert.deepEqual(found, []);
 });
 
-test('the reveal allow-list gains no module for database commands but runner\'s workload-environment module', { criterion: 'AC-SPEC-36-20' }, () => {
+test('the reveal allow-list gains no module for database commands but runner\'s workload-environment module', () => {
   const list = revealAllowList();
   assert.deepEqual(unexpectedAdditions(list), []);
   // The list never shrinks below what the other features need.
@@ -88,7 +87,7 @@ test('the reveal allow-list gains no module for database commands but runner\'s 
 });
 
 // Mutants: the same checks find a planted dependency and a planted allow-list entry.
-test('mutant: the module check reports a planted database driver import and run-time resolution', { criterion: 'AC-SPEC-36-20' }, () => {
+test('mutant: the module check reports a planted database driver import and run-time resolution', () => {
   const planted = [
     "import { Client } from 'pg';",
     "const mysql = await import('mysql2/promise');",
@@ -100,7 +99,7 @@ test('mutant: the module check reports a planted database driver import and run-
   assert.deepEqual(foreignModules(planted, ['@revisum/contracts']), ['pg', 'mysql2/promise', 'better-sqlite3']);
 });
 
-test('mutant: an allow-list that also names a database-command module in runner or cli is reported', { criterion: 'AC-SPEC-36-20' }, () => {
+test('mutant: an allow-list that also names a database-command module in runner or cli is reported', () => {
   const planted = `export const REVEAL_ALLOWED_MODULES: readonly string[] = [
     ${[...ALLOW_LIST_BEFORE, WORKLOAD_ENVIRONMENT_MODULE, 'packages/runner/src/workload-runner.ts', 'packages/cli/src/database-commands.ts']
     .map((path) => `'${path}'`).join(',\n    ')},

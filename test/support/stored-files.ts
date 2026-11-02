@@ -3,7 +3,6 @@
 // downloads folder. Only folders changed since the test began are searched below the top, so the
 // search stays quick: a folder made, or written into, during the test always has a newer time.
 // A test plants a marker in each file the server sends, then asks which files on disk hold it.
-// See docs/specs/SPEC-31-page-states-metadata-downloads-and-tabs.md.
 import { lstatSync, readdirSync, readFileSync, type Stats } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';

@@ -5,7 +5,7 @@
 // before that parse, and the source changes nothing: the same plan gets the same hash, policy
 // decision and approval requirement whichever route it came by.
 //
-// Provenance (SPEC-28's build notes): without a declared source a draft is hand-written, basis
+// Provenance: without a declared source a draft is hand-written, basis
 // declared. A caller may declare hand-written or customer-llm. Only core's own recorder produces a
 // core-recorded basis (phase 2b), so a draft whose caller claims one is refused with
 // untrusted-source, before the parser. A malformed JSON draft is not_object at $, also before it.
@@ -20,7 +20,6 @@
 //
 // The policy decisions use the shared test project, whose one target is in de-DE: a click on
 // "Konto löschen" (delete account) is denied as irreversible there, and "Create account" is not.
-// See docs/specs/SPEC-28-plan-authoring.md.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
@@ -37,7 +36,7 @@ import { ORIGIN, accountClosurePlan, defaultParser, signupPlan, testProject, tes
 
 type Route = { readonly format: PlanFormat; readonly basis: ProvenanceBasis; readonly reference?: string };
 
-// 'explore-draft' is SPEC-37's route (docs/specs/SPEC-37-explore-to-draft.md); it is named beside
+// 'explore-draft' is the explore route; it is named beside
 // PlanSource so this file compiles before and after the source joins PLAN_SOURCES.
 const ROUTES: { readonly [Source in PlanSource | 'explore-draft']: Route } = {
   'hand-written': { format: 'text', basis: 'declared' },
@@ -140,7 +139,7 @@ async function runAdmitted(plan: Plan, log: CallLog): Promise<void> {
 // ---- Every route's draft is parsed first ------------------------------------------------------------------
 
 for (const source of DECLARABLE) {
-  test(`a ${source} draft is parsed exactly once, and the plan admitted is the parser's own`, { criterion: 'AC-SPEC-28-03' }, () => {
+  test(`a ${source} draft is parsed exactly once, and the plan admitted is the parser's own`, () => {
     const log: CallLog = [];
     const spy = spyParser(log);
     const admitted = admitDraft(draftOf(source, signupPlan()), spy.parse, memoryEventSink(), someActor());
@@ -150,7 +149,7 @@ for (const source of DECLARABLE) {
     assert.equal(admitted.value, spy.plans[0], 'the admitted plan is not the object the parser returned');
   });
 
-  test(`a ${source} draft reaches the parser as plain JSON, never as a Plan`, { criterion: 'AC-SPEC-28-03' }, () => {
+  test(`a ${source} draft reaches the parser as plain JSON, never as a Plan`, () => {
     const spy = spyParser([]);
     const draft = draftOf(source, signupPlan());
     admitDraft(draft, spy.parse, memoryEventSink(), someActor());
@@ -159,7 +158,7 @@ for (const source of DECLARABLE) {
     assert.deepEqual(spy.inputs[0], expectedParserInput(draft));
   });
 
-  test(`a ${source} draft reaches a run only after its parse: no gate or driver call comes first`, { criterion: 'AC-SPEC-28-03' }, async () => {
+  test(`a ${source} draft reaches a run only after its parse: no gate or driver call comes first`, async () => {
     const log: CallLog = [];
     const admitted = admitDraft(draftOf(source, signupPlan()), spyParser(log).parse, memoryEventSink(), someActor());
     if (!admitted.ok) assert.fail(shown(admitted.error));
@@ -170,7 +169,7 @@ for (const source of DECLARABLE) {
     assert.ok(log.slice(2).includes('driver'), `the admitted plan never reached the driver: ${JSON.stringify(log)}`);
   });
 
-  test(`a ${source} draft the parser refuses is not admitted, even when the text reads cleanly`, { criterion: 'AC-SPEC-28-03' }, () => {
+  test(`a ${source} draft the parser refuses is not admitted, even when the text reads cleanly`, () => {
     // A mutant parser that refuses everything: had admitDraft built the plan itself, it would pass.
     const refusal: readonly PlanError[] = [{ code: 'unknown_step', path: '$.steps[0]' }];
     const refusing: PlanParse = () => failure(refusal);
@@ -180,7 +179,7 @@ for (const source of DECLARABLE) {
     assert.ok(admitted.error.some((error) => error.stage === 'plan' && error.code === 'unknown_step' && error.path === '$.steps[0]'), shown(admitted.error));
   });
 
-  test(`a ${source} draft is admitted as whatever plan the parser returns`, { criterion: 'AC-SPEC-28-03' }, () => {
+  test(`a ${source} draft is admitted as whatever plan the parser returns`, () => {
     // A mutant parser that answers with a different plan: the admitted plan follows the parser.
     const substitute = parsedSignupPlan(accountClosurePlan());
     const admitted = admitDraft(draftOf(source, signupPlan()), () => success(substitute), memoryEventSink(), someActor());
@@ -190,7 +189,7 @@ for (const source of DECLARABLE) {
 }
 
 for (const source of CORE_RECORDED) {
-  test(`a draft claiming to come from core's ${source} route is refused before the parser, and nothing runs`, { criterion: 'AC-SPEC-28-03' }, () => {
+  test(`a draft claiming to come from core's ${source} route is refused before the parser, and nothing runs`, () => {
     const log: CallLog = [];
     const admitted = admitDraft(draftOf(source, signupPlan()), spyParser(log).parse, memoryEventSink(), someActor());
     assert.equal(admitted.ok, false, `a caller's claim of the ${source} route was admitted`);
@@ -198,7 +197,7 @@ for (const source of CORE_RECORDED) {
   });
 }
 
-test('a text draft the reader refuses never reaches the parser', { criterion: 'AC-SPEC-28-03' }, () => {
+test('a text draft the reader refuses never reaches the parser', () => {
   const log: CallLog = [];
   const admitted = admitDraft(draftWith('text', 'Teleport to "nowhere"\n', DEFAULT_PROVENANCE), spyParser(log).parse, memoryEventSink(), someActor());
   assert.equal(admitted.ok, false);
@@ -206,7 +205,7 @@ test('a text draft the reader refuses never reaches the parser', { criterion: 'A
 });
 
 for (const content of ['{ "version": "1.2", ', 'not JSON at all', '']) {
-  test(`a JSON draft that is not JSON (${JSON.stringify(content)}) is not_object at $, before the parser`, { criterion: 'AC-SPEC-28-03' }, () => {
+  test(`a JSON draft that is not JSON (${JSON.stringify(content)}) is not_object at $, before the parser`, () => {
     const log: CallLog = [];
     const events = memoryEventSink();
     const admitted = admitDraft(draftWith('json', content, DEFAULT_PROVENANCE), spyParser(log).parse, events, someActor());
@@ -220,7 +219,7 @@ for (const content of ['{ "version": "1.2", ', 'not JSON at all', '']) {
 // ---- Declared sources --------------------------------------------------------------------------------------
 
 for (const format of ['text', 'json'] as const) {
-  test(`a ${format} draft with no declared source is recorded as hand-written, basis declared`, { criterion: 'AC-SPEC-28-09' }, () => {
+  test(`a ${format} draft with no declared source is recorded as hand-written, basis declared`, () => {
     const events = memoryEventSink();
     const admitted = admitDraft(draftWith(format, contentOf(signupPlan(), format), undefined), defaultParser(), events, someActor());
     assert.equal(admitted.ok, true, JSON.stringify(admitted));
@@ -229,7 +228,7 @@ for (const format of ['text', 'json'] as const) {
   });
 }
 
-test('a draft declared as customer-llm keeps that source, basis declared', { criterion: 'AC-SPEC-28-09' }, () => {
+test('a draft declared as customer-llm keeps that source, basis declared', () => {
   // The counter-example to the default: a declared source is recorded as declared, not replaced.
   const events = memoryEventSink();
   const declared: PlanProvenance = { source: 'customer-llm', basis: 'declared' };
@@ -238,7 +237,7 @@ test('a draft declared as customer-llm keeps that source, basis declared', { cri
 });
 
 for (const source of SOURCES) {
-  test(`a draft claiming a core-recorded basis for ${source} is refused with untrusted-source`, { criterion: 'AC-SPEC-28-09' }, () => {
+  test(`a draft claiming a core-recorded basis for ${source} is refused with untrusted-source`, () => {
     const events = memoryEventSink();
     const claim: PlanProvenance = { source, basis: 'core-recorded' };
     const admitted = admitDraft(draftWith('text', contentOf(signupPlan(), 'text'), claim), defaultParser(), events, someActor());
@@ -255,7 +254,7 @@ for (const source of SOURCES) {
 // ---- One audit event, with the draft's provenance ----------------------------------------------------------
 
 for (const source of DECLARABLE) {
-  test(`admitting a ${source} draft appends one plan.submitted event with its source and basis`, { criterion: 'AC-SPEC-28-08' }, () => {
+  test(`admitting a ${source} draft appends one plan.submitted event with its source and basis`, () => {
     const events = memoryEventSink();
     const actor = someActor();
     const admitted = admitDraft(draftOf(source, signupPlan()), defaultParser(), events, actor);
@@ -269,7 +268,7 @@ for (const source of DECLARABLE) {
   });
 
   for (const format of ['text', 'json'] as const) {
-    test(`refusing a ${source} draft in ${format} form appends one plan.rejected event with its source and basis`, { criterion: 'AC-SPEC-28-08' }, () => {
+    test(`refusing a ${source} draft in ${format} form appends one plan.rejected event with its source and basis`, () => {
       const events = memoryEventSink();
       const content = format === 'text'
         ? 'Teleport to "nowhere"\n'
@@ -309,7 +308,7 @@ for (const { name, plan, decision, approved } of [
   { name: 'the sign-up plan', plan: signupPlan, decision: 'allow', approved: 'approved' },
   { name: 'the sign-up plan with an irreversible click', plan: DENIED_SIGNUP, decision: 'deny irreversible-action at 8', approved: 'proposal' },
 ]) {
-  test(`${name} gets the same hash, policy decision and approval requirement from every admissible source and form`, { criterion: 'AC-SPEC-28-08' }, async () => {
+  test(`${name} gets the same hash, policy decision and approval requirement from every admissible source and form`, async () => {
     const drafts: { readonly label: string; readonly draft: PlanDraft }[] = [
       ...DECLARABLE.flatMap((source) => (['text', 'json'] as const).map((format) => ({ label: `${source} ${format}`, draft: draftOf(source, plan(), format) }))),
       ...(['text', 'json'] as const).map((format) => ({ label: `no declared source, ${format}`, draft: draftWith(format, contentOf(plan(), format), undefined) })),

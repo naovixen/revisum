@@ -5,7 +5,6 @@
 // A counter-example on the same page shows an ordinary click there passes.
 // The Playwright fallback refuses the steps only the own driver performs (hover, select, upload,
 // frame and dialog) the same way, with nothing sent to the page.
-// See docs/specs/SPEC-06-cdp-driver.md.
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -37,7 +36,7 @@ const OPENERS = [
 for (const targetId of CDP_TARGETS) {
   describe(`pages and downloads: ${targetId}`, () => {
     for (const opener of OPENERS) {
-      test(`${opener.name} fails the step with unsupported-step and skips the rest`, { criterion: 'AC-SPEC-06-05' }, async () => {
+      test(`${opener.name} fails the step with unsupported-step and skips the rest`, async () => {
         const before = leftDownloads();
         const plan = capability.plan(capabilityPlan(targetId, [
           navigate('/pages.html'),
@@ -55,7 +54,7 @@ for (const targetId of CDP_TARGETS) {
       });
     }
 
-    test('counter-example: an ordinary click on the same page passes and the run goes on', { criterion: 'AC-SPEC-06-05' }, async () => {
+    test('counter-example: an ordinary click on the same page passes and the run goes on', async () => {
       const plan = capability.plan(capabilityPlan(targetId, [
         navigate('/pages.html'),
         click(role('button', 'Stay here')),
@@ -67,7 +66,7 @@ for (const targetId of CDP_TARGETS) {
       assert.equal(store.references().length, 1);
     });
 
-    test('the popup is closed and the session stays on the page that opened it', { criterion: 'AC-SPEC-06-05' }, async () => {
+    test('the popup is closed and the session stays on the page that opened it', async () => {
       const session = await capability.openOwn(targetId);
       try {
         assert.ok((await session.navigate(capability.url('/pages.html'))).ok);
@@ -97,7 +96,7 @@ describe('the Playwright fallback refuses the steps only the own driver performs
   ] as const;
 
   for (const refused of REFUSED) {
-    test(`${refused.name} fails with unsupported-step and sends nothing to the page`, { criterion: 'AC-SPEC-06-05' }, async () => {
+    test(`${refused.name} fails with unsupported-step and sends nothing to the page`, async () => {
       const session = await capability.open(PLAYWRIGHT_TARGET);
       try {
         assert.ok((await session.navigate(capability.url('/guard.html'))).ok);
@@ -113,7 +112,7 @@ describe('the Playwright fallback refuses the steps only the own driver performs
     });
   }
 
-  test('a frame fails with unsupported-step and none of its steps runs', { criterion: 'AC-SPEC-06-05' }, async () => {
+  test('a frame fails with unsupported-step and none of its steps runs', async () => {
     const plan = capability.plan(capabilityPlan(PLAYWRIGHT_TARGET, [
       navigate('/frame.html'),
       { type: 'frame', locator: testId('checkout-frame'), steps: [textEquals(testId('frame-status'), 'Waiting', 'frame.waiting')] },
@@ -126,7 +125,7 @@ describe('the Playwright fallback refuses the steps only the own driver performs
     ]);
   });
 
-  test('counter-example: a click on the Playwright fallback is sent to the page', { criterion: 'AC-SPEC-06-05' }, async () => {
+  test('counter-example: a click on the Playwright fallback is sent to the page', async () => {
     const session = await capability.open(PLAYWRIGHT_TARGET);
     try {
       assert.ok((await session.navigate(capability.url('/guard.html'))).ok);

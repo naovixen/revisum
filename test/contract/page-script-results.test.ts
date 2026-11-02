@@ -9,7 +9,6 @@
 // Each is an evaluate step, so the run ends Errored, the later steps are skipped and the page gets
 // no more input. The counter-examples run the same script with a result just inside each limit,
 // and a plain result, and pass.
-// See docs/specs/SPEC-36-unsafe-plan-features.md.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import {
@@ -52,7 +51,7 @@ const scriptThenContinue = (kind: HostileResultKind, amount: number): unknown[] 
 for (const targetId of BOTH_TARGETS) {
   describe(`page script results: ${targetId}`, () => {
     for (const { name, kind, amount, code } of REFUSED) {
-      test(`${name} fails the evaluate step with ${code}, ends the run Errored and skips the rest`, { criterion: 'AC-SPEC-36-10' }, async () => {
+      test(`${name} fails the evaluate step with ${code}, ends the run Errored and skips the rest`, async () => {
         const ran = await harness.runSteps(targetId, scriptThenContinue(kind, amount), { read: ['input-events', 'continue-state'] });
         assert.equal(ran.result.state, 'Errored', JSON.stringify(ran.result.steps));
         assert.deepEqual(outcomes(ran.result), [[0, 'passed', undefined], [1, 'failed', code], [2, 'skipped', undefined], [3, 'skipped', undefined]]);
@@ -61,7 +60,7 @@ for (const targetId of BOTH_TARGETS) {
       });
     }
 
-    test('a promise that never settles is stopped by the script\'s own timeout, well before the step timeout', { criterion: 'AC-SPEC-36-10' }, async () => {
+    test('a promise that never settles is stopped by the script\'s own timeout, well before the step timeout', async () => {
       const ran = await harness.runSteps(targetId, scriptThenContinue('never-settles', 0));
       assert.equal(ran.result.steps[1]?.code, 'script-timeout');
       const taken = stepMilliseconds(ran.result, 1);
@@ -72,7 +71,7 @@ for (const targetId of BOTH_TARGETS) {
     // Counter-examples: the same script, with results inside every limit, passes, and the page
     // then receives the click.
     for (const { name, kind, amount } of ACCEPTED) {
-      test(`counter-example: ${name} passes and the run goes on`, { criterion: 'AC-SPEC-36-10' }, async () => {
+      test(`counter-example: ${name} passes and the run goes on`, async () => {
         const ran = await harness.runSteps(targetId, scriptThenContinue(kind, amount), { read: ['input-events'] });
         assert.equal(ran.result.state, 'Passed', JSON.stringify(ran.result.steps));
         assert.notEqual(ran.atClose?.shown['input-events'], '0', 'the click after the script reached the page');

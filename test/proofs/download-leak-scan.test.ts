@@ -6,10 +6,8 @@
 // result keeps the file's sha256 instead.
 // A failing content check keeps none of the file's text in its observation. With the project's
 // evidence.keepDownloads on, the scan finds no canary either; and until privacy masking lands
-// (SPEC-09, M3) no text of the file is kept at all, whatever keepDownloads says.
-// Not covered here: the visual report, which a run cannot produce until the result model joins it
-// (SPEC-11, SPEC-12).
-// See docs/specs/SPEC-31-page-states-metadata-downloads-and-tabs.md and docs/specs/SPEC-04-secrets-and-redaction.md.
+// (M3) no text of the file is kept at all, whatever keepDownloads says.
+// Not covered here: the visual report, which a run cannot produce until the result model joins it.
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -103,7 +101,7 @@ const downloadAndCheck = (harness: PageStatesHarness, contentCheck: string) => h
 ]);
 
 describe('a run that downloads a CSV of secrets and personal data', () => {
-  test('the leak scan finds no canary in the result, event log, audit events or images; the result keeps the file\'s sha256', { criterion: 'AC-SPEC-31-08', timeout: TIMEOUT }, async () => {
+  test('the leak scan finds no canary in the result, event log, audit events or images; the result keeps the file\'s sha256', { timeout: TIMEOUT }, async () => {
     const ran = await downloadAndCheck(keepUnset, 'Contact,Email');
     assert.equal(ran.result.state, 'Passed', JSON.stringify(ran.result.steps));
     assert.ok(ran.store.references().length > 0, 'the run kept its capture');
@@ -112,7 +110,7 @@ describe('a run that downloads a CSV of secrets and personal data', () => {
     assert.ok(!everythingKept(ran).includes(HARMLESS_ROW), 'no text of the file was kept');
   });
 
-  test('a failing content check keeps none of the file\'s text in its observation', { criterion: 'AC-SPEC-31-08', timeout: TIMEOUT }, async () => {
+  test('a failing content check keeps none of the file\'s text in its observation', { timeout: TIMEOUT }, async () => {
     const ran = await downloadAndCheck(keepUnset, 'Text the file never holds');
     assert.equal(ran.result.state, 'Failed');
     assert.deepEqual(outcomes(ran.result).slice(0, 6), [
@@ -123,12 +121,12 @@ describe('a run that downloads a CSV of secrets and personal data', () => {
     assert.ok(!everythingKept(ran).includes(HARMLESS_ROW), 'no text of the file was kept');
   });
 
-  test('with evidence.keepDownloads on, the scan still finds no canary, and no text of the file is kept before privacy masking', { criterion: 'AC-SPEC-31-08', timeout: TIMEOUT }, async () => {
+  test('with evidence.keepDownloads on, the scan still finds no canary, and no text of the file is kept before privacy masking', { timeout: TIMEOUT }, async () => {
     const ran = await downloadAndCheck(keepOn, 'Contact,Email');
     assert.equal(ran.result.state, 'Passed', JSON.stringify(ran.result.steps));
     assertNoEcho('kept', ran);
     assert.ok(resultText(ran).includes(sha256(Buffer.from(CONTACTS_TEXT, 'utf8'))), 'the result holds the file\'s sha256');
-    // Changes when SPEC-09 lands: the kept text, redacted, may then hold this harmless row.
+    // Changes when privacy masking lands: the kept text, redacted, may then hold this harmless row.
     assert.ok(!everythingKept(ran).includes(HARMLESS_ROW), 'no text of the file was kept');
   });
 });

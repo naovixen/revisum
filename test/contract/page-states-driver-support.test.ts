@@ -4,7 +4,6 @@
 // and skips the rest. Nothing of the step reaches the page: no input event is counted, no file
 // is fetched, no tab's page is requested and a page to load with scripts off is never loaded.
 // Each refusal is paired with the same plan without the feature, which the fallback does run.
-// See docs/specs/SPEC-31-page-states-metadata-downloads-and-tabs.md.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import {
@@ -68,7 +67,7 @@ const stepsWith = (page: string, step: JsonRecord) => [navigate(page), step, cli
 
 describe(`the Playwright fallback: ${PLAYWRIGHT_TARGET}`, () => {
   for (const feature of FEATURES) {
-    test(`a run with ${feature.name} fails that step with unsupported-step, sends nothing and skips the rest`, { criterion: 'AC-SPEC-31-15' }, async () => {
+    test(`a run with ${feature.name} fails that step with unsupported-step, sends nothing and skips the rest`, async () => {
       const { result, atClose, requestedPaths } = await harness.runSteps(PLAYWRIGHT_TARGET, stepsWith(feature.page, feature.withFeature()));
       assert.equal(result.state, 'Failed');
       assert.deepEqual(outcomes(result), [[0, 'passed', undefined], [1, 'failed', 'unsupported-step'], [2, 'skipped', undefined], [3, 'skipped', undefined]]);
@@ -76,14 +75,14 @@ describe(`the Playwright fallback: ${PLAYWRIGHT_TARGET}`, () => {
       if (feature.neverRequested !== undefined) assert.ok(!requestedPaths.includes(feature.neverRequested()), `${feature.neverRequested()} was never requested`);
     });
 
-    test(`counter-example: the same run without ${feature.name} passes and sends its input`, { criterion: 'AC-SPEC-31-15' }, async () => {
+    test(`counter-example: the same run without ${feature.name} passes and sends its input`, async () => {
       const { result, atClose } = await harness.runSteps(PLAYWRIGHT_TARGET, stepsWith(feature.page, feature.without));
       assert.equal(result.state, 'Passed', JSON.stringify(result.steps));
       assert.notEqual(atClose?.shown['input-events'], '0');
     });
   }
 
-  test('a run with a navigate whose scripts are disabled fails it with unsupported-step and never loads the page', { criterion: 'AC-SPEC-31-15' }, async () => {
+  test('a run with a navigate whose scripts are disabled fails it with unsupported-step and never loads the page', async () => {
     const { result, requestedPaths } = await harness.runSteps(PLAYWRIGHT_TARGET, [
       navigate('/index.html'), navigateWithoutScripts('/head.html'), click(role('button', 'Continue')), continueShown(),
     ]);
@@ -91,7 +90,7 @@ describe(`the Playwright fallback: ${PLAYWRIGHT_TARGET}`, () => {
     assert.ok(!requestedPaths.includes('/head.html'), 'the page was never loaded, with scripts or without');
   });
 
-  test('counter-example: the same navigate without scripts disabled loads the page', { criterion: 'AC-SPEC-31-15' }, async () => {
+  test('counter-example: the same navigate without scripts disabled loads the page', async () => {
     const { result, requestedPaths } = await harness.runSteps(PLAYWRIGHT_TARGET, [
       navigate('/index.html'), navigate('/head.html'), click(role('button', 'Continue')), continueShown(),
     ]);
@@ -102,13 +101,13 @@ describe(`the Playwright fallback: ${PLAYWRIGHT_TARGET}`, () => {
 
 describe(`the own CDP driver: ${CDP_TARGET}`, () => {
   for (const feature of FEATURES) {
-    test(`a run with ${feature.name} performs it and passes`, { criterion: 'AC-SPEC-31-15' }, async () => {
+    test(`a run with ${feature.name} performs it and passes`, async () => {
       const { result } = await harness.runSteps(CDP_TARGET, stepsWith(feature.page, feature.withFeature()));
       assert.equal(result.state, 'Passed', JSON.stringify(result.steps));
     });
   }
 
-  test('a run with a navigate whose scripts are disabled performs it and passes', { criterion: 'AC-SPEC-31-15' }, async () => {
+  test('a run with a navigate whose scripts are disabled performs it and passes', async () => {
     const { result, requestedPaths } = await harness.runSteps(CDP_TARGET, [
       navigate('/index.html'), navigateWithoutScripts('/head.html'), click(role('button', 'Continue')), continueShown(),
     ]);

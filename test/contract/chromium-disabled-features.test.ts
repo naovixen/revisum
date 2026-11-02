@@ -90,7 +90,7 @@ function sessionEnvironment(): SessionEnvironment {
 }
 
 describe('Chromium port randomisation is off in every browser a driver starts', () => {
-  test('the shared Chromium launcher, with its default flags, disables port randomisation', { criterion: 'AC-SPEC-00-01' }, async () => {
+  test('the shared Chromium launcher, with its default flags, disables port randomisation', async () => {
     const launched = await launchChromium(BROWSERS.chrome, { profilePrefix: 'disabled-features-test-' });
     try {
       const { targetId } = await launched.connection.send<{ targetId: string }>(undefined, 'Target.createTarget', { url: 'chrome://version' });
@@ -112,7 +112,7 @@ describe('Chromium port randomisation is off in every browser a driver starts', 
     }
   });
 
-  test('the CDP driver\'s browser disables port randomisation', { criterion: 'AC-SPEC-00-01' }, async () => {
+  test('the CDP driver\'s browser disables port randomisation', async () => {
     const driver = cdpDriver({ executablePath: BROWSERS.chrome });
     const opened = await driver.open(contractTarget('cdp-chromium'), sessionEnvironment());
     assert.ok(opened.ok, 'session opens');
@@ -129,7 +129,7 @@ describe('Chromium port randomisation is off in every browser a driver starts', 
     }
   });
 
-  test('the Playwright driver\'s Chromium disables port randomisation and every feature Playwright disables by default', { criterion: 'AC-SPEC-00-01' }, async () => {
+  test('the Playwright driver\'s Chromium disables port randomisation and every feature Playwright disables by default', async () => {
     // What the installed Playwright disables when it launches Chromium with no overrides.
     const plain = await chromium.launch({ headless: true });
     let playwrightDefaults: readonly string[];
@@ -168,7 +168,7 @@ describe('Chromium port randomisation is off in every browser a driver starts', 
     assert.deepEqual(featuresLeftOn(commandLine, playwrightDefaults), [], commandLine.join(' '));
   });
 
-  test('the check fails a command line whose later --disable-features flag drops a feature', { criterion: 'AC-SPEC-00-01' }, () => {
+  test('the check fails a command line whose later --disable-features flag drops a feature', () => {
     // An earlier flag that disables the feature does not count: Chromium reads only the last one.
     const overridden = ['chrome', `--disable-features=Translate,${PORT_RANDOMISATION_FEATURE}`, '--headless', '--disable-features=Translate'];
     assert.deepEqual(featuresLeftOn(overridden, [PORT_RANDOMISATION_FEATURE]), [PORT_RANDOMISATION_FEATURE]);

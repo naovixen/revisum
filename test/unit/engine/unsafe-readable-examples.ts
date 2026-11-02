@@ -16,7 +16,6 @@
 //
 // Every plan is built as JSON and parsed before it is used, so a plan the parser refuses is a
 // broken test and throws. Readable text is written by hand only where the spec prints it.
-// See docs/specs/SPEC-28-plan-authoring.md ("Readable syntax for plan 1.3").
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { readPlanText, type DraftError, type Plan, type StepType, type TextReading } from '@revisum/engine';

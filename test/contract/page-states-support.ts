@@ -13,7 +13,6 @@
 // gate and run with run(). The project's targets are the own CDP driver on Chrome for Testing and
 // the Playwright fallback on Chromium, in English and London time, with a 64 KiB download limit.
 // Every run reads the page just before the run closes its session, after an optional test hook.
-// See docs/specs/SPEC-31-page-states-metadata-downloads-and-tabs.md.
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import { readFileSync } from 'node:fs';

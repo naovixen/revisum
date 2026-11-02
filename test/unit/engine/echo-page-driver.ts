@@ -3,7 +3,6 @@
 // an element found by its test id shows a text the test chooses, such as a careless echo of a
 // secret. The test hands in the values of the secrets it planted, so the driver never needs
 // reveal: it looks the typed value up by the secret's name, as a real page would hold it.
-// See docs/specs/SPEC-04-secrets-and-redaction.md.
 import type { BrowserDriver, ElementProbe, Locator, Session } from '@revisum/engine';
 import { ORIGIN } from './secret-examples.ts';
 

@@ -13,7 +13,6 @@
 // The project declares the shop at SHOP_ORIGIN (loopback port 4180); the proxy's connect function
 // sends that port to the local shop, whatever port it really listens on, and every other port to a
 // port where nothing listens.
-// See docs/specs/SPEC-32-declared-service-calls.md, "The real caller".
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { connect } from 'node:net';
@@ -114,7 +113,7 @@ const CALL_TIMEOUT = 400;
 
 // ---- Where a call may go -------------------------------------------------------------------------------
 
-test('through the real caller, a call to a loopback shop not declared private ends the run Errored with egress-blocked, and the shop receives nothing', { criterion: 'AC-SPEC-32-05' }, async () => {
+test('through the real caller, a call to a loopback shop not declared private ends the run Errored with egress-blocked, and the shop receives nothing', async () => {
   const projectFile = callProjectFile({}, {}, { services: [{ ...SHOP, private: false }] });
   const ran = await runThroughProxy(callPlanOf([NAVIGATE, CREATE_ORDER, NAVIGATE]), { projectFile, shopPrivate: false });
   assert.equal(ran.result.state, 'Errored');
@@ -123,13 +122,13 @@ test('through the real caller, a call to a loopback shop not declared private en
 });
 
 // Counter-example: the same plan, with the shop declared private, reaches it.
-test('through the real caller, the same plan with the shop declared private passes', { criterion: 'AC-SPEC-32-05' }, async () => {
+test('through the real caller, the same plan with the shop declared private passes', async () => {
   const ran = await runThroughProxy(callPlanOf([NAVIGATE, CREATE_ORDER, NAVIGATE]));
   assert.equal(ran.result.state, 'Passed', JSON.stringify(ran.result.steps));
   assert.deepEqual(received(ran.shop), ['POST /api/orders']);
 });
 
-test('through the real caller, a redirect is judged against successStatuses and never followed', { criterion: 'AC-SPEC-32-05', timeout: 20_000 }, async () => {
+test('through the real caller, a redirect is judged against successStatuses and never followed', { timeout: 20_000 }, async () => {
   const redirecting = answering('POST /api/test/reset', (response) => response.writeHead(303, { location: `${SHOP_ORIGIN}/api/test/landing` }).end());
   const undeclared = await runThroughProxy(callPlanOf([RESET_SHOP]), { override: redirecting });
   assert.deepEqual(stepLines(undeclared.result).slice(0, 1), ['call failed unexpected-status']);
@@ -159,7 +158,7 @@ const FAILED_CALLS: readonly { readonly name: string; readonly options: RealRunO
 ];
 
 for (const failed of FAILED_CALLS) {
-  test(`through the real caller, a call that gets ${failed.name} ends the run Errored with ${failed.code}, skips later steps, and cleanup still runs`, { criterion: 'AC-SPEC-32-07' }, async () => {
+  test(`through the real caller, a call that gets ${failed.name} ends the run Errored with ${failed.code}, skips later steps, and cleanup still runs`, async () => {
     const ran = await runThroughProxy(withCleanup(callPlanOf([NAVIGATE, CREATE_ORDER, NAVIGATE]), [RESET_SHOP]), failed.options);
     assert.equal(ran.result.state, 'Errored');
     assert.deepEqual(stepLines(ran.result), ['navigate passed', `call failed ${failed.code}`, 'navigate skipped', 'expect skipped']);
@@ -170,7 +169,7 @@ for (const failed of FAILED_CALLS) {
 
 // ---- Backend checks poll; a write is sent once -------------------------------------------------------------
 
-test('through the real caller, a backend check whose field matches only on the third read passes after three reads', { criterion: 'AC-SPEC-32-09' }, async () => {
+test('through the real caller, a backend check whose field matches only on the third read passes after three reads', async () => {
   const paidOnThirdRead = answering(`GET /api/orders/${ORDER_ID}`, (response, earlier) => {
     const readsBefore = earlier.filter((request) => request.method === 'GET').length;
     json(response, 200, { status: readsBefore >= 2 ? 'paid' : 'pending', total: 42 });
@@ -181,7 +180,7 @@ test('through the real caller, a backend check whose field matches only on the t
   assert.equal(countOf(ran.shop, `GET /api/orders/${ORDER_ID}`), 3);
 });
 
-test('through the real caller, a backend check whose field never matches fails with assertion-failed after polling', { criterion: 'AC-SPEC-32-09' }, async () => {
+test('through the real caller, a backend check whose field never matches fails with assertion-failed after polling', async () => {
   const neverPaid = answering(`GET /api/orders/${ORDER_ID}`, (response) => json(response, 200, { status: 'pending', total: 42 }));
   const ran = await runThroughProxy(callPlanOf([CREATE_ORDER, ORDER_PAID]), { override: neverPaid, projectFile: shortChecks() });
   assert.deepEqual(stepLines(ran.result).slice(0, 3), ['call passed', 'expectBackend failed assertion-failed', 'expect skipped']);
@@ -190,7 +189,7 @@ test('through the real caller, a backend check whose field never matches fails w
   assert.ok(countOf(ran.shop, `GET /api/orders/${ORDER_ID}`) > 1, 'the read was polled');
 });
 
-test('through the real caller, a write that times out reached the shop exactly once', { criterion: 'AC-SPEC-32-09' }, async () => {
+test('through the real caller, a write that times out reached the shop exactly once', async () => {
   const ran = await runThroughProxy(callPlanOf([CREATE_ORDER]), {
     override: answering('POST /api/orders', () => undefined),
     projectFile: shortChecks(changedCall('createOrder', { timeoutMilliseconds: CALL_TIMEOUT })),
@@ -214,7 +213,7 @@ const RESPONSE_CASES: readonly { readonly name: string; readonly answer: (respon
 ];
 
 for (const responseCase of RESPONSE_CASES) {
-  test(`through the real caller, a call whose response is ${responseCase.name} fails with ${responseCase.code}`, { criterion: 'AC-SPEC-32-10' }, async () => {
+  test(`through the real caller, a call whose response is ${responseCase.name} fails with ${responseCase.code}`, async () => {
     const ran = await runThroughProxy(callPlanOf([CREATE_ORDER]), {
       override: answering('POST /api/orders', responseCase.answer), projectFile: callProjectFile(responseCase.calls ?? {}),
     });
@@ -224,7 +223,7 @@ for (const responseCase of RESPONSE_CASES) {
 }
 
 // Counter-example: a response just within its cap is read.
-test('through the real caller, a response within its cap is read and its field remembered', { criterion: 'AC-SPEC-32-10' }, async () => {
+test('through the real caller, a response within its cap is read and its field remembered', async () => {
   const ran = await runThroughProxy(callPlanOf([CREATE_ORDER, call('getOrder', { orderId: { valueName: 'orderId' } })]), {
     projectFile: callProjectFile(changedCall('createOrder', { maximumResponseBytes: 256 })),
   });
@@ -261,7 +260,7 @@ const echoPlan = withCleanup(callPlanOf([
 
 const everythingKept = (ran: RealRun): string => `${ran.everything}\n${JSON.stringify(ran.proxy.decisions())}\n${ran.consoleText}`;
 
-test('through the real caller, the secrets reach the shop, yet no form of any secret reaches the result, the log, the proxy or the console', { criterion: 'AC-SPEC-32-11' }, async () => {
+test('through the real caller, the secrets reach the shop, yet no form of any secret reaches the result, the log, the proxy or the console', async () => {
   const ran = await runThroughProxy(echoPlan, { override: echoingShop, projectFile: shortChecks() });
   assert.equal(ran.result.state, 'Failed', 'the echo check failed, so the run kept what it observed');
 
@@ -279,14 +278,14 @@ test('through the real caller, the secrets reach the shop, yet no form of any se
   }
 });
 
-test('through the real caller, no header value is recorded in the result, the log, the proxy\'s decisions or the console', { criterion: 'AC-SPEC-32-11' }, async () => {
+test('through the real caller, no header value is recorded in the result, the log, the proxy\'s decisions or the console', async () => {
   const ran = await runThroughProxy(echoPlan, { override: echoingShop, projectFile: shortChecks() });
   const kept = everythingKept(ran);
   assert.ok(!kept.includes(HEADER_MARKER), 'a literal header value was recorded');
   assert.ok(!kept.toLowerCase().includes('bearer '), 'an authorization header was recorded');
 });
 
-test('through the real caller, the leak scan finds no secret in what the run kept, and does find a planted canary', { criterion: 'AC-SPEC-32-11' }, async () => {
+test('through the real caller, the leak scan finds no secret in what the run kept, and does find a planted canary', async () => {
   const ran = await runThroughProxy(echoPlan, { override: echoingShop, projectFile: shortChecks() });
   const folder = mkdtempSync(join(tmpdir(), 'real-caller-leaks-'));
   try {

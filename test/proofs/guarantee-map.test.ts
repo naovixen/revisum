@@ -10,7 +10,6 @@
 // Each test works in a throw-away copy of the repository whose test folders are replaced by
 // stand-in tests, one per mapped test id (`<file>#<full name>`), each made to pass, fail or be
 // left out. tools/run-test-folder.ts runs them and writes the results the gates step reads.
-// See docs/specs/SPEC-00-repo-seed-and-gates.md.
 import assert from 'node:assert/strict';
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -134,7 +133,7 @@ const tickSpecs = (specs: readonly number[]) => (text: string): string => {
 
 // ---- A green run --------------------------------------------------------------------------------
 
-test('when every mapped test passes, the gates step passes and the run matches the published table', { criterion: 'AC-SPEC-00-10', timeout: TIMEOUT }, () => {
+test('when every mapped test passes, the gates step passes and the run matches the published table', { timeout: TIMEOUT }, () => {
   const { gates, table } = runGates({});
   assert.equal(gates.passed, true, describeRun(gates));
   assert.ok(!rowLine(table, PROVEN_ROW).includes(WEAKER_CLASS), `a passing row shows its weaker class:\n${table}`);
@@ -142,13 +141,13 @@ test('when every mapped test passes, the gates step passes and the run matches t
   for (const row of GUARANTEE_ROWS) assert.ok(published.includes(row), `the published table has no row ${row}`);
 });
 
-test('every row that is not pending maps to a test id', { criterion: 'AC-SPEC-00-10' }, () => {
+test('every row that is not pending maps to a test id', () => {
   assert.deepEqual([...mappedTests.keys()].sort(), GUARANTEE_ROWS.filter((row) => !isPending(row)).sort());
 });
 
 // ---- A failing or missing mapped test -----------------------------------------------------------
 
-test('when a mapped test fails, the gates step fails and the run shows the row\'s weaker class', { criterion: 'AC-SPEC-00-10', timeout: TIMEOUT }, () => {
+test('when a mapped test fails, the gates step fails and the run shows the row\'s weaker class', { timeout: TIMEOUT }, () => {
   const green = runGates({});
   const { gates, table } = runGates({ [PROVEN_ROW]: 'fail' });
   assert.equal(gates.passed, false, describeRun(gates));
@@ -157,13 +156,13 @@ test('when a mapped test fails, the gates step fails and the run shows the row\'
   assert.ok(rowLine(table, PROVEN_ROW).includes(WEAKER_CLASS), `the failing row does not show its weaker class:\n${table}`);
 });
 
-test('when a mapped test is in no result, the gates step fails and the run shows the row\'s weaker class', { criterion: 'AC-SPEC-00-10', timeout: TIMEOUT }, () => {
+test('when a mapped test is in no result, the gates step fails and the run shows the row\'s weaker class', { timeout: TIMEOUT }, () => {
   const { gates, table } = runGates({ [PROVEN_ROW]: 'absent' });
   assert.equal(gates.passed, false, describeRun(gates));
   assert.ok(rowLine(table, PROVEN_ROW).includes(WEAKER_CLASS), `the missing row does not show its weaker class:\n${table}`);
 });
 
-test('the gates step fails when the published table differs from what a green run generates', { criterion: 'AC-SPEC-00-10', timeout: TIMEOUT }, () => {
+test('the gates step fails when the published table differs from what a green run generates', { timeout: TIMEOUT }, () => {
   const { gates } = withEdits(scratch.root, {
     'docs/guarantees.md': (text) => text.replace(WEAKER_CLASS, 'proven by CI'),
   }, () => runGates({}));
@@ -173,7 +172,7 @@ test('the gates step fails when the published table differs from what a green ru
 
 // ---- Pending rows -------------------------------------------------------------------------------
 
-test('a pending row whose specs are unticked passes and shows its weaker class', { criterion: 'AC-SPEC-00-10', timeout: TIMEOUT }, () => {
+test('a pending row whose specs are unticked passes and shows its weaker class', { timeout: TIMEOUT }, () => {
   const { gates, table } = runGates({});
   assert.equal(gates.passed, true, describeRun(gates));
   for (const row of Object.keys(PENDING_ROWS) as GuaranteeRow[]) {
@@ -181,18 +180,18 @@ test('a pending row whose specs are unticked passes and shows its weaker class',
   }
 });
 
-test('a pending row still passes while one of its two specs is unticked', { criterion: 'AC-SPEC-00-10', timeout: TIMEOUT }, () => {
+test('a pending row still passes while one of its two specs is unticked', { timeout: TIMEOUT }, () => {
   const { gates } = withEdits(scratch.root, { 'START.md': tickSpecs([9]) }, () => runGates({}));
   assert.equal(gates.passed, true, describeRun(gates));
 });
 
-test('a pending row fails once all its specs are ticked', { criterion: 'AC-SPEC-00-10', timeout: TIMEOUT }, () => {
+test('a pending row fails once all its specs are ticked', { timeout: TIMEOUT }, () => {
   const { gates } = withEdits(scratch.root, { 'START.md': tickSpecs([9, 12]) }, () => runGates({}));
   assert.equal(gates.passed, false, describeRun(gates));
   assert.ok(gates.output.includes('no-pii-in-reports'), describeRun(gates));
 });
 
-test('ticking the spec two pending rows wait for fails both rows', { criterion: 'AC-SPEC-00-10', timeout: TIMEOUT }, () => {
+test('ticking the spec two pending rows wait for fails both rows', { timeout: TIMEOUT }, () => {
   const { gates } = withEdits(scratch.root, { 'START.md': tickSpecs([14]) }, () => runGates({}));
   assert.equal(gates.passed, false, describeRun(gates));
   assert.ok(gates.output.includes('actions-tamper-evident') && gates.output.includes('spec-to-commit-trace'), describeRun(gates));

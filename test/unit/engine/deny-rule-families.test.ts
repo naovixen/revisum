@@ -3,7 +3,6 @@
 // "git push origin main" leaves "git push", "git push --force" and every other remote and branch
 // open, so it must not count as a lock-down. The repository's own deny rules, and the fixture
 // repositories' rules, deny the whole families and still count.
-// See docs/specs/SPEC-02-project-trust-and-approval.md.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -33,25 +32,25 @@ const PARTIAL_RULE_SETS: readonly { readonly title: string; readonly rules: read
 ];
 
 for (const { title, rules } of PARTIAL_RULE_SETS) {
-  test(`deny rules that cover ${title} do not deny the required actions`, { criterion: 'AC-SPEC-02-15' }, () => {
+  test(`deny rules that cover ${title} do not deny the required actions`, () => {
     assert.equal(deniesRequiredActions(rules), false, `these rules counted as a lock-down: ${JSON.stringify(rules)}`);
   });
 }
 
 // ---- Counter-examples: rules that deny the whole families -----------------------------------------
 
-test('deny rules that cover each whole family deny the required actions', { criterion: 'AC-SPEC-02-14' }, () => {
+test('deny rules that cover each whole family deny the required actions', () => {
   assert.equal(deniesRequiredActions([...WHOLE_PUSH, ...WHOLE_MERGE, ...WHOLE_APPROVAL]), true);
 });
 
-test("this repository's own deny rules deny the required actions", { criterion: 'AC-SPEC-02-14' }, () => {
+test("this repository's own deny rules deny the required actions", () => {
   const rules = parseDenyRules(JSON.parse(readFileSync(join(REPOSITORY_ROOT, '.claude', 'settings.json'), 'utf8')));
   assert.notEqual(rules, null, 'the repository has no deny rules');
   assert.equal(deniesRequiredActions(rules ?? []), true);
 });
 
 for (const name of ['solo', 'team'] as const) {
-  test(`the ${name} fixture repository's deny rules deny the required actions`, { criterion: 'AC-SPEC-02-14' }, () => {
+  test(`the ${name} fixture repository's deny rules deny the required actions`, () => {
     // The team rules write "git push *" without a separate bare "git push": a trailing " *" also
     // matches the command with no arguments, as in Claude Code's own rules.
     assert.equal(deniesRequiredActions(denyRulesOf(readFixture(name)).permissions.deny), true);
@@ -60,7 +59,7 @@ for (const name of ['solo', 'team'] as const) {
 
 // ---- Through the lock-down route ------------------------------------------------------------------
 
-test('the lock-down route refuses with lockdown-not-declared when the deny rules name one example command per action', { criterion: 'AC-SPEC-02-15' }, async () => {
+test('the lock-down route refuses with lockdown-not-declared when the deny rules name one example command per action', async () => {
   await withRepository('solo', async (repository) => {
     assertRefused(repository, await repository.verify(repository.subject('plan'), repository.lockdownProof()), 'lockdown-not-declared');
   }, (fixture) => {
@@ -68,7 +67,7 @@ test('the lock-down route refuses with lockdown-not-declared when the deny rules
   });
 });
 
-test("the lock-down route approves with this repository's own deny rules in place", { criterion: 'AC-SPEC-02-14' }, async () => {
+test("the lock-down route approves with this repository's own deny rules in place", async () => {
   // The counter-example: only the deny rules differ from the refusal above.
   const rules = parseDenyRules(JSON.parse(readFileSync(join(REPOSITORY_ROOT, '.claude', 'settings.json'), 'utf8'))) ?? [];
   await withRepository('solo', async (repository) => {

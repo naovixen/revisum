@@ -8,7 +8,6 @@
 //   - the hostile cases of the API-step suite that also apply to a browser plan, written here as
 //     browser steps;
 //   - the API-step plans themselves, whose steps belong to protocol packs (a later spec).
-// See docs/specs/SPEC-01-plan-language-and-parser.md.
 import assert from 'node:assert/strict';
 import { arch, platform } from 'node:os';
 import { afterEach, beforeEach, test } from 'node:test';
@@ -111,7 +110,7 @@ const API_STEPS: readonly (readonly [string, RawObject])[] = [
 
 // ---- The proofs ---------------------------------------------------------------------------------
 
-test('control: the shared sign-up plan parses, so each rejection comes from the hostile part', { criterion: 'AC-SPEC-01-02' }, () => {
+test('control: the shared sign-up plan parses, so each rejection comes from the hostile part', () => {
   const parsed: Result<Plan, readonly PlanError[]> = parsePlan(valid());
   assert.equal(parsed.ok, true, JSON.stringify(parsed));
 });
@@ -124,7 +123,7 @@ const suites: readonly (readonly [string, () => readonly HostilePlan[], number])
 ];
 
 for (const [suiteName, cases, fewest] of suites) {
-  test(`every plan in ${suiteName} is rejected with its expected code, with no driver call or network request`, { criterion: 'AC-SPEC-01-02' }, async () => {
+  test(`every plan in ${suiteName} is rejected with its expected code, with no driver call or network request`, async () => {
     const hostile = cases();
     assert.ok(hostile.length >= fewest, `the suite holds at least ${fewest} cases`);
     for (const plan of hostile) {
@@ -136,7 +135,7 @@ for (const [suiteName, cases, fewest] of suites) {
   });
 }
 
-test('every API-step plan is rejected with no driver call or network request', { criterion: 'AC-SPEC-01-02' }, async () => {
+test('every API-step plan is rejected with no driver call or network request', async () => {
   for (const [name, step] of API_STEPS) {
     const errors = await rejectedErrors(withSteps(navigate('/'), step));
     assert.ok(errors.length > 0, `${name}: rejected with a reason`);
@@ -147,7 +146,7 @@ test('every API-step plan is rejected with no driver call or network request', {
 });
 
 // Positive control: the same counters do move for a valid plan, so the zeros above can fail.
-test('positive control: a valid plan does reach the spy driver', { criterion: 'AC-SPEC-01-02' }, async () => {
+test('positive control: a valid plan does reach the spy driver', async () => {
   const outcome = await runUntrusted(valid(), parsePlan, base, ports());
   assert.ok(Array.isArray(outcome), JSON.stringify(outcome));
   assert.ok(driverCalls > 0, 'the driver was asked to open a session');

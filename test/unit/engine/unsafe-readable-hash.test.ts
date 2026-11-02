@@ -2,7 +2,6 @@
 // in: each unsafe golden plan and coverage plan has the same hash read from its JSON, its canonical
 // text and its text laid out differently. Any change to an unsafe step's text changes the hash: a
 // selector, a script line, a carriage return in a source, a returned field or a database argument.
-// See docs/specs/SPEC-28-plan-authoring.md and docs/specs/SPEC-02-project-trust-and-approval.md.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { planHash, writePlanJson, writePlanText } from '@revisum/engine';
@@ -21,13 +20,13 @@ const LAYOUTS: readonly { readonly name: string; readonly relayout: (text: strin
 for (const { name, plan } of everyUnsafeExample()) {
   const fromJson = (): string => planHash(parsedWith(parseAll, plan, name));
   for (const { name: layoutName, relayout } of LAYOUTS) {
-    test(`${name} read from ${layoutName} has the hash of the plan read from JSON`, { criterion: 'AC-SPEC-28-07' }, () => {
+    test(`${name} read from ${layoutName} has the hash of the plan read from JSON`, () => {
       const text = writePlanText(parsedWith(parseAll, plan, name));
       assert.equal(planHash(planFromText(relayout(text), `${name} from ${layoutName}`)), fromJson());
     });
   }
 
-  test(`${name} read from its canonical JSON has the hash of the plan read from its JSON as written`, { criterion: 'AC-SPEC-28-07' }, () => {
+  test(`${name} read from its canonical JSON has the hash of the plan read from its JSON as written`, () => {
     const canonical = writePlanJson(parsedWith(parseAll, plan, name));
     assert.equal(planHash(parsedWith(parseAll, JSON.parse(canonical), `${name} from canonical JSON`)), fromJson());
   });
@@ -48,7 +47,7 @@ const STEP_CHANGES: readonly { readonly feature: FeatureName; readonly name: str
 ];
 
 for (const { feature, name, from, to } of STEP_CHANGES) {
-  test(`changing ${name} in the ${feature} golden text changes the hash`, { criterion: 'AC-SPEC-28-07' }, () => {
+  test(`changing ${name} in the ${feature} golden text changes the hash`, () => {
     const original = unsafeGoldenText(feature);
     const line = lineOf(original, from);
     const indent = /^\s*/.exec(linesOf(original)[line - 1] ?? '')?.[0] ?? '';
@@ -57,7 +56,7 @@ for (const { feature, name, from, to } of STEP_CHANGES) {
   });
 }
 
-test('a script line added at the end of a source, even an empty one, changes the hash', { criterion: 'AC-SPEC-28-07' }, () => {
+test('a script line added at the end of a source, even an empty one, changes the hash', () => {
   const original = unsafeGoldenText('inline-page-script');
   const line = lineOf(original, '"() => ({ blocks: window.editorStore.blocks.length })"');
   const lines = linesOf(original);

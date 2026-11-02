@@ -2,8 +2,6 @@
 // is refused with exactly the code and path a 1.1 parser gives, and declared as "1.2" the same
 // plan is accepted. The expected codes were recorded from the parser before any of these features
 // existed, when it still read them as a 1.1 parser does.
-// See docs/specs/SPEC-31-page-states-metadata-downloads-and-tabs.md and
-// docs/specs/SPEC-30-plan-values-positions-and-keys.md.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { defaultParser, signupPlan, stepsOf } from './plan-examples.ts';
@@ -66,7 +64,7 @@ const PREVIOUS_CASES: readonly PreviousCase[] = [
 ];
 
 for (const previous of PREVIOUS_CASES) {
-  test(`a plan declaring "${PREVIOUS_VERSION}" that uses ${previous.feature} is refused as a 1.1 parser refuses it`, { criterion: 'AC-SPEC-30-01' }, () => {
+  test(`a plan declaring "${PREVIOUS_VERSION}" that uses ${previous.feature} is refused as a 1.1 parser refuses it`, () => {
     const parsed = parsePlan(previous.plan());
     assert.equal(parsed.ok, false, 'the plan was accepted');
     assert.deepEqual(parsed.ok ? [] : parsed.error.map((error) => `${error.code} ${error.path}`), previous.errors);
@@ -74,14 +72,14 @@ for (const previous of PREVIOUS_CASES) {
 
   // Counter-example: the same plan declared as "1.2" is accepted, so the declared version is what
   // decides the grammar.
-  test(`the same plan with ${previous.feature}, declared as "${NEW_VERSION}", is accepted`, { criterion: 'AC-SPEC-30-01' }, () => {
+  test(`the same plan with ${previous.feature}, declared as "${NEW_VERSION}", is accepted`, () => {
     const parsed = parsePlan({ ...previous.plan(), version: NEW_VERSION });
     assert.ok(parsed.ok, JSON.stringify(parsed));
     assert.equal(parsed.value.version, NEW_VERSION);
   });
 }
 
-test(`a download and its check, declared as "${PREVIOUS_VERSION}", are both refused as unknown steps`,{ criterion: 'AC-SPEC-30-01' }, () => {
+test(`a download and its check, declared as "${PREVIOUS_VERSION}", are both refused as unknown steps`, () => {
   const plan = previousPlanWith(DOWNLOAD, { type: 'expectDownload', download: 'report', assert: { kind: 'sizeAtLeast', value: 1 }, criterionId: 'export.file' });
   const parsed = parsePlan(plan);
   assert.deepEqual(parsed.ok ? [] : parsed.error.map((error) => `${error.code} ${error.path}`), ['unknown_step $.steps[1].type', 'unknown_step $.steps[2].type']);

@@ -5,7 +5,6 @@
 // agent's environment, so the approval is always declared, never verified, and labelled
 // "declared, not verified". It suffices for every subject, and a project with one person and no
 // code-owners file can pass every gate this way.
-// See docs/specs/SPEC-02-project-trust-and-approval.md.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { PERSON_ACTOR_TYPES, approvalLabel, mergeGateOpen, planStanding, unverified, type Approval, type ApprovalErrorCode } from '@revisum/engine';
@@ -19,7 +18,7 @@ const MAINTAINER = 'maintainer-mia';
 
 // ---- The maintainer's push or merge -------------------------------------------------------------
 
-test("the maintainer's merge to the protected branch records a declared approval with a person-declared actor", { criterion: 'AC-SPEC-02-14' }, async () => {
+test("the maintainer's merge to the protected branch records a declared approval with a person-declared actor", async () => {
   await withRepository('solo', async (repository) => {
     const subject = repository.subject('plan');
     const verified = await repository.verify(subject, repository.lockdownProof());
@@ -35,7 +34,7 @@ test("the maintainer's merge to the protected branch records a declared approval
   });
 });
 
-test("the maintainer's merge appends one plan.approved event with proof kind agent-lockdown-merge", { criterion: 'AC-SPEC-02-14' }, async () => {
+test("the maintainer's merge appends one plan.approved event with proof kind agent-lockdown-merge", async () => {
   await withRepository('solo', async (repository) => {
     const subject = repository.subject('plan');
     const verified = await repository.verify(subject, repository.lockdownProof());
@@ -50,7 +49,7 @@ test("the maintainer's merge appends one plan.approved event with proof kind age
   });
 });
 
-test('the declared approval is dated by when GitHub says the commit landed, not by the run', { criterion: 'AC-SPEC-02-14' }, async () => {
+test('the declared approval is dated by when GitHub says the commit landed, not by the run', async () => {
   await withRepository('solo', async (repository) => {
     const verified = await repository.verify(repository.subject('plan'), repository.lockdownProof());
     assert.equal(verified.ok, true, JSON.stringify(verified));
@@ -61,7 +60,7 @@ test('the declared approval is dated by when GitHub says the commit landed, not 
 });
 
 const approvesWith = (title: string, edit: (fixture: FixtureRepository) => void): void => {
-  test(title, { criterion: 'AC-SPEC-02-14' }, async () => {
+  test(title, async () => {
     await withRepository('solo', async (repository) => {
       const verified = await repository.verify(repository.subject('plan'), repository.lockdownProof());
       assert.equal(verified.ok, true, JSON.stringify(verified));
@@ -170,14 +169,14 @@ const REFUSALS: readonly Refusal[] = [
 ];
 
 for (const refusal of REFUSALS) {
-  test(refusal.title, { criterion: 'AC-SPEC-02-15' }, async () => {
+  test(refusal.title, async () => {
     await withRepository('solo', async (repository) => {
       assertRefused(repository, await repository.verify(repository.subject('plan'), repository.lockdownProof(refusal.proof)), refusal.code);
     }, refusal.edit);
   });
 }
 
-test('the unedited solo repository, which every refusal above changes in one way, approves', { criterion: 'AC-SPEC-02-15' }, async () => {
+test('the unedited solo repository, which every refusal above changes in one way, approves', async () => {
   // The counter-example: each refusal differs from this case by its one edit or proof field.
   await withRepository('solo', async (repository) => {
     const verified = await repository.verify(repository.subject('plan'), repository.lockdownProof());
@@ -188,7 +187,7 @@ test('the unedited solo repository, which every refusal above changes in one way
 // ---- GitHub unavailable -------------------------------------------------------------------------
 
 for (const down of [['landedBy'], ['protectedFile'], ['reviews', 'changedFiles', 'pullRequest', 'lastCommitTouching', 'protectedFile', 'landedBy']] as const) {
-  test(`when GitHub cannot answer ${down.join(', ')}, a lock-down approval is absent with version-control-unavailable`, { criterion: 'AC-SPEC-02-13' }, async () => {
+  test(`when GitHub cannot answer ${down.join(', ')}, a lock-down approval is absent with version-control-unavailable`, async () => {
     await withRepository('solo', async (repository) => {
       assertRefused(repository, await repository.verify(repository.subject('plan'), repository.lockdownProof(), down), 'version-control-unavailable');
     });
@@ -197,7 +196,7 @@ for (const down of [['landedBy'], ['protectedFile'], ['reviews', 'changedFiles',
 
 // ---- Declared, not verified ---------------------------------------------------------------------
 
-test('a lock-down approval is labelled "declared, not verified", whatever the maintainer declares about credentials', { criterion: 'AC-SPEC-02-16' }, async () => {
+test('a lock-down approval is labelled "declared, not verified", whatever the maintainer declares about credentials', async () => {
   for (const agentHasGithubCredentials of [true, false]) {
     await withRepository('solo', async (repository) => {
       const verified = await repository.verify(repository.subject('plan'), repository.lockdownProof());
@@ -212,7 +211,7 @@ test('a lock-down approval is labelled "declared, not verified", whatever the ma
   }
 });
 
-test('the same plan approved by a code owner is labelled verified, so the label follows the route', { criterion: 'AC-SPEC-02-16' }, async () => {
+test('the same plan approved by a code owner is labelled verified, so the label follows the route', async () => {
   await withRepository('team', async (repository) => {
     const subject = repository.subject('plan');
     const reviewed = await repository.verify(subject, repository.codeOwnerProof('review-grace'));
@@ -226,7 +225,7 @@ test('the same plan approved by a code owner is labelled verified, so the label 
 // ---- Every subject kind, on the declared route alone ---------------------------------------------
 
 for (const kind of SUBJECT_KINDS) {
-  test(`a ${kind} with only the maintainer's declared approval is approved as a person's approval`, { criterion: 'AC-SPEC-02-18' }, async () => {
+  test(`a ${kind} with only the maintainer's declared approval is approved as a person's approval`, async () => {
     await withRepository('solo', async (repository) => {
       const subject = repository.subject(kind);
       const verified = await repository.verify(subject, repository.lockdownProof());
@@ -241,7 +240,7 @@ for (const kind of SUBJECT_KINDS) {
 
 // ---- One person, no code-owners file, no second account -------------------------------------------
 
-test('with one person, no code-owners file and no second account, every subject kind passes through the lock-down route', { criterion: 'AC-SPEC-02-19' }, async () => {
+test('with one person, no code-owners file and no second account, every subject kind passes through the lock-down route', async () => {
   await withRepository('solo', async (repository) => {
     // The solo fixture: no code-owners file, and only the maintainer lands commits on the protected branch.
     assert.equal(repository.fixture.protectedFiles[CODE_OWNERS_PATH], undefined);
@@ -256,7 +255,7 @@ test('with one person, no code-owners file and no second account, every subject 
   });
 });
 
-test("in the solo repository the plan gate opens on the maintainer's declared approval", { criterion: 'AC-SPEC-02-19' }, async () => {
+test("in the solo repository the plan gate opens on the maintainer's declared approval", async () => {
   await withRepository('solo', async (repository) => {
     const verified = await repository.verify(repository.subject('plan'), repository.lockdownProof());
     assert.equal(verified.ok, true, JSON.stringify(verified));
@@ -265,11 +264,11 @@ test("in the solo repository the plan gate opens on the maintainer's declared ap
   });
 });
 
-// Words that would ask for a second approver. Every text the SPEC-02 surface produces for the solo
+// Words that would ask for a second approver. Every text the approval surface produces for the solo
 // repository is searched for them.
 const SECOND_APPROVER_WORDS = [/\bsecond\b/, /\banother approver\b/, /\bother approver\b/, /\bcode[- ]owners?\b/, /\breviewers?\b/, /\btwo[- ]person\b/, /\btwo people\b/];
 
-test('nothing the trust and approval surface produces for the solo repository mentions a second approver', { criterion: 'AC-SPEC-02-19' }, async () => {
+test('nothing the trust and approval surface produces for the solo repository mentions a second approver', async () => {
   await withRepository('solo', async (repository) => {
     const loaderEvents = memoryEventSink();
     const texts: unknown[] = [];

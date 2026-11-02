@@ -4,7 +4,6 @@
 // one. Each test plants a study file in a throw-away copy of the repository, runs the study tool
 // there and reads the report it writes. The study is built from
 // fixtures/coverage-study/unsafe-features.json (see coverage-study-unsafe-features.test.ts).
-// See docs/specs/SPEC-36-unsafe-plan-features.md and docs/specs/SPEC-01-plan-language-and-parser.md.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -48,14 +47,14 @@ const killLine = (report: string): string => {
 // Closed share 2 of 4 (50.0%); with unsafe features 4 of 4 (100.0%).
 const HALF_CLOSED = [0, 1, 4, 5];
 
-test('the report shows the closed share and the share with unsafe features side by side', { criterion: 'AC-SPEC-36-19', timeout: TIMEOUT }, () => {
+test('the report shows the closed share and the share with unsafe features side by side', { timeout: TIMEOUT }, () => {
   const report = reportFor(studyOf(HALF_CLOSED));
   assert.ok(report.includes('1.3 with unsafe features'), `the second share is not named:\n${report}`);
   assert.ok(report.includes('50.0%'), `the closed share is missing:\n${report}`);
   assert.ok(report.includes('100.0%'), `the share with unsafe features is missing:\n${report}`);
 });
 
-test('with the share with unsafe features at 100% and the closed share at 50%, the kill criterion is not met', { criterion: 'AC-SPEC-36-19', timeout: TIMEOUT }, () => {
+test('with the share with unsafe features at 100% and the closed share at 50%, the kill criterion is not met', { timeout: TIMEOUT }, () => {
   const line = killLine(reportFor(studyOf(HALF_CLOSED)));
   assert.match(line, /not met/);
   assert.ok(!line.includes('100.0%'), `the kill-criterion line quotes the share with unsafe features: ${line}`);
@@ -63,7 +62,7 @@ test('with the share with unsafe features at 100% and the closed share at 50%, t
 
 // Counter-example: a study whose closed share passes the threshold meets the criterion, so the
 // line above can say "met" and its "not met" came from the closed share.
-test('with every intent closed and expressible, the kill criterion is met', { criterion: 'AC-SPEC-36-19', timeout: TIMEOUT }, () => {
+test('with every intent closed and expressible, the kill criterion is met', { timeout: TIMEOUT }, () => {
   const line = killLine(reportFor(studyOf([0, 5])));
   assert.match(line, /\bmet\b/);
   assert.doesNotMatch(line, /not met/);

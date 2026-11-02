@@ -4,7 +4,6 @@
 // scripts and inline scripts enabled. A css selector or XPath expression is literal, single-line
 // plan text of at most 512 characters with no "{", "}", ";" or "@", and an `inside` chain is at
 // most 3 deep, so what a locator can match is fixed when the plan is approved.
-// See docs/specs/SPEC-36-unsafe-plan-features.md.
 import assert from 'node:assert/strict';
 import { arch, platform } from 'node:os';
 import { test } from 'node:test';
@@ -26,63 +25,63 @@ const NOTHING_ENABLED: readonly FeatureName[] = [];
 // ---- One plan per feature, with that feature off ---------------------------------------------------
 
 for (const example of FEATURE_EXAMPLES) {
-  test(`a 1.3 plan using ${example.feature} is refused with unsafe_feature_disabled at ${example.path} when every other feature is on`, { criterion: 'AC-SPEC-36-01' }, () => {
+  test(`a 1.3 plan using ${example.feature} is refused with unsafe_feature_disabled at ${example.path} when every other feature is on`, () => {
     const errors = errorsOf(parserEnabling(allBut(example.feature)), unsafePlan(example.steps));
     assert.deepEqual(disabledPaths(errors), [example.path]);
   });
 
-  test(`a 1.3 plan using ${example.feature} is refused the same way when no feature is on`, { criterion: 'AC-SPEC-36-01' }, () => {
+  test(`a 1.3 plan using ${example.feature} is refused the same way when no feature is on`, () => {
     const errors = errorsOf(parserEnabling(NOTHING_ENABLED), unsafePlan(example.steps));
     assert.deepEqual(disabledPaths(errors), [example.path]);
   });
 
   // Counter-example: the plan itself is valid, so the refusal above comes from the project alone.
-  test(`the same plan using ${example.feature} parses once the project enables it`, { criterion: 'AC-SPEC-36-01' }, () => {
+  test(`the same plan using ${example.feature} parses once the project enables it`, () => {
     acceptedBy(parserEnabling(FEATURES), unsafePlan(example.steps));
   });
 }
 
-test('an inline script is refused at .script.inline when page scripts are on but inline scripts are off', { criterion: 'AC-SPEC-36-01' }, () => {
+test('an inline script is refused at .script.inline when page scripts are on but inline scripts are off', () => {
   const errors = errorsOf(parserEnabling(allBut('inline-page-script')), unsafePlan([OPEN_CART, INLINE_READ]));
   assert.deepEqual(disabledPaths(errors), ['$.steps[1].script.inline']);
   assert.ok(errors.every((error) => error.code === 'unsafe_feature_disabled'), JSON.stringify(errors));
 });
 
-test('an inline script is refused at .script.inline, and only there, when page scripts are off too', { criterion: 'AC-SPEC-36-01' }, () => {
+test('an inline script is refused at .script.inline, and only there, when page scripts are off too', () => {
   const errors = errorsOf(parserEnabling(allBut('page-script')), unsafePlan([OPEN_CART, INLINE_READ]));
   assert.deepEqual(disabledPaths(errors), ['$.steps[1].script.inline']);
 });
 
 // ---- Every use, in one plan ----------------------------------------------------------------------
 
-test('a plan using all six features under a project enabling none is refused at every use, nested and in cleanup included', { criterion: 'AC-SPEC-36-01' }, () => {
+test('a plan using all six features under a project enabling none is refused at every use, nested and in cleanup included', () => {
   const errors = errorsOf(parserEnabling(NOTHING_ENABLED), ALL_FEATURES_PLAN());
   assert.deepEqual(disabledPaths(errors), [...ALL_FEATURES_PATHS].sort());
 });
 
-test('the same plan under a project with no unsafeFeatures section at all is refused at the same paths', { criterion: 'AC-SPEC-36-01' }, () => {
+test('the same plan under a project with no unsafeFeatures section at all is refused at the same paths', () => {
   // The shared test project as it was before plan 1.3.
   const errors = errorsOf(defaultParser(), ALL_FEATURES_PLAN());
   assert.deepEqual(disabledPaths(errors), [...ALL_FEATURES_PATHS].sort());
 });
 
-test('two uses of one disabled feature are both reported, not only the first', { criterion: 'AC-SPEC-36-01' }, () => {
+test('two uses of one disabled feature are both reported, not only the first', () => {
   const plan = unsafePlan([OPEN_CART, CSS_CHECK, { type: 'click', locator: css('button.add-to-cart') }, CSS_CHECK]);
   assert.deepEqual(disabledPaths(errorsOf(parserEnabling(allBut('css-locator')), plan)), ['$.steps[1].locator.by', '$.steps[2].locator.by', '$.steps[3].locator.by']);
 });
 
-test('only the disabled feature is reported when the plan also uses enabled ones', { criterion: 'AC-SPEC-36-01' }, () => {
+test('only the disabled feature is reported when the plan also uses enabled ones', () => {
   const plan = unsafePlan([OPEN_CART, CSS_CHECK, XPATH_CHECK]);
   assert.deepEqual(disabledPaths(errorsOf(parserEnabling(['css-locator']), plan)), ['$.steps[2].locator.by']);
 });
 
-test('the plan using all six parses once the project enables all six', { criterion: 'AC-SPEC-36-01' }, () => {
+test('the plan using all six parses once the project enables all six', () => {
   acceptedBy(parserEnabling(FEATURES), ALL_FEATURES_PLAN());
 });
 
 // ---- Nothing is echoed ------------------------------------------------------------------------------
 
-test('a refusal for a disabled feature echoes no selector, expression, script text or argument', { criterion: 'AC-SPEC-36-01' }, () => {
+test('a refusal for a disabled feature echoes no selector, expression, script text or argument', () => {
   const plan = unsafePlan([
     OPEN_CART,
     { type: 'click', locator: css(`button.${PRIVATE_MARKER}`) },
@@ -97,7 +96,7 @@ test('a refusal for a disabled feature echoes no selector, expression, script te
 
 // ---- Nothing runs ----------------------------------------------------------------------------------
 
-test('a plan refused for a disabled feature opens no browser, makes no call and runs no script or command', { criterion: 'AC-SPEC-36-01' }, async () => {
+test('a plan refused for a disabled feature opens no browser, makes no call and runs no script or command', async () => {
   const project = parsedProject(unsafeProjectFile(NOTHING_ENABLED));
   const parse = parserEnabling(NOTHING_ENABLED);
   const spy = spyDriver();
@@ -135,25 +134,25 @@ const BASE_TEXT: Readonly<Record<LocatorCase['kind'], string>> = { css: 'ul.cart
 for (const locatorCase of LOCATOR_KINDS) {
   const path = `$.steps[1].locator.${locatorCase.field}`;
 
-  test(`a ${locatorCase.kind} locator whose ${locatorCase.field} is a value reference is refused with wrong_type`, { criterion: 'AC-SPEC-36-05' }, () => {
+  test(`a ${locatorCase.kind} locator whose ${locatorCase.field} is a value reference is refused with wrong_type`, () => {
     assert.deepEqual(rejection(parseAll, clickPlan(locatorCase.locator({ valueName: 'orderCode' }))), [`wrong_type ${path}`]);
   });
 
-  test(`a ${locatorCase.kind} ${locatorCase.field} holding a line break is refused with unsafe_text`, { criterion: 'AC-SPEC-36-05' }, () => {
+  test(`a ${locatorCase.kind} ${locatorCase.field} holding a line break is refused with unsafe_text`, () => {
     for (const lineBreak of ['\n', '\r\n', '\r']) {
       assert.deepEqual(rejection(parseAll, clickPlan(locatorCase.locator(`${BASE_TEXT[locatorCase.kind]}${lineBreak}li`))), [`unsafe_text ${path}`], JSON.stringify(lineBreak));
     }
   });
 
   for (const character of ['{', '}', ';', '@']) {
-    test(`a ${locatorCase.kind} ${locatorCase.field} holding "${character}" is refused with unsafe_text, echoing nothing`, { criterion: 'AC-SPEC-36-05' }, () => {
+    test(`a ${locatorCase.kind} ${locatorCase.field} holding "${character}" is refused with unsafe_text, echoing nothing`, () => {
       const errors = errorsOf(parseAll, clickPlan(locatorCase.locator(`${BASE_TEXT[locatorCase.kind]}${character}${PRIVATE_MARKER}`)));
       assert.deepEqual(errors.map((error) => `${error.code} ${error.path}`), [`unsafe_text ${path}`]);
       assert.ok(!JSON.stringify(errors).includes(PRIVATE_MARKER), 'the refusal echoed the text');
     });
   }
 
-  test(`a ${locatorCase.kind} ${locatorCase.field} of 513 characters is refused with too_long, and one of 512 parses`, { criterion: 'AC-SPEC-36-05' }, () => {
+  test(`a ${locatorCase.kind} ${locatorCase.field} of 513 characters is refused with too_long, and one of 512 parses`, () => {
     const padded = (length: number): string => `${BASE_TEXT[locatorCase.kind]}${'a'.repeat(length - BASE_TEXT[locatorCase.kind].length)}`;
     assert.equal(padded(513).length, 513);
     assert.deepEqual(rejection(parseAll, clickPlan(locatorCase.locator(padded(513)))), [`too_long ${path}`]);
@@ -162,20 +161,20 @@ for (const locatorCase of LOCATOR_KINDS) {
 
   // Counter-example: the same locator with safe literal text parses, so the refusals above come
   // from the text alone.
-  test(`a ${locatorCase.kind} locator with safe literal text parses`, { criterion: 'AC-SPEC-36-05' }, () => {
+  test(`a ${locatorCase.kind} locator with safe literal text parses`, () => {
     acceptedBy(parseAll, clickPlan(locatorCase.locator(BASE_TEXT[locatorCase.kind])));
   });
 
-  test(`a ${locatorCase.kind} locator's hasText may hold a value reference, though its ${locatorCase.field} may not`, { criterion: 'AC-SPEC-36-05' }, () => {
+  test(`a ${locatorCase.kind} locator's hasText may hold a value reference, though its ${locatorCase.field} may not`, () => {
     acceptedBy(parseAll, clickPlan(locatorCase.locator(BASE_TEXT[locatorCase.kind], { hasText: { valueName: 'orderCode' } })));
   });
 }
 
-test('an XPath expression selecting by attribute is refused, since it needs "@"', { criterion: 'AC-SPEC-36-05' }, () => {
+test('an XPath expression selecting by attribute is refused, since it needs "@"', () => {
   assert.deepEqual(rejection(parseAll, clickPlan(xpath('//button[@type="submit"]'))), ['unsafe_text $.steps[1].locator.expression']);
 });
 
-test('a selector error inside an inside locator is reported at its own path', { criterion: 'AC-SPEC-36-05' }, () => {
+test('a selector error inside an inside locator is reported at its own path', () => {
   const plan = clickPlan(css('button.add', { inside: css('li.product;') }));
   assert.deepEqual(rejection(parseAll, plan), ['unsafe_text $.steps[1].locator.inside.selector']);
 });
@@ -192,15 +191,15 @@ function nested(depth: number): JsonRecord {
   return css('button.add', { inside: locator });
 }
 
-test('an inside chain 3 deep parses', { criterion: 'AC-SPEC-36-05' }, () => {
+test('an inside chain 3 deep parses', () => {
   acceptedBy(parseAll, clickPlan(nested(2)));
 });
 
-test('an inside chain 4 deep is refused with too_large at the inside that goes past the limit', { criterion: 'AC-SPEC-36-05' }, () => {
+test('an inside chain 4 deep is refused with too_large at the inside that goes past the limit', () => {
   // nested(3) puts four locators under the clicked one: the fourth `inside` is one too many.
   assert.deepEqual(rejection(parseAll, clickPlan(nested(3))), ['too_large $.steps[1].locator.inside.inside.inside.inside']);
 });
 
-test('an inside chain far past the limit gets the same one error, at the same place', { criterion: 'AC-SPEC-36-05' }, () => {
+test('an inside chain far past the limit gets the same one error, at the same place', () => {
   assert.deepEqual(rejection(parseAll, clickPlan(nested(40))), ['too_large $.steps[1].locator.inside.inside.inside.inside']);
 });

@@ -8,7 +8,6 @@
 // the way. The run's egress events join the browser's record of each request's channel with the
 // proxy's decision. The fixture origin's own requests, allowed and recorded as allowed, are the
 // counter-example that shows the proxy is not simply refusing everything.
-// See docs/specs/SPEC-07-isolated-runner-and-egress.md.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import { cdpDriver, type DriverSession } from '@revisum/driver-cdp';
@@ -86,7 +85,7 @@ async function sendThrough(channel: ChannelName): Promise<{ readonly events: rea
 describe('every channel to an undeclared origin is blocked and recorded as an egress event', () => {
   for (const channel of CHANNEL_NAMES) {
     const host = CHANNEL_HOSTS[channel];
-    test(`${channel} traffic to ${host} is recorded as a blocked ${channel} event`, { criterion: 'AC-SPEC-07-01' }, async () => {
+    test(`${channel} traffic to ${host} is recorded as a blocked ${channel} event`, async () => {
       const { events, session } = await sendThrough(channel);
       try {
         const forHost = events.filter((event) => hostOf(String(event.origin)) === host);
@@ -101,11 +100,11 @@ describe('every channel to an undeclared origin is blocked and recorded as an eg
     });
   }
 
-  // A popup is held back by the driver before it loads (docs/specs/SPEC-06-cdp-driver.md), so
+  // A popup is held back by the driver before it loads, so
   // only the five other channels ever reach the proxy.
   for (const channel of CHANNEL_NAMES.filter((name) => name !== 'popup')) {
     const host = CHANNEL_HOSTS[channel];
-    test(`the proxy itself blocks the ${channel} request that the widened browser let through`, { criterion: 'AC-SPEC-07-01' }, async () => {
+    test(`the proxy itself blocks the ${channel} request that the widened browser let through`, async () => {
       const { session } = await sendThrough(channel);
       try {
         await waitFor(() => proxy.decisions().some((entry) => hostOf(String(entry.origin)) === host));
@@ -119,7 +118,7 @@ describe('every channel to an undeclared origin is blocked and recorded as an eg
   }
 });
 
-test('counter-example: the fixture origin\'s own requests go through the proxy and are allowed', { criterion: 'AC-SPEC-07-01' }, async () => {
+test('counter-example: the fixture origin\'s own requests go through the proxy and are allowed', async () => {
   const session = await openThroughProxy();
   try {
     const navigated = await session.navigate(fixture.url('/index.html'));
@@ -132,7 +131,7 @@ test('counter-example: the fixture origin\'s own requests go through the proxy a
   }
 });
 
-test('counter-example: the redirect\'s first hop, to the fixture origin, is allowed before its second hop is blocked', { criterion: 'AC-SPEC-07-01' }, async () => {
+test('counter-example: the redirect\'s first hop, to the fixture origin, is allowed before its second hop is blocked', async () => {
   const { session } = await sendThrough('redirect');
   try {
     assert.ok(fixture.requested.includes('/leave'), 'the page asked its own origin for the redirecting path');

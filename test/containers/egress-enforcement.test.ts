@@ -4,7 +4,6 @@
 // with the CDP driver behind the run's proxy: its page opens a WebSocket to an undeclared origin,
 // which the browser's own request interception cannot see, and the proxy blocks and records it.
 // Reaching the proxy itself from inside is the counter-example that shows the probe can succeed.
-// See docs/specs/SPEC-07-isolated-runner-and-egress.md.
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
 import { hostOf } from '../unit/runner/runner-examples.ts';
@@ -30,25 +29,25 @@ const directConnection = (host: string, port: number): string => `
   socket.on('connect', () => finish('reached'));
   socket.on('error', () => finish('blocked'));`;
 
-test('the runner reports the isolated level once the probe from inside has failed', { criterion: 'AC-SPEC-07-05', timeout: TIMEOUT }, () => {
+test('the runner reports the isolated level once the probe from inside has failed', { timeout: TIMEOUT }, () => {
   assert.equal(run.runner.guaranteeLevel(), 'isolated');
   assert.ok(!run.logged.some((entry) => entry.code === 'egress-unenforceable'), JSON.stringify(run.logged));
 });
 
 for (const { host, port } of OUTSIDE_TARGETS) {
-  test(`a direct connection from inside to ${host}:${port}, bypassing the proxy, finds no route out`, { criterion: 'AC-SPEC-07-05', timeout: TIMEOUT }, async () => {
+  test(`a direct connection from inside to ${host}:${port}, bypassing the proxy, finds no route out`, { timeout: TIMEOUT }, async () => {
     assert.equal(await jsonInside(run.handle, directConnection(host, port)), 'blocked');
   });
 }
 
-test('counter-example: the same probe reaches the run\'s proxy, which is on the container\'s network', { criterion: 'AC-SPEC-07-05', timeout: TIMEOUT }, async () => {
+test('counter-example: the same probe reaches the run\'s proxy, which is on the container\'s network', { timeout: TIMEOUT }, async () => {
   const proxyAddress = await jsonInside(run.handle, 'console.log(JSON.stringify(process.env.HTTP_PROXY ?? ""))');
   assert.ok(typeof proxyAddress === 'string' && proxyAddress !== '', 'the run container is told where its proxy is');
   const proxy = new URL(proxyAddress);
   assert.equal(await jsonInside(run.handle, directConnection(proxy.hostname, Number(proxy.port))), 'reached');
 });
 
-test('a plan run inside the container passes while its WebSocket to an undeclared origin is blocked by the proxy', { criterion: 'AC-SPEC-07-01', timeout: TIMEOUT }, async () => {
+test('a plan run inside the container passes while its WebSocket to an undeclared origin is blocked by the proxy', { timeout: TIMEOUT }, async () => {
   const outcome = await run.handle.exec(['node', 'test/containers/plan-run-inside.ts']);
   assert.equal(outcome.exitCode, 0, `the plan run inside the container failed: ${outcome.stderr}`);
   const printed: unknown = JSON.parse(outcome.stdout.trim().split('\n').at(-1) ?? 'null');

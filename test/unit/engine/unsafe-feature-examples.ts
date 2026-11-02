@@ -14,7 +14,6 @@
 //     of before plan 1.3 (unsafe-feature-closed-plans-unchanged.test.ts);
 //   - in M1 a run of a plan with page scripts or database commands still builds its manifest, and
 //     reports those steps as unsupported-step.
-// See docs/specs/SPEC-36-unsafe-plan-features.md.
 import assert from 'node:assert/strict';
 import {
   defaultRedactor, guaranteeStatement, parseProject, planParser, run, unsafeFeaturesOf,

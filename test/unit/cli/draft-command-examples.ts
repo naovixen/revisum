@@ -13,8 +13,7 @@
 //     gathers everything it wrote: its outcome, the console, the audit events and the draft file.
 //
 // What these tests assume about shapes the spec leaves open, gathered here so a change to one is
-// a change to this file only (docs/specs/SPEC-28-plan-authoring.md, "`draft` and the planner
-// adapters" under "Milestone"):
+// a change to this file only:
 //   - cli exports draftCommand(argv, ports), where argv holds the arguments after the word
 //     "draft" and ports are DraftCommandPorts below. It answers with the exit code and the text it
 //     would print on standard output and standard error;
@@ -33,7 +32,6 @@
 //   - a spec's criteria are "- <id>: <text>" items under an "## Acceptance criteria" heading;
 //   - --json prints one CliOutput whose data is the DraftCommandResult, plus the planner origin
 //     the command called, under a field the spec does not name.
-// See docs/specs/SPEC-28-plan-authoring.md and docs/specs/SPEC-37-explore-to-draft.md.
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';

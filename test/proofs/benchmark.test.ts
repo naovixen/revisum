@@ -11,7 +11,7 @@
 //     "::warning::" line naming the regression and adds a line to the job summary
 //     ($GITHUB_STEP_SUMMARY). On arm64 the medians are recorded with no comparison. Whatever it finds,
 //     the tool exits 0.
-// Every test reads sample files under fixtures/benchmark/. See docs/specs/SPEC-08-manifest-and-replay.md (AC-05).
+// Every test reads sample files under fixtures/benchmark/.
 import assert from 'node:assert/strict';
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -46,7 +46,7 @@ const alarmLines = (run: BenchmarkRun): string[] => run.output.split(/\r?\n/).fi
 
 // ---- The comparison -------------------------------------------------------------------------------
 
-test('medians within 30% of the Linux baseline raise no alarm, even with one slow outlier run', { criterion: 'AC-SPEC-08-05' }, () => {
+test('medians within 30% of the Linux baseline raise no alarm, even with one slow outlier run', () => {
   // Setup's median is 1200 ms against 1000 (+20%); its mean, pulled up by one 60 s run, is over 4 s.
   const run = compare('within-tolerance.json');
   assert.equal(run.status, 0, describeRun(run));
@@ -55,7 +55,7 @@ test('medians within 30% of the Linux baseline raise no alarm, even with one slo
   assert.match(run.output, /\b440\b/, 'the peak memory median is reported');
 });
 
-test('a setup median 40% over the baseline raises a non-blocking alarm naming setup time, and the tool still exits 0', { criterion: 'AC-SPEC-08-05' }, () => {
+test('a setup median 40% over the baseline raises a non-blocking alarm naming setup time, and the tool still exits 0', () => {
   const run = compare('setup-regression.json');
   assert.equal(run.status, 0, describeRun(run));
   const alarms = alarmLines(run);
@@ -65,7 +65,7 @@ test('a setup median 40% over the baseline raises a non-blocking alarm naming se
   assert.match(run.summary, SETUP);
 });
 
-test('a peak memory median 40% over the baseline raises a non-blocking alarm naming memory, and the tool still exits 0', { criterion: 'AC-SPEC-08-05' }, () => {
+test('a peak memory median 40% over the baseline raises a non-blocking alarm naming memory, and the tool still exits 0', () => {
   const run = compare('memory-regression.json');
   assert.equal(run.status, 0, describeRun(run));
   const alarms = alarmLines(run);
@@ -74,19 +74,19 @@ test('a peak memory median 40% over the baseline raises a non-blocking alarm nam
   assert.match(run.summary, MEMORY);
 });
 
-test('medians exactly 30% over the baseline are not over the tolerance, so they raise no alarm', { criterion: 'AC-SPEC-08-05' }, () => {
+test('medians exactly 30% over the baseline are not over the tolerance, so they raise no alarm', () => {
   const run = compare('at-tolerance.json');
   assert.equal(run.status, 0, describeRun(run));
   assert.deepEqual(alarmLines(run), [], describeRun(run));
 });
 
-test('faster runs and lower memory raise no alarm', { criterion: 'AC-SPEC-08-05' }, () => {
+test('faster runs and lower memory raise no alarm', () => {
   const run = compare('faster.json');
   assert.equal(run.status, 0, describeRun(run));
   assert.deepEqual(alarmLines(run), [], describeRun(run));
 });
 
-test('arm64 results are recorded with their medians and no comparison, pass or fail', { criterion: 'AC-SPEC-08-05' }, () => {
+test('arm64 results are recorded with their medians and no comparison, pass or fail', () => {
   // Five times the Linux baseline: any comparison would alarm.
   const run = compare('arm64.json');
   assert.equal(run.status, 0, describeRun(run));
@@ -96,7 +96,7 @@ test('arm64 results are recorded with their medians and no comparison, pass or f
   assert.doesNotMatch(`${run.output}\n${run.summary}`, /regress/i, describeRun(run));
 });
 
-test('fewer than 20 runs are not compared, and the tool says it needs 20', { criterion: 'AC-SPEC-08-05' }, () => {
+test('fewer than 20 runs are not compared, and the tool says it needs 20', () => {
   // These 19 runs are 40% over the baseline on both medians.
   const run = compare('nineteen-runs.json');
   assert.equal(run.status, 0, describeRun(run));
@@ -104,14 +104,14 @@ test('fewer than 20 runs are not compared, and the tool says it needs 20', { cri
   assert.match(run.output, /\b20\b/, describeRun(run));
 });
 
-test('samples that do not decode are named, compared with nothing, and still never fail the job', { criterion: 'AC-SPEC-08-05' }, () => {
+test('samples that do not decode are named, compared with nothing, and still never fail the job', () => {
   const run = compare('invalid-missing-memory.json');
   assert.equal(run.status, 0, describeRun(run));
   assert.deepEqual(alarmLines(run), [], describeRun(run));
   assert.match(run.output, /peakMemoryMegabytes/, describeRun(run));
 });
 
-test('the repository\'s own Linux baseline decodes and is the default', { criterion: 'AC-SPEC-08-05' }, () => {
+test('the repository\'s own Linux baseline decodes and is the default', () => {
   const path = join(REPOSITORY_ROOT, 'docs', 'decisions', 'benchmark-baseline.json');
   assert.ok(existsSync(path), 'docs/decisions/benchmark-baseline.json exists');
   const baseline: unknown = JSON.parse(readFileSync(path, 'utf8'));
@@ -137,7 +137,7 @@ const runsBenchmark = (text: string): boolean => text.includes(`tools/${TOOL}`) 
 // The text of the workflow's `on:` block.
 const triggersOf = (text: string): string => /^on:\s*\n((?:[ \t]+.*\n|\s*\n)*)/m.exec(text)?.[1] ?? '';
 
-test('the benchmark runs in its own workflow, weekly and on manual dispatch, never on a push or a pull request', { criterion: 'AC-SPEC-08-05' }, () => {
+test('the benchmark runs in its own workflow, weekly and on manual dispatch, never on a push or a pull request', () => {
   const benchmark = workflows().filter((workflow) => runsBenchmark(workflow.text));
   assert.equal(benchmark.length, 1, `workflows running the benchmark: ${benchmark.map((workflow) => workflow.name).join(', ')}`);
   const workflow = benchmark[0] ?? assert.fail('no benchmark workflow');
@@ -152,7 +152,7 @@ test('the benchmark runs in its own workflow, weekly and on manual dispatch, nev
   assert.match(fields[4] ?? '', /^[0-6]$|^(SUN|MON|TUE|WED|THU|FRI|SAT)$/i, `cron "${cron}" runs once a week`);
 });
 
-test('the benchmark workflow runs in the same pinned image as the ci workflow', { criterion: 'AC-SPEC-08-05' }, () => {
+test('the benchmark workflow runs in the same pinned image as the ci workflow', () => {
   const all = workflows();
   const ci = all.find((workflow) => workflow.name === 'ci.yml') ?? assert.fail('no ci workflow');
   const pinned = /[\w./-]+:[\w.-]+@sha256:[0-9a-f]{64}/.exec(ci.text)?.[0] ?? assert.fail('the ci workflow names no pinned image');
@@ -160,7 +160,7 @@ test('the benchmark workflow runs in the same pinned image as the ci workflow', 
   assert.ok(benchmark.text.includes(pinned), `${benchmark.name} does not run in ${pinned}`);
 });
 
-test('the benchmark is outside check, the gates and the ci workflow', { criterion: 'AC-SPEC-08-05' }, () => {
+test('the benchmark is outside check, the gates and the ci workflow', () => {
   const manifest: unknown = JSON.parse(readFileSync(join(REPOSITORY_ROOT, 'package.json'), 'utf8'));
   const scripts: unknown = typeof manifest === 'object' && manifest !== null ? Reflect.get(manifest, 'scripts') : undefined;
   assert.ok(typeof scripts === 'object' && scripts !== null, 'package.json has scripts');

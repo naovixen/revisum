@@ -2,7 +2,6 @@
 // it. RunInputs.guaranteeLevel is set from Runner.guaranteeLevel(); only 'isolated' makes the result
 // state that egress was enforced. Without it, or at 'host', the result is what every committed
 // hash already holds. Each test reads the real result of a real run, on a recording driver.
-// See docs/specs/SPEC-07-isolated-runner-and-egress.md.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { GuaranteeLevel } from '@revisum/contracts';
@@ -34,7 +33,7 @@ async function runAt(level?: GuaranteeLevel): Promise<RunResult> {
 
 const statementWith = (egressEnforced: boolean) => guaranteeStatement({ mode: 'plan', egressEnforced, unmaskedScreenshotsKept: false, unsafeFeatures: [] });
 
-test('a run started at the isolated level states that egress was enforced', { criterion: 'AC-SPEC-07-05' }, async () => {
+test('a run started at the isolated level states that egress was enforced', async () => {
   const { guarantees, state } = await runAt('isolated');
   assert.equal(state, 'Passed');
   assert.deepEqual(guarantees, statementWith(true));
@@ -44,7 +43,7 @@ test('a run started at the isolated level states that egress was enforced', { cr
   assert.ok(!guarantees.lost.some((loss) => loss.because === 'egress-unenforceable'), JSON.stringify(guarantees.lost));
 });
 
-test('counter-example: a run started at the host level loses egress to egress-unenforceable and claims no isolation', { criterion: 'AC-SPEC-07-05' }, async () => {
+test('counter-example: a run started at the host level loses egress to egress-unenforceable and claims no isolation', async () => {
   const { guarantees, state } = await runAt('host');
   assert.equal(state, 'Passed');
   assert.deepEqual(guarantees, statementWith(false));
@@ -53,19 +52,19 @@ test('counter-example: a run started at the host level loses egress to egress-un
   assert.ok(guarantees.lost.some((loss) => loss.guarantee === 'egress-enforced' && loss.because === 'egress-unenforceable'), JSON.stringify(guarantees.lost));
 });
 
-test('a run given no level claims what a host run claims, so no one has to say host for the claim to be safe', { criterion: 'AC-SPEC-07-05' }, async () => {
+test('a run given no level claims what a host run claims, so no one has to say host for the claim to be safe', async () => {
   const { guarantees } = await runAt();
   assert.deepEqual(guarantees, statementWith(false));
 });
 
-test('a run given no level has the very hashes of a host run, so committed hashes stay valid', { criterion: 'AC-SPEC-07-05' }, async () => {
+test('a run given no level has the very hashes of a host run, so committed hashes stay valid', async () => {
   const unset = await runAt();
   const host = await runAt('host');
   assert.equal(unset.resultHash, host.resultHash);
   assert.equal(unset.manifestHash, host.manifestHash);
 });
 
-test('the level a run claims is part of its result hash, so the claim cannot be changed unnoticed', { criterion: 'AC-SPEC-07-05' }, async () => {
+test('the level a run claims is part of its result hash, so the claim cannot be changed unnoticed', async () => {
   const isolated = await runAt('isolated');
   const host = await runAt('host');
   assert.notEqual(isolated.resultHash, host.resultHash);

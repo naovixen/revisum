@@ -11,7 +11,6 @@
 // Every run reads the page just before the run closes its session: the page's URL and the texts
 // of chosen test ids, such as the input-event counter every fixture page keeps (counting.js), so
 // a test can show what a failed or refused step did not send.
-// See docs/specs/SPEC-30-plan-values-positions-and-keys.md.
 import assert from 'node:assert/strict';
 import { arch, platform } from 'node:os';
 import { join } from 'node:path';

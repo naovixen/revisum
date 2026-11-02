@@ -2,7 +2,6 @@
 // it is recorded as a blocked decision. The decision must also survive the trip from the proxy's
 // file: the reader of those lines drops an entry with no origin, so an empty origin would lose it.
 // A well-formed request, which adds its own one decision, is the counter-example.
-// See docs/specs/SPEC-07-isolated-runner-and-egress.md.
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
 import { readProxyDecision, startEgressProxy, type EgressProxy } from '@revisum/runner';
@@ -34,7 +33,7 @@ const MALFORMED: readonly { readonly title: string; readonly send: () => Promise
 ];
 
 for (const { title, send } of MALFORMED) {
-  test(`${title} gets 400, is recorded as blocked, and dials nothing`, { criterion: 'AC-SPEC-07-01' }, async () => {
+  test(`${title} gets 400, is recorded as blocked, and dials nothing`, async () => {
     const decisionsBefore = proxy.decisions().length;
     const dialledBefore = upstream.dialled.length;
     assert.equal(await send(), 400);
@@ -46,7 +45,7 @@ for (const { title, send } of MALFORMED) {
   });
 }
 
-test('counter-example: a well-formed request to a declared origin is recorded as allowed, not blocked', { criterion: 'AC-SPEC-07-01' }, async () => {
+test('counter-example: a well-formed request to a declared origin is recorded as allowed, not blocked', async () => {
   const decisionsBefore = proxy.decisions().length;
   assert.equal((await getThroughProxy(proxy.url, 'http://public.test/')).status, 200);
   assert.deepEqual(proxy.decisions().slice(decisionsBefore), [{ origin: 'http://public.test', decision: 'allowed' }]);

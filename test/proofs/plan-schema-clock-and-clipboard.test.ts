@@ -3,7 +3,6 @@
 // every golden plan against the schema, and the changelog's one 1.2 entry names each new step,
 // mode, unit, check, source, limit and error code. The schema-hash and entry-format checks are
 // in plan-schema-newer-version.test.ts.
-// See docs/specs/SPEC-34-clock-advance-and-clipboard.md.
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -60,12 +59,12 @@ const FEATURES: Readonly<Record<string, (plan: JsonRecord) => boolean>> = {
 };
 
 for (const [feature, uses] of Object.entries(FEATURES)) {
-  test(`a 1.2 golden plan uses ${feature}`, { criterion: 'AC-SPEC-34-01' }, () => {
+  test(`a 1.2 golden plan uses ${feature}`, () => {
     assert.ok(newerGoldenPlans().some(uses), `no golden plan declaring 1.2 uses ${feature}`);
   });
 }
 
-test('the clock, clipboard and clipboard-remember golden plans declare 1.2 and parse against the shared test project', { criterion: 'AC-SPEC-34-01' }, () => {
+test('the clock, clipboard and clipboard-remember golden plans declare 1.2 and parse against the shared test project', () => {
   const project = parseProject(testProjectInput());
   assert.ok(project.ok, JSON.stringify(project));
   const parse = planParser(project.value);
@@ -86,14 +85,14 @@ const NAMED_IN_ENTRY = [
   'clock-runaway', 'clipboard-unavailable',
 ];
 
-test('the 1.2 changelog entry names each new step, mode, unit, check, source, limit and error code, in code type', { criterion: 'AC-SPEC-34-01' }, () => {
+test('the 1.2 changelog entry names each new step, mode, unit, check, source, limit and error code, in code type', () => {
   const entry = changelogEntry('1.2');
   assert.match(entry, /^## 1\.2\b/);
   assert.deepEqual(NAMED_IN_ENTRY.filter((name) => !entry.includes(`\`${name}\``)), [], 'names the 1.2 entry leaves out');
 });
 
 // Dating the entry when 1.2 is released is allowed.
-test('the changelog has one 1.2 entry, unreleased or dated, with a schema sha256', { criterion: 'AC-SPEC-34-01' }, () => {
+test('the changelog has one 1.2 entry, unreleased or dated, with a schema sha256', () => {
   const entry = changelogEntry('1.2');
   assert.match(entry, /^## 1\.2 \((unreleased|\d{4}-\d{2}-\d{2})/);
   assert.match(entry, /Schema sha256: `[0-9a-f]{64}`/);
@@ -123,19 +122,19 @@ const firstAdvance = (plan: JsonRecord): JsonRecord => {
   return advance;
 };
 
-test('the lint fails when a golden plan advances the clock by an unknown unit', { criterion: 'AC-SPEC-34-01', timeout: TIMEOUT }, () => {
+test('the lint fails when a golden plan advances the clock by an unknown unit', { timeout: TIMEOUT }, () => {
   const plan = planAt(CLOCK_PLAN_PATH);
   firstAdvance(plan)['by'] = { amount: 1, unit: 'weeks' };
   assertFailsNaming(scratch.lintWith('golden/plans/planted-clock-unit.json', `${JSON.stringify(plan, null, 2)}\n`), 'planted-clock-unit.json');
 });
 
-test('the lint fails when a golden plan gives an advance a real wait', { criterion: 'AC-SPEC-34-01', timeout: TIMEOUT }, () => {
+test('the lint fails when a golden plan gives an advance a real wait', { timeout: TIMEOUT }, () => {
   const plan = planAt(CLOCK_PLAN_PATH);
   firstAdvance(plan)['sleep'] = 1000;
   assertFailsNaming(scratch.lintWith('golden/plans/planted-clock-sleep.json', `${JSON.stringify(plan, null, 2)}\n`), 'planted-clock-sleep.json');
 });
 
-test('the lint fails when a golden plan remembers the clipboard as HTML', { criterion: 'AC-SPEC-34-01', timeout: TIMEOUT }, () => {
+test('the lint fails when a golden plan remembers the clipboard as HTML', { timeout: TIMEOUT }, () => {
   const plan = planAt(REMEMBER_PLAN_PATH);
   const remember = stepsOf(plan).find(remembersClipboard);
   assert.ok(remember !== undefined);
@@ -145,7 +144,7 @@ test('the lint fails when a golden plan remembers the clipboard as HTML', { crit
 
 // Counter-example: a valid copy of the clipboard plan, with an advance added, passes, so the
 // failures above come from the planted problems.
-test('the lint accepts a new 1.2 golden plan with an advance and clipboard checks', { criterion: 'AC-SPEC-34-01', timeout: TIMEOUT }, () => {
+test('the lint accepts a new 1.2 golden plan with an advance and clipboard checks', { timeout: TIMEOUT }, () => {
   const plan = planAt(CLIPBOARD_PLAN_PATH);
   (plan['meta'] as JsonRecord)['title'] = 'Copy buttons, second copy';
   stepsOf(plan).splice(4, 0, { type: 'advanceClock', by: { amount: 300, unit: 'milliseconds' }, mode: 'runTimers' });

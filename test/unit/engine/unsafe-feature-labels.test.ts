@@ -6,7 +6,6 @@
 // alone, so two runs of one plan say the same. The manifest records the features and the sha256 of
 // each named script's source and each command declaration the plan uses, so changing any of them
 // changes the manifest hash.
-// See docs/specs/SPEC-36-unsafe-plan-features.md and docs/specs/SPEC-35-evidence-mode.md.
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { test } from 'node:test';
@@ -28,7 +27,7 @@ const SORTED_FEATURES = [...FEATURES].sort();
 
 // ---- The features a plan uses -------------------------------------------------------------------------
 
-test('every closed golden plan uses no unsafe feature, even under a project that enables all six', { criterion: 'AC-SPEC-36-16' }, () => {
+test('every closed golden plan uses no unsafe feature, even under a project that enables all six', () => {
   for (const name of goldenPlanNames()) {
     assert.deepEqual(featuresOf(acceptedBy(parseAll, goldenPlan(name))), [], name);
   }
@@ -36,20 +35,20 @@ test('every closed golden plan uses no unsafe feature, even under a project that
 
 // A plan whose only script is inline lists inline-page-script alone, not page-script.
 for (const example of FEATURE_EXAMPLES) {
-  test(`a plan using only ${example.feature} uses exactly that feature`, { criterion: 'AC-SPEC-36-16' }, () => {
+  test(`a plan using only ${example.feature} uses exactly that feature`, () => {
     assert.deepEqual(featuresOf(acceptedBy(parseAll, unsafePlan(example.steps))), [example.feature]);
   });
 }
 
-test('a plan with a named and an inline script lists both page-script and inline-page-script', { criterion: 'AC-SPEC-36-16' }, () => {
+test('a plan with a named and an inline script lists both page-script and inline-page-script', () => {
   assert.deepEqual(featuresOf(acceptedBy(parseAll, unsafePlan([OPEN_CART, READ_CART, INLINE_READ]))), ['inline-page-script', 'page-script']);
 });
 
-test('the plan using all six lists all six, sorted', { criterion: 'AC-SPEC-36-16' }, () => {
+test('the plan using all six lists all six, sorted', () => {
   assert.deepEqual(featuresOf(acceptedBy(parseAll, ALL_FEATURES_PLAN())), SORTED_FEATURES);
 });
 
-test('a feature used several times is listed once, and the list is sorted whatever the plan\'s order', { criterion: 'AC-SPEC-36-16' }, () => {
+test('a feature used several times is listed once, and the list is sorted whatever the plan\'s order', () => {
   const plan = unsafePlan([OPEN_CART, XPATH_CHECK, STYLE_CHECK, CSS_CHECK, CLASS_CHECK, XPATH_CHECK]);
   assert.deepEqual(featuresOf(acceptedBy(parseAll, plan)), ['css-locator', 'dom-checks', 'xpath-locator']);
 });
@@ -57,7 +56,7 @@ test('a feature used several times is listed once, and the list is sorted whatev
 // ---- The guarantee statement ------------------------------------------------------------------------
 
 for (const feature of FEATURES) {
-  test(`with egress enforced, ${feature} loses exactly ${LOST_BY_FEATURE[feature].join(', ')}, each because of ${feature}`, { criterion: 'AC-SPEC-36-16' }, () => {
+  test(`with egress enforced, ${feature} loses exactly ${LOST_BY_FEATURE[feature].join(', ')}, each because of ${feature}`, () => {
     const statement = statementFor([feature], true);
     assert.equal(statement.level, 'host');
     assert.deepEqual(lostIds(statement), [...LOST_BY_FEATURE[feature]].sort());
@@ -67,13 +66,13 @@ for (const feature of FEATURES) {
 }
 
 // Counter-example: the same conditions with no unsafe feature keep every guarantee.
-test('with egress enforced and no unsafe feature, a plan run keeps every guarantee at the isolated level', { criterion: 'AC-SPEC-36-16' }, () => {
+test('with egress enforced and no unsafe feature, a plan run keeps every guarantee at the isolated level', () => {
   const statement = statementFor([], true);
   assert.equal(statement.level, 'isolated');
   assert.deepEqual(statement.lost, []);
 });
 
-test('with all six features, the lost guarantees are the union of the table\'s rows, each lost to a feature that loses it', { criterion: 'AC-SPEC-36-16' }, () => {
+test('with all six features, the lost guarantees are the union of the table\'s rows, each lost to a feature that loses it', () => {
   const statement = statementFor(SORTED_FEATURES, true);
   assert.equal(statement.level, 'host');
   assert.deepEqual(lostIds(statement), lostBy(FEATURES));
@@ -84,12 +83,12 @@ test('with all six features, the lost guarantees are the union of the table\'s r
   }
 });
 
-test('egress control, ambient credentials and secret redaction hold whatever unsafe features a plan uses', { criterion: 'AC-SPEC-36-16' }, () => {
+test('egress control, ambient credentials and secret redaction hold whatever unsafe features a plan uses', () => {
   const statement = statementFor(SORTED_FEATURES, true);
   for (const guarantee of ['egress-enforced', 'no-ambient-credentials', 'secrets-redacted'] as const) assert.ok(statement.holds.includes(guarantee), guarantee);
 });
 
-test('PII masking holds for every feature but page scripts', { criterion: 'AC-SPEC-36-16' }, () => {
+test('PII masking holds for every feature but page scripts', () => {
   for (const feature of FEATURES) {
     const masked = statementFor([feature], true).holds.includes('pii-masked');
     assert.equal(masked, feature !== 'page-script' && feature !== 'inline-page-script', feature);
@@ -102,20 +101,20 @@ test('PII masking holds for every feature but page scripts', { criterion: 'AC-SP
 const FOUR_FEATURES_PLAN = (): JsonRecord => unsafePlan([OPEN_CART, CSS_CHECK, CLASS_CHECK, CART_COUNT_CHECK, ORDER_COUNT_CHECK]);
 const FOUR_FEATURES: readonly FeatureName[] = ['css-locator', 'database-command', 'dom-checks', 'page-script'];
 
-test('a run of a plan using css locators carries the unsafe label, naming css-locator, in its result JSON', { criterion: 'AC-SPEC-36-16' }, async () => {
+test('a run of a plan using css locators carries the unsafe label, naming css-locator, in its result JSON', async () => {
   const { result } = await runUnsafePlan(unsafePlan([OPEN_CART, CSS_CHECK]));
   assert.deepEqual(result.unsafeFeatures, ['css-locator']);
   const written: JsonRecord = JSON.parse(JSON.stringify(result));
   assert.deepEqual(written['unsafeFeatures'], ['css-locator']);
 });
 
-test('that run is host level, and the only guarantee it loses to a feature is semantic-locators', { criterion: 'AC-SPEC-36-16' }, async () => {
+test('that run is host level, and the only guarantee it loses to a feature is semantic-locators', async () => {
   const { result } = await runUnsafePlan(unsafePlan([OPEN_CART, CSS_CHECK]));
   assert.equal(result.guarantees.level, 'host');
   assert.deepEqual(lostToFeatures(result.guarantees), ['semantic-locators']);
 });
 
-test('a run of a plan using four features names all four and loses exactly the table\'s guarantees on top of a closed run\'s', { criterion: 'AC-SPEC-36-16' }, async () => {
+test('a run of a plan using four features names all four and loses exactly the table\'s guarantees on top of a closed run\'s', async () => {
   const { result } = await runUnsafePlan(FOUR_FEATURES_PLAN());
   assert.deepEqual(result.unsafeFeatures, FOUR_FEATURES);
   assert.equal(result.guarantees.level, 'host');
@@ -127,7 +126,7 @@ test('a run of a plan using four features names all four and loses exactly the t
   }
 });
 
-test('a run\'s statement is the gate\'s statement for the plan\'s features on the host, and nothing the run did', { criterion: 'AC-SPEC-36-16' }, async () => {
+test('a run\'s statement is the gate\'s statement for the plan\'s features on the host, and nothing the run did', async () => {
   // Plan runs are not yet inside the isolated runner, so egress is not enforced.
   for (const plan of [unsafePlan([OPEN_CART, CSS_CHECK]), FOUR_FEATURES_PLAN()]) {
     const { result } = await runUnsafePlan(plan);
@@ -136,7 +135,7 @@ test('a run\'s statement is the gate\'s statement for the plan\'s features on th
 });
 
 // Counter-example: a closed plan's run carries no unsafe label and the statement it had before.
-test('a run of a closed plan carries no unsafe feature, and its statement is the closed one', { criterion: 'AC-SPEC-36-16' }, async () => {
+test('a run of a closed plan carries no unsafe feature, and its statement is the closed one', async () => {
   const { result } = await runPlan(planOf([OPEN_ORDERS]));
   // Absent, not an empty list, so a closed run's hashes stay as they were.
   assert.equal(Object.hasOwn(result, 'unsafeFeatures'), false);
@@ -148,7 +147,7 @@ test('a run of a closed plan carries no unsafe feature, and its statement is the
 
 // ---- Two runs of one plan ------------------------------------------------------------------------------
 
-test('two runs of one unsafe plan carry the same features, the same statement and the same hashes', { criterion: 'AC-SPEC-36-17' }, async () => {
+test('two runs of one unsafe plan carry the same features, the same statement and the same hashes', async () => {
   const first = (await runUnsafePlan(FOUR_FEATURES_PLAN())).result;
   const second = (await runUnsafePlan(FOUR_FEATURES_PLAN())).result;
   assert.deepEqual(second.unsafeFeatures, first.unsafeFeatures);
@@ -159,12 +158,12 @@ test('two runs of one unsafe plan carry the same features, the same statement an
 
 // ---- The manifest ---------------------------------------------------------------------------------------
 
-test('the manifest records the plan\'s unsafe features beside its plan hash', { criterion: 'AC-SPEC-36-17' }, async () => {
+test('the manifest records the plan\'s unsafe features beside its plan hash', async () => {
   const { result } = await runUnsafePlan(FOUR_FEATURES_PLAN());
   assert.deepEqual(manifestOf(result).unsafeFeatures, FOUR_FEATURES);
 });
 
-test('adding a feature to a plan changes the manifest\'s features and its hash', { criterion: 'AC-SPEC-36-17' }, async () => {
+test('adding a feature to a plan changes the manifest\'s features and its hash', async () => {
   const before = (await runUnsafePlan(unsafePlan([OPEN_CART, CSS_CHECK]))).result;
   const after = (await runUnsafePlan(unsafePlan([OPEN_CART, CSS_CHECK, CLASS_CHECK]))).result;
   assert.deepEqual(manifestOf(before).unsafeFeatures, ['css-locator']);
@@ -174,14 +173,14 @@ test('adding a feature to a plan changes the manifest\'s features and its hash',
 
 const SCRIPT_PLAN = (): JsonRecord => unsafePlan([OPEN_CART, CART_COUNT_CHECK]);
 
-test('the manifest records the sha256 of the named script\'s source, by its declared name', { criterion: 'AC-SPEC-36-17' }, async () => {
+test('the manifest records the sha256 of the named script\'s source, by its declared name', async () => {
   const { result } = await runUnsafePlan(SCRIPT_PLAN());
   const source = SCRIPT_SOURCES[READ_CART_FILE];
   assert.ok(source !== undefined);
   assert.deepEqual(manifestOf(result).unsafeDeclarations, [{ kind: 'script', name: 'readCart', sha256: sha256Of(source) }]);
 });
 
-test('one byte more in the named script\'s source changes the manifest hash, though the plan is the same', { criterion: 'AC-SPEC-36-17' }, async () => {
+test('one byte more in the named script\'s source changes the manifest hash, though the plan is the same', async () => {
   const source = SCRIPT_SOURCES[READ_CART_FILE];
   assert.ok(source !== undefined);
   const before = (await runUnsafePlan(SCRIPT_PLAN())).result;
@@ -191,7 +190,7 @@ test('one byte more in the named script\'s source changes the manifest hash, tho
 });
 
 // Counter-example: only declarations the plan uses are recorded.
-test('a change to a script the plan does not use leaves the manifest hash as it was', { criterion: 'AC-SPEC-36-17' }, async () => {
+test('a change to a script the plan does not use leaves the manifest hash as it was', async () => {
   const before = (await runUnsafePlan(SCRIPT_PLAN())).result;
   const after = (await runUnsafePlan(SCRIPT_PLAN(), { scriptSources: { ...SCRIPT_SOURCES, [SEED_EDITOR_FILE]: '() => null\n' } })).result;
   assert.equal(after.manifestHash, before.manifestHash);
@@ -206,14 +205,14 @@ const withArguments = (name: string, argv: readonly JsonRecord[]): JsonRecord =>
 });
 const COMMAND_PLAN = (): JsonRecord => unsafePlan([OPEN_CART, ORDER_COUNT_CHECK]);
 
-test('the manifest records one sha256 for the database command the plan uses, by its declared name', { criterion: 'AC-SPEC-36-17' }, async () => {
+test('the manifest records one sha256 for the database command the plan uses, by its declared name', async () => {
   const { result } = await runUnsafePlan(COMMAND_PLAN());
   const records = manifestOf(result).unsafeDeclarations ?? [];
   assert.deepEqual(records.map((record) => [record.kind, record.name]), [['command', 'countOrders']]);
   assert.match(records[0]?.sha256 ?? '', /^[0-9a-f]{64}$/);
 });
 
-test('a change to the command\'s argument vector changes the manifest hash, though the plan is the same', { criterion: 'AC-SPEC-36-17' }, async () => {
+test('a change to the command\'s argument vector changes the manifest hash, though the plan is the same', async () => {
   const before = (await runUnsafePlan(COMMAND_PLAN())).result;
   const changed = [{ literal: 'node' }, { literal: 'scripts/count-orders.js' }, { literal: '--verbose' }, { literal: '--' }, { $parameter: 'email' }];
   const after = (await runUnsafePlan(COMMAND_PLAN(), { projectFile: withArguments('countOrders', changed) })).result;
@@ -222,7 +221,7 @@ test('a change to the command\'s argument vector changes the manifest hash, thou
   assert.notEqual(after.manifestHash, before.manifestHash);
 });
 
-test('a change to a command the plan does not use leaves the manifest hash as it was', { criterion: 'AC-SPEC-36-17' }, async () => {
+test('a change to a command the plan does not use leaves the manifest hash as it was', async () => {
   const before = (await runUnsafePlan(COMMAND_PLAN())).result;
   const after = (await runUnsafePlan(COMMAND_PLAN(), { projectFile: withArguments('wipeOrders', [{ literal: 'node' }, { literal: 'scripts/wipe-all.js' }]) })).result;
   assert.equal(after.manifestHash, before.manifestHash);

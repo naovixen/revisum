@@ -4,9 +4,8 @@
 // beside this one asks the gate directly; this one proves run() lets the guard decide, for every
 // action kind, the dialog step included.
 //
-// The real CDP and Playwright drivers ignore the guard until SPEC-06 wires it in, so they are not
+// The real CDP and Playwright drivers ignore the guard until the CDP driver wires it in, so they are not
 // run here.
-// See docs/specs/SPEC-03-policy-gate.md.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -41,7 +40,7 @@ async function runVariant(variant: Variant, targetId: string) {
 }
 
 for (const redTeamCase of RED_TEAM) {
-  test(`run end to end, a plan that ${redTeamCase.name} ends Denied as ${redTeamCase.rule}, with no input event for the denied step`, { criterion: 'AC-SPEC-03-03' }, async () => {
+  test(`run end to end, a plan that ${redTeamCase.name} ends Denied as ${redTeamCase.rule}, with no input event for the denied step`, async () => {
     const { outcome, driven } = await runVariant(redTeamCase.harmful, redTeamCase.harmful.target ?? redTeamCase.target);
     const run = onlyRun(outcome);
     assert.equal(finalState(outcome), 'Denied', JSON.stringify(run?.steps ?? outcome));
@@ -58,7 +57,7 @@ for (const redTeamCase of RED_TEAM) {
     assert.deepEqual(driven.inputEvents.slice(denied).filter((count) => count > 0), [], JSON.stringify(driven.inputEvents));
   });
 
-  test(`run end to end, the benign twin of the plan that ${redTeamCase.name} passes`, { criterion: 'AC-SPEC-03-03' }, async () => {
+  test(`run end to end, the benign twin of the plan that ${redTeamCase.name} passes`, async () => {
     const { outcome, driven, audit } = await runVariant(redTeamCase.benign, redTeamCase.benign.target ?? redTeamCase.target);
     assert.equal(finalState(outcome), 'Passed', JSON.stringify(onlyRun(outcome)?.steps ?? outcome));
     const acting = redTeamCase.benign.steps.filter((step) => step['type'] !== 'navigate').length;
@@ -67,7 +66,7 @@ for (const redTeamCase of RED_TEAM) {
   });
 }
 
-test('run end to end, the click on a test id that turns out to be Delete account is stopped by the runtime guard', { criterion: 'AC-SPEC-03-03' }, async () => {
+test('run end to end, the click on a test id that turns out to be Delete account is stopped by the runtime guard', async () => {
   const runtimeClick = RED_TEAM.find((redTeamCase) => redTeamCase.actionKind === 'click' && redTeamCase.stage === 'runtime');
   assert.ok(runtimeClick !== undefined, 'the red-team set has no runtime click case');
   const { outcome, driven, audit } = await runVariant(runtimeClick.harmful, runtimeClick.target);

@@ -3,8 +3,7 @@
 // run's own clock start and gains no field: the advance amounts are in the plan, so the plan hash
 // already covers them. These runs use the recording driver, on which an advance fails with
 // unsupported-step until the clock port lands; what the page sees after a real advance, and 20
-// replays in the pinned Linux image, come with SPEC-06 and SPEC-08.
-// See docs/specs/SPEC-34-clock-advance-and-clipboard.md.
+// replays in the pinned Linux image, come with the CDP driver and replay.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { planHash } from '@revisum/engine';
@@ -29,7 +28,7 @@ const filledValues = (actions: readonly { readonly type: string }[]): unknown[] 
 
 // ---- Date values and the clocks (metamorphic) -----------------------------------------------------------
 
-test('date values filled in a plan with advances equal those of the same plan without them', { criterion: 'AC-SPEC-34-10' }, async () => {
+test('date values filled in a plan with advances equal those of the same plan without them', async () => {
   const plain = await runPlan(withoutAdvances());
   const advanced = await runPlan(withAdvances());
   const plainValues = filledValues(plain.recording.actions);
@@ -38,7 +37,7 @@ test('date values filled in a plan with advances equal those of the same plan wi
   assert.deepEqual(filledValues(advanced.recording.actions), plainValues);
 });
 
-test('the page starts at the same plan-clock time with and without advances', { criterion: 'AC-SPEC-34-10' }, async () => {
+test('the page starts at the same plan-clock time with and without advances', async () => {
   const plain = await runPlan(withoutAdvances());
   const advanced = await runPlan(withAdvances());
   const startTimes = (recording: typeof plain.recording) => recording.environments.map((environment) => environment.fixedTimeMilliseconds);
@@ -47,7 +46,7 @@ test('the page starts at the same plan-clock time with and without advances', { 
   assert.deepEqual(startTimes(advanced.recording), startTimes(plain.recording));
 });
 
-test('the manifest records the run\'s own clock start, with and without advances', { criterion: 'AC-SPEC-34-10' }, async () => {
+test('the manifest records the run\'s own clock start, with and without advances', async () => {
   for (const raw of [withoutAdvances(), withAdvances()]) {
     const { result } = await runPlan(raw);
     assert.deepEqual(result.manifest?.clock, { fixedTimeMilliseconds: DEFAULT_CLOCK_START });
@@ -56,7 +55,7 @@ test('the manifest records the run\'s own clock start, with and without advances
 
 // Counter-example: a different clock start does change the date values, so the equality above
 // is not true of any two runs.
-test('counter-example: a clock start 40 days later changes the date values', { criterion: 'AC-SPEC-34-10' }, async () => {
+test('counter-example: a clock start 40 days later changes the date values', async () => {
   const plain = await runPlan(withoutAdvances());
   const later = await runPlan(withoutAdvances(), { clockStartMilliseconds: DEFAULT_CLOCK_START + 40 * 86_400_000 });
   assert.notDeepEqual(filledValues(later.recording.actions), filledValues(plain.recording.actions));
@@ -64,14 +63,14 @@ test('counter-example: a clock start 40 days later changes the date values', { c
 
 // ---- The plan hash and the manifest ---------------------------------------------------------------------
 
-test('changing one advance amount changes the plan hash; parsing the same plan twice does not', { criterion: 'AC-SPEC-34-11' }, () => {
+test('changing one advance amount changes the plan hash; parsing the same plan twice does not', () => {
   const parse = parserFor();
   const planWith = (seconds: number) => planOf([OPEN_ORDERS, advanceClock(599, 'seconds'), advanceClock(seconds, 'seconds'), COPY_LINK, expectClipboard('textContains', '/invite/')]);
   assert.equal(planHash(accepted(parse, planWith(1))), planHash(accepted(parse, planWith(1))));
   assert.notEqual(planHash(accepted(parse, planWith(1))), planHash(accepted(parse, planWith(2))));
 });
 
-test('changing an advance\'s mode or unit changes the plan hash', { criterion: 'AC-SPEC-34-11' }, () => {
+test('changing an advance\'s mode or unit changes the plan hash', () => {
   const parse = parserFor();
   const hashOf = (step: JsonRecord) => planHash(accepted(parse, planOf([OPEN_ORDERS, step])));
   const hashes = new Set([hashOf(advanceClock(1, 'minutes')), hashOf(advanceClock(1, 'minutes', 'skipAhead')), hashOf(advanceClock(1, 'seconds'))]);
@@ -80,7 +79,7 @@ test('changing an advance\'s mode or unit changes the plan hash', { criterion: '
 
 const MANIFEST_FIELDS = ['adapter', 'browser', 'clock', 'engineVersion', 'fixtures', 'host', 'nonHermeticInputs', 'planHash', 'schema', 'seeds', 'target'];
 
-test('the manifest of a run with advances and clipboard checks has exactly the fields of one without', { criterion: 'AC-SPEC-34-11' }, async () => {
+test('the manifest of a run with advances and clipboard checks has exactly the fields of one without', async () => {
   const fieldsOf = (manifest: object | null): string[] => Object.keys(manifest ?? {}).sort();
   const plain = await runPlan(planOf([OPEN_ORDERS, COPY_LINK]));
   const advanced = await runPlan(planOf([OPEN_ORDERS, advanceClock(10, 'minutes'), COPY_LINK, expectClipboard('textContains', '/invite/')]));
@@ -90,7 +89,7 @@ test('the manifest of a run with advances and clipboard checks has exactly the f
   assert.notEqual(advanced.result.manifest?.planHash, plain.result.manifest?.planHash);
 });
 
-test('20 runs of a plan with advances and clipboard checks give identical result and manifest hashes', { criterion: 'AC-SPEC-34-11' }, async () => {
+test('20 runs of a plan with advances and clipboard checks give identical result and manifest hashes', async () => {
   const raw = planOf([OPEN_ORDERS, ...FILLS, advanceClock(599, 'seconds'), advanceClock(1, 'seconds'), COPY_LINK, expectClipboard('textContains', '/invite/')], { values: VALUES, clock: PLAN_CLOCK });
   const results = new Set<string>();
   const manifests = new Set<string | null>();

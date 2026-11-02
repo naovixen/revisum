@@ -3,7 +3,6 @@
 // golden plan against the schema, and the changelog's one 1.2 entry names each new step, check,
 // project section, setting and error code. The schema-hash and entry-format checks are in
 // plan-schema-newer-version.test.ts.
-// See docs/specs/SPEC-33-network-stubs-request-checks-and-storage.md.
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -70,7 +69,7 @@ const FEATURES: Readonly<Record<string, (plan: JsonRecord) => boolean>> = {
 };
 
 for (const [feature, uses] of Object.entries(FEATURES)) {
-  test(`a 1.2 golden plan uses ${feature}`, { criterion: 'AC-SPEC-30-02' }, () => {
+  test(`a 1.2 golden plan uses ${feature}`, () => {
     assert.ok(newerGoldenPlans().some(uses), `no golden plan declaring 1.2 uses ${feature}`);
   });
 }
@@ -83,7 +82,7 @@ const NAMED_IN_ENTRY = [
   'stubs', 'observedRequests', 'storageEntries', 'requestQuietMilliseconds', 'request-not-seen', 'storage-origin-mismatch',
 ];
 
-test('the 1.2 changelog entry names each new step, check, section, setting and error code, in code type', { criterion: 'AC-SPEC-30-02' }, () => {
+test('the 1.2 changelog entry names each new step, check, section, setting and error code, in code type', () => {
   const entry = changelogEntry('1.2');
   assert.match(entry, /^## 1\.2\b/);
   assert.deepEqual(NAMED_IN_ENTRY.filter((name) => !entry.includes(`\`${name}\``)), [], 'names the 1.2 entry leaves out');
@@ -107,7 +106,7 @@ const stepsOf = (plan: JsonRecord): JsonRecord[] => {
   return steps;
 };
 
-test('the lint fails when a golden plan gives a stub an action the language does not have', { criterion: 'AC-SPEC-30-02', timeout: TIMEOUT }, () => {
+test('the lint fails when a golden plan gives a stub an action the language does not have', { timeout: TIMEOUT }, () => {
   const plan = planAt(STUB_PLAN_PATH);
   const stub = stepsOf(plan).find((step) => step['type'] === 'stub');
   assert.ok(stub !== undefined);
@@ -115,7 +114,7 @@ test('the lint fails when a golden plan gives a stub an action the language does
   assertFailsNaming(scratch.lintWith('golden/plans/planted-stub-action.json', `${JSON.stringify(plan, null, 2)}\n`), 'planted-stub-action.json');
 });
 
-test('the lint fails when a golden plan writes its own response into a stub step', { criterion: 'AC-SPEC-30-02', timeout: TIMEOUT }, () => {
+test('the lint fails when a golden plan writes its own response into a stub step', { timeout: TIMEOUT }, () => {
   const plan = planAt(STUB_PLAN_PATH);
   const stub = stepsOf(plan).find((step) => step['type'] === 'stub');
   assert.ok(stub !== undefined);
@@ -123,7 +122,7 @@ test('the lint fails when a golden plan writes its own response into a stub step
   assertFailsNaming(scratch.lintWith('golden/plans/planted-stub-response.json', `${JSON.stringify(plan, null, 2)}\n`), 'planted-stub-response.json');
 });
 
-test('the lint fails when a golden plan names its own storage key in a setStorage', { criterion: 'AC-SPEC-30-02', timeout: TIMEOUT }, () => {
+test('the lint fails when a golden plan names its own storage key in a setStorage', { timeout: TIMEOUT }, () => {
   const plan = planAt(STORAGE_PLAN_PATH);
   const write = stepsOf(plan).find((step) => step['type'] === 'setStorage');
   assert.ok(write !== undefined);
@@ -133,7 +132,7 @@ test('the lint fails when a golden plan names its own storage key in a setStorag
 
 // Counter-example: a valid copy of the storage plan, with a stub added, passes, so the failures
 // above come from the planted problems.
-test('the lint accepts a new 1.2 golden plan with a stub, a request check and storage steps', { criterion: 'AC-SPEC-30-02', timeout: TIMEOUT }, () => {
+test('the lint accepts a new 1.2 golden plan with a stub, a request check and storage steps', { timeout: TIMEOUT }, () => {
   const plan = planAt(STORAGE_PLAN_PATH);
   (plan['meta'] as JsonRecord)['title'] = 'A docked menu stays docked, second copy';
   stepsOf(plan).unshift({ type: 'stub', stub: 'loginNeedsCode', action: 'start', arguments: { reason: 'Code needed' } });

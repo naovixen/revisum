@@ -15,7 +15,6 @@
 // is up, records each exec and its output, and, before the run stops, reads what the site's servers
 // heard and the proxy's decisions. Every docker command line is recorded from the spawn of the
 // Docker client itself. The runner removes the containers and network it created.
-// See docs/specs/SPEC-37-explore-to-draft.md.
 import assert from 'node:assert/strict';
 import { createRequire, syncBuiltinESMExports } from 'node:module';
 import { before, test } from 'node:test';
@@ -271,7 +270,7 @@ function assertCrawled(crawl: ContainerCrawl): void {
 
 // ---- Isolation and the page map -------------------------------------------------------------------------
 
-test('without --host, the crawl runs in the run container through the cli\'s entry module, and no host browser opens', { criterion: 'AC-SPEC-37-11', timeout: TIMEOUT }, async () => {
+test('without --host, the crawl runs in the run container through the cli\'s entry module, and no host browser opens', { timeout: TIMEOUT }, async () => {
   const crawl = await crawled();
   assertCrawled(crawl);
   const [exec] = crawlExecs(crawl);
@@ -279,7 +278,7 @@ test('without --host, the crawl runs in the run container through the cli\'s ent
   assert.equal(crawl.hostSessions, 0, 'a browser session was opened on this machine');
 });
 
-test('the page map says isolated and the --json output says egress was enforced', { criterion: 'AC-SPEC-37-11', timeout: TIMEOUT }, async () => {
+test('the page map says isolated and the --json output says egress was enforced', { timeout: TIMEOUT }, async () => {
   const crawl = await crawled();
   assertCrawled(crawl);
   assert.equal(crawl.map.guaranteeLevel, 'isolated');
@@ -287,20 +286,20 @@ test('the page map says isolated and the --json output says egress was enforced'
   assert.equal(crawl.data['crawledOrigin'], INSIDE_SITE_ORIGIN);
 });
 
-test('the run container\'s egress policy allows the start origin and nothing else', { criterion: 'AC-SPEC-37-11', timeout: TIMEOUT }, async () => {
+test('the run container\'s egress policy allows the start origin and nothing else', { timeout: TIMEOUT }, async () => {
   const crawl = await crawled();
   assert.equal(crawl.watch.policies.length, 1);
   assert.deepEqual(crawl.watch.policies[0]?.allowOrigins, [INSIDE_SITE_ORIGIN]);
   assert.deepEqual(crawl.watch.policies[0]?.allowServices, []);
 });
 
-test('the run\'s containers and network are removed once the crawl ends', { criterion: 'AC-SPEC-37-11', timeout: TIMEOUT }, async () => {
+test('the run\'s containers and network are removed once the crawl ends', { timeout: TIMEOUT }, async () => {
   const crawl = await crawled();
   assert.deepEqual(crawl.leftContainers, [], 'a container was left behind');
   assert.deepEqual(crawl.leftNetworks, [], 'a network was left behind');
 });
 
-test('the page map crawled in the container is the golden page map of the host-mode tests, apart from its origin and guarantee level', { criterion: 'AC-SPEC-37-03', timeout: TIMEOUT }, async () => {
+test('the page map crawled in the container is the golden page map of the host-mode tests, apart from its origin and guarantee level', { timeout: TIMEOUT }, async () => {
   const crawl = await crawled();
   assertCrawled(crawl);
   // The site is the same; only where it was served and how the crawl was placed differ.
@@ -310,7 +309,7 @@ test('the page map crawled in the container is the golden page map of the host-m
 
 // ---- Other origins ----------------------------------------------------------------------------------------
 
-test('the crawl never requests the second origin the home page links to', { criterion: 'AC-SPEC-37-01', timeout: TIMEOUT }, async () => {
+test('the crawl never requests the second origin the home page links to', { timeout: TIMEOUT }, async () => {
   const crawl = await crawled();
   assertCrawled(crawl);
   assert.deepEqual(crawl.watch.requests.filter((request) => request.server === 'second'), []);
@@ -318,13 +317,13 @@ test('the crawl never requests the second origin the home page links to', { crit
   for (const foreign of ['/partner.html', '/checkout']) assert.equal(paths.includes(foreign), false, `${foreign} is in the page map`);
 });
 
-test('counter-example: the site\'s own server, inside the container, recorded the crawl\'s requests', { criterion: 'AC-SPEC-37-01', timeout: TIMEOUT }, async () => {
+test('counter-example: the site\'s own server, inside the container, recorded the crawl\'s requests', { timeout: TIMEOUT }, async () => {
   const crawl = await crawled();
   const served = crawl.watch.requests.filter((request) => request.server === 'site').map((request) => request.path);
   assert.ok(served.includes('/index.html') && served.includes('/about.html'), JSON.stringify(crawl.watch.requests));
 });
 
-test('the proxy allowed no request to any origin but the start origin, and saw none for production or the second origin', { criterion: 'AC-SPEC-37-01', timeout: TIMEOUT }, async () => {
+test('the proxy allowed no request to any origin but the start origin, and saw none for production or the second origin', { timeout: TIMEOUT }, async () => {
   const crawl = await crawled();
   assertCrawled(crawl);
   const events = crawl.watch.crawlEgress;
@@ -332,7 +331,7 @@ test('the proxy allowed no request to any origin but the start origin, and saw n
   assert.deepEqual(events.filter((event) => hostOf(String(event.origin)) === PRODUCTION_HOST || String(event.origin) === INSIDE_SECOND_ORIGIN), [], JSON.stringify(events));
 });
 
-test('counter-example: a request through the same run\'s proxy for the production link\'s host is recorded, and blocked', { criterion: 'AC-SPEC-37-01', timeout: TIMEOUT }, async () => {
+test('counter-example: a request through the same run\'s proxy for the production link\'s host is recorded, and blocked', { timeout: TIMEOUT }, async () => {
   const crawl = await crawled();
   const production = crawl.watch.probeEgress.filter((event) => hostOf(String(event.origin)) === PRODUCTION_HOST);
   assert.ok(production.length >= 1, `the proxy recorded nothing for ${PRODUCTION_HOST}: ${JSON.stringify(crawl.watch.probeEgress)}`);
@@ -343,7 +342,7 @@ test('counter-example: a request through the same run\'s proxy for the productio
 
 const secretValues = (crawl: ContainerCrawl): readonly string[] => [crawl.loginName, OFFICE_KEY_VALUE];
 
-test('with an approved --after login plan, the container signs in before it crawls, and reaches the members\' page', { criterion: 'AC-SPEC-37-09', timeout: TIMEOUT }, async () => {
+test('with an approved --after login plan, the container signs in before it crawls, and reaches the members\' page', { timeout: TIMEOUT }, async () => {
   const crawl = await crawledAfterLogin();
   assertCrawled(crawl);
   assert.ok(crawl.map.pages.some((page) => page.path === '/members.html'), JSON.stringify(crawlOrder(crawl.map)));
@@ -351,7 +350,7 @@ test('with an approved --after login plan, the container signs in before it craw
   assert.ok(homeNames.some((name) => name.startsWith('Signed in as ')), JSON.stringify(homeNames));
 });
 
-test('the typed secret\'s value is on no docker command line the runner issued', { criterion: 'AC-SPEC-37-09', timeout: TIMEOUT }, async () => {
+test('the typed secret\'s value is on no docker command line the runner issued', { timeout: TIMEOUT }, async () => {
   const crawl = await crawledAfterLogin();
   assertCrawled(crawl);
   for (const value of secretValues(crawl)) {
@@ -360,7 +359,7 @@ test('the typed secret\'s value is on no docker command line the runner issued',
   }
 });
 
-test('counter-example: the command-line spy sees the crawl\'s docker exec, its secret names and its start URL', { criterion: 'AC-SPEC-37-09', timeout: TIMEOUT }, async () => {
+test('counter-example: the command-line spy sees the crawl\'s docker exec, its secret names and its start URL', { timeout: TIMEOUT }, async () => {
   const crawl = await crawledAfterLogin();
   const crawlLines = crawl.commandLines.filter((line) => line[1] === 'exec' && line.includes(CRAWL_MODULE));
   assert.equal(crawlLines.length, 1, JSON.stringify(crawl.commandLines.map((line) => line.slice(0, 4))));
@@ -371,7 +370,7 @@ test('counter-example: the command-line spy sees the crawl\'s docker exec, its s
   assert.ok(line.some((word) => word.includes(START)), 'the crawl\'s input is not on its command line');
 });
 
-test('the typed secret\'s value is in no page map, draft, output or event, nor in what the container printed or the proxy recorded', { criterion: 'AC-SPEC-37-09', timeout: TIMEOUT }, async () => {
+test('the typed secret\'s value is in no page map, draft, output or event, nor in what the container printed or the proxy recorded', { timeout: TIMEOUT }, async () => {
   const crawl = await crawledAfterLogin();
   assertCrawled(crawl);
   const everything = [
@@ -382,7 +381,7 @@ test('the typed secret\'s value is in no page map, draft, output or event, nor i
   for (const value of secretValues(crawl)) assert.equal(everything.includes(value), false, 'a secret\'s value leaked');
 });
 
-test('counter-example: the signed-in pages did show the typed name, and the map holds its heading with the name redacted', { criterion: 'AC-SPEC-37-09', timeout: TIMEOUT }, async () => {
+test('counter-example: the signed-in pages did show the typed name, and the map holds its heading with the name redacted', { timeout: TIMEOUT }, async () => {
   const crawl = await crawledAfterLogin();
   // The container's own printed map is what the host decoded: it holds the heading the name was in.
   const printed = crawlExecs(crawl)[0]?.outcome.stdout ?? '';

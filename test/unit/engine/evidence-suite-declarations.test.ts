@@ -4,7 +4,6 @@
 // other than Playwright Test, reach outside the repository, override what Revisum sets itself or
 // hold a secret, with the code and JSON path and never the value. Without the section, or without
 // the named suite, `run --suite` is refused before any container starts.
-// See docs/specs/SPEC-35-evidence-mode.md.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { parseProject } from '@revisum/engine';
@@ -23,11 +22,11 @@ const environmentWith = (name: string, value: unknown): JsonRecord => ({ environ
 
 // ---- A valid declaration (the counter-example for every refusal below) --------------------------
 
-test('a project with no evidenceMode section parses with evidence mode off', { criterion: 'AC-SPEC-35-01' }, () => {
+test('a project with no evidenceMode section parses with evidence mode off', () => {
   assert.equal(parsedProject(projectFileWith()).evidenceMode, undefined);
 });
 
-test('a valid suite declaration parses, with the defaults for every setting it leaves out', { criterion: 'AC-SPEC-35-01' }, () => {
+test('a valid suite declaration parses, with the defaults for every setting it leaves out', () => {
   const evidenceMode = parsedProject(projectFileWithEvidence()).evidenceMode;
   assert.ok(evidenceMode !== undefined, 'the evidenceMode section was dropped');
   assert.deepEqual(JSON.parse(JSON.stringify(evidenceMode.suites)), [{
@@ -47,7 +46,7 @@ test('a valid suite declaration parses, with the defaults for every setting it l
   }]);
 });
 
-test('an evidenceMode section without limits gets the default evidence limits', { criterion: 'AC-SPEC-35-01' }, () => {
+test('an evidenceMode section without limits gets the default evidence limits', () => {
   assert.deepEqual(parsedProject(projectFileWithEvidence()).evidenceMode?.limits, {
     maximumReportBytes: 50 * 1024 * 1024,
     maximumTests: 5000,
@@ -57,7 +56,7 @@ test('an evidenceMode section without limits gets the default evidence limits', 
   });
 });
 
-test('a command run through npx and one that calls playwright directly are both accepted', { criterion: 'AC-SPEC-35-01' }, () => {
+test('a command run through npx and one that calls playwright directly are both accepted', () => {
   for (const command of [['npx', 'playwright', 'test'], ['playwright', 'test']]) {
     const parsed = parseProject(projectWithSuite({ command }));
     assert.equal(parsed.ok, true, `${command.join(' ')}: ${JSON.stringify(parsed)}`);
@@ -100,7 +99,7 @@ const CASES: readonly DeclarationCase[] = [
 ];
 
 for (const declaration of CASES) {
-  test(`a suite declaring ${declaration.name} is refused with ${declaration.code} at ${declaration.path}`, { criterion: 'AC-SPEC-35-01' }, () => {
+  test(`a suite declaring ${declaration.name} is refused with ${declaration.code} at ${declaration.path}`, () => {
     const parsed = parseProject(projectWithSuite(declaration.fields));
     assert.equal(parsed.ok, false, 'the declaration was accepted');
     if (parsed.ok) return;
@@ -111,7 +110,7 @@ for (const declaration of CASES) {
   });
 }
 
-test('no refusal of a suite declaration echoes the value that caused it', { criterion: 'AC-SPEC-35-01' }, () => {
+test('no refusal of a suite declaration echoes the value that caused it', () => {
   const token = tokenShapedText();
   const hostile = [...CASES.map((declaration) => declaration.fields), environmentWith('CHECKOUT_MODE', { literal: token })];
   assert.ok(hostile.filter((fields) => JSON.stringify(fields).includes(HOSTILE_MARKER)).length >= 15, 'enough cases carry the marker');
@@ -123,7 +122,7 @@ test('no refusal of a suite declaration echoes the value that caused it', { crit
   }
 });
 
-test('environment names that only resemble reserved ones are accepted', { criterion: 'AC-SPEC-35-01' }, () => {
+test('environment names that only resemble reserved ones are accepted', () => {
   // The counter-example to the reserved names: the rule is the names, not any variable at all.
   for (const name of ['BASE_URL', 'E2E_USER', 'CHECKOUT_REGION']) {
     const parsed = parseProject(projectWithSuite(environmentWith(name, { literal: 'eu-west' })));
@@ -133,13 +132,13 @@ test('environment names that only resemble reserved ones are accepted', { criter
 
 // ---- Choosing the suite to run ------------------------------------------------------------------
 
-test('run --suite on a project with no evidenceMode section is refused with evidence-mode-disabled', { criterion: 'AC-SPEC-35-02' }, () => {
+test('run --suite on a project with no evidenceMode section is refused with evidence-mode-disabled', () => {
   const chosen = chooseSuite(parsedProject(projectFileWith()), SUITE_NAME);
   assert.equal(chosen.ok, false, 'a suite was chosen from a project without evidence mode');
   if (!chosen.ok) assert.equal(chosen.error.code, 'evidence-mode-disabled');
 });
 
-test('run --suite naming a suite the project does not declare is refused with suite-not-declared', { criterion: 'AC-SPEC-35-02' }, () => {
+test('run --suite naming a suite the project does not declare is refused with suite-not-declared', () => {
   const project = parsedProject(projectFileWithEvidence());
   for (const name of ['smoke', 'Checkout', 'checkout ', '']) {
     const chosen = chooseSuite(project, name);
@@ -148,7 +147,7 @@ test('run --suite naming a suite the project does not declare is refused with su
   }
 });
 
-test('run --suite naming a declared suite gets exactly that declaration', { criterion: 'AC-SPEC-35-02' }, () => {
+test('run --suite naming a declared suite gets exactly that declaration', () => {
   // The counter-example: the refusals above come from the section and the name, not from the call.
   const project = parsedProject(projectFileWithEvidence());
   const chosen = chooseSuite(project, SUITE_NAME);

@@ -4,7 +4,6 @@
 // The step never gives a partial result: no probe, action or navigation of it reaches the driver,
 // and every later step is skipped. The counter-example runs the same plan without the step and
 // does reach the driver.
-// See docs/specs/SPEC-33-network-stubs-request-checks-and-storage.md.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { OPEN_ORDERS, runPlan } from './run-value-examples.ts';
@@ -34,7 +33,7 @@ const reached = (recording: { readonly navigations: readonly string[]; readonly 
   ({ navigations: recording.navigations, actions: recording.actions.length, probes: recording.probes });
 
 for (const { name, step } of FEATURES) {
-  test(`a run with ${name} fails that step with unsupported-step, sends nothing of it and skips the rest`, { criterion: 'AC-SPEC-33-15' }, async () => {
+  test(`a run with ${name} fails that step with unsupported-step, sends nothing of it and skips the rest`, async () => {
     const { result, recording } = await runPlan(planOf([OPEN_ORDERS, step, AFTER]), { projectFile: PROJECT_FILE });
     assert.equal(result.state, 'Failed');
     assert.deepEqual(result.steps.map((stepResult) => [stepResult.index, stepResult.type, stepResult.outcome, stepResult.code]), [
@@ -46,7 +45,7 @@ for (const { name, step } of FEATURES) {
 }
 
 // Counter-example: the same run, on the same project, without the step reaches the driver.
-test('counter-example: the same run without any of those steps clicks and checks the page, and passes', { criterion: 'AC-SPEC-33-15' }, async () => {
+test('counter-example: the same run without any of those steps clicks and checks the page, and passes', async () => {
   const { result, recording } = await runPlan(planOf([OPEN_ORDERS, AFTER]), { projectFile: PROJECT_FILE });
   assert.equal(result.state, 'Passed', JSON.stringify(result.steps));
   assert.deepEqual(recording.navigations, [`${ORIGIN}/orders`]);
@@ -55,7 +54,7 @@ test('counter-example: the same run without any of those steps clicks and checks
 });
 
 // A stop needs an earlier start, which fails first; the stop is skipped, never performed alone.
-test('a stub stop after a start that failed with unsupported-step is skipped', { criterion: 'AC-SPEC-33-15' }, async () => {
+test('a stub stop after a start that failed with unsupported-step is skipped', async () => {
   const { result, recording } = await runPlan(planOf([OPEN_ORDERS, startStub('cartEmpty'), stopStub('cartEmpty'), AFTER]), { projectFile: PROJECT_FILE });
   assert.equal(result.state, 'Failed');
   assert.deepEqual(result.steps.map((stepResult) => [stepResult.index, stepResult.type, stepResult.outcome, stepResult.code]), [
@@ -65,7 +64,7 @@ test('a stub stop after a start that failed with unsupported-step is skipped', {
   assert.deepEqual(reached(recording), { navigations: [`${ORIGIN}/orders`], actions: 0, probes: 0 });
 });
 
-test('a stub started before the first navigation fails with unsupported-step and the page is never loaded', { criterion: 'AC-SPEC-33-15' }, async () => {
+test('a stub started before the first navigation fails with unsupported-step and the page is never loaded', async () => {
   const { result, recording } = await runPlan(planOf([startStub('cartEmpty'), OPEN_ORDERS]), { projectFile: PROJECT_FILE });
   assert.equal(result.state, 'Failed');
   assert.deepEqual(result.steps.map((stepResult) => [stepResult.index, stepResult.outcome, stepResult.code]), [

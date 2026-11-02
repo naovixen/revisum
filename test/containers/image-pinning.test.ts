@@ -2,7 +2,6 @@
 // it returns image-digest-mismatch, and no container or network is created, so no browser can
 // launch. Starting with the right id, which does create them, is the counter-example; stopping
 // that run removes everything it created.
-// See docs/specs/SPEC-07-isolated-runner-and-egress.md.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { dockerCliEngine, dockerRunner } from '@revisum/runner';
@@ -16,7 +15,7 @@ const POLICY = egressPolicy({ allowOrigins: [] });
 // Another well-formed digest: the pinned id with its last hex digit changed.
 const alteredDigest = (digest: string): string => `${digest.slice(0, -1)}${digest.endsWith('0') ? '1' : '0'}`;
 
-test('a digest that differs from the local run image\'s id is refused with image-digest-mismatch, and nothing is created', { criterion: 'AC-SPEC-07-06', timeout: TIMEOUT }, async () => {
+test('a digest that differs from the local run image\'s id is refused with image-digest-mismatch, and nothing is created', { timeout: TIMEOUT }, async () => {
   const pinned = await pinnedRunImage();
   const containersBefore = dockerIds('containers');
   const networksBefore = dockerIds('networks');
@@ -30,7 +29,7 @@ test('a digest that differs from the local run image\'s id is refused with image
   assert.equal(runner.guaranteeLevel(), 'host');
 });
 
-test('counter-example: the pinned id starts the run, and stopping it removes every container and network it created', { criterion: 'AC-SPEC-07-06', timeout: TIMEOUT }, async () => {
+test('counter-example: the pinned id starts the run, and stopping it removes every container and network it created', { timeout: TIMEOUT }, async () => {
   const pinned = await pinnedRunImage();
   const containersBefore = dockerIds('containers');
   const networksBefore = dockerIds('networks');

@@ -3,7 +3,6 @@
 // then downloads and checks a second CSV in the first tab. 20 replays share one browser, so the
 // file stays quick: every replay still asks the driver for its session, and the test shows each
 // asked with the same environment. The pinned Linux image runs it with npm run check:linux.
-// See docs/specs/SPEC-31-page-states-metadata-downloads-and-tabs.md.
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
 import {
@@ -32,7 +31,7 @@ const replayedSteps = () => [
   textEquals(testId('download-status'), 'Ready', 'replays.page-ready'),
 ];
 
-test('20 replays of a plan with downloads and a newTab give one result hash, each from the same session environment', { criterion: 'AC-SPEC-31-14', timeout: 300_000 }, async () => {
+test('20 replays of a plan with downloads and a newTab give one result hash, each from the same session environment', { timeout: 300_000 }, async () => {
   const plan = harness.plan(pagePlan(CDP_TARGET, replayedSteps()));
   const adapter = harness.target(CDP_TARGET).adapter;
   const inner = harness.drivers.get(adapter);
@@ -56,7 +55,7 @@ test('20 replays of a plan with downloads and a newTab give one result hash, eac
 
 // Counter-example: a plan that differs in one check gives another hash, so one hash across the
 // replays is not a hash that ignores the steps.
-test('counter-example: the same plan with one check changed gives a different result hash', { criterion: 'AC-SPEC-31-14', timeout: 120_000 }, async () => {
+test('counter-example: the same plan with one check changed gives a different result hash', { timeout: 120_000 }, async () => {
   const steps = replayedSteps();
   const changed = [...steps.slice(0, -1), textEquals(testId('download-status'), 'Ready', 'replays.page-ready-again')];
   const first = await harness.run(harness.plan(pagePlan(CDP_TARGET, steps)), CDP_TARGET);

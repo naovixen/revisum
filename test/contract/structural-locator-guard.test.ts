@@ -11,7 +11,6 @@
 // page, so the counter is shown able to move.
 // The engine-level half, the guard's verdicts on resolved elements, is in
 // test/unit/engine/policy-unsafe-features.test.ts.
-// See docs/specs/SPEC-36-unsafe-plan-features.md and docs/specs/SPEC-03-policy-gate.md.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import {
@@ -61,7 +60,7 @@ for (const targetId of BOTH_TARGETS) {
 
   describe(`irreversible actions found by structure: ${targetId}`, () => {
     for (const { name, locator } of locators) {
-      test(`a click on "Delete account" found by ${name} is denied irreversible-action with zero input events`, { criterion: 'AC-SPEC-36-06' }, async () => {
+      test(`a click on "Delete account" found by ${name} is denied irreversible-action with zero input events`, async () => {
         const ran = await clickOnGuardPage(targetId, locator, accountKept());
         assertDenied(ran, 'irreversible-action');
         assert.equal(ran.atClose?.shown['account-state'], 'Account kept');
@@ -69,37 +68,37 @@ for (const targetId of BOTH_TARGETS) {
     }
 
     // Counter-examples: the same kinds of locator finding a harmless button do click it.
-    test('counter-example: button.safe, named "Show details", is clicked and the page shows it', { criterion: 'AC-SPEC-36-06' }, async () => {
+    test('counter-example: button.safe, named "Show details", is clicked and the page shows it', async () => {
       const ran = await clickOnGuardPage(targetId, css('button.safe'), textEquals(testId('details-state'), 'Details shown', 'guard.details-shown'));
       assertClickReachedPage(ran);
     });
 
-    test('counter-example: the XPath expression for the second button of the section clicks "Show details"', { criterion: 'AC-SPEC-36-06' }, async () => {
+    test('counter-example: the XPath expression for the second button of the section clicks "Show details"', async () => {
       const ran = await clickOnGuardPage(targetId, xpath('//main/section[1]/button[2]'), textEquals(testId('details-state'), 'Details shown', 'guard.details-shown'));
       assertClickReachedPage(ran);
     });
   });
 
   describe(`unnamed controls found by structure: ${targetId}`, () => {
-    test('an icon button with no accessible name found by an unlisted css selector is denied unnamed-control with zero input events', { criterion: 'AC-SPEC-36-06' }, async () => {
+    test('an icon button with no accessible name found by an unlisted css selector is denied unnamed-control with zero input events', async () => {
       const ran = await clickOnGuardPage(targetId, css('button.icon-menu'), textEquals(testId('toolbar-state'), 'Toolbar untouched', 'guard.toolbar-untouched'));
       assertDenied(ran, 'unnamed-control');
       assert.equal(ran.atClose?.shown['toolbar-state'], 'Toolbar untouched');
     });
 
-    test('an icon button with no accessible name found by an unlisted XPath expression is denied unnamed-control', { criterion: 'AC-SPEC-36-06' }, async () => {
+    test('an icon button with no accessible name found by an unlisted XPath expression is denied unnamed-control', async () => {
       const ran = await clickOnGuardPage(targetId, xpath('//main/section[2]/button[2]'), textEquals(testId('toolbar-state'), 'Toolbar untouched', 'guard.toolbar-untouched'));
       assertDenied(ran, 'unnamed-control');
     });
 
-    test(`the unnamed icon button found by the exact listed selector ${ALLOWED_UNNAMED_SELECTOR} is clicked`, { criterion: 'AC-SPEC-36-06' }, async () => {
+    test(`the unnamed icon button found by the exact listed selector ${ALLOWED_UNNAMED_SELECTOR} is clicked`, async () => {
       const ran = await clickOnGuardPage(targetId, css(ALLOWED_UNNAMED_SELECTOR), textEquals(testId('toolbar-state'), 'Toolbar closed', 'guard.toolbar-closed'));
       assertClickReachedPage(ran);
     });
 
     // Mutant of the allow-list: the same control, found by a selector that holds the listed one but
     // is not it, is denied, so the list is matched exactly and not by what the selector resolves.
-    test('the same unnamed button found by a selector that only contains the listed one is denied unnamed-control', { criterion: 'AC-SPEC-36-06' }, async () => {
+    test('the same unnamed button found by a selector that only contains the listed one is denied unnamed-control', async () => {
       const ran = await clickOnGuardPage(targetId, css(`section.toolbar ${ALLOWED_UNNAMED_SELECTOR}`), textEquals(testId('toolbar-state'), 'Toolbar untouched', 'guard.toolbar-untouched'));
       assertDenied(ran, 'unnamed-control');
       assert.equal(ran.atClose?.shown['toolbar-state'], 'Toolbar untouched');
@@ -111,7 +110,7 @@ for (const targetId of BOTH_TARGETS) {
       { name: 'a CSS selector', locator: css('button[') },
       { name: 'an XPath expression', locator: xpath('//button[') },
     ]) {
-      test(`a click found by ${name} the browser rejects fails with selector-invalid, sends nothing and skips the rest`, { criterion: 'AC-SPEC-36-06' }, async () => {
+      test(`a click found by ${name} the browser rejects fails with selector-invalid, sends nothing and skips the rest`, async () => {
         const ran = await clickOnGuardPage(targetId, locator, accountKept());
         assert.deepEqual(outcomes(ran.result), [[0, 'passed', undefined], [1, 'failed', 'selector-invalid'], [2, 'skipped', undefined]], JSON.stringify(ran.result.steps));
         assert.equal(ran.atClose?.shown['input-events'], '0', 'no input event reached the page');

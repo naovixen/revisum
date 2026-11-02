@@ -5,7 +5,6 @@
 //   - one that handles exactly the codes the spec lists. It compiles only if the union holds those
 //     codes and no others: an unknown case label, or a code left over at `unreachable`, is an error;
 //   - one that leaves a code out. Its @ts-expect-error line must stay an error.
-// See docs/specs/SPEC-27-shared-types-and-events.md.
 import type { CliErrorCode, DriverErrorCode, RecorderError, RunnerError, ServiceCallErrorCode, SinkError } from '@revisum/contracts';
 import type { PlanErrorCode, ReplayErrorCode, StepErrorCode, SuiteDecodeErrorCode, TextErrorCode } from '@revisum/engine';
 import type { EgressPolicyError } from '@revisum/runner';

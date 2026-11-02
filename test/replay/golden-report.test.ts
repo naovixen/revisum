@@ -11,7 +11,7 @@ import { GOLDEN } from '../support/repository.ts';
 
 const GOLDEN_REPORTS = join(GOLDEN, 'report');
 
-test('every recorded run renders to its golden report byte for byte', { criterion: 'AC-SPEC-00-01' }, () => {
+test('every recorded run renders to its golden report byte for byte', () => {
   assert.deepEqual(readdirSync(GOLDEN_REPORTS).sort(), loaded.reports.map((report) => report.input.reportId).sort(), 'one golden folder per recorded run');
   for (const report of loaded.reports) {
     const folder = join(GOLDEN_REPORTS, report.input.reportId);

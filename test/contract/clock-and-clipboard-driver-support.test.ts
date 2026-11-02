@@ -8,7 +8,6 @@
 //     session are recorded, and no action or guard call falls inside an advance.
 // The counter-examples run the same plans without the feature, and with clicks around the advance,
 // so the counters and the recording can be seen to move.
-// See docs/specs/SPEC-34-clock-advance-and-clipboard.md.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import {
@@ -50,7 +49,7 @@ const refusedSteps = (step: JsonRecord): unknown[] => [navigate('/clipboard.html
 // The same, with the copy the clipboard steps check first.
 const performedSteps = (step: JsonRecord): unknown[] => [navigate('/clipboard.html'), copyInviteCode, step, continueStep, continued()];
 
-test('the own CDP driver declares clockControl and clipboard; the Playwright fallback declares neither', { criterion: 'AC-SPEC-34-12' }, () => {
+test('the own CDP driver declares clockControl and clipboard; the Playwright fallback declares neither', () => {
   const cdp = listedFeatures(harness.drivers.get('cdp'));
   const headlessShell = listedFeatures(harness.drivers.get('cdp-headless-shell'));
   const playwright = listedFeatures(harness.drivers.get('playwright'));
@@ -63,7 +62,7 @@ test('the own CDP driver declares clockControl and clipboard; the Playwright fal
 
 describe(`the Playwright fallback: ${PLAYWRIGHT_TARGET}`, () => {
   for (const { name, step } of FEATURE_STEPS) {
-    test(`a run with ${name} fails that step with unsupported-step, sends nothing, waits no real time and skips the rest`, { criterion: 'AC-SPEC-34-12' }, async () => {
+    test(`a run with ${name} fails that step with unsupported-step, sends nothing, waits no real time and skips the rest`, async () => {
       const ran = await harness.runSteps(PLAYWRIGHT_TARGET, refusedSteps(step), { read: ['input-events', 'continue-state'] });
       assert.equal(ran.result.state, 'Failed');
       assert.deepEqual(outcomes(ran.result), [[0, 'passed', undefined], [1, 'failed', 'unsupported-step'], [2, 'skipped', undefined], [3, 'skipped', undefined]]);
@@ -73,7 +72,7 @@ describe(`the Playwright fallback: ${PLAYWRIGHT_TARGET}`, () => {
     });
   }
 
-  test('counter-example: the same run without any of those steps passes and sends its input', { criterion: 'AC-SPEC-34-12' }, async () => {
+  test('counter-example: the same run without any of those steps passes and sends its input', async () => {
     const ran = await harness.runSteps(PLAYWRIGHT_TARGET, [navigate('/clipboard.html'), continueStep, continued()], { read: ['input-events'] });
     assert.equal(ran.result.state, 'Passed', JSON.stringify(ran.result.steps));
     assert.notEqual(ran.atClose?.shown['input-events'], '0', 'the click reached the page');
@@ -82,14 +81,14 @@ describe(`the Playwright fallback: ${PLAYWRIGHT_TARGET}`, () => {
 
 describe(`the own CDP driver: ${CDP_TARGET}`, () => {
   for (const { name, step } of FEATURE_STEPS) {
-    test(`a run with ${name} performs it and passes`, { criterion: 'AC-SPEC-34-12', ...copying }, async () => {
+    test(`a run with ${name} performs it and passes`, { ...copying }, async () => {
       const ran = await harness.runSteps(CDP_TARGET, performedSteps(step));
       assert.equal(ran.result.state, 'Passed', JSON.stringify(ran.result.steps));
     });
   }
 
   for (const lacking of CLOCK_AND_CLIPBOARD_FEATURES) {
-    test(`with ${lacking} taken off its list, the driver is refused that feature's steps and still runs the others`, { criterion: 'AC-SPEC-34-12', timeout: 300_000, ...copying }, async () => {
+    test(`with ${lacking} taken off its list, the driver is refused that feature's steps and still runs the others`, { timeout: 300_000, ...copying }, async () => {
       const drivers = cdpWithout(harness, lacking);
       for (const { name, feature, step } of FEATURE_STEPS) {
         const ran = await harness.runSteps(CDP_TARGET, performedSteps(step), { drivers });
@@ -120,7 +119,7 @@ function callsDuringAdvances(calls: readonly string[]): readonly string[] {
 
 describe('during an advance', () => {
   for (const mode of ['runTimers', 'skipAhead'] as const) {
-    test(`a ${mode} advance whose timers change the page dispatches no input event and asks the runtime guard nothing`, { criterion: 'AC-SPEC-34-18' }, async () => {
+    test(`a ${mode} advance whose timers change the page dispatches no input event and asks the runtime guard nothing`, async () => {
       const cdp = harness.drivers.get('cdp');
       assert.ok(cdp !== undefined);
       const recorder = recordingSessionCalls(cdp);
@@ -137,7 +136,7 @@ describe('during an advance', () => {
     });
   }
 
-  test('with clicks before and after it, the advance holds no action and no guard call, and the input counter moves only for the clicks', { criterion: 'AC-SPEC-34-18' }, async () => {
+  test('with clicks before and after it, the advance holds no action and no guard call, and the input counter moves only for the clicks', async () => {
     const cdp = harness.drivers.get('cdp');
     assert.ok(cdp !== undefined);
     const recorder = recordingSessionCalls(cdp);
@@ -156,7 +155,7 @@ describe('during an advance', () => {
     assert.ok(Number.isInteger(perClick) && perClick > 0, `the two clicks sent the same number of input events: ${String(ran.atClose?.shown['input-events'])}`);
   });
 
-  test('mutant: a recording with an action inside an advance is caught', { criterion: 'AC-SPEC-34-18' }, () => {
+  test('mutant: a recording with an action inside an advance is caught', () => {
     assert.deepEqual(callsDuringAdvances(['act', 'guard', 'advance-start', 'act', 'guard', 'advance-end']), ['act', 'guard']);
   });
 });

@@ -12,7 +12,6 @@
 //   - a command whose service is on a production origin is denied before it starts;
 //   - each command's record holds its name, service, exit code and output sha256, never the raw
 //     output or an environment value.
-// See docs/specs/SPEC-36-unsafe-plan-features.md ("Database commands" under "Milestone").
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { TEST_SERVICE } from './plan-examples.ts';
@@ -47,14 +46,14 @@ const FAILED_COMMANDS: readonly { readonly name: string; readonly answer: Comman
 ];
 
 for (const failed of FAILED_COMMANDS) {
-  test(`a command that ${failed.name} fails with ${failed.code}, ends the run Errored and skips later steps`, { criterion: 'AC-SPEC-36-14' }, async () => {
+  test(`a command that ${failed.name} fails with ${failed.code}, ends the run Errored and skips later steps`, async () => {
     const ran = await runWithCommands(commandPlan([OPEN_CART, COUNT_ORDERS, OPEN_CART], [WIPE_ORDERS]), { route: modeAnswers('count', failed.answer) });
     assert.equal(ran.result.state, 'Errored');
     assert.deepEqual(stepLines(ran.result), ['navigate passed', `database failed ${failed.code}`, 'navigate skipped', 'expect skipped']);
     assert.equal(ran.recording.navigations.length, 1, 'a step after the failed command reached the page');
   });
 
-  test(`after a command that ${failed.name}, cleanup still runs`, { criterion: 'AC-SPEC-36-14' }, async () => {
+  test(`after a command that ${failed.name}, cleanup still runs`, async () => {
     const ran = await runWithCommands(commandPlan([COUNT_ORDERS], [WIPE_ORDERS]), { route: modeAnswers('count', failed.answer) });
     assert.deepEqual(modesOf(ran.commands), ['count', 'wipe']);
     assert.deepEqual(cleanupRecords(ran.result).map((record) => record.outcome), ['passed']);
@@ -70,19 +69,19 @@ const PASSING_COMMANDS: readonly { readonly name: string; readonly answer: Comma
 ];
 
 for (const passing of PASSING_COMMANDS) {
-  test(`counter-example: a command that ${passing.name} passes, and the steps after it run`, { criterion: 'AC-SPEC-36-14' }, async () => {
+  test(`counter-example: a command that ${passing.name} passes, and the steps after it run`, async () => {
     const ran = await runWithCommands(commandPlan([OPEN_CART, COUNT_ORDERS, OPEN_CART]), { route: modeAnswers('count', passing.answer) });
     assert.equal(ran.result.state, 'Passed', JSON.stringify(ran.result.steps));
     assert.deepEqual(stepLines(ran.result), ['navigate passed', 'database passed', 'navigate passed', 'expect passed']);
   });
 }
 
-test('a command whose output is none passes whatever it prints', { criterion: 'AC-SPEC-36-14' }, async () => {
+test('a command whose output is none passes whatever it prints', async () => {
   const ran = await runWithCommands(commandPlan([SEED_ORDERS]), { route: modeAnswers('seed', { stdout: 'seeded 3 orders, not JSON' }) });
   assert.equal(ran.result.state, 'Passed', JSON.stringify(ran.result.steps));
 });
 
-test('a write command that exits outside successExitCodes ends the run Errored, and cleanup still runs', { criterion: 'AC-SPEC-36-14' }, async () => {
+test('a write command that exits outside successExitCodes ends the run Errored, and cleanup still runs', async () => {
   const ran = await runWithCommands(commandPlan([OPEN_CART, SEED_ORDERS, OPEN_CART], [WIPE_ORDERS]), {
     route: modeAnswers('seed', { exitCode: 1, stdout: '' }),
   });
@@ -93,7 +92,7 @@ test('a write command that exits outside successExitCodes ends the run Errored, 
 
 // ---- A write is never run twice ------------------------------------------------------------------------
 
-test('a write command that times out has run exactly once', { criterion: 'AC-SPEC-36-14' }, async () => {
+test('a write command that times out has run exactly once', async () => {
   const ran = await runWithCommands(commandPlan([OPEN_CART, SEED_ORDERS, OPEN_CART], [WIPE_ORDERS]), {
     route: modeAnswers('seed', { exitCode: 137, timedOut: true }),
   });
@@ -102,12 +101,12 @@ test('a write command that times out has run exactly once', { criterion: 'AC-SPE
   assert.deepEqual(modesOf(ran.commands), ['seed', 'wipe'], 'cleanup did not run after the timeout');
 });
 
-test('a write command that fails is not retried either', { criterion: 'AC-SPEC-36-14' }, async () => {
+test('a write command that fails is not retried either', async () => {
   const ran = await runWithCommands(commandPlan([SEED_ORDERS]), { route: modeAnswers('seed', { exitCode: 1 }) });
   assert.equal(modesOf(ran.commands).filter((mode) => mode === 'seed').length, 1);
 });
 
-test('the write command is handed its declared timeout', { criterion: 'AC-SPEC-36-14' }, async () => {
+test('the write command is handed its declared timeout', async () => {
   const ran = await runWithCommands(commandPlan([SEED_ORDERS]));
   assert.equal(ran.commands[0]?.request['timeoutMilliseconds'], SEED_TIMEOUT_MILLISECONDS);
 });
@@ -116,14 +115,14 @@ test('the write command is handed its declared timeout', { criterion: 'AC-SPEC-3
 // command until it passes, and ends the run Failed when it never does.
 const COUNT_IS_THREE = expectDatabase('countOrders', 'count', { kind: 'numberEquals', value: 3 });
 
-test('counter-example: an expectDatabase check reruns its read command until it passes', { criterion: 'AC-SPEC-36-14' }, async () => {
+test('counter-example: an expectDatabase check reruns its read command until it passes', async () => {
   const route = routeWith((seen, earlier) => (seen.argv.includes('count') ? { stdout: JSON.stringify({ count: earlier.length < 2 ? 1 : 3 }) } : undefined));
   const ran = await runWithCommands(commandPlan([COUNT_IS_THREE]), { route });
   assert.equal(ran.result.state, 'Passed', JSON.stringify(ran.result.steps));
   assert.equal(modesOf(ran.commands).filter((mode) => mode === 'count').length, 3);
 });
 
-test('an expectDatabase check that never passes ends the run Failed after backendCheckTimeoutMilliseconds, and cleanup still runs', { criterion: 'AC-SPEC-36-14' }, async () => {
+test('an expectDatabase check that never passes ends the run Failed after backendCheckTimeoutMilliseconds, and cleanup still runs', async () => {
   const timeout = 2000;
   const ran = await runWithCommands(commandPlan([COUNT_IS_THREE, OPEN_CART], [WIPE_ORDERS]), {
     route: modeAnswers('count', { stdout: JSON.stringify({ count: 1 }) }),
@@ -138,13 +137,13 @@ test('an expectDatabase check that never passes ends the run Failed after backen
 
 // ---- Cleanup -------------------------------------------------------------------------------------------
 
-test('a cleanup command that fails is recorded cleanup-failed, and the passing verdict does not change', { criterion: 'AC-SPEC-36-14' }, async () => {
+test('a cleanup command that fails is recorded cleanup-failed, and the passing verdict does not change', async () => {
   const ran = await runWithCommands(commandPlan([SEED_ORDERS], [WIPE_ORDERS]), { route: modeAnswers('wipe', { exitCode: 1 }) });
   assert.equal(ran.result.state, 'Passed');
   assert.deepEqual(cleanupRecords(ran.result).map((record) => `${record.outcome} ${record.code ?? ''}`), ['failed cleanup-failed']);
 });
 
-test('cleanup commands run in order after a passing run', { criterion: 'AC-SPEC-36-14' }, async () => {
+test('cleanup commands run in order after a passing run', async () => {
   const ran = await runWithCommands(commandPlan([SEED_ORDERS], [WIPE_ORDERS, database('seedOrders', { count: 1 })]));
   assert.equal(ran.result.state, 'Passed');
   assert.deepEqual(modesOf(ran.commands), ['seed', 'wipe', 'seed']);
@@ -155,7 +154,7 @@ test('cleanup commands run in order after a passing run', { criterion: 'AC-SPEC-
 
 const RAW_OUTPUT_MARKER = 'raw-output-marker-q7zx';
 
-test('a command\'s record holds its name, service, exit code and output sha256, never the raw output', { criterion: 'AC-SPEC-36-14' }, async () => {
+test('a command\'s record holds its name, service, exit code and output sha256, never the raw output', async () => {
   const output = JSON.stringify({ count: 3, note: RAW_OUTPUT_MARKER });
   const projectFile = commandProjectFile({
     unsafeFeatures: { databaseCommands: { commands: { ...COMMANDS, countOrders: { ...(COMMANDS['countOrders'] as JsonRecord), maximumOutputBytes: 4096 } } } },
@@ -172,7 +171,7 @@ test('a command\'s record holds its name, service, exit code and output sha256, 
 // ---- The request's environment and network (the engine's half; the container half is in
 // test/containers/database-commands.test.ts) ---------------------------------------------------------------
 
-test('the request\'s environment holds exactly the declared variables', { criterion: 'AC-SPEC-36-13' }, async () => {
+test('the request\'s environment holds exactly the declared variables', async () => {
   const seeded = 'GITHUB_TOKEN';
   const before = process.env[seeded];
   process.env[seeded] = 'ghp_fakeTokenSeededForDatabaseCommandTests';
@@ -186,7 +185,7 @@ test('the request\'s environment holds exactly the declared variables', { criter
   }
 });
 
-test('the declared secret reaches the port as an opaque Secret, never as its value', { criterion: 'AC-SPEC-36-13' }, async () => {
+test('the declared secret reaches the port as an opaque Secret, never as its value', async () => {
   const ran = await runWithCommands(commandPlan([SEED_ORDERS]));
   assert.equal(ran.commands.length, 1, 'the command was not handed to the port');
   const password = ran.commands[0]?.environment['PGPASSWORD'];
@@ -195,7 +194,7 @@ test('the declared secret reaches the port as an opaque Secret, never as its val
   assert.ok(!ran.everything.includes(DATABASE_PASSWORD), 'the secret\'s value reached the result or the log');
 });
 
-test('the request\'s egress policy reaches only the command\'s own service, over TCP, and no origin', { criterion: 'AC-SPEC-36-13' }, async () => {
+test('the request\'s egress policy reaches only the command\'s own service, over TCP, and no origin', async () => {
   const ran = await runWithCommands(commandPlan([SEED_ORDERS]));
   const policy = ran.commands[0]?.request['policy'];
   assert.ok(typeof policy === 'object' && policy !== null, JSON.stringify(ran.commands[0]?.request));
@@ -217,14 +216,14 @@ const PRODUCTION_PROJECT = commandProjectFile({
   },
 });
 
-test('a command whose service is on a production origin is denied production-origin before it starts: the port is never called', { criterion: 'AC-SPEC-36-13' }, async () => {
+test('a command whose service is on a production origin is denied production-origin before it starts: the port is never called', async () => {
   const { outcome, commands, opens } = await runUntrustedWithCommands(commandPlan([OPEN_CART, { type: 'database', command: 'seedLiveOrders', arguments: { count: 3 } }]), PRODUCTION_PROJECT);
   assert.ok('rule' in outcome && outcome.rule === 'production-origin', JSON.stringify(outcome));
   assert.deepEqual(commands, [], 'the command was handed to the port');
   assert.equal(opens, 0, 'a browser was opened');
 });
 
-test('counter-example: the same command on the test database, in the same project, reaches the port once', { criterion: 'AC-SPEC-36-13' }, async () => {
+test('counter-example: the same command on the test database, in the same project, reaches the port once', async () => {
   const { outcome, commands } = await runUntrustedWithCommands(commandPlan([OPEN_CART, SEED_ORDERS]), PRODUCTION_PROJECT);
   assert.ok(Array.isArray(outcome), JSON.stringify(outcome));
   assert.deepEqual(modesOf(commands), ['seed']);

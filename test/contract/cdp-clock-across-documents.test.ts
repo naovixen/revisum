@@ -4,7 +4,6 @@
 // (fixtures/clock-and-clipboard-app/clock.html), is the plan clock plus every earlier advance.
 // An advance inside a newTab block moves the first tab's clock too, and an advance moves a frame
 // that had already loaded. The counter-examples show the same checks fail without the advance.
-// See docs/specs/SPEC-34-clock-advance-and-clipboard.md.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import { resolvePlanClock } from '@revisum/engine';
@@ -31,14 +30,14 @@ const showNow = click(role('button', 'Show the time now'));
 const clockFrame = (steps: readonly unknown[]) => frame(testId('clock-frame'), steps);
 const withPlanClock = { fields: { clock: FIRST_OF_NEXT_MONTH_AT_NINE } };
 
-test('the plan clock the checks expect is resolvePlanClock\'s own answer', { criterion: 'AC-SPEC-34-09' }, () => {
+test('the plan clock the checks expect is resolvePlanClock\'s own answer', () => {
   const plan = harness.plan(clockPlan(CDP_TARGET, [navigate('/clock.html'), loadedAt(PLAN_CLOCK, 'documents.plan-clock')], { clock: FIRST_OF_NEXT_MONTH_AT_NINE }));
   assert.ok(plan.clock !== undefined);
   assert.equal(resolvePlanClock(plan.clock, CLOCK_START_MILLISECONDS, harness.target(CDP_TARGET).timezone), PLAN_CLOCK);
 });
 
 describe('documents loaded after an advance', () => {
-  test('a navigation, a newTab and a frame loaded after advances each start at the plan clock plus every earlier advance', { criterion: 'AC-SPEC-34-09' }, async () => {
+  test('a navigation, a newTab and a frame loaded after advances each start at the plan clock plus every earlier advance', async () => {
     const ran = await harness.runSteps(CDP_TARGET, [
       navigate('/clock.html'),
       loadedAt(PLAN_CLOCK, 'documents.first-at-plan-clock'),
@@ -53,7 +52,7 @@ describe('documents loaded after an advance', () => {
     assertPassed(ran);
   });
 
-  test('an advance inside a newTab block moves the tab\'s clock and the first tab\'s clock, and a later navigation starts there', { criterion: 'AC-SPEC-34-09' }, async () => {
+  test('an advance inside a newTab block moves the tab\'s clock and the first tab\'s clock, and a later navigation starts there', async () => {
     const ran = await harness.runSteps(CDP_TARGET, [
       navigate('/clock.html'),
       newTab('/clock.html', [
@@ -70,7 +69,7 @@ describe('documents loaded after an advance', () => {
     assertPassed(ran);
   });
 
-  test('an advance moves a frame that loaded before it', { criterion: 'AC-SPEC-34-09' }, async () => {
+  test('an advance moves a frame that loaded before it', async () => {
     const ran = await harness.runSteps(CDP_TARGET, [
       navigate('/clock-frame.html'),
       clockFrame([loadedAt(PLAN_CLOCK, 'documents.frame-at-plan-clock')]),
@@ -80,7 +79,7 @@ describe('documents loaded after an advance', () => {
     assertPassed(ran);
   });
 
-  test('without a plan clock, a document loaded after an advance starts at the run\'s clock start plus the advance', { criterion: 'AC-SPEC-34-09' }, async () => {
+  test('without a plan clock, a document loaded after an advance starts at the run\'s clock start plus the advance', async () => {
     const ran = await harness.runSteps(CDP_TARGET, [
       navigate('/clock.html'),
       loadedAt(CLOCK_START_MILLISECONDS, 'documents.first-at-clock-start'),
@@ -93,7 +92,7 @@ describe('documents loaded after an advance', () => {
 });
 
 describe('counter-examples', () => {
-  test('without the advance inside the tab, the first tab still shows the plan clock, so the check for the moved clock fails', { criterion: 'AC-SPEC-34-09' }, async () => {
+  test('without the advance inside the tab, the first tab still shows the plan clock, so the check for the moved clock fails', async () => {
     const ran = await harness.runSteps(CDP_TARGET, [
       navigate('/clock.html'),
       newTab('/clock.html', [loadedAt(PLAN_CLOCK, 'documents.tab-unmoved')]),
@@ -103,7 +102,7 @@ describe('counter-examples', () => {
     assert.deepEqual(outcomes(ran.result).at(-1), [3, 'failed', 'assertion-failed'], JSON.stringify(ran.result.steps));
   });
 
-  test('a newTab opened without an earlier advance starts at the plan clock, not later', { criterion: 'AC-SPEC-34-09' }, async () => {
+  test('a newTab opened without an earlier advance starts at the plan clock, not later', async () => {
     const ran = await harness.runSteps(CDP_TARGET, [
       navigate('/clock.html'),
       newTab('/clock.html', [loadedAt(PLAN_CLOCK + ADVANCED, 'documents.tab-not-advanced')]),

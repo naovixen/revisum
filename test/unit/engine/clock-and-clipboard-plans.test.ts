@@ -5,7 +5,6 @@
 // backwards, write the clipboard, paste, match a pattern or run a script. Every refusal gives a
 // code and a JSON path, echoes no value from the plan, and happens before any driver, network or
 // service call.
-// See docs/specs/SPEC-34-clock-advance-and-clipboard.md.
 import assert from 'node:assert/strict';
 import { arch, platform } from 'node:os';
 import { afterEach, beforeEach, test } from 'node:test';
@@ -38,13 +37,13 @@ const ACCEPTED_ADVANCES: readonly { readonly name: string; readonly step: JsonRe
 ];
 
 for (const { name, step } of ACCEPTED_ADVANCES) {
-  test(`${name} is accepted and kept as written`, { criterion: 'AC-SPEC-34-02' }, () => {
+  test(`${name} is accepted and kept as written`, () => {
     const plan = accepted(parsePlan, planOf([OPEN_ORDERS, step]));
     assert.deepEqual(asJson(plan.steps[1]), step);
   });
 }
 
-test('an advance with no mode is accepted, and its amount and unit are kept', { criterion: 'AC-SPEC-34-02' }, () => {
+test('an advance with no mode is accepted, and its amount and unit are kept', () => {
   const plan = accepted(parsePlan, planOf([OPEN_ORDERS, advanceClock(5, 'minutes')]));
   const step = asJson(plan.steps[1]) as JsonRecord;
   assert.equal(step['type'], 'advanceClock');
@@ -52,12 +51,12 @@ test('an advance with no mode is accepted, and its amount and unit are kept', { 
   assert.ok(step['mode'] === undefined || step['mode'] === 'runTimers', `the default mode is runTimers: ${JSON.stringify(step)}`);
 });
 
-test('an advance before the first navigation, and advances inside a frame and a newTab, are accepted', { criterion: 'AC-SPEC-34-02' }, () => {
+test('an advance before the first navigation, and advances inside a frame and a newTab, are accepted', () => {
   accepted(parsePlan, planOf([advanceClock(1, 'minutes'), OPEN_ORDERS]));
   accepted(parsePlan, planOf([OPEN_ORDERS, frame([advanceClock(1, 'minutes')]), newTab([advanceClock(1, 'minutes'), frame([advanceClock(1, 'seconds')])])]));
 });
 
-test('an advance in days is accepted when the project raises the step limit to 31 days', { criterion: 'AC-SPEC-34-02' }, () => {
+test('an advance in days is accepted when the project raises the step limit to 31 days', () => {
   const roomy = parserFor({}, { maximumClockAdvanceMilliseconds: 31 * 86_400_000, maximumTotalClockAdvanceMilliseconds: 31 * 86_400_000 });
   const step = advanceClock(31, 'days');
   assert.deepEqual(asJson(accepted(roomy, planOf([OPEN_ORDERS, step])).steps[1]), step);
@@ -74,31 +73,31 @@ const ACCEPTED_CLIPBOARD: readonly { readonly name: string; readonly step: JsonR
 ];
 
 for (const { name, step, fields } of ACCEPTED_CLIPBOARD) {
-  test(`${name} is accepted and kept as written`, { criterion: 'AC-SPEC-34-03' }, () => {
+  test(`${name} is accepted and kept as written`, () => {
     const plan = accepted(parsePlan, planOf([OPEN_ORDERS, COPY_LINK, step], fields));
     assert.deepEqual(asJson(plan.steps[2]), step);
   });
 }
 
-test('a remember from the clipboard is accepted, and a later fill and clipboard check may use the value', { criterion: 'AC-SPEC-34-03' }, () => {
+test('a remember from the clipboard is accepted, and a later fill and clipboard check may use the value', () => {
   const steps = [OPEN_ORDERS, COPY_LINK, rememberClipboard('inviteLink'), fillInviteLink, expectClipboard('textEquals', { valueName: 'inviteLink' })];
   const plan = accepted(parsePlan, planOf(steps));
   assert.deepEqual(asJson(plan.steps.slice(0, steps.length)), steps);
 });
 
-test('a clipboard check and a clipboard remember are accepted inside a frame and a newTab', { criterion: 'AC-SPEC-34-03' }, () => {
+test('a clipboard check and a clipboard remember are accepted inside a frame and a newTab', () => {
   accepted(parsePlan, planOf([OPEN_ORDERS, frame([COPY_LINK, expectClipboard('textContains', '/invite/')])]));
   accepted(parsePlan, planOf([OPEN_ORDERS, newTab([COPY_LINK, rememberClipboard('inviteLink'), fillInviteLink])]));
 });
 
 // expectClipboard is an assertion step for the vacuity rule; advanceClock is not.
-test('a plan whose only assertion is a clipboard check is accepted', { criterion: 'AC-SPEC-34-03' }, () => {
+test('a plan whose only assertion is a clipboard check is accepted', () => {
   const raw = { ...planOf([]), steps: [OPEN_ORDERS, COPY_LINK, expectClipboard('textContains', '/invite/')] };
   accepted(parsePlan, raw);
 });
 
 // Counter-example: a plan that only navigates and advances checks nothing, so it is vacuous.
-test('a plan that only navigates and advances the clock, checking nothing, is refused as vacuous', { criterion: 'AC-SPEC-34-02' }, () => {
+test('a plan that only navigates and advances the clock, checking nothing, is refused as vacuous', () => {
   const raw = { ...planOf([]), steps: [OPEN_ORDERS, advanceClock(10, 'minutes')] };
   const errors = rejection(parsePlan, raw);
   assert.deepEqual([...new Set(errors.map((error) => error.split(' ')[0]))], ['vacuous'], JSON.stringify(errors));
@@ -177,13 +176,13 @@ const REFUSED_CLIPBOARD: readonly RefusedCase[] = [
 ];
 
 for (const refused of REFUSED_ADVANCES) {
-  test(`${refused.name} is refused with ${refused.code} at ${refused.path}`, { criterion: 'AC-SPEC-34-02' }, () => {
+  test(`${refused.name} is refused with ${refused.code} at ${refused.path}`, () => {
     assert.deepEqual(rejection(parsePlan, refused.plan), [`${refused.code} ${refused.path}`]);
   });
 }
 
 for (const refused of REFUSED_CLIPBOARD) {
-  test(`${refused.name} is refused with ${refused.code} at ${refused.path}`, { criterion: 'AC-SPEC-34-03' }, () => {
+  test(`${refused.name} is refused with ${refused.code} at ${refused.path}`, () => {
     assert.deepEqual(rejection(parsePlan, refused.plan), [`${refused.code} ${refused.path}`]);
   });
 }
@@ -191,7 +190,7 @@ for (const refused of REFUSED_CLIPBOARD) {
 // An amount of 1e308 is a whole number, so it is over the step limit, not of the wrong type. The
 // spec leaves open whether the error sits at the amount or at `by`.
 for (const unit of ['milliseconds', 'days']) {
-  test(`an advance of 1e308 ${unit} is refused with too_large at its amount`, { criterion: 'AC-SPEC-34-02' }, () => {
+  test(`an advance of 1e308 ${unit} is refused with too_large at its amount`, () => {
     const errors = rejection(parsePlan, planOf([OPEN_ORDERS, advanceClock(1e308, unit)]));
     assertRefusedInside(errors, '$.steps[1].by', `1e308 ${unit}`);
     assert.deepEqual(errors.map((error) => error.split(' ')[0]), ['too_large']);
@@ -209,25 +208,25 @@ function assertNoEcho(cases: readonly RefusedCase[], fewest: number): void {
   }
 }
 
-test('no refusal of an advance echoes the value the plan wrote', { criterion: 'AC-SPEC-34-02' }, () => {
+test('no refusal of an advance echoes the value the plan wrote', () => {
   assertNoEcho(REFUSED_ADVANCES, 12);
 });
 
-test('no refusal of a clipboard step echoes the value the plan wrote', { criterion: 'AC-SPEC-34-03' }, () => {
+test('no refusal of a clipboard step echoes the value the plan wrote', () => {
   assertNoEcho(REFUSED_CLIPBOARD, 15);
 });
 
-test('an advance with no unit, or with a by that is not an object, is refused at by', { criterion: 'AC-SPEC-34-02' }, () => {
+test('an advance with no unit, or with a by that is not an object, is refused at by', () => {
   for (const by of [{ amount: 1 }, 1000, '10 minutes', null, []]) {
     assertRefusedInside(rejection(parsePlan, planOf([OPEN_ORDERS, { type: 'advanceClock', by }])), '$.steps[1].by', JSON.stringify(by));
   }
 });
 
-test('an advance with no by at all is refused at the step', { criterion: 'AC-SPEC-34-02' }, () => {
+test('an advance with no by at all is refused at the step', () => {
   assertRefusedInside(rejection(parsePlan, planOf([OPEN_ORDERS, { type: 'advanceClock' }])), '$.steps[1]', 'no by');
 });
 
-test('multi-line expected text is refused for textContains and textExcludes, at the value', { criterion: 'AC-SPEC-34-03' }, () => {
+test('multi-line expected text is refused for textContains and textExcludes, at the value', () => {
   for (const kind of ['textContains', 'textExcludes']) {
     const errors = rejection(parsePlan, planOf([OPEN_ORDERS, expectClipboard(kind, { lines: ['Ada Lovelace', 'London'] })]));
     assertRefusedInside(errors, '$.steps[1].assert.value', kind);
@@ -235,30 +234,30 @@ test('multi-line expected text is refused for textContains and textExcludes, at 
   }
 });
 
-test('a clipboard check against a secret is refused at the value', { criterion: 'AC-SPEC-34-03' }, () => {
+test('a clipboard check against a secret is refused at the value', () => {
   for (const kind of CLIPBOARD_KINDS) {
     assertRefusedInside(rejection(parsePlan, planOf([OPEN_ORDERS, expectClipboard(kind, { secretName: 'SHOP_API_TOKEN' })])), '$.steps[1].assert.value', kind);
   }
 });
 
-test('a clipboard check without a criterion id is refused', { criterion: 'AC-SPEC-34-03' }, () => {
+test('a clipboard check without a criterion id is refused', () => {
   const { criterionId: _removed, ...untraced } = expectClipboard('textContains', '/invite/');
   assertRefusedInside(rejection(parsePlan, planOf([OPEN_ORDERS, untraced])), '$.steps[1]', 'no criterion id');
 });
 
-test('a clipboard value remembered under the name of a generated value is refused as duplicate', { criterion: 'AC-SPEC-34-03' }, () => {
+test('a clipboard value remembered under the name of a generated value is refused as duplicate', () => {
   const errors = rejection(parsePlan, planOf([OPEN_ORDERS, COPY_LINK, rememberClipboard('invitee')], { values: INVITE_VALUES }));
   assert.deepEqual(errors.map((error) => error.split(' ')[0]), ['duplicate']);
 });
 
 // Counter-example for the refusals above: the closing check alone, with the page opened, parses.
-test('counter-example: the plan around every refused step parses without it', { criterion: 'AC-SPEC-34-02' }, () => {
+test('counter-example: the plan around every refused step parses without it', () => {
   accepted(parsePlan, planOf([OPEN_ORDERS]));
 });
 
 // ---- Version 1.1 ----------------------------------------------------------------------------------
 
-test('a plan declaring 1.1 that advances the clock, checks the clipboard or remembers it is refused as a 1.1 parser refuses it', { criterion: 'AC-SPEC-34-01' }, () => {
+test('a plan declaring 1.1 that advances the clock, checks the clipboard or remembers it is refused as a 1.1 parser refuses it', () => {
   const parse = defaultParser();
   assert.equal(signupPlan()['version'], PREVIOUS_VERSION);
   const previousWith = (added: JsonRecord): JsonRecord => {
@@ -272,7 +271,7 @@ test('a plan declaring 1.1 that advances the clock, checks the clipboard or reme
 });
 
 // Counter-example: the same 1.1 plan without the added step parses.
-test('counter-example: the 1.1 sign-up plan parses unchanged', { criterion: 'AC-SPEC-34-01' }, () => {
+test('counter-example: the 1.1 sign-up plan parses unchanged', () => {
   accepted(defaultParser(), signupPlan());
 });
 
@@ -316,17 +315,17 @@ async function assertNothingReached(plans: readonly JsonRecord[]): Promise<void>
   assert.equal(events.read().length, 0, 'nothing was logged');
 }
 
-test('every refused plan that advances the clock reaches no driver, network or service caller, and nothing is logged', { criterion: 'AC-SPEC-34-02' }, async () => {
+test('every refused plan that advances the clock reaches no driver, network or service caller, and nothing is logged', async () => {
   await assertNothingReached([...REFUSED_ADVANCES.map((refused) => refused.plan), planOf([OPEN_ORDERS, advanceClock(1e308, 'milliseconds')])]);
 });
 
-test('every refused plan with a clipboard step reaches no driver, network or service caller, and nothing is logged', { criterion: 'AC-SPEC-34-03' }, async () => {
+test('every refused plan with a clipboard step reaches no driver, network or service caller, and nothing is logged', async () => {
   await assertNothingReached(REFUSED_CLIPBOARD.map((refused) => refused.plan));
 });
 
 // Counter-example: an accepted plan with an advance and a clipboard check does reach the driver,
 // so the zero above can fail.
-test('counter-example: an accepted plan that advances the clock and checks the clipboard reaches the driver', { criterion: 'AC-SPEC-34-02' }, async () => {
+test('counter-example: an accepted plan that advances the clock and checks the clipboard reaches the driver', async () => {
   const { ports, counts } = countingPorts();
   await runUntrusted(planOf([OPEN_ORDERS, advanceClock(10, 'minutes'), COPY_LINK, expectClipboard('textContains', '/invite/')]), parsePlan, base(), ports);
   assert.ok(counts.driverCalls > 0, 'the driver was asked to open a session');

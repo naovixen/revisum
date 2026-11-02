@@ -2,10 +2,9 @@
 // gate denies must dispatch no input event. Each harmful plan has a benign twin that differs only
 // in the harmful detail and runs to the end, so a gate that denied everything would fail too.
 //
-// The gate is wired into the CDP driver only in SPEC-06, so each plan runs here through a stand-in
+// The gate is wired into the CDP driver only later, so each plan runs here through a stand-in
 // for the driver's act(): it asks the guard first, as the driver will, and dispatches an input
 // event only when the guard allows. A static denial means the run never starts.
-// See docs/specs/SPEC-03-policy-gate.md.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -45,7 +44,7 @@ type Outcome =
 
 // Steps a driver performs on the page. A navigate step is judged by the static check; assertions,
 // captures and audits only read the page. A runtime denial ends the run Denied before the step's
-// input event, as the driver will once SPEC-06 wires the guard in.
+// input event, as the driver will once the CDP driver wires the guard in.
 const ACTING_STEPS: readonly Step['type'][] = ['click', 'hover', 'fill', 'select', 'upload', 'press', 'dialog'];
 
 // What the page resolves a step's locator to, unless the case says otherwise.
@@ -84,7 +83,7 @@ async function runVariant(variant: Variant, targetId: string): Promise<Outcome> 
   return runThroughGate(gate, project, parsedPlan(planOf(variant.steps, [targetId])), targetId, variant.page);
 }
 
-test('the red-team set holds at least one harmful plan for every action kind the gate guards', { criterion: 'AC-SPEC-03-03' }, () => {
+test('the red-team set holds at least one harmful plan for every action kind the gate guards', () => {
   const covered = new Set(RED_TEAM.map((redTeamCase) => redTeamCase.actionKind));
   assert.deepEqual(ACTION_KINDS.filter((kind) => !covered.has(kind)), []);
   assert.ok(RED_TEAM.some((redTeamCase) => redTeamCase.stage === 'static'), 'no case is caught by the static check');
@@ -92,7 +91,7 @@ test('the red-team set holds at least one harmful plan for every action kind the
 });
 
 for (const redTeamCase of RED_TEAM) {
-  test(`a plan that ${redTeamCase.name} ends Denied as ${redTeamCase.rule}, with no input event for the denied step`, { criterion: 'AC-SPEC-03-03' }, async () => {
+  test(`a plan that ${redTeamCase.name} ends Denied as ${redTeamCase.rule}, with no input event for the denied step`, async () => {
     const outcome = await runVariant(redTeamCase.harmful, redTeamCase.harmful.target ?? redTeamCase.target);
     assert.equal(outcome.state, 'Denied', JSON.stringify(outcome));
     if (outcome.state !== 'Denied') return;
@@ -107,7 +106,7 @@ for (const redTeamCase of RED_TEAM) {
     assert.deepEqual(outcome.inputEvents.slice(firstSilent).filter((count) => count > 0), [], JSON.stringify(outcome.inputEvents));
   });
 
-  test(`the benign twin of the plan that ${redTeamCase.name} runs to the end`, { criterion: 'AC-SPEC-03-03' }, async () => {
+  test(`the benign twin of the plan that ${redTeamCase.name} runs to the end`, async () => {
     const outcome = await runVariant(redTeamCase.benign, redTeamCase.benign.target ?? redTeamCase.target);
     assert.equal(outcome.state, 'Ran', JSON.stringify(outcome));
     const actingSteps = redTeamCase.benign.steps.filter((step) => ACTING_STEPS.includes(step['type'] as Step['type'])).length;
@@ -128,12 +127,12 @@ async function decideAgainstTrusted(plan: Plan, trustedInput: JsonRecord) {
 const LOOSE_ORIGINS = policyProjectInput({ origins: [ORIGIN, PRODUCTION_ORIGIN, UNLISTED_ORIGIN] });
 const toUnlistedOrigin = () => parsedPlan(planOf([OPEN_ACCOUNT_PAGE, navigate(`${UNLISTED_ORIGIN}/admin`)]), LOOSE_ORIGINS);
 
-test('a plan that navigates to an origin the trusted project does not declare ends Denied as undeclared-origin', { criterion: 'AC-SPEC-03-03' }, async () => {
+test('a plan that navigates to an origin the trusted project does not declare ends Denied as undeclared-origin', async () => {
   const decision = await decideAgainstTrusted(toUnlistedOrigin(), policyProjectInput());
   assert.deepEqual(decision, { kind: 'deny', rule: 'undeclared-origin', stepIndex: 1 });
 });
 
-test('the same plan is allowed by a trusted project that declares the origin', { criterion: 'AC-SPEC-03-03' }, async () => {
+test('the same plan is allowed by a trusted project that declares the origin', async () => {
   const decision = await decideAgainstTrusted(toUnlistedOrigin(), LOOSE_ORIGINS);
   assert.equal(decision.kind, 'allow', JSON.stringify(decision));
 });
@@ -141,12 +140,12 @@ test('the same plan is allowed by a trusted project that declares the origin', {
 const EIGHT_CLICKS = Array.from({ length: 8 }, (_, index) => click(role('button', `Next page ${index + 1}`)));
 const longPlan = () => parsedPlan(planOf([OPEN_ACCOUNT_PAGE, ...EIGHT_CLICKS]));
 
-test('a plan with more steps than the trusted project\'s limit ends Denied as over-limit', { criterion: 'AC-SPEC-03-03' }, async () => {
+test('a plan with more steps than the trusted project\'s limit ends Denied as over-limit', async () => {
   const decision = await decideAgainstTrusted(longPlan(), policyProjectInput({ limits: { stepTimeoutMilliseconds: 2000, maximumSteps: 3 } }));
   assert.deepEqual(decision, { kind: 'deny', rule: 'over-limit', stepIndex: null });
 });
 
-test('the same plan is allowed within the trusted project\'s limit', { criterion: 'AC-SPEC-03-03' }, async () => {
+test('the same plan is allowed within the trusted project\'s limit', async () => {
   const decision = await decideAgainstTrusted(longPlan(), policyProjectInput({ limits: { stepTimeoutMilliseconds: 2000, maximumSteps: 20 } }));
   assert.equal(decision.kind, 'allow', JSON.stringify(decision));
 });

@@ -2,7 +2,6 @@
 // error code, which its anchor in docs/errors.md explains. fixture-origin-policy.test.ts shows what is
 // refused; this pins the code each refusal gives, exactly, and that a rewrite outside the fixture
 // origins keeps the code it always had.
-// See docs/specs/SPEC-07-isolated-runner-and-egress.md.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { FixtureRewrite, Origin } from '@revisum/contracts';
@@ -23,24 +22,24 @@ const REFUSALS: readonly { readonly title: string; readonly allowOrigins: readon
 ];
 
 for (const { title, allowOrigins, fixture, code } of REFUSALS) {
-  test(`${title} is refused as ${code}, naming the origin`, { criterion: 'AC-SPEC-07-07' }, () => {
+  test(`${title} is refused as ${code}, naming the origin`, () => {
     const built = buildEgressPolicy({ allowOrigins, allowServices: [], fixtureOrigins: [fixture] });
     assert.deepEqual(built, { ok: false, error: { code, origin: fixture } });
   });
 
-  test(`${title} with a rewrite on it is refused as ${code}, not as a rewrite outside the fixtures`, { criterion: 'AC-SPEC-07-07' }, () => {
+  test(`${title} with a rewrite on it is refused as ${code}, not as a rewrite outside the fixtures`, () => {
     const built = buildEgressPolicy({ allowOrigins, allowServices: [], fixtureOrigins: [fixture], responseRewrites: [rewriteOn(fixture)] });
     assert.deepEqual(built, { ok: false, error: { code, origin: fixture } });
   });
 }
 
-test('counter-example: a rewrite on a declared origin that is not a fixture keeps rewrite-origin-not-fixture', { criterion: 'AC-SPEC-07-07' }, () => {
+test('counter-example: a rewrite on a declared origin that is not a fixture keeps rewrite-origin-not-fixture', () => {
   const other = origin('http://other.test');
   const built = buildEgressPolicy({ allowOrigins: [PLAIN, other], allowServices: [], fixtureOrigins: [PLAIN], responseRewrites: [rewriteOn(other)] });
   assert.deepEqual(built, { ok: false, error: { code: 'rewrite-origin-not-fixture', origin: other } });
 });
 
-test('counter-example: a declared plain-HTTP fixture origin gives no refusal code at all', { criterion: 'AC-SPEC-07-07' }, () => {
+test('counter-example: a declared plain-HTTP fixture origin gives no refusal code at all', () => {
   const built = buildEgressPolicy({ allowOrigins: [PLAIN], allowServices: [], fixtureOrigins: [PLAIN], responseRewrites: [rewriteOn(PLAIN)] });
   assert.equal(built.ok, true, JSON.stringify(built));
 });

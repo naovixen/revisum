@@ -3,7 +3,6 @@
 // run's base URL, so no value can change where the browser goes or how many segments the path has.
 // Here the values are unique texts whose prefixes hold "/", "?", "#", "%2F", "..", spaces and
 // non-Latin text, run through run() on a recording driver.
-// See docs/specs/SPEC-30-plan-values-positions-and-keys.md.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
@@ -23,7 +22,7 @@ const templatePlan = (prefix: string): JsonRecord => planOf(
   { values: { orderCode: { kind: 'uniqueText', prefix } } },
 );
 
-test('1,000 generated values keep the base URL\'s origin and exactly three path segments, each value decoding to itself', { criterion: 'AC-SPEC-30-11', timeout: 300_000 }, async () => {
+test('1,000 generated values keep the base URL\'s origin and exactly three path segments, each value decoding to itself', { timeout: 300_000 }, async () => {
   let checked = 0;
   for (const prefix of HOSTILE_PREFIXES) {
     for (let seed = 0; seed < SEEDS_PER_PREFIX; seed++) {
@@ -47,7 +46,7 @@ test('1,000 generated values keep the base URL\'s origin and exactly three path 
   assert.equal(checked, 1000);
 });
 
-test('two seeds put two different values into the same template', { criterion: 'AC-SPEC-30-11' }, async () => {
+test('two seeds put two different values into the same template', async () => {
   const first = await runPlan(templatePlan('order'), { seed: 1 });
   const second = await runPlan(templatePlan('order'), { seed: 2 });
   assert.notEqual(first.recording.navigations[0], second.recording.navigations[0]);
@@ -55,25 +54,25 @@ test('two seeds put two different values into the same template', { criterion: '
 });
 
 for (const character of ['/', '?', '#']) {
-  test(`a literal segment holding "${character}" is refused at parse time with unknown_value at that segment`, { criterion: 'AC-SPEC-30-11' }, () => {
+  test(`a literal segment holding "${character}" is refused at parse time with unknown_value at that segment`, () => {
     const plan = planOf([navigate({ segments: ['orders', `latest${character}admin`] })]);
     assert.deepEqual(rejection(parsePlan, plan), ['unknown_value $.steps[0].url.segments[1]']);
   });
 }
 
 for (const segment of ['.', '..']) {
-  test(`a literal segment written as "${segment}" is refused at parse time with invalid_url at that segment`, { criterion: 'AC-SPEC-30-11' }, () => {
+  test(`a literal segment written as "${segment}" is refused at parse time with invalid_url at that segment`, () => {
     const plan = planOf([navigate({ segments: ['orders', segment, 'admin'] })]);
     assert.deepEqual(rejection(parsePlan, plan), ['invalid_url $.steps[0].url.segments[1]']);
   });
 }
 
 // Counter-example: dots inside a longer literal segment are ordinary text.
-test('a literal segment such as "v1.2" or "...more" is accepted', { criterion: 'AC-SPEC-30-11' }, () => {
+test('a literal segment such as "v1.2" or "...more" is accepted', () => {
   accepted(parsePlan, planOf([navigate({ segments: ['docs', 'v1.2', '...more'] })]));
 });
 
-test('a query key outside letters, digits, "_", "." and "-" is refused', { criterion: 'AC-SPEC-30-11' }, () => {
+test('a query key outside letters, digits, "_", "." and "-" is refused', () => {
   // Control: the same template with a valid key is accepted, so the refusals below are the key's.
   accepted(parsePlan, planOf([navigate({ segments: ['orders'], query: { search: 'shoes' } })]));
   rejection(parsePlan, planOf([navigate({ segments: ['orders'], query: { 'search term': 'shoes' } })]));
@@ -82,11 +81,11 @@ test('a query key outside letters, digits, "_", "." and "-" is refused', { crite
 
 // Counter-example: literal segments and query values without separators are accepted, and a
 // literal query value may hold any safe text, since it is encoded as a whole.
-test('a template of plain literal segments, with query values holding "/" and "?", is accepted', { criterion: 'AC-SPEC-30-11' }, () => {
+test('a template of plain literal segments, with query values holding "/" and "?", is accepted', () => {
   accepted(parsePlan, planOf([navigate({ segments: ['orders', 'latest'], query: { search: 'a/b?c', 'page.size': '20' } })]));
 });
 
-test('a literal path template navigates to its literal path on the base URL', { criterion: 'AC-SPEC-30-11' }, async () => {
+test('a literal path template navigates to its literal path on the base URL', async () => {
   const { recording } = await runPlan(planOf([navigate({ segments: ['orders', 'two words'] }), OPEN_ORDERS]));
   assert.equal(recording.navigations[0], `${ORIGIN}/orders/two%20words`);
 });

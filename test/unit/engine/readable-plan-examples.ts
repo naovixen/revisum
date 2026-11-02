@@ -14,7 +14,6 @@
 // Every plan here is built as JSON and parsed before it is used, so a plan the parser refuses is a
 // broken test and throws. Readable text is written by hand only in the statements the spec gives
 // (its grammar, the plan 1.2 addition and its examples); otherwise it comes from writePlanText.
-// See docs/specs/SPEC-28-plan-authoring.md.
 import {
   CLOCK_ADVANCE_MODES, CLOCK_UNITS, DATE_ANCHORS, DATE_FORMATS, ELEMENT_STATE_KINDS, GENERATED_VALUE_KINDS, KEYS, LOCATOR_KINDS, MODIFIERS,
   REQUEST_COUNT_KINDS, ROLES, planParser,
@@ -334,7 +333,7 @@ export const EVERY_STEP_TYPE = [
   'expectDownload', 'newTab', 'a11yAudit', 'capture', 'remember', 'call', 'expectBackend', 'stub', 'resetRequests',
   'expectRequests', 'expectResponse', 'setStorage', 'removeStorage', 'expectStorage', 'advanceClock', 'expectClipboard',
 ] as const satisfies readonly StepType[];
-// The unsafe steps of plan 1.3 have no readable form (SPEC-36), so the readable examples leave them out.
+// The unsafe steps of plan 1.3 have no readable form, so the readable examples leave them out.
 type UnsafeStepType = 'evaluate' | 'expectScript' | 'database' | 'expectDatabase';
 type StepTypeLeftOut = Exclude<StepType, (typeof EVERY_STEP_TYPE)[number] | UnsafeStepType>;
 export const NO_STEP_TYPE_LEFT_OUT: [StepTypeLeftOut] extends [never] ? true : false = true;

@@ -6,7 +6,6 @@
 // Single-run tests below them pin what each capability means: a frame's steps reach only the
 // frame's document, a dialog is accepted or dismissed as asked and its text is checked, and the
 // uploaded file's name and bytes reach the page.
-// See docs/specs/SPEC-06-cdp-driver.md.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import type { RunResult } from '@revisum/engine';
@@ -73,22 +72,22 @@ const CRASH_PLAN_STEPS = [
 ];
 
 describe('20 runs of each capability on Chrome for Testing', () => {
-  test('steps inside an iframe pass in all 20 runs', { criterion: 'AC-SPEC-06-02' }, async () => {
+  test('steps inside an iframe pass in all 20 runs', async () => {
     const { result } = await capability.run(capability.plan(capabilityPlan(CDP_TARGET, repeated(FRAME_BLOCK))), CDP_TARGET);
     assertEveryStepPassed(result, FRAME_BLOCK.length);
   });
 
-  test('accepting and dismissing a dialog pass in all 20 runs', { criterion: 'AC-SPEC-06-02' }, async () => {
+  test('accepting and dismissing a dialog pass in all 20 runs', async () => {
     const { result } = await capability.run(capability.plan(capabilityPlan(CDP_TARGET, repeated(DIALOG_BLOCK))), CDP_TARGET);
     assertEveryStepPassed(result, DIALOG_BLOCK.length);
   });
 
-  test('uploading the declared fixture file passes in all 20 runs', { criterion: 'AC-SPEC-06-02' }, async () => {
+  test('uploading the declared fixture file passes in all 20 runs', async () => {
     const { result } = await capability.run(capability.plan(capabilityPlan(CDP_TARGET, repeated(UPLOAD_BLOCK))), CDP_TARGET);
     assertEveryStepPassed(result, UPLOAD_BLOCK.length);
   });
 
-  test('a tab that crashes mid-plan is reported as target-crashed and cleaned up in all 20 runs', { criterion: 'AC-SPEC-06-02' }, async () => {
+  test('a tab that crashes mid-plan is reported as target-crashed and cleaned up in all 20 runs', async () => {
     const plan = capability.plan(capabilityPlan(CDP_TARGET, CRASH_PLAN_STEPS));
     for (let repetition = 1; repetition <= REPETITIONS; repetition++) {
       const watched = watchedDriver(capabilityCdpDriver(BROWSERS.chrome));
@@ -112,12 +111,12 @@ describe('20 runs of each capability on Chrome for Testing', () => {
 });
 
 describe('what each capability does', () => {
-  test('a frame step acts on the iframe document, not on the same-named control outside it', { criterion: 'AC-SPEC-06-02' }, async () => {
+  test('a frame step acts on the iframe document, not on the same-named control outside it', async () => {
     const { result } = await capability.run(capability.plan(capabilityPlan(CDP_TARGET, FRAME_BLOCK)), CDP_TARGET);
     assert.equal(result.state, 'Passed', JSON.stringify(result.steps));
   });
 
-  test('counter-example: the frame\'s status is not found from the outer document', { criterion: 'AC-SPEC-06-02' }, async () => {
+  test('counter-example: the frame\'s status is not found from the outer document', async () => {
     const plan = capability.plan(capabilityPlan(CDP_TARGET, [
       navigate('/frame.html'),
       { type: 'expect', locator: testId('frame-status'), assert: { kind: 'visible' }, criterionId: 'frame.status-outside' },
@@ -127,7 +126,7 @@ describe('what each capability does', () => {
     assert.equal(result.steps[1]?.outcome, 'failed');
   });
 
-  test('a failing check inside a frame fails the frame step', { criterion: 'AC-SPEC-06-02' }, async () => {
+  test('a failing check inside a frame fails the frame step', async () => {
     const plan = capability.plan(capabilityPlan(CDP_TARGET, [
       navigate('/frame.html'),
       { type: 'frame', locator: testId('checkout-frame'), steps: [textEquals(testId('frame-status'), 'Confirmed for nobody', 'frame.wrong-text')] },
@@ -139,7 +138,7 @@ describe('what each capability does', () => {
     assert.equal(result.steps[2]?.outcome, 'skipped');
   });
 
-  test('a dialog whose text is not the expected text fails the dialog step and skips the rest',{ criterion: 'AC-SPEC-06-02' }, async () => {
+  test('a dialog whose text is not the expected text fails the dialog step and skips the rest', async () => {
     const plan = capability.plan(capabilityPlan(CDP_TARGET, [
       navigate('/dialog.html'),
       click(role('button', 'Ask a question')),
@@ -151,7 +150,7 @@ describe('what each capability does', () => {
     assert.deepEqual(result.steps.map((step) => step.outcome), ['passed', 'passed', 'failed', 'skipped']);
   });
 
-  test('the uploaded file reaches the page with its declared name and its bytes', { criterion: 'AC-SPEC-06-02' }, async () => {
+  test('the uploaded file reaches the page with its declared name and its bytes', async () => {
     const { result } = await capability.run(capability.plan(capabilityPlan(CDP_TARGET, UPLOAD_BLOCK)), CDP_TARGET);
     assert.equal(result.state, 'Passed', JSON.stringify(result.steps));
   });

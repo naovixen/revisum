@@ -1,6 +1,5 @@
 // The shared types compile as the spec describes them: every error-code union is closed, and
 // every type the spec declares resolves to a declaration in core.
-// See docs/specs/SPEC-27-shared-types-and-events.md.
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -14,12 +13,12 @@ const FORGETFUL_SWITCH_LINE = /^export function describe\w+ForgettingOne\(/;
 
 // ---- Closed error-code unions -------------------------------------------------------------------
 
-test('a switch over each error-code union compiles only when it handles every code', { criterion: 'AC-SPEC-27-01', timeout: 300_000 }, () => {
+test('a switch over each error-code union compiles only when it handles every code', { timeout: 300_000 }, () => {
   const compiled = compileFiles([EXHAUSTIVENESS_FILE]);
   assert.equal(compiled.passed, true, compiled.output);
 });
 
-test('removing the expected-error markers makes every switch that forgets a code fail to compile', { criterion: 'AC-SPEC-27-01', timeout: 300_000 }, () => {
+test('removing the expected-error markers makes every switch that forgets a code fail to compile', { timeout: 300_000 }, () => {
   // The mutant: the same file with each @ts-expect-error line deleted. Every switch that leaves a
   // code out must now be a compile error of its own, so the check above can fail.
   const source = readFileSync(EXHAUSTIVENESS_FILE, 'utf8');
@@ -27,7 +26,7 @@ test('removing the expected-error markers makes every switch that forgets a code
   const markers = lines.filter((line) => EXPECTED_ERROR_LINE.test(line)).length;
   // One forgetful switch per error-code union, counted from the file so a new union needs no edit here.
   const forgetfulSwitches = lines.filter((line) => FORGETFUL_SWITCH_LINE.test(line)).length;
-  assert.ok(forgetfulSwitches >= 6, 'the six SPEC-27 unions each keep a forgetful switch');
+  assert.ok(forgetfulSwitches >= 6, 'the six shared unions each keep a forgetful switch');
   assert.equal(markers, forgetfulSwitches, 'one forgetful switch per error-code union');
   const mutant = lines.filter((line) => !EXPECTED_ERROR_LINE.test(line)).join('\n');
   const compiled = compileFiles([{ name: 'error-code-exhaustiveness-mutant.ts', source: mutant }]);
@@ -77,7 +76,7 @@ const reexportFile = (names: readonly string[]) => ({
   source: `export type {\n  ${names.join(',\n  ')},\n} from '@revisum/engine';\n`,
 });
 
-test('every type the spec declares resolves to a declaration exported by core', { criterion: 'AC-SPEC-27-02', timeout: 300_000 }, () => {
+test('every type the spec declares resolves to a declaration exported by core', { timeout: 300_000 }, () => {
   const names = declaredNames(specTypeBlock());
   // A floor, so a change to the spec's layout cannot silently empty the list.
   for (const expected of ['Result', 'Session', 'DerivedActor', 'EventSink', 'PERSON_ACTOR_TYPES', 'Thresholds', 'SinkError', 'CliErrorCode', 'GuaranteeLevel']) {
@@ -87,7 +86,7 @@ test('every type the spec declares resolves to a declaration exported by core', 
   assert.equal(compiled.passed, true, compiled.output);
 });
 
-test('a type name that core does not declare fails the resolution check', { criterion: 'AC-SPEC-27-02', timeout: 300_000 }, () => {
+test('a type name that core does not declare fails the resolution check', { timeout: 300_000 }, () => {
   // The counter-example: one invented name among the real ones must fail, and be named.
   const names = [...declaredNames(specTypeBlock()), ...NAMED_PLAN_TYPES, 'NoSuchSharedType'];
   const compiled = compileFiles([reexportFile(names)]);

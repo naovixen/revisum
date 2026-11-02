@@ -4,7 +4,6 @@
 // rebase, tag and hard reset. The agent may still make ordinary commits. The lint reads the file
 // from the working tree; each test removes one denial, in every shell, from a throw-away copy of
 // the repository and expects the lint to fail naming it.
-// See docs/specs/SPEC-00-repo-seed-and-gates.md.
 import { after, before, test } from 'node:test';
 import { copyRepository, type ScratchRepository } from './scratch-repository.ts';
 import { assertLintFails, assertLintPasses, editJson, lintWithEdits } from './scratch-edits.ts';
@@ -39,12 +38,12 @@ const REQUIRED_DENIALS: readonly { readonly action: string; readonly matches: (r
   { action: 'hard reset', matches: (rule) => rule.includes('reset --hard'), named: /reset/i },
 ];
 
-test('control: the unchanged copy of the repository passes every lint command', { criterion: 'AC-SPEC-00-19', timeout: TIMEOUT }, () => {
+test('control: the unchanged copy of the repository passes every lint command', { timeout: TIMEOUT }, () => {
   assertLintPasses(scratch.lint());
 });
 
 for (const { action, matches, named } of REQUIRED_DENIALS) {
-  test(`the lint fails when the deny rules no longer deny ${action}`, { criterion: 'AC-SPEC-00-19', timeout: TIMEOUT }, () => {
+  test(`the lint fails when the deny rules no longer deny ${action}`, { timeout: TIMEOUT }, () => {
     const outcome = lintWithEdits(scratch, { [SETTINGS_PATH]: withoutDenials(matches) });
     assertLintFails(outcome, ['settings.json']);
     if (!named.test(outcome.failureOutput)) {
@@ -53,6 +52,6 @@ for (const { action, matches, named } of REQUIRED_DENIALS) {
   });
 }
 
-test('counter-example: removing a denial the lock-down does not need passes', { criterion: 'AC-SPEC-00-19', timeout: TIMEOUT }, () => {
+test('counter-example: removing a denial the lock-down does not need passes', { timeout: TIMEOUT }, () => {
   assertLintPasses(lintWithEdits(scratch, { [SETTINGS_PATH]: withoutDenials((rule) => rule.includes('npm publish')) }));
 });

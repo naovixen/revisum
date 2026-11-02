@@ -9,9 +9,8 @@
 // remembered value appears only as its name and sha256, and a failed check says only "differs".
 // The control run checks the element showing the canary against a text it can never equal, so the
 // observation does reach the result, and the scan finds it there.
-// Not covered here: the visual report, which a run cannot produce until the result model joins it
-// (SPEC-11, SPEC-12), and text drawn as pixels, which no text scan can read.
-// See docs/specs/SPEC-34-clock-advance-and-clipboard.md and docs/specs/SPEC-04-secrets-and-redaction.md.
+// Not covered here: the visual report, which a run cannot produce until the result model joins it,
+// and text drawn as pixels, which no text scan can read.
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -96,7 +95,7 @@ const ENDINGS: readonly { readonly name: string; readonly steps: readonly JsonRe
   { name: 'secret-on-clipboard', steps: [copyToken, expectClipboard('textContains', 'deliberately wrong', 'leaks.token-checked')] },
 ];
 
-test('the leak scan finds no copied secret or canary personal data in what runs with clipboard checks keep', { criterion: 'AC-SPEC-34-15', timeout: TIMEOUT, ...copying }, async () => {
+test('the leak scan finds no copied secret or canary personal data in what runs with clipboard checks keep', { timeout: TIMEOUT, ...copying }, async () => {
   const outputs: string[] = [];
   const secrets = fakeEnvironmentStore({ [COPY_SECRET]: secretValueText });
   for (const { name, steps } of ENDINGS) {
@@ -129,7 +128,7 @@ test('the leak scan finds no copied secret or canary personal data in what runs 
   assert.deepEqual(leaks.filter((leak) => leak.file !== plantedPath).map((leak) => `${leak.secret} in ${leak.file}`), [], 'each value is found only where it was planted');
 });
 
-test('a value remembered from the clipboard appears in the result and event log only as its name and sha256', { criterion: 'AC-SPEC-34-15', timeout: TIMEOUT, ...copying }, async () => {
+test('a value remembered from the clipboard appears in the result and event log only as its name and sha256', { timeout: TIMEOUT, ...copying }, async () => {
   const ran = await harness.runSteps(CDP_TARGET, [
     navigate('/leaks.html'),
     copyContact,
@@ -148,7 +147,7 @@ test('a value remembered from the clipboard appears in the result and event log 
 
 // Control: the canary, observed by a failed check of the element that shows it, does reach the
 // result, and the scan finds it there.
-test('control: a failed check of the element showing the canary keeps it in the result, and the scan finds it', { criterion: 'AC-SPEC-34-15', timeout: TIMEOUT }, async () => {
+test('control: a failed check of the element showing the canary keeps it in the result, and the scan finds it', { timeout: TIMEOUT }, async () => {
   const ran = await harness.runSteps(CDP_TARGET, [navigate('/leaks.html'), textEquals(testId('contact-name'), 'deliberately wrong', 'leaks.contact-shown')]);
   const check = ran.result.steps[1];
   assert.equal(check?.outcome, 'failed');

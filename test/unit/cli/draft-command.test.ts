@@ -8,7 +8,6 @@
 // Each test runs the real command against a fake planner on loopback that replays a recorded
 // reply, through the command's own in-process egress proxy. No model or real key is used. The
 // wire formats themselves, the key and the endpoint checks are in planner-adapters.test.ts.
-// See docs/specs/SPEC-28-plan-authoring.md and docs/specs/SPEC-16-cli-and-github-action.md.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { isTrustedFile } from '@revisum/engine';
@@ -43,14 +42,14 @@ const eventKinds = (run: { readonly events: { readonly recorded: readonly { read
 
 // ---- Writing the draft ---------------------------------------------------------------------------------
 
-test('drafting from a spec writes the recorded planner text to --out, byte for byte as the golden draft', { criterion: 'AC-SPEC-28-10' }, async () => {
+test('drafting from a spec writes the recorded planner text to --out, byte for byte as the golden draft', async () => {
   await withPlannedRun(localSetup, ({ workspace, outcome }) => {
     assert.ok(workspace.exists(DRAFT_PATH), `no draft was written:\n${outcome.stdout}\n${outcome.stderr}`);
     assert.equal(workspace.read(DRAFT_PATH), GOLDEN_DRAFT);
   });
 });
 
-test('the draft is recorded with source draft-command, basis core-recorded and the spec as its reference', { criterion: 'AC-SPEC-28-10' }, async () => {
+test('the draft is recorded with source draft-command, basis core-recorded and the spec as its reference', async () => {
   await withPlannedRun(localSetup, (run) => {
     const submissions = run.events.recorded.filter((recorded) => recorded.event.kind === 'plan.submitted');
     assert.equal(submissions.length, 1, JSON.stringify(run.events.recorded));
@@ -59,7 +58,7 @@ test('the draft is recorded with source draft-command, basis core-recorded and t
   });
 });
 
-test('a draft with a faulty line is still written, and its error names that line of the written file', { criterion: 'AC-SPEC-28-10' }, async () => {
+test('a draft with a faulty line is still written, and its error names that line of the written file', async () => {
   await withPlannedRun({ ...localSetup, answer: jsonAnswer(200, replyWithContent('openai-chat', FAULTY.text)) }, (run) => {
     assert.ok(run.workspace.exists(DRAFT_PATH), `the draft with an error was not written:\n${run.outcome.stdout}`);
     const errors = outputData(run)['errors'];
@@ -70,21 +69,21 @@ test('a draft with a faulty line is still written, and its error names that line
   });
 });
 
-test('counter-example: the recorded draft without the faulty line is written with no errors', { criterion: 'AC-SPEC-28-10' }, async () => {
+test('counter-example: the recorded draft without the faulty line is written with no errors', async () => {
   await withPlannedRun(localSetup, (run) => {
     assert.deepEqual(outputData(run)['errors'], []);
     assert.equal(run.outcome.exitCode, 0, run.outcome.stdout);
   });
 });
 
-test('the draft is left unapproved, and nothing but its submission is recorded', { criterion: 'AC-SPEC-28-10' }, async () => {
+test('the draft is left unapproved, and nothing but its submission is recorded', async () => {
   await withPlannedRun(localSetup, (run) => {
     assert.equal(outputData(run)['approved'], false);
     assert.deepEqual(eventKinds(run), ['plan.submitted']);
   });
 });
 
-test('two runs with the same recorded reply write byte-identical drafts and print byte-identical --json output', { criterion: 'AC-SPEC-28-10' }, async () => {
+test('two runs with the same recorded reply write byte-identical drafts and print byte-identical --json output', async () => {
   const planner = await startFakePlanner(recordedAnswer('openai-chat'));
   const workspace = draftWorkspace({ planner: localPlanner(planner.origin) });
   try {
@@ -103,7 +102,7 @@ test('two runs with the same recorded reply write byte-identical drafts and prin
 
 // ---- draft --json ------------------------------------------------------------------------------------------
 
-test('--json prints the draft path, source draft-command, the errors by line and approved false', { criterion: 'AC-SPEC-16-09' }, async () => {
+test('--json prints the draft path, source draft-command, the errors by line and approved false', async () => {
   await withPlannedRun({ ...localSetup, answer: jsonAnswer(200, replyWithContent('openai-chat', FAULTY.text)) }, (run) => {
     assert.ok(run.output !== undefined, `stdout is not one JSON object:\n${run.outcome.stdout}`);
     assert.match(String(run.output['schema']), /\.cli\/v1$/);
@@ -116,14 +115,14 @@ test('--json prints the draft path, source draft-command, the errors by line and
   });
 });
 
-test('--json lists the planner origin the command called', { criterion: 'AC-SPEC-16-09' }, async () => {
+test('--json lists the planner origin the command called', async () => {
   await withPlannedRun(localSetup, (run) => {
     const plannerOrigin = run.planner.origin;
     assert.ok(stringsIn(outputData(run)).includes(plannerOrigin), `the planner origin ${plannerOrigin} is not listed: ${run.outcome.stdout}`);
   });
 });
 
-test('the command writes no trusted file but the draft, and changes no file that was there before', { criterion: 'AC-SPEC-16-09' }, async () => {
+test('the command writes no trusted file but the draft, and changes no file that was there before', async () => {
   const planner = await startFakePlanner(recordedAnswer('openai-chat'));
   const workspace = draftWorkspace({ planner: localPlanner(planner.origin) });
   try {
@@ -140,7 +139,7 @@ test('the command writes no trusted file but the draft, and changes no file that
   }
 });
 
-test('no run or approval follows from the command: the audit log holds no approval and no finished run', { criterion: 'AC-SPEC-16-09' }, async () => {
+test('no run or approval follows from the command: the audit log holds no approval and no finished run', async () => {
   await withPlannedRun(localSetup, (run) => {
     const followed = eventKinds(run).filter((kind) => kind.startsWith('run.') || kind === 'plan.approved' || kind === 'approval.refused');
     assert.deepEqual(followed, []);
@@ -148,7 +147,7 @@ test('no run or approval follows from the command: the audit log holds no approv
   });
 });
 
-test('a project with no planner stops with usage, naming the planner field, before the spec is read', { criterion: 'AC-SPEC-16-09' }, async () => {
+test('a project with no planner stops with usage, naming the planner field, before the spec is read', async () => {
   const workspace = draftWorkspace({ planner: undefined });
   try {
     // With the spec gone, a command that read it first would fail for that instead.
@@ -165,7 +164,7 @@ test('a project with no planner stops with usage, naming the planner field, befo
 
 // ---- What the planner sees ---------------------------------------------------------------------------------
 
-test('the request holds each criterion text, the grammar version, both declared origins and the target', { criterion: 'AC-SPEC-28-11' }, async () => {
+test('the request holds each criterion text, the grammar version, both declared origins and the target', async () => {
   await withPlannedRun(localSetup, (run) => {
     const prompt = promptTexts(requestBody(onlyRequest(run.planner))).join('\n');
     for (const text of [...Object.values(CRITERION_TEXTS), GRAMMAR_VERSION, APP_ORIGIN, SECOND_APP_ORIGIN, TARGET]) {
@@ -174,7 +173,7 @@ test('the request holds each criterion text, the grammar version, both declared 
   });
 });
 
-test('the declared secret, the planner key, text outside the criteria and artefact paths are absent from the request body', { criterion: 'AC-SPEC-28-11' }, async () => {
+test('the declared secret, the planner key, text outside the criteria and artefact paths are absent from the request body', async () => {
   const secrets = seededSecrets();
   await withPlannedRun({ ...customerKeySetup('anthropic-messages', replyWithContent('anthropic-messages', GOLDEN_DRAFT)), secrets: secrets.variables }, (run) => {
     const request = onlyRequest(run.planner);
@@ -192,7 +191,7 @@ test('the declared secret, the planner key, text outside the criteria and artefa
   });
 });
 
-test('--criteria sends only the criteria it names', { criterion: 'AC-SPEC-28-11' }, async () => {
+test('--criteria sends only the criteria it names', async () => {
   await withPlannedRun({ ...localSetup, argv: draftArguments(['--criteria', 'AC-1,AC-3', '--json']) }, (run) => {
     const prompt = promptTexts(requestBody(onlyRequest(run.planner))).join('\n');
     assert.ok(prompt.includes(CRITERION_TEXTS.emailAccepted));
@@ -207,7 +206,7 @@ const RESHAPED_SPEC = SIGNUP_SPEC
   .replace(NOTES_ARTEFACT, 'other-review.png')
   .concat('\n## Open questions\n\nShould the page ask for a name as well?\n');
 
-test('changing the spec outside its criteria, the secrets and the folder leaves the request body byte-identical', { criterion: 'AC-SPEC-28-11' }, async () => {
+test('changing the spec outside its criteria, the secrets and the folder leaves the request body byte-identical', async () => {
   const bodies: string[] = [];
   for (const spec of [SIGNUP_SPEC, RESHAPED_SPEC]) {
     await withPlannedRun({ ...customerKeySetup('openai-chat', replyWithContent('openai-chat', GOLDEN_DRAFT)), spec, secrets: seededSecrets().variables }, (run) => {
@@ -217,7 +216,7 @@ test('changing the spec outside its criteria, the secrets and the folder leaves 
   assert.equal(bodies[1], bodies[0]);
 });
 
-test('counter-example: changing one criterion\'s text changes the request body', { criterion: 'AC-SPEC-28-11' }, async () => {
+test('counter-example: changing one criterion\'s text changes the request body', async () => {
   const bodies: string[] = [];
   const changed = SIGNUP_SPEC.replace(CRITERION_TEXTS.addressTaken, 'When the email address is already registered, the page shall offer to sign in.');
   for (const spec of [SIGNUP_SPEC, changed]) {
@@ -243,7 +242,7 @@ const REFUSED_REPLIES: readonly { readonly name: string; readonly reply: (wire: 
 
 for (const wire of WIRE_FORMATS) {
   for (const refused of REFUSED_REPLIES) {
-    test(`${wire}: ${refused.name} writes no draft and reports plan-rejected`, { criterion: 'AC-SPEC-28-12' }, async () => {
+    test(`${wire}: ${refused.name} writes no draft and reports plan-rejected`, async () => {
       await withPlannedRun(customerKeySetup(wire, refused.reply(wire)), (run) => {
         assert.equal(run.planner.received.length, 1, 'the planner was not called, so the reply was never judged');
         assert.equal(run.workspace.exists(DRAFT_PATH), false, 'a draft was written');
@@ -254,7 +253,7 @@ for (const wire of WIRE_FORMATS) {
     });
   }
 
-  test(`${wire}: counter-example: the recorded reply is written as the draft`, { criterion: 'AC-SPEC-28-12' }, async () => {
+  test(`${wire}: counter-example: the recorded reply is written as the draft`, async () => {
     await withPlannedRun(customerKeySetup(wire, replyWithContent(wire, GOLDEN_DRAFT)), (run) => {
       assert.equal(run.workspace.read(DRAFT_PATH), GOLDEN_DRAFT);
       assert.deepEqual(outputErrorCodes(run), []);
@@ -262,7 +261,7 @@ for (const wire of WIRE_FORMATS) {
   });
 }
 
-test('the script-bearing text is echoed nowhere in what the command prints', { criterion: 'AC-SPEC-28-12' }, async () => {
+test('the script-bearing text is echoed nowhere in what the command prints', async () => {
   await withPlannedRun(customerKeySetup('openai-chat', replyWithContent('openai-chat', SCRIPT_BEARING)), (run) => {
     for (const text of [run.outcome.stdout, run.outcome.stderr, run.printed]) {
       assert.equal(text.includes('document.cookie'), false, text);

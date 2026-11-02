@@ -6,7 +6,6 @@
 // meets every required gate. With --require-checks it also fails unless both `ci` and
 // `tests-apart` are required, which is how branch protection makes tests-apart block a merge.
 // The fixtures in fixtures/branch-gates/ are the planned beta ruleset and one break each.
-// See docs/specs/SPEC-00-repo-seed-and-gates.md.
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -42,56 +41,56 @@ const assertFails = (run: ToolRun, reason: string | RegExp): void => {
 
 // ---- No second person ---------------------------------------------------------------------------
 
-test('the planned beta ruleset passes: it requires only the checks CI produces', { criterion: 'AC-SPEC-00-20' }, () => {
+test('the planned beta ruleset passes: it requires only the checks CI produces', () => {
   assertPasses(checkGates(fixture('planned-beta-ruleset.json')));
 });
 
-test('no rules and no protection, as on main today, pass', { criterion: 'AC-SPEC-00-20' }, () => {
+test('no rules and no protection, as on main today, pass', () => {
   assertPasses(checkGates(EMPTY_RULES, { protection: EMPTY_PROTECTION }));
 });
 
-test('a ruleset that requires one approving review fails', { criterion: 'AC-SPEC-00-20' }, () => {
+test('a ruleset that requires one approving review fails', () => {
   assertFails(checkGates(fixture('review-count-one.json')), /approving review/i);
 });
 
-test('a ruleset that requires a code-owner review fails', { criterion: 'AC-SPEC-00-20' }, () => {
+test('a ruleset that requires a code-owner review fails', () => {
   assertFails(checkGates(fixture('code-owner-review.json')), /code.?owner/i);
 });
 
-test('a ruleset that requires approval of the last push fails', { criterion: 'AC-SPEC-00-20' }, () => {
+test('a ruleset that requires approval of the last push fails', () => {
   assertFails(checkGates(fixture('last-push-approval.json')), /last.?push/i);
 });
 
-test('a ruleset that requires a status check ci.yml does not produce fails, naming the check', { criterion: 'AC-SPEC-00-20' }, () => {
+test('a ruleset that requires a status check ci.yml does not produce fails, naming the check', () => {
   assertFails(checkGates(fixture('unknown-required-check.json')), 'build-and-deploy');
 });
 
-test('classic protection that requires only CI\'s checks passes', { criterion: 'AC-SPEC-00-20' }, () => {
+test('classic protection that requires only CI\'s checks passes', () => {
   assertPasses(checkGates(EMPTY_RULES, { protection: fixture('protection-status-checks-only.json') }));
 });
 
-test('classic protection that requires one approving review fails, even when the ruleset is clean', { criterion: 'AC-SPEC-00-20' }, () => {
+test('classic protection that requires one approving review fails, even when the ruleset is clean', () => {
   assertFails(checkGates(fixture('planned-beta-ruleset.json'), { protection: fixture('protection-review-count-one.json') }), /approving review/i);
 });
 
-test('classic protection that requires a code-owner review fails', { criterion: 'AC-SPEC-00-20' }, () => {
+test('classic protection that requires a code-owner review fails', () => {
   assertFails(checkGates(EMPTY_RULES, { protection: fixture('protection-code-owner-review.json') }), /code.?owner/i);
 });
 
 // ---- tests-apart is required --------------------------------------------------------------------
 
-test('with --require-checks, the planned beta ruleset passes: ci and tests-apart are both required', { criterion: 'AC-SPEC-00-05' }, () => {
+test('with --require-checks, the planned beta ruleset passes: ci and tests-apart are both required', () => {
   assertPasses(checkGates(fixture('planned-beta-ruleset.json'), { requireChecks: true }));
 });
 
-test('with --require-checks, a ruleset that does not require tests-apart fails, naming it', { criterion: 'AC-SPEC-00-05' }, () => {
+test('with --require-checks, a ruleset that does not require tests-apart fails, naming it', () => {
   assertFails(checkGates(fixture('without-tests-apart.json'), { requireChecks: true }), 'tests-apart');
 });
 
-test('counter-example: without --require-checks, the same ruleset passes', { criterion: 'AC-SPEC-00-05' }, () => {
+test('counter-example: without --require-checks, the same ruleset passes', () => {
   assertPasses(checkGates(fixture('without-tests-apart.json')));
 });
 
-test('with --require-checks, no rules at all fail', { criterion: 'AC-SPEC-00-05' }, () => {
+test('with --require-checks, no rules at all fail', () => {
   assertFails(checkGates(EMPTY_RULES, { requireChecks: true }), 'tests-apart');
 });

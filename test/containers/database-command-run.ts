@@ -15,7 +15,6 @@
 //     port; the run's proxy container already joins that bridge. Nothing is published on the host,
 //     so the tests run the same on Docker Desktop and on Linux CI.
 // The host's environment is seeded with fake credentials while a command runs.
-// See docs/specs/SPEC-36-unsafe-plan-features.md ("Database commands" under "Milestone").
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import { join } from 'node:path';

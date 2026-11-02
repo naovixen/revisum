@@ -5,7 +5,6 @@
 // working tree, writes it to `to`, and writes seed-provenance.json with the commit and each
 // file's sha256. It fails, naming the file, when the commit lacks one.
 // A throw-away Git repository built here stands in for the research repository.
-// See docs/specs/SPEC-00-repo-seed-and-gates.md.
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -67,7 +66,7 @@ const PAIRS = [
 type Provenance = Readonly<Record<string, unknown>>;
 type SeededFile = { readonly from?: unknown; readonly to?: unknown; readonly sourceSha256?: unknown };
 
-test('seeding copies each named file byte for byte from the given commit', { criterion: 'AC-SPEC-00-11' }, () => {
+test('seeding copies each named file byte for byte from the given commit', () => {
   product = freshProduct();
   try {
     const run = seed(PAIRS);
@@ -80,7 +79,7 @@ test('seeding copies each named file byte for byte from the given commit', { cri
   }
 });
 
-test('seeding records the research commit and each file\'s source sha256 in seed-provenance.json', { criterion: 'AC-SPEC-00-11' }, () => {
+test('seeding records the research commit and each file\'s source sha256 in seed-provenance.json', () => {
   product = freshProduct();
   try {
     const run = seed(PAIRS);
@@ -98,7 +97,7 @@ test('seeding records the research commit and each file\'s source sha256 in seed
   }
 });
 
-test('seeding fails, naming the file, when the commit does not contain it', { criterion: 'AC-SPEC-00-11' }, () => {
+test('seeding fails, naming the file, when the commit does not contain it', () => {
   product = freshProduct();
   try {
     // The file exists in a later commit and in the working tree, but not in the seeded commit.
@@ -111,7 +110,7 @@ test('seeding fails, naming the file, when the commit does not contain it', { cr
   }
 });
 
-test('counter-example: the same file seeds from the later commit that holds it', { criterion: 'AC-SPEC-00-11' }, () => {
+test('counter-example: the same file seeds from the later commit that holds it', () => {
   product = freshProduct();
   try {
     const later = research.git('rev-parse', 'HEAD');

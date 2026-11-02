@@ -1,6 +1,5 @@
 // A plan written for a newer language than the running engine knows is rejected, never run with
 // the unknown parts skipped: a skipped check would turn into a silent pass.
-// See docs/specs/SPEC-01-plan-language-and-parser.md.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { arch, platform } from 'node:os';
@@ -34,13 +33,13 @@ const insertAt = (plan: JsonRecord, index: number, step: JsonRecord): JsonRecord
 // ---- A newer declared version -------------------------------------------------------------------
 
 for (const version of futureVersions()) {
-  test(`rejects a plan that declares the newer version ${version} with version_unsupported`, { criterion: 'AC-SPEC-01-07' }, () => {
+  test(`rejects a plan that declares the newer version ${version} with version_unsupported`, () => {
     const parsed = parsePlan({ ...signupPlan(), version });
     assert.deepEqual(parsed, { ok: false, error: [{ code: 'version_unsupported', path: '$.version' }] });
   });
 }
 
-test('accepts the same plan at the version the engine runs', { criterion: 'AC-SPEC-01-07' }, () => {
+test('accepts the same plan at the version the engine runs', () => {
   const parsed = parsePlan({ ...signupPlan(), version: CURRENT_VERSION });
   assert.equal(parsed.ok, true, JSON.stringify(parsed));
 });
@@ -48,26 +47,26 @@ test('accepts the same plan at the version the engine runs', { criterion: 'AC-SP
 // ---- A newer step in a current plan -------------------------------------------------------------
 
 for (const step of NEWER_STEPS) {
-  test(`rejects a plan containing the newer step "${String(step['type'])}" rather than skipping it`, { criterion: 'AC-SPEC-01-07' }, () => {
+  test(`rejects a plan containing the newer step "${String(step['type'])}" rather than skipping it`, () => {
     const parsed = parsePlan(insertAt(signupPlan(), 8, step));
     assert.deepEqual(parsed, { ok: false, error: [{ code: 'unknown_step', path: '$.steps[8].type' }] });
   });
 }
 
-test('rejects a newer step nested inside a frame rather than skipping it', { criterion: 'AC-SPEC-01-07' }, () => {
+test('rejects a newer step nested inside a frame rather than skipping it', () => {
   const frameSteps = [...(stepsOf(accountClosurePlan())[3]?.['steps'] as JsonRecord[]), NEWER_STEPS[0]];
   const parsed = parsePlan(withValue(accountClosurePlan(), ['steps', 3, 'steps'], frameSteps));
   assert.deepEqual(parsed, { ok: false, error: [{ code: 'unknown_step', path: '$.steps[3].steps[2].type' }] });
 });
 
-test('rejects a newer step even when it comes after every assertion', { criterion: 'AC-SPEC-01-07' }, () => {
+test('rejects a newer step even when it comes after every assertion', () => {
   const plan = signupPlan();
   const parsed = parsePlan(insertAt(plan, stepsOf(plan).length, { type: 'download', locator: { by: 'text', text: 'Receipt' } }));
   assert.deepEqual(parsed, { ok: false, error: [{ code: 'unknown_step', path: `$.steps[${stepsOf(plan).length}].type` }] });
 });
 
 // Counter-example: without the newer step, every step the author wrote is kept, in order.
-test('a plan without newer steps keeps every step, in order', { criterion: 'AC-SPEC-01-07' }, () => {
+test('a plan without newer steps keeps every step, in order', () => {
   const plan = accountClosurePlan();
   const parsed = parsePlan(plan);
   assert.ok(parsed.ok, JSON.stringify(parsed));
@@ -76,7 +75,7 @@ test('a plan without newer steps keeps every step, in order', { criterion: 'AC-S
 
 // ---- At run time --------------------------------------------------------------------------------
 
-test('a run of a plan with a newer step is refused before any driver is touched', { criterion: 'AC-SPEC-01-07' }, async () => {
+test('a run of a plan with a newer step is refused before any driver is touched', async () => {
   let calls = 0;
   const spy: BrowserDriver = {
     info: { id: 'playwright', version: 'spy', protocol: 'none' },

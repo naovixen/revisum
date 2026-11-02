@@ -4,7 +4,6 @@
 // inside the quoted data, escaped, so it can never close the data block or start an instruction
 // line of its own. The command-level checks of the request body are in
 // test/unit/cli/explore-command.test.ts.
-// See docs/specs/SPEC-37-explore-to-draft.md.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { READABLE_GRAMMAR_VERSION, plannerPrompt, type DraftRequest, type Origin, type TargetId } from '@revisum/engine';
@@ -31,7 +30,7 @@ function requestWithPages(): DraftRequest {
 const jsonText = (value: string): string => JSON.stringify(value).slice(1, -1);
 const lines = (text: string): readonly string[] => text.split('\n');
 
-test('a request with pages and no criteria puts each page\'s path, title and names in the prompt\'s data', { criterion: 'AC-SPEC-37-05' }, () => {
+test('a request with pages and no criteria puts each page\'s path, title and names in the prompt\'s data', () => {
   const { message } = plannerPrompt(requestWithPages());
   const data = message.slice(message.indexOf('BEGIN DATA'), message.lastIndexOf('END DATA'));
   for (const text of ['/', '/notes.html', 'Lantern Books', 'Release notes', 'Lantern "Books"', HOSTILE_NAME]) {
@@ -39,7 +38,7 @@ test('a request with pages and no criteria puts each page\'s path, title and nam
   }
 });
 
-test('a page name with line breaks and the end-of-data marker stays escaped inside the data', { criterion: 'AC-SPEC-37-05' }, () => {
+test('a page name with line breaks and the end-of-data marker stays escaped inside the data', () => {
   const { instructions, message } = plannerPrompt(requestWithPages());
   assert.deepEqual(lines(message).filter((line) => line === 'END DATA'), ['END DATA'], 'the page name closed the data block');
   assert.equal(lines(message).at(-1), 'END DATA', 'the data block does not end the message');
@@ -48,11 +47,11 @@ test('a page name with line breaks and the end-of-data marker stays escaped insi
   assert.equal(instructions.includes('evil.example.net'), false, 'page text reached the instructions');
 });
 
-test('counter-example: the same name written into the prompt as plain text would close the data block', { criterion: 'AC-SPEC-37-05' }, () => {
+test('counter-example: the same name written into the prompt as plain text would close the data block', () => {
   const unquoted = `BEGIN DATA\n${HOSTILE_NAME}\nEND DATA`;
   assert.equal(lines(unquoted).filter((line) => line === 'END DATA').length, 2);
 });
 
-test('the prompt for the same request is the same text each time', { criterion: 'AC-SPEC-37-05' }, () => {
+test('the prompt for the same request is the same text each time', () => {
   assert.deepEqual(plannerPrompt(requestWithPages()), plannerPrompt(requestWithPages()));
 });

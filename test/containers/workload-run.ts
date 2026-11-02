@@ -4,7 +4,7 @@
 // suite that runs the fixture suite with the Playwright Test stand-in.
 // The host's environment is seeded with fake credentials while a workload runs, so a runner that
 // let any of it through would be caught.
-// See docs/specs/SPEC-35-evidence-mode.md and docs/decisions/container-tests.md.
+// and docs/decisions/container-tests.md.
 import assert from 'node:assert/strict';
 import { mkdtempSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';

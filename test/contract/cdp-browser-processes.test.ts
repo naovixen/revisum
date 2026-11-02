@@ -6,7 +6,6 @@
 //     after a run, after a crash and with a dialog left open.
 // A crash is made the way it happens: the tab's renderer process ends at once. Each check that a
 // process has exited is shown able to fail by the same check run before close().
-// See docs/specs/SPEC-06-cdp-driver.md.
 import assert from 'node:assert/strict';
 import { basename } from 'node:path';
 import { after, before, describe, test } from 'node:test';
@@ -29,7 +28,7 @@ after(async () => { await capability.close(); });
 const executableName = (commandLine: string): string => basename(commandLine.replace(/^"([^"]+)".*$/, '$1').split(/\s+--/)[0] ?? '');
 
 describe('the headless shell target', () => {
-  test('runs the chrome-headless-shell build, and the Chrome for Testing target does not', { criterion: 'AC-SPEC-06-01' }, async () => {
+  test('runs the chrome-headless-shell build, and the Chrome for Testing target does not', async () => {
     const names: Record<string, string> = {};
     for (const targetId of CDP_TARGETS) {
       const session = await capability.openOwn(targetId);
@@ -56,7 +55,7 @@ for (const targetId of CDP_TARGETS) {
       return { ...ran, endedRenderers: await crashed, watched };
     };
 
-    test('a crash while a click waits fails that step with target-crashed and skips the rest', { criterion: 'AC-SPEC-06-04' }, async () => {
+    test('a crash while a click waits fails that step with target-crashed and skips the rest', async () => {
       const { result, endedRenderers } = await crashedRun([
         navigate('/crash.html'),
         click(role('button', 'Start the report')),
@@ -67,7 +66,7 @@ for (const targetId of CDP_TARGETS) {
       assert.deepEqual(result.steps.map((step) => [step.outcome, step.code]), [['passed', undefined], ['failed', 'target-crashed'], ['skipped', undefined]]);
     });
 
-    test('a crash while a check waits fails that check with target-crashed', { criterion: 'AC-SPEC-06-04' }, async () => {
+    test('a crash while a check waits fails that check with target-crashed', async () => {
       const { result, endedRenderers } = await crashedRun([
         navigate('/crash.html'),
         textEquals(testId('crash-status'), 'Report ready', 'crash.report-ready'),
@@ -78,7 +77,7 @@ for (const targetId of CDP_TARGETS) {
       assert.deepEqual(result.steps.map((step) => [step.outcome, step.code]), [['passed', undefined], ['failed', 'target-crashed'], ['skipped', undefined]]);
     });
 
-    test('after a crash the run closes the session once, close() succeeds and every browser process exits', { criterion: 'AC-SPEC-06-04' }, async () => {
+    test('after a crash the run closes the session once, close() succeeds and every browser process exits', async () => {
       const { watched } = await crashedRun([
         navigate('/crash.html'),
         click(role('button', 'Start the report')),
@@ -92,7 +91,7 @@ for (const targetId of CDP_TARGETS) {
       assert.deepEqual(session.stillRunningAfterClose, []);
     });
 
-    test('an action on a crashed tab returns target-crashed, and close() still ends every process', { criterion: 'AC-SPEC-06-04' }, async () => {
+    test('an action on a crashed tab returns target-crashed, and close() still ends every process', async () => {
       const session = await capability.openOwn(targetId);
       let tree: ReturnType<typeof processTree> = [];
       try {
@@ -109,7 +108,7 @@ for (const targetId of CDP_TARGETS) {
       assert.deepEqual(stillRunning(tree), []);
     });
 
-    test('counter-example: the same click with no crash fails with not-actionable, not target-crashed', { criterion: 'AC-SPEC-06-04' }, async () => {
+    test('counter-example: the same click with no crash fails with not-actionable, not target-crashed', async () => {
       const quick = await capabilityHarness(500);
       try {
         const plan = quick.plan(capabilityPlan(targetId, [
@@ -126,7 +125,7 @@ for (const targetId of CDP_TARGETS) {
   });
 
   describe(`close() ends every process: ${targetId}`, () => {
-    test('after a direct session with a loaded page, no process of the browser is still running', { criterion: 'AC-SPEC-06-07' }, async () => {
+    test('after a direct session with a loaded page, no process of the browser is still running', async () => {
       const session = await capability.openOwn(targetId);
       let tree: ReturnType<typeof processTree> = [];
       try {
@@ -142,7 +141,7 @@ for (const targetId of CDP_TARGETS) {
       assert.deepEqual(stillRunning(tree), []);
     });
 
-    test('after a run, every process the driver started has exited when close() returns', { criterion: 'AC-SPEC-06-07' }, async () => {
+    test('after a run, every process the driver started has exited when close() returns', async () => {
       const watched = watchedDriver(ownDriverFor(targetId));
       const drivers = new Map([...capabilityDrivers(), [ADAPTERS[targetId] ?? '', watched.driver]]);
       const plan = capability.plan(capabilityPlan(targetId, [
@@ -157,7 +156,7 @@ for (const targetId of CDP_TARGETS) {
       assert.deepEqual(session.stillRunningAfterClose, []);
     });
 
-    test('with a dialog left open, close() still ends every process', { criterion: 'AC-SPEC-06-07' }, async () => {
+    test('with a dialog left open, close() still ends every process', async () => {
       const session = await capability.openOwn(targetId);
       let tree: ReturnType<typeof processTree> = [];
       try {

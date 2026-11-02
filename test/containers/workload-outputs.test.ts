@@ -6,7 +6,6 @@
 //   - Standard output is capped at 1 MiB and says when it was cut short.
 //   - A command still running at its timeout is stopped: the runner returns timedOut and leaves no
 //     container or network behind (AC-13).
-// See docs/specs/SPEC-35-evidence-mode.md.
 import assert from 'node:assert/strict';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -28,14 +27,14 @@ before(async () => { image = await fixtureWorkloadImage(); }, { timeout: TIMEOUT
 
 // ---- Secrets the suite prints --------------------------------------------------------------------------
 
-test('a secret the fixture test prints and throws appears in the result in no form', { criterion: 'AC-SPEC-35-08', timeout: TIMEOUT }, async () => {
+test('a secret the fixture test prints and throws appears in the result in no form', { timeout: TIMEOUT }, async () => {
   const secretValue = fakeSecretValue();
   const { result } = await runFixtureSuite(image, secretValue);
   assert.equal(result.state, 'Failed', JSON.stringify(result));
   assert.deepEqual(echoesIn(JSON.stringify(result), secretValue), []);
 });
 
-test('the leak scan finds no echo in the real result, and finds the planted canary', { criterion: 'AC-SPEC-35-08', timeout: TIMEOUT }, async () => {
+test('the leak scan finds no echo in the real result, and finds the planted canary', { timeout: TIMEOUT }, async () => {
   const secretValue = fakeSecretValue();
   const { result } = await runFixtureSuite(image, secretValue);
   const folder = outputFolder();
@@ -46,19 +45,19 @@ test('the leak scan finds no echo in the real result, and finds the planted cana
   assert.ok(leakScanner().scan([join(folder, 'canary.txt')], [secret]).length >= 1, 'the scan cannot see the planted canary');
 });
 
-test('counter-example: the fixture test\'s error message reaches the result, with only the secret taken out', { criterion: 'AC-SPEC-35-08', timeout: TIMEOUT }, async () => {
+test('counter-example: the fixture test\'s error message reaches the result, with only the secret taken out', { timeout: TIMEOUT }, async () => {
   const { result } = await runFixtureSuite(image, fakeSecretValue());
   const message = (result.suite?.findings ?? []).flatMap((finding) => finding.message).join('\n');
   assert.ok(message.includes(MESSAGE_TEXT), `the error message was dropped: ${message}`);
 });
 
-test('standard output past 1 MiB is cut at 1 MiB and marked truncated', { criterion: 'AC-SPEC-35-08', timeout: TIMEOUT }, async () => {
+test('standard output past 1 MiB is cut at 1 MiB and marked truncated', { timeout: TIMEOUT }, async () => {
   const outcome = await runInWorkload(image, { argv: ['node', '-e', `process.stdout.write('x'.repeat(${2 * MEBIBYTE}))`] });
   assert.ok(outcome.stdout.bytes.length <= MEBIBYTE, `${outcome.stdout.bytes.length} bytes were kept`);
   assert.equal(outcome.stdout.truncated, true);
 });
 
-test('counter-example: short output is kept whole and not marked truncated', { criterion: 'AC-SPEC-35-08', timeout: TIMEOUT }, async () => {
+test('counter-example: short output is kept whole and not marked truncated', { timeout: TIMEOUT }, async () => {
   const outcome = await runInWorkload(image, { argv: ['node', '-e', 'console.log("short"); console.error("also short")'] });
   assert.equal(printed(outcome.stdout).trim(), 'short');
   assert.equal(printed(outcome.stderr).trim(), 'also short');
@@ -72,7 +71,7 @@ const TIMEOUT_MILLISECONDS = 5_000;
 // command that never stops would.
 const STOP_ALLOWANCE_MILLISECONDS = 120_000;
 
-test('a command still running at its timeout is stopped, and the runner says it timed out', { criterion: 'AC-SPEC-35-13', timeout: TIMEOUT }, async () => {
+test('a command still running at its timeout is stopped, and the runner says it timed out', { timeout: TIMEOUT }, async () => {
   const containersBefore = dockerIds('containers');
   const networksBefore = dockerIds('networks');
   const started = Date.now();
@@ -86,7 +85,7 @@ test('a command still running at its timeout is stopped, and the runner says it 
   assert.deepEqual(newIds(networksBefore, dockerIds('networks')), [], 'a network was left behind');
 });
 
-test('counter-example: a command that ends within its timeout is not marked timed out', { criterion: 'AC-SPEC-35-13', timeout: TIMEOUT }, async () => {
+test('counter-example: a command that ends within its timeout is not marked timed out', { timeout: TIMEOUT }, async () => {
   const outcome = await runInWorkload(image, { argv: ['node', '-e', 'console.log("done")'], timeoutMilliseconds: 60_000 });
   assert.equal(outcome.timedOut, false);
   assert.equal(outcome.exitCode, 0);

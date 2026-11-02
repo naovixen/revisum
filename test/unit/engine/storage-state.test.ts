@@ -2,8 +2,7 @@
 // `storageState: { secretName }`; the secret's value is the storage-state JSON. Core resolves it
 // through the SecretStore like any secret, records only its name and sha256 in the manifest, and
 // no cookie or token value from it reaches any output. Loading it into a real browser session
-// comes with SPEC-06, so it is not tested here.
-// See docs/specs/SPEC-04-secrets-and-redaction.md.
+// comes with the CDP driver, so it is not tested here.
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -24,20 +23,20 @@ after(() => { rmSync(folder, { recursive: true, force: true }); });
 
 // ---- Parsing ------------------------------------------------------------------------------------
 
-test('a plan naming declared storage state parses and keeps the name', { criterion: 'AC-SPEC-04-06' }, () => {
+test('a plan naming declared storage state parses and keeps the name', () => {
   const parsed = planParser(secretProject([SAVED]))(withStorageState(SAVED));
   assert.ok(parsed.ok, `rejected: ${parsed.ok ? '' : JSON.stringify(parsed.error)}`);
   assert.deepEqual(Reflect.get(parsed.value, 'storageState'), { secretName: SAVED });
 });
 
-test('a plan naming storage state the project does not declare is rejected as unknown_value', { criterion: 'AC-SPEC-04-06' }, () => {
+test('a plan naming storage state the project does not declare is rejected as unknown_value', () => {
   const parsed = planParser(secretProject(['OTHER_SESSION']))(withStorageState(SAVED));
   assert.equal(parsed.ok, false);
   if (parsed.ok) return;
   assert.deepEqual(parsed.error.filter((error) => error.path.startsWith('$.storageState')), [{ code: 'unknown_value', path: '$.storageState.secretName' }]);
 });
 
-test('a plan holding literal storage-state JSON, as an object or as text, is rejected without echoing it', { criterion: 'AC-SPEC-04-06' }, () => {
+test('a plan holding literal storage-state JSON, as an object or as text, is rejected without echoing it', () => {
   const state = fakeStorageState();
   const parse = planParser(secretProject([SAVED]));
   for (const literal of [JSON.parse(state.json), state.json]) {
@@ -52,7 +51,7 @@ test('a plan holding literal storage-state JSON, as an object or as text, is rej
 
 // ---- Resolution and the manifest ----------------------------------------------------------------
 
-test('the manifest records the storage state by name and sha256 only', { criterion: 'AC-SPEC-04-06' }, async () => {
+test('the manifest records the storage state by name and sha256 only', async () => {
   const state = fakeStorageState();
   const ran = await runWithSecrets([SAVED], withStorageState(SAVED), { [SAVED]: state.json }, quietDriver());
   assert.ok(ran.result.manifest, 'the run reached its manifest');
@@ -61,14 +60,14 @@ test('the manifest records the storage state by name and sha256 only', { criteri
   assert.deepEqual([...echoesIn(manifest, state.cookieValue), ...echoesIn(manifest, state.tokenValue)], []);
 });
 
-test('a different storage state under the same name changes the recorded sha256', { criterion: 'AC-SPEC-04-06' }, async () => {
+test('a different storage state under the same name changes the recorded sha256', async () => {
   const first = await runWithSecrets([SAVED], withStorageState(SAVED), { [SAVED]: fakeStorageState().json }, quietDriver());
   const second = await runWithSecrets([SAVED], withStorageState(SAVED), { [SAVED]: fakeStorageState().json }, quietDriver());
   assert.notDeepEqual(manifestField(first.result, 'storageState'), manifestField(second.result, 'storageState'));
   assert.notEqual(first.result.manifestHash, second.result.manifestHash);
 });
 
-test('storage state the store cannot resolve ends the run with secret-missing before any driver opens', { criterion: 'AC-SPEC-04-06' }, async () => {
+test('storage state the store cannot resolve ends the run with secret-missing before any driver opens', async () => {
   const spy = spyDriver();
   const ran = await runWithSecrets([SAVED], withStorageState(SAVED), {}, spy);
   assert.equal(spy.opens, 0, 'no browser session was opened');
@@ -76,7 +75,7 @@ test('storage state the store cannot resolve ends the run with secret-missing be
   assert.ok(JSON.stringify(ran.result.refusal).includes(SAVED));
 });
 
-test('a run whose plan names no storage state has no storageState field in its manifest', { criterion: 'AC-SPEC-04-06' }, async () => {
+test('a run whose plan names no storage state has no storageState field in its manifest', async () => {
   const ran = await runWithSecrets([SAVED], secretFillPlan([]), { [SAVED]: fakeStorageState().json }, quietDriver());
   assert.ok(ran.result.manifest, 'the run reached its manifest');
   assert.equal(Object.hasOwn(ran.result.manifest, 'storageState'), false, JSON.stringify(ran.result.manifest));
@@ -84,7 +83,7 @@ test('a run whose plan names no storage state has no storageState field in its m
 
 // ---- Leak scan over planted storage-state values ------------------------------------------------
 
-test('the leak scan finds its canary and no cookie or token value from the storage state in the outputs', { criterion: 'AC-SPEC-04-06' }, async () => {
+test('the leak scan finds its canary and no cookie or token value from the storage state in the outputs', async () => {
   const state = fakeStorageState();
   const ran = await runWithSecrets(
     [SAVED, 'ACCOUNT_TOKEN'], secretFillPlan(['ACCOUNT_TOKEN'], { storageState: { secretName: SAVED } }),

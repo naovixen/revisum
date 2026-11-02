@@ -1,5 +1,5 @@
 // Declared calls in a run, against a fake ServiceCaller in place of runner's (which, with the
-// egress proxy, comes with SPEC-07). The engine builds each request, judges its status against the
+// egress proxy, comes later). The engine builds each request, judges its status against the
 // declaration, reads response fields, polls backend checks and runs cleanup:
 //   - a failed `call` ends the run Errored, skips the later steps, and cleanup still runs;
 //   - a failed `expectBackend` ends it Failed; read checks are polled until they pass or
@@ -8,7 +8,6 @@
 //     and a failing one is recorded cleanup-failed without changing the verdict;
 //   - secrets are resolved before any call, and no secret, header value or response body reaches
 //     the result or the log, which holds only the logging manifest's fields.
-// See docs/specs/SPEC-32-declared-service-calls.md.
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -32,7 +31,7 @@ const orderCreationAnswers = (reply: Reply) => shopWith((request) => (requestLin
 
 // ---- Run-time type checks --------------------------------------------------------------------------
 
-test('a generated value that fails its parameter\'s type fails the call with parameter-invalid, sending nothing', { criterion: 'AC-SPEC-32-04' }, async () => {
+test('a generated value that fails its parameter\'s type fails the call with parameter-invalid, sending nothing', async () => {
   // A unique text is "order-<unique part>": its hyphen is not allowed in an identifier.
   const values = { orderCode: { kind: 'uniqueText', prefix: 'order' } };
   const ran = await runWithCalls(callPlanOf([call('getOrder', { orderId: { valueName: 'orderCode' } }), NAVIGATE], { values }));
@@ -41,7 +40,7 @@ test('a generated value that fails its parameter\'s type fails the call with par
   assert.deepEqual(lines(ran.requests), [], 'no request was sent');
 });
 
-test('a remembered value that fails the next call\'s type fails that call with parameter-invalid', { criterion: 'AC-SPEC-32-04' }, async () => {
+test('a remembered value that fails the next call\'s type fails that call with parameter-invalid', async () => {
   const hostileId = shopWith((request) => (requestLine(request) === 'POST /api/orders' ? jsonReply(201, { id: "17'; DROP TABLE orders; --", status: 'pending' }) : undefined));
   const ran = await runWithCalls(callPlanOf([CREATE_ORDER, call('getOrder', { orderId: { valueName: 'orderId' } })]), { route: hostileId });
   assert.deepEqual(stepLines(ran.result).slice(0, 2), ['call passed', 'call failed parameter-invalid']);
@@ -49,7 +48,7 @@ test('a remembered value that fails the next call\'s type fails that call with p
 });
 
 // Counter-example: the same plan, when the shop gives an identifier, sends both calls.
-test('a remembered identifier reaches the next call\'s path', { criterion: 'AC-SPEC-32-04' }, async () => {
+test('a remembered identifier reaches the next call\'s path', async () => {
   const ran = await runWithCalls(callPlanOf([CREATE_ORDER, call('getOrder', { orderId: { valueName: 'orderId' } })]));
   assert.equal(ran.result.state, 'Passed', JSON.stringify(ran.result.steps));
   assert.deepEqual(lines(ran.requests), ['POST /api/orders', `GET /api/orders/${ORDER_ID}`]);
@@ -66,14 +65,14 @@ const FAILED_CALLS: readonly { readonly name: string; readonly reply: Reply; rea
 ];
 
 for (const failed of FAILED_CALLS) {
-  test(`a call that gets ${failed.name} ends the run Errored with ${failed.code}, skipping later steps`, { criterion: 'AC-SPEC-32-07' }, async () => {
+  test(`a call that gets ${failed.name} ends the run Errored with ${failed.code}, skipping later steps`, async () => {
     const ran = await runWithCalls(withCleanup(callPlanOf([NAVIGATE, CREATE_ORDER, NAVIGATE]), [RESET_SHOP]), { route: orderCreationAnswers(failed.reply) });
     assert.equal(ran.result.state, 'Errored');
     assert.deepEqual(stepLines(ran.result), ['navigate passed', `call failed ${failed.code}`, 'navigate skipped', 'expect skipped']);
     assert.deepEqual(ran.recording.navigations.length, 1, 'no step after the failed call reached the page');
   });
 
-  test(`after a call that gets ${failed.name}, cleanup still runs`, { criterion: 'AC-SPEC-32-07' }, async () => {
+  test(`after a call that gets ${failed.name}, cleanup still runs`, async () => {
     const ran = await runWithCalls(withCleanup(callPlanOf([CREATE_ORDER]), [RESET_SHOP]), { route: orderCreationAnswers(failed.reply) });
     assert.deepEqual(lines(ran.requests), ['POST /api/orders', 'POST /api/test/reset']);
     assert.deepEqual(cleanupRecords(ran.result).map((record) => record.outcome), ['passed']);
@@ -81,21 +80,21 @@ for (const failed of FAILED_CALLS) {
 }
 
 // Counter-example: the declared status passes, and the run goes on.
-test('a call that gets a declared success status passes, and the steps after it run', { criterion: 'AC-SPEC-32-07' }, async () => {
+test('a call that gets a declared success status passes, and the steps after it run', async () => {
   const ran = await runWithCalls(callPlanOf([NAVIGATE, CREATE_ORDER, NAVIGATE]));
   assert.equal(ran.result.state, 'Passed');
   assert.deepEqual(stepLines(ran.result), ['navigate passed', 'call passed', 'navigate passed', 'expect passed']);
 });
 
-test('a status the declaration lists as success, such as 404 for deleteOrder, passes', { criterion: 'AC-SPEC-32-07' }, async () => {
+test('a status the declaration lists as success, such as 404 for deleteOrder, passes', async () => {
   const gone = shopWith((request) => (request.method === 'DELETE' ? emptyReply(404) : undefined));
   const ran = await runWithCalls(callPlanOf([CREATE_ORDER, DELETE_ORDER]), { route: gone });
   assert.equal(ran.result.state, 'Passed', JSON.stringify(ran.result.steps));
 });
 
-// The real caller never follows a redirect (with SPEC-07); the engine judges the redirect's own
+// The real caller never follows a redirect; the engine judges the redirect's own
 // status against the declaration, like any other status.
-test('a redirect status is judged against successStatuses: undeclared it fails, declared it passes', { criterion: 'AC-SPEC-32-05' }, async () => {
+test('a redirect status is judged against successStatuses: undeclared it fails, declared it passes', async () => {
   const redirecting = shopWith((request) => (requestLine(request) === 'POST /api/test/reset' ? emptyReply(303) : undefined));
   const undeclared = await runWithCalls(callPlanOf([RESET_SHOP]), { route: redirecting });
   assert.deepEqual(stepLines(undeclared.result).slice(0, 1), ['call failed unexpected-status']);
@@ -116,28 +115,28 @@ test('a redirect status is judged against successStatuses: undeclared it fails, 
 const CLEANUP = [DELETE_ORDER, RESET_SHOP];
 const CLEANUP_LINES = [`DELETE /api/orders/${ORDER_ID}`, 'POST /api/test/reset'];
 
-test('when the run passes, its cleanup calls run in order after the steps', { criterion: 'AC-SPEC-32-08' }, async () => {
+test('when the run passes, its cleanup calls run in order after the steps', async () => {
   const ran = await runWithCalls(withCleanup(callPlanOf([CREATE_ORDER, ORDER_PAID]), CLEANUP));
   assert.equal(ran.result.state, 'Passed');
   assert.deepEqual(lines(ran.requests), ['POST /api/orders', `GET /api/orders/${ORDER_ID}`, ...CLEANUP_LINES]);
   assert.deepEqual(cleanupRecords(ran.result).map((record) => record.outcome), ['passed', 'passed']);
 });
 
-test('when the run fails, its cleanup calls still run in order', { criterion: 'AC-SPEC-32-08' }, async () => {
+test('when the run fails, its cleanup calls still run in order', async () => {
   const pending = shopWith((request) => (request.method === 'GET' ? jsonReply(200, { status: 'pending', total: 42 }) : undefined));
   const ran = await runWithCalls(withCleanup(callPlanOf([CREATE_ORDER, ORDER_PAID]), CLEANUP), { route: pending });
   assert.equal(ran.result.state, 'Failed');
   assert.deepEqual(lines(ran.requests).slice(-2), CLEANUP_LINES);
 });
 
-test('when the run errors after the value is set, its cleanup calls still run in order', { criterion: 'AC-SPEC-32-08' }, async () => {
+test('when the run errors after the value is set, its cleanup calls still run in order', async () => {
   const brokenRead = shopWith((request) => (request.method === 'GET' ? failedReply('service-unreachable') : undefined));
   const ran = await runWithCalls(withCleanup(callPlanOf([CREATE_ORDER, call('getOrder', { orderId: { valueName: 'orderId' } })]), CLEANUP), { route: brokenRead });
   assert.equal(ran.result.state, 'Errored');
   assert.deepEqual(lines(ran.requests).slice(-2), CLEANUP_LINES);
 });
 
-test('a cleanup call needing a value never set, because the run stopped first, is recorded skipped and not sent', { criterion: 'AC-SPEC-32-08' }, async () => {
+test('a cleanup call needing a value never set, because the run stopped first, is recorded skipped and not sent', async () => {
   const ran = await runWithCalls(withCleanup(callPlanOf([CREATE_ORDER]), CLEANUP), { route: orderCreationAnswers(jsonReply(500, {})) });
   assert.equal(ran.result.state, 'Errored');
   assert.deepEqual(cleanupRecords(ran.result).map((record) => record.outcome), ['skipped', 'passed']);
@@ -147,7 +146,7 @@ test('a cleanup call needing a value never set, because the run stopped first, i
 
 const failingReset = shopWith((request) => (requestLine(request) === 'POST /api/test/reset' ? jsonReply(500, {}) : undefined));
 
-test('a failing cleanup call is recorded cleanup-failed, and the passing verdict does not change', { criterion: 'AC-SPEC-32-08' }, async () => {
+test('a failing cleanup call is recorded cleanup-failed, and the passing verdict does not change', async () => {
   const plan = withCleanup(callPlanOf([CREATE_ORDER, ORDER_PAID]), CLEANUP);
   const failing = await runWithCalls(plan, { route: failingReset });
   const succeeding = await runWithCalls(plan);
@@ -157,7 +156,7 @@ test('a failing cleanup call is recorded cleanup-failed, and the passing verdict
   assert.deepEqual(stepLines(failing.result), stepLines(succeeding.result));
 });
 
-test('a failing cleanup call does not change a failing verdict either', { criterion: 'AC-SPEC-32-08' }, async () => {
+test('a failing cleanup call does not change a failing verdict either', async () => {
   const pendingAndFailingReset = shopWith((request, earlier) => {
     if (request.method === 'GET') return jsonReply(200, { status: 'pending', total: 42 });
     return failingReset(request, earlier);
@@ -167,13 +166,13 @@ test('a failing cleanup call does not change a failing verdict either', { criter
   assert.deepEqual(cleanupRecords(ran.result), [{ outcome: 'failed', code: 'cleanup-failed' }]);
 });
 
-test('a failing cleanup call raises a review item; a clean cleanup raises none', { criterion: 'AC-SPEC-32-08' }, async () => {
+test('a failing cleanup call raises a review item; a clean cleanup raises none', async () => {
   const plan = withCleanup(callPlanOf([CREATE_ORDER]), CLEANUP);
   assert.deepEqual(reviewItemCodes((await runWithCalls(plan, { route: failingReset })).result), ['cleanup-failed']);
   assert.deepEqual(reviewItemCodes((await runWithCalls(plan)).result), []);
 });
 
-test('a failing cleanup call does not stop the cleanup calls after it', { criterion: 'AC-SPEC-32-08' }, async () => {
+test('a failing cleanup call does not stop the cleanup calls after it', async () => {
   const ran = await runWithCalls(withCleanup(callPlanOf([CREATE_ORDER]), [RESET_SHOP, DELETE_ORDER]), { route: failingReset });
   assert.deepEqual(lines(ran.requests), ['POST /api/orders', 'POST /api/test/reset', `DELETE /api/orders/${ORDER_ID}`]);
 });
@@ -183,7 +182,7 @@ test('a failing cleanup call does not stop the cleanup calls after it', { criter
 const BACKEND_CHECK_TIMEOUT = 2000;
 const shortChecks = callProjectFile({}, { backendCheckTimeoutMilliseconds: BACKEND_CHECK_TIMEOUT });
 
-test('an expectBackend whose field matches only on the third poll passes', { criterion: 'AC-SPEC-32-09' }, async () => {
+test('an expectBackend whose field matches only on the third poll passes', async () => {
   const paidOnThirdRead = shopWith((request, earlier) => {
     if (request.method !== 'GET') return undefined;
     const readsBefore = earlier.filter((sent) => sent.method === 'GET').length;
@@ -196,7 +195,7 @@ test('an expectBackend whose field matches only on the third poll passes', { cri
   assert.ok(ran.clock.elapsed() < BACKEND_CHECK_TIMEOUT, `the check waited ${ran.clock.elapsed()} ms`);
 });
 
-test('an expectBackend whose field never matches fails with assertion-failed once the check timeout runs out', { criterion: 'AC-SPEC-32-09' }, async () => {
+test('an expectBackend whose field never matches fails with assertion-failed once the check timeout runs out', async () => {
   const neverPaid = shopWith((request) => (request.method === 'GET' ? jsonReply(200, { status: 'pending', total: 42 }) : undefined));
   const ran = await runWithCalls(callPlanOf([CREATE_ORDER, ORDER_PAID]), { route: neverPaid, projectFile: shortChecks });
   assert.deepEqual(stepLines(ran.result).slice(0, 3), ['call passed', 'expectBackend failed assertion-failed', 'expect skipped']);
@@ -206,7 +205,7 @@ test('an expectBackend whose field never matches fails with assertion-failed onc
   assert.ok(sentTo(ran.requests, `GET /api/orders/${ORDER_ID}`) > 1, 'the read was polled');
 });
 
-test('each backend assertion kind passes on a matching field and fails on another', { criterion: 'AC-SPEC-32-09' }, async () => {
+test('each backend assertion kind passes on a matching field and fails on another', async () => {
   const cases: readonly [string, JsonRecord, boolean][] = [
     ['status', { kind: 'equals', value: 'paid' }, true], ['status', { kind: 'equals', value: 'Paid' }, false],
     ['status', { kind: 'contains', value: 'ai' }, true], ['status', { kind: 'contains', value: 'due' }, false],
@@ -220,7 +219,7 @@ test('each backend assertion kind passes on a matching field and fails on anothe
 });
 
 for (const [name, reply] of [['times out', failedReply('call-timeout')], ['gets an unexpected status', jsonReply(503, {})]] as const) {
-  test(`a write call that ${name} is sent exactly once`, { criterion: 'AC-SPEC-32-09' }, async () => {
+  test(`a write call that ${name} is sent exactly once`, async () => {
     const ran = await runWithCalls(callPlanOf([CREATE_ORDER]), { route: orderCreationAnswers(reply), projectFile: shortChecks });
     assert.equal(ran.result.state, 'Errored');
     assert.equal(sentTo(ran.requests, 'POST /api/orders'), 1);
@@ -235,13 +234,13 @@ for (const [name, reply, code] of [
   ['labelled JSON but not JSON', textReply(201, 'application/json', '{"id": "ord_1042",'), 'response-not-json'],
   ['JSON without the remembered field', jsonReply(201, { status: 'pending' }), 'field-missing'],
 ] as const) {
-  test(`a call whose response is ${name} fails with ${code}`, { criterion: 'AC-SPEC-32-10' }, async () => {
+  test(`a call whose response is ${name} fails with ${code}`, async () => {
     const ran = await runWithCalls(callPlanOf([CREATE_ORDER]), { route: orderCreationAnswers(reply) });
     assert.deepEqual(stepLines(ran.result).slice(0, 1), [`call failed ${code}`]);
   });
 }
 
-test('a call that remembers nothing passes on a non-JSON response with a declared status', { criterion: 'AC-SPEC-32-10' }, async () => {
+test('a call that remembers nothing passes on a non-JSON response with a declared status', async () => {
   const htmlReset = shopWith((request) => (requestLine(request) === 'POST /api/test/reset' ? textReply(204, 'text/html', '') : undefined));
   const ran = await runWithCalls(callPlanOf([RESET_SHOP]), { route: htmlReset });
   assert.equal(ran.result.state, 'Passed', JSON.stringify(ran.result.steps));
@@ -249,7 +248,7 @@ test('a call that remembers nothing passes on a non-JSON response with a declare
 
 // ---- Secrets -----------------------------------------------------------------------------------------------
 
-test('a header secret the store cannot resolve ends the run before any call or page, with secret-missing', { criterion: 'AC-SPEC-32-12' }, async () => {
+test('a header secret the store cannot resolve ends the run before any call or page, with secret-missing', async () => {
   const environment = { [ADMIN_LOGIN_SECRET]: SECRET_VALUES[ADMIN_LOGIN_SECRET] ?? '', [ADMIN_PASSWORD_SECRET]: SECRET_VALUES[ADMIN_PASSWORD_SECRET] ?? '' };
   const ran = await runWithCalls(withCleanup(callPlanOf([NAVIGATE, CREATE_ORDER]), [RESET_SHOP]), { environment });
   assert.equal(ran.result.state, 'Refused');
@@ -260,7 +259,7 @@ test('a header secret the store cannot resolve ends the run before any call or p
   for (const value of Object.values(environment)) assert.deepEqual(echoesIn(ran.everything, value), [], 'a resolvable secret was echoed');
 });
 
-test('a secret argument or a cleanup call\'s secret that cannot be resolved ends the run before any call', { criterion: 'AC-SPEC-32-12' }, async () => {
+test('a secret argument or a cleanup call\'s secret that cannot be resolved ends the run before any call', async () => {
   const withoutPassword = { [TOKEN_SECRET]: SECRET_VALUES[TOKEN_SECRET] ?? '', [ADMIN_LOGIN_SECRET]: SECRET_VALUES[ADMIN_LOGIN_SECRET] ?? '' };
   const signIn = call('signInAsAdmin', { adminPassword: { secretName: ADMIN_PASSWORD_SECRET } });
   const byArgument = await runWithCalls(callPlanOf([CREATE_ORDER, signIn]), { environment: withoutPassword });
@@ -274,7 +273,7 @@ test('a secret argument or a cleanup call\'s secret that cannot be resolved ends
 });
 
 // Counter-example: with every secret resolvable, the same plans make their calls.
-test('control: when every secret resolves, the calls are made', { criterion: 'AC-SPEC-32-12' }, async () => {
+test('control: when every secret resolves, the calls are made', async () => {
   const ran = await runWithCalls(withCleanup(callPlanOf([CREATE_ORDER, call('signInAsAdmin', { adminPassword: { secretName: ADMIN_PASSWORD_SECRET } })]), [RESET_SHOP]));
   assert.equal(ran.result.state, 'Passed', JSON.stringify(ran.result));
   assert.deepEqual(lines(ran.requests), ['POST /api/orders', 'POST /api/test/sessions', 'POST /api/test/reset']);
@@ -300,7 +299,7 @@ const echoPlan = withCleanup(callPlanOf([
   CREATE_ORDER, expectBackend('getOrder', { orderId: { valueName: 'orderId' } }, 'echoedToken', { kind: 'equals', value: 'deliberately wrong' }),
 ]), [RESET_SHOP]);
 
-test('the result and log of a run whose responses echo its secrets hold no form of any secret', { criterion: 'AC-SPEC-32-11' }, async () => {
+test('the result and log of a run whose responses echo its secrets hold no form of any secret', async () => {
   const ran = await runWithCalls(echoPlan, { route: echoingShop, projectFile: shortChecks });
   assert.equal(ran.result.state, 'Failed', 'the echo check failed, so the run kept what it observed');
   for (const [name, value] of Object.entries(SECRET_VALUES)) {
@@ -309,7 +308,7 @@ test('the result and log of a run whose responses echo its secrets hold no form 
   }
 });
 
-test('the leak scan finds no secret in the run\'s result and log, and does find a planted canary', { criterion: 'AC-SPEC-32-11' }, async () => {
+test('the leak scan finds no secret in the run\'s result and log, and does find a planted canary', async () => {
   const ran = await runWithCalls(echoPlan, { route: echoingShop, projectFile: shortChecks });
   const folder = mkdtempSync(join(tmpdir(), 'service-leaks-'));
   try {
@@ -333,7 +332,7 @@ test('the leak scan finds no secret in the run\'s result and log, and does find 
   }
 });
 
-test('no header value and no response body is recorded in the result or the log', { criterion: 'AC-SPEC-32-11' }, async () => {
+test('no header value and no response body is recorded in the result or the log', async () => {
   const ran = await runWithCalls(echoPlan, { route: echoingShop, projectFile: shortChecks });
   assert.ok(!ran.everything.includes(HEADER_MARKER), 'a literal header value was recorded');
   assert.ok(!ran.everything.includes(RESPONSE_MARKER), 'response body text was recorded');
@@ -342,12 +341,12 @@ test('no header value and no response body is recorded in the result or the log'
 
 // ---- Evidence --------------------------------------------------------------------------------------------------
 
-test('a run with calls lists service-calls among its non-hermetic inputs', { criterion: 'AC-SPEC-32-13' }, async () => {
+test('a run with calls lists service-calls among its non-hermetic inputs', async () => {
   const ran = await runWithCalls(callPlanOf([CREATE_ORDER]));
   assert.ok(ran.result.manifest?.nonHermeticInputs.includes('service-calls'), JSON.stringify(ran.result.manifest));
 });
 
-test('a run with only cleanup calls lists service-calls too, and a run without calls does not', { criterion: 'AC-SPEC-32-13' }, async () => {
+test('a run with only cleanup calls lists service-calls too, and a run without calls does not', async () => {
   const cleanupOnly = await runWithCalls(withCleanup(callPlanOf([NAVIGATE]), [RESET_SHOP]));
   assert.ok(cleanupOnly.result.manifest?.nonHermeticInputs.includes('service-calls'), JSON.stringify(cleanupOnly.result.manifest));
   const noCalls = await runWithCalls(callPlanOf([NAVIGATE]));
@@ -355,7 +354,7 @@ test('a run with only cleanup calls lists service-calls too, and a run without c
   assert.ok(!noCalls.result.manifest.nonHermeticInputs.includes('service-calls'));
 });
 
-test('the same run with calls, repeated, gives the same result hash', { criterion: 'AC-SPEC-32-13' }, async () => {
+test('the same run with calls, repeated, gives the same result hash', async () => {
   const plan = withCleanup(callPlanOf([CREATE_ORDER, ORDER_PAID]), CLEANUP);
   const hashes = new Set<string>();
   for (let attempt = 0; attempt < 3; attempt++) hashes.add((await runWithCalls(plan)).result.resultHash);
@@ -364,7 +363,7 @@ test('the same run with calls, repeated, gives the same result hash', { criterio
 
 // ---- The log holds only manifest fields -------------------------------------------------------------------------
 
-test('every event of a run with calls holds only fields the logging manifest lists', { criterion: 'AC-SPEC-32-16' }, async () => {
+test('every event of a run with calls holds only fields the logging manifest lists', async () => {
   const ran = await runWithCalls(echoPlan, { route: echoingShop, projectFile: shortChecks });
   const allowed = new Set(Object.keys(LOGGING_MANIFEST));
   const unlisted = ran.events.flatMap((event) => Object.keys(event).filter((key) => !allowed.has(key)).map((key) => `${event.kind}: ${key}`));
@@ -374,7 +373,7 @@ test('every event of a run with calls holds only fields the logging manifest lis
   assert.ok(ran.events.some((event) => event.stepType === 'expectBackend'), JSON.stringify(ran.events));
 });
 
-test('the events of a call record neither arguments, headers nor the response, only codes, hashes and timings', { criterion: 'AC-SPEC-32-16' }, async () => {
+test('the events of a call record neither arguments, headers nor the response, only codes, hashes and timings', async () => {
   const marked = callPlanOf([call('createOrder', orderArguments({ customerName: 'Grace argument-q7zx' })), RESET_SHOP]);
   const ran = await runWithCalls(marked, { route: echoingShop });
   const logged = JSON.stringify(ran.events);
@@ -385,7 +384,7 @@ test('the events of a call record neither arguments, headers nor the response, o
 
 // ---- A run with no service caller ----------------------------------------------------------------------------
 
-test('a plan that calls a service, run with no services port, is refused with services-unavailable before any side effect', { criterion: 'AC-SPEC-32-07' }, async () => {
+test('a plan that calls a service, run with no services port, is refused with services-unavailable before any side effect', async () => {
   for (const plan of [callPlanOf([NAVIGATE, CREATE_ORDER]), withCleanup(callPlanOf([NAVIGATE]), [RESET_SHOP]), callPlanOf([NAVIGATE, expectBackend('getOrder', { orderId: 'ord_1' }, 'status', { kind: 'present' })])]) {
     const ran = await runWithCalls(plan, { withCaller: false });
     assert.equal(ran.result.state, 'Refused', JSON.stringify(ran.result));
@@ -397,7 +396,7 @@ test('a plan that calls a service, run with no services port, is refused with se
 });
 
 // Counter-example: a plan that calls nothing needs no services port.
-test('a plan that calls no service runs without a services port', { criterion: 'AC-SPEC-32-07' }, async () => {
+test('a plan that calls no service runs without a services port', async () => {
   const ran = await runWithCalls(callPlanOf([NAVIGATE]), { withCaller: false });
   assert.equal(ran.result.state, 'Passed', JSON.stringify(ran.result));
   assert.equal(ran.result.refusal, undefined);
@@ -405,7 +404,7 @@ test('a plan that calls no service runs without a services port', { criterion: '
 
 // ---- The call limit counts steps, not polls ---------------------------------------------------------------------
 
-test('an expectBackend polled three times counts once toward maximumCalls, so the run is not cut short', { criterion: 'AC-SPEC-32-06' }, async () => {
+test('an expectBackend polled three times counts once toward maximumCalls, so the run is not cut short', async () => {
   const paidOnThirdRead = shopWith((request, earlier) => {
     if (request.method !== 'GET') return undefined;
     return jsonReply(200, { status: earlier.filter((sent) => sent.method === 'GET').length >= 2 ? 'paid' : 'pending', total: 42 });

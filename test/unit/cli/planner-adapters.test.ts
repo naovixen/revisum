@@ -13,7 +13,6 @@
 // declared on a made-up host that only the test's resolver knows, so a request that went round the
 // proxy could not reach it, and is served over HTTPS with a test certificate the command is told
 // to trust. The seeded key is fresh in every test and scanned for in every form.
-// See docs/specs/SPEC-37-explore-to-draft.md and docs/specs/SPEC-28-plan-authoring.md.
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import { echoesIn } from '../engine/secret-examples.ts';
@@ -46,7 +45,7 @@ const assertNoDraft = (run: PlannedRun): void => {
 
 for (const wire of WIRE_FORMATS) {
   describe(`the ${wire} adapter`, () => {
-    test('its request matches the golden method, path, headers and body', { criterion: 'AC-SPEC-37-13' }, async () => {
+    test('its request matches the golden method, path, headers and body', async () => {
       const golden = goldenRequest(wire);
       await withPlannedRun(recordedSetup(wire), (run) => {
         const request = onlyRequest(run.planner);
@@ -59,7 +58,7 @@ for (const wire of WIRE_FORMATS) {
       });
     });
 
-    test('the key goes only in its own header, in its own scheme', { criterion: 'AC-SPEC-37-13' }, async () => {
+    test('the key goes only in its own header, in its own scheme', async () => {
       const secrets = seededSecrets();
       await withPlannedRun(recordedSetup(wire, secrets.variables), (run) => {
         const request = onlyRequest(run.planner);
@@ -70,7 +69,7 @@ for (const wire of WIRE_FORMATS) {
       });
     });
 
-    test('the request goes through the egress proxy, to the address the proxy vetted', { criterion: 'AC-SPEC-37-13' }, async () => {
+    test('the request goes through the egress proxy, to the address the proxy vetted', async () => {
       await withPlannedRun(recordedSetup(wire), (run) => {
         const request = onlyRequest(run.planner);
         assert.ok(run.resolver.lookupsOf(PLANNER_HOST) >= 1, 'the proxy never resolved the planner host, so the request went round it');
@@ -79,7 +78,7 @@ for (const wire of WIRE_FORMATS) {
       });
     });
 
-    test('the key appears in no output, log, error, event or file', { criterion: 'AC-SPEC-37-13' }, async () => {
+    test('the key appears in no output, log, error, event or file', async () => {
       const secrets = seededSecrets();
       await withPlannedRun(recordedSetup(wire, secrets.variables), (run) => {
         assert.ok(run.workspace.exists(DRAFT_PATH), `the call did not succeed:\n${run.outcome.stdout}`);
@@ -89,7 +88,7 @@ for (const wire of WIRE_FORMATS) {
       });
     });
 
-    test('a refusal that echoes the key in its body gives planner-call-failed, with neither the body nor the key', { criterion: 'AC-SPEC-37-13' }, async () => {
+    test('a refusal that echoes the key in its body gives planner-call-failed, with neither the body nor the key', async () => {
       const secrets = seededSecrets();
       const bodyMark = 'REFUSAL-BODY-MARK-2W8';
       const echoingRefusal: Answer = (received, response) => {
@@ -108,7 +107,7 @@ for (const wire of WIRE_FORMATS) {
   });
 }
 
-test('both wire formats carry the same prompt texts', { criterion: 'AC-SPEC-37-13' }, async () => {
+test('both wire formats carry the same prompt texts', async () => {
   const prompts: (readonly string[])[] = [];
   for (const wire of WIRE_FORMATS) {
     await withPlannedRun(recordedSetup(wire), (run) => {
@@ -121,7 +120,7 @@ test('both wire formats carry the same prompt texts', { criterion: 'AC-SPEC-37-1
 
 // ---- Where the endpoint comes from --------------------------------------------------------------------
 
-test('a working-tree project.json that points the planner elsewhere is ignored: the key goes only to the protected endpoint', { criterion: 'AC-SPEC-37-13' }, async () => {
+test('a working-tree project.json that points the planner elsewhere is ignored: the key goes only to the protected endpoint', async () => {
   const secrets = seededSecrets();
   const trusted = await startFakePlanner(jsonAnswer(200, replyWithContent('anthropic-messages', GOLDEN_DRAFT)), true);
   const redirected = await startFakePlanner(jsonAnswer(200, replyWithContent('openai-chat', GOLDEN_DRAFT)));
@@ -146,7 +145,7 @@ test('a working-tree project.json that points the planner elsewhere is ignored: 
   }
 });
 
-test('a customer-key endpoint over plain http is refused by the project parser and nothing is sent', { criterion: 'AC-SPEC-37-13' }, async () => {
+test('a customer-key endpoint over plain http is refused by the project parser and nothing is sent', async () => {
   const secrets = seededSecrets();
   await withPlannedRun({ ...recordedSetup('openai-chat', secrets.variables), planner: () => customerKeyPlanner('openai-chat', `http://${PLANNER_HOST}`) }, (run) => {
     assert.deepEqual(outputErrorCodes(run), ['config-invalid']);
@@ -159,7 +158,7 @@ test('a customer-key endpoint over plain http is refused by the project parser a
 
 // ---- Local endpoints -----------------------------------------------------------------------------------
 
-test('a local planner on loopback is called with no credential header', { criterion: 'AC-SPEC-37-13' }, async () => {
+test('a local planner on loopback is called with no credential header', async () => {
   await withPlannedRun({ planner: (fake) => localPlanner(fake.origin), answer: jsonAnswer(200, replyWithContent('openai-chat', GOLDEN_DRAFT)), routed: false }, (run) => {
     const request = onlyRequest(run.planner);
     assert.equal(headerValue(request, 'authorization'), undefined);
@@ -171,7 +170,7 @@ test('a local planner on loopback is called with no credential header', { criter
 const OFF_LOOPBACK_ORIGINS = ['http://192.168.1.20:11434', 'http://10.0.0.5:11434', `http://${PUBLIC_ADDRESS}:11434`, 'http://ollama.example.org:11434'];
 
 for (const origin of OFF_LOOPBACK_ORIGINS) {
-  test(`a local planner at ${origin} is refused with planner-endpoint-not-loopback before any request`, { criterion: 'AC-SPEC-37-13' }, async () => {
+  test(`a local planner at ${origin} is refused with planner-endpoint-not-loopback before any request`, async () => {
     await withPlannedRun({
       planner: () => localPlanner(origin), answer: jsonAnswer(200, replyWithContent('openai-chat', GOLDEN_DRAFT)), routed: true,
       names: { 'ollama.example.org': [PUBLIC_ADDRESS] },
@@ -185,7 +184,7 @@ for (const origin of OFF_LOOPBACK_ORIGINS) {
   });
 }
 
-test('counter-example: the same local planner on 127.0.0.1 is called', { criterion: 'AC-SPEC-37-13' }, async () => {
+test('counter-example: the same local planner on 127.0.0.1 is called', async () => {
   await withPlannedRun({ planner: (fake) => localPlanner(fake.origin), answer: jsonAnswer(200, replyWithContent('openai-chat', GOLDEN_DRAFT)), routed: false }, (run) => {
     assert.deepEqual(outputErrorCodes(run), []);
     assert.equal(run.planner.received.length, 1);
@@ -194,7 +193,7 @@ test('counter-example: the same local planner on 127.0.0.1 is called', { criteri
 
 // ---- Failed calls --------------------------------------------------------------------------------------
 
-test('a planner answering 500 gives planner-call-failed without its body', { criterion: 'AC-SPEC-37-13' }, async () => {
+test('a planner answering 500 gives planner-call-failed without its body', async () => {
   const bodyMark = 'SERVER-ERROR-BODY-MARK-6J1';
   await withPlannedRun({ ...recordedSetup('openai-chat'), answer: jsonAnswer(500, { error: { message: `${bodyMark} overloaded` } }) }, (run) => {
     assert.deepEqual(outputErrorCodes(run), ['planner-call-failed']);
@@ -203,7 +202,7 @@ test('a planner answering 500 gives planner-call-failed without its body', { cri
   });
 });
 
-test('a local planner that nothing listens on gives planner-call-failed', { criterion: 'AC-SPEC-37-13' }, async () => {
+test('a local planner that nothing listens on gives planner-call-failed', async () => {
   const port = await closedPort();
   await withPlannedRun({ planner: () => localPlanner(`http://127.0.0.1:${port}`), answer: jsonAnswer(200, {}), routed: false }, (run) => {
     assert.deepEqual(outputErrorCodes(run), ['planner-call-failed']);
@@ -211,7 +210,7 @@ test('a local planner that nothing listens on gives planner-call-failed', { crit
   });
 });
 
-test('a customer-key planner whose host resolves to a private address is blocked by the proxy: planner-call-failed', { criterion: 'AC-SPEC-37-13' }, async () => {
+test('a customer-key planner whose host resolves to a private address is blocked by the proxy: planner-call-failed', async () => {
   await withPlannedRun({ ...recordedSetup('anthropic-messages'), names: { [PLANNER_HOST]: ['10.0.0.5'] } }, (run) => {
     assert.deepEqual(outputErrorCodes(run), ['planner-call-failed']);
     assert.deepEqual(run.planner.received, [], 'the blocked request reached the planner');
@@ -220,7 +219,7 @@ test('a customer-key planner whose host resolves to a private address is blocked
   });
 });
 
-test('a reply over the 1 MiB limit gives planner-call-failed and writes no draft', { criterion: 'AC-SPEC-37-13' }, async () => {
+test('a reply over the 1 MiB limit gives planner-call-failed and writes no draft', async () => {
   await withPlannedRun({ ...recordedSetup('openai-chat'), answer: sizedAnswer(1024 * 1024 + 512 * 1024) }, (run) => {
     assert.deepEqual(outputErrorCodes(run), ['planner-call-failed']);
     assertNoDraft(run);

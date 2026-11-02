@@ -13,9 +13,8 @@
 // each value: it must find each value only where it was planted. The control runs check an
 // element showing each canary against a text it never equals, so the observation does reach the
 // result, and the scan finds it there.
-// Not covered here: the visual report, which a run cannot produce until the result model joins it
-// (SPEC-11, SPEC-12), and text drawn as pixels, which no text scan can read.
-// See docs/specs/SPEC-36-unsafe-plan-features.md and docs/specs/SPEC-04-secrets-and-redaction.md.
+// Not covered here: the visual report, which a run cannot produce until the result model joins it,
+// and text drawn as pixels, which no text scan can read.
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -117,7 +116,7 @@ const ORDER_ENDINGS: readonly { readonly name: string; readonly step: JsonRecord
 
 // A remember from an attribute needs rememberedValues too, which only the own CDP driver declares.
 describe(`an attribute remembered: ${CDP_TARGET}`, () => {
-  test('the leak scan finds the remembered order id in no output of runs that type it, check it and fail a check', { criterion: 'AC-SPEC-36-07', timeout: TIMEOUT }, async () => {
+  test('the leak scan finds the remembered order id in no output of runs that type it, check it and fail a check', { timeout: TIMEOUT }, async () => {
     const planted = [['ORDER_ID_CANARY', harness.canaries.orderId]] as const;
     const outputs: string[] = [];
     for (const { name, step } of ORDER_ENDINGS) {
@@ -129,7 +128,7 @@ describe(`an attribute remembered: ${CDP_TARGET}`, () => {
     assertFoundOnlyWherePlanted('order', outputs, planted);
   });
 
-  test('the remembered attribute appears in the result and event log only as its name and sha256', { criterion: 'AC-SPEC-36-07', timeout: TIMEOUT }, async () => {
+  test('the remembered attribute appears in the result and event log only as its name and sha256', { timeout: TIMEOUT }, async () => {
     const ran = await harness.runSteps(CDP_TARGET, orderSteps(check(orderRow, { kind: 'visible' }, 'orders.row-shown')));
     assert.equal(ran.result.state, 'Passed', JSON.stringify(ran.result.steps));
     const digest = sha256(harness.canaries.orderId);
@@ -139,7 +138,7 @@ describe(`an attribute remembered: ${CDP_TARGET}`, () => {
 
   // Control: the canary, typed as plain plan text (not a remembered value) and observed by a failed
   // check of the field, does reach the result, and the scan finds it there.
-  test('control: a failed check of the field holding the order id typed as plain text keeps it, and the scan finds it', { criterion: 'AC-SPEC-36-07', timeout: TIMEOUT }, async () => {
+  test('control: a failed check of the field holding the order id typed as plain text keeps it, and the scan finds it', { timeout: TIMEOUT }, async () => {
     const ran = await harness.runSteps(CDP_TARGET, [
       navigate('/orders.html'),
       fill(orderField, harness.canaries.orderId),
@@ -180,7 +179,7 @@ for (const targetId of BOTH_TARGETS) {
       ['SESSION_COOKIE_CANARY', harness.canaries.sessionCookie],
     ];
 
-    test('the leak scan finds neither the secret nor the session cookie in any output; only the declared fields were read', { criterion: 'AC-SPEC-36-11', timeout: TIMEOUT }, async () => {
+    test('the leak scan finds neither the secret nor the session cookie in any output; only the declared fields were read', { timeout: TIMEOUT }, async () => {
       const secrets = fakeEnvironmentStore({ [PAGE_SECRET]: secretValueText });
       const outputs: string[] = [];
       for (const { name, step } of SCRIPT_ENDINGS) {
@@ -192,7 +191,7 @@ for (const targetId of BOTH_TARGETS) {
       assertFoundOnlyWherePlanted(`script-${targetId}`, outputs, planted());
     });
 
-    test('the remembered field is the declared one: its record is the sha256 of "ok", the status the script returned', { criterion: 'AC-SPEC-36-11', timeout: TIMEOUT }, async () => {
+    test('the remembered field is the declared one: its record is the sha256 of "ok", the status the script returned', { timeout: TIMEOUT }, async () => {
       const ran = await harness.runSteps(targetId, scriptSteps(check(testId('input-events'), { kind: 'visible' }, 'leaks.page-shown')), {
         secrets: fakeEnvironmentStore({ [PAGE_SECRET]: secretValueText }),
       });
@@ -202,7 +201,7 @@ for (const targetId of BOTH_TARGETS) {
 
     // Control: the cookie, observed by a failed check of the element the page shows it in, does
     // reach the result, and the scan finds it there, so the scan above could have found it.
-    test('control: a failed check of the element showing the session cookie keeps it in the result, and the scan finds it', { criterion: 'AC-SPEC-36-11', timeout: TIMEOUT }, async () => {
+    test('control: a failed check of the element showing the session cookie keeps it in the result, and the scan finds it', { timeout: TIMEOUT }, async () => {
       const ran = await harness.runSteps(targetId, [navigate('/leaks.html'), textEquals(testId('session-shown'), 'deliberately wrong', 'leaks.session-shown')]);
       const shown = ran.result.steps[1];
       assert.equal(shown?.outcome, 'failed');

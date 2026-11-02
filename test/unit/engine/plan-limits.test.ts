@@ -1,7 +1,6 @@
 // Size and frame-depth limits are checked before the parser walks a plan, so an oversized or
 // deeply nested plan costs nothing to reject and cannot exhaust the parser. Such a plan gets one
 // error, too_large, and none of the problems hidden inside it are reported.
-// See docs/specs/SPEC-01-plan-language-and-parser.md.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { planParser } from '@revisum/engine';
@@ -47,20 +46,20 @@ const assertOnlyTooLarge = (input: unknown): void => {
 
 // ---- Size ---------------------------------------------------------------------------------------
 
-test('rejects a plan over the size limit with too_large at the root, before walking it', { criterion: 'AC-SPEC-01-11' }, () => {
+test('rejects a plan over the size limit with too_large at the root, before walking it', () => {
   const padding = Array.from({ length: 200 }, (_unused, index) => ({ type: 'capture', name: `padding-${index}` }));
   const plan = { ...planWith(...HIDDEN_PROBLEMS, ...padding, tracedExpect), shell: 'rm -rf /' };
   assert.ok(sizeInBytes(plan) > MAXIMUM_PLAN_BYTES);
   assert.deepEqual(parsePlan(plan), { ok: false, error: [{ code: 'too_large', path: '$' }] });
 });
 
-test('rejects one oversized text value with too_large, before walking the plan', { criterion: 'AC-SPEC-01-11' }, () => {
+test('rejects one oversized text value with too_large, before walking the plan', () => {
   const plan = planWith(...HIDDEN_PROBLEMS, { ...tracedExpect, assert: { kind: 'textEquals', value: 'x'.repeat(MAXIMUM_PLAN_BYTES) } });
   assert.deepEqual(parsePlan(plan), { ok: false, error: [{ code: 'too_large', path: '$' }] });
 });
 
 // Counter-example: a valid plan under the limit is accepted by the same parser.
-test('accepts a valid plan under the size limit', { criterion: 'AC-SPEC-01-11' }, () => {
+test('accepts a valid plan under the size limit', () => {
   const plan = signupPlan();
   assert.ok(sizeInBytes(plan) < MAXIMUM_PLAN_BYTES);
   const parsed = parsePlan(plan);
@@ -69,33 +68,33 @@ test('accepts a valid plan under the size limit', { criterion: 'AC-SPEC-01-11' }
 
 // ---- Frame depth --------------------------------------------------------------------------------
 
-test('rejects frames nested one deeper than the limit with too_large, before walking them', { criterion: 'AC-SPEC-01-11' }, () => {
+test('rejects frames nested one deeper than the limit with too_large, before walking them', () => {
   const plan = planWith(nestedFrames(MAXIMUM_FRAME_DEPTH + 1, [...HIDDEN_PROBLEMS, tracedExpect]), tracedExpect);
   assert.ok(sizeInBytes(plan) < MAXIMUM_PLAN_BYTES, 'small enough that only the depth can be the reason');
   assertOnlyTooLarge(plan);
 });
 
-test('rejects frames nested far deeper than the limit with too_large and does not crash', { criterion: 'AC-SPEC-01-11' }, () => {
+test('rejects frames nested far deeper than the limit with too_large and does not crash', () => {
   assert.doesNotThrow(() => assertOnlyTooLarge(planWith(nestedFrames(5_000, [tracedExpect]), tracedExpect)));
 });
 
-test('rejects a too-deep frame that follows valid frames', { criterion: 'AC-SPEC-01-11' }, () => {
+test('rejects a too-deep frame that follows valid frames', () => {
   const plan = planWith(nestedFrames(1, [tracedExpect]), nestedFrames(MAXIMUM_FRAME_DEPTH + 1, [tracedExpect]), tracedExpect);
   assertOnlyTooLarge(plan);
 });
 
 // Counter-examples: frames at exactly the limit, side by side or nested, are accepted.
-test('accepts frames nested exactly to the depth limit', { criterion: 'AC-SPEC-01-11' }, () => {
+test('accepts frames nested exactly to the depth limit', () => {
   const parsed = parsePlan(planWith(nestedFrames(MAXIMUM_FRAME_DEPTH, [tracedExpect]), tracedExpect));
   assert.equal(parsed.ok, true, JSON.stringify(parsed));
 });
 
-test('accepts many frames side by side, since depth and not count is limited', { criterion: 'AC-SPEC-01-11' }, () => {
+test('accepts many frames side by side, since depth and not count is limited', () => {
   const parsed = parsePlan(planWith(...Array.from({ length: MAXIMUM_FRAME_DEPTH + 3 }, () => nestedFrames(1, [tracedExpect]))));
   assert.equal(parsed.ok, true, JSON.stringify(parsed));
 });
 
-test('the account-closure plan, with one frame, is within the depth limit', { criterion: 'AC-SPEC-01-11' }, () => {
+test('the account-closure plan, with one frame, is within the depth limit', () => {
   assert.equal(stepsOf(accountClosurePlan()).filter((step) => step['type'] === 'frame').length, 1);
   const parsed = parsePlan(accountClosurePlan());
   assert.equal(parsed.ok, true, JSON.stringify(parsed));

@@ -6,7 +6,6 @@
 // The function is assumed to be exported by the driver package as
 //   heldModifierKeys(modifiers: readonly Modifier[], platform: NodeJS.Platform): readonly ('Alt' | 'Control' | 'Meta' | 'Shift')[]
 // and is looked up by name, so this file compiles before it exists.
-// See docs/specs/SPEC-30-plan-values-positions-and-keys.md.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { Modifier } from '@revisum/contracts';
@@ -20,23 +19,23 @@ function heldModifierKeys(modifiers: readonly Modifier[], platform: NodeJS.Platf
   return (exported as HeldModifierKeys)(modifiers, platform);
 }
 
-test('ControlOrMeta is held as Meta on macOS', { criterion: 'AC-SPEC-30-14' }, () => {
+test('ControlOrMeta is held as Meta on macOS', () => {
   assert.deepEqual(heldModifierKeys(['ControlOrMeta'], 'darwin'), ['Meta']);
 });
 
 for (const platform of ['linux', 'win32'] as const) {
-  test(`ControlOrMeta is held as Control on ${platform}`, { criterion: 'AC-SPEC-30-14' }, () => {
+  test(`ControlOrMeta is held as Control on ${platform}`, () => {
     assert.deepEqual(heldModifierKeys(['ControlOrMeta'], platform), ['Control']);
   });
 }
 
-test('every other modifier is held as itself, in the order written, on every platform', { criterion: 'AC-SPEC-30-14' }, () => {
+test('every other modifier is held as itself, in the order written, on every platform', () => {
   for (const platform of ['darwin', 'linux', 'win32'] as const) {
     assert.deepEqual(heldModifierKeys(['Shift', 'Alt', 'Meta', 'Control'], platform), ['Shift', 'Alt', 'Meta', 'Control'], platform);
   }
 });
 
-test('ControlOrMeta keeps its place among the other modifiers', { criterion: 'AC-SPEC-30-14' }, () => {
+test('ControlOrMeta keeps its place among the other modifiers', () => {
   assert.deepEqual(heldModifierKeys(['Shift', 'ControlOrMeta', 'Alt'], 'darwin'), ['Shift', 'Meta', 'Alt']);
   assert.deepEqual(heldModifierKeys(['Shift', 'ControlOrMeta', 'Alt'], 'linux'), ['Shift', 'Control', 'Alt']);
 });

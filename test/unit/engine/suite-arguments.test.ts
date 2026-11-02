@@ -4,7 +4,6 @@
 // on and one --project per declared project. Its environment points PLAYWRIGHT_JSON_OUTPUT_NAME
 // into Revisum's output directory. Revisum's arguments come after the declared ones, so they win
 // over whatever the team's own Playwright config says. No argument is ever read by a shell.
-// See docs/specs/SPEC-35-evidence-mode.md.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { suiteArguments } from '@revisum/engine';
@@ -49,44 +48,44 @@ function selectedProjects(argv: readonly string[]): string[] {
 
 const DECLARED_COMMAND = ['npx', 'playwright', 'test'];
 
-test('the argument vector starts with the declared command, unchanged', { criterion: 'AC-SPEC-35-12' }, () => {
+test('the argument vector starts with the declared command, unchanged', () => {
   assert.deepEqual(built().argv.slice(0, DECLARED_COMMAND.length), DECLARED_COMMAND);
 });
 
 for (const argument of ['--retries=0', '--reporter=json', '--trace=on']) {
-  test(`the argument vector holds ${argument}, after every declared argument`, { criterion: 'AC-SPEC-35-12' }, () => {
+  test(`the argument vector holds ${argument}, after every declared argument`, () => {
     const { argv } = built();
     const at = argv.indexOf(argument);
     assert.ok(at >= DECLARED_COMMAND.length, `${argument} is missing or comes before the declared command ends: ${JSON.stringify(argv)}`);
   });
 }
 
-test('no other retries, reporter or trace setting is passed beside Revisum\'s own', { criterion: 'AC-SPEC-35-12' }, () => {
+test('no other retries, reporter or trace setting is passed beside Revisum\'s own', () => {
   const { argv } = built();
   assert.deepEqual(argv.filter((word) => /^--retries\b/.test(word)), ['--retries=0']);
   assert.deepEqual(argv.filter((word) => /^--reporter\b/.test(word)), ['--reporter=json']);
   assert.deepEqual(argv.filter((word) => /^--trace\b/.test(word)), ['--trace=on']);
 });
 
-test('one --project is passed for each declared project, and no other', { criterion: 'AC-SPEC-35-12' }, () => {
+test('one --project is passed for each declared project, and no other', () => {
   assert.deepEqual(selectedProjects(built({ projects: ['chromium', 'firefox'] }).argv), ['chromium', 'firefox']);
   // The counter-example: with one declared project, one is selected.
   assert.deepEqual(selectedProjects(built().argv), ['chromium']);
 });
 
-test('the JSON report is pointed into Revisum\'s output directory', { criterion: 'AC-SPEC-35-12' }, () => {
+test('the JSON report is pointed into Revisum\'s output directory', () => {
   const reportPath = built().environment['PLAYWRIGHT_JSON_OUTPUT_NAME'];
   assert.ok(reportPath !== undefined, 'PLAYWRIGHT_JSON_OUTPUT_NAME is not set');
   assert.ok(reportPath.startsWith(`${OUTPUT_DIRECTORY}/`), `the report goes to ${reportPath}`);
   assert.ok(!reportPath.slice(OUTPUT_DIRECTORY.length).split('/').includes('..'), `the report path leaves the output directory: ${reportPath}`);
 });
 
-test('declared arguments that look like shell syntax pass through as separate, literal strings', { criterion: 'AC-SPEC-35-12' }, () => {
+test('declared arguments that look like shell syntax pass through as separate, literal strings', () => {
   const { argv } = built({ command: [...DECLARED_COMMAND, ...HOSTILE_ARGUMENTS] });
   assert.deepEqual(argv.slice(0, DECLARED_COMMAND.length + HOSTILE_ARGUMENTS.length), [...DECLARED_COMMAND, ...HOSTILE_ARGUMENTS]);
 });
 
-test('the argument vector never wraps the command in a shell', { criterion: 'AC-SPEC-35-12' }, () => {
+test('the argument vector never wraps the command in a shell', () => {
   const { argv } = built({ command: [...DECLARED_COMMAND, ...HOSTILE_ARGUMENTS] });
   const shells = /(^|\/)(sh|bash|dash|zsh|cmd|cmd\.exe|powershell|pwsh)$/;
   assert.ok(!argv.some((word) => shells.test(word)), `a shell is in the argument vector: ${JSON.stringify(argv)}`);

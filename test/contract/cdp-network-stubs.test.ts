@@ -7,7 +7,6 @@
 // report can say the check ran against a faked response.
 // Each claim has its counter-example: the same bytes served as a page do run their script, and
 // without the stub the same requests reach the server.
-// See docs/specs/SPEC-33-network-stubs-request-checks-and-storage.md.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import {
@@ -23,7 +22,7 @@ after(async () => { await harness.close(); });
 const assertPassed = (ran: NetworkRun): void => assert.equal(ran.result.state, 'Passed', JSON.stringify(ran.result.steps));
 
 describe('a stub serves data only, to fetch and XHR only', () => {
-  test('a fixture body holding script markup reaches the page\'s fetch as JSON with nosniff, and no script runs', { criterion: 'AC-SPEC-33-03' }, async () => {
+  test('a fixture body holding script markup reaches the page\'s fetch as JSON with nosniff, and no script runs', async () => {
     const ran = await harness.runSteps(CDP_TARGET, [
       navigate('/resources.html'),
       startStub('markupNotes'),
@@ -41,7 +40,7 @@ describe('a stub serves data only, to fetch and XHR only', () => {
 
   // Counter-example: the script counter is live. The same fixture bytes served as an HTML page in
   // a frame do run their markup, and the counter shows it.
-  test('counter-example: the same bytes served as an HTML page in a frame run their script, and the counter shows it', { criterion: 'AC-SPEC-33-03' }, async () => {
+  test('counter-example: the same bytes served as an HTML page in a frame run their script, and the counter shows it', async () => {
     const ran = await harness.runSteps(CDP_TARGET, [
       navigate('/resources.html'),
       click(role('button', 'Show the notes as a page')),
@@ -50,7 +49,7 @@ describe('a stub serves data only, to fetch and XHR only', () => {
     assertPassed(ran);
   });
 
-  test('counter-example: without the stub, the same fetch gets the server\'s notes', { criterion: 'AC-SPEC-33-03' }, async () => {
+  test('counter-example: without the stub, the same fetch gets the server\'s notes', async () => {
     const ran = await harness.runSteps(CDP_TARGET, [
       navigate('/resources.html'),
       click(role('button', 'Load notes')),
@@ -60,7 +59,7 @@ describe('a stub serves data only, to fetch and XHR only', () => {
     assert.equal(timesRequested(ran.requestedPaths, '/api/notes'), 1);
   });
 
-  test('a script, style sheet, frame, worker, image and document that match a stub go to the server; its fetch and XHR get the stub', { criterion: 'AC-SPEC-33-03' }, async () => {
+  test('a script, style sheet, frame, worker, image and document that match a stub go to the server; its fetch and XHR get the stub', async () => {
     const ran = await harness.runSteps(CDP_TARGET, [
       navigate('/resources.html'),
       startStub('assetRequests'),
@@ -84,7 +83,7 @@ describe('a stub serves data only, to fetch and XHR only', () => {
     assert.equal(timesRequested(ran.requestedPaths, '/api/assets/data.json'), 0, 'the fetch and the XHR never reached the server');
   });
 
-  test('counter-example: without the stub, the same fetch and XHR reach the server', { criterion: 'AC-SPEC-33-03' }, async () => {
+  test('counter-example: without the stub, the same fetch and XHR reach the server', async () => {
     const ran = await harness.runSteps(CDP_TARGET, [
       navigate('/resources.html'),
       click(role('button', 'Load every resource')),
@@ -108,13 +107,13 @@ const sequenceSteps = (stubbedQuestions: number): unknown[] => {
 };
 
 describe('a stub\'s responses are served in order, and the last repeats', () => {
-  test('a stub with three responses answers five requests with responses 1, 2, 3, 3 and 3; after its stop the server answers', { criterion: 'AC-SPEC-33-04' }, async () => {
+  test('a stub with three responses answers five requests with responses 1, 2, 3, 3 and 3; after its stop the server answers', async () => {
     const ran = await harness.runSteps(CDP_TARGET, sequenceSteps(5));
     assertPassed(ran);
     assert.equal(timesRequested(ran.requestedPaths, '/api/sequence'), 1, 'only the request after the stop reached the server');
   });
 
-  test('the result records the stub name and the response index of each stubbed request, and none for the request after the stop', { criterion: 'AC-SPEC-33-04' }, async () => {
+  test('the result records the stub name and the response index of each stubbed request, and none for the request after the stop', async () => {
     const ran = await harness.runSteps(CDP_TARGET, sequenceSteps(5));
     assertPassed(ran);
     const answers = stubbedAnswersIn(ran.result);
@@ -125,7 +124,7 @@ describe('a stub\'s responses are served in order, and the last repeats', () => 
     assert.deepEqual(answers.map((answer) => answer.responseIndex - first), [0, 1, 2, 2, 2]);
   });
 
-  test('20 replays of the same stubbed plan give one result hash', { criterion: 'AC-SPEC-33-04', timeout: 600_000 }, async () => {
+  test('20 replays of the same stubbed plan give one result hash', { timeout: 600_000 }, async () => {
     const plan = harness.plan(networkPlan(CDP_TARGET, sequenceSteps(5)));
     const hashes = new Set<string>();
     for (let replay = 0; replay < 20; replay++) {
@@ -137,7 +136,7 @@ describe('a stub\'s responses are served in order, and the last repeats', () => 
   });
 
   // Counter-example: one hash across the replays is not a hash that ignores the stubbed requests.
-  test('counter-example: the plan with one stubbed request fewer gives another result hash', { criterion: 'AC-SPEC-33-04', timeout: 120_000 }, async () => {
+  test('counter-example: the plan with one stubbed request fewer gives another result hash', { timeout: 120_000 }, async () => {
     const five = await harness.runSteps(CDP_TARGET, sequenceSteps(5));
     const four = await harness.runSteps(CDP_TARGET, sequenceSteps(4));
     assertPassed(five);
@@ -148,7 +147,7 @@ describe('a stub\'s responses are served in order, and the last repeats', () => 
 });
 
 describe('assertions name the stubs active while they ran', () => {
-  test('every kind of assertion lists the stubs active while it ran, and none once they are stopped', { criterion: 'AC-SPEC-33-14' }, async () => {
+  test('every kind of assertion lists the stubs active while it ran, and none once they are stopped', async () => {
     const ran = await harness.runSteps(CDP_TARGET, [
       navigate('/requests.html'),
       textEquals(testId('schedule-state'), 'Schedule loaded', 'active.before-any-stub'),
@@ -176,7 +175,7 @@ describe('assertions name the stubs active while they ran', () => {
     assert.deepEqual(listed(13), [], 'a check after every stop lists none');
   });
 
-  test('a failed assertion while a stub is active lists it too', { criterion: 'AC-SPEC-33-14' }, async () => {
+  test('a failed assertion while a stub is active lists it too', async () => {
     const ran = await harness.runSteps(CDP_TARGET, [
       navigate('/requests.html'),
       startStub('answerSequence'),

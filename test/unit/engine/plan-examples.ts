@@ -6,7 +6,6 @@
 //     before assertions carried criterion ids, with <name>.mapping.json giving each assertion's
 //     criterion id, keyed by the assertion step's JSON path.
 // Each loader returns a fresh copy, so a test may change it freely.
-// See docs/specs/SPEC-01-plan-language-and-parser.md.
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseProject, planParser, type Project } from '@revisum/engine';
@@ -14,7 +13,7 @@ import { FIXTURES, GOLDEN } from '../../support/repository.ts';
 
 export const ORIGIN = 'http://127.0.0.1:4173';
 export const TARGET_ID = 'playwright-chromium';
-// The version the SPEC-01 examples are written in; version 1.2 still parses them unchanged.
+// The version the first examples are written in; version 1.2 still parses them unchanged.
 export const CURRENT_VERSION = '1.1';
 
 // A JSON object as read from disk, before any parsing.
@@ -46,7 +45,7 @@ export const signupPlan = (): JsonRecord => goldenPlan('signup');
 export const accountClosurePlan = (): JsonRecord => goldenPlan('account-closure');
 
 // The shop's test API, which the shared project declares as a service, with the secrets its calls
-// use and the calls a plan may make (docs/specs/SPEC-32-declared-service-calls.md). The shapes are
+// use and the calls a plan may make. The shapes are
 // those of service-call-examples.ts, which adds authorization headers on top. The calls here name
 // no secret themselves (signInAsAdmin's password is a secret parameter), so a test that replaces
 // the secret names still gets a project that parses.
@@ -86,8 +85,7 @@ export const TEST_SERVICE_CALLS: JsonRecord = {
   },
 };
 
-// The stub, observed request and storage entries the 1.2 golden plans name
-// (docs/specs/SPEC-33-network-stubs-request-checks-and-storage.md), copied from
+// The stub, observed request and storage entries the 1.2 golden plans name, copied from
 // stub-and-storage-examples.ts. Each is on the allowed origin and names no fixture, secret or
 // service, so a test that replaces the fixtures, secret names or services still gets a project
 // that parses.

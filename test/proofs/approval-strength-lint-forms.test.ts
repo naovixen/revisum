@@ -3,7 +3,6 @@
 // parameter type, and an Approval narrowed to strength 'verified' written out by hand. Each test
 // plants one file in a throw-away copy of the repository and runs the repository's lint commands
 // over it. Taking any Approval, under an alias or narrowed on another field, still passes.
-// See docs/specs/SPEC-02-project-trust-and-approval.md.
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
 import { copyRepository, type ScratchRepository } from './scratch-repository.ts';
@@ -32,7 +31,7 @@ function assertLintPassesWith(relativePath: string, source: string): void {
 
 // ---- Forms the check must report --------------------------------------------------------------------
 
-test("the lint fails on a merge gate that switches on an approval's strength", { criterion: 'AC-SPEC-02-20', timeout: TIMEOUT }, () => {
+test("the lint fails on a merge gate that switches on an approval's strength", { timeout: TIMEOUT }, () => {
   assertStrengthCheckFailsOn('packages/engine/src/plan/planted-switch-gate.ts', [
     "import type { Approval } from '@revisum/contracts';",
     'export function mayMerge(approval: Approval): boolean {',
@@ -45,7 +44,7 @@ test("the lint fails on a merge gate that switches on an approval's strength", {
   ].join('\n'));
 });
 
-test('the lint fails on a level function whose parameter type is an alias for VerifiedApproval', { criterion: 'AC-SPEC-02-20', timeout: TIMEOUT }, () => {
+test('the lint fails on a level function whose parameter type is an alias for VerifiedApproval', { timeout: TIMEOUT }, () => {
   assertStrengthCheckFailsOn('packages/report/src/planted-alias-level.ts', [
     "import type { VerifiedApproval } from '@revisum/contracts';",
     'type CheckedApproval = VerifiedApproval;',
@@ -54,7 +53,7 @@ test('the lint fails on a level function whose parameter type is an alias for Ve
   ].join('\n'));
 });
 
-test("the lint fails on a gate that takes an Approval narrowed to strength 'verified' by hand", { criterion: 'AC-SPEC-02-20', timeout: TIMEOUT }, () => {
+test("the lint fails on a gate that takes an Approval narrowed to strength 'verified' by hand", { timeout: TIMEOUT }, () => {
   assertStrengthCheckFailsOn('packages/engine/src/planted-narrowed-gate.ts', [
     "import type { Approval } from '@revisum/contracts';",
     "export const opensMergeGate = (approval: Approval & { readonly strength: 'verified' }): boolean => approval.subject.hash.length > 0;",
@@ -62,7 +61,7 @@ test("the lint fails on a gate that takes an Approval narrowed to strength 'veri
   ].join('\n'));
 });
 
-test("the lint fails on a metric whose narrowed approval type is declared apart from the parameter", { criterion: 'AC-SPEC-02-20', timeout: TIMEOUT }, () => {
+test("the lint fails on a metric whose narrowed approval type is declared apart from the parameter", { timeout: TIMEOUT }, () => {
   assertStrengthCheckFailsOn('packages/report/src/planted-narrowed-metric.ts', [
     "import type { Approval } from '@revisum/contracts';",
     "type CheckedApproval = Approval & { readonly strength: 'verified' };",
@@ -71,7 +70,7 @@ test("the lint fails on a metric whose narrowed approval type is declared apart 
   ].join('\n'));
 });
 
-test('the lint still fails on a gate that takes VerifiedApproval directly', { criterion: 'AC-SPEC-02-20', timeout: TIMEOUT }, () => {
+test('the lint still fails on a gate that takes VerifiedApproval directly', { timeout: TIMEOUT }, () => {
   // The existing control, re-planted with the approval strength check named.
   assertStrengthCheckFailsOn('packages/engine/src/plan/planted-direct-gate.ts', [
     "import type { VerifiedApproval } from '@revisum/contracts';",
@@ -82,7 +81,7 @@ test('the lint still fails on a gate that takes VerifiedApproval directly', { cr
 
 // ---- Counter-examples the check must accept -------------------------------------------------------------
 
-test('the lint accepts a gate whose parameter type is an alias for any Approval', { criterion: 'AC-SPEC-02-20', timeout: TIMEOUT }, () => {
+test('the lint accepts a gate whose parameter type is an alias for any Approval', { timeout: TIMEOUT }, () => {
   assertLintPassesWith('packages/report/src/planted-alias-level.ts', [
     "import type { Approval } from '@revisum/contracts';",
     'type AnyApproval = Approval;',
@@ -91,7 +90,7 @@ test('the lint accepts a gate whose parameter type is an alias for any Approval'
   ].join('\n'));
 });
 
-test('the lint accepts a gate that narrows an Approval on its subject, not its strength', { criterion: 'AC-SPEC-02-20', timeout: TIMEOUT }, () => {
+test('the lint accepts a gate that narrows an Approval on its subject, not its strength', { timeout: TIMEOUT }, () => {
   assertLintPassesWith('packages/engine/src/planted-narrowed-gate.ts', [
     "import type { Approval, ApprovalSubject } from '@revisum/contracts';",
     "export const opensMergeGate = (approval: Approval & { readonly subject: ApprovalSubject & { readonly kind: 'plan' } }): boolean =>",

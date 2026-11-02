@@ -6,7 +6,6 @@
 // Counter-examples show the rules are narrow: literal text in an ordinary field, ordinary text that
 // merely contains "sk", a link that mentions a password, and a secret reference all parse.
 // Token-shaped values are fresh fakes generated here.
-// See docs/specs/SPEC-04-secrets-and-redaction.md.
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import { test } from 'node:test';
@@ -64,19 +63,19 @@ const TOKEN_SHAPES: readonly { readonly shape: string; readonly make: () => stri
 const SENSITIVE_LABELS = ['Password', 'Passcode', 'Access token', 'Client secret', 'API key', 'Passwort', 'Mot de passe'];
 
 for (const label of SENSITIVE_LABELS) {
-  test(`a fill with literal text into the "${label}" field is rejected as literal_secret`, { criterion: 'AC-SPEC-04-03' }, () => {
+  test(`a fill with literal text into the "${label}" field is rejected as literal_secret`, () => {
     const literal = `horse ${letters(10, /[^a-z]/g)} staple`;
     assertLiteralSecret(planWith(fill(label, literal)), '$.steps[1].value', literal);
   });
 }
 
-test('a fill with literal text into a textbox whose accessible name is Password is rejected as literal_secret', { criterion: 'AC-SPEC-04-03' }, () => {
+test('a fill with literal text into a textbox whose accessible name is Password is rejected as literal_secret', () => {
   const literal = `horse ${letters(10, /[^a-z]/g)} staple`;
   const step = { type: 'fill', locator: { by: 'role', role: 'textbox', name: 'Password' }, value: literal };
   assertLiteralSecret(planWith(step), '$.steps[1].value', literal);
 });
 
-test('a fill into a sensitive field inside a frame is rejected as literal_secret', { criterion: 'AC-SPEC-04-03' }, () => {
+test('a fill into a sensitive field inside a frame is rejected as literal_secret', () => {
   const literal = `horse ${letters(10, /[^a-z]/g)} staple`;
   const step = { type: 'frame', locator: { by: 'testId', testId: 'login-frame' }, steps: [fill('Password', literal)] };
   assertLiteralSecret(planWith(step), '$.steps[1].steps[0].value', literal);
@@ -85,13 +84,13 @@ test('a fill into a sensitive field inside a frame is rejected as literal_secret
 // ---- Token-shaped literals anywhere -------------------------------------------------------------
 
 for (const token of TOKEN_SHAPES) {
-  test(`${token.shape} typed into an ordinary field is rejected as literal_secret`, { criterion: 'AC-SPEC-04-03' }, () => {
+  test(`${token.shape} typed into an ordinary field is rejected as literal_secret`, () => {
     const literal = token.make();
     assertLiteralSecret(planWith(fill('Full name', literal)), '$.steps[1].value', literal);
   });
 }
 
-test('token-shaped literals in a title, an expected text, an option and a locator name are rejected as literal_secret', { criterion: 'AC-SPEC-04-03' }, () => {
+test('token-shaped literals in a title, an expected text, an option and a locator name are rejected as literal_secret', () => {
   const [jwt, bearer, github, openKey, cloudKey] = TOKEN_SHAPES.map((token) => token.make());
   assert.ok(jwt !== undefined && bearer !== undefined && github !== undefined && openKey !== undefined && cloudKey !== undefined);
   assertLiteralSecret(planWith(fill('Full name', 'Ada Lovelace'), { title: `Uses ${openKey}` }), '$.meta.title', openKey);
@@ -105,22 +104,22 @@ test('token-shaped literals in a title, an expected text, an option and a locato
 
 // ---- Counter-examples ---------------------------------------------------------------------------
 
-test('counter-example: literal text in an ordinary field parses', { criterion: 'AC-SPEC-04-03' }, () => {
+test('counter-example: literal text in an ordinary field parses', () => {
   assertAccepted(planWith(fill('Full name', 'Ada Lovelace')));
   assertAccepted(planWith(fill('Email', 'ada@example.test')));
 });
 
-test('counter-example: ordinary text that merely contains "sk" parses', { criterion: 'AC-SPEC-04-03' }, () => {
+test('counter-example: ordinary text that merely contains "sk" parses', () => {
   assertAccepted(planWith(fill('Search', 'Ask a question about the task-list')));
   assertAccepted(planWith({
     type: 'expect', locator: { by: 'testId', testId: 'banner' }, assert: { kind: 'textContains', value: 'Desk booking is risk-free' }, criterionId: 'secrets.banner',
   }, { title: 'Book a desk' }));
 });
 
-test('counter-example: a click on a link that mentions a password parses', { criterion: 'AC-SPEC-04-03' }, () => {
+test('counter-example: a click on a link that mentions a password parses', () => {
   assertAccepted(planWith({ type: 'click', locator: { by: 'role', role: 'link', name: 'Forgot password?' } }));
 });
 
-test('counter-example: a secret reference in the Password field parses', { criterion: 'AC-SPEC-04-03' }, () => {
+test('counter-example: a secret reference in the Password field parses', () => {
   assertAccepted(planWith(fill('Password', { secretName: 'ACCOUNT_PASSWORD' })));
 });

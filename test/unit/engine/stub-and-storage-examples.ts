@@ -11,7 +11,6 @@
 //     types, so a test reads what the parser kept, whatever shape the types take.
 //
 // The steps and declarations follow the shapes in the spec's "Interfaces and types".
-// See docs/specs/SPEC-33-network-stubs-request-checks-and-storage.md.
 import assert from 'node:assert/strict';
 import { parseProject, planParser, type Project } from '@revisum/engine';
 import {

@@ -9,7 +9,6 @@
 // readable-plan-examples.ts, which together use every construct of the language and of the
 // readable form's plan 1.2 addition; the property test adds seeded plans whose page-facing and
 // header text is hard to write down.
-// See docs/specs/SPEC-28-plan-authoring.md.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readPlanText, writePlanJson, writePlanText, type Plan, type TextReading } from '@revisum/engine';
@@ -47,14 +46,14 @@ const keysReversed = (value: unknown): unknown => {
 
 // ---- What the examples cover -----------------------------------------------------------------------
 
-test('the conversion examples use every step type, locator kind, role, assertion kind, key and plan field', { criterion: 'AC-SPEC-28-01' }, () => {
+test('the conversion examples use every step type, locator kind, role, assertion kind, key and plan field', () => {
   const used = new Set<string>();
   for (const { plan } of EXAMPLES) for (const feature of featuresOf(plan)) used.add(feature);
   assert.deepEqual(languageFeatures().filter((feature) => !used.has(feature)), [], 'features no conversion example uses');
 });
 
 for (const { name, plan } of EXAMPLES) {
-  test(`${name} parses, so the conversion tests start from a valid plan`, { criterion: 'AC-SPEC-28-01' }, () => {
+  test(`${name} parses, so the conversion tests start from a valid plan`, () => {
     const parsed = parsePlan(plan);
     assert.equal(parsed.ok, true, JSON.stringify(parsed));
   });
@@ -63,7 +62,7 @@ for (const { name, plan } of EXAMPLES) {
 // ---- Canonical JSON ----------------------------------------------------------------------------------
 
 for (const { name, plan } of EXAMPLES) {
-  test(`${name}: canonical JSON is two-space indented, with LF line ends and a final newline, and holds the plan`, { criterion: 'AC-SPEC-28-01' }, () => {
+  test(`${name}: canonical JSON is two-space indented, with LF line ends and a final newline, and holds the plan`, () => {
     const parsed = parsedWith(parsePlan, plan, name);
     const canonical = writePlanJson(parsed);
     assert.equal(canonical.includes('\r'), false, 'canonical JSON holds a carriage return');
@@ -72,7 +71,7 @@ for (const { name, plan } of EXAMPLES) {
     assert.deepEqual(JSON.parse(canonical), JSON.parse(JSON.stringify(parsed)));
   });
 
-  test(`${name}: canonical JSON does not depend on the key order or layout of the input`, { criterion: 'AC-SPEC-28-01' }, () => {
+  test(`${name}: canonical JSON does not depend on the key order or layout of the input`, () => {
     const canonical = writePlanJson(parsedWith(parsePlan, plan, name));
     const relaidOut = JSON.parse(JSON.stringify(keysReversed(plan), null, 4));
     assert.equal(writePlanJson(parsedWith(parsePlan, relaidOut, `${name} with its keys reversed`)), canonical);
@@ -83,14 +82,14 @@ for (const { name, plan } of EXAMPLES) {
 // ---- JSON to text and back -------------------------------------------------------------------------
 
 for (const { name, plan } of EXAMPLES) {
-  test(`${name}: canonical JSON written as text and read back gives byte-identical canonical JSON`, { criterion: 'AC-SPEC-28-01' }, () => {
+  test(`${name}: canonical JSON written as text and read back gives byte-identical canonical JSON`, () => {
     const canonical = writePlanJson(parsedWith(parsePlan, plan, name));
     const fromCanonical = parsedWith(parsePlan, JSON.parse(canonical), `${name} from canonical JSON`);
     assert.equal(writePlanJson(throughText(fromCanonical, name)), canonical);
   });
 }
 
-test('seeded plans with awkward page text survive the trip through text byte for byte', { criterion: 'AC-SPEC-28-01' }, () => {
+test('seeded plans with awkward page text survive the trip through text byte for byte', () => {
   const generated = generatedPlans(parsePlan, FIRST_SEED, GENERATED_COUNT);
   // The generator keeps only plans the parser accepts; nearly all of them must be kept, or the
   // property is tested on too little.
@@ -107,7 +106,7 @@ test('seeded plans with awkward page text survive the trip through text byte for
   assert.deepEqual(failures, []);
 });
 
-test('seeded plans with awkward page text keep their canonical text when it is read and written again', { criterion: 'AC-SPEC-28-02' }, () => {
+test('seeded plans with awkward page text keep their canonical text when it is read and written again', () => {
   const failures: string[] = [];
   for (const { seed, name, plan } of generatedPlans(parsePlan, FIRST_SEED, GENERATED_COUNT)) {
     const text = writePlanText(parsedWith(parsePlan, plan, `seed ${seed}`));
@@ -120,7 +119,7 @@ test('seeded plans with awkward page text keep their canonical text when it is r
   assert.deepEqual(failures, []);
 });
 
-test('the generated plans start or end header and page text with spaces and quotes, which the writer must quote', { criterion: 'AC-SPEC-28-01' }, () => {
+test('the generated plans start or end header and page text with spaces and quotes, which the writer must quote', () => {
   // A counter-example guard for the quoting rules: the property is only tested if these occur.
   const metas = generatedPlans(parsePlan, FIRST_SEED, GENERATED_COUNT).map(({ plan }) => plan['meta'] as JsonRecord);
   const headerTexts = metas.flatMap((meta) => [String(meta['title']), String(meta['specReference'])]);
@@ -128,7 +127,7 @@ test('the generated plans start or end header and page text with spaces and quot
   assert.ok(headerTexts.some((value) => value.startsWith('"')), 'no header text starts with a quote');
 });
 
-test('the generated plans really hold the awkward text the property is about', { criterion: 'AC-SPEC-28-01' }, () => {
+test('the generated plans really hold the awkward text the property is about', () => {
   // A counter-example guard: if the generator stopped replacing text, the property above would
   // pass on the plain examples alone.
   const generated = generatedPlans(parsePlan, FIRST_SEED, GENERATED_COUNT);
@@ -141,7 +140,7 @@ test('the generated plans really hold the awkward text the property is about', {
 // ---- Text to text ------------------------------------------------------------------------------------
 
 for (const { name, plan } of EXAMPLES) {
-  test(`${name}: canonical text read, parsed and written again is the same text, twice over`, { criterion: 'AC-SPEC-28-02' }, () => {
+  test(`${name}: canonical text read, parsed and written again is the same text, twice over`, () => {
     const canonicalText = writePlanText(parsedWith(parsePlan, plan, name));
     const once = writePlanText(planFromText(canonicalText, name));
     const twice = writePlanText(planFromText(once, `${name} written once`));
@@ -194,7 +193,7 @@ const RELAYOUTS: readonly { readonly name: string; readonly relayout: (text: str
 ];
 
 for (const { name, plan } of EXAMPLES) {
-  test(`${name}: canonical text has LF line ends, a final newline and no byte-order mark`, { criterion: 'AC-SPEC-28-02' }, () => {
+  test(`${name}: canonical text has LF line ends, a final newline and no byte-order mark`, () => {
     const canonicalText = writePlanText(parsedWith(parsePlan, plan, name));
     assert.equal(canonicalText.includes('\r'), false, 'canonical text holds a carriage return');
     assert.ok(canonicalText.endsWith('\n') && !canonicalText.endsWith('\n\n'), 'canonical text does not end with one final newline');
@@ -204,7 +203,7 @@ for (const { name, plan } of EXAMPLES) {
 
 for (const { name, plan } of EXAMPLES) {
   for (const { name: relayoutName, relayout } of RELAYOUTS) {
-    test(`${name}: canonical text with ${relayoutName} is written back as the canonical text`, { criterion: 'AC-SPEC-28-02' }, () => {
+    test(`${name}: canonical text with ${relayoutName} is written back as the canonical text`, () => {
       const canonicalText = writePlanText(parsedWith(parsePlan, plan, name));
       const relaidOut = relayout(canonicalText);
       assert.notEqual(relaidOut, canonicalText, 'the re-layout changed nothing, so it proves nothing');
@@ -213,7 +212,7 @@ for (const { name, plan } of EXAMPLES) {
   }
 }
 
-test('each dropped comment line is reported once, as comment-dropped at its own line and column 1', { criterion: 'AC-SPEC-28-02' }, () => {
+test('each dropped comment line is reported once, as comment-dropped at its own line and column 1', () => {
   const example = EXAMPLES.find(({ name }) => name === 'golden signup');
   assert.ok(example !== undefined, 'the sign-up golden plan is missing');
   const canonicalText = writePlanText(parsedWith(parsePlan, example.plan, example.name));

@@ -6,7 +6,6 @@
 //     cannot be read;
 //   - probeEgress's script really runs, in Node, against a loopback port with nothing listening: a
 //     refused connection is reached only for a target that counts a refusal.
-// See docs/specs/SPEC-07-isolated-runner-and-egress.md.
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import { createRequire, syncBuiltinESMExports } from 'node:module';
@@ -90,7 +89,7 @@ const prints = (stdout: string): DockerAnswer => ({ status: 0, stdout });
 
 // ---- Where a gateway would be -------------------------------------------------------------------------
 
-test('Docker is asked for that network\'s whole description, as JSON', { criterion: 'AC-SPEC-07-05' }, async () => {
+test('Docker is asked for that network\'s whole description, as JSON', async () => {
   const lines = dockerPrints(prints(description({ subnets: ['172.18.0.0/16'] })));
   await gatewayAddress(dockerCliEngine());
   assert.deepEqual(lines, [['network', 'inspect', '--format', '{{json .}}', NETWORK]]);
@@ -104,28 +103,28 @@ const FIRST_ADDRESSES: readonly { readonly subnet: string; readonly first: strin
 ];
 
 for (const { subnet, first } of FIRST_ADDRESSES) {
-  test(`on an empty network with the subnet ${subnet}, the place to try is ${first}`, { criterion: 'AC-SPEC-07-05' }, async () => {
+  test(`on an empty network with the subnet ${subnet}, the place to try is ${first}`, async () => {
     dockerPrints(prints(description({ subnets: [subnet] })));
     assert.deepEqual(await gatewayAddress(dockerCliEngine()), { ok: true, value: first });
   });
 }
 
-test('when a container on the network holds the subnet\'s first address, there is nothing to try', { criterion: 'AC-SPEC-07-05' }, async () => {
+test('when a container on the network holds the subnet\'s first address, there is nothing to try', async () => {
   dockerPrints(prints(description({ subnets: ['172.18.0.0/16'], members: ['172.18.0.2/16', '172.18.0.1/16'] })));
   assert.deepEqual(await gatewayAddress(dockerCliEngine()), { ok: true, value: null });
 });
 
-test('counter-example: containers on other addresses leave the first address to try', { criterion: 'AC-SPEC-07-05' }, async () => {
+test('counter-example: containers on other addresses leave the first address to try', async () => {
   dockerPrints(prints(description({ subnets: ['172.18.0.0/16'], members: ['172.18.0.2/16', '172.18.0.10/16', '172.18.1.1/16'] })));
   assert.deepEqual(await gatewayAddress(dockerCliEngine()), { ok: true, value: '172.18.0.1' });
 });
 
-test('an IPv6 pool listed first does not hide the network\'s IPv4 subnet', { criterion: 'AC-SPEC-07-05' }, async () => {
+test('an IPv6 pool listed first does not hide the network\'s IPv4 subnet', async () => {
   dockerPrints(prints(description({ subnets: ['fd00::/64', '172.18.0.0/16'] })));
   assert.deepEqual(await gatewayAddress(dockerCliEngine()), { ok: true, value: '172.18.0.1' });
 });
 
-test('a description that lists no containers still gives the first address to try', { criterion: 'AC-SPEC-07-05' }, async () => {
+test('a description that lists no containers still gives the first address to try', async () => {
   dockerPrints(prints(JSON.stringify({ IPAM: { Config: [{ Subnet: '172.18.0.0/16' }] } })));
   assert.deepEqual(await gatewayAddress(dockerCliEngine()), { ok: true, value: '172.18.0.1' });
 });
@@ -140,14 +139,14 @@ const UNREADABLE: readonly { readonly title: string; readonly answer: DockerAnsw
 ];
 
 for (const { title, answer } of UNREADABLE) {
-  test(`a problem is reported when ${title}`, { criterion: 'AC-SPEC-07-05' }, async () => {
+  test(`a problem is reported when ${title}`, async () => {
     dockerPrints(answer);
     const read = await gatewayAddress(dockerCliEngine());
     assert.equal(read.ok, false, JSON.stringify(read));
   });
 }
 
-test('a problem is reported when the Docker client cannot start', { criterion: 'AC-SPEC-07-05' }, async () => {
+test('a problem is reported when the Docker client cannot start', async () => {
   dockerCannotStart();
   const read = await gatewayAddress(dockerCliEngine());
   assert.equal(read.ok, false, JSON.stringify(read));
@@ -164,7 +163,7 @@ const NO_READABLE_SUBNET: readonly { readonly title: string; readonly pools: rea
 ];
 
 for (const { title, pools } of NO_READABLE_SUBNET) {
-  test(`a problem is reported, not "nothing to try", for a description with ${title}`, { criterion: 'AC-SPEC-07-05' }, async () => {
+  test(`a problem is reported, not "nothing to try", for a description with ${title}`, async () => {
     dockerPrints(prints(JSON.stringify({ IPAM: { Config: pools }, Containers: {} })));
     const read = await gatewayAddress(dockerCliEngine());
     assert.equal(read.ok, false, JSON.stringify(read));
@@ -183,19 +182,19 @@ async function closedPort(): Promise<number> {
   return address.port;
 }
 
-test('the probe counts a refused connection as reached for a target that says so', { criterion: 'AC-SPEC-07-05', timeout: 30_000 }, async () => {
+test('the probe counts a refused connection as reached for a target that says so', { timeout: 30_000 }, async () => {
   const port = await closedPort();
   execRunsHere();
   assert.equal(await dockerCliEngine().probeEgress('run-container', [{ host: '127.0.0.1', port, refusalCountsAsReached: true }]), 'reached');
 });
 
-test('counter-example: the probe counts a refused connection as blocked for any other target', { criterion: 'AC-SPEC-07-05', timeout: 30_000 }, async () => {
+test('counter-example: the probe counts a refused connection as blocked for any other target', { timeout: 30_000 }, async () => {
   const port = await closedPort();
   execRunsHere();
   assert.equal(await dockerCliEngine().probeEgress('run-container', [{ host: '127.0.0.1', port }]), 'blocked');
 });
 
-test('the probe counts an accepted connection as reached for a target that does not count refusals', { criterion: 'AC-SPEC-07-05', timeout: 30_000 }, async () => {
+test('the probe counts an accepted connection as reached for a target that does not count refusals', { timeout: 30_000 }, async () => {
   const server = createServer((socket) => { socket.destroy(); });
   await new Promise<void>((resolve) => { server.listen(0, '127.0.0.1', resolve); });
   try {

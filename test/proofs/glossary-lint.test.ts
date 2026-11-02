@@ -6,7 +6,6 @@
 //   - every type the engine's public API exports, through `export *` into contracts, is listed;
 //   - the Standard names table equals the naming lint's standardNames.
 // Each test changes the glossary in a throw-away copy of the repository and runs the lint.
-// See docs/specs/SPEC-00-repo-seed-and-gates.md.
 import { after, before, test } from 'node:test';
 import { copyRepository, type ScratchRepository } from './scratch-repository.ts';
 import { assertLintFails, assertLintPasses, lintWithEdits } from './scratch-edits.ts';
@@ -32,34 +31,34 @@ const without = (removed: string) => (text: string): string => {
   return text.replace(removed, '');
 };
 
-test('control: the unchanged copy of the repository passes every lint command', { criterion: 'AC-SPEC-00-16', timeout: TIMEOUT }, () => {
+test('control: the unchanged copy of the repository passes every lint command', { timeout: TIMEOUT }, () => {
   assertLintPasses(scratch.lint());
 });
 
 // ---- Code names resolve -------------------------------------------------------------------------
 
-test('the lint fails on a row whose code name is no exported declaration', { criterion: 'AC-SPEC-00-16', timeout: TIMEOUT }, () => {
+test('the lint fails on a row whose code name is no exported declaration', { timeout: TIMEOUT }, () => {
   const outcome = lintWithEdits(scratch, {
     [GLOSSARY_PATH]: withRow('| Planted term | `plantedMissingExport` | `engine`, exists | A term whose code name names nothing |'),
   });
   assertLintFails(outcome, ['plantedMissingExport'], GLOSSARY_CHECK);
 });
 
-test('the lint fails on a partly planned row whose existing code name is missing', { criterion: 'AC-SPEC-00-16', timeout: TIMEOUT }, () => {
+test('the lint fails on a partly planned row whose existing code name is missing', { timeout: TIMEOUT }, () => {
   const outcome = lintWithEdits(scratch, {
-    [GLOSSARY_PATH]: withRow('| Planted term | `plantedMissingExport` | `engine`, exists; driver planned (SPEC-06) | A term whose code name names nothing |'),
+    [GLOSSARY_PATH]: withRow('| Planted term | `plantedMissingExport` | `engine`, exists; driver planned | A term whose code name names nothing |'),
   });
   assertLintFails(outcome, ['plantedMissingExport'], GLOSSARY_CHECK);
 });
 
-test('the lint fails on a row whose code name is a path that does not exist', { criterion: 'AC-SPEC-00-16', timeout: TIMEOUT }, () => {
+test('the lint fails on a row whose code name is a path that does not exist', { timeout: TIMEOUT }, () => {
   const outcome = lintWithEdits(scratch, {
     [GLOSSARY_PATH]: withRow('| Planted tool | `tools/planted-missing-tool.ts` | `tools`, exists | A tool that is not there |'),
   });
   assertLintFails(outcome, ['tools/planted-missing-tool.ts'], GLOSSARY_CHECK);
 });
 
-test('counter-example: a row whose "Where" says only "planned" is not checked', { criterion: 'AC-SPEC-00-16', timeout: TIMEOUT }, () => {
+test('counter-example: a row whose "Where" says only "planned" is not checked', { timeout: TIMEOUT }, () => {
   assertLintPasses(lintWithEdits(scratch, {
     [GLOSSARY_PATH]: withRow('| Planted term | `plantedMissingExport` | planned | A term whose code is still to come |'),
   }));
@@ -67,26 +66,26 @@ test('counter-example: a row whose "Where" says only "planned" is not checked', 
 
 // ---- The engine's public API is listed ----------------------------------------------------------
 
-test('the lint fails when an exported engine type is taken out of the glossary', { criterion: 'AC-SPEC-00-16', timeout: TIMEOUT }, () => {
+test('the lint fails when an exported engine type is taken out of the glossary', { timeout: TIMEOUT }, () => {
   const outcome = lintWithEdits(scratch, {
     [GLOSSARY_PATH]: (text) => text.split('\n').filter((line) => !line.includes('`AiText`')).join('\n'),
   });
   assertLintFails(outcome, ['AiText'], GLOSSARY_CHECK);
 });
 
-test('the lint fails when a contracts type the engine re-exports is taken out of the glossary', { criterion: 'AC-SPEC-00-16', timeout: TIMEOUT }, () => {
+test('the lint fails when a contracts type the engine re-exports is taken out of the glossary', { timeout: TIMEOUT }, () => {
   const outcome = lintWithEdits(scratch, { [GLOSSARY_PATH]: without('`LeakScanner`, ') });
   assertLintFails(outcome, ['LeakScanner'], GLOSSARY_CHECK);
 });
 
 // ---- Standard names -----------------------------------------------------------------------------
 
-test('the lint fails when a standard name is dropped from the glossary', { criterion: 'AC-SPEC-00-16', timeout: TIMEOUT }, () => {
+test('the lint fails when a standard name is dropped from the glossary', { timeout: TIMEOUT }, () => {
   const outcome = lintWithEdits(scratch, { [GLOSSARY_PATH]: without('| mcp | Model Context Protocol |\n') });
   assertLintFails(outcome, ['mcp'], GLOSSARY_CHECK);
 });
 
-test('the lint fails when a standard name is given another full name', { criterion: 'AC-SPEC-00-16', timeout: TIMEOUT }, () => {
+test('the lint fails when a standard name is given another full name', { timeout: TIMEOUT }, () => {
   const outcome = lintWithEdits(scratch, {
     [GLOSSARY_PATH]: (text) => without('| jwt | JSON Web Token |')(text).replace('| oidc | OpenID Connect |', '| oidc | OpenID Connect |\n| jwt | JSON Web Tokens |'),
   });

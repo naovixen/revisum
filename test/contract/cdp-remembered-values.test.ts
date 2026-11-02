@@ -6,7 +6,6 @@
 // (fixtures/plan-values-app/remember.html) counts every input event, whoever sends it.
 // A remembered value used as a path segment stays one whole segment on the base URL's origin,
 // however hostile its text; one of "." or ".." fails the navigate step before any request.
-// See docs/specs/SPEC-30-plan-values-positions-and-keys.md.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import {
@@ -37,7 +36,7 @@ describe('a remember step whose text cannot be used', () => {
   ] as const;
 
   for (const refused of REFUSED) {
-    test(`remembering ${refused.what} fails the step with ${refused.code}, ends the run Failed there and sends no later input`, { criterion: 'AC-SPEC-30-09' }, async () => {
+    test(`remembering ${refused.what} fails the step with ${refused.code}, ends the run Failed there and sends no later input`, async () => {
       const { result, atClose } = await harness.runSteps(CDP_TARGET, [OPEN_PAGE, remember('remembered', testId(refused.element)), ...AFTER_REMEMBER], { read: READ_AT_CLOSE });
       assert.equal(result.state, 'Failed');
       assert.deepEqual(outcomes(result), [
@@ -52,7 +51,7 @@ describe('a remember step whose text cannot be used', () => {
 describe('a remember step whose text can be used', () => {
   // Counter-example to every refusal above: the same plan reading usable text sends the later
   // input, so the page's counters can move.
-  test('the order number is remembered without its surrounding whitespace, and the later steps run', { criterion: 'AC-SPEC-30-09' }, async () => {
+  test('the order number is remembered without its surrounding whitespace, and the later steps run', async () => {
     const { result, atClose } = await harness.runSteps(CDP_TARGET, [
       OPEN_PAGE, remember('remembered', testId('order-number')), ...AFTER_REMEMBER,
       valueEquals(label('Search'), 'ORD-58213', 'remember.search-filled'),
@@ -63,7 +62,7 @@ describe('a remember step whose text can be used', () => {
     assert.notEqual(atClose?.shown['input-events'], '0', 'the later steps sent input');
   });
 
-  test('an input\'s value is remembered with read "value"', { criterion: 'AC-SPEC-30-09' }, async () => {
+  test('an input\'s value is remembered with read "value"', async () => {
     const { result } = await harness.runSteps(CDP_TARGET, [
       OPEN_PAGE, remember('reference', label('Reference'), 'value'), fill(label('Search'), reference('reference')),
       valueEquals(label('Search'), 'REF-7731', 'remember.reference-copied'),
@@ -71,7 +70,7 @@ describe('a remember step whose text can be used', () => {
     assert.equal(result.state, 'Passed', JSON.stringify(result.steps));
   });
 
-  test('a remember step waits for text that appears after the page loads', { criterion: 'AC-SPEC-30-09' }, async () => {
+  test('a remember step waits for text that appears after the page loads', async () => {
     const { result } = await harness.runSteps(CDP_TARGET, [
       OPEN_PAGE, remember('late', testId('late-value')), fill(label('Search'), reference('late')),
       valueEquals(label('Search'), 'LATE-4471', 'remember.late-value-copied'),
@@ -83,7 +82,7 @@ describe('a remember step whose text can be used', () => {
 describe('a remembered value as a path segment', () => {
   const HOSTILE = 'a/b?c#d %2F ../名前';
 
-  test('a value holding "/", "?", "#", "%2F", ".." and non-Latin text stays one segment and one query value on the base URL\'s origin', { criterion: 'AC-SPEC-30-11' }, async () => {
+  test('a value holding "/", "?", "#", "%2F", ".." and non-Latin text stays one segment and one query value on the base URL\'s origin', async () => {
     const { result, atClose, requestedPaths } = await harness.runSteps(CDP_TARGET, [
       OPEN_PAGE, remember('segment', testId('hostile-segment')),
       navigate({ segments: ['items', reference('segment'), 'detail'], query: { search: reference('segment') } }),
@@ -105,7 +104,7 @@ describe('a remembered value as a path segment', () => {
   });
 
   for (const [what, element] of [['"."', 'dot-segment'], ['".."', 'dot-dot-segment']] as const) {
-    test(`a value of ${what} fails the navigate step with value-unsafe before any request`, { criterion: 'AC-SPEC-30-11' }, async () => {
+    test(`a value of ${what} fails the navigate step with value-unsafe before any request`, async () => {
       const { result, atClose, requestedPaths } = await harness.runSteps(CDP_TARGET, [
         OPEN_PAGE, remember('segment', testId(element)),
         navigate({ segments: ['items', reference('segment')] }),

@@ -4,7 +4,6 @@
 // nothing: the run fails that step and skips the rest, and the fixture page
 // (fixtures/plan-values-app/remember.html) counts no input event. Each refusal is paired with the
 // same plan without the feature, which the fallback does run.
-// See docs/specs/SPEC-30-plan-values-positions-and-keys.md.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import {
@@ -43,14 +42,14 @@ const stepsWith = (step: JsonRecord) => [
 
 describe(`the Playwright fallback: ${PLAYWRIGHT_TARGET}`, () => {
   for (const feature of FEATURES) {
-    test(`a run with ${feature.name} fails that step with unsupported-step, sends nothing and skips the rest`, { criterion: 'AC-SPEC-30-19' }, async () => {
+    test(`a run with ${feature.name} fails that step with unsupported-step, sends nothing and skips the rest`, async () => {
       const { result, atClose } = await harness.runSteps(PLAYWRIGHT_TARGET, stepsWith(feature.withFeature));
       assert.equal(result.state, 'Failed');
       assert.deepEqual(outcomes(result), [[0, 'passed', undefined], [1, 'failed', 'unsupported-step'], [2, 'skipped', undefined], [3, 'skipped', undefined]]);
       assert.equal(atClose?.shown['input-events'], '0', 'no input event reached the page');
     });
 
-    test(`counter-example: the same run without ${feature.name} passes and sends its input`, { criterion: 'AC-SPEC-30-19' }, async () => {
+    test(`counter-example: the same run without ${feature.name} passes and sends its input`, async () => {
       const { result, atClose } = await harness.runSteps(PLAYWRIGHT_TARGET, stepsWith(feature.without));
       assert.equal(result.state, 'Passed', JSON.stringify(result.steps));
       assert.notEqual(atClose?.shown['input-events'], '0');
@@ -60,7 +59,7 @@ describe(`the Playwright fallback: ${PLAYWRIGHT_TARGET}`, () => {
 
 describe(`the own CDP driver: ${CDP_TARGET}`, () => {
   for (const feature of FEATURES) {
-    test(`a run with ${feature.name} performs it and passes`, { criterion: 'AC-SPEC-30-19' }, async () => {
+    test(`a run with ${feature.name} performs it and passes`, async () => {
       const { result, atClose } = await harness.runSteps(CDP_TARGET, stepsWith(feature.withFeature));
       assert.equal(result.state, 'Passed', JSON.stringify(result.steps));
       assert.notEqual(atClose?.shown['input-events'], '0');

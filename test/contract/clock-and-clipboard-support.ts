@@ -15,7 +15,6 @@
 //
 // Clock advances need the page's timers to be the determinism kit's virtual timers: the fixture
 // pages register theirs as they load, and expect none to run until an advance.
-// See docs/specs/SPEC-34-clock-advance-and-clipboard.md.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { arch, platform } from 'node:os';

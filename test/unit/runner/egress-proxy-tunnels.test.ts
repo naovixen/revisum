@@ -3,7 +3,6 @@
 // recorded as blocked and dials nothing; a name that rebinds to a private address is refused at its
 // next tunnel. Every name resolves through a fake resolver, and every allowed connection goes to a
 // local stand-in server, so nothing reaches the network.
-// See docs/specs/SPEC-07-isolated-runner-and-egress.md.
 import assert from 'node:assert/strict';
 import { request, type IncomingMessage } from 'node:http';
 import type { Socket } from 'node:net';
@@ -62,18 +61,18 @@ function requestThroughTunnel(authority: string): Promise<string> {
   });
 }
 
-test('an allowed CONNECT succeeds, dials the address the proxy vetted, and is recorded as allowed', { criterion: 'AC-SPEC-07-02' }, async () => {
+test('an allowed CONNECT succeeds, dials the address the proxy vetted, and is recorded as allowed', async () => {
   const dialledBefore = upstream.dialled.length;
   assert.equal(await connectThroughProxy(proxy.url, 'public.test:443'), 200);
   assert.deepEqual(upstream.dialled.slice(dialledBefore), [{ address: PUBLIC_ADDRESS, port: 443 }]);
   assert.deepEqual(decisionsFor('public.test:443'), [{ origin: 'public.test:443', decision: 'allowed' }]);
 });
 
-test('an allowed tunnel carries bytes both ways', { criterion: 'AC-SPEC-07-02' }, async () => {
+test('an allowed tunnel carries bytes both ways', async () => {
   assert.ok((await requestThroughTunnel('carrier.test:443')).includes(UPSTREAM_BODY));
 });
 
-test('a CONNECT to an undeclared origin is recorded as blocked, with no lookup and nothing dialled', { criterion: 'AC-SPEC-07-01' }, async () => {
+test('a CONNECT to an undeclared origin is recorded as blocked, with no lookup and nothing dialled', async () => {
   const dialledBefore = upstream.dialled.length;
   assert.equal(await connectThroughProxy(proxy.url, 'undeclared.invalid:443'), 403);
   assert.equal(upstream.dialled.length, dialledBefore);
@@ -81,7 +80,7 @@ test('a CONNECT to an undeclared origin is recorded as blocked, with no lookup a
   assert.deepEqual(decisionsFor('undeclared.invalid:443'), [{ origin: 'undeclared.invalid:443', decision: 'blocked' }]);
 });
 
-test('a CONNECT to another port of a declared host is recorded as blocked', { criterion: 'AC-SPEC-07-01' }, async () => {
+test('a CONNECT to another port of a declared host is recorded as blocked', async () => {
   const dialledBefore = upstream.dialled.length;
   assert.equal(await connectThroughProxy(proxy.url, 'public.test:8443'), 403);
   assert.equal(upstream.dialled.length, dialledBefore);
@@ -89,7 +88,7 @@ test('a CONNECT to another port of a declared host is recorded as blocked', { cr
 });
 
 for (const name of ['private-ten.test', 'metadata.test']) {
-  test(`a CONNECT to the declared name ${name}, which resolves to a refused address, is recorded as blocked and dials nothing`, { criterion: 'AC-SPEC-07-02' }, async () => {
+  test(`a CONNECT to the declared name ${name}, which resolves to a refused address, is recorded as blocked and dials nothing`, async () => {
     const dialledBefore = upstream.dialled.length;
     assert.equal(await connectThroughProxy(proxy.url, `${name}:443`), 403);
     assert.equal(upstream.dialled.length, dialledBefore);
@@ -97,7 +96,7 @@ for (const name of ['private-ten.test', 'metadata.test']) {
   });
 }
 
-test('a rebinding name is refused for tunnels too: the first tunnel dials the vetted address, the next is refused', { criterion: 'AC-SPEC-07-02' }, async () => {
+test('a rebinding name is refused for tunnels too: the first tunnel dials the vetted address, the next is refused', async () => {
   const dialledBefore = upstream.dialled.length;
   assert.equal(await connectThroughProxy(proxy.url, 'rebind.test:443'), 200);
   assert.deepEqual(upstream.dialled.slice(dialledBefore), [{ address: PUBLIC_ADDRESS, port: 443 }], 'the counter-example: while public, the name is reached');

@@ -4,7 +4,6 @@
 // address inside. Each refused range is checked at its edges, and the address just outside each
 // edge is allowed, so a check that refused too much would fail as surely as one that refused too
 // little.
-// See docs/specs/SPEC-07-isolated-runner-and-egress.md.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { checkResolvedAddress } from '@revisum/runner';
@@ -52,21 +51,21 @@ const ALLOWED_IPV6: readonly string[] = [
 ];
 
 for (const { range, addresses } of REFUSED_IPV4) {
-  test(`an IPv4 address in ${range} is refused`, { criterion: 'AC-SPEC-07-02' }, () => {
+  test(`an IPv4 address in ${range} is refused`, () => {
     for (const address of addresses) assert.equal(checkResolvedAddress(address), 'refused', address);
   });
 }
 
-test('a public IPv4 address, including each one just outside a refused range, is allowed', { criterion: 'AC-SPEC-07-02' }, () => {
+test('a public IPv4 address, including each one just outside a refused range, is allowed', () => {
   for (const address of ALLOWED_IPV4) assert.equal(checkResolvedAddress(address), 'allowed', address);
 });
 
 for (const { range, addresses } of REFUSED_IPV6) {
-  test(`an IPv6 address in ${range} is refused`, { criterion: 'AC-SPEC-07-02' }, () => {
+  test(`an IPv6 address in ${range} is refused`, () => {
     for (const address of addresses) assert.equal(checkResolvedAddress(address), 'refused', address);
   });
 }
 
-test('a public IPv6 address, and each IPv6 form carrying a public IPv4 address, is allowed', { criterion: 'AC-SPEC-07-02' }, () => {
+test('a public IPv6 address, and each IPv6 form carrying a public IPv4 address, is allowed', () => {
   for (const address of ALLOWED_IPV6) assert.equal(checkResolvedAddress(address), 'allowed', address);
 });

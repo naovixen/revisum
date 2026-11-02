@@ -7,7 +7,6 @@
 // pair is asked. The counter-example shows an element that exposes the property fails the wrong
 // state with assertion-failed instead, so the two codes are told apart.
 // The runs share one browser; each starts by loading the page again.
-// See docs/specs/SPEC-31-page-states-metadata-downloads-and-tabs.md.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import type { BrowserDriver } from '@revisum/engine';
@@ -54,35 +53,35 @@ const IN_STATE: readonly StateCase[] = [
 
 describe('each state check on an element in that state', () => {
   for (const stateCase of IN_STATE) {
-    test(`${stateCase.holds} passes on ${stateCase.element}`, { criterion: 'AC-SPEC-31-01' }, async () => {
+    test(`${stateCase.holds} passes on ${stateCase.element}`, async () => {
       const { result } = await runChecks([expectState(stateCase.locator, stateCase.holds, 'states.in-state')]);
       assert.equal(result.state, 'Passed', JSON.stringify(result.steps));
     });
 
-    test(`${stateCase.opposite} fails on ${stateCase.element} with assertion-failed`, { criterion: 'AC-SPEC-31-01' }, async () => {
+    test(`${stateCase.opposite} fails on ${stateCase.element} with assertion-failed`, async () => {
       const { result } = await runChecks([expectState(stateCase.locator, stateCase.opposite, 'states.opposite')]);
       assert.equal(result.state, 'Failed');
       assert.deepEqual(outcomes(result), [[0, 'passed', undefined], [1, 'failed', 'assertion-failed'], [2, 'skipped', undefined]]);
     });
   }
 
-  test('current passes on the navigation link with aria-current="page"', { criterion: 'AC-SPEC-31-01' }, async () => {
+  test('current passes on the navigation link with aria-current="page"', async () => {
     const { result } = await runChecks([expectState(role('link', 'Overview'), 'current', 'states.current-page')]);
     assert.equal(result.state, 'Passed', JSON.stringify(result.steps));
   });
 
-  test('current fails with assertion-failed on the navigation link with aria-current="false"', { criterion: 'AC-SPEC-31-01' }, async () => {
+  test('current fails with assertion-failed on the navigation link with aria-current="false"', async () => {
     const { result } = await runChecks([expectState(role('link', 'Reports'), 'current', 'states.not-current')]);
     assert.deepEqual(outcomes(result), [[0, 'passed', undefined], [1, 'failed', 'assertion-failed'], [2, 'skipped', undefined]]);
   });
 
   // The state is read from the page as it is now, not as it loaded.
-  test('after a click opens the Returns notes disclosure, expanded passes on it', { criterion: 'AC-SPEC-31-01' }, async () => {
+  test('after a click opens the Returns notes disclosure, expanded passes on it', async () => {
     const { result } = await runChecks([click(testId('returns-disclosure')), expectState(testId('returns-disclosure'), 'expanded', 'states.opened')]);
     assert.equal(result.state, 'Passed', JSON.stringify(result.steps));
   });
 
-  test('after a click opens the Returns notes disclosure, collapsed fails on it with assertion-failed', { criterion: 'AC-SPEC-31-01' }, async () => {
+  test('after a click opens the Returns notes disclosure, collapsed fails on it with assertion-failed', async () => {
     const { result } = await runChecks([click(testId('returns-disclosure')), expectState(testId('returns-disclosure'), 'collapsed', 'states.opened')]);
     assert.deepEqual(outcomes(result), [[0, 'passed', undefined], [1, 'passed', undefined], [2, 'failed', 'assertion-failed'], [3, 'skipped', undefined]]);
   });
@@ -101,7 +100,7 @@ const NOT_EXPOSED: readonly HiddenStateCase[] = [
 
 describe('a state check on an element that does not expose the property', () => {
   for (const hidden of NOT_EXPOSED) {
-    test(`on ${hidden.element}, ${hidden.kinds.join(', ')} each fail with state-not-exposed and never pass`, { criterion: 'AC-SPEC-31-02' }, async () => {
+    test(`on ${hidden.element}, ${hidden.kinds.join(', ')} each fail with state-not-exposed and never pass`, async () => {
       for (const kind of hidden.kinds) {
         const { result } = await runChecks([expectState(hidden.locator, kind, 'states.not-exposed')]);
         assert.equal(result.state, 'Failed', `${kind}: ${JSON.stringify(result.steps)}`);
@@ -112,7 +111,7 @@ describe('a state check on an element that does not expose the property', () => 
 
   // Counter-example: the Italic button exposes aria-pressed="false", so the wrong state fails as
   // an ordinary assertion and the right one passes.
-  test('counter-example: on a button that exposes aria-pressed, pressed fails with assertion-failed and unpressed passes', { criterion: 'AC-SPEC-31-02' }, async () => {
+  test('counter-example: on a button that exposes aria-pressed, pressed fails with assertion-failed and unpressed passes', async () => {
     const pressed = await runChecks([expectState(testId('italic-toggle'), 'pressed', 'states.exposed')]);
     assert.deepEqual(outcomes(pressed.result), [[0, 'passed', undefined], [1, 'failed', 'assertion-failed'], [2, 'skipped', undefined]]);
     const unpressed = await runChecks([expectState(testId('italic-toggle'), 'unpressed', 'states.exposed')]);
@@ -121,7 +120,7 @@ describe('a state check on an element that does not expose the property', () => 
 
   // Counter-example: the class-only tab is on the page and visible, so the refusal is about the
   // state, not about finding the element.
-  test('counter-example: the class-only tab is found and visible', { criterion: 'AC-SPEC-31-02' }, async () => {
+  test('counter-example: the class-only tab is found and visible', async () => {
     const { result } = await runChecks([expectState(testId('class-only-tab'), 'visible', 'states.class-only-shown')]);
     assert.equal(result.state, 'Passed', JSON.stringify(result.steps));
   });

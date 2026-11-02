@@ -7,7 +7,6 @@
 //
 // admitCoreDraft is called through admitAsCoreRoute() below, so this file compiles before
 // 'explore-draft' joins CoreRouteSource.
-// See docs/specs/SPEC-37-explore-to-draft.md and docs/specs/SPEC-28-plan-authoring.md.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
@@ -32,7 +31,7 @@ const textOf = (plan: JsonRecord): string => {
 };
 const draftOf = (plan: JsonRecord): PlanDraft => ({ format: 'text', content: textOf(plan) });
 
-test('an explore draft is admitted with source explore-draft, basis core-recorded and the page map\'s sha256 as its reference', { criterion: 'AC-SPEC-37-07' }, () => {
+test('an explore draft is admitted with source explore-draft, basis core-recorded and the page map\'s sha256 as its reference', () => {
   const events = memoryEventSink();
   const admitted = admitAsCoreRoute(draftOf(signupPlan()), 'explore-draft', PAGE_MAP_REFERENCE, defaultParser(), events);
   assert.equal(admitted.ok, true, JSON.stringify(admitted));
@@ -40,13 +39,13 @@ test('an explore draft is admitted with source explore-draft, basis core-recorde
   assert.deepEqual(events.recorded[0]?.event.planProvenance, { source: 'explore-draft', basis: 'core-recorded', reference: PAGE_MAP_REFERENCE });
 });
 
-test('the explore route is recorded as an agent, never as a person', { criterion: 'AC-SPEC-37-07' }, () => {
+test('the explore route is recorded as an agent, never as a person', () => {
   const events = memoryEventSink();
   admitAsCoreRoute(draftOf(signupPlan()), 'explore-draft', PAGE_MAP_REFERENCE, defaultParser(), events);
   assert.equal(events.recorded[0]?.actor.actorType, 'agent');
 });
 
-test('a draft that declares itself an explore draft is refused with untrusted-source, before the parser', { criterion: 'AC-SPEC-37-07' }, () => {
+test('a draft that declares itself an explore draft is refused with untrusted-source, before the parser', () => {
   let parses = 0;
   const counting: PlanParse = (input) => { parses += 1; return defaultParser()(input); };
   for (const basis of ['declared', 'core-recorded'] as const) {
@@ -92,7 +91,7 @@ for (const { name, plan, decision, approved } of [
   { name: 'the sign-up plan', plan: signupPlan, decision: 'allow', approved: 'approved' },
   { name: 'the sign-up plan with an irreversible click', plan: DENIED_SIGNUP, decision: 'deny irreversible-action at 8', approved: 'proposal' },
 ]) {
-  test(`${name} admitted as an explore draft gets the same hash, policy decision and approval requirement as under every other source`, { criterion: 'AC-SPEC-37-07' }, async () => {
+  test(`${name} admitted as an explore draft gets the same hash, policy decision and approval requirement as under every other source`, async () => {
     const treatments: { readonly source: string; readonly treatment: string }[] = [];
     for (const source of ['explore-draft', 'hand-written', 'draft-command', 'ticket', 'chat']) {
       treatments.push({ source, treatment: await treatmentOf(admittedUnder(source, plan())) });

@@ -1,7 +1,6 @@
 // Every error code has a docs anchor: docs/errors.md holds one "## <code>" heading per code, so
 // the link errors#<code> resolves. The check runs inside `npm run lint` and fails, naming the
 // code, when a heading is missing.
-// See docs/specs/SPEC-27-shared-types-and-events.md.
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -76,7 +75,7 @@ let scratch: ScratchRepository;
 before(() => { scratch = copyRepository(); });
 after(() => { scratch.dispose(); });
 
-test('docs/errors.md has a "## <code>" heading for every code of every error-code union', { criterion: 'AC-SPEC-27-06' }, () => {
+test('docs/errors.md has a "## <code>" heading for every code of every error-code union', () => {
   const page = join(REPOSITORY_ROOT, ERRORS_PAGE);
   assert.ok(existsSync(page), `${ERRORS_PAGE} does not exist`);
   const headings = headingsIn(readFileSync(page, 'utf8'));
@@ -85,12 +84,12 @@ test('docs/errors.md has a "## <code>" heading for every code of every error-cod
   assert.deepEqual(missing, [], `codes with no heading in ${ERRORS_PAGE}`);
 });
 
-test('the unchanged copy of the repository, with every anchor present, passes the lint', { criterion: 'AC-SPEC-27-06', timeout: TIMEOUT }, () => {
+test('the unchanged copy of the repository, with every anchor present, passes the lint', { timeout: TIMEOUT }, () => {
   const outcome = scratch.lint();
   assert.equal(outcome.passed, true, outcome.failureOutput);
 });
 
-test('removing the not-append-only heading makes the lint fail and name that code', { criterion: 'AC-SPEC-27-06', timeout: TIMEOUT }, () => {
+test('removing the not-append-only heading makes the lint fail and name that code', { timeout: TIMEOUT }, () => {
   assert.ok(existsSync(join(scratch.root, ERRORS_PAGE)), `${ERRORS_PAGE} does not exist`);
   const outcome = scratch.lintWithEdit(ERRORS_PAGE, (text) =>
     text.split('\n').filter((line) => !/^##\s+not-append-only\s*$/.test(line)).join('\n'));
@@ -98,7 +97,7 @@ test('removing the not-append-only heading makes the lint fail and name that cod
   assert.ok(outcome.failureOutput.includes('not-append-only'), `the lint failed, but did not name the code:\n${outcome.failureOutput}`);
 });
 
-test('removing the vacuous heading makes the lint fail and name that code', { criterion: 'AC-SPEC-27-06', timeout: TIMEOUT }, () => {
+test('removing the vacuous heading makes the lint fail and name that code', { timeout: TIMEOUT }, () => {
   assert.ok(existsSync(join(scratch.root, ERRORS_PAGE)), `${ERRORS_PAGE} does not exist`);
   const outcome = scratch.lintWithEdit(ERRORS_PAGE, (text) =>
     text.split('\n').filter((line) => !/^##\s+vacuous\s*$/.test(line)).join('\n'));

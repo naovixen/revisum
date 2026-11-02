@@ -5,7 +5,6 @@
 // "../", "%2F", JSON fragments and SQL can never change the request's shape. Values that reach
 // a call by name are checked against the parameter's type when the request is built, and a value
 // that fails is refused before anything is sent.
-// See docs/specs/SPEC-32-declared-service-calls.md.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
@@ -121,7 +120,7 @@ const DECLARED_HEADERS = Object.keys(NOTE_DECLARATION['headers'] as JsonRecord).
 
 // ---- The request keeps the declaration's shape --------------------------------------------------------
 
-test('over 1,000 generated argument sets, the origin, method, header names and path segment count never change', { criterion: 'AC-SPEC-32-03' }, () => {
+test('over 1,000 generated argument sets, the origin, method, header names and path segment count never change', () => {
   const shapes = new Set<string>();
   for (const generated of GENERATED) {
     const request = built('addCustomerNote', argumentsFor('addCustomerNote', generated));
@@ -137,7 +136,7 @@ test('over 1,000 generated argument sets, the origin, method, header names and p
   assert.equal(shapes.size, 1, 'every generated set gives a request of one shape');
 });
 
-test('a text argument fills exactly its path segment and its query value, percent-encoded', { criterion: 'AC-SPEC-32-03' }, () => {
+test('a text argument fills exactly its path segment and its query value, percent-encoded', () => {
   for (const generated of GENERATED) {
     const request = built('addCustomerNote', argumentsFor('addCustomerNote', generated));
     assert.equal(decodeURIComponent(pathOf(request).split('/')[3] ?? ''), generated.customerId, JSON.stringify(generated));
@@ -149,7 +148,7 @@ test('a text argument fills exactly its path segment and its query value, percen
   }
 });
 
-test('the body is valid JSON in which each text argument is exactly one string value', { criterion: 'AC-SPEC-32-03' }, () => {
+test('the body is valid JSON in which each text argument is exactly one string value', () => {
   for (const generated of GENERATED) {
     const request = built('addCustomerNote', argumentsFor('addCustomerNote', generated));
     assert.ok(request.body !== null, 'the declaration has a body');
@@ -163,7 +162,7 @@ test('the body is valid JSON in which each text argument is exactly one string v
   }
 });
 
-test('no argument text reaches a header', { criterion: 'AC-SPEC-32-03' }, () => {
+test('no argument text reaches a header', () => {
   for (const generated of GENERATED.slice(0, 100)) {
     const request = built('addCustomerNote', argumentsFor('addCustomerNote', generated));
     const literal = headerNamed(request, 'x-test-suite');
@@ -172,14 +171,14 @@ test('no argument text reaches a header', { criterion: 'AC-SPEC-32-03' }, () => 
 });
 
 // The generator must stay inside safe text, or the sets above would not reach the builder at all.
-test('control: every generated argument set is one the plan parser accepts', { criterion: 'AC-SPEC-32-03' }, () => {
+test('control: every generated argument set is one the plan parser accepts', () => {
   const refused = GENERATED.filter((generated) => !parsePlan(callPlanOf([call('addCustomerNote', generated)])).ok);
   assert.deepEqual(refused, []);
 });
 
 // Mutant: splicing the same text into the path, as string templating would, changes the shape;
 // so the segment-count oracle above can fail.
-test('mutant: a request whose path is built by splicing text changes the segment count', { criterion: 'AC-SPEC-32-03' }, () => {
+test('mutant: a request whose path is built by splicing text changes the segment count', () => {
   const spliced = GENERATED.filter((generated) => `/api/customers/${generated.customerId}/notes`.split('?')[0]?.split('/').length !== 5);
   assert.ok(spliced.length > 100, `only ${spliced.length} generated sets would break a spliced path`);
 });
@@ -187,7 +186,7 @@ test('mutant: a request whose path is built by splicing text changes the segment
 // ---- Line breaks never reach a request -----------------------------------------------------------------
 
 for (const lineBreak of ['\r', '\n', '\r\n']) {
-  test(`a text argument holding ${JSON.stringify(lineBreak)} is refused by the parser as unsafe_text`, { criterion: 'AC-SPEC-32-03' }, () => {
+  test(`a text argument holding ${JSON.stringify(lineBreak)} is refused by the parser as unsafe_text`, () => {
     for (const argument of ['customerId', 'note', 'tag']) {
       const generated = { ...GENERATED[0], [argument]: `notes${lineBreak}Host: evil.example` };
       assert.deepEqual(rejection(parsePlan, callPlanOf([call('addCustomerNote', generated)])), [`unsafe_text $.steps[0].arguments.${argument}`]);
@@ -199,7 +198,7 @@ for (const lineBreak of ['\r', '\n', '\r\n']) {
 
 const byName = (name: string) => ({ valueName: name });
 
-test('a path segment of "", "." or ".." from a run value is refused with parameter-invalid', { criterion: 'AC-SPEC-32-03' }, () => {
+test('a path segment of "", "." or ".." from a run value is refused with parameter-invalid', () => {
   const callArguments = argumentsFor('addCustomerNote', { ...GENERATED[0], customerId: byName('customerKey') }, ['customerKey']);
   for (const text of ['.', '..']) {
     assert.equal(refusedBuild('addCustomerNote', callArguments, valuesOf({ customerKey: text })), 'parameter-invalid', JSON.stringify(text));
@@ -219,7 +218,7 @@ const RUN_TIME_CASES: readonly RunTimeCase[] = [
 ];
 
 for (const runTime of RUN_TIME_CASES) {
-  test(`a run value that fails ${runTime.parameter}'s type is refused with parameter-invalid`, { criterion: 'AC-SPEC-32-04' }, () => {
+  test(`a run value that fails ${runTime.parameter}'s type is refused with parameter-invalid`, () => {
     const values = { kept: { kind: 'uniqueText', prefix: 'kept' } };
     const plan = accepted(parsePlan, callPlanOf([call('createOrder', orderArguments({ [runTime.parameter]: byName('kept') }))], { values }));
     for (const text of runTime.bad) {
@@ -230,7 +229,7 @@ for (const runTime of RUN_TIME_CASES) {
   });
 }
 
-test('an identifier parameter refuses a remembered value holding a hyphen, a space or a quote', { criterion: 'AC-SPEC-32-04' }, () => {
+test('an identifier parameter refuses a remembered value holding a hyphen, a space or a quote', () => {
   const callArguments = argumentsFor('getOrder', { orderId: byName('orderKey') }, ['orderKey']);
   for (const text of ['order-17', 'ord 17', "ord_17'; DROP TABLE orders; --", '17abc', '']) {
     assert.equal(refusedBuild('getOrder', callArguments, valuesOf({ orderKey: text })), 'parameter-invalid', JSON.stringify(text));
@@ -238,7 +237,7 @@ test('an identifier parameter refuses a remembered value holding a hyphen, a spa
   assert.equal(pathOf(built('getOrder', callArguments, valuesOf({ orderKey: 'ord_17' }))), '/api/orders/ord_17');
 });
 
-test('a run value of the right type fills the request as a literal would', { criterion: 'AC-SPEC-32-04' }, () => {
+test('a run value of the right type fills the request as a literal would', () => {
   const byValue = argumentsFor('getOrder', { orderId: byName('orderKey') }, ['orderKey']);
   const literal = argumentsFor('getOrder', { orderId: 'ord_17' });
   assert.deepEqual(built('getOrder', byValue, valuesOf({ orderKey: 'ord_17' })), built('getOrder', literal));
@@ -246,7 +245,7 @@ test('a run value of the right type fills the request as a literal would', { cri
 
 // ---- Types in the body ---------------------------------------------------------------------------------
 
-test('integers and booleans fill the body as JSON numbers and booleans, from literals or values', { criterion: 'AC-SPEC-32-03' }, () => {
+test('integers and booleans fill the body as JSON numbers and booleans, from literals or values', () => {
   const fromLiterals = bodyJson(built('createOrder', argumentsFor('createOrder', orderArguments({ quantity: 3, giftWrap: true })))) as JsonRecord;
   assert.equal(fromLiterals.quantity, 3);
   assert.equal(fromLiterals.giftWrap, true);
@@ -258,7 +257,7 @@ test('integers and booleans fill the body as JSON numbers and booleans, from lit
   assert.equal(fromValue.reference, 'test-eu-42');
 });
 
-test('a call with no body sends none, and a GET carries only its declared headers', { criterion: 'AC-SPEC-32-03' }, () => {
+test('a call with no body sends none, and a GET carries only its declared headers', () => {
   const request = built('getOrder', argumentsFor('getOrder', { orderId: 'ord_17' }));
   assert.equal(request.body, null);
   assert.deepEqual(headerNames(request), ['authorization']);
@@ -266,13 +265,13 @@ test('a call with no body sends none, and a GET carries only its declared header
 
 // ---- Limits carried to the caller -------------------------------------------------------------------------
 
-test('a declaration that sets no limits gets a 10 s timeout and a 1 MiB response cap', { criterion: 'AC-SPEC-32-10' }, () => {
+test('a declaration that sets no limits gets a 10 s timeout and a 1 MiB response cap', () => {
   const request = built('getOrder', argumentsFor('getOrder', { orderId: 'ord_17' }));
   assert.equal(request.timeoutMilliseconds, 10_000);
   assert.equal(request.maximumResponseBytes, 1024 * 1024);
 });
 
-test('a declaration\'s own timeout and response cap reach the request', { criterion: 'AC-SPEC-32-10' }, () => {
+test('a declaration\'s own timeout and response cap reach the request', () => {
   const request = built('addCustomerNote', argumentsFor('addCustomerNote', GENERATED[1] ?? assert.fail('no generated set')));
   assert.equal(request.timeoutMilliseconds, 2500);
   assert.equal(request.maximumResponseBytes, 4096);
@@ -280,7 +279,7 @@ test('a declaration\'s own timeout and response cap reach the request', { criter
 
 // ---- Secrets ---------------------------------------------------------------------------------------------
 
-test('a bearer header carries the token as an opaque secret, never as plain text', { criterion: 'AC-SPEC-32-11' }, () => {
+test('a bearer header carries the token as an opaque secret, never as plain text', () => {
   const request = built('getOrder', argumentsFor('getOrder', { orderId: 'ord_17' }));
   const header = headerNamed(request, 'authorization');
   assert.ok(header !== undefined && typeof header.value !== 'string', 'the secret header is not plain text');
@@ -288,7 +287,7 @@ test('a bearer header carries the token as an opaque secret, never as plain text
   assert.ok(!JSON.stringify(request).includes(SECRET_VALUES[TOKEN_SECRET] ?? '?'), 'the request serialises its secret');
 });
 
-test('a basic header carries "user:password" base64-encoded, inside an opaque secret', { criterion: 'AC-SPEC-32-11' }, () => {
+test('a basic header carries "user:password" base64-encoded, inside an opaque secret', () => {
   const request = built('resetShop', argumentsFor('resetShop', {}));
   const header = headerNamed(request, 'authorization');
   assert.ok(header !== undefined && typeof header.value !== 'string', 'the secret header is not plain text');
@@ -297,12 +296,12 @@ test('a basic header carries "user:password" base64-encoded, inside an opaque se
   assert.ok(!serialised.includes(Buffer.from(SECRET_VALUES[ADMIN_LOGIN_SECRET] ?? '').toString('base64')), 'the request serialises its secret');
 });
 
-test('a header secret the store cannot resolve is refused with secret-missing', { criterion: 'AC-SPEC-32-12' }, () => {
+test('a header secret the store cannot resolve is refused with secret-missing', () => {
   const store = environmentSecretStore({ [ADMIN_LOGIN_SECRET]: SECRET_VALUES[ADMIN_LOGIN_SECRET] ?? '' });
   assert.equal(refusedBuild('getOrder', argumentsFor('getOrder', { orderId: 'ord_17' }), NO_VALUES, store), 'secret-missing');
 });
 
-test('a secret argument the store cannot resolve is refused with secret-missing', { criterion: 'AC-SPEC-32-12' }, () => {
+test('a secret argument the store cannot resolve is refused with secret-missing', () => {
   const store = environmentSecretStore({ [TOKEN_SECRET]: SECRET_VALUES[TOKEN_SECRET] ?? '' });
   const callArguments = argumentsFor('signInAsAdmin', { adminPassword: { secretName: ADMIN_PASSWORD_SECRET } });
   assert.equal(refusedBuild('signInAsAdmin', callArguments, NO_VALUES, store), 'secret-missing');
@@ -310,7 +309,7 @@ test('a secret argument the store cannot resolve is refused with secret-missing'
 
 // ---- Purity ----------------------------------------------------------------------------------------------
 
-test('the same declaration, arguments, values and secrets always build the same request', { criterion: 'AC-SPEC-32-03' }, () => {
+test('the same declaration, arguments, values and secrets always build the same request', () => {
   const callArguments = argumentsFor('addCustomerNote', GENERATED[2] ?? assert.fail('no generated set'));
   const first = built('addCustomerNote', callArguments);
   const second = built('addCustomerNote', callArguments);
@@ -318,7 +317,7 @@ test('the same declaration, arguments, values and secrets always build the same 
   assert.deepEqual(bodyJson(first), bodyJson(second));
 });
 
-test('a token header sends the secret\'s value as it is, inside an opaque secret', { criterion: 'AC-SPEC-32-11' }, () => {
+test('a token header sends the secret\'s value as it is, inside an opaque secret', () => {
   const tokenCall = {
     service: 'shop', method: 'GET', path: '/api/orders/{orderId}', headers: { 'x-api-key': { secretName: TOKEN_SECRET, scheme: 'token' } },
     parameters: { orderId: { kind: 'identifier' } }, effect: 'read', successStatuses: [200],

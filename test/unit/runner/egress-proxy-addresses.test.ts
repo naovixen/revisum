@@ -4,7 +4,6 @@
 // address is refused, and otherwise connects to the very address it vetted, with no second
 // lookup. The proxy's connect function is the test's own: it records the vetted address and
 // connects to a local stand-in server, so allowed requests never leave the machine either.
-// See docs/specs/SPEC-07-isolated-runner-and-egress.md.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import { startEgressProxy, type EgressProxy } from '@revisum/runner';
@@ -88,7 +87,7 @@ const blockedOrigins = (): readonly string[] => proxy.decisions().filter((entry)
 
 describe('a declared origin whose name resolves to a refused address is refused at resolve time', () => {
   for (const name of REFUSED_NAMES) {
-    test(`http://${name} gets 403, is recorded as blocked, and no connection is made`, { criterion: 'AC-SPEC-07-02' }, async () => {
+    test(`http://${name} gets 403, is recorded as blocked, and no connection is made`, async () => {
       const dialledBefore = upstream.dialled.length;
       const answer = await getThroughProxy(proxy.url, `http://${name}/`);
       assert.equal(answer.status, 403);
@@ -102,7 +101,7 @@ describe('a declared origin whose name resolves to a refused address is refused 
 
 describe('a declared origin written as a refused IP literal is refused', () => {
   for (const literal of REFUSED_LITERALS) {
-    test(`${literal} gets 403 and no connection is made`, { criterion: 'AC-SPEC-07-02' }, async () => {
+    test(`${literal} gets 403 and no connection is made`, async () => {
       const dialledBefore = upstream.dialled.length;
       const answer = await getThroughProxy(proxy.url, literal);
       assert.equal(answer.status, 403);
@@ -112,14 +111,14 @@ describe('a declared origin written as a refused IP literal is refused', () => {
   }
 });
 
-test('a tunnel to a name that resolves to a private address is refused, as HTTPS would ask for it', { criterion: 'AC-SPEC-07-02' }, async () => {
+test('a tunnel to a name that resolves to a private address is refused, as HTTPS would ask for it', async () => {
   const dialledBefore = upstream.dialled.length;
   const status = await connectThroughProxy(proxy.url, 'private-ten.test:443');
   assert.notEqual(status, 200);
   assert.equal(upstream.dialled.length, dialledBefore);
 });
 
-test('a tunnel to the cloud metadata address, written as an IPv6 literal, is refused', { criterion: 'AC-SPEC-07-02' }, async () => {
+test('a tunnel to the cloud metadata address, written as an IPv6 literal, is refused', async () => {
   const dialledBefore = upstream.dialled.length;
   const status = await connectThroughProxy(proxy.url, '[fd00:ec2::254]:443');
   assert.notEqual(status, 200);
@@ -128,7 +127,7 @@ test('a tunnel to the cloud metadata address, written as an IPv6 literal, is ref
 
 describe('counter-examples: public addresses on the same proxy are allowed', () => {
   for (const { target, address, sameAddress } of ALLOWED_TARGETS) {
-    test(`${target} reaches the upstream server through the address the proxy vetted`, { criterion: 'AC-SPEC-07-02' }, async () => {
+    test(`${target} reaches the upstream server through the address the proxy vetted`, async () => {
       const answer = await getThroughProxy(proxy.url, target);
       assert.equal(answer.status, 200);
       assert.equal(answer.body, UPSTREAM_BODY);
@@ -138,21 +137,21 @@ describe('counter-examples: public addresses on the same proxy are allowed', () 
     });
   }
 
-  test('a service declared private may resolve to a private address', { criterion: 'AC-SPEC-07-02' }, async () => {
+  test('a service declared private may resolve to a private address', async () => {
     const answer = await getThroughProxy(proxy.url, 'http://private-api.test/orders');
     assert.equal(answer.status, 200);
     assert.equal(dialledHosts().at(-1), '10.0.0.7');
   });
 });
 
-test('a declared service that is not declared private is refused when it resolves to a private address', { criterion: 'AC-SPEC-07-02' }, async () => {
+test('a declared service that is not declared private is refused when it resolves to a private address', async () => {
   const dialledBefore = upstream.dialled.length;
   const answer = await getThroughProxy(proxy.url, 'http://internal-api.test/orders');
   assert.equal(answer.status, 403);
   assert.equal(upstream.dialled.length, dialledBefore);
 });
 
-test('a rebinding name is looked up once and the proxy connects to the address it vetted, never the later private one', { criterion: 'AC-SPEC-07-02' }, async () => {
+test('a rebinding name is looked up once and the proxy connects to the address it vetted, never the later private one', async () => {
   const lookupsBefore = resolver.lookupsOf('rebind.test');
   const answer = await getThroughProxy(proxy.url, 'http://rebind.test/');
   assert.equal(answer.status, 200);
@@ -161,14 +160,14 @@ test('a rebinding name is looked up once and the proxy connects to the address i
   assert.equal(upstream.hosts.at(-1), 'rebind.test', 'the request still names the host it was sent to');
 });
 
-test('a second request to the rebinding name, now resolving to loopback, is refused', { criterion: 'AC-SPEC-07-02' }, async () => {
+test('a second request to the rebinding name, now resolving to loopback, is refused', async () => {
   const dialledBefore = upstream.dialled.length;
   const answer = await getThroughProxy(proxy.url, 'http://rebind.test/');
   assert.equal(answer.status, 403);
   assert.equal(upstream.dialled.length, dialledBefore);
 });
 
-test('an undeclared origin is refused before its name is resolved, so the lookup never leaves the proxy', { criterion: 'AC-SPEC-07-01' }, async () => {
+test('an undeclared origin is refused before its name is resolved, so the lookup never leaves the proxy', async () => {
   const answer = await getThroughProxy(proxy.url, 'http://undeclared.invalid/');
   assert.equal(answer.status, 403);
   assert.ok(!resolver.asked.includes('undeclared.invalid'), `the proxy looked up ${JSON.stringify(resolver.asked)}`);

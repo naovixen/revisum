@@ -8,7 +8,6 @@
 // shown able to move. A run through the real policy gate then shows a control whose test id hides
 // an irreversible name ending the run Denied, with nothing sent.
 // Every test opens its own browser, so no mouse position or open dialog carries over.
-// See docs/specs/SPEC-06-cdp-driver.md and docs/specs/SPEC-03-policy-gate.md.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import type { ActionGuard, GuardVerdict, ResolvedElement, Session } from '@revisum/engine';
@@ -87,7 +86,7 @@ const DRIVERS = [
 for (const { targetId, actions } of DRIVERS) {
   describe(`the runtime guard on ${targetId}`, () => {
     for (const action of actions) {
-      test(`a denied ${action.name} ends with policy-denied and sends no input event`, { criterion: 'AC-SPEC-06-09' }, async () => {
+      test(`a denied ${action.name} ends with policy-denied and sends no input event`, async () => {
         const { guard, calls } = spyGuard(DENY);
         await withGuardPage(targetId, async (session) => {
           const acted = await session.act(capability.actionStep(action.step), guard);
@@ -98,7 +97,7 @@ for (const { targetId, actions } of DRIVERS) {
         assert.equal(calls.length, 1, 'the guard was asked once');
       });
 
-      test(`the guard is told the resolved element of the ${action.name} step`, { criterion: 'AC-SPEC-06-09' }, async () => {
+      test(`the guard is told the resolved element of the ${action.name} step`, async () => {
         const { guard, calls } = spyGuard(DENY);
         await withGuardPage(targetId, async (session) => { await session.act(capability.actionStep(action.step), guard); });
         const asked = calls[0];
@@ -109,7 +108,7 @@ for (const { targetId, actions } of DRIVERS) {
         assert.equal(asked.dialogText, null);
       });
 
-      test(`counter-example: an allowed ${action.name} reaches the page`, { criterion: 'AC-SPEC-06-09' }, async () => {
+      test(`counter-example: an allowed ${action.name} reaches the page`, async () => {
         const { guard, calls } = spyGuard(ALLOW);
         await withGuardPage(targetId, async (session) => {
           const acted = await session.act(capability.actionStep(action.step), guard);
@@ -120,7 +119,7 @@ for (const { targetId, actions } of DRIVERS) {
       });
     }
 
-    test('an element that is never found is not passed to the guard', { criterion: 'AC-SPEC-06-09' }, async () => {
+    test('an element that is never found is not passed to the guard', async () => {
       const { guard, calls } = spyGuard(ALLOW);
       await withGuardPage(targetId, async (session) => {
         const acted = await session.act(capability.actionStep(click(role('button', 'Does not exist'))), guard);
@@ -132,7 +131,7 @@ for (const { targetId, actions } of DRIVERS) {
 }
 
 describe(`the runtime guard on dialogs: ${CDP_TARGET}`, () => {
-  test('a denied dialog answer ends with policy-denied; the guard gets the dialog text and an empty element', { criterion: 'AC-SPEC-06-09' }, async () => {
+  test('a denied dialog answer ends with policy-denied; the guard gets the dialog text and an empty element', async () => {
     const { guard, calls } = spyGuard({ kind: 'deny', rule: 'irreversible-dialog', stepIndex: 2 });
     await withGuardPage(CDP_TARGET, async (session) => {
       assert.ok((await session.act(capability.actionStep(click(role('button', 'Ask a question'))))).ok, 'the click opens the dialog');
@@ -143,7 +142,7 @@ describe(`the runtime guard on dialogs: ${CDP_TARGET}`, () => {
     assert.deepEqual(calls[0], { element: { role: null, name: null, box: null, formSubmitName: null, linkUrl: null }, dialogText: 'Keep the draft?' });
   });
 
-  test('counter-example: an allowed dialog answer accepts the dialog', { criterion: 'AC-SPEC-06-09' }, async () => {
+  test('counter-example: an allowed dialog answer accepts the dialog', async () => {
     const { guard, calls } = spyGuard(ALLOW);
     await withGuardPage(CDP_TARGET, async (session) => {
       assert.ok((await session.act(capability.actionStep(click(role('button', 'Ask a question'))))).ok);
@@ -164,7 +163,7 @@ describe(`the real policy gate, through a run: ${CDP_TARGET}`, () => {
     return { ...ran, inputEvents: watched.sessions[0]?.readBeforeClose ?? null };
   };
 
-  test('a click on a control named "Delete account" ends the run Denied with nothing sent', { criterion: 'AC-SPEC-06-09' }, async () => {
+  test('a click on a control named "Delete account" ends the run Denied with nothing sent', async () => {
     const { result, inputEvents } = await runReadingInputEvents([
       navigate('/guard.html'),
       click(testId('close-account')),
@@ -176,7 +175,7 @@ describe(`the real policy gate, through a run: ${CDP_TARGET}`, () => {
     assert.equal(inputEvents, '0');
   });
 
-  test('counter-example: the same run clicking "Save draft" passes and sends the click', { criterion: 'AC-SPEC-06-09' }, async () => {
+  test('counter-example: the same run clicking "Save draft" passes and sends the click', async () => {
     const { result, inputEvents } = await runReadingInputEvents([
       navigate('/guard.html'),
       click(role('button', 'Save draft')),
@@ -186,7 +185,7 @@ describe(`the real policy gate, through a run: ${CDP_TARGET}`, () => {
     assert.notEqual(inputEvents, '0');
   });
 
-  test('accepting a dialog whose text is irreversible ends the run Denied', { criterion: 'AC-SPEC-06-09' }, async () => {
+  test('accepting a dialog whose text is irreversible ends the run Denied', async () => {
     const { result } = await runReadingInputEvents([
       navigate('/guard.html'),
       click(role('button', 'Clear drafts')),

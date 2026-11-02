@@ -6,7 +6,6 @@
 // the proxy, because only this process can see them; a test outside hands them to the run's handle.
 // The plan opens a page whose WebSocket goes to an undeclared origin and passes only once the
 // page shows that WebSocket was closed.
-// See docs/specs/SPEC-07-isolated-runner-and-egress.md.
 import { arch, platform } from 'node:os';
 import { cdpDriver } from '@revisum/driver-cdp';
 import { defaultRedactor, parseProject, planParser, run, type BrowserDriver, type BrowserRequestRecord, type TargetId } from '@revisum/engine';

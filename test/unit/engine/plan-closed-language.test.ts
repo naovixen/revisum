@@ -1,7 +1,6 @@
 // The plan language is closed at every depth: an unknown key, step type or value anywhere in a
 // plan, including inside a frame step, is rejected with its error code and JSON path. Errors
 // name where the problem is, never what the value was, so hostile or private text is not echoed.
-// See docs/specs/SPEC-01-plan-language-and-parser.md.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
@@ -56,20 +55,20 @@ const CASES: readonly ClosedCase[] = [
 
 // The counter-example for every case below: each base plan parses unchanged.
 for (const name of goldenPlanNames()) {
-  test(`the golden plan "${name}" parses unchanged`, { criterion: 'AC-SPEC-01-03' }, () => {
+  test(`the golden plan "${name}" parses unchanged`, () => {
     const parsed = parsePlan(goldenPlan(name));
     assert.equal(parsed.ok, true, JSON.stringify(parsed));
   });
 }
 
 for (const closed of CASES) {
-  test(`rejects ${closed.name} with ${closed.code} at ${closed.errorPath}`, { criterion: 'AC-SPEC-01-03' }, () => {
+  test(`rejects ${closed.name} with ${closed.code} at ${closed.errorPath}`, () => {
     const parsed = parsePlan(withValue(closed.plan(), closed.path, closed.value));
     assert.deepEqual(parsed, { ok: false, error: [{ code: closed.code, path: closed.errorPath }] });
   });
 }
 
-test('no rejection echoes the value that caused it', { criterion: 'AC-SPEC-01-03' }, () => {
+test('no rejection echoes the value that caused it', () => {
   const withMarker = CASES.filter((closed) => closed.value === PRIVATE_MARKER);
   assert.ok(withMarker.length >= 10, 'enough cases carry the marker for the check to mean something');
   for (const closed of withMarker) {
@@ -79,7 +78,7 @@ test('no rejection echoes the value that caused it', { criterion: 'AC-SPEC-01-03
   }
 });
 
-test('a rejection lists every problem in the plan, each with its own path', { criterion: 'AC-SPEC-01-03' }, () => {
+test('a rejection lists every problem in the plan, each with its own path', () => {
   let plan = withValue(accountClosurePlan(), ['steps', 1, 'delay'], 500);
   plan = withValue(plan, ['steps', 3, 'steps', 0, 'type'], 'wait');
   plan = withValue(plan, ['steps', 5, 'action'], 'ignore');

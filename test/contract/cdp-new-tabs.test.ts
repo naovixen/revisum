@@ -8,7 +8,6 @@
 // its block ends, even when a step inside it fails. The /account page asks an origin no project
 // allows for an image; that blocked origin joins the run's blockedOrigins.
 // A popup the page opens inside the tab still fails its step with unsupported-step.
-// See docs/specs/SPEC-31-page-states-metadata-downloads-and-tabs.md.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import type { Session } from '@revisum/engine';
@@ -32,7 +31,7 @@ const COUNT_TABS = click(role('button', 'Count other tabs'));
 const otherTabs = (count: string, criterionId: string) => textEquals(testId('other-tabs'), count, criterionId);
 
 describe('a newTab after signing in', () => {
-  test('the tab sends the session cookie, reads the stored name and the frozen clock, sees the first tab, and is closed after its block', { criterion: 'AC-SPEC-31-11' }, async () => {
+  test('the tab sends the session cookie, reads the stored name and the frozen clock, sees the first tab, and is closed after its block', async () => {
     const { result, requestedPaths } = await harness.runSteps(CDP_TARGET, [
       ...SIGN_IN,
       newTab('/account', [
@@ -49,7 +48,7 @@ describe('a newTab after signing in', () => {
     assert.ok(requestedPaths.includes('/account'), 'the tab loaded its page');
   });
 
-  test('the origin the tab\'s page was blocked from joins the run\'s blocked origins', { criterion: 'AC-SPEC-31-11' }, async () => {
+  test('the origin the tab\'s page was blocked from joins the run\'s blocked origins', async () => {
     const { result } = await harness.runSteps(CDP_TARGET, [
       ...SIGN_IN, newTab('/account', [textEquals(testId('session-cookie'), 'Signed in', 'tabs.cookie-shared')]),
     ]);
@@ -59,7 +58,7 @@ describe('a newTab after signing in', () => {
 
   // Counter-example: the first tab's pages ask for nothing blocked, so the origin above came
   // from the second tab.
-  test('counter-example: the same sign-in without the tab blocks no such origin', { criterion: 'AC-SPEC-31-11' }, async () => {
+  test('counter-example: the same sign-in without the tab blocks no such origin', async () => {
     const { result } = await harness.runSteps(CDP_TARGET, SIGN_IN);
     assert.equal(result.state, 'Passed', JSON.stringify(result.steps));
     assert.ok(!result.blockedOrigins.includes(BLOCKED_IN_TAB), JSON.stringify(result.blockedOrigins));
@@ -67,7 +66,7 @@ describe('a newTab after signing in', () => {
 
   // Counter-example: without signing in, the same tab shows no session and no stored name, so the
   // checks above see what signing in shared.
-  test('counter-example: a tab opened without signing in shows "Signed out" and no stored name', { criterion: 'AC-SPEC-31-11' }, async () => {
+  test('counter-example: a tab opened without signing in shows "Signed out" and no stored name', async () => {
     const { result } = await harness.runSteps(CDP_TARGET, [
       navigate('/sign-in.html'),
       newTab('/account', [
@@ -80,7 +79,7 @@ describe('a newTab after signing in', () => {
 });
 
 describe('a newTab whose step fails', () => {
-  test('fails the newTab step with that step\'s code, skips the rest, and still closes the tab', { criterion: 'AC-SPEC-31-11' }, async () => {
+  test('fails the newTab step with that step\'s code, skips the rest, and still closes the tab', async () => {
     const counted: { shown: string | null } = { shown: null };
     // Asks the first tab, as the session closes, how many other pages of the origin answer.
     const countAtClose = async (session: Session): Promise<void> => {
@@ -105,7 +104,7 @@ describe('a newTab whose step fails', () => {
 });
 
 describe('a popup opened inside a newTab', () => {
-  test('fails the newTab step with unsupported-step and skips the rest', { criterion: 'AC-SPEC-31-09' }, async () => {
+  test('fails the newTab step with unsupported-step and skips the rest', async () => {
     const { result } = await harness.runSteps(CDP_TARGET, [
       navigate('/sign-in.html'),
       newTab('/account', [click(role('button', 'Open help')), textEquals(testId('stored-name'), 'none', 'tabs.no-storage')]),

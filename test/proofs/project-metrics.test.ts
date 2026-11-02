@@ -1,8 +1,8 @@
 // The project's own metrics, recorded by the gates step at the end of every CI run:
 //   - agentAuthoredShare: commits with an Agent trailer over commits since the trailer cut-over;
 //   - specLinkedShare: commits with a Spec or Criteria trailer over the same commits;
-//   - tracedCriteriaShare: criterion ids in docs/specs/ with at least one passing tagged test in
-//     this run, over every criterion id in docs/specs/;
+//   - criteriaTraced over criteriaInScope: criterion ids named in a Criteria trailer since the
+//     cut-over, over every criterion id in docs/specs/;
 //   - flakyRunRate: 1 when a failing test file passed on its one measuring rerun, else 0.
 // The approval behind them is the founder's push under the agent lock-down, so they are recorded
 // as declared, never verified. A commit after the cut-over with a malformed trailer fails.
@@ -10,7 +10,6 @@
 // the tests with tools/run-test-folder.ts (which writes .test-results/), then runs
 // `node tools/project-metrics.ts --cut-over <commit>` there and compares each share with a hand
 // count. The cut-over is given because a fixture repository cannot hold the real one.
-// See docs/specs/SPEC-00-repo-seed-and-gates.md.
 import assert from 'node:assert/strict';
 import { existsSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
@@ -21,7 +20,6 @@ import { describeRun, runTool, type ToolRun } from '../support/tool-runs.ts';
 
 const RESULTS_FOLDER = '.test-results';
 const METRICS_FILE = 'project-metrics.json';
-const TRACE_INDEX_FILE = 'trace-index.json';
 const CO_AUTHOR_CLAUDE = 'Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>';
 const AGENT = 'Agent: claude-code/2.1.312';
 const TIMEOUT = 240_000;
@@ -41,20 +39,19 @@ const FIXTURE_MANIFEST = { 'package.json': '{ "name": "fixture-project", "privat
 const message = (subject: string, ...trailers: readonly string[]): string =>
   trailers.length === 0 ? `${subject}\n` : `${subject}\n\n${trailers.join('\n')}\n`;
 
-// Tagged tests. Criterion 1 of spec 1 has a passing and a failing test; criterion 2 of spec 1 has
-// only a failing one; criterion 1 of spec 2 passes inside a suite. So two of five are traced.
+// Fixture tests: two of them fail on purpose, and one passes inside a suite.
 const SIGN_UP_TESTS = [
   "import { test } from 'node:test';",
-  `test('signs up with a new email', { criterion: '${criterionId(1, 1)}' }, () => {});`,
-  `test('refuses a taken email', { criterion: '${criterionId(1, 1)}' }, () => { throw new Error('fails on purpose'); });`,
-  `test('sends a welcome email', { criterion: '${criterionId(1, 2)}' }, () => { throw new Error('fails on purpose'); });`,
+  `test('signs up with a new email', () => {});`,
+  `test('refuses a taken email', () => { throw new Error('fails on purpose'); });`,
+  `test('sends a welcome email', () => { throw new Error('fails on purpose'); });`,
   "test('loads the page', () => {});",
   '',
 ].join('\n');
 const CHECKOUT_TESTS = [
   "import { describe, test } from 'node:test';",
   "describe('checkout', () => {",
-  `  test('pays by card', { criterion: '${criterionId(2, 1)}' }, () => {});`,
+  `  test('pays by card', () => {});`,
   '});',
   '',
 ].join('\n');
@@ -63,14 +60,14 @@ const FLAKY_TESTS = [
   "import { existsSync, writeFileSync } from 'node:fs';",
   "import { test } from 'node:test';",
   "const marker = new URL('./first-attempt.marker', import.meta.url);",
-  `test('passes on the second attempt', { criterion: '${criterionId(1, 3)}' }, () => {`,
+  `test('passes on the second attempt', () => {`,
   "  if (!existsSync(marker)) { writeFileSync(marker, ''); throw new Error('the first attempt fails'); }",
   '});',
   '',
 ].join('\n');
 const PASSING_TESTS = [
   "import { test } from 'node:test';",
-  `test('pays by bank transfer', { criterion: '${criterionId(2, 2)}' }, () => {});`,
+  `test('pays by bank transfer', () => {});`,
   '',
 ].join('\n');
 
@@ -144,12 +141,12 @@ function assertShare(metrics: unknown, key: string, expected: number): void {
 
 // ---- Commit metrics and traced criteria, from one run -------------------------------------------
 
-test('a run with failing tests still fails: the measuring rerun is not a retry', { criterion: 'AC-SPEC-00-07', timeout: TIMEOUT }, () => {
+test('a run with failing tests still fails: the measuring rerun is not a retry', { timeout: TIMEOUT }, () => {
   const run = runTests('checks');
   assert.equal(run.passed, false, describeRun(run));
 });
 
-test('the commit shares equal a hand count of the trailers since the cut-over', { criterion: 'AC-SPEC-00-07', timeout: TIMEOUT }, () => {
+test('the commit shares equal a hand count of the trailers since the cut-over', { timeout: TIMEOUT }, () => {
   runTests('checks');
   const run = recordMetrics(repository.root, repository.environment, cutOver);
   assert.equal(run.passed, true, describeRun(run));
@@ -159,30 +156,29 @@ test('the commit shares equal a hand count of the trailers since the cut-over', 
   assert.equal(onlyValueOf(metrics, 'beforeTrailers'), 2);
 });
 
-test('the traced share counts criteria with at least one passing tagged test, over every criterion in the specs', { criterion: 'AC-SPEC-00-07', timeout: TIMEOUT }, () => {
+test('the traced criteria are those named in a Criteria trailer since the cut-over, out of every criterion in the specs', { timeout: TIMEOUT }, () => {
   runTests('checks');
   const run = recordMetrics(repository.root, repository.environment, cutOver);
   assert.equal(run.passed, true, describeRun(run));
   const metrics = readResult(repository.root, METRICS_FILE);
-  assertShare(metrics, 'tracedCriteriaShare', 2 / 5);
+  assert.equal(onlyValueOf(metrics, 'criteriaTraced'), 3);
+  assert.equal(onlyValueOf(metrics, 'criteriaInScope'), 5);
   // Tests that fail on the rerun too are failing, not flaky.
   assertShare(metrics, 'flakyRunRate', 0);
   assert.equal(onlyValueOf(metrics, 'flakyPair'), false);
 });
 
-test('the trace index lists each criterion with its test ids and their outcome', { criterion: 'AC-SPEC-00-15', timeout: TIMEOUT }, () => {
+test('the metrics hold no share of criteria traced to a passing test, and no trace index is written', { timeout: TIMEOUT }, () => {
   runTests('checks');
   const run = recordMetrics(repository.root, repository.environment, cutOver);
   assert.equal(run.passed, true, describeRun(run));
-  const index = JSON.stringify(readResult(repository.root, TRACE_INDEX_FILE));
-  for (const expected of [criterionId(1, 1), criterionId(2, 1), 'signs up with a new email', 'checkout > pays by card', 'sign-up.test.ts']) {
-    assert.ok(index.includes(expected), `the trace index does not mention "${expected}": ${index}`);
-  }
+  assert.ok(!JSON.stringify(readResult(repository.root, METRICS_FILE)).includes('tracedCriteriaShare'));
+  assert.ok(!existsSync(join(repository.root, RESULTS_FOLDER, 'trace-index.json')));
 });
 
 // ---- Flaky runs ---------------------------------------------------------------------------------
 
-test('a test file that fails and then passes on its rerun fails the run and makes the run flaky', { criterion: 'AC-SPEC-00-07', timeout: TIMEOUT }, () => {
+test('a test file that fails and then passes on its rerun fails the run and makes the run flaky', { timeout: TIMEOUT }, () => {
   const testRun = runTests('flaky-checks');
   assert.equal(testRun.passed, false, `the flaky run passed, so a rerun was used as a retry:\n${describeRun(testRun)}`);
   const run = recordMetrics(repository.root, repository.environment, cutOver);
@@ -192,19 +188,18 @@ test('a test file that fails and then passes on its rerun fails the run and make
   assert.equal(onlyValueOf(metrics, 'flakyPair'), true);
 });
 
-test('counter-example: a run where every test passes is not flaky', { criterion: 'AC-SPEC-00-07', timeout: TIMEOUT }, () => {
+test('counter-example: a run where every test passes is not flaky', { timeout: TIMEOUT }, () => {
   const testRun = runTests('passing-checks');
   assert.equal(testRun.passed, true, describeRun(testRun));
   const run = recordMetrics(repository.root, repository.environment, cutOver);
   assert.equal(run.passed, true, describeRun(run));
   const metrics = readResult(repository.root, METRICS_FILE);
   assertShare(metrics, 'flakyRunRate', 0);
-  assertShare(metrics, 'tracedCriteriaShare', 1 / 5);
 });
 
 // ---- Declared approvals -------------------------------------------------------------------------
 
-test('the metrics and their summary record the approval as declared, not verified', { criterion: 'AC-SPEC-00-19', timeout: TIMEOUT }, () => {
+test('the metrics and their summary record the approval as declared, not verified', { timeout: TIMEOUT }, () => {
   runTests('passing-checks');
   const run = recordMetrics(repository.root, repository.environment, cutOver);
   assert.equal(run.passed, true, describeRun(run));
@@ -222,7 +217,7 @@ test('the metrics and their summary record the approval as declared, not verifie
 
 // ---- Malformed trailers -------------------------------------------------------------------------
 
-test('a commit after the cut-over with a malformed trailer fails the check, naming the commit', { criterion: 'AC-SPEC-00-07', timeout: TIMEOUT }, () => {
+test('a commit after the cut-over with a malformed trailer fails the check, naming the commit', { timeout: TIMEOUT }, () => {
   const malformedRepository = createGitRepository();
   try {
     malformedRepository.commit({ files: { ...FIXTURE_SPECS, ...FIXTURE_MANIFEST }, message: message('Seed the fixture project') });
@@ -240,7 +235,7 @@ test('a commit after the cut-over with a malformed trailer fails the check, nami
   }
 });
 
-test('a commit after the cut-over with a Claude co-author and no Agent trailer fails the check', { criterion: 'AC-SPEC-00-07', timeout: TIMEOUT }, () => {
+test('a commit after the cut-over with a Claude co-author and no Agent trailer fails the check', { timeout: TIMEOUT }, () => {
   const malformedRepository = createGitRepository();
   try {
     malformedRepository.commit({ files: { ...FIXTURE_SPECS, ...FIXTURE_MANIFEST }, message: message('Seed the fixture project') });

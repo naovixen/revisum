@@ -3,7 +3,6 @@
 // returns image-digest-mismatch, and in both cases nothing starts: no network, no container, so no
 // browser. The container engine here is a fake that records every call; the matching digest is the
 // counter-example that shows the same runner does start containers.
-// See docs/specs/SPEC-07-isolated-runner-and-egress.md.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { dockerRunner, type RunnerLogEntry } from '@revisum/runner';
@@ -22,7 +21,7 @@ function runnerOn(settings: FakeEngineSettings) {
 
 const startingCalls = (calls: readonly string[]): readonly string[] => calls.filter((call) => ENGINE_STARTING_CALLS.includes(call));
 
-test('with no local run image, start returns image-missing and starts nothing', { criterion: 'AC-SPEC-07-06' }, async () => {
+test('with no local run image, start returns image-missing and starts nothing', async () => {
   const { engine, runner } = runnerOn({ localImageId: null, internalNetworks: true, probe: 'blocked' });
   const started = await runner.start(imageDigest(PINNED_IMAGE_ID), POLICY);
   assert.ok(!started.ok);
@@ -32,7 +31,7 @@ test('with no local run image, start returns image-missing and starts nothing', 
   assert.deepEqual(engine.existingNetworks(), []);
 });
 
-test('when the local run image has another id, start returns image-digest-mismatch and starts nothing', { criterion: 'AC-SPEC-07-06' }, async () => {
+test('when the local run image has another id, start returns image-digest-mismatch and starts nothing', async () => {
   const { engine, runner } = runnerOn({ localImageId: OTHER_IMAGE_ID, internalNetworks: true, probe: 'blocked' });
   const started = await runner.start(imageDigest(PINNED_IMAGE_ID), POLICY);
   assert.ok(!started.ok);
@@ -42,13 +41,13 @@ test('when the local run image has another id, start returns image-digest-mismat
   assert.deepEqual(engine.existingNetworks(), []);
 });
 
-test('a refused image leaves the runner at the host guarantee level', { criterion: 'AC-SPEC-07-06' }, async () => {
+test('a refused image leaves the runner at the host guarantee level', async () => {
   const { runner } = runnerOn({ localImageId: OTHER_IMAGE_ID, internalNetworks: true, probe: 'blocked' });
   await runner.start(imageDigest(PINNED_IMAGE_ID), POLICY);
   assert.equal(runner.guaranteeLevel(), 'host');
 });
 
-test('counter-example: with the pinned image present, the same runner starts its containers and removes them on stop', { criterion: 'AC-SPEC-07-06' }, async () => {
+test('counter-example: with the pinned image present, the same runner starts its containers and removes them on stop', async () => {
   const { engine, runner } = runnerOn({ localImageId: PINNED_IMAGE_ID, internalNetworks: true, probe: 'blocked' });
   const started = await runner.start(imageDigest(PINNED_IMAGE_ID), POLICY);
   assert.ok(started.ok, JSON.stringify(started));

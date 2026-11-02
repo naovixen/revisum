@@ -15,7 +15,7 @@
 // The working copy is written to a temporary folder, so a test can show that core reads trusted
 // files from the protected branch and not from the change. Nothing here touches a real git remote.
 //
-// The names below follow SPEC-02's build notes. Three shapes the notes leave unnamed are used only
+// The names below follow the build notes. Three shapes the notes leave unnamed are used only
 // in this file, so settling them changes one place:
 //   - the loader's `change` argument is { files, events }: the files the change edits, and the
 //     sink its trusted.changed-with-code events go to; its result is { project, reviewItems };
@@ -23,7 +23,6 @@
 //   - lastCommitTouching(path, pullRequest) answers the commit id;
 //   - fileAtCommit(path, commit) answers { bytes }, the file at `path` as `commit` holds it, or
 //     'not-found' when that commit has no such file.
-// See docs/specs/SPEC-02-project-trust-and-approval.md.
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';

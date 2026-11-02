@@ -3,7 +3,6 @@
 // The test points the real Docker client at an address where no daemon listens, as a stopped daemon
 // looks to the client; it stops nothing. The counter-examples ask the running daemon for an image it
 // really does not have, which is image-missing.
-// See docs/specs/SPEC-07-isolated-runner-and-egress.md.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { dockerCliEngine, dockerRunner, type ContainerEngine, type RunnerLogEntry } from '@revisum/runner';
@@ -40,7 +39,7 @@ function engineWithoutTheImage(): ContainerEngine {
   return { ...engine, imageId: (reference) => engine.imageId(`${reference}-absent-for-this-test`) };
 }
 
-test('with no Docker daemon to answer, start gives start-failed, not image-missing', { criterion: 'AC-SPEC-07-06', timeout: TIMEOUT }, async () => {
+test('with no Docker daemon to answer, start gives start-failed, not image-missing', { timeout: TIMEOUT }, async () => {
   requireDocker();
   await withNoDaemon(async () => {
     const { logged, runner, started } = startOn(dockerCliEngine());
@@ -52,7 +51,7 @@ test('with no Docker daemon to answer, start gives start-failed, not image-missi
   });
 });
 
-test('counter-example: with the daemon running and the run image absent, start gives image-missing', { criterion: 'AC-SPEC-07-06', timeout: TIMEOUT }, async () => {
+test('counter-example: with the daemon running and the run image absent, start gives image-missing', { timeout: TIMEOUT }, async () => {
   requireDocker();
   const outcome = await startOn(engineWithoutTheImage()).started;
   if (outcome.ok) await outcome.value.stop();
@@ -60,7 +59,7 @@ test('counter-example: with the daemon running and the run image absent, start g
   assert.deepEqual(outcome.error, { code: 'image-missing' });
 });
 
-test('with no Docker daemon to answer, the workload runner gives workload-start-failed, not image-missing', { criterion: 'AC-SPEC-07-06', timeout: TIMEOUT }, async () => {
+test('with no Docker daemon to answer, the workload runner gives workload-start-failed, not image-missing', { timeout: TIMEOUT }, async () => {
   requireDocker();
   await withNoDaemon(async () => {
     const { runner, logged } = runnerOn(dockerCliEngine());
@@ -70,7 +69,7 @@ test('with no Docker daemon to answer, the workload runner gives workload-start-
   });
 });
 
-test('counter-example: with the daemon running and the run image absent, the workload runner gives image-missing', { criterion: 'AC-SPEC-07-06', timeout: TIMEOUT }, async () => {
+test('counter-example: with the daemon running and the run image absent, the workload runner gives image-missing', { timeout: TIMEOUT }, async () => {
   requireDocker();
   const outcome = await runnerOn(engineWithoutTheImage()).runner.run(workloadRequest());
   assert.equal(errorCode(outcome), 'image-missing');

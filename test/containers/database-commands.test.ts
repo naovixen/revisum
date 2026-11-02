@@ -14,7 +14,6 @@
 // network-admin rights in the container, so a command connects by the service's name (founder,
 // 2026-10-31).
 // The engine's half of each rule, against a fake port, is in test/unit/engine/database-command-*.
-// See docs/specs/SPEC-36-unsafe-plan-features.md ("Database commands" under "Milestone").
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
 import type { EgressEvent } from '@revisum/contracts';
@@ -46,7 +45,7 @@ const step = (command: string, commandArguments: Readonly<Record<string, unknown
 
 // ---- Arguments ----------------------------------------------------------------------------------------
 
-test('"; rm -rf /" and "$(id)" reach the program as literal single arguments, and "-rf" after a declared "--" as one argument', { criterion: 'AC-SPEC-36-12', timeout: TIMEOUT }, async () => {
+test('"; rm -rf /" and "$(id)" reach the program as literal single arguments, and "-rf" after a declared "--" as one argument', { timeout: TIMEOUT }, async () => {
   const ran = await runCommandStep(commandProjectFile(image, listeners), step('echoArguments', { first: '; rm -rf /', second: '$(id)', late: '-rf' }), fakeSecretValue());
   const outcome = onlyOutcome(ran);
   assert.equal(outcome.exitCode, 0, JSON.stringify(outcome));
@@ -54,7 +53,7 @@ test('"; rm -rf /" and "$(id)" reach the program as literal single arguments, an
   assert.equal(ran.result.state, 'Passed', JSON.stringify(ran.result.steps));
 });
 
-test('a line break never reaches the program: remembering it fails with value-unsafe, and the echo command never starts', { criterion: 'AC-SPEC-36-12', timeout: TIMEOUT }, async () => {
+test('a line break never reaches the program: remembering it fails with value-unsafe, and the echo command never starts', { timeout: TIMEOUT }, async () => {
   const ran = await runCommandSteps(commandProjectFile(image, listeners), [
     { ...step('readNote'), remember: { noteText: 'note' } },
     step('echoArguments', { first: { valueName: 'noteText' }, second: 'plain', late: 'text' }),
@@ -65,7 +64,7 @@ test('a line break never reaches the program: remembering it fails with value-un
   assert.ok(!JSON.stringify(ran.result).includes('second line'), 'the note reached the result');
 });
 
-test('a leading "-" before the declared "--" fails with parameter-invalid, and no container starts', { criterion: 'AC-SPEC-36-12', timeout: TIMEOUT }, async () => {
+test('a leading "-" before the declared "--" fails with parameter-invalid, and no container starts', { timeout: TIMEOUT }, async () => {
   const ran = await runCommandStep(commandProjectFile(image, listeners), step('echoArguments', { first: '-rf', second: 'plain', late: 'text' }), fakeSecretValue());
   assert.equal(ran.result.state, 'Errored');
   assert.equal(ran.result.steps[0]?.code, 'parameter-invalid');
@@ -95,7 +94,7 @@ async function reachAttempts(): Promise<Attempts> {
 const eventsFor = (events: readonly EgressEvent[], host: string): readonly EgressEvent[] =>
   events.filter((event) => hostOf(String(event.origin)) === host);
 
-test('counter-example: the command reaches its own service\'s declared port, by the service\'s name', { criterion: 'AC-SPEC-36-13', timeout: TIMEOUT }, async () => {
+test('counter-example: the command reaches its own service\'s declared port, by the service\'s name', { timeout: TIMEOUT }, async () => {
   const { seen } = await reachAttempts();
   assert.equal(seen['declared-database'], `reached:${DATABASE_BANNER}`);
   assert.ok(await listeners.database.connections() >= 1, 'the declared database saw no connection');
@@ -113,19 +112,19 @@ const BLOCKED_ATTEMPTS = [
 ];
 
 for (const { attempt, name } of BLOCKED_ATTEMPTS) {
-  test(`a connection to ${attempt} is blocked`, { criterion: 'AC-SPEC-36-13', timeout: TIMEOUT }, async () => {
+  test(`a connection to ${attempt} is blocked`, { timeout: TIMEOUT }, async () => {
     const { seen } = await reachAttempts();
     assert.equal(seen[name], 'blocked');
   });
 }
 
-test('the other declared service saw no connection', { criterion: 'AC-SPEC-36-13', timeout: TIMEOUT }, async () => {
+test('the other declared service saw no connection', { timeout: TIMEOUT }, async () => {
   await reachAttempts();
   assert.equal(await listeners.otherService.connections(), 0, 'the other declared service was reached');
 });
 
 for (const host of ['example.com', 'metadata.google.internal']) {
-  test(`the attempt to reach ${host} by name is recorded as a blocked egress event`, { criterion: 'AC-SPEC-36-13', timeout: TIMEOUT }, async () => {
+  test(`the attempt to reach ${host} by name is recorded as a blocked egress event`, { timeout: TIMEOUT }, async () => {
     const { events } = await reachAttempts();
     const recorded = eventsFor(events, host);
     assert.ok(recorded.length >= 1, `nothing was recorded for ${host}: ${JSON.stringify(events)}`);
@@ -133,7 +132,7 @@ for (const host of ['example.com', 'metadata.google.internal']) {
   });
 }
 
-test('no egress event allows anything but the declared database', { criterion: 'AC-SPEC-36-13', timeout: TIMEOUT }, async () => {
+test('no egress event allows anything but the declared database', { timeout: TIMEOUT }, async () => {
   const { events } = await reachAttempts();
   const allowed = events.filter((event) => event.decision === 'allowed');
   assert.ok(allowed.every((event) => event.origin.includes(listeners.database.address)), JSON.stringify(allowed));
@@ -158,25 +157,25 @@ async function environmentInside(): Promise<Readonly<Record<string, string>>> {
   return inside;
 }
 
-test('the command\'s environment holds only the declared variables, the image\'s own and the container\'s own', { criterion: 'AC-SPEC-36-13', timeout: TIMEOUT }, async () => {
+test('the command\'s environment holds only the declared variables, the image\'s own and the container\'s own', { timeout: TIMEOUT }, async () => {
   const environment = await environmentInside();
   const allowed = new Set<string>([...DECLARED_VARIABLES, ...CONTAINER_OWN, ...await imageEnvironmentNames(image)]);
   assert.deepEqual(Object.keys(environment).filter((name) => !allowed.has(name)), []);
 });
 
-test('the command\'s environment holds no proxy variable, since the command speaks TCP', { criterion: 'AC-SPEC-36-13', timeout: TIMEOUT }, async () => {
+test('the command\'s environment holds no proxy variable, since the command speaks TCP', { timeout: TIMEOUT }, async () => {
   const environment = await environmentInside();
   assert.deepEqual(Object.keys(environment).filter((name) => PROXY_VARIABLE.test(name)), []);
 });
 
-test('no host credential\'s name or value is in the command\'s environment', { criterion: 'AC-SPEC-36-13', timeout: TIMEOUT }, async () => {
+test('no host credential\'s name or value is in the command\'s environment', { timeout: TIMEOUT }, async () => {
   const environment = await environmentInside();
   assert.deepEqual(Object.keys(environment).filter((name) => name.startsWith('GITHUB_') || /^(AWS_|AZURE_|GOOGLE_|GCP_|NPM_|ACTIONS_)/.test(name)), []);
   const values = Object.values(environment);
   for (const value of DISTINCTIVE_HOST_VALUES) assert.ok(!values.some((text) => text.includes(value)), 'a host credential\'s value is inside');
 });
 
-test('counter-example: the declared literal and the declared secret\'s value are in the command\'s environment', { criterion: 'AC-SPEC-36-13', timeout: TIMEOUT }, async () => {
+test('counter-example: the declared literal and the declared secret\'s value are in the command\'s environment', { timeout: TIMEOUT }, async () => {
   const environment = await environmentInside();
   assert.equal(environment['PGDATABASE'], DATABASE_NAME);
   assert.equal(environment['PGPASSWORD'], secretValue);

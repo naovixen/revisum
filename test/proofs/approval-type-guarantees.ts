@@ -6,7 +6,6 @@
 //   - A declared approval and a verified approval are both an Approval, so wherever a gate takes
 //     an Approval, the owner's declared approval passes exactly as a verified one does.
 // Each @ts-expect-error line must stay an error; the test deletes them to prove it.
-// See docs/specs/SPEC-02-project-trust-and-approval.md.
 import {
   unverified,
   type ActorId, type Approval, type ApprovalSubject, type DeclaredApproval, type DerivedActor, type VerifiedApproval,

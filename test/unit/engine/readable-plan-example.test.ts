@@ -4,11 +4,9 @@
 // path stays a path, as JSON allows.
 //
 // The example has no Feature: or Spec: header, which meta needs before the plan can parse, so the
-// expected JSON golden file holds the version, targets and steps, and only those are compared
-// (SPEC-28's build notes).
+// expected JSON golden file holds the version, targets and steps, and only those are compared.
 //   - fixtures/readable-plans/sign-in.plan: the example, exactly as the spec gives it;
 //   - golden/readable-plans/sign-in.json: the JSON it reads to.
-// See docs/specs/SPEC-28-plan-authoring.md.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -34,29 +32,29 @@ const fieldsOf = (json: unknown): JsonRecord => {
 };
 const stepsOf = (json: unknown): JsonRecord[] => fieldsOf(json)['steps'] as JsonRecord[];
 
-test('the founder\'s example reads to the version, targets and steps of the expected JSON golden file', { criterion: 'AC-SPEC-28-06' }, () => {
+test('the founder\'s example reads to the version, targets and steps of the expected JSON golden file', () => {
   const json = fieldsOf(readExample().json);
   assert.deepEqual({ version: json['version'], targets: json['targets'], steps: json['steps'] }, EXPECTED);
 });
 
-test('in the founder\'s example, Go to /login resolves against the Origin: header', { criterion: 'AC-SPEC-28-06' }, () => {
+test('in the founder\'s example, Go to /login resolves against the Origin: header', () => {
   assert.deepEqual(stepsOf(readExample().json)[0], { type: 'navigate', url: 'https://staging.example.org/login' });
 });
 
-test('in the founder\'s example, Type secret TEST_USER is a fill step carrying the secret by name', { criterion: 'AC-SPEC-28-06' }, () => {
+test('in the founder\'s example, Type secret TEST_USER is a fill step carrying the secret by name', () => {
   const fill = stepsOf(readExample().json)[1];
   assert.equal(fill?.['type'], 'fill');
   assert.deepEqual(fill?.['value'], { secretName: 'TEST_USER' });
 });
 
-test('a different Origin: header resolves the same path against that origin instead', { criterion: 'AC-SPEC-28-06' }, () => {
+test('a different Origin: header resolves the same path against that origin instead', () => {
   // The counter-example: the URL comes from the header, not from anything fixed in the reader.
   const moved = EXAMPLE_TEXT.replace(ORIGIN_HEADER, 'Origin: https://preview.example.org');
   assert.notEqual(moved, EXAMPLE_TEXT);
   assert.deepEqual(stepsOf(readExample(moved).json)[0], { type: 'navigate', url: 'https://preview.example.org/login' });
 });
 
-test('without an Origin: header, Go to /login reads as the path itself, with no error', { criterion: 'AC-SPEC-28-06' }, () => {
+test('without an Origin: header, Go to /login reads as the path itself, with no error', () => {
   const withoutOrigin = EXAMPLE_TEXT.split('\n').filter((line) => line !== ORIGIN_HEADER).join('\n');
   assert.notEqual(withoutOrigin, EXAMPLE_TEXT);
   assert.deepEqual(stepsOf(readExample(withoutOrigin).json)[0], { type: 'navigate', url: '/login' });

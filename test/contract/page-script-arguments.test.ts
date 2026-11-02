@@ -11,7 +11,6 @@
 // wrote, and the source the page ran is the file, whatever the arguments. The mutant shows a
 // driver that spliced the text into the source would fail it: the same sets, spliced, break the
 // script or change what it receives.
-// See docs/specs/SPEC-36-unsafe-plan-features.md.
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { runInNewContext } from 'node:vm';
@@ -108,13 +107,13 @@ const echoCheck = (script: unknown, set: ArgumentSet, source: string, index: num
 const batches = (sets: readonly ArgumentSet[]): readonly (readonly ArgumentSet[])[] =>
   Array.from({ length: Math.ceil(sets.length / SETS_PER_RUN) }, (_unused, batch) => sets.slice(batch * SETS_PER_RUN, (batch + 1) * SETS_PER_RUN));
 
-test('the declared script file is one function expression with nothing around it, so its bytes are its source text', { criterion: 'AC-SPEC-36-09' }, () => {
+test('the declared script file is one function expression with nothing around it, so its bytes are its source text', () => {
   const source = scriptFileText(ECHO_ARGUMENTS_FILE);
   assert.equal(source, source.trim(), 'no leading or trailing whitespace in the fixture file');
   assert.ok(source.startsWith('async function echoArguments('), source.slice(0, 40));
 });
 
-test('the generated argument sets hold quotes, "); fetch(, template-literal text and non-Latin text, and almost all differ', { criterion: 'AC-SPEC-36-09' }, () => {
+test('the generated argument sets hold quotes, "); fetch(, template-literal text and non-Latin text, and almost all differ', () => {
   const texts = ALL_SETS.map((set) => set.text);
   assert.equal(ALL_SETS.length, ARGUMENT_SETS);
   for (const needle of ['"', '\'', '"); fetch(', '${', '`']) assert.ok(texts.filter((text) => text.includes(needle)).length >= 50, `at least 50 sets hold ${needle}`);
@@ -125,7 +124,7 @@ test('the generated argument sets hold quotes, "); fetch(, template-literal text
 // Mutant: a driver that spliced each text into the source, as a string literal, would run code the
 // plan wrote or receive other text. Spliced into a sandbox with nothing to reach, the hostile sets
 // either break the script or change what it receives, so the browser runs below can tell.
-test('mutant: splicing the same texts into the source breaks the script or changes what it receives', { criterion: 'AC-SPEC-36-09' }, () => {
+test('mutant: splicing the same texts into the source breaks the script or changes what it receives', () => {
   const changed = ALL_SETS.filter((set) => {
     try {
       const received: unknown = runInNewContext(`((received) => received)("${set.text}")`, { fetch: () => 'fetched', alert: () => 'alerted', document: { cookie: 'c' } }, { timeout: 100 });
@@ -140,7 +139,7 @@ test('mutant: splicing the same texts into the source breaks the script or chang
 
 for (const targetId of BOTH_TARGETS) {
   describe(`named page script arguments: ${targetId}`, () => {
-    test(`each of ${ARGUMENT_SETS} generated argument sets reaches the script as one JSON object, and the page runs the file's exact source`, { criterion: 'AC-SPEC-36-09', timeout: TIMEOUT }, async () => {
+    test(`each of ${ARGUMENT_SETS} generated argument sets reaches the script as one JSON object, and the page runs the file's exact source`, { timeout: TIMEOUT }, async () => {
       const source = scriptFileText(ECHO_ARGUMENTS_FILE);
       let checked = 0;
       for (const [batch, sets] of batches(ALL_SETS).entries()) {
@@ -157,7 +156,7 @@ for (const targetId of BOTH_TARGETS) {
 
     // Counter-example: the same check against a report computed for other arguments fails, so a
     // passing check is not one that passes on anything.
-    test('counter-example: a report expected for other arguments, or another source, fails the check', { criterion: 'AC-SPEC-36-09', timeout: TIMEOUT }, async () => {
+    test('counter-example: a report expected for other arguments, or another source, fails the check', { timeout: TIMEOUT }, async () => {
       const [set] = ALL_SETS;
       assert.ok(set !== undefined);
       const source = scriptFileText(ECHO_ARGUMENTS_FILE);
@@ -177,7 +176,7 @@ for (const targetId of BOTH_TARGETS) {
     // An inline script's source is the plan's own text; it must reach the page unchanged too. An
     // inline script runs only in an approved plan. An inline script declares no parameters, so it
     // is called with one empty object.
-    test('an inline script is called once with one empty object, and the page runs the plan\'s exact source', { criterion: 'AC-SPEC-36-09', timeout: TIMEOUT }, async () => {
+    test('an inline script is called once with one empty object, and the page runs the plan\'s exact source', { timeout: TIMEOUT }, async () => {
       const source = scriptFileText(ECHO_ARGUMENTS_FILE);
       const script = inlineScript(source, 'read', { report: '/report' });
       const report = JSON.stringify({ callArguments: 1, names: [], textType: 'undefined', sourceSha256: sha256(source) });
@@ -190,7 +189,7 @@ for (const targetId of BOTH_TARGETS) {
   describe(`no secret reaches a page script: ${targetId}`, () => {
     // After the page has been given a secret, the script still receives one object holding only
     // its declared arguments, with the values the plan wrote: the driver passes it nothing else.
-    test('after a secret is typed into the page, the script is called with only its declared arguments', { criterion: 'AC-SPEC-36-20', timeout: TIMEOUT }, async () => {
+    test('after a secret is typed into the page, the script is called with only its declared arguments', { timeout: TIMEOUT }, async () => {
       const source = scriptFileText(ECHO_ARGUMENTS_FILE);
       const secret = fakeSecretValue();
       const set: ArgumentSet = { text: 'plain text', count: 7, flag: true };

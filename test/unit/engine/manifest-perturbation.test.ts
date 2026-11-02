@@ -1,6 +1,6 @@
 // Every field of the run manifest is fed by an input, and changing that input changes the manifest
 // hash or a nonHermeticInputs entry. The cases are enumerated from the type: the table below is
-// typed over every key of Required<RunManifest> (with SPEC-08's added fields), and the same over
+// typed over every key of Required<RunManifest> (with the added replay fields), and the same over
 // `versions`, `seeds` and `clock`, so a new field without a case fails to compile
 // (manifest-perturbation-guarantees.ts shows it).
 //
@@ -9,7 +9,6 @@
 // script, run with a driver that has a build port and with every pin. The fields only other kinds of
 // run have (an evidence run's record, a browser mutant's rewrites) start from their own builders.
 // Each case checks its own field changed, so a case that perturbs the wrong input fails.
-// See docs/specs/SPEC-08-manifest-and-replay.md (AC-02).
 import assert from 'node:assert/strict';
 import { after, test } from 'node:test';
 import { buildManifest, canonicalJson, evidenceManifest, manifestHash, sha256, type AdapterInfo, type RunManifest } from '@revisum/engine';
@@ -191,7 +190,7 @@ async function assertPerturbationShows(path: readonly string[], perturbation: Pe
   assert.ok(hashChanged || nonHermeticChanged, `changing ${name} changed neither the manifest hash nor nonHermeticInputs`);
 }
 
-test('the fully populated run records every manifest field a plan run can have', { criterion: 'AC-SPEC-08-02' }, async () => {
+test('the fully populated run records every manifest field a plan run can have', async () => {
   const manifest = await populatedManifest();
   const onlyOtherRuns = new Set(['responseRewrites', 'evidence']);
   const absent = Object.keys(PERTURBATIONS).filter((field) => !onlyOtherRuns.has(field) && !Object.hasOwn(manifest, field));
@@ -199,30 +198,30 @@ test('the fully populated run records every manifest field a plan run can have',
 });
 
 for (const [field, perturbation] of Object.entries(PERTURBATIONS)) {
-  test(`perturbing the input of ${field} changes the manifest hash or nonHermeticInputs`, { criterion: 'AC-SPEC-08-02' }, async () => {
+  test(`perturbing the input of ${field} changes the manifest hash or nonHermeticInputs`, async () => {
     await assertPerturbationShows([field], perturbation);
   });
 }
 
 for (const [field, perturbation] of Object.entries(VERSION_PERTURBATIONS)) {
-  test(`perturbing the ${field} version changes the manifest hash`, { criterion: 'AC-SPEC-08-02' }, async () => {
+  test(`perturbing the ${field} version changes the manifest hash`, async () => {
     await assertPerturbationShows(['versions', field], perturbation);
   });
 }
 
 for (const [field, perturbation] of Object.entries(SEED_PERTURBATIONS)) {
-  test(`perturbing the ${field} seed changes the manifest hash`, { criterion: 'AC-SPEC-08-02' }, async () => {
+  test(`perturbing the ${field} seed changes the manifest hash`, async () => {
     await assertPerturbationShows(['seeds', field], perturbation);
   });
 }
 
 for (const [field, perturbation] of Object.entries(CLOCK_PERTURBATIONS)) {
-  test(`perturbing the clock's ${field} changes the manifest hash`, { criterion: 'AC-SPEC-08-02' }, async () => {
+  test(`perturbing the clock's ${field} changes the manifest hash`, async () => {
     await assertPerturbationShows(['clock', field], perturbation);
   });
 }
 
-test('a host run, whose pins name no run image, lists run-image in nonHermeticInputs', { criterion: 'AC-SPEC-08-02' }, async () => {
+test('a host run, whose pins name no run image, lists run-image in nonHermeticInputs', async () => {
   const { imageDigest: _none, ...hostPins } = PINS;
   const host = await runScenario({ ...POPULATED, pins: hostPins });
   const pinned = await populatedManifest();
@@ -231,7 +230,7 @@ test('a host run, whose pins name no run image, lists run-image in nonHermeticIn
   assert.equal(Object.hasOwn(host.manifest, 'imageDigest'), false);
 });
 
-test('the project hash leaves out the evidence-mode and planner sections, which a plan run never reads', { criterion: 'AC-SPEC-08-02' }, async () => {
+test('the project hash leaves out the evidence-mode and planner sections, which a plan run never reads', async () => {
   const withPlanner = await runScenario({
     ...POPULATED,
     projectFile: populatedProjectFile({ planner: { kind: 'local', url: 'http://127.0.0.1:11434/v1/chat/completions', model: 'llama3.1', wire: 'openai-chat' } }),
@@ -241,7 +240,7 @@ test('the project hash leaves out the evidence-mode and planner sections, which 
   assert.equal(withPlanner.manifest.projectHash, manifest.projectHash);
 });
 
-test('counter-example: changing an input the manifest leaves out on purpose, the base URL\'s port, changes neither', { criterion: 'AC-SPEC-08-02' }, async () => {
+test('counter-example: changing an input the manifest leaves out on purpose, the base URL\'s port, changes neither', async () => {
   const before = await populatedManifest();
   // The manifest keeps the fixtures' content hashes, never the address they were served from.
   const after = (await runScenario({ ...POPULATED, baseUrl: 'http://127.0.0.1:4999' })).manifest;
@@ -249,7 +248,7 @@ test('counter-example: changing an input the manifest leaves out on purpose, the
   assert.deepEqual(after.nonHermeticInputs, before.nonHermeticInputs);
 });
 
-test('a run given no pins, on a driver with no build port, records none of the added fields, so committed manifest hashes stand', { criterion: 'AC-SPEC-08-02' }, async () => {
+test('a run given no pins, on a driver with no build port, records none of the added fields, so committed manifest hashes stand', async () => {
   const unpinned = await runScenario({ ...POPULATED, pins: null, executable: null });
   const pinnedOnly = ['versions', 'redactor', 'limits', 'baselinesHash', 'rulesetHash', 'executableSha256', 'imageDigest', 'fontsSha256', 'commit', 'projectHash'];
   assert.deepEqual(pinnedOnly.filter((field) => Object.hasOwn(unpinned.manifest, field)), []);

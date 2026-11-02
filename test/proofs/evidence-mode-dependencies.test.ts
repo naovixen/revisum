@@ -2,7 +2,6 @@
 // hand in engine, which imports only its own files, Node built-ins and contracts. And no package
 // but cli wires engine and runner together, so the code that decodes a suite's outputs never
 // starts the container that produces them. A planted file shows each check can fail.
-// See docs/specs/SPEC-35-evidence-mode.md.
 import assert from 'node:assert/strict';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -38,7 +37,7 @@ const manifestOf = (packageFolder: string): Record<string, unknown> =>
 // ---- contracts and engine ----------------------------------------------------------------------
 
 for (const checked of [{ name: 'contracts', allowed: [] }, { name: 'engine', allowed: ['@revisum/contracts'] }] as const) {
-  test(`${checked.name} declares no runtime dependency and imports only its own files, Node built-ins and allowed packages`, { criterion: 'AC-SPEC-35-22' }, () => {
+  test(`${checked.name} declares no runtime dependency and imports only its own files, Node built-ins and allowed packages`, () => {
     assert.deepEqual(declaredDependencies(manifestOf(checked.name)), []);
     const files = sourceFiles(join(PACKAGES, checked.name, 'src'));
     assert.ok(files.length > 0);
@@ -47,7 +46,7 @@ for (const checked of [{ name: 'contracts', allowed: [] }, { name: 'engine', all
   });
 }
 
-test('the suite report decoder lives in engine, so the checks above cover it', { criterion: 'AC-SPEC-35-22' }, () => {
+test('the suite report decoder lives in engine, so the checks above cover it', () => {
   const defining = sourceFiles(join(PACKAGES, 'engine', 'src'))
     .filter((file) => /\bexport\s+(?:async\s+)?function\s+parseSuiteReport\b|\bexport\s+const\s+parseSuiteReport\b/.test(readFileSync(file, 'utf8')));
   assert.equal(defining.length, 1, `files defining parseSuiteReport in engine: ${defining.map((file) => relative(PACKAGES, file)).join(', ')}`);
@@ -69,7 +68,7 @@ function wiresEngineAndRunner(sources: readonly string[], manifest: Record<strin
   return uses(ENGINE) && uses(RUNNER);
 }
 
-test('no package but cli imports both engine and runner', { criterion: 'AC-SPEC-35-22' }, () => {
+test('no package but cli imports both engine and runner', () => {
   const packages = readdirSync(PACKAGES, { withFileTypes: true }).filter((entry) => entry.isDirectory()).map((entry) => entry.name);
   assert.ok(packages.includes('cli') && packages.includes('runner') && packages.includes('engine'));
   const wiring = packages.filter((name) => name !== 'cli').filter((name) => {
@@ -80,7 +79,7 @@ test('no package but cli imports both engine and runner', { criterion: 'AC-SPEC-
 });
 
 // Mutants: the check finds the pair however it is written, and only the pair.
-test('the wiring check finds a planted package that imports both, and passes one that imports one', { criterion: 'AC-SPEC-35-22' }, () => {
+test('the wiring check finds a planted package that imports both, and passes one that imports one', () => {
   const both = ["import { parseSuiteReport } from '@revisum/engine';", "import type { WorkloadRunner } from '@revisum/runner';"];
   assert.equal(wiresEngineAndRunner(both, {}), true);
   assert.equal(wiresEngineAndRunner([both[0] ?? ''], { dependencies: { [RUNNER]: '*' } }), true);

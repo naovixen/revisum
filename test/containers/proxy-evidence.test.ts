@@ -5,7 +5,6 @@
 //     manifest differs from a plain run's. The plain run, against the same server, is the counter-example.
 //   - A failed read: once the proxy's container has stopped, its files cannot be read, and the
 //     decisions already read must survive. A file not yet written, in a fresh run, still reads as no lines.
-// See docs/specs/SPEC-07-isolated-runner-and-egress.md.
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import { after, before, test } from 'node:test';
@@ -100,7 +99,7 @@ function manifestWith(applied: readonly AppliedRewrite[]) {
   });
 }
 
-test('a mutated container run reads back the rewrite its proxy applied, and its manifest differs from a plain run\'s', { criterion: 'AC-SPEC-07-07', timeout: TIMEOUT }, async () => {
+test('a mutated container run reads back the rewrite its proxy applied, and its manifest differs from a plain run\'s', { timeout: TIMEOUT }, async () => {
   const mutated = await askFixtureUnder(mutatedPolicy());
   assert.deepEqual(mutated.answer, { status: 200, body: MUTATED_BODY }, 'the proxy changed what the fixture sent');
   assert.deepEqual(mutated.applied, [{ origin: origin(fixtureOrigin), name: BODY_CHANGED.name }]);
@@ -117,7 +116,7 @@ test('a mutated container run reads back the rewrite its proxy applied, and its 
 // The decisions the handle holds for the one undeclared origin these tests ask for.
 const decisionsOf = (handle: RunnerHandle) => handle.proxyDecisions().filter((decision) => decision.origin === 'http://undeclared.invalid');
 
-test('the decisions already read survive the proxy\'s container stopping, and a file not yet written reads as no lines', { criterion: 'AC-SPEC-07-01', timeout: TIMEOUT }, async () => {
+test('the decisions already read survive the proxy\'s container stopping, and a file not yet written reads as no lines', { timeout: TIMEOUT }, async () => {
   const run = await startIsolatedRun();
   try {
     await run.handle.exec(['true']);

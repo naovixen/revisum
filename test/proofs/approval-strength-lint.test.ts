@@ -4,7 +4,6 @@
 //   - a function that takes a VerifiedApproval parameter fails the lint;
 //   - a check that compares strength with 'verified' to decide a result fails the lint;
 //   - choosing a label by strength passes, so the lint fails for the planted reason only.
-// See docs/specs/SPEC-02-project-trust-and-approval.md.
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
 import { copyRepository, type ScratchRepository } from './scratch-repository.ts';
@@ -27,14 +26,14 @@ function assertLintPassesWith(relativePath: string, source: string): void {
   assert.equal(outcome.passed, true, `the lint rejected ${relativePath}:\n${outcome.failureOutput}`);
 }
 
-test('the unchanged copy of the repository passes every lint command', { criterion: 'AC-SPEC-02-20', timeout: TIMEOUT }, () => {
+test('the unchanged copy of the repository passes every lint command', { timeout: TIMEOUT }, () => {
   const outcome = scratch.lint();
   assert.equal(outcome.passed, true, outcome.failureOutput);
 });
 
 // ---- Taking VerifiedApproval --------------------------------------------------------------------
 
-test('the lint fails on an engine gate that takes a VerifiedApproval parameter', { criterion: 'AC-SPEC-02-20', timeout: TIMEOUT }, () => {
+test('the lint fails on an engine gate that takes a VerifiedApproval parameter', { timeout: TIMEOUT }, () => {
   assertLintFailsOn('packages/engine/src/plan/planted-merge-gate.ts', [
     "import type { VerifiedApproval } from '@revisum/contracts';",
     "// A merge gate only a verified approval can open, so the owner's declared approval would be shut out.",
@@ -43,7 +42,7 @@ test('the lint fails on an engine gate that takes a VerifiedApproval parameter',
   ].join('\n'));
 });
 
-test('the lint fails on a level function in another package that takes a VerifiedApproval parameter', { criterion: 'AC-SPEC-02-20', timeout: TIMEOUT }, () => {
+test('the lint fails on a level function in another package that takes a VerifiedApproval parameter', { timeout: TIMEOUT }, () => {
   assertLintFailsOn('packages/report/src/planted-level.ts', [
     "import type { VerifiedApproval } from '@revisum/contracts';",
     'export function reachesLevelFour(approvals: readonly VerifiedApproval[]): boolean {',
@@ -55,7 +54,7 @@ test('the lint fails on a level function in another package that takes a Verifie
 
 // ---- Testing strength to decide a result --------------------------------------------------------
 
-test("the lint fails on a metric that counts only approvals whose strength is 'verified'", { criterion: 'AC-SPEC-02-20', timeout: TIMEOUT }, () => {
+test("the lint fails on a metric that counts only approvals whose strength is 'verified'", { timeout: TIMEOUT }, () => {
   assertLintFailsOn('packages/engine/src/planted-metric.ts', [
     "import type { Approval } from '@revisum/contracts';",
     'export const approvedChanges = (approvals: readonly Approval[]): number =>',
@@ -64,7 +63,7 @@ test("the lint fails on a metric that counts only approvals whose strength is 'v
   ].join('\n'));
 });
 
-test("the lint fails on a reversed inequality that refuses a strength other than 'verified'", { criterion: 'AC-SPEC-02-20', timeout: TIMEOUT }, () => {
+test("the lint fails on a reversed inequality that refuses a strength other than 'verified'", { timeout: TIMEOUT }, () => {
   assertLintFailsOn('packages/report/src/planted-gate.ts', [
     "import type { Approval } from '@revisum/contracts';",
     'export function mayMerge(approval: Approval): boolean {',
@@ -77,7 +76,7 @@ test("the lint fails on a reversed inequality that refuses a strength other than
 
 // ---- Strength may select a label ----------------------------------------------------------------
 
-test('the lint accepts strength used only to choose the label shown beside a result', { criterion: 'AC-SPEC-02-20', timeout: TIMEOUT }, () => {
+test('the lint accepts strength used only to choose the label shown beside a result', { timeout: TIMEOUT }, () => {
   assertLintPassesWith('packages/report/src/planted-label.ts', [
     "import type { Approval, ApprovalStrength } from '@revisum/contracts';",
     'const APPROVAL_LABELS: Readonly<Record<ApprovalStrength, string>> = { verified: \'verified\', declared: \'declared, not verified\' };',
@@ -86,7 +85,7 @@ test('the lint accepts strength used only to choose the label shown beside a res
   ].join('\n'));
 });
 
-test('the lint accepts a gate that takes any Approval, whatever its strength', { criterion: 'AC-SPEC-02-20', timeout: TIMEOUT }, () => {
+test('the lint accepts a gate that takes any Approval, whatever its strength', { timeout: TIMEOUT }, () => {
   assertLintPassesWith('packages/engine/src/plan/planted-merge-gate.ts', [
     "import type { Approval } from '@revisum/contracts';",
     'export const opensMergeGate = (approval: Approval | null): boolean => approval !== null;',

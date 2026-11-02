@@ -1,7 +1,6 @@
 // Text an AI writer returns is outside input. parseAiText is the one way it becomes AiText, which
 // is only ever stored as a suggestion: anything that is not text, carries script or is too long is
 // rejected, and a rejected suggestion is never stored.
-// See docs/specs/SPEC-01-plan-language-and-parser.md.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { parseAiText, planParser, writeReleaseNotes, type AiWriter } from '@revisum/engine';
@@ -29,7 +28,7 @@ const SCRIPT_BEARING: readonly (readonly [string, string])[] = [
 ];
 
 for (const [name, input] of NOT_TEXT) {
-  test(`rejects ${name} as wrong_type`, { criterion: 'AC-SPEC-01-09' }, () => {
+  test(`rejects ${name} as wrong_type`, () => {
     const parsed = parseAiText(input, LIMIT);
     assert.equal(parsed.ok, false);
     assert.equal(parsed.ok ? undefined : parsed.error.code, 'wrong_type');
@@ -38,7 +37,7 @@ for (const [name, input] of NOT_TEXT) {
 }
 
 for (const [name, input] of SCRIPT_BEARING) {
-  test(`rejects text with ${name} as unsafe_text`, { criterion: 'AC-SPEC-01-09' }, () => {
+  test(`rejects text with ${name} as unsafe_text`, () => {
     assert.ok(input.length <= LIMIT, 'short enough that only the content can be the reason');
     const parsed = parseAiText(input, LIMIT);
     assert.equal(parsed.ok, false);
@@ -47,13 +46,13 @@ for (const [name, input] of SCRIPT_BEARING) {
   });
 }
 
-test('rejects text one character over the limit as too_long', { criterion: 'AC-SPEC-01-09' }, () => {
+test('rejects text one character over the limit as too_long', () => {
   const parsed = parseAiText('a'.repeat(LIMIT + 1), LIMIT);
   assert.equal(parsed.ok, false);
   assert.equal(parsed.ok ? undefined : parsed.error.code, 'too_long');
 });
 
-test('rejects a very long text as too_long', { criterion: 'AC-SPEC-01-09' }, () => {
+test('rejects a very long text as too_long', () => {
   const parsed = parseAiText(`${PRIVATE_MARKER} `.repeat(100_000), LIMIT);
   assert.equal(parsed.ok, false);
   assert.equal(parsed.ok ? undefined : parsed.error.code, 'too_long');
@@ -62,19 +61,19 @@ test('rejects a very long text as too_long', { criterion: 'AC-SPEC-01-09' }, () 
 
 // Counter-examples: plain text up to the limit, including multi-line prose such as release notes,
 // is accepted unchanged.
-test('accepts plain text of exactly the limit, unchanged', { criterion: 'AC-SPEC-01-09' }, () => {
+test('accepts plain text of exactly the limit, unchanged', () => {
   const text = 'a'.repeat(LIMIT);
   assert.deepEqual(parseAiText(text, LIMIT), { ok: true, value: text });
 });
 
-test('accepts multi-line plain prose, unchanged', { criterion: 'AC-SPEC-01-09' }, () => {
+test('accepts multi-line plain prose, unchanged', () => {
   const text = '## Sign-up\n\nNow with friendlier wording.\n- One fewer step.';
   assert.deepEqual(parseAiText(text, LIMIT), { ok: true, value: text });
 });
 
 // ---- Nothing is stored --------------------------------------------------------------------------
 
-test('a rejected suggestion is never stored: only the deterministic draft is', { criterion: 'AC-SPEC-01-09' }, async () => {
+test('a rejected suggestion is never stored: only the deterministic draft is', async () => {
   const parsed = planParser(testProject())(signupPlan());
   assert.ok(parsed.ok, JSON.stringify(parsed));
   const writers: readonly (readonly [string, AiWriter])[] = [

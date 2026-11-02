@@ -1,7 +1,6 @@
 // The plan language changelog, read the way the version tests need it: the entry for one version,
 // and versions newer than any the changelog lists. Tests look up their own version's entry, never
 // "the newest", so opening a new version needs no test edits.
-// See docs/specs/SPEC-30-plan-values-positions-and-keys.md and docs/specs/SPEC-36-unsafe-plan-features.md.
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { REPOSITORY_ROOT } from './repository.ts';

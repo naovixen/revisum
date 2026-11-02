@@ -11,7 +11,7 @@
 // means isolated, and the team's image starts. The fake probe answers as the real one does: a
 // target answers only if a machine is listening there or refuses and the target counts that.
 // What Docker's description of a network gives networkGatewayAddress is in
-// docker-network-description.test.ts. See docs/specs/SPEC-07-isolated-runner-and-egress.md.
+// docker-network-description.test.ts.
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -123,19 +123,19 @@ const targetsTried = (finding: Finding): readonly ProbeTarget[] => finding.recor
 // ---- The rules, for each runner -------------------------------------------------------------------------
 
 for (const { title, probeIn } of RUNNERS) {
-  test(`${title} skips the subnet's first address when a container on the network holds it`, { criterion: 'AC-SPEC-07-05' }, async () => {
+  test(`${title} skips the subnet's first address when a container on the network holds it`, async () => {
     const finding = await probeIn(HELD_BY_A_CONTAINER);
     assert.ok(!targetsTried(finding).some((target) => target.host === FIRST_ADDRESS), JSON.stringify(targetsTried(finding)));
     assertEnforced(finding);
   });
 
-  test(`${title} still tries public addresses when a container holds the first address`, { criterion: 'AC-SPEC-07-05' }, async () => {
+  test(`${title} still tries public addresses when a container holds the first address`, async () => {
     const finding = await probeIn({ ...HELD_BY_A_CONTAINER, listening: [PUBLIC_ADDRESS] });
     assert.ok(targetsTried(finding).some((target) => target.host === PUBLIC_ADDRESS), JSON.stringify(targetsTried(finding)));
     assertUnenforceable(finding);
   });
 
-  test(`${title} tries the first address on port 80 when no container holds it, counting a refusal as reached`, { criterion: 'AC-SPEC-07-05' }, async () => {
+  test(`${title} tries the first address on port 80 when no container holds it, counting a refusal as reached`, async () => {
     const finding = await probeIn({ gateway: success(FIRST_ADDRESS) });
     assert.deepEqual(
       targetsTried(finding).filter((target) => target.host === FIRST_ADDRESS),
@@ -143,7 +143,7 @@ for (const { title, probeIn } of RUNNERS) {
     );
   });
 
-  test(`${title} still tries public addresses beside the first address, without counting a refusal there`, { criterion: 'AC-SPEC-07-05' }, async () => {
+  test(`${title} still tries public addresses beside the first address, without counting a refusal there`, async () => {
     const finding = await probeIn({ gateway: success(FIRST_ADDRESS), refusing: [PUBLIC_ADDRESS] });
     const publicTarget = targetsTried(finding).find((target) => target.host === PUBLIC_ADDRESS);
     assert.ok(publicTarget !== undefined, JSON.stringify(targetsTried(finding)));
@@ -151,30 +151,30 @@ for (const { title, probeIn } of RUNNERS) {
     assertEnforced(finding);
   });
 
-  test(`${title} treats a gateway that refuses the connection as reached`, { criterion: 'AC-SPEC-07-05' }, async () => {
+  test(`${title} treats a gateway that refuses the connection as reached`, async () => {
     assertUnenforceable(await probeIn({ gateway: success(FIRST_ADDRESS), refusing: [FIRST_ADDRESS] }));
   });
 
-  test(`${title} treats a gateway that accepts the connection as reached`, { criterion: 'AC-SPEC-07-05' }, async () => {
+  test(`${title} treats a gateway that accepts the connection as reached`, async () => {
     assertUnenforceable(await probeIn({ gateway: success(FIRST_ADDRESS), listening: [FIRST_ADDRESS] }));
   });
 
-  test(`counter-example: ${title} takes egress as enforced when nothing answers at the first address`, { criterion: 'AC-SPEC-07-05' }, async () => {
+  test(`counter-example: ${title} takes egress as enforced when nothing answers at the first address`, async () => {
     assertEnforced(await probeIn({ gateway: success(FIRST_ADDRESS) }));
   });
 
-  test(`${title} treats a network it cannot read as reached, whatever a probe would find`, { criterion: 'AC-SPEC-07-05' }, async () => {
+  test(`${title} treats a network it cannot read as reached, whatever a probe would find`, async () => {
     assertUnenforceable(await probeIn({ gateway: failure({ detail: 'no such network' }) }));
   });
 
-  test(`${title} asks about the run's own network`, { criterion: 'AC-SPEC-07-05' }, async () => {
+  test(`${title} asks about the run's own network`, async () => {
     const finding = await probeIn(HELD_BY_A_CONTAINER);
     const internal = finding.record.engine.createdNetworks.filter((network) => network.internal).map((network) => network.name);
     assert.equal(internal.length, 1, JSON.stringify(finding.record.engine.createdNetworks));
     assert.deepEqual(finding.record.gatewayAskedAbout, internal);
   });
 
-  test(`counter-example: ${title}, on an engine that cannot say where a gateway would be, goes by the public addresses alone`, { criterion: 'AC-SPEC-07-05' }, async () => {
+  test(`counter-example: ${title}, on an engine that cannot say where a gateway would be, goes by the public addresses alone`, async () => {
     assertEnforced(await probeIn({}));
     assertUnenforceable(await probeIn({ listening: [PUBLIC_ADDRESS] }));
   });
@@ -182,7 +182,7 @@ for (const { title, probeIn } of RUNNERS) {
 
 // ---- What the level says, for the isolated runner, which has one ------------------------------------------
 
-test('reached leaves the isolated runner at the host level, and not reached gives isolated', { criterion: 'AC-SPEC-07-05' }, async () => {
+test('reached leaves the isolated runner at the host level, and not reached gives isolated', async () => {
   const levelIn = async (world: NetworkWorld): Promise<string> => {
     const { engine } = engineIn(world);
     const runner = dockerRunner({ engine, repositoryRoot: REPOSITORY_ROOT });

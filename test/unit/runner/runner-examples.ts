@@ -1,7 +1,6 @@
 // Shared examples for the isolated runner's tests: branded values the tests build from their own
 // constants, egress policies, a fake name resolver that never touches the network, and the
 // undeclared hosts the fixture pages send traffic to.
-// See docs/specs/SPEC-07-isolated-runner-and-egress.md.
 import assert from 'node:assert/strict';
 import type { DeclaredService, EgressPolicy, ImageDigest, Origin, ServiceName } from '@revisum/contracts';
 import { buildEgressPolicy, type AddressResolver, type ResponseRewrite } from '@revisum/runner';

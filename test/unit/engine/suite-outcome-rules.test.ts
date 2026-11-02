@@ -5,7 +5,6 @@
 // "expected-failure", and a review item with the same reason, so a person looks at it.
 // Counter-examples: a report with a passing test ends Passed with no "vacuous" code, and the same
 // failed test expected to pass is an ordinary failure.
-// See docs/specs/SPEC-35-evidence-mode.md.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
@@ -25,7 +24,7 @@ const EMPTY_REPORT = (): JsonRecord => withValue(withValue(recordedReport('passi
 // Playwright Test exits with 1 and "No tests found" when nothing matches, and with 0 when the
 // team's config sets passWithNoTests. Neither may pass.
 for (const exitCode of [1, 0]) {
-  test(`a report with no tests and exit code ${exitCode} ends Failed with the code vacuous`, { criterion: 'AC-SPEC-35-11' }, () => {
+  test(`a report with no tests and exit code ${exitCode} ends Failed with the code vacuous`, () => {
     const result = evidenceRun(EMPTY_REPORT(), { exitCode });
     assert.deepEqual(testsOf(result), []);
     assert.equal(result.state, 'Failed');
@@ -33,11 +32,11 @@ for (const exitCode of [1, 0]) {
   });
 }
 
-test('a report with no tests never opens the merge gate', { criterion: 'AC-SPEC-35-11' }, () => {
+test('a report with no tests never opens the merge gate', () => {
   assert.equal(opensMergeGate(evidenceRun(EMPTY_REPORT(), { exitCode: 0 })), false);
 });
 
-test('counter-example: a report with passing tests ends Passed and is not called vacuous', { criterion: 'AC-SPEC-35-11' }, () => {
+test('counter-example: a report with passing tests ends Passed and is not called vacuous', () => {
   const result = evidenceRun(recordedReport('passing-with-criteria'));
   assert.equal(result.state, 'Passed');
   assert.equal(carriesCode(result, 'vacuous'), false);
@@ -58,28 +57,28 @@ function expectedFailureReport(): JsonRecord {
   return withValue(withValue(marked, [...specPath(FAILED_SPEC), 'ok'], true), [...testPath, 'annotations'], [{ type: 'fail' }]);
 }
 
-test('a failed test the suite expected to fail gets the outcome expected-failure', { criterion: 'AC-SPEC-35-11' }, () => {
+test('a failed test the suite expected to fail gets the outcome expected-failure', () => {
   const result = evidenceRun(expectedFailureReport(), { exitCode: 0 });
   assert.equal(testTitled(result, FAILED_TITLE).outcome, 'expected-failure');
   assert.equal(testTitled(result, 'adds an item to the cart').outcome, 'passed');
 });
 
-test('an expected failure raises a review item with the reason expected-failure', { criterion: 'AC-SPEC-35-11' }, () => {
+test('an expected failure raises a review item with the reason expected-failure', () => {
   const codes = reviewCodes(evidenceRun(expectedFailureReport(), { exitCode: 0 }));
   assert.equal(codes.filter((code) => code === 'expected-failure').length, 1, JSON.stringify(codes));
 });
 
-test('an expected failure with Playwright\'s exit code 0 does not end the run Errored', { criterion: 'AC-SPEC-35-11' }, () => {
+test('an expected failure with Playwright\'s exit code 0 does not end the run Errored', () => {
   const result = evidenceRun(expectedFailureReport(), { exitCode: 0 });
   assert.notEqual(result.state, 'Errored');
   assert.notEqual(result.evidence?.exitCodeMismatch, true);
 });
 
-test('a run with an expected failure does not open the merge gate, since a person must look at it', { criterion: 'AC-SPEC-35-11' }, () => {
+test('a run with an expected failure does not open the merge gate, since a person must look at it', () => {
   assert.equal(opensMergeGate(evidenceRun(expectedFailureReport(), { exitCode: 0 })), false);
 });
 
-test('counter-example: the same failed test expected to pass is an ordinary failure, with no expected-failure item', { criterion: 'AC-SPEC-35-11' }, () => {
+test('counter-example: the same failed test expected to pass is an ordinary failure, with no expected-failure item', () => {
   const report = withoutSpec(withoutSpec(withoutSpec(recordedReport('each-outcome'), INTERRUPTED_SPEC), 3), 2);
   const result = evidenceRun(report, { exitCode: 1 });
   assert.equal(testTitled(result, FAILED_TITLE).outcome, 'failed');

@@ -10,7 +10,6 @@
 //     the part for standard output, standard error and the error message).
 //   - The manifest's evidence record pins the suite files, command, image and self-reported
 //     versions; one byte of one suite file changes its hash, and replay is not claimed (AC-19).
-// See docs/specs/SPEC-35-evidence-mode.md.
 import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -29,19 +28,19 @@ const DECLARED_COMMAND = ['npx', 'playwright', 'test'];
 
 // ---- Egress that cannot be enforced ----------------------------------------------------------------
 
-test('a workload runner that cannot enforce egress makes the run Refused with egress-unenforceable', { criterion: 'AC-SPEC-35-07' }, async () => {
+test('a workload runner that cannot enforce egress makes the run Refused with egress-unenforceable', async () => {
   const { result } = await runDeclaredSuite({ behaviour: { refusal: 'egress-unenforceable' } });
   assert.equal(result.state, 'Refused');
   assert.equal(result.refusal?.code, 'egress-unenforceable');
 });
 
-test('after the refusal nothing else is run: no setup, no suite, and no test result', { criterion: 'AC-SPEC-35-07' }, async () => {
+test('after the refusal nothing else is run: no setup, no suite, and no test result', async () => {
   const { result, runner } = await runDeclaredSuite({ behaviour: { refusal: 'egress-unenforceable' } });
   assert.ok(runner.requests.length <= 1, `the runner was asked ${runner.requests.length} times`);
   assert.deepEqual(result.suite?.tests ?? [], []);
 });
 
-test('counter-example: with egress enforced, the same suite runs and is not refused', { criterion: 'AC-SPEC-35-07' }, async () => {
+test('counter-example: with egress enforced, the same suite runs and is not refused', async () => {
   const { result } = await runDeclaredSuite();
   assert.notEqual(result.state, 'Refused');
   assert.equal(result.state, 'Passed');
@@ -49,14 +48,14 @@ test('counter-example: with egress enforced, the same suite runs and is not refu
 
 // ---- The suite's environment -----------------------------------------------------------------------------
 
-test('the suite is given only the declared variables and Revisum\'s own', { criterion: 'AC-SPEC-35-06' }, async () => {
+test('the suite is given only the declared variables and Revisum\'s own', async () => {
   const { runner } = await runDeclaredSuite();
   const names = suiteRequestOf(runner).environment.map((entry) => entry.name);
   assert.deepEqual(names.filter((name) => !['BASE_URL', DECLARED_SECRET].includes(name) && !isRevisumOwnName(name)), []);
   assert.deepEqual(names.filter((name) => name.startsWith('GITHUB_')), []);
 });
 
-test('the declared secret is handed to the runner as an opaque secret, never as its text', { criterion: 'AC-SPEC-35-06' }, async () => {
+test('the declared secret is handed to the runner as an opaque secret, never as its text', async () => {
   const secretValue = fakeSecretValue();
   const { runner } = await runDeclaredSuite({ secretValue });
   const request = suiteRequestOf(runner);
@@ -64,14 +63,14 @@ test('the declared secret is handed to the runner as an opaque secret, never as 
   assert.deepEqual(echoesIn(JSON.stringify(request), secretValue), []);
 });
 
-test('counter-example: the declared literal reaches the suite as written', { criterion: 'AC-SPEC-35-06' }, async () => {
+test('counter-example: the declared literal reaches the suite as written', async () => {
   const { runner } = await runDeclaredSuite();
   assert.equal(variable(suiteRequestOf(runner), 'BASE_URL'), 'http://127.0.0.1:4173');
 });
 
 // ---- The command ------------------------------------------------------------------------------------------
 
-test('the suite runs with the declared command, then --retries=0, the JSON reporter, traces on and its project', { criterion: 'AC-SPEC-35-12' }, async () => {
+test('the suite runs with the declared command, then --retries=0, the JSON reporter, traces on and its project', async () => {
   const { runner } = await runDeclaredSuite();
   const argv = suiteRequestOf(runner).argv;
   assert.deepEqual(argv.slice(0, DECLARED_COMMAND.length), DECLARED_COMMAND);
@@ -79,13 +78,13 @@ test('the suite runs with the declared command, then --retries=0, the JSON repor
   assert.ok(argv.includes('--project=chromium') || argv.join(' ').includes('--project chromium'), JSON.stringify(argv));
 });
 
-test('declared arguments of "; rm -rf /" and "$(id)" reach the runner as literal, separate strings', { criterion: 'AC-SPEC-35-12' }, async () => {
+test('declared arguments of "; rm -rf /" and "$(id)" reach the runner as literal, separate strings', async () => {
   const hostile = [...DECLARED_COMMAND, '; rm -rf /', '$(id)'];
   const { runner } = await runDeclaredSuite({ project: evidenceProject({ command: hostile }) });
   assert.deepEqual(suiteRequestOf(runner).argv.slice(0, hostile.length), hostile);
 });
 
-test('the report the suite wrote into Revisum\'s output directory is the one the result is built from', { criterion: 'AC-SPEC-35-12' }, async () => {
+test('the report the suite wrote into Revisum\'s output directory is the one the result is built from', async () => {
   const { result, runner, outputDirectory } = await runDeclaredSuite();
   assert.equal(suiteRequestOf(runner).outputDirectory, outputDirectory);
   assert.ok(variable(suiteRequestOf(runner), REPORT_VARIABLE) !== undefined);
@@ -95,32 +94,32 @@ test('the report the suite wrote into Revisum\'s output directory is the one the
 
 // ---- Timeouts --------------------------------------------------------------------------------------------
 
-test('the declared timeout is passed to the workload runner', { criterion: 'AC-SPEC-35-13' }, async () => {
+test('the declared timeout is passed to the workload runner', async () => {
   const { runner } = await runDeclaredSuite({ project: evidenceProject({ timeoutMilliseconds: 120_000 }) });
   assert.equal(suiteRequestOf(runner).timeoutMilliseconds, 120_000);
 });
 
-test('a suite stopped at its timeout, with no report, ends Errored with suite-timeout', { criterion: 'AC-SPEC-35-13' }, async () => {
+test('a suite stopped at its timeout, with no report, ends Errored with suite-timeout', async () => {
   const { result } = await runDeclaredSuite({ behaviour: { timedOut: true, exitCode: 137 } });
   assert.equal(result.state, 'Errored');
   assert.ok(carriesCode(result, 'suite-timeout'), JSON.stringify(result));
 });
 
-test('a suite stopped at its timeout reports its unfinished test interrupted, never passed', { criterion: 'AC-SPEC-35-13' }, async () => {
+test('a suite stopped at its timeout reports its unfinished test interrupted, never passed', async () => {
   const { result } = await runDeclaredSuite({ behaviour: { report: reportWithUnfinishedTest(), timedOut: true, exitCode: 137 } });
   assert.equal(result.state, 'Errored');
   assert.ok(carriesCode(result, 'suite-timeout'));
   assert.equal(testTitled(result, 'pays with a saved card', 'firefox').outcome, 'interrupted');
 });
 
-test('a timed-out suite never reports a test passed that the report does not show finished', { criterion: 'AC-SPEC-35-13' }, async () => {
+test('a timed-out suite never reports a test passed that the report does not show finished', async () => {
   const { result } = await runDeclaredSuite({ behaviour: { report: reportWithUnfinishedTest(), timedOut: true, exitCode: 137 } });
   const finishedPassing = ['pays with a saved card|chromium', 'lists past orders|chromium'];
   const passed = testsOf(result).filter((entry) => entry.outcome === 'passed').map((entry) => `${entry.titlePath.at(-1)}|${entry.project}`);
   assert.ok(passed.every((key) => finishedPassing.includes(key)), JSON.stringify(passed));
 });
 
-test('counter-example: the same suite finishing in time ends Passed, with no suite-timeout', { criterion: 'AC-SPEC-35-13' }, async () => {
+test('counter-example: the same suite finishing in time ends Passed, with no suite-timeout', async () => {
   const { result } = await runDeclaredSuite();
   assert.equal(result.state, 'Passed');
   assert.equal(carriesCode(result, 'suite-timeout'), false);
@@ -140,12 +139,12 @@ async function echoingRun(secretValue: string): Promise<RunResult> {
   return result;
 }
 
-test('a secret the suite writes to its output and error message appears in the result in no form', { criterion: 'AC-SPEC-35-08' }, async () => {
+test('a secret the suite writes to its output and error message appears in the result in no form', async () => {
   const secretValue = fakeSecretValue();
   assert.deepEqual(echoesIn(JSON.stringify(await echoingRun(secretValue)), secretValue), []);
 });
 
-test('the leak scan finds no echo in the result, and finds the planted canary', { criterion: 'AC-SPEC-35-08' }, async () => {
+test('the leak scan finds no echo in the result, and finds the planted canary', async () => {
   const secretValue = fakeSecretValue();
   const folder = outputFolder();
   const resultFile = join(folder, 'result.json');
@@ -157,7 +156,7 @@ test('the leak scan finds no echo in the result, and finds the planted canary', 
   assert.ok(leakScanner().scan([canaryFile], [secret]).length >= 1, 'the scan cannot see the planted canary');
 });
 
-test('counter-example: the failed test\'s error message reaches the result, with only the secret taken out', { criterion: 'AC-SPEC-35-08' }, async () => {
+test('counter-example: the failed test\'s error message reaches the result, with only the secret taken out', async () => {
   const result = await echoingRun(fakeSecretValue());
   const message = (result.suite?.findings ?? []).flatMap((finding) => finding.message).join('\n');
   assert.ok(message.includes(MESSAGE_MARKER), `the error message was dropped: ${message}`);
@@ -171,7 +170,7 @@ async function manifestOf(options: Parameters<typeof runDeclaredSuite>[0] = {}) 
   return { manifest: result.manifest, hash: result.manifestHash };
 }
 
-test('the manifest\'s evidence record names the suite and the workload image digest', { criterion: 'AC-SPEC-35-19' }, async () => {
+test('the manifest\'s evidence record names the suite and the workload image digest', async () => {
   const image = `sha256:${'5'.repeat(64)}`;
   const { manifest } = await manifestOf({ project: evidenceProject({ image }) });
   const record = JSON.stringify(manifest.evidence);
@@ -179,24 +178,24 @@ test('the manifest\'s evidence record names the suite and the workload image dig
   assert.ok(record.includes('"checkout"'), record);
 });
 
-test('the manifest lists suite-code, suite-browser and app-server as inputs it could not pin', { criterion: 'AC-SPEC-35-19' }, async () => {
+test('the manifest lists suite-code, suite-browser and app-server as inputs it could not pin', async () => {
   const { manifest } = await manifestOf();
   for (const input of ['suite-code', 'suite-browser', 'app-server']) assert.ok(manifest.nonHermeticInputs.includes(input), JSON.stringify(manifest.nonHermeticInputs));
 });
 
-test('the Playwright version the report gives is recorded, marked as self-reported', { criterion: 'AC-SPEC-35-19' }, async () => {
+test('the Playwright version the report gives is recorded, marked as self-reported', async () => {
   const { manifest } = await manifestOf();
   const record = JSON.stringify(manifest.evidence);
   assert.ok(record.includes('1.56.1'), record);
   assert.match(record, /self.?reported/i);
 });
 
-test('the same suite files, command and image give the same manifest hash twice', { criterion: 'AC-SPEC-35-19' }, async () => {
+test('the same suite files, command and image give the same manifest hash twice', async () => {
   const checkout = suiteCheckout();
   assert.equal((await manifestOf({ checkout })).hash, (await manifestOf({ checkout })).hash);
 });
 
-test('changing one byte of one suite file changes the manifest hash', { criterion: 'AC-SPEC-35-19' }, async () => {
+test('changing one byte of one suite file changes the manifest hash', async () => {
   const before = await manifestOf({ checkout: suiteCheckout() });
   const changed = suiteCheckout();
   const file = join(changed, 'apps/web/e2e/helpers/cart.ts');
@@ -205,7 +204,7 @@ test('changing one byte of one suite file changes the manifest hash', { criterio
   assert.notEqual((await manifestOf({ checkout: changed })).hash, before.hash);
 });
 
-test('changing the setup command, the command or the image changes the manifest hash', { criterion: 'AC-SPEC-35-19' }, async () => {
+test('changing the setup command, the command or the image changes the manifest hash', async () => {
   const checkout = suiteCheckout();
   const base = (await manifestOf({ checkout })).hash;
   for (const fields of [
@@ -217,14 +216,14 @@ test('changing the setup command, the command or the image changes the manifest 
   }
 });
 
-test('a report giving another Playwright version changes the manifest hash', { criterion: 'AC-SPEC-35-19' }, async () => {
+test('a report giving another Playwright version changes the manifest hash', async () => {
   const checkout = suiteCheckout();
   const base = (await manifestOf({ checkout })).hash;
   const report = withValue(recordedReport('passing-with-criteria'), ['config', 'version'], '1.57.0');
   assert.notEqual((await manifestOf({ checkout, behaviour: { report, exitCode: 0 } })).hash, base);
 });
 
-test('counter-example: editing an application file outside the suite\'s paths leaves the suite files\' hash as it was', { criterion: 'AC-SPEC-35-19' }, async () => {
+test('counter-example: editing an application file outside the suite\'s paths leaves the suite files\' hash as it was', async () => {
   const first = suiteCheckout();
   const second = suiteCheckout();
   writeFileSync(join(second, APPLICATION_FILE), 'export const app = 2;\n');
@@ -248,12 +247,12 @@ async function replayCode(manifest: Parameters<typeof replayManifest>[0]): Promi
   return typeof code === 'string' ? code : null;
 }
 
-test('replaying an evidence manifest is refused with replay-not-claimed', { criterion: 'AC-SPEC-35-19' }, async () => {
+test('replaying an evidence manifest is refused with replay-not-claimed', async () => {
   const { manifest } = await manifestOf();
   assert.equal(await replayCode(manifest), 'replay-not-claimed');
 });
 
-test('counter-example: the same manifest without its evidence record is not refused as replay-not-claimed', { criterion: 'AC-SPEC-35-19' }, async () => {
+test('counter-example: the same manifest without its evidence record is not refused as replay-not-claimed', async () => {
   const { manifest } = await manifestOf();
   const planManifest = { ...manifest };
   Reflect.deleteProperty(planManifest, 'evidence');

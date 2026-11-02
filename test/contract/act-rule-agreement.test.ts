@@ -48,7 +48,7 @@ let browser: Browser;
 before(async () => { server = await startAccessibilityServer(); browser = await launchBrowser(BROWSERS.chrome); }, { timeout: 60_000 });
 after(async () => { await browser?.close(); await server?.close(); });
 
-test('the own engine agrees with at least 80% of the W3C ACT test cases of its implemented rules', { criterion: 'AC-SPEC-00-01', timeout: 600_000 }, async () => {
+test('the own engine agrees with at least 80% of the W3C ACT test cases of its implemented rules', { timeout: 600_000 }, async () => {
   const scores = await scoreCases(browser, server.origin);
   const pinned = implementedCases().length;
   assert.equal(scores.length, pinned, 'every pinned case of every implemented rule is scored');

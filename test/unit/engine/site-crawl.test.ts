@@ -11,7 +11,6 @@
 // made on it, including calls of methods the port does not have. Each negative test runs the
 // mutant crawl followEveryLink() against the same site, to show its check fails for a crawl that
 // does what the spec forbids.
-// See docs/specs/SPEC-37-explore-to-draft.md.
 import assert from 'node:assert/strict';
 import { before, test } from 'node:test';
 import { canonicalJson, type TrustedProject } from '@revisum/engine';
@@ -75,21 +74,21 @@ const offStart = (urls: readonly string[]): readonly string[] => urls.filter((ur
 
 // ---- Origins ---------------------------------------------------------------------------------------
 
-test('the crawl opens only pages on the start origin, whatever origins the pages link to', { criterion: 'AC-SPEC-37-01' }, async () => {
+test('the crawl opens only pages on the start origin, whatever origins the pages link to', async () => {
   const { spy, outcome } = await crawl();
   mapOf(outcome);
   assert.ok(spy.navigations().length > 0, 'the crawl opened no page');
   assert.deepEqual(offStart(spy.navigations()), []);
 });
 
-test('counter-example: a crawl that follows every link opens the declared, production, undeclared and look-alike origins', { criterion: 'AC-SPEC-37-01' }, async () => {
+test('counter-example: a crawl that follows every link opens the declared, production, undeclared and look-alike origins', async () => {
   const spy = spyExploreDriver(site());
   await followEveryLink(spy.driver, at('/'), 100);
   const opened = new Set(offStart(spy.navigations()).map((url) => new URL(url).origin));
   assert.deepEqual([...opened].sort(), [PRODUCTION_ORIGIN, SECOND_ORIGIN, UNDECLARED_ORIGIN, 'http://localhost:4310', 'https://127.0.0.1:4310'].sort());
 });
 
-test('the page map holds the start origin and no page of another origin', { criterion: 'AC-SPEC-37-01' }, async () => {
+test('the page map holds the start origin and no page of another origin', async () => {
   const map = mapOf((await crawl()).outcome);
   assert.equal(map.origin, START_ORIGIN);
   for (const path of ['/partner.html', '/checkout', '/elsewhere.html', '/secure.html', '/alias.html']) {
@@ -101,14 +100,14 @@ for (const { name, start } of [
   { name: 'a production origin', start: at('/', PRODUCTION_ORIGIN) },
   { name: 'an undeclared origin', start: at('/', UNDECLARED_ORIGIN) },
 ]) {
-  test(`a start URL on ${name} is refused with explore-origin-refused, before any driver call`, { criterion: 'AC-SPEC-37-01' }, async () => {
+  test(`a start URL on ${name} is refused with explore-origin-refused, before any driver call`, async () => {
     const { spy, outcome } = await crawl(site(), {}, start);
     assert.deepEqual(outcome, { ok: false, code: 'explore-origin-refused' });
     assert.deepEqual(spy.calls, []);
   });
 }
 
-test('counter-example: a start URL on the second declared, non-production origin is crawled there', { criterion: 'AC-SPEC-37-01' }, async () => {
+test('counter-example: a start URL on the second declared, non-production origin is crawled there', async () => {
   const { spy, outcome } = await crawl(site(), {}, at('/partner.html', SECOND_ORIGIN));
   const map = mapOf(outcome);
   assert.equal(map.origin, SECOND_ORIGIN);
@@ -117,7 +116,7 @@ test('counter-example: a start URL on the second declared, non-production origin
 
 // ---- Navigation and reads only ---------------------------------------------------------------------
 
-test('the crawl makes only navigation, page, accessibility-tree and link-target calls', { criterion: 'AC-SPEC-37-02' }, async () => {
+test('the crawl makes only navigation, page, accessibility-tree and link-target calls', async () => {
   const { spy, outcome } = await crawl();
   mapOf(outcome);
   const methods = new Set(spy.calls.map((call) => call.method));
@@ -126,13 +125,13 @@ test('the crawl makes only navigation, page, accessibility-tree and link-target 
   for (const method of CRAWL_METHODS) assert.ok(methods.has(method), `the crawl never called ${method}`);
 });
 
-test('counter-example: the spy records a click that a crawl makes, though the port has no such method', { criterion: 'AC-SPEC-37-02' }, async () => {
+test('counter-example: the spy records a click that a crawl makes, though the port has no such method', async () => {
   const spy = spyExploreDriver(site());
   await followEveryLink(spy.driver, at('/'), 3);
   assert.ok(spy.calls.some((call) => call.method === 'act'), JSON.stringify(spy.calls));
 });
 
-test('the crawl opens each page once, at origin plus path, with no query or fragment', { criterion: 'AC-SPEC-37-02' }, async () => {
+test('the crawl opens each page once, at origin plus path, with no query or fragment', async () => {
   const { spy } = await crawl();
   const opened = spy.navigations();
   assert.equal(new Set(opened).size, opened.length, `a page was opened twice: ${JSON.stringify(opened)}`);
@@ -144,13 +143,13 @@ test('the crawl opens each page once, at origin plus path, with no query or frag
 
 // ---- Order and bounds --------------------------------------------------------------------------
 
-test('a crawl with room for the whole site visits it breadth first, each page\'s links in sorted order, and is not truncated', { criterion: 'AC-SPEC-37-03' }, async () => {
+test('a crawl with room for the whole site visits it breadth first, each page\'s links in sorted order, and is not truncated', async () => {
   const map = mapOf((await crawl()).outcome);
   assert.deepEqual(visited(map), FULL_ORDER);
   assert.equal(map.truncated, false);
 });
 
-test('the default bounds, 20 pages and depth 3, leave the depth-4 archive out and mark the map truncated', { criterion: 'AC-SPEC-37-03' }, async () => {
+test('the default bounds, 20 pages and depth 3, leave the depth-4 archive out and mark the map truncated', async () => {
   const map = mapOf((await crawl(site(), { maximumPages: 20, maximumDepth: 3 })).outcome);
   assert.deepEqual(visited(map), FULL_ORDER.filter(([, depth]) => depth <= 3));
   assert.equal(map.truncated, true);
@@ -159,7 +158,7 @@ test('the default bounds, 20 pages and depth 3, leave the depth-4 archive out an
 // Every pair of bounds up to beyond the site's size: the crawl holds the first maximumPages pages of the
 // whole crawl that are no deeper than maximumDepth, and is truncated exactly when that leaves one out.
 for (let maximumDepth = 0; maximumDepth <= 5; maximumDepth++) {
-  test(`with depth at most ${maximumDepth}, every page bound from 1 to 10 gives the bounded prefix of the whole crawl`, { criterion: 'AC-SPEC-37-03' }, async () => {
+  test(`with depth at most ${maximumDepth}, every page bound from 1 to 10 gives the bounded prefix of the whole crawl`, async () => {
     for (let maximumPages = 1; maximumPages <= 10; maximumPages++) {
       const map = mapOf((await crawl(site(), { maximumPages, maximumDepth })).outcome);
       const expected = FULL_ORDER.filter(([, depth]) => depth <= maximumDepth).slice(0, maximumPages);
@@ -170,17 +169,17 @@ for (let maximumDepth = 0; maximumDepth <= 5; maximumDepth++) {
   });
 }
 
-test('a page bound equal to the site\'s size is not truncated, and one less is', { criterion: 'AC-SPEC-37-03' }, async () => {
+test('a page bound equal to the site\'s size is not truncated, and one less is', async () => {
   assert.equal(mapOf((await crawl(site(), { maximumPages: FULL_ORDER.length, maximumDepth: 5 })).outcome).truncated, false);
   assert.equal(mapOf((await crawl(site(), { maximumPages: FULL_ORDER.length - 1, maximumDepth: 5 })).outcome).truncated, true);
 });
 
-test('a depth bound equal to the deepest page is not truncated, and one less is', { criterion: 'AC-SPEC-37-03' }, async () => {
+test('a depth bound equal to the deepest page is not truncated, and one less is', async () => {
   assert.equal(mapOf((await crawl(site(), { maximumPages: 100, maximumDepth: 4 })).outcome).truncated, false);
   assert.equal(mapOf((await crawl(site(), { maximumPages: 100, maximumDepth: 3 })).outcome).truncated, true);
 });
 
-test('a linked page that fails to load is left out, not counted against maximumPages, opened once, and truncates nothing', { criterion: 'AC-SPEC-37-03' }, async () => {
+test('a linked page that fails to load is left out, not counted against maximumPages, opened once, and truncates nothing', async () => {
   const broken = fakeSite({
     [at('/')]: page('Home', [at('/b-broken.html'), at('/a.html'), at('/c.html')]),
     [at('/a.html')]: page('A', [at('/b-broken.html')]),
@@ -197,7 +196,7 @@ test('a linked page that fails to load is left out, not counted against maximumP
   assert.deepEqual(visited(bounded), [['/', 0], ['/a.html', 1], ['/c.html', 1]]);
 });
 
-test('a start page that fails to load gives explore-start-unreachable', { criterion: 'AC-SPEC-37-03' }, async () => {
+test('a start page that fails to load gives explore-start-unreachable', async () => {
   const unreachable = fakeSite({ [at('/')]: page('Home', [at('/a.html')], { fails: true }), [at('/a.html')]: page('A', []) });
   const { outcome } = await crawl(unreachable);
   assert.deepEqual(outcome, { ok: false, code: 'explore-start-unreachable' });
@@ -205,7 +204,7 @@ test('a start page that fails to load gives explore-start-unreachable', { criter
 
 // ---- The same site gives the same map ----------------------------------------------------------------
 
-test('two crawls of the same site give byte-identical page maps', { criterion: 'AC-SPEC-37-03' }, async () => {
+test('two crawls of the same site give byte-identical page maps', async () => {
   const first = mapOf((await crawl()).outcome);
   const second = mapOf((await crawl()).outcome);
   assert.equal(canonicalJson(second), canonicalJson(first));
@@ -218,13 +217,13 @@ const reshuffled = (): FakeSite => fakeSite(Object.fromEntries(Object.entries(SH
   links: [...shown.links].reverse().flatMap((link) => [link, `${link.split('#')[0]?.split('?')[0] ?? link}?utm_source=crawl#top`]),
 }])));
 
-test('the same site with its links in another order, repeated, and with queries and fragments gives a byte-identical page map', { criterion: 'AC-SPEC-37-03' }, async () => {
+test('the same site with its links in another order, repeated, and with queries and fragments gives a byte-identical page map', async () => {
   const original = mapOf((await crawl(site(), { maximumPages: 20, maximumDepth: 3 })).outcome);
   const shuffled = mapOf((await crawl(reshuffled(), { maximumPages: 20, maximumDepth: 3 })).outcome);
   assert.equal(canonicalJson(shuffled), canonicalJson(original));
 });
 
-test('counter-example: a site with one title changed gives a different page map', { criterion: 'AC-SPEC-37-03' }, async () => {
+test('counter-example: a site with one title changed gives a different page map', async () => {
   const changed = fakeSite({ ...SHOP, [at('/faq.html')]: page('Questions and answers', [at('/')]) });
   const original = mapOf((await crawl()).outcome);
   const other = mapOf((await crawl(changed)).outcome);

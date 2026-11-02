@@ -14,7 +14,6 @@
 //     that PLAYWRIGHT_JSON_OUTPUT_NAME gives (that variable names the path inside the container);
 //   - the workload runner fails with the bare WorkloadErrorCode, and WorkloadOutcome's stdout and
 //     stderr are each { bytes, truncated }.
-// See docs/specs/SPEC-35-evidence-mode.md.
 import assert from 'node:assert/strict';
 import { Buffer } from 'node:buffer';
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';

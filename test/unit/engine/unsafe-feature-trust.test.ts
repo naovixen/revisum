@@ -4,7 +4,6 @@
 // for each such file. So a plan in that change that uses the new feature is refused with
 // unsafe_feature_disabled: an agent cannot enable an escape hatch and use it in one change.
 // The fixture is fixtures/unsafe-features/hostile-change.json, on the solo approval repository.
-// See docs/specs/SPEC-36-unsafe-plan-features.md and docs/specs/SPEC-02-project-trust-and-approval.md.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -70,19 +69,19 @@ async function loadedFor(fixtureEdit: (fixture: FixtureRepository) => void, chan
 
 // ---- A change that turns features on ---------------------------------------------------------------
 
-test('a change that turns on css locators and page scripts in its own project.json is refused its own css plan with unsafe_feature_disabled', { criterion: 'AC-SPEC-36-04' }, async () => {
+test('a change that turns on css locators and page scripts in its own project.json is refused its own css plan with unsafe_feature_disabled', async () => {
   const { parse } = await loadedFor(applyHostileChange);
   const errors = errorsOf(parse, changedPlan());
   assert.deepEqual(disabledPaths(errors), ['$.steps[1].locator.by', '$.steps[2].type']);
 });
 
-test('the change\'s edits of project.json, its plan and its script each raise one changed-with-code item and event; its app code raises none', { criterion: 'AC-SPEC-36-04' }, async () => {
+test('the change\'s edits of project.json, its plan and its script each raise one changed-with-code item and event; its app code raises none', async () => {
   const { reviewPaths, eventCount } = await loadedFor(applyHostileChange);
   assert.deepEqual([...reviewPaths].sort(), [PLAN_IN_CHANGE, SCRIPT_PATH, PROJECT_PATH].sort());
   assert.equal(eventCount, 3);
 });
 
-test('a change that edits only the script under plans/scripts/ raises changed-with-code naming it', { criterion: 'AC-SPEC-36-04' }, async () => {
+test('a change that edits only the script under plans/scripts/ raises changed-with-code naming it', async () => {
   const { reviewPaths } = await loadedFor((fixture) => {
     fixture.protectedFiles[SCRIPT_PATH] = '() => ({ count: window.cartStore.items.length })\n';
     fixture.workingCopy[SCRIPT_PATH] = hostileChange().workingCopy[SCRIPT_PATH];
@@ -92,7 +91,7 @@ test('a change that edits only the script under plans/scripts/ raises changed-wi
 
 // Counter-example: the same section, once on the protected branch, lets the same plan parse, so
 // the refusal above comes from where the section was read.
-test('the same unsafeFeatures section, once on the protected branch, lets the change\'s plan parse', { criterion: 'AC-SPEC-36-04' }, async () => {
+test('the same unsafeFeatures section, once on the protected branch, lets the change\'s plan parse', async () => {
   const { parse } = await loadedFor((fixture) => { fixture.protectedFiles[PROJECT_PATH] = changedProject(); }, []);
   const parsed = parse(changedPlan());
   assert.ok(parsed.ok, JSON.stringify(parsed));
@@ -103,7 +102,7 @@ test('the same unsafeFeatures section, once on the protected branch, lets the ch
 // The protected branch already enables what the hostile change enables.
 const protectChangedProject = (fixture: FixtureRepository): void => { fixture.protectedFiles[PROJECT_PATH] = changedProject(); };
 
-test('a change that adds XPath locators to protected css locators is refused its XPath plan, while its css plan still parses', { criterion: 'AC-SPEC-36-04' }, async () => {
+test('a change that adds XPath locators to protected css locators is refused its XPath plan, while its css plan still parses', async () => {
   const widened = changedProject();
   unsafeSectionOf(widened)['xpathLocators'] = true;
   const { parse, reviewPaths } = await loadedFor((fixture) => {
@@ -115,7 +114,7 @@ test('a change that adds XPath locators to protected css locators is refused its
   assert.ok(parse(changedPlan()).ok, 'the protected css and page-script features were lost');
 });
 
-test('a change that turns inline scripts on over protected page scripts is refused its inline script at .script.inline', { criterion: 'AC-SPEC-36-04' }, async () => {
+test('a change that turns inline scripts on over protected page scripts is refused its inline script at .script.inline', async () => {
   const protectedProject = changedProject();
   (unsafeSectionOf(protectedProject)['pageScripts'] as JsonRecord)['allowInline'] = false;
   const { parse, reviewPaths } = await loadedFor((fixture) => {
@@ -126,7 +125,7 @@ test('a change that turns inline scripts on over protected page scripts is refus
   assert.deepEqual(disabledPaths(errorsOf(parse, planWith([INLINE_STEP]))), ['$.steps[1].script.inline']);
 });
 
-test('a change that declares a new script in its own project.json is refused a plan naming it, as an undeclared script', { criterion: 'AC-SPEC-36-04' }, async () => {
+test('a change that declares a new script in its own project.json is refused a plan naming it, as an undeclared script', async () => {
   const widened = changedProject();
   const scripts = (unsafeSectionOf(widened)['pageScripts'] as JsonRecord)['scripts'] as JsonRecord;
   scripts['readCookies'] = { file: 'plans/scripts/read-cookies.js', parameters: {}, effect: 'read', fields: { cookies: '/cookies' }, allowInProposals: true };

@@ -1,7 +1,6 @@
 // Locking the target matrix: `lock` pins each target's exact browser build by version and
 // executable sha256, and `lockToFile` writes targets.lock.json only when every target locked, so a
 // failed or refused lock leaves the existing file byte for byte as it was.
-// See docs/specs/SPEC-05-target-matrix-and-lock.md.
 import assert from 'node:assert/strict';
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -74,7 +73,7 @@ async function lockedFolder(state: Setup): Promise<{ readonly folder: string; re
 // ---- A successful lock: the positive control the failure tests compare against -----------------
 
 describe('a successful lock', () => {
-  test('pins each target by version and the sha256 of its executable, sorted by target id', { criterion: 'AC-SPEC-05-07' }, async () => {
+  test('pins each target by version and the sha256 of its executable, sorted by target id', async () => {
     const state = await setup();
     const locked = await lock(state.project, state.registry(), []);
     assert.ok(locked.ok, JSON.stringify(locked));
@@ -84,7 +83,7 @@ describe('a successful lock', () => {
     ]);
   });
 
-  test('writes targets.lock.json as canonical JSON with a final newline, and leaves no temporary file', { criterion: 'AC-SPEC-05-07' }, async () => {
+  test('writes targets.lock.json as canonical JSON with a final newline, and leaves no temporary file', async () => {
     const state = await setup();
     const { folder, bytes } = await lockedFolder(state);
     const text = bytes.toString('utf8');
@@ -100,7 +99,7 @@ describe('a successful lock', () => {
     assert.deepEqual(readdirSync(folder), [LOCKFILE]);
   });
 
-  test('re-locking unchanged builds rewrites the very same bytes', { criterion: 'AC-SPEC-05-07' }, async () => {
+  test('re-locking unchanged builds rewrites the very same bytes', async () => {
     const state = await setup();
     const { folder, bytes } = await lockedFolder(state);
     const again = await lockToFile(folder, state.project, state.registry());
@@ -108,7 +107,7 @@ describe('a successful lock', () => {
     assert.deepEqual(readBytes(folder), bytes);
   });
 
-  test('counter-example: a successful re-lock to a new version does change the file, so the byte checks below can fail', { criterion: 'AC-SPEC-05-07' }, async () => {
+  test('counter-example: a successful re-lock to a new version does change the file, so the byte checks below can fail', async () => {
     const state = await setup();
     const { folder, bytes } = await lockedFolder(state);
     const upgraded = fakeBrowserBuild('chromium executable 157.0.7300.0');
@@ -124,7 +123,7 @@ describe('a successful lock', () => {
 
 describe('a lock that cannot get a build', () => {
   for (const code of ['lock-download-failed', 'lock-offline'] as const) {
-    test(`${code}: the lock fails with that code and names the target`, { criterion: 'AC-SPEC-05-07' }, async () => {
+    test(`${code}: the lock fails with that code and names the target`, async () => {
       const state = await setup();
       state.firefox = () => failure({ code, detail: 'the build could not be fetched' });
       const locked = await lock(state.project, state.registry(), []);
@@ -133,7 +132,7 @@ describe('a lock that cannot get a build', () => {
       assert.equal(locked.error.targetId, 'alpha-firefox');
     });
 
-    test(`${code}: the existing lockfile stays byte-identical, with no temporary file left`, { criterion: 'AC-SPEC-05-07' }, async () => {
+    test(`${code}: the existing lockfile stays byte-identical, with no temporary file left`, async () => {
       const state = await setup();
       const { folder, bytes } = await lockedFolder(state);
       // A new build to pin for one target, so a written file would differ, and a failure for the other.
@@ -149,7 +148,7 @@ describe('a lock that cannot get a build', () => {
       assert.deepEqual(readdirSync(folder), [LOCKFILE]);
     });
 
-    test(`${code}: the failure names whichever target failed`, { criterion: 'AC-SPEC-05-07' }, async () => {
+    test(`${code}: the failure names whichever target failed`, async () => {
       const state = await setup();
       const { folder, bytes } = await lockedFolder(state);
       state.chromium = () => failure({ code, detail: 'the build could not be fetched' });
@@ -159,7 +158,7 @@ describe('a lock that cannot get a build', () => {
       assert.deepEqual(readBytes(folder), bytes);
     });
 
-    test(`${code}: with no lockfile yet, none is created`, { criterion: 'AC-SPEC-05-07' }, async () => {
+    test(`${code}: with no lockfile yet, none is created`, async () => {
       const state = await setup();
       const folder = projectFolder();
       state.chromium = () => failure({ code, detail: 'the build could not be fetched' });
@@ -175,7 +174,7 @@ describe('a lock that cannot get a build', () => {
 // ---- Same version, different executable --------------------------------------------------------
 
 describe('a re-lock that finds the same version with a different executable', () => {
-  test('lock refuses with build-mismatch and names the target', { criterion: 'AC-SPEC-05-08' }, async () => {
+  test('lock refuses with build-mismatch and names the target', async () => {
     const state = await setup();
     const first = await lock(state.project, state.registry(), []);
     assert.ok(first.ok);
@@ -186,7 +185,7 @@ describe('a re-lock that finds the same version with a different executable', ()
     assert.equal(relocked.error.targetId, 'zeta-chromium');
   });
 
-  test('lockToFile leaves the lockfile byte-identical, keeping the old hash', { criterion: 'AC-SPEC-05-08' }, async () => {
+  test('lockToFile leaves the lockfile byte-identical, keeping the old hash', async () => {
     const state = await setup();
     const { folder, bytes } = await lockedFolder(state);
     const pinned = state.chromiumBuild.sha256();
@@ -200,7 +199,7 @@ describe('a re-lock that finds the same version with a different executable', ()
     assert.ok(!bytes.toString('utf8').includes(state.chromiumBuild.sha256()), 'the new hash was never written');
   });
 
-  test('counter-example: the same version with the same executable re-locks to the same entries', { criterion: 'AC-SPEC-05-08' }, async () => {
+  test('counter-example: the same version with the same executable re-locks to the same entries', async () => {
     const state = await setup();
     const first = await lock(state.project, state.registry(), []);
     assert.ok(first.ok);
@@ -209,7 +208,7 @@ describe('a re-lock that finds the same version with a different executable', ()
     assert.deepEqual(relocked.value, first.value);
   });
 
-  test('counter-example: a new version with a new executable is pinned, not refused', { criterion: 'AC-SPEC-05-08' }, async () => {
+  test('counter-example: a new version with a new executable is pinned, not refused', async () => {
     const state = await setup();
     const first = await lock(state.project, state.registry(), []);
     assert.ok(first.ok);

@@ -1,7 +1,6 @@
 // What the target matrix and lock tests share: projects built from raw JSON through the project
 // parser, fake browser drivers that count every call and never launch a browser, and fake browser
 // builds that are real files on disk, so a build's sha256 is computed from real bytes.
-// See docs/specs/SPEC-05-target-matrix-and-lock.md.
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { arch, platform, tmpdir } from 'node:os';
 import { join } from 'node:path';

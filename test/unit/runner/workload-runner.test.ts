@@ -8,7 +8,6 @@
 // Revisum's own, never the host's. Its argument vector reaches the engine as separate strings.
 // The counter-examples run the same requests on a host where egress is enforced, so each check
 // can be seen to find a container of the team's image when there is one.
-// See docs/specs/SPEC-35-evidence-mode.md.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createSecret, type SecretName } from '@revisum/contracts';
@@ -58,13 +57,13 @@ const UNENFORCEABLE_HOSTS: readonly { readonly title: string; readonly settings:
 ];
 
 for (const { title, settings } of UNENFORCEABLE_HOSTS) {
-  test(`on ${title}, the workload is refused with egress-unenforceable`, { criterion: 'AC-SPEC-35-07' }, async () => {
+  test(`on ${title}, the workload is refused with egress-unenforceable`, async () => {
     const { outcome } = await runOn(settings);
     assert.ok(!('thrown' in outcome), `run threw instead of refusing: ${String('thrown' in outcome ? outcome.thrown : '')}`);
     assert.equal(errorCode(outcome), 'egress-unenforceable');
   });
 
-  test(`on ${title}, no container of the team's image is started and nothing is left behind`, { criterion: 'AC-SPEC-35-07' }, async () => {
+  test(`on ${title}, no container of the team's image is started and nothing is left behind`, async () => {
     const { engine } = await runOn(settings);
     assert.deepEqual(teamContainers(engine.started), []);
     assert.ok(!engine.executed.some((run) => run.command.includes('playwright')), JSON.stringify(engine.executed));
@@ -72,12 +71,12 @@ for (const { title, settings } of UNENFORCEABLE_HOSTS) {
   });
 }
 
-test('counter-example: on a host that enforces egress, a container of the team\'s image is started', { criterion: 'AC-SPEC-35-07' }, async () => {
+test('counter-example: on a host that enforces egress, a container of the team\'s image is started', async () => {
   const { engine } = await runOn(ENFORCING_HOST);
   assert.equal(teamContainers(engine.started).length, 1);
 });
 
-test('the egress probe has run before the team\'s image is started', { criterion: 'AC-SPEC-35-07' }, async () => {
+test('the egress probe has run before the team\'s image is started', async () => {
   const { engine } = await runOn(ENFORCING_HOST);
   const teamStart = engine.started.findIndex((options) => options.image === TEAM_IMAGE_ID);
   assert.ok(teamStart >= 0, 'the team\'s image was never started');
@@ -90,14 +89,14 @@ test('the egress probe has run before the team\'s image is started', { criterion
 
 // ---- The network and the proxy -------------------------------------------------------------------------
 
-test('the team\'s container joins only the run\'s network, which has no route out', { criterion: 'AC-SPEC-35-05' }, async () => {
+test('the team\'s container joins only the run\'s network, which has no route out', async () => {
   const { engine, options } = await teamContainer();
   assert.equal(options.networks.length, 1, JSON.stringify(options.networks));
   const network = engine.createdNetworks.find((created) => created.name === options.networks[0]);
   assert.deepEqual(network, { name: options.networks[0], internal: true });
 });
 
-test('every process in the team\'s container is pointed at the run\'s proxy, with loopback kept local', { criterion: 'AC-SPEC-35-05' }, async () => {
+test('every process in the team\'s container is pointed at the run\'s proxy, with loopback kept local', async () => {
   const { engine, options } = await teamContainer();
   const environment = options.environment;
   const proxy = environment['HTTP_PROXY'];
@@ -111,7 +110,7 @@ test('every process in the team\'s container is pointed at the run\'s proxy, wit
     `no proxy container named ${proxyHost} was started: ${JSON.stringify(engine.started.map((other) => other.name))}`);
 });
 
-test('the proxy container also joins the run\'s network, so the team\'s container can reach it', { criterion: 'AC-SPEC-35-05' }, async () => {
+test('the proxy container also joins the run\'s network, so the team\'s container can reach it', async () => {
   const { engine, options } = await teamContainer();
   const proxyHost = new URL(options.environment['HTTP_PROXY'] ?? 'http://missing').hostname;
   const proxy = engine.started.find((other) => other.name === proxyHost);
@@ -119,7 +118,7 @@ test('the proxy container also joins the run\'s network, so the team\'s containe
   assert.ok(proxy.networks.includes(options.networks[0] ?? ''), JSON.stringify(proxy.networks));
 });
 
-test('the team\'s container never runs as root', { criterion: 'AC-SPEC-35-05' }, async () => {
+test('the team\'s container never runs as root', async () => {
   const { options } = await teamContainer();
   const user = options.user.trim();
   assert.ok(user !== '' && !/^(root|0)(:|$)/.test(user), `the container runs as "${options.user}"`);
@@ -128,13 +127,13 @@ test('the team\'s container never runs as root', { criterion: 'AC-SPEC-35-05' },
 
 // ---- The environment ----------------------------------------------------------------------------------
 
-test('the team\'s container gets only the declared variables and Revisum\'s own', { criterion: 'AC-SPEC-35-06' }, async () => {
+test('the team\'s container gets only the declared variables and Revisum\'s own', async () => {
   const { options } = await teamContainer();
   const unexpected = Object.keys(options.environment).filter((name) => name !== DECLARED_LITERAL.name && !isRevisumOwnName(name));
   assert.deepEqual(unexpected, []);
 });
 
-test('no seeded host credential reaches the team\'s container, by name or by value', { criterion: 'AC-SPEC-35-06' }, async () => {
+test('no seeded host credential reaches the team\'s container, by name or by value', async () => {
   const { options } = await teamContainer();
   for (const name of Object.keys(HOST_CREDENTIALS)) assert.ok(!Object.hasOwn(options.environment, name), `${name} reached the container`);
   const values = Object.values(options.environment);
@@ -142,7 +141,7 @@ test('no seeded host credential reaches the team\'s container, by name or by val
   assert.deepEqual(Object.keys(options.environment).filter((name) => name.startsWith('GITHUB_')), []);
 });
 
-test('counter-example: the declared literal and the declared secret\'s value do reach the team\'s container', { criterion: 'AC-SPEC-35-06' }, async () => {
+test('counter-example: the declared literal and the declared secret\'s value do reach the team\'s container', async () => {
   const secretValue = `shop-token-${'x7'.repeat(12)}`;
   const secret = createSecret(DECLARED_SECRET_NAME as SecretName, secretValue);
   const { options } = await teamContainer({ environment: [DECLARED_LITERAL, { name: DECLARED_SECRET_NAME, value: secret }] });
@@ -165,13 +164,13 @@ function commandsGiven(engine: FakeContainerEngine): readonly (readonly string[]
 const holdsInOrder = (command: readonly string[], argv: readonly string[]): boolean =>
   command.some((_, start) => argv.every((word, offset) => command[start + offset] === word));
 
-test('the argument vector reaches the team\'s container as separate strings, shell text unchanged', { criterion: 'AC-SPEC-35-12' }, async () => {
+test('the argument vector reaches the team\'s container as separate strings, shell text unchanged', async () => {
   const { engine } = await runOn(ENFORCING_HOST, { argv: HOSTILE_COMMAND });
   const commands = commandsGiven(engine);
   assert.ok(commands.some((command) => holdsInOrder(command, HOSTILE_COMMAND)), `the argument vector was changed: ${JSON.stringify(commands)}`);
 });
 
-test('the argument vector is never handed to a shell', { criterion: 'AC-SPEC-35-12' }, async () => {
+test('the argument vector is never handed to a shell', async () => {
   const { engine } = await runOn(ENFORCING_HOST, { argv: HOSTILE_COMMAND });
   for (const command of commandsGiven(engine)) {
     assert.ok(!command.includes('-c') || !command.some((word) => /(^|\/)(sh|bash|dash|ash|zsh)$/.test(word)), `a shell runs: ${JSON.stringify(command)}`);

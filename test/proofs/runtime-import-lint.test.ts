@@ -8,7 +8,6 @@
 // The fixture repositories under fixtures/runtime-imports/ are a clean set (driver-playwright
 // using playwright-core, and the word "playwright" kept as data), and the same set with banned
 // imports or dependencies planted. `npm run check` runs the lint, and the repository passes it.
-// See docs/specs/SPEC-06-cdp-driver.md.
 import assert from 'node:assert/strict';
 import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -46,17 +45,17 @@ function assertReported(run: ToolRun, packageFolder: string, library: string): v
   assert.ok(named, `no line names ${packageFolder} and ${library}:\n${describeRun(run)}`);
 }
 
-test('the clean fixture set passes: only the fallback adapter uses Playwright, and the word alone is data', { criterion: 'AC-SPEC-06-06' }, () => {
+test('the clean fixture set passes: only the fallback adapter uses Playwright, and the word alone is data', () => {
   const run = lint(fixture('clean'));
   assert.equal(run.passed, true, describeRun(run));
 });
 
-test('the repository\'s own default runtime set passes', { criterion: 'AC-SPEC-06-06' }, () => {
+test('the repository\'s own default runtime set passes', () => {
   const run = lint(REPOSITORY_ROOT);
   assert.equal(run.passed, true, describeRun(run));
 });
 
-test('npm run check runs the runtime import lint', { criterion: 'AC-SPEC-06-06' }, () => {
+test('npm run check runs the runtime import lint', () => {
   const manifest: { scripts?: Record<string, string> } = JSON.parse(readFileSync(join(REPOSITORY_ROOT, 'package.json'), 'utf8'));
   const scripts = manifest.scripts ?? {};
   // `check` runs `check:tests`, which runs `lint`.
@@ -65,7 +64,7 @@ test('npm run check runs the runtime import lint', { criterion: 'AC-SPEC-06-06' 
   assert.ok(scripts['lint']?.includes(`node tools/${TOOL}`), `lint runs tools/${TOOL}`);
 });
 
-test('every banned import in the default set is reported, by package and library', { criterion: 'AC-SPEC-06-06' }, () => {
+test('every banned import in the default set is reported, by package and library', () => {
   const run = lint(fixture('banned-imports'));
   for (const [packageFolder, library] of [
     ['report', 'playwright'], ['cli', 'puppeteer-core'], ['runner', 'webdriverio'], ['auditor-act', 'selenium-webdriver'],
@@ -75,20 +74,20 @@ test('every banned import in the default set is reported, by package and library
   }
 });
 
-test('a banned library declared as a dependency fails, even with no import of it', { criterion: 'AC-SPEC-06-06' }, () => {
+test('a banned library declared as a dependency fails, even with no import of it', () => {
   const run = lint(fixture('declared-dependency'));
   assertReported(run, 'runner', 'puppeteer');
   assertReported(run, 'report', 'chrome-remote-interface');
 });
 
 for (const library of BANNED) {
-  test(`mutant: one planted import of ${library} in the clean set fails the lint`, { criterion: 'AC-SPEC-06-06' }, () => {
+  test(`mutant: one planted import of ${library} in the clean set fails the lint`, () => {
     const run = lint(cleanCopyWith('packages/report/src/planted.ts', `import { launch } from '${library}';\nexport const planted = launch;\n`));
     assertReported(run, 'report', library);
   });
 }
 
-test('mutant: a sub-path import of a banned library fails the lint', { criterion: 'AC-SPEC-06-06' }, () => {
+test('mutant: a sub-path import of a banned library fails the lint', () => {
   const run = lint(cleanCopyWith('packages/report/src/planted.ts', "export { launchServer } from 'playwright-core/lib/server';\n"));
   assertReported(run, 'report', 'playwright-core');
 });

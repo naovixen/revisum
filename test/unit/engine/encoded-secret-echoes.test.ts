@@ -6,7 +6,6 @@
 // report it, and a run whose page shows it must keep no decodable trace of it. The trace is judged
 // by holdsSecret (echo-page-driver.ts), which decodes kept text on its own, without the engine.
 // Counter-examples: a near miss in the same encoding is neither reported nor redacted.
-// See docs/specs/SPEC-04-secrets-and-redaction.md.
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -81,7 +80,7 @@ async function observedAfterEcho(secretValue: string, text: string): Promise<{ r
 }
 
 for (const echo of [...BASE64_ECHOES, ...PERCENT_ECHOES]) {
-  test(`the scanner reports ${echo.title}`, { criterion: 'AC-SPEC-04-04' }, () => {
+  test(`the scanner reports ${echo.title}`, () => {
     assert.ok(holdsSecret(echo.text, echo.secret), 'setup: the planted text does hold the secret');
     const secret = resolvedSecret(SECRET, echo.secret);
     const path = plant(echo.text);
@@ -89,7 +88,7 @@ for (const echo of [...BASE64_ECHOES, ...PERCENT_ECHOES]) {
     assert.ok(leaks.some((leak) => leak.secret === secret.name && leak.file === path), `no leak reported in: ${echo.text}`);
   });
 
-  test(`a run whose page shows ${echo.title} keeps no decodable trace of it`, { criterion: 'AC-SPEC-04-04' }, async () => {
+  test(`a run whose page shows ${echo.title} keeps no decodable trace of it`, async () => {
     const { observed, everything } = await observedAfterEcho(echo.secret, echo.text);
     assert.equal(holdsSecret(observed, echo.secret), false, `the observation still holds the secret: ${observed}`);
     assert.equal(holdsSecret(everything, echo.secret), false, 'the result or the event log still holds the secret');
@@ -97,13 +96,13 @@ for (const echo of [...BASE64_ECHOES, ...PERCENT_ECHOES]) {
 }
 
 for (const nearMiss of NEAR_MISSES) {
-  test(`counter-example: the scanner reports nothing for ${nearMiss.title}`, { criterion: 'AC-SPEC-04-04' }, () => {
+  test(`counter-example: the scanner reports nothing for ${nearMiss.title}`, () => {
     assert.equal(holdsSecret(nearMiss.text, nearMiss.secret), false, 'setup: the planted text does not hold the secret');
     const path = plant(nearMiss.text);
     assert.deepEqual(leakScanner().scan([path], [resolvedSecret(SECRET, nearMiss.secret)]), []);
   });
 
-  test(`counter-example: a run whose page shows ${nearMiss.title} keeps it as observed`, { criterion: 'AC-SPEC-04-04' }, async () => {
+  test(`counter-example: a run whose page shows ${nearMiss.title} keeps it as observed`, async () => {
     const { observed } = await observedAfterEcho(nearMiss.secret, nearMiss.text);
     assert.equal(observed, nearMiss.text);
   });

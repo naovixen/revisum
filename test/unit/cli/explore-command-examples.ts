@@ -1,4 +1,4 @@
-// Shared setup for the tests of explore mode: `revisum draft --explore <url>` (SPEC-37).
+// Shared setup for the tests of explore mode: `revisum draft --explore <url>`.
 //
 //   - startExploreSite() serves the Lantern Books fixture site (fixtures/explore-site/) on
 //     loopback, and a second server on another port that the home page links to. Each records the
@@ -14,7 +14,7 @@
 //   - runExplore() runs the draft command with all of these, and gathers what it wrote.
 //
 // What these tests assume about shapes the spec leaves open, gathered here so a change to one is
-// a change to this file only (docs/specs/SPEC-37-explore-to-draft.md, build notes of 2026-10-31):
+// a change to this file only:
 //   - DraftCommandPorts gains `browser` and `isolatedRunner`, as the build notes name them, and
 //     `approvals`, an ApprovalStore holding the approvals the protected branch gives, against
 //     which an --after plan's hash is checked. The build notes say the check is made "against the

@@ -4,7 +4,6 @@
 // refuses every step that needs it with unsupported-step, before anything of it reaches the
 // driver: no input event reaches the page, and a script that counts its own runs on the page never
 // ran. The same steps on the unchanged driver pass, so the counters are shown able to move.
-// See docs/specs/SPEC-36-unsafe-plan-features.md.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import {
@@ -16,11 +15,6 @@ import {
 let harness: UnsafePageHarness;
 before(async () => { harness = await unsafePageHarness(); });
 after(async () => { await harness.close(); });
-
-// The test metadata of each feature's driver part: the criterion it belongs to.
-const METADATA: Readonly<Record<PagePartFeature, { readonly criterion: string }>> = {
-  structuralLocators: { criterion: 'AC-SPEC-36-06' }, domChecks: { criterion: 'AC-SPEC-36-07' }, pageScripts: { criterion: 'AC-SPEC-36-09' },
-};
 
 // `alsoNeeds` names a feature from before this spec that the step needs too, such as rememberedValues,
 // which the Playwright fallback does not declare; on a driver without it the step is left out.
@@ -60,21 +54,21 @@ for (const targetId of BOTH_TARGETS) {
 
   describe(`page parts on ${targetId}`, () => {
     for (const feature of PAGE_PART_FEATURES) {
-      test(`the ${adapter} driver declares ${feature}`, METADATA[feature], () => {
+      test(`the ${adapter} driver declares ${feature}`, () => {
         const listed = listedFeatures(harness.drivers.get(adapter));
         assert.ok(listed.includes(feature), `${adapter} declares ${feature}: ${JSON.stringify(listed)}`);
       });
     }
 
-    for (const { name, feature, page, step } of runnable) {
-      test(`${name} passes on the driver as it is`, METADATA[feature], async () => {
+    for (const { name, page, step } of runnable) {
+      test(`${name} passes on the driver as it is`, async () => {
         const ran = await harness.runSteps(targetId, [navigate(page), step, pageShown()]);
         assert.equal(ran.result.state, 'Passed', JSON.stringify(ran.result.steps));
       });
     }
 
     for (const lacking of PAGE_PART_FEATURES) {
-      test(`with ${lacking} taken off its list, the driver is refused that feature's steps with nothing sent, and still runs the others`, { ...METADATA[lacking], timeout: 300_000 }, async () => {
+      test(`with ${lacking} taken off its list, the driver is refused that feature's steps with nothing sent, and still runs the others`, { timeout: 300_000 }, async () => {
         const drivers = driversWithout(harness, adapter, lacking);
         for (const { name, feature, page, step } of runnable) {
           const steps = [navigate(page), step, pageShown()];
@@ -92,7 +86,7 @@ for (const targetId of BOTH_TARGETS) {
     }
 
     // Counter-example: the counters move when the steps do run.
-    test('counter-example: on the driver as it is, the click reaches the page and the script runs', { criterion: 'AC-SPEC-36-09' }, async () => {
+    test('counter-example: on the driver as it is, the click reaches the page and the script runs', async () => {
       const clicked = await harness.runSteps(targetId, [navigate('/guard.html'), click(css('button.safe')), pageShown()], { read: READ });
       assert.notEqual(clicked.atClose?.shown['input-events'], '0');
       const scripted = await harness.runSteps(targetId, [navigate('/'), evaluate('countRun', {}), check(testId('script-runs'), { kind: 'textEquals', value: '1' }, 'support.script-ran')], { read: READ });

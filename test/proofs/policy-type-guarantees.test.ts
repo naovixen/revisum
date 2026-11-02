@@ -1,7 +1,6 @@
 // run() accepts only a plan the policy gate authorised. This is a compile-time guarantee: the
 // guarantee file must compile, and each line marked as an expected error must be one, so a parsed
 // but unauthorised plan, or a hand-made copy, can never reach a run.
-// See docs/specs/SPEC-03-policy-gate.md.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -29,20 +28,20 @@ const assertMutantFails = (marker: string): void => {
   assert.equal(compiled.errors.length, 1, compiled.output);
 };
 
-test('the policy guarantee file compiles: an authorised plan is a real type, is a Plan, and runs', { criterion: 'AC-SPEC-03-04', timeout: TIMEOUT }, () => {
+test('the policy guarantee file compiles: an authorised plan is a real type, is a Plan, and runs', { timeout: TIMEOUT }, () => {
   const compiled = compileFiles([GUARANTEE_FILE]);
   assert.equal(compiled.passed, true, compiled.output);
 });
 
-test('run() called with a parsed plan that has not been authorised does not type-check', { criterion: 'AC-SPEC-03-04', timeout: TIMEOUT }, () => {
+test('run() called with a parsed plan that has not been authorised does not type-check', { timeout: TIMEOUT }, () => {
   assertMutantFails('unauthorisedPlanRuns');
 });
 
-test('a copy of a parsed plan cannot pass as Authorised', { criterion: 'AC-SPEC-03-04', timeout: TIMEOUT }, () => {
+test('a copy of a parsed plan cannot pass as Authorised', { timeout: TIMEOUT }, () => {
   assertMutantFails('forgedAuthorised');
 });
 
-test('every expected-error marker in the policy guarantee file is checked by a test above', { criterion: 'AC-SPEC-03-04' }, () => {
+test('every expected-error marker in the policy guarantee file is checked by a test above', () => {
   const markers = readFileSync(GUARANTEE_FILE, 'utf8').split(/\r?\n/).filter((line) => EXPECTED_ERROR_LINE.test(line)).length;
   assert.equal(markers, 2);
 });

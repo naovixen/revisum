@@ -6,8 +6,6 @@
 //     must stay untouched, and the run's own fakes see nothing after the recorded run;
 //   - a recording changed on purpose (a request hash, a reply removed or added, a reply's body or
 //     output) shows the replay reads it: each ends in a mismatch, never an identical replay.
-// See docs/specs/SPEC-08-manifest-and-replay.md ("Recorded replies, opt-in"),
-// docs/specs/SPEC-32-declared-service-calls.md and docs/specs/SPEC-36-unsafe-plan-features.md.
 import assert from 'node:assert/strict';
 import { after, test } from 'node:test';
 import { replayManifest } from '@revisum/engine';
@@ -78,7 +76,7 @@ async function assertReplaysIdentical(ran: ScenarioRun, sentByRun: { readonly ca
 
 // ---- Service calls -------------------------------------------------------------------------------------
 
-test('a run with calls, replayed 20 times from its recording, sends no call and gives the same result hash each time', { criterion: 'AC-SPEC-32-13', timeout: 120_000 }, async () => {
+test('a run with calls, replayed 20 times from its recording, sends no call and gives the same result hash each time', { timeout: 120_000 }, async () => {
   const ran = await runScenario(RECORDED_CALLS, { record: true });
   assert.equal(ran.result.state, 'Passed', JSON.stringify(ran.result.steps));
   assert.equal(ran.serviceRequests.length, CALL_COUNT);
@@ -86,7 +84,7 @@ test('a run with calls, replayed 20 times from its recording, sends no call and 
   await assertReplaysIdentical(ran, { calls: CALL_COUNT, commands: 0 });
 });
 
-test('the recorded responses are what the replay feeds the engine: another recorded body gives another result', { criterion: 'AC-SPEC-32-13' }, async () => {
+test('the recorded responses are what the replay feeds the engine: another recorded body gives another result', async () => {
   const ran = await runScenario(RECORDED_CALLS, { record: true });
   // The created order's status is recorded, never checked, so the replay still runs to the end.
   const replay = await replayRun(ran, { recording: withTextReplaced(ran.recording, 'pending', 'shipped') });
@@ -96,7 +94,7 @@ test('the recorded responses are what the replay feeds the engine: another recor
   assertNothingSent(ran, replay, { calls: CALL_COUNT, commands: 0 });
 });
 
-test('a response that echoed a secret is recorded without it, and the replay puts it back from its own secret store', { criterion: 'AC-SPEC-32-13' }, async () => {
+test('a response that echoed a secret is recorded without it, and the replay puts it back from its own secret store', async () => {
   const token = SECRET_VALUES[TOKEN_SECRET] ?? assert.fail('no token');
   const echoing = shopWith((request) => (requestLine(request) === `GET /api/orders/${ORDER_ID}`
     ? jsonReply(200, { status: 'paid', total: 42, echo: { token } }) : undefined));
@@ -114,7 +112,7 @@ const CALL_TAMPERING = [
 ] as const;
 
 for (const tampering of CALL_TAMPERING) {
-  test(`${tampering.name} ends the replay replay-mismatch at that call`, { criterion: 'AC-SPEC-32-13' }, async () => {
+  test(`${tampering.name} ends the replay replay-mismatch at that call`, async () => {
     const ran = await runScenario(RECORDED_CALLS, { record: true });
     const replay = await replayRun(ran, { recording: tampering.change(ran.recording) });
     assert.deepEqual(refused(replay.answer), { code: 'replay-mismatch', kind: 'service-call', position: tampering.position });
@@ -122,7 +120,7 @@ for (const tampering of CALL_TAMPERING) {
   });
 }
 
-test('a project that records replies, replayed with no recording, ends replay-mismatch at the calls', { criterion: 'AC-SPEC-32-13' }, async () => {
+test('a project that records replies, replayed with no recording, ends replay-mismatch at the calls', async () => {
   const ran = await runScenario(RECORDED_CALLS, { record: true });
   const replay = await replayRun(ran, { recording: null });
   const error = refused(replay.answer);
@@ -131,7 +129,7 @@ test('a project that records replies, replayed with no recording, ends replay-mi
   assertNothingSent(ran, replay, { calls: CALL_COUNT, commands: 0 });
 });
 
-test('a recording whose schema is newer or which has an unknown key is refused version-unsupported', { criterion: 'AC-SPEC-08-08' }, async () => {
+test('a recording whose schema is newer or which has an unknown key is refused version-unsupported', async () => {
   const ran = await runScenario(RECORDED_CALLS, { record: true });
   for (const recording of [withRecordingField(ran.recording, 'schema', 'revisum.run-recording/v2'), withRecordingField(ran.recording, 'stderr', [])]) {
     const replay = await replayRun(ran, { recording });
@@ -142,7 +140,7 @@ test('a recording whose schema is newer or which has an unknown key is refused v
 
 // ---- Database commands -------------------------------------------------------------------------------------
 
-test('a run with database commands, replayed 20 times from its recording, runs no command and gives the same result hash each time', { criterion: 'AC-SPEC-36-15', timeout: 120_000 }, async () => {
+test('a run with database commands, replayed 20 times from its recording, runs no command and gives the same result hash each time', { timeout: 120_000 }, async () => {
   const ran = await runScenario(RECORDED_COMMANDS, { record: true });
   assert.equal(ran.result.state, 'Passed', JSON.stringify(ran.result.steps));
   assert.equal(ran.commands.length, COMMAND_COUNT);
@@ -150,7 +148,7 @@ test('a run with database commands, replayed 20 times from its recording, runs n
   await assertReplaysIdentical(ran, { calls: 0, commands: COMMAND_COUNT });
 });
 
-test('the recorded outputs are what the replay feeds the engine: another recorded count fails the check', { criterion: 'AC-SPEC-36-15' }, async () => {
+test('the recorded outputs are what the replay feeds the engine: another recorded count fails the check', async () => {
   const ran = await runScenario(RECORDED_COMMANDS, { record: true });
   const replay = await replayRun(ran, { recording: withTextReplaced(ran.recording, '\\"count\\":3', '\\"count\\":4') });
   const outcome = replayed(replay.answer);
@@ -166,7 +164,7 @@ const COMMAND_TAMPERING = [
 ] as const;
 
 for (const tampering of COMMAND_TAMPERING) {
-  test(`${tampering.name} ends the replay replay-mismatch at that command`, { criterion: 'AC-SPEC-36-15' }, async () => {
+  test(`${tampering.name} ends the replay replay-mismatch at that command`, async () => {
     const ran = await runScenario(RECORDED_COMMANDS, { record: true });
     const replay = await replayRun(ran, { recording: tampering.change(ran.recording) });
     assert.deepEqual(refused(replay.answer), { code: 'replay-mismatch', kind: 'database-command', position: tampering.position });
@@ -177,12 +175,12 @@ for (const tampering of COMMAND_TAMPERING) {
 // ---- Without the setting -------------------------------------------------------------------------------------
 
 const UNRECORDED = [
-  { name: 'calls', scenario: UNRECORDED_CALLS, recorded: RECORDED_CALLS, criterion: 'AC-SPEC-32-13', sent: { calls: CALL_COUNT, commands: 0 } },
-  { name: 'database commands', scenario: UNRECORDED_COMMANDS, recorded: RECORDED_COMMANDS, criterion: 'AC-SPEC-36-15', sent: { calls: 0, commands: COMMAND_COUNT } },
+  { name: 'calls', scenario: UNRECORDED_CALLS, recorded: RECORDED_CALLS, sent: { calls: CALL_COUNT, commands: 0 } },
+  { name: 'database commands', scenario: UNRECORDED_COMMANDS, recorded: RECORDED_COMMANDS, sent: { calls: 0, commands: COMMAND_COUNT } },
 ] as const;
 
 for (const unrecorded of UNRECORDED) {
-  test(`without replay.recordReplies, a run with ${unrecorded.name} is refused replay-not-claimed and nothing is sent`, { criterion: unrecorded.criterion }, async () => {
+  test(`without replay.recordReplies, a run with ${unrecorded.name} is refused replay-not-claimed and nothing is sent`, async () => {
     const ran = await runScenario(unrecorded.scenario);
     const claimed = replayManifest(ran.manifest);
     assert.equal(claimed.ok ? 'claimed' : claimed.error.code, 'replay-not-claimed');
@@ -192,14 +190,14 @@ for (const unrecorded of UNRECORDED) {
     assertNothingSent(ran, replay, unrecorded.sent);
   });
 
-  test(`without replay.recordReplies, a recording made anyway does not make a run with ${unrecorded.name} replay-claimed`, { criterion: unrecorded.criterion }, async () => {
+  test(`without replay.recordReplies, a recording made anyway does not make a run with ${unrecorded.name} replay-claimed`, async () => {
     const ran = await runScenario(unrecorded.scenario, { record: true });
     const replay = await replayRun(ran);
     assert.equal(refused(replay.answer).code, 'replay-not-claimed');
     assertNothingSent(ran, replay, unrecorded.sent);
   });
 
-  test(`counter-example: with replay.recordReplies, the same run with ${unrecorded.name} is replay-claimed`, { criterion: unrecorded.criterion }, async () => {
+  test(`counter-example: with replay.recordReplies, the same run with ${unrecorded.name} is replay-claimed`, async () => {
     const ran = await runScenario(unrecorded.recorded, { record: true });
     assert.equal(replayManifest(ran.manifest).ok, true);
     assert.equal(replayed((await replayRun(ran)).answer).identical, true);

@@ -4,7 +4,6 @@
 // does with them (the state read from the accessibility tree, the head the server sent, the
 // downloaded file, the tab sharing the session) comes with the CDP driver; until then a run
 // reports these steps as unsupported-step (unsupported-page-checks.test.ts).
-// See docs/specs/SPEC-31-page-states-metadata-downloads-and-tabs.md.
 import assert from 'node:assert/strict';
 import { arch, platform } from 'node:os';
 import { test } from 'node:test';
@@ -38,30 +37,30 @@ const frame = (steps: readonly unknown[]): JsonRecord => ({ type: 'frame', locat
 const NEW_STATES = ['selected', 'unselected', 'expanded', 'collapsed', 'pressed', 'unpressed', 'current'];
 
 for (const kind of NEW_STATES) {
-  test(`the state check "${kind}" is accepted on an expect step and kept as written`, { criterion: 'AC-SPEC-31-01' }, () => {
+  test(`the state check "${kind}" is accepted on an expect step and kept as written`, () => {
     const step = expectOn(BILLING_TAB, { kind });
     assert.deepEqual(parsedStep(accepted(parsePlan, planOf([OPEN_ORDERS, step])), 1), step);
   });
 
-  test(`the state check "${kind}" compares against nothing, so a value beside it is refused`, { criterion: 'AC-SPEC-31-01' }, () => {
+  test(`the state check "${kind}" compares against nothing, so a value beside it is refused`, () => {
     assert.deepEqual(rejection(parsePlan, planOf([OPEN_ORDERS, expectOn(BILLING_TAB, { kind, value: 'true' })])), ['unknown_field $.steps[1].assert.value']);
   });
 }
 
 // Counter-example: a state the language does not have, such as a css class's "active", is refused.
-test('a state the language does not have, such as "active" or "highlighted", is refused at the kind', { criterion: 'AC-SPEC-31-02' }, () => {
+test('a state the language does not have, such as "active" or "highlighted", is refused at the kind', () => {
   for (const kind of ['active', 'highlighted', 'open', 'aria-selected']) {
     assert.deepEqual(rejection(parsePlan, planOf([OPEN_ORDERS, expectOn(BILLING_TAB, { kind })])), ['unknown_value $.steps[1].assert.kind'], kind);
   }
 });
 
-test('state checks are page checks, not page assertions: on expectPage they are refused', { criterion: 'AC-SPEC-31-01' }, () => {
+test('state checks are page checks, not page assertions: on expectPage they are refused', () => {
   assert.deepEqual(rejection(parsePlan, planOf([OPEN_ORDERS, expectPage({ kind: 'selected' })])), ['unknown_value $.steps[1].assert.kind']);
 });
 
 // ---- Link target ----------------------------------------------------------------------------------
 
-test('hrefEquals takes literal text or a run value and is kept as written', { criterion: 'AC-SPEC-31-03' }, () => {
+test('hrefEquals takes literal text or a run value and is kept as written', () => {
   const literal = expectOn(GUIDE_LINK, { kind: 'hrefEquals', value: `${ORIGIN}/help/billing` });
   assert.deepEqual(parsedStep(accepted(parsePlan, planOf([OPEN_ORDERS, literal])), 1), literal);
   const values = { guidePath: { kind: 'uniqueText', prefix: 'guide' } };
@@ -69,29 +68,29 @@ test('hrefEquals takes literal text or a run value and is kept as written', { cr
   assert.deepEqual(parsedStep(accepted(parsePlan, planOf([OPEN_ORDERS, referring], { values })), 1), referring);
 });
 
-test('hrefEquals with script-like text is refused as unsafe_text', { criterion: 'AC-SPEC-31-03' }, () => {
+test('hrefEquals with script-like text is refused as unsafe_text', () => {
   const step = expectOn(GUIDE_LINK, { kind: 'hrefEquals', value: 'javascript:alert(1)' });
   assert.deepEqual(rejection(parsePlan, planOf([OPEN_ORDERS, step])), ['unsafe_text $.steps[1].assert.value']);
 });
 
-test('hrefEquals is an element check: on expectPage it is refused', { criterion: 'AC-SPEC-31-03' }, () => {
+test('hrefEquals is an element check: on expectPage it is refused', () => {
   assert.deepEqual(rejection(parsePlan, planOf([OPEN_ORDERS, expectPage({ kind: 'hrefEquals', value: `${ORIGIN}/help` })])), ['unknown_value $.steps[1].assert.kind']);
 });
 
 // ---- Server-rendered view -------------------------------------------------------------------------
 
-test('navigate takes scripts "disabled", with a URL or a path template, and keeps it', { criterion: 'AC-SPEC-31-04' }, () => {
+test('navigate takes scripts "disabled", with a URL or a path template, and keeps it', () => {
   for (const url of ['/events/team-meeting', `${ORIGIN}/events/team-meeting`, { segments: ['events', 'team-meeting'] }]) {
     const step = { type: 'navigate', url, scripts: 'disabled' };
     assert.deepEqual(parsedStep(accepted(parsePlan, planOf([step])), 0), step, JSON.stringify(url));
   }
 });
 
-test('navigate without scripts keeps no scripts field, so the page runs its scripts as before', { criterion: 'AC-SPEC-31-04' }, () => {
+test('navigate without scripts keeps no scripts field, so the page runs its scripts as before', () => {
   assert.deepEqual(parsedStep(accepted(parsePlan, planOf([navigate('/events/team-meeting')])), 0), navigate('/events/team-meeting'));
 });
 
-test('scripts other than "disabled" are refused at the field', { criterion: 'AC-SPEC-31-04' }, () => {
+test('scripts other than "disabled" are refused at the field', () => {
   for (const scripts of ['enabled', 'off', 'Disabled', '']) {
     assert.deepEqual(rejection(parsePlan, planOf([{ ...navigate('/events'), scripts }])), ['unknown_value $.steps[0].scripts'], scripts);
   }
@@ -103,7 +102,7 @@ test('scripts other than "disabled" are refused at the field', { criterion: 'AC-
 
 // ---- Page metadata --------------------------------------------------------------------------------
 
-test('metaContent takes a tag name and literal text or a run value, and is kept as written', { criterion: 'AC-SPEC-31-05' }, () => {
+test('metaContent takes a tag name and literal text or a run value, and is kept as written', () => {
   for (const name of ['og:title', 'description', 'twitter:card', 'robots']) {
     const step = expectPage({ kind: 'metaContent', name, value: 'Team meeting' });
     assert.deepEqual(parsedStep(accepted(parsePlan, planOf([OPEN_ORDERS, step])), 1), step, name);
@@ -116,27 +115,27 @@ test('metaContent takes a tag name and literal text or a run value, and is kept 
 const SCRIPT_LIKE = ['<script>alert(1)</script>', 'javascript:alert(1)', '<img src=x onerror=alert(1)>'];
 
 for (const name of SCRIPT_LIKE) {
-  test(`a metaContent name of script-like text ${JSON.stringify(name)} is refused as unsafe_text at the name`, { criterion: 'AC-SPEC-31-05' }, () => {
+  test(`a metaContent name of script-like text ${JSON.stringify(name)} is refused as unsafe_text at the name`, () => {
     assert.deepEqual(rejection(parsePlan, planOf([OPEN_ORDERS, expectPage({ kind: 'metaContent', name, value: 'Team meeting' })])), ['unsafe_text $.steps[1].assert.name']);
   });
 }
 
-test('a metaContent without a name is refused as missing_field', { criterion: 'AC-SPEC-31-05' }, () => {
+test('a metaContent without a name is refused as missing_field', () => {
   assert.deepEqual(rejection(parsePlan, planOf([OPEN_ORDERS, expectPage({ kind: 'metaContent', value: 'Team meeting' })])), ['missing_field $.steps[1].assert.name']);
 });
 
-test('canonicalUrl takes text, also of another origin since it is compared and never visited', { criterion: 'AC-SPEC-31-05' }, () => {
+test('canonicalUrl takes text, also of another origin since it is compared and never visited', () => {
   for (const value of [`${ORIGIN}/events/team-meeting`, 'https://www.example.com/events/team-meeting']) {
     const step = expectPage({ kind: 'canonicalUrl', value });
     assert.deepEqual(parsedStep(accepted(parsePlan, planOf([OPEN_ORDERS, step])), 1), step, value);
   }
 });
 
-test('canonicalUrl of script-like text is refused as unsafe_text', { criterion: 'AC-SPEC-31-05' }, () => {
+test('canonicalUrl of script-like text is refused as unsafe_text', () => {
   assert.deepEqual(rejection(parsePlan, planOf([OPEN_ORDERS, expectPage({ kind: 'canonicalUrl', value: 'javascript:alert(1)' })])), ['unsafe_text $.steps[1].assert.value']);
 });
 
-test('metaContent and canonicalUrl are page assertions: on an element they are refused', { criterion: 'AC-SPEC-31-05' }, () => {
+test('metaContent and canonicalUrl are page assertions: on an element they are refused', () => {
   for (const assertion of [{ kind: 'metaContent', name: 'og:title', value: 'Team meeting' }, { kind: 'canonicalUrl', value: `${ORIGIN}/events` }]) {
     assert.deepEqual(rejection(parsePlan, planOf([OPEN_ORDERS, expectOn(GUIDE_LINK, assertion)])), ['unknown_value $.steps[1].assert.kind'], assertion.kind);
   }
@@ -153,13 +152,13 @@ const DOWNLOAD_CHECKS: readonly JsonRecord[] = [
   { kind: 'contentExcludes', value: 'Archived pilot' },
 ];
 
-test('a download step and each download check after it are accepted and kept as written', { criterion: 'AC-SPEC-31-06' }, () => {
+test('a download step and each download check after it are accepted and kept as written', () => {
   const steps = [OPEN_ORDERS, download('project-list'), ...DOWNLOAD_CHECKS.map((check) => expectDownload('project-list', check))];
   const plan = accepted(parsePlan, planOf(steps));
   steps.forEach((step, index) => assert.deepEqual(parsedStep(plan, index), step, `step ${index}`));
 });
 
-test('fileNameEquals and the content checks take a run value; mediaTypeEquals does not', { criterion: 'AC-SPEC-31-06' }, () => {
+test('fileNameEquals and the content checks take a run value; mediaTypeEquals does not', () => {
   const values = { exportTitle: { kind: 'uniqueText', prefix: 'export' } };
   for (const kind of ['fileNameEquals', 'contentContains', 'contentExcludes']) {
     accepted(parsePlan, planOf([OPEN_ORDERS, download('project-list'), expectDownload('project-list', { kind, value: reference('exportTitle') })], { values }));
@@ -168,13 +167,13 @@ test('fileNameEquals and the content checks take a run value; mediaTypeEquals do
   assert.deepEqual(errors, ['wrong_type $.steps[2].assert.value']);
 });
 
-test('sizeAtLeast of 0 is refused, since an empty file proves nothing; 1 is accepted', { criterion: 'AC-SPEC-31-06' }, () => {
+test('sizeAtLeast of 0 is refused, since an empty file proves nothing; 1 is accepted', () => {
   const errors = rejection(parsePlan, planOf([OPEN_ORDERS, download('project-list'), expectDownload('project-list', { kind: 'sizeAtLeast', value: 0 })]));
   assert.deepEqual(errors.map((error) => error.split(' ')[1]), ['$.steps[2].assert.value']);
   accepted(parsePlan, planOf([OPEN_ORDERS, download('project-list'), expectDownload('project-list', { kind: 'sizeAtLeast', value: 1 })]));
 });
 
-test('a size that is not a whole number of bytes, or is negative, is refused at the value', { criterion: 'AC-SPEC-31-06' }, () => {
+test('a size that is not a whole number of bytes, or is negative, is refused at the value', () => {
   for (const kind of ['sizeAtLeast', 'sizeAtMost']) {
     for (const value of [-1, 2.5, '100', null]) {
       const errors = rejection(parsePlan, planOf([OPEN_ORDERS, download('project-list'), expectDownload('project-list', { kind, value })]));
@@ -183,12 +182,12 @@ test('a size that is not a whole number of bytes, or is negative, is refused at 
   }
 });
 
-test('a download check the language does not have, such as a page count, is refused at the kind', { criterion: 'AC-SPEC-31-06' }, () => {
+test('a download check the language does not have, such as a page count, is refused at the kind', () => {
   const errors = rejection(parsePlan, planOf([OPEN_ORDERS, download('project-list'), expectDownload('project-list', { kind: 'pageCountEquals', value: 3 })]));
   assert.deepEqual(errors, ['unknown_value $.steps[2].assert.kind']);
 });
 
-test('download names are lowercase letters, digits and hyphens, 1 to 64 long, starting with a letter or digit', { criterion: 'AC-SPEC-31-06' }, () => {
+test('download names are lowercase letters, digits and hyphens, 1 to 64 long, starting with a letter or digit', () => {
   for (const name of ['report', 'r', '2026-export', `a${'b'.repeat(63)}`]) {
     accepted(parsePlan, planOf([OPEN_ORDERS, download(name), expectDownload(name, { kind: 'sizeAtLeast', value: 1 })]));
   }
@@ -198,25 +197,25 @@ test('download names are lowercase letters, digits and hyphens, 1 to 64 long, st
   }
 });
 
-test('a download name and the name an expectDownload checks are plain text, never a run value', { criterion: 'AC-SPEC-31-06' }, () => {
+test('a download name and the name an expectDownload checks are plain text, never a run value', () => {
   const values = { exportName: { kind: 'uniqueText', prefix: 'export' } };
   assert.deepEqual(rejection(parsePlan, planOf([OPEN_ORDERS, download(reference('exportName'))], { values })), ['wrong_type $.steps[1].name']);
   const errors = rejection(parsePlan, planOf([OPEN_ORDERS, download('project-list'), expectDownload(reference('exportName'), { kind: 'sizeAtLeast', value: 1 })], { values }));
   assert.deepEqual(errors, ['wrong_type $.steps[2].download']);
 });
 
-test('a download step needs a locator, and takes no other field', { criterion: 'AC-SPEC-31-06' }, () => {
+test('a download step needs a locator, and takes no other field', () => {
   assert.deepEqual(rejection(parsePlan, planOf([OPEN_ORDERS, { type: 'download', name: 'project-list' }])), ['missing_field $.steps[1].locator']);
   assert.deepEqual(rejection(parsePlan, planOf([OPEN_ORDERS, { ...download('project-list'), path: '/tmp/projects.csv' }])), ['unknown_field $.steps[1].path']);
 });
 
 // expectDownload is an assertion step: it counts against a vacuous plan and needs a criterion id.
-test('a plan whose only check is an expectDownload is accepted', { criterion: 'AC-SPEC-31-06' }, () => {
+test('a plan whose only check is an expectDownload is accepted', () => {
   const plan = { ...planOf([]), steps: [OPEN_ORDERS, download('project-list'), expectDownload('project-list', { kind: 'sizeAtLeast', value: 1 })] };
   accepted(parsePlan, plan);
 });
 
-test('an expectDownload without a criterion id is refused as vacuous', { criterion: 'AC-SPEC-31-06' }, () => {
+test('an expectDownload without a criterion id is refused as vacuous', () => {
   const { criterionId: _removed, ...untraced } = expectDownload('project-list', { kind: 'sizeAtLeast', value: 1 });
   const errors = rejection(parsePlan, planOf([OPEN_ORDERS, download('project-list'), untraced]));
   assert.ok(errors.length > 0 && errors.every((error) => error.startsWith('vacuous $.steps[2]')), JSON.stringify(errors));
@@ -224,27 +223,27 @@ test('an expectDownload without a criterion id is refused as vacuous', { criteri
 
 // ---- Download names are defined before use, and only once -------------------------------------------
 
-test('an expectDownload naming a download no step defines is refused with undefined_value at the name', { criterion: 'AC-SPEC-31-13' }, () => {
+test('an expectDownload naming a download no step defines is refused with undefined_value at the name', () => {
   const plan = planOf([OPEN_ORDERS, download('project-list'), expectDownload('invoice-list', { kind: 'sizeAtLeast', value: 1 })]);
   assert.deepEqual(rejection(parsePlan, plan), ['undefined_value $.steps[2].download']);
 });
 
-test('an expectDownload before the download step that defines its name is refused with undefined_value', { criterion: 'AC-SPEC-31-13' }, () => {
+test('an expectDownload before the download step that defines its name is refused with undefined_value', () => {
   const plan = planOf([OPEN_ORDERS, expectDownload('project-list', { kind: 'sizeAtLeast', value: 1 }), download('project-list')]);
   assert.deepEqual(rejection(parsePlan, plan), ['undefined_value $.steps[1].download']);
 });
 
-test('an expectDownload in a plan with no download step at all is refused with undefined_value', { criterion: 'AC-SPEC-31-13' }, () => {
+test('an expectDownload in a plan with no download step at all is refused with undefined_value', () => {
   assert.deepEqual(rejection(parsePlan, planOf([OPEN_ORDERS, expectDownload('project-list', { kind: 'sizeAtLeast', value: 1 })])), ['undefined_value $.steps[1].download']);
 });
 
-test('the same download name defined twice is refused as duplicate', { criterion: 'AC-SPEC-31-13' }, () => {
+test('the same download name defined twice is refused as duplicate', () => {
   const errors = rejection(parsePlan, planOf([OPEN_ORDERS, download('project-list'), download('project-list', label('Export again'))]));
   assert.deepEqual(errors.map((error) => error.split(' ')[0]), ['duplicate']);
 });
 
 // Counter-example: the same check after its download, and two checks of two downloads, are accepted.
-test('an expectDownload after its download is accepted, and each of two downloads may be checked', { criterion: 'AC-SPEC-31-13' }, () => {
+test('an expectDownload after its download is accepted, and each of two downloads may be checked', () => {
   accepted(parsePlan, planOf([OPEN_ORDERS, download('project-list'), expectDownload('project-list', { kind: 'sizeAtLeast', value: 1 })]));
   accepted(parsePlan, planOf([
     OPEN_ORDERS, download('project-list'), download('invoice-list', label('Invoices')),
@@ -252,7 +251,7 @@ test('an expectDownload after its download is accepted, and each of two download
   ]));
 });
 
-test('an undefined download name is not echoed in the error', { criterion: 'AC-SPEC-31-13' }, () => {
+test('an undefined download name is not echoed in the error', () => {
   const parsed = parsePlan(planOf([OPEN_ORDERS, expectDownload('private-marker-q7zx', { kind: 'sizeAtLeast', value: 1 })]));
   assert.deepEqual(parsed.ok ? [] : parsed.error.map((error) => error.code), ['undefined_value']);
   assert.ok(!JSON.stringify(parsed).includes('private-marker-q7zx'), JSON.stringify(parsed));
@@ -260,14 +259,14 @@ test('an undefined download name is not echoed in the error', { criterion: 'AC-S
 
 // ---- A second tab ---------------------------------------------------------------------------------
 
-test('a newTab at the top level, with a URL or a path template, is accepted and kept as written', { criterion: 'AC-SPEC-31-12' }, () => {
+test('a newTab at the top level, with a URL or a path template, is accepted and kept as written', () => {
   for (const url of ['/account', `${ORIGIN}/account`, { segments: ['account'] }]) {
     const step = newTab(url, [CLOSING_CHECK]);
     assert.deepEqual(parsedStep(accepted(parsePlan, planOf([OPEN_ORDERS, step])), 1), step, JSON.stringify(url));
   }
 });
 
-test('a newTab may hold frames, whose depth counts from the tab', { criterion: 'AC-SPEC-31-12' }, () => {
+test('a newTab may hold frames, whose depth counts from the tab', () => {
   const shallow = parserFor({}, { maximumFrameDepth: 2 });
   accepted(shallow, planOf([OPEN_ORDERS, newTab('/account', [frame([frame([CLOSING_CHECK])])])]));
   const errors = rejection(shallow, planOf([OPEN_ORDERS, newTab('/account', [frame([frame([frame([CLOSING_CHECK])])])])]));
@@ -280,39 +279,39 @@ function assertMisplacedAt(errors: readonly string[], stepPath: string): void {
   assert.ok([`misplaced_step ${stepPath}`, `misplaced_step ${stepPath}.type`].includes(errors[0] ?? ''), JSON.stringify(errors));
 }
 
-test('a newTab inside a frame is refused with misplaced_step at the newTab', { criterion: 'AC-SPEC-31-12' }, () => {
+test('a newTab inside a frame is refused with misplaced_step at the newTab', () => {
   assertMisplacedAt(rejection(parsePlan, planOf([OPEN_ORDERS, frame([newTab('/account'), CLOSING_CHECK])])), '$.steps[1].steps[0]');
 });
 
-test('a newTab inside another newTab is refused with misplaced_step at the inner one', { criterion: 'AC-SPEC-31-12' }, () => {
+test('a newTab inside another newTab is refused with misplaced_step at the inner one', () => {
   assertMisplacedAt(rejection(parsePlan, planOf([OPEN_ORDERS, newTab('/account', [CLOSING_CHECK, newTab('/orders')])])), '$.steps[1].steps[1]');
 });
 
-test('a newTab inside a frame inside a newTab is refused with misplaced_step', { criterion: 'AC-SPEC-31-12' }, () => {
+test('a newTab inside a frame inside a newTab is refused with misplaced_step', () => {
   assertMisplacedAt(rejection(parsePlan, planOf([OPEN_ORDERS, newTab('/account', [frame([newTab('/orders'), CLOSING_CHECK])])])), '$.steps[1].steps[0].steps[0]');
 });
 
-test('a newTab whose URL is not on the allow-list is refused with origin_not_allowed at the URL', { criterion: 'AC-SPEC-31-12' }, () => {
+test('a newTab whose URL is not on the allow-list is refused with origin_not_allowed at the URL', () => {
   assert.deepEqual(rejection(parsePlan, planOf([OPEN_ORDERS, newTab('https://evil.example/collect')])), ['origin_not_allowed $.steps[1].url']);
 });
 
-test('a navigate inside a newTab to an origin not on the allow-list is refused as at the top level', { criterion: 'AC-SPEC-31-12' }, () => {
+test('a navigate inside a newTab to an origin not on the allow-list is refused as at the top level', () => {
   const errors = rejection(parsePlan, planOf([OPEN_ORDERS, newTab('/account', [navigate('https://evil.example/collect'), CLOSING_CHECK])]));
   assert.deepEqual(errors, ['origin_not_allowed $.steps[1].steps[0].url']);
 });
 
-test('a newTab URL with another scheme or script-like text is refused at the URL', { criterion: 'AC-SPEC-31-12' }, () => {
+test('a newTab URL with another scheme or script-like text is refused at the URL', () => {
   for (const url of ['file:///etc/passwd', 'javascript:alert(1)']) {
     const errors = rejection(parsePlan, planOf([OPEN_ORDERS, newTab(url)]));
     assert.deepEqual(errors.map((error) => error.split(' ')[1]), ['$.steps[1].url'], url);
   }
 });
 
-test('a newTab takes no other field, such as a window name or a popup flag', { criterion: 'AC-SPEC-31-12' }, () => {
+test('a newTab takes no other field, such as a window name or a popup flag', () => {
   assert.deepEqual(rejection(parsePlan, planOf([OPEN_ORDERS, { ...newTab('/account'), popup: true }])), ['unknown_field $.steps[1].popup']);
 });
 
-test('a plan with a misplaced or off-list newTab is refused before any driver is touched', { criterion: 'AC-SPEC-31-12' }, async () => {
+test('a plan with a misplaced or off-list newTab is refused before any driver is touched', async () => {
   let calls = 0;
   const spy: BrowserDriver = {
     info: { id: 'playwright', version: 'spy', protocol: 'none' },

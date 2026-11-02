@@ -7,7 +7,6 @@
 // counter-example.
 // What these tests assume about shapes the spec leaves open: each refusal from the builder names
 // the origin it refused, and the proxy refuses by rejecting, as it does when it cannot listen.
-// See docs/specs/SPEC-07-isolated-runner-and-egress.md.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { EgressPolicy, FixtureRewrite, Origin } from '@revisum/contracts';
@@ -33,26 +32,26 @@ const REFUSED_FIXTURES: readonly { readonly title: string; readonly allowOrigins
 ];
 
 for (const { title, allowOrigins, fixture } of REFUSED_FIXTURES) {
-  test(`the builder refuses ${title}, with no rewrite on it yet`, { criterion: 'AC-SPEC-07-07' }, () => {
+  test(`the builder refuses ${title}, with no rewrite on it yet`, () => {
     const built = buildEgressPolicy({ allowOrigins, allowServices: [], fixtureOrigins: [fixture] });
     assert.ok(!built.ok, JSON.stringify(built));
     assert.equal(built.error.origin, fixture);
   });
 
-  test(`the builder refuses ${title}, with a rewrite on it`, { criterion: 'AC-SPEC-07-07' }, () => {
+  test(`the builder refuses ${title}, with a rewrite on it`, () => {
     const built = buildEgressPolicy({ allowOrigins, allowServices: [], fixtureOrigins: [fixture], responseRewrites: [rewriteOn(fixture)] });
     assert.ok(!built.ok, JSON.stringify(built));
     assert.equal(built.error.origin, fixture);
   });
 }
 
-test('one refused fixture origin refuses the policy, even beside an accepted one', { criterion: 'AC-SPEC-07-07' }, () => {
+test('one refused fixture origin refuses the policy, even beside an accepted one', () => {
   const built = buildEgressPolicy({ allowOrigins: [PLAIN, SECURE], allowServices: [], fixtureOrigins: [PLAIN, SECURE] });
   assert.ok(!built.ok, JSON.stringify(built));
   assert.equal(built.error.origin, SECURE);
 });
 
-test('counter-example: the builder accepts a declared plain-HTTP fixture origin and its rewrite', { criterion: 'AC-SPEC-07-07' }, () => {
+test('counter-example: the builder accepts a declared plain-HTTP fixture origin and its rewrite', () => {
   const built = buildEgressPolicy({ allowOrigins: [PLAIN], allowServices: [], fixtureOrigins: [PLAIN], responseRewrites: [rewriteOn(PLAIN)] });
   assert.ok(built.ok, JSON.stringify(built));
   assert.deepEqual(built.value.responseRewrites, [rewriteOn(PLAIN)]);
@@ -91,16 +90,16 @@ const REFUSED_POLICIES: readonly { readonly title: string; readonly policy: Egre
 ];
 
 for (const { title, policy } of REFUSED_POLICIES) {
-  test(`startEgressProxy refuses to start with ${title}`, { criterion: 'AC-SPEC-07-07' }, async () => {
+  test(`startEgressProxy refuses to start with ${title}`, async () => {
     assert.equal(await refusesToStart(() => startEgressProxy({ policy, resolve: fakeResolver({}).resolve })), true);
   });
 
-  test(`startProxyServer, as the proxy's container calls it, refuses to start with ${title}`, { criterion: 'AC-SPEC-07-07' }, async () => {
+  test(`startProxyServer, as the proxy's container calls it, refuses to start with ${title}`, async () => {
     assert.equal(await refusesToStart(() => startProxyServer(rulesInContainer(policy), { resolve: fakeResolver({}).resolve })), true);
   });
 }
 
-test('counter-example: startProxyServer, as the proxy\'s container calls it, starts with a rewrite on a declared plain-HTTP origin, and applies it', { criterion: 'AC-SPEC-07-07' }, async () => {
+test('counter-example: startProxyServer, as the proxy\'s container calls it, starts with a rewrite on a declared plain-HTTP origin, and applies it', async () => {
   const upstream = await startUpstream();
   const proxy = await startProxyServer(rulesInContainer(handBuilt([PLAIN], [rewriteOn(PLAIN)])), {
     resolve: fakeResolver({ 'fixture.test': ['93.184.215.14'] }).resolve,
@@ -116,7 +115,7 @@ test('counter-example: startProxyServer, as the proxy\'s container calls it, sta
   }
 });
 
-test('counter-example: the proxy starts with a hand-built rewrite on a declared plain-HTTP origin, and applies it', { criterion: 'AC-SPEC-07-07' }, async () => {
+test('counter-example: the proxy starts with a hand-built rewrite on a declared plain-HTTP origin, and applies it', async () => {
   const upstream = await startUpstream();
   const proxy = await startEgressProxy({
     policy: handBuilt([PLAIN], [rewriteOn(PLAIN)]),

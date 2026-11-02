@@ -11,7 +11,6 @@
 // loopback replaying a recorded response (explore-command-examples.ts), in host mode with a spy on
 // the real browser, or with a fake isolated runner. The hostile page and draft are in
 // test/proofs/explore-hostile-page.test.ts.
-// See docs/specs/SPEC-37-explore-to-draft.md.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { CLI_OUTPUT_SCHEMA } from '@revisum/cli';
@@ -50,11 +49,11 @@ for (const { name, start } of [
   { name: 'a production origin', start: () => `${PRODUCTION_ORIGIN}/` },
   { name: 'an undeclared origin', start: () => `${UNDECLARED_ORIGIN}/` },
 ]) {
-  test(`a start URL on ${name} stops with explore-origin-refused before any browser starts`, { criterion: 'AC-SPEC-37-01' }, async () => {
+  test(`a start URL on ${name} stops with explore-origin-refused before any browser starts`, async () => {
     await withExploreRun({ argv: () => exploreArguments(start(), ['--host', '--json']) }, (run) => assertStoppedEarly(run, 'explore-origin-refused'));
   });
 
-  test(`a start URL on ${name} stops with explore-origin-refused before the isolated runner starts`, { criterion: 'AC-SPEC-37-01' }, async () => {
+  test(`a start URL on ${name} stops with explore-origin-refused before the isolated runner starts`, async () => {
     await withExploreRun({
       argv: () => exploreArguments(start(), ['--json']),
       runner: (site) => fakeRunner({ level: 'isolated', output: containerPageMap(site.origin).printed }),
@@ -62,14 +61,14 @@ for (const { name, start } of [
   });
 }
 
-test('counter-example: a start URL on the site\'s declared, non-production origin is crawled', { criterion: 'AC-SPEC-37-01' }, async () => {
+test('counter-example: a start URL on the site\'s declared, non-production origin is crawled', async () => {
   await withExploreRun(hostRun(), (run) => {
     assert.deepEqual(exploreErrorCodes(run), [], run.outcome.stdout);
     assert.equal(writtenMap(run).origin, run.site.origin);
   });
 });
 
-test('the crawl never follows a link to another origin: the second origin and production are never requested', { criterion: 'AC-SPEC-37-01' }, async () => {
+test('the crawl never follows a link to another origin: the second origin and production are never requested', async () => {
   await withExploreRun(hostRun(), (run) => {
     const navigations = run.browser?.navigations() ?? [];
     assert.ok(navigations.length > 0, 'the crawl opened no page');
@@ -80,7 +79,7 @@ test('the crawl never follows a link to another origin: the second origin and pr
   });
 });
 
-test('counter-example: the home page does link to the second origin, and that server records any request made of it', { criterion: 'AC-SPEC-37-01' }, async () => {
+test('counter-example: the home page does link to the second origin, and that server records any request made of it', async () => {
   await withExploreRun(hostRun(), async (run) => {
     const homePage = await (await fetch(home(run.site))).text();
     assert.ok(homePage.includes(`${run.site.secondOrigin}/partner.html`), 'the home page has no link to the second origin');
@@ -92,7 +91,7 @@ test('counter-example: the home page does link to the second origin, and that se
 
 // ---- Navigation and reads only ------------------------------------------------------
 
-test('without --after, the browser spy records only navigation, page, accessibility-tree and link-target calls', { criterion: 'AC-SPEC-37-02' }, async () => {
+test('without --after, the browser spy records only navigation, page, accessibility-tree and link-target calls', async () => {
   await withExploreRun(hostRun(), (run) => {
     const recorded = methods(run.browser?.calls ?? []);
     assert.deepEqual(recorded.filter((method) => !CRAWL_CALLS.includes(method) && !UPKEEP_CALLS.includes(method)), [], JSON.stringify(recorded));
@@ -100,7 +99,7 @@ test('without --after, the browser spy records only navigation, page, accessibil
   });
 });
 
-test('without --after, no click, typing, selection, upload, key press, dialog answer or page script reaches the browser', { criterion: 'AC-SPEC-37-02' }, async () => {
+test('without --after, no click, typing, selection, upload, key press, dialog answer or page script reaches the browser', async () => {
   await withExploreRun(hostRun(), (run) => {
     const recorded = methods(run.browser?.calls ?? []);
     assert.ok(recorded.includes('navigate'), `the crawl opened no page: ${run.outcome.stdout}`);
@@ -108,7 +107,7 @@ test('without --after, no click, typing, selection, upload, key press, dialog an
   });
 });
 
-test('with an approved --after plan, the only acting calls are the plan\'s, and all come before the crawl reads its first links', { criterion: 'AC-SPEC-37-02' }, async () => {
+test('with an approved --after plan, the only acting calls are the plan\'s, and all come before the crawl reads its first links', async () => {
   await withExploreRun({
     argv: (site) => exploreArguments(home(site), ['--after', AFTER_PLAN_PATH, '--host', '--json']),
     files: { [AFTER_PLAN_PATH]: SIGN_IN_PLAN },
@@ -126,7 +125,7 @@ test('with an approved --after plan, the only acting calls are the plan\'s, and 
 
 // ---- Bounds and order -------------------------------------------------------------
 
-test('with the default bounds, the page map holds the site breadth first in sorted order, to depth 3, and is truncated', { criterion: 'AC-SPEC-37-03' }, async () => {
+test('with the default bounds, the page map holds the site breadth first in sorted order, to depth 3, and is truncated', async () => {
   await withExploreRun(hostRun(), (run) => {
     const map = writtenMap(run);
     assert.deepEqual(crawlOrder(map), DEFAULT_CRAWL);
@@ -134,7 +133,7 @@ test('with the default bounds, the page map holds the site breadth first in sort
   });
 });
 
-test('--max-depth 4 reaches the archive and, with the whole site crawled, is not truncated', { criterion: 'AC-SPEC-37-03' }, async () => {
+test('--max-depth 4 reaches the archive and, with the whole site crawled, is not truncated', async () => {
   await withExploreRun(hostRun(['--max-depth', '4']), (run) => {
     const map = writtenMap(run);
     assert.deepEqual(crawlOrder(map), [...DEFAULT_CRAWL, BEYOND_DEFAULT_DEPTH]);
@@ -142,7 +141,7 @@ test('--max-depth 4 reaches the archive and, with the whole site crawled, is not
   });
 });
 
-test('--max-pages 3 keeps the first three pages of the crawl and is truncated', { criterion: 'AC-SPEC-37-03' }, async () => {
+test('--max-pages 3 keeps the first three pages of the crawl and is truncated', async () => {
   await withExploreRun(hostRun(['--max-pages', '3']), (run) => {
     const map = writtenMap(run);
     assert.deepEqual(crawlOrder(map), DEFAULT_CRAWL.slice(0, 3));
@@ -151,7 +150,7 @@ test('--max-pages 3 keeps the first three pages of the crawl and is truncated', 
   });
 });
 
-test('--max-depth 0 keeps the start page alone and is truncated', { criterion: 'AC-SPEC-37-03' }, async () => {
+test('--max-depth 0 keeps the start page alone and is truncated', async () => {
   await withExploreRun(hostRun(['--max-depth', '0']), (run) => {
     const map = writtenMap(run);
     assert.deepEqual(crawlOrder(map), [['/', 0]]);
@@ -160,7 +159,7 @@ test('--max-depth 0 keeps the start page alone and is truncated', { criterion: '
 });
 
 for (const bound of [['--max-pages', '0'], ['--max-pages', '101'], ['--max-pages', 'twenty'], ['--max-pages', '2.5'], ['--max-depth', '6'], ['--max-depth', '-1']]) {
-  test(`${bound.join(' ')} is a usage error before any browser starts`, { criterion: 'AC-SPEC-37-03' }, async () => {
+  test(`${bound.join(' ')} is a usage error before any browser starts`, async () => {
     await withExploreRun(hostRun(bound), (run) => {
       assertStoppedEarly(run, 'usage');
       // The error names the bound, not the explore mode itself.
@@ -170,14 +169,14 @@ for (const bound of [['--max-pages', '0'], ['--max-pages', '101'], ['--max-pages
   });
 }
 
-test('counter-example: the largest bounds, --max-pages 100 and --max-depth 5, are accepted', { criterion: 'AC-SPEC-37-03' }, async () => {
+test('counter-example: the largest bounds, --max-pages 100 and --max-depth 5, are accepted', async () => {
   await withExploreRun(hostRun(['--max-pages', '100', '--max-depth', '5']), (run) => {
     assert.deepEqual(exploreErrorCodes(run), [], run.outcome.stdout);
     assert.equal(writtenMap(run).pages.length, DEFAULT_CRAWL.length + 1);
   });
 });
 
-test('two crawls of the same site write byte-identical page maps', { criterion: 'AC-SPEC-37-03' }, async () => {
+test('two crawls of the same site write byte-identical page maps', async () => {
   await withExploreRun(hostRun(), async (run) => {
     const first = pageMapText(run);
     await run.again();
@@ -187,7 +186,7 @@ test('two crawls of the same site write byte-identical page maps', { criterion: 
 
 // ---- What the page map and request hold ----------------------------------------------
 
-test('the page map holds the filled field\'s role and name but not its value, no paragraph text, and the long name cut to 80', { criterion: 'AC-SPEC-37-04' }, async () => {
+test('the page map holds the filled field\'s role and name but not its value, no paragraph text, and the long name cut to 80', async () => {
   await withExploreRun(hostRun(), (run) => {
     const contact = writtenMap(run).pages.find((page) => page.path === '/contact.html');
     assert.ok(contact !== undefined, 'the contact page was not crawled');
@@ -201,7 +200,7 @@ test('the page map holds the filled field\'s role and name but not its value, no
   });
 });
 
-test('neither the declared secret nor the email address is in the page map or the planner request', { criterion: 'AC-SPEC-37-04' }, async () => {
+test('neither the declared secret nor the email address is in the page map or the planner request', async () => {
   await withExploreRun(hostRun(), (run) => {
     for (const text of [pageMapText(run), ...plannerRequestTexts(run)]) {
       for (const absent of [OFFICE_KEY_VALUE, CANARIES.email, CANARIES.fieldValue, CANARIES.paragraph]) {
@@ -215,7 +214,7 @@ test('neither the declared secret nor the email address is in the page map or th
   });
 });
 
-test('counter-example: the contact page the site serves holds every canary the map and request must not', { criterion: 'AC-SPEC-37-04' }, async () => {
+test('counter-example: the contact page the site serves holds every canary the map and request must not', async () => {
   await withExploreRun(hostRun(), async (run) => {
     const contact = await (await fetch(`${run.site.origin}/contact.html`)).text();
     for (const present of [OFFICE_KEY_VALUE, CANARIES.email, CANARIES.fieldValue, CANARIES.paragraph, LONG_BUTTON_NAME]) {
@@ -226,7 +225,7 @@ test('counter-example: the contact page the site serves holds every canary the m
 
 // ---- What the planner sees ----------------------------------------------------------
 
-test('with --from, the request holds the criteria, the grammar version, the origin, the target and every crawled path', { criterion: 'AC-SPEC-37-05' }, async () => {
+test('with --from, the request holds the criteria, the grammar version, the origin, the target and every crawled path', async () => {
   await withExploreRun({ argv: (site) => ['--from', SPEC_PATH, ...exploreArguments(home(site))] }, (run) => {
     const [, prompt] = plannerRequestTexts(run);
     assert.ok(prompt !== undefined);
@@ -236,7 +235,7 @@ test('with --from, the request holds the criteria, the grammar version, the orig
   });
 });
 
-test('the request holds no cookie, stored value, screenshot, query string, typed or field value, page text or artefact path', { criterion: 'AC-SPEC-37-05' }, async () => {
+test('the request holds no cookie, stored value, screenshot, query string, typed or field value, page text or artefact path', async () => {
   await withExploreRun({ argv: (site) => ['--from', SPEC_PATH, ...exploreArguments(home(site))] }, (run) => {
     const absent = [
       CANARIES.cookie, 'shop-session', CANARIES.storage, 'explore-visit', 'iVBORw0KGgo', 'data:image', HOME_LINK_QUERY, HOME_LINK_FRAGMENT,
@@ -249,7 +248,7 @@ test('the request holds no cookie, stored value, screenshot, query string, typed
   });
 });
 
-test('counter-example: the browser did hold the cookie the home page set, so its absence from the request is not by chance', { criterion: 'AC-SPEC-37-05' }, async () => {
+test('counter-example: the browser did hold the cookie the home page set, so its absence from the request is not by chance', async () => {
   await withExploreRun(hostRun(), async (run) => {
     assert.ok(run.site.requested.includes('/index.html'), 'the crawl never loaded the home page');
     const response = await fetch(home(run.site));
@@ -257,7 +256,7 @@ test('counter-example: the browser did hold the cookie the home page set, so its
   });
 });
 
-test('without --from, no criterion text is sent', { criterion: 'AC-SPEC-37-05' }, async () => {
+test('without --from, no criterion text is sent', async () => {
   await withExploreRun(hostRun(), (run) => {
     for (const text of plannerRequestTexts(run)) {
       for (const criterion of Object.values(CRITERION_TEXTS)) assert.equal(text.includes(criterion), false, `the request holds ${criterion}`);
@@ -277,7 +276,7 @@ for (const { name, reply } of [
   { name: 'a reply whose text holds a script tag', reply: () => replyWithContent('openai-chat', SCRIPT_BEARING) },
   { name: 'a reply whose text is over-long', reply: () => replyWithContent('openai-chat', OVER_LONG) },
 ]) {
-  test(`${name} writes no draft and reports plan-rejected`, { criterion: 'AC-SPEC-37-06' }, async () => {
+  test(`${name} writes no draft and reports plan-rejected`, async () => {
     await withExploreRun({ ...hostRun(), answer: jsonAnswer(200, reply()) }, (run) => {
       assert.equal(run.planner.received.length, 1, 'the planner was not called, so the reply was never judged');
       assert.equal(run.workspace.exists(DRAFT_OUT), false, 'a draft was written');
@@ -288,7 +287,7 @@ for (const { name, reply } of [
   });
 }
 
-test('counter-example: the recorded reply is written as the draft', { criterion: 'AC-SPEC-37-06' }, async () => {
+test('counter-example: the recorded reply is written as the draft', async () => {
   await withExploreRun(hostRun(), (run) => {
     assert.deepEqual(exploreErrorCodes(run), [], run.outcome.stdout);
     assert.ok(run.workspace.exists(DRAFT_OUT));
@@ -297,7 +296,7 @@ test('counter-example: the recorded reply is written as the draft', { criterion:
 
 // ---- Admission ------------------------------------------------------------------
 
-test('the draft is admitted with source explore-draft, basis core-recorded and the page map file\'s sha256 as reference', { criterion: 'AC-SPEC-37-07' }, async () => {
+test('the draft is admitted with source explore-draft, basis core-recorded and the page map file\'s sha256 as reference', async () => {
   await withExploreRun(hostRun(), (run) => {
     const expected = { source: 'explore-draft', basis: 'core-recorded', reference: pageMapReference(run) };
     assert.match(expected.reference, /^sha256:[0-9a-f]{64}$/);
@@ -308,7 +307,7 @@ test('the draft is admitted with source explore-draft, basis core-recorded and t
   });
 });
 
-test('the draft is left unapproved and nothing runs it: no approval, no run, and no page opened but the crawl\'s', { criterion: 'AC-SPEC-37-07' }, async () => {
+test('the draft is left unapproved and nothing runs it: no approval, no run, and no page opened but the crawl\'s', async () => {
   await withExploreRun(hostRun(), (run) => {
     assert.equal(exploreData(run)['approved'], false);
     assert.deepEqual(eventKinds(run).filter((kind) => kind.startsWith('run.') || kind === 'plan.approved' || kind === 'approval.refused'), []);
@@ -350,7 +349,7 @@ const warningLines = (run: ExploreRun): readonly (readonly [string, number])[] =
   });
 };
 
-test('a missing and an ambiguous locator are warned of at their lines of the written draft, and a locator after a click is not', { criterion: 'AC-SPEC-37-08' }, async () => {
+test('a missing and an ambiguous locator are warned of at their lines of the written draft, and a locator after a click is not', async () => {
   await withExploreRun({ ...hostRun(), answer: jsonAnswer(200, replyWithContent('openai-chat', WARNED.text)) }, (run) => {
     assert.deepEqual([...warningLines(run)].sort((left, right) => left[1] - right[1]), [
       ['locator-ambiguous', WARNED.ambiguous],
@@ -363,7 +362,7 @@ test('a missing and an ambiguous locator are warned of at their lines of the wri
   });
 });
 
-test('counter-example: the recorded draft, whose locators are all on their pages, has no warnings', { criterion: 'AC-SPEC-37-08' }, async () => {
+test('counter-example: the recorded draft, whose locators are all on their pages, has no warnings', async () => {
   await withExploreRun(hostRun(), (run) => {
     assert.deepEqual(warningLines(run), []);
   });
@@ -377,23 +376,23 @@ const afterRun = (approvals: NonNullable<ExploreSetup['approvals']>, plan: strin
   approvals,
 });
 
-test('--after naming a plan with no approval for its hash stops with after-plan-unapproved before any browser starts', { criterion: 'AC-SPEC-37-09' }, async () => {
+test('--after naming a plan with no approval for its hash stops with after-plan-unapproved before any browser starts', async () => {
   await withExploreRun(afterRun([]), (run) => assertStoppedEarly(run, 'after-plan-unapproved'));
 });
 
-test('--after naming a plan whose approval is for another plan\'s hash stops with after-plan-unapproved', { criterion: 'AC-SPEC-37-09' }, async () => {
+test('--after naming a plan whose approval is for another plan\'s hash stops with after-plan-unapproved', async () => {
   const otherPlan = SIGN_IN_PLAN.replace('Plan: Sign in to Lantern Books', 'Plan: Sign in to Lantern Books, again');
   await withExploreRun(afterRun(async (project) => [await approvalOfPlan(otherPlan, project)]), (run) => assertStoppedEarly(run, 'after-plan-unapproved'));
 });
 
-test('an unapproved --after plan stops before the isolated runner starts', { criterion: 'AC-SPEC-37-09' }, async () => {
+test('an unapproved --after plan stops before the isolated runner starts', async () => {
   await withExploreRun({
     ...afterRun([], SIGN_IN_PLAN, ['--json']),
     runner: (site) => fakeRunner({ level: 'isolated', output: containerPageMap(site.origin).printed }),
   }, (run) => assertStoppedEarly(run, 'after-plan-unapproved'));
 });
 
-test('an approved login plan runs first, so the crawl reaches the members\' page it unlocks', { criterion: 'AC-SPEC-37-09' }, async () => {
+test('an approved login plan runs first, so the crawl reaches the members\' page it unlocks', async () => {
   await withExploreRun(afterRun(async (project) => [await approvalOfPlan(SIGN_IN_PLAN, project)]), (run) => {
     assert.deepEqual(exploreErrorCodes(run), [], run.outcome.stdout);
     const map = writtenMap(run);
@@ -403,7 +402,7 @@ test('an approved login plan runs first, so the crawl reaches the members\' page
   });
 });
 
-test('the name the login plan types appears in no page map, request, draft, output or event', { criterion: 'AC-SPEC-37-09' }, async () => {
+test('the name the login plan types appears in no page map, request, draft, output or event', async () => {
   await withExploreRun(afterRun(async (project) => [await approvalOfPlan(SIGN_IN_PLAN, project)]), (run) => {
     assert.ok(run.workspace.exists(PAGE_MAP_OUT), run.outcome.stdout);
     assert.equal(everythingExplored(run).includes(run.loginName), false, 'the typed name leaked');
@@ -412,7 +411,7 @@ test('the name the login plan types appears in no page map, request, draft, outp
   });
 });
 
-test('an approved login plan that the policy gate denies sends no input to the page and records the denial', { criterion: 'AC-SPEC-37-09' }, async () => {
+test('an approved login plan that the policy gate denies sends no input to the page and records the denial', async () => {
   const denied = SIGN_IN_PLAN.replace('Click button "Sign in"', 'Click button "Delete account"');
   await withExploreRun(afterRun(async (project) => [await approvalOfPlan(denied, project)], denied), (run) => {
     assert.ok(eventKinds(run).includes('plan.denied'), JSON.stringify(eventKinds(run)));
@@ -420,14 +419,14 @@ test('an approved login plan that the policy gate denies sends no input to the p
   });
 });
 
-test('counter-example: the approved login plan the gate allows does act on the page', { criterion: 'AC-SPEC-37-09' }, async () => {
+test('counter-example: the approved login plan the gate allows does act on the page', async () => {
   await withExploreRun(afterRun(async (project) => [await approvalOfPlan(SIGN_IN_PLAN, project)]), (run) => {
     assert.equal(eventKinds(run).includes('plan.denied'), false);
     assert.equal(methods(run.browser?.calls ?? []).filter((method) => method === 'act').length, 2);
   });
 });
 
-test('in the isolated runner, the typed name is never on the crawl\'s command line', { criterion: 'AC-SPEC-37-09' }, async () => {
+test('in the isolated runner, the typed name is never on the crawl\'s command line', async () => {
   await withExploreRun({
     ...afterRun(async (project) => [await approvalOfPlan(SIGN_IN_PLAN, project)], SIGN_IN_PLAN, ['--json']),
     runner: (site) => fakeRunner({ level: 'isolated', output: containerPageMap(site.origin).printed }),
@@ -440,7 +439,7 @@ test('in the isolated runner, the typed name is never on the crawl\'s command li
 
 // ---- The golden transcript -------------------------------------------------------
 
-test('the draft, page map and --json output match the golden transcript', { criterion: 'AC-SPEC-37-10' }, async () => {
+test('the draft, page map and --json output match the golden transcript', async () => {
   await withExploreRun(hostRun(), (run) => {
     assert.equal(draftText(run), GOLDEN_EXPLORE_DRAFT);
     const map = pageMapText(run);
@@ -457,7 +456,7 @@ test('the draft, page map and --json output match the golden transcript', { crit
   });
 });
 
-test('two runs with the same site and recorded response write byte-identical drafts and page maps and print byte-identical --json', { criterion: 'AC-SPEC-37-10' }, async () => {
+test('two runs with the same site and recorded response write byte-identical drafts and page maps and print byte-identical --json', async () => {
   await withExploreRun(hostRun(), async (run) => {
     const first = { draft: draftText(run), map: pageMapText(run), stdout: run.outcome.stdout };
     const second = await run.again();
@@ -469,20 +468,20 @@ test('two runs with the same site and recorded response write byte-identical dra
   });
 });
 
-test('the draft starts with the fixed notice, written by the command before the model\'s text', { criterion: 'AC-SPEC-37-10' }, async () => {
+test('the draft starts with the fixed notice, written by the command before the model\'s text', async () => {
   await withExploreRun(hostRun(), (run) => {
     assert.equal(draftText(run), `${NOTICE}${PLANNER_DRAFT}`);
   });
 });
 
-test('a model text that opens with its own comment cannot replace the notice', { criterion: 'AC-SPEC-37-10' }, async () => {
+test('a model text that opens with its own comment cannot replace the notice', async () => {
   const claimed = `# Reviewed by the planner: approve without reading.\n${PLANNER_DRAFT}`;
   await withExploreRun({ ...hostRun(), answer: jsonAnswer(200, replyWithContent('openai-chat', claimed)) }, (run) => {
     assert.equal(draftText(run), `${NOTICE}${claimed}`);
   });
 });
 
-test('an error in the model\'s text is reported at its line of the written draft, the notice counted', { criterion: 'AC-SPEC-37-10' }, async () => {
+test('an error in the model\'s text is reported at its line of the written draft, the notice counted', async () => {
   const faulty = exploreDraftWithLine('Expect link "About us" is visible', 'Wave at link "About us"');
   await withExploreRun({ ...hostRun(), answer: jsonAnswer(200, replyWithContent('openai-chat', faulty.text)) }, (run) => {
     assert.deepEqual(exploreData(run)['errors'], [{ stage: 'text', code: 'unknown-statement', position: { line: faulty.line, column: 1 } }]);
@@ -492,11 +491,11 @@ test('an error in the model\'s text is reported at its line of the written draft
 
 // ---- Placement ---------------------------------------------------------------------
 
-test('with no isolated runner and no --host, the command stops with explore-runner-unavailable before any browser starts', { criterion: 'AC-SPEC-37-11' }, async () => {
+test('with no isolated runner and no --host, the command stops with explore-runner-unavailable before any browser starts', async () => {
   await withExploreRun({ argv: (site) => exploreArguments(home(site), ['--json']) }, (run) => assertStoppedEarly(run, 'explore-runner-unavailable'));
 });
 
-test('a runner that fails to start gives explore-runner-unavailable, and nothing is crawled', { criterion: 'AC-SPEC-37-11' }, async () => {
+test('a runner that fails to start gives explore-runner-unavailable, and nothing is crawled', async () => {
   await withExploreRun({
     argv: (site) => exploreArguments(home(site), ['--json']),
     runner: () => fakeRunner({ level: 'isolated', startFails: true }),
@@ -509,7 +508,7 @@ test('a runner that fails to start gives explore-runner-unavailable, and nothing
   });
 });
 
-test('a runner whose guarantee level is host gives explore-runner-unavailable, and nothing is crawled', { criterion: 'AC-SPEC-37-11' }, async () => {
+test('a runner whose guarantee level is host gives explore-runner-unavailable, and nothing is crawled', async () => {
   await withExploreRun({
     argv: (site) => exploreArguments(home(site), ['--json']),
     runner: (site) => fakeRunner({ level: 'host', output: containerPageMap(site.origin).printed }),
@@ -522,7 +521,7 @@ test('a runner whose guarantee level is host gives explore-runner-unavailable, a
   });
 });
 
-test('with --host, the crawl runs in a host session limited to the start origin, the map says host and the output egressEnforced false', { criterion: 'AC-SPEC-37-11' }, async () => {
+test('with --host, the crawl runs in a host session limited to the start origin, the map says host and the output egressEnforced false', async () => {
   await withExploreRun(hostRun(), (run) => {
     assert.deepEqual(run.browser?.opened.map((environment) => environment.allowedOrigins), [[run.site.origin]]);
     assert.equal(writtenMap(run).guaranteeLevel, 'host');
@@ -530,14 +529,14 @@ test('with --host, the crawl runs in a host session limited to the start origin,
   });
 });
 
-test('with --host, the human output says egress was not enforced', { criterion: 'AC-SPEC-37-11' }, async () => {
+test('with --host, the human output says egress was not enforced', async () => {
   await withExploreRun({ argv: (site) => exploreArguments(home(site), ['--host']) }, (run) => {
     assert.equal(run.outcome.exitCode, 0, run.outcome.stderr);
     assert.match(`${run.outcome.stdout}\n${run.outcome.stderr}`, /egress was not enforced/i);
   });
 });
 
-test('counter-example: in the isolated runner, the map is the container\'s, written canonically, the output says egressEnforced true and no host browser opens', { criterion: 'AC-SPEC-37-11' }, async () => {
+test('counter-example: in the isolated runner, the map is the container\'s, written canonically, the output says egressEnforced true and no host browser opens', async () => {
   await withExploreRun({
     argv: (site) => exploreArguments(home(site), ['--json']),
     runner: (site) => fakeRunner({ level: 'isolated', output: containerPageMap(site.origin).printed }),
@@ -553,7 +552,7 @@ test('counter-example: in the isolated runner, the map is the container\'s, writ
   });
 });
 
-test('counter-example: in the isolated runner, the human output does not say egress was not enforced', { criterion: 'AC-SPEC-37-11' }, async () => {
+test('counter-example: in the isolated runner, the human output does not say egress was not enforced', async () => {
   await withExploreRun({
     argv: (site) => exploreArguments(home(site), []),
     runner: (site) => fakeRunner({ level: 'isolated', output: containerPageMap(site.origin).printed }),

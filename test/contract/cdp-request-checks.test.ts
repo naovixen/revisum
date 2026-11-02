@@ -12,7 +12,6 @@
 //     with request-not-seen.
 //   - Remember. arrayLength gives the decimal length of an array and fails with field-missing on
 //     anything else.
-// See docs/specs/SPEC-33-network-stubs-request-checks-and-storage.md.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import { sha256 } from '@revisum/engine';
@@ -39,7 +38,7 @@ const loadTwoBatches = () => click(role('button', 'Load two batches'));
 const openRequests = () => navigate('/requests.html');
 
 describe('counting the requests an observed request saw', () => {
-  test('equals 2 and atLeast 1 pass on a page that sent exactly two matching requests', { criterion: 'AC-SPEC-33-07' }, async () => {
+  test('equals 2 and atLeast 1 pass on a page that sent exactly two matching requests', async () => {
     const ran = await harness.runSteps(CDP_TARGET, [
       openRequests(),
       loadTwoBatches(),
@@ -53,7 +52,7 @@ describe('counting the requests an observed request saw', () => {
   });
 
   for (const count of [{ equals: 1 }, { atMost: 1 }, { equals: 3 }]) {
-    test(`${JSON.stringify(count)} fails on a page that sent exactly two matching requests`, { criterion: 'AC-SPEC-33-07' }, async () => {
+    test(`${JSON.stringify(count)} fails on a page that sent exactly two matching requests`, async () => {
       const ran = await harness.runSteps(CDP_TARGET, [
         openRequests(),
         loadTwoBatches(),
@@ -64,7 +63,7 @@ describe('counting the requests an observed request saw', () => {
     });
   }
 
-  test('after resetRequests, equals 0 passes and atLeast 1 counts only what comes next', { criterion: 'AC-SPEC-33-07' }, async () => {
+  test('after resetRequests, equals 0 passes and atLeast 1 counts only what comes next', async () => {
     const ran = await harness.runSteps(CDP_TARGET, [
       openRequests(),
       loadTwoBatches(),
@@ -77,7 +76,7 @@ describe('counting the requests an observed request saw', () => {
     assertPassed(ran);
   });
 
-  test('counter-example: without resetRequests, equals 0 fails after the two requests', { criterion: 'AC-SPEC-33-07' }, async () => {
+  test('counter-example: without resetRequests, equals 0 fails after the two requests', async () => {
     const ran = await harness.runSteps(CDP_TARGET, [
       openRequests(),
       loadTwoBatches(),
@@ -87,7 +86,7 @@ describe('counting the requests an observed request saw', () => {
     assertLastStepFailed(ran, 'assertion-failed');
   });
 
-  test('requests the page sent while it loaded count from the start of the plan', { criterion: 'AC-SPEC-33-07' }, async () => {
+  test('requests the page sent while it loaded count from the start of the plan', async () => {
     const ran = await harness.runSteps(CDP_TARGET, [
       openRequests(),
       expectRequests('scheduleLoads', { equals: 1 }, 'counts.loaded-with-page'),
@@ -98,7 +97,7 @@ describe('counting the requests an observed request saw', () => {
   // Straight after the click only the first request has been sent: the second follows 300 ms
   // later and is answered over 600 ms more. A count that did not wait for the quiet window would
   // see one request, so equals 2 would fail and atMost 1 would pass.
-  test('equals 2 straight after the click waits for the quiet window, sees both requests and passes', { criterion: 'AC-SPEC-33-07' }, async () => {
+  test('equals 2 straight after the click waits for the quiet window, sees both requests and passes', async () => {
     const ran = await harness.runSteps(CDP_TARGET, [
       openRequests(),
       loadTwoBatches(),
@@ -109,7 +108,7 @@ describe('counting the requests an observed request saw', () => {
     assert.ok(waited >= QUIET_MILLISECONDS, `the count waited ${waited} ms, at least the quiet window of ${QUIET_MILLISECONDS} ms`);
   });
 
-  test('atMost 1 straight after the click waits for the quiet window, sees both requests and fails', { criterion: 'AC-SPEC-33-07' }, async () => {
+  test('atMost 1 straight after the click waits for the quiet window, sees both requests and fails', async () => {
     const ran = await harness.runSteps(CDP_TARGET, [
       openRequests(),
       loadTwoBatches(),
@@ -123,7 +122,7 @@ const loadItems = () => click(role('button', 'Load items'));
 const itemsShown = () => textEquals(testId('first-item'), ITEM_NAMES[0], 'responses.items-shown');
 
 describe('checking the latest response', () => {
-  test('statusEquals, fieldEquals, fieldContains, fieldPresent and fieldAbsent pass on the latest exchange', { criterion: 'AC-SPEC-33-08' }, async () => {
+  test('statusEquals, fieldEquals, fieldContains, fieldPresent and fieldAbsent pass on the latest exchange', async () => {
     const ran = await harness.runSteps(CDP_TARGET, [
       openRequests(),
       loadItems(),
@@ -140,7 +139,7 @@ describe('checking the latest response', () => {
     assertPassed(ran);
   });
 
-  test('statusEquals passes on a 404 answer that the page received', { criterion: 'AC-SPEC-33-08' }, async () => {
+  test('statusEquals passes on a 404 answer that the page received', async () => {
     const ran = await harness.runSteps(CDP_TARGET, [
       openRequests(),
       click(role('button', 'Load missing items')),
@@ -201,7 +200,7 @@ describe('checking the latest response', () => {
   ];
 
   for (const failure of FAILURES) {
-    test(failure.name, { criterion: 'AC-SPEC-33-08' }, async () => {
+    test(failure.name, async () => {
       const ran = await harness.runSteps(CDP_TARGET, [openRequests(), ...failure.steps()]);
       assertLastStepFailed(ran, failure.code);
     });
@@ -209,7 +208,7 @@ describe('checking the latest response', () => {
 
   // Counter-example: the same field of a body under the cap is read, so the size failure above
   // comes from the cap, not from the field.
-  test('counter-example: the same field check on a body under the cap passes', { criterion: 'AC-SPEC-33-08' }, async () => {
+  test('counter-example: the same field check on a body under the cap passes', async () => {
     const ran = await harness.runSteps(CDP_TARGET, [
       openRequests(), loadItems(), itemsShown(),
       expectResponse('items', { kind: 'fieldPresent', field: 'firstName' }, 'responses.under-cap'),
@@ -224,7 +223,7 @@ const remembered = (ran: NetworkRun, index: number): JsonRecord | undefined => {
 };
 
 describe('remembering a response field', () => {
-  test('arrayLength remembers the decimal length of an array, which a later check uses', { criterion: 'AC-SPEC-33-09' }, async () => {
+  test('arrayLength remembers the decimal length of an array, which a later check uses', async () => {
     const ran = await harness.runSteps(CDP_TARGET, [
       openRequests(), loadItems(), itemsShown(),
       rememberResponse('itemCount', 'items', 'itemList', 'arrayLength'),
@@ -234,7 +233,7 @@ describe('remembering a response field', () => {
     assert.deepEqual(remembered(ran, 3), { valueName: 'itemCount', sha256: sha256(String(ITEM_NAMES.length)) }, 'the value is "12"');
   });
 
-  test('text remembers a field\'s text', { criterion: 'AC-SPEC-33-09' }, async () => {
+  test('text remembers a field\'s text', async () => {
     const ran = await harness.runSteps(CDP_TARGET, [
       openRequests(), loadItems(), itemsShown(),
       rememberResponse('firstItem', 'items', 'firstName', 'text'),
@@ -245,7 +244,7 @@ describe('remembering a response field', () => {
   });
 
   for (const field of ['firstName', 'total']) {
-    test(`arrayLength of a field that is not an array (${field}) fails with field-missing`, { criterion: 'AC-SPEC-33-09' }, async () => {
+    test(`arrayLength of a field that is not an array (${field}) fails with field-missing`, async () => {
       const ran = await harness.runSteps(CDP_TARGET, [
         openRequests(), loadItems(), itemsShown(),
         rememberResponse('notAList', 'items', field, 'arrayLength'),
@@ -255,7 +254,7 @@ describe('remembering a response field', () => {
     });
   }
 
-  test('a remember from a request the page never sent fails with request-not-seen', { criterion: 'AC-SPEC-33-09' }, async () => {
+  test('a remember from a request the page never sent fails with request-not-seen', async () => {
     const ran = await harness.runSteps(CDP_TARGET, [
       openRequests(), loadItems(), itemsShown(),
       rememberResponse('neverCount', 'neverSent', 'firstName', 'text'),

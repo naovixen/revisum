@@ -10,7 +10,6 @@
 //   - unpinnable inputs (AC-03): an adapter that cannot pin the clock, the time zone or randomness
 //     lists them in nonHermeticInputs, loses replay-identical to determinism-unpinned, and its runs
 //     are refused replay-not-claimed.
-// See docs/specs/SPEC-08-manifest-and-replay.md.
 import assert from 'node:assert/strict';
 import { after, test } from 'node:test';
 import { canonicalJson, replayManifest } from '@revisum/engine';
@@ -37,7 +36,7 @@ const assertNoDriverCall = (replay: Replay): void => {
 
 // ---- Verdicts ---------------------------------------------------------------------------------
 
-test('a replay of the same manifest on the same host is identical, with no differing input', { criterion: 'AC-SPEC-08-06' }, async () => {
+test('a replay of the same manifest on the same host is identical, with no differing input', async () => {
   const ran = await runScenario(CLOSED);
   const outcome = replayed((await replayRun(ran)).answer);
   assert.deepEqual(outcome, {
@@ -45,7 +44,7 @@ test('a replay of the same manifest on the same host is identical, with no diffe
   });
 });
 
-test('a replay on another host says the hashes differ and reports a per-environment baseline, not a pass', { criterion: 'AC-SPEC-08-06' }, async () => {
+test('a replay on another host says the hashes differ and reports a per-environment baseline, not a pass', async () => {
   const ran = await runScenario(CLOSED);
   const outcome = replayed((await replayRun(ran, { host: { platform: 'linux', arch: 'x64' } })).answer);
   assert.equal(outcome.identical, false);
@@ -54,7 +53,7 @@ test('a replay on another host says the hashes differ and reports a per-environm
   assert.equal(outcome.verdict, 'per-environment-baseline');
 });
 
-test('a replay on another host and browser build is still a per-environment baseline', { criterion: 'AC-SPEC-08-06' }, async () => {
+test('a replay on another host and browser build is still a per-environment baseline', async () => {
   const built: Scenario = { ...CLOSED, executable: 'browser build one', browserVersion: '156.0.1' };
   const ran = await runScenario(built);
   const elsewhere: Scenario = { ...built, executable: 'browser build two', browserVersion: '156.0.2', host: { platform: 'linux', arch: 'x64' } };
@@ -65,7 +64,7 @@ test('a replay on another host and browser build is still a per-environment base
   assert.equal(outcome.verdict, 'per-environment-baseline');
 });
 
-test('counter-example: a manifest from another engine version is a mismatch, not a per-environment baseline', { criterion: 'AC-SPEC-08-06' }, async () => {
+test('counter-example: a manifest from another engine version is a mismatch, not a per-environment baseline', async () => {
   const ran = await runScenario(CLOSED);
   const outcome = replayed((await replayRun(ran, { manifest: manifestJson(ran, (manifest) => { manifest['engineVersion'] = '0.0.9'; }) })).answer);
   assert.equal(outcome.identical, false);
@@ -73,7 +72,7 @@ test('counter-example: a manifest from another engine version is a mismatch, not
   assert.equal(outcome.verdict, 'mismatch');
 });
 
-test('a replay whose inputs all match but whose result hash differs from the recorded one is a mismatch', { criterion: 'AC-SPEC-08-06' }, async () => {
+test('a replay whose inputs all match but whose result hash differs from the recorded one is a mismatch', async () => {
   const ran = await runScenario(CLOSED);
   const recordedResultHash = ran.result.resultHash.replace(/^./, (first) => (first === '0' ? '1' : '0'));
   const outcome = replayed((await replayRun(ran, { recordedResultHash })).answer);
@@ -82,7 +81,7 @@ test('a replay whose inputs all match but whose result hash differs from the rec
   assert.equal(outcome.verdict, 'mismatch');
 });
 
-test('identical is true exactly when the replay\'s result hash equals the recorded one', { criterion: 'AC-SPEC-08-06' }, async () => {
+test('identical is true exactly when the replay\'s result hash equals the recorded one', async () => {
   const ran = await runScenario(CLOSED);
   const replays = [
     await replayRun(ran),
@@ -99,14 +98,14 @@ test('identical is true exactly when the replay\'s result hash equals the record
 
 // ---- Inputs a replay checks first ---------------------------------------------------------------
 
-test('a replay whose manifest names a fixture that is missing ends replay-mismatch naming it, before any driver call', { criterion: 'AC-SPEC-08-07' }, async () => {
+test('a replay whose manifest names a fixture that is missing ends replay-mismatch naming it, before any driver call', async () => {
   const ran = await runScenario(CLOSED);
   const replay = await replayRun(ran, { readFixture: (path) => (path === '/app.js' ? null : new TextEncoder().encode(CLOSED.fixtures.find((file) => file.path === path)?.text ?? '')) });
   assert.deepEqual(refused(replay.answer), { code: 'replay-mismatch', fixture: '/app.js' });
   assertNoDriverCall(replay);
 });
 
-test('a replay whose fixture differs by one byte ends replay-mismatch naming it, before any driver call', { criterion: 'AC-SPEC-08-07' }, async () => {
+test('a replay whose fixture differs by one byte ends replay-mismatch naming it, before any driver call', async () => {
   const ran = await runScenario(CLOSED);
   const replay = await replayRun(ran, {
     readFixture: (path) => {
@@ -118,20 +117,20 @@ test('a replay whose fixture differs by one byte ends replay-mismatch naming it,
   assertNoDriverCall(replay);
 });
 
-test('counter-example: the same fixtures, read back unchanged, replay identically', { criterion: 'AC-SPEC-08-07' }, async () => {
+test('counter-example: the same fixtures, read back unchanged, replay identically', async () => {
   const ran = await runScenario(CLOSED);
   const replay = await replayRun(ran, { readFixture: (path) => new TextEncoder().encode(CLOSED.fixtures.find((file) => file.path === path)?.text ?? '') });
   assert.equal(replayed(replay.answer).identical, true);
 });
 
-test('a replay given another plan than the manifest\'s ends replay-mismatch, before any driver call', { criterion: 'AC-SPEC-08-07' }, async () => {
+test('a replay given another plan than the manifest\'s ends replay-mismatch, before any driver call', async () => {
   const ran = await runScenario(CLOSED);
   const replay = await replayRun(ran, { scenario: { ...CLOSED, plan: planOf([navigate('/orders/archive')]) } });
   assert.equal(refused(replay.answer).code, 'replay-mismatch');
   assertNoDriverCall(replay);
 });
 
-test('a replay whose manifest names another target ends replay-mismatch, before any driver call', { criterion: 'AC-SPEC-08-07' }, async () => {
+test('a replay whose manifest names another target ends replay-mismatch, before any driver call', async () => {
   const ran = await runScenario(CLOSED);
   const manifest = manifestJson(ran, (copy) => { copy['target'] = { ...Object(copy['target']), id: 'playwright-firefox' }; });
   const replay = await replayRun(ran, { manifest });
@@ -141,7 +140,7 @@ test('a replay whose manifest names another target ends replay-mismatch, before 
 
 // ---- Manifests from other versions ------------------------------------------------------------
 
-test('decodeManifest reads back a run\'s manifest from its JSON unchanged', { criterion: 'AC-SPEC-08-08' }, async () => {
+test('decodeManifest reads back a run\'s manifest from its JSON unchanged', async () => {
   const ran = await runScenario(CLOSED);
   const decoded = await decodeManifest(manifestJson(ran));
   assert.ok(decoded.ok, JSON.stringify(decoded));
@@ -155,7 +154,7 @@ const REFUSED_SCHEMAS = [
 ] as const;
 
 for (const refusedSchema of REFUSED_SCHEMAS) {
-  test(`a manifest whose schema is ${refusedSchema.name} is refused version-unsupported`, { criterion: 'AC-SPEC-08-08' }, async () => {
+  test(`a manifest whose schema is ${refusedSchema.name} is refused version-unsupported`, async () => {
     const ran = await runScenario(CLOSED);
     const manifest = manifestJson(ran, (copy) => { copy['schema'] = refusedSchema.schema; });
     const decoded = await decodeManifest(manifest);
@@ -166,7 +165,7 @@ for (const refusedSchema of REFUSED_SCHEMAS) {
   });
 }
 
-test('a manifest with a key this version does not know is refused version-unsupported', { criterion: 'AC-SPEC-08-08' }, async () => {
+test('a manifest with a key this version does not know is refused version-unsupported', async () => {
   const ran = await runScenario(CLOSED);
   const manifest = manifestJson(ran, (copy) => { copy['deviceMemory'] = 8; });
   const decoded = await decodeManifest(manifest);
@@ -176,7 +175,7 @@ test('a manifest with a key this version does not know is refused version-unsupp
   assertNoDriverCall(replay);
 });
 
-test('a manifest with a known field of the wrong shape ends replay-mismatch at that field\'s JSON path', { criterion: 'AC-SPEC-08-08' }, async () => {
+test('a manifest with a known field of the wrong shape ends replay-mismatch at that field\'s JSON path', async () => {
   const ran = await runScenario(CLOSED);
   const manifest = manifestJson(ran, (copy) => { copy['seeds'] = { random: 'seven' }; });
   const decoded = await decodeManifest(manifest);
@@ -186,7 +185,7 @@ test('a manifest with a known field of the wrong shape ends replay-mismatch at t
   assertNoDriverCall(replay);
 });
 
-test('something that is not a manifest at all is refused before any driver call', { criterion: 'AC-SPEC-08-08' }, async () => {
+test('something that is not a manifest at all is refused before any driver call', async () => {
   const ran = await runScenario(CLOSED);
   for (const manifest of [null, 'revisum.run-manifest/v1', [], {}]) {
     const replay = await replayRun(ran, { manifest });
@@ -198,7 +197,7 @@ test('something that is not a manifest at all is refused before any driver call'
 // ---- Inputs an adapter cannot pin ---------------------------------------------------------------
 
 for (const input of ['clock', 'time-zone', 'randomness']) {
-  test(`an adapter that cannot pin ${input} puts it in nonHermeticInputs, and the run is not replay-claimed`, { criterion: 'AC-SPEC-08-03' }, async () => {
+  test(`an adapter that cannot pin ${input} puts it in nonHermeticInputs, and the run is not replay-claimed`, async () => {
     const ran = await runScenario({ ...CLOSED, cannotPin: [input] });
     assert.ok(ran.manifest.nonHermeticInputs.includes(input), JSON.stringify(ran.manifest.nonHermeticInputs));
     const lost = ran.result.guarantees.lost.map((loss) => `${loss.guarantee} ${String(loss.because)}`);
@@ -211,7 +210,7 @@ for (const input of ['clock', 'time-zone', 'randomness']) {
   });
 }
 
-test('counter-example: an adapter that pins the clock, time zone and randomness keeps its runs replay-claimed', { criterion: 'AC-SPEC-08-03' }, async () => {
+test('counter-example: an adapter that pins the clock, time zone and randomness keeps its runs replay-claimed', async () => {
   const ran = await runScenario(CLOSED);
   assert.deepEqual(ran.manifest.nonHermeticInputs, []);
   assert.equal(ran.result.guarantees.lost.some((loss) => String(loss.because) === 'determinism-unpinned'), false);

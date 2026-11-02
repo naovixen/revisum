@@ -5,7 +5,6 @@
 // is about route code, not about every command-line module.
 //
 // Assumed here: the draft command lives in packages/cli/src/draft-command.ts.
-// See docs/specs/SPEC-28-plan-authoring.md.
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
@@ -30,13 +29,13 @@ function assertLintFailsNamingTheModule(lines: readonly string[]): void {
   assert.ok(outcome.failureOutput.includes(DRAFT_COMMAND_FILE), `the lint failed, but did not name ${DRAFT_COMMAND_FILE}:\n${outcome.failureOutput}`);
 }
 
-test('control: the draft command module exists and the unchanged copy passes every lint command', { criterion: 'AC-SPEC-28-04', timeout: TIMEOUT }, () => {
+test('control: the draft command module exists and the unchanged copy passes every lint command', { timeout: TIMEOUT }, () => {
   assert.ok(existsSync(join(scratch.root, DRAFT_COMMAND_MODULE)), `${DRAFT_COMMAND_MODULE} does not exist`);
   const outcome = scratch.lint();
   assert.equal(outcome.passed, true, outcome.failureOutput);
 });
 
-test('the lint fails when the draft command module imports the engine\'s run function', { criterion: 'AC-SPEC-28-04', timeout: TIMEOUT }, () => {
+test('the lint fails when the draft command module imports the engine\'s run function', { timeout: TIMEOUT }, () => {
   assertLintFailsNamingTheModule([
     "import { run } from '@revisum/engine';",
     '// Runs the draft straight away, skipping approval.',
@@ -44,14 +43,14 @@ test('the lint fails when the draft command module imports the engine\'s run fun
   ]);
 });
 
-test('the lint fails when the draft command module imports run under another name', { criterion: 'AC-SPEC-28-04', timeout: TIMEOUT }, () => {
+test('the lint fails when the draft command module imports run under another name', { timeout: TIMEOUT }, () => {
   assertLintFailsNamingTheModule([
     "import { run as startRun } from '@revisum/engine';",
     'export const startDraftRun = startRun;',
   ]);
 });
 
-test('the lint fails when the draft command module makes a Plan by a cast', { criterion: 'AC-SPEC-28-04', timeout: TIMEOUT }, () => {
+test('the lint fails when the draft command module makes a Plan by a cast', { timeout: TIMEOUT }, () => {
   assertLintFailsNamingTheModule([
     "import type { Plan } from '@revisum/contracts';",
     '// Treats the planner\'s reply as a plan, skipping the parser.',
@@ -59,7 +58,7 @@ test('the lint fails when the draft command module makes a Plan by a cast', { cr
   ]);
 });
 
-test('counter-example: a command-line module that is not route code may import run', { criterion: 'AC-SPEC-28-04', timeout: TIMEOUT }, () => {
+test('counter-example: a command-line module that is not route code may import run', { timeout: TIMEOUT }, () => {
   const outcome = scratch.lintWith('packages/cli/src/planted-run-wiring.ts', [
     "import { run } from '@revisum/engine';",
     '// The run command wires the engine\'s run function to the drivers.',

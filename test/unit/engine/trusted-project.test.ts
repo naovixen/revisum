@@ -4,7 +4,6 @@
 // version, raised as a changed-with-code review item naming the file, and recorded as a
 // trusted.changed-with-code event. So an agent cannot widen its own origins, approvers or code
 // owners.
-// See docs/specs/SPEC-02-project-trust-and-approval.md.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { canonicalJson } from '@revisum/engine';
@@ -32,7 +31,7 @@ const editsProjectWithCode = (fixture: FixtureRepository): void => {
 
 // ---- project.json from another branch -----------------------------------------------------------
 
-test('a project.json that exists only off the protected branch is refused as untrusted-source', { criterion: 'AC-SPEC-02-01' }, async () => {
+test('a project.json that exists only off the protected branch is refused as untrusted-source', async () => {
   await withRepository('solo', async (repository) => {
     const loaded = await loadForChange(repository.versionControl(), [PROJECT_PATH], memoryEventSink());
     assert.deepEqual(loaded, { ok: false, error: { code: 'untrusted-source', path: PROJECT_PATH } });
@@ -43,7 +42,7 @@ test('a project.json that exists only off the protected branch is refused as unt
   });
 });
 
-test('the same project.json on the protected branch is trusted, with protected-branch provenance', { criterion: 'AC-SPEC-02-01' }, async () => {
+test('the same project.json on the protected branch is trusted, with protected-branch provenance', async () => {
   // The counter-example: only where the file comes from differs from the refused case above.
   await withRepository('solo', async (repository) => {
     const loaded = await loadForChange(repository.versionControl(), [], memoryEventSink());
@@ -55,7 +54,7 @@ test('the same project.json on the protected branch is trusted, with protected-b
 
 // ---- A trusted file edited together with application code ---------------------------------------
 
-test('when the change edits project.json with application code, core uses the protected-branch version', { criterion: 'AC-SPEC-02-02' }, async () => {
+test('when the change edits project.json with application code, core uses the protected-branch version', async () => {
   await withRepository('solo', async (repository) => {
     const loaded = await loadForChange(repository.versionControl(), [PROJECT_PATH, APPLICATION_CODE], memoryEventSink());
     assert.equal(loaded.ok, true, JSON.stringify(loaded));
@@ -66,7 +65,7 @@ test('when the change edits project.json with application code, core uses the pr
   }, editsProjectWithCode);
 });
 
-test('a trusted file edited with application code raises one changed-with-code review item naming it', { criterion: 'AC-SPEC-02-02' }, async () => {
+test('a trusted file edited with application code raises one changed-with-code review item naming it', async () => {
   await withRepository('solo', async (repository) => {
     const loaded = await loadForChange(repository.versionControl(), [PROJECT_PATH, APPLICATION_CODE], memoryEventSink());
     assert.equal(loaded.ok, true, JSON.stringify(loaded));
@@ -75,7 +74,7 @@ test('a trusted file edited with application code raises one changed-with-code r
   }, editsProjectWithCode);
 });
 
-test('each trusted file the change edits gets its own review item and trusted.changed-with-code event', { criterion: 'AC-SPEC-02-02' }, async () => {
+test('each trusted file the change edits gets its own review item and trusted.changed-with-code event', async () => {
   await withRepository('solo', async (repository) => {
     const events = memoryEventSink();
     const loaded = await loadForChange(repository.versionControl(), [PROJECT_PATH, APPLICATION_CODE, PLAN_PATH], events);
@@ -88,7 +87,7 @@ test('each trusted file the change edits gets its own review item and trusted.ch
   }, editsProjectWithCode);
 });
 
-test('a change that edits only application code raises no review item and appends no event', { criterion: 'AC-SPEC-02-02' }, async () => {
+test('a change that edits only application code raises no review item and appends no event', async () => {
   // The counter-example: the item and event come from the trusted file, not from any edit.
   await withRepository('solo', async (repository) => {
     const events = memoryEventSink();
@@ -100,7 +99,7 @@ test('a change that edits only application code raises no review item and append
   });
 });
 
-test('the trusted project is the same whether or not the change edits project.json', { criterion: 'AC-SPEC-02-02' }, async () => {
+test('the trusted project is the same whether or not the change edits project.json', async () => {
   // Metamorphic: adding the change's edit must not change what core trusts.
   await withRepository('solo', async (repository) => {
     const untouched = await loadForChange(repository.versionControl(), [], memoryEventSink());
@@ -111,7 +110,7 @@ test('the trusted project is the same whether or not the change edits project.js
   }, editsProjectWithCode);
 });
 
-test('the same edit, once it is on the protected branch, is trusted', { criterion: 'AC-SPEC-02-02' }, async () => {
+test('the same edit, once it is on the protected branch, is trusted', async () => {
   // The counter-example that shows the tests above can fail: the protected version is what counts.
   await withRepository('solo', async (repository) => {
     const trusted = await repository.trustedProject();
@@ -121,7 +120,7 @@ test('the same edit, once it is on the protected branch, is trusted', { criterio
 
 // ---- approvers.json and the code-owners file are read from the protected branch -----------------
 
-test('a code-owners file edited in the change does not make its new owner able to approve', { criterion: 'AC-SPEC-02-12' }, async () => {
+test('a code-owners file edited in the change does not make its new owner able to approve', async () => {
   await withRepository('team', async (repository) => {
     const verified = await repository.verify(repository.subject('plan'), repository.codeOwnerProof('review-linus'));
     assertRefused(repository, verified, 'not-code-owner');
@@ -132,7 +131,7 @@ test('a code-owners file edited in the change does not make its new owner able t
   });
 });
 
-test('the same code-owners line on the protected branch does let that owner approve', { criterion: 'AC-SPEC-02-12' }, async () => {
+test('the same code-owners line on the protected branch does let that owner approve', async () => {
   // The counter-example: the edit itself is valid, so the refusal above comes from where it was read.
   await withRepository('team', async (repository) => {
     const verified = await repository.verify(repository.subject('plan'), repository.codeOwnerProof('review-linus'));
@@ -142,7 +141,7 @@ test('the same code-owners line on the protected branch does let that owner appr
   });
 });
 
-test('an approvers.json edited in the change does not make its new maintainer able to approve', { criterion: 'AC-SPEC-02-12' }, async () => {
+test('an approvers.json edited in the change does not make its new maintainer able to approve', async () => {
   await withRepository('solo', async (repository) => {
     const proof = repository.lockdownProof({ commit: 'commit-agent-merge', mergedBy: 'agent-account' });
     assertRefused(repository, await repository.verify(repository.subject('plan'), proof), 'not-maintainer');
@@ -155,7 +154,7 @@ test('an approvers.json edited in the change does not make its new maintainer ab
   });
 });
 
-test('the same maintainer, once named in approvers.json on the protected branch, can approve', { criterion: 'AC-SPEC-02-12' }, async () => {
+test('the same maintainer, once named in approvers.json on the protected branch, can approve', async () => {
   await withRepository('solo', async (repository) => {
     const proof = repository.lockdownProof({ commit: 'commit-agent-merge', mergedBy: 'agent-account' });
     const verified = await repository.verify(repository.subject('plan'), proof);
@@ -167,7 +166,7 @@ test('the same maintainer, once named in approvers.json on the protected branch,
   });
 });
 
-test('the verifier reads the code-owners file from the protected branch through the port', { criterion: 'AC-SPEC-02-12' }, async () => {
+test('the verifier reads the code-owners file from the protected branch through the port', async () => {
   await withRepository('team', async (repository) => {
     await repository.verify(repository.subject('plan'), repository.codeOwnerProof('review-grace'));
     const reads = repository.calls.filter((call) => call.startsWith('protectedFile '));

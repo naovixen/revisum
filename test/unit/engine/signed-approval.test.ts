@@ -2,7 +2,6 @@
 // signingKeys in protected-branch approvers.json. Core rejects a key it does not know and a
 // signature made without the user-presence flag. Checking a valid signature waits for customer
 // demand, so until then no signature verifies at all.
-// See docs/specs/SPEC-02-project-trust-and-approval.md.
 import assert from 'node:assert/strict';
 import { generateKeyPairSync, sign } from 'node:crypto';
 import { test } from 'node:test';
@@ -22,21 +21,21 @@ const signatureProof = (subjectHash: string, keyId: string, userPresent: boolean
   kind: 'signature', keyId, signature: sign(null, Buffer.from(subjectHash, 'utf8'), privateKey).toString('base64'), flags: { userPresent },
 });
 
-test('a signature with a key that protected-branch approvers.json does not register returns unknown-key', { criterion: 'AC-SPEC-02-10' }, async () => {
+test('a signature with a key that protected-branch approvers.json does not register returns unknown-key', async () => {
   await withRepository('solo', async (repository) => {
     const subject = repository.subject('plan');
     assertRefused(repository, await repository.verify(subject, signatureProof(subject.hash, 'key-the-agent-made', true)), 'unknown-key');
   }, withRegisteredKey);
 });
 
-test('a signature from a registered key without the user-presence flag returns no-user-presence', { criterion: 'AC-SPEC-02-10' }, async () => {
+test('a signature from a registered key without the user-presence flag returns no-user-presence', async () => {
   await withRepository('solo', async (repository) => {
     const subject = repository.subject('plan');
     assertRefused(repository, await repository.verify(subject, signatureProof(subject.hash, REGISTERED_KEY_ID, false)), 'no-user-presence');
   }, withRegisteredKey);
 });
 
-test('while the signed route is unbuilt, no signature verifies, not even a valid one from a registered, user-present key', { criterion: 'AC-SPEC-02-10' }, async () => {
+test('while the signed route is unbuilt, no signature verifies, not even a valid one from a registered, user-present key', async () => {
   await withRepository('solo', async (repository) => {
     const subject = repository.subject('plan');
     const verified = await repository.verify(subject, signatureProof(subject.hash, REGISTERED_KEY_ID, true));

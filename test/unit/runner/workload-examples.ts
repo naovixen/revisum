@@ -1,7 +1,7 @@
 // Shared examples for the workload runner's tests: the team's image, a workload request, and the
 // runner built on a container engine.
 //
-// The workload runner (SPEC-35, extending SPEC-07) starts a team's own image, pinned by digest,
+// The workload runner starts a team's own image, pinned by digest,
 // behind the same egress proxy and hardening as the isolated runner. The spec names
 // WorkloadRunner, WorkloadRequest and WorkloadOutcome. The shapes it leaves open are settled
 // here only, so changing one changes one place:
@@ -11,7 +11,6 @@
 //   - run() fails with the bare WorkloadErrorCode, as the spec's Result type gives it; errorCode()
 //     below also reads a { code } error, so either form passes;
 //   - WorkloadOutcome's stdout and stderr are each { bytes, truncated }.
-// See docs/specs/SPEC-35-evidence-mode.md.
 import { Buffer } from 'node:buffer';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';

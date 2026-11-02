@@ -11,7 +11,6 @@
 //     counter-example grants a Playwright browser clipboard access, and the same button then reads.
 // The browsers are headless and the clipboard is the browser's own; the person's clipboard is
 // still saved and put back around this file, in case a copy reaches it.
-// See docs/specs/SPEC-34-clock-advance-and-clipboard.md.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import { chromium } from 'playwright-core';
@@ -71,12 +70,12 @@ const FAILING_ONE_LINE: readonly Check[] = [
 for (const targetId of CDP_TARGETS) {
   describe(`one copied line on ${targetId}`, () => {
     for (const { name, step } of PASSING_ONE_LINE) {
-      test(`after a copy, ${name} passes`, { criterion: 'AC-SPEC-34-13', ...copying }, async () => {
+      test(`after a copy, ${name} passes`, { ...copying }, async () => {
         assertPassed(await harness.runSteps(targetId, [openClipboardPage, copyInviteCode, step]));
       });
     }
     for (const { name, step } of FAILING_ONE_LINE) {
-      test(`after a copy, ${name} fails and reports only that the text differs`, { criterion: 'AC-SPEC-34-13', ...copying }, async () => {
+      test(`after a copy, ${name} fails and reports only that the text differs`, { ...copying }, async () => {
         const failed = await lastStepFails([openClipboardPage, copyInviteCode, step], 'assertion-failed', targetId);
         assert.equal(failed?.observed ?? 'differs', 'differs', JSON.stringify(failed));
       });
@@ -92,7 +91,7 @@ describe('before any copy', () => {
     { name: 'multi-line textEquals', step: expectClipboard('textEquals', { lines: [...ADDRESS_LINES] }, 'clipboard.lines-before-copy') },
   ];
   for (const { name, step } of CHECKS) {
-    test(`${name} fails on the empty clipboard and reports only that it is empty`, { criterion: 'AC-SPEC-34-13', ...copying }, async () => {
+    test(`${name} fails on the empty clipboard and reports only that it is empty`, { ...copying }, async () => {
       const failed = await lastStepFails([openClipboardPage, step], 'assertion-failed');
       assert.equal(failed?.observed ?? 'empty', 'empty', JSON.stringify(failed));
     });
@@ -100,11 +99,11 @@ describe('before any copy', () => {
 });
 
 describe('multi-line text with CRLF line endings', () => {
-  test('textEquals with the three lines passes: the clipboard is compared with the lines joined by "\\n"', { criterion: 'AC-SPEC-34-13', ...copying }, async () => {
+  test('textEquals with the three lines passes: the clipboard is compared with the lines joined by "\\n"', { ...copying }, async () => {
     assertPassed(await harness.runSteps(CDP_TARGET, [openClipboardPage, copyAddress, expectClipboard('textEquals', { lines: [...ADDRESS_LINES] }, 'clipboard.lines-equal')]));
   });
 
-  test('textContains one of the lines passes', { criterion: 'AC-SPEC-34-13', ...copying }, async () => {
+  test('textContains one of the lines passes', { ...copying }, async () => {
     assertPassed(await harness.runSteps(CDP_TARGET, [openClipboardPage, copyAddress, expectClipboard('textContains', '12 St James Square', 'clipboard.line-contained')]));
   });
 
@@ -114,20 +113,20 @@ describe('multi-line text with CRLF line endings', () => {
     { name: 'an extra line', lines: [...ADDRESS_LINES, 'United Kingdom'] },
   ];
   for (const { name, lines } of WRONG_LINES) {
-    test(`counter-example: textEquals with ${name} fails`, { criterion: 'AC-SPEC-34-13', ...copying }, async () => {
+    test(`counter-example: textEquals with ${name} fails`, { ...copying }, async () => {
       await lastStepFails([openClipboardPage, copyAddress, expectClipboard('textEquals', { lines }, 'clipboard.lines-differ')], 'assertion-failed');
     });
   }
 });
 
 describe('a copy that lands about 300 ms after its click', () => {
-  test('textEquals waits for the late copy and passes', { criterion: 'AC-SPEC-34-13', ...copying }, async () => {
+  test('textEquals waits for the late copy and passes', { ...copying }, async () => {
     const ran = await harness.runSteps(CDP_TARGET, [openClipboardPage, copyLateCode, expectClipboard('textEquals', LATE_CODE, 'clipboard.late-copy')]);
     assertPassed(ran);
     assert.ok(stepMilliseconds(ran.result, 2) >= 200, `the check waited for the copy: ${stepMilliseconds(ran.result, 2)} ms`);
   });
 
-  test('counter-example: a check for text the late copy never holds still fails after waiting', { criterion: 'AC-SPEC-34-13', ...copying }, async () => {
+  test('counter-example: a check for text the late copy never holds still fails after waiting', { ...copying }, async () => {
     await lastStepFails([openClipboardPage, copyLateCode, expectClipboard('textEquals', 'Late code: QZ-0000', 'clipboard.late-copy-other')], 'assertion-failed');
   });
 });
@@ -140,7 +139,7 @@ const INVITE_VALUES: JsonRecord = {
 };
 
 describe('a copied invite link and run values', () => {
-  test('a link built from a uniqueEmail value contains that value', { criterion: 'AC-SPEC-34-14', ...copying }, async () => {
+  test('a link built from a uniqueEmail value contains that value', { ...copying }, async () => {
     const ran = await harness.runSteps(CDP_TARGET, [
       openClipboardPage,
       fill(label('Email address'), reference('invitee')),
@@ -151,7 +150,7 @@ describe('a copied invite link and run values', () => {
     assertPassed(ran);
   });
 
-  test('counter-example: the link does not contain another uniqueEmail value', { criterion: 'AC-SPEC-34-14', ...copying }, async () => {
+  test('counter-example: the link does not contain another uniqueEmail value', { ...copying }, async () => {
     const ran = await harness.runSteps(CDP_TARGET, [
       openClipboardPage,
       fill(label('Email address'), reference('invitee')),
@@ -161,7 +160,7 @@ describe('a copied invite link and run values', () => {
     assert.deepEqual(outcomes(ran.result).at(-1), [3, 'failed', 'assertion-failed'], JSON.stringify(ran.result.steps));
   });
 
-  test('a remembered link typed into a field is the copied link', { criterion: 'AC-SPEC-34-14', ...copying }, async () => {
+  test('a remembered link typed into a field is the copied link', { ...copying }, async () => {
     const link = harness.url('/join?email=ada@example.test');
     const ran = await harness.runSteps(CDP_TARGET, [
       openClipboardPage,
@@ -183,7 +182,7 @@ describe('a copied invite link and run values', () => {
     { name: 'text longer than the clipboard limit', copy: [copyLongText, textEquals(testId('copy-state'), 'Copied 25000 characters', 'remember.long-copied')], code: 'value-too-long' },
   ];
   for (const { name, copy, code } of FAILING_REMEMBERS) {
-    test(`a clipboard remember of ${name} fails with ${code}, and the fill that uses it is skipped`, { criterion: 'AC-SPEC-34-14', ...copying }, async () => {
+    test(`a clipboard remember of ${name} fails with ${code}, and the fill that uses it is skipped`, { ...copying }, async () => {
       const ran = await harness.runSteps(CDP_TARGET, [
         openClipboardPage, ...copy, rememberClipboard('copiedText'), fill(label('Pasted link'), reference('copiedText')),
         valueEquals(label('Pasted link'), reference('copiedText'), 'remember.typed'),
@@ -196,7 +195,7 @@ describe('a copied invite link and run values', () => {
     });
   }
 
-  test('counter-example: a clipboard remember of one copied line passes', { criterion: 'AC-SPEC-34-14', ...copying }, async () => {
+  test('counter-example: a clipboard remember of one copied line passes', { ...copying }, async () => {
     assertPassed(await harness.runSteps(CDP_TARGET, [
       openClipboardPage, copyInviteCode, expectClipboard('textEquals', INVITE_CODE, 'remember.code-copied'), rememberClipboard('inviteCode'),
       fill(label('Pasted link'), reference('inviteCode')), valueEquals(label('Pasted link'), INVITE_CODE, 'remember.code-typed'),
@@ -208,7 +207,7 @@ describe('a copied invite link and run values', () => {
 
 describe('the page reading the clipboard itself', () => {
   for (const targetId of CDP_TARGETS) {
-    test(`on ${targetId}, the page's reads before and after an expectClipboard step are both refused`, { criterion: 'AC-SPEC-34-17', ...copying }, async () => {
+    test(`on ${targetId}, the page's reads before and after an expectClipboard step are both refused`, { ...copying }, async () => {
       const ran = await harness.runSteps(targetId, [
         openClipboardPage,
         copyInviteCode,
@@ -226,7 +225,7 @@ describe('the page reading the clipboard itself', () => {
   // The same page and button in a browser that grants the page clipboard access: the read is no
   // longer refused, so "Refused" above comes from the run's browser, not from the page. The page
   // reads without writing, and shows only a length, so nothing of the host's clipboard is kept.
-  test('counter-example: with clipboard access granted, the same button reads the clipboard', { criterion: 'AC-SPEC-34-17', ...copying }, async () => {
+  test('counter-example: with clipboard access granted, the same button reads the clipboard', { ...copying }, async () => {
     const browser = await chromium.launch({ headless: true });
     try {
       const context = await browser.newContext();

@@ -5,7 +5,6 @@
 // nothing of the step reaching the page. A driver that declares only some of the features is
 // refused only the steps of the ones it lacks, so the run decides by feature, not by driver.
 // Each refusal is paired with the same plan without the feature, which the fallback does run.
-// See docs/specs/SPEC-33-network-stubs-request-checks-and-storage.md.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import type { BrowserDriver } from '@revisum/engine';
@@ -59,7 +58,7 @@ const cdpWithout = (feature: NetworkFeature): ReadonlyMap<string, BrowserDriver>
   return new Map([...harness.drivers, ['cdp', lacking]]);
 };
 
-test('the own CDP driver declares networkStubs, requestChecks and storage; the Playwright fallback declares none of them', { criterion: 'AC-SPEC-33-15' }, () => {
+test('the own CDP driver declares networkStubs, requestChecks and storage; the Playwright fallback declares none of them', () => {
   const cdp = listedFeatures(harness.drivers.get('cdp'));
   const playwright = listedFeatures(harness.drivers.get('playwright'));
   for (const feature of NETWORK_FEATURES) {
@@ -70,7 +69,7 @@ test('the own CDP driver declares networkStubs, requestChecks and storage; the P
 
 describe(`the Playwright fallback: ${PLAYWRIGHT_TARGET}`, () => {
   for (const { name, step } of FEATURE_STEPS) {
-    test(`a run with ${name} fails that step with unsupported-step, sends nothing and skips the rest`, { criterion: 'AC-SPEC-33-15' }, async () => {
+    test(`a run with ${name} fails that step with unsupported-step, sends nothing and skips the rest`, async () => {
       const ran = await harness.runSteps(PLAYWRIGHT_TARGET, stepsWith(step), { read: ['input-events', 'continue-state'] });
       assert.equal(ran.result.state, 'Failed');
       assert.deepEqual(outcomes(ran.result), [
@@ -82,7 +81,7 @@ describe(`the Playwright fallback: ${PLAYWRIGHT_TARGET}`, () => {
   }
 
   // The run never goes on without the stub: the request the stub would have answered is never sent.
-  test('a refused stub start ends the run before the request it would have answered is sent', { criterion: 'AC-SPEC-33-15' }, async () => {
+  test('a refused stub start ends the run before the request it would have answered is sent', async () => {
     const ran = await harness.runSteps(PLAYWRIGHT_TARGET, [
       navigate('/requests.html'), startStub('answerSequence'), click(role('button', 'Ask for the next answer')),
       textEquals(testId('answers'), '1', 'support.stubbed-answer'),
@@ -91,7 +90,7 @@ describe(`the Playwright fallback: ${PLAYWRIGHT_TARGET}`, () => {
     assert.equal(timesRequested(ran.requestedPaths, '/api/sequence'), 0, 'the skipped click sent nothing');
   });
 
-  test('counter-example: the same run without any of those steps passes and sends its input', { criterion: 'AC-SPEC-33-15' }, async () => {
+  test('counter-example: the same run without any of those steps passes and sends its input', async () => {
     const ran = await harness.runSteps(PLAYWRIGHT_TARGET, [
       navigate('/requests.html'), textEquals(testId('schedule-state'), 'Schedule loaded', 'support.schedule-loaded'),
       click(role('button', 'Continue')), continued(),
@@ -102,14 +101,14 @@ describe(`the Playwright fallback: ${PLAYWRIGHT_TARGET}`, () => {
 
 describe(`the own CDP driver: ${CDP_TARGET}`, () => {
   for (const { name, step } of FEATURE_STEPS) {
-    test(`a run with ${name} performs it and passes`, { criterion: 'AC-SPEC-33-15' }, async () => {
+    test(`a run with ${name} performs it and passes`, async () => {
       const ran = await harness.runSteps(CDP_TARGET, stepsWith(step));
       assert.equal(ran.result.state, 'Passed', JSON.stringify(ran.result.steps));
     });
   }
 
   for (const lacking of NETWORK_FEATURES) {
-    test(`with ${lacking} taken off its list, the driver is refused that feature's steps and still runs the others`, { criterion: 'AC-SPEC-33-15', timeout: 300_000 }, async () => {
+    test(`with ${lacking} taken off its list, the driver is refused that feature's steps and still runs the others`, { timeout: 300_000 }, async () => {
       const drivers = cdpWithout(lacking);
       for (const { name, feature, step } of FEATURE_STEPS) {
         const ran = await harness.runSteps(CDP_TARGET, stepsWith(step), { drivers });

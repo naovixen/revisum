@@ -7,7 +7,6 @@
 // every unsafe construct and readable form; the property test adds seeded plans whose selectors,
 // expressions, class names and script sources are hard to write down. Every plan is parsed with
 // all six features enabled.
-// See docs/specs/SPEC-28-plan-authoring.md ("Readable syntax for plan 1.3", "Golden plans as text").
 import assert from 'node:assert/strict';
 import { readdirSync } from 'node:fs';
 import { test } from 'node:test';
@@ -27,16 +26,16 @@ const throughText = (plan: Plan, label: string): Plan => planFromText(writePlanT
 
 // ---- The golden plans as text ------------------------------------------------------------------
 
-test('golden/readable-unsafe-plans/ holds the text of each 1.3 golden plan, and nothing else', { criterion: 'AC-SPEC-28-01' }, () => {
+test('golden/readable-unsafe-plans/ holds the text of each 1.3 golden plan, and nothing else', () => {
   assert.deepEqual(readdirSync(GOLDEN_TEXT_FOLDER_PATH).sort(), FEATURES.map((feature) => `${feature}.plan`).sort());
 });
 
 for (const feature of FEATURES) {
-  test(`the ${feature} golden plan is written as exactly the text the spec gives`, { criterion: 'AC-SPEC-28-01' }, () => {
+  test(`the ${feature} golden plan is written as exactly the text the spec gives`, () => {
     assert.equal(writePlanText(parsed(unsafeGoldenPlan(feature), feature)), unsafeGoldenText(feature));
   });
 
-  test(`the ${feature} golden text reads back to its golden JSON plan, byte for byte in canonical JSON`, { criterion: 'AC-SPEC-28-01' }, () => {
+  test(`the ${feature} golden text reads back to its golden JSON plan, byte for byte in canonical JSON`, () => {
     const fromText = planFromText(unsafeGoldenText(feature), feature);
     const canonical = writePlanJson(parsed(unsafeGoldenPlan(feature), feature));
     assert.equal(writePlanJson(fromText), canonical);
@@ -44,7 +43,7 @@ for (const feature of FEATURES) {
     assert.deepEqual(JSON.parse(writePlanJson(fromText)), JSON.parse(unsafeGoldenJsonFile(feature)));
   });
 
-  test(`the ${feature} golden text read, parsed and written again is the same text, twice over`, { criterion: 'AC-SPEC-28-02' }, () => {
+  test(`the ${feature} golden text read, parsed and written again is the same text, twice over`, () => {
     const text = unsafeGoldenText(feature);
     const once = writePlanText(planFromText(text, feature));
     const twice = writePlanText(planFromText(once, `${feature} written once`));
@@ -52,7 +51,7 @@ for (const feature of FEATURES) {
     assert.equal(twice, once);
   });
 
-  test(`the ${feature} golden text reads with no error and no warning`, { criterion: 'AC-SPEC-28-02' }, () => {
+  test(`the ${feature} golden text reads with no error and no warning`, () => {
     const read = readPlanText(unsafeGoldenText(feature), unsafeLimits());
     assert.equal(read.ok, true, JSON.stringify(read));
     if (read.ok) assert.deepEqual(read.value.warnings, []);
@@ -61,14 +60,14 @@ for (const feature of FEATURES) {
 
 // ---- What the examples cover ---------------------------------------------------------------------
 
-test('the unsafe conversion examples use every unsafe construct and readable form of plan 1.3', { criterion: 'AC-SPEC-28-01' }, () => {
+test('the unsafe conversion examples use every unsafe construct and readable form of plan 1.3', () => {
   const used = new Set<string>();
   for (const { plan } of EXAMPLES) for (const feature of unsafeFeaturesUsed(plan)) used.add(feature);
   assert.deepEqual(UNSAFE_LANGUAGE_FEATURES.filter((feature) => !used.has(feature)), [], 'constructs no example uses');
 });
 
 for (const { name, plan } of EXAMPLES) {
-  test(`${name} parses with every feature enabled, so the conversion tests start from a valid plan`, { criterion: 'AC-SPEC-28-01' }, () => {
+  test(`${name} parses with every feature enabled, so the conversion tests start from a valid plan`, () => {
     const result = parseAll(plan);
     assert.equal(result.ok, true, JSON.stringify(result));
   });
@@ -77,20 +76,20 @@ for (const { name, plan } of EXAMPLES) {
 // ---- JSON to text and back -------------------------------------------------------------------------
 
 for (const { name, plan } of EXAMPLES) {
-  test(`${name}: canonical JSON written as text and read back gives byte-identical canonical JSON`, { criterion: 'AC-SPEC-28-01' }, () => {
+  test(`${name}: canonical JSON written as text and read back gives byte-identical canonical JSON`, () => {
     const canonical = writePlanJson(parsed(plan, name));
     const fromCanonical = parsed(JSON.parse(canonical), `${name} from canonical JSON`);
     assert.equal(writePlanJson(throughText(fromCanonical, name)), canonical);
   });
 
-  test(`${name}: canonical text read, parsed and written again is the same text, twice over`, { criterion: 'AC-SPEC-28-02' }, () => {
+  test(`${name}: canonical text read, parsed and written again is the same text, twice over`, () => {
     const text = writePlanText(parsed(plan, name));
     const once = writePlanText(planFromText(text, name));
     assert.equal(once, text);
     assert.equal(writePlanText(planFromText(once, `${name} written once`)), once);
   });
 
-  test(`${name}: canonical text has LF line ends, a final newline and no byte-order mark`, { criterion: 'AC-SPEC-28-02' }, () => {
+  test(`${name}: canonical text has LF line ends, a final newline and no byte-order mark`, () => {
     const text = writePlanText(parsed(plan, name));
     assert.equal(text.includes('\r'), false, 'canonical text holds a carriage return');
     assert.ok(text.endsWith('\n') && !text.endsWith('\n\n'), 'canonical text does not end with one final newline');
@@ -118,7 +117,7 @@ const markedStepCount = (steps: unknown): number => (Array.isArray(steps) ? step
   (count, step) => count + (isRecord(step) ? (needsMark(step) ? 1 : 0) + markedStepCount(step['steps']) : 0), 0);
 
 for (const { name, plan } of EXAMPLES) {
-  test(`${name}: exactly the lines holding an unsafe construct start with the mark, after their indentation`, { criterion: 'AC-SPEC-28-01' }, () => {
+  test(`${name}: exactly the lines holding an unsafe construct start with the mark, after their indentation`, () => {
     const text = writePlanText(parsed(plan, name));
     const lines = linesOf(text);
     const marked = lines.filter((line) => line.trimStart().startsWith(UNSAFE_MARK));
@@ -131,7 +130,7 @@ for (const { name, plan } of EXAMPLES) {
 
 // ---- The property test ----------------------------------------------------------------------------
 
-test('seeded plans with awkward selectors and script sources survive the trip through text byte for byte', { criterion: 'AC-SPEC-28-01' }, () => {
+test('seeded plans with awkward selectors and script sources survive the trip through text byte for byte', () => {
   const generated = generatedUnsafePlans(FIRST_SEED, GENERATED_COUNT);
   assert.ok(generated.length >= GENERATED_COUNT * 0.9, `only ${generated.length} of ${GENERATED_COUNT} generated plans parsed`);
   const failures: string[] = [];
@@ -146,7 +145,7 @@ test('seeded plans with awkward selectors and script sources survive the trip th
   assert.deepEqual(failures, []);
 });
 
-test('seeded plans with awkward selectors and script sources keep their canonical text when read and written again', { criterion: 'AC-SPEC-28-02' }, () => {
+test('seeded plans with awkward selectors and script sources keep their canonical text when read and written again', () => {
   const failures: string[] = [];
   for (const { seed, name, plan } of generatedUnsafePlans(FIRST_SEED, GENERATED_COUNT)) {
     const text = writePlanText(parsed(plan, `seed ${seed}`));
@@ -159,7 +158,7 @@ test('seeded plans with awkward selectors and script sources keep their canonica
   assert.deepEqual(failures, []);
 });
 
-test('the generated plans really hold the awkward text the property is about', { criterion: 'AC-SPEC-28-01' }, () => {
+test('the generated plans really hold the awkward text the property is about', () => {
   // A counter-example guard: if the generator stopped replacing text, the property would pass on
   // the plain examples alone.
   const sources: string[] = [];
@@ -207,7 +206,7 @@ const RELAYOUTS: readonly { readonly name: string; readonly relayout: (text: str
 
 for (const { name, plan } of EXAMPLES) {
   for (const { name: relayoutName, relayout } of RELAYOUTS) {
-    test(`${name}: canonical text with ${relayoutName} is written back as the canonical text`, { criterion: 'AC-SPEC-28-02' }, () => {
+    test(`${name}: canonical text with ${relayoutName} is written back as the canonical text`, () => {
       const text = writePlanText(parsed(plan, name));
       const relaidOut = relayout(text);
       assert.notEqual(relaidOut, text, 'the re-layout changed nothing, so it proves nothing');
@@ -233,7 +232,7 @@ const WORD_CASE_CHANGES: readonly { readonly feature: (typeof FEATURES)[number];
 ];
 
 for (const { feature, from, to } of WORD_CASE_CHANGES) {
-  test(`the ${feature} golden text with "${to.trim()}" in another case reads as the same plan`, { criterion: 'AC-SPEC-28-02' }, () => {
+  test(`the ${feature} golden text with "${to.trim()}" in another case reads as the same plan`, () => {
     const text = unsafeGoldenText(feature);
     assert.ok(text.includes(from), `the golden text has no "${from}"`);
     const changed = text.replace(from, to);
@@ -241,7 +240,7 @@ for (const { feature, from, to } of WORD_CASE_CHANGES) {
   });
 }
 
-test('a comment line inside a source block is dropped with comment-dropped and the source keeps its lines', { criterion: 'AC-SPEC-28-02' }, () => {
+test('a comment line inside a source block is dropped with comment-dropped and the source keeps its lines', () => {
   const text = unsafeGoldenText('inline-page-script');
   const lines = linesOf(text);
   const scriptLine = lines.findIndex((line) => line.startsWith('  "'));

@@ -3,7 +3,6 @@
 // Calls and cleanup calls together count toward the project's maximumCalls (over-limit). A call to
 // a service on a production origin is denied (production-origin). Each denial is recorded as a
 // plan.denied event with its rule, and a denied plan makes no call at all.
-// See docs/specs/SPEC-32-declared-service-calls.md.
 import assert from 'node:assert/strict';
 import { arch, platform } from 'node:os';
 import { test } from 'node:test';
@@ -62,50 +61,50 @@ async function decide(raw: JsonRecord, options: DecideOptions = {}) {
 
 // ---- Writes in proposals ----------------------------------------------------------------------------
 
-test('a proposal that makes a write call its declaration does not allow in proposals is denied', { criterion: 'AC-SPEC-32-06' }, async () => {
+test('a proposal that makes a write call its declaration does not allow in proposals is denied', async () => {
   const { decision, events } = await decide(newerPlan([OPEN_ACCOUNT_PAGE, call('createOrder')]));
   assert.deepEqual(decision, { kind: 'deny', rule: 'side-effect-in-proposal', stepIndex: 1 });
   assert.deepEqual(deniedCodes(events), ['side-effect-in-proposal']);
 });
 
-test('a proposal whose only such write is in cleanup is denied too', { criterion: 'AC-SPEC-32-06' }, async () => {
+test('a proposal whose only such write is in cleanup is denied too', async () => {
   const { decision } = await decide(newerPlan([OPEN_ACCOUNT_PAGE], [call('createOrder')]));
   assert.equal(decision['kind'], 'deny');
   assert.equal(decision['rule'], 'side-effect-in-proposal');
 });
 
 // Counter-examples: the same write in an approved plan, a write allowed in proposals, and reads.
-test('the same write call in an approved plan is allowed', { criterion: 'AC-SPEC-32-06' }, async () => {
+test('the same write call in an approved plan is allowed', async () => {
   const { decision } = await decide(newerPlan([OPEN_ACCOUNT_PAGE, call('createOrder')]), { approved: true });
   assert.deepEqual(decision, { kind: 'allow' });
 });
 
-test('a proposal may make a write call whose declaration sets allowInProposals', { criterion: 'AC-SPEC-32-06' }, async () => {
+test('a proposal may make a write call whose declaration sets allowInProposals', async () => {
   assert.deepEqual((await decide(newerPlan([OPEN_ACCOUNT_PAGE, call('seedCatalogue')], [call('seedCatalogue')]))).decision, { kind: 'allow' });
 });
 
-test('a proposal may make read calls and backend checks', { criterion: 'AC-SPEC-32-06' }, async () => {
+test('a proposal may make read calls and backend checks', async () => {
   const readCall = { type: 'call', call: 'getOrder', arguments: { orderId: 'ord_1' } };
   assert.deepEqual((await decide(newerPlan([OPEN_ACCOUNT_PAGE, readCall, readOrderStatus]))).decision, { kind: 'allow' });
 });
 
 // ---- The call limit ---------------------------------------------------------------------------------
 
-test('calls plus cleanup calls over maximumCalls are denied as over-limit', { criterion: 'AC-SPEC-32-06' }, async () => {
+test('calls plus cleanup calls over maximumCalls are denied as over-limit', async () => {
   const { decision, events } = await decide(newerPlan([OPEN_ACCOUNT_PAGE, call('seedCatalogue'), call('seedCatalogue')], [call('seedCatalogue')]), { limits: { maximumCalls: 2 } });
   assert.equal(decision['kind'], 'deny');
   assert.equal(decision['rule'], 'over-limit');
   assert.deepEqual(deniedCodes(events), ['over-limit']);
 });
 
-test('calls plus cleanup calls up to maximumCalls are allowed', { criterion: 'AC-SPEC-32-06' }, async () => {
+test('calls plus cleanup calls up to maximumCalls are allowed', async () => {
   for (const [steps, cleanup] of [[2, 0], [1, 1], [0, 2]] as const) {
     const plan = newerPlan([OPEN_ACCOUNT_PAGE, ...Array.from({ length: steps }, () => call('seedCatalogue'))], Array.from({ length: cleanup }, () => call('seedCatalogue')));
     assert.deepEqual((await decide(plan, { limits: { maximumCalls: 2 } })).decision, { kind: 'allow' }, `${steps} steps, ${cleanup} cleanup`);
   }
 });
 
-test('with no limit set, 20 calls are allowed and 21 are denied as over-limit', { criterion: 'AC-SPEC-32-06' }, async () => {
+test('with no limit set, 20 calls are allowed and 21 are denied as over-limit', async () => {
   const calls = (count: number) => Array.from({ length: count }, () => call('seedCatalogue'));
   assert.deepEqual((await decide(newerPlan([OPEN_ACCOUNT_PAGE, ...calls(19)], calls(1)))).decision, { kind: 'allow' });
   const denied = (await decide(newerPlan([OPEN_ACCOUNT_PAGE, ...calls(20)], calls(1)))).decision;
@@ -114,35 +113,35 @@ test('with no limit set, 20 calls are allowed and 21 are denied as over-limit', 
 
 // ---- Production services -------------------------------------------------------------------------------
 
-test('a call to a service on a production origin is denied as production-origin, in a proposal', { criterion: 'AC-SPEC-32-06' }, async () => {
+test('a call to a service on a production origin is denied as production-origin, in a proposal', async () => {
   const { decision, events } = await decide(newerPlan([OPEN_ACCOUNT_PAGE, liveCount]));
   assert.deepEqual(decision, { kind: 'deny', rule: 'production-origin', stepIndex: 1 });
   assert.deepEqual(deniedCodes(events), ['production-origin']);
 });
 
-test('a call to a service on a production origin is denied in an approved plan too', { criterion: 'AC-SPEC-32-06' }, async () => {
+test('a call to a service on a production origin is denied in an approved plan too', async () => {
   const { decision } = await decide(newerPlan([OPEN_ACCOUNT_PAGE, liveCount]), { approved: true });
   assert.deepEqual(decision, { kind: 'deny', rule: 'production-origin', stepIndex: 1 });
 });
 
-test('a cleanup call to a production service is denied as production-origin', { criterion: 'AC-SPEC-32-06' }, async () => {
+test('a cleanup call to a production service is denied as production-origin', async () => {
   const { decision } = await decide(newerPlan([OPEN_ACCOUNT_PAGE], [{ type: 'call', call: 'liveOrderCount', arguments: {} }]));
   assert.equal(decision['rule'], 'production-origin');
 });
 
-test('a production service is allowed for an approved plan when the policy allows production for approved plans', { criterion: 'AC-SPEC-32-06' }, async () => {
+test('a production service is allowed for an approved plan when the policy allows production for approved plans', async () => {
   const { decision } = await decide(newerPlan([OPEN_ACCOUNT_PAGE, liveCount]), { approved: true, policy: { allowProductionForApprovedPlans: true } });
   assert.deepEqual(decision, { kind: 'allow' });
 });
 
-test('a proposal calling a production service is denied even when the policy allows production for approved plans', { criterion: 'AC-SPEC-32-06' }, async () => {
+test('a proposal calling a production service is denied even when the policy allows production for approved plans', async () => {
   const policy = { allowProductionForApprovedPlans: true };
   assert.deepEqual((await decide(newerPlan([OPEN_ACCOUNT_PAGE, liveCount]), { policy })).decision, { kind: 'deny', rule: 'production-origin', stepIndex: 1 });
   const cleanup = (await decide(newerPlan([OPEN_ACCOUNT_PAGE], [{ type: 'call', call: 'liveOrderCount', arguments: {} }]), { policy })).decision;
   assert.equal(cleanup['rule'], 'production-origin');
 });
 
-test('a backend check counts once toward maximumCalls, as a call step does', { criterion: 'AC-SPEC-32-06' }, async () => {
+test('a backend check counts once toward maximumCalls, as a call step does', async () => {
   const limits = { maximumCalls: 2 };
   assert.deepEqual((await decide(newerPlan([OPEN_ACCOUNT_PAGE, call('seedCatalogue'), readOrderStatus]), { limits })).decision, { kind: 'allow' });
   assert.deepEqual((await decide(newerPlan([OPEN_ACCOUNT_PAGE, readOrderStatus, readOrderStatus]), { limits })).decision, { kind: 'allow' });
@@ -154,7 +153,7 @@ test('a backend check counts once toward maximumCalls, as a call step does', { c
 
 // ---- No call is made for a denied plan -----------------------------------------------------------------
 
-test('a plan the gate denies for any of these rules makes zero calls and opens no browser', { criterion: 'AC-SPEC-32-06' }, async () => {
+test('a plan the gate denies for any of these rules makes zero calls and opens no browser', async () => {
   const input = projectInput({ maximumCalls: 2 });
   const project = parserProject(input);
   const { caller, requests } = fakeServiceCaller();

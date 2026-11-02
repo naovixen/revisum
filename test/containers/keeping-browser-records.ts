@@ -1,6 +1,6 @@
 // Wraps the own CDP driver so each session hands over its browser's request records as it closes,
 // since a run closes its session before it returns. Used by the plan run inside the run container,
-// which prints them for the test outside. See docs/specs/SPEC-07-isolated-runner-and-egress.md.
+// which prints them for the test outside.
 import type { OwnBrowserDriver } from '@revisum/driver-cdp';
 import type { BrowserDriver, BrowserRequestRecord, SessionEnvironment, Target } from '@revisum/engine';
 

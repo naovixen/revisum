@@ -4,7 +4,6 @@
 // the draft command before the container exists. The browser inside reaches loopback without the
 // egress proxy, which would refuse any private address. Each request either server answers is
 // appended as one JSON line to REQUESTS_FILE, in the container's private /tmp, for the test to read.
-// See docs/specs/SPEC-37-explore-to-draft.md.
 import { appendFileSync } from 'node:fs';
 import { startExploreSite } from '../unit/cli/explore-command-examples.ts';
 

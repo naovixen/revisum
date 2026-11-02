@@ -1,7 +1,6 @@
 // Compile-time guarantee for manifest-perturbation.test.ts: its tables are typed over every key of
-// Required<RunManifest> (with SPEC-08's added fields), so a manifest field with no perturbation case
+// Required<RunManifest> (with the added replay fields), so a manifest field with no perturbation case
 // fails to compile. Type-checked by test/proofs/type-check.test.ts, never run.
-// See docs/specs/SPEC-08-manifest-and-replay.md (AC-02).
 import type { RunManifest } from '@revisum/engine';
 import type { ManifestUnderTest } from './replay-examples.ts';
 

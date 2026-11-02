@@ -3,7 +3,6 @@
 // breaks one of those promises in a throw-away copy of the repository and expects the lint to
 // fail, naming the file. The schema itself comes from planJsonSchema(), which builds it from the
 // same tables the parser uses.
-// See docs/specs/SPEC-01-plan-language-and-parser.md.
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -32,29 +31,29 @@ const committedSchemaText = (): string => readFileSync(join(REPOSITORY_ROOT, SCH
 
 // ---- The committed schema -----------------------------------------------------------------------
 
-test('the committed schema is exactly what planJsonSchema() builds', { criterion: 'AC-SPEC-01-10' }, () => {
+test('the committed schema is exactly what planJsonSchema() builds', () => {
   assert.deepEqual(JSON.parse(committedSchemaText()), planJsonSchema());
 });
 
-test('planJsonSchema() is a JSON Schema 2020-12 document and builds the same bytes every time', { criterion: 'AC-SPEC-01-10' }, () => {
+test('planJsonSchema() is a JSON Schema 2020-12 document and builds the same bytes every time', () => {
   const schema = planJsonSchema() as { readonly $schema?: unknown };
   assert.equal(schema.$schema, 'https://json-schema.org/draft/2020-12/schema');
   assert.equal(JSON.stringify(planJsonSchema()), JSON.stringify(planJsonSchema()));
 });
 
-test('the newest changelog entry names the committed schema\'s sha256', { criterion: 'AC-SPEC-01-10' }, () => {
+test('the newest changelog entry names the committed schema\'s sha256', () => {
   const changelog = readFileSync(join(REPOSITORY_ROOT, CHANGELOG_PATH), 'utf8');
   assert.ok(changelog.includes(sha256Of(committedSchemaText())), 'the schema hash is in the changelog');
 });
 
 // ---- The lint check -----------------------------------------------------------------------------
 
-test('control: the unchanged copy of the repository passes every lint command', { criterion: 'AC-SPEC-01-10', timeout: TIMEOUT }, () => {
+test('control: the unchanged copy of the repository passes every lint command', { timeout: TIMEOUT }, () => {
   const outcome = scratch.lint();
   assert.equal(outcome.passed, true, outcome.failureOutput);
 });
 
-test('the lint fails when the committed schema is stale', { criterion: 'AC-SPEC-01-10', timeout: TIMEOUT }, () => {
+test('the lint fails when the committed schema is stale', { timeout: TIMEOUT }, () => {
   const outcome = scratch.lintWithEdit(SCHEMA_PATH, (text) => {
     const schema: Record<string, unknown> = JSON.parse(text);
     return `${JSON.stringify({ ...schema, description: `${String(schema['description'] ?? '')} (edited by hand)` }, null, 2)}\n`;
@@ -62,14 +61,14 @@ test('the lint fails when the committed schema is stale', { criterion: 'AC-SPEC-
   assertFailsNaming(outcome, 'plan.schema.json');
 });
 
-test('the lint fails when a golden plan does not validate against the schema', { criterion: 'AC-SPEC-01-10', timeout: TIMEOUT }, () => {
+test('the lint fails when a golden plan does not validate against the schema', { timeout: TIMEOUT }, () => {
   const plan: { steps: unknown[] } = JSON.parse(readFileSync(join(REPOSITORY_ROOT, GOLDEN_SIGNUP_PATH), 'utf8'));
   plan.steps.push({ type: 'eval', code: 'fetch("/admin")' });
   const outcome = scratch.lintWith('golden/plans/planted-invalid.json', `${JSON.stringify(plan, null, 2)}\n`);
   assertFailsNaming(outcome, 'planted-invalid.json');
 });
 
-test('the lint fails when a golden plan lacks a criterion id on an assertion', { criterion: 'AC-SPEC-01-10', timeout: TIMEOUT }, () => {
+test('the lint fails when a golden plan lacks a criterion id on an assertion', { timeout: TIMEOUT }, () => {
   const plan: { steps: Record<string, unknown>[] } = JSON.parse(readFileSync(join(REPOSITORY_ROOT, GOLDEN_SIGNUP_PATH), 'utf8'));
   const assertion = plan.steps.find((step) => step['type'] === 'expect');
   assert.ok(assertion);
@@ -78,7 +77,7 @@ test('the lint fails when a golden plan lacks a criterion id on an assertion', {
   assertFailsNaming(outcome, 'planted-untraced.json');
 });
 
-test('the lint fails when the newest changelog entry does not name the schema\'s sha256', { criterion: 'AC-SPEC-01-10', timeout: TIMEOUT }, () => {
+test('the lint fails when the newest changelog entry does not name the schema\'s sha256', { timeout: TIMEOUT }, () => {
   const hash = sha256Of(readFileSync(join(scratch.root, SCHEMA_PATH), 'utf8'));
   const outcome = scratch.lintWithEdit(CHANGELOG_PATH, (text) => text.replaceAll(hash, '0'.repeat(64)));
   assertFailsNaming(outcome, 'CHANGELOG.md');
@@ -86,7 +85,7 @@ test('the lint fails when the newest changelog entry does not name the schema\'s
 
 // Counter-example: another valid golden plan is accepted, so the failures above come from the
 // planted problem, not from any new file in golden/plans/.
-test('the lint accepts a new golden plan that validates', { criterion: 'AC-SPEC-01-10', timeout: TIMEOUT }, () => {
+test('the lint accepts a new golden plan that validates', { timeout: TIMEOUT }, () => {
   const plan: { meta: Record<string, unknown> } = JSON.parse(readFileSync(join(REPOSITORY_ROOT, GOLDEN_SIGNUP_PATH), 'utf8'));
   plan.meta['title'] = 'Sign-up happy path, second copy';
   const outcome = scratch.lintWith('golden/plans/planted-valid.json', `${JSON.stringify(plan, null, 2)}\n`);

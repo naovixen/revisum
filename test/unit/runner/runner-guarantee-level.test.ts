@@ -5,7 +5,6 @@
 // egress-unenforceable, and the run's guarantee statement says egress is not enforced, so no report
 // can claim hermetic isolation. The container engine is a fake; the probe that is blocked is the
 // counter-example.
-// See docs/specs/SPEC-07-isolated-runner-and-egress.md.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { guaranteeStatement } from '@revisum/engine';
@@ -37,26 +36,26 @@ const loggedCodes = (logged: readonly RunnerLogEntry[]): readonly string[] => lo
 const statementFor = (level: GuaranteeLevel) =>
   guaranteeStatement({ mode: 'plan', egressEnforced: level === 'isolated', unmaskedScreenshotsKept: false, unsafeFeatures: [] });
 
-test('before any run has started, the runner claims only the host level', { criterion: 'AC-SPEC-07-05' }, () => {
+test('before any run has started, the runner claims only the host level', () => {
   const engine = fakeContainerEngine({ localImageId: PINNED_IMAGE_ID, internalNetworks: true, probe: 'blocked' });
   assert.equal(dockerRunner({ engine, repositoryRoot: REPOSITORY_ROOT }).guaranteeLevel(), 'host');
 });
 
-test('when the probe from inside the container reaches outside, the level is host and egress-unenforceable is logged', { criterion: 'AC-SPEC-07-05' }, async () => {
+test('when the probe from inside the container reaches outside, the level is host and egress-unenforceable is logged', async () => {
   const { level, logged, startedCode } = await startOn({ internalNetworks: true, probe: 'reached' });
   assert.equal(level, 'host');
   assert.ok(loggedCodes(logged).includes('egress-unenforceable'), JSON.stringify(logged));
   assert.ok(startedCode === null || startedCode === 'egress-unenforceable', `start failed with ${String(startedCode)}`);
 });
 
-test('when Docker cannot create a network with no route out, the level is host and egress-unenforceable is logged', { criterion: 'AC-SPEC-07-05' }, async () => {
+test('when Docker cannot create a network with no route out, the level is host and egress-unenforceable is logged', async () => {
   const { level, logged, startedCode } = await startOn({ internalNetworks: false, probe: 'blocked' });
   assert.equal(level, 'host');
   assert.ok(loggedCodes(logged).includes('egress-unenforceable'), JSON.stringify(logged));
   assert.ok(startedCode === null || startedCode === 'egress-unenforceable', `start failed with ${String(startedCode)}`);
 });
 
-test('a run at the host level states egress and credentials as lost to egress-unenforceable, and claims no isolation', { criterion: 'AC-SPEC-07-05' }, async () => {
+test('a run at the host level states egress and credentials as lost to egress-unenforceable, and claims no isolation', async () => {
   const { level } = await startOn({ internalNetworks: true, probe: 'reached' });
   const statement = statementFor(level);
   assert.equal(statement.level, 'host');
@@ -65,7 +64,7 @@ test('a run at the host level states egress and credentials as lost to egress-un
   assert.ok(statement.lost.some((loss) => loss.guarantee === 'egress-enforced' && loss.because === 'egress-unenforceable'), JSON.stringify(statement.lost));
 });
 
-test('counter-example: when every part started and the probe was blocked, the level is isolated and nothing is logged as unenforceable', { criterion: 'AC-SPEC-07-05' }, async () => {
+test('counter-example: when every part started and the probe was blocked, the level is isolated and nothing is logged as unenforceable', async () => {
   const { level, logged, startedCode } = await startOn({ internalNetworks: true, probe: 'blocked' });
   assert.equal(startedCode, null);
   assert.equal(level, 'isolated');

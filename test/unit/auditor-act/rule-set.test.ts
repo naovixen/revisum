@@ -23,7 +23,7 @@ function sourceFiles(folder: string, found: string[] = []): string[] {
 const ENGINE_SOURCES = sourceFiles(join(ENGINE_PACKAGE, 'src'));
 const isWorkspacePackage = (specifier: string): boolean => specifier.startsWith('@revisum/');
 
-test('the engine has no third-party runtime dependency, and its sources import only Node built-ins, local files or workspace packages', { criterion: 'AC-SPEC-00-02' }, () => {
+test('the engine has no third-party runtime dependency, and its sources import only Node built-ins, local files or workspace packages', () => {
   const manifest = readJson<{ dependencies?: Record<string, string> }>(join(ENGINE_PACKAGE, 'package.json'));
   assert.deepEqual(Object.keys(manifest.dependencies ?? {}).filter((name) => !isWorkspacePackage(name)), []);
   for (const file of ENGINE_SOURCES) {

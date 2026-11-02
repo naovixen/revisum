@@ -4,9 +4,8 @@
 // is put on the protected branch (a holdout plan by its hash in holdouts.json), approved once by the
 // maintainer's merge under agent lock-down and once by a code owner's review, and then:
 //   - both approvals name the same subject and differ only in how they were given.
-// SPEC-02 names a gate only for plans (planStanding and mergeGateOpen), so the other kinds' gates
+// The approval design names a gate only for plans (planStanding and mergeGateOpen), so the other kinds' gates
 // are tested with the specs that define them.
-// See docs/specs/SPEC-02-project-trust-and-approval.md.
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -64,12 +63,12 @@ async function approvalIn(name: RepositoryName, subject: SubjectFixture): Promis
   return approval;
 }
 
-test('there is one subject fixture for each kind other than a plan', { criterion: 'AC-SPEC-02-18' }, () => {
+test('there is one subject fixture for each kind other than a plan', () => {
   assert.deepEqual(subjectFixtures().map((fixture) => fixture.kind).sort(), ['extra-review', 'holdout-plan', 'review-decision', 'trusted-file']);
 });
 
 for (const subject of subjectFixtures()) {
-  test(`the ${subject.kind}'s declared and verified approvals name the same subject and differ only in how they were given`, { criterion: 'AC-SPEC-02-18' }, async () => {
+  test(`the ${subject.kind}'s declared and verified approvals name the same subject and differ only in how they were given`, async () => {
     const declared = await approvalIn('solo', subject);
     const verified = await approvalIn('team', subject);
     assert.deepEqual(declared.subject, verified.subject);

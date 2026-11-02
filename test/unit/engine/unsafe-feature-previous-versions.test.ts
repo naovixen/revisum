@@ -3,7 +3,6 @@
 // code and path that version's parser gives, even when the project enables the feature. Each
 // expected refusal below was recorded from the 1.2 engine itself, before any 1.3 code existed, on
 // the plans built from unsafe-feature-steps.ts.
-// See docs/specs/SPEC-36-unsafe-plan-features.md and docs/specs/SPEC-30-plan-values-positions-and-keys.md.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { acceptedBy, parserEnabling, rejection } from './unsafe-feature-examples.ts';
@@ -73,13 +72,13 @@ const PREVIOUS_CASES: readonly PreviousCase[] = [
 
 for (const previous of PREVIOUS_CASES) {
   for (const version of ['1.2', '1.1'] as const) {
-    test(`a plan declaring "${version}" that uses ${previous.construct} is refused as the ${version} parser refused it, with every feature enabled`, { criterion: 'AC-SPEC-36-02' }, () => {
+    test(`a plan declaring "${version}" that uses ${previous.construct} is refused as the ${version} parser refused it, with every feature enabled`, () => {
       assert.deepEqual(rejection(parseAll, previous.plan(version)), previous.errors[version]);
     });
   }
 }
 
-test('none of those refusals is unsafe_feature_disabled: below 1.3 the features do not exist', { criterion: 'AC-SPEC-36-02' }, () => {
+test('none of those refusals is unsafe_feature_disabled: below 1.3 the features do not exist', () => {
   for (const previous of PREVIOUS_CASES) {
     for (const version of ['1.2', '1.1'] as const) {
       assert.ok(!rejection(parseAll, previous.plan(version)).some((line) => line.startsWith('unsafe_feature_disabled')), `${previous.construct} in ${version}`);
@@ -87,7 +86,7 @@ test('none of those refusals is unsafe_feature_disabled: below 1.3 the features 
   }
 });
 
-test('a project with no feature enabled refuses those plans with the same codes and paths', { criterion: 'AC-SPEC-36-02' }, () => {
+test('a project with no feature enabled refuses those plans with the same codes and paths', () => {
   // Metamorphic: enabling the features must not change how a 1.2 or 1.1 plan is read.
   const parseNone = parserEnabling([]);
   for (const previous of PREVIOUS_CASES) {
@@ -99,7 +98,7 @@ test('a project with no feature enabled refuses those plans with the same codes 
 
 // Counter-example: each of those plans, declared as "1.3", parses, so the declared version alone
 // refused them above.
-test('declared as "1.3", every one of those plans parses under the project that enables every feature', { criterion: 'AC-SPEC-36-02' }, () => {
+test('declared as "1.3", every one of those plans parses under the project that enables every feature', () => {
   for (const previous of PREVIOUS_CASES) {
     acceptedBy(parseAll, previous.plan(UNSAFE_VERSION));
   }

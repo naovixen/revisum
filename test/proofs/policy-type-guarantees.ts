@@ -5,7 +5,6 @@
 //     copy of a parsed plan.
 //   - An Authorised plan is still a Plan, so everything that reads a plan reads it unchanged.
 // Each @ts-expect-error line must stay an error; the test deletes them to prove it.
-// See docs/specs/SPEC-03-policy-gate.md.
 import { run, type Authorised, type Plan, type RunInputs, type RunPorts } from '@revisum/engine';
 
 declare const inputs: RunInputs;

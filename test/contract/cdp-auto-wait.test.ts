@@ -4,7 +4,6 @@
 // click with not-actionable within the step timeout plus 1,500 ms, and gets no click.
 // Each case is its own fixture page (fixtures/capability-app/auto-wait-<case>.html) whose result
 // line counts the clicks; one browser serves every case of a target, with a fresh page load each.
-// See docs/specs/SPEC-06-cdp-driver.md.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import type { DriverSession } from '@revisum/driver-cdp';
@@ -41,7 +40,7 @@ for (const targetId of CDP_TARGETS) {
     };
 
     for (const [scenario, description] of ACTIONABLE_AFTER_400_MILLISECONDS) {
-      test(`a button ${description} for its first 400 ms gets one click, after it is ready`, { criterion: 'AC-SPEC-06-03' }, async () => {
+      test(`a button ${description} for its first 400 ms gets one click, after it is ready`, async () => {
         const { acted, shown } = await clickContinue(scenario);
         assert.ok(acted.ok, acted.ok ? '' : `${acted.error.code}: ${acted.error.detail}`);
         assert.equal(shown, LANDED_ONCE);
@@ -49,7 +48,7 @@ for (const targetId of CDP_TARGETS) {
     }
 
     for (const scenario of NEVER_ACTIONABLE) {
-      test(`a button that is ${scenario === 'never' ? 'never enabled' : 'always covered'} fails with not-actionable within the timeout plus 1,500 ms`, { criterion: 'AC-SPEC-06-03' }, async () => {
+      test(`a button that is ${scenario === 'never' ? 'never enabled' : 'always covered'} fails with not-actionable within the timeout plus 1,500 ms`, async () => {
         const { acted, elapsed, shown } = await clickContinue(scenario);
         assert.equal(acted.ok ? 'passed' : acted.error.code, 'not-actionable');
         assert.ok(elapsed <= STEP_TIMEOUT_MILLISECONDS + NEVER_ACTIONABLE_ALLOWANCE_MILLISECONDS, `took ${elapsed} ms`);
@@ -59,7 +58,7 @@ for (const targetId of CDP_TARGETS) {
 
     // Counter-example: the result line does count a click that lands too early, so the checks
     // above can fail. A page script clicks the button while it is still moving.
-    test('counter-example: a click while the button still moves is counted as early', { criterion: 'AC-SPEC-06-03' }, async () => {
+    test('counter-example: a click while the button still moves is counted as early', async () => {
       assert.ok((await session.navigate(capability.url('/auto-wait-moving.html'))).ok);
       const early = await session.evaluate(() => {
         const button = [...document.querySelectorAll('button')].find((candidate) => candidate.textContent === 'Continue');

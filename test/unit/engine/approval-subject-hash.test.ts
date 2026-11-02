@@ -5,7 +5,6 @@
 //   - a run, and the policy gate before it, use a plan's standing only when the approval in it is
 //     for that plan's own hash. Another plan's standing leaves the plan a proposal: no production
 //     origin and no approval label.
-// See docs/specs/SPEC-02-project-trust-and-approval.md.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
@@ -44,14 +43,14 @@ const retitledSignupInput = (): JsonRecord => withValue(signupPlan(), ['meta', '
 
 // ---- The code-owner route checks the subject hash -----------------------------------------------
 
-test('a code-owner review does not approve a plan hash that no file on the protected branch has', { criterion: 'AC-SPEC-02-05' }, async () => {
+test('a code-owner review does not approve a plan hash that no file on the protected branch has', async () => {
   await withRepository('team', async (repository) => {
     const subject: ApprovalSubject = { kind: 'plan', hash: UNREVIEWED_HASH, path: PLAN_PATH };
     assertSubjectRefused(repository, await repository.verify(subject, repository.codeOwnerProof('review-grace')));
   });
 });
 
-test('a code-owner review of the sign-up plan does not approve the same plan changed by one byte', { criterion: 'AC-SPEC-02-04' }, async () => {
+test('a code-owner review of the sign-up plan does not approve the same plan changed by one byte', async () => {
   await withRepository('team', async (repository) => {
     const changed = parsedSignupPlan(retitledSignupInput());
     assert.notEqual(planHash(changed), repository.subject('plan').hash);
@@ -60,7 +59,7 @@ test('a code-owner review of the sign-up plan does not approve the same plan cha
   });
 });
 
-test('the same review approves the plan whose hash matches the file on the protected branch', { criterion: 'AC-SPEC-02-05' }, async () => {
+test('the same review approves the plan whose hash matches the file on the protected branch', async () => {
   // The counter-example: only the subject hash differs from the two refusals above.
   await withRepository('team', async (repository) => {
     const verified = await repository.verify(repository.subject('plan'), repository.codeOwnerProof('review-grace'));
@@ -126,7 +125,7 @@ const runBase = (standing: PlanStanding) => ({
   host: { platform: 'test', arch: 'test' }, standing,
 });
 
-test("an AI plan given another plan's approved standing does not reach the production origin", { criterion: 'AC-SPEC-02-03' }, async () => {
+test("an AI plan given another plan's approved standing does not reach the production origin", async () => {
   const standingOfPlanA = await standingOf(parsedForProduction(signupPlan()));
   const driver = countingDriver();
   const outcome = await runUntrusted(retitledSignupInput(), parseForProduction, runBase(standingOfPlanA), runPorts(driver));
@@ -134,7 +133,7 @@ test("an AI plan given another plan's approved standing does not reach the produ
   assert.ok(!JSON.stringify(outcome).includes('approvalLabel'), `plan B's result carries plan A's approval label: ${JSON.stringify(outcome)}`);
 });
 
-test('the same run with the plan whose approval the standing holds does reach the production origin', { criterion: 'AC-SPEC-02-03' }, async () => {
+test('the same run with the plan whose approval the standing holds does reach the production origin', async () => {
   // The counter-example: only the plan differs from the refused run above.
   const standingOfPlanA = await standingOf(parsedForProduction(signupPlan()));
   const driver = countingDriver();
@@ -143,7 +142,7 @@ test('the same run with the plan whose approval the standing holds does reach th
   assert.ok(JSON.stringify(outcome).includes('declared, not verified'), JSON.stringify(outcome));
 });
 
-test("a cleared plan run with another plan's standing is refused the production origin before any driver call", { criterion: 'AC-SPEC-02-03' }, async () => {
+test("a cleared plan run with another plan's standing is refused the production origin before any driver call", async () => {
   const standingOfPlanA = await standingOf(parsedForProduction(signupPlan()));
   const planB = parsedForProduction(retitledSignupInput());
   const trusted = await trustedProjectFrom(testProjectInput({}, productionPolicy));
@@ -154,7 +153,7 @@ test("a cleared plan run with another plan's standing is refused the production 
   assert.equal(result.approvalLabel, undefined, "plan B's result carries plan A's approval label");
 });
 
-test("the policy gate denies another plan's standing the production origin a navigation names", { criterion: 'AC-SPEC-02-03' }, async () => {
+test("the policy gate denies another plan's standing the production origin a navigation names", async () => {
   const toProduction = (input: JsonRecord): JsonRecord => withValue(input, ['steps', 0, 'url'], `${PRODUCTION_ORIGIN}/`);
   const planA = parsedForProduction(toProduction(signupPlan()));
   const planB = parsedForProduction(toProduction(retitledSignupInput()));

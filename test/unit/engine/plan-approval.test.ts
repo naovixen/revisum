@@ -7,7 +7,6 @@
 //
 // One shape the build notes leave unnamed is assumed here: a run receives the plan's standing as
 // `standing` in its inputs.
-// See docs/specs/SPEC-02-project-trust-and-approval.md.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
@@ -91,13 +90,13 @@ async function runPlan(plan: Plan, standing: ReturnType<typeof planStanding>, ba
 
 // ---- No approval: a proposal ---------------------------------------------------------------------
 
-test('a plan whose hash has no approval stands as a proposal, and a proposal never opens the merge gate', { criterion: 'AC-SPEC-02-03' }, () => {
+test('a plan whose hash has no approval stands as a proposal, and a proposal never opens the merge gate', () => {
   const standing = planStanding(parsedSignupPlan(), memoryApprovalStore([]));
   assert.deepEqual(standing, { mode: 'proposal' });
   assert.equal(mergeGateOpen(standing), false);
 });
 
-test('approvals of other subjects leave a plan standing as a proposal', { criterion: 'AC-SPEC-02-03' }, async () => {
+test('approvals of other subjects leave a plan standing as a proposal', async () => {
   await withRepository('solo', async (repository) => {
     const verified = await repository.verify(repository.subject('trusted-file'), repository.lockdownProof());
     assert.equal(verified.ok, true, JSON.stringify(verified));
@@ -108,7 +107,7 @@ test('approvals of other subjects leave a plan standing as a proposal', { criter
   });
 });
 
-test('with its own approval the plan stands approved and opens the merge gate', { criterion: 'AC-SPEC-02-03' }, async () => {
+test('with its own approval the plan stands approved and opens the merge gate', async () => {
   // The counter-example: the same plan, once its hash has an approval.
   const approval = await approvalIn('solo', declaredPlanApproval);
   const standing = planStanding(parsedSignupPlan(), memoryApprovalStore([approval]));
@@ -116,18 +115,18 @@ test('with its own approval the plan stands approved and opens the merge gate', 
   assert.equal(mergeGateOpen(standing), true);
 });
 
-test('a proposal run on a production origin is refused with origin_not_allowed before any driver call', { criterion: 'AC-SPEC-02-03' }, async () => {
+test('a proposal run on a production origin is refused with origin_not_allowed before any driver call', async () => {
   const { result, driverCalls } = await runPlan(parsedSignupPlan(), { mode: 'proposal' }, PRODUCTION_ORIGIN);
   assert.equal(driverCalls, 0, 'the driver was called for a proposal on a production origin');
   assert.ok(JSON.stringify(result).includes('origin_not_allowed'), JSON.stringify(result));
 });
 
-test('a proposal run on a non-production origin goes ahead', { criterion: 'AC-SPEC-02-03' }, async () => {
+test('a proposal run on a non-production origin goes ahead', async () => {
   const { driverCalls } = await runPlan(parsedSignupPlan(), { mode: 'proposal' }, ORIGIN);
   assert.ok(driverCalls > 0, 'a proposal on a non-production origin was not run');
 });
 
-test('the same plan, approved, may run on the production origin', { criterion: 'AC-SPEC-02-03' }, async () => {
+test('the same plan, approved, may run on the production origin', async () => {
   // The counter-example: only the standing differs from the refused proposal above.
   const approval = await approvalIn('solo', declaredPlanApproval);
   // Production is denied to every plan unless the project allows it for approved plans.
@@ -138,13 +137,13 @@ test('the same plan, approved, may run on the production origin', { criterion: '
 
 // ---- One byte changed ---------------------------------------------------------------------------
 
-test('the approval still applies to the same plan parsed again from the same JSON', { criterion: 'AC-SPEC-02-04' }, async () => {
+test('the approval still applies to the same plan parsed again from the same JSON', async () => {
   const store = memoryApprovalStore([await approvalIn('solo', declaredPlanApproval)]);
   assert.equal(planStanding(parsedSignupPlan(signupPlan()), store).mode, 'approved');
 });
 
 for (const [what, path] of [['title', ['meta', 'title']], ['criterion id of an assertion', ['steps', 1, 'criterionId']], ['filled value', ['steps', 3, 'value']]] as const) {
-  test(`a plan whose ${what} changes by one byte no longer has the approval it had`, { criterion: 'AC-SPEC-02-04' }, async () => {
+  test(`a plan whose ${what} changes by one byte no longer has the approval it had`, async () => {
     const store = memoryApprovalStore([await approvalIn('solo', declaredPlanApproval)]);
     const original = signupPlan();
     const changed = parsedSignupPlan(withValue(original, path, oneByteChanged(stringAt(original, path))));
@@ -158,7 +157,7 @@ for (const [what, path] of [['title', ['meta', 'title']], ['criterion id of an a
 // ---- MCP sessions and CI tokens -----------------------------------------------------------------
 
 for (const source of ['mcp', 'token'] as const) {
-  test(`a decision that arrives through ${source === 'mcp' ? 'an MCP session' : 'a CI token'} is recorded with actor type agent`, { criterion: 'AC-SPEC-02-07' }, () => {
+  test(`a decision that arrives through ${source === 'mcp' ? 'an MCP session' : 'a CI token'} is recorded with actor type agent`, () => {
     const actor = unverified({ kind: 'plan', hash: planHash(parsedSignupPlan()) }, source);
     assert.equal(actor.actorType, 'agent');
     assert.equal(PERSON_ACTOR_TYPES.includes(actor.actorType), false);
@@ -167,13 +166,13 @@ for (const source of ['mcp', 'token'] as const) {
 
 // ---- Local decisions with no proof --------------------------------------------------------------
 
-test('a local decision with no proof is recorded as unverified, which is not a person', { criterion: 'AC-SPEC-02-11' }, () => {
+test('a local decision with no proof is recorded as unverified, which is not a person', () => {
   const actor = unverified({ kind: 'review-decision', hash: planHash(parsedSignupPlan()) }, 'local');
   assert.equal(actor.actorType, 'unverified');
   assert.equal(PERSON_ACTOR_TYPES.includes(actor.actorType), false);
 });
 
-test('a plan with only unverified decisions stands as a proposal and does not open the merge gate', { criterion: 'AC-SPEC-02-11' }, () => {
+test('a plan with only unverified decisions stands as a proposal and does not open the merge gate', () => {
   const plan = parsedSignupPlan();
   for (const source of ['local', 'mcp', 'token'] as const) unverified({ kind: 'plan', hash: planHash(plan) }, source);
   const standing = planStanding(plan, memoryApprovalStore([]));
@@ -182,7 +181,7 @@ test('a plan with only unverified decisions stands as a proposal and does not op
 
 // ---- Declared counts exactly as verified --------------------------------------------------------
 
-test('a declared and a verified approval of the same plan each open the merge gate', { criterion: 'AC-SPEC-02-18' }, async () => {
+test('a declared and a verified approval of the same plan each open the merge gate', async () => {
   const plan = parsedSignupPlan();
   const declared = await approvalIn('solo', declaredPlanApproval);
   const verified = await approvalIn('team', verifiedPlanApproval);
@@ -191,13 +190,13 @@ test('a declared and a verified approval of the same plan each open the merge ga
   assert.equal(mergeGateOpen(planStanding(plan, memoryApprovalStore([verified]))), true);
 });
 
-test('a run under a declared approval carries the "declared, not verified" label', { criterion: 'AC-SPEC-02-16' }, async () => {
+test('a run under a declared approval carries the "declared, not verified" label', async () => {
   const approval = await approvalIn('solo', declaredPlanApproval);
   const { result } = await runPlan(parsedSignupPlan(), { mode: 'approved', approval }, ORIGIN);
   assert.ok(JSON.stringify(result).includes('declared, not verified'), JSON.stringify(result));
 });
 
-test('a run under a declared approval equals one under a verified approval except for its label', { criterion: 'AC-SPEC-02-18' }, async () => {
+test('a run under a declared approval equals one under a verified approval except for its label', async () => {
   // Metamorphic: swap the approval's route and only the label (and the hash over it) may change.
   const plan = parsedSignupPlan();
   const comparable = (result: unknown, label: string): string => {

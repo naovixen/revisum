@@ -5,7 +5,6 @@
 //   - `reveal`, the one way to read a secret's value, joins exactly one more module on its
 //     allow-list: runner's call module. Any other module that imports it fails the lint.
 // The changelog's 1.2 entry names the new steps, settings and codes.
-// See docs/specs/SPEC-32-declared-service-calls.md.
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -42,7 +41,7 @@ const PACKAGES_CHECKED = [
 ] as const;
 
 for (const checked of PACKAGES_CHECKED) {
-  test(`${checked.name}'s package manifest declares no runtime dependency`, { criterion: 'AC-SPEC-32-15' }, () => {
+  test(`${checked.name}'s package manifest declares no runtime dependency`, () => {
     const manifest: Record<string, unknown> = JSON.parse(readFileSync(join(PACKAGES, checked.name, 'package.json'), 'utf8'));
     const declared = DEPENDENCY_FIELDS.filter((field) => {
       const value = manifest[field];
@@ -51,7 +50,7 @@ for (const checked of PACKAGES_CHECKED) {
     assert.deepEqual(declared, []);
   });
 
-  test(`every import in ${checked.name}'s sources is relative, a Node built-in or ${checked.allowed.join(', ') || 'nothing else'}`, { criterion: 'AC-SPEC-32-15' }, () => {
+  test(`every import in ${checked.name}'s sources is relative, a Node built-in or ${checked.allowed.join(', ') || 'nothing else'}`, () => {
     const folder = join(PACKAGES, checked.name, 'src');
     const found = sourceFiles(folder).flatMap((file) =>
       foreignImports(readFileSync(file, 'utf8'), checked.allowed).map((name) => `${relative(PACKAGES, file)}: ${name}`));
@@ -59,20 +58,20 @@ for (const checked of PACKAGES_CHECKED) {
   });
 }
 
-test('neither contracts nor engine imports a protocol pack', { criterion: 'AC-SPEC-32-15' }, () => {
+test('neither contracts nor engine imports a protocol pack', () => {
   const found = ['contracts', 'engine'].flatMap((name) => sourceFiles(join(PACKAGES, name, 'src')).flatMap((file) =>
     importsOf(readFileSync(file, 'utf8')).filter(isPackImport).map((imported) => `${relative(PACKAGES, file)}: ${imported}`)));
   assert.deepEqual(found, []);
 });
 
-test('the service call port, ServiceCaller, is declared in contracts, so runner needs nothing from engine', { criterion: 'AC-SPEC-32-15' }, () => {
+test('the service call port, ServiceCaller, is declared in contracts, so runner needs nothing from engine', () => {
   const declaring = sourceFiles(join(PACKAGES, 'contracts', 'src'))
     .filter((file) => /export\s+interface\s+ServiceCaller\b/.test(readFileSync(file, 'utf8')));
   assert.equal(declaring.length, 1, 'contracts declares ServiceCaller once');
 });
 
 // Mutant: the same checks find a planted pack import and a planted engine import in runner.
-test('mutant: the checks report a pack import, a runner import of engine and an HTTP library', { criterion: 'AC-SPEC-32-15' }, () => {
+test('mutant: the checks report a pack import, a runner import of engine and an HTTP library', () => {
   const planted = [
     "import { httpStep } from '@revisum/pack-http';",
     "export { request } from '../packs/http/request.ts';",
@@ -90,7 +89,7 @@ test('mutant: the checks report a pack import, a runner import of engine and an 
 // ---- The reveal allow-list -------------------------------------------------------------------------
 
 const REVEAL_CHECK = 'tools/check-secret-reveal.ts';
-// The allow-list before SPEC-32: the drivers' input modules and the engine's secret values module.
+// The allow-list before declared service calls: the drivers' input modules and the engine's secret values module.
 const EARLIER_ALLOWED = [
   'packages/driver-cdp/src/browser-session.ts',
   'packages/driver-playwright/src/playwright-driver.ts',
@@ -105,7 +104,7 @@ function revealAllowList(): string[] {
   return [...list[1].matchAll(/'([^']+)'/g)].map((match) => match[1] ?? '');
 }
 
-test('the reveal allow-list gains exactly one module, and it is in runner', { criterion: 'AC-SPEC-32-12' }, () => {
+test('the reveal allow-list gains exactly one module, and it is in runner', () => {
   const allowed = revealAllowList();
   const added = allowed.filter((path) => !EARLIER_ALLOWED.includes(path));
   assert.equal(added.length, 1, `modules added to the allow-list: ${JSON.stringify(added)}`);
@@ -124,7 +123,7 @@ function assertLintFailsOn(relativePath: string, lines: readonly string[]): void
   assert.ok(outcome.failureOutput.includes(fileName), `the lint failed, but did not name ${fileName}:\n${outcome.failureOutput}`);
 }
 
-test('the lint fails when another runner module imports reveal', { criterion: 'AC-SPEC-32-12', timeout: TIMEOUT }, () => {
+test('the lint fails when another runner module imports reveal', { timeout: TIMEOUT }, () => {
   assertLintFailsOn('packages/runner/src/planted-request-log.ts', [
     "import { reveal } from '@revisum/contracts';",
     '// Logs the headers of a service request.',
@@ -132,7 +131,7 @@ test('the lint fails when another runner module imports reveal', { criterion: 'A
   ]);
 });
 
-test('the lint fails when an engine module other than the secret values module imports reveal', { criterion: 'AC-SPEC-32-12', timeout: TIMEOUT }, () => {
+test('the lint fails when an engine module other than the secret values module imports reveal', { timeout: TIMEOUT }, () => {
   assertLintFailsOn('packages/engine/src/planted-request-builder.ts', [
     "import { reveal as show } from '@revisum/contracts';",
     '// Builds an authorization header as text.',
@@ -148,7 +147,7 @@ const NAMED_IN_ENTRY = [
   'call-timeout', 'service-unreachable', 'egress-blocked', 'response-not-json', 'response-too-large', 'field-missing', 'cleanup-failed',
 ];
 
-test('the 1.2 changelog entry names the call steps, settings and codes, in code type', { criterion: 'AC-SPEC-30-02' }, () => {
+test('the 1.2 changelog entry names the call steps, settings and codes, in code type', () => {
   const entry = changelogEntry('1.2');
   assert.match(entry, /^## 1\.2\b/);
   assert.deepEqual(NAMED_IN_ENTRY.filter((name) => !entry.includes(`\`${name}\``)), [], 'names the 1.2 entry leaves out');
@@ -156,7 +155,7 @@ test('the 1.2 changelog entry names the call steps, settings and codes, in code 
 
 // ---- A 1.2 golden plan for calls --------------------------------------------------------------------
 
-test('a 1.2 golden plan uses a call that remembers a field, an expectBackend and cleanup', { criterion: 'AC-SPEC-30-02' }, () => {
+test('a 1.2 golden plan uses a call that remembers a field, an expectBackend and cleanup', () => {
   const folder = join(REPOSITORY_ROOT, 'golden', 'plans');
   const plans = readdirSync(folder).filter((name) => name.endsWith('.json'))
     .map((name): Record<string, unknown> => JSON.parse(readFileSync(join(folder, name), 'utf8')))

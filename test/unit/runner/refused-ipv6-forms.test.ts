@@ -3,7 +3,6 @@
 // address inside, and the address just outside each edge is allowed, so a check that refused too
 // much would fail as surely as one that refused too little. The same forms are also tried through
 // the proxy with a fake resolver, so a name resolving to one is refused before anything is dialled.
-// See docs/specs/SPEC-07-isolated-runner-and-egress.md.
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
 import { checkResolvedAddress, startEgressProxy, type EgressProxy } from '@revisum/runner';
@@ -33,18 +32,18 @@ const ALLOWED: readonly { readonly range: string; readonly addresses: readonly s
 ];
 
 for (const { range, addresses } of REFUSED) {
-  test(`an IPv6 address in ${range} is refused, whatever it holds`, { criterion: 'AC-SPEC-07-02' }, () => {
+  test(`an IPv6 address in ${range} is refused, whatever it holds`, () => {
     for (const address of addresses) assert.equal(checkResolvedAddress(address), 'refused', address);
   });
 }
 
 for (const { range, addresses } of ALLOWED) {
-  test(`counter-example: an IPv6 address just outside ${range} is allowed`, { criterion: 'AC-SPEC-07-02' }, () => {
+  test(`counter-example: an IPv6 address just outside ${range} is allowed`, () => {
     for (const address of addresses) assert.equal(checkResolvedAddress(address), 'allowed', address);
   });
 }
 
-test('a private service still never reaches a metadata address written in the translated form', { criterion: 'AC-SPEC-07-02' }, () => {
+test('a private service still never reaches a metadata address written in the translated form', () => {
   assert.equal(checkResolvedAddress('::ffff:0:169.254.169.254', { privateService: true }), 'refused');
 });
 
@@ -75,7 +74,7 @@ after(async () => {
 });
 
 for (const name of ['translated.test', 'local-nat64.test', 'teredo.test']) {
-  test(`the declared name ${name} is refused at resolve time, as a request and as a tunnel`, { criterion: 'AC-SPEC-07-02' }, async () => {
+  test(`the declared name ${name} is refused at resolve time, as a request and as a tunnel`, async () => {
     const dialledBefore = upstream.dialled.length;
     assert.equal((await getThroughProxy(proxy.url, `http://${name}/`)).status, 403);
     assert.equal(await connectThroughProxy(proxy.url, `${name}:443`), 403);
@@ -83,7 +82,7 @@ for (const name of ['translated.test', 'local-nat64.test', 'teredo.test']) {
   });
 }
 
-test('counter-example: a declared name with a public IPv6 address is reached through the proxy', { criterion: 'AC-SPEC-07-02' }, async () => {
+test('counter-example: a declared name with a public IPv6 address is reached through the proxy', async () => {
   assert.equal((await getThroughProxy(proxy.url, 'http://public-ipv6.test/')).status, 200);
   assert.deepEqual(upstream.dialled.at(-1), { address: '2001:4860:4860::8888', port: 80 });
 });

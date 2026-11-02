@@ -1,7 +1,6 @@
 // The type system stops a forged Plan at compile time, but a cast defeats it. So run() checks the
 // brand again at run time, first: an object that looks like a plan but was not made by the plan
 // parser is refused before any driver call, log entry or stored artefact.
-// See docs/specs/SPEC-01-plan-language-and-parser.md.
 import assert from 'node:assert/strict';
 import { arch, platform } from 'node:os';
 import { test } from 'node:test';
@@ -65,7 +64,7 @@ const inputs = (plan: Authorised) => ({
 });
 
 for (const [name, forge] of FORGERIES) {
-  test(`run() refuses ${name} before any side effect`, { criterion: 'AC-SPEC-01-05' }, async () => {
+  test(`run() refuses ${name} before any side effect`, async () => {
     const watched = watchedPorts();
     // The forgery is cast past the gate too: the run-time check must catch it all the same.
     await assert.rejects(run(inputs(forge() as Authorised), watched.ports));
@@ -74,22 +73,22 @@ for (const [name, forge] of FORGERIES) {
     assert.equal(watched.storeWrites(), 0, 'nothing was stored');
   });
 
-  test(`assertBranded rejects ${name}`, { criterion: 'AC-SPEC-01-05' }, () => {
+  test(`assertBranded rejects ${name}`, () => {
     assert.throws(() => assertBranded(forge()));
   });
 }
 
-test('assertBranded rejects values that are not plans at all', { criterion: 'AC-SPEC-01-05' }, () => {
+test('assertBranded rejects values that are not plans at all', () => {
   for (const value of [null, undefined, 'plan', 42, [], {}]) assert.throws(() => assertBranded(value), `accepted ${JSON.stringify(value)}`);
 });
 
 // Counter-examples: the parser's own output passes the check and reaches the driver, so the
 // refusals above come from the forgery, not from the run being broken.
-test('assertBranded accepts a plan made by the parser', { criterion: 'AC-SPEC-01-05' }, () => {
+test('assertBranded accepts a plan made by the parser', () => {
   assert.doesNotThrow(() => assertBranded(genuinePlan()));
 });
 
-test('run() accepts a plan made by the parser and reaches the driver', { criterion: 'AC-SPEC-01-05' }, async () => {
+test('run() accepts a plan made by the parser and reaches the driver', async () => {
   const watched = watchedPorts();
   const result = await run(inputs(await authorisedPlan()), watched.ports);
   assert.equal(result.state, 'TargetUnavailable', 'the spy driver cannot launch, so the target is unavailable');
@@ -97,7 +96,7 @@ test('run() accepts a plan made by the parser and reaches the driver', { criteri
   assert.ok(watched.ports.events.read().length > 0, 'the run was logged');
 });
 
-test('a parser-made plan passes the check each time it is run', { criterion: 'AC-SPEC-01-05' }, async () => {
+test('a parser-made plan passes the check each time it is run', async () => {
   const plan = await authorisedPlan();
   for (let attempt = 0; attempt < 2; attempt++) {
     const watched = watchedPorts();

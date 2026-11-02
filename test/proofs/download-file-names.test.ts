@@ -8,7 +8,6 @@
 // no file anywhere holds the marker or carries the escaping name; the absolute path was never
 // written and /etc/passwd, where there is one, is unchanged.
 // A counter-example plants a file with the escaping name, to show the search finds one.
-// See docs/specs/SPEC-31-page-states-metadata-downloads-and-tabs.md.
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -36,7 +35,7 @@ const nearbyFolders = (): readonly string[] => [...new Set([
 ])];
 const escapingName = (): string => `revisum-escaped-${harness.nonce}`;
 
-test('every hostile file is served under the name it claims, with a marker in its bytes', { criterion: 'AC-SPEC-31-07' }, () => {
+test('every hostile file is served under the name it claims, with a marker in its bytes', () => {
   assert.deepEqual(harness.hostileFiles.map((file) => lastPart(file.fileName)), [
     'passwd', `${escapingName()}.txt`, `${escapingName()}-absolute.txt`, 'CON', 'NUL.txt',
   ]);
@@ -50,7 +49,7 @@ const HOSTILE_NAMES = [
 ];
 
 for (const [index, described] of HOSTILE_NAMES.entries()) {
-  test(`a download the server names ${described} is stored under a generated name inside the run's download folder, and nothing is written outside it`, { criterion: 'AC-SPEC-31-07', timeout: TIMEOUT }, async () => {
+  test(`a download the server names ${described} is stored under a generated name inside the run's download folder, and nothing is written outside it`, { timeout: TIMEOUT }, async () => {
     const file = harness.hostileFiles[index];
     assert.ok(file !== undefined);
     const passwordBefore = digestOf(SYSTEM_PASSWORD_FILE);
@@ -88,7 +87,7 @@ for (const [index, described] of HOSTILE_NAMES.entries()) {
 
 // Counter-example: a file with the escaping name written into the temporary folder is found by
 // the same searches, so their empty answers above mean something.
-test('counter-example: a planted file with the escaping name and a marker is found by both searches', { criterion: 'AC-SPEC-31-07' }, () => {
+test('counter-example: a planted file with the escaping name and a marker is found by both searches', () => {
   const startedAt = Date.now();
   const planted = join(tmpdir(), `${escapingName()}-planted.txt`);
   const marker = `planted-marker-${harness.nonce}`;

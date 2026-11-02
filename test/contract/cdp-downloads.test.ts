@@ -12,7 +12,6 @@
 // ends Denied, no input event reaches the page and the file is never requested.
 // Every file the server sends holds a marker; the disk is searched for it just before the run
 // closes its session, while the driver's own download folder still exists.
-// See docs/specs/SPEC-31-page-states-metadata-downloads-and-tabs.md.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import type { Session } from '@revisum/engine';
@@ -45,7 +44,7 @@ function storedAtClose(marker: string): DiskWatch {
 }
 
 describe('expectDownload checks on a CSV', () => {
-  test('every check passes on the CSV it describes, at its exact size', { criterion: 'AC-SPEC-31-06' }, async () => {
+  test('every check passes on the CSV it describes, at its exact size', async () => {
     const csv = harness.files.projects;
     const { result, requestedPaths } = await harness.runSteps(CDP_TARGET, [
       OPEN_DOWNLOADS,
@@ -72,7 +71,7 @@ describe('expectDownload checks on a CSV', () => {
   ];
 
   for (const failing of FAILING) {
-    test(`${failing.name} fails with assertion-failed and skips the rest`, { criterion: 'AC-SPEC-31-06' }, async () => {
+    test(`${failing.name} fails with assertion-failed and skips the rest`, async () => {
       const { result } = await harness.runSteps(CDP_TARGET, [OPEN_DOWNLOADS, download(NAME, EXPORT_CSV), check(failing.assertion()), STILL_READY]);
       assert.equal(result.state, 'Failed');
       assert.deepEqual(outcomes(result), [[0, 'passed', undefined], [1, 'passed', undefined], [2, 'failed', 'assertion-failed'], [3, 'skipped', undefined]]);
@@ -82,7 +81,7 @@ describe('expectDownload checks on a CSV', () => {
 
 describe('an empty download', () => {
   // An empty file proves nothing about what it excludes.
-  test('contentExcludes fails with assertion-failed on an empty file', { criterion: 'AC-SPEC-31-06' }, async () => {
+  test('contentExcludes fails with assertion-failed on an empty file', async () => {
     const { result } = await harness.runSteps(CDP_TARGET, [
       OPEN_DOWNLOADS, download(NAME, role('link', 'Export empty list')),
       check({ kind: 'mediaTypeEquals', value: 'text/csv' }), check({ kind: 'contentExcludes', value: 'Website relaunch' }), STILL_READY,
@@ -92,14 +91,14 @@ describe('an empty download', () => {
     ]);
   });
 
-  test('sizeAtLeast 1 fails with assertion-failed on an empty file', { criterion: 'AC-SPEC-31-06' }, async () => {
+  test('sizeAtLeast 1 fails with assertion-failed on an empty file', async () => {
     const { result } = await harness.runSteps(CDP_TARGET, [OPEN_DOWNLOADS, download(NAME, role('link', 'Export empty list')), check({ kind: 'sizeAtLeast', value: 1 })]);
     assert.deepEqual(outcomes(result), [[0, 'passed', undefined], [1, 'passed', undefined], [2, 'failed', 'assertion-failed']]);
   });
 });
 
 describe('a download over the project\'s limit', () => {
-  test('fails with download-too-large, skips its checks and leaves none of its bytes on disk', { criterion: 'AC-SPEC-31-06' }, async () => {
+  test('fails with download-too-large, skips its checks and leaves none of its bytes on disk', async () => {
     const watch = storedAtClose(harness.files.oversize.marker);
     const ran = await harness.runSteps(CDP_TARGET, [
       OPEN_DOWNLOADS, download(NAME, role('link', 'Export full history')), check({ kind: 'sizeAtLeast', value: 1 }), STILL_READY,
@@ -112,7 +111,7 @@ describe('a download over the project\'s limit', () => {
 
   // Counter-example: a file within the limit is kept on disk while the session is open, where
   // the search above looks, so finding nothing there means something.
-  test('counter-example: a CSV within the limit is stored on disk until the run closes', { criterion: 'AC-SPEC-31-06' }, async () => {
+  test('counter-example: a CSV within the limit is stored on disk until the run closes', async () => {
     const watch = storedAtClose(harness.files.projects.marker);
     const ran = await harness.runSteps(CDP_TARGET, [OPEN_DOWNLOADS, download(NAME, EXPORT_CSV), check({ kind: 'sizeAtLeast', value: 1 })], { beforeClose: watch.beforeClose });
     assert.equal(ran.result.state, 'Passed', JSON.stringify(ran.result.steps));
@@ -122,7 +121,7 @@ describe('a download over the project\'s limit', () => {
 });
 
 describe('a download step whose click starts no download', () => {
-  test('fails with no-download after the click reached the page, and skips its checks', { criterion: 'AC-SPEC-31-06' }, async () => {
+  test('fails with no-download after the click reached the page, and skips its checks', async () => {
     const { result, atClose } = await harness.runSteps(CDP_TARGET, [
       OPEN_DOWNLOADS, download(NAME, role('button', 'Prepare export')), check({ kind: 'sizeAtLeast', value: 1 }),
     ], { read: ['download-status', 'input-events'] });
@@ -133,7 +132,7 @@ describe('a download step whose click starts no download', () => {
 });
 
 describe('content checks on a file that is not text', () => {
-  test('a PNG passes its media type and size checks', { criterion: 'AC-SPEC-31-06' }, async () => {
+  test('a PNG passes its media type and size checks', async () => {
     const { result } = await harness.runSteps(CDP_TARGET, [
       OPEN_DOWNLOADS, download(NAME, role('link', 'Download logo')),
       check({ kind: 'mediaTypeEquals', value: 'image/png' }), check({ kind: 'sizeAtLeast', value: harness.files.logo.bytes.length }),
@@ -143,7 +142,7 @@ describe('content checks on a file that is not text', () => {
 
   // "PNG" is readable in the file's bytes, so reading them as text would wrongly pass.
   for (const assertion of [{ kind: 'contentContains', value: 'PNG' }, { kind: 'contentExcludes', value: 'GIF' }]) {
-    test(`${assertion.kind} on a PNG fails with download-not-text`, { criterion: 'AC-SPEC-31-06' }, async () => {
+    test(`${assertion.kind} on a PNG fails with download-not-text`, async () => {
       const { result } = await harness.runSteps(CDP_TARGET, [OPEN_DOWNLOADS, download(NAME, role('link', 'Download logo')), check(assertion), STILL_READY]);
       assert.deepEqual(outcomes(result), [[0, 'passed', undefined], [1, 'passed', undefined], [2, 'failed', 'download-not-text'], [3, 'skipped', undefined]]);
     });
@@ -151,7 +150,7 @@ describe('content checks on a file that is not text', () => {
 });
 
 describe('downloads and popups no download step asked for', () => {
-  test('in a plan with a download step, a later click that starts a download fails with unsupported-step and keeps no file', { criterion: 'AC-SPEC-31-09' }, async () => {
+  test('in a plan with a download step, a later click that starts a download fails with unsupported-step and keeps no file', async () => {
     const watch = storedAtClose(harness.files.invoices.marker);
     const ran = await harness.runSteps(CDP_TARGET, [
       OPEN_DOWNLOADS, download(NAME, EXPORT_CSV), check({ kind: 'sizeAtLeast', value: 1 }), click(role('link', 'Export invoices')), STILL_READY,
@@ -164,14 +163,14 @@ describe('downloads and popups no download step asked for', () => {
     assert.deepEqual(filesHolding(harness.files.invoices.marker, ran.startedAt), []);
   });
 
-  test('in a plan with no download step, a click that starts a download still fails with unsupported-step and keeps no file', { criterion: 'AC-SPEC-31-09' }, async () => {
+  test('in a plan with no download step, a click that starts a download still fails with unsupported-step and keeps no file', async () => {
     const watch = storedAtClose(harness.files.invoices.marker);
     const ran = await harness.runSteps(CDP_TARGET, [OPEN_DOWNLOADS, click(role('link', 'Export invoices')), STILL_READY], { beforeClose: watch.beforeClose });
     assert.deepEqual(outcomes(ran.result), [[0, 'passed', undefined], [1, 'failed', 'unsupported-step'], [2, 'skipped', undefined]]);
     assert.deepEqual(watch.found, []);
   });
 
-  test('a download step whose click opens a popup fails with unsupported-step, and the popup does not stay open', { criterion: 'AC-SPEC-31-09' }, async () => {
+  test('a download step whose click opens a popup fails with unsupported-step, and the popup does not stay open', async () => {
     const { result, atClose } = await harness.runSteps(CDP_TARGET, [
       OPEN_DOWNLOADS, download(NAME, role('button', 'Open help')), check({ kind: 'sizeAtLeast', value: 1 }), STILL_READY,
     ], {
@@ -188,7 +187,7 @@ describe('downloads and popups no download step asked for', () => {
 
 describe('the runtime guard on a download step', () => {
   // The control's test id hides its name from the static check; only the runtime guard sees it.
-  test('a download from a control named "Delete account" ends the run Denied, with no input event and no request for the file', { criterion: 'AC-SPEC-31-10' }, async () => {
+  test('a download from a control named "Delete account" ends the run Denied, with no input event and no request for the file', async () => {
     const { result, atClose, requestedPaths } = await harness.runSteps(CDP_TARGET, [
       OPEN_DOWNLOADS, download(NAME, testId('danger-export')), check({ kind: 'sizeAtLeast', value: 1 }),
     ]);
@@ -200,7 +199,7 @@ describe('the runtime guard on a download step', () => {
   });
 
   // Counter-example: the same file from a control named "Export CSV" is downloaded.
-  test('counter-example: the same file from a control named "Export CSV" is clicked, fetched and checked', { criterion: 'AC-SPEC-31-10' }, async () => {
+  test('counter-example: the same file from a control named "Export CSV" is clicked, fetched and checked', async () => {
     const { result, atClose, requestedPaths } = await harness.runSteps(CDP_TARGET, [
       OPEN_DOWNLOADS, download(NAME, testId('safe-export')), check({ kind: 'sizeAtLeast', value: 1 }),
     ]);

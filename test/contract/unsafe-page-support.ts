@@ -22,7 +22,6 @@
 // structuralLocators, domChecks and pageScripts in AdapterInfo.performs, and both drivers declare
 // all three. A script's source is one function expression, called once with one object of named
 // JSON arguments.
-// See docs/specs/SPEC-36-unsafe-plan-features.md.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { arch, platform } from 'node:os';

@@ -5,7 +5,6 @@
 // host-level run already loses it to egress-unenforceable, and its statement, and so its committed
 // hashes, stay as they were.
 // The loss reason is read as text, as replay.test.ts reads determinism-unpinned.
-// See docs/specs/SPEC-07-isolated-runner-and-egress.md.
 import assert from 'node:assert/strict';
 import { after, test } from 'node:test';
 import type { GuaranteeLevel } from '@revisum/contracts';
@@ -49,14 +48,14 @@ const statementWith = (egressEnforced: boolean) => guaranteeStatement({ mode: 'p
 // ---- Isolated, calling services, with no recording ---------------------------------------------------
 
 for (const { title, plan } of PLANS_WITH_CALLS) {
-  test(`at the isolated level, a plan with ${title} and no recording loses replay-identical with replies-not-recorded`, { criterion: 'AC-SPEC-07-05' }, async () => {
+  test(`at the isolated level, a plan with ${title} and no recording loses replay-identical with replies-not-recorded`, async () => {
     const { result } = await runScenario(callScenario(plan, {}, 'isolated'));
     assert.equal(result.state, 'Passed', JSON.stringify(result.steps));
     assert.ok(!result.guarantees.holds.includes('replay-identical'), JSON.stringify(result.guarantees));
     assert.deepEqual(lossLines(result), [NOT_RECORDED]);
   });
 
-  test(`at the isolated level, replayManifest refuses a plan with ${title} and no recording, as its statement says`, { criterion: 'AC-SPEC-07-05' }, async () => {
+  test(`at the isolated level, replayManifest refuses a plan with ${title} and no recording, as its statement says`, async () => {
     const ran = await runScenario(callScenario(plan, {}, 'isolated'));
     const claimed = replayManifest(ran.manifest);
     assert.equal(claimed.ok ? 'claimed' : claimed.error.code, 'replay-not-claimed');
@@ -65,7 +64,7 @@ for (const { title, plan } of PLANS_WITH_CALLS) {
   });
 }
 
-test('losing replay-identical takes nothing else away: egress and credentials still hold, and the level says host', { criterion: 'AC-SPEC-07-05' }, async () => {
+test('losing replay-identical takes nothing else away: egress and credentials still hold, and the level says host', async () => {
   const { result } = await runScenario(callScenario(CALLING_PLAN.plan, {}, 'isolated'));
   assert.deepEqual(lossLines(result), [NOT_RECORDED]);
   assert.ok(result.guarantees.holds.includes('egress-enforced'), JSON.stringify(result.guarantees));
@@ -76,7 +75,7 @@ test('losing replay-identical takes nothing else away: egress and credentials st
 // ---- Isolated, calling services, with a recording ---------------------------------------------------
 
 for (const { title, plan } of PLANS_WITH_CALLS) {
-  test(`counter-example: at the isolated level, a plan with ${title} keeps replay-identical when the project records replies`, { criterion: 'AC-SPEC-07-05' }, async () => {
+  test(`counter-example: at the isolated level, a plan with ${title} keeps replay-identical when the project records replies`, async () => {
     const ran = await runScenario(callScenario(plan, RECORD_REPLIES, 'isolated'), { record: true });
     assert.deepEqual(ran.result.guarantees, statementWith(true));
     assert.equal(replayManifest(ran.manifest).ok, true);
@@ -84,21 +83,21 @@ for (const { title, plan } of PLANS_WITH_CALLS) {
   });
 }
 
-test('at the isolated level, a project that sets the recording to false loses replay-identical like one that never mentions it',{ criterion: 'AC-SPEC-07-05' }, async () => {
+test('at the isolated level, a project that sets the recording to false loses replay-identical like one that never mentions it', async () => {
   const { result } = await runScenario(callScenario(CALLING_PLAN.plan, { replay: { recordReplies: false } }, 'isolated'));
   assert.deepEqual(lossLines(result), [NOT_RECORDED]);
 });
 
 // ---- Isolated, with no calls -----------------------------------------------------------------------------
 
-test('counter-example: at the isolated level, a plan with no calls keeps replay-identical and replays identically', { criterion: 'AC-SPEC-07-05' }, async () => {
+test('counter-example: at the isolated level, a plan with no calls keeps replay-identical and replays identically', async () => {
   const ran = await runScenario({ ...closedScenario(projectFileWith(), planOf([OPEN_ORDERS])), guaranteeLevel: 'isolated' });
   assert.deepEqual(ran.result.guarantees, statementWith(true));
   assert.equal(replayManifest(ran.manifest).ok, true);
   assert.equal(replayed((await replayRun(ran)).answer).verdict, 'identical');
 });
 
-test('counter-example: at the isolated level, a plan with no calls keeps it even in a project that declares calls', { criterion: 'AC-SPEC-07-05' }, async () => {
+test('counter-example: at the isolated level, a plan with no calls keeps it even in a project that declares calls', async () => {
   const { result, manifest } = await runScenario(callScenario(callPlanOf([]), {}, 'isolated'));
   assert.deepEqual(result.guarantees, statementWith(true));
   assert.equal(replayManifest(manifest).ok, true);
@@ -122,7 +121,7 @@ const AT_THE_ISOLATED_LEVEL: readonly { readonly title: string; readonly scenari
 ];
 
 for (const { title, scenario, record, claims } of AT_THE_ISOLATED_LEVEL) {
-  test(`at the isolated level, a run with ${title} ${claims ? 'claims a replay that replay allows' : 'claims no replay'}`, { criterion: 'AC-SPEC-07-05' }, async () => {
+  test(`at the isolated level, a run with ${title} ${claims ? 'claims a replay that replay allows' : 'claims no replay'}`, async () => {
     const ran = await runScenario(scenario, { record });
     assert.equal(ran.result.guarantees.holds.includes('replay-identical'), claims, JSON.stringify(ran.result.guarantees));
     if (claims) assert.equal(replayManifest(ran.manifest).ok, true, 'the run claims a replay that replay refuses');
@@ -132,14 +131,14 @@ for (const { title, scenario, record, claims } of AT_THE_ISOLATED_LEVEL) {
 // ---- The host level, whose committed hashes must stay valid ---------------------------------------------
 
 for (const { title, plan } of PLANS_WITH_CALLS) {
-  test(`at the host level, a plan with ${title} and no recording keeps the statement it always had`, { criterion: 'AC-SPEC-07-05' }, async () => {
+  test(`at the host level, a plan with ${title} and no recording keeps the statement it always had`, async () => {
     const { result } = await runScenario(callScenario(plan, {}, 'host'));
     assert.deepEqual(result.guarantees, statementWith(false));
     assert.ok(!lossLines(result).includes(NOT_RECORDED), JSON.stringify(result.guarantees.lost));
   });
 }
 
-test('a run given no level has the very hashes of a host run, with calls and no recording', { criterion: 'AC-SPEC-07-05' }, async () => {
+test('a run given no level has the very hashes of a host run, with calls and no recording', async () => {
   const host = await runScenario(callScenario(CALLING_PLAN.plan, {}, 'host'));
   const unset = await runScenario(callScenario(CALLING_PLAN.plan, {}));
   assert.deepEqual(unset.result.guarantees, statementWith(false));
@@ -147,7 +146,7 @@ test('a run given no level has the very hashes of a host run, with calls and no 
   assert.equal(unset.result.manifestHash, host.result.manifestHash);
 });
 
-test('at the host level, a recorded plan with calls keeps the statement it always had, and replays identically', { criterion: 'AC-SPEC-07-05' }, async () => {
+test('at the host level, a recorded plan with calls keeps the statement it always had, and replays identically', async () => {
   const ran = await runScenario(callScenario(CALLING_PLAN.plan, RECORD_REPLIES, 'host'), { record: true });
   assert.deepEqual(ran.result.guarantees, statementWith(false));
   assert.equal(replayed((await replayRun(ran)).answer).verdict, 'identical');

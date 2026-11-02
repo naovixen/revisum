@@ -1,4 +1,4 @@
-// Shared setup for SPEC-08's engine tests: the run manifest, its perturbations and replay.
+// Shared setup for the replay engine tests: the run manifest, its perturbations and replay.
 //
 //   - replay(), decodeManifest(), recordingPorts(), replayedServices() and replayedDatabaseCommands()
 //     call the engine's functions, looked up at run time so these tests compile before the functions
@@ -24,7 +24,6 @@
 //   - a recording names its schema in a `schema` field, as the manifest does; in it, each reply's
 //     entry holds its request's sha256 as the entry's only 64-hex string, and a text body or output
 //     is kept as its text, so a test can find and change both.
-// See docs/specs/SPEC-08-manifest-and-replay.md.
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -55,7 +54,7 @@ export type RunPins = {
   readonly commit: string | null;
 };
 
-// The manifest fields SPEC-08 adds, each optional, as the spec's RunManifest block names them. Once
+// The manifest fields replay adds, each optional, as the spec's RunManifest block names them. Once
 // RunManifest has them, this intersection adds nothing; until then it lets the perturbation table
 // name them.
 export type PinnedManifestFields = {

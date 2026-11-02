@@ -39,7 +39,7 @@ const flatten = (node: A11yNode): A11yNode[] => [node, ...node.children.flatMap(
 
 for (const targetId of CONTRACT_TARGETS) {
   describe(`contract: ${targetId}`, () => {
-    test('runs the sign-up flow to Passed and captures two PNGs', { criterion: 'AC-SPEC-00-01' }, async () => {
+    test('runs the sign-up flow to Passed and captures two PNGs', async () => {
       const { result, store } = await testHarness.run(testHarness.plan(signupPlan([targetId])), targetId);
       assert.equal(result.state, 'Passed', JSON.stringify(result.steps.filter((step) => step.outcome !== 'passed')));
       const shots = store.references();
@@ -47,7 +47,7 @@ for (const targetId of CONTRACT_TARGETS) {
       for (const reference of shots) assert.deepEqual([...(store.get(reference.name) ?? []).slice(0, 4)], PNG_SIGNATURE);
     });
 
-    test('pins locale, time zone, clock, randomness, motion and colour scheme', { criterion: 'AC-SPEC-00-01' }, async () => {
+    test('pins locale, time zone, clock, randomness, motion and colour scheme', async () => {
       const expected = {
         'env-lang': LOCALE, 'env-tz': TIMEZONE, 'env-now': new Date(FIXED_TIME_MILLISECONDS).toISOString(), 'env-hour': '19',
         'env-random': seededRandom(SEED).next().toFixed(6), 'env-motion': 'reduce', 'env-scheme': 'dark',
@@ -56,7 +56,7 @@ for (const targetId of CONTRACT_TARGETS) {
       assert.equal(result.state, 'Passed', JSON.stringify(result.steps.filter((step) => step.outcome !== 'passed')));
     });
 
-    test('a missing element fails with not-found and skips the rest', { criterion: 'AC-SPEC-00-01' }, async () => {
+    test('a missing element fails with not-found and skips the rest', async () => {
       const plan = testHarness.plan(stepsPlan([targetId], [
         { type: 'click', locator: { by: 'role', role: 'button', name: 'Does not exist' } },
         { type: 'capture', name: 'never' },
@@ -67,7 +67,7 @@ for (const targetId of CONTRACT_TARGETS) {
       assert.equal(result.steps[2]?.outcome, 'skipped');
     });
 
-    test('a non-unique locator fails with ambiguous (no first-match guessing)', { criterion: 'AC-SPEC-00-01' }, async () => {
+    test('a non-unique locator fails with ambiguous (no first-match guessing)', async () => {
       const plan = testHarness.plan(stepsPlan([targetId], [
         { type: 'expect', locator: { by: 'role', role: 'link', name: 'Learn more' }, assert: { kind: 'visible' } },
       ]));
@@ -76,7 +76,7 @@ for (const targetId of CONTRACT_TARGETS) {
       assert.equal(result.steps[1]?.code, 'ambiguous');
     });
 
-    test('the accessibility audit finds the seeded image-alt issue, and gate mode fails on it', { criterion: 'AC-SPEC-00-01' }, async () => {
+    test('the accessibility audit finds the seeded image-alt issue, and gate mode fails on it', async () => {
       const report = await testHarness.run(testHarness.plan(stepsPlan([targetId], [{ type: 'a11yAudit', mode: 'report' }])), targetId);
       assert.equal(report.result.state, 'Passed');
       assert.deepEqual(report.result.steps[1]?.findings?.map((finding) => finding.ruleId), ['image-alt']);
@@ -85,14 +85,14 @@ for (const targetId of CONTRACT_TARGETS) {
       assert.equal(gate.result.steps[1]?.code, 'a11y-violations');
     });
 
-    test('blocks every origin not on the allow-list and records it', { criterion: 'AC-SPEC-00-01' }, async () => {
+    test('blocks every origin not on the allow-list and records it', async () => {
       const { result, events } = await testHarness.run(testHarness.plan(stepsPlan([targetId], [])), targetId);
       assert.equal(result.state, 'Passed');
       assert.deepEqual(result.blockedOrigins, ['https://tracker.example']);
       assert.ok(events.read().some((event) => event.kind === 'network.blocked' && event.origin === 'https://tracker.example'));
     });
 
-    test('accessibility snapshot exposes the heading and named form controls', { criterion: 'AC-SPEC-00-01' }, async () => {
+    test('accessibility snapshot exposes the heading and named form controls', async () => {
       const nodes = await withSession(targetId, async (session) => {
         assert.ok((await session.navigate(`${testHarness.server.origin}/`)).ok);
         return flatten(await session.accessibilitySnapshot());
@@ -103,7 +103,7 @@ for (const targetId of CONTRACT_TARGETS) {
       assert.ok(has('button', 'Create account'));
     });
 
-    test('probes report value, box and PII sensitivity consistently', { criterion: 'AC-SPEC-00-01' }, async () => {
+    test('probes report value, box and PII sensitivity consistently', async () => {
       const probe = await withSession(targetId, async (session) => {
         assert.ok((await session.navigate(`${testHarness.server.origin}/`)).ok);
         const fill = parsedStep({ type: 'fill', locator: { by: 'label', label: 'Email' }, value: EMAIL }, 'fill');

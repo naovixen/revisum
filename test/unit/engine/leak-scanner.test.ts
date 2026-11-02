@@ -2,7 +2,6 @@
 // a prefix and with its case changed, in text and in image bytes. Each form is planted in its own
 // file; clean files and other secrets are counter-examples, so a scanner that reports everything
 // or nothing fails. The run-wide scan with its planted canary is in test/proofs/secret-leak-scan.test.ts.
-// See docs/specs/SPEC-04-secrets-and-redaction.md.
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -37,7 +36,7 @@ const PLANTED: readonly { readonly fileName: string; readonly form: LeakForm; re
 ];
 
 for (const planted of PLANTED) {
-  test(`the scanner reports a ${planted.form} echo planted in ${planted.fileName}, naming the file and the secret`, { criterion: 'AC-SPEC-04-04' }, () => {
+  test(`the scanner reports a ${planted.form} echo planted in ${planted.fileName}, naming the file and the secret`, () => {
     const value = fakeSecretValue();
     const secret = resolvedSecret('ACCOUNT_TOKEN', value);
     const path = plant(planted.fileName, planted.echo(value));
@@ -48,7 +47,7 @@ for (const planted of PLANTED) {
   });
 }
 
-test('the scanner reports a raw echo inside image bytes, such as a PNG text chunk', { criterion: 'AC-SPEC-04-04' }, () => {
+test('the scanner reports a raw echo inside image bytes, such as a PNG text chunk', () => {
   const value = fakeSecretValue();
   const secret = resolvedSecret('ACCOUNT_TOKEN', value);
   const signature = [137, 80, 78, 71, 13, 10, 26, 10];
@@ -58,7 +57,7 @@ test('the scanner reports a raw echo inside image bytes, such as a PNG text chun
   assert.ok(found.some((leak) => leak.form === 'raw'), `forms reported: ${found.map((leak) => leak.form).join(', ')}`);
 });
 
-test('the scanner reports every planted file at once and nothing in the clean ones', { criterion: 'AC-SPEC-04-04' }, () => {
+test('the scanner reports every planted file at once and nothing in the clean ones', () => {
   const value = fakeSecretValue();
   const secret = resolvedSecret('ACCOUNT_TOKEN', value);
   const plantedPaths = PLANTED.map((planted) => plant(`all-${planted.fileName}`, planted.echo(value)));
@@ -71,19 +70,19 @@ test('the scanner reports every planted file at once and nothing in the clean on
   for (const path of cleanPaths) assert.deepEqual(leaksIn(leaks, path), [], `a leak reported in clean file ${path}`);
 });
 
-test('counter-example: another secret of the same shape in a file is not reported as this one', { criterion: 'AC-SPEC-04-04' }, () => {
+test('counter-example: another secret of the same shape in a file is not reported as this one', () => {
   const ours = resolvedSecret('ACCOUNT_TOKEN', fakeSecretValue());
   const otherValue = fakeSecretValue();
   const path = plant('other-secret.json', JSON.stringify({ observed: otherValue, encoded: echoForms(otherValue).base64 }));
   assert.deepEqual(leakScanner().scan([path], [ours]), []);
 });
 
-test('counter-example: with no secrets to look for, a file holding a value reports nothing', { criterion: 'AC-SPEC-04-04' }, () => {
+test('counter-example: with no secrets to look for, a file holding a value reports nothing', () => {
   const path = plant('unwatched.json', JSON.stringify({ observed: fakeSecretValue() }));
   assert.deepEqual(leakScanner().scan([path], []), []);
 });
 
-test('the scanner tells two secrets apart and names the one each file echoes', { criterion: 'AC-SPEC-04-04' }, () => {
+test('the scanner tells two secrets apart and names the one each file echoes', () => {
   const firstValue = fakeSecretValue();
   const secondValue = fakeSecretValue();
   const first = resolvedSecret('ACCOUNT_TOKEN', firstValue);

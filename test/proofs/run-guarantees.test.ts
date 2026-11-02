@@ -38,7 +38,7 @@ const spyPorts = (drivers: ReadonlyMap<string, BrowserDriver>) => ({
 
 describe('(a) replay: same manifest, same result hash', () => {
   for (const targetId of CONTRACT_TARGETS) {
-    test(`${targetId}: two runs give identical manifest, result hash and event log`, { criterion: 'AC-SPEC-00-01' }, async () => {
+    test(`${targetId}: two runs give identical manifest, result hash and event log`, async () => {
       const plan = testHarness.plan(signupPlan([targetId]));
       const first = await testHarness.run(plan, targetId);
       const second = await testHarness.run(plan, targetId);
@@ -53,7 +53,7 @@ describe('(a) replay: same manifest, same result hash', () => {
     });
   }
 
-  test('the manifest pins plan, target, adapter, browser, seeds, clock, fixtures, host and engine version', { criterion: 'AC-SPEC-00-01' }, async () => {
+  test('the manifest pins plan, target, adapter, browser, seeds, clock, fixtures, host and engine version', async () => {
     const { result } = await testHarness.run(testHarness.plan(stepsPlan(['playwright-chromium'], [])), 'playwright-chromium');
     const manifest = result.manifest;
     assert.ok(manifest);
@@ -70,7 +70,7 @@ describe('(a) replay: same manifest, same result hash', () => {
 // ---- (b) AI containment -------------------------------------------------------------------------
 
 describe('(b) AI containment: hostile plans are rejected before any side effect', () => {
-  test('every hostile plan is rejected with the expected code and the driver is never touched', { criterion: 'AC-SPEC-00-01' }, async () => {
+  test('every hostile plan is rejected with the expected code and the driver is never touched', async () => {
     const spies = [spyDriver('playwright'), spyDriver('cdp')];
     const ports = spyPorts(new Map(spies.map((spy) => [spy.info.id, spy])));
     const hostile = hostilePlans(testHarness.server.origin);
@@ -84,7 +84,7 @@ describe('(b) AI containment: hostile plans are rejected before any side effect'
     assert.ok(hostile.length >= 12);
   });
 
-  test('positive control: a valid plan does reach the (spy) driver', { criterion: 'AC-SPEC-00-01' }, async () => {
+  test('positive control: a valid plan does reach the (spy) driver', async () => {
     const spy = spyDriver('playwright');
     const outcome = await runUntrusted(signupPlan(['playwright-chromium']), testHarness.parse, testHarness.base(), spyPorts(new Map([['playwright', spy]])));
     assert.ok(Array.isArray(outcome));
@@ -92,7 +92,7 @@ describe('(b) AI containment: hostile plans are rejected before any side effect'
     assert.equal(spy.calls, 2);
   });
 
-  test('an AI planner\'s output is only usable after parsing', { criterion: 'AC-SPEC-00-01' }, async () => {
+  test('an AI planner\'s output is only usable after parsing', async () => {
     const hostile: AiPlanner = { propose: async () => ({ ...signupPlan(['playwright-chromium']), steps: [{ type: 'eval', code: '1' }] }) };
     const honest: AiPlanner = { propose: async () => signupPlan(['playwright-chromium']) };
     const throws: AiPlanner = { propose: async () => { throw new Error('model refused'); } };
@@ -102,7 +102,7 @@ describe('(b) AI containment: hostile plans are rejected before any side effect'
     assert.equal((await planWithAi(honest, spec, testHarness.parse)).ok, true);
   });
 
-  test('errors never echo the hostile value', { criterion: 'AC-SPEC-00-01' }, async () => {
+  test('errors never echo the hostile value', async () => {
     const parsed = testHarness.parse({ ...signupPlan(['playwright-chromium']), meta: { featureId: 'X-1', specReference: 's', title: '<script>steal()</script>' } });
     assert.ok(!parsed.ok);
     assert.ok(!JSON.stringify(parsed.error).includes('steal'));
@@ -112,13 +112,13 @@ describe('(b) AI containment: hostile plans are rejected before any side effect'
 // ---- (c) Logging manifest -----------------------------------------------------------------------
 
 describe('(c) logging manifest', () => {
-  test('a non-manifest field is rejected at run time (and at compile time: compile-time-guarantees.ts)', { criterion: 'AC-SPEC-00-01' }, () => {
+  test('a non-manifest field is rejected at run time (and at compile time: compile-time-guarantees.ts)', () => {
     const logger = manifestLogger(memoryRunEventSink(), defaultRedactor(), 'run');
     const smuggled: Record<string, unknown> = { kind: 'step.end', email: EMAIL };
     assert.throws(() => logger.log(smuggled as never), LoggingManifestViolation);
   });
 
-  test('every event of a real run uses only manifest fields and contains no typed value', { criterion: 'AC-SPEC-00-01' }, async () => {
+  test('every event of a real run uses only manifest fields and contains no typed value', async () => {
     const { events } = await testHarness.run(testHarness.plan(signupPlan(['playwright-chromium'])), 'playwright-chromium');
     const allowed = new Set(Object.keys(LOGGING_MANIFEST));
     for (const event of events.read()) for (const key of Object.keys(event)) assert.ok(allowed.has(key), `field ${key}`);
@@ -145,7 +145,7 @@ function blackFraction(png: Uint8Array, box: Box): number {
 
 describe('(d) redaction by default', () => {
   for (const targetId of CONTRACT_TARGETS) {
-    test(`${targetId}: PII fields are solid black in screenshots, and visible without the mask`, { criterion: 'AC-SPEC-00-01' }, async () => {
+    test(`${targetId}: PII fields are solid black in screenshots, and visible without the mask`, async () => {
       const target = testHarness.project.matrix.find((candidate) => candidate.id === targetId);
       assert.ok(target);
       const driver = makeDrivers().get(target.adapter);
@@ -180,7 +180,7 @@ describe('(d) redaction by default', () => {
       }
     });
 
-    test(`${targetId}: PII text never reaches events or results`, { criterion: 'AC-SPEC-00-01' }, async () => {
+    test(`${targetId}: PII text never reaches events or results`, async () => {
       const fill = [
         { type: 'fill', locator: { by: 'label', label: 'Full name' }, value: NAME },
         { type: 'fill', locator: { by: 'label', label: 'Email' }, value: EMAIL },
@@ -206,7 +206,7 @@ describe('(d) redaction by default', () => {
 // ---- (e) No silent target substitution ----------------------------------------------------------
 
 describe('(e) targets are never substituted', () => {
-  test('unsupported device and unregistered adapter become explicit TargetUnavailable results', { criterion: 'AC-SPEC-00-01' }, async () => {
+  test('unsupported device and unregistered adapter become explicit TargetUnavailable results', async () => {
     const plan = testHarness.plan(stepsPlan(['playwright-firefox-phone', 'appium-android'], []));
     const phone = await testHarness.run(plan, 'playwright-firefox-phone');
     const appium = await testHarness.run(plan, 'appium-android');
@@ -217,7 +217,7 @@ describe('(e) targets are never substituted', () => {
     assert.equal(phone.store.references().length + appium.store.references().length, 0);
   });
 
-  test('a target missing from the plan is refused even if it is in the matrix', { criterion: 'AC-SPEC-00-01' }, async () => {
+  test('a target missing from the plan is refused even if it is in the matrix', async () => {
     const plan = testHarness.plan(stepsPlan(['playwright-chromium'], []));
     const ran = await testHarness.run(plan, 'playwright-webkit');
     assert.equal(ran.result.state, 'TargetUnavailable');
@@ -228,7 +228,7 @@ describe('(e) targets are never substituted', () => {
 // ---- (f) Release artefacts ----------------------------------------------------------------------
 
 describe('(f) release artefacts', () => {
-  test('the release-note draft is deterministic, value-free and never replaced by AI', { criterion: 'AC-SPEC-00-01' }, async () => {
+  test('the release-note draft is deterministic, value-free and never replaced by AI', async () => {
     const plan = testHarness.plan(signupPlan(['playwright-chromium']));
     const first = await testHarness.run(plan, 'playwright-chromium');
     const second = await testHarness.run(plan, 'playwright-chromium');

@@ -6,7 +6,6 @@
 // Plan language 1.3 adds six features, each off unless the trusted project.json enables it under
 // `unsafeFeatures`: css locators, XPath locators, DOM checks, named page scripts, inline page
 // scripts (which need named page scripts too) and database commands.
-// See docs/specs/SPEC-36-unsafe-plan-features.md.
 import { ORIGIN, TARGET_ID, TEST_SERVICE, TEST_SERVICE_SECRET_NAMES, testProjectInput, type JsonRecord } from './plan-examples.ts';
 
 export { ORIGIN, TARGET_ID, type JsonRecord };

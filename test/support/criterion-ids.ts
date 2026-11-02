@@ -3,7 +3,7 @@
 // spec, a planted file) build it here instead of writing it out.
 const twoDigits = (value: number): string => String(value).padStart(2, '0');
 
-// "SPEC-07" for 7.
+// For 7, "SPEC-" followed by "07".
 export const specId = (spec: number): string => `SPEC-${twoDigits(spec)}`;
 
 // The criterion id for spec 7, criterion 3 is "AC-" then specId(7) then "-03".

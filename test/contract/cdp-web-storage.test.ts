@@ -4,7 +4,6 @@
 // is on another origin than the entry's fails with storage-origin-mismatch and writes nothing,
 // on either origin. The counter-examples show the checks can fail, and that the same write
 // succeeds once the page is on the entry's origin.
-// See docs/specs/SPEC-33-network-stubs-request-checks-and-storage.md.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import type { Session } from '@revisum/engine';
@@ -23,7 +22,7 @@ const dockedShown = (value: string, criterionId: string) => textEquals(testId('s
 const greetingShown = (value: string, criterionId: string) => textEquals(testId('stored-greeting'), value, criterionId);
 
 describe('writing, checking and removing a storage entry', () => {
-  test('after setStorage, expectStorage sees the value and the page reads it; after removeStorage it is absent', { criterion: 'AC-SPEC-33-10' }, async () => {
+  test('after setStorage, expectStorage sees the value and the page reads it; after removeStorage it is absent', async () => {
     const ran = await harness.runSteps(CDP_TARGET, [
       openStorage(),
       dockedShown('(none)', 'storage.nothing-yet'),
@@ -40,7 +39,7 @@ describe('writing, checking and removing a storage entry', () => {
     assertPassed(ran);
   });
 
-  test('a string value is written to session storage as it is', { criterion: 'AC-SPEC-33-10' }, async () => {
+  test('a string value is written to session storage as it is', async () => {
     const ran = await harness.runSteps(CDP_TARGET, [
       openStorage(),
       setStorage('visitGreeting'),
@@ -52,7 +51,7 @@ describe('writing, checking and removing a storage entry', () => {
     assertPassed(ran);
   });
 
-  test('a false argument is stored as false, and a later write replaces the value', { criterion: 'AC-SPEC-33-10' }, async () => {
+  test('a false argument is stored as false, and a later write replaces the value', async () => {
     const ran = await harness.runSteps(CDP_TARGET, [
       openStorage(),
       setStorage('menuDocked', { docked: false }),
@@ -84,7 +83,7 @@ describe('writing, checking and removing a storage entry', () => {
     },
   ];
   for (const failing of FAILING) {
-    test(`counter-example: expectStorage ${failing.name} fails`, { criterion: 'AC-SPEC-33-10' }, async () => {
+    test(`counter-example: expectStorage ${failing.name} fails`, async () => {
       const ran = await harness.runSteps(CDP_TARGET, [openStorage(), ...failing.steps()]);
       const all = outcomes(ran.result);
       assert.deepEqual(all.at(-1), [all.length - 1, 'failed', 'assertion-failed'], JSON.stringify(ran.result.steps));
@@ -94,7 +93,7 @@ describe('writing, checking and removing a storage entry', () => {
 });
 
 describe('a write while the page is on another origin', () => {
-  test('setStorage for an entry on another origin fails with storage-origin-mismatch and writes nothing on either origin', { criterion: 'AC-SPEC-33-10' }, async () => {
+  test('setStorage for an entry on another origin fails with storage-origin-mismatch and writes nothing on either origin', async () => {
     const seen: { otherOrigin: string | null } = { otherOrigin: null };
     const readOtherOrigin = async (session: Session): Promise<void> => {
       const opened = await session.navigate(harness.otherUrl('/storage.html'));
@@ -112,7 +111,7 @@ describe('a write while the page is on another origin', () => {
     assert.equal(seen.otherOrigin, '(none)', 'nothing was written to the entry\'s origin');
   });
 
-  test('counter-example: the same write with the page on the entry\'s origin succeeds, and that origin\'s page reads it', { criterion: 'AC-SPEC-33-10' }, async () => {
+  test('counter-example: the same write with the page on the entry\'s origin succeeds, and that origin\'s page reads it', async () => {
     const ran = await harness.runSteps(CDP_TARGET, [
       navigate(harness.otherUrl('/storage.html')),
       setStorage('otherMenuDocked', { docked: true }),

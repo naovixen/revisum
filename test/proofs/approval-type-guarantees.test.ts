@@ -3,7 +3,6 @@
 // a declared approval opens it exactly as a verified one does. These are compile-time
 // guarantees: the guarantee file must compile, and each line marked as an expected error must be
 // one.
-// See docs/specs/SPEC-02-project-trust-and-approval.md.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -31,28 +30,28 @@ const assertMutantFails = (marker: string): void => {
   assert.equal(compiled.errors.length, 1, compiled.output);
 };
 
-test('the approval guarantee file compiles: declared and verified approvals both pass a gate that takes Approval', { criterion: 'AC-SPEC-02-18', timeout: TIMEOUT }, () => {
+test('the approval guarantee file compiles: declared and verified approvals both pass a gate that takes Approval', { timeout: TIMEOUT }, () => {
   const compiled = compileFiles([GUARANTEE_FILE]);
   assert.equal(compiled.passed, true, compiled.output);
 });
 
-test('the actor for a local decision with no proof cannot be passed to a gate', { criterion: 'AC-SPEC-02-11', timeout: TIMEOUT }, () => {
+test('the actor for a local decision with no proof cannot be passed to a gate', { timeout: TIMEOUT }, () => {
   assertMutantFails('localDecisionAtGate');
 });
 
-test('the actor for an MCP decision cannot be passed to a gate', { criterion: 'AC-SPEC-02-17', timeout: TIMEOUT }, () => {
+test('the actor for an MCP decision cannot be passed to a gate', { timeout: TIMEOUT }, () => {
   assertMutantFails('mcpDecisionAtGate');
 });
 
-test('an approval written as an object literal cannot be passed to a gate', { criterion: 'AC-SPEC-02-17', timeout: TIMEOUT }, () => {
+test('an approval written as an object literal cannot be passed to a gate', { timeout: TIMEOUT }, () => {
   assertMutantFails("proofKind: 'agent-lockdown-merge'");
 });
 
-test('unverified() refuses any source other than local, MCP or token', { criterion: 'AC-SPEC-02-11', timeout: TIMEOUT }, () => {
+test('unverified() refuses any source other than local, MCP or token', { timeout: TIMEOUT }, () => {
   assertMutantFails('personSource');
 });
 
-test('every expected-error marker in the guarantee file is checked by a test above', { criterion: 'AC-SPEC-02-17' }, () => {
+test('every expected-error marker in the guarantee file is checked by a test above', () => {
   const markers = readFileSync(GUARANTEE_FILE, 'utf8').split(/\r?\n/).filter((line) => EXPECTED_ERROR_LINE.test(line)).length;
   assert.equal(markers, 4);
 });

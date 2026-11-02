@@ -1,6 +1,5 @@
 // The minimal audit event sink: one JSON Lines entry per event, appended, never rewritten. If
 // anything else truncates or rewrites the file, the next append is refused as not-append-only.
-// See docs/specs/SPEC-27-shared-types-and-events.md.
 import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync, rmSync, truncateSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -42,7 +41,7 @@ function appendOk(event: EventInput, actor: DerivedActor): number {
 
 // ---- One entry per event ------------------------------------------------------------------------
 
-test('writes exactly one newline-terminated JSON line per appended event, in order', { criterion: 'AC-SPEC-27-03' }, () => {
+test('writes exactly one newline-terminated JSON line per appended event, in order', () => {
   appendOk(SUBMITTED, AGENT);
   appendOk(APPROVED, FOUNDER);
   appendOk(FINISHED, FOUNDER);
@@ -54,7 +53,7 @@ test('writes exactly one newline-terminated JSON line per appended event, in ord
   assert.deepEqual(written.map((entry) => entry['kind']), ['plan.submitted', 'plan.approved', 'run.finished']);
 });
 
-test('each entry records the event and the derived actor it was appended with', { criterion: 'AC-SPEC-27-03' }, () => {
+test('each entry records the event and the derived actor it was appended with', () => {
   appendOk(SUBMITTED, AGENT);
   appendOk(APPROVED, FOUNDER);
 
@@ -68,7 +67,7 @@ test('each entry records the event and the derived actor it was appended with', 
   assert.equal(approved?.['actorType'], 'person-declared');
 });
 
-test('returns consecutive sequence numbers, one per appended event', { criterion: 'AC-SPEC-27-03' }, () => {
+test('returns consecutive sequence numbers, one per appended event', () => {
   const first = appendOk(SUBMITTED, AGENT);
   const second = appendOk(APPROVED, FOUNDER);
   const third = appendOk(FINISHED, FOUNDER);
@@ -78,7 +77,7 @@ test('returns consecutive sequence numbers, one per appended event', { criterion
 
 // ---- Earlier lines never change -----------------------------------------------------------------
 
-test('leaves every earlier line byte for byte unchanged when later events are appended', { criterion: 'AC-SPEC-27-03' }, () => {
+test('leaves every earlier line byte for byte unchanged when later events are appended', () => {
   appendOk(SUBMITTED, AGENT);
   const afterOne = readText();
   appendOk(APPROVED, FOUNDER);
@@ -92,7 +91,7 @@ test('leaves every earlier line byte for byte unchanged when later events are ap
 
 // ---- Truncation and rewriting are refused -------------------------------------------------------
 
-test('refuses the next append with not-append-only after the file was truncated to its first line', { criterion: 'AC-SPEC-27-03' }, () => {
+test('refuses the next append with not-append-only after the file was truncated to its first line', () => {
   appendOk(SUBMITTED, AGENT);
   const firstLine = readText();
   appendOk(APPROVED, FOUNDER); // the control: while only the sink writes, appends are accepted
@@ -102,14 +101,14 @@ test('refuses the next append with not-append-only after the file was truncated 
   assert.equal(readText(), firstLine, 'the refused append still wrote to the file');
 });
 
-test('refuses the next append with not-append-only after the file was emptied', { criterion: 'AC-SPEC-27-03' }, () => {
+test('refuses the next append with not-append-only after the file was emptied', () => {
   appendOk(SUBMITTED, AGENT);
   truncateSync(path, 0);
   assert.deepEqual(sink.append(APPROVED, FOUNDER), { ok: false, error: { code: 'not-append-only' } });
   assert.equal(readText(), '');
 });
 
-test('refuses the next append with not-append-only after an earlier line was rewritten', { criterion: 'AC-SPEC-27-03' }, () => {
+test('refuses the next append with not-append-only after an earlier line was rewritten', () => {
   appendOk(SUBMITTED, AGENT);
   appendOk(APPROVED, FOUNDER);
   // Someone relabels the agent's event as a person's.
@@ -121,7 +120,7 @@ test('refuses the next append with not-append-only after an earlier line was rew
   assert.equal(readText(), rewritten, 'the refused append still wrote to the file');
 });
 
-test('refuses the next append with not-append-only after an earlier line was rewritten to the same length', { criterion: 'AC-SPEC-27-03' }, () => {
+test('refuses the next append with not-append-only after an earlier line was rewritten to the same length', () => {
   appendOk(SUBMITTED, AGENT);
   appendOk(APPROVED, FOUNDER);
   // A same-size edit: a check of the file's length alone would miss it.

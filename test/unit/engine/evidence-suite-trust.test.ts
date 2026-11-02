@@ -6,7 +6,6 @@
 // the protected branch's suite files, and the change's own version runs only as a proposal pass,
 // labelled proposal, which never opens the merge gate. So an agent cannot make a run pass by
 // editing the tests in the same change.
-// See docs/specs/SPEC-35-evidence-mode.md and docs/specs/SPEC-02-project-trust-and-approval.md.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -36,7 +35,7 @@ const protectEvidenceMode = (fixture: FixtureRepository): void => { fixture.prot
 
 // ---- A change that turns evidence mode on or edits it -------------------------------------------
 
-test('a change that turns evidence mode on in its own project.json runs on the protected version, without evidence mode', { criterion: 'AC-SPEC-35-03' }, async () => {
+test('a change that turns evidence mode on in its own project.json runs on the protected version, without evidence mode', async () => {
   await withRepository('solo', async (repository) => {
     const loaded = await loadForChange(repository.versionControl(), hostileChange().changedFiles, memoryEventSink());
     assert.ok(loaded.ok, JSON.stringify(loaded));
@@ -45,7 +44,7 @@ test('a change that turns evidence mode on in its own project.json runs on the p
   }, applyHostileChange);
 });
 
-test('so the change\'s own suite cannot be run: run --suite is refused with evidence-mode-disabled', { criterion: 'AC-SPEC-35-03' }, async () => {
+test('so the change\'s own suite cannot be run: run --suite is refused with evidence-mode-disabled', async () => {
   await withRepository('solo', async (repository) => {
     const loaded = await loadForChange(repository.versionControl(), hostileChange().changedFiles, memoryEventSink());
     assert.ok(loaded.ok, JSON.stringify(loaded));
@@ -55,7 +54,7 @@ test('so the change\'s own suite cannot be run: run --suite is refused with evid
   }, applyHostileChange);
 });
 
-test('the change\'s edit of project.json raises one changed-with-code item and event naming it', { criterion: 'AC-SPEC-35-03' }, async () => {
+test('the change\'s edit of project.json raises one changed-with-code item and event naming it', async () => {
   await withRepository('solo', async (repository) => {
     const events = memoryEventSink();
     const loaded = await loadForChange(repository.versionControl(), hostileChange().changedFiles, events);
@@ -66,7 +65,7 @@ test('the change\'s edit of project.json raises one changed-with-code item and e
   }, applyHostileChange);
 });
 
-test('the same evidenceMode section, once on the protected branch, lets run --suite choose the suite', { criterion: 'AC-SPEC-35-03' }, async () => {
+test('the same evidenceMode section, once on the protected branch, lets run --suite choose the suite', async () => {
   // The counter-example: the section itself is valid, so the refusal above comes from where it was read.
   await withRepository('solo', async (repository) => {
     const loaded = await loadForChange(repository.versionControl(), [], memoryEventSink());
@@ -77,7 +76,7 @@ test('the same evidenceMode section, once on the protected branch, lets run --su
   }, protectEvidenceMode);
 });
 
-test('a change that edits a declared suite runs the protected declaration, unchanged', { criterion: 'AC-SPEC-35-03' }, async () => {
+test('a change that edits a declared suite runs the protected declaration, unchanged', async () => {
   // Metamorphic: the change's edit to the declaration must not change what core trusts.
   const widenSuite = (fixture: FixtureRepository): void => {
     protectEvidenceMode(fixture);
@@ -103,7 +102,7 @@ test('a change that edits a declared suite runs the protected declaration, uncha
 const SUITE_EDITS = ['e2e/checkout.spec.ts', 'e2e/helpers/sign-in.ts'];
 const APPLICATION_CODE = 'src/checkout.ts';
 
-test('each suite file the change edits, a helper included, raises its own changed-with-code item and event', { criterion: 'AC-SPEC-35-04' }, async () => {
+test('each suite file the change edits, a helper included, raises its own changed-with-code item and event', async () => {
   await withRepository('solo', async (repository) => {
     const events = memoryEventSink();
     const loaded = await loadForChange(repository.versionControl(), [...SUITE_EDITS, APPLICATION_CODE], events);
@@ -118,7 +117,7 @@ test('each suite file the change edits, a helper included, raises its own change
   }, protectEvidenceMode);
 });
 
-test('the same edits raise nothing when the protected project declares no suite', { criterion: 'AC-SPEC-35-04' }, async () => {
+test('the same edits raise nothing when the protected project declares no suite', async () => {
   // The counter-example: the files are trusted because the protected declaration names them.
   await withRepository('solo', async (repository) => {
     const loaded = await loadForChange(repository.versionControl(), [...SUITE_EDITS, APPLICATION_CODE], memoryEventSink());
@@ -127,7 +126,7 @@ test('the same edits raise nothing when the protected project declares no suite'
   });
 });
 
-test('a change that edits only application code raises no item, even with a suite declared', { criterion: 'AC-SPEC-35-04' }, async () => {
+test('a change that edits only application code raises no item, even with a suite declared', async () => {
   await withRepository('solo', async (repository) => {
     const events = memoryEventSink();
     const loaded = await loadForChange(repository.versionControl(), [APPLICATION_CODE, 'e2e-notes.md'], events);
@@ -140,26 +139,26 @@ test('a change that edits only application code raises no item, even with a suit
 const CHANGED_TEST = `${SUITE_FOLDER}/e2e/checkout.spec.ts`;
 const passesOf = (passes: ReturnType<typeof passesFor>) => passes.map((entry) => ({ pass: entry.pass, suiteFiles: entry.suiteFiles }));
 
-test('a change that edits a suite file gets a gating pass on the protected suite files and a proposal pass on its own', { criterion: 'AC-SPEC-35-04' }, () => {
+test('a change that edits a suite file gets a gating pass on the protected suite files and a proposal pass on its own', () => {
   assert.deepEqual(passesOf(passesFor(declaredCheckoutSuite(), [CHANGED_TEST, `${SUITE_FOLDER}/src/cart.ts`])), [
     { pass: 'gating', suiteFiles: 'protected-branch' },
     { pass: 'proposal', suiteFiles: 'change' },
   ]);
 });
 
-test('with runChangedTestsAsProposal off, the change gets only the gating pass on the protected suite files', { criterion: 'AC-SPEC-35-04' }, () => {
+test('with runChangedTestsAsProposal off, the change gets only the gating pass on the protected suite files', () => {
   assert.deepEqual(passesOf(passesFor(declaredCheckoutSuite({ runChangedTestsAsProposal: false }), [CHANGED_TEST])), [
     { pass: 'gating', suiteFiles: 'protected-branch' },
   ]);
 });
 
-test('a change that edits no suite file gets only the gating pass, still on the protected suite files', { criterion: 'AC-SPEC-35-04' }, () => {
+test('a change that edits no suite file gets only the gating pass, still on the protected suite files', () => {
   assert.deepEqual(passesOf(passesFor(declaredCheckoutSuite(), [`${SUITE_FOLDER}/src/cart.ts`])), [
     { pass: 'gating', suiteFiles: 'protected-branch' },
   ]);
 });
 
-test('every test of a proposal pass is labelled proposal, and of a gating pass gating', { criterion: 'AC-SPEC-35-04' }, () => {
+test('every test of a proposal pass is labelled proposal, and of a gating pass gating', () => {
   const report = recordedReport('passing-with-criteria');
   const proposal = testsOf(evidenceRun(report, { pass: 'proposal' }));
   const gating = testsOf(evidenceRun(report, { pass: 'gating' }));
@@ -172,14 +171,14 @@ test('every test of a proposal pass is labelled proposal, and of a gating pass g
 // but the pass can keep the gate shut.
 const cleanPassingReport = (): JsonRecord => withoutSpec(recordedReport('passing-with-criteria'), 1);
 
-test('a proposal pass never opens the merge gate, even when every test passed', { criterion: 'AC-SPEC-35-04' }, () => {
+test('a proposal pass never opens the merge gate, even when every test passed', () => {
   const report = cleanPassingReport();
   const proposal = evidenceRun(report, { pass: 'proposal' });
   assert.equal(proposal.state, 'Passed', 'the counter-example below needs a passing run');
   assert.equal(opensMergeGate(proposal), false);
 });
 
-test('the gating pass of the same passing report does open the merge gate', { criterion: 'AC-SPEC-35-04' }, () => {
+test('the gating pass of the same passing report does open the merge gate', () => {
   // The counter-example: only the pass differs from the case above.
   assert.equal(opensMergeGate(evidenceRun(cleanPassingReport(), { pass: 'gating' })), true);
 });

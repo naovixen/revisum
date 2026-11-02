@@ -2,7 +2,6 @@
 // manifest, rather than trusting the version the adapter reports. It hashes whenever the adapter has
 // a build port, with or without a lockfile, before the browser opens; an executable it cannot hash
 // is never launched. The browser's version stays a label.
-// See docs/specs/SPEC-08-manifest-and-replay.md (AC-04).
 import assert from 'node:assert/strict';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -24,19 +23,19 @@ const BUILT: Scenario = {
   executable: EXECUTABLE, reportedBuildVersion: '156.0.8078.47', browserVersion: '156.0.8078.47',
 };
 
-test('a run on an adapter with a build port records the sha256 of the executable, with no lockfile', { criterion: 'AC-SPEC-08-04' }, async () => {
+test('a run on an adapter with a build port records the sha256 of the executable, with no lockfile', async () => {
   const ran = await runScenario(BUILT);
   assert.equal(ran.manifest.executableSha256, sha256(EXECUTABLE));
 });
 
-test('the executable is hashed before the browser opens', { criterion: 'AC-SPEC-08-04' }, async () => {
+test('the executable is hashed before the browser opens', async () => {
   const ran = await runScenario(BUILT);
   const order = ran.driverCalls.order;
   assert.ok(order.includes('build') && order.includes('open'), JSON.stringify(order));
   assert.ok(order.indexOf('build') < order.indexOf('open'), `the build was asked after the browser opened: ${JSON.stringify(order)}`);
 });
 
-test('the reported version is a label: another reported version on the same executable records the same hash', { criterion: 'AC-SPEC-08-04' }, async () => {
+test('the reported version is a label: another reported version on the same executable records the same hash', async () => {
   const first = await runScenario(BUILT);
   const relabelled = await runScenario({ ...BUILT, reportedBuildVersion: '157.0.0.1', browserVersion: '157.0.0.1' });
   assert.equal(relabelled.manifest.executableSha256, sha256(EXECUTABLE));
@@ -44,7 +43,7 @@ test('the reported version is a label: another reported version on the same exec
   assert.notDeepEqual(relabelled.manifest.browser, first.manifest.browser, 'the browser label follows what the adapter reports');
 });
 
-test('counter-example: another executable under the same reported version records another hash', { criterion: 'AC-SPEC-08-04' }, async () => {
+test('counter-example: another executable under the same reported version records another hash', async () => {
   const first = await runScenario(BUILT);
   const swapped = await runScenario({ ...BUILT, executable: `${EXECUTABLE}, swapped in place` });
   assert.equal(swapped.manifest.executableSha256, sha256(`${EXECUTABLE}, swapped in place`));
@@ -52,7 +51,7 @@ test('counter-example: another executable under the same reported version record
   assert.deepEqual(swapped.manifest.browser, first.manifest.browser, 'the reported version did not change');
 });
 
-test('an executable core cannot hash ends the run TargetUnavailable, and the browser never opens', { criterion: 'AC-SPEC-08-04' }, async () => {
+test('an executable core cannot hash ends the run TargetUnavailable, and the browser never opens', async () => {
   const missing = join(tmpdir(), 'revisum-no-such-browser', 'browser-executable');
   const { result, calls } = await runKeepingAnyOutcome({ ...BUILT, executablePath: missing });
   assert.equal(result.state, 'TargetUnavailable');
@@ -61,7 +60,7 @@ test('an executable core cannot hash ends the run TargetUnavailable, and the bro
   assert.equal(calls.includes('open'), false, `the browser opened: ${JSON.stringify(calls)}`);
 });
 
-test('a run on an adapter with no build port records no executable hash', { criterion: 'AC-SPEC-08-04' }, async () => {
+test('a run on an adapter with no build port records no executable hash', async () => {
   const ran = await runScenario({ ...BUILT, executable: null });
   assert.equal(Object.hasOwn(ran.manifest, 'executableSha256'), false, JSON.stringify(ran.manifest));
 });

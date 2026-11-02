@@ -11,7 +11,6 @@
 // The page map is written out here, as the crawl would give it for the contact and about pages;
 // its redacted name is the engine's defaultRedactor() output, as the map holds it. Each "not
 // checked" test has a counter-example: the same locator where it is checked gives a warning.
-// See docs/specs/SPEC-37-explore-to-draft.md.
 import assert from 'node:assert/strict';
 import { before, test } from 'node:test';
 import { defaultRedactor, planParser, readPlanText, type TrustedProject } from '@revisum/engine';
@@ -99,13 +98,13 @@ async function warningsFor(draft: string, map: PageMap = MAP): Promise<readonly 
 const at = (warnings: readonly LineWarning[], text: string): readonly string[] =>
   warnings.filter((warning) => warning.line === lineOf(text)).map((warning) => warning.code);
 
-test('a locator missing from its page gives locator-not-on-page, and one matching two elements gives locator-ambiguous, at their lines', { criterion: 'AC-SPEC-37-08' }, async () => {
+test('a locator missing from its page gives locator-not-on-page, and one matching two elements gives locator-ambiguous, at their lines', async () => {
   const warnings = await warningsFor(DRAFT);
   assert.deepEqual(at(warnings, 'Expect button "Archive everything" is visible'), ['locator-not-on-page']);
   assert.deepEqual(at(warnings, 'Expect link "Read more" is visible'), ['locator-ambiguous']);
 });
 
-test('the whole draft gives exactly the expected warnings, in line order', { criterion: 'AC-SPEC-37-08' }, async () => {
+test('the whole draft gives exactly the expected warnings, in line order', async () => {
   const warnings = await warningsFor(DRAFT);
   assert.deepEqual([...warnings].sort((left, right) => left.line - right.line), [
     { code: 'locator-not-on-page', line: lineOf('Expect button "Archive everything" is visible') },
@@ -118,70 +117,70 @@ test('the whole draft gives exactly the expected warnings, in line order', { cri
   ]);
 });
 
-test('a role locator that matches one node of its role and name gives no warning', { criterion: 'AC-SPEC-37-08' }, async () => {
+test('a role locator that matches one node of its role and name gives no warning', async () => {
   assert.deepEqual(at(await warningsFor(DRAFT), 'Expect heading "Contact us" is visible'), []);
 });
 
-test('a label locator matches a form control by name, and never a heading of that name', { criterion: 'AC-SPEC-37-08' }, async () => {
+test('a label locator matches a form control by name, and never a heading of that name', async () => {
   const warnings = await warningsFor(DRAFT);
   assert.deepEqual(at(warnings, 'Expect label "Display name" is visible'), []);
   assert.deepEqual(at(warnings, 'Expect label "Postcode" is visible'), ['locator-not-on-page']);
   assert.deepEqual(at(warnings, 'Expect label "Contact us" is visible'), ['locator-not-on-page']);
 });
 
-test('a locator after a click on the same page is not checked', { criterion: 'AC-SPEC-37-08' }, async () => {
+test('a locator after a click on the same page is not checked', async () => {
   const warnings = await warningsFor(DRAFT);
   assert.deepEqual(at(warnings, 'Expect button "Nowhere at all" is enabled'), []);
   assert.deepEqual(at(warnings, 'Expect link "Read more" is enabled'), []);
 });
 
-test('counter-example: the same missing locator before the click gives locator-not-on-page', { criterion: 'AC-SPEC-37-08' }, async () => {
+test('counter-example: the same missing locator before the click gives locator-not-on-page', async () => {
   assert.deepEqual(at(await warningsFor(DRAFT), 'Expect button "Nowhere at all" is visible'), ['locator-not-on-page']);
 });
 
 for (const changing of ['Press Enter in label "Display name"', 'Select "Reader" in label "Display name"', 'Accept dialog']) {
-  test(`a locator after "${changing}" on the same page is not checked`, { criterion: 'AC-SPEC-37-08' }, async () => {
+  test(`a locator after "${changing}" on the same page is not checked`, async () => {
     const lines = ['Plan: After a change', 'Feature: EXPLORE-1', 'Spec: pages/lantern-books', 'Version: 1.1', 'Targets: explore-chromium', 'Go to /contact', changing, 'Criterion: AC-1', 'Expect button "Nowhere at all" is visible'];
     assert.deepEqual(await warningsFor(`${lines.join('\n')}\n`), []);
   });
 }
 
-test('a new Go to a page in the map starts checking again', { criterion: 'AC-SPEC-37-08' }, async () => {
+test('a new Go to a page in the map starts checking again', async () => {
   assert.deepEqual(at(await warningsFor(DRAFT), 'Expect heading "Missing from about" is visible'), ['locator-not-on-page']);
 });
 
-test('steps on a page not in the map, or on another origin, are not checked', { criterion: 'AC-SPEC-37-08' }, async () => {
+test('steps on a page not in the map, or on another origin, are not checked', async () => {
   const warnings = await warningsFor(DRAFT);
   assert.deepEqual(at(warnings, 'Expect heading "Anything at all" is visible'), []);
   assert.deepEqual(at(warnings, 'Expect heading "Not on the second origin" is visible'), []);
 });
 
-test('counter-example: with /not-in-map in the map, the same step is checked and gives locator-not-on-page', { criterion: 'AC-SPEC-37-08' }, async () => {
+test('counter-example: with /not-in-map in the map, the same step is checked and gives locator-not-on-page', async () => {
   const withPage: PageMap = { ...MAP, pages: [...MAP.pages, { path: '/not-in-map', title: 'Now mapped', depth: 1, tree: [leaf('heading', 'Something else')] }] };
   assert.deepEqual(at(await warningsFor(DRAFT, withPage), 'Expect heading "Anything at all" is visible'), ['locator-not-on-page']);
 });
 
-test('a text locator is not checked', { criterion: 'AC-SPEC-37-08' }, async () => {
+test('a text locator is not checked', async () => {
   assert.deepEqual(at(await warningsFor(DRAFT), 'Expect text "Nothing like this is on the page" is visible'), []);
 });
 
-test('a name the map holds cut to 80 characters counts as a possible match, and one that starts otherwise does not', { criterion: 'AC-SPEC-37-08' }, async () => {
+test('a name the map holds cut to 80 characters counts as a possible match, and one that starts otherwise does not', async () => {
   const warnings = await warningsFor(DRAFT);
   assert.deepEqual(at(warnings, `Expect button "${LONG_NAME}" is visible`), []);
   assert.deepEqual(at(warnings, `Expect button "${LONG_NAME.slice(0, 40)} and some other ending" is visible`), ['locator-not-on-page']);
 });
 
-test('a name the map holds redacted counts as a possible match, so it gives no locator-not-on-page', { criterion: 'AC-SPEC-37-08' }, async () => {
+test('a name the map holds redacted counts as a possible match, so it gives no locator-not-on-page', async () => {
   assert.equal(at(await warningsFor(DRAFT), `Expect link "${EMAIL_LINK}" is visible`).includes('locator-not-on-page'), false);
 });
 
-test('counter-example: the same link against a map that holds another, unredacted name gives locator-not-on-page', { criterion: 'AC-SPEC-37-08' }, async () => {
+test('counter-example: the same link against a map that holds another, unredacted name gives locator-not-on-page', async () => {
   const contact = MAP.pages[0];
   assert.ok(contact !== undefined);
   const otherName: PageMap = { ...MAP, pages: [{ ...contact, tree: [leaf('link', 'Write to the reading room')] }] };
   assert.deepEqual(at(await warningsFor(DRAFT, otherName), `Expect link "${EMAIL_LINK}" is visible`), ['locator-not-on-page']);
 });
 
-test('the check is pure: the same draft and map give the same warnings each time', { criterion: 'AC-SPEC-37-08' }, async () => {
+test('the check is pure: the same draft and map give the same warnings each time', async () => {
   assert.deepEqual(await warningsFor(DRAFT), await warningsFor(DRAFT));
 });

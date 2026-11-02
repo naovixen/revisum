@@ -4,7 +4,6 @@
 // values; `expectBackend` checks one field of a read call; a plan-level `cleanup` list holds calls
 // only. Nothing a plan writes can name a URL, a method, a header or a body. Every refusal gives a
 // code and a JSON path, echoes no value from the plan, and happens before any call is made.
-// See docs/specs/SPEC-32-declared-service-calls.md.
 import assert from 'node:assert/strict';
 import { arch, platform } from 'node:os';
 import { test } from 'node:test';
@@ -32,12 +31,12 @@ const argumentsWithout = (name: string): JsonRecord => {
 
 // ---- Plans the parser accepts -------------------------------------------------------------------------
 
-test('a call with literal arguments, remembering a response field, is accepted and kept as written', { criterion: 'AC-SPEC-32-02' }, () => {
+test('a call with literal arguments, remembering a response field, is accepted and kept as written', () => {
   const plan = accepted(parsePlan, callPlanOf([CREATE_ORDER]));
   assert.deepEqual(asJson(plan.steps[0]), CREATE_ORDER);
 });
 
-test('a call may take run values by name for any parameter that is not a secret', { criterion: 'AC-SPEC-32-02' }, () => {
+test('a call may take run values by name for any parameter that is not a secret', () => {
   const values = {
     buyer: { kind: 'uniqueText', prefix: 'buyer' }, buyerEmail: { kind: 'uniqueEmail', localPrefix: 'buyer' },
     count: { kind: 'uniqueNumber', digits: 4 },
@@ -48,19 +47,19 @@ test('a call may take run values by name for any parameter that is not a secret'
   assert.deepEqual(asJson(accepted(parsePlan, callPlanOf([step], { values })).steps[0]), step);
 });
 
-test('a secret parameter takes a declared secret by name, and the plan holds only the name', { criterion: 'AC-SPEC-32-02' }, () => {
+test('a secret parameter takes a declared secret by name, and the plan holds only the name', () => {
   const step = call('signInAsAdmin', { adminPassword: { secretName: 'SHOP_ADMIN_PASSWORD' } });
   const plan = accepted(parsePlan, callPlanOf([step]));
   assert.deepEqual(asJson(plan.steps[0]), step);
   assert.ok(!JSON.stringify(plan).includes(SECRET_VALUES['SHOP_ADMIN_PASSWORD'] ?? '?'), 'the plan holds the secret value');
 });
 
-test('an expectBackend on a read call, using a remembered value, is accepted and kept as written', { criterion: 'AC-SPEC-32-02' }, () => {
+test('an expectBackend on a read call, using a remembered value, is accepted and kept as written', () => {
   const plan = accepted(parsePlan, callPlanOf([CREATE_ORDER, READ_ORDER]));
   assert.deepEqual(asJson(plan.steps[1]), READ_ORDER);
 });
 
-test('each backend assertion kind is accepted on expectBackend', { criterion: 'AC-SPEC-32-02' }, () => {
+test('each backend assertion kind is accepted on expectBackend', () => {
   for (const [field, assertion] of [
     ['status', { kind: 'present' }], ['status', { kind: 'absent' }], ['status', { kind: 'equals', value: 'paid' }],
     ['status', { kind: 'contains', value: 'pai' }], ['total', { kind: 'numberEquals', value: 42 }],
@@ -69,12 +68,12 @@ test('each backend assertion kind is accepted on expectBackend', { criterion: 'A
   }
 });
 
-test('a cleanup list of calls is accepted and may use values the steps remember', { criterion: 'AC-SPEC-32-02' }, () => {
+test('a cleanup list of calls is accepted and may use values the steps remember', () => {
   const plan = accepted(parsePlan, withCleanup(callPlanOf([CREATE_ORDER]), [DELETE_ORDER, RESET_SHOP]));
   assert.deepEqual(asJson(plan.cleanup), [DELETE_ORDER, RESET_SHOP]);
 });
 
-test('a call with no parameters takes an empty argument object', { criterion: 'AC-SPEC-32-02' }, () => {
+test('a call with no parameters takes an empty argument object', () => {
   accepted(parsePlan, callPlanOf([RESET_SHOP]));
 });
 
@@ -171,7 +170,7 @@ const acceptsPath = (refused: RefusedCase, path: string): boolean =>
   path === refused.path || (refused.code === 'misplaced_step' && path === `${refused.path}.type`);
 
 for (const refused of REFUSED) {
-  test(`${refused.name} is refused with ${refused.code} at ${refused.path}`, { criterion: 'AC-SPEC-32-02' }, () => {
+  test(`${refused.name} is refused with ${refused.code} at ${refused.path}`, () => {
     const errors = rejection(parsePlan, refused.plan);
     assert.equal(errors.length, 1, JSON.stringify(errors));
     const [code, path = ''] = (errors[0] ?? '').split(' ');
@@ -180,7 +179,7 @@ for (const refused of REFUSED) {
   });
 }
 
-test('no refusal echoes the value the plan wrote', { criterion: 'AC-SPEC-32-02' }, () => {
+test('no refusal echoes the value the plan wrote', () => {
   const withMarker = REFUSED.filter((refused) => JSON.stringify(refused.plan).includes(PRIVATE_MARKER));
   assert.ok(withMarker.length >= 10, 'most cases carry the private marker');
   for (const refused of withMarker) {
@@ -200,7 +199,7 @@ const assertRefusedInside = (errors: readonly string[], path: string, label: str
   }
 };
 
-test('an integer outside its range, a malformed email or day, or a null is refused at the argument', { criterion: 'AC-SPEC-32-02' }, () => {
+test('an integer outside its range, a malformed email or day, or a null is refused at the argument', () => {
   for (const [argument, value] of [
     ['quantity', 0], ['quantity', 100], ['quantity', 2.5], ['contactEmail', 'not-an-email'], ['deliveryDay', '2026-02-30'],
     ['deliveryDay', '02.11.2026'], ['giftWrap', null],
@@ -210,30 +209,30 @@ test('an integer outside its range, a malformed email or day, or a null is refus
   }
 });
 
-test('a secret reference or a template object for a text parameter is refused at the argument', { criterion: 'AC-SPEC-32-02' }, () => {
+test('a secret reference or a template object for a text parameter is refused at the argument', () => {
   for (const value of [{ secretName: 'SHOP_API_TOKEN' }, { $parameter: 'quantity' }, { $interpolate: '{quantity}', parameters: ['quantity'] }]) {
     assertRefusedInside(rejection(parsePlan, callPlanOf([call('createOrder', orderArguments({ customerName: value }))])), '$.steps[0].arguments.customerName', JSON.stringify(value));
   }
 });
 
-test('a secret parameter given an undeclared secret or a run value is refused at the argument', { criterion: 'AC-SPEC-32-02' }, () => {
+test('a secret parameter given an undeclared secret or a run value is refused at the argument', () => {
   for (const value of [{ secretName: 'PRODUCTION_DATABASE_URL' }, { valueName: 'orderId' }]) {
     assertRefusedInside(rejection(parsePlan, callPlanOf([CREATE_ORDER, call('signInAsAdmin', { adminPassword: value })])), '$.steps[1].arguments.adminPassword', JSON.stringify(value));
   }
 });
 
-test('arguments that are not an object, or a remember that is not an object, are refused as wrong_type', { criterion: 'AC-SPEC-32-02' }, () => {
+test('arguments that are not an object, or a remember that is not an object, are refused as wrong_type', () => {
   assert.deepEqual(rejection(parsePlan, callPlanOf([call('resetShop', [])])), ['wrong_type $.steps[0].arguments']);
   assert.deepEqual(rejection(parsePlan, callPlanOf([call('createOrder', orderArguments(), 'orderId')])), ['wrong_type $.steps[0].remember']);
 });
 
-test('an expectBackend without a criterion id is refused as vacuous', { criterion: 'AC-SPEC-32-02' }, () => {
+test('an expectBackend without a criterion id is refused as vacuous', () => {
   const { criterionId: _removed, ...untraced } = READ_ORDER;
   const errors = rejection(parsePlan, callPlanOf([CREATE_ORDER, untraced]));
   assert.ok(errors.length > 0 && errors.every((error) => error.startsWith('vacuous $.steps[1]')), JSON.stringify(errors));
 });
 
-test('an expectBackend with an assertion kind the language does not have is refused at the kind', { criterion: 'AC-SPEC-32-02' }, () => {
+test('an expectBackend with an assertion kind the language does not have is refused at the kind', () => {
   for (const kind of ['matches', 'greaterThan', 'jsonPath']) {
     const errors = rejection(parsePlan, callPlanOf([CREATE_ORDER, { ...READ_ORDER, assert: { kind, value: 'paid' } }]));
     assert.deepEqual(errors, ['unknown_value $.steps[1].assert.kind'], kind);
@@ -242,23 +241,23 @@ test('an expectBackend with an assertion kind the language does not have is refu
 
 // ---- Remembered values follow the run-value rules --------------------------------------------------
 
-test('a remembered value used before the call that remembers it is refused with undefined_value', { criterion: 'AC-SPEC-32-02' }, () => {
+test('a remembered value used before the call that remembers it is refused with undefined_value', () => {
   assert.deepEqual(rejection(parsePlan, callPlanOf([READ_ORDER, CREATE_ORDER])), ['undefined_value $.steps[0].arguments.orderId']);
 });
 
-test('a remembered value with the name of a generated value is refused as duplicate', { criterion: 'AC-SPEC-32-02' }, () => {
+test('a remembered value with the name of a generated value is refused as duplicate', () => {
   const errors = rejection(parsePlan, callPlanOf([CREATE_ORDER], { values: { orderId: { kind: 'uniqueText', prefix: 'order' } } }));
   assert.deepEqual(errors.map((error) => error.split(' ')[0]), ['duplicate']);
 });
 
-test('a cleanup call naming a value no step defines is refused with undefined_value', { criterion: 'AC-SPEC-32-02' }, () => {
+test('a cleanup call naming a value no step defines is refused with undefined_value', () => {
   assert.deepEqual(rejection(parsePlan, withCleanup(callPlanOf([RESET_SHOP]), [DELETE_ORDER])), ['undefined_value $.cleanup[0].arguments.orderId']);
 });
 
 // ---- Version 1.1 -----------------------------------------------------------------------------------
 
 // Recorded from the parser before calls existed, when it read them as a 1.1 parser does.
-test('a plan declaring 1.1 that uses a call, an expectBackend or cleanup is refused as a 1.1 parser refuses it', { criterion: 'AC-SPEC-32-02' }, () => {
+test('a plan declaring 1.1 that uses a call, an expectBackend or cleanup is refused as a 1.1 parser refuses it', () => {
   const parse = defaultParser();
   const previousWith = (added: JsonRecord): JsonRecord => {
     const steps = [...stepsOf(signupPlan())];
@@ -273,7 +272,7 @@ test('a plan declaring 1.1 that uses a call, an expectBackend or cleanup is refu
 
 // ---- No call is made for a refused plan -----------------------------------------------------------------
 
-test('a refused plan reaches neither the service caller nor the driver, and nothing is logged', { criterion: 'AC-SPEC-32-02' }, async () => {
+test('a refused plan reaches neither the service caller nor the driver, and nothing is logged', async () => {
   let driverCalls = 0;
   const spy: BrowserDriver = {
     info: { id: 'playwright', version: 'spy', protocol: 'none' },
@@ -310,7 +309,7 @@ const NOT_CALLS: readonly JsonRecord[] = [
 ];
 
 for (const step of NOT_CALLS) {
-  test(`a ${String(step['type'])} step in cleanup is refused with misplaced_step at that cleanup entry`, { criterion: 'AC-SPEC-32-02' }, () => {
+  test(`a ${String(step['type'])} step in cleanup is refused with misplaced_step at that cleanup entry`, () => {
     const errors = rejection(parsePlan, withCleanup(callPlanOf([CREATE_ORDER]), [RESET_SHOP, step]));
     assert.equal(errors.length, 1, JSON.stringify(errors));
     assert.ok(['misplaced_step $.cleanup[1]', 'misplaced_step $.cleanup[1].type'].includes(errors[0] ?? ''), JSON.stringify(errors));
@@ -318,6 +317,6 @@ for (const step of NOT_CALLS) {
 }
 
 // Counter-example: the same steps in the plan's steps are not misplaced.
-test('the same click and capture in the plan\'s steps are accepted', { criterion: 'AC-SPEC-32-02' }, () => {
+test('the same click and capture in the plan\'s steps are accepted', () => {
   accepted(parsePlan, callPlanOf([{ type: 'navigate', url: '/orders' }, NOT_CALLS[0], NOT_CALLS[3]]));
 });

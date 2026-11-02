@@ -3,7 +3,6 @@
 // manifest keeps the run's own clock start, so replays stay identical.
 // The page's own Date.now() comes from the time the driver is given: the driver contract
 // (test/contract/driver-contract.test.ts) proves a session's page reports exactly that time.
-// See docs/specs/SPEC-30-plan-values-positions-and-keys.md.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { resolvePlanClock } from '@revisum/engine';
@@ -32,7 +31,7 @@ function planClockIn(timezone: string, clock: JsonRecord) {
 
 // ---- resolvePlanClock ---------------------------------------------------------------------------
 
-test('without a plan clock, the page time is the run\'s clock start', { criterion: 'AC-SPEC-30-06' }, () => {
+test('without a plan clock, the page time is the run\'s clock start', () => {
   const { timezone } = planClockIn('Europe/London', FIRST_OF_NEXT_MONTH_AT_NINE);
   assert.equal(resolvePlanClock(undefined, CLOCK_START, timezone), CLOCK_START);
 });
@@ -45,14 +44,14 @@ const CLOCK_CASES = [
 ] as const;
 
 for (const clockCase of CLOCK_CASES) {
-  test(`"the first of next month, 09:00" in ${clockCase.timezone} from ${new Date(clockCase.clockStart).toISOString()} is ${new Date(clockCase.expected).toISOString()} (${clockCase.why})`, { criterion: 'AC-SPEC-30-06' }, () => {
+  test(`"the first of next month, 09:00" in ${clockCase.timezone} from ${new Date(clockCase.clockStart).toISOString()} is ${new Date(clockCase.expected).toISOString()} (${clockCase.why})`, () => {
     const { clock, timezone } = planClockIn(clockCase.timezone, FIRST_OF_NEXT_MONTH_AT_NINE);
     assert.ok(clock !== undefined, 'the parsed plan keeps its clock');
     assert.equal(resolvePlanClock(clock, clockCase.clockStart, timezone), clockCase.expected);
   });
 }
 
-test('a clock time of "00:00" and "23:59" is accepted; "24:00", "9:00", "09:60" and "09:00:00" are refused at the time', { criterion: 'AC-SPEC-30-06' }, () => {
+test('a clock time of "00:00" and "23:59" is accepted; "24:00", "9:00", "09:60" and "09:00:00" are refused at the time', () => {
   const parse = parserFor();
   const withTime = (time: string): JsonRecord => planOf([], { clock: { day: { from: 'today', addDays: 0 }, time } });
   for (const time of ['00:00', '23:59']) accepted(parse, withTime(time));
@@ -69,7 +68,7 @@ const clockedPlan = planOf([OPEN_ORDERS, { type: 'expectPage', assert: { kind: '
   clock: FIRST_OF_NEXT_MONTH_AT_NINE,
 });
 
-test('with a plan clock, the driver freezes the page at resolvePlanClock\'s time and the manifest keeps the run\'s clock start', { criterion: 'AC-SPEC-30-06' }, async () => {
+test('with a plan clock, the driver freezes the page at resolvePlanClock\'s time and the manifest keeps the run\'s clock start', async () => {
   const projectFile = projectFileIn('Europe/London');
   const { result, recording } = await runPlan(clockedPlan, { projectFile, clockStartMilliseconds: CLOCK_START });
   assert.equal(result.state, 'Passed', JSON.stringify(result.steps));
@@ -80,13 +79,13 @@ test('with a plan clock, the driver freezes the page at resolvePlanClock\'s time
 });
 
 // Counter-example: without a plan clock the page is frozen at the run's clock start, as before.
-test('without a plan clock, the driver freezes the page at the run\'s clock start', { criterion: 'AC-SPEC-30-06' }, async () => {
+test('without a plan clock, the driver freezes the page at the run\'s clock start', async () => {
   const { clock: _removed, ...unclocked } = clockedPlan;
   const { recording } = await runPlan(unclocked, { projectFile: projectFileIn('Europe/London'), clockStartMilliseconds: CLOCK_START });
   assert.deepEqual(recording.environments.map((environment) => environment.fixedTimeMilliseconds), [CLOCK_START]);
 });
 
-test('20 replays of a plan with a plan clock give identical result and manifest hashes', { criterion: 'AC-SPEC-30-06' }, async () => {
+test('20 replays of a plan with a plan clock give identical result and manifest hashes', async () => {
   const projectFile = projectFileIn('Europe/London');
   const hashes = new Set<string>();
   const manifests = new Set<string | null>();

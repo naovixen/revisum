@@ -11,12 +11,11 @@
 //     show the caller logs no header value.
 //
 // What these tests assume about the caller's shape, gathered here so a change to it is a change
-// to this file only (docs/specs/SPEC-32-declared-service-calls.md, "The real caller"):
+// to this file only:
 //   - runner exports serviceCaller({ proxy }), where `proxy` is the running EgressProxy, and every
 //     request goes to proxy.url;
 //   - it answers with the Result the ServiceCaller port declares: a ServiceResponse whose status
 //     and body are exactly what the service sent, or one ServiceCallErrorCode.
-// See docs/specs/SPEC-32-declared-service-calls.md and docs/specs/SPEC-07-isolated-runner-and-egress.md.
 import { createServer, type IncomingHttpHeaders, type OutgoingHttpHeaders, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { connect, type Socket } from 'node:net';

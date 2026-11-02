@@ -5,7 +5,7 @@
 // The writer follows the zip format's three parts: a local header and the data for each entry,
 // then a central directory listing every entry, then the end-of-central-directory record that
 // says where the directory starts. A test may make any header lie about an entry's size, as a
-// zip bomb does. See docs/specs/SPEC-35-evidence-mode.md.
+// zip bomb does.
 import { Buffer } from 'node:buffer';
 import { crc32, deflateRawSync } from 'node:zlib';
 

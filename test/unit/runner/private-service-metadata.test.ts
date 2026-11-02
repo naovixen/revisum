@@ -3,7 +3,6 @@
 // request, a CONNECT tunnel or a TCP relay. A private address on the same proxy, which is reached,
 // is the counter-example. Names resolve through a fake resolver and allowed connections go to a
 // local stand-in server, so nothing reaches the network.
-// See docs/specs/SPEC-07-isolated-runner-and-egress.md.
 import assert from 'node:assert/strict';
 import { createServer as createTcpServer, connect, type AddressInfo } from 'node:net';
 import { after, before, test } from 'node:test';
@@ -55,7 +54,7 @@ after(async () => {
 });
 
 for (const name of METADATA_NAMES) {
-  test(`a private service whose name resolves as ${name} does gets 403 over HTTP and dials nothing`, { criterion: 'AC-SPEC-07-02' }, async () => {
+  test(`a private service whose name resolves as ${name} does gets 403 over HTTP and dials nothing`, async () => {
     const dialledBefore = upstream.dialled.length;
     const answer = await getThroughProxy(proxy.url, `http://${name}/latest/meta-data/`);
     assert.equal(answer.status, 403);
@@ -63,7 +62,7 @@ for (const name of METADATA_NAMES) {
     assert.ok(proxy.decisions().some((entry) => entry.origin === `http://${name}` && entry.decision === 'blocked'), JSON.stringify(proxy.decisions()));
   });
 
-  test(`a private service whose name resolves as ${name} does is refused a tunnel and dials nothing`, { criterion: 'AC-SPEC-07-02' }, async () => {
+  test(`a private service whose name resolves as ${name} does is refused a tunnel and dials nothing`, async () => {
     const dialledBefore = upstream.dialled.length;
     assert.equal(await connectThroughProxy(proxy.url, `${name}:443`), 403);
     assert.equal(upstream.dialled.length, dialledBefore, JSON.stringify(upstream.dialled.slice(dialledBefore)));
@@ -71,7 +70,7 @@ for (const name of METADATA_NAMES) {
 }
 
 for (const literal of METADATA_LITERALS) {
-  test(`a private service declared with the metadata literal ${literal} gets 403 and dials nothing`, { criterion: 'AC-SPEC-07-02' }, async () => {
+  test(`a private service declared with the metadata literal ${literal} gets 403 and dials nothing`, async () => {
     const dialledBefore = upstream.dialled.length;
     const answer = await getThroughProxy(proxy.url, `${literal}/latest/meta-data/`);
     assert.equal(answer.status, 403);
@@ -79,7 +78,7 @@ for (const literal of METADATA_LITERALS) {
   });
 }
 
-test('counter-example: on the same proxy, a private service at a private address is reached over HTTP and by tunnel', { criterion: 'AC-SPEC-07-02' }, async () => {
+test('counter-example: on the same proxy, a private service at a private address is reached over HTTP and by tunnel', async () => {
   const answer = await getThroughProxy(proxy.url, 'http://private-api.test/orders');
   assert.equal(answer.status, 200);
   assert.equal(answer.body, UPSTREAM_BODY);
@@ -88,7 +87,7 @@ test('counter-example: on the same proxy, a private service at a private address
   assert.deepEqual(upstream.dialled.at(-1), { address: PRIVATE_ADDRESS, port: 443 });
 });
 
-test('the address check itself refuses every metadata form for a private service, and allows a private address', { criterion: 'AC-SPEC-07-02' }, () => {
+test('the address check itself refuses every metadata form for a private service, and allows a private address', () => {
   for (const address of Object.values(METADATA_ANSWERS).flat().filter((answer) => answer !== PRIVATE_ADDRESS)) {
     assert.equal(checkResolvedAddress(address, { privateService: true }), 'refused', address);
   }
@@ -116,7 +115,7 @@ function untilClosed(port: number): Promise<void> {
   });
 }
 
-test('a TCP relay to a private service that resolves to a metadata address closes the connection and dials nothing', { criterion: 'AC-SPEC-07-02' }, async () => {
+test('a TCP relay to a private service that resolves to a metadata address closes the connection and dials nothing', async () => {
   const port = await freePort();
   const service: DeclaredService = { name: serviceName('metadata-database'), origin: origin('http://metadata-database.test'), private: true, port };
   const relayUpstream = await startUpstream();

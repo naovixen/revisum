@@ -4,7 +4,6 @@
 // the trusted project declares, with arguments typed by the declaration. Nothing a plan writes can
 // name a URL, a response, a header, a storage key or a value to store. Every refusal gives a code
 // and a JSON path, echoes no value from the plan, and happens before any driver call.
-// See docs/specs/SPEC-33-network-stubs-request-checks-and-storage.md.
 import assert from 'node:assert/strict';
 import { arch, platform } from 'node:os';
 import { test } from 'node:test';
@@ -52,13 +51,13 @@ const ACCEPTED_STEPS: readonly { readonly name: string; readonly step: JsonRecor
 ];
 
 for (const { name, step } of ACCEPTED_STEPS) {
-  test(`${name} is accepted and kept as written`, { criterion: 'AC-SPEC-33-02' }, () => {
+  test(`${name} is accepted and kept as written`, () => {
     const plan = accepted(parsePlan, planOf([OPEN_LOGIN, step]));
     assert.deepEqual(asJson(plan.steps[1]), step);
   });
 }
 
-test('a remember may read a response field as text or as an array length, for later steps to use', { criterion: 'AC-SPEC-33-02' }, () => {
+test('a remember may read a response field as text or as an array length, for later steps to use', () => {
   const steps = [
     OPEN_LOGIN, rememberResponse('likeCount', 'likes', 'likeList', 'arrayLength'), rememberResponse('firstName', 'likes', 'firstLiker', 'text'),
     { type: 'expect', locator: LIKE_COUNT, assert: { kind: 'textEquals', value: { valueName: 'likeCount' } }, criterionId: 'likes.count-shown' },
@@ -69,7 +68,7 @@ test('a remember may read a response field as text or as an array length, for la
 });
 
 // Stubs started inside a frame or a second tab apply to the whole browser context.
-test('a stub may be started and stopped inside a frame or a newTab', { criterion: 'AC-SPEC-33-02' }, () => {
+test('a stub may be started and stopped inside a frame or a newTab', () => {
   accepted(parsePlan, planOf([OPEN_LOGIN, frame([startStub('loginNeedsCode', LOGIN_ARGUMENTS), stopStub('loginNeedsCode')])]));
   accepted(parsePlan, planOf([OPEN_LOGIN, newTab([startStub('cartEmpty')])]));
 });
@@ -142,12 +141,12 @@ const REFUSED: readonly RefusedCase[] = [
 ];
 
 for (const refused of REFUSED) {
-  test(`${refused.name} is refused with ${refused.code} at ${refused.path}`, { criterion: 'AC-SPEC-33-02' }, () => {
+  test(`${refused.name} is refused with ${refused.code} at ${refused.path}`, () => {
     assert.deepEqual(rejection(parsePlan, refused.plan), [`${refused.code} ${refused.path}`]);
   });
 }
 
-test('no refusal echoes the value the plan wrote', { criterion: 'AC-SPEC-33-02' }, () => {
+test('no refusal echoes the value the plan wrote', () => {
   const withMarker = REFUSED.filter((refused) => JSON.stringify(refused.plan).includes(PRIVATE_MARKER));
   assert.ok(withMarker.length >= 20, 'most cases carry the private marker');
   for (const refused of withMarker) {
@@ -167,71 +166,71 @@ const assertRefusedInside = (errors: readonly string[], path: string, label: str
   }
 };
 
-test('a stub start with no arguments, for a stub that has parameters, is refused at its arguments', { criterion: 'AC-SPEC-33-02' }, () => {
+test('a stub start with no arguments, for a stub that has parameters, is refused at its arguments', () => {
   const errors = rejection(parsePlan, planOf([OPEN_LOGIN, startStub('loginNeedsCode')]));
   assertRefusedInside(errors, '$.steps[1].arguments', 'no arguments');
   assert.deepEqual(errors.map((error) => error.split(' ')[0]), ['missing_field']);
 });
 
-test('a request count that is not a whole number is refused with wrong_type at the count', { criterion: 'AC-SPEC-33-02' }, () => {
+test('a request count that is not a whole number is refused with wrong_type at the count', () => {
   for (const [count, path] of [[{ atLeast: 1.5 }, 'atLeast'], [{ atMost: '1' }, 'atMost'], [{ equals: null }, 'equals']] as const) {
     assert.deepEqual(rejection(parsePlan, planOf([OPEN_LOGIN, expectRequests('likes', count)])), [`wrong_type $.steps[1].count.${path}`], JSON.stringify(count));
   }
 });
 
-test('a request count that is negative, empty, of two kinds or of an unknown kind is refused at the count', { criterion: 'AC-SPEC-33-02' }, () => {
+test('a request count that is negative, empty, of two kinds or of an unknown kind is refused at the count', () => {
   for (const count of [{ equals: -1 }, {}, { equals: 1, atMost: 2 }, { exactly: 2 }, 2]) {
     assertRefusedInside(rejection(parsePlan, planOf([OPEN_LOGIN, expectRequests('likes', count)])), '$.steps[1].count', JSON.stringify(count));
   }
 });
 
-test('a request count of atLeast 0, which any page passes, is refused as vacuous', { criterion: 'AC-SPEC-33-02' }, () => {
+test('a request count of atLeast 0, which any page passes, is refused as vacuous', () => {
   const errors = rejection(parsePlan, planOf([OPEN_LOGIN, expectRequests('likes', { atLeast: 0 })]));
   assertRefusedInside(errors, '$.steps[1]', 'atLeast 0');
   assert.deepEqual(errors.map((error) => error.split(' ')[0]), ['vacuous']);
 });
 
 // Counter-example: equals 0 says something (no request was sent), so it is accepted; atLeast 1 too.
-test('a request count of equals 0 or atLeast 1 is accepted', { criterion: 'AC-SPEC-33-02' }, () => {
+test('a request count of equals 0 or atLeast 1 is accepted', () => {
   for (const count of [{ equals: 0 }, { atLeast: 1 }, { atMost: 0 }]) accepted(parsePlan, planOf([OPEN_LOGIN, expectRequests('likes', count)]));
 });
 
-test('a statusEquals value that is not a whole number is refused with wrong_type at the value', { criterion: 'AC-SPEC-33-02' }, () => {
+test('a statusEquals value that is not a whole number is refused with wrong_type at the value', () => {
   for (const value of ['200', null, 200.5]) {
     assert.deepEqual(rejection(parsePlan, planOf([OPEN_LOGIN, expectResponse('likes', { kind: 'statusEquals', value })])), ['wrong_type $.steps[1].assert.value'], JSON.stringify(value));
   }
 });
 
-test('a statusEquals value that is a run value is refused at the value', { criterion: 'AC-SPEC-33-02' }, () => {
+test('a statusEquals value that is a run value is refused at the value', () => {
   const values = { expectedStatus: { kind: 'uniqueNumber', digits: 4 } };
   assertRefusedInside(rejection(parsePlan, planOf([OPEN_LOGIN, expectResponse('likes', { kind: 'statusEquals', value: { valueName: 'expectedStatus' } })], { values })), '$.steps[1].assert.value', 'run value');
 });
 
-test('a stub started, stopped and started again is accepted', { criterion: 'AC-SPEC-33-02' }, () => {
+test('a stub started, stopped and started again is accepted', () => {
   accepted(parsePlan, planOf([OPEN_LOGIN, startStub('cartEmpty'), stopStub('cartEmpty'), startStub('cartEmpty'), stopStub('cartEmpty')]));
 });
 
-test('a storage or response value that names a secret is refused at the value', { criterion: 'AC-SPEC-33-02' }, () => {
+test('a storage or response value that names a secret is refused at the value', () => {
   const secret = { secretName: TOKEN_SECRET };
   assertRefusedInside(rejection(parsePlan, planOf([OPEN_LOGIN, expectStorage('sessionToken', { kind: 'equals', value: secret })])), '$.steps[1].assert.value', 'storage');
   assertRefusedInside(rejection(parsePlan, planOf([OPEN_LOGIN, expectResponse('likes', { kind: 'fieldEquals', field: 'firstLiker', value: secret })])), '$.steps[1].assert.value', 'response');
 });
 
-test('a secret storage parameter given an undeclared secret or a run value is refused at the argument', { criterion: 'AC-SPEC-33-02' }, () => {
+test('a secret storage parameter given an undeclared secret or a run value is refused at the argument', () => {
   const values = { visitor: { kind: 'uniqueText', prefix: 'visitor' } };
   for (const token of [{ secretName: 'PRODUCTION_DATABASE_URL' }, { valueName: 'visitor' }]) {
     assertRefusedInside(rejection(parsePlan, planOf([OPEN_LOGIN, setStorage('sessionToken', { token })], { values })), '$.steps[1].arguments.token', JSON.stringify(token));
   }
 });
 
-test('a response value remembered under the name of a generated value is refused as duplicate', { criterion: 'AC-SPEC-33-02' }, () => {
+test('a response value remembered under the name of a generated value is refused as duplicate', () => {
   const errors = rejection(parsePlan, planOf([OPEN_LOGIN, rememberResponse('likeCount', 'likes', 'likeList', 'arrayLength')], {
     values: { likeCount: { kind: 'uniqueNumber', digits: 4 } },
   }));
   assert.deepEqual(errors.map((error) => error.split(' ')[0]), ['duplicate']);
 });
 
-test('an assertion step of this spec without a criterion id is refused', { criterion: 'AC-SPEC-33-02' }, () => {
+test('an assertion step of this spec without a criterion id is refused', () => {
   for (const step of [expectRequests('likes', { atLeast: 1 }), expectResponse('likes', { kind: 'statusEquals', value: 200 }), expectStorage('privateKey', { kind: 'present' })]) {
     const { criterionId: _removed, ...untraced } = step;
     const errors = rejection(parsePlan, planOf([OPEN_LOGIN, untraced]));
@@ -241,7 +240,7 @@ test('an assertion step of this spec without a criterion id is refused', { crite
 
 // ---- Version 1.1 ----------------------------------------------------------------------------------
 
-test('a plan declaring 1.1 that uses any step of this spec is refused with unknown_step, as a 1.1 parser refuses it', { criterion: 'AC-SPEC-33-02' }, () => {
+test('a plan declaring 1.1 that uses any step of this spec is refused with unknown_step, as a 1.1 parser refuses it', () => {
   const parse = defaultParser();
   assert.equal(signupPlan()['version'], PREVIOUS_VERSION);
   const previousWith = (added: JsonRecord): JsonRecord => {
@@ -260,7 +259,7 @@ test('a plan declaring 1.1 that uses any step of this spec is refused with unkno
 
 // ---- No driver call for a refused plan ---------------------------------------------------------------
 
-test('a refused plan reaches no driver method, and nothing is logged', { criterion: 'AC-SPEC-33-02' }, async () => {
+test('a refused plan reaches no driver method, and nothing is logged', async () => {
   let driverCalls = 0;
   const spy: BrowserDriver = {
     info: { id: 'playwright', version: 'spy', protocol: 'none' },
@@ -279,7 +278,7 @@ test('a refused plan reaches no driver method, and nothing is logged', { criteri
 });
 
 // Counter-example: an accepted plan with a stub does reach the driver, so the spy above can fail.
-test('counter-example: an accepted plan with a stub step does reach the driver', { criterion: 'AC-SPEC-33-02' }, async () => {
+test('counter-example: an accepted plan with a stub step does reach the driver', async () => {
   let opens = 0;
   const spy: BrowserDriver = {
     info: { id: 'playwright', version: 'spy', protocol: 'none' },

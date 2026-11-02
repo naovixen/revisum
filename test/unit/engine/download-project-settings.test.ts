@@ -3,7 +3,6 @@
 // evidence.keepDownloads, off unless the project turns it on, decides whether a download's
 // redacted text is kept. What the driver does at the cap, and what is kept, come with the
 // downloads themselves.
-// See docs/specs/SPEC-31-page-states-metadata-downloads-and-tabs.md.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { parseProject, type Project } from '@revisum/engine';
@@ -34,17 +33,17 @@ const keepDownloadsOf = (project: Project): unknown => {
 
 // ---- maximumDownloadBytes -----------------------------------------------------------------------
 
-test('a project that sets no download limit caps downloads at 5 MiB', { criterion: 'AC-SPEC-31-06' }, () => {
+test('a project that sets no download limit caps downloads at 5 MiB', () => {
   assert.equal(limitsOf(parsed())['maximumDownloadBytes'], 5 * MEBIBYTE);
 });
 
-test('a project may set the download limit from 1 byte up to 100 MiB', { criterion: 'AC-SPEC-31-06' }, () => {
+test('a project may set the download limit from 1 byte up to 100 MiB', () => {
   for (const bytes of [1, 64 * 1024, 100 * MEBIBYTE]) {
     assert.equal(limitsOf(parsed({}, { maximumDownloadBytes: bytes }))['maximumDownloadBytes'], bytes);
   }
 });
 
-test('a download limit over 100 MiB, of 0, or not a whole number is refused at the limit', { criterion: 'AC-SPEC-31-06' }, () => {
+test('a download limit over 100 MiB, of 0, or not a whole number is refused at the limit', () => {
   for (const bytes of [100 * MEBIBYTE + 1, 0, -1, 1.5]) {
     const errors = refusal({}, { maximumDownloadBytes: bytes });
     assert.deepEqual(errors.map((error) => error.split(' ')[1]), ['$.limits.maximumDownloadBytes'], String(bytes));
@@ -55,21 +54,21 @@ test('a download limit over 100 MiB, of 0, or not a whole number is refused at t
 
 // ---- evidence.keepDownloads ---------------------------------------------------------------------
 
-test('a project with no evidence section keeps no download content', { criterion: 'AC-SPEC-31-08' }, () => {
+test('a project with no evidence section keeps no download content', () => {
   assert.equal(keepDownloadsOf(parsed()), false);
 });
 
-test('a project may turn keepDownloads on, and an empty evidence section leaves it off', { criterion: 'AC-SPEC-31-08' }, () => {
+test('a project may turn keepDownloads on, and an empty evidence section leaves it off', () => {
   assert.equal(keepDownloadsOf(parsed({ evidence: { keepDownloads: true } })), true);
   assert.equal(keepDownloadsOf(parsed({ evidence: {} })), false);
 });
 
-test('keepDownloads that is not true or false is refused as wrong_type', { criterion: 'AC-SPEC-31-08' }, () => {
+test('keepDownloads that is not true or false is refused as wrong_type', () => {
   for (const keepDownloads of ['yes', 1, null]) {
     assert.deepEqual(refusal({ evidence: { keepDownloads } }), ['wrong_type $.evidence.keepDownloads'], JSON.stringify(keepDownloads));
   }
 });
 
-test('the evidence section is closed: an unknown key in it is refused', { criterion: 'AC-SPEC-31-08' }, () => {
+test('the evidence section is closed: an unknown key in it is refused', () => {
   assert.deepEqual(refusal({ evidence: { keepDownloads: false, keepScreenshotsUnmasked: true } }), ['unknown_field $.evidence.keepScreenshotsUnmasked']);
 });

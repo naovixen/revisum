@@ -5,7 +5,6 @@
 // fixture origin with a rewrite. A real headless Chromium, through the own CDP driver, loads both
 // through the in-process proxy: the first shows the mutated heading, the second, the
 // counter-example, still shows the original.
-// See docs/specs/SPEC-07-isolated-runner-and-egress.md.
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
 import { cdpDriver, type DriverSession } from '@revisum/driver-cdp';
@@ -56,26 +55,26 @@ after(async () => {
   await capability?.close();
 });
 
-test('counter-example: the same page on a declared origin that is not a fixture origin is not rewritten', { criterion: 'AC-SPEC-07-07' }, async () => {
+test('counter-example: the same page on a declared origin that is not a fixture origin is not rewritten', async () => {
   const navigated = await session.navigate(secondApp.url('/mutant.html'));
   assert.ok(navigated.ok, JSON.stringify(navigated));
   assert.equal(await session.evaluate(readHeading), 'Original heading');
   assert.deepEqual(proxy.rewritesApplied(), [], 'no rewrite has been applied yet');
 });
 
-test('the page on the fixture origin is rewritten by its browser mutant', { criterion: 'AC-SPEC-07-07' }, async () => {
+test('the page on the fixture origin is rewritten by its browser mutant', async () => {
   const navigated = await session.navigate(fixtureApp.url('/mutant.html'));
   assert.ok(navigated.ok, JSON.stringify(navigated));
   assert.equal(await session.evaluate(readHeading), 'Mutated heading');
 });
 
-test('the proxy reports the rewrite it applied, by origin and name, once', { criterion: 'AC-SPEC-07-07' }, async () => {
+test('the proxy reports the rewrite it applied, by origin and name, once', async () => {
   // Loading the fixture page again applies the same rewrite again; it is still one rewrite.
   assert.ok((await session.navigate(fixtureApp.url('/mutant.html'))).ok);
   assert.deepEqual(proxy.rewritesApplied(), [{ origin: origin(fixtureApp.origin), name: 'heading-changed' }]);
 });
 
-test('the run manifest records the rewrites the proxy applied', { criterion: 'AC-SPEC-07-07' }, () => {
+test('the run manifest records the rewrites the proxy applied', () => {
   const parsed = defaultParser()(signupPlan());
   assert.ok(parsed.ok);
   const manifest = buildManifest({

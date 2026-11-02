@@ -3,7 +3,6 @@
 // reads, so a plan with no approval, a proposal, may hold all three, and no side-effect rule
 // applies. That the driver dispatches no input event during an advance, and that the runtime
 // guard is never asked, come with the CDP driver's clock port.
-// See docs/specs/SPEC-34-clock-advance-and-clipboard.md.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
@@ -32,27 +31,27 @@ async function decide(raw: JsonRecord, approved = false) {
   return { decision: comparable(decideOn(tested, plan, standing)), events: tested.events };
 }
 
-test('a proposal that advances the clock in both modes and checks and remembers the clipboard is allowed, with no denial recorded', { criterion: 'AC-SPEC-34-18' }, async () => {
+test('a proposal that advances the clock in both modes and checks and remembers the clipboard is allowed, with no denial recorded', async () => {
   const { decision, events } = await decide(newerPlan([OPEN_ACCOUNT_PAGE, ADVANCE, SKIP_AHEAD, COPY, CLIPBOARD_CHECK, CLIPBOARD_EXCLUDES, REMEMBER]));
   assert.deepEqual(decision, { kind: 'allow' });
   assert.deepEqual(deniedCodes(events), []);
 });
 
-test('a proposal is allowed an advance before its first navigation and a clipboard check as its only assertion', { criterion: 'AC-SPEC-34-18' }, async () => {
+test('a proposal is allowed an advance before its first navigation and a clipboard check as its only assertion', async () => {
   const raw = { ...newerPlan([]), steps: [ADVANCE, OPEN_ACCOUNT_PAGE, COPY, CLIPBOARD_CHECK] };
   const { decision, events } = await decide(raw);
   assert.deepEqual(decision, { kind: 'allow' });
   assert.deepEqual(deniedCodes(events), []);
 });
 
-test('the same plan is allowed when approved', { criterion: 'AC-SPEC-34-18' }, async () => {
+test('the same plan is allowed when approved', async () => {
   const { decision } = await decide(newerPlan([OPEN_ACCOUNT_PAGE, ADVANCE, COPY, CLIPBOARD_CHECK, REMEMBER]), true);
   assert.deepEqual(decision, { kind: 'allow' });
 });
 
 // Counter-example: the gate still judges the plan's actions around the advance, so the allows
 // above come from the advance and the clipboard steps, not from a gate that allows everything.
-test('counter-example: an irreversible click after an advance and a clipboard check is still denied at its own index', { criterion: 'AC-SPEC-34-18' }, async () => {
+test('counter-example: an irreversible click after an advance and a clipboard check is still denied at its own index', async () => {
   const { decision, events } = await decide(newerPlan([OPEN_ACCOUNT_PAGE, ADVANCE, CLIPBOARD_CHECK, click(role('button', 'Delete account'))]));
   assert.deepEqual(decision, { kind: 'deny', rule: 'irreversible-action', stepIndex: 3 });
   assert.deepEqual(deniedCodes(events), ['irreversible-action']);

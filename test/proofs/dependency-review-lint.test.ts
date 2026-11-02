@@ -8,7 +8,6 @@
 //   - a review whose version is not the installed one, or whose evidence path is missing, fails;
 //   - a development-only package, a `partial` result and a failing optional adapter all pass,
 //     so the lint fails for the planted reason only.
-// See docs/specs/SPEC-00-repo-seed-and-gates.md.
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { after, before, test } from 'node:test';
@@ -74,46 +73,46 @@ function replaceResultAfter(component: string, from: string, to: string): (text:
   };
 }
 
-test('control: the unchanged copy of the repository passes every lint command', { criterion: 'AC-SPEC-00-04', timeout: TIMEOUT }, () => {
+test('control: the unchanged copy of the repository passes every lint command', { timeout: TIMEOUT }, () => {
   assertLintPasses(scratch.lint());
 });
 
 // ---- A component with no review -----------------------------------------------------------------
 
-test('the lint fails when a workspace package gains a runtime dependency that has no review', { criterion: 'AC-SPEC-00-04', timeout: TIMEOUT }, () => {
+test('the lint fails when a workspace package gains a runtime dependency that has no review', { timeout: TIMEOUT }, () => {
   assertLintFails(lintWithEdits(scratch, runtimeDependencyEdits), [PLANTED_PACKAGE]);
 });
 
-test('counter-example: the same package as a development dependency needs no review', { criterion: 'AC-SPEC-00-04', timeout: TIMEOUT }, () => {
+test('counter-example: the same package as a development dependency needs no review', { timeout: TIMEOUT }, () => {
   assertLintPasses(lintWithEdits(scratch, developmentDependencyEdits));
 });
 
 // ---- A failing check on the default path --------------------------------------------------------
 
-test('the lint fails when the default axe-core review is given a failing check', { criterion: 'AC-SPEC-00-04', timeout: TIMEOUT }, () => {
+test('the lint fails when the default axe-core review is given a failing check', { timeout: TIMEOUT }, () => {
   const outcome = lintWithEdits(scratch, { [REVIEWS_PATH]: replaceResultAfter('axe-core', 'pass', 'fail') });
   assertLintFails(outcome, ['axe-core']);
 });
 
-test('the lint fails when playwright-core, which fails two checks, is moved onto the default path', { criterion: 'AC-SPEC-00-04', timeout: TIMEOUT }, () => {
+test('the lint fails when playwright-core, which fails two checks, is moved onto the default path', { timeout: TIMEOUT }, () => {
   const outcome = lintWithEdits(scratch, {
     [REVIEWS_PATH]: (text) => text.replace(/(['"])optional-adapter\1/, (_match, quote: string) => `${quote}default${quote}`),
   });
   assertLintFails(outcome, ['playwright-core']);
 });
 
-test('counter-example: a partial result on the default path passes', { criterion: 'AC-SPEC-00-04', timeout: TIMEOUT }, () => {
+test('counter-example: a partial result on the default path passes', { timeout: TIMEOUT }, () => {
   assertLintPasses(lintWithEdits(scratch, { [REVIEWS_PATH]: replaceResultAfter('axe-core', 'pass', 'partial') }));
 });
 
 // ---- The review matches what is installed, and its evidence exists ------------------------------
 
-test('the lint fails when a review names a version other than the one installed', { criterion: 'AC-SPEC-00-04', timeout: TIMEOUT }, () => {
+test('the lint fails when a review names a version other than the one installed', { timeout: TIMEOUT }, () => {
   const outcome = lintWithEdits(scratch, { [REVIEWS_PATH]: (text) => text.replace('4.14.0', '4.13.0') });
   assertLintFails(outcome, ['axe-core']);
 });
 
-test('the lint fails when a review cites a repository path that does not exist', { criterion: 'AC-SPEC-00-04', timeout: TIMEOUT }, () => {
+test('the lint fails when a review cites a repository path that does not exist', { timeout: TIMEOUT }, () => {
   const outcome = lintWithEdits(scratch, {
     [REVIEWS_PATH]: (text) => {
       // The first quoted repository path the reviews cite as evidence.

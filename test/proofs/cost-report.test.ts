@@ -6,7 +6,6 @@
 // Each test rewrites the record in a throw-away copy of the repository. The record's fields are
 // found by shape (the list of service lines, each line's one number, the top-level count), so
 // the tests fix the budget rule and not the field names.
-// See docs/specs/SPEC-00-repo-seed-and-gates.md.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -69,7 +68,7 @@ function costReport(): ToolRun {
 
 // ---- The committed record -----------------------------------------------------------------------
 
-test('the committed record declares zero customers and a total within the budget', { criterion: 'AC-SPEC-00-09' }, () => {
+test('the committed record declares zero customers and a total within the budget', () => {
   const run = costReport();
   assert.equal(run.passed, true, describeRun(run));
   const record: JsonObject = JSON.parse(readFileSync(join(scratch.root, RECORD_PATH), 'utf8'));
@@ -78,34 +77,34 @@ test('the committed record declares zero customers and a total within the budget
   assert.ok(JSON.stringify(record).includes('"declared"'), 'each service line is marked as declared');
 });
 
-test('control: the unchanged copy of the repository passes every lint command', { criterion: 'AC-SPEC-00-09', timeout: TIMEOUT }, () => {
+test('control: the unchanged copy of the repository passes every lint command', { timeout: TIMEOUT }, () => {
   assertLintPasses(scratch.lint());
 });
 
 // ---- The budget ---------------------------------------------------------------------------------
 
-test('the lint fails on a record totalling USD 5.01 at zero customers', { criterion: 'AC-SPEC-00-09', timeout: TIMEOUT }, () => {
+test('the lint fails on a record totalling USD 5.01 at zero customers', { timeout: TIMEOUT }, () => {
   assertLintFails(lintWithEdits(scratch, { [RECORD_PATH]: recordWith([2.5, 2.51], 0) }), ['hosted-costs.json']);
 });
 
-test('the cost report fails on a record totalling USD 5.01 at zero customers, and prints the total', { criterion: 'AC-SPEC-00-09' }, () => {
+test('the cost report fails on a record totalling USD 5.01 at zero customers, and prints the total', () => {
   const run = withEdits(scratch.root, { [RECORD_PATH]: recordWith([2.5, 2.51], 0) }, costReport);
   assert.equal(run.passed, false, describeRun(run));
   assert.ok(run.output.includes('5.01'), describeRun(run));
 });
 
-test('counter-example: a record totalling exactly USD 5 passes the lint and the report', { criterion: 'AC-SPEC-00-09', timeout: TIMEOUT }, () => {
+test('counter-example: a record totalling exactly USD 5 passes the lint and the report', { timeout: TIMEOUT }, () => {
   assertLintPasses(lintWithEdits(scratch, { [RECORD_PATH]: recordWith([2.5, 2.5], 0) }));
   const run = withEdits(scratch.root, { [RECORD_PATH]: recordWith([2.5, 2.5], 0) }, costReport);
   assert.equal(run.passed, true, describeRun(run));
 });
 
-test('counter-example: amounts that sum to exactly USD 5 in cents pass, whatever binary rounding does', { criterion: 'AC-SPEC-00-09' }, () => {
+test('counter-example: amounts that sum to exactly USD 5 in cents pass, whatever binary rounding does', () => {
   const run = withEdits(scratch.root, { [RECORD_PATH]: recordWith([0.03, 4.07, 0.9], 0) }, costReport);
   assert.equal(run.passed, true, describeRun(run));
 });
 
-test('counter-example: the budget applies only at zero customers', { criterion: 'AC-SPEC-00-09' }, () => {
+test('counter-example: the budget applies only at zero customers', () => {
   const run = withEdits(scratch.root, { [RECORD_PATH]: recordWith([2.5, 2.51], 1) }, costReport);
   assert.equal(run.passed, true, describeRun(run));
 });

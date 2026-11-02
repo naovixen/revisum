@@ -1,10 +1,9 @@
 // Until the determinism kit tracks timers and the CDP driver carries the clock and clipboard ports
-// (SPEC-06 and SPEC-08), runs report every step of this spec as failed with unsupported-step: an
+// (the CDP driver and replay), runs report every step of this spec as failed with unsupported-step: an
 // advanceClock in either mode, an expectClipboard of each kind and a remember from the clipboard.
 // The step never gives a partial result and never falls back to a real wait: nothing of it
 // reaches the driver, no timer as long as the advance is started, and every later step is
 // skipped. The counter-example runs the same plan without the step and does reach the driver.
-// See docs/specs/SPEC-34-clock-advance-and-clipboard.md.
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, test } from 'node:test';
 import { OPEN_ORDERS, ORIGIN, runPlan, type JsonRecord } from './run-value-examples.ts';
@@ -50,7 +49,7 @@ afterEach(() => {
 });
 
 for (const { name, step } of FEATURES) {
-  test(`a run with ${name} fails that step with unsupported-step, sends nothing of it and skips the rest`, { criterion: 'AC-SPEC-34-12' }, async () => {
+  test(`a run with ${name} fails that step with unsupported-step, sends nothing of it and skips the rest`, async () => {
     const { result, recording } = await runPlan(planOf([OPEN_ORDERS, step, AFTER]));
     assert.equal(result.state, 'Failed');
     assert.deepEqual(result.steps.map((stepResult) => [stepResult.index, stepResult.type, stepResult.outcome, stepResult.code]), [
@@ -61,7 +60,7 @@ for (const { name, step } of FEATURES) {
   });
 }
 
-test('an unsupported advance of one hour waits no real time: no timer near its length is started and the run ends at once', { criterion: 'AC-SPEC-34-12' }, async () => {
+test('an unsupported advance of one hour waits no real time: no timer near its length is started and the run ends at once', async () => {
   const started = performance.now();
   const { result } = await runPlan(planOf([OPEN_ORDERS, advanceClock(1, 'hours'), AFTER]));
   const elapsed = performance.now() - started;
@@ -71,14 +70,14 @@ test('an unsupported advance of one hour waits no real time: no timer near its l
 });
 
 // Mutant: the timer record does see a long timer, so the empty list above can fail.
-test('mutant: a timer as long as the advance is seen by the timer record', { criterion: 'AC-SPEC-34-12' }, () => {
+test('mutant: a timer as long as the advance is seen by the timer record', () => {
   const timer = setTimeout(() => undefined, HOUR);
   clearTimeout(timer);
   assert.deepEqual(timerDelays.filter((delay) => delay >= HOUR / 2), [HOUR]);
 });
 
 // Counter-example: the same run without any of those steps clicks and checks the page, and passes.
-test('counter-example: the same run without any of those steps clicks and checks the page, and passes', { criterion: 'AC-SPEC-34-12' }, async () => {
+test('counter-example: the same run without any of those steps clicks and checks the page, and passes', async () => {
   const { result, recording } = await runPlan(planOf([OPEN_ORDERS, AFTER]));
   assert.equal(result.state, 'Passed', JSON.stringify(result.steps));
   assert.deepEqual(recording.navigations, [`${ORIGIN}/orders`]);
@@ -88,7 +87,7 @@ test('counter-example: the same run without any of those steps clicks and checks
 
 // A copy, then a clipboard check: the copy click is performed, the check is not, and a fill that
 // uses a value remembered from the clipboard is skipped, never sent with empty text.
-test('after a copy click, a clipboard remember fails with unsupported-step and the fill that uses it is skipped', { criterion: 'AC-SPEC-34-12' }, async () => {
+test('after a copy click, a clipboard remember fails with unsupported-step and the fill that uses it is skipped', async () => {
   const fill = { type: 'fill', locator: { by: 'label', label: 'Invite link' }, value: { valueName: 'inviteLink' } };
   const { result, recording } = await runPlan(planOf([OPEN_ORDERS, COPY_LINK, rememberClipboard('inviteLink'), fill]));
   assert.equal(result.state, 'Failed');
@@ -98,7 +97,7 @@ test('after a copy click, a clipboard remember fails with unsupported-step and t
   assert.deepEqual(recording.actions.map((action) => action.type), ['click']);
 });
 
-test('an advance before the first navigation fails with unsupported-step and the page is never loaded', { criterion: 'AC-SPEC-34-12' }, async () => {
+test('an advance before the first navigation fails with unsupported-step and the page is never loaded', async () => {
   const { result, recording } = await runPlan(planOf([advanceClock(10, 'minutes'), OPEN_ORDERS]));
   assert.equal(result.state, 'Failed');
   assert.deepEqual(result.steps.map((stepResult) => [stepResult.index, stepResult.outcome, stepResult.code]), [

@@ -1,7 +1,6 @@
 // The shipped drivers explain a "no" for a target they cannot serve, and the engine reports it
 // as the run's outcome: no other adapter, engine or device is tried, and no browser starts.
 // Only `supports` is asked of a real driver here, so no browser is needed.
-// See docs/specs/SPEC-05-target-matrix-and-lock.md.
 import assert from 'node:assert/strict';
 import { arch, platform } from 'node:os';
 import { test } from 'node:test';
@@ -72,7 +71,7 @@ async function runOn(targetId: string, drivers: ReadonlyMap<string, BrowserDrive
   return { result, store };
 }
 
-test('when the only registered adapter is CDP, it refuses a WebKit target with engine-not-supported', { criterion: 'AC-SPEC-05-02' }, () => {
+test('when the only registered adapter is CDP, it refuses a WebKit target with engine-not-supported', () => {
   const registry = adapterRegistry(new Map([['cdp', cdpDriver({ executablePath: 'never-launched' })]]));
   for (const driver of registry.all()) {
     const answer = driver.supports(target('cdp-webkit'));
@@ -81,7 +80,7 @@ test('when the only registered adapter is CDP, it refuses a WebKit target with e
   }
 });
 
-test('a WebKit run on CDP ends engine-not-supported; Playwright, registered too, is not used instead', { criterion: 'AC-SPEC-05-02' }, async () => {
+test('a WebKit run on CDP ends engine-not-supported; Playwright, registered too, is not used instead', async () => {
   const cdp = watched(cdpDriver({ executablePath: 'never-launched' }));
   const playwright = watched(playwrightDriver());
   const { result, store } = await runOn('cdp-webkit', new Map<string, BrowserDriver>([['cdp', cdp], ['playwright', playwright]]));
@@ -91,7 +90,7 @@ test('a WebKit run on CDP ends engine-not-supported; Playwright, registered too,
   assert.equal(store.references().length, 0);
 });
 
-test('Playwright refuses Firefox with a phone profile as device-not-supported, and accepts it on desktop', { criterion: 'AC-SPEC-05-03' }, () => {
+test('Playwright refuses Firefox with a phone profile as device-not-supported, and accepts it on desktop', () => {
   const driver = playwrightDriver();
   const phone = driver.supports(target('playwright-firefox-phone'));
   assert.ok(!phone.ok);
@@ -99,7 +98,7 @@ test('Playwright refuses Firefox with a phone profile as device-not-supported, a
   assert.ok(driver.supports(target('playwright-firefox-desktop')).ok, 'control: the desktop profile is supported');
 });
 
-test('a Firefox phone run ends device-not-supported, and neither Playwright nor CDP opens a browser', { criterion: 'AC-SPEC-05-03' }, async () => {
+test('a Firefox phone run ends device-not-supported, and neither Playwright nor CDP opens a browser', async () => {
   const cdp = watched(cdpDriver({ executablePath: 'never-launched' }));
   const playwright = watched(playwrightDriver());
   const { result, store } = await runOn('playwright-firefox-phone', new Map<string, BrowserDriver>([['cdp', cdp], ['playwright', playwright]]));

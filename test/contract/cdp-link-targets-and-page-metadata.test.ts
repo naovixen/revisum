@@ -9,7 +9,6 @@
 // loaded as usual, it sees the script's. Scripts stay off only until the next navigate.
 // metaContent and canonicalUrl fail with assertion-failed on a page whose head has no such tag
 // (bare-head.html); the counter-examples pass on head.html.
-// See docs/specs/SPEC-31-page-states-metadata-downloads-and-tabs.md.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import {
@@ -32,7 +31,7 @@ describe('hrefEquals on a link with a relative href', () => {
   const LINK_TARGETS = ['/billing/fees.html', '/help/billing/fees.html', '/help/../billing/fees.html', '/guide.html'];
   const followed = (paths: readonly string[]): readonly string[] => paths.filter((path) => LINK_TARGETS.includes(path));
 
-  test('passes against the href resolved on the page URL, given as an absolute URL, and follows no link', { criterion: 'AC-SPEC-31-03' }, async () => {
+  test('passes against the href resolved on the page URL, given as an absolute URL, and follows no link', async () => {
     const { result, atClose, requestedPaths } = await harness.runSteps(CDP_TARGET, [
       OPEN_LINKS,
       hrefEquals(role('link', 'Late fees'), `${harness.origin}/billing/fees.html?tab=2`, 'links.fees-target'),
@@ -44,7 +43,7 @@ describe('hrefEquals on a link with a relative href', () => {
     assert.equal(atClose?.shown['input-events'], '0', 'no input event reached the page');
   });
 
-  test('passes against the resolved href given as a path starting with /', { criterion: 'AC-SPEC-31-03' }, async () => {
+  test('passes against the resolved href given as a path starting with /', async () => {
     const { result, requestedPaths } = await harness.runSteps(CDP_TARGET, [
       OPEN_LINKS, hrefEquals(role('link', 'Late fees'), '/billing/fees.html?tab=2', 'links.fees-path'),
     ]);
@@ -55,7 +54,7 @@ describe('hrefEquals on a link with a relative href', () => {
   // The unresolved join of the page's folder and the attribute text, and a different query, are
   // not the link's target.
   for (const wrong of ['/help/billing/fees.html?tab=2', '/billing/fees.html?tab=3']) {
-    test(`fails with assertion-failed against ${wrong}, and follows no link`, { criterion: 'AC-SPEC-31-03' }, async () => {
+    test(`fails with assertion-failed against ${wrong}, and follows no link`, async () => {
       const { result, atClose, requestedPaths } = await harness.runSteps(CDP_TARGET, [
         OPEN_LINKS, hrefEquals(role('link', 'Late fees'), `${harness.origin}${wrong}`, 'links.fees-wrong'), textEquals(testId('input-events'), '0', 'links.untouched'),
       ]);
@@ -69,7 +68,7 @@ describe('hrefEquals on a link with a relative href', () => {
 describe('metaContent after a navigate with and without scripts', () => {
   const OPEN_HEAD = '/head.html';
 
-  test('with scripts disabled, metaContent sees the og:title the server sent and no page script runs', { criterion: 'AC-SPEC-31-04' }, async () => {
+  test('with scripts disabled, metaContent sees the og:title the server sent and no page script runs', async () => {
     const { result, requestedPaths } = await harness.runSteps(CDP_TARGET, [
       navigateWithoutScripts(OPEN_HEAD),
       metaContent('og:title', SERVER_TITLE, 'head.server-title'),
@@ -80,7 +79,7 @@ describe('metaContent after a navigate with and without scripts', () => {
     assert.ok(!requestedPaths.includes(SCRIPT_BEACON), 'no page script asked the server for anything');
   });
 
-  test('without scripts disabled, metaContent sees the og:title the page script wrote, and both page scripts ran', { criterion: 'AC-SPEC-31-04' }, async () => {
+  test('without scripts disabled, metaContent sees the og:title the page script wrote, and both page scripts ran', async () => {
     const { result, requestedPaths } = await harness.runSteps(CDP_TARGET, [
       navigate(OPEN_HEAD),
       metaContent('og:title', SCRIPT_TITLE, 'head.script-title'),
@@ -92,17 +91,17 @@ describe('metaContent after a navigate with and without scripts', () => {
 
   // The two pairs below are the same check with the other run's value: each fails, so the
   // passes above are not constants of the page.
-  test('with scripts disabled, metaContent expecting the script\'s og:title fails with assertion-failed', { criterion: 'AC-SPEC-31-04' }, async () => {
+  test('with scripts disabled, metaContent expecting the script\'s og:title fails with assertion-failed', async () => {
     const { result } = await harness.runSteps(CDP_TARGET, [navigateWithoutScripts(OPEN_HEAD), metaContent('og:title', SCRIPT_TITLE, 'head.script-title')]);
     assert.deepEqual(outcomes(result), [[0, 'passed', undefined], [1, 'failed', 'assertion-failed']]);
   });
 
-  test('without scripts disabled, metaContent expecting the server\'s og:title fails with assertion-failed', { criterion: 'AC-SPEC-31-04' }, async () => {
+  test('without scripts disabled, metaContent expecting the server\'s og:title fails with assertion-failed', async () => {
     const { result } = await harness.runSteps(CDP_TARGET, [navigate(OPEN_HEAD), metaContent('og:title', SERVER_TITLE, 'head.server-title')]);
     assert.deepEqual(outcomes(result), [[0, 'passed', undefined], [1, 'failed', 'assertion-failed']]);
   });
 
-  test('scripts stay off only until the next navigate, which runs the page scripts again', { criterion: 'AC-SPEC-31-04' }, async () => {
+  test('scripts stay off only until the next navigate, which runs the page scripts again', async () => {
     const { result, requestedPaths } = await harness.runSteps(CDP_TARGET, [
       navigateWithoutScripts(OPEN_HEAD),
       metaContent('og:title', SERVER_TITLE, 'head.server-title'),
@@ -116,7 +115,7 @@ describe('metaContent after a navigate with and without scripts', () => {
 });
 
 describe('metaContent and canonicalUrl on a head without the tag', () => {
-  test('metaContent fails with assertion-failed when no meta tag has the name', { criterion: 'AC-SPEC-31-05' }, async () => {
+  test('metaContent fails with assertion-failed when no meta tag has the name', async () => {
     const { result } = await harness.runSteps(CDP_TARGET, [
       navigate('/bare-head.html'), metaContent('description', 'Garden tools at half price.', 'head.description'), textEquals(testId('input-events'), '0', 'head.shown'),
     ]);
@@ -124,21 +123,21 @@ describe('metaContent and canonicalUrl on a head without the tag', () => {
   });
 
   // The page's own URL is not its canonical URL when the head names none.
-  test('canonicalUrl fails with assertion-failed when the head has no canonical link, even against the page\'s own URL', { criterion: 'AC-SPEC-31-05' }, async () => {
+  test('canonicalUrl fails with assertion-failed when the head has no canonical link, even against the page\'s own URL', async () => {
     const { result } = await harness.runSteps(CDP_TARGET, [
       navigate('/bare-head.html'), canonicalUrl(`${harness.origin}/bare-head.html`, 'head.canonical'), textEquals(testId('input-events'), '0', 'head.shown'),
     ]);
     assert.deepEqual(outcomes(result), [[0, 'passed', undefined], [1, 'failed', 'assertion-failed'], [2, 'skipped', undefined]]);
   });
 
-  test('metaContent with a matching name but different content fails with assertion-failed', { criterion: 'AC-SPEC-31-05' }, async () => {
+  test('metaContent with a matching name but different content fails with assertion-failed', async () => {
     const { result } = await harness.runSteps(CDP_TARGET, [navigate('/head.html'), metaContent('description', 'Garden tools at full price.', 'head.description')]);
     assert.deepEqual(outcomes(result), [[0, 'passed', undefined], [1, 'failed', 'assertion-failed']]);
   });
 
   // Counter-example: on head.html both tags are there, and the canonical link's relative href is
   // compared resolved.
-  test('counter-example: on a head with both tags, metaContent and canonicalUrl pass', { criterion: 'AC-SPEC-31-05' }, async () => {
+  test('counter-example: on a head with both tags, metaContent and canonicalUrl pass', async () => {
     const { result } = await harness.runSteps(CDP_TARGET, [
       navigate('/head.html'),
       metaContent('description', 'Garden tools at half price.', 'head.description'),

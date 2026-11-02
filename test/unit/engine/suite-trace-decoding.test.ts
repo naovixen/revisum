@@ -5,7 +5,6 @@
 // truncated archive, is trace-invalid; a trace format version it does not know is
 // trace-unsupported. A refusal never echoes an entry's name or content.
 // Counter-examples: the same archives, made well-formed or within the limits, are read.
-// See docs/specs/SPEC-35-evidence-mode.md.
 import assert from 'node:assert/strict';
 import { Buffer } from 'node:buffer';
 import { randomBytes } from 'node:crypto';
@@ -35,28 +34,28 @@ function refusal(archive: Uint8Array, limits: EvidenceLimits = evidenceLimits())
 
 // ---- A well-formed trace, the counter-example to every refusal below -----------------------------
 
-test('a well-formed trace archive is read, and holds its two actions in order', { criterion: 'AC-SPEC-35-10' }, () => {
+test('a well-formed trace archive is read, and holds its two actions in order', () => {
   const trace = accepted(traceArchive());
   assert.equal(trace.actions.length, TRACE_ACTIONS.length, JSON.stringify(trace.actions));
 });
 
 // ---- Zip bombs --------------------------------------------------------------------------------------
 
-test('an archive whose entries inflate past maximumTraceBytes is refused as too-large', { criterion: 'AC-SPEC-35-10' }, () => {
+test('an archive whose entries inflate past maximumTraceBytes is refused as too-large', () => {
   // Random bytes do not compress, so only the total size, not the ratio, is over a limit here.
   const archive = zipArchive([...traceEntries(), { name: 'resources/large-image', data: randomBytes(2 * MEBIBYTE) }]);
   assert.equal(refusal(archive, evidenceLimits({ maximumTraceBytes: MEBIBYTE })).code, 'too-large');
   accepted(archive, evidenceLimits({ maximumTraceBytes: 4 * MEBIBYTE }));
 });
 
-test('an entry that inflates a thousandfold, a zip bomb, is refused as too-large even under the size limit', { criterion: 'AC-SPEC-35-10' }, () => {
+test('an entry that inflates a thousandfold, a zip bomb, is refused as too-large even under the size limit', () => {
   // Four MiB of zeros deflate to about four KiB: far over any compression-ratio limit, and far
   // under the default 100 MiB per trace.
   const archive = zipArchive([...traceEntries(), { name: 'resources/zeros', data: new Uint8Array(4 * MEBIBYTE) }]);
   assert.equal(refusal(archive).code, 'too-large');
 });
 
-test('an entry whose headers claim a small size but which inflates past the limit is refused, not trusted', { criterion: 'AC-SPEC-35-10' }, () => {
+test('an entry whose headers claim a small size but which inflates past the limit is refused, not trusted', () => {
   const archive = zipArchive([
     ...traceEntries(), { name: 'resources/lying-entry', data: randomBytes(2 * MEBIBYTE), claimedSize: 100 },
   ]);
@@ -79,7 +78,7 @@ const ESCAPING_NAMES: readonly { readonly title: string; readonly name: (file: s
 ];
 
 for (const { title, name } of ESCAPING_NAMES) {
-  test(`${title} is refused as trace-invalid, the name is not echoed, and nothing is written`, { criterion: 'AC-SPEC-35-10' }, () => {
+  test(`${title} is refused as trace-invalid, the name is not echoed, and nothing is written`, () => {
     const file = marker();
     const entryName = name(file);
     const error = refusal(zipArchive([...traceEntries(), { name: entryName, data: 'written outside the archive' }]));
@@ -94,7 +93,7 @@ for (const { title, name } of ESCAPING_NAMES) {
   });
 }
 
-test('counter-example: an entry inside a subfolder of the archive is read', { criterion: 'AC-SPEC-35-10' }, () => {
+test('counter-example: an entry inside a subfolder of the archive is read', () => {
   accepted(zipArchive([...traceEntries(), { name: `resources/${marker()}.txt`, data: 'inside the archive' }]));
 });
 
@@ -105,41 +104,41 @@ const withResources = (count: number): ZipEntry[] => [
   ...Array.from({ length: count }, (_, index): ZipEntry => ({ name: `resources/resource-${index}`, data: `resource ${index}` })),
 ];
 
-test('an archive with more entries than maximumTraceEntries is refused as too-large', { criterion: 'AC-SPEC-35-10' }, () => {
+test('an archive with more entries than maximumTraceEntries is refused as too-large', () => {
   assert.equal(refusal(zipArchive(withResources(4)), evidenceLimits({ maximumTraceEntries: 5 })).code, 'too-large');
 });
 
-test('counter-example: an archive with exactly maximumTraceEntries entries is read', { criterion: 'AC-SPEC-35-10' }, () => {
+test('counter-example: an archive with exactly maximumTraceEntries entries is read', () => {
   accepted(zipArchive(withResources(3)), evidenceLimits({ maximumTraceEntries: 5 }));
 });
 
 // ---- Truncated and malformed archives -----------------------------------------------------------------
 
-test('an archive cut short before its end record is refused as trace-invalid', { criterion: 'AC-SPEC-35-10' }, () => {
+test('an archive cut short before its end record is refused as trace-invalid', () => {
   const archive = traceArchive();
   assert.equal(refusal(archive.slice(0, archive.length - 10)).code, 'trace-invalid');
 });
 
-test('an archive cut in half, inside its entries, is refused as trace-invalid', { criterion: 'AC-SPEC-35-10' }, () => {
+test('an archive cut in half, inside its entries, is refused as trace-invalid', () => {
   const archive = traceArchive();
   assert.equal(refusal(archive.slice(0, Math.floor(archive.length / 2))).code, 'trace-invalid');
 });
 
-test('an archive whose directory points past its own end is refused as trace-invalid', { criterion: 'AC-SPEC-35-10' }, () => {
+test('an archive whose directory points past its own end is refused as trace-invalid', () => {
   const archive = Buffer.from(traceArchive());
   // The end record's last four-byte field before the comment length is the directory's offset.
   archive.writeUInt32LE(archive.length + 4096, archive.length - 6);
   assert.equal(refusal(new Uint8Array(archive)).code, 'trace-invalid');
 });
 
-test('an empty file and random bytes are each refused as trace-invalid', { criterion: 'AC-SPEC-35-10' }, () => {
+test('an empty file and random bytes are each refused as trace-invalid', () => {
   assert.equal(refusal(new Uint8Array(0)).code, 'trace-invalid');
   assert.equal(refusal(new Uint8Array(randomBytes(4096))).code, 'trace-invalid');
 });
 
 // ---- Trace versions ------------------------------------------------------------------------------------
 
-test('a trace of a version no Playwright has written is refused as trace-unsupported, never guessed at', { criterion: 'AC-SPEC-35-10' }, () => {
+test('a trace of a version no Playwright has written is refused as trace-unsupported, never guessed at', () => {
   assert.equal(refusal(traceArchive(UNKNOWN_TRACE_VERSION)).code, 'trace-unsupported');
   accepted(traceArchive(SUPPORTED_TRACE_VERSION));
 });

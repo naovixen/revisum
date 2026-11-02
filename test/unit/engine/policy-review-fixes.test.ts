@@ -4,7 +4,6 @@
 //   - a plan the gate cleared under one project's allowances could run under another project;
 //   - names written in camelCase, with a soft hyphen, or in full-width letters escaped the patterns;
 //   - an audit sink that failed to record a denial let the denial pass silently.
-// See docs/specs/SPEC-03-policy-gate.md.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { failure, policyGate, run, runUntrusted, type EventSink, type RunResult } from '@revisum/engine';
@@ -25,7 +24,7 @@ const PLACEHOLDER_ORIGIN = 'https://relative.invalid';
 // A project whose plan parser would accept the placeholder origin like any declared origin.
 const WITH_PLACEHOLDER = policyProjectInput({ origins: [ORIGIN, PRODUCTION_ORIGIN, PLACEHOLDER_ORIGIN] });
 
-test('a plan that navigates to an absolute URL on the placeholder origin never reaches the gate: it is rejected and opens no browser', { criterion: 'AC-SPEC-03-02' }, async () => {
+test('a plan that navigates to an absolute URL on the placeholder origin never reaches the gate: it is rejected and opens no browser', async () => {
   const steps = [OPEN_ACCOUNT_PAGE, navigate(`${PLACEHOLDER_ORIGIN}/admin`)];
   for (const projectInput of [policyProjectInput(), WITH_PLACEHOLDER]) {
     const driven = guardedDriver([...steps, CLOSING_CHECK]);
@@ -35,7 +34,7 @@ test('a plan that navigates to an absolute URL on the placeholder origin never r
   }
 });
 
-test('a plan that navigates to a relative path runs, on the base URL', { criterion: 'AC-SPEC-03-02' }, async () => {
+test('a plan that navigates to a relative path runs, on the base URL', async () => {
   const steps = [OPEN_ACCOUNT_PAGE, navigate('/admin')];
   const driven = guardedDriver([...steps, CLOSING_CHECK]);
   const outcome = await runUntrusted(planOf(steps), parserFor(), runBase(), { ...portsWithoutAudit(driven.driver), audit: memoryEventSink() });
@@ -48,12 +47,12 @@ test('a plan that navigates to a relative path runs, on the base URL', { criteri
 const DELETE_STEPS = [OPEN_ACCOUNT_PAGE, click(role('button', 'Delete account'))];
 const SAVE_STEPS = [OPEN_ACCOUNT_PAGE, click(role('button', 'Save changes'))];
 
-test('with no targets, a click on Delete account is still denied as irreversible-action', { criterion: 'AC-SPEC-03-01' }, async () => {
+test('with no targets, a click on Delete account is still denied as irreversible-action', async () => {
   const { gate } = await testGate();
   assert.deepEqual(gate.decide(parsedPlan(planOf(DELETE_STEPS)), []), { kind: 'deny', rule: 'irreversible-action', stepIndex: 1 });
 });
 
-test('with no targets, a click on Save changes is not denied as irreversible-action', { criterion: 'AC-SPEC-03-01' }, async () => {
+test('with no targets, a click on Save changes is not denied as irreversible-action', async () => {
   const { gate } = await testGate();
   const decision = gate.decide(parsedPlan(planOf(SAVE_STEPS)), []);
   assert.ok(decision.kind === 'allow' || decision.rule !== 'irreversible-action', JSON.stringify(decision));
@@ -84,13 +83,13 @@ async function runClearedUnderA(runProjectInput: Record<string, unknown>) {
   return { result, thrown, driven };
 }
 
-test('a plan cleared under one project\'s allowed names is refused before any browser opens when run under a project that does not allow them', { criterion: 'AC-SPEC-03-01' }, async () => {
+test('a plan cleared under one project\'s allowed names is refused before any browser opens when run under a project that does not allow them', async () => {
   const { result, thrown, driven } = await runClearedUnderA(policyProjectInput());
   assert.equal(driven.opens(), 0, `the run opened a browser and ended ${result?.state ?? 'nowhere'}`);
   assert.ok(thrown !== undefined || (result !== undefined && result.state !== 'Passed'), JSON.stringify(result));
 });
 
-test('the same plan runs to the end under the project that cleared it', { criterion: 'AC-SPEC-03-01' }, async () => {
+test('the same plan runs to the end under the project that cleared it', async () => {
   const { result, thrown, driven } = await runClearedUnderA(ALLOWS_DELETE);
   assert.equal(thrown, undefined);
   assert.equal(result?.state, 'Passed', JSON.stringify(result?.steps));
@@ -112,21 +111,21 @@ const DISGUISED_NAMES: readonly (readonly [string, string])[] = [
 const LOOK_ALIKE_NAMES: readonly string[] = ['DeletedItems', 'Deleted items', 'Delegate account', 'UndeleteItem'];
 
 for (const [how, name] of DISGUISED_NAMES) {
-  test(`the runtime guard denies a click on a control named "Delete account" written in ${how}`, { criterion: 'AC-SPEC-03-11' }, async () => {
+  test(`the runtime guard denies a click on a control named "Delete account" written in ${how}`, async () => {
     const { gate, project } = await testGate();
     const step = stepAt(parsedPlan(planOf([OPEN_ACCOUNT_PAGE, click(testId('danger-zone-action'))])), 1);
     const verdict = gate.guardAction(step, 1, element({ role: 'button', name }), null, localeOf(project, ENGLISH));
     assert.deepEqual(verdict, { kind: 'deny', rule: 'irreversible-action', stepIndex: 1 });
   });
 
-  test(`the static check denies a click on a button named "Delete account" written in ${how}`, { criterion: 'AC-SPEC-03-11' }, async () => {
+  test(`the static check denies a click on a button named "Delete account" written in ${how}`, async () => {
     const plan = parsedPlan(planOf([OPEN_ACCOUNT_PAGE, click(role('button', name))]));
     assert.deepEqual(decideOn(await testGate(), plan), { kind: 'deny', rule: 'irreversible-action', stepIndex: 1 });
   });
 }
 
 for (const name of LOOK_ALIKE_NAMES) {
-  test(`a control named "${name}" is still allowed: only whole words match`, { criterion: 'AC-SPEC-03-11' }, async () => {
+  test(`a control named "${name}" is still allowed: only whole words match`, async () => {
     const { gate, project } = await testGate();
     const step = stepAt(parsedPlan(planOf([OPEN_ACCOUNT_PAGE, click(testId('danger-zone-action'))])), 1);
     assert.deepEqual(gate.guardAction(step, 1, element({ role: 'button', name }), null, localeOf(project, ENGLISH)), { kind: 'allow' });
@@ -155,7 +154,7 @@ async function settle<Value>(work: Promise<Value>): Promise<{ readonly value?: V
   }
 }
 
-test('when the audit sink fails to record a static denial, the outcome says so rather than a plain Denied', { criterion: 'AC-SPEC-03-05' }, async () => {
+test('when the audit sink fails to record a static denial, the outcome says so rather than a plain Denied', async () => {
   const driven = guardedDriver([...DELETE_STEPS, CLOSING_CHECK]);
   const sink = failingSink();
   const settled = await settle(runUntrusted(DELETE_PLAN, parserFor(), runBase(), { ...portsWithoutAudit(driven.driver), audit: sink }));
@@ -166,7 +165,7 @@ test('when the audit sink fails to record a static denial, the outcome says so r
     'the denial went unrecorded, yet the outcome looks exactly like a recorded one');
 });
 
-test('when the audit sink records a static denial, the outcome is a plain Denied', { criterion: 'AC-SPEC-03-05' }, async () => {
+test('when the audit sink records a static denial, the outcome is a plain Denied', async () => {
   const driven = guardedDriver([...DELETE_STEPS, CLOSING_CHECK]);
   const sink = memoryEventSink();
   const outcome = await runUntrusted(DELETE_PLAN, parserFor(), runBase(), { ...portsWithoutAudit(driven.driver), audit: sink });
@@ -180,7 +179,7 @@ async function runtimeDenial(audit: EventSink) {
   return { settled, driven };
 }
 
-test('when the audit sink fails to record a runtime denial, the run result differs from one whose denial was recorded', { criterion: 'AC-SPEC-03-05' }, async () => {
+test('when the audit sink fails to record a runtime denial, the run result differs from one whose denial was recorded', async () => {
   const recorded = await runtimeDenial(memoryEventSink());
   const sink = failingSink();
   const unrecorded = await runtimeDenial(sink);
@@ -193,7 +192,7 @@ test('when the audit sink fails to record a runtime denial, the run result diffe
     'the denial went unrecorded, yet the result is identical to a recorded one');
 });
 
-test('two runs whose runtime denial was recorded give the same result', { criterion: 'AC-SPEC-03-05' }, async () => {
+test('two runs whose runtime denial was recorded give the same result', async () => {
   const first = await runtimeDenial(memoryEventSink());
   const second = await runtimeDenial(memoryEventSink());
   assert.equal(finalState(first.settled.value ?? []), 'Denied');

@@ -7,9 +7,8 @@
 // The control run checks the canary element against a text it can never equal, without
 // remembering it, and that observation does reach the result, so the scan can see the canary when
 // it is there.
-// Not covered here: the visual report, which a run cannot produce until the result model joins it
-// (SPEC-11, SPEC-12), and text drawn as pixels, which no text scan can read.
-// See docs/specs/SPEC-30-plan-values-positions-and-keys.md and docs/specs/SPEC-04-secrets-and-redaction.md.
+// Not covered here: the visual report, which a run cannot produce until the result model joins it,
+// and text drawn as pixels, which no text scan can read.
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -58,7 +57,7 @@ function writeOutputs(name: string, ran: PlanRun): string[] {
   return paths;
 }
 
-test('the leak scan finds a remembered canary only where it was planted; the run keeps its name and sha256', { criterion: 'AC-SPEC-30-10', timeout: TIMEOUT }, async () => {
+test('the leak scan finds a remembered canary only where it was planted; the run keeps its name and sha256', { timeout: TIMEOUT }, async () => {
   const ran = await harness.runSteps(CDP_TARGET, [
     navigate('/remember.html'),
     remember(VALUE_NAME, testId('canary')),
@@ -93,7 +92,7 @@ test('the leak scan finds a remembered canary only where it was planted; the run
 
 // Control: the same page's canary, observed by a failed check without being remembered, does
 // reach the result, and the scan finds it there.
-test('control: a failed check of the canary element keeps it in the result, and the scan finds it', { criterion: 'AC-SPEC-30-10', timeout: TIMEOUT }, async () => {
+test('control: a failed check of the canary element keeps it in the result, and the scan finds it', { timeout: TIMEOUT }, async () => {
   const ran = await harness.runSteps(CDP_TARGET, [
     navigate('/remember.html'),
     textEquals(testId('canary'), 'deliberately wrong', 'remember.canary-checked'),

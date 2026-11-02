@@ -1,5 +1,5 @@
 // Shared setup for the engine tests of explore mode: the page map, the crawl and the static
-// locator check (docs/specs/SPEC-37-explore-to-draft.md).
+// locator check.
 //
 //   - pageMapEntry(), crawlSite(), checkDraftLocators() and admitAsCoreRoute() call the engine's
 //     functions, looked up at run time so these tests compile before the functions exist. A missing

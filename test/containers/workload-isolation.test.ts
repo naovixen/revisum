@@ -8,7 +8,6 @@
 //   - Where egress cannot be enforced, the suite is refused with egress-unenforceable and no suite
 //     code runs: it writes no report, and no container of the team's image is started (AC-07).
 //   - Declared arguments that look like shell syntax reach the process as literal text (AC-12).
-// See docs/specs/SPEC-35-evidence-mode.md.
 import assert from 'node:assert/strict';
 import { before, test } from 'node:test';
 import { createSecret, failure, type EgressEvent, type SecretName } from '@revisum/contracts';
@@ -57,7 +56,7 @@ const UNDECLARED_HOSTS = [
 ];
 
 for (const { attempt, host } of UNDECLARED_HOSTS) {
-  test(`${attempt} to ${host} is blocked and recorded, and never allowed`, { criterion: 'AC-SPEC-35-05', timeout: TIMEOUT }, async () => {
+  test(`${attempt} to ${host} is blocked and recorded, and never allowed`, { timeout: TIMEOUT }, async () => {
     const { events } = await egressAttempts();
     const recorded = eventsFor(events, host);
     assert.ok(recorded.length >= 1, `nothing was recorded for ${host}: ${JSON.stringify(events)}`);
@@ -66,18 +65,18 @@ for (const { attempt, host } of UNDECLARED_HOSTS) {
   });
 }
 
-test('a raw socket that ignores the proxy is recorded with the channel process', { criterion: 'AC-SPEC-35-05', timeout: TIMEOUT }, async () => {
+test('a raw socket that ignores the proxy is recorded with the channel process', { timeout: TIMEOUT }, async () => {
   const { events } = await egressAttempts();
   assert.ok(eventsFor(events, 'socket.invalid').some((event) => event.channel === 'process'), JSON.stringify(events));
 });
 
-test('an IPv6 form of loopback is blocked and recorded, not treated as the container\'s own loopback', { criterion: 'AC-SPEC-35-05', timeout: TIMEOUT }, async () => {
+test('an IPv6 form of loopback is blocked and recorded, not treated as the container\'s own loopback', { timeout: TIMEOUT }, async () => {
   const { events } = await egressAttempts();
   const recorded = events.filter((event) => hostOf(String(event.origin)).startsWith('::ffff:'));
   assert.ok(recorded.length >= 1 && recorded.every((event) => event.decision === 'blocked'), JSON.stringify(events));
 });
 
-test('no attempt reached an undeclared origin, from the suite\'s own view', { criterion: 'AC-SPEC-35-05', timeout: TIMEOUT }, async () => {
+test('no attempt reached an undeclared origin, from the suite\'s own view', { timeout: TIMEOUT }, async () => {
   const { seen } = await egressAttempts();
   for (const name of ['node-fetch', 'metadata-name', 'metadata-address', 'ipv6-loopback']) {
     assert.ok(!/^status 2\d\d$/.test(String(seen[name])), `${name} got ${String(seen[name])}`);
@@ -89,7 +88,7 @@ test('no attempt reached an undeclared origin, from the suite\'s own view', { cr
   assert.notEqual(Reflect.get(browser, 'websocket'), 'open');
 });
 
-test('counter-example: the suite\'s own app on loopback answers, and is not recorded as egress', { criterion: 'AC-SPEC-35-05', timeout: TIMEOUT }, async () => {
+test('counter-example: the suite\'s own app on loopback answers, and is not recorded as egress', { timeout: TIMEOUT }, async () => {
   const { seen, events } = await egressAttempts();
   assert.equal(seen['own-app'], 'status 200');
   assert.deepEqual(eventsFor(events, '127.0.0.1'), []);
@@ -106,7 +105,7 @@ async function environmentInside(secretValue: string): Promise<Readonly<Record<s
   return printedJson(outcome) as Readonly<Record<string, string>>;
 }
 
-test('a test printing its environment sees only the declared variables, Revisum\'s own and the image\'s own', { criterion: 'AC-SPEC-35-06', timeout: TIMEOUT }, async () => {
+test('a test printing its environment sees only the declared variables, Revisum\'s own and the image\'s own', { timeout: TIMEOUT }, async () => {
   const inside = await environmentInside(fakeSecretValue());
   const imageOwn = new Set([...await imageEnvironmentNames(image), 'HOSTNAME']);
   const unexpected = Object.keys(inside).filter((name) =>
@@ -114,14 +113,14 @@ test('a test printing its environment sees only the declared variables, Revisum\
   assert.deepEqual(unexpected, []);
 });
 
-test('no CI token, cloud credential or GITHUB_* value is in the environment inside', { criterion: 'AC-SPEC-35-06', timeout: TIMEOUT }, async () => {
+test('no CI token, cloud credential or GITHUB_* value is in the environment inside', { timeout: TIMEOUT }, async () => {
   const inside = await environmentInside(fakeSecretValue());
   assert.deepEqual(Object.keys(inside).filter((name) => name.startsWith('GITHUB_') || /^(AWS_|AZURE_|GOOGLE_|GCP_|NPM_|ACTIONS_)/.test(name)), []);
   const values = Object.values(inside);
   for (const value of DISTINCTIVE_HOST_VALUES) assert.ok(!values.some((text) => text.includes(value)), 'a host credential\'s value is inside');
 });
 
-test('counter-example: the declared literal and the declared secret\'s value are inside', { criterion: 'AC-SPEC-35-06', timeout: TIMEOUT }, async () => {
+test('counter-example: the declared literal and the declared secret\'s value are inside', { timeout: TIMEOUT }, async () => {
   const secretValue = fakeSecretValue();
   const inside = await environmentInside(secretValue);
   assert.equal(inside[DECLARED_LITERAL.name], DECLARED_LITERAL.value);
@@ -153,7 +152,7 @@ function engineWhere(change: 'no-internal-network' | 'probe-reaches'): Container
 }
 
 for (const change of ['no-internal-network', 'probe-reaches'] as const) {
-  test(`with egress unenforceable (${change}), the suite is refused with egress-unenforceable and no suite code runs`, { criterion: 'AC-SPEC-35-07', timeout: TIMEOUT }, async () => {
+  test(`with egress unenforceable (${change}), the suite is refused with egress-unenforceable and no suite code runs`, { timeout: TIMEOUT }, async () => {
     const containersBefore = dockerIds('containers');
     const networksBefore = dockerIds('networks');
     const engine = engineWhere(change);
@@ -167,7 +166,7 @@ for (const change of ['no-internal-network', 'probe-reaches'] as const) {
   });
 }
 
-test('counter-example: with egress enforced, the same suite runs and writes its report', { criterion: 'AC-SPEC-35-07', timeout: TIMEOUT }, async () => {
+test('counter-example: with egress enforced, the same suite runs and writes its report', { timeout: TIMEOUT }, async () => {
   const { result, outputDirectory } = await runFixtureSuite(image, fakeSecretValue());
   assert.notEqual(result.state, 'Refused');
   assert.ok(filesIn(outputDirectory).length >= 1, 'the suite wrote nothing');
@@ -175,7 +174,7 @@ test('counter-example: with egress enforced, the same suite runs and writes its 
 
 // ---- The command -------------------------------------------------------------------------------------------
 
-test('declared arguments of "; rm -rf /" and "$(id)" reach the process as literal text, with no shell', { criterion: 'AC-SPEC-35-12', timeout: TIMEOUT }, async () => {
+test('declared arguments of "; rm -rf /" and "$(id)" reach the process as literal text, with no shell', { timeout: TIMEOUT }, async () => {
   const outcome = await runInWorkload(image, { argv: ['node', '-e', 'console.log(JSON.stringify(process.argv.slice(1)))', '; rm -rf /', '$(id)'] });
   assert.equal(outcome.exitCode, 0);
   assert.deepEqual(printedJson(outcome), ['; rm -rf /', '$(id)']);

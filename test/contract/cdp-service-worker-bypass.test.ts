@@ -5,7 +5,6 @@
 // every matching request and the check sees every one.
 // The counter-example runs the same page with no stub and no check: the worker answers, and the
 // server never sees the request, so the worker is live and the bypass is what the tests show.
-// See docs/specs/SPEC-33-network-stubs-request-checks-and-storage.md.
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
 import {
@@ -28,13 +27,13 @@ const answered = (source: string, count: number, criterionId: string) => [
   textEquals(testId('items-source'), source, criterionId),
 ];
 
-test('counter-example: with no stub and no request check, the service worker answers the page and the server never sees the request', { criterion: 'AC-SPEC-33-06' }, async () => {
+test('counter-example: with no stub and no request check, the service worker answers the page and the server never sees the request', async () => {
   const ran = await harness.runSteps(CDP_TARGET, [...openWorkerPage(), loadItems(), ...answered('service worker', 1, 'worker.answered-itself')]);
   assertPassed(ran);
   assert.equal(timesRequested(ran.requestedPaths, '/api/worker-items'), 0);
 });
 
-test('an active stub answers every matching request of a page a service worker controls', { criterion: 'AC-SPEC-33-06' }, async () => {
+test('an active stub answers every matching request of a page a service worker controls', async () => {
   const ran = await harness.runSteps(CDP_TARGET, [
     ...openWorkerPage(),
     startStub('workerItems'),
@@ -47,7 +46,7 @@ test('an active stub answers every matching request of a page a service worker c
   assert.equal(timesRequested(ran.requestedPaths, '/api/worker-items'), 0, 'the stub answered; nothing reached the server');
 });
 
-test('an active request check sees every matching request of a page a service worker controls', { criterion: 'AC-SPEC-33-06' }, async () => {
+test('an active request check sees every matching request of a page a service worker controls', async () => {
   const ran = await harness.runSteps(CDP_TARGET, [
     ...openWorkerPage(),
     loadItems(), ...answered('server', 1, 'worker.check-first'),
@@ -59,7 +58,7 @@ test('an active request check sees every matching request of a page a service wo
   assert.equal(timesRequested(ran.requestedPaths, '/api/worker-items'), 2, 'every request went past the worker to the server');
 });
 
-test('a stub and a request check together: the check counts each request the stub answered', { criterion: 'AC-SPEC-33-06' }, async () => {
+test('a stub and a request check together: the check counts each request the stub answered', async () => {
   const ran = await harness.runSteps(CDP_TARGET, [
     ...openWorkerPage(),
     startStub('workerItems'),

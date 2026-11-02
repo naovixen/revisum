@@ -7,7 +7,6 @@
 //     project fields a test adds, such as testIdAttributes or generatedEmailDomains;
 //   - runPlan() runs a parsed plan through the policy gate and run() on a driver that needs no
 //     browser and records every call, so a test can see what reached the page.
-// See docs/specs/SPEC-30-plan-values-positions-and-keys.md.
 import assert from 'node:assert/strict';
 import {
   defaultRedactor, parseProject, planParser, run,

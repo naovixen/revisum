@@ -5,7 +5,6 @@
 // 20 replays on each CDP target give one result hash. The replays share one browser per target,
 // so the file stays quick: every replay still asks the driver for its session, and the test shows
 // each asked with the same environment.
-// See docs/specs/SPEC-30-plan-values-positions-and-keys.md.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import { resolvePlanClock } from '@revisum/engine';
@@ -33,7 +32,7 @@ const clockedPlan = (targetId: string) => harness.plan(planFor(targetId, clockSt
 
 for (const targetId of CDP_TARGETS) {
   describe(`the plan clock on ${targetId}`, () => {
-    test('the page\'s Date.now() is resolvePlanClock\'s time, and the manifest keeps the run\'s own clock start', { criterion: 'AC-SPEC-30-06' }, async () => {
+    test('the page\'s Date.now() is resolvePlanClock\'s time, and the manifest keeps the run\'s own clock start', async () => {
       const plan = clockedPlan(targetId);
       assert.ok(plan.clock !== undefined, 'the parsed plan keeps its clock');
       // The expectation the page is checked against is resolvePlanClock's own answer.
@@ -43,7 +42,7 @@ for (const targetId of CDP_TARGETS) {
       assert.equal(result.manifest?.clock.fixedTimeMilliseconds, CLOCK_START_MILLISECONDS, 'the manifest records the run\'s own clock start');
     });
 
-    test('20 replays of the plan give one result hash, each from the same session environment', { criterion: 'AC-SPEC-30-06', timeout: 180_000 }, async () => {
+    test('20 replays of the plan give one result hash, each from the same session environment', { timeout: 180_000 }, async () => {
       const plan = clockedPlan(targetId);
       const adapter = harness.target(targetId).adapter;
       const inner = harness.drivers.get(adapter);
@@ -70,13 +69,13 @@ for (const targetId of CDP_TARGETS) {
 
 // Counter-example: without a plan clock the page shows the run's own clock start, so the checks
 // above see the plan clock and not a constant the page always shows.
-test('without a plan clock, the page\'s Date.now() is the run\'s clock start', { criterion: 'AC-SPEC-30-06' }, async () => {
+test('without a plan clock, the page\'s Date.now() is the run\'s clock start', async () => {
   const { result } = await harness.runSteps(CDP_TARGET, clockSteps(CLOCK_START_MILLISECONDS));
   assert.equal(result.state, 'Passed', JSON.stringify(result.steps));
 });
 
 // A second clock start moves the page's time with it: the plan clock is relative, not fixed.
-test('a clock start a month later freezes the page at the first of the month after that', { criterion: 'AC-SPEC-30-06' }, async () => {
+test('a clock start a month later freezes the page at the first of the month after that', async () => {
   const laterStart = Date.UTC(2026, 10, 20, 12, 0, 0);
   // 1 December 2026, 09:00 in London is 09:00 UTC.
   const firstOfDecemberAtNine = Date.UTC(2026, 11, 1, 9, 0, 0);

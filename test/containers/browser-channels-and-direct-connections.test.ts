@@ -7,7 +7,6 @@
 //     run's proxy: the counter-examples that show the probe can succeed;
 //   - cutting the gateway off does not cut the run off: the runner still reports the isolated level,
 //     the proxy still carries a declared request out, and the network's peers still reach each other.
-// See docs/specs/SPEC-07-isolated-runner-and-egress.md.
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import { createServer as createTcpServer, type AddressInfo, type Server as TcpServer } from 'node:net';
@@ -108,28 +107,28 @@ async function planRecords(): Promise<PrintedRecords> {
   return printedRecords;
 }
 
-test('a WebSocket to an undeclared origin is blocked and its event says websocket', { criterion: 'AC-SPEC-07-01', timeout: TIMEOUT }, async () => {
+test('a WebSocket to an undeclared origin is blocked and its event says websocket', { timeout: TIMEOUT }, async () => {
   const { browserRecords, fixtureOrigin } = await planRecords();
   const outside = run.handle.egressEvents(browserRecords, [fixtureOrigin]).filter((event) => hostOf(event.origin) === OUTSIDE_HOST);
   assert.ok(outside.some((event) => event.channel === 'websocket' && event.decision === 'blocked'), JSON.stringify(outside));
   assert.ok(outside.every((event) => event.decision === 'blocked'), JSON.stringify(outside));
 });
 
-test('the proxy\'s own decision for that WebSocket is read back from its container', { criterion: 'AC-SPEC-07-01', timeout: TIMEOUT }, async () => {
+test('the proxy\'s own decision for that WebSocket is read back from its container', { timeout: TIMEOUT }, async () => {
   await planRecords();
   const outside = run.handle.proxyDecisions().filter((decision) => hostOf(decision.origin) === OUTSIDE_HOST);
   assert.ok(outside.length >= 1, JSON.stringify(run.handle.proxyDecisions()));
   assert.ok(outside.every((decision) => decision.decision === 'blocked'), JSON.stringify(outside));
 });
 
-test('counter-example: without the browser\'s records the same decision has no channel, so the channel came from them', { criterion: 'AC-SPEC-07-01', timeout: TIMEOUT }, async () => {
+test('counter-example: without the browser\'s records the same decision has no channel, so the channel came from them', { timeout: TIMEOUT }, async () => {
   await planRecords();
   const outside = run.handle.egressEvents().filter((event) => hostOf(event.origin) === OUTSIDE_HOST);
   assert.ok(outside.length >= 1, JSON.stringify(run.handle.egressEvents()));
   assert.ok(outside.every((event) => event.channel === 'unattributed'), JSON.stringify(outside));
 });
 
-test('the page\'s request to its own loopback, which never reaches the proxy, is allowed only because the run names it direct', { criterion: 'AC-SPEC-07-01', timeout: TIMEOUT }, async () => {
+test('the page\'s request to its own loopback, which never reaches the proxy, is allowed only because the run names it direct', { timeout: TIMEOUT }, async () => {
   const { browserRecords, fixtureOrigin } = await planRecords();
   const named = run.handle.egressEvents(browserRecords, [fixtureOrigin]).filter((event) => event.origin === fixtureOrigin);
   assert.ok(named.some((event) => event.channel === 'page' && event.decision === 'allowed'), JSON.stringify(named));
@@ -156,19 +155,19 @@ const METADATA_TARGETS = [
 ];
 
 for (const { host, port } of METADATA_TARGETS) {
-  test(`a direct connection from inside to the metadata address ${host}:${port} finds nothing`, { criterion: 'AC-SPEC-07-02', timeout: TIMEOUT }, async () => {
+  test(`a direct connection from inside to the metadata address ${host}:${port} finds nothing`, { timeout: TIMEOUT }, async () => {
     assert.equal(await jsonInside(run.handle, directConnection(host, port)), 'blocked');
   });
 }
 
 for (const network of ['the run\'s own network', 'the default bridge']) {
-  test(`a direct connection from inside to the gateway of ${network} does not reach a service on the Docker host`, { criterion: 'AC-SPEC-07-02', timeout: TIMEOUT }, async () => {
+  test(`a direct connection from inside to the gateway of ${network} does not reach a service on the Docker host`, { timeout: TIMEOUT }, async () => {
     const gateway = await gatewayOf(network === 'the default bridge' ? 'bridge' : `${run.handle.runId}-network`);
     assert.equal(await jsonInside(run.handle, directConnection(gateway, dockerHostService.port)), 'blocked', `${gateway}:${dockerHostService.port}`);
   });
 }
 
-test('counter-example: an ordinary container on the default bridge does reach that service through its gateway', { criterion: 'AC-SPEC-07-02', timeout: TIMEOUT }, async () => {
+test('counter-example: an ordinary container on the default bridge does reach that service through its gateway', { timeout: TIMEOUT }, async () => {
   const gateway = await gatewayOf('bridge');
   const probed = await runDocker(['run', '--rm', '--network', 'bridge', '--user', 'node', dockerHostService.image, 'node', '-e', directConnection(gateway, dockerHostService.port)]);
   assert.equal(probed.status, 0, probed.stderr);
@@ -182,11 +181,11 @@ const machineServicePort = (): number => (
 );
 
 // A name that does not resolve counts as blocked too: the script's connection simply fails.
-test('a direct connection from inside to host.docker.internal does not reach a service on that machine', { criterion: 'AC-SPEC-07-02', timeout: TIMEOUT }, async () => {
+test('a direct connection from inside to host.docker.internal does not reach a service on that machine', { timeout: TIMEOUT }, async () => {
   assert.equal(await jsonInside(run.handle, directConnection('host.docker.internal', machineServicePort())), 'blocked');
 });
 
-test('counter-example: an ordinary container on the default bridge does reach that service through host.docker.internal', { criterion: 'AC-SPEC-07-02', timeout: TIMEOUT }, async () => {
+test('counter-example: an ordinary container on the default bridge does reach that service through host.docker.internal', { timeout: TIMEOUT }, async () => {
   const probed = await runDocker([
     'run', '--rm', '--network', 'bridge', '--add-host', 'host.docker.internal:host-gateway', '--user', 'node', dockerHostService.image,
     'node', '-e', directConnection('host.docker.internal', machineServicePort()),
@@ -195,7 +194,7 @@ test('counter-example: an ordinary container on the default bridge does reach th
   assert.equal(JSON.parse(probed.stdout.trim()), 'reached', `host.docker.internal:${machineServicePort()}`);
 });
 
-test('counter-example: the same probe reaches the run\'s proxy, which is on the container\'s network', { criterion: 'AC-SPEC-07-02', timeout: TIMEOUT }, async () => {
+test('counter-example: the same probe reaches the run\'s proxy, which is on the container\'s network', { timeout: TIMEOUT }, async () => {
   const proxyAddress = await jsonInside(run.handle, 'console.log(JSON.stringify(process.env.HTTP_PROXY ?? ""))');
   assert.ok(typeof proxyAddress === 'string' && proxyAddress !== '', 'the run container is told where its proxy is');
   const proxy = new URL(proxyAddress);
@@ -204,7 +203,7 @@ test('counter-example: the same probe reaches the run\'s proxy, which is on the 
 
 // ---- The run still works on its network ------------------------------------------------------------
 
-test('the runner reports the isolated level on the run\'s network, with nothing logged as unenforceable', { criterion: 'AC-SPEC-07-05', timeout: TIMEOUT }, () => {
+test('the runner reports the isolated level on the run\'s network, with nothing logged as unenforceable', { timeout: TIMEOUT }, () => {
   assert.equal(run.runner.guaranteeLevel(), 'isolated');
   assert.ok(!run.logged.some((entry) => entry.code === 'egress-unenforceable'), JSON.stringify(run.logged));
 });
@@ -221,16 +220,16 @@ const throughProxy = (url: string): string => `
   outgoing.on('error', (error) => { console.error(error.message); process.exit(1); });
   outgoing.end();`;
 
-test('the proxy still carries a declared request out of the run\'s network', { criterion: 'AC-SPEC-07-01', timeout: TIMEOUT }, async () => {
+test('the proxy still carries a declared request out of the run\'s network', { timeout: TIMEOUT }, async () => {
   assert.deepEqual(await jsonInside(run.handle, throughProxy(`${dockerHostServiceOrigin}/`)), { status: 200, body: DOCKER_HOST_SERVICE_BODY });
 });
 
-test('counter-example: the proxy still refuses an undeclared request from the run\'s network', { criterion: 'AC-SPEC-07-01', timeout: TIMEOUT }, async () => {
+test('counter-example: the proxy still refuses an undeclared request from the run\'s network', { timeout: TIMEOUT }, async () => {
   const answer = await jsonInside(run.handle, throughProxy('http://undeclared.invalid/'));
   assert.equal((answer as { readonly status: number }).status, 403);
 });
 
-test('peers on the run\'s network still reach each other by name, in both directions', { criterion: 'AC-SPEC-07-01', timeout: TIMEOUT }, async () => {
+test('peers on the run\'s network still reach each other by name, in both directions', { timeout: TIMEOUT }, async () => {
   const peerPort = 4500;
   const runContainer = `${run.handle.runId}-run`;
   const proxyContainer = `${run.handle.runId}-proxy`;

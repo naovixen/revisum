@@ -2,7 +2,6 @@
 // Node's built-in Intl, so their locale data is fixed by the Node version, not by a package.
 // Each package manifest declares no runtime dependency, and every import in their sources is
 // relative, a Node built-in or, for engine, contracts. A planted import shows the check can fail.
-// See docs/specs/SPEC-30-plan-values-positions-and-keys.md.
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -32,7 +31,7 @@ const PACKAGES_CHECKED = [
 ] as const;
 
 for (const checked of PACKAGES_CHECKED) {
-  test(`${checked.name}'s package manifest declares no runtime dependency`, { criterion: 'AC-SPEC-30-20' }, () => {
+  test(`${checked.name}'s package manifest declares no runtime dependency`, () => {
     const manifest: Record<string, unknown> = JSON.parse(readFileSync(join(PACKAGES, checked.name, 'package.json'), 'utf8'));
     const declared = DEPENDENCY_FIELDS.filter((field) => {
       const value = manifest[field];
@@ -41,7 +40,7 @@ for (const checked of PACKAGES_CHECKED) {
     assert.deepEqual(declared, []);
   });
 
-  test(`every import in ${checked.name}'s sources is relative, a Node built-in or an allowed workspace package`, { criterion: 'AC-SPEC-30-20' }, () => {
+  test(`every import in ${checked.name}'s sources is relative, a Node built-in or an allowed workspace package`, () => {
     const folder = join(PACKAGES, checked.name, 'src');
     const files = sourceFiles(folder);
     assert.ok(files.length > 0, `no sources under ${folder}`);
@@ -52,7 +51,7 @@ for (const checked of PACKAGES_CHECKED) {
 }
 
 // Mutant: the same check finds a date library or a bare package, written any of the usual ways.
-test('the import check reports a planted date library, re-export or dynamic import', { criterion: 'AC-SPEC-30-20' }, () => {
+test('the import check reports a planted date library, re-export or dynamic import', () => {
   const planted = [
     "import { DateTime } from 'luxon';",
     "export { format } from 'date-fns';",

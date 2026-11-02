@@ -2,7 +2,6 @@
 // accounts as maintainer and code owner, offering approvals from a bot, an app and a CI token by
 // every route. None of them may ever gate a merge, whatever the project declares: no approval is
 // minted, no plan.approved event is appended, and the merge gate stays shut.
-// See docs/specs/SPEC-02-project-trust-and-approval.md.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
@@ -62,7 +61,7 @@ const ATTEMPTS: readonly Attempt[] = [
 ];
 
 for (const attempt of ATTEMPTS) {
-  test(`no approval gates when it comes from ${attempt.title}`, { criterion: 'AC-SPEC-02-17' }, async () => {
+  test(`no approval gates when it comes from ${attempt.title}`, async () => {
     await withRepository('red-team', async (repository) => {
       const subject = repository.subject('plan');
       const verified = await repository.verify(subject, attempt.proof(repository));
@@ -74,7 +73,7 @@ for (const attempt of ATTEMPTS) {
   });
 }
 
-test('after every agent attempt in the red-team repository, the merge gate is still shut', { criterion: 'AC-SPEC-02-17' }, async () => {
+test('after every agent attempt in the red-team repository, the merge gate is still shut', async () => {
   const minted: Approval[] = [];
   for (const attempt of ATTEMPTS) {
     await withRepository('red-team', async (repository) => {
@@ -87,7 +86,7 @@ test('after every agent attempt in the red-team repository, the merge gate is st
   assert.equal(mergeGateOpen(planStanding(parsedSignupPlan(), memoryApprovalStore(minted))), false);
 });
 
-test('decisions offered through an MCP session or a CI token are agents, whatever the project declares', { criterion: 'AC-SPEC-02-17' }, async () => {
+test('decisions offered through an MCP session or a CI token are agents, whatever the project declares', async () => {
   await withRepository('red-team', async (repository) => {
     for (const source of ['mcp', 'token'] as const) {
       assert.equal(unverified(repository.subject('plan'), source).actorType, 'agent');
@@ -95,7 +94,7 @@ test('decisions offered through an MCP session or a CI token are agents, whateve
   });
 });
 
-test('the same lock-down, with a person as maintainer who merged, does approve', { criterion: 'AC-SPEC-02-17' }, async () => {
+test('the same lock-down, with a person as maintainer who merged, does approve', async () => {
   // The counter-example: change only the account that landed the commit, to a user named as
   // maintainer, and the route approves. So the refusals above come from the bot, app or token.
   await withRepository('red-team', async (repository) => {

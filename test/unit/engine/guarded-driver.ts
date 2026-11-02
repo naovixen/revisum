@@ -1,14 +1,13 @@
-// A driver that needs no browser and honours the policy gate's runtime guard the way SPEC-06 says
+// A driver that needs no browser and honours the policy gate's runtime guard the way the real drivers must
 // every real driver must: before each action it resolves the element, asks the guard it was given,
 // and sends the input event only on an allow. Each acting step's input events are counted, so a
 // test can show that a denied step sent none.
 //
 // Used to run plans through run() and runUntrusted() end to end. The real CDP and Playwright
-// drivers do not call the guard yet (SPEC-06 wires it in), so they are not tested here.
+// drivers do not call the guard yet (the CDP driver does not wire it in yet), so they are not tested here.
 //
 // A dialog step acts on no element: the driver asks the guard with an element whose fields are all
 // null, and passes the open dialog's text as the guard's second argument.
-// See docs/specs/SPEC-03-policy-gate.md.
 import {
   defaultRedactor, planParser, runUntrusted,
   type BrowserDriver, type ElementProbe, type GuardVerdict, type Plan, type PlanError, type ResolvedElement, type Result,

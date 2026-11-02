@@ -9,7 +9,6 @@
 //
 // Neither step needs a declaration in the trusted project, so every plan here parses against the
 // shared test project (plan-examples.ts) with, at most, its limits changed.
-// See docs/specs/SPEC-34-clock-advance-and-clipboard.md.
 import assert from 'node:assert/strict';
 import type { JsonRecord } from './run-value-examples.ts';
 

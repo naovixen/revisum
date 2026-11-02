@@ -3,7 +3,6 @@
 // texts, expected texts, dialog text and path-template segments and query values. Everywhere else
 // it is refused, echoing nothing. A value must be defined before it is used, and only once; a plan
 // that breaks either rule never reaches a driver.
-// See docs/specs/SPEC-30-plan-values-positions-and-keys.md.
 import assert from 'node:assert/strict';
 import { arch, platform } from 'node:os';
 import { test } from 'node:test';
@@ -37,52 +36,52 @@ function assertUndefinedAt(errors: readonly string[], referencePath: string): vo
 
 // ---- Defined before use, and only once ----------------------------------------------------------
 
-test('a reference to a value the plan never defines is refused with undefined_value at the reference', { criterion: 'AC-SPEC-30-07' }, () => {
+test('a reference to a value the plan never defines is refused with undefined_value at the reference', () => {
   assertUndefinedAt(rejection(parsePlan, withValues([OPEN_ORDERS, fill(reference('missingValue'))])), '$.steps[1].value');
 });
 
-test('a reference to a remembered value before the step that remembers it is refused with undefined_value', { criterion: 'AC-SPEC-30-07' }, () => {
+test('a reference to a remembered value before the step that remembers it is refused with undefined_value', () => {
   const plan = planOf([OPEN_ORDERS, fill(reference('orderNumber')), remember('orderNumber')]);
   assertUndefinedAt(rejection(parsePlan, plan), '$.steps[1].value');
 });
 
-test('a remember step cannot use the value it is still defining in its own locator', { criterion: 'AC-SPEC-30-07' }, () => {
+test('a remember step cannot use the value it is still defining in its own locator', () => {
   const plan = planOf([OPEN_ORDERS, remember('orderNumber', label(reference('orderNumber')))]);
   assertUndefinedAt(rejection(parsePlan, plan), '$.steps[1].from.element.label');
 });
 
-test('an undefined reference inside a path template is refused at its segment', { criterion: 'AC-SPEC-30-07' }, () => {
+test('an undefined reference inside a path template is refused at its segment', () => {
   const plan = planOf([navigate({ segments: ['orders', reference('missingValue')] })]);
   assertUndefinedAt(rejection(parsePlan, plan), '$.steps[0].url.segments[1]');
 });
 
-test('a value defined in the plan\'s values and remembered again is refused as duplicate', { criterion: 'AC-SPEC-30-07' }, () => {
+test('a value defined in the plan\'s values and remembered again is refused as duplicate', () => {
   const errors = rejection(parsePlan, withValues([OPEN_ORDERS, remember(MARKED)]));
   assert.deepEqual(errors.map((error) => error.split(' ')[0]), ['duplicate']);
 });
 
-test('a value remembered twice is refused as duplicate', { criterion: 'AC-SPEC-30-07' }, () => {
+test('a value remembered twice is refused as duplicate', () => {
   const errors = rejection(parsePlan, planOf([OPEN_ORDERS, remember('orderNumber'), remember('orderNumber', label('Order total'))]));
   assert.deepEqual(errors.map((error) => error.split(' ')[0]), ['duplicate']);
 });
 
-test('a remember step may read only text or value', { criterion: 'AC-SPEC-30-07' }, () => {
+test('a remember step may read only text or value', () => {
   const plan = planOf([OPEN_ORDERS, { type: 'remember', name: 'orderNumber', from: { element: ORDER_FIELD, read: 'attribute' } }]);
   assert.deepEqual(rejection(parsePlan, plan), ['unknown_value $.steps[1].from.read']);
 });
 
 // Counter-examples: the same plans in a valid order are accepted.
-test('a value used after its definition is accepted, from the values and from a remember step', { criterion: 'AC-SPEC-30-07' }, () => {
+test('a value used after its definition is accepted, from the values and from a remember step', () => {
   accepted(parsePlan, withValues([OPEN_ORDERS, fill(MARKED_REFERENCE)]));
   accepted(parsePlan, planOf([OPEN_ORDERS, remember('orderNumber'), fill(reference('orderNumber'))]));
 });
 
-test('a value remembered inside a frame is visible to the steps after the frame', { criterion: 'AC-SPEC-30-07' }, () => {
+test('a value remembered inside a frame is visible to the steps after the frame', () => {
   const frame = { type: 'frame', locator: { by: 'testId', testId: 'checkout-frame' }, steps: [remember('orderNumber'), CLOSING_CHECK] };
   accepted(parsePlan, planOf([OPEN_ORDERS, frame, fill(reference('orderNumber'))]));
 });
 
-test('a plan with an undefined or duplicate value is refused before any driver is touched', { criterion: 'AC-SPEC-30-07' }, async () => {
+test('a plan with an undefined or duplicate value is refused before any driver is touched', async () => {
   let calls = 0;
   const spy: BrowserDriver = {
     info: { id: 'playwright', version: 'spy', protocol: 'none' },
@@ -142,7 +141,7 @@ const atOrBelow = (path: string, place: string): boolean =>
   path === place || path.startsWith(`${place}.`) || path.startsWith(`${place}[`);
 
 for (const place of PLACES) {
-  test(`a value reference in ${place.name} is refused with wrong_type or unknown_field at ${place.path}`, { criterion: 'AC-SPEC-30-08' }, () => {
+  test(`a value reference in ${place.name} is refused with wrong_type or unknown_field at ${place.path}`, () => {
     const parsed = parsePlan(place.plan);
     assert.equal(parsed.ok, false, 'the plan was accepted');
     const errors = parsed.ok ? [] : parsed.error;
@@ -158,7 +157,7 @@ for (const place of PLACES) {
 }
 
 // Counter-example: the same reference is accepted in every place the language allows it.
-test('the same reference is accepted in every place where a plan writes text for the page', { criterion: 'AC-SPEC-30-08' }, () => {
+test('the same reference is accepted in every place where a plan writes text for the page', () => {
   const allowed: readonly unknown[] = [
     navigate({ segments: ['orders', MARKED_REFERENCE], query: { search: MARKED_REFERENCE } }),
     fill(MARKED_REFERENCE),

@@ -6,7 +6,6 @@
 // The elements are found by test id, and once more by a css locator inside a twin, so the checks
 // are shown to read the element the locator resolves.
 // The remembered attribute's leak scan is in test/proofs/unsafe-page-leak-scan.test.ts.
-// See docs/specs/SPEC-36-unsafe-plan-features.md.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import {
@@ -33,7 +32,7 @@ const DOM_CHECKS: readonly DomCheck[] = [
 for (const targetId of BOTH_TARGETS) {
   describe(`DOM checks on twin elements: ${targetId}`, () => {
     for (const domCheck of DOM_CHECKS) {
-      test(`${domCheck.name} passes on the matching twin and fails on the mismatched twin`, { criterion: 'AC-SPEC-36-07' }, async () => {
+      test(`${domCheck.name} passes on the matching twin and fails on the mismatched twin`, async () => {
         const matching = await harness.runSteps(targetId, [navigate('/dom-checks.html'), check(domCheck.element('matching'), domCheck.assertion, 'dom.matching')]);
         assert.equal(matching.result.state, 'Passed', JSON.stringify(matching.result.steps));
         const mismatched = await harness.runSteps(targetId, [navigate('/dom-checks.html'), check(domCheck.element('mismatched'), domCheck.assertion, 'dom.mismatched')]);
@@ -42,7 +41,7 @@ for (const targetId of BOTH_TARGETS) {
       });
     }
 
-    test('the class and colour checks read the element a css locator inside each twin resolves', { criterion: 'AC-SPEC-36-07' }, async () => {
+    test('the class and colour checks read the element a css locator inside each twin resolves', async () => {
       const inTwin = (twin: Twin): JsonRecord => css('.badge', { inside: testId(`${twin}-twin`) });
       const matching = await harness.runSteps(targetId, [
         navigate('/dom-checks.html'),
@@ -59,7 +58,7 @@ for (const targetId of BOTH_TARGETS) {
 
     // A remember from an attribute also needs rememberedValues, which the Playwright fallback does not declare.
     const remembers = listedFeatures(unsafePageDrivers().get(ADAPTER_OF[targetId] ?? '')).includes('rememberedValues');
-    test('an attribute remembered from one twin passes attributeEquals on that twin and fails it on the other', { criterion: 'AC-SPEC-36-07', skip: !remembers }, async () => {
+    test('an attribute remembered from one twin passes attributeEquals on that twin and fails it on the other', { skip: !remembers }, async () => {
       const ran = await harness.runSteps(targetId, [
         navigate('/dom-checks.html'),
         rememberAttribute('sortOrder', testId('matching-sort'), 'aria-sort'),

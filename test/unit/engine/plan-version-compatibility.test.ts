@@ -2,7 +2,6 @@
 // gave before 1.2 existed, kept in golden/parsed-plans/, and a 1.2 feature in a plan declaring
 // "1.1" is refused with exactly the code and path a 1.1 parser gave. Those codes were recorded
 // from the 1.1 parser itself, before any 1.2 code existed.
-// See docs/specs/SPEC-30-plan-values-positions-and-keys.md.
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -21,27 +20,27 @@ const storedResult = (name: string): unknown => JSON.parse(readFileSync(join(PAR
 
 // ---- 1.1 golden plans parse to the same plan -------------------------------------------------------
 
-test('every 1.1 golden plan has its 1.1 parse result stored, and no other plan does', { criterion: 'AC-SPEC-30-01' }, () => {
+test('every 1.1 golden plan has its 1.1 parse result stored, and no other plan does', () => {
   const stored = readdirSync(PARSED_FOLDER).filter((name) => name.endsWith('.json')).map((name) => name.slice(0, -'.json'.length)).sort();
   assert.ok(previousGoldenNames().length >= 4, 'the 1.1 golden plans are still there');
   assert.deepEqual(stored, previousGoldenNames());
 });
 
 for (const name of previousGoldenNames()) {
-  test(`the 1.1 golden plan "${name}" parses to exactly its stored 1.1 result`, { criterion: 'AC-SPEC-30-01' }, () => {
+  test(`the 1.1 golden plan "${name}" parses to exactly its stored 1.1 result`, () => {
     const parsed = parsePlan(goldenPlan(name));
     assert.ok(parsed.ok, JSON.stringify(parsed));
     assert.deepEqual(JSON.parse(JSON.stringify(parsed.value)), storedResult(name));
   });
 }
 
-test('a 1.1 plan keeps declaring "1.1" once parsed, rather than being moved to the newer version', { criterion: 'AC-SPEC-30-01' }, () => {
+test('a 1.1 plan keeps declaring "1.1" once parsed, rather than being moved to the newer version', () => {
   const parsed = parsePlan(signupPlan());
   assert.ok(parsed.ok, JSON.stringify(parsed));
   assert.equal(parsed.value.version, PREVIOUS_VERSION);
 });
 
-test('a version 1 plan still migrates to a 1.1 plan, which the parser accepts', { criterion: 'AC-SPEC-30-01' }, () => {
+test('a version 1 plan still migrates to a 1.1 plan, which the parser accepts', () => {
   // The mapping file holds plain strings; the cast stands in for the author who writes it by hand.
   const migrated = migratePlan(legacyPlan('signup'), criterionMapping('signup') as CriterionMapping);
   assert.ok(migrated.ok, JSON.stringify(migrated));
@@ -51,14 +50,14 @@ test('a version 1 plan still migrates to a 1.1 plan, which the parser accepts', 
 
 // Counter-example: the same 1.1 steps declared as "1.2" are accepted and keep "1.2", so the
 // version a plan declares is what decides its grammar.
-test('the same steps declared as "1.2" parse too, keeping the declared version', { criterion: 'AC-SPEC-30-01' }, () => {
+test('the same steps declared as "1.2" parse too, keeping the declared version', () => {
   const parsed = parsePlan({ ...signupPlan(), version: NEW_VERSION });
   assert.ok(parsed.ok, JSON.stringify(parsed));
   assert.equal(parsed.value.version, NEW_VERSION);
   assert.deepEqual(parsed.value.steps, stepsOf(signupPlan()));
 });
 
-test('a plan declaring a version newer than any the changelog lists is still refused with version_unsupported', { criterion: 'AC-SPEC-30-01' }, () => {
+test('a plan declaring a version newer than any the changelog lists is still refused with version_unsupported', () => {
   for (const version of futureVersions()) {
     assert.deepEqual(parsePlan({ ...signupPlan(), version }), { ok: false, error: [{ code: 'version_unsupported', path: '$.version' }] }, version);
   }
@@ -98,7 +97,7 @@ const PREVIOUS_CASES: readonly PreviousCase[] = [
 ];
 
 for (const previous of PREVIOUS_CASES) {
-  test(`a plan declaring "1.1" that uses ${previous.feature} is refused as a 1.1 parser refuses it`, { criterion: 'AC-SPEC-30-01' }, () => {
+  test(`a plan declaring "1.1" that uses ${previous.feature} is refused as a 1.1 parser refuses it`, () => {
     const parsed = parsePlan(previous.plan());
     assert.equal(parsed.ok, false, 'the plan was accepted');
     assert.deepEqual(parsed.ok ? [] : parsed.error.map((error) => `${error.code} ${error.path}`), previous.errors);
@@ -107,7 +106,7 @@ for (const previous of PREVIOUS_CASES) {
 
 // Counter-example: each of those plans, declared as "1.2", is not refused for the same reasons.
 // (Some still fail for other reasons, such as an undefined value, so only the 1.1 errors are compared.)
-test('declared as "1.2", none of those plans is refused with the errors a 1.1 parser gives', { criterion: 'AC-SPEC-30-01' }, () => {
+test('declared as "1.2", none of those plans is refused with the errors a 1.1 parser gives', () => {
   for (const previous of PREVIOUS_CASES) {
     const parsed = parsePlan({ ...previous.plan(), version: NEW_VERSION });
     const errors = parsed.ok ? [] : parsed.error.map((error) => `${error.code} ${error.path}`);

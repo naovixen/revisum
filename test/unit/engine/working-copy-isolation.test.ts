@@ -3,7 +3,6 @@
 // whose trusted files differ from the protected branch's, and watches every file read Node's file
 // system module makes. The loader and the verifier must give the protected-branch answer and read
 // nothing from the working copy.
-// See docs/specs/SPEC-02-project-trust-and-approval.md.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import fsPromises from 'node:fs/promises';
@@ -53,7 +52,7 @@ const widenProject = (fixture: FixtureRepository): void => {
   fixture.workingCopy[APPLICATION_CODE] = 'export const signUp = () => fetch("/api/sign-up");\n';
 };
 
-test('the watch reports a read of a working-copy file, so an empty list means nothing was read', { criterion: 'AC-SPEC-02-02' }, async () => {
+test('the watch reports a read of a working-copy file, so an empty list means nothing was read', async () => {
   // The control for every test below: a relative path read from the working folder is caught.
   await withRepository('solo', async (repository) => {
     const reads = await readsFromWorkingCopy(repository, async () => { await fsPromises.readFile(PROJECT_PATH, 'utf8'); });
@@ -63,7 +62,7 @@ test('the watch reports a read of a working-copy file, so an empty list means no
 
 // ---- project.json -----------------------------------------------------------------------------------
 
-test('a project.json that is only in the reachable working copy is still refused as untrusted-source', { criterion: 'AC-SPEC-02-01' }, async () => {
+test('a project.json that is only in the reachable working copy is still refused as untrusted-source', async () => {
   await withRepository('solo', async (repository) => {
     assert.ok(workingCopyText(repository, PROJECT_PATH).includes('origins'), 'the working copy has no project.json');
     let loaded: unknown;
@@ -78,7 +77,7 @@ test('a project.json that is only in the reachable working copy is still refused
   });
 });
 
-test('with the edited project.json reachable in the working copy, core loads the protected-branch version and reads nothing from the working copy', { criterion: 'AC-SPEC-02-02' }, async () => {
+test('with the edited project.json reachable in the working copy, core loads the protected-branch version and reads nothing from the working copy', async () => {
   await withRepository('solo', async (repository) => {
     assert.ok(workingCopyText(repository, PROJECT_PATH).includes(PRODUCTION_ORIGIN), 'the working copy does not hold the edit');
     let origins: unknown;
@@ -92,7 +91,7 @@ test('with the edited project.json reachable in the working copy, core loads the
   }, widenProject);
 });
 
-test('with an unedited working copy, the project loads the same from the same folder', { criterion: 'AC-SPEC-02-02' }, async () => {
+test('with an unedited working copy, the project loads the same from the same folder', async () => {
   // The counter-example: the folder and the watch are the same, and the load succeeds.
   await withRepository('solo', async (repository) => {
     const reads = await readsFromWorkingCopy(repository, async () => {
@@ -105,7 +104,7 @@ test('with an unedited working copy, the project loads the same from the same fo
 
 // ---- The code-owners file and approvers.json ----------------------------------------------------------
 
-test('with an edited code-owners file reachable in the working copy, its new owner still gets not-code-owner', { criterion: 'AC-SPEC-02-12' }, async () => {
+test('with an edited code-owners file reachable in the working copy, its new owner still gets not-code-owner', async () => {
   await withRepository('team', async (repository) => {
     assert.ok(workingCopyText(repository, CODE_OWNERS_PATH).includes('/plans/ @reviewer-linus'), 'the working copy does not hold the edit');
     const reads = await readsFromWorkingCopy(repository, async () => {
@@ -118,7 +117,7 @@ test('with an edited code-owners file reachable in the working copy, its new own
   });
 });
 
-test('with an edited approvers.json reachable in the working copy, its new maintainer still gets not-maintainer', { criterion: 'AC-SPEC-02-12' }, async () => {
+test('with an edited approvers.json reachable in the working copy, its new maintainer still gets not-maintainer', async () => {
   await withRepository('solo', async (repository) => {
     assert.ok(workingCopyText(repository, APPROVERS_PATH).includes('build-agent'), 'the working copy does not hold the edit');
     const reads = await readsFromWorkingCopy(repository, async () => {
@@ -134,7 +133,7 @@ test('with an edited approvers.json reachable in the working copy, its new maint
   });
 });
 
-test("the maintainer's own merge verifies from the same working folder", { criterion: 'AC-SPEC-02-12' }, async () => {
+test("the maintainer's own merge verifies from the same working folder", async () => {
   // The counter-example: the watch and the folder are the same, and the protected-branch maintainer approves.
   await withRepository('solo', async (repository) => {
     const reads = await readsFromWorkingCopy(repository, async () => {

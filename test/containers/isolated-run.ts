@@ -5,7 +5,6 @@
 //
 // The host's environment is seeded with fake credentials before a run starts, so a runner that
 // passed any of the host's environment into the container would be caught.
-// See docs/specs/SPEC-07-isolated-runner-and-egress.md.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import type { DeclaredService, EgressPolicy, ImageDigest, Runner, RunnerHandle } from '@revisum/contracts';

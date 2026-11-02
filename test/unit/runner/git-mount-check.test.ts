@@ -1,7 +1,7 @@
 // The repository's .git folder never reaches a run, however its name is written. Windows ignores
 // case, so ".GIT" names the same folder as ".git", and a check that compared exact text would let
 // it through. Names that merely start with ".git", which are ordinary folders, are the
-// counter-examples. See docs/specs/SPEC-07-isolated-runner-and-egress.md.
+// counter-examples.
 import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -25,7 +25,7 @@ function runnerWithInputs(inputs: readonly string[]) {
 const GIT_FOLDER_INPUTS = ['.git', '.GIT', '.Git', '.gIt', 'fixtures/.GIT', '.GIT/config', 'fixtures/.Git/hooks', 'fixtures\\.GIT\\hooks'];
 
 for (const input of GIT_FOLDER_INPUTS) {
-  test(`the input ${input} names a .git folder, so start fails and nothing is started`, { criterion: 'AC-SPEC-07-03' }, async () => {
+  test(`the input ${input} names a .git folder, so start fails and nothing is started`, async () => {
     const { engine, runner, logged } = runnerWithInputs([input]);
     const started = await runner.start(imageDigest(PINNED_IMAGE_ID), POLICY);
     if (started.ok) await started.value.stop();
@@ -38,7 +38,7 @@ for (const input of GIT_FOLDER_INPUTS) {
 }
 
 for (const input of ['.github', '.gitignored', 'fixtures/.github', 'fixtures/git']) {
-  test(`counter-example: the input ${input} is only named like .git, so it is mounted`, { criterion: 'AC-SPEC-07-03' }, async () => {
+  test(`counter-example: the input ${input} is only named like .git, so it is mounted`, async () => {
     const { engine, runner } = runnerWithInputs([input]);
     const started = await runner.start(imageDigest(PINNED_IMAGE_ID), POLICY);
     assert.ok(started.ok, JSON.stringify(started));
@@ -71,15 +71,15 @@ async function mountedCheckoutFolders(folders: readonly string[]): Promise<reado
   }
 }
 
-test('a checkout\'s .GIT folder is left out of the workload\'s mounts, as .git is', { criterion: 'AC-SPEC-07-03' }, async () => {
+test('a checkout\'s .GIT folder is left out of the workload\'s mounts, as .git is', async () => {
   assert.deepEqual(await mountedCheckoutFolders(['.GIT', 'src']), ['src']);
 });
 
-test('counter-example: a checkout\'s .github folder is mounted', { criterion: 'AC-SPEC-07-03' }, async () => {
+test('counter-example: a checkout\'s .github folder is mounted', async () => {
   assert.deepEqual([...await mountedCheckoutFolders(['.github', 'src'])].sort(), ['.github', 'src']);
 });
 
-test('a working directory inside a .GIT folder is refused', { criterion: 'AC-SPEC-07-03' }, async () => {
+test('a working directory inside a .GIT folder is refused', async () => {
   const engine = fakeContainerEngine(ENFORCING_HOST);
   const { runner } = runnerOn(engine);
   const outcome = await runner.run(workloadRequest({ workingDirectory: '.GIT/hooks' }));

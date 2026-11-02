@@ -4,7 +4,6 @@
 // claiming a flaky test (impossible with --retries=0), nesting past the depth limit, more tests
 // than maximumTests, a report over maximumReportBytes, __proto__ and constructor keys, and
 // attachment paths that leave Revisum's output directory.
-// See docs/specs/SPEC-35-evidence-mode.md.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
@@ -27,12 +26,12 @@ function assertRefusedAt(report: unknown, code: string, path: string, limits = e
 
 // ---- The recorded reports decode (the counter-example for every refusal below) --------------------
 
-test('both recorded reports decode under the default limits', { criterion: 'AC-SPEC-35-09' }, () => {
+test('both recorded reports decode under the default limits', () => {
   decodedReport(recordedReport('each-outcome'));
   decodedReport(recordedReport('passing-with-criteria'));
 });
 
-test('a report whose attachment path stays inside the output directory decodes', { criterion: 'AC-SPEC-35-09' }, () => {
+test('a report whose attachment path stays inside the output directory decodes', () => {
   const attachment = { name: 'trace', contentType: 'application/zip', path: ATTACHMENT_INSIDE_OUTPUT };
   decodedReport(withValue(recordedReport('each-outcome'), [...RESULT_PATH(1), 'attachments'], [attachment]));
 });
@@ -59,7 +58,7 @@ const WRONG_TYPES: readonly HostileCase[] = [
 ];
 
 for (const hostile of WRONG_TYPES) {
-  test(`a report with ${hostile.name} is refused with suite-report-invalid at ${hostile.path}`, { criterion: 'AC-SPEC-35-09' }, () => {
+  test(`a report with ${hostile.name} is refused with suite-report-invalid at ${hostile.path}`, () => {
     assertRefusedAt(hostile.report(), 'suite-report-invalid', hostile.path);
   });
 }
@@ -73,7 +72,7 @@ const UNKNOWN_STATUSES: readonly HostileCase[] = [
 ];
 
 for (const hostile of UNKNOWN_STATUSES) {
-  test(`a report with ${hostile.name} is refused with suite-report-invalid at ${hostile.path}`, { criterion: 'AC-SPEC-35-09' }, () => {
+  test(`a report with ${hostile.name} is refused with suite-report-invalid at ${hostile.path}`, () => {
     assertRefusedAt(hostile.report(), 'suite-report-invalid', hostile.path);
   });
 }
@@ -95,7 +94,7 @@ const PROTOTYPE_KEYS: readonly HostileCase[] = [
 ];
 
 for (const hostile of PROTOTYPE_KEYS) {
-  test(`a report with ${hostile.name} is refused with suite-report-invalid at ${hostile.path}, polluting nothing`, { criterion: 'AC-SPEC-35-09' }, () => {
+  test(`a report with ${hostile.name} is refused with suite-report-invalid at ${hostile.path}, polluting nothing`, () => {
     const report = hostile.report();
     assert.ok(JSON.stringify(report).includes(HOSTILE_MARKER), 'the hostile key was lost before decoding');
     assertRefusedAt(report, 'suite-report-invalid', hostile.path);
@@ -114,7 +113,7 @@ const LEAVING_PATHS = [
 ];
 
 for (const leaving of LEAVING_PATHS) {
-  test(`an attachment path "${leaving.replace(HOSTILE_MARKER, '…')}" that leaves the output directory is refused at its JSON path`, { criterion: 'AC-SPEC-35-09' }, () => {
+  test(`an attachment path "${leaving.replace(HOSTILE_MARKER, '…')}" that leaves the output directory is refused at its JSON path`, () => {
     const attachment = { name: 'trace', contentType: 'application/zip', path: leaving };
     const report = withValue(recordedReport('each-outcome'), [...RESULT_PATH(1), 'attachments'], [attachment]);
     assertRefusedAt(report, 'suite-report-invalid', `${RESULT_JSON_PATH(1)}.attachments[0].path`);
@@ -125,18 +124,18 @@ for (const leaving of LEAVING_PATHS) {
 
 const compactBytes = (report: unknown): number => Buffer.byteLength(JSON.stringify(report), 'utf8');
 
-test('a report over maximumReportBytes is refused with too-large', { criterion: 'AC-SPEC-35-09' }, () => {
+test('a report over maximumReportBytes is refused with too-large', () => {
   const report = recordedReport('each-outcome');
   const errors = refusal(report, evidenceLimits({ maximumReportBytes: Math.floor(compactBytes(report) / 2) }));
   assert.ok(errors.some((error) => error.code === 'too-large' && error.path.startsWith('$')), JSON.stringify(errors));
 });
 
-test('the same report under a maximumReportBytes twice its size decodes', { criterion: 'AC-SPEC-35-09' }, () => {
+test('the same report under a maximumReportBytes twice its size decodes', () => {
   const report = recordedReport('each-outcome');
   decodedReport(report, evidenceLimits({ maximumReportBytes: compactBytes(report) * 2 }));
 });
 
-test('a report with more tests than maximumTests is refused with too-large; one with exactly that many decodes', { criterion: 'AC-SPEC-35-09' }, () => {
+test('a report with more tests than maximumTests is refused with too-large; one with exactly that many decodes', () => {
   // The each-outcome report holds five tests.
   const report = recordedReport('each-outcome');
   const errors = refusal(report, evidenceLimits({ maximumTests: 4 }));
@@ -144,7 +143,7 @@ test('a report with more tests than maximumTests is refused with too-large; one 
   decodedReport(report, evidenceLimits({ maximumTests: 5 }));
 });
 
-test('a report whose tests are counted per project is held to maximumTests across projects', { criterion: 'AC-SPEC-35-09' }, () => {
+test('a report whose tests are counted per project is held to maximumTests across projects', () => {
   // passing-with-criteria holds three specs, one of them run in two projects: four tests.
   const report = recordedReport('passing-with-criteria');
   const errors = refusal(report, evidenceLimits({ maximumTests: 3 }));
@@ -167,18 +166,18 @@ function nestedReport(depth: number): JsonRecord {
   return report;
 }
 
-test('describe blocks nested 5 deep decode', { criterion: 'AC-SPEC-35-09' }, () => {
+test('describe blocks nested 5 deep decode', () => {
   decodedReport(nestedReport(5));
 });
 
-test('describe blocks nested 500 deep are refused with too-large, inside the suites', { criterion: 'AC-SPEC-35-09' }, () => {
+test('describe blocks nested 500 deep are refused with too-large, inside the suites', () => {
   const errors = refusal(nestedReport(500));
   assert.ok(errors.some((error) => error.code === 'too-large' && error.path.startsWith('$.suites[0]')), JSON.stringify(errors).slice(0, 400));
 });
 
 // ---- Nothing echoed ----------------------------------------------------------------------------------
 
-test('no refusal of a hostile report echoes a value from it', { criterion: 'AC-SPEC-35-09' }, () => {
+test('no refusal of a hostile report echoes a value from it', () => {
   const hostile = [...WRONG_TYPES, ...UNKNOWN_STATUSES, ...PROTOTYPE_KEYS].map((entry) => entry.report());
   const leaving = LEAVING_PATHS.map((path) =>
     withValue(recordedReport('each-outcome'), [...RESULT_PATH(1), 'attachments'], [{ name: 'trace', contentType: 'application/zip', path }]));

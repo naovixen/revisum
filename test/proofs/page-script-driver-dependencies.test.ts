@@ -10,7 +10,6 @@
 //     secret into the page. A page-script path that revealed a secret would be a second call.
 // The runtime half, a script called with only its declared arguments after a secret was typed, is
 // in test/contract/page-script-arguments.test.ts. Planted sources show each check can fail.
-// See docs/specs/SPEC-36-unsafe-plan-features.md and docs/specs/SPEC-04-secrets-and-redaction.md.
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -63,7 +62,7 @@ function revealAllowList(): string[] {
 }
 
 for (const driver of DRIVERS) {
-  test(`${driver.name}'s package manifest declares no runtime dependency beyond the ones it had`, { criterion: 'AC-SPEC-36-20' }, () => {
+  test(`${driver.name}'s package manifest declares no runtime dependency beyond the ones it had`, () => {
     const manifest: Record<string, unknown> = JSON.parse(readFileSync(join(PACKAGES, driver.name, 'package.json'), 'utf8'));
     const declared: Record<string, unknown> = {};
     for (const field of DEPENDENCY_FIELDS) {
@@ -73,7 +72,7 @@ for (const driver of DRIVERS) {
     assert.deepEqual(declared, driver.dependencies);
   });
 
-  test(`every module ${driver.name}'s sources import or resolve is relative, a Node built-in or an allowed package`, { criterion: 'AC-SPEC-36-20' }, () => {
+  test(`every module ${driver.name}'s sources import or resolve is relative, a Node built-in or an allowed package`, () => {
     const folder = join(PACKAGES, driver.name, 'src');
     const files = sourceFiles(folder);
     assert.ok(files.length > 0, `no sources under ${folder}`);
@@ -82,7 +81,7 @@ for (const driver of DRIVERS) {
     assert.deepEqual(found, []);
   });
 
-  test(`${driver.name} calls reveal at one place only, the fill that types a secret, in its input module`, { criterion: 'AC-SPEC-36-20' }, () => {
+  test(`${driver.name} calls reveal at one place only, the fill that types a secret, in its input module`, () => {
     const calls = sourceFiles(join(PACKAGES, driver.name, 'src')).flatMap((file) =>
       revealCallLines(readFileSync(file, 'utf8')).map((line) => ({ file: relative(REPOSITORY_ROOT, file).split('\\').join('/'), line: line.trim() })));
     assert.equal(calls.length, 1, JSON.stringify(calls));
@@ -91,13 +90,13 @@ for (const driver of DRIVERS) {
   });
 }
 
-test('the reveal allow-list names no driver module but the two input modules', { criterion: 'AC-SPEC-36-20' }, () => {
+test('the reveal allow-list names no driver module but the two input modules', () => {
   const driverModules = revealAllowList().filter((path) => path.startsWith('packages/driver-'));
   assert.deepEqual(driverModules.sort(), DRIVERS.map((driver) => driver.inputModule).sort());
 });
 
 // Mutants: the same checks find a planted dependency and a planted second reveal.
-test('mutant: the module check reports a planted import, dynamic import and run-time resolution', { criterion: 'AC-SPEC-36-20' }, () => {
+test('mutant: the module check reports a planted import, dynamic import and run-time resolution', () => {
   const planted = [
     "import { parse } from 'css-what';",
     "const xpath = await import('xpath');",
@@ -111,7 +110,7 @@ test('mutant: the module check reports a planted import, dynamic import and run-
   assert.deepEqual(foreignModules(planted, ['@revisum/contracts', 'playwright-core']), ['css-what', 'xpath', 'safe-stable-stringify/index.js']);
 });
 
-test('mutant: the reveal check counts a second call in a page-script path, and ignores comments', { criterion: 'AC-SPEC-36-20' }, () => {
+test('mutant: the reveal check counts a second call in a page-script path, and ignores comments', () => {
   const planted = [
     "      case 'fill': await operations.fill(element, reveal(typedSecret)); break;",
     '      // reveal(secret) is never called here.',

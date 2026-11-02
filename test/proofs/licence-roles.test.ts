@@ -6,7 +6,6 @@
 // A licence change is planted in both licences.json and the package's manifest, so the two still
 // agree and only the role rule can catch it. For axe-core the copy gets its own installed-packages
 // folder: every package links to the real one, except axe-core, which is copied and then edited.
-// See docs/specs/SPEC-00-repo-seed-and-gates.md.
 import { cpSync, copyFileSync, mkdirSync, readdirSync, readFileSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { after, before, test } from 'node:test';
@@ -35,27 +34,27 @@ function relicense(folder: string, licence: string): LintOutcome {
   });
 }
 
-test('control: the unchanged copy of the repository passes every lint command', { criterion: 'AC-SPEC-00-08', timeout: TIMEOUT }, () => {
+test('control: the unchanged copy of the repository passes every lint command', { timeout: TIMEOUT }, () => {
   assertLintPasses(scratch.lint());
 });
 
 // ---- Licences by role ---------------------------------------------------------------------------
 
 for (const [folder, role] of [['contracts', 'schema'], ['action', 'SDK'], ['driver-cdp', 'driver'], ['driver-playwright', 'driver'], ['report', 'adapter'], ['auditor-axe', 'adapter']] as const) {
-  test(`the licence check fails when ${folder}, a ${role} package, carries the engine licence`, { criterion: 'AC-SPEC-00-08', timeout: TIMEOUT }, () => {
+  test(`the licence check fails when ${folder}, a ${role} package, carries the engine licence`, { timeout: TIMEOUT }, () => {
     assertLintFails(relicense(folder, FSL), [folder], LICENCE_CHECK);
   });
 }
 
-test('the licence check fails when the engine carries Apache-2.0', { criterion: 'AC-SPEC-00-08', timeout: TIMEOUT }, () => {
+test('the licence check fails when the engine carries Apache-2.0', { timeout: TIMEOUT }, () => {
   assertLintFails(relicense('engine', APACHE), ['engine'], LICENCE_CHECK);
 });
 
-test('counter-example: a product package may carry Apache-2.0 instead of the engine licence', { criterion: 'AC-SPEC-00-08', timeout: TIMEOUT }, () => {
+test('counter-example: a product package may carry Apache-2.0 instead of the engine licence', { timeout: TIMEOUT }, () => {
   assertLintPasses(relicense('cli', APACHE));
 });
 
-test('the licence check fails on a published JSON Schema that licences.json does not list', { criterion: 'AC-SPEC-00-08', timeout: TIMEOUT }, () => {
+test('the licence check fails on a published JSON Schema that licences.json does not list', { timeout: TIMEOUT }, () => {
   const outcome = lintWithEdits(scratch, {
     'docs/plan-language/project.schema.json': '{ "$schema": "https://json-schema.org/draft/2020-12/schema", "type": "object" }\n',
   });
@@ -100,12 +99,12 @@ function lintWithInstalledAxe(edit: (axeFolder: string) => void): LintOutcome {
   }
 }
 
-test('control: an unedited copy of the installed axe-core passes', { criterion: 'AC-SPEC-00-08', timeout: TIMEOUT }, () => {
+test('control: an unedited copy of the installed axe-core passes', { timeout: TIMEOUT }, () => {
   assertLintPasses(lintWithInstalledAxe(() => {}));
 });
 
 for (const file of ['axe.min.js', 'axe.js']) {
-  test(`the licence check fails when the installed ${file} differs from the pinned release by one byte`, { criterion: 'AC-SPEC-00-08', timeout: TIMEOUT }, () => {
+  test(`the licence check fails when the installed ${file} differs from the pinned release by one byte`, { timeout: TIMEOUT }, () => {
     const outcome = lintWithInstalledAxe((folder) => {
       const path = join(folder, file);
       writeFileSync(path, `${readFileSync(path, 'utf8')} `);
@@ -114,7 +113,7 @@ for (const file of ['axe.min.js', 'axe.js']) {
   });
 }
 
-test('the licence check fails when the installed axe-core is not the pinned version', { criterion: 'AC-SPEC-00-08', timeout: TIMEOUT }, () => {
+test('the licence check fails when the installed axe-core is not the pinned version', { timeout: TIMEOUT }, () => {
   const outcome = lintWithInstalledAxe((folder) => {
     const path = join(folder, 'package.json');
     const manifest: Record<string, unknown> = JSON.parse(readFileSync(path, 'utf8'));
@@ -123,7 +122,7 @@ test('the licence check fails when the installed axe-core is not the pinned vers
   assertLintFails(outcome, ['axe-core', '4.13.0'], LICENCE_CHECK);
 });
 
-test('the licence check fails when a package holds a copy of axe.min.js', { criterion: 'AC-SPEC-00-08', timeout: TIMEOUT }, () => {
+test('the licence check fails when a package holds a copy of axe.min.js', { timeout: TIMEOUT }, () => {
   const axe = readFileSync(join(REPOSITORY_ROOT, 'node_modules', 'axe-core', 'axe.min.js'), 'utf8');
   const outcome = lintWithEdits(scratch, { 'packages/auditor-axe/src/axe.min.js': axe });
   assertLintFails(outcome, ['axe.min.js'], LICENCE_CHECK);

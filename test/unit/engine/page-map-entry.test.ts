@@ -9,7 +9,6 @@
 // The redactor these tests pass is the engine's defaultRedactor() with the declared secret's value
 // replaced first, as withSecretRedaction does. Each leak test has a counter-example: the same page
 // through a redactor that redacts nothing keeps the value, so the scan can see it.
-// See docs/specs/SPEC-37-explore-to-draft.md.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { SECRET_PLACEHOLDER, defaultRedactor, type A11yNode, type Redactor } from '@revisum/engine';
@@ -64,7 +63,7 @@ const names = (tree: readonly PageMapNode[]): readonly string[] => allNodes(tree
 const shown = (entry: PageMapEntry): string => JSON.stringify(entry);
 const leaf = (role: string, name: string): PageMapNode => ({ role, name, children: [] });
 
-test('the contact page gives its path, title, depth and an outline of kept roles with their names', { criterion: 'AC-SPEC-37-04' }, async () => {
+test('the contact page gives its path, title, depth and an outline of kept roles with their names', async () => {
   const entry = await contactEntry();
   assert.deepEqual(entry, {
     path: '/contact.html',
@@ -84,26 +83,26 @@ test('the contact page gives its path, title, depth and an outline of kept roles
   });
 });
 
-test('the filled text field keeps its role and name, and its value is nowhere in the entry', { criterion: 'AC-SPEC-37-04' }, async () => {
+test('the filled text field keeps its role and name, and its value is nowhere in the entry', async () => {
   const entry = await contactEntry();
   assert.ok(allNodes(entry.tree).some((kept) => kept.role === 'textbox' && kept.name === 'Display name'), shown(entry));
   assert.equal(shown(entry).includes(FIELD_VALUE), false, 'the field value reached the page map');
 });
 
-test('the paragraph and every static text are dropped, so no paragraph text is in the entry', { criterion: 'AC-SPEC-37-04' }, async () => {
+test('the paragraph and every static text are dropped, so no paragraph text is in the entry', async () => {
   const entry = await contactEntry();
   const roles = allNodes(entry.tree).map((kept) => kept.role);
   for (const dropped of ['paragraph', 'StaticText', 'generic', 'label', 'ListMarker', 'document']) assert.equal(roles.includes(dropped), false, `${dropped} was kept`);
   assert.equal(shown(entry).includes(PARAGRAPH_TEXT), false, 'paragraph text reached the page map');
 });
 
-test('counter-example: with no redaction and no role filter to hide it, the field value and paragraph text are what the browser reported', { criterion: 'AC-SPEC-37-04' }, () => {
+test('counter-example: with no redaction and no role filter to hide it, the field value and paragraph text are what the browser reported', () => {
   // The canaries are in the tree the entry is built from, so their absence above is the filter's doing.
   const reported = JSON.stringify(contactPage());
   assert.ok(reported.includes(FIELD_VALUE) && reported.includes(PARAGRAPH_TEXT));
 });
 
-test('a 200-character button name is cut to its first 80 characters', { criterion: 'AC-SPEC-37-04' }, async () => {
+test('a 200-character button name is cut to its first 80 characters', async () => {
   assert.equal(LONG_NAME.length, 200);
   const entry = await contactEntry();
   const button = allNodes(entry.tree).find((kept) => kept.role === 'button');
@@ -111,26 +110,26 @@ test('a 200-character button name is cut to its first 80 characters', { criterio
   assert.ok(names(entry.tree).every((name) => name.length <= MAXIMUM_NAME_LENGTH), JSON.stringify(names(entry.tree)));
 });
 
-test('a name of exactly 80 characters is kept whole', { criterion: 'AC-SPEC-37-04' }, async () => {
+test('a name of exactly 80 characters is kept whole', async () => {
   const exact = LONG_NAME.slice(0, MAXIMUM_NAME_LENGTH);
   const entry = await pageMapEntry(node('document', '', [node('button', exact)]), PAGE_URL, 'Short', 0, projectRedactor());
   assert.deepEqual(entry.tree, [leaf('button', exact)]);
 });
 
-test('neither the declared secret nor the email address is in the entry', { criterion: 'AC-SPEC-37-04' }, async () => {
+test('neither the declared secret nor the email address is in the entry', async () => {
   const entry = await contactEntry();
   assert.equal(shown(entry).includes(SECRET_VALUE), false, 'the declared secret reached the page map');
   assert.equal(shown(entry).includes(EMAIL), false, 'the email address reached the page map');
   assert.equal(shown(entry).includes('@'), false, 'part of the email address reached the page map');
 });
 
-test('counter-example: through a redactor that redacts nothing, the same page keeps the secret and the email', { criterion: 'AC-SPEC-37-04' }, async () => {
+test('counter-example: through a redactor that redacts nothing, the same page keeps the secret and the email', async () => {
   const entry = await contactEntry(noRedaction);
   assert.ok(shown(entry).includes(SECRET_VALUE), 'the entry does not apply the redactor it is given');
   assert.ok(shown(entry).includes(EMAIL));
 });
 
-test('a name is redacted before it is cut, so an email address across the 80th character leaves nothing of itself', { criterion: 'AC-SPEC-37-04' }, async () => {
+test('a name is redacted before it is cut, so an email address across the 80th character leaves nothing of itself', async () => {
   // The address starts at character 70: cut first, "ada.lovela" would be left and no rule would match it.
   const name = `${'Write to the reading room team with any question you have, at '.padEnd(70, '.')}ada.lovelace@example.org today`;
   const entry = await pageMapEntry(node('document', '', [node('link', name)]), PAGE_URL, 'Contact', 0, projectRedactor());
@@ -140,32 +139,32 @@ test('a name is redacted before it is cut, so an email address across the 80th c
   assert.equal(kept.includes('@'), false, kept);
 });
 
-test('a declared secret across the 80th character is redacted whole before the cut', { criterion: 'AC-SPEC-37-04' }, async () => {
+test('a declared secret across the 80th character is redacted whole before the cut', async () => {
   const name = `${'Your office key, kept for the reading room only, is'.padEnd(72, ' ')}${SECRET_VALUE}`;
   const entry = await pageMapEntry(node('document', '', [node('heading', name)]), PAGE_URL, 'Contact', 0, projectRedactor());
   const kept = names(entry.tree)[0] ?? '';
   assert.equal(kept.includes(SECRET_VALUE.slice(0, 8)), false, `the start of the secret survived: ${kept}`);
 });
 
-test('a title holding an email address or the declared secret is redacted too', { criterion: 'AC-SPEC-37-04' }, async () => {
+test('a title holding an email address or the declared secret is redacted too', async () => {
   const entry = await pageMapEntry(node('document', '', []), PAGE_URL, `Messages for ${EMAIL} (${SECRET_VALUE})`, 2, projectRedactor());
   assert.equal(entry.title.includes(EMAIL), false, entry.title);
   assert.equal(entry.title.includes(SECRET_VALUE), false, entry.title);
 });
 
-test('the path keeps no query or fragment, so values in the address never reach the map', { criterion: 'AC-SPEC-37-04' }, async () => {
+test('the path keeps no query or fragment, so values in the address never reach the map', async () => {
   const entry = await contactEntry();
   assert.equal(entry.path, '/contact.html');
   for (const part of ['newsletter', 'reader=ada', '#form', '?']) assert.equal(shown(entry).includes(part), false, `${part} is in the entry`);
 });
 
-test('every kept role is kept, with its name, in document order', { criterion: 'AC-SPEC-37-04' }, async () => {
+test('every kept role is kept, with its name, in document order', async () => {
   const tree = node('document', '', KEPT_ROLES.map((role) => node(role, `${role} name`)));
   const entry = await pageMapEntry(tree, PAGE_URL, 'Every role', 0, projectRedactor());
   assert.deepEqual(entry.tree, KEPT_ROLES.map((role) => leaf(role, `${role} name`)));
 });
 
-test('a node of a role not kept is dropped and its kept descendants take its place, in order', { criterion: 'AC-SPEC-37-04' }, async () => {
+test('a node of a role not kept is dropped and its kept descendants take its place, in order', async () => {
   for (const dropped of DROPPED_ROLES) {
     const tree = node('main', '', [
       node('heading', 'Before'),
@@ -179,7 +178,7 @@ test('a node of a role not kept is dropped and its kept descendants take its pla
   }
 });
 
-test('the same tree, address and title give the same entry each time', { criterion: 'AC-SPEC-37-04' }, async () => {
+test('the same tree, address and title give the same entry each time', async () => {
   const first = await contactEntry();
   const second = await contactEntry();
   assert.equal(JSON.stringify(second), JSON.stringify(first));

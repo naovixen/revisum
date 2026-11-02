@@ -5,7 +5,6 @@
 // NPM_TOKEN values first, so a runner that let the host's environment through would be caught.
 // The proxy settings and the mounted packages, which the run does need, are the counter-examples
 // that show the inspection itself sees what is there.
-// See docs/specs/SPEC-07-isolated-runner-and-egress.md.
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
 import { SEEDED_CREDENTIALS, jsonInside, startIsolatedRun, type IsolatedRun } from './isolated-run.ts';
@@ -30,7 +29,7 @@ type Environment = Readonly<Record<string, string>>;
 const environmentInside = async (): Promise<Environment> =>
   await jsonInside(run.handle, 'console.log(JSON.stringify(process.env))') as Environment;
 
-test('no seeded host credential is in the container\'s environment, by name or by value', { criterion: 'AC-SPEC-07-03', timeout: TIMEOUT }, async () => {
+test('no seeded host credential is in the container\'s environment, by name or by value', { timeout: TIMEOUT }, async () => {
   const inside = await environmentInside();
   for (const [name, value] of Object.entries(SEEDED_CREDENTIALS)) {
     assert.ok(!Object.hasOwn(inside, name), `${name} reached the container`);
@@ -38,18 +37,18 @@ test('no seeded host credential is in the container\'s environment, by name or b
   }
 });
 
-test('no variable in the container\'s environment is named like a credential', { criterion: 'AC-SPEC-07-03', timeout: TIMEOUT }, async () => {
+test('no variable in the container\'s environment is named like a credential', { timeout: TIMEOUT }, async () => {
   const inside = await environmentInside();
   assert.deepEqual(Object.keys(inside).filter((name) => CREDENTIAL_NAME.test(name)), []);
 });
 
-test('counter-example: the inspection sees the environment the run does get, such as its proxy setting', { criterion: 'AC-SPEC-07-03', timeout: TIMEOUT }, async () => {
+test('counter-example: the inspection sees the environment the run does get, such as its proxy setting', { timeout: TIMEOUT }, async () => {
   const inside = await environmentInside();
   assert.ok(Object.keys(inside).length > 0, 'the environment inside is read');
   assert.ok(typeof inside['HTTP_PROXY'] === 'string' && inside['HTTP_PROXY'] !== '', JSON.stringify(Object.keys(inside)));
 });
 
-test('no credential file is readable in the home folder of the container\'s user or of root', { criterion: 'AC-SPEC-07-03', timeout: TIMEOUT }, async () => {
+test('no credential file is readable in the home folder of the container\'s user or of root', { timeout: TIMEOUT }, async () => {
   const script = `
     const { accessSync, constants } = require('node:fs');
     const { homedir } = require('node:os');
@@ -65,7 +64,7 @@ test('no credential file is readable in the home folder of the container\'s user
   assert.deepEqual(await jsonInside(run.handle, script), []);
 });
 
-test('the repository\'s .git folder is not mounted, while the packages the run needs are', { criterion: 'AC-SPEC-07-03', timeout: TIMEOUT }, async () => {
+test('the repository\'s .git folder is not mounted, while the packages the run needs are', { timeout: TIMEOUT }, async () => {
   const script = `
     const { existsSync, readFileSync } = require('node:fs');
     const mountPoints = readFileSync('/proc/self/mountinfo', 'utf8').split('\\n').map((line) => line.split(' ')[4] ?? '');
@@ -77,7 +76,7 @@ test('the repository\'s .git folder is not mounted, while the packages the run n
   assert.deepEqual(await jsonInside(run.handle, script), { gitHere: false, gitMounts: [], packagesHere: true });
 });
 
-test('neither the Docker socket nor a secrets folder is reachable from inside', { criterion: 'AC-SPEC-07-03', timeout: TIMEOUT }, async () => {
+test('neither the Docker socket nor a secrets folder is reachable from inside', { timeout: TIMEOUT }, async () => {
   const script = `
     const { existsSync } = require('node:fs');
     console.log(JSON.stringify(['/var/run/docker.sock', '/run/docker.sock', '/run/secrets'].filter((path) => existsSync(path))));`;

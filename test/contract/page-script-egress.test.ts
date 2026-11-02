@@ -7,7 +7,6 @@
 // The declared script hostileEgress (fixtures/unsafe-features-project/plans/scripts/) first fetches
 // a file on the page's own origin: that request is allowed and reaches the server, the
 // counter-example that shows the script's requests do go through the proxy.
-// See docs/specs/SPEC-36-unsafe-plan-features.md and docs/specs/SPEC-07-isolated-runner-and-egress.md.
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
 import { cdpDriver, type OwnBrowserDriver } from '@revisum/driver-cdp';
@@ -101,7 +100,7 @@ async function hostileRun(): Promise<ProxiedRun> {
 }
 
 for (const { channel, host, what } of SCRIPT_CHANNELS) {
-  test(`the script's ${what} to ${host} is blocked by the proxy and recorded as a blocked ${channel} event`, { criterion: 'AC-SPEC-36-10', timeout: TIMEOUT }, async () => {
+  test(`the script's ${what} to ${host} is blocked by the proxy and recorded as a blocked ${channel} event`, { timeout: TIMEOUT }, async () => {
     const ran = await hostileRun();
     await waitFor(() => ran.decisions().some((entry) => hostOf(String(entry.origin)) === host));
     const decided = ran.decisions().filter((entry) => hostOf(String(entry.origin)) === host);
@@ -114,7 +113,7 @@ for (const { channel, host, what } of SCRIPT_CHANNELS) {
   });
 }
 
-test('counter-example: the script\'s fetch of its own origin goes through the proxy, is allowed and reaches the server', { criterion: 'AC-SPEC-36-10', timeout: TIMEOUT }, async () => {
+test('counter-example: the script\'s fetch of its own origin goes through the proxy, is allowed and reaches the server', { timeout: TIMEOUT }, async () => {
   const ran = await hostileRun();
   assert.ok(ran.requestedPaths.includes('/egress-allowed.json'), `the server received the script's request: ${JSON.stringify(ran.requestedPaths)}`);
   const own = new URL(harness.origin);

@@ -15,7 +15,6 @@
 // Plans are written as raw JSON, parsed against the project, cleared through the policy gate and
 // run with run(). Every run reads the page just before the run closes its session, after an
 // optional test hook.
-// See docs/specs/SPEC-33-network-stubs-request-checks-and-storage.md.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { arch, platform } from 'node:os';

@@ -9,7 +9,6 @@
 //
 // Columns follow the build notes: a statement's own error is at column 1, and any other error
 // inside the faulty token.
-// See docs/specs/SPEC-28-plan-authoring.md.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
@@ -100,13 +99,13 @@ function assertPlaced(text: string, errors: readonly DraftError[]): void {
 
 // ---- The unchanged text -------------------------------------------------------------------------------
 
-test('the sign-up plan\'s canonical text reads with no error and no warning', { criterion: 'AC-SPEC-28-05' }, () => {
+test('the sign-up plan\'s canonical text reads with no error and no warning', () => {
   const read = readPlanText(signupText(), limits);
   assert.equal(read.ok, true, JSON.stringify(read));
   if (read.ok) assert.deepEqual(read.value.warnings, []);
 });
 
-test('reading text gives the line each step came from', { criterion: 'AC-SPEC-28-05' }, () => {
+test('reading text gives the line each step came from', () => {
   const text = signupText();
   const read = readPlanText(text, limits);
   if (!read.ok) assert.fail(shown(read.error));
@@ -117,7 +116,7 @@ test('reading text gives the line each step came from', { criterion: 'AC-SPEC-28
 
 // ---- Statements and placement ---------------------------------------------------------------------------
 
-test('an unknown statement is unknown-statement at its line and column 1, without echoing it', { criterion: 'AC-SPEC-28-05' }, () => {
+test('an unknown statement is unknown-statement at its line and column 1, without echoing it', () => {
   const original = signupText();
   const line = lineOf(original, CAPTURE_FORM);
   const text = withLineReplaced(original, line, `Teleport to "${PRIVATE_MARKER}"`);
@@ -127,7 +126,7 @@ test('an unknown statement is unknown-statement at its line and column 1, withou
   assertPlaced(text, errors);
 });
 
-test('a header after the first step is unknown-statement at its line and column 1', { criterion: 'AC-SPEC-28-05' }, () => {
+test('a header after the first step is unknown-statement at its line and column 1', () => {
   const original = signupText();
   const targets = lineStartingWith(original, 'Targets:');
   const moved = withLineRemoved(original, targets);
@@ -136,7 +135,7 @@ test('a header after the first step is unknown-statement at its line and column 
   assertTextError(errors, 'unknown-statement', line, 1, 1);
 });
 
-test('a statement after the Clean up: block is unknown-statement at its line and column 1', { criterion: 'AC-SPEC-28-05' }, () => {
+test('a statement after the Clean up: block is unknown-statement at its line and column 1', () => {
   const original = canonicalText('order-backend-state');
   assert.ok(original.endsWith('\n'), 'canonical text ends with a newline');
   // Just before the empty line after the final newline: a new last line.
@@ -147,7 +146,7 @@ test('a statement after the Clean up: block is unknown-statement at its line and
 
 // ---- Locators and strings ---------------------------------------------------------------------------------
 
-test('a locator with an unknown role is bad-locator at its line, at the role', { criterion: 'AC-SPEC-28-05' }, () => {
+test('a locator with an unknown role is bad-locator at its line, at the role', () => {
   const original = signupText();
   const line = lineOf(original, CREATE_ACCOUNT);
   const replacement = `Click banana "${PRIVATE_MARKER}"`;
@@ -157,7 +156,7 @@ test('a locator with an unknown role is bad-locator at its line, at the role', {
   assertNoEcho(text, errors);
 });
 
-test('a position with the wrong English suffix is bad-locator at its line, at the position', { criterion: 'AC-SPEC-28-05' }, () => {
+test('a position with the wrong English suffix is bad-locator at its line, at the position', () => {
   const original = signupText();
   const line = lineOf(original, CREATE_ACCOUNT);
   const replacement = 'Click 2th button "Create account"';
@@ -165,7 +164,7 @@ test('a position with the wrong English suffix is bad-locator at its line, at th
   assertTextError(errors, 'bad-locator', line, ...columnsOf(replacement, '2th', 1));
 });
 
-test('the same position with its English suffix reads as position 2', { criterion: 'AC-SPEC-28-05' }, () => {
+test('the same position with its English suffix reads as position 2', () => {
   // The counter-example for the wrong suffix.
   const original = signupText();
   const read = readPlanText(withLineReplaced(original, lineOf(original, CREATE_ACCOUNT), 'Click 2nd button "Create account"'), limits);
@@ -174,7 +173,7 @@ test('the same position with its English suffix reads as position 2', { criterio
   assert.deepEqual(steps[8]?.locator, { by: 'role', role: 'button', name: 'Create account', position: 2 });
 });
 
-test('a string with no closing quote is bad-string at its line, from its opening quote on', { criterion: 'AC-SPEC-28-05' }, () => {
+test('a string with no closing quote is bad-string at its line, from its opening quote on', () => {
   const original = signupText();
   const line = lineOf(original, CREATE_ACCOUNT);
   const replacement = `Click button "${PRIVATE_MARKER}`;
@@ -184,7 +183,7 @@ test('a string with no closing quote is bad-string at its line, from its opening
   assertNoEcho(text, errors);
 });
 
-test('a string with an escape other than \\" and \\\\ is bad-string at its line, inside the string', { criterion: 'AC-SPEC-28-05' }, () => {
+test('a string with an escape other than \\" and \\\\ is bad-string at its line, inside the string', () => {
   const original = signupText();
   const line = lineOf(original, CREATE_ACCOUNT);
   const replacement = `Click button "Create \\q ${PRIVATE_MARKER}"`;
@@ -194,7 +193,7 @@ test('a string with an escape other than \\" and \\\\ is bad-string at its line,
   assertNoEcho(text, errors);
 });
 
-test('a malformed value reference is bad-string at its line, inside the reference', { criterion: 'AC-SPEC-28-05' }, () => {
+test('a malformed value reference is bad-string at its line, inside the reference', () => {
   const original = signupText();
   const line = lineOf(original, CREATE_ACCOUNT);
   const replacement = `Click button {${PRIVATE_MARKER} name}`;
@@ -204,7 +203,7 @@ test('a malformed value reference is bad-string at its line, inside the referenc
   assertNoEcho(text, errors);
 });
 
-test('quoted text with the two allowed escapes and braces reads as literal text', { criterion: 'AC-SPEC-28-05' }, () => {
+test('quoted text with the two allowed escapes and braces reads as literal text', () => {
   // The counter-example for the bad-string cases: "{name}" inside quotes is text, not a reference.
   const original = signupText();
   const text = withLineReplaced(original, lineOf(original, CREATE_ACCOUNT), 'Click button "Create \\"new\\" \\\\ {account}"');
@@ -216,14 +215,14 @@ test('quoted text with the two allowed escapes and braces reads as literal text'
 
 // ---- Indentation and headers --------------------------------------------------------------------------------
 
-test('a line indented by three spaces outside any block is bad-indent at its line, inside the indentation', { criterion: 'AC-SPEC-28-05' }, () => {
+test('a line indented by three spaces outside any block is bad-indent at its line, inside the indentation', () => {
   const original = signupText();
   const line = lineOf(original, CREATE_ACCOUNT) + 1;
   const errors = textErrors(withLineInserted(original, line, `   ${CREATE_ACCOUNT}`));
   assertTextError(errors, 'bad-indent', line, 1, 4);
 });
 
-test('a line indented by a tab is bad-indent at its line and column 1', { criterion: 'AC-SPEC-28-05' }, () => {
+test('a line indented by a tab is bad-indent at its line and column 1', () => {
   const original = signupText();
   const line = lineOf(original, CREATE_ACCOUNT);
   const errors = textErrors(withLineReplaced(original, line, `\t${CREATE_ACCOUNT}`));
@@ -231,7 +230,7 @@ test('a line indented by a tab is bad-indent at its line and column 1', { criter
 });
 
 for (const header of ['Plan:', 'Version:', 'Targets:']) {
-  test(`text without its ${header} header is missing-header`, { criterion: 'AC-SPEC-28-05' }, () => {
+  test(`text without its ${header} header is missing-header`, () => {
     const original = signupText();
     const text = withLineRemoved(original, lineStartingWith(original, header));
     const errors = textErrors(text);
@@ -240,14 +239,14 @@ for (const header of ['Plan:', 'Version:', 'Targets:']) {
   });
 }
 
-test('a second Version: header is duplicate-header at the second one\'s line and column 1', { criterion: 'AC-SPEC-28-05' }, () => {
+test('a second Version: header is duplicate-header at the second one\'s line and column 1', () => {
   const original = signupText();
   const line = lineStartingWith(original, 'Version:');
   const errors = textErrors(withLineInserted(original, line + 1, lineAt(original, line)));
   assertTextError(errors, 'duplicate-header', line + 1, 1, 1);
 });
 
-test('an Expect line with no Criterion: header before it is no-criterion at the Expect line and column 1', { criterion: 'AC-SPEC-28-05' }, () => {
+test('an Expect line with no Criterion: header before it is no-criterion at the Expect line and column 1', () => {
   const original = signupText();
   const text = withLineRemoved(original, lineOf(original, FIRST_CRITERION));
   const errors = textErrors(text);
@@ -256,7 +255,7 @@ test('an Expect line with no Criterion: header before it is no-criterion at the 
 
 // ---- Keys and names ---------------------------------------------------------------------------------------------
 
-test('a press of a key the language does not name is unknown-key-name at its line, at the key', { criterion: 'AC-SPEC-28-05' }, () => {
+test('a press of a key the language does not name is unknown-key-name at its line, at the key', () => {
   const original = signupText();
   const line = lineOf(original, CREATE_ACCOUNT);
   const replacement = 'Press Hyperkey in button "Create account"';
@@ -264,14 +263,14 @@ test('a press of a key the language does not name is unknown-key-name at its lin
   assertTextError(errors, 'unknown-key-name', line, ...columnsOf(replacement, 'Hyperkey', 1));
 });
 
-test('the same press with a key the language names reads without error', { criterion: 'AC-SPEC-28-05' }, () => {
+test('the same press with a key the language names reads without error', () => {
   // The counter-example for unknown-key-name.
   const original = signupText();
   const read = readPlanText(withLineReplaced(original, lineOf(original, CREATE_ACCOUNT), 'Press Enter in button "Create account"'), limits);
   assert.equal(read.ok, true, JSON.stringify(read));
 });
 
-test('a value defined twice under Values: is duplicate-key at the second one', { criterion: 'AC-SPEC-28-05' }, () => {
+test('a value defined twice under Values: is duplicate-key at the second one', () => {
   const original = canonicalText('unique-sign-up');
   const line = lineOf(original, DISPLAY_NAME_VALUE.trim()) + 1;
   const errors = textErrors(withLineInserted(original, line, DISPLAY_NAME_VALUE));
@@ -292,7 +291,7 @@ const DUPLICATE_KEYS: readonly { readonly name: string; readonly plan: string; r
 ];
 
 for (const { name, plan, from, to, key } of DUPLICATE_KEYS) {
-  test(`${name} is duplicate-key at the second one`, { criterion: 'AC-SPEC-28-05' }, () => {
+  test(`${name} is duplicate-key at the second one`, () => {
     const original = canonicalText(plan);
     const line = lineOf(original, from);
     const errors = textErrors(withLineReplaced(original, line, to));
@@ -300,7 +299,7 @@ for (const { name, plan, from, to, key } of DUPLICATE_KEYS) {
   });
 }
 
-test('a value remembered twice in one call\'s remembering list is duplicate-key at the second one', { criterion: 'AC-SPEC-28-05' }, () => {
+test('a value remembered twice in one call\'s remembering list is duplicate-key at the second one', () => {
   const original = canonicalText('order-backend-state');
   const line = lineOf(original, CREATE_ORDER);
   const to = `${CREATE_ORDER}, field status as orderId`;
@@ -309,7 +308,7 @@ test('a value remembered twice in one call\'s remembering list is duplicate-key 
   assertTextError(errors, 'duplicate-key', line, last + 1, last + 'orderId'.length);
 });
 
-test('a name reused elsewhere in the plan is the parser\'s duplicate, not duplicate-key', { criterion: 'AC-SPEC-28-05' }, () => {
+test('a name reused elsewhere in the plan is the parser\'s duplicate, not duplicate-key', () => {
   // The counter-example: a Remember naming a value the Values: block defines.
   const original = canonicalText('unique-sign-up');
   const line = linesOf(original).length;
@@ -321,7 +320,7 @@ test('a name reused elsewhere in the plan is the parser\'s duplicate, not duplic
   assert.ok(admitted.error.some((error) => error.stage === 'plan' && error.code === 'duplicate'), shown(admitted.error));
 });
 
-test('text over the plan size limit is refused with one too-large error, without echoing it', { criterion: 'AC-SPEC-28-05' }, () => {
+test('text over the plan size limit is refused with one too-large error, without echoing it', () => {
   const original = signupText();
   const long = `${PRIVATE_MARKER} `.repeat(Math.ceil(limits.maximumPlanBytes / PRIVATE_MARKER.length));
   const text = withLineReplaced(original, lineOf(original, CREATE_ACCOUNT), `Click button "${long}"`);
@@ -353,7 +352,7 @@ function assertParserError(errors: readonly DraftError[], code: string | null, p
   assert.equal(found[0]?.position?.line, line, `${code ?? 'the error'} at ${path} is not placed on line ${line}: ${shown(errors)}`);
 }
 
-test('script-like text in a locator is the parser\'s unsafe_text, placed on the step\'s line, without echoing it', { criterion: 'AC-SPEC-28-05' }, () => {
+test('script-like text in a locator is the parser\'s unsafe_text, placed on the step\'s line, without echoing it', () => {
   const original = signupText();
   const line = lineOf(original, CREATE_ACCOUNT);
   const text = withLineReplaced(original, line, `Click button "<script>${PRIVATE_MARKER}</script>"`);
@@ -363,14 +362,14 @@ test('script-like text in a locator is the parser\'s unsafe_text, placed on the 
   assertPlaced(text, errors);
 });
 
-test('a lone surrogate in quoted text is the parser\'s unsafe_text, placed on the step\'s line', { criterion: 'AC-SPEC-28-05' }, () => {
+test('a lone surrogate in quoted text is the parser\'s unsafe_text, placed on the step\'s line', () => {
   const original = signupText();
   const line = lineOf(original, CREATE_ACCOUNT);
   const errors = parserErrors(withLineReplaced(original, line, 'Click button "Create \uD800 account"'));
   assertParserError(errors, 'unsafe_text', '$.steps[8].locator.name', line);
 });
 
-test('the parser refuses a lone surrogate in JSON as unsafe_text, and accepts a whole surrogate pair', { criterion: 'AC-SPEC-28-05' }, () => {
+test('the parser refuses a lone surrogate in JSON as unsafe_text, and accepts a whole surrogate pair', () => {
   const named = (name: string) => {
     const plan = signupPlan();
     const steps = plan['steps'] as { locator: { name: string } }[];
@@ -388,7 +387,7 @@ test('the parser refuses a lone surrogate in JSON as unsafe_text, and accepts a 
   assert.equal(parsePlan(named('Create 🙂 account')).ok, true);
 });
 
-test('a target off the matrix is the parser\'s target_not_in_matrix, placed on the Targets: line', { criterion: 'AC-SPEC-28-05' }, () => {
+test('a target off the matrix is the parser\'s target_not_in_matrix, placed on the Targets: line', () => {
   const original = signupText();
   const line = lineStartingWith(original, 'Targets:');
   const text = withLineReplaced(original, line, `Targets: ${PRIVATE_MARKER}`);
@@ -397,7 +396,7 @@ test('a target off the matrix is the parser\'s target_not_in_matrix, placed on t
   assertNoEcho(text, errors);
 });
 
-test('a navigation to an origin off the allow-list is the parser\'s origin_not_allowed, placed on the Go to line', { criterion: 'AC-SPEC-28-05' }, () => {
+test('a navigation to an origin off the allow-list is the parser\'s origin_not_allowed, placed on the Go to line', () => {
   const original = signupText();
   const line = lineOf(original, OPEN_PAGE);
   const text = withLineReplaced(original, line, `Go to https://${PRIVATE_MARKER}.example/`);
@@ -406,7 +405,7 @@ test('a navigation to an origin off the allow-list is the parser\'s origin_not_a
   assertNoEcho(text, errors);
 });
 
-test('a malformed criterion id is the parser\'s error at the check\'s criterionId, placed on its Criterion: line', { criterion: 'AC-SPEC-28-05' }, () => {
+test('a malformed criterion id is the parser\'s error at the check\'s criterionId, placed on its Criterion: line', () => {
   const original = signupText();
   const line = lineOf(original, FIRST_CRITERION);
   const text = withLineReplaced(original, line, `Criterion: ${PRIVATE_MARKER}!`);
@@ -415,7 +414,7 @@ test('a malformed criterion id is the parser\'s error at the check\'s criterionI
   assertNoEcho(text, errors);
 });
 
-test('the unchanged sign-up text is admitted, so the parser errors above come from the changed lines', { criterion: 'AC-SPEC-28-05' }, () => {
+test('the unchanged sign-up text is admitted, so the parser errors above come from the changed lines', () => {
   const admitted = admitDraft(textDraft(signupText()), parsePlan, memoryEventSink(), actor());
   assert.equal(admitted.ok, true, JSON.stringify(admitted));
 });

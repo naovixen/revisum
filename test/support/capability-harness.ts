@@ -5,7 +5,6 @@
 //
 // The project declares one upload file, upload-note.txt, which lives in fixtures/capability-uploads/
 // (the project's fixtures folder); the CDP driver is told where that folder is.
-// See docs/specs/SPEC-06-cdp-driver.md.
 import assert from 'node:assert/strict';
 import { arch, platform } from 'node:os';
 import { join } from 'node:path';

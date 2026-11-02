@@ -9,7 +9,6 @@
 //     unnamed control by its test id. It allows no irreversible name.
 // The gate is built by policyGate({ project, events }); each denial appends one plan.denied event
 // whose code is the rule. A dialog step acts on no element, so the guard receives NO_ELEMENT for it.
-// See docs/specs/SPEC-03-policy-gate.md.
 import {
   failure, loadTrustedProject, parseProject, planHash, planParser, policyGate, success,
   type EventSink, type Locale, type Plan, type PlanStanding, type PolicyDecision, type PolicyGate, type PolicyRuleId,

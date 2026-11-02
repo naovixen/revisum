@@ -4,7 +4,6 @@
 //   - Every denial is recorded. A run either cannot be given ports without an audit sink (the
 //     port is required, so leaving it out does not type-check), or, if it can, it refuses to start
 //     without one rather than deny a plan with no record.
-// See docs/specs/SPEC-03-policy-gate.md.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { runUntrusted, type RunPorts } from '@revisum/engine';
@@ -24,7 +23,7 @@ const FORGERY_SETUP = [
   'declare const parsed: Plan;',
 ];
 
-test('control: the plan the policy gate returns compiles as Authorised', { criterion: 'AC-SPEC-03-04', timeout: TIMEOUT }, () => {
+test('control: the plan the policy gate returns compiles as Authorised', { timeout: TIMEOUT }, () => {
   const compiled = compile('gate-output.ts', [
     "import type { Authorised, Plan, PolicyGate, Target } from '@revisum/engine';",
     'declare const gate: PolicyGate;',
@@ -36,7 +35,7 @@ test('control: the plan the policy gate returns compiles as Authorised', { crite
   assert.equal(compiled.passed, true, compiled.output);
 });
 
-test('a parsed plan spread into an object with the brand\'s field added by hand does not compile as Authorised', { criterion: 'AC-SPEC-03-04', timeout: TIMEOUT }, () => {
+test('a parsed plan spread into an object with the brand\'s field added by hand does not compile as Authorised', { timeout: TIMEOUT }, () => {
   const compiled = compile('forged-by-spread.ts', [
     ...FORGERY_SETUP,
     "export const forged: Authorised = { ...parsed, __authorisedBy: 'policy-gate' };",
@@ -45,7 +44,7 @@ test('a parsed plan spread into an object with the brand\'s field added by hand 
   assert.equal(compiled.errors.length, 1, compiled.output);
 });
 
-test('a parsed plan given the brand\'s field by Object.assign does not compile as Authorised', { criterion: 'AC-SPEC-03-04', timeout: TIMEOUT }, () => {
+test('a parsed plan given the brand\'s field by Object.assign does not compile as Authorised', { timeout: TIMEOUT }, () => {
   const compiled = compile('forged-by-assign.ts', [
     ...FORGERY_SETUP,
     "export const forged: Authorised = Object.assign({}, parsed, { __authorisedBy: 'policy-gate' as const });",
@@ -66,7 +65,7 @@ const PORTS_SETUP = [
   'declare const audit: EventSink;',
 ];
 
-test('control: run ports with an audit sink compile', { criterion: 'AC-SPEC-03-05', timeout: TIMEOUT }, () => {
+test('control: run ports with an audit sink compile', { timeout: TIMEOUT }, () => {
   const compiled = compile('ports-with-audit.ts', [...PORTS_SETUP, 'export const ports: RunPorts = { drivers, clock, artifacts, redactor, events, audit };']);
   assert.equal(compiled.passed, true, compiled.output);
 });
@@ -74,7 +73,7 @@ test('control: run ports with an audit sink compile', { criterion: 'AC-SPEC-03-0
 const DELETE_STEPS = [OPEN_ACCOUNT_PAGE, click(role('button', 'Delete account'))];
 const SAVE_STEPS = [OPEN_ACCOUNT_PAGE, click(role('button', 'Save changes'))];
 
-test('a run cannot deny a plan without recording it: the audit port is required, or a run without one refuses to start', { criterion: 'AC-SPEC-03-05', timeout: TIMEOUT }, async () => {
+test('a run cannot deny a plan without recording it: the audit port is required, or a run without one refuses to start', { timeout: TIMEOUT }, async () => {
   const compiled = compile('ports-without-audit.ts', [...PORTS_SETUP, 'export const ports: RunPorts = { drivers, clock, artifacts, redactor, events };']);
   if (!compiled.passed) {
     // The port is required: leaving it out is the one error, and it names the audit sink.
@@ -99,7 +98,7 @@ test('a run cannot deny a plan without recording it: the audit port is required,
   }
 });
 
-test('with an audit sink, a denial is recorded and an allowed plan runs', { criterion: 'AC-SPEC-03-05' }, async () => {
+test('with an audit sink, a denial is recorded and an allowed plan runs', async () => {
   const audit = memoryEventSink();
   const denied = guardedDriver([...DELETE_STEPS, CLOSING_CHECK]);
   assert.equal(finalState(await runUntrusted(planOf(DELETE_STEPS), parserFor(), runBase(), { ...portsWithoutAudit(denied.driver), audit })), 'Denied');

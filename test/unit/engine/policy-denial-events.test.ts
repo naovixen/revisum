@@ -3,7 +3,6 @@
 // when nothing ran. A denied plan is not patched and retried under its old standing: the
 // re-planned plan is a new plan, with a new hash, and stands as a proposal until it has its own
 // approval.
-// See docs/specs/SPEC-03-policy-gate.md.
 import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -31,7 +30,7 @@ const STATIC_DENIALS = [
 ] as const;
 
 for (const [what, raw, rule] of STATIC_DENIALS) {
-  test(`when the gate denies a plan for ${what}, core appends one plan.denied event whose code is ${rule}`, { criterion: 'AC-SPEC-03-05' }, async () => {
+  test(`when the gate denies a plan for ${what}, core appends one plan.denied event whose code is ${rule}`, async () => {
     const tested = await testGate();
     const decision = decideOn(tested, parsedPlan(raw));
     assert.equal(decision.kind, 'deny', JSON.stringify(decision));
@@ -39,7 +38,7 @@ for (const [what, raw, rule] of STATIC_DENIALS) {
   });
 }
 
-test('when the gate allows a plan, no plan.denied event is appended', { criterion: 'AC-SPEC-03-05' }, async () => {
+test('when the gate allows a plan, no plan.denied event is appended', async () => {
   // The counter-example: only the clicked control's name differs from the denied plan above.
   const tested = await testGate();
   const decision = decideOn(tested, parsedPlan(SAVE_PLAN));
@@ -58,7 +57,7 @@ const RUNTIME_DENIALS = [
 ] as const;
 
 for (const [what, raw, resolved, dialogText, rule] of RUNTIME_DENIALS) {
-  test(`when the runtime guard denies ${what}, core appends one plan.denied event whose code is ${rule}`, { criterion: 'AC-SPEC-03-05' }, async () => {
+  test(`when the runtime guard denies ${what}, core appends one plan.denied event whose code is ${rule}`, async () => {
     const { gate, events, project } = await testGate();
     const verdict = gate.guardAction(stepAt(parsedPlan(raw), 1), 1, resolved, dialogText, localeOf(project, ENGLISH));
     assert.equal(verdict.kind, 'deny', JSON.stringify(verdict));
@@ -66,7 +65,7 @@ for (const [what, raw, resolved, dialogText, rule] of RUNTIME_DENIALS) {
   });
 }
 
-test('when the runtime guard allows an action, no plan.denied event is appended', { criterion: 'AC-SPEC-03-05' }, async () => {
+test('when the runtime guard allows an action, no plan.denied event is appended', async () => {
   const { gate, events, project } = await testGate();
   const plan = parsedPlan(DANGER_ZONE_PLAN);
   const verdict = gate.guardAction(stepAt(plan, 1), 1, element({ role: 'button', name: 'Download your data' }), null, localeOf(project, ENGLISH));
@@ -74,7 +73,7 @@ test('when the runtime guard allows an action, no plan.denied event is appended'
   assert.deepEqual(deniedCodes(events), [], JSON.stringify(events.recorded));
 });
 
-test('a denial reaches the JSON Lines sink as a plan.denied entry carrying the rule', { criterion: 'AC-SPEC-03-05' }, async () => {
+test('a denial reaches the JSON Lines sink as a plan.denied entry carrying the rule', async () => {
   const folder = mkdtempSync(join(tmpdir(), 'policy-events-'));
   try {
     const path = join(folder, 'audit.jsonl');
@@ -112,7 +111,7 @@ async function declaredSignupApproval(): Promise<Approval> {
   return approval;
 }
 
-test('an approved plan is still denied by the gate: approval does not bypass policy', { criterion: 'AC-SPEC-03-05' }, async () => {
+test('an approved plan is still denied by the gate: approval does not bypass policy', async () => {
   const store = memoryApprovalStore([await declaredSignupApproval()]);
   const approved = parsedSignupPlan();
   const standing = planStanding(approved, store);
@@ -122,7 +121,7 @@ test('an approved plan is still denied by the gate: approval does not bypass pol
   assert.deepEqual(deniedCodes(tested.events), ['irreversible-action']);
 });
 
-test('the plan re-planned after a denial is a new plan that stands as a proposal, not under the denied plan\'s approval', { criterion: 'AC-SPEC-03-05' }, async () => {
+test('the plan re-planned after a denial is a new plan that stands as a proposal, not under the denied plan\'s approval', async () => {
   const store = memoryApprovalStore([await declaredSignupApproval()]);
   const denied = parsedSignupPlan();
   const replanned = parsedSignupPlan(withValue(signupPlan(), ['steps', 8, 'locator', 'name'], 'Register'));

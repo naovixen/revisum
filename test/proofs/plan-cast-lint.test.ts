@@ -2,7 +2,6 @@
 // repository and runs the repository's lint commands over it: a cast to Plan, or a call to the
 // engine's brand helper for Plan, anywhere outside the parser fails the lint and names the file.
 // Counter-examples show the lint fails for the planted reason, not for everything.
-// See docs/specs/SPEC-01-plan-language-and-parser.md.
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
 import { copyRepository, type ScratchRepository } from './scratch-repository.ts';
@@ -26,12 +25,12 @@ function assertLintPassesWith(relativePath: string, lines: readonly string[]): v
   assert.equal(outcome.passed, true, `the lint rejected ${relativePath}:\n${outcome.failureOutput}`);
 }
 
-test('control: the unchanged copy of the repository passes every lint command', { criterion: 'AC-SPEC-01-06', timeout: TIMEOUT }, () => {
+test('control: the unchanged copy of the repository passes every lint command', { timeout: TIMEOUT }, () => {
   const outcome = scratch.lint();
   assert.equal(outcome.passed, true, outcome.failureOutput);
 });
 
-test('the lint fails when engine code outside the parser casts plan data to Plan', { criterion: 'AC-SPEC-01-06', timeout: TIMEOUT }, () => {
+test('the lint fails when engine code outside the parser casts plan data to Plan', { timeout: TIMEOUT }, () => {
   assertLintFailsOn('packages/engine/src/planted-plan-shortcut.ts', [
     "import type { Plan, PlanData } from '@revisum/contracts';",
     '// Skips the parser for plans the caller says are already safe.',
@@ -39,7 +38,7 @@ test('the lint fails when engine code outside the parser casts plan data to Plan
   ]);
 });
 
-test('the lint fails when engine code beside the parser brands a Plan with the brand helper', { criterion: 'AC-SPEC-01-06', timeout: TIMEOUT }, () => {
+test('the lint fails when engine code beside the parser brands a Plan with the brand helper', { timeout: TIMEOUT }, () => {
   assertLintFailsOn('packages/engine/src/plan/planted-plan-migration.ts', [
     "import type { PlanData } from '@revisum/contracts';",
     "import { brand } from '../brand.ts';",
@@ -47,28 +46,28 @@ test('the lint fails when engine code beside the parser brands a Plan with the b
   ]);
 });
 
-test('the lint fails when a driver casts parsed JSON through unknown to Plan', { criterion: 'AC-SPEC-01-06', timeout: TIMEOUT }, () => {
+test('the lint fails when a driver casts parsed JSON through unknown to Plan', { timeout: TIMEOUT }, () => {
   assertLintFailsOn('packages/driver-cdp/src/planted-plan-cast.ts', [
     "import type { Plan } from '@revisum/contracts';",
     'export const loadPlan = (text: string): Plan => JSON.parse(text) as unknown as Plan;',
   ]);
 });
 
-test('the lint fails on an angle-bracket cast to Plan in the command-line package', { criterion: 'AC-SPEC-01-06', timeout: TIMEOUT }, () => {
+test('the lint fails on an angle-bracket cast to Plan in the command-line package', { timeout: TIMEOUT }, () => {
   assertLintFailsOn('packages/cli/src/planted-plan-cast.ts', [
     "import type { Plan } from '@revisum/contracts';",
     'export const asPlan = (value: unknown): Plan => <Plan>value;',
   ]);
 });
 
-test('the lint accepts code that receives a Plan and reads it', { criterion: 'AC-SPEC-01-06', timeout: TIMEOUT }, () => {
+test('the lint accepts code that receives a Plan and reads it', { timeout: TIMEOUT }, () => {
   assertLintPassesWith('packages/report/src/planted-plan-reader.ts', [
     "import type { Plan } from '@revisum/contracts';",
     'export const stepCount = (plan: Plan): number => plan.steps.length;',
   ]);
 });
 
-test('the lint accepts a cast to the unbranded PlanData', { criterion: 'AC-SPEC-01-06', timeout: TIMEOUT }, () => {
+test('the lint accepts a cast to the unbranded PlanData', { timeout: TIMEOUT }, () => {
   assertLintPassesWith('packages/cli/src/planted-plan-data.ts', [
     "import type { PlanData } from '@revisum/contracts';",
     '// A draft for display only: PlanData carries no promise that it was parsed.',

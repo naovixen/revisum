@@ -5,7 +5,6 @@
 //
 // The approval is the maintainer's declared approval of the sign-up plan from the solo repository
 // (approval-repositories.ts), which approves the hash of the plan as the parser returns it.
-// See docs/specs/SPEC-28-plan-authoring.md and docs/specs/SPEC-02-project-trust-and-approval.md.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { planHash, planStanding, readPlanText, writePlanJson, writePlanText, type Approval, type ApprovalStore, type Plan } from '@revisum/engine';
@@ -67,17 +66,17 @@ const SAME_PLAN: readonly { readonly name: string; readonly plan: () => Plan }[]
 ];
 
 for (const { name, plan } of SAME_PLAN) {
-  test(`the sign-up plan read from ${name} has the hash of the plan approved as JSON`, { criterion: 'AC-SPEC-28-07' }, () => {
+  test(`the sign-up plan read from ${name} has the hash of the plan approved as JSON`, () => {
     assert.equal(planHash(plan()), planHash(parsedSignupPlan()));
   });
 
-  test(`the approval of the sign-up plan still applies to it read from ${name}`, { criterion: 'AC-SPEC-28-07' }, async () => {
+  test(`the approval of the sign-up plan still applies to it read from ${name}`, async () => {
     const standing = planStanding(plan(), await approvedStore());
     assert.equal(standing.mode, 'approved');
   });
 }
 
-test('a plan approved through its text form is the same subject as its JSON form', { criterion: 'AC-SPEC-28-07' }, async () => {
+test('a plan approved through its text form is the same subject as its JSON form', async () => {
   // Approval is keyed by the hash alone, so the store finds the one approval for either form.
   const store = await approvedStore();
   const fromJsonForm = fromJson(signupPlan());
@@ -97,7 +96,7 @@ const STEP_CHANGES: readonly { readonly name: string; readonly from: string; rea
 ];
 
 for (const { name, from, to } of STEP_CHANGES) {
-  test(`changing ${name} in the text changes the hash, and the approval no longer applies`, { criterion: 'AC-SPEC-28-07' }, async () => {
+  test(`changing ${name} in the text changes the hash, and the approval no longer applies`, async () => {
     const original = signupText();
     const changed = fromText(withLineReplaced(original, lineOf(original, from), to));
     assert.notEqual(planHash(changed), planHash(parsedSignupPlan()));
@@ -105,7 +104,7 @@ for (const { name, from, to } of STEP_CHANGES) {
   });
 }
 
-test('swapping two steps in the text changes the hash', { criterion: 'AC-SPEC-28-07' }, () => {
+test('swapping two steps in the text changes the hash', () => {
   const original = signupText();
   const first = lineOf(original, 'Click checkbox "I agree to the terms"');
   const second = lineOf(original, 'Click button "Create account"');

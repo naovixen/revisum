@@ -1,6 +1,5 @@
 // Target resolution at run time: core runs exactly the declared target or ends the run
 // TargetUnavailable with the reason, and never tries another adapter, device or build instead.
-// See docs/specs/SPEC-05-target-matrix-and-lock.md.
 import assert from 'node:assert/strict';
 import { after, describe, test } from 'node:test';
 import { adapterRegistry, planParser, type Target } from '@revisum/engine';
@@ -15,7 +14,7 @@ describe('a target that is not in the matrix', () => {
   const smallMatrix = [targetInput('chromium-desktop', 'fake-any', 'chromium', 'desktop-1280')];
   const largeMatrix = [...smallMatrix, targetInput('chromium-tablet', 'fake-any', 'chromium', 'tablet-820')];
 
-  test('a run on a target the matrix does not declare ends TargetUnavailable with not-declared, touching no driver', { criterion: 'AC-SPEC-05-01' }, async () => {
+  test('a run on a target the matrix does not declare ends TargetUnavailable with not-declared, touching no driver', async () => {
     const runProject = projectWith(smallMatrix);
     const planProject = projectWith(largeMatrix);
     const driver = fakeDriver('fake-any');
@@ -32,7 +31,7 @@ describe('a target that is not in the matrix', () => {
     assert.equal(ran.store.references().length, 0, 'nothing was stored');
   });
 
-  test('counter-example: the same plan on a declared target does reach the driver', { criterion: 'AC-SPEC-05-01' }, async () => {
+  test('counter-example: the same plan on a declared target does reach the driver', async () => {
     const project = projectWith(largeMatrix);
     const driver = fakeDriver('fake-any');
     const ran = await runOnTarget({
@@ -44,7 +43,7 @@ describe('a target that is not in the matrix', () => {
     assert.equal(driver.calls.open, 1);
   });
 
-  test('the plan parser already rejects a plan whose target is not in the matrix, at its JSON path', { criterion: 'AC-SPEC-05-01' }, () => {
+  test('the plan parser already rejects a plan whose target is not in the matrix, at its JSON path', () => {
     const plan = withValue(signupPlan(), ['targets'], ['chromium-tablet']);
     const rejected = planParser(projectWith(smallMatrix))(plan);
     assert.ok(!rejected.ok);
@@ -64,7 +63,7 @@ describe('a WebKit target that no registered adapter supports', () => {
     targetInput('chromium-desktop', 'fake-chromium', 'chromium', 'desktop-1280'),
   ];
 
-  test('every registered adapter refuses it with engine-not-supported', { criterion: 'AC-SPEC-05-02' }, () => {
+  test('every registered adapter refuses it with engine-not-supported', () => {
     const registry = adapterRegistry(new Map([
       ['fake-chromium', fakeDriver('fake-chromium', { refuse: chromiumOnly })],
       ['fake-chromium-too', fakeDriver('fake-chromium-too', { refuse: chromiumOnly })],
@@ -78,7 +77,7 @@ describe('a WebKit target that no registered adapter supports', () => {
     }
   });
 
-  test('the run ends TargetUnavailable with engine-not-supported and no other adapter runs instead', { criterion: 'AC-SPEC-05-02' }, async () => {
+  test('the run ends TargetUnavailable with engine-not-supported and no other adapter runs instead', async () => {
     const project = projectWith(matrix);
     const named = fakeDriver('fake-chromium', { refuse: chromiumOnly });
     // A registered adapter that would accept anything: a substitute, if core ever looked for one.
@@ -95,7 +94,7 @@ describe('a WebKit target that no registered adapter supports', () => {
     assert.equal(ran.store.references().length, 0);
   });
 
-  test('counter-example: a Chromium target on the same adapter does reach open', { criterion: 'AC-SPEC-05-02' }, async () => {
+  test('counter-example: a Chromium target on the same adapter does reach open', async () => {
     const project = projectWith(matrix);
     const named = fakeDriver('fake-chromium', { refuse: chromiumOnly });
     const ran = await runOnTarget({
@@ -106,7 +105,7 @@ describe('a WebKit target that no registered adapter supports', () => {
     assert.equal(named.calls.open, 1);
   });
 
-  test('the adapter registry finds only the adapter named, and nothing for an unregistered one', { criterion: 'AC-SPEC-05-02' }, () => {
+  test('the adapter registry finds only the adapter named, and nothing for an unregistered one', () => {
     const named = fakeDriver('fake-chromium', { refuse: chromiumOnly });
     const other = fakeDriver('fake-any');
     const registry = adapterRegistry(new Map([['fake-chromium', named], ['fake-any', other]]));
@@ -130,7 +129,7 @@ describe('a Firefox target with a phone profile', () => {
     targetInput('firefox-desktop', 'fake-firefox', 'firefox', 'desktop-1280'),
   ];
 
-  test('the run ends device-not-supported rather than running on desktop, and no other adapter is tried', { criterion: 'AC-SPEC-05-03' }, async () => {
+  test('the run ends device-not-supported rather than running on desktop, and no other adapter is tried', async () => {
     const project = projectWith(matrix);
     const named = fakeDriver('fake-firefox', { refuse: noMobileFirefox });
     const substitute = fakeDriver('fake-any');
@@ -149,7 +148,7 @@ describe('a Firefox target with a phone profile', () => {
     assert.equal(ran.store.references().length, 0);
   });
 
-  test('counter-example: the same adapter does open a Firefox desktop target', { criterion: 'AC-SPEC-05-03' }, async () => {
+  test('counter-example: the same adapter does open a Firefox desktop target', async () => {
     const project = projectWith(matrix);
     const named = fakeDriver('fake-firefox', { refuse: noMobileFirefox });
     const ran = await runOnTarget({
@@ -180,7 +179,7 @@ describe('a browser build that differs from the lockfile at run time', () => {
     return { ...ran, driver };
   };
 
-  test('the target is unavailable with build-mismatch and no browser opens', { criterion: 'AC-SPEC-05-04' }, async () => {
+  test('the target is unavailable with build-mismatch and no browser opens', async () => {
     const ran = await runPinned('0'.repeat(64));
     assert.equal(ran.result.state, 'TargetUnavailable');
     assert.equal(ran.result.unavailable?.reason, 'build-mismatch');
@@ -189,19 +188,19 @@ describe('a browser build that differs from the lockfile at run time', () => {
     assert.equal(ran.store.references().length, 0);
   });
 
-  test('counter-example: the hash the lockfile holds lets the run reach open', { criterion: 'AC-SPEC-05-04' }, async () => {
+  test('counter-example: the hash the lockfile holds lets the run reach open', async () => {
     const ran = await runPinned(build.sha256());
     assert.equal(ran.result.unavailable?.reason, 'launch-failed');
     assert.equal(ran.driver.calls.open, 1);
   });
 
-  test('a run given no lock entries behaves as before and reaches open', { criterion: 'AC-SPEC-05-04' }, async () => {
+  test('a run given no lock entries behaves as before and reaches open', async () => {
     const ran = await runPinned(null);
     assert.equal(ran.result.unavailable?.reason, 'launch-failed');
     assert.equal(ran.driver.calls.open, 1);
   });
 
-  test('a build whose bytes change after locking makes the target unavailable', { criterion: 'AC-SPEC-05-04' }, async () => {
+  test('a build whose bytes change after locking makes the target unavailable', async () => {
     const changing = fakeBrowserBuild('chromium build 156.0.7258.5');
     try {
       const pinnedHash = changing.sha256();

@@ -7,7 +7,6 @@
 //   - a hash the reviewed commit does not hold is refused with subject-mismatch, even when it is
 //     the plan on the protected branch.
 // The version-control port reads a file at a commit through fileAtCommit(path, commit).
-// See docs/specs/SPEC-02-project-trust-and-approval.md.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { planHash, type ApprovalSubject } from '@revisum/engine';
@@ -37,7 +36,7 @@ const planAtCommit = (commit: string, plan: ReturnType<typeof parsedSignupPlan>)
 
 // ---- (a) The reviewed commit holds the plan: it verifies before merge ---------------------------
 
-test('a code owner\'s review of the commit holding the plan verifies before the pull request merges', { criterion: 'AC-SPEC-02-05' }, async () => {
+test('a code owner\'s review of the commit holding the plan verifies before the pull request merges', async () => {
   await withRepository('team', async (repository) => {
     const subject = planSubject(REVIEWED_PLAN);
     assert.notEqual(subject.hash, repository.subject('plan').hash, 'the protected branch already holds the reviewed plan');
@@ -51,7 +50,7 @@ test('a code owner\'s review of the commit holding the plan verifies before the 
   }, planAtCommit(HEAD_COMMIT, REVIEWED_PLAN));
 });
 
-test('the review that verifies before merge appends one plan.approved event for the reviewed plan\'s hash', { criterion: 'AC-SPEC-02-05' }, async () => {
+test('the review that verifies before merge appends one plan.approved event for the reviewed plan\'s hash', async () => {
   await withRepository('team', async (repository) => {
     const subject = planSubject(REVIEWED_PLAN);
     const verified = await repository.verify(subject, repository.codeOwnerProof('review-grace'));
@@ -76,20 +75,20 @@ const changedAfterReview = (fixture: FixtureRepository): void => {
   assert.equal(fixture.pullRequests[PULL_REQUEST]?.lastCommitTouching[PLAN_PATH], HEAD_COMMIT);
 };
 
-test('a review is refused for the plan a later commit wrote, which the reviewer never saw', { criterion: 'AC-SPEC-02-04' }, async () => {
+test('a review is refused for the plan a later commit wrote, which the reviewer never saw', async () => {
   await withRepository('team', async (repository) => {
     assertRefused(repository, await repository.verify(planSubject(LATER_PLAN), repository.codeOwnerProof('review-grace-early')), 'stale-commit');
   }, changedAfterReview);
 });
 
-test('a review is refused even for the bytes the reviewer saw, once a later commit in the pull request changed the plan', { criterion: 'AC-SPEC-02-04' }, async () => {
+test('a review is refused even for the bytes the reviewer saw, once a later commit in the pull request changed the plan', async () => {
   await withRepository('team', async (repository) => {
     const proof = repository.codeOwnerProof('review-grace-early', { commit: FIRST_COMMIT });
     assertRefused(repository, await repository.verify(planSubject(REVIEWED_PLAN), proof), 'stale-commit');
   }, changedAfterReview);
 });
 
-test('counter-example: with no later change, the same review of the same bytes verifies before merge', { criterion: 'AC-SPEC-02-04' }, async () => {
+test('counter-example: with no later change, the same review of the same bytes verifies before merge', async () => {
   // Only the commits differ from the refusals above: the reviewed commit is the last to touch the plan.
   await withRepository('team', async (repository) => {
     const verified = await repository.verify(planSubject(REVIEWED_PLAN), repository.codeOwnerProof('review-grace-early', { commit: FIRST_COMMIT }));
@@ -103,13 +102,13 @@ test('counter-example: with no later change, the same review of the same bytes v
 
 // ---- (c) A hash the reviewed commit does not hold: subject-mismatch -----------------------------
 
-test('a review is refused with subject-mismatch for a plan hash no reviewed commit holds', { criterion: 'AC-SPEC-02-04' }, async () => {
+test('a review is refused with subject-mismatch for a plan hash no reviewed commit holds', async () => {
   await withRepository('team', async (repository) => {
     assertRefused(repository, await repository.verify(planSubject(NEVER_COMMITTED_PLAN), repository.codeOwnerProof('review-grace')), 'subject-mismatch');
   }, planAtCommit(HEAD_COMMIT, REVIEWED_PLAN));
 });
 
-test('a review is refused with subject-mismatch for the protected branch\'s plan when the reviewed commit holds another', { criterion: 'AC-SPEC-02-04' }, async () => {
+test('a review is refused with subject-mismatch for the protected branch\'s plan when the reviewed commit holds another', async () => {
   // The protected branch's plan was not what owner-grace reviewed: the pull request replaces it.
   await withRepository('team', async (repository) => {
     assertRefused(repository, await repository.verify(repository.subject('plan'), repository.codeOwnerProof('review-grace')), 'subject-mismatch');

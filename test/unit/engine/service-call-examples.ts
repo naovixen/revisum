@@ -12,11 +12,10 @@
 //
 // What these tests assume about shapes the spec leaves open is gathered here, so a change to the
 // interface is a change to one file:
-//   - the project file lists services as SPEC-02 describes them: { name, origin, private };
+//   - the project file lists services as the project design describes them: { name, origin, private };
 //   - a run's cleanup calls are recorded in RunResult.cleanup, one record per cleanup call in
 //     order, each with an `outcome` (passed, failed or skipped) and, on failure, a `code`;
 //   - a review item a run raises is in RunResult.reviewItems, each with a `code`.
-// See docs/specs/SPEC-32-declared-service-calls.md.
 import assert from 'node:assert/strict';
 import {
   defaultRedactor, environmentSecretStore, failure, parseProject, planParser, run, success,

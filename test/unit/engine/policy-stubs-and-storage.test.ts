@@ -3,7 +3,6 @@
 // proposals (side-effect-in-proposal). Checking requests and reading storage change nothing, so a
 // proposal may do both. Each denial is recorded as a plan.denied event with its rule, and a denied
 // plan opens no browser.
-// See docs/specs/SPEC-33-network-stubs-request-checks-and-storage.md.
 import assert from 'node:assert/strict';
 import { arch, platform } from 'node:os';
 import { test } from 'node:test';
@@ -61,56 +60,56 @@ async function decide(raw: JsonRecord, approved = false) {
 
 // ---- Side effects in proposals ------------------------------------------------------------------------
 
-test('a proposal that starts a stub its declaration does not allow in proposals is denied', { criterion: 'AC-SPEC-33-12' }, async () => {
+test('a proposal that starts a stub its declaration does not allow in proposals is denied', async () => {
   const { decision, events } = await decide(newerPlan([OPEN_ACCOUNT_PAGE, startStub('accountUnavailable')]));
   assert.deepEqual(decision, { kind: 'deny', rule: 'side-effect-in-proposal', stepIndex: 1 });
   assert.deepEqual(deniedCodes(events), ['side-effect-in-proposal']);
 });
 
-test('a proposal that writes a storage entry its declaration does not allow in proposals is denied', { criterion: 'AC-SPEC-33-12' }, async () => {
+test('a proposal that writes a storage entry its declaration does not allow in proposals is denied', async () => {
   const { decision, events } = await decide(newerPlan([OPEN_ACCOUNT_PAGE, setStorage('chosenLanguage')]));
   assert.deepEqual(decision, { kind: 'deny', rule: 'side-effect-in-proposal', stepIndex: 1 });
   assert.deepEqual(deniedCodes(events), ['side-effect-in-proposal']);
 });
 
 // Removing an entry is a storage write too.
-test('a proposal that removes a storage entry its declaration does not allow in proposals is denied', { criterion: 'AC-SPEC-33-12' }, async () => {
+test('a proposal that removes a storage entry its declaration does not allow in proposals is denied', async () => {
   const { decision, events } = await decide(newerPlan([OPEN_ACCOUNT_PAGE, removeStorage('chosenLanguage')]));
   assert.deepEqual(decision, { kind: 'deny', rule: 'side-effect-in-proposal', stepIndex: 1 });
   assert.deepEqual(deniedCodes(events), ['side-effect-in-proposal']);
 });
 
-test('a removeStorage is allowed in an approved plan, and in a proposal when the declaration allows it', { criterion: 'AC-SPEC-33-12' }, async () => {
+test('a removeStorage is allowed in an approved plan, and in a proposal when the declaration allows it', async () => {
   assert.deepEqual((await decide(newerPlan([OPEN_ACCOUNT_PAGE, removeStorage('chosenLanguage')]), true)).decision, { kind: 'allow' });
   assert.deepEqual((await decide(newerPlan([OPEN_ACCOUNT_PAGE, removeStorage('bannerDismissed')]))).decision, { kind: 'allow' });
 });
 
 // Counter-examples: the same steps in an approved plan, declarations allowed in proposals, and checks.
-test('the same stub start and storage write in an approved plan are allowed', { criterion: 'AC-SPEC-33-12' }, async () => {
+test('the same stub start and storage write in an approved plan are allowed', async () => {
   assert.deepEqual((await decide(newerPlan([OPEN_ACCOUNT_PAGE, startStub('accountUnavailable')]), true)).decision, { kind: 'allow' });
   assert.deepEqual((await decide(newerPlan([OPEN_ACCOUNT_PAGE, setStorage('chosenLanguage')]), true)).decision, { kind: 'allow' });
 });
 
-test('a proposal may start a stub and write an entry whose declarations set allowInProposals', { criterion: 'AC-SPEC-33-12' }, async () => {
+test('a proposal may start a stub and write an entry whose declarations set allowInProposals', async () => {
   const { decision, events } = await decide(newerPlan([OPEN_ACCOUNT_PAGE, startStub('noNotifications'), setStorage('bannerDismissed')]));
   assert.deepEqual(decision, { kind: 'allow' });
   assert.deepEqual(deniedCodes(events), []);
 });
 
-test('a proposal may check requests, check a response and check a storage entry', { criterion: 'AC-SPEC-33-12' }, async () => {
+test('a proposal may check requests, check a response and check a storage entry', async () => {
   const resetAccountLoads = { type: 'resetRequests', request: 'accountLoads' };
   const { decision } = await decide(newerPlan([OPEN_ACCOUNT_PAGE, resetAccountLoads, ACCOUNT_LOADED_ONCE, ACCOUNT_LOADED_OK, CONSENT_KEPT]));
   assert.deepEqual(decision, { kind: 'allow' });
 });
 
-test('a denied stub start is found after steps the gate allows, at its own index', { criterion: 'AC-SPEC-33-12' }, async () => {
+test('a denied stub start is found after steps the gate allows, at its own index', async () => {
   const { decision } = await decide(newerPlan([OPEN_ACCOUNT_PAGE, startStub('noNotifications'), ACCOUNT_LOADED_ONCE, startStub('accountUnavailable')]));
   assert.deepEqual(decision, { kind: 'deny', rule: 'side-effect-in-proposal', stepIndex: 3 });
 });
 
 // ---- Nothing is dispatched for a denied plan ------------------------------------------------------------
 
-test('a plan the gate denies for a stub or a storage write opens no browser', { criterion: 'AC-SPEC-33-12' }, async () => {
+test('a plan the gate denies for a stub or a storage write opens no browser', async () => {
   const input = projectInput();
   const spy = spyDriver();
   const ports = {
@@ -129,7 +128,7 @@ test('a plan the gate denies for a stub or a storage write opens no browser', { 
 });
 
 // Counter-example: the same spy is opened for a plan the gate allows, so the count above can fail.
-test('counter-example: a proposal with a stub allowed in proposals opens the browser', { criterion: 'AC-SPEC-33-12' }, async () => {
+test('counter-example: a proposal with a stub allowed in proposals opens the browser', async () => {
   const input = projectInput();
   const spy = spyDriver();
   const ports = {

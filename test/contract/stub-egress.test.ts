@@ -10,8 +10,6 @@
 // the fixture server received. The counter-example runs the same page without the stub: the same
 // three requests then reach the server and add three allowed events.
 // A script, style sheet, frame, worker or image that matches a stub also goes through the proxy.
-// See docs/specs/SPEC-33-network-stubs-request-checks-and-storage.md and
-// docs/specs/SPEC-07-isolated-runner-and-egress.md.
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
 import { cdpDriver, type OwnBrowserDriver } from '@revisum/driver-cdp';
@@ -109,7 +107,7 @@ const egressSteps = (withStub: boolean): unknown[] => [
   textEquals(testId('outside-state'), 'Outside tried', 'egress.outside-tried'),
 ];
 
-test('stubbed requests make no egress event; the fixture origin\'s events are exactly the requests the server received, all allowed', { criterion: 'AC-SPEC-33-05', timeout: 120_000 }, async () => {
+test('stubbed requests make no egress event; the fixture origin\'s events are exactly the requests the server received, all allowed', { timeout: 120_000 }, async () => {
   const ran = await runThroughProxy(egressSteps(true));
   assert.equal(ran.result.state, 'Passed', JSON.stringify(ran.result.steps));
   assert.equal(timesRequested(ran.requestedPaths, '/api/stubbed-data'), 0, 'the stub answered all three');
@@ -119,7 +117,7 @@ test('stubbed requests make no egress event; the fixture origin\'s events are ex
   assert.equal(events.length, ran.requestedPaths.length, `one allowed event per request the server received: ${JSON.stringify(ran.requestedPaths)}`);
 });
 
-test('unstubbed requests still go through the egress proxy: the fixture origin\'s are allowed and blocked.invalid is blocked by the proxy', { criterion: 'AC-SPEC-33-05', timeout: 120_000 }, async () => {
+test('unstubbed requests still go through the egress proxy: the fixture origin\'s are allowed and blocked.invalid is blocked by the proxy', { timeout: 120_000 }, async () => {
   const firstDecision = proxy.decisions().length;
   const ran = await runThroughProxy(egressSteps(true));
   assert.equal(ran.result.state, 'Passed', JSON.stringify(ran.result.steps));
@@ -134,7 +132,7 @@ test('unstubbed requests still go through the egress proxy: the fixture origin\'
 
 // Counter-example: without the stub, the same three requests reach the server through the proxy,
 // and each is one more allowed event.
-test('counter-example: without the stub, the same three requests reach the server and add three allowed events', { criterion: 'AC-SPEC-33-05', timeout: 120_000 }, async () => {
+test('counter-example: without the stub, the same three requests reach the server and add three allowed events', { timeout: 120_000 }, async () => {
   const stubbed = await runThroughProxy(egressSteps(true));
   const unstubbed = await runThroughProxy(egressSteps(false));
   assert.equal(unstubbed.result.state, 'Passed', JSON.stringify(unstubbed.result.steps));
@@ -143,7 +141,7 @@ test('counter-example: without the stub, the same three requests reach the serve
   assert.equal(allowed(unstubbed), allowed(stubbed) + 3, `${JSON.stringify(fixtureEvents(stubbed))} against ${JSON.stringify(fixtureEvents(unstubbed))}`);
 });
 
-test('a script, style sheet, frame, worker and image that match a stub go through the egress proxy to the server', { criterion: 'AC-SPEC-33-03', timeout: 120_000 }, async () => {
+test('a script, style sheet, frame, worker and image that match a stub go through the egress proxy to the server', { timeout: 120_000 }, async () => {
   const ran = await runThroughProxy([
     navigate('/resources.html'),
     startStub('assetRequests'),

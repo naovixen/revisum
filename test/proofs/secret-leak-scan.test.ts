@@ -5,9 +5,8 @@
 // planted canary: it must find the canary and no echo of the secret.
 // The control run types a plain text instead, and its echo does reach the result, so the probe can
 // see a leak when there is one.
-// Not covered here: the visual report, which a run cannot produce until the result model exists
-// (SPEC-11, SPEC-12), and text drawn as pixels, which no text scan can read.
-// See docs/specs/SPEC-04-secrets-and-redaction.md.
+// Not covered here: the visual report, which a run cannot produce until the result model exists,
+// and text drawn as pixels, which no text scan can read.
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { arch, platform, tmpdir } from 'node:os';
@@ -107,7 +106,7 @@ function writeOutputs(label: string, ran: Ran): string[] {
 
 describe('secret echoes never reach a run\'s outputs', () => {
   for (const targetId of TARGETS) {
-    test(`${targetId}: the scan finds the planted canary and no echo of the secret in any form`, { criterion: 'AC-SPEC-04-04', timeout: TIMEOUT }, async () => {
+    test(`${targetId}: the scan finds the planted canary and no echo of the secret in any form`, { timeout: TIMEOUT }, async () => {
       const secretValue = fakeSecretValue();
       const outputs: string[] = [];
       for (const echo of ECHOES) {
@@ -139,7 +138,7 @@ describe('secret echoes never reach a run\'s outputs', () => {
     });
 
     // Literal text in the token field is itself refused as literal_secret, so the control types into the plain note field.
-    test(`${targetId}: control: a plain text typed into a plain field does reach the kept observation`, { criterion: 'AC-SPEC-04-04', timeout: TIMEOUT }, async () => {
+    test(`${targetId}: control: a plain text typed into a plain field does reach the kept observation`, { timeout: TIMEOUT }, async () => {
       // Letters only, so the privacy masker never mistakes a run of digits for a phone number.
       const plainText = `plain${fakeSecretValue().replace(/[^A-Za-z]/g, '')}`;
       const ran = await runEcho(targetId, 'raw', plainText, fakeSecretValue(), 'Note');

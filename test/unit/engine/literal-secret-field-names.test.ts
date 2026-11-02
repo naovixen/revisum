@@ -3,7 +3,6 @@
 // "#access_token". Literal text filled into such a field is a literal secret, just as it is for a
 // field labelled "Access token", and the parser rejects it with literal_secret without echoing the
 // text. Counter-examples: fields whose code-style names hold no sensitive word still take literal text.
-// See docs/specs/SPEC-04-secrets-and-redaction.md.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { planParser, type Plan, type PlanError, type Result } from '@revisum/engine';
@@ -50,7 +49,7 @@ const ORDINARY: readonly FieldCase[] = [
 ];
 
 for (const field of SENSITIVE) {
-  test(`a fill with literal text into the field named by ${field.title} is rejected as literal_secret`, { criterion: 'AC-SPEC-04-03' }, () => {
+  test(`a fill with literal text into the field named by ${field.title} is rejected as literal_secret`, () => {
     const parsed = field.parse(field.plan);
     assert.equal(parsed.ok, false, 'the plan was accepted');
     if (parsed.ok) return;
@@ -60,7 +59,7 @@ for (const field of SENSITIVE) {
 }
 
 for (const field of ORDINARY) {
-  test(`counter-example: a fill with literal text into the field named by ${field.title} parses`, { criterion: 'AC-SPEC-04-03' }, () => {
+  test(`counter-example: a fill with literal text into the field named by ${field.title} parses`, () => {
     const parsed = field.parse(field.plan);
     assert.ok(parsed.ok, `rejected: ${parsed.ok ? '' : JSON.stringify(parsed.error)}`);
   });

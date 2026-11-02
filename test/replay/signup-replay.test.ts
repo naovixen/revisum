@@ -7,7 +7,7 @@
 //     README says how). Replayed on a machine with the golden's platform and architecture it is
 //     identical; anywhere else, such as the Linux image, the hashes differ, `host` is among the
 //     differing inputs, and the verdict is a per-environment baseline: never a pass.
-// The browser never runs headed. See docs/specs/SPEC-08-manifest-and-replay.md.
+// The browser never runs headed.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { arch, platform } from 'node:os';
@@ -73,7 +73,7 @@ async function signupRunOnHeadlessShell(): Promise<{ readonly plan: unknown; rea
   return headlessRun;
 }
 
-test('the sign-up run\'s manifest, replayed 20 times on the headless shell, gives an identical result hash every time', { criterion: 'AC-SPEC-08-01', timeout: 600_000 }, async () => {
+test('the sign-up run\'s manifest, replayed 20 times on the headless shell, gives an identical result hash every time', { timeout: 600_000 }, async () => {
   const { plan, result } = await signupRunOnHeadlessShell();
   const manifest: unknown = JSON.parse(JSON.stringify(result.manifest));
   for (let index = 0; index < REPLAYS; index++) {
@@ -86,7 +86,7 @@ test('the sign-up run\'s manifest, replayed 20 times on the headless shell, give
   }
 });
 
-test('the headless-shell run records the sha256 of the executable it launched', { criterion: 'AC-SPEC-08-04', timeout: 120_000 }, async () => {
+test('the headless-shell run records the sha256 of the executable it launched', { timeout: 120_000 }, async () => {
   const { result } = await signupRunOnHeadlessShell();
   const hashed = await hashExecutable(BROWSERS.chromeHeadlessShell);
   assert.ok(hashed.ok, hashed.ok ? '' : hashed.error);
@@ -109,7 +109,7 @@ function goldenRecord(): { readonly plan: unknown; readonly manifest: Readonly<R
   return { plan: readJson('plan.json'), manifest: Object.fromEntries(Object.entries(manifest)), resultHash, manifestHash };
 }
 
-test('the Windows-made golden was made on Windows, on the target and fixtures this repository holds', { criterion: 'AC-SPEC-08-06' }, () => {
+test('the Windows-made golden was made on Windows, on the target and fixtures this repository holds', () => {
   const golden = goldenRecord();
   assert.deepEqual(golden.manifest['host'], { platform: 'win32', arch: 'x64' });
   const target = golden.manifest['target'];
@@ -118,7 +118,7 @@ test('the Windows-made golden was made on Windows, on the target and fixtures th
     .sort((left, right) => (left.path < right.path ? -1 : 1)));
 });
 
-test('the Windows-made manifest, replayed here, states whether the hashes match and never passes a mismatch', { criterion: 'AC-SPEC-08-06', timeout: 120_000 }, async () => {
+test('the Windows-made manifest, replayed here, states whether the hashes match and never passes a mismatch', { timeout: 120_000 }, async () => {
   const golden = goldenRecord();
   const outcome = replayed(await replaySignup(golden.plan, 'playwright-chromium', golden.manifest, golden.resultHash));
   assert.equal(outcome.identical, outcome.resultHash === golden.resultHash, 'identical must say whether the hashes match');
@@ -136,7 +136,7 @@ test('the Windows-made manifest, replayed here, states whether the hashes match 
   }
 });
 
-test('counter-example: the Windows-made manifest from another engine version is a mismatch on any machine', { criterion: 'AC-SPEC-08-06', timeout: 120_000 }, async () => {
+test('counter-example: the Windows-made manifest from another engine version is a mismatch on any machine', { timeout: 120_000 }, async () => {
   const golden = goldenRecord();
   const changed = { ...golden.manifest, engineVersion: '0.0.9' };
   const outcome = replayed(await replaySignup(golden.plan, 'playwright-chromium', changed, golden.resultHash));
