@@ -24,8 +24,8 @@ import { FIXED_TIME_MILLISECONDS, SEED, makeDrivers, makeProjectFile } from '../
 import { echoesIn, fakeEnvironmentStore, fakeSecretValue, resolvedSecret } from '../unit/engine/secret-examples.ts';
 
 const TIMEOUT = 300_000;
-// One target per driver package.
-const TARGETS = ['playwright-chromium', 'cdp-chromium'] as const;
+// One target per driver.
+const TARGETS = ['cdp-chromium'] as const;
 // The echo elements on the fixture page, one per leak form.
 const ECHOES = ['raw', 'uri', 'base64', 'base64url', 'prefix', 'upper', 'lower'] as const;
 const SECRET = 'ACCOUNT_TOKEN';

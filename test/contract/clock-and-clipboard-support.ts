@@ -1,6 +1,5 @@
 // Shared setup for the browser tests of plan language 1.2's clock advances and clipboard checks:
-// the driver parts of each, carried out by the own CDP driver's clock and clipboard ports, and
-// refused by the Playwright fallback.
+// the driver parts of each, carried out by the own CDP driver's clock and clipboard ports.
 //
 // It serves the clock-and-clipboard fixture app (fixtures/clock-and-clipboard-app/). Beside the
 // app's files it answers two routes: /api/late-code, which answers in two parts 150 ms apart, so
@@ -8,7 +7,7 @@
 // a canary name made fresh for the harness.
 //
 // The trusted project's targets are the own CDP driver on Chrome for Testing and on its headless
-// shell, and the Playwright fallback on Chromium, in London time. It declares one secret, for a
+// shell, in London time. It declares one secret, for a
 // fill whose value the leak page copies, and keeps the default clock and clipboard limits.
 // Plans are written as raw JSON, parsed against the project, cleared through the policy gate and
 // run with run(). Every run reads chosen test ids just before the run closes its session.
@@ -20,7 +19,6 @@ import { readFileSync } from 'node:fs';
 import { arch, platform } from 'node:os';
 import { join } from 'node:path';
 import { cdpDriver } from '@revisum/driver-cdp';
-import { playwrightDriver } from '@revisum/driver-playwright';
 import {
   defaultRedactor, parseProject, planParser, run,
   type BrowserDriver, type Locator, type Plan, type Project, type RunEventSink, type RunResult, type SecretStore, type Session,
@@ -57,7 +55,6 @@ export const DEFAULT_MAXIMUM_CLIPBOARD_CHARACTERS = 20_000;
 
 export const CDP_TARGET = 'cdp-chromium';
 export const HEADLESS_SHELL_TARGET = 'cdp-chromium-headless-shell';
-export const PLAYWRIGHT_TARGET = 'playwright-chromium';
 export const CDP_TARGETS = [CDP_TARGET, HEADLESS_SHELL_TARGET] as const;
 
 // The features this spec adds to the driver capability model.
@@ -87,14 +84,12 @@ export const clockAndClipboardProjectFile = (origin: string) => ({
   matrix: [
     { id: CDP_TARGET, adapter: 'cdp', engine: 'chromium', ...desktop },
     { id: HEADLESS_SHELL_TARGET, adapter: 'cdp-headless-shell', engine: 'chromium', ...desktop },
-    { id: PLAYWRIGHT_TARGET, adapter: 'playwright', engine: 'chromium', ...desktop },
   ],
 });
 
 export const clockAndClipboardDrivers = (): ReadonlyMap<string, BrowserDriver> => new Map<string, BrowserDriver>([
   ['cdp', cdpDriver({ executablePath: BROWSERS.chrome })],
   ['cdp-headless-shell', cdpDriver({ executablePath: BROWSERS.chromeHeadlessShell })],
-  ['playwright', playwrightDriver()],
 ]);
 
 // ---- Plans, written as raw JSON -------------------------------------------------------------

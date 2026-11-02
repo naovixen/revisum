@@ -4,7 +4,6 @@
 import { arch, platform } from 'node:os';
 import { join } from 'node:path';
 import { cdpDriver } from '@revisum/driver-cdp';
-import { playwrightDriver } from '@revisum/driver-playwright';
 import {
   defaultRedactor, parseProject, planParser, run,
   type BrowserDriver, type Plan, type Project, type RunEventSink, type RunInputs, type RunResult, type TargetId,
@@ -22,9 +21,7 @@ export const TIMEZONE = 'Asia/Tokyo';
 
 // Every driver must pass the contract unchanged on each of these targets. The own CDP driver runs
 // it twice: on Chrome for Testing and on its headless shell, the build CI uses.
-export const CONTRACT_TARGETS = [
-  'playwright-chromium', 'playwright-firefox', 'playwright-webkit', 'cdp-chromium', 'cdp-chromium-headless-shell',
-] as const;
+export const CONTRACT_TARGETS = ['cdp-chromium', 'cdp-chromium-headless-shell'] as const;
 
 const desktop = { device: 'desktop-1280', locale: LOCALE, timezone: TIMEZONE, colorScheme: 'dark', reducedMotion: 'reduce' } as const;
 
@@ -34,14 +31,10 @@ export const makeProjectFile = (origin: string) => ({
   origins: [origin],
   limits: { stepTimeoutMilliseconds: 2000 },
   matrix: [
-    { id: 'playwright-chromium', adapter: 'playwright', engine: 'chromium', ...desktop },
-    { id: 'playwright-firefox', adapter: 'playwright', engine: 'firefox', ...desktop },
-    { id: 'playwright-webkit', adapter: 'playwright', engine: 'webkit', ...desktop },
     { id: 'cdp-chromium', adapter: 'cdp', engine: 'chromium', ...desktop },
     // The same CDP driver, given the headless shell's executable instead of Chrome for Testing's.
     { id: 'cdp-chromium-headless-shell', adapter: 'cdp-headless-shell', engine: 'chromium', ...desktop },
-    // Targets no registered driver can serve, to prove they are reported and never substituted.
-    { id: 'playwright-firefox-phone', adapter: 'playwright', engine: 'firefox', ...desktop, device: 'phone-390' },
+    // A target no registered driver can serve, to prove it is reported and never substituted.
     { id: 'appium-android', adapter: 'appium', engine: 'chromium', ...desktop, device: 'phone-390' },
   ],
 });
@@ -53,7 +46,6 @@ export function makeProject(origin: string): Project {
 }
 
 export const makeDrivers = (): ReadonlyMap<string, BrowserDriver> => new Map<string, BrowserDriver>([
-  ['playwright', playwrightDriver()],
   ['cdp', cdpDriver({ executablePath: BROWSERS.chrome })],
   ['cdp-headless-shell', cdpDriver({ executablePath: BROWSERS.chromeHeadlessShell })],
 ]);

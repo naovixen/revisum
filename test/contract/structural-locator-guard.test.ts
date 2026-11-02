@@ -1,5 +1,5 @@
 // The runtime guard judges every element a css or XPath locator resolves for an action, as it
-// judges any other, in a real browser on both drivers (fixtures/unsafe-features-app/guard.html):
+// judges any other, in a real browser on the CDP driver (fixtures/unsafe-features-app/guard.html):
 //   - a button named "Delete account", found by its class, its place in the page, or by hasText
 //     inside a section, ends the run Denied with irreversible-action, and the page receives no
 //     input event at all (the page counts every press, click, key and value change);
@@ -14,7 +14,7 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import {
-  ADAPTER_OF, ALLOWED_UNNAMED_SELECTOR, BOTH_TARGETS, click, css, listedFeatures, navigate, outcomes, testId, textEquals, unsafePageDrivers,
+  ADAPTER_OF, ALLOWED_UNNAMED_SELECTOR, CDP_TARGETS, click, css, listedFeatures, navigate, outcomes, testId, textEquals, unsafePageDrivers,
   unsafePageHarness, xpath,
   type JsonRecord, type UnsafePageHarness, type UnsafePageRun,
 } from './unsafe-page-support.ts';
@@ -45,8 +45,8 @@ function assertClickReachedPage(ran: UnsafePageRun): void {
 }
 
 // Every way of finding the "Delete account" button by page structure. `alsoNeeds` names a feature
-// from before this spec the locator needs too, such as positions, which the Playwright fallback does
-// not declare; on a driver without it the locator is left out.
+// from before this spec the locator needs too, such as positions; on a driver without it
+// the locator is left out.
 const DELETE_ACCOUNT_LOCATORS: readonly { readonly name: string; readonly locator: JsonRecord; readonly alsoNeeds?: string }[] = [
   { name: 'the CSS selector button.danger', locator: css('button.danger') },
   { name: 'an XPath expression by its place in the page', locator: xpath('//main/section[1]/button[1]') },
@@ -54,7 +54,7 @@ const DELETE_ACCOUNT_LOCATORS: readonly { readonly name: string; readonly locato
   { name: 'a CSS selector with a position', locator: css('section.account button', { position: 'first' }), alsoNeeds: 'positions' },
 ];
 
-for (const targetId of BOTH_TARGETS) {
+for (const targetId of CDP_TARGETS) {
   const declaredBefore = listedFeatures(unsafePageDrivers().get(ADAPTER_OF[targetId] ?? ''));
   const locators = DELETE_ACCOUNT_LOCATORS.filter((entry) => entry.alsoNeeds === undefined || declaredBefore.includes(entry.alsoNeeds));
 

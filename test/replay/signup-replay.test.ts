@@ -113,14 +113,14 @@ test('the Windows-made golden was made on Windows, on the target and fixtures th
   const golden = goldenRecord();
   assert.deepEqual(golden.manifest['host'], { platform: 'win32', arch: 'x64' });
   const target = golden.manifest['target'];
-  assert.ok(typeof target === 'object' && target !== null && Reflect.get(target, 'id') === 'playwright-chromium', JSON.stringify(target));
+  assert.ok(typeof target === 'object' && target !== null && Reflect.get(target, 'id') === 'cdp-chromium', JSON.stringify(target));
   assert.deepEqual(golden.manifest['fixtures'], testHarness.server.fixtures.map((fixture) => ({ path: fixture.path, sha256: fixture.sha256 }))
     .sort((left, right) => (left.path < right.path ? -1 : 1)));
 });
 
 test('the Windows-made manifest, replayed here, states whether the hashes match and never passes a mismatch', { timeout: 120_000 }, async () => {
   const golden = goldenRecord();
-  const outcome = replayed(await replaySignup(golden.plan, 'playwright-chromium', golden.manifest, golden.resultHash));
+  const outcome = replayed(await replaySignup(golden.plan, 'cdp-chromium', golden.manifest, golden.resultHash));
   assert.equal(outcome.identical, outcome.resultHash === golden.resultHash, 'identical must say whether the hashes match');
   const sameHost = platform() === 'win32' && arch() === 'x64';
   if (sameHost) {
@@ -139,7 +139,7 @@ test('the Windows-made manifest, replayed here, states whether the hashes match 
 test('counter-example: the Windows-made manifest from another engine version is a mismatch on any machine', { timeout: 120_000 }, async () => {
   const golden = goldenRecord();
   const changed = { ...golden.manifest, engineVersion: '0.0.9' };
-  const outcome = replayed(await replaySignup(golden.plan, 'playwright-chromium', changed, golden.resultHash));
+  const outcome = replayed(await replaySignup(golden.plan, 'cdp-chromium', changed, golden.resultHash));
   assert.equal(outcome.identical, false);
   assert.ok(outcome.differingInputs.includes('engineVersion'), JSON.stringify(outcome.differingInputs));
   assert.equal(outcome.verdict, 'mismatch');

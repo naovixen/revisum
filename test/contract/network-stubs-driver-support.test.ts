@@ -1,15 +1,15 @@
 // Which driver performs declared stubs, request checks and web storage. The own CDP driver
 // declares the three features (networkStubs, requestChecks, storage) and performs every step of
-// them, so the same plans pass there. The Playwright fallback declares none: a run with any of
-// them fails that step with unsupported-step, never a partial result, and skips the rest, with
+// them, so the same plans pass there. With a feature taken off its list, a run with any of its
+// steps fails that step with unsupported-step, never a partial result, and skips the rest, with
 // nothing of the step reaching the page. A driver that declares only some of the features is
 // refused only the steps of the ones it lacks, so the run decides by feature, not by driver.
-// Each refusal is paired with the same plan without the feature, which the fallback does run.
+// The refusal is paired with the same plan without any of those steps, which the driver does run.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import type { BrowserDriver } from '@revisum/engine';
 import {
-  CDP_TARGET, PLAYWRIGHT_TARGET, click, expectRequests, expectResponse, expectStorage, navigate, networkHarness, outcomes, rememberResponse,
+  CDP_TARGET, click, expectRequests, expectResponse, expectStorage, navigate, networkHarness, outcomes, rememberResponse,
   removeStorage, resetRequests, role, setStorage, startStub, testId, textEquals, timesRequested, type JsonRecord, type NetworkHarness,
 } from './network-stubs-support.ts';
 
@@ -58,19 +58,17 @@ const cdpWithout = (feature: NetworkFeature): ReadonlyMap<string, BrowserDriver>
   return new Map([...harness.drivers, ['cdp', lacking]]);
 };
 
-test('the own CDP driver declares networkStubs, requestChecks and storage; the Playwright fallback declares none of them', () => {
+test('the own CDP driver declares networkStubs, requestChecks and storage', () => {
   const cdp = listedFeatures(harness.drivers.get('cdp'));
-  const playwright = listedFeatures(harness.drivers.get('playwright'));
   for (const feature of NETWORK_FEATURES) {
     assert.ok(cdp.includes(feature), `the CDP driver declares ${feature}: ${JSON.stringify(cdp)}`);
-    assert.ok(!playwright.includes(feature), `the Playwright fallback does not declare ${feature}`);
   }
 });
 
-describe(`the Playwright fallback: ${PLAYWRIGHT_TARGET}`, () => {
-  for (const { name, step } of FEATURE_STEPS) {
+describe(`the own CDP driver with the step's feature taken off its list: ${CDP_TARGET}`, () => {
+  for (const { name, feature, step } of FEATURE_STEPS) {
     test(`a run with ${name} fails that step with unsupported-step, sends nothing and skips the rest`, async () => {
-      const ran = await harness.runSteps(PLAYWRIGHT_TARGET, stepsWith(step), { read: ['input-events', 'continue-state'] });
+      const ran = await harness.runSteps(CDP_TARGET, stepsWith(step), { drivers: cdpWithout(feature), read: ['input-events', 'continue-state'] });
       assert.equal(ran.result.state, 'Failed');
       assert.deepEqual(outcomes(ran.result), [
         [0, 'passed', undefined], [1, 'passed', undefined], [2, 'failed', 'unsupported-step'], [3, 'skipped', undefined], [4, 'skipped', undefined],
@@ -82,16 +80,16 @@ describe(`the Playwright fallback: ${PLAYWRIGHT_TARGET}`, () => {
 
   // The run never goes on without the stub: the request the stub would have answered is never sent.
   test('a refused stub start ends the run before the request it would have answered is sent', async () => {
-    const ran = await harness.runSteps(PLAYWRIGHT_TARGET, [
+    const ran = await harness.runSteps(CDP_TARGET, [
       navigate('/requests.html'), startStub('answerSequence'), click(role('button', 'Ask for the next answer')),
       textEquals(testId('answers'), '1', 'support.stubbed-answer'),
-    ]);
+    ], { drivers: cdpWithout('networkStubs') });
     assert.deepEqual(outcomes(ran.result), [[0, 'passed', undefined], [1, 'failed', 'unsupported-step'], [2, 'skipped', undefined], [3, 'skipped', undefined]]);
     assert.equal(timesRequested(ran.requestedPaths, '/api/sequence'), 0, 'the skipped click sent nothing');
   });
 
   test('counter-example: the same run without any of those steps passes and sends its input', async () => {
-    const ran = await harness.runSteps(PLAYWRIGHT_TARGET, [
+    const ran = await harness.runSteps(CDP_TARGET, [
       navigate('/requests.html'), textEquals(testId('schedule-state'), 'Schedule loaded', 'support.schedule-loaded'),
       click(role('button', 'Continue')), continued(),
     ]);

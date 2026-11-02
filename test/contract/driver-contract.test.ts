@@ -1,5 +1,7 @@
 // The driver contract: the same tests, unchanged, against every driver and browser engine.
 // A driver, hand-written or AI-generated, is substitutable only if it passes all of them.
+// Today only the CDP driver is registered, on two Chromium builds, so these tests do not yet show
+// that drivers are substitutable. Changed by the founder, 2026-11-02: the second driver was removed.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import { defaultRedactor, seededRandom, type A11yNode, type Session, type SessionEnvironment, type Step } from '@revisum/engine';

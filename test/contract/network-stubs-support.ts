@@ -1,6 +1,6 @@
 // Shared setup for the browser tests of plan language 1.2's declared network stubs, request checks
 // and web storage: the driver parts of each, carried out by the own CDP driver over CDP's Fetch,
-// Network and DOMStorage domains, and refused by the Playwright fallback.
+// Network and DOMStorage domains.
 //
 // It serves the network-stubs fixture app (fixtures/network-stubs-app/) twice, on two loopback
 // ports, so storage can be written on one origin while the page is on the other. Beside the app's
@@ -20,7 +20,6 @@ import { readFileSync } from 'node:fs';
 import { arch, platform } from 'node:os';
 import { join } from 'node:path';
 import { cdpDriver } from '@revisum/driver-cdp';
-import { playwrightDriver } from '@revisum/driver-playwright';
 import {
   defaultRedactor, parseProject, planParser, run,
   type BrowserDriver, type Locator, type Plan, type Project, type RunEventSink, type RunResult, type SecretStore, type Session,
@@ -50,7 +49,6 @@ export const QUIET_MILLISECONDS = 800;
 export const BIG_ITEMS_CAP_BYTES = 1024;
 
 export const CDP_TARGET = 'cdp-chromium';
-export const PLAYWRIGHT_TARGET = 'playwright-chromium';
 
 export const FIXTURE_FOLDER = join(FIXTURES, 'network-stubs-app');
 // The stub fixture whose JSON text holds script markup.
@@ -146,13 +144,11 @@ export const networkProjectFile = (origin: string, otherOrigin: string, extraOri
   },
   matrix: [
     { id: CDP_TARGET, adapter: 'cdp', engine: 'chromium', ...desktop },
-    { id: PLAYWRIGHT_TARGET, adapter: 'playwright', engine: 'chromium', ...desktop },
   ],
 });
 
 export const networkDrivers = (): ReadonlyMap<string, BrowserDriver> => new Map<string, BrowserDriver>([
   ['cdp', cdpDriver({ executablePath: BROWSERS.chrome, fixturesFolder: FIXTURE_FOLDER })],
-  ['playwright', playwrightDriver()],
 ]);
 
 // ---- Plans, written as raw JSON -------------------------------------------------------------

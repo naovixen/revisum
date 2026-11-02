@@ -53,12 +53,12 @@ describe('(a) replay: same manifest, same result hash', () => {
     });
   }
 
-  test('the manifest pins plan, target, adapter, browser, seeds, clock, fixtures, host and engine version', async () => {
-    const { result } = await testHarness.run(testHarness.plan(stepsPlan(['playwright-chromium'], [])), 'playwright-chromium');
+  test('the manifest pins plan, target, adapter, browser, executable hash, seeds, clock, fixtures, host and engine version', async () => {
+    const { result } = await testHarness.run(testHarness.plan(stepsPlan(['cdp-chromium'], [])), 'cdp-chromium');
     const manifest = result.manifest;
     assert.ok(manifest);
     assert.deepEqual(Object.keys(manifest).sort(), [
-      'adapter', 'browser', 'clock', 'engineVersion', 'fixtures', 'host', 'nonHermeticInputs', 'planHash', 'schema', 'seeds', 'target',
+      'adapter', 'browser', 'clock', 'engineVersion', 'executableSha256', 'fixtures', 'host', 'nonHermeticInputs', 'planHash', 'schema', 'seeds', 'target',
     ]);
     assert.equal(manifest.seeds.random, SEED);
     assert.equal(manifest.clock.fixedTimeMilliseconds, FIXED_TIME_MILLISECONDS);
@@ -71,7 +71,7 @@ describe('(a) replay: same manifest, same result hash', () => {
 
 describe('(b) AI containment: hostile plans are rejected before any side effect', () => {
   test('every hostile plan is rejected with the expected code and the driver is never touched', async () => {
-    const spies = [spyDriver('playwright'), spyDriver('cdp')];
+    const spies = [spyDriver('cdp')];
     const ports = spyPorts(new Map(spies.map((spy) => [spy.info.id, spy])));
     const hostile = hostilePlans(testHarness.server.origin);
     for (const plan of hostile) {
@@ -85,16 +85,16 @@ describe('(b) AI containment: hostile plans are rejected before any side effect'
   });
 
   test('positive control: a valid plan does reach the (spy) driver', async () => {
-    const spy = spyDriver('playwright');
-    const outcome = await runUntrusted(signupPlan(['playwright-chromium']), testHarness.parse, testHarness.base(), spyPorts(new Map([['playwright', spy]])));
+    const spy = spyDriver('cdp');
+    const outcome = await runUntrusted(signupPlan(['cdp-chromium']), testHarness.parse, testHarness.base(), spyPorts(new Map([['cdp', spy]])));
     assert.ok(Array.isArray(outcome));
     assert.equal(outcome[0]?.state, 'TargetUnavailable');
     assert.equal(spy.calls, 2);
   });
 
   test('an AI planner\'s output is only usable after parsing', async () => {
-    const hostile: AiPlanner = { propose: async () => ({ ...signupPlan(['playwright-chromium']), steps: [{ type: 'eval', code: '1' }] }) };
-    const honest: AiPlanner = { propose: async () => signupPlan(['playwright-chromium']) };
+    const hostile: AiPlanner = { propose: async () => ({ ...signupPlan(['cdp-chromium']), steps: [{ type: 'eval', code: '1' }] }) };
+    const honest: AiPlanner = { propose: async () => signupPlan(['cdp-chromium']) };
     const throws: AiPlanner = { propose: async () => { throw new Error('model refused'); } };
     const spec = { specReference: 'specs/signup.md', text: 'A user can sign up.' };
     assert.equal((await planWithAi(hostile, spec, testHarness.parse)).ok, false);
@@ -103,7 +103,7 @@ describe('(b) AI containment: hostile plans are rejected before any side effect'
   });
 
   test('errors never echo the hostile value', async () => {
-    const parsed = testHarness.parse({ ...signupPlan(['playwright-chromium']), meta: { featureId: 'X-1', specReference: 's', title: '<script>steal()</script>' } });
+    const parsed = testHarness.parse({ ...signupPlan(['cdp-chromium']), meta: { featureId: 'X-1', specReference: 's', title: '<script>steal()</script>' } });
     assert.ok(!parsed.ok);
     assert.ok(!JSON.stringify(parsed.error).includes('steal'));
   });
@@ -119,7 +119,7 @@ describe('(c) logging manifest', () => {
   });
 
   test('every event of a real run uses only manifest fields and contains no typed value', async () => {
-    const { events } = await testHarness.run(testHarness.plan(signupPlan(['playwright-chromium'])), 'playwright-chromium');
+    const { events } = await testHarness.run(testHarness.plan(signupPlan(['cdp-chromium'])), 'cdp-chromium');
     const allowed = new Set(Object.keys(LOGGING_MANIFEST));
     for (const event of events.read()) for (const key of Object.keys(event)) assert.ok(allowed.has(key), `field ${key}`);
     const everything = JSON.stringify(events.read());
@@ -206,20 +206,17 @@ describe('(d) redaction by default', () => {
 // ---- (e) No silent target substitution ----------------------------------------------------------
 
 describe('(e) targets are never substituted', () => {
-  test('unsupported device and unregistered adapter become explicit TargetUnavailable results', async () => {
-    const plan = testHarness.plan(stepsPlan(['playwright-firefox-phone', 'appium-android'], []));
-    const phone = await testHarness.run(plan, 'playwright-firefox-phone');
+  test('an unregistered adapter becomes an explicit TargetUnavailable result', async () => {
+    const plan = testHarness.plan(stepsPlan(['appium-android'], []));
     const appium = await testHarness.run(plan, 'appium-android');
-    assert.equal(phone.result.state, 'TargetUnavailable');
-    assert.equal(phone.result.unavailable?.reason, 'device-not-supported');
     assert.equal(appium.result.state, 'TargetUnavailable');
     assert.equal(appium.result.unavailable?.reason, 'adapter-not-registered');
-    assert.equal(phone.store.references().length + appium.store.references().length, 0);
+    assert.equal(appium.store.references().length, 0);
   });
 
   test('a target missing from the plan is refused even if it is in the matrix', async () => {
-    const plan = testHarness.plan(stepsPlan(['playwright-chromium'], []));
-    const ran = await testHarness.run(plan, 'playwright-webkit');
+    const plan = testHarness.plan(stepsPlan(['cdp-chromium'], []));
+    const ran = await testHarness.run(plan, 'cdp-chromium-headless-shell');
     assert.equal(ran.result.state, 'TargetUnavailable');
     assert.equal(ran.result.unavailable?.reason, 'not-declared');
   });
@@ -229,9 +226,9 @@ describe('(e) targets are never substituted', () => {
 
 describe('(f) release artefacts', () => {
   test('the release-note draft is deterministic, value-free and never replaced by AI', async () => {
-    const plan = testHarness.plan(signupPlan(['playwright-chromium']));
-    const first = await testHarness.run(plan, 'playwright-chromium');
-    const second = await testHarness.run(plan, 'playwright-chromium');
+    const plan = testHarness.plan(signupPlan(['cdp-chromium']));
+    const first = await testHarness.run(plan, 'cdp-chromium');
+    const second = await testHarness.run(plan, 'cdp-chromium');
     const draft = releaseNoteDraft(plan, [first.result]);
     assert.equal(draft, releaseNoteDraft(plan, [second.result]), 'byte-identical drafts');
     assert.ok(!draft.includes(EMAIL) && !draft.includes(NAME), 'no typed values');

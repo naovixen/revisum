@@ -5,7 +5,6 @@ import assert from 'node:assert/strict';
 import { arch, platform } from 'node:os';
 import { test } from 'node:test';
 import { cdpDriver } from '@revisum/driver-cdp';
-import { playwrightDriver } from '@revisum/driver-playwright';
 import {
   adapterRegistry, defaultRedactor, parseProject, planParser, run,
   type BrowserDriver, type Project, type Target,
@@ -30,8 +29,7 @@ const projectFile = {
   limits: { stepTimeoutMilliseconds: 2000 },
   matrix: [
     { id: 'cdp-webkit', adapter: 'cdp', engine: 'webkit', device: 'desktop-1280', ...environment },
-    { id: 'playwright-firefox-phone', adapter: 'playwright', engine: 'firefox', device: 'phone-390', ...environment },
-    { id: 'playwright-firefox-desktop', adapter: 'playwright', engine: 'firefox', device: 'desktop-1280', ...environment },
+    { id: 'appium-android', adapter: 'appium', engine: 'chromium', device: 'phone-390', ...environment },
   ],
 };
 
@@ -80,31 +78,22 @@ test('when the only registered adapter is CDP, it refuses a WebKit target with e
   }
 });
 
-test('a WebKit run on CDP ends engine-not-supported; Playwright, registered too, is not used instead', async () => {
+test('a WebKit run on CDP ends engine-not-supported; another registered adapter is not used instead', async () => {
   const cdp = watched(cdpDriver({ executablePath: 'never-launched' }));
-  const playwright = watched(playwrightDriver());
-  const { result, store } = await runOn('cdp-webkit', new Map<string, BrowserDriver>([['cdp', cdp], ['playwright', playwright]]));
+  const bystander = watched(cdpDriver({ executablePath: 'never-launched' }));
+  const { result, store } = await runOn('cdp-webkit', new Map<string, BrowserDriver>([['cdp', cdp], ['other', bystander]]));
   assert.equal(result.state, 'TargetUnavailable');
   assert.equal(result.unavailable?.reason, 'engine-not-supported');
-  assert.equal(cdp.opened + playwright.opened, 0, 'no browser was started');
+  assert.equal(cdp.opened + bystander.opened, 0, 'no browser was started');
   assert.equal(store.references().length, 0);
 });
 
-test('Playwright refuses Firefox with a phone profile as device-not-supported, and accepts it on desktop', () => {
-  const driver = playwrightDriver();
-  const phone = driver.supports(target('playwright-firefox-phone'));
-  assert.ok(!phone.ok);
-  assert.equal(phone.error.reason, 'device-not-supported');
-  assert.ok(driver.supports(target('playwright-firefox-desktop')).ok, 'control: the desktop profile is supported');
-});
-
-test('a Firefox phone run ends device-not-supported, and neither Playwright nor CDP opens a browser', async () => {
+test('a run on an adapter nobody registered ends adapter-not-registered, and the registered CDP driver opens no browser', async () => {
   const cdp = watched(cdpDriver({ executablePath: 'never-launched' }));
-  const playwright = watched(playwrightDriver());
-  const { result, store } = await runOn('playwright-firefox-phone', new Map<string, BrowserDriver>([['cdp', cdp], ['playwright', playwright]]));
+  const { result, store } = await runOn('appium-android', new Map<string, BrowserDriver>([['cdp', cdp]]));
   assert.equal(result.state, 'TargetUnavailable');
-  assert.equal(result.unavailable?.reason, 'device-not-supported');
-  assert.equal(cdp.opened + playwright.opened, 0, 'nothing opened, on desktop or any other adapter');
+  assert.equal(result.unavailable?.reason, 'adapter-not-registered');
+  assert.equal(cdp.opened, 0, 'no browser was started');
   assert.equal(result.manifest, null);
   assert.equal(store.references().length, 0);
 });

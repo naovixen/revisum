@@ -22,7 +22,7 @@ import { join } from 'node:path';
 import { after, before, describe, test } from 'node:test';
 import { leakScanner, sha256 } from '@revisum/engine';
 import {
-  BOTH_TARGETS, CDP_TARGET, PAGE_SECRET, capture, check, evaluate, expectScript, fill, label, navigate, outcomes, reference, rememberAttribute,
+  CDP_TARGETS, CDP_TARGET, PAGE_SECRET, capture, check, evaluate, expectScript, fill, label, navigate, outcomes, reference, rememberAttribute,
   secretValue, testId, textEquals, unsafePageHarness, valueEquals, type JsonRecord, type UnsafePageHarness, type UnsafePageRun,
 } from '../contract/unsafe-page-support.ts';
 import { echoesIn, fakeEnvironmentStore, fakeSecretValue, resolvedSecret } from '../unit/engine/secret-examples.ts';
@@ -172,7 +172,7 @@ const SCRIPT_ENDINGS: readonly { readonly name: string; readonly step: JsonRecor
   { name: 'count-check-fails', step: expectScript('leakyResult', {}, 'itemCount', { kind: 'numberEquals', value: 4 }, 'leaks.item-count-wrong') },
 ];
 
-for (const targetId of BOTH_TARGETS) {
+for (const targetId of CDP_TARGETS) {
   describe(`a page script returning a secret and a session cookie: ${targetId}`, () => {
     const planted = (): readonly (readonly [string, string])[] => [
       ['PAGE_SECRET_VALUE', secretValueText],

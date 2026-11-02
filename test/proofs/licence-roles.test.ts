@@ -40,7 +40,7 @@ test('control: the unchanged copy of the repository passes every lint command', 
 
 // ---- Licences by role ---------------------------------------------------------------------------
 
-for (const [folder, role] of [['contracts', 'schema'], ['action', 'SDK'], ['driver-cdp', 'driver'], ['driver-playwright', 'driver'], ['report', 'adapter'], ['auditor-axe', 'adapter']] as const) {
+for (const [folder, role] of [['contracts', 'schema'], ['driver-cdp', 'driver'], ['report', 'adapter'], ['auditor-axe', 'adapter']] as const) {
   test(`the licence check fails when ${folder}, a ${role} package, carries the engine licence`, { timeout: TIMEOUT }, () => {
     assertLintFails(relicense(folder, FSL), [folder], LICENCE_CHECK);
   });

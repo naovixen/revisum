@@ -1,4 +1,4 @@
-// DOM checks in a real browser on both drivers (fixtures/unsafe-features-app/dom-checks.html). The
+// DOM checks in a real browser on the CDP driver (fixtures/unsafe-features-app/dom-checks.html). The
 // page holds two twins that differ only in what the checks read: one class, one computed colour,
 // one attribute value and one attribute's presence. Each check passes on its matching twin and
 // fails on its mismatched twin; the same check, with only the twin swapped, flips its outcome, so
@@ -9,7 +9,7 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import {
-  ADAPTER_OF, BOTH_TARGETS, check, css, listedFeatures, navigate, outcomes, reference, rememberAttribute, testId, unsafePageDrivers, unsafePageHarness,
+  ADAPTER_OF, CDP_TARGETS, check, css, listedFeatures, navigate, outcomes, reference, rememberAttribute, testId, unsafePageDrivers, unsafePageHarness,
   type JsonRecord, type UnsafePageHarness,
 } from './unsafe-page-support.ts';
 
@@ -29,7 +29,7 @@ const DOM_CHECKS: readonly DomCheck[] = [
   { name: 'attributeAbsent disabled', element: (twin) => testId(`${twin}-checkout`), assertion: { kind: 'attributeAbsent', name: 'disabled' } },
 ];
 
-for (const targetId of BOTH_TARGETS) {
+for (const targetId of CDP_TARGETS) {
   describe(`DOM checks on twin elements: ${targetId}`, () => {
     for (const domCheck of DOM_CHECKS) {
       test(`${domCheck.name} passes on the matching twin and fails on the mismatched twin`, async () => {
@@ -56,7 +56,7 @@ for (const targetId of BOTH_TARGETS) {
       assert.deepEqual(outcomes(mismatched.result), [[0, 'passed', undefined], [1, 'failed', 'assertion-failed']], JSON.stringify(mismatched.result.steps));
     });
 
-    // A remember from an attribute also needs rememberedValues, which the Playwright fallback does not declare.
+    // A remember from an attribute also needs rememberedValues, which a driver may not declare.
     const remembers = listedFeatures(unsafePageDrivers().get(ADAPTER_OF[targetId] ?? '')).includes('rememberedValues');
     test('an attribute remembered from one twin passes attributeEquals on that twin and fails it on the other', { skip: !remembers }, async () => {
       const ran = await harness.runSteps(targetId, [

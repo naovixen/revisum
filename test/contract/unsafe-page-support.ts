@@ -1,5 +1,5 @@
 // Shared setup for the browser tests of plan language 1.3's page parts: css and XPath locators, DOM
-// checks and page scripts, carried out by the own CDP driver and by the Playwright fallback.
+// checks and page scripts, carried out by the own CDP driver.
 //
 // It serves the unsafe-features fixture app (fixtures/unsafe-features-app/). Beside the app's files
 // it answers two routes: /orders.html, whose order row carries a canary order id made fresh for the
@@ -9,8 +9,7 @@
 // inline scripts, and lists one css selector, button.icon-close, that may resolve a control with no
 // accessible name. Its named scripts are the files under the fixture project's plans/scripts/
 // folder (fixtures/unsafe-features-project/), passed to the run as its script sources, keyed by
-// each declared file path. Its targets are the own CDP driver on Chrome for Testing and the
-// Playwright fallback on Chromium, in English (so the engine's English irreversible patterns apply
+// each declared file path. Its targets are the own CDP driver on Chrome for Testing, in English (so the engine's English irreversible patterns apply
 // to the runtime guard) and in London time. It declares one secret, typed into the leak page.
 //
 // Plans are written as raw JSON, parsed against the project, cleared through the policy gate (as a
@@ -27,7 +26,6 @@ import { readFileSync } from 'node:fs';
 import { arch, platform } from 'node:os';
 import { join } from 'node:path';
 import { cdpDriver } from '@revisum/driver-cdp';
-import { playwrightDriver } from '@revisum/driver-playwright';
 import {
   defaultRedactor, parseProject, planParser, run,
   type BrowserDriver, type Locator, type Plan, type PlanStanding, type Project, type RunEventSink, type RunResult, type SecretStore,
@@ -61,10 +59,8 @@ export const SCRIPT_CHECK_TIMEOUT_MILLISECONDS = 1000;
 export const MAXIMUM_CALLS = 200;
 
 export const CDP_TARGET = 'cdp-chromium';
-export const PLAYWRIGHT_TARGET = 'playwright-chromium';
-// This spec names both drivers, so every browser test runs on both.
-export const BOTH_TARGETS = [CDP_TARGET, PLAYWRIGHT_TARGET] as const;
-export const ADAPTER_OF: Readonly<Record<string, string>> = { [CDP_TARGET]: 'cdp', [PLAYWRIGHT_TARGET]: 'playwright' };
+export const CDP_TARGETS = [CDP_TARGET] as const;
+export const ADAPTER_OF: Readonly<Record<string, string>> = { [CDP_TARGET]: 'cdp' };
 
 // The features this spec adds to the driver capability model.
 export const PAGE_PART_FEATURES = ['structuralLocators', 'domChecks', 'pageScripts'] as const;
@@ -147,7 +143,6 @@ export const unsafePageProjectFile = (origin: string, extraOrigins: readonly str
   secretNames: [PAGE_SECRET],
   matrix: [
     { id: CDP_TARGET, adapter: 'cdp', engine: 'chromium', ...desktop },
-    { id: PLAYWRIGHT_TARGET, adapter: 'playwright', engine: 'chromium', ...desktop },
   ],
   unsafeFeatures: {
     cssLocators: true, xpathLocators: true, domChecks: true,
@@ -158,7 +153,6 @@ export const unsafePageProjectFile = (origin: string, extraOrigins: readonly str
 
 export const unsafePageDrivers = (): ReadonlyMap<string, BrowserDriver> => new Map<string, BrowserDriver>([
   ['cdp', cdpDriver({ executablePath: BROWSERS.chrome })],
-  ['playwright', playwrightDriver()],
 ]);
 
 // ---- Plans, written as raw JSON -------------------------------------------------------------

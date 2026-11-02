@@ -43,7 +43,7 @@ const spyDriver = (id: string): BrowserDriver => ({
 });
 
 const ports = () => ({
-  drivers: new Map<string, BrowserDriver>([['playwright', spyDriver('playwright')], ['cdp', spyDriver('cdp')]]),
+  drivers: new Map<string, BrowserDriver>([['cdp', spyDriver('cdp')]]),
   clock: systemClock, artifacts: memoryArtifactStore(), redactor: defaultRedactor(), audit: memoryEventSink(), events: memoryRunEventSink(),
 });
 const base = {
@@ -58,7 +58,7 @@ async function rejectedErrors(input: unknown): Promise<readonly PlanError[]> {
 
 // ---- Browser-plan cases from the API-step suite -------------------------------------------------
 
-const valid = (): RawObject => signupPlan(['playwright-chromium']);
+const valid = (): RawObject => signupPlan(['cdp-chromium']);
 const withSteps = (...steps: unknown[]): RawObject => ({ ...valid(), steps });
 const navigate = (url: string) => ({ type: 'navigate', url });
 

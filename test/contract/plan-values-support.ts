@@ -4,8 +4,8 @@
 // It serves the plan-values fixture app (fixtures/plan-values-app/), parses plans written as raw
 // JSON against a trusted project, clears them through the policy gate and runs them with run().
 // The project's targets are the own CDP driver on Chrome for Testing and on its headless shell,
-// and the Playwright fallback on Chromium, all in English (so the engine's built-in English
-// irreversible patterns apply to the runtime guard) and in London time. It declares three test-id
+// all in English (so the engine's built-in English irreversible patterns apply to the runtime
+// guard) and in London time. It declares three test-id
 // attributes: data-testid, data-qa and id.
 //
 // Every run reads the page just before the run closes its session: the page's URL and the texts
@@ -15,7 +15,6 @@ import assert from 'node:assert/strict';
 import { arch, platform } from 'node:os';
 import { join } from 'node:path';
 import { cdpDriver } from '@revisum/driver-cdp';
-import { playwrightDriver } from '@revisum/driver-playwright';
 import {
   defaultRedactor, parseProject, planParser, run,
   type BrowserDriver, type Locator, type Plan, type Project, type RunEventSink, type RunResult, type Session,
@@ -37,7 +36,6 @@ export const STEP_TIMEOUT_MILLISECONDS = 2000;
 
 export const CDP_TARGET = 'cdp-chromium';
 export const HEADLESS_SHELL_TARGET = 'cdp-chromium-headless-shell';
-export const PLAYWRIGHT_TARGET = 'playwright-chromium';
 // Both targets of the own CDP driver: the same driver with a different executable.
 export const CDP_TARGETS = [CDP_TARGET, HEADLESS_SHELL_TARGET] as const;
 
@@ -55,14 +53,12 @@ export const planValuesProjectFile = (origin: string) => ({
   matrix: [
     { id: CDP_TARGET, adapter: 'cdp', engine: 'chromium', ...desktop },
     { id: HEADLESS_SHELL_TARGET, adapter: 'cdp-headless-shell', engine: 'chromium', ...desktop },
-    { id: PLAYWRIGHT_TARGET, adapter: 'playwright', engine: 'chromium', ...desktop },
   ],
 });
 
 export const planValuesDrivers = (): ReadonlyMap<string, BrowserDriver> => new Map<string, BrowserDriver>([
   ['cdp', cdpDriver({ executablePath: BROWSERS.chrome })],
   ['cdp-headless-shell', cdpDriver({ executablePath: BROWSERS.chromeHeadlessShell })],
-  ['playwright', playwrightDriver()],
 ]);
 
 // ---- Plans, written as raw JSON -------------------------------------------------------------
@@ -275,4 +271,19 @@ export async function planValuesHarness(): Promise<PlanValuesHarness> {
     runSteps: (targetId, steps, options = {}) => runPlan(plan(planFor(targetId, steps, options.fields ?? {})), targetId, options),
     close: () => server.close(),
   };
+}
+
+export type PlanValuesFeature = 'positions' | 'keyChords' | 'rememberedValues';
+
+// The harness's drivers with the own CDP driver's list lacking one feature, and nothing else changed.
+export function cdpWithout(harness: PlanValuesHarness, feature: PlanValuesFeature): ReadonlyMap<string, BrowserDriver> {
+  const inner = harness.drivers.get('cdp');
+  assert.ok(inner !== undefined);
+  const performs = (inner.info.performs ?? []).filter((listed) => String(listed) !== feature);
+  const lacking: BrowserDriver = {
+    info: { ...inner.info, performs },
+    supports: (asked) => inner.supports(asked),
+    open: (opened, environment) => inner.open(opened, environment),
+  };
+  return new Map([...harness.drivers, ['cdp', lacking]]);
 }

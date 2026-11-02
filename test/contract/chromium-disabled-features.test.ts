@@ -1,18 +1,11 @@
 // Chromium's port randomisation (TcpPortRandomizationWin) makes about one local connect in sixty
 // fail on Windows, so every Chromium a driver starts must have it turned off. Chromium reads only
 // the last --disable-features flag on its command line, so these tests read the command line of
-// the running browser, take that last flag, and check what it actually disables. For the
-// Playwright driver they also check that none of the features Playwright itself disables by
-// default is lost when the driver replaces Playwright's flag with its own.
+// the running browser, take that last flag, and check what it actually disables.
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
-import { platform } from 'node:os';
 import { after, before, describe, test } from 'node:test';
 import { cdpDriver, launchChromium } from '@revisum/driver-cdp';
-import { playwrightDriver } from '@revisum/driver-playwright';
 import { defaultRedactor, type SessionEnvironment, type Target } from '@revisum/engine';
-import { chromium, type Browser } from 'playwright-core';
 import { BROWSERS } from '../support/browsers.ts';
 import { FIXED_TIME_MILLISECONDS, SEED, harness, type Harness } from '../support/signup-harness.ts';
 
@@ -41,36 +34,6 @@ function featuresLeftOn(commandLine: readonly string[], required: readonly strin
 const COMMAND_LINE_ELEMENT_ID = 'command_line';
 const readCommandLineText = (): string => document.getElementById('command_line')?.textContent ?? '';
 const splitCommandLine = (text: string): readonly string[] => text.split(/\s+/).filter((argument) => argument !== '');
-
-// The command line the operating system holds for a running process.
-function processCommandLine(processId: number): readonly string[] {
-  if (platform() === 'linux') return readFileSync(`/proc/${processId}/cmdline`, 'utf8').split('\0').filter((argument) => argument !== '');
-  const query = platform() === 'win32'
-    ? spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
-      `(Get-CimInstance Win32_Process -Filter "ProcessId=${processId}").CommandLine`], { encoding: 'utf8', windowsHide: true })
-    : spawnSync('ps', ['-o', 'args=', '-p', String(processId)], { encoding: 'utf8' });
-  assert.equal(query.status, 0, `reading the command line of process ${processId}: ${query.stderr}`);
-  return splitCommandLine(query.stdout);
-}
-
-// The arguments a Playwright-launched Chromium was started with. Playwright's headless shell has
-// no chrome://version and no --enable-automation (which Browser.getBrowserCommandLine needs), so
-// the browser is asked for its own process id and the operating system for that process's
-// command line.
-async function playwrightCommandLine(browser: Browser): Promise<readonly string[]> {
-  const session = await browser.newBrowserCDPSession();
-  let processId: number | undefined;
-  try {
-    const { processInfo } = await session.send('SystemInfo.getProcessInfo');
-    processId = processInfo.find((entry) => entry.type === 'browser')?.id;
-  } finally {
-    await session.detach();
-  }
-  assert.ok(processId !== undefined, 'the browser reports its own process id');
-  const commandLine = processCommandLine(processId);
-  assert.ok(commandLine.length > 1, `the operating system shows the command line of process ${processId}`);
-  return commandLine;
-}
 
 let testHarness: Harness;
 before(async () => { testHarness = await harness(); });
@@ -129,53 +92,14 @@ describe('Chromium port randomisation is off in every browser a driver starts', 
     }
   });
 
-  test('the Playwright driver\'s Chromium disables port randomisation and every feature Playwright disables by default', async () => {
-    // What the installed Playwright disables when it launches Chromium with no overrides.
-    const plain = await chromium.launch({ headless: true });
-    let playwrightDefaults: readonly string[];
-    try {
-      playwrightDefaults = lastDisabledFeatures(await playwrightCommandLine(plain));
-    } finally {
-      await plain.close();
-    }
-    assert.ok(playwrightDefaults.length > 0, 'Playwright disables some Chromium features by default');
-
-    // The driver launches through the same playwright-core module, so a wrapper on its
-    // chromium.launch hands this test the browser the driver started.
-    const launched: Browser[] = [];
-    const originalLaunch = chromium.launch;
-    chromium.launch = async (options) => {
-      const browser = await originalLaunch.call(chromium, options);
-      launched.push(browser);
-      return browser;
-    };
-    let commandLine: readonly string[];
-    try {
-      const opened = await playwrightDriver().open(contractTarget('playwright-chromium'), sessionEnvironment());
-      chromium.launch = originalLaunch;
-      assert.ok(opened.ok, `session opens: ${JSON.stringify(opened.ok ? null : opened.error)}`);
-      try {
-        const browser = launched[0];
-        assert.ok(browser !== undefined && launched.length === 1, 'the driver launched one Chromium through playwright-core');
-        commandLine = await playwrightCommandLine(browser);
-      } finally {
-        await opened.value.close();
-      }
-    } finally {
-      chromium.launch = originalLaunch;
-    }
-    assert.deepEqual(featuresLeftOn(commandLine, [PORT_RANDOMISATION_FEATURE]), [], commandLine.join(' '));
-    assert.deepEqual(featuresLeftOn(commandLine, playwrightDefaults), [], commandLine.join(' '));
-  });
-
   test('the check fails a command line whose later --disable-features flag drops a feature', () => {
     // An earlier flag that disables the feature does not count: Chromium reads only the last one.
     const overridden = ['chrome', `--disable-features=Translate,${PORT_RANDOMISATION_FEATURE}`, '--headless', '--disable-features=Translate'];
     assert.deepEqual(featuresLeftOn(overridden, [PORT_RANDOMISATION_FEATURE]), [PORT_RANDOMISATION_FEATURE]);
-    // A replacement list that keeps the port feature but loses one of Playwright's defaults.
-    const playwrightDefaults = ['Translate', 'MediaRouter', 'PaintHolding'];
+    // A replacement list that keeps the port feature but loses one of the other required features.
+    const otherRequired = ['Translate', 'MediaRouter', 'PaintHolding'];
     const shortened = ['chrome', `--disable-features=Translate,PaintHolding,${PORT_RANDOMISATION_FEATURE}`];
-    assert.deepEqual(featuresLeftOn(shortened, playwrightDefaults), ['MediaRouter']);
+    assert.deepEqual(featuresLeftOn(shortened, otherRequired), ['MediaRouter']);
     // No flag at all leaves every feature on; a quoted last flag is still read.
     assert.deepEqual(featuresLeftOn(['chrome', '--headless'], [PORT_RANDOMISATION_FEATURE]), [PORT_RANDOMISATION_FEATURE]);
     assert.deepEqual(featuresLeftOn(['chrome', `"--disable-features=${PORT_RANDOMISATION_FEATURE}"`], [PORT_RANDOMISATION_FEATURE]), []);

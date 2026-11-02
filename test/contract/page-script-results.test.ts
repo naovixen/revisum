@@ -1,4 +1,4 @@
-// What a page script's result may be, on both drivers. The declared script hostileResult
+// What a page script's result may be, on the CDP driver. The declared script hostileResult
 // (fixtures/unsafe-features-project/plans/scripts/) returns, throws or hangs as its `kind` argument
 // asks; its declaration sets a 1,024-byte result limit and a 1-second timeout.
 //   - over maximumResultBytes: script-result-too-large (the engine decodes the result text);
@@ -12,7 +12,7 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import {
-  BOTH_TARGETS, HOSTILE_RESULT_MAXIMUM_BYTES, HOSTILE_RESULT_TIMEOUT_MILLISECONDS, STEP_TIMEOUT_MILLISECONDS, continueStep, continued, hostileResult,
+  CDP_TARGETS, HOSTILE_RESULT_MAXIMUM_BYTES, HOSTILE_RESULT_TIMEOUT_MILLISECONDS, STEP_TIMEOUT_MILLISECONDS, continueStep, continued, hostileResult,
   navigate, outcomes, stepMilliseconds, unsafePageHarness, type HostileResultKind, type UnsafePageHarness,
 } from './unsafe-page-support.ts';
 
@@ -48,7 +48,7 @@ const ACCEPTED: readonly { readonly name: string; readonly kind: HostileResultKi
 const scriptThenContinue = (kind: HostileResultKind, amount: number): unknown[] =>
   [navigate('/'), hostileResult(kind, amount), continueStep(), continued()];
 
-for (const targetId of BOTH_TARGETS) {
+for (const targetId of CDP_TARGETS) {
   describe(`page script results: ${targetId}`, () => {
     for (const { name, kind, amount, code } of REFUSED) {
       test(`${name} fails the evaluate step with ${code}, ends the run Errored and skips the rest`, async () => {

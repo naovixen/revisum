@@ -1,6 +1,6 @@
 // Which driver advances the clock and reads the clipboard, and what an advance must not do.
-//   - The own CDP driver declares clockControl and clipboard and performs every step of them. The
-//     Playwright fallback declares neither: a run with any of them fails that step with
+//   - The own CDP driver declares clockControl and clipboard and performs every step of them. With
+//     the feature taken off its list, a run with any of its steps fails that step with
 //     unsupported-step, sends nothing, waits no real time and skips the rest. A CDP driver with
 //     one feature taken off its list is refused only that feature's steps.
 //   - During an advance the driver dispatches no input event (the fixture page counts every
@@ -11,7 +11,7 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import {
-  CDP_TARGET, CLOCK_AND_CLIPBOARD_FEATURES, INVITE_CODE, PLAYWRIGHT_TARGET, advanceClock, cdpWithout, click, clockHarness, expectClipboard,
+  CDP_TARGET, CLOCK_AND_CLIPBOARD_FEATURES, INVITE_CODE, advanceClock, cdpWithout, click, clockHarness, expectClipboard,
   listedFeatures, navigate, outcomes, recordingSessionCalls, rememberClipboard, role, stepMilliseconds, testId, textEquals,
   type ClockAndClipboardFeature, type ClockHarness, type JsonRecord,
 } from './clock-and-clipboard-support.ts';
@@ -49,21 +49,19 @@ const refusedSteps = (step: JsonRecord): unknown[] => [navigate('/clipboard.html
 // The same, with the copy the clipboard steps check first.
 const performedSteps = (step: JsonRecord): unknown[] => [navigate('/clipboard.html'), copyInviteCode, step, continueStep, continued()];
 
-test('the own CDP driver declares clockControl and clipboard; the Playwright fallback declares neither', () => {
+test('the own CDP driver declares clockControl and clipboard', () => {
   const cdp = listedFeatures(harness.drivers.get('cdp'));
   const headlessShell = listedFeatures(harness.drivers.get('cdp-headless-shell'));
-  const playwright = listedFeatures(harness.drivers.get('playwright'));
   for (const feature of CLOCK_AND_CLIPBOARD_FEATURES) {
     assert.ok(cdp.includes(feature), `the CDP driver declares ${feature}: ${JSON.stringify(cdp)}`);
     assert.ok(headlessShell.includes(feature), `the CDP driver on the headless shell declares ${feature}`);
-    assert.ok(!playwright.includes(feature), `the Playwright fallback does not declare ${feature}`);
   }
 });
 
-describe(`the Playwright fallback: ${PLAYWRIGHT_TARGET}`, () => {
-  for (const { name, step } of FEATURE_STEPS) {
+describe(`the own CDP driver with the step's feature taken off its list: ${CDP_TARGET}`, () => {
+  for (const { name, feature, step } of FEATURE_STEPS) {
     test(`a run with ${name} fails that step with unsupported-step, sends nothing, waits no real time and skips the rest`, async () => {
-      const ran = await harness.runSteps(PLAYWRIGHT_TARGET, refusedSteps(step), { read: ['input-events', 'continue-state'] });
+      const ran = await harness.runSteps(CDP_TARGET, refusedSteps(step), { drivers: cdpWithout(harness, feature), read: ['input-events', 'continue-state'] });
       assert.equal(ran.result.state, 'Failed');
       assert.deepEqual(outcomes(ran.result), [[0, 'passed', undefined], [1, 'failed', 'unsupported-step'], [2, 'skipped', undefined], [3, 'skipped', undefined]]);
       assert.ok(stepMilliseconds(ran.result, 1) < 1000, `the refused step took ${stepMilliseconds(ran.result, 1)} ms of real time`);
@@ -73,7 +71,7 @@ describe(`the Playwright fallback: ${PLAYWRIGHT_TARGET}`, () => {
   }
 
   test('counter-example: the same run without any of those steps passes and sends its input', async () => {
-    const ran = await harness.runSteps(PLAYWRIGHT_TARGET, [navigate('/clipboard.html'), continueStep, continued()], { read: ['input-events'] });
+    const ran = await harness.runSteps(CDP_TARGET, [navigate('/clipboard.html'), continueStep, continued()], { read: ['input-events'] });
     assert.equal(ran.result.state, 'Passed', JSON.stringify(ran.result.steps));
     assert.notEqual(ran.atClose?.shown['input-events'], '0', 'the click reached the page');
   });

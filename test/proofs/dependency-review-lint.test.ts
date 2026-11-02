@@ -6,8 +6,8 @@
 //   - a new runtime dependency with no review fails, naming it;
 //   - a `default` review with a failing check fails, naming the package;
 //   - a review whose version is not the installed one, or whose evidence path is missing, fails;
-//   - a development-only package, a `partial` result and a failing optional adapter all pass,
-//     so the lint fails for the planted reason only.
+//   - a development-only package and a `partial` result both pass, so the lint fails for the
+//     planted reason only.
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { after, before, test } from 'node:test';
@@ -92,13 +92,6 @@ test('counter-example: the same package as a development dependency needs no rev
 test('the lint fails when the default axe-core review is given a failing check', { timeout: TIMEOUT }, () => {
   const outcome = lintWithEdits(scratch, { [REVIEWS_PATH]: replaceResultAfter('axe-core', 'pass', 'fail') });
   assertLintFails(outcome, ['axe-core']);
-});
-
-test('the lint fails when playwright-core, which fails two checks, is moved onto the default path', { timeout: TIMEOUT }, () => {
-  const outcome = lintWithEdits(scratch, {
-    [REVIEWS_PATH]: (text) => text.replace(/(['"])optional-adapter\1/, (_match, quote: string) => `${quote}default${quote}`),
-  });
-  assertLintFails(outcome, ['playwright-core']);
 });
 
 test('counter-example: a partial result on the default path passes', { timeout: TIMEOUT }, () => {

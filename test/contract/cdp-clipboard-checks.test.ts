@@ -8,12 +8,14 @@
 //   - A copied invite link built from a uniqueEmail value contains that value; a remembered link
 //     can be typed into a field; a clipboard remember fails on empty, multi-line and over-limit text.
 //   - The page's own script cannot read the clipboard, before or after the driver's own read. The
-//     counter-example grants a Playwright browser clipboard access, and the same button then reads.
+//     counter-example grants a browser started by the CDP driver's launcher clipboard access, and the
+//     same button then reads.
 // The browsers are headless and the clipboard is the browser's own; the person's clipboard is
 // still saved and put back around this file, in case a copy reaches it.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
-import { chromium } from 'playwright-core';
+import { launchChromium } from '@revisum/driver-cdp';
+import { BROWSERS } from '../support/browsers.ts';
 import {
   ADDRESS_LINES, CDP_TARGET, CDP_TARGETS, INVITE_CODE, LATE_CODE, click, clockHarness, expectClipboard, fill, label, navigate, outcomes, reference,
   rememberClipboard, role, stepMilliseconds, testId, textEquals, valueEquals, type ClockHarness, type ClockRun, type JsonRecord,
@@ -226,18 +228,31 @@ describe('the page reading the clipboard itself', () => {
   // longer refused, so "Refused" above comes from the run's browser, not from the page. The page
   // reads without writing, and shows only a length, so nothing of the host's clipboard is kept.
   test('counter-example: with clipboard access granted, the same button reads the clipboard', { ...copying }, async () => {
-    const browser = await chromium.launch({ headless: true });
+    const launched = await launchChromium(BROWSERS.chrome, { profilePrefix: 'clipboard-grant-test-' });
     try {
-      const context = await browser.newContext();
-      await context.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: harness.origin });
-      const page = await context.newPage();
-      await page.goto(harness.url('/clipboard.html'));
-      await page.getByRole('button', { name: 'Read the clipboard' }).click();
-      await page.getByTestId('page-read').filter({ hasText: /attempt 1$/ }).waitFor();
-      const shown = await page.getByTestId('page-read').textContent();
-      assert.match(shown ?? '', /^Read \d+ characters, attempt 1$/);
+      await launched.connection.send(undefined, 'Browser.grantPermissions', {
+        origin: harness.origin, permissions: ['clipboardReadWrite', 'clipboardSanitizedWrite'],
+      });
+      const { targetId } = await launched.connection.send<{ targetId: string }>(undefined, 'Target.createTarget', { url: harness.url('/clipboard.html') });
+      const { sessionId } = await launched.connection.send<{ sessionId: string }>(undefined, 'Target.attachToTarget', { targetId, flatten: true });
+      const page = launched.connection.session(sessionId);
+      await page.send('Emulation.setFocusEmulationEnabled', { enabled: true });
+      // Click as a person would (with a user gesture), then wait for the page to show what it read.
+      const expression = `new Promise((resolve) => {
+        const start = () => {
+          document.getElementById('read-clipboard').click();
+          const poll = () => {
+            const shown = document.querySelector('[data-testid="page-read"]').textContent;
+            if (shown === 'Not read') setTimeout(poll, 50); else resolve(shown);
+          };
+          poll();
+        };
+        if (document.readyState === 'complete') start(); else addEventListener('load', start);
+      })`;
+      const evaluated = await page.send<{ result: { value?: unknown } }>('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true, userGesture: true });
+      assert.match(String(evaluated.result.value), /^Read \d+ characters, attempt 1$/);
     } finally {
-      await browser.close();
+      await launched.stop();
     }
   });
 });

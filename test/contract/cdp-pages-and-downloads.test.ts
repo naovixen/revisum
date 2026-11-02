@@ -3,16 +3,13 @@
 // never a pass, never a partial result. The popup is closed, the download is cancelled and no
 // file of it is left behind, and every later step is skipped, so nothing is captured after it.
 // A counter-example on the same page shows an ordinary click there passes.
-// The Playwright fallback refuses the steps only the own driver performs (hover, select, upload,
-// frame and dialog) the same way, with nothing sent to the page.
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, describe, test } from 'node:test';
 import {
-  CDP_TARGETS, PLAYWRIGHT_TARGET, UPLOAD_FIXTURE, capabilityHarness, capabilityPlan, click, label, navigate, role, shownText, testId,
-  textEquals, type CapabilityHarness,
+  CDP_TARGETS, capabilityHarness, capabilityPlan, click, navigate, role, shownText, testId, textEquals, type CapabilityHarness,
 } from '../support/capability-harness.ts';
 
 let capability: CapabilityHarness;
@@ -86,54 +83,3 @@ for (const targetId of CDP_TARGETS) {
     });
   });
 }
-
-describe('the Playwright fallback refuses the steps only the own driver performs', () => {
-  const REFUSED = [
-    { name: 'a hover', step: { type: 'hover', locator: role('button', 'Help') } },
-    { name: 'a select', step: { type: 'select', locator: label('Size'), option: 'Large' } },
-    { name: 'an upload', step: { type: 'upload', locator: label('Attachment'), fixture: UPLOAD_FIXTURE } },
-    { name: 'a dialog answer', step: { type: 'dialog', action: 'dismiss' } },
-  ] as const;
-
-  for (const refused of REFUSED) {
-    test(`${refused.name} fails with unsupported-step and sends nothing to the page`, async () => {
-      const session = await capability.open(PLAYWRIGHT_TARGET);
-      try {
-        assert.ok((await session.navigate(capability.url('/guard.html'))).ok);
-        const acted = await session.act(capability.actionStep(refused.step));
-        assert.equal(acted.ok ? 'passed' : acted.error.code, 'unsupported-step');
-        assert.equal(await shownText(capability, session, 'input-events'), '0');
-        assert.equal(await shownText(capability, session, 'help-state'), 'closed');
-        assert.equal(await shownText(capability, session, 'size-chosen'), 'Small');
-        assert.equal(await shownText(capability, session, 'attachment-name'), 'none');
-      } finally {
-        await session.close();
-      }
-    });
-  }
-
-  test('a frame fails with unsupported-step and none of its steps runs', async () => {
-    const plan = capability.plan(capabilityPlan(PLAYWRIGHT_TARGET, [
-      navigate('/frame.html'),
-      { type: 'frame', locator: testId('checkout-frame'), steps: [textEquals(testId('frame-status'), 'Waiting', 'frame.waiting')] },
-      textEquals(testId('outer-status'), 'Not confirmed', 'frame.outer-untouched'),
-    ]));
-    const { result } = await capability.run(plan, PLAYWRIGHT_TARGET);
-    assert.equal(result.state, 'Failed');
-    assert.deepEqual(result.steps.map((step) => [step.index, step.outcome, step.code]), [
-      [0, 'passed', undefined], [1, 'failed', 'unsupported-step'], [2, 'skipped', undefined],
-    ]);
-  });
-
-  test('counter-example: a click on the Playwright fallback is sent to the page', async () => {
-    const session = await capability.open(PLAYWRIGHT_TARGET);
-    try {
-      assert.ok((await session.navigate(capability.url('/guard.html'))).ok);
-      assert.ok((await session.act(capability.actionStep(click(role('button', 'Save draft'))))).ok);
-      assert.equal(await shownText(capability, session, 'save-clicks'), '1');
-      assert.notEqual(await shownText(capability, session, 'input-events'), '0');
-    } finally {
-      await session.close();
-    }
-  });
-});

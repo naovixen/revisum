@@ -1,13 +1,12 @@
-// Which driver performs the page parts of plan language 1.3. The spec names both drivers, so the
-// own CDP driver and the Playwright fallback each declare structuralLocators, domChecks and
-// pageScripts. With one of them taken off a driver's list, and nothing else changed, the run
+// Which driver performs the page parts of plan language 1.3. The own CDP driver declares
+// structuralLocators, domChecks and pageScripts. With one of them taken off a driver's list, and nothing else changed, the run
 // refuses every step that needs it with unsupported-step, before anything of it reaches the
 // driver: no input event reaches the page, and a script that counts its own runs on the page never
 // ran. The same steps on the unchanged driver pass, so the counters are shown able to move.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import {
-  ADAPTER_OF, BOTH_TARGETS, PAGE_PART_FEATURES, check, click, css, driversWithout, evaluate, expectScript, listedFeatures, navigate, outcomes,
+  ADAPTER_OF, CDP_TARGETS, PAGE_PART_FEATURES, check, click, css, driversWithout, evaluate, expectScript, listedFeatures, navigate, outcomes,
   rememberAttribute, stepMilliseconds, testId, unsafePageDrivers, unsafePageHarness, xpath,
   type JsonRecord, type PagePartFeature, type UnsafePageHarness,
 } from './unsafe-page-support.ts';
@@ -16,8 +15,8 @@ let harness: UnsafePageHarness;
 before(async () => { harness = await unsafePageHarness(); });
 after(async () => { await harness.close(); });
 
-// `alsoNeeds` names a feature from before this spec that the step needs too, such as rememberedValues,
-// which the Playwright fallback does not declare; on a driver without it the step is left out.
+// `alsoNeeds` names a feature from before this spec that the step needs too, such as rememberedValues;
+// on a driver without it the step is left out.
 type FeatureStep = {
   readonly name: string; readonly feature: PagePartFeature; readonly page: string; readonly step: JsonRecord; readonly alsoNeeds?: string;
 };
@@ -45,7 +44,7 @@ const FEATURE_STEPS: readonly FeatureStep[] = [
 const READ = ['input-events', 'script-runs'];
 const pageShown = (): JsonRecord => check(testId('input-events'), { kind: 'visible' }, 'support.page-shown');
 
-for (const targetId of BOTH_TARGETS) {
+for (const targetId of CDP_TARGETS) {
   const adapter = ADAPTER_OF[targetId] ?? '';
   // The steps this driver can run once it declares this spec's features: each step's other
   // feature, if any, is one the driver declares already.

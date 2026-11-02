@@ -1,7 +1,6 @@
 // Shared setup for the CDP driver's capability tests: the capability fixture app, a trusted project
-// whose targets are the own CDP driver on Chrome for Testing and on its headless shell, and the
-// Playwright fallback on Chromium, with helpers to run plans, open sessions directly, parse single
-// steps, and watch the processes a driver started.
+// whose targets are the own CDP driver on Chrome for Testing and on its headless shell, with helpers
+// to run plans, open sessions directly, parse single steps, and watch the processes a driver started.
 //
 // The project declares one upload file, upload-note.txt, which lives in fixtures/capability-uploads/
 // (the project's fixtures folder); the CDP driver is told where that folder is.
@@ -9,7 +8,6 @@ import assert from 'node:assert/strict';
 import { arch, platform } from 'node:os';
 import { join } from 'node:path';
 import { cdpDriver, type CdpDriverOptions, type DriverSession, type OwnBrowserDriver } from '@revisum/driver-cdp';
-import { playwrightDriver } from '@revisum/driver-playwright';
 import {
   defaultRedactor, parseProject, planParser, run,
   type ActionStep, type BrowserDriver, type Locator, type Plan, type Project, type Session, type SessionEnvironment,
@@ -29,7 +27,6 @@ export const PLAN_LANGUAGE_VERSION = '1.1';
 
 export const CDP_TARGET = 'cdp-chromium';
 export const HEADLESS_SHELL_TARGET = 'cdp-chromium-headless-shell';
-export const PLAYWRIGHT_TARGET = 'playwright-chromium';
 // Both targets of the own CDP driver: the same driver with a different executable.
 export const CDP_TARGETS = [CDP_TARGET, HEADLESS_SHELL_TARGET] as const;
 
@@ -50,7 +47,6 @@ export const capabilityProjectFile = (origin: string, stepTimeoutMilliseconds: n
   matrix: [
     { id: CDP_TARGET, adapter: 'cdp', engine: 'chromium', ...desktop },
     { id: HEADLESS_SHELL_TARGET, adapter: 'cdp-headless-shell', engine: 'chromium', ...desktop },
-    { id: PLAYWRIGHT_TARGET, adapter: 'playwright', engine: 'chromium', ...desktop },
   ],
 });
 
@@ -63,7 +59,6 @@ export function capabilityCdpDriver(executablePath: string): OwnBrowserDriver {
 export const capabilityDrivers = (): ReadonlyMap<string, BrowserDriver> => new Map<string, BrowserDriver>([
   ['cdp', capabilityCdpDriver(BROWSERS.chrome)],
   ['cdp-headless-shell', capabilityCdpDriver(BROWSERS.chromeHeadlessShell)],
-  ['playwright', playwrightDriver()],
 ]);
 
 // The own CDP driver that serves a target, by the target's adapter.

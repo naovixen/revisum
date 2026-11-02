@@ -1,12 +1,11 @@
 // Running css and XPath locators, DOM checks and page scripts adds no runtime dependency to either
 // driver, and no driver module passes a secret to a page script.
-//   - Dependencies: the own CDP driver's manifest declares none, and the Playwright fallback's
-//     declares exactly the two it had before (Playwright and axe-core, at the same versions). Every
-//     import in their sources is relative, a Node built-in, contracts or, for the fallback, one of
-//     those two; so is every package a source resolves by name at run time.
-//   - Secrets: reveal(), the one way to read a secret's value, may be imported only by each
+//   - Dependencies: the own CDP driver's manifest declares none. Every import in its sources is
+//     relative, a Node built-in or contracts; so is every package a source resolves by name at run
+//     time.
+//   - Secrets: reveal(), the one way to read a secret's value, may be imported only by the
 //     driver's input module, and the reveal allow-list (tools/check-secret-reveal.ts) still names
-//     only those two driver modules. In each, reveal is called at one place: the fill that types a
+//     only that driver module. In it, reveal is called at one place: the fill that types a
 //     secret into the page. A page-script path that revealed a secret would be a second call.
 // The runtime half, a script called with only its declared arguments after a secret was typed, is
 // in test/contract/page-script-arguments.test.ts. Planted sources show each check can fail.
@@ -29,10 +28,6 @@ const REVEAL_CALL = /\breveal\s*\(/g;
 
 const DRIVERS = [
   { name: 'driver-cdp', dependencies: {}, packages: ['@revisum/contracts'], inputModule: 'packages/driver-cdp/src/browser-session.ts' },
-  {
-    name: 'driver-playwright', dependencies: { 'axe-core': '4.14.0', 'playwright-core': '1.64.1' },
-    packages: ['@revisum/contracts', 'axe-core', 'playwright-core'], inputModule: 'packages/driver-playwright/src/playwright-driver.ts',
-  },
 ] as const;
 
 const sourceFiles = (folder: string): string[] =>
@@ -90,7 +85,7 @@ for (const driver of DRIVERS) {
   });
 }
 
-test('the reveal allow-list names no driver module but the two input modules', () => {
+test('the reveal allow-list names no driver module but the input module', () => {
   const driverModules = revealAllowList().filter((path) => path.startsWith('packages/driver-'));
   assert.deepEqual(driverModules.sort(), DRIVERS.map((driver) => driver.inputModule).sort());
 });
@@ -103,11 +98,10 @@ test('mutant: the module check reports a planted import, dynamic import and run-
     "const serialise = require.resolve('safe-stable-stringify/index.js');",
     "const settled = Promise.resolve('not a package');",
     "import type { Secret } from '@revisum/contracts';",
-    "import { chromium } from 'playwright-core';",
     "import { readFileSync } from 'node:fs';",
     "import { pageScript } from './page-script.ts';",
   ].join('\n');
-  assert.deepEqual(foreignModules(planted, ['@revisum/contracts', 'playwright-core']), ['css-what', 'xpath', 'safe-stable-stringify/index.js']);
+  assert.deepEqual(foreignModules(planted, ['@revisum/contracts']), ['css-what', 'xpath', 'safe-stable-stringify/index.js']);
 });
 
 test('mutant: the reveal check counts a second call in a page-script path, and ignores comments', () => {

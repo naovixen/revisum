@@ -5,7 +5,7 @@ import { signupPlan } from './signup-harness.ts';
 
 export type HostilePlan = { readonly name: string; readonly input: unknown; readonly code: PlanErrorCode };
 
-const valid = (): Record<string, unknown> => signupPlan(['playwright-chromium']) as unknown as Record<string, unknown>;
+const valid = (): Record<string, unknown> => signupPlan(['cdp-chromium']) as unknown as Record<string, unknown>;
 const withSteps = (...steps: unknown[]): unknown => ({ ...valid(), steps });
 const click = { type: 'click', locator: { by: 'role', role: 'button', name: 'Create account' } };
 const BACKSLASH = String.fromCharCode(92);

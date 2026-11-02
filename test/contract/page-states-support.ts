@@ -10,8 +10,7 @@
 // harness, so a test can search the disk for any copy of it.
 //
 // Plans are written as raw JSON, parsed against a trusted project, cleared through the policy
-// gate and run with run(). The project's targets are the own CDP driver on Chrome for Testing and
-// the Playwright fallback on Chromium, in English and London time, with a 64 KiB download limit.
+// gate and run with run(). The project's targets are the own CDP driver on Chrome for Testing, in English and London time, with a 64 KiB download limit.
 // Every run reads the page just before the run closes its session, after an optional test hook.
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
@@ -19,7 +18,6 @@ import { readFileSync } from 'node:fs';
 import { arch, platform, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { cdpDriver } from '@revisum/driver-cdp';
-import { playwrightDriver } from '@revisum/driver-playwright';
 import {
   defaultRedactor, parseProject, planParser, run,
   type ActionStep, type BrowserDriver, type Locator, type Plan, type Project, type RunEventSink, type RunResult, type Session,
@@ -46,7 +44,6 @@ export const STEP_TIMEOUT_MILLISECONDS = 2000;
 export const MAXIMUM_DOWNLOAD_BYTES = 64 * 1024;
 
 export const CDP_TARGET = 'cdp-chromium';
-export const PLAYWRIGHT_TARGET = 'playwright-chromium';
 
 const FIXTURE_FOLDER = join(FIXTURES, 'page-states-app');
 
@@ -61,13 +58,11 @@ export const pageStatesProjectFile = (origin: string, keepDownloads?: boolean) =
   ...(keepDownloads === undefined ? {} : { evidence: { keepDownloads } }),
   matrix: [
     { id: CDP_TARGET, adapter: 'cdp', engine: 'chromium', ...desktop },
-    { id: PLAYWRIGHT_TARGET, adapter: 'playwright', engine: 'chromium', ...desktop },
   ],
 });
 
 export const pageStatesDrivers = (): ReadonlyMap<string, BrowserDriver> => new Map<string, BrowserDriver>([
   ['cdp', cdpDriver({ executablePath: BROWSERS.chrome })],
-  ['playwright', playwrightDriver()],
 ]);
 
 // ---- Plans, written as raw JSON -------------------------------------------------------------
@@ -382,4 +377,19 @@ export async function settledText(harness: PageStatesHarness, session: Session, 
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
   return shown;
+}
+
+export type PageStatesFeature = 'pageStates' | 'linkTargets' | 'pageMetadata' | 'scriptsDisabled' | 'downloads' | 'newTabs';
+
+// The harness's drivers with the own CDP driver's list lacking one feature, and nothing else changed.
+export function cdpWithout(harness: PageStatesHarness, feature: PageStatesFeature): ReadonlyMap<string, BrowserDriver> {
+  const inner = harness.drivers.get('cdp');
+  assert.ok(inner !== undefined);
+  const performs = (inner.info.performs ?? []).filter((listed) => String(listed) !== feature);
+  const lacking: BrowserDriver = {
+    info: { ...inner.info, performs },
+    supports: (asked) => inner.supports(asked),
+    open: (opened, environment) => inner.open(opened, environment),
+  };
+  return new Map([...harness.drivers, ['cdp', lacking]]);
 }

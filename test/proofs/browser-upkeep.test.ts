@@ -1,10 +1,10 @@
 // Browser upkeep: what each new Chrome for Testing major costs to re-validate, and when that cost
-// says to return to the Playwright fallback.
+// trips the kill criterion.
 //   node tools/browser-upkeep.ts [--records <file>]
 //     decodes the upkeep records ({ browser, major, fixHours, revalidatedAt }, a JSON list; by
 //     default docs/decisions/browser-upkeep.json) and prints the average fixHours over the first
 //     six Chrome majors, to two decimals, with how many majors it covers. Over 1.8 it prints a flag
-//     naming the Playwright fallback rule and exits 1. With fewer than six Chrome records it prints
+//     naming the kill criterion and exits 1. With fewer than six Chrome records it prints
 //     the running average and never flags. Records that do not decode fail, naming the field.
 //   node tools/browser-upkeep.ts [--records <file>] --versions <file> [--pinned <build>]
 //     reads Chrome for Testing's version list (its last-known-good-versions.json shape) and compares
@@ -21,7 +21,7 @@ import { FIXTURES, REPOSITORY_ROOT } from '../support/repository.ts';
 import { describeRun, runTool, type ToolRun } from '../support/tool-runs.ts';
 
 const TOOL = 'browser-upkeep.ts';
-const FALLBACK_FLAG = /Playwright fallback/i;
+const KILL_CRITERION_FLAG = /kill criterion/i;
 const fixture = (name: string): string => join(FIXTURES, 'browser-upkeep', name);
 const upkeep = (words: readonly string[]): ToolRun => runTool(TOOL, words, { cwd: REPOSITORY_ROOT });
 const summary = (records: string): ToolRun => upkeep(['--records', fixture(records)]);
@@ -35,43 +35,43 @@ function assertPassesWithout(run: ToolRun, unwanted: RegExp): void {
 
 // ---- The average and the flag ------------------------------------------------------------------
 
-test('six Chrome majors averaging 2.00 fix hours flag the Playwright fallback rule and exit 1', () => {
+test('six Chrome majors averaging 2.00 fix hours flag the kill criterion and exit 1', () => {
   const run = summary('six-majors-over-limit.json');
   assert.equal(run.status, 1, describeRun(run));
   assert.match(run.output, /\b2\.00\b/);
   assert.match(run.output, /\b6\b/);
-  assert.match(run.output, FALLBACK_FLAG);
+  assert.match(run.output, KILL_CRITERION_FLAG);
 });
 
 test('six Chrome majors averaging 1.50 fix hours pass with no flag', () => {
   const run = summary('six-majors-under-limit.json');
-  assertPassesWithout(run, FALLBACK_FLAG);
+  assertPassesWithout(run, KILL_CRITERION_FLAG);
   assert.match(run.output, /\b1\.50\b/);
 });
 
 test('an average of exactly 1.8 hours is not over the limit, so it does not flag', () => {
   const run = summary('six-majors-at-limit.json');
-  assertPassesWithout(run, FALLBACK_FLAG);
+  assertPassesWithout(run, KILL_CRITERION_FLAG);
   assert.match(run.output, /\b1\.80\b/);
 });
 
 test('only the first six Chrome majors count: later majors and Firefox records do not move the average', () => {
   // All nine records would average 10.67 and flag; the six lowest Chrome majors average 1.00.
   const run = summary('later-majors-and-firefox.json');
-  assertPassesWithout(run, FALLBACK_FLAG);
+  assertPassesWithout(run, KILL_CRITERION_FLAG);
   assert.match(run.output, /\b1\.00\b/);
 });
 
 test('with fewer than six Chrome records the running average is reported and never flags', () => {
   const run = summary('four-majors.json');
-  assertPassesWithout(run, FALLBACK_FLAG);
+  assertPassesWithout(run, KILL_CRITERION_FLAG);
   assert.match(run.output, /\b5\.00\b/);
   assert.match(run.output, /\b4\b/);
 });
 
 test('with no records yet the tool passes, flags nothing and prints no number it cannot compute', () => {
   const run = summary('no-records.json');
-  assertPassesWithout(run, FALLBACK_FLAG);
+  assertPassesWithout(run, KILL_CRITERION_FLAG);
   assert.doesNotMatch(run.output, /NaN|Infinity/);
 });
 
@@ -90,7 +90,7 @@ for (const invalid of INVALID_RECORDS) {
     const run = summary(invalid.file);
     assert.equal(run.passed, false, describeRun(run));
     assert.match(run.output, invalid.fault, describeRun(run));
-    assert.doesNotMatch(run.output, FALLBACK_FLAG);
+    assert.doesNotMatch(run.output, KILL_CRITERION_FLAG);
   });
 }
 
@@ -98,7 +98,7 @@ test('the repository\'s own upkeep records decode', () => {
   assert.ok(existsSync(join(REPOSITORY_ROOT, 'docs', 'decisions', 'browser-upkeep.json')), 'docs/decisions/browser-upkeep.json exists');
   const run = upkeep([]);
   // Passing, or flagging the fallback rule, are both verdicts on decoded records.
-  assert.ok(run.passed || FALLBACK_FLAG.test(run.output), describeRun(run));
+  assert.ok(run.passed || KILL_CRITERION_FLAG.test(run.output), describeRun(run));
 });
 
 // ---- A new Chrome for Testing major -----------------------------------------------------------

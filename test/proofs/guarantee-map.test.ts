@@ -23,7 +23,7 @@ import { withEdits } from './scratch-edits.ts';
 const GUARANTEE_ROWS = [
   'ai-output-only-as-plan', 'known-actions-only', 'lifecycle-no-skip', 'declared-log-fields', 'targets-not-substituted',
   'browser-egress-allow-list', 'secrets-absent', 'pii-masked-in-pixels', 'no-pii-in-reports', 'same-inputs-same-result',
-  'adapters-substitutable', 'report-runs-no-content', 'actions-tamper-evident', 'spec-to-commit-trace', 'person-approval',
+  'report-runs-no-content', 'actions-tamper-evident', 'spec-to-commit-trace', 'person-approval',
 ] as const;
 type GuaranteeRow = (typeof GUARANTEE_ROWS)[number];
 
@@ -35,7 +35,7 @@ const PENDING_ROWS: Readonly<Partial<Record<GuaranteeRow, readonly number[]>>> =
 };
 const isPending = (row: GuaranteeRow): boolean => PENDING_ROWS[row] !== undefined;
 
-const PROVEN_ROW: GuaranteeRow = 'adapters-substitutable';
+const PROVEN_ROW: GuaranteeRow = 'same-inputs-same-result';
 const WEAKER_CLASS = 'claimed, not proven by CI';
 const RUN_TABLE = '.test-results/guarantees.md';
 // The folders whose tests are replaced by stand-ins in the copy.

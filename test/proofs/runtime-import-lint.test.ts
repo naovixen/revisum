@@ -1,13 +1,12 @@
-// No third-party browser automation library reaches the default runtime set: every package except
-// driver-playwright, the optional fallback adapter. `node tools/check-runtime-imports.ts` reads
-// the packages under packages/ of its working folder, and fails, naming the package and the
-// library, when a package of the default set imports one (a static or dynamic import, a
+// No third-party browser automation library reaches the runtime set: every package under packages/.
+// `node tools/check-runtime-imports.ts` reads the packages under packages/ of its working folder,
+// and fails, naming the package and the library, when a package imports one (a static or dynamic import, a
 // re-export or a require, including a sub-path such as playwright-core/lib/server) or declares one
 // as a dependency. The banned libraries are playwright, playwright-core, puppeteer,
 // puppeteer-core, webdriverio, selenium-webdriver and chrome-remote-interface.
-// The fixture repositories under fixtures/runtime-imports/ are a clean set (driver-playwright
-// using playwright-core, and the word "playwright" kept as data), and the same set with banned
-// imports or dependencies planted. `npm run check` runs the lint, and the repository passes it.
+// The fixture repositories under fixtures/runtime-imports/ are a clean set (with the word
+// "playwright" kept as data), and the same set with banned imports or dependencies planted. The
+// repository's own dev dependency on playwright-core is in the root package.json, not a package. `npm run check` runs the lint, and the repository passes it.
 import assert from 'node:assert/strict';
 import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -39,18 +38,18 @@ function cleanCopyWith(path: string, content: string): string {
 // The run failed, and one line of its output names both the package folder and the library.
 function assertReported(run: ToolRun, packageFolder: string, library: string): void {
   assert.equal(run.passed, false, describeRun(run));
-  // The library's name standing alone, so playwright is not found inside playwright-core or driver-playwright.
+  // The library's name standing alone, so playwright is not found inside playwright-core.
   const libraryName = new RegExp(`(?<![\\w@/.-])${library}(?![\\w-])`);
   const named = run.output.split('\n').some((line) => line.includes(packageFolder) && libraryName.test(line));
   assert.ok(named, `no line names ${packageFolder} and ${library}:\n${describeRun(run)}`);
 }
 
-test('the clean fixture set passes: only the fallback adapter uses Playwright, and the word alone is data', () => {
+test('the clean fixture set passes, and the word playwright alone is data', () => {
   const run = lint(fixture('clean'));
   assert.equal(run.passed, true, describeRun(run));
 });
 
-test('the repository\'s own default runtime set passes', () => {
+test('the repository\'s own runtime set passes', () => {
   const run = lint(REPOSITORY_ROOT);
   assert.equal(run.passed, true, describeRun(run));
 });
@@ -64,7 +63,7 @@ test('npm run check runs the runtime import lint', () => {
   assert.ok(scripts['lint']?.includes(`node tools/${TOOL}`), `lint runs tools/${TOOL}`);
 });
 
-test('every banned import in the default set is reported, by package and library', () => {
+test('every banned import in the set is reported, by package and library', () => {
   const run = lint(fixture('banned-imports'));
   for (const [packageFolder, library] of [
     ['report', 'playwright'], ['cli', 'puppeteer-core'], ['runner', 'webdriverio'], ['auditor-act', 'selenium-webdriver'],

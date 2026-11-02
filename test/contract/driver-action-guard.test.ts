@@ -1,4 +1,4 @@
-// Both real drivers honour the policy gate's runtime guard. Given a guard, a driver resolves the
+// The real driver honours the policy gate's runtime guard. Given a guard, a driver resolves the
 // step's element, asks the guard with the element as the page shows it, and sends input only on
 // an allow. On a deny the step ends with policy-denied and the page receives no input event at
 // all: the fixture page (fixtures/capability-app/guard.html) counts every press, click, key and
@@ -12,7 +12,7 @@ import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import type { ActionGuard, GuardVerdict, ResolvedElement, Session } from '@revisum/engine';
 import {
-  CDP_TARGET, PLAYWRIGHT_TARGET, UPLOAD_FIXTURE, capabilityCdpDriver, capabilityDrivers, capabilityHarness, capabilityPlan, click,
+  CDP_TARGET, UPLOAD_FIXTURE, capabilityCdpDriver, capabilityDrivers, capabilityHarness, capabilityPlan, click,
   label, navigate, role, shownText, testId, textEquals, watchedDriver, type CapabilityHarness,
 } from '../support/capability-harness.ts';
 import { BROWSERS } from '../support/browsers.ts';
@@ -53,7 +53,7 @@ type GuardedAction = {
 const shown = (id: string) => (session: Session): Promise<string> => shownText(capability, session, id);
 const noteValue = async (session: Session): Promise<string> => (await session.probe(capability.locator(label('Note')))).value ?? '';
 
-const BOTH_DRIVERS: readonly GuardedAction[] = [
+const CLICK_FILL_AND_PRESS: readonly GuardedAction[] = [
   { name: 'click', step: click(role('button', 'Save draft')), element: { role: 'button', name: 'Save draft' }, effect: { read: shown('save-clicks'), untouched: '0', done: '1' } },
   {
     name: 'fill', step: { type: 'fill', locator: label('Note'), value: 'Remember the milk' }, element: { role: 'textbox', name: 'Note' },
@@ -65,8 +65,7 @@ const BOTH_DRIVERS: readonly GuardedAction[] = [
   },
 ];
 
-// Steps the own CDP driver performs and the Playwright fallback refuses.
-const CDP_ONLY: readonly GuardedAction[] = [
+const HOVER_SELECT_AND_UPLOAD: readonly GuardedAction[] = [
   { name: 'hover', step: { type: 'hover', locator: role('button', 'Help') }, element: { role: 'button', name: 'Help' }, effect: { read: shown('help-state'), untouched: 'closed', done: 'open' } },
   {
     name: 'select', step: { type: 'select', locator: label('Size'), option: 'Large' }, element: { role: 'combobox', name: 'Size' },
@@ -79,8 +78,7 @@ const CDP_ONLY: readonly GuardedAction[] = [
 ];
 
 const DRIVERS = [
-  { targetId: CDP_TARGET, actions: [...BOTH_DRIVERS, ...CDP_ONLY] },
-  { targetId: PLAYWRIGHT_TARGET, actions: BOTH_DRIVERS },
+  { targetId: CDP_TARGET, actions: [...CLICK_FILL_AND_PRESS, ...HOVER_SELECT_AND_UPLOAD] },
 ] as const;
 
 for (const { targetId, actions } of DRIVERS) {

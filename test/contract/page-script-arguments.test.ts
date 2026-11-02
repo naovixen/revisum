@@ -1,5 +1,5 @@
 // A page script receives its arguments as JSON values, never spliced into its source, and its
-// source reaches the page unchanged, on both drivers.
+// source reaches the page unchanged, on the CDP driver.
 //
 // The declared script echoArguments (fixtures/unsafe-features-project/plans/scripts/) reports how
 // many arguments it was called with, the names of the one object's fields, the text, number and
@@ -18,7 +18,7 @@ import { after, before, describe, test } from 'node:test';
 import { approvedStanding } from '../unit/engine/policy-examples.ts';
 import { fakeEnvironmentStore, fakeSecretValue } from '../unit/engine/secret-examples.ts';
 import {
-  BOTH_TARGETS, ECHO_ARGUMENTS_FILE, ECHO_COUNT_MAXIMUM, ECHO_TEXT_MAXIMUM_LENGTH, PAGE_SECRET, expectScript, fill, inlineScript, label,
+  CDP_TARGETS, ECHO_ARGUMENTS_FILE, ECHO_COUNT_MAXIMUM, ECHO_TEXT_MAXIMUM_LENGTH, PAGE_SECRET, expectScript, fill, inlineScript, label,
   navigate, outcomes, scriptFileText, secretValue, unsafePageHarness, unsafePagePlan, type JsonRecord, type UnsafePageHarness,
 } from './unsafe-page-support.ts';
 
@@ -137,7 +137,7 @@ test('mutant: splicing the same texts into the source breaks the script or chang
   assert.ok(changed.some((set) => set.text === '"); fetch('), 'the named "); fetch( set is among them');
 });
 
-for (const targetId of BOTH_TARGETS) {
+for (const targetId of CDP_TARGETS) {
   describe(`named page script arguments: ${targetId}`, () => {
     test(`each of ${ARGUMENT_SETS} generated argument sets reaches the script as one JSON object, and the page runs the file's exact source`, { timeout: TIMEOUT }, async () => {
       const source = scriptFileText(ECHO_ARGUMENTS_FILE);

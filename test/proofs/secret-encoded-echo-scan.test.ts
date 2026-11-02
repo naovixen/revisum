@@ -26,7 +26,7 @@ import { holdsSecret } from '../unit/engine/echo-page-driver.ts';
 import { fakeEnvironmentStore, fakeSecretOfLength, fakeSecretValue, resolvedSecret } from '../unit/engine/secret-examples.ts';
 
 const TIMEOUT = 300_000;
-const TARGETS = ['playwright-chromium', 'cdp-chromium'] as const;
+const TARGETS = ['cdp-chromium'] as const;
 // The echo elements on the fixture page.
 const ECHOES = ['basic-offset-0', 'basic-offset-1', 'basic-offset-2', 'form', 'lower-hex'] as const;
 const SECRET_LENGTHS = [8, 10] as const;
