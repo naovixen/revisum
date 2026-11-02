@@ -15,6 +15,9 @@ const TRACE_ENTRY = /\.trace$/;
 const CONTEXT_OPTIONS = 'context-options';
 const ACTION_START = 'before';
 const MAXIMUM_ACTION_TITLE_LENGTH = 2000;
+// Far more than one test does. A trace can hold millions of short lines under its size limit, and
+// each action kept becomes a step of a finding.
+const MAXIMUM_TRACE_ACTIONS = 20_000;
 // A self-reported version or browser name is kept only when it looks like one.
 const VERSION_TEXT = /^\d{1,4}\.\d{1,4}\.\d{1,4}([-+.][0-9A-Za-z.-]{1,32})?$/;
 const BROWSER_NAME = /^[a-z][a-z0-9-]{0,31}$/;
@@ -59,6 +62,9 @@ function readTraceFile(text: string, path: string): Result<ReadEvents, SuiteDeco
     if (event['type'] !== ACTION_START) continue;
     const title = actionTitle(event);
     const start = event['startTime'];
+    if (title !== null && actions.length === MAXIMUM_TRACE_ACTIONS) {
+      return failure({ code: 'too-large', path });
+    }
     if (title !== null) actions.push({ start: typeof start === 'number' && Number.isFinite(start) ? start : actions.length, title });
   }
   const browserName = first['browserName'];
@@ -89,7 +95,12 @@ export function parseSuiteTrace(archive: Uint8Array, limits: EvidenceLimits, att
     }
     const events = readTraceFile(text, `$.entries[${index}]`);
     if (!events.ok) return events;
-    actions.push(...events.value.actions);
+    for (const action of events.value.actions) {
+      if (actions.length === MAXIMUM_TRACE_ACTIONS) {
+        return failure({ code: 'too-large', path: `$.entries[${index}]` });
+      }
+      actions.push(action);
+    }
     browserName ??= events.value.browserName;
     playwrightVersion ??= events.value.playwrightVersion;
   }

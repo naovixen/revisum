@@ -16,17 +16,17 @@
 import {
   failure, success,
   type CommandName, type Clock, type DatabaseCommandDeclaration, type DatabaseCommandRequest, type DatabaseCommandRunner, type DatabaseStep,
-  type DeclaredService, type ExpectDatabaseStep, type FieldName, type ParameterName, type Result, type SafeText, type ScriptArguments,
+  type DeclaredService, type ExpectDatabaseStep, type FieldName, type ParameterName, type Result, type ScriptArguments,
   type SecretStore, type ServiceName, type ValueName, type WorkloadErrorCode, type WorkloadOutcome, type WorkloadVariable,
 } from '@revisum/contracts';
 import { sha256 } from '../hashing.ts';
 import type { Logger } from '../logging.ts';
 import { MAXIMUM_SCRIPT_RESULT_DEPTH, nestingDepth } from '../page-scripts/page-script-result.ts';
-import { runTimeText } from '../plan/plan-decoders.ts';
 import { rememberedFieldEntries } from '../plan/plan-values.ts';
 import type { Project } from '../project/project-parser.ts';
 import { declaredCommands } from '../project/unsafe-feature-declarations.ts';
-import { resolveText, type StepErrorCode } from '../run-values.ts';
+import type { RememberedRecord, RememberedValues } from '../RememberedValues.ts';
+import { resolveText, type RunValues, type StepErrorCode } from '../run-values.ts';
 import { argumentProblem, argumentText, runValueArgument, type ArgumentValue } from '../service-calls/parameter-values.ts';
 import { checkBackendField, fieldAt, fieldText } from '../service-calls/service-response.ts';
 
@@ -62,8 +62,6 @@ export type DatabaseCommandRecord = {
 export type DatabaseStepCode = StepErrorCode | WorkloadErrorCode
   | 'parameter-invalid' | 'field-missing' | 'secret-missing' | 'egress-blocked' | 'assertion-failed';
 
-type RememberedRecord = { readonly valueName: ValueName; readonly sha256: string };
-
 // What one of these steps gives its step result. A step that remembers one value records it as
 // `remembered`; one that remembers several records them all in `rememberedValues`.
 type DatabaseStepOutcome = {
@@ -74,13 +72,13 @@ type DatabaseStepOutcome = {
   readonly rememberedValues?: readonly RememberedRecord[];
 };
 
-// What the run hands these steps. `values` and `rememberedTexts` are the run's own: a step adds
-// what it remembers. `secrets` holds only the secrets the run resolved for commands.
+// What the run hands these steps. `remembered` is how a step adds to the run's values. `secrets`
+// holds only the secrets the run resolved for commands.
 export type DatabaseCommandContext = {
   readonly runner: DatabaseCommandRunner;
   readonly project: Project;
-  readonly values: Map<ValueName, SafeText>;
-  readonly rememberedTexts: Set<string>;
+  readonly values: RunValues;
+  readonly remembered: RememberedValues;
   readonly secrets: SecretStore;
   readonly clock: Clock;
   readonly logger: Logger;
@@ -242,23 +240,17 @@ function outputField(document: unknown, declaration: DatabaseCommandDeclaration,
   return pointer === undefined ? failure('field-missing') : fieldAt(document, pointer);
 }
 
-// The output fields a step remembers, as run values. All or none: a value is set only once every
-// field has been read, so a failed read leaves the run's values as they were.
-function rememberedEntries(
-  step: DatabaseStep, document: unknown, declaration: DatabaseCommandDeclaration, project: Project,
-): Result<readonly (readonly [ValueName, SafeText])[], DatabaseStepCode> {
-  const entries: (readonly [ValueName, SafeText])[] = [];
+// The texts of the output fields a step remembers. Every field is read before any is kept.
+function textsToRemember(
+  step: DatabaseStep, document: unknown, declaration: DatabaseCommandDeclaration,
+): Result<readonly (readonly [ValueName, string])[], DatabaseStepCode> {
+  const entries: (readonly [ValueName, string])[] = [];
   for (const [name, field] of rememberedFieldEntries(step.remember)) {
     const found = outputField(document, declaration, field);
     if (!found.ok) return found;
     const text = fieldText(found.value);
     if (text === undefined) return failure('field-missing');
-    // A remembered value is plan text from then on, so it passes the same rules as plan text: a
-    // line break is value-unsafe, so it never reaches a later command's argument.
-    if (text.length > project.limits.maximumTextLength) return failure('value-too-long');
-    const safe = runTimeText(text, project.limits.maximumTextLength);
-    if (safe === undefined) return failure('value-unsafe');
-    entries.push([name, safe]);
+    entries.push([name, text]);
   }
   return success(entries);
 }
@@ -272,16 +264,11 @@ export async function runDatabaseStep(step: DatabaseStep, stepIndex: number, con
   const once = await runOnce(request.value, found.declaration, stepIndex, step.type, context);
   const databaseCommand = record(found, once, 1);
   if (!once.result.ok) return failedWith(once.result.error, databaseCommand);
-  const remembered = rememberedEntries(step, once.result.value, found.declaration, context.project);
+  const texts = textsToRemember(step, once.result.value, found.declaration);
+  if (!texts.ok) return failedWith(texts.error, databaseCommand);
+  const remembered = context.remembered.rememberAll(texts.value, stepIndex);
   if (!remembered.ok) return failedWith(remembered.error, databaseCommand);
-  const records: RememberedRecord[] = [];
-  for (const [valueName, text] of remembered.value) {
-    context.values.set(valueName, text);
-    context.rememberedTexts.add(text);
-    const digest = sha256(text);
-    context.logger.log({ kind: 'value.remembered', stepIndex, valueName, sha256: digest });
-    records.push({ valueName, sha256: digest });
-  }
+  const records = remembered.value;
   const [only] = records;
   const kept = records.length === 1 && only !== undefined ? { remembered: only } : records.length > 1 ? { rememberedValues: records } : {};
   return { outcome: 'passed', databaseCommand, ...kept };

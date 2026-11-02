@@ -14,13 +14,11 @@ import {
   failure, isSecret, success,
   type CallArguments, type Clock, type FieldName, type JsonPointer, type ObservedExchange, type Plan, type RequestName, type ResolvedStub,
   type ResolvedStubResponse, type ResponseAssertion, type Result, type SafeText, type SecretStore, type Session, type Step, type StubDeclaration,
-  type StubName, type StubResponseBody, type ValueName,
+  type StubName, type StubResponseBody,
 } from '@revisum/contracts';
-import { sha256 } from '../hashing.ts';
-import type { Logger } from '../logging.ts';
-import { runTimeText } from '../plan/plan-decoders.ts';
 import type { Project } from '../project/project-parser.ts';
-import { resolveText } from '../run-values.ts';
+import type { RememberedRecord, RememberedValues } from '../RememberedValues.ts';
+import { resolveText, type RunValues } from '../run-values.ts';
 import { jsonTextWithSecrets, storedTextWithSecrets } from '../secrets/secret-values.ts';
 import { bodyOf, filledTemplate, type JsonWithSecrets, type RequestBuildError } from '../service-calls/service-request.ts';
 import { fieldAt, fieldText, responseJson } from '../service-calls/service-response.ts';
@@ -28,18 +26,17 @@ import { fieldAt, fieldText, responseJson } from '../service-calls/service-respo
 // How long a check waits between two looks at the exchanges or the storage.
 const POLL_INTERVAL_MILLISECONDS = 50;
 
-// What the run hands these steps. `values` and `rememberedTexts` are the run's own: a remember step
-// adds to them. `activeStubs` is the run's record of the stubs started and not yet stopped.
+// What the run hands these steps. `remembered` is how a remember step adds to the run's values.
+// `activeStubs` is the run's record of the stubs started and not yet stopped.
 export type NetworkStepContext = {
   readonly project: Project;
   // The run's session, whose ports these steps use; null before one is open.
   readonly session: Session | null;
-  readonly values: Map<ValueName, SafeText>;
-  readonly rememberedTexts: Set<string>;
+  readonly values: RunValues;
+  readonly remembered: RememberedValues;
   // Only the secrets the run resolved for stub starts and storage writes.
   readonly secrets: SecretStore;
   readonly clock: Clock;
-  readonly logger: Logger;
   readonly activeStubs: Set<StubName>;
 };
 
@@ -49,7 +46,7 @@ type NetworkStepOutcome = {
   readonly code?: string;
   // Only a count, or "present", "absent" or "differs": never a value read from the page or a response.
   readonly observed?: string;
-  readonly remembered?: { readonly valueName: ValueName; readonly sha256: string };
+  readonly remembered?: RememberedRecord;
 };
 
 const passed: NetworkStepOutcome = { outcome: 'passed' };
@@ -244,16 +241,9 @@ export async function rememberFromResponse(
     return { pass: text.ok, text, final: !latest.ok && !isWorthAnotherLook(latest.error) };
   });
   if (!seen.text.ok) return failedWith(seen.text.error);
-  const maximumLength = context.project.limits.maximumTextLength;
   if (seen.text.value === '') return failedWith('value-empty');
-  if (seen.text.value.length > maximumLength) return failedWith('value-too-long');
-  const safe = runTimeText(seen.text.value, maximumLength);
-  if (safe === undefined) return failedWith('value-unsafe');
-  context.values.set(step.name, safe);
-  context.rememberedTexts.add(safe);
-  const digest = sha256(safe);
-  context.logger.log({ kind: 'value.remembered', stepIndex: index, valueName: step.name, sha256: digest });
-  return { outcome: 'passed', remembered: { valueName: step.name, sha256: digest } };
+  const kept = context.remembered.remember(step.name, seen.text.value, index);
+  return kept.ok ? { outcome: 'passed', remembered: kept.value } : failedWith(kept.error);
 }
 
 // ---- Stubs ----------------------------------------------------------------------------------

@@ -15,6 +15,10 @@ export const SUITE_REPORT_FILE = 'report.json';
 // The folder, inside Revisum's output folder, where Playwright writes traces and attachments.
 const SUITE_RESULTS_FOLDER = 'test-results';
 const REPORT_PATH_VARIABLE = 'PLAYWRIGHT_JSON_OUTPUT_NAME';
+// What is read back as a suite's evidence, so nothing older may be there when it runs. The rest of the
+// output folder is left alone: it is the only place a setup command can leave work for the suite,
+// since the checkout is read-only and each command gets a new container.
+export const SUITE_EVIDENCE_PATHS: readonly string[] = [SUITE_REPORT_FILE, SUITE_RESULTS_FOLDER];
 
 export type SuiteArguments = {
   readonly argv: readonly string[];

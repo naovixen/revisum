@@ -14,7 +14,7 @@ import { canonicalJson, sha256 } from '../hashing.ts';
 import type { Refusal, TerminalState } from '../lifecycle.ts';
 import { manifestHash, type RunManifest } from '../manifest.ts';
 import { runTimeTextOrDigest } from '../plan/plan-decoders.ts';
-import { CRITERION_ID } from '../plan/plan-grammar.ts';
+import { criterionIdFrom } from '../plan/plan-parser.ts';
 import { withResultHash } from '../result-hash.ts';
 import type { EvidenceOutcomeCode, RunResult, RunReviewItem } from '../run.ts';
 import type { SuiteDecodeError, SuiteReport, SuiteReportTest, SuiteTrace } from './suite-report.ts';
@@ -31,11 +31,17 @@ export type EvidenceContext = {
   readonly manifest?: RunManifest;
   // What the egress proxy blocked, as seen on the wire. Kept redacted: a name can carry a secret.
   readonly blockedOrigins?: readonly string[];
+  // True when what the proxy decided could not be read back whole.
+  readonly egressRecordUnread?: boolean;
+  // Why a trace the report attaches could not be read.
+  readonly traceDecodeErrors?: readonly SuiteDecodeError[];
 };
 
 const CRITERION_ANNOTATION = 'criterion';
 const MAXIMUM_KEPT_TEXT_LENGTH = 2000;
 const MAXIMUM_MESSAGE_LINES = 40;
+// A test can attach several traces, each under its own limit on actions.
+const MAXIMUM_FINDING_STEPS = 20_000;
 // Terminal colour codes, which Playwright writes into error messages.
 const TERMINAL_ESCAPE = /\u001b\[[0-9;]*[A-Za-z]/g;
 // The outcomes that make Playwright Test exit with 1.
@@ -56,15 +62,19 @@ const suiteTestId = (test: SuiteReportTest): SuiteTestId =>
 const agreeingExitCode = (outcomes: readonly SuiteTestOutcome[]): number => (outcomes.some((outcome) => FAILING_OUTCOMES.includes(outcome)) ? 1 : 0);
 
 // The criterion ids a test's annotations link, and the index of each criterion annotation whose
-// description is not a valid id, which is dropped and raised for review without its text.
-function linkedCriteria(test: SuiteReportTest): { readonly criterionIds: readonly CriterionId[]; readonly invalid: readonly number[] } {
+// description is not a valid id, or holds what the redactor removes, which is dropped and raised for
+// review without its text.
+function linkedCriteria(test: SuiteReportTest, redactor: Redactor): { readonly criterionIds: readonly CriterionId[]; readonly invalid: readonly number[] } {
   const criterionIds: CriterionId[] = [];
   const invalid: number[] = [];
   test.annotations.forEach((annotation, index) => {
     if (annotation.type !== CRITERION_ANNOTATION) return;
     const description = annotation.description;
-    if (description === undefined || !CRITERION_ID.test(description)) { invalid.push(index); return; }
-    const criterionId = brand<string, 'CriterionId'>(description);
+    const criterionId = description === undefined || redactor.text(description) !== description ? undefined : criterionIdFrom(description);
+    if (criterionId === undefined) {
+      invalid.push(index);
+      return;
+    }
     if (!criterionIds.includes(criterionId)) criterionIds.push(criterionId);
   });
   return { criterionIds, invalid };
@@ -76,13 +86,13 @@ const messageLines = (message: string, redactor: Redactor): SafeText[] =>
     .map((line) => keptText(line, redactor));
 
 // The actions of the test's trace, found by the trace attachments it has.
-function traceSteps(test: SuiteReportTest, traces: readonly SuiteTrace[], redactor: Redactor): SafeText[] {
+function traceActions(test: SuiteReportTest, traces: readonly SuiteTrace[]): readonly string[] {
   const attached = new Set(test.attachments.flatMap((attachment) => (attachment.path === undefined ? [] : [attachment.path])));
-  return traces.filter((trace) => attached.has(trace.attachmentPath)).flatMap((trace) => trace.actions.map((action) => keptText(action, redactor)));
+  return traces.filter((trace) => attached.has(trace.attachmentPath)).flatMap((trace) => trace.actions);
 }
 
 function failFinding(
-  test: SuiteReportTest, id: SuiteTestId, criterionIds: readonly CriterionId[], traces: readonly SuiteTrace[], redactor: Redactor,
+  test: SuiteReportTest, id: SuiteTestId, criterionIds: readonly CriterionId[], actions: readonly string[], redactor: Redactor,
 ): SuiteFinding {
   const error = test.errors[0];
   const location: SuiteLocation | undefined = error?.location === undefined
@@ -90,26 +100,29 @@ function failFinding(
   return {
     id: sha256(canonicalJson({ finding: 'fail', testId: id })), testId: id, status: 'fail', criterionIds,
     ...(criterionIds.length === 0 ? {} : { criterionLink: SUITE_CRITERION_LINK }),
-    steps: traceSteps(test, traces, redactor),
+    // The last steps, since those led to the failure.
+    steps: actions.slice(-MAXIMUM_FINDING_STEPS).map((action) => keptText(action, redactor)),
     message: test.errors.flatMap((each) => (each.message === undefined ? [] : messageLines(each.message, redactor))),
     ...(location === undefined ? {} : { location }),
   };
 }
 
-// Interrupted tests and a disagreeing exit code make the run Errored: it could not test. Then a
-// failed or timed-out test, or a report with no tests at all, makes it Failed; otherwise it Passed.
+// Interrupted tests, a disagreeing exit code and an unread egress record make the run Errored: it
+// could not test, or cannot show how. Then a failed or timed-out test, or a report with no test that
+// ran, makes it Failed; otherwise it Passed.
 function evidenceState(
   outcomes: readonly SuiteTestOutcome[], exitCodeMismatch: boolean, outcomeCode: EvidenceOutcomeCode | undefined,
 ): Extract<TerminalState, 'Passed' | 'Failed' | 'Errored'> {
-  if (outcomeCode === 'suite-timeout' || exitCodeMismatch || outcomes.includes('interrupted')) return 'Errored';
+  if (outcomeCode === 'suite-timeout' || outcomeCode === 'egress-unread' || exitCodeMismatch || outcomes.includes('interrupted')) return 'Errored';
   if (outcomeCode === 'vacuous') return 'Failed';
   return outcomes.some((outcome) => FINDING_OUTCOMES.includes(outcome)) ? 'Failed' : 'Passed';
 }
 
 // The guarantee statement every evidence result carries. A suite runs only inside the isolated
 // runner, behind its egress proxy; without it the run is refused before any suite code runs.
-const evidenceGuarantees = (suite: EvidenceSuiteDeclaration, egressEnforced = true) =>
-  guaranteeStatement({ mode: 'evidence', egressEnforced, unmaskedScreenshotsKept: suite.keepSuiteScreenshots, unsafeFeatures: [] });
+const evidenceGuarantees = (context: EvidenceContext) => guaranteeStatement({
+  mode: 'evidence', egressEnforced: context.egressRecordUnread !== true, unmaskedScreenshotsKept: context.suite.keepSuiteScreenshots, unsafeFeatures: [],
+});
 
 const manifestFields = (context: EvidenceContext): Pick<RunResult, 'manifest' | 'manifestHash'> =>
   context.manifest === undefined ? { manifest: null, manifestHash: null } : { manifest: context.manifest, manifestHash: manifestHash(context.manifest) };
@@ -118,6 +131,18 @@ const manifestFields = (context: EvidenceContext): Pick<RunResult, 'manifest' | 
 const keptOrigins = (context: EvidenceContext): readonly string[] =>
   [...new Set((context.blockedOrigins ?? []).map((origin) => keptText(origin, context.redactor)))].sort();
 
+// A stopped suite's exit code is the stop's, and a suite that ran no test is vacuous whatever its
+// exit code says, so the caller compares neither with the outcomes.
+function outcomeCodeOf(context: EvidenceContext, outcomes: readonly SuiteTestOutcome[]): EvidenceOutcomeCode | undefined {
+  if (context.timedOut === true) {
+    return 'suite-timeout';
+  }
+  if (context.egressRecordUnread === true) {
+    return 'egress-unread';
+  }
+  return outcomes.every((outcome) => outcome === 'skipped') ? 'vacuous' : undefined;
+}
+
 export function evidenceResult(
   report: SuiteReport, traces: readonly SuiteTrace[], audits: readonly A11yFinding[], context: EvidenceContext,
 ): RunResult {
@@ -125,12 +150,18 @@ export function evidenceResult(
   const tests: SuiteTestResult[] = [];
   const findings: SuiteFinding[] = [];
   const reviewItems: RunReviewItem[] = [];
-  for (const test of report.tests) {
+  const decodeErrors: SuiteDecodeError[] = [...(context.traceDecodeErrors ?? [])];
+  for (const [testIndex, test] of report.tests.entries()) {
     const id = suiteTestId(test);
-    const { criterionIds, invalid } = linkedCriteria(test);
+    const { criterionIds, invalid } = linkedCriteria(test, redactor);
     for (const annotationIndex of invalid) reviewItems.push({ code: 'spec-ambiguous', testId: id, annotationIndex });
     if (test.outcome === 'expected-failure') reviewItems.push({ code: 'expected-failure', testId: id });
-    const finding = FINDING_OUTCOMES.includes(test.outcome) ? failFinding(test, id, criterionIds, traces, redactor) : undefined;
+    const isFinding = FINDING_OUTCOMES.includes(test.outcome);
+    const actions = isFinding ? traceActions(test, traces) : [];
+    if (actions.length > MAXIMUM_FINDING_STEPS) {
+      decodeErrors.push({ code: 'too-large', path: `$.tests[${testIndex}].steps` });
+    }
+    const finding = isFinding ? failFinding(test, id, criterionIds, actions, redactor) : undefined;
     if (finding !== undefined) findings.push(finding);
     tests.push({
       id, file: keptText(test.file, redactor), titlePath: test.titlePath.map((title) => keptText(title, redactor)),
@@ -141,36 +172,44 @@ export function evidenceResult(
       artefacts: [],
     });
   }
+  const reportedProjects = new Set(report.tests.map((test) => test.project));
+  for (const project of suite.projects) {
+    if (!reportedProjects.has(project)) {
+      reviewItems.push({ code: 'project-without-tests', project: keptText(project, redactor) });
+    }
+  }
+  for (const decodeErrorIndex of decodeErrors.keys()) {
+    reviewItems.push({ code: 'suite-output-unread', decodeErrorIndex });
+  }
   const outcomes = report.tests.map((test) => test.outcome);
-  // A stopped suite's exit code is the stop's, and a suite with no tests is vacuous whatever its
-  // exit code says, so neither is compared with the outcomes.
-  const outcomeCode: EvidenceOutcomeCode | undefined = context.timedOut === true ? 'suite-timeout' : outcomes.length === 0 ? 'vacuous' : undefined;
+  const outcomeCode = outcomeCodeOf(context, outcomes);
   const exitCodeMismatch = outcomeCode === undefined && exitCode !== agreeingExitCode(outcomes);
   return withResultHash({
     state: evidenceState(outcomes, exitCodeMismatch, outcomeCode),
     mode: 'evidence',
-    guarantees: evidenceGuarantees(suite),
+    guarantees: evidenceGuarantees(context),
     targetId: suite.name,
     ...manifestFields(context),
     steps: [], blockedOrigins: keptOrigins(context), unavailable: null,
     suite: { name: suite.name, tests, findings, ...(audits.length === 0 ? {} : { accessibilityFindings: audits }) },
-    evidence: { pass, exitCode, exitCodeMismatch, ...(outcomeCode === undefined ? {} : { outcomeCode }) },
+    evidence: { pass, exitCode, exitCodeMismatch, ...(outcomeCode === undefined ? {} : { outcomeCode }), ...(decodeErrors.length === 0 ? {} : { decodeErrors }) },
     ...(reviewItems.length === 0 ? {} : { reviewItems }),
     timings: { totalMilliseconds: report.tests.reduce((total, test) => total + test.durationMilliseconds, 0), stepMilliseconds: [] },
   });
 }
 
 // The result of a suite run whose report could not be read: it wrote none, or the decoder refused
-// it, or its setup command failed first. It could not test, so it is Errored, with no tests.
+// it, or its setup command failed first or left no egress record. It could not test, so it is
+// Errored, with no tests.
 export function unreadSuiteResult(
-  context: EvidenceContext, outcomeCode: Extract<EvidenceOutcomeCode, 'suite-timeout' | 'setup-failed' | 'suite-report-unread'>,
+  context: EvidenceContext, outcomeCode: Extract<EvidenceOutcomeCode, 'suite-timeout' | 'setup-failed' | 'suite-report-unread' | 'egress-unread'>,
   decodeErrors: readonly SuiteDecodeError[] = [],
 ): RunResult {
   const { suite, pass, exitCode } = context;
   return withResultHash({
     state: 'Errored',
     mode: 'evidence',
-    guarantees: evidenceGuarantees(suite),
+    guarantees: evidenceGuarantees(context),
     targetId: suite.name,
     ...manifestFields(context),
     steps: [], blockedOrigins: keptOrigins(context), unavailable: null,

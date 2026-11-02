@@ -164,6 +164,10 @@ export async function crawlInRunner(
     }
     const decoded = decodePageMap(printed, origin);
     if (!decoded.ok || decoded.value.guaranteeLevel !== 'isolated') return failure('explore-runner-unavailable');
+    // The exec read the proxy's record back, so this says whether all of the crawl's egress was recorded.
+    if (isolated.runner.guaranteeLevel() !== 'isolated') {
+      return failure('explore-runner-unavailable');
+    }
     // Redacted again on the host, in case the container lacked a secret's value.
     return success(redactPageMap(decoded.value, redactor));
   } finally {

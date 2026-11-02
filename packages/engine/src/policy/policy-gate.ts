@@ -115,29 +115,61 @@ export const isClearedForStanding = (plan: Authorised, targetId: TargetId, proje
 const withEscapesDecoded = (path: string): string =>
   path.replace(RUN_OF_ESCAPES, (run) => UTF8.decode(Uint8Array.from(run.split('%').slice(1), (escape) => Number.parseInt(escape, 16))));
 
+const comparableForm = (decoded: string): string =>
+  decoded.toLowerCase().replace(/;[^/]*/gu, '').replace(/\/+/gu, '/').replace(/\/$/u, '');
+
+// The path with its "." and ".." segments resolved, a path parameter on one included, as Tomcat reads
+// "..;x=1". Servers differ on whether "//" holds an empty segment that ".." climbs out of.
+function withoutDotSegments(path: string, isMergingSlashes: boolean): string {
+  const kept: string[] = [];
+  for (const segment of path.split('/').slice(1)) {
+    const name = segment.replace(/;.*$/u, '');
+    if (name === '..') {
+      kept.pop();
+    } else if (name !== '.' && (segment !== '' || !isMergingSlashes)) {
+      kept.push(segment);
+    }
+  }
+  return `/${kept.join('/')}`;
+}
+
 // A path compared the way servers commonly read it: percent-decoded through every layer,
 // case-insensitive, with path parameters and repeated and trailing slashes removed, so
-// "/Account//%2564elete;x=1/" still reads as /account/delete. Null when it holds more layers than
-// the gate will read.
-function comparablePath(path: string): string | null {
+// "/Account//%2564elete;x=1/" still reads as /account/delete. A server may decode a path more than
+// once and only then resolve what is left, so `resolved` reads it with its dot segments resolved after
+// each round. `decoded` reads it without, as a server that decodes once does: resolving alone would
+// allow "/account/delete/%252e%252e/settings", which that server reads as under /account/delete.
+type ComparablePath = { readonly decoded: string; readonly resolved: readonly string[] };
+
+// Null when the path holds more layers than the gate will read.
+function comparablePath(path: string): ComparablePath | null {
   let decoded = path;
+  let keepingSlashes = withoutDotSegments(path, false);
+  let mergingSlashes = withoutDotSegments(path, true);
   for (let round = 0; round < MAXIMUM_DECODING_ROUNDS; round++) {
     const next = withEscapesDecoded(decoded);
     if (next === decoded) {
-      return decoded.toLowerCase().replace(/;[^/]*/gu, '').replace(/\/+/gu, '/').replace(/\/$/u, '');
+      return { decoded: comparableForm(decoded), resolved: [comparableForm(keepingSlashes), comparableForm(mergingSlashes)] };
     }
     decoded = next;
+    keepingSlashes = withoutDotSegments(withEscapesDecoded(keepingSlashes), false);
+    mergingSlashes = withoutDotSegments(withEscapesDecoded(mergingSlashes), true);
   }
   return null;
 }
 
-// True when `path` is a destructive path or continues one after a "/". A path or pattern too deeply
-// encoded to read might be one, so it counts as one.
+// True when any reading of `path` is a destructive path or continues one after a "/". A path or
+// pattern too deeply encoded to read might be one, so it counts as one. A pattern names one route as
+// a person wrote it, so only its decoded form counts.
 function isDestructivePath(path: string, policy: ProjectPolicy): boolean {
   const visited = comparablePath(path);
-  return visited === null || policy.destructiveUrlPatterns.some((pattern) => {
-    const destructive = comparablePath(pattern);
-    return destructive === null || visited === destructive || visited.startsWith(`${destructive}/`);
+  if (visited === null) {
+    return true;
+  }
+  const readings = [visited.decoded, ...visited.resolved];
+  return policy.destructiveUrlPatterns.some((pattern) => {
+    const destructive = comparablePath(pattern)?.decoded;
+    return destructive === undefined || readings.some((reading) => reading === destructive || reading.startsWith(`${destructive}/`));
   });
 }
 

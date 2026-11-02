@@ -36,7 +36,7 @@ import { hostAndPort, joinEgressEvents } from './egress-events.ts';
 import { relayOrigin, tcpRelaysFor } from './egress-proxy.ts';
 import { PROXY_PORT } from './proxy-container.ts';
 import {
-  DEFAULT_BRIDGE_NETWORK, SECCOMP_PROFILE, dependenciesVolumeFor, isGitFolderName, ownCodeMounts, probeRunNetwork, proxyContainer, proxyReadyScript, proxyUrl,
+  DEFAULT_BRIDGE_NETWORK, SECCOMP_PROFILE, dependenciesVolumeFor, hasProxyLostRecords, isGitFolderName, ownCodeMounts, probeRunNetwork, proxyContainer, proxyReadyScript, proxyUrl,
   readDecisions, readLookups, repositoryFolder, runImageContainer,
 } from './run-containers.ts';
 import { RUN_IMAGE_TAG } from './run-image.ts';
@@ -280,8 +280,15 @@ export function workloadRunner(options: WorkloadRunnerOptions): WorkloadRunner {
       if (!finished.ok && first !== 'timed-out') return refuse('workload-start-failed', `the command could not be run: ${finished.error.detail}`);
       const printed: ExecOutcome = finished.ok ? finished.value : { exitCode: -1, stdout: '', stderr: '' };
 
-      const decisions = await readDecisions(engine, proxyId) ?? [];
-      const lookups = await readLookups(engine, proxyId);
+      const decisionsRead = await readDecisions(engine, proxyId);
+      const lookupsRead = await readLookups(engine, proxyId);
+      // A proxy that cannot be read is not a proxy that blocked nothing.
+      const isEgressRecordUnread = decisionsRead === null || lookupsRead === null || await hasProxyLostRecords(engine, proxyId);
+      if (isEgressRecordUnread) {
+        log({ code: 'notice', detail: 'what the proxy decided could not be read back whole' });
+      }
+      const decisions = decisionsRead ?? [];
+      const lookups = lookupsRead ?? [];
       // A relayed connection is the command's own, not a browser's: its channel is process.
       const relayed = new Set(relays.map(relayOrigin));
       const relayEvents = decisions.filter((decision) => relayed.has(decision.origin))
@@ -293,6 +300,7 @@ export function workloadRunner(options: WorkloadRunnerOptions): WorkloadRunner {
           ...joinEgressEvents([], decisions.filter((decision) => !relayed.has(decision.origin))), ...relayEvents,
           ...processEvents(lookups, decisions, request.policy),
         ],
+        ...(isEgressRecordUnread ? { egressRecordUnread: true } : {}),
         stdout: captured(printed.stdout, outputLimit),
         stderr: captured(printed.stderr, outputLimit),
       });

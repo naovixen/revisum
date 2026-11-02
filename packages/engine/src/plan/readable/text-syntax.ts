@@ -8,6 +8,8 @@
 // spaces. A failed reading says how far it got (`reach`); when several alternatives fail, the one
 // that got furthest explains the line best.
 
+import { entriesInKeyOrder } from '../../hashing.ts';
+
 // Why readable text was refused. None of them carries a value from the text.
 export type TextErrorCode = 'unknown-statement' | 'bad-locator' | 'bad-string' | 'bad-indent' | 'missing-header'
   | 'duplicate-header' | 'no-criterion' | 'unknown-key-name' | 'too-large' | 'duplicate-key'
@@ -54,6 +56,10 @@ export type EntrySyntax = {
 
 export const isRecord = (value: unknown): value is Readonly<Fields> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
+
+// A map whose keys are text from the plan. It has no prototype, so a key named "__proto__" is a key
+// like any other, as it is when JSON.parse reads one, and text and JSON mean the same.
+export const newMap = (): Fields => Object.create(null) as Fields;
 
 // True when two plain JSON values are the same, whatever the order of their keys.
 function sameJson(left: unknown, right: unknown): boolean {
@@ -500,12 +506,13 @@ export function entry(layout: readonly (RecordPart | 'name' | 'value')[], value:
   };
 }
 
-// A non-empty map, its entries separated by commas, in their JSON order. A name given twice is
+// A non-empty map, its entries separated by commas, read in any order and written in key order: a
+// plan's hash ignores the order of its keys, so one hash has one text. A name given twice is
 // duplicate-key at the second one: JSON cannot hold one key twice.
 export function map(item: EntrySyntax): Syntax {
   return {
     read(line, index) {
-      const entries: Fields = {};
+      const entries = newMap();
       let at = index;
       let furthest: TextFailure | undefined;
       for (let next = index, first = true; first || line[next] === ','; next = skipSpaces(line, at), first = false) {
@@ -522,7 +529,7 @@ export function map(item: EntrySyntax): Syntax {
     },
     write(value) {
       if (!isRecord(value) || Object.keys(value).length === 0) return undefined;
-      const pieces = Object.entries(value).map(([name, entryValue]) => item.write(name, entryValue));
+      const pieces = entriesInKeyOrder(value).map(([name, entryValue]) => item.write(name, entryValue));
       return pieces.every((piece) => piece !== undefined) ? pieces.join(', ') : undefined;
     },
   };

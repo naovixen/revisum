@@ -4,9 +4,15 @@ Newest entry first. Each entry names the sha256 of `plan.schema.json` as it stoo
 
 ## 1.3 (unreleased)
 
-Schema sha256: `7db2b11ac818bdc8d18fd4978b3976f140cb1f1c482a5aa15828fd438a79d8fc`
+Schema sha256: `a508e388f6d74241a89658cb75d36f47dbdf3ed1c35cd1fbf928fa032c62cebb`
 
-1.3 is 1.2 plus six opt-in unsafe features and nothing else (SPEC-36).
+1.3 is 1.2 plus six opt-in unsafe features and nothing else (SPEC-36), with these refusals added since (2026-11-02). Plans that passed them before are refused now, but what an accepted plan means and its hash do not change:
+
+- **Hidden text.** Plan text may not hold C1 controls, bidirectional marks, a zero width space, word joiners and other invisible operators, a byte order mark, interlinear annotation marks, U+2028 or U+2029 (`unsafe_text`). The zero width joiner and non-joiner and the soft hyphen stay allowed.
+- **URLs.** A URL is written as a path starting with `/` or as a lower-case `http://` or `https://` URL with nothing before it, in the parser as in the schema (`invalid_url`). A path starting `//` once its dots are worked out is `invalid_url`.
+- **Names and pointers.** Capture names, download names and query keys shaped like a credential are `literal_secret`, and so are an inline script's field pointers, which also follow the rules of plan text. A query key may not be `__proto__`.
+- **Holes.** A list with a hole, which no JSON file can hold, is refused at any depth.
+- **One text, one URL.** The readable format writes every map in key order, and a path template's query is sent in key order, so two plans with one hash read and navigate alike.
 
 - **One version (2026-11-02).** `"version": "1.3"` is the only version a plan may declare, and any other is refused with `version_unsupported`, so no plan partly runs. An unsafe feature is gated only by the trusted project. `migratePlan` and `no_criterion_id` are gone. The entries below this one are history: what they promise about older versions no longer holds.
 - **Opt-in, per feature.** Each feature is off unless the trusted `project.json` enables it in a new `unsafeFeatures` section: `cssLocators` (feature `css-locator`), `xpathLocators` (`xpath-locator`), `domChecks` (`dom-checks`), `pageScripts` (`page-script`; with `allowInline` set to true also `inline-page-script`) and `databaseCommands` (`database-command`). A disabled feature is refused by the one plan parser with the new plan error `unsafe_feature_disabled`, at every use: a locator's `by`, an assertion's `kind`, a `remember` source's `read`, a step's `type`, or an inline script's `script.inline`. Nothing under it is read or echoed.

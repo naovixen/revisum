@@ -86,6 +86,9 @@ const AUTHORITY = /^(\[[0-9a-fA-F:.%a-zA-Z]+\]|[^:[\]/\s]+):(\d{1,5})$/;
 // How a decision names a request too malformed to name an origin. The reader of the proxy's file
 // drops a decision with no origin, and the request's own text could hold anything, so neither is used.
 const MALFORMED_REQUEST_ORIGIN = 'malformed-request';
+// A client's parser passes on any three digits, such as 000, and Node's server throws on a status
+// outside this range, which from inside a handler would end the proxy for every other request.
+const isWritableStatus = (status: number): boolean => status >= 100 && status <= 999;
 
 // The proxy's rules for a policy: its origins, the origins of the services it allows, which of
 // those services are private, its rewrites, and a TCP relay for each service it allows over TCP
@@ -221,6 +224,11 @@ export async function startProxyServer(rules: ProxyRules, options: ProxyServerOp
     // timeout, ends the service's connection too, so the service stops sending.
     response.on('close', () => { if (!response.writableFinished) upstream.destroy(); });
     upstream.on('response', (answer) => {
+      if (!isWritableStatus(answer.statusCode ?? 502)) {
+        answerFromProxy(response, 502, 'unreachable', 'the service sent a status HTTP does not have');
+        upstream.destroy();
+        return;
+      }
       if (rewrites.length === 0) {
         response.writeHead(answer.statusCode ?? 502, answerHeaders(answer.headers));
         answer.pipe(response);

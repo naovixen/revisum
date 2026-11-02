@@ -4,7 +4,7 @@
 // policy gate applies, written by a person. AI output never reaches this type. The person declares
 // every target; the engine never invents one.
 import {
-  COLOR_SCHEMES, DEFAULT_TEST_ID_ATTRIBUTE, DEVICE_PROFILES, ENGINES, FIDELITIES, MOTION_PREFERENCES, PLANNER_WIRES, TARGET_KINDS, TARGET_PROVIDERS, success, failure,
+  COLOR_SCHEMES, DEFAULT_TEST_ID_ATTRIBUTE, DEVICE_PROFILES, ENGINES, FIDELITIES, MOTION_PREFERENCES, PLANNER_WIRES, success, failure,
   type Brand, type CallDeclaration, type CallName, type DeclaredService, type DeviceProfileId, type FixtureName, type IrreversiblePatterns, type Locale, type Origin, type Result,
   type EmailDomain, type EvidenceMode, type PlannerEndpoint, type SafeText, type SecretName, type Target, type TestIdAttribute, type TimeZone,
   type ObservedRequestDeclaration, type RequestName, type StorageEntryDeclaration, type StorageEntryName, type StubDeclaration, type StubName,
@@ -12,7 +12,7 @@ import {
 } from '@revisum/contracts';
 import { brand } from '../brand.ts';
 import {
-  INVALID, allValid, peekRecord, readInteger, readList, readOneOf, readRecord, readText, type Issues, type Parsed, type PlanError,
+  INVALID, allValid, hasHoles, peekRecord, readInteger, readList, readOneOf, readRecord, readText, type Issues, type Parsed, type PlanError,
 } from '../plan/plan-decoders.ts';
 import { readCallDeclarations, readServices } from './call-declarations.ts';
 import { readObservedRequestDeclarations, readStorageEntryDeclarations, readStubDeclarations } from './network-and-storage-declarations.ts';
@@ -190,7 +190,7 @@ function readTimeZone(input: unknown, path: string, issues: Issues): Parsed<Time
 }
 
 const REQUIRED_TARGET_KEYS = ['id', 'adapter', 'engine', 'device', 'locale', 'timezone', 'colorScheme', 'reducedMotion'] as const;
-const OPTIONAL_TARGET_KEYS = ['kind', 'version', 'fidelity', 'provider', 'required', 'vendorExtensions'] as const;
+const OPTIONAL_TARGET_KEYS = ['version', 'fidelity', 'required', 'vendorExtensions'] as const;
 // A browser build as its vendor numbers it, such as "156.0.7258.5" or "26.0".
 const BUILD_VERSION = /^[0-9][0-9A-Za-z.+_-]{0,63}$/;
 // "vendor:name", both parts lowercase words such as "acme:device-farm-pool".
@@ -215,7 +215,7 @@ function isJsonValue(input: unknown, depth: number): boolean {
   if (input === null || typeof input === 'string' || typeof input === 'boolean') return true;
   if (typeof input === 'number') return Number.isFinite(input);
   if (depth >= MAXIMUM_EXTENSION_DEPTH || typeof input !== 'object') return false;
-  if (Array.isArray(input)) return input.every((item) => isJsonValue(item, depth + 1));
+  if (Array.isArray(input)) return !hasHoles(input) && input.every((item) => isJsonValue(item, depth + 1));
   const prototype = Object.getPrototypeOf(input);
   if (prototype !== Object.prototype && prototype !== null) return false;
   return Object.values(input).every((item) => isJsonValue(item, depth + 1));
@@ -263,22 +263,18 @@ export function readTarget(input: unknown, path: string, issues: Issues): Parsed
     readOneOf(fields['reducedMotion'], `${path}.reducedMotion`, issues, MOTION_PREFERENCES),
   ] as const;
   const optional = [
-    readOptional(fields, 'kind', path, issues, (value, at, found) => readOneOf(value, at, found, TARGET_KINDS)),
     readOptional(fields, 'version', path, issues, readBuildVersion),
     readOptional(fields, 'fidelity', path, issues, (value, at, found) => readOneOf(value, at, found, FIDELITIES)),
-    readOptional(fields, 'provider', path, issues, (value, at, found) => readOneOf(value, at, found, TARGET_PROVIDERS)),
     readOptional(fields, 'required', path, issues, readBoolean),
     readOptional(fields, 'vendorExtensions', path, issues, readVendorExtensions),
   ] as const;
   if (!allValid(parts) || !allValid(optional)) return INVALID;
   const [id, adapter, engine, device, locale, timezone, colorScheme, reducedMotion] = parts;
-  const [kind, version, fidelity, provider, required, vendorExtensions] = optional;
+  const [version, fidelity, required, vendorExtensions] = optional;
   return {
     id, adapter, engine, device, locale, timezone, colorScheme, reducedMotion,
-    ...(kind === undefined ? {} : { kind }),
     ...(version === undefined ? {} : { version }),
     ...(fidelity === undefined ? {} : { fidelity }),
-    ...(provider === undefined ? {} : { provider }),
     ...(required === undefined ? {} : { required }),
     ...(vendorExtensions === undefined ? {} : { vendorExtensions }),
   };
@@ -426,7 +422,8 @@ function readPolicy(input: unknown, path: string, issues: Issues, limits: Parsed
   const fields = readRecord(input, path, issues, POLICY_KEYS, []);
   if (fields === INVALID) return INVALID;
   const longestName = limits === INVALID ? DEFAULT_LIMITS.maximumTextLength : limits.maximumTextLength;
-  const allowProduction = fields['allowProductionForApprovedPlans'] ?? false;
+  // Present but null is not "absent": only true or false is a setting.
+  const allowProduction = Object.hasOwn(fields, 'allowProductionForApprovedPlans') ? fields['allowProductionForApprovedPlans'] : false;
   if (typeof allowProduction !== 'boolean') issues.push({ code: 'wrong_type', path: `${path}.allowProductionForApprovedPlans` });
   const parts = [
     readIrreversiblePatterns(fields['irreversiblePatterns'], `${path}.irreversiblePatterns`, issues),
@@ -550,6 +547,10 @@ export function parseProject(input: unknown): Result<Project, readonly PlanError
   // A name such as "a..b" matches the pattern but is refused anyway, so no fixture name looks like a way out.
   const fixtures = readNameList<'FixtureName'>(fields['fixtures'], '$.fixtures', issues, FIXTURE_NAME, (name) => !name.includes('..'));
   const origins = rawOrigins === INVALID ? [] : rawOrigins.map((origin, index) => readOrigin(origin, `$.origins[${index}]`, issues));
+  const readOrigins = origins.filter((origin) => origin !== INVALID);
+  if (new Set(readOrigins).size !== readOrigins.length) {
+    issues.push({ code: 'duplicate', path: '$.origins' });
+  }
   const productionOrigins = readProductionOrigins(fields['productionOrigins'], issues);
   const policy = readPolicy(fields['policy'], '$.policy', issues, limits);
   const testIdAttributes = readNameListOr<'TestIdAttribute'>(

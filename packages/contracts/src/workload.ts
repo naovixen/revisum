@@ -47,6 +47,9 @@ export type WorkloadOutcome = {
   // True when the runner stopped the container at the request's timeout.
   readonly timedOut: boolean;
   readonly egressEvents: readonly EgressEvent[];
+  // True when the proxy's record could not be read back or the proxy could not write all of it, so
+  // egressEvents may lack what it decided. Absent otherwise.
+  readonly egressRecordUnread?: boolean;
   // Raw: the engine redacts and leak-scans them before anything keeps them.
   readonly stdout: CapturedOutput;
   readonly stderr: CapturedOutput;

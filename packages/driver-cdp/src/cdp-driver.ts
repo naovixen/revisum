@@ -13,7 +13,7 @@ import type { ProxySettings } from './chrome-flags.ts';
 import { DownloadFolder } from './downloads.ts';
 import { EgressRecorder } from './egress-records.ts';
 import { BrowserNetwork, atResponseStage, type HeldRequest } from './network-stubs.ts';
-import { focusAndSelect, focusElement, frameContentOffset, scriptResultText } from './in-page.ts';
+import { focusAndSelect, focusElement, frameContentOffset, isConnectedToItsDocument, scriptResultText } from './in-page.ts';
 import type { HeldModifierKey } from './modifier-keys.ts';
 import type {
   DriverSession, ExposedStates, OwnBrowserDriver, PageArgument, PageFunction, PageOperations, Point, RoleAndName, ScriptCallOutcome,
@@ -287,6 +287,7 @@ async function createSession(
     events: watch,
     fixturePath: (fixture) => fixtureFilePath(fixturesFolder, fixture),
     downloads: browser.downloads,
+    secretTypedFields: [],
     openTab: () => openTab(browser, watch, details),
     network: browser.network,
     storage: pageStorage(watch),
@@ -403,7 +404,7 @@ async function openTab(browser: SessionBrowser, firstWatch: PageWatch, firstDeta
   return success(buildSession(operations, browser.environment, {
     browser: firstDetails.browser, processId: firstDetails.processId, blockedOrigins: firstDetails.blockedOrigins,
     egressRecords: firstDetails.egressRecords, fixturePath: firstDetails.fixturePath, downloads: browser.downloads, events: watch, close,
-    network: browser.network, storage: pageStorage(watch), clock: browser.clock,
+    secretTypedFields: firstDetails.secretTypedFields, network: browser.network, storage: pageStorage(watch), clock: browser.clock,
     ...(firstDetails.clipboard === undefined ? {} : { clipboard: firstDetails.clipboard }),
   }));
 }
@@ -442,6 +443,8 @@ const FRAME_WORLD_NAME = 'driver-frame';
 const HTTP_ERROR_STATUS = 'net::ERR_HTTP_RESPONSE_CODE_FAILURE';
 // Messages of a command that named an execution context the page has since destroyed.
 const LOST_CONTEXT = /context|Cannot find/i;
+// Messages of a command about an object whose document was replaced, or whose tab has closed.
+const LOST_OBJECT = /Cannot find context|Could not find object|Execution context was destroyed|Inspected target navigated or closed|Session with given id not found/i;
 
 // PageOperations over one flat CDP session, for its top document or one of its iframes' documents.
 // Element handles are remote object ids.
@@ -662,6 +665,25 @@ class CdpPage implements PageOperations<string> {
     const above = await frame.parent.#viewportOffset();
     const offset = decodePoint(await frame.parent.callForString(frameContentOffset, [{ element: frame.frameElement }]));
     return { x: above.x + offset.x, y: above.y + offset.y };
+  }
+
+  // Called on the element itself, in whichever world found it, since this document's world may be
+  // a later document's by now.
+  async isElementGone(element: string): Promise<boolean> {
+    if (this.#watch.crashed()) {
+      return true;
+    }
+    try {
+      const called = await this.#send<CallResult>('Runtime.callFunctionOn', {
+        functionDeclaration: isConnectedToItsDocument.toString(), objectId: element, returnByValue: true,
+      });
+      return called.exceptionDetails === undefined && called.result.value === false;
+    } catch (error) {
+      if (this.#watch.crashed() || LOST_OBJECT.test(errorText(error))) {
+        return true;
+      }
+      throw error;
+    }
   }
 
   async click(_element: string, at: Point): Promise<void> {

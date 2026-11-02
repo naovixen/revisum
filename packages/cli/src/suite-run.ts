@@ -3,15 +3,17 @@
 // then the suite through the workload runner, reads the JSON report and traces the suite wrote
 // into Revisum's output folder, and builds the result and its manifest. Every output of the suite
 // is decoded in engine before anything uses it; the secrets stay opaque until the runner writes
-// the container's environment. The `run --suite` command that calls this is not here.
-import { existsSync, lstatSync, readdirSync, readFileSync, statSync } from 'node:fs';
-import { join, posix } from 'node:path';
+// the container's environment. Any earlier report and traces are removed just before the suite runs,
+// so what is read afterwards cannot be left from setup or an earlier run or pass, and every file read
+// from the folder must really lie inside it. The `run --suite` command that calls this is not here.
+import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync } from 'node:fs';
+import { isAbsolute, join, posix, relative, sep } from 'node:path';
 import {
-  SUITE_REPORT_FILE, WORKLOAD_OUTPUT_PATH,
-  declaredSuite, defaultRedactor, evidenceManifest, evidenceResult, isSuiteFile, parseSuiteReport, parseSuiteTrace, refusedSuiteResult,
-  suiteArguments, suiteEnvironment, suiteRedactor, unreadSuiteResult,
+  SUITE_EVIDENCE_PATHS, SUITE_REPORT_FILE, WORKLOAD_OUTPUT_PATH,
+  declaredSuite, defaultRedactor, evidenceManifest, evidenceResult, failure, isSuiteFile, parseSuiteReport, parseSuiteTrace, refusedSuiteResult,
+  success, suiteArguments, suiteEnvironment, suiteRedactor, unreadSuiteResult,
   type EgressPolicy, type EvidenceContext, type EvidenceLimits, type EvidenceSuiteDeclaration, type HostInfo, type Project, type Redactor,
-  type RunResult, type SecretStore, type SuiteDecodeError, type SuiteFile, type SuitePass, type SuiteReport, type SuiteTrace,
+  type Result, type RunResult, type SecretStore, type SuiteDecodeError, type SuiteFile, type SuitePass, type SuiteReport, type SuiteTrace,
   type WorkloadErrorCode, type WorkloadRequest, type WorkloadRunner, type WorkloadVariable,
 } from '@revisum/engine';
 import { buildEgressPolicy } from '@revisum/runner';
@@ -22,13 +24,15 @@ export type SuiteRunPorts = {
   readonly secrets: SecretStore;
   // The host folder of the repository under test. The suite's files are hashed from it.
   readonly checkout: string;
-  // The host folder Revisum owns for the suite's output, which the workload runner mounts.
+  // The host folder Revisum owns for the suite's output, which the workload runner mounts. Each run
+  // deletes any earlier report and traces in it.
   readonly outputDirectory: string;
   // The personal-data redaction every kept text goes through, before the suite's secrets are
   // removed; defaultRedactor() when absent.
   readonly redactor?: Redactor;
-  // Which pass this is (suitePasses); the gating pass when absent.
-  readonly pass?: SuitePass;
+  // Which pass this is (suitePasses). Required, because a caller that left it out must not get the
+  // pass that may open the merge gate.
+  readonly pass: SuitePass;
 };
 
 const TRACE_ATTACHMENT = 'trace';
@@ -72,16 +76,68 @@ function suiteFiles(checkout: string, suite: EvidenceSuiteDeclaration): readonly
   return [...found.values()];
 }
 
+const isInsideFolder = (folder: string, path: string): boolean => {
+  const fromFolder = relative(folder, path);
+  return fromFolder !== '..' && !fromFolder.startsWith(`..${sep}`) && !isAbsolute(fromFolder);
+};
+
+// Makes sure the output folder exists. Refused when it holds the checkout: the team's container could
+// then write to the read-only checkout, and a caller's mistake could lose files in it.
+function readyOutputFolder(outputDirectory: string, checkout: string): Result<void, WorkloadErrorCode> {
+  try {
+    mkdirSync(outputDirectory, { recursive: true });
+    return isInsideFolder(realpathSync.native(outputDirectory), realpathSync.native(checkout)) ? failure('workload-start-failed') : success(undefined);
+  } catch {
+    return failure('workload-start-failed');
+  }
+}
+
+// Links are removed, never followed. Refused when one cannot be removed, since a leftover could not
+// be told from what this run writes.
+function removeEarlierEvidence(outputDirectory: string): Result<void, WorkloadErrorCode> {
+  try {
+    for (const path of SUITE_EVIDENCE_PATHS) {
+      rmSync(join(outputDirectory, path), { recursive: true, force: true });
+    }
+    return success(undefined);
+  } catch {
+    return failure('workload-start-failed');
+  }
+}
+
+type OutputFileProblem = 'missing' | 'refused';
+
+// Where a file named inside the output folder really is, with every link on its path followed. The
+// suite controls the folder and Revisum reads with host rights, so a link must not lead it elsewhere.
+function outputFile(outputDirectory: string, path: string): Result<string, OutputFileProblem> {
+  let real: string;
+  let folder: string;
+  try {
+    folder = realpathSync.native(outputDirectory);
+    real = realpathSync.native(join(outputDirectory, path));
+  } catch {
+    return failure('missing');
+  }
+  return isInsideFolder(folder, real) ? success(real) : failure('refused');
+}
+
 type ReadReport = { readonly ok: true; readonly report: SuiteReport } | { readonly ok: false; readonly errors: readonly SuiteDecodeError[] };
 
 // The report the suite wrote at the top of the output folder, decoded under the evidence limits.
 function readReport(outputDirectory: string, limits: EvidenceLimits): ReadReport {
-  const file = join(outputDirectory, SUITE_REPORT_FILE);
-  if (!existsSync(file) || !statSync(file).isFile()) return { ok: false, errors: [{ code: 'suite-report-missing', path: '$' }] };
-  if (statSync(file).size > limits.maximumReportBytes) return { ok: false, errors: [{ code: 'too-large', path: '$' }] };
+  const file = outputFile(outputDirectory, SUITE_REPORT_FILE);
+  if (!file.ok) {
+    return { ok: false, errors: [{ code: file.error === 'refused' ? 'suite-report-invalid' : 'suite-report-missing', path: '$' }] };
+  }
+  if (!statSync(file.value).isFile()) {
+    return { ok: false, errors: [{ code: 'suite-report-missing', path: '$' }] };
+  }
+  if (statSync(file.value).size > limits.maximumReportBytes) {
+    return { ok: false, errors: [{ code: 'too-large', path: '$' }] };
+  }
   let parsed: unknown;
   try {
-    parsed = JSON.parse(readFileSync(file, 'utf8'));
+    parsed = JSON.parse(readFileSync(file.value, 'utf8'));
   } catch {
     return { ok: false, errors: [{ code: 'suite-report-invalid', path: '$' }] };
   }
@@ -89,20 +145,48 @@ function readReport(outputDirectory: string, limits: EvidenceLimits): ReadReport
   return decoded.ok ? { ok: true, report: decoded.value } : { ok: false, errors: decoded.error };
 }
 
-// The traces the report attaches, each read from the output folder and decoded. A trace that is
-// missing, too large or refused is left out: the test's finding then has no trace steps.
-function readTraces(outputDirectory: string, report: SuiteReport, limits: EvidenceLimits): readonly SuiteTrace[] {
+type ReadTraces = { readonly traces: readonly SuiteTrace[]; readonly decodeErrors: readonly SuiteDecodeError[] };
+
+// One trace's bytes decoded, or why they could not be. No error holds the report's text for the
+// path, which the suite wrote.
+function readTrace(outputDirectory: string, path: string, limits: EvidenceLimits): Result<SuiteTrace, SuiteDecodeError> {
+  const unreadable = failure<SuiteDecodeError>({ code: 'trace-invalid', path: '$' });
+  // The decoder has checked each path stays inside the output folder as written; this follows links.
+  const file = outputFile(outputDirectory, path);
+  if (!file.ok) {
+    return unreadable;
+  }
+  try {
+    const found = statSync(file.value);
+    if (!found.isFile()) {
+      return unreadable;
+    }
+    if (found.size > limits.maximumTraceBytes) {
+      return failure({ code: 'too-large', path: '$' });
+    }
+    return parseSuiteTrace(new Uint8Array(readFileSync(file.value)), limits, path);
+  } catch {
+    return unreadable;
+  }
+}
+
+// The traces the report attaches, each read from the output folder and decoded. One that is missing,
+// too large or refused leaves its test's finding with no trace steps, and is listed by its place
+// among the report's traces.
+function readTraces(outputDirectory: string, report: SuiteReport, limits: EvidenceLimits): ReadTraces {
   const paths = new Set(report.tests.flatMap((test) => test.attachments
     .flatMap((attachment) => (attachment.name === TRACE_ATTACHMENT && attachment.path !== undefined ? [attachment.path] : []))));
   const traces: SuiteTrace[] = [];
-  for (const path of paths) {
-    // The decoder has checked each path stays inside the output folder.
-    const file = join(outputDirectory, path);
-    if (!existsSync(file) || !lstatSync(file).isFile() || lstatSync(file).size > limits.maximumTraceBytes) continue;
-    const decoded = parseSuiteTrace(new Uint8Array(readFileSync(file)), limits, path);
-    if (decoded.ok) traces.push(decoded.value);
+  const decodeErrors: SuiteDecodeError[] = [];
+  for (const [index, path] of [...paths].entries()) {
+    const decoded = readTrace(outputDirectory, path, limits);
+    if (decoded.ok) {
+      traces.push(decoded.value);
+    } else {
+      decodeErrors.push({ code: decoded.error.code, path: `$.traces[${index}]${decoded.error.path.slice(1)}` });
+    }
   }
-  return traces;
+  return { traces, decodeErrors };
 }
 
 const refusalFor = (code: WorkloadErrorCode) => ({ code });
@@ -125,13 +209,18 @@ export async function runSuite(project: Project, suiteName: string, ports: Suite
   });
   const redactor = suiteRedactor(ports.redactor ?? defaultRedactor(), environment.value.secrets);
   const context = (exitCode: number, timedOut: boolean, extra: Partial<EvidenceContext> = {}): EvidenceContext => ({
-    suite, pass: ports.pass ?? 'gating', exitCode, redactor, timedOut, ...extra,
+    suite, pass: ports.pass, exitCode, redactor, timedOut, ...extra,
   });
   const manifestFor = (report: SuiteReport | null, traces: readonly SuiteTrace[]) => evidenceManifest({
     suite, suiteFiles: files, host: host(),
     playwrightVersion: report?.playwrightVersion ?? traces.find((trace) => trace.playwrightVersion !== undefined)?.playwrightVersion,
     browsers: traces.flatMap((trace) => (trace.browserName === undefined ? [] : [trace.browserName])),
   });
+
+  const folderReady = readyOutputFolder(ports.outputDirectory, ports.checkout);
+  if (!folderReady.ok) {
+    return refusedSuiteResult(suiteName, refusalFor(folderReady.error));
+  }
 
   if (suite.setupCommand !== undefined) {
     const setup = await ports.workload.run(request(suite.setupCommand, environment.value.variables));
@@ -140,6 +229,14 @@ export async function runSuite(project: Project, suiteName: string, ports: Suite
       return unreadSuiteResult(context(setup.value.exitCode, setup.value.timedOut, { manifest: manifestFor(null, []) }),
         setup.value.timedOut ? 'suite-timeout' : 'setup-failed');
     }
+    if (setup.value.egressRecordUnread === true) {
+      return unreadSuiteResult(context(setup.value.exitCode, false, { manifest: manifestFor(null, []), egressRecordUnread: true }), 'egress-unread');
+    }
+  }
+
+  const evidenceRemoved = removeEarlierEvidence(ports.outputDirectory);
+  if (!evidenceRemoved.ok) {
+    return refusedSuiteResult(suiteName, refusalFor(evidenceRemoved.error));
   }
 
   const built = suiteArguments(suite, WORKLOAD_OUTPUT_PATH);
@@ -152,12 +249,13 @@ export async function runSuite(project: Project, suiteName: string, ports: Suite
   if (!ran.ok) return refusedSuiteResult(suiteName, refusalFor(ran.error));
   const { exitCode, timedOut, egressEvents } = ran.value;
   const blockedOrigins = egressEvents.filter((event) => event.decision === 'blocked').map((event) => event.origin);
+  const egress = { blockedOrigins, egressRecordUnread: ran.value.egressRecordUnread === true };
 
   const read = readReport(ports.outputDirectory, limits);
   if (!read.ok) {
-    return unreadSuiteResult(context(exitCode, timedOut, { manifest: manifestFor(null, []), blockedOrigins }),
+    return unreadSuiteResult(context(exitCode, timedOut, { manifest: manifestFor(null, []), ...egress }),
       timedOut ? 'suite-timeout' : 'suite-report-unread', read.errors);
   }
-  const traces = readTraces(ports.outputDirectory, read.report, limits);
-  return evidenceResult(read.report, traces, [], context(exitCode, timedOut, { manifest: manifestFor(read.report, traces), blockedOrigins }));
+  const { traces, decodeErrors } = readTraces(ports.outputDirectory, read.report, limits);
+  return evidenceResult(read.report, traces, [], context(exitCode, timedOut, { manifest: manifestFor(read.report, traces), ...egress, traceDecodeErrors: decodeErrors }));
 }

@@ -18,11 +18,11 @@ import {
 } from '@revisum/contracts';
 import { sha256 } from '../hashing.ts';
 import type { Logger } from '../logging.ts';
-import { runTimeText } from '../plan/plan-decoders.ts';
 import { rememberedFieldEntries } from '../plan/plan-values.ts';
 import type { Project } from '../project/project-parser.ts';
 import { declaredScripts } from '../project/unsafe-feature-declarations.ts';
-import { resolveText } from '../run-values.ts';
+import type { RememberedRecord, RememberedValues } from '../RememberedValues.ts';
+import { resolveText, type RunValues } from '../run-values.ts';
 import { argumentProblem, runValueArgument, type ArgumentValue } from '../service-calls/parameter-values.ts';
 import { checkBackendField, fieldAt, fieldText } from '../service-calls/service-response.ts';
 import { decodeScriptResult } from './page-script-result.ts';
@@ -33,14 +33,13 @@ const DEFAULT_MAXIMUM_SCRIPT_RESULT_BYTES = 256 * 1024;
 // How long a script check waits between two runs of its script.
 const SCRIPT_CHECK_INTERVAL_MILLISECONDS = 100;
 
-// What the run hands these steps. `values` and `rememberedTexts` are the run's own: an evaluate
-// adds what it remembers.
+// What the run hands these steps. `remembered` is how an evaluate adds to the run's values.
 export type PageScriptContext = {
   readonly project: Project;
   // The declared script files' bytes, keyed by declared file path.
   readonly scriptSources: Readonly<Record<string, Uint8Array>>;
-  readonly values: Map<ValueName, SafeText>;
-  readonly rememberedTexts: Set<string>;
+  readonly values: RunValues;
+  readonly remembered: RememberedValues;
   readonly clock: Clock;
   readonly logger: Logger;
 };
@@ -48,8 +47,6 @@ export type PageScriptContext = {
 // What a run keeps of a page-script step: the script's name (null for one written in the plan),
 // how many times it ran, and the sha256 of the last result text it accepted (null when none was).
 export type PageScriptRecord = { readonly script: ScriptName | null; readonly attempts: number; readonly resultSha256: string | null };
-
-type RememberedRecord = { readonly valueName: ValueName; readonly sha256: string };
 
 // What one of these steps gives its step result. An evaluate that remembers one value records it
 // as `remembered`, as a remember step does; one that remembers several records them all in
@@ -162,22 +159,15 @@ function resultField(document: unknown, script: ScriptToRun, field: FieldName): 
   return pointer === undefined ? failure('field-missing') : fieldAt(document, pointer);
 }
 
-// The result fields an evaluate remembers, as run values. All or none: a value is set only once
-// every field has been read, so a failed read leaves the run's values as they were.
-function rememberedEntries(
-  step: EvaluateStep, document: unknown, script: ScriptToRun, project: Project,
-): Result<readonly (readonly [ValueName, SafeText])[], string> {
-  const entries: (readonly [ValueName, SafeText])[] = [];
+// The texts of the result fields an evaluate remembers. Every field is read before any is kept.
+function textsToRemember(step: EvaluateStep, document: unknown, script: ScriptToRun): Result<readonly (readonly [ValueName, string])[], string> {
+  const entries: (readonly [ValueName, string])[] = [];
   for (const [name, field] of rememberedFieldEntries(step.remember)) {
     const found = resultField(document, script, field);
     if (!found.ok) return found;
     const text = fieldText(found.value);
     if (text === undefined) return failure('field-missing');
-    // A remembered value is plan text from then on, so it passes the same rules as plan text.
-    if (text.length > project.limits.maximumTextLength) return failure('value-too-long');
-    const safe = runTimeText(text, project.limits.maximumTextLength);
-    if (safe === undefined) return failure('value-unsafe');
-    entries.push([name, safe]);
+    entries.push([name, text]);
   }
   return success(entries);
 }
@@ -191,16 +181,11 @@ export async function runEvaluate(step: EvaluateStep, stepIndex: number, session
   const once = await runOnce(session, script.value, callArguments.value, stepIndex, step.type, context);
   const pageScript: PageScriptRecord = { script: script.value.name, attempts: 1, resultSha256: once.resultSha256 };
   if (!once.result.ok) return failedWith(once.result.error, pageScript);
-  const remembered = rememberedEntries(step, once.result.value, script.value, context.project);
+  const texts = textsToRemember(step, once.result.value, script.value);
+  if (!texts.ok) return failedWith(texts.error, pageScript);
+  const remembered = context.remembered.rememberAll(texts.value, stepIndex);
   if (!remembered.ok) return failedWith(remembered.error, pageScript);
-  const records: RememberedRecord[] = [];
-  for (const [valueName, text] of remembered.value) {
-    context.values.set(valueName, text);
-    context.rememberedTexts.add(text);
-    const digest = sha256(text);
-    context.logger.log({ kind: 'value.remembered', stepIndex, valueName, sha256: digest });
-    records.push({ valueName, sha256: digest });
-  }
+  const records = remembered.value;
   const [only] = records;
   const kept = records.length === 1 && only !== undefined ? { remembered: only } : records.length > 1 ? { rememberedValues: records } : {};
   return { outcome: 'passed', pageScript, ...kept };

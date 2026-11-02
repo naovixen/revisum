@@ -12,6 +12,7 @@
 // The writer writes exactly one text for a plan: LF line ends, a final newline, the headers in a
 // fixed order, a `Criterion:` line wherever the criterion id changes, and never `Origin:`.
 import { failure, success, type Plan, type Result, type SinkError, type StepType } from '@revisum/contracts';
+import { entriesInKeyOrder } from '../../hashing.ts';
 import type { PlanLimits } from '../../project/project-parser.ts';
 import type { PlanError, PlanErrorCode } from '../plan-decoders.ts';
 import { CRITERION_FIELD, STEP_FIELDS } from '../plan-grammar.ts';
@@ -20,7 +21,7 @@ import {
   type StatementBlock,
 } from './plan-statements.ts';
 import {
-  SCRIPT_LINE, better, isRecord, notThisStatement, skipSpaces, wordAt, type TextErrorCode, type TextFailure, type TextPosition,
+  SCRIPT_LINE, better, isRecord, newMap, notThisStatement, skipSpaces, wordAt, type TextErrorCode, type TextFailure, type TextPosition,
 } from './text-syntax.ts';
 
 export type { TextErrorCode, TextPosition } from './text-syntax.ts';
@@ -205,7 +206,7 @@ export function readPlanText(text: string, limits: PlanLimits): Result<TextReadi
     if (valuesLine.ok) {
       refuseMark(marked, number);
       if (!placeHeader('Values:', number)) return;
-      values = {};
+      values = newMap();
       positions.set('$.values', at(number));
       blocks.push({ kind: 'values', values });
       return;
@@ -333,7 +334,7 @@ export function writePlanText(plan: Plan): string {
   }
   if (plan.values !== undefined) {
     put(0, VALUES_LINE.write({}));
-    for (const [name, value] of Object.entries(plan.values)) put(1, VALUE_DEFINITION.write(name, value));
+    for (const [name, value] of entriesInKeyOrder(plan.values)) put(1, VALUE_DEFINITION.write(name, value));
   }
   let criterion: unknown;
   const writeSteps = (steps: readonly unknown[], depth: number): void => {

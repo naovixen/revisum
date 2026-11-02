@@ -87,7 +87,7 @@ const lockfileText = (entries: readonly LockEntry[]): string =>
   `${canonicalJson({ schema: LOCKFILE_SCHEMA, entries: [...entries].sort(byTargetId) })}\n`;
 
 // The entries of the lockfile in `folder`; none when there is no lockfile yet.
-async function readLockfile(folder: string): Promise<Result<readonly LockEntry[], LockfileFailure>> {
+export async function readLockfile(folder: string): Promise<Result<readonly LockEntry[], LockfileFailure>> {
   let text: string;
   try {
     text = await readFile(join(folder, LOCKFILE_NAME), 'utf8');

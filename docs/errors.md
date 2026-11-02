@@ -37,7 +37,7 @@ Plan error. A value is not one of those allowed, such as an unknown role, key or
 
 ## invalid_url
 
-Plan error. A URL cannot be parsed, carries a user name or password, or is relative without starting with `/`.
+Plan error. A URL cannot be parsed, carries a user name or password, is relative without starting with `/`, or is not written as a path starting with `/` or an absolute `http://` or `https://` URL in lower case, with nothing before it. A path that starts with `//` once its dots are worked out, such as `/.//elsewhere.example/`, is also refused, because a browser would read it as another host.
 
 ## scheme_not_allowed
 
@@ -53,7 +53,7 @@ Plan error. A plan names a target the project's matrix does not declare. Nothing
 
 ## unsafe_text
 
-Plan error. Text holds control or bidirectional-override characters, or something that looks like script. Remove them.
+Plan error. Text holds control characters (C1 ones included), bidirectional marks or overrides, a zero width space, a word joiner, a byte order mark or another invisible character, U+2028 or U+2029, or something that looks like script. A person approving the plan could not read such text for what it holds. Remove them. The zero width joiner and non-joiner stay allowed, because emoji and Persian and Indic text need them, and so does the soft hyphen, which pages hold.
 
 ## too_large
 
@@ -81,11 +81,13 @@ Plan error. Required text or a required list is empty.
 
 Plan error. A check would pass on anything, or proves nothing traceable: a plan with no assertion, an empty assertion (`assert: {}`), a text or value assertion whose expected text is blank (empty or only white space), a locator looking for blank text, a request count of `atLeast` 0, or an assertion without a `criterionId`. Give each assertion its expected text and the id of the acceptance criterion it checks.
 
+Evidence run outcome. The suite's report holds no test that ran: it has no tests, or every test was skipped. The run says nothing about the product, so it ends `Failed` and the merge gate stays shut, whatever the exit code. Check the suite's filters and any `test.skip()`.
+
 Evidence run outcome. The suite's report holds no tests, so the run checked nothing. It ends `Failed`, whatever the suite's exit code, and never opens the merge gate. Check the suite's paths, projects and `testMatch`.
 
 ## literal_secret
 
-Plan error. The plan holds a secret instead of naming one: literal text filled into a field whose locator names a password, passcode, token, secret or API key (or the German or French word for one), text shaped like a credential anywhere in the plan (a JSON Web Token, a `Bearer` value, or a key with a known prefix such as `ghp_`, `sk-` or `AKIA`), or saved storage state written into `storageState` itself. The error gives the path, never the text. Declare the secret's name in the project's `secretNames`, put its value in the secret store (a CI secret of the same name), and write `{ "secretName": "…" }` in the plan.
+Plan error. The plan holds a secret instead of naming one: literal text filled into a field whose locator names a password, passcode, token, secret or API key (or the German or French word for one), text shaped like a credential anywhere in the plan, names and query keys included (a JSON Web Token, a `Bearer` value, or a key with a known prefix such as `ghp_`, `sk-` or `AKIA`), or saved storage state written into `storageState` itself. The error gives the path, never the text. Declare the secret's name in the project's `secretNames`, put its value in the secret store (a CI secret of the same name), and write `{ "secretName": "…" }` in the plan.
 
 ## undefined_value
 
@@ -157,7 +159,7 @@ Readable plan error. A `Press` line names a key or modifier the plan language do
 
 Readable plan error. The text is larger than any plan may be, so none of it is read. Split the plan.
 
-Suite output error. A suite's JSON report or trace is over one of the project's `evidenceMode.limits`: its size, its number of tests or entries, or how deeply it nests (`maximumReportDepth`, 64 unless set). Nothing in it is used. Raise the limit in the trusted project file, or split the suite.
+Suite output error. A suite's JSON report or trace is over one of the project's `evidenceMode.limits`: its size, its number of tests or entries, or how deeply it nests (`maximumReportDepth`, 64 unless set). Nothing in it is used. Raise the limit in the trusted project file, or split the suite. A trace is also refused over 20,000 actions, and a finding over 20,000 steps keeps only its last ones; neither limit can be raised, and each is listed in the result's `evidence.decodeErrors`.
 
 ## suite-report-missing
 
@@ -165,7 +167,7 @@ Suite output error. The suite command wrote no JSON report into Revisum's output
 
 ## suite-report-invalid
 
-Suite output error. The suite's JSON report does not have the shape of a Playwright Test JSON report at the given path: a field of the wrong type, a status Playwright does not have, a test claiming to be `flaky` (impossible with `--retries=0`), more than one result for a test, a `__proto__`, `constructor` or `prototype` key, or an attachment path that leaves Revisum's output directory. Nothing in the report is used, and the run is never marked verified.
+Suite output error. The suite's JSON report does not have the shape of a Playwright Test JSON report at the given path: a field of the wrong type, a status Playwright does not have, a test claiming to be `flaky` (impossible with `--retries=0`), more than one result for a test, a `__proto__`, `constructor` or `prototype` key, or an attachment path that leaves Revisum's output directory. The same code refuses a report file that is a link leading out of that directory. Nothing in the report is used, and the run is never marked verified.
 
 ## suite-report-unsupported
 
@@ -173,7 +175,7 @@ Suite output error. The report comes from a reporter or Playwright version Revis
 
 ## trace-invalid
 
-Suite output error. A trace archive the suite attached is not a readable Playwright trace: it is truncated, or an entry name holds `..` or an absolute path. Nothing is extracted from it.
+Suite output error. A trace archive the suite attached is not a readable Playwright trace: it is missing, truncated, not a regular file, reached through a link leading out of Revisum's output directory, or an entry name holds `..` or an absolute path. Nothing is extracted from it.
 
 ## trace-unsupported
 
@@ -211,11 +213,13 @@ The clipboard text an `expectClipboard` or a clipboard `remember` reads is also 
 
 ## value-holds-secret
 
-Step error. A `remember` step would have kept a secret: its element is a field a secret was typed into, or the text it read holds one of the plan's secrets, in any form the leak scan looks for. The step fails and every later step is skipped. No value is kept and no hash of it is recorded, since a hash of a short secret is as good as the secret. Remember something else; a plan never needs to read a secret it was given.
+Step error. A step would have remembered a secret: its element is a field a secret was typed into, or the text it read holds one of the plan's secrets, in any form the leak scan looks for. It applies wherever the value comes from: the page, a response, the clipboard, a page script, a database command or a declared call. The step fails and every later step is skipped; a `call`, `evaluate` or `database` step also ends the run `Errored`, since a failed one could not set up the test. No value is kept and no hash of it is recorded as a remembered value, since a hash of a short secret is as good as the secret. Remember something else; a plan never needs to read a secret it was given.
 
 ## capture-left-out
 
-Step error, on a step that passes. A `capture` took no image, because a field a secret was typed into could not be found to mask it, so what it holds may still be on screen. Text drawn as pixels is out of reach of any later scan, so no image is kept rather than one that may show the secret. The step does not fail, because a capture checks nothing: the steps' verdict stands. Expect this after the field has gone, such as a capture after signing in, since the run cannot tell a field that has gone from one it can no longer find. Capture before typing the secret, or type plain text into that field first.
+Step error, on a step that passes. A `capture` took no image, because a field a secret was typed into is still on the page but its locator no longer finds it, such as when its label has changed or been removed, so it could not be masked and what it holds may still be on screen. Text drawn as pixels is out of reach of any later scan, so no image is kept rather than one that may show the secret. The step does not fail, because a capture checks nothing: the steps' verdict stands.
+
+A field that has gone does not cause this: when the page has removed it, or its document was replaced, as after most sign-ins, there is nothing left to mask and the capture is taken as usual. If you do see this code, make the field's locator still find it when the capture runs, capture before typing the secret, or type plain text into that field first.
 
 ## state-not-exposed
 
@@ -306,7 +310,7 @@ Driver error. The element was found but could not be acted on in time: it was hi
 
 ## timeout
 
-Driver error. The browser did not finish the operation within the session's time limit.
+Driver error. The browser did not finish the operation within the session's time limit. An action fails with it when the browser is still handling its input after the step timeout, or the page answers nothing for that long, which is what a navigation whose server holds its answer looks like: the browser answers nothing about a page while that navigation waits. Check the server rather than the page, or raise `stepTimeoutMilliseconds` in the trusted project if the navigation is just slow.
 
 ## navigation-failed
 
@@ -364,7 +368,7 @@ Driver error. A page script did not settle within its `timeoutMilliseconds` (5 s
 
 ## page-unreadable
 
-Driver error. A check could not read the page: every read threw until the step timeout, so nothing is known about what is on it. The check fails rather than passes, `absent` and `hidden` included, because a page the run cannot read is not an empty page. Every later step is skipped. Look for page scripts that replace DOM functions such as `querySelectorAll`, or a frame the page has removed.
+Driver error. A check could not read the page: every read threw or went unanswered until the step timeout, so nothing is known about what is on it. The check fails rather than passes, `absent` and `hidden` included, because a page the run cannot read is not an empty page. Every later step is skipped. Look for page scripts that replace DOM functions such as `querySelectorAll`, a frame the page has removed, or a navigation whose server holds its answer: the browser answers nothing about a page while that navigation waits.
 
 ## dialog-open
 
@@ -384,13 +388,15 @@ Workload runner error and run refusal, for an evidence run: the local workload i
 
 ## egress-unenforceable
 
-Runner log entry. Network egress cannot be enforced on this host: Docker could not create a network with no route out, or a probe from inside the run container reached an address outside. The run still starts, at the `host` guarantee level, and claims no hermetic isolation.
+Runner log entry. Network egress cannot be enforced on this host: Docker could not create a network with no route out, or a probe from inside the run container reached an address outside. The run still starts, at the `host` guarantee level, and claims no hermetic isolation. The same entry is logged, and the runner falls to `host`, when what the proxy decided cannot be read back whole during a run.
 
 Run refusal, for an evidence run (`run --suite`): Revisum never runs a team's own suite code without egress control, so the run is refused before any suite code runs. Run it on a host where the isolated runner can enforce egress.
 
 ## workload-start-failed
 
 Workload runner error and run refusal, for an evidence run. The workload container did not start, or the request could not be run: a working directory outside the checkout, an empty command, a variable name no environment can hold, a path Docker cannot mount, or no Docker daemon to answer. No suite code ran. The runner's log says which.
+
+`runSuite` also refuses with this code when the output folder holds the checkout, or when it cannot delete an earlier `report.json` or `test-results` from the folder, since a leftover could not be told from what this run writes. A setup command may have run by then. Give the suite a folder of its own whose files the host user can delete.
 
 ## start-failed
 
@@ -684,6 +690,15 @@ Evidence run outcome. The suite's setup command exited with a non-zero code, so 
 ## suite-report-unread
 
 Evidence run outcome. The suite's JSON report was missing or refused; the result's `evidence.decodeErrors` give each code and JSON path. The run ends `Errored`, with no tests.
+
+Review items an evidence run can raise beside its outcome, each keeping the merge gate shut:
+
+- `suite-output-unread`: a trace was refused, or a finding's steps were cut, so the result shows less than the suite recorded. It names its place in `evidence.decodeErrors`, which gives the code and path.
+- `project-without-tests`: a project in `evidenceMode.suites[].projects` has no test in the report, so less was tested than declared. Check its name against the suite's config.
+
+## egress-unread
+
+Evidence run outcome. What the egress proxy decided could not be read back, or the proxy could not write all of it, such as when its `/tmp` is full. That is not the same as a proxy that blocked nothing, so the run ends `Errored` and its guarantee statement does not claim egress was enforced. Rerun, and look at what flooded the proxy if it recurs.
 
 ## suite-not-declared
 

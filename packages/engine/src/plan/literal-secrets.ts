@@ -37,16 +37,24 @@ export const looksLikeCredential = (text: string): boolean => CREDENTIAL_SHAPES.
 
 // The text a locator finds its element by, as the plan writes it: a value reference has no text
 // until the run, so it names no field here. A css selector or XPath expression names a field by
-// its structure, such as input[type=password], so its own text is judged, with any hasText.
+// its structure, such as input[type=password], so its own text is judged, with any hasText, and
+// with the locator it is inside, which may name the field just as plainly.
 function locatorText(locator: Locator): string {
   switch (locator.by) {
     case 'role': return literalText(locator.name) ?? '';
     case 'label': return literalText(locator.label) ?? '';
     case 'text': return literalText(locator.text) ?? '';
     case 'testId': return literalText(locator.testId) ?? '';
-    case 'css': return [locator.selector, locator.hasText === undefined ? '' : literalText(locator.hasText) ?? ''].join(' ');
-    case 'xpath': return [locator.expression, locator.hasText === undefined ? '' : literalText(locator.hasText) ?? ''].join(' ');
+    case 'css': return [locator.selector, ...surroundingText(locator)].join(' ');
+    case 'xpath': return [locator.expression, ...surroundingText(locator)].join(' ');
   }
+}
+
+function surroundingText(locator: Extract<Locator, { by: 'css' | 'xpath' }>): readonly string[] {
+  return [
+    locator.hasText === undefined ? '' : literalText(locator.hasText) ?? '',
+    locator.inside === undefined ? '' : locatorText(locator.inside),
+  ];
 }
 
 // Splits names written in code style into words, so a test id or selector such as "authToken",

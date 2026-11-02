@@ -24,7 +24,7 @@ import {
   MAXIMUM_META_NAME_LENGTH, MAXIMUM_MODIFIERS, MAXIMUM_PATH_SEGMENTS, MAXIMUM_POSITION, MAXIMUM_SELECTOR_LENGTH,
   MAXIMUM_SPEC_REFERENCE_LENGTH, MAXIMUM_STYLE_VALUE_LENGTH, MAXIMUM_TEST_ID_LENGTH, MAXIMUM_TITLE_LENGTH, MAXIMUM_URL_LENGTH, MAXIMUM_VALUE_PREFIX_LENGTH,
   META_FIELDS, OPTIONAL_LOCATOR_FIELDS, PLAN_FIELDS, QUERY_KEY, RESPONSE_STATUS, STEP_FIELDS, STEP_TYPES, STYLE_PROPERTY,
-  UNIQUE_NUMBER_DIGITS, VALUE_NAME, type LocatorKind,
+  UNIQUE_NUMBER_DIGITS, UNSAFE_TEXT_CHARACTERS, VALUE_NAME, WRITTEN_URL_PATTERN, type LocatorKind,
 } from './plan-grammar.ts';
 
 // A JSON Schema document or part of one. Plain JSON values only, so it serialises exactly.
@@ -35,9 +35,8 @@ type JsonValue = string | number | boolean | null | readonly JsonValue[] | { rea
 // standard's vocabulary, not names of ours.
 const reference = (name: string): JsonSchema => ({ '$ref': `#/$defs/${name}` });
 
-// No control or bidirectional-override characters. The parser's script rules are not expressed here.
-const UNSAFE_CHARACTERS = '\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069';
-const SAFE_TEXT_PATTERN = `^[^${UNSAFE_CHARACTERS}]*$`;
+// The parser's script rules are not expressed here.
+const SAFE_TEXT_PATTERN = `^[^${UNSAFE_TEXT_CHARACTERS}]*$`;
 const text = (minimumLength: number, maximumLength?: number): JsonSchema => ({
   type: 'string', 'minLength': minimumLength, ...(maximumLength === undefined ? {} : { 'maxLength': maximumLength }), pattern: SAFE_TEXT_PATTERN,
 });
@@ -59,10 +58,10 @@ const SECRET_REFERENCE: JsonSchema = closedObject({ secretName: { type: 'string'
 
 // A css selector or XPath expression: literal text on one line, with none of "{", "}", ";" and "@".
 const SELECTOR_TEXT: JsonSchema = {
-  type: 'string', 'minLength': 1, 'maxLength': MAXIMUM_SELECTOR_LENGTH, pattern: `^[^{};@${UNSAFE_CHARACTERS}]*$`,
+  type: 'string', 'minLength': 1, 'maxLength': MAXIMUM_SELECTOR_LENGTH, pattern: `^[^{};@${UNSAFE_TEXT_CHARACTERS}]*$`,
 };
 // A response, result or output field declared as a JSON pointer, by name.
-const DECLARED_FIELDS: JsonSchema = recordOf(DECLARED_NAME, { type: 'string', pattern: '^(/([^~]|~[01])*)*$' });
+const DECLARED_FIELDS: JsonSchema = recordOf(DECLARED_NAME, { type: 'string', pattern: `^(/([^~${UNSAFE_TEXT_CHARACTERS}]|~[01])*)*$` });
 // A script a page-script step runs: a name the project declares, or one written into the plan.
 // The source may hold line breaks and tabs, but no other control characters, and none of the
 // characters an editor may show as a line break (U+0085, U+2028 and U+2029).
@@ -195,7 +194,7 @@ const GENERATED_VALUE: JsonSchema = {
 };
 
 // A literal path segment: no separator that would add a segment or start a query or fragment.
-const LITERAL_SEGMENT: JsonSchema = { type: 'string', 'minLength': 1, pattern: `^[^/?#${UNSAFE_CHARACTERS}]*$` };
+const LITERAL_SEGMENT: JsonSchema = { type: 'string', 'minLength': 1, pattern: `^[^/?#${UNSAFE_TEXT_CHARACTERS}]*$` };
 
 // Builds the schema. The same bytes every time: nothing in it depends on the clock or the machine.
 export function planJsonSchema(): JsonSchema {
@@ -257,7 +256,7 @@ export function planJsonSchema(): JsonSchema {
           closedObject({ kind: { const: 'url' }, value: reference('url') }, ['kind', 'value']),
           closedObject({
             kind: { const: 'urlPathStartsWith' },
-            value: { type: 'string', 'maxLength': MAXIMUM_URL_LENGTH, pattern: `^/[^${UNSAFE_CHARACTERS}]*$` },
+            value: { type: 'string', 'maxLength': MAXIMUM_URL_LENGTH, pattern: `^/[^${UNSAFE_TEXT_CHARACTERS}]*$` },
           }, ['kind', 'value']),
           closedObject({
             kind: { const: 'metaContent' }, name: text(1, MAXIMUM_META_NAME_LENGTH), value: textOrValue(1),
@@ -320,9 +319,9 @@ export function planJsonSchema(): JsonSchema {
       },
       // A URL a check compares and never visits: a path starting with "/", or an absolute http or
       // https URL of any origin.
-      comparedUrl: { type: 'string', 'minLength': 1, 'maxLength': MAXIMUM_URL_LENGTH, pattern: '^(/|https?://)' },
+      comparedUrl: { type: 'string', 'minLength': 1, 'maxLength': MAXIMUM_URL_LENGTH, pattern: WRITTEN_URL_PATTERN },
       // A path starting with "/", or an absolute http or https URL. The parser checks the origin.
-      url: { type: 'string', 'minLength': 1, 'maxLength': MAXIMUM_URL_LENGTH, pattern: '^(/|https?://)' },
+      url: { type: 'string', 'minLength': 1, 'maxLength': MAXIMUM_URL_LENGTH, pattern: WRITTEN_URL_PATTERN },
       // A path on the run's base URL. It has no origin field, so no value can change where it goes.
       pathTemplate: closedObject({
         segments: {

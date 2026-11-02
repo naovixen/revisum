@@ -72,6 +72,10 @@ const VERSION_TEXT = /^\d{1,4}\.\d{1,4}\.\d{1,4}([-+.][0-9A-Za-z.-]{1,32})?$/;
 // Playwright's statuses for a test as a whole. "flaky" is left out on purpose: with --retries=0 a
 // test runs once, so a report claiming a flaky test is not to be believed.
 const TEST_STATUSES: readonly string[] = ['expected', 'unexpected', 'skipped'];
+// The test-level status that says a test did not end as the suite expected.
+const UNEXPECTED_STATUS = 'unexpected';
+// Result outcomes that read as harmless, which an "unexpected" test-level status overrules.
+const OUTCOMES_AN_UNEXPECTED_TEST_CANNOT_HAVE: readonly SuiteTestOutcome[] = ['passed', 'skipped'];
 // Keys that would reach an object's prototype if code ever assigned them.
 const PROTOTYPE_KEYS: readonly string[] = ['__proto__', 'constructor', 'prototype'];
 // The keys this decoder reads, which a refusal's path may name. Any other key is written "*".
@@ -249,7 +253,10 @@ function readTest(
     || result === INVALID) return INVALID;
   // A test the suite expects to fail, which failed, is Playwright's "expected" outcome: kept apart
   // from both a pass and an ordinary failure.
-  const outcome: SuiteTestOutcome = expectedStatus === 'failed' && result.outcome === 'failed' ? 'expected-failure' : result.outcome;
+  const finished: SuiteTestOutcome = expectedStatus === 'failed' && result.outcome === 'failed' ? 'expected-failure' : result.outcome;
+  // A test.fail() whose body passed has a passed result and an "unexpected" test, and Playwright
+  // exits 1 for it. Believing the result alone would count it as a pass.
+  const outcome: SuiteTestOutcome = knownStatus === UNEXPECTED_STATUS && OUTCOMES_AN_UNEXPECTED_TEST_CANNOT_HAVE.includes(finished) ? 'failed' : finished;
   return { ...spec, project, annotations, ...result, outcome };
 }
 

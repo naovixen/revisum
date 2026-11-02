@@ -2,6 +2,7 @@
 // masking and auditing live here once, so every protocol behaves the same way.
 // for css
 // and XPath locators, DOM reads and page scripts.
+import { isDeepStrictEqual } from 'node:util';
 import {
   DEFAULT_TEST_ID_ATTRIBUTE, DRIVER_FEATURES, failure, literalActionStep, literalText, performableLocator, reveal, success,
   type ActionGuard, type ActionStep, type BrowserRequestRecord, type DialogStep, type DocumentSession, type DomRead, type DomValue, type DownloadedFile,
@@ -23,12 +24,32 @@ const READ_FAILED: ElementProbe = { ...NOTHING_READ, count: UnreadablePage.ReadF
 const DIALOG_HOLDS_PAGE: ElementProbe = { ...NOTHING_READ, count: UnreadablePage.DialogOpen };
 const ON_BROWSER_ERROR_PAGE: ElementProbe = { ...NOTHING_READ, count: UnreadablePage.BrowserErrorPage };
 const POLL_INTERVAL_MILLISECONDS = 50;
+const TIMED_OUT = Symbol('timed out');
 // What the runtime guard is told for a dialog step, which acts on no element.
 const NO_RESOLVED_ELEMENT: ResolvedElement = { role: null, name: null, box: null, formSubmitName: null, linkUrl: null };
 
 export const errorText = (error: unknown): string => (error instanceof Error ? error.message : String(error)).slice(0, 200);
 const normalise = (text: string): string => text.replace(/\s+/g, ' ').trim();
 const pause = (milliseconds: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, milliseconds));
+
+// Waits for what the page was asked for at most this long. While a navigation of the page waits for
+// its server, the browser answers no command to that page, and nor does the mouse release that began
+// it, so a server that holds its answer would otherwise hold the step for as long as a command's own
+// limit, however short the step's timeout. What was asked for is left to end by itself.
+async function forAtMost<Value>(milliseconds: number, work: Promise<Value>): Promise<Value | typeof TIMED_OUT> {
+  let timer: NodeJS.Timeout | undefined;
+  const timedOut = new Promise<typeof TIMED_OUT>((resolveTimedOut) => { timer = setTimeout(() => resolveTimedOut(TIMED_OUT), milliseconds); });
+  try {
+    return await Promise.race([work, timedOut]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+const notAnswering = (timeoutMilliseconds: number): DriverError => ({ code: 'timeout', detail: `the page did not answer within ${timeoutMilliseconds} ms` });
+
+// A field a secret was typed into: the locator that found it, and whether that very element has gone.
+export type SecretTypedField = { readonly locator: ResolvedLocator; readonly isGone: () => Promise<boolean> };
 
 export type SessionDetails = {
   readonly browser: { readonly name: string; readonly version: string };
@@ -42,6 +63,8 @@ export type SessionDetails = {
   readonly fixturePath: (fixture: string) => Result<string, DriverError>;
   // Where a download step's file is saved. Without it, the session refuses download steps.
   readonly downloads?: DownloadCapture;
+  // Every field the session and its tabs have typed a secret into, in the order they were typed.
+  readonly secretTypedFields: SecretTypedField[];
   // Opens a second tab of the session's browser context, still on about:blank. Without it, the
   // session opens no tabs.
   readonly openTab?: () => Promise<Result<DriverSession, DriverError>>;
@@ -134,41 +157,60 @@ async function ownElements<Handle>(operations: PageOperations<Handle>, found: re
 type Actionable<Handle> = Result<{ readonly element: Handle; readonly at: { x: number; y: number } }, DriverError>;
 type Found<Handle> = Result<Handle, DriverError>;
 
-const neverStops = (): boolean => false;
+type ActionabilityLook<Handle> = { readonly count: number; readonly element?: Handle; readonly check: Actionability | null };
+
+async function lookForActionable<Handle>(operations: PageOperations<Handle>, locator: ResolvedLocator): Promise<ActionabilityLook<Handle>> {
+  const found = await locate(operations, locator);
+  const element = found[0];
+  if (found.length !== 1 || element === undefined) {
+    return { count: found.length, check: null };
+  }
+  try {
+    return { count: 1, element, check: JSON.parse(await operations.callForString(actionability, [{ element }])) as Actionability };
+  } catch {
+    return { count: 1, check: null }; // detached during the check: locate again
+  }
+}
+
+const REQUIRED_STATES = ['attached', 'visible', 'stable', 'enabled', 'receivesEvents'] as const;
+
+function whyNotActionable<Handle>(look: ActionabilityLook<Handle>, timeoutMilliseconds: number): DriverError {
+  if (look.count === 0) {
+    return { code: 'not-found', detail: `not-found after ${timeoutMilliseconds} ms` };
+  }
+  if (look.count > 1) {
+    return { code: 'ambiguous', detail: `${look.count} matches after ${timeoutMilliseconds} ms` };
+  }
+  const check = look.check;
+  const missing = check === null ? 'attached' : REQUIRED_STATES.find((state) => !check[state]) ?? 'unknown';
+  return { code: 'not-actionable', detail: `not ${missing} after ${timeoutMilliseconds} ms` };
+}
 
 // Auto-wait: exactly one match that is attached, visible, stable, enabled and hit by a pointer at
 // its centre. Never the first of several matches; a typed failure at the deadline, or at once when
-// `crashed` says the page has died.
+// `crashed` says the page has died. One look gets the whole of `lookLimitMilliseconds`, however
+// little of the wait is left, so only a page that has stopped answering fails with timeout.
 async function waitUntilActionable<Handle>(
-  operations: PageOperations<Handle>, locator: ResolvedLocator, timeoutMilliseconds: number, crashed: () => boolean = neverStops,
+  operations: PageOperations<Handle>, locator: ResolvedLocator, timeoutMilliseconds: number, lookLimitMilliseconds: number, crashed: () => boolean,
 ): Promise<Actionable<Handle>> {
   const deadline = Date.now() + timeoutMilliseconds;
-  let count = 0;
-  let last: Actionability | null = null;
   for (;;) {
-    const found = await locate(operations, locator);
-    count = found.length;
-    const element = found[0];
-    if (count === 1 && element !== undefined) {
-      try {
-        last = JSON.parse(await operations.callForString(actionability, [{ element }])) as Actionability;
-        if (last.attached && last.visible && last.stable && last.enabled && last.receivesEvents && last.centre) {
-          return success({ element, at: last.centre });
-        }
-      } catch {
-        last = null; // detached during the check: locate again
-      }
+    const look = await forAtMost(lookLimitMilliseconds, lookForActionable(operations, locator));
+    if (look === TIMED_OUT) {
+      return failure(notAnswering(lookLimitMilliseconds));
     }
-    if (crashed()) return failure(CRASHED);
-    if (Date.now() >= deadline) break;
+    const centre = look.check?.centre ?? null;
+    if (look.element !== undefined && centre !== null && REQUIRED_STATES.every((state) => look.check?.[state] === true)) {
+      return success({ element: look.element, at: centre });
+    }
+    if (crashed()) {
+      return failure(CRASHED);
+    }
+    if (Date.now() >= deadline) {
+      return failure(whyNotActionable(look, timeoutMilliseconds));
+    }
     await pause(POLL_INTERVAL_MILLISECONDS);
   }
-  if (count === 0) return failure({ code: 'not-found', detail: `not-found after ${timeoutMilliseconds} ms` });
-  if (count > 1) return failure({ code: 'ambiguous', detail: `${count} matches after ${timeoutMilliseconds} ms` });
-  const lastCheck = last;
-  const missing = lastCheck === null ? 'attached'
-    : (['attached', 'visible', 'stable', 'enabled', 'receivesEvents'] as const).find((key) => !lastCheck[key]) ?? 'unknown';
-  return failure({ code: 'not-actionable', detail: `not ${missing} after ${timeoutMilliseconds} ms` });
 }
 
 // Exactly one match, attached to the page: enough for setting a file input's files, which is
@@ -178,7 +220,10 @@ async function waitUntilFound<Handle>(
 ): Promise<Found<Handle>> {
   const deadline = Date.now() + timeoutMilliseconds;
   for (;;) {
-    const found = await locate(operations, locator);
+    const found = await forAtMost(timeoutMilliseconds, locate(operations, locator));
+    if (found === TIMED_OUT) {
+      return failure(notAnswering(timeoutMilliseconds));
+    }
     const element = found[0];
     if (found.length === 1 && element !== undefined) return success(element);
     if (crashed()) return failure(CRASHED);
@@ -298,6 +343,18 @@ async function clickDenial<Handle>(operations: PageOperations<Handle>, element: 
   return null;
 }
 
+// True when every element a secret was typed into under this locator has gone. One the session has
+// no record of, or one that cannot say, counts as still there.
+async function hasTypedFieldGone(typedFields: readonly SecretTypedField[], locator: ResolvedLocator): Promise<boolean> {
+  const typed = typedFields.filter((field) => isDeepStrictEqual(field.locator, locator));
+  try {
+    const gone = await Promise.all(typed.map((field) => field.isGone()));
+    return typed.length > 0 && gone.every(Boolean);
+  } catch {
+    return false;
+  }
+}
+
 // The text a fill of literal text or of lines types; a secret reference is revealed elsewhere.
 const textToFill = (value: Extract<ResolvedActionStep, { type: 'fill' }>['value']): string =>
   (typeof value === 'string' ? value : 'lines' in value ? value.lines.join('\n') : '');
@@ -313,7 +370,7 @@ function documentPorts<Handle>(
   const crashed = (): boolean => events.crashed();
   const timeout = environment.timeoutMilliseconds;
 
-  const probe = async (planLocator: Locator, read?: DomRead): Promise<ElementProbe> => {
+  const probeNow = async (planLocator: Locator, read?: DomRead): Promise<ElementProbe> => {
     // A value reference, or a locator this session cannot resolve, says nothing about the page.
     const locator = performableLocator(planLocator, SESSION_FEATURES);
     if (locator === undefined || crashed()) return READ_FAILED;
@@ -345,25 +402,55 @@ function documentPorts<Handle>(
     }
   };
 
+  // A read the page does not answer in time is one that says nothing about what is on it.
+  const probe = async (planLocator: Locator, read?: DomRead): Promise<ElementProbe> => {
+    const probed = await forAtMost(timeout, probeNow(planLocator, read));
+    if (probed !== TIMED_OUT) {
+      return probed;
+    }
+    return events.openDialog() === null ? READ_FAILED : DIALOG_HOLDS_PAGE;
+  };
+
+  // Input gets the step's timeout from the moment it is sent. The wait for the element is not counted:
+  // a click on an element found late is as entitled to its navigation as any other. A dialog that
+  // opens meanwhile is the input landing, as ever.
+  const inputWithinTimeout = async <Value>(input: Promise<Value>, onDialog: Value): Promise<Result<Value, DriverError>> => {
+    const ended = await forAtMost(timeout, input);
+    if (ended !== TIMED_OUT) {
+      return success(ended);
+    }
+    return events.openDialog() === null ? failure({ code: 'timeout', detail: `the input was still being handled after ${timeout} ms` }) : success(onDialog);
+  };
+
   // A click with a hit-target check: a click that lands on another element is swallowed in the
   // page and retried. The guard is asked on every attempt: the page may have re-rendered, so the
   // locator may now find another element than the guard last allowed.
   const click = async (locator: ResolvedLocator, guard: ActionGuard): Promise<Result<void, DriverError>> => {
     const deadline = Date.now() + timeout;
     for (;;) {
-      const waited = await waitUntilActionable(operations, locator, Math.max(deadline - Date.now(), 0), crashed);
+      const waited = await waitUntilActionable(operations, locator, Math.max(deadline - Date.now(), 0), timeout, crashed);
       if (!waited.ok) return waited;
       const denied = await clickDenial(operations, waited.value.element, waited.value.at, guard);
       if (denied !== null) {
         return failure(denied);
       }
       await operations.callForString(armHitCheck, [{ element: waited.value.element }]);
-      await operations.click(waited.value.element, waited.value.at);
-      // A dialog the click opened stops the page until it is answered: the click landed.
-      if (events.openDialog() !== null) return success(undefined);
-      let hit = 'hit';
-      try { hit = await operations.callForString(readHitCheck, []); } catch { /* the click navigated, so it landed */ }
-      if (hit !== 'miss') return success(undefined);
+      const clickAndReadHit = async (): Promise<string> => {
+        await operations.click(waited.value.element, waited.value.at);
+        // A dialog the click opened stops the page until it is answered: the click landed.
+        if (events.openDialog() !== null) {
+          return 'hit';
+        }
+        // A read that fails means the click navigated, so it landed.
+        return operations.callForString(readHitCheck, []).catch(() => 'hit');
+      };
+      const hit = await inputWithinTimeout(clickAndReadHit(), 'hit');
+      if (!hit.ok) {
+        return hit;
+      }
+      if (hit.value !== 'miss') {
+        return success(undefined);
+      }
       if (Date.now() >= deadline) {
         return failure({ code: 'not-actionable', detail: `click landed on another element until ${timeout} ms` });
       }
@@ -383,7 +470,7 @@ function documentPorts<Handle>(
       await operations.setFiles(found.value, [path.value]);
       return success(undefined);
     }
-    const waited = await waitUntilActionable(operations, action.locator, timeout, crashed);
+    const waited = await waitUntilActionable(operations, action.locator, timeout, timeout, crashed);
     if (!waited.ok) return waited;
     const { element, at } = waited.value;
     const denied = await denial(operations, element, guard);
@@ -392,8 +479,21 @@ function documentPorts<Handle>(
       case 'hover': await operations.hover(at); break;
       // The secret is revealed here, as it is typed, and nowhere else in this driver. Lines are
       // joined by line feeds and inserted as text, so no Enter key press can send a form early.
-      case 'fill': await operations.fill(element, typedSecret === null ? textToFill(action.value) : reveal(typedSecret)); break;
-      case 'press': await operations.press(element, action.key, heldModifierKeys(action.modifiers ?? [], process.platform)); break;
+      // Noted before typing: a fill that fails part way may still have typed some of it.
+      case 'fill':
+        if (typedSecret !== null) {
+          details.secretTypedFields.push({ locator: action.locator, isGone: () => operations.isElementGone(element) });
+        }
+        await operations.fill(element, typedSecret === null ? textToFill(action.value) : reveal(typedSecret));
+        break;
+      case 'press': {
+        // Enter on a form or a link starts a navigation as a click does.
+        const pressed = await inputWithinTimeout(operations.press(element, action.key, heldModifierKeys(action.modifiers ?? [], process.platform)), undefined);
+        if (!pressed.ok) {
+          return pressed;
+        }
+        break;
+      }
       case 'select': {
         const chosen = await operations.callForString(selectOption, [{ element }, action.option]);
         if (chosen === 'no-option') return failure({ code: 'not-found', detail: 'the select has no option with that text or value' });
@@ -442,7 +542,13 @@ function documentPorts<Handle>(
     // Anything this driver cannot perform in full is refused before it touches the page.
     const action = literalActionStep(step, SESSION_FEATURES);
     if (action === undefined) return failure({ code: 'unsupported-step', detail: `this driver does not perform this ${step.type} step yet` });
-    if (await rejectsSelector(operations, action.locator)) return failure(SELECTOR_INVALID);
+    const rejected = await forAtMost(timeout, rejectsSelector(operations, action.locator));
+    if (rejected === TIMED_OUT) {
+      return failure(notAnswering(timeout));
+    }
+    if (rejected) {
+      return failure(SELECTOR_INVALID);
+    }
     // A secret reference arrives with the secret the engine resolved for it. Without that secret
     // there is nothing to type, and typing nothing could pass a step that should fail.
     const typed = action.type === 'fill' ? action.value : '';
@@ -460,8 +566,12 @@ function documentPorts<Handle>(
       return acted;
     }
     // Whatever the action started reaches the browser within a frame or two; then the driver looks.
+    // A read that fails means the page navigated or died, which is looked at below.
     if (acted.ok && events.openDialog() === null) {
-      try { await operations.callForString(afterTwoFrames, []); } catch { /* the page navigated or died: looked at below */ }
+      const settled = await inputWithinTimeout(operations.callForString(afterTwoFrames, []).catch(() => ''), '');
+      if (!settled.ok) {
+        acted = settled;
+      }
     }
     if (crashed()) return failure(CRASHED);
     if (events.unsupportedOpenings() > openingsBefore) {
@@ -562,7 +672,11 @@ function documentPorts<Handle>(
       }
     },
     async page(): Promise<PageProbe> {
-      const shown = decodePageInfo(await operations.callForString(pageInfo, []));
+      const answered = await forAtMost(timeout, operations.callForString(pageInfo, []));
+      if (answered === TIMED_OUT) {
+        throw new Error(notAnswering(timeout).detail);
+      }
+      const shown = decodePageInfo(answered);
       // In place of a page it could not show, the browser shows its own error page at an internal
       // URL. The address bar still shows the URL it wanted, which is not a page that loaded.
       if (!shown.url.startsWith(BROWSER_ERROR_PAGE)) return shown;
@@ -574,16 +688,20 @@ function documentPorts<Handle>(
     runScript,
     screenshot: (mask) => maskedScreenshot(mask, () => Promise.resolve()),
     // Each field is found before anything is painted, so no image exists for a field that cannot be.
+    // A field its locator no longer finds holds nothing on screen only if the element typed into has
+    // gone: one still on the page may still show what was typed. A read that throws shows neither.
     async screenshotHidingFields(mask, fields) {
       const toPaint: { readonly framed: PageOperations<Handle>; readonly elements: readonly Handle[] }[] = [];
       for (const field of fields) {
         let isFound = false;
+        let isEveryDocumentRead = true;
         for (const framed of masked) {
-          const elements = await locate(framed, field);
-          isFound ||= elements.length > 0;
-          toPaint.push({ framed, elements });
+          const elements = await findElements(framed, field).catch(() => null);
+          isEveryDocumentRead &&= elements !== null;
+          isFound ||= elements !== null && elements.length > 0;
+          toPaint.push({ framed, elements: elements ?? [] });
         }
-        if (!isFound) {
+        if (!isFound && !(isEveryDocumentRead && await hasTypedFieldGone(details.secretTypedFields, field))) {
           return failure({ code: 'not-found', detail: 'a field a secret was typed into cannot be found to hide it' });
         }
       }

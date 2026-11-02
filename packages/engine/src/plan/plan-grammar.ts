@@ -153,12 +153,26 @@ export const VALUE_NAME = /^[a-z][A-Za-z0-9]{0,63}$/;
 // name: a lowercase letter, then up to 63 letters and digits. The project parser owns these names;
 // a plan only refers to them.
 export const DECLARED_NAME = /^[a-z][A-Za-z0-9]{0,63}$/;
-// A query key in a path template.
-export const QUERY_KEY = /^[A-Za-z0-9_.-]{1,64}$/;
+// A query key in a path template. "__proto__" is never one: a key that means something else to
+// whatever reads the plan next could not mean one thing everywhere.
+export const QUERY_KEY = /^(?!__proto__$)[A-Za-z0-9_.-]{1,64}$/;
 // A plan clock's time of day, "HH:MM" on the 24-hour clock.
 export const CLOCK_TIME = /^([01][0-9]|2[0-3]):[0-5][0-9]$/;
 // The start of a generated email address: characters every mail system accepts in a local part.
 export const EMAIL_LOCAL_PREFIX = /^[A-Za-z0-9._+-]{1,53}$/;
+
+// How a URL in a plan is written: a path starting with "/", or an absolute http or https URL in
+// lower case. A URL parser would also forgive other spellings, such as a leading space.
+export const WRITTEN_URL_PATTERN = '^(/|https?://)';
+export const WRITTEN_URL = new RegExp(WRITTEN_URL_PATTERN);
+
+// The characters plan and project text may not hold, as regular expression source for a character
+// class: C0 and C1 controls, and characters that hide or change what the text reads as (zero width
+// space, directional marks and overrides, word joiners and other invisible operators, byte order
+// mark, interlinear annotation marks) or break the line where nothing shows (U+2028, U+2029). The
+// zero width non-joiner and joiner (U+200C, U+200D) stay allowed, because emoji and Persian and
+// Indic text need them, and so does the soft hyphen, because pages hold it and a plan may quote them.
+export const UNSAFE_TEXT_CHARACTERS = '\\u0000-\\u001f\\u007f-\\u009f\\u061c\\u180e\\u200b\\u200e\\u200f\\u2028-\\u202e\\u2060-\\u206f\\ufeff\\ufff9-\\ufffb';
 
 // Fixed text lengths that do not depend on the project's limits.
 export const MAXIMUM_URL_LENGTH = 2048;
@@ -196,6 +210,8 @@ export const CLASS_TOKEN = /^[^\s]{1,256}$/;
 export const STYLE_PROPERTY = /^-?[a-z][a-z0-9-]{0,99}$/;
 // An attribute name: lowercase letters, digits and hyphens, starting with a letter.
 export const ATTRIBUTE_NAME = /^[a-z][a-z0-9-]{0,99}$/;
+// The longest a class token, style property or attribute name may be: the longest of their patterns.
+export const MAXIMUM_LITERAL_NAME_LENGTH = 256;
 // The longest expected text a computed style check may compare against.
 export const MAXIMUM_STYLE_VALUE_LENGTH = 500;
 // The longest script text a plan may hold inline.

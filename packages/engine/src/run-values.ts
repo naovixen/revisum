@@ -11,7 +11,7 @@ import {
 } from '@revisum/contracts';
 import { brand } from './brand.ts';
 import { formatCalendarDay, instantOf, relativeCalendarDay } from './calendar.ts';
-import { sha256 } from './hashing.ts';
+import { entriesInKeyOrder, sha256 } from './hashing.ts';
 import { normalise } from './oracle.ts';
 import { runTimeText } from './plan/plan-decoders.ts';
 import { generatedValueEntries } from './plan/plan-values.ts';
@@ -36,9 +36,10 @@ export type RunValues = ReadonlyMap<ValueName, SafeText>;
 //   command-timeout    a database command ran past its timeout and was stopped;
 //   command-output-invalid  a database command printed more than its maximumOutputBytes, or output
 //                      that is not one JSON value when its declaration reads JSON.
-//   value-holds-secret a remember step's element is a field a secret was typed into, or its text
-//                      holds a secret;
-//   capture-left-out   a capture took no image, since a field a secret was typed into cannot be masked.
+//   value-holds-secret a remember step's element is a field a secret was typed into, or a text any
+//                      step would remember holds a secret;
+//   capture-left-out   a capture took no image, since a field a secret was typed into is still on
+//                      the page but cannot be found to mask it.
 export type StepErrorCode =
   | 'value-empty' | 'value-unsafe' | 'value-too-long' | 'state-not-exposed' | 'download-not-text' | 'request-not-seen'
   | 'script-result-too-large' | 'script-result-invalid' | 'command-failed' | 'command-timeout' | 'command-output-invalid'
@@ -84,7 +85,8 @@ export function generateValue(
     }
   })();
   // Built from safe text, digits and Intl output, so this never fails; it is still checked, so a
-  // generated value is SafeText only because it passed the same rules as plan text.
+  // generated value is SafeText only because it passed the rules for run-time text. Intl output
+  // may hold directional marks, which plan text may not.
   const safe = runTimeText(text, MAXIMUM_GENERATED_LENGTH);
   if (safe === undefined) throw new TypeError(`the generated value ${name} broke the safe-text rules`);
   return safe;
@@ -243,7 +245,9 @@ export function resolvePathTemplate(template: PathTemplate, values: RunValues, p
     segments.push(encoded.value);
   }
   const query: string[] = [];
-  for (const [key, value] of Object.entries(template.query ?? {})) {
+  // In key order, because a plan's hash ignores the order its keys are written in: two plans with
+  // one hash must go to one URL.
+  for (const [key, value] of entriesInKeyOrder(template.query ?? {})) {
     const text = resolveText(value, values, project.limits.maximumTextLength);
     if (!text.ok) return text;
     query.push(`${encodeURIComponent(key)}=${encodeURIComponent(text.value)}`);

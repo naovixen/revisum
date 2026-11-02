@@ -266,8 +266,10 @@ export function approvalVerifier(options: ApprovalVerifierOptions): ApprovalVeri
       const { login, strength, at } = checked.value;
       const approver = pseudonymousActorId(login, actorKey);
       const actor = deriveActor(approver, PERSON_FOR_STRENGTH[strength]);
+      // The file the proof was judged on, never a path the caller offers beside it.
+      const judgedFile = subject.kind === 'holdout-plan' ? HOLDOUTS_FILE : subject.path;
       const approval = brand<ApprovalFields, 'Approval'>({
-        subject: { kind: subject.kind, hash: subject.hash, ...(subject.path === undefined ? {} : { path: subject.path }) },
+        subject: { kind: subject.kind, hash: subject.hash, ...(judgedFile === undefined ? {} : { path: judgedFile }) },
         approver, proofKind: proof.kind, strength, at,
       });
       const recorded = events.append({ kind: 'plan.approved', subjectHash: subject.hash, proofKind: proof.kind }, actor);

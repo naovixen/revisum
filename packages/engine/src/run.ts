@@ -36,7 +36,7 @@ import {
 import { checkElement, checkPage, domReadFor, normalise, type Verdict } from './oracle.ts';
 import { runEvaluate, runScriptCheck, type PageScriptContext, type PageScriptRecord } from './page-scripts/page-script-steps.ts';
 import type { SuiteDecodeError } from './evidence/suite-report.ts';
-import { runTimeText, type PlanError } from './plan/plan-decoders.ts';
+import type { PlanError } from './plan/plan-decoders.ts';
 import { ASSERTION_STEP_TYPES } from './plan/plan-grammar.ts';
 import { assertBranded, everyPlanStep } from './plan/plan-parser.ts';
 import { unsafeFeaturesOf } from './plan/unsafe-features.ts';
@@ -44,9 +44,10 @@ import { assertAuthorised, isClearedForStanding, policyGate, type PolicyGate } f
 import type { Project } from './project/project-parser.ts';
 import { declaredCommands } from './project/unsafe-feature-declarations.ts';
 import { SENSITIVE_PLACEHOLDER } from './redaction.ts';
+import { rememberedValues, type RememberedValues } from './RememberedValues.ts';
 import { withResultHash } from './result-hash.ts';
 import {
-  generateRunValues, resolveActionStep, resolveElementAssertion, resolveLocator, resolvePathTemplate, resolvePlanClock, resolveText,
+  generateRunValues, resolveActionStep, resolveElementAssertion, resolveLocator, resolvePathTemplate, resolvePlanClock, resolveText, type RunValues,
 } from './run-values.ts';
 import {
   NO_SECRETS, commandSecretStore, resolvePlanSecrets, resolvedSecretStore, secretEchoRemoval, secretRecords, shortSecretObservation, stubAndStorageSecretStore, withSecretRedaction,
@@ -166,14 +167,21 @@ export type RunReviewItem =
   | { readonly code: 'spec-ambiguous'; readonly testId: SuiteTestId; readonly annotationIndex: number }
   // A test the suite marked as expected to fail did fail: Playwright counts it as expected, but a
   // person should see why a failing test is kept.
-  | { readonly code: 'expected-failure'; readonly testId: SuiteTestId };
+  | { readonly code: 'expected-failure'; readonly testId: SuiteTestId }
+  // A project the suite declares has no test in the report, so what was tested is less than declared.
+  | { readonly code: 'project-without-tests'; readonly project: SafeText }
+  // Part of the suite's output was refused (the run's decodeErrors, at this index), so the result
+  // shows less than the suite recorded.
+  | { readonly code: 'suite-output-unread'; readonly decodeErrorIndex: number };
 
 // Why an evidence run ended as it did, beyond its tests' outcomes.
-//   vacuous: the report holds no tests, so the run checked nothing and ends Failed.
+//   vacuous: the report holds no test that ran, so the run checked nothing and ends Failed.
 //   suite-timeout: the suite ran past its timeout and was stopped; the run ends Errored.
 //   setup-failed: the suite's setup command failed or timed out, so the suite never ran; Errored.
 //   suite-report-unread: the suite's report is missing or was refused (decodeErrors says why); Errored.
-export type EvidenceOutcomeCode = 'vacuous' | 'suite-timeout' | 'setup-failed' | 'suite-report-unread';
+//   egress-unread: what the egress proxy decided could not be read back, or not all of it was written,
+//   so the run cannot show its egress was enforced; Errored.
+export type EvidenceOutcomeCode = 'vacuous' | 'suite-timeout' | 'setup-failed' | 'suite-report-unread' | 'egress-unread';
 
 // What only an evidence run records: which pass it was, the suite command's exit code, and whether
 // that code disagreed with the outcomes the report gives, which makes the run Errored. The outcome
@@ -258,7 +266,9 @@ type RunContext = {
   readonly secretFilledFields: Map<string, ResolvedLocator>;
   // The run's values by name: the plan's generated values, the response fields calls remember and
   // the page texts remember steps read.
-  readonly values: Map<ValueName, SafeText>;
+  readonly values: RunValues;
+  // The only way a step adds to the run's values.
+  readonly remembered: RememberedValues;
   // The texts remember steps read from the page, which a failed check's observation never keeps.
   readonly rememberedTexts: Set<string>;
   // The optional plan features the session's driver performs; none until a session is open.
@@ -307,15 +317,21 @@ export async function run(given: RunInputs, ports: RunPorts): Promise<RunResult>
   // Generation is pure, so values exist before anything runs; a run with no target has none.
   const values = new Map<ValueName, SafeText>(target === undefined
     ? [] : generateRunValues(inputs.plan, inputs.seed, inputs.fixedTimeMilliseconds, target, inputs.project));
-  const calls: CallStepContext | undefined = ports.services === undefined ? undefined : {
-    caller: ports.services, project: inputs.project, values, secrets: resolvedSecretStore(secrets), clock: ports.clock, logger,
-  };
+  const isShortSecret = shortSecretObservation(secrets);
+  const withoutSecrets = secretEchoRemoval(secrets);
   const rememberedTexts = new Set<string>();
+  const remembered = rememberedValues({
+    values, rememberedTexts, hasSecret: (text) => isShortSecret(text) || withoutSecrets(text) !== text,
+    maximumTextLength: inputs.project.limits.maximumTextLength, logger,
+  });
+  const calls: CallStepContext | undefined = ports.services === undefined ? undefined : {
+    caller: ports.services, project: inputs.project, values, remembered, secrets: resolvedSecretStore(secrets), clock: ports.clock, logger,
+  };
   const commands: DatabaseCommandContext | undefined = ports.databaseCommands === undefined ? undefined : {
-    runner: ports.databaseCommands, project: inputs.project, values, rememberedTexts, secrets: commandSecretStore(secrets), clock: ports.clock, logger,
+    runner: ports.databaseCommands, project: inputs.project, values, remembered, secrets: commandSecretStore(secrets), clock: ports.clock, logger,
   };
   const context: RunContext = {
-    inputs, ports, logger, gate, denials: [], redactor, secrets, isShortSecret: shortSecretObservation(secrets), withoutSecrets: secretEchoRemoval(secrets), secretFilledFields: new Map(), values, calls,
+    inputs, ports, logger, gate, denials: [], redactor, secrets, isShortSecret, withoutSecrets, secretFilledFields: new Map(), values, remembered, calls,
     commands, rememberedTexts, performs: [], session: null, downloads: new Map(), activeStubs: new Set(), setupFailedInside: new Set(),
     determinismUnpinned: target !== undefined && cannotPinDeterminism(ports.drivers, target),
   };
@@ -327,7 +343,9 @@ export async function run(given: RunInputs, ports: RunPorts): Promise<RunResult>
   // project, is refused.
   assertAuthorised(inputs.plan, target.id, inputs.project);
   const planned = lifecycle.plan(inputs.plan, target);
-  logger.log({ kind: 'run.state', state: planned.state, targetId: target.id });
+  // A log that fails this early ends the run Errored like one that fails later, once there are steps
+  // to account for. It must not reject the run, and a refusal below still stands.
+  const isPlanLogged = logKeepingTheResult({ kind: 'run.state', state: planned.state, targetId: target.id }, logger);
 
   if (!isClearedForStanding(inputs.plan, target.id, inputs.project, standing)) {
     return refusedResult(planned, { code: 'clearance-standing-mismatch' }, context, startedAt);
@@ -378,15 +396,17 @@ export async function run(given: RunInputs, ports: RunPorts): Promise<RunResult>
     recordsReplies: inputs.project.replay?.recordReplies === true,
   });
   const resolved = lifecycle.resolve(planned, session, manifest, manifestHash(manifest));
-  logger.log({ kind: 'run.state', state: resolved.state, targetId: target.id, adapter: driver.info.id, sha256: resolved.manifestHash });
-
   const running = lifecycle.start(resolved);
-  logger.log({ kind: 'run.state', state: running.state, targetId: target.id });
   const steps: StepResult[] = [];
   const stepMilliseconds: number[] = [];
   let stubAnswers: readonly StubAnswer[] = [];
   let finished: lifecycle.Finished<'Passed' | 'Failed' | 'Errored'> | lifecycle.DeniedRun;
   try {
+    if (!isPlanLogged) {
+      throw new Error('the log could not be written');
+    }
+    logger.log({ kind: 'run.state', state: resolved.state, targetId: target.id, adapter: driver.info.id, sha256: resolved.manifestHash });
+    logger.log({ kind: 'run.state', state: running.state, targetId: target.id });
     const notObserved = await failureToObserveRequests(session, stepContext);
     for (const [index, step] of inputs.plan.steps.entries()) {
       if (steps.some((done) => done.outcome === 'failed')) { steps.push({ index, type: step.type, outcome: 'skipped' }); continue; }
@@ -526,7 +546,7 @@ function refusedResult(
   logged: { readonly origin?: string; readonly detail?: string } = {},
 ): RunResult {
   const refused = lifecycle.refuse(planned, refusal);
-  context.logger.log({ kind: 'run.state', state: refused.state, targetId: planned.target.id, code: refused.refusal.code, ...logged });
+  logKeepingTheResult({ kind: 'run.state', state: refused.state, targetId: planned.target.id, code: refused.refusal.code, ...logged }, context.logger);
   return seal({
     state: refused.state, targetId: planned.target.id, manifest: null, manifestHash: null, steps: [], blockedOrigins: [],
     unavailable: null, refusal: refused.refusal, timings: { totalMilliseconds: context.ports.clock.now() - startedAt, stepMilliseconds: [] },
@@ -665,6 +685,16 @@ function logFailureAfterTheVerdict(code: string, error: unknown, logger: Logger)
   }
 }
 
+// Logs what happened where a failing log must not reject the run. True when the log took it.
+function logKeepingTheResult(event: Parameters<Logger['log']>[0], logger: Logger): boolean {
+  try {
+    logger.log(event);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // A session that will not close, such as a browser profile Windows still holds, says nothing about
 // what the steps found. It stays out of the result, whose hash a replay on a calmer machine must match.
 async function closeKeepingTheResult(session: Session, logger: Logger): Promise<void> {
@@ -739,20 +769,20 @@ function withActiveStubs(step: Step, result: StepResult, activeStubs: ReadonlySe
 // What the stub, request-check and storage steps use: the run's session, values and the secrets
 // resolved for stub starts and storage writes.
 const networkContext = (context: RunContext): NetworkStepContext => ({
-  project: context.inputs.project, session: context.session, values: context.values, rememberedTexts: context.rememberedTexts,
-  secrets: stubAndStorageSecretStore(context.secrets), clock: context.ports.clock, logger: context.logger, activeStubs: context.activeStubs,
+  project: context.inputs.project, session: context.session, values: context.values, remembered: context.remembered,
+  secrets: stubAndStorageSecretStore(context.secrets), clock: context.ports.clock, activeStubs: context.activeStubs,
 });
 
 // What the clock and clipboard steps use: the run's session and values.
 const clockAndClipboardContext = (context: RunContext): ClockAndClipboardContext => ({
-  project: context.inputs.project, session: context.session, values: context.values, rememberedTexts: context.rememberedTexts,
-  clock: context.ports.clock, logger: context.logger,
+  project: context.inputs.project, session: context.session, values: context.values, remembered: context.remembered,
+  clock: context.ports.clock,
 });
 
 // What the page-script steps use: the run's values and the declared scripts' sources.
 const pageScriptContext = (context: RunContext): PageScriptContext => ({
   project: context.inputs.project, scriptSources: context.inputs.scriptSources ?? {}, values: context.values,
-  rememberedTexts: context.rememberedTexts, clock: context.ports.clock, logger: context.logger,
+  remembered: context.remembered, clock: context.ports.clock, logger: context.logger,
 });
 
 // What the runtime guard is given for a step that acts on no element.
@@ -929,9 +959,6 @@ async function pixelsWithSecretsHidden(session: DocumentSession, context: RunCon
   return taken.ok ? taken.value : null;
 }
 
-// True when a text read from the page holds one of the plan's secrets, in any form the run looks for.
-const isSecretEcho = (text: string, context: RunContext): boolean => context.isShortSecret(text) || context.withoutSecrets(text) !== text;
-
 // Reads a remember step's value from the page through the prober, waiting as a check waits until
 // the locator matches one element with non-empty text (or input value), whitespace normalised, or
 // with a non-empty attribute, taken exactly as the page holds it.
@@ -972,19 +999,8 @@ async function rememberFromPage(step: Extract<Step, { type: 'remember' }>, index
   }
   const text = seen.probe === null ? '' : textOf(seen.probe);
   if (text === '') return { ...base, outcome: 'failed', code: 'value-empty' };
-  // Another locator for a secret-filled field, or the page's own echo of a secret, reads the same.
-  if (isSecretEcho(text, context)) {
-    return { ...base, outcome: 'failed', code: 'value-holds-secret' };
-  }
-  const maximumLength = context.inputs.project.limits.maximumTextLength;
-  if (text.length > maximumLength) return { ...base, outcome: 'failed', code: 'value-too-long' };
-  const safe = runTimeText(text, maximumLength);
-  if (safe === undefined) return { ...base, outcome: 'failed', code: 'value-unsafe' };
-  context.values.set(step.name, safe);
-  context.rememberedTexts.add(safe);
-  const digest = sha256(safe);
-  context.logger.log({ kind: 'value.remembered', stepIndex: index, valueName: step.name, sha256: digest });
-  return { ...base, outcome: 'passed', remembered: { valueName: step.name, sha256: digest } };
+  const kept = context.remembered.remember(step.name, text, index);
+  return kept.ok ? { ...base, outcome: 'passed', remembered: kept.value } : { ...base, outcome: 'failed', code: kept.error };
 }
 
 // A page check with a meta tag's expected content resolved, when it is a value reference.
@@ -1187,7 +1203,7 @@ function withoutRememberedTexts(observed: string, remembered: ReadonlySet<string
 const errorText = (error: unknown): string => (error instanceof Error ? error.message : String(error)).slice(0, 200);
 
 function unavailableResult(targetId: string, unavailable: Unavailable, context: RunContext, startedAt: number): RunResult {
-  context.logger.log({ kind: 'run.state', state: 'TargetUnavailable', targetId, code: unavailable.reason });
+  logKeepingTheResult({ kind: 'run.state', state: 'TargetUnavailable', targetId, code: unavailable.reason }, context.logger);
   return seal({
     state: 'TargetUnavailable', targetId, manifest: null, manifestHash: null, steps: [], blockedOrigins: [],
     unavailable, timings: { totalMilliseconds: context.ports.clock.now() - startedAt, stepMilliseconds: [] },

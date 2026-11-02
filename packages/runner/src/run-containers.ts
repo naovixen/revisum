@@ -8,7 +8,7 @@ import { isAbsolute, join, normalize, sep } from 'node:path';
 import type { ContainerEngine, ContainerMount, ContainerOptions, ProbeTarget } from './container-engine.ts';
 import { proxyRules } from './egress-proxy.ts';
 import {
-  DECISIONS_FILE, LOOKUPS_FILE, LOOKUPS_VARIABLE, REWRITES_FILE, RULES_VARIABLE, PROXY_PORT, readAppliedRewrite, readProxyDecision,
+  DECISIONS_FILE, LOOKUPS_FILE, LOOKUPS_VARIABLE, RECORDS_LOST, RECORDS_STATE_FILE, REWRITES_FILE, RULES_VARIABLE, PROXY_PORT, readAppliedRewrite, readProxyDecision,
 } from './proxy-container.ts';
 
 // Where Revisum's own files appear inside the run image's containers.
@@ -124,9 +124,17 @@ export async function readAppliedRewrites(engine: ContainerEngine, proxyId: stri
   return lines === null ? null : lines.map(readAppliedRewrite).filter((applied) => applied !== null);
 }
 
-// The names looked up on the run's network so far, as the proxy container recorded them.
-export async function readLookups(engine: ContainerEngine, proxyId: string): Promise<readonly string[]> {
-  return ((await linesOf(engine, proxyId, LOOKUPS_FILE)) ?? []).map(readRecordedLookup).filter((name) => name !== null);
+// The names looked up on the run's network so far, as the proxy container recorded them, or null
+// when they cannot be read.
+export async function readLookups(engine: ContainerEngine, proxyId: string): Promise<readonly string[] | null> {
+  const lines = await linesOf(engine, proxyId, LOOKUPS_FILE);
+  return lines === null ? null : lines.map(readRecordedLookup).filter((name) => name !== null);
+}
+
+// True when the proxy could not write a record, or cannot say whether it could.
+export async function hasProxyLostRecords(engine: ContainerEngine, proxyId: string): Promise<boolean> {
+  const lines = await linesOf(engine, proxyId, RECORDS_STATE_FILE);
+  return lines === null || lines.includes(RECORDS_LOST);
 }
 
 const HOST_NAME = /^(?=.{1,253}$)[a-z0-9_]([a-z0-9_-]{0,62})(\.[a-z0-9_]([a-z0-9_-]{0,62}))*$/;

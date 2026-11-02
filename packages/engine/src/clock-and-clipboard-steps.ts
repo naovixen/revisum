@@ -9,28 +9,24 @@
 //   - A remember from the clipboard keeps the text as a run value only when it passes the same
 //     rules as plan text; the result and the log keep its name and sha256 only.
 import type {
-  AdvanceClockStep, ClipboardAssertion, Clock, DriverError, ExpectClipboardStep, Result, SafeText, Session, Step, ValueName,
+  AdvanceClockStep, ClipboardAssertion, Clock, DriverError, ExpectClipboardStep, Result, Session, Step,
 } from '@revisum/contracts';
 import { clockAdvanceMilliseconds } from './clock-advance.ts';
-import { sha256 } from './hashing.ts';
-import type { Logger } from './logging.ts';
-import { runTimeText } from './plan/plan-decoders.ts';
 import type { Project } from './project/project-parser.ts';
+import type { RememberedRecord, RememberedValues } from './RememberedValues.ts';
 import { resolveText, type RunValues } from './run-values.ts';
 
 // How long a clipboard check or remember waits between two reads of the clipboard.
 const POLL_INTERVAL_MILLISECONDS = 50;
 
-// What the run hands these steps. `values` and `rememberedTexts` are the run's own: a remember
-// step adds to them.
+// What the run hands these steps. `remembered` is how a remember step adds to the run's values.
 export type ClockAndClipboardContext = {
   readonly project: Project;
   // The run's session, whose ports these steps use; null before one is open.
   readonly session: Session | null;
-  readonly values: Map<ValueName, SafeText>;
-  readonly rememberedTexts: Set<string>;
+  readonly values: RunValues;
+  readonly remembered: RememberedValues;
   readonly clock: Clock;
-  readonly logger: Logger;
 };
 
 // What one of these steps gives its step result.
@@ -39,7 +35,7 @@ type ClockAndClipboardOutcome = {
   readonly code?: string;
   // Only "empty" or "differs": never the clipboard's text.
   readonly observed?: string;
-  readonly remembered?: { readonly valueName: ValueName; readonly sha256: string };
+  readonly remembered?: RememberedRecord;
 };
 
 const passed: ClockAndClipboardOutcome = { outcome: 'passed' };
@@ -136,13 +132,6 @@ export async function rememberFromClipboard(
   if (read.kind === 'error') return failedWith(read.error.code);
   if (read.kind === 'too-long') return failedWith('value-too-long');
   if (read.text === '') return failedWith('value-empty');
-  const maximumLength = context.project.limits.maximumTextLength;
-  if (read.text.length > maximumLength) return failedWith('value-too-long');
-  const safe = runTimeText(read.text, maximumLength);
-  if (safe === undefined) return failedWith('value-unsafe');
-  context.values.set(step.name, safe);
-  context.rememberedTexts.add(safe);
-  const digest = sha256(safe);
-  context.logger.log({ kind: 'value.remembered', stepIndex: index, valueName: step.name, sha256: digest });
-  return { outcome: 'passed', remembered: { valueName: step.name, sha256: digest } };
+  const kept = context.remembered.remember(step.name, read.text, index);
+  return kept.ok ? { outcome: 'passed', remembered: kept.value } : failedWith(kept.error);
 }

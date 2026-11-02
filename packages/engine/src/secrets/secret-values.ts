@@ -13,6 +13,10 @@ import {
 } from '@revisum/contracts';
 import { sha256 } from '../hashing.ts';
 import { normalise } from '../oracle.ts';
+import {
+  BASE64_ALPHABETS, base64Pattern, encodedEchoes, foldCase, mergedRanges, needsPieces, occurrences, percentEscapes,
+  prefixRuns, uriWritings, wholeBase64Writings, wholeEncodedCharacters, writtenPattern, type EncodedEcho, type Range,
+} from './EncodedEchoes.ts';
 import { htmlWritings, jsonWritings } from './JsonWritings.ts';
 
 // What replaces an echo of a secret in kept text.
@@ -25,170 +29,7 @@ export const redactionModeOf = (secret: Secret): RedactionMode =>
 // Identifies a secret's content, such as a saved storage state, without revealing it.
 export const secretSha256 = (secret: Secret): string => sha256(reveal(secret));
 
-// Lower-cases each character whose lower-case form has the same length, so positions found in the
-// folded text are positions in the original.
-function foldCase(text: string): string {
-  let folded = '';
-  for (const character of text) {
-    const lower = character.toLowerCase();
-    folded += lower.length === character.length ? lower : character;
-  }
-  return folded;
-}
-
-const escapeForPattern = (text: string): string => text.replace(/[\\^$.*+?()[\]{}|/-]/g, '\\$&');
-
-// ---- Written forms ------------------------------------------------------------------------------
-
-// A pattern for the value with each character written as itself or in any of the ways `writings`
-// gives, ignoring case: hex digits may be either case and a case-changed echo is caught too. A run
-// of white space may be any other run, whichever way each is written: a page may lay out or collapse
-// the spaces a secret holds, and the same words are the same secret.
-function writtenPattern(value: string, writings: (character: string) => readonly string[]): RegExp {
-  const eachWay = (character: string): string => [escapeForPattern(character), ...writings(character)].join('|');
-  const anyWhiteSpace = `(?:\\s|${WHITE_SPACE_CHARACTERS.flatMap((character) => writings(character)).join('|')})+`;
-  const pieces = value.split(/(\s+)/).filter((piece) => piece !== '').map((piece) =>
-    (piece.trim() === '' ? anyWhiteSpace : [...piece].map((character) => `(?:${eachWay(character)})`).join('')));
-  return new RegExp(pieces.join(''), 'gi');
-}
-
-// The white space that encoders write in ways a pattern has to know, so that a run of them can be
-// matched in any of those ways.
-const WHITE_SPACE_CHARACTERS: readonly string[] = [' ', '\t', '\n', '\r', '\u00a0'];
-
-// ---- URL and form encoding ------------------------------------------------------------------------
-
-// The percent escapes of one character's UTF-8 bytes: "%2f" for "/".
-const percentEscapes = (character: string): string =>
-  [...Buffer.from(character, 'utf8')].map((byte) => `%${byte.toString(16).padStart(2, '0')}`).join('');
-
-// A pattern for the value as any URL or form encoder may write it: each character as itself or
-// percent-escaped, and a space also as "+", as forms and URLSearchParams write it. Encoders differ
-// in which characters they escape (encodeURIComponent leaves "!" and "~" alone, URLSearchParams
-// does not), so every character may take either form. The pattern ignores case, so hex digits may
-// be upper or lower case and a case-changed echo is caught too.
-function uriPattern(value: string): RegExp {
-  return writtenPattern(value, (character) => (character === ' ' ? [percentEscapes(character), '\\+'] : [percentEscapes(character)]));
-}
-
-// ---- Base64 inside longer text ---------------------------------------------------------------------
-
-const BASE64_ALPHABETS = {
-  base64: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/',
-  base64url: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_',
-} as const;
-
-// One base64 character as far as the value decides it: which of its six bits come from the value
-// (knownBits) and what they are (bits). The other bits come from the bytes around the value.
-type EncodedCharacter = { readonly knownBits: number; readonly bits: number };
-
-// The base64 characters that hold the value's bits when the value starts `offset` bytes into a
-// three-byte group, as it does inside a longer encoded text such as "user:password".
-function encodedCharacters(bytes: Buffer, offset: number): EncodedCharacter[] {
-  const characters: EncodedCharacter[] = [];
-  const characterCount = Math.ceil(((offset + bytes.length) * 8) / 6);
-  for (let character = 0; character < characterCount; character++) {
-    let knownBits = 0;
-    let bits = 0;
-    for (let bit = 0; bit < 6; bit++) {
-      const position = character * 6 + bit;
-      const byte = bytes[Math.floor(position / 8) - offset];
-      knownBits <<= 1;
-      bits <<= 1;
-      if (byte !== undefined) {
-        knownBits |= 1;
-        bits |= (byte >> (7 - (position % 8))) & 1;
-      }
-    }
-    // A leading character that holds only the preceding bytes' bits says nothing about the value.
-    if (knownBits !== 0) characters.push({ knownBits, bits });
-  }
-  return characters;
-}
-
-// A pattern for the value's base64 at each of the three alignments it can take inside a longer
-// encoded text, with any padding when the value ends it. A character the value only partly decides
-// matches every alphabet character that agrees on the value's bits, so all of the value's bits are
-// checked: a near miss differs in some character and does not match, however short the value.
-function base64Pattern(value: string, alphabet: string): RegExp {
-  const bytes = Buffer.from(value, 'utf8');
-  const alignments = [0, 1, 2].map((offset) => {
-    const characters = encodedCharacters(bytes, offset).map(({ knownBits, bits }) => {
-      const allowed = [...alphabet].filter((_, index) => (index & knownBits) === bits).map(escapeForPattern);
-      return allowed.length === 1 ? allowed.join('') : `[${allowed.join('')}]`;
-    });
-    const padding = (offset + bytes.length) % 3 === 0 ? '' : '={0,2}';
-    return `(?:${characters.join('')}${padding})`;
-  });
-  return new RegExp(alignments.join('|'), 'g');
-}
-
 // ---- Finding and redacting echoes ------------------------------------------------------------------
-
-type EncodedEcho = { readonly form: 'uri' | 'json' | 'html' | 'base64' | 'base64url'; readonly pattern: RegExp };
-
-// Every encoded form of a value: URL and form encoding, JSON escapes and HTML entities (whose
-// patterns each also match the value as typed, in any case), then base64 and base64url at every
-// alignment.
-const encodedEchoes = (value: string): EncodedEcho[] => [
-  { form: 'uri', pattern: uriPattern(value) },
-  { form: 'json', pattern: writtenPattern(value, jsonWritings) },
-  { form: 'html', pattern: writtenPattern(value, htmlWritings) },
-  { form: 'base64', pattern: base64Pattern(value, BASE64_ALPHABETS.base64) },
-  { form: 'base64url', pattern: base64Pattern(value, BASE64_ALPHABETS.base64url) },
-];
-
-type Range = { readonly start: number; readonly end: number };
-
-function occurrences(text: string, search: string): Range[] {
-  const found: Range[] = [];
-  if (search === '') return found;
-  for (let index = text.indexOf(search); index !== -1; index = text.indexOf(search, index + search.length)) {
-    found.push({ start: index, end: index + search.length });
-  }
-  return found;
-}
-
-const isWhiteSpace = (character: string | undefined): boolean => character !== undefined && /\s/.test(character);
-
-// Runs in `foldedText` that match the start of `foldedValue` for at least the minimum secret
-// length: a value cut short, as a log line or a page that truncates a token would show it. A run of
-// white space in the value matches any run in the text, so a search neither misses a value the page
-// has collapsed nor stops at the value's first word.
-function prefixRuns(foldedText: string, foldedValue: string): Range[] {
-  const runs: Range[] = [];
-  const wanted = normalise(foldedValue);
-  const head = wanted.slice(0, MINIMUM_SECRET_LENGTH);
-  if (head.length < MINIMUM_SECRET_LENGTH) {
-    return runs;
-  }
-  const headPattern = new RegExp(escapeForPattern(head).replace(/ /g, '\\s+'), 'g');
-  for (let found = headPattern.exec(foldedText); found !== null; found = headPattern.exec(foldedText)) {
-    let position = found.index;
-    let end = position;
-    let matched = 0;
-    while (matched < wanted.length && position < foldedText.length) {
-      if (wanted[matched] === ' ') {
-        if (!isWhiteSpace(foldedText[position])) {
-          break;
-        }
-        while (isWhiteSpace(foldedText[position])) {
-          position++;
-        }
-      } else {
-        if (foldedText[position] !== wanted[matched]) {
-          break;
-        }
-        position++;
-        end = position;
-      }
-      matched++;
-    }
-    runs.push({ start: found.index, end });
-    headPattern.lastIndex = Math.max(end, found.index + 1);
-  }
-  return runs;
-}
 
 function replaceRanges(text: string, ranges: readonly Range[]): string {
   if (ranges.length === 0) return text;
@@ -203,16 +44,39 @@ function replaceRanges(text: string, ranges: readonly Range[]): string {
   return kept + text.slice(position);
 }
 
+// The text with every encoded echo of the value replaced. The pieces of a long value are all looked
+// for in the text as it came, and what they cover goes as one: replacing them in turn could use up
+// a piece's rightful place on another piece that repeats it, and leave part of the value behind.
+function withoutEncodedEchoes(text: string, value: string, echoes: readonly EncodedEcho[]): string {
+  if (needsPieces(value)) {
+    return replaceRanges(text, mergedRanges(echoes.flatMap((echo) => echo.rangesIn(text))));
+  }
+  let redacted = text;
+  for (const echo of echoes) {
+    redacted = echo.withoutEchoes(redacted, SECRET_PLACEHOLDER);
+  }
+  return redacted;
+}
+
 // A function that replaces every echo of one value: its encoded forms, then the value in any case,
-// then any prefix of it at least the minimum secret length long.
+// then any prefix of it at least the minimum secret length long. A search that cannot be built or run
+// says nothing about what a text holds, so the whole text goes rather than a value that may be in it.
 function valueRedaction(value: string): (text: string) => string {
-  const echoes = encodedEchoes(value);
+  let echoes: readonly EncodedEcho[];
+  try {
+    echoes = encodedEchoes(value);
+  } catch {
+    return () => SECRET_PLACEHOLDER;
+  }
   const foldedValue = foldCase(value);
   return (text) => {
-    let redacted = text;
-    for (const echo of echoes) redacted = redacted.replace(echo.pattern, SECRET_PLACEHOLDER);
-    redacted = replaceRanges(redacted, occurrences(foldCase(redacted), foldedValue));
-    return replaceRanges(redacted, prefixRuns(foldCase(redacted), foldedValue));
+    try {
+      let redacted = withoutEncodedEchoes(text, value, echoes);
+      redacted = replaceRanges(redacted, occurrences(foldCase(redacted), foldedValue));
+      return replaceRanges(redacted, prefixRuns(foldCase(redacted), foldedValue));
+    } catch {
+      return SECRET_PLACEHOLDER;
+    }
   };
 }
 
@@ -244,21 +108,32 @@ const sameWords = (left: string, right: string): boolean => normalise(foldCase(l
 // when it differs from the value in more than case and white space, and a prefix only when the whole
 // value does not appear in any case. A value with its white space changed counts as typed: spacing
 // is layout, not an encoding. A value below the minimum length is not searched for, so it reports
-// nothing.
+// nothing. A search that cannot be built or run has not shown the text is clean, so it reports a leak.
 export function echoFormsIn(text: string, secret: Secret): readonly LeakForm[] {
   const value = reveal(secret);
   if (value.length < MINIMUM_SECRET_LENGTH) return [];
+  try {
+    return echoFormsOfValueIn(text, value);
+  } catch {
+    return ['raw'];
+  }
+}
+
+function echoFormsOfValueIn(text: string, value: string): readonly LeakForm[] {
   const foldedText = foldCase(text);
   const foldedValue = foldCase(value);
   const forms = new Set<LeakForm>();
   if (text.includes(value)) forms.add('raw');
   let isRespaced = false;
+  let hasItsWords = false;
   for (const echo of encodedEchoes(value)) {
-    const found = text.match(echo.pattern) ?? [];
+    const found = echo.matchesIn(text);
     const isWritten = echo.form === 'uri' || echo.form === 'json' || echo.form === 'html';
-    const counts = isWritten ? found.some((match) => !sameWords(match, value)) : found.length > 0;
+    const counts = isWritten ? found.some((match) => !sameWords(match, echo.writes)) : found.length > 0;
     if (counts) forms.add(echo.form);
-    isRespaced ||= isWritten && found.some((match) => sameWords(match, value) && foldCase(match) !== foldedValue);
+    const asWords = isWritten ? found.filter((match) => sameWords(match, echo.writes)) : [];
+    hasItsWords ||= asWords.length > 0;
+    isRespaced ||= asWords.some((match) => foldCase(match) !== foldCase(echo.writes));
   }
   if (isRespaced) {
     forms.add('raw');
@@ -268,7 +143,8 @@ export function echoFormsIn(text: string, secret: Secret): readonly LeakForm[] {
   if (isInAnyCase && !forms.has('raw')) {
     forms.add('case');
   }
-  if (!wholeInAnyCase && prefixRuns(foldedText, foldedValue).length > 0) forms.add('prefix');
+  // Its words found while the whole value is not can only be one piece of a long value: a value cut short.
+  if (!wholeInAnyCase && (hasItsWords || prefixRuns(foldedText, foldedValue).length > 0)) forms.add('prefix');
   return [...forms];
 }
 
@@ -447,19 +323,14 @@ function spellingEcho(echoed: string, candidate: EchoCandidate, prefix: boolean)
   };
 }
 
-// The base64 characters wholly decided by `value` at `alignment`, in order, as `alphabet` writes them.
-function wholeEncodedCharacters(value: string, alignment: number, alphabet: string): string {
-  return encodedCharacters(Buffer.from(value, 'utf8'), alignment)
-    .filter((character) => character.knownBits === 0b111111)
-    .map((character) => alphabet[character.bits] ?? '')
-    .join('');
-}
-
 type Found = { readonly start: number; readonly end: number; readonly echo: Omit<SecretEcho, 'offset'> };
 
 // The echoes of `candidate` in `text` in one form, in order and apart: its base64 or base64url
 // forms first, then the value as typed, in another case or URL-encoded, then a prefix of it.
 function echoesOf(text: string, candidate: EchoCandidate): Found[] {
+  if (needsPieces(candidate.value)) {
+    return echoesOfLongValue(text, candidate);
+  }
   const named = { secretName: candidate.secretName, ...(candidate.scheme === undefined ? {} : { scheme: candidate.scheme }) };
   for (const form of ['base64', 'base64url'] as const) {
     const alphabet = BASE64_ALPHABETS[form];
@@ -476,7 +347,7 @@ function echoesOf(text: string, candidate: EchoCandidate): Found[] {
     }
     if (found.length > 0) return found;
   }
-  const typed = [...text.matchAll(uriPattern(candidate.value))]
+  const typed = [...text.matchAll(writtenPattern(candidate.value, uriWritings))]
     .map((match): Found => ({ start: match.index, end: match.index + match[0].length, echo: spellingEcho(match[0], candidate, false) }));
   if (typed.length > 0) return typed;
   // Put back as typed, not as it was written, so a replay of it gives another result and is no pass.
@@ -488,16 +359,55 @@ function echoesOf(text: string, candidate: EchoCandidate): Found[] {
       return written;
     }
   }
-  return prefixRuns(foldCase(text), foldCase(candidate.value))
+  return prefixEchoes(text, candidate);
+}
+
+const prefixEchoes = (text: string, candidate: EchoCandidate): Found[] =>
+  prefixRuns(foldCase(text), foldCase(candidate.value))
     .map((run): Found => ({ start: run.start, end: run.end, echo: spellingEcho(text.slice(run.start, run.end), candidate, true) }));
+
+// The same search for a value too long for one pattern. Its base64 and the value as typed are found
+// as plain text and go back exactly. What is left is found piece by piece, and goes back as the whole
+// value typed, so a replay of it gives another result and is no pass.
+function echoesOfLongValue(text: string, candidate: EchoCandidate): Found[] {
+  const named = { secretName: candidate.secretName, ...(candidate.scheme === undefined ? {} : { scheme: candidate.scheme }) };
+  for (const { form, alignment, written } of wholeBase64Writings(candidate.value)) {
+    const found = occurrences(text, written);
+    if (found.length > 0) {
+      return found.map((range): Found => ({ ...range, echo: { ...named, form, alignment } }));
+    }
+  }
+  const typed = occurrences(text, candidate.value);
+  if (typed.length > 0) {
+    return typed.map((range): Found => ({ ...range, echo: { ...named, form: 'raw' } }));
+  }
+  const echoes = encodedEchoes(candidate.value);
+  for (const form of ['uri', 'json', 'html'] as const) {
+    const covered = mergedRanges(echoes.filter((echo) => echo.form === form).flatMap((echo) => echo.rangesIn(text)));
+    if (covered.length > 0) {
+      return covered.map((range): Found => ({ ...range, echo: { ...named, form, approximate: true } }));
+    }
+  }
+  return prefixEchoes(text, candidate);
 }
 
 // Cuts every echo of the given secrets out of a reply's text, in any form the leak scanner looks
 // for, and says where each goes back. One form is found at a time, so the search repeats on what
-// is left until nothing more is found.
+// is left until nothing more is found. A search that cannot be built or run has not shown the text is
+// clean, so all of it goes, leaving one echo a replay cannot match.
 export function cutSecretEchoes(text: string, secrets: readonly Secret[]): CutText {
+  const candidates = echoCandidates(secrets);
+  try {
+    return cutEchoesOf(text, candidates);
+  } catch {
+    const [first] = candidates;
+    return first === undefined ? { kept: text, echoes: [] } : { kept: '', echoes: [{ offset: 0, secretName: first.secretName, form: 'raw', approximate: true }] };
+  }
+}
+
+function cutEchoesOf(text: string, candidates: readonly EchoCandidate[]): CutText {
   let pieces: Piece[] = [{ kept: text }];
-  for (const candidate of echoCandidates(secrets)) {
+  for (const candidate of candidates) {
     for (let changed = true; changed;) {
       changed = false;
       pieces = pieces.flatMap((piece): Piece[] => {

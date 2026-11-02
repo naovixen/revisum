@@ -18,10 +18,10 @@ import {
 import { runDatabaseStep, type DatabaseCommandContext, type DatabaseStepCode } from '../database-commands/database-command-steps.ts';
 import { sha256 } from '../hashing.ts';
 import type { Logger } from '../logging.ts';
-import { runTimeText } from '../plan/plan-decoders.ts';
 import { rememberedFieldEntries } from '../plan/plan-values.ts';
 import type { Project } from '../project/project-parser.ts';
-import { resolveText, type StepErrorCode } from '../run-values.ts';
+import type { RememberedValues } from '../RememberedValues.ts';
+import { resolveText, type RunValues, type StepErrorCode } from '../run-values.ts';
 import { buildServiceRequest } from './service-request.ts';
 import { checkBackendField, fieldAt, fieldText, isSuccessStatus, responseJson } from './service-response.ts';
 
@@ -57,11 +57,12 @@ export type CleanupResult = {
   readonly cause?: CallStepCode | DatabaseStepCode | 'unsupported-step';
 } & ({ readonly call: CallName } | { readonly command: CommandName });
 
-// What the run hands these steps. `values` is the run's own map: a call adds what it remembers.
+// What the run hands these steps. `remembered` is how a call adds to the run's values.
 export type CallStepContext = {
   readonly caller: ServiceCaller;
   readonly project: Project;
-  readonly values: Map<ValueName, SafeText>;
+  readonly values: RunValues;
+  readonly remembered: RememberedValues;
   readonly secrets: SecretStore;
   readonly clock: Clock;
   readonly logger: Logger;
@@ -112,27 +113,22 @@ function record(step: { readonly call: CallName }, found: Declared, response: Se
   };
 }
 
-// The response fields a call remembers, as run values. All or none: a value is set only once every
-// field has been read, so a failed call leaves the run's values as they were.
-function rememberedValues(
-  step: CallStep, declaration: CallDeclaration, response: ServiceResponse, maximumResponseBytes: number, project: Project,
-): Result<readonly (readonly [ValueName, SafeText])[], CallStepCode> {
+// The texts of the response fields a call remembers. Every field is read before any is kept.
+function textsToRemember(
+  step: CallStep, declaration: CallDeclaration, response: ServiceResponse, maximumResponseBytes: number,
+): Result<readonly (readonly [ValueName, string])[], CallStepCode> {
   const remembered = rememberedFieldEntries(step.remember);
   if (remembered.length === 0) return success([]);
   const document = responseJson(response, maximumResponseBytes);
   if (!document.ok) return document;
-  const entries: (readonly [ValueName, SafeText])[] = [];
+  const entries: (readonly [ValueName, string])[] = [];
   for (const [name, field] of remembered) {
     const pointer = pointerOf(declaration, field);
     const found = pointer === undefined ? failure('field-missing' as const) : fieldAt(document.value, pointer);
     if (!found.ok) return found;
     const text = fieldText(found.value);
     if (text === undefined) return failure('field-missing');
-    // A remembered value is plan text from then on, so it passes the same rules as plan text.
-    if (text.length > project.limits.maximumTextLength) return failure('value-too-long');
-    const safe = runTimeText(text, project.limits.maximumTextLength);
-    if (safe === undefined) return failure('value-unsafe');
-    entries.push([name, safe]);
+    entries.push([name, text]);
   }
   return success(entries);
 }
@@ -151,10 +147,10 @@ export async function runCallStep(step: CallStep, stepIndex: number, context: Ca
   const answered = sent.judged;
   const serviceCall = record(step, found, sent.received, 1);
   if (!answered.ok) return failedWith(answered.error, serviceCall);
-  const remembered = rememberedValues(step, found.declaration, answered.value, request.value.maximumResponseBytes, context.project);
-  if (!remembered.ok) return failedWith(remembered.error, serviceCall);
-  for (const [name, text] of remembered.value) context.values.set(name, text);
-  return { outcome: 'passed', serviceCall };
+  const texts = textsToRemember(step, found.declaration, answered.value, request.value.maximumResponseBytes);
+  if (!texts.ok) return failedWith(texts.error, serviceCall);
+  const kept = context.remembered.keepUnrecorded(texts.value);
+  return kept.ok ? { outcome: 'passed', serviceCall } : failedWith(kept.error, serviceCall);
 }
 
 // A backend check: its read call repeated until the field passes or the check timeout runs out.

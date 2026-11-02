@@ -19,7 +19,7 @@ import { join } from 'node:path';
 import type { ContainerEngine, ContainerMount } from './container-engine.ts';
 import { joinEgressEvents } from './egress-events.ts';
 import {
-  DEFAULT_BRIDGE_NETWORK, WORKSPACE, dependenciesVolumeFor, ownCodeMounts, probeRunNetwork, proxyContainer, proxyReadyScript, proxyUrl,
+  DEFAULT_BRIDGE_NETWORK, WORKSPACE, dependenciesVolumeFor, hasProxyLostRecords, ownCodeMounts, probeRunNetwork, proxyContainer, proxyReadyScript, proxyUrl,
   readAppliedRewrites, readDecisions, repositoryFolder, runImageContainer,
 } from './run-containers.ts';
 import { RUN_IMAGE_TAG } from './run-image.ts';
@@ -141,11 +141,18 @@ export function dockerRunner(options: DockerRunnerOptions): Runner {
     let decisions: readonly ProxyDecision[] = [];
     let rewrites: readonly AppliedRewrite[] = [];
     // Reads the proxy's files back from its container. A read that fails keeps what the last one
-    // found, since each file only grows.
+    // found, since each file only grows. But the record may then be incomplete, and egress is
+    // enforced only as far as it can be shown, so the run no longer counts as isolated.
     const refreshEvidence = async (): Promise<void> => {
-      const [readNow, appliedNow] = await Promise.all([readDecisions(engine, proxyId), readAppliedRewrites(engine, proxyId)]);
+      const [readNow, appliedNow, hasLostRecords] = await Promise.all([
+        readDecisions(engine, proxyId), readAppliedRewrites(engine, proxyId), hasProxyLostRecords(engine, proxyId),
+      ]);
       decisions = readNow ?? decisions;
       rewrites = appliedNow ?? rewrites;
+      if (level === 'isolated' && (readNow === null || hasLostRecords)) {
+        level = 'host';
+        log({ code: 'egress-unenforceable', detail: 'what the proxy decided could not be read back whole' });
+      }
     };
     let stopped = false;
     const handle: RunnerHandle = {

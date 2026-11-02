@@ -4,6 +4,7 @@
 import type { SafeText } from '@revisum/contracts';
 import { brand } from '../brand.ts';
 import { sha256 } from '../hashing.ts';
+import { UNSAFE_TEXT_CHARACTERS } from './plan-grammar.ts';
 
 export const PLAN_ERROR_CODES = [
   'not_object', 'unknown_field', 'missing_field', 'wrong_type', 'unknown_step',
@@ -48,22 +49,32 @@ export type Issues = PlanError[];
 
 const CONTROL_OR_BIDIRECTIONAL = /[\u0000-\u001f\u007f‪-‮⁦-⁩]/;
 const SCRIPT_LIKE: readonly RegExp[] = [
-  /<\s*\/?\s*(script|iframe|object|embed|svg|math|style|link|meta|base)\b/i,
+  // The spaces before and after "/" are one group, so a long run of spaces is read only one way.
+  /<\s*(?:\/\s*)?(script|iframe|object|embed|svg|math|style|link|meta|base)\b/i,
   /\b(javascript|vbscript)\s*:/i,
   /\bon[a-z]+\s*=/i,
   /data\s*:\s*text\/html/i,
 ];
 
-// True for text with control or bidirectional-override characters, anything that looks like
-// script, or half of a UTF-16 surrogate pair on its own, which no UTF-8 file can hold, so the plan
-// would change when saved.
+const UNSAFE_TEXT_CHARACTER = new RegExp(`[${UNSAFE_TEXT_CHARACTERS}]`);
+
+const looksLikeScript = (value: string): boolean => SCRIPT_LIKE.some((pattern) => pattern.test(value));
+
+// True for plan or project text that a person approving it could not read for what it holds: a
+// character from UNSAFE_TEXT_CHARACTERS, anything that looks like script, or half of a UTF-16
+// surrogate pair on its own, which no UTF-8 file can hold, so the plan would change when saved.
 export const isUnsafeText = (value: string): boolean =>
-  CONTROL_OR_BIDIRECTIONAL.test(value) || SCRIPT_LIKE.some((pattern) => pattern.test(value)) || !value.isWellFormed();
+  UNSAFE_TEXT_CHARACTER.test(value) || looksLikeScript(value) || !value.isWellFormed();
+
+// The rule for text a run meets, such as a page's text. Pages hold marks and invisible characters
+// a plan has no reason to, and refusing them would fail runs over what no one wrote into a plan.
+const isUnsafeRunTimeText = (value: string): boolean =>
+  CONTROL_OR_BIDIRECTIONAL.test(value) || looksLikeScript(value) || !value.isWellFormed();
 
 // The same characters apart from tab and line breaks, which prose such as release notes needs.
 const CONTROL_OR_BIDIRECTIONAL_IN_PROSE = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f‪-‮⁦-⁩]/;
 
-// The rule for multi-line prose: as isUnsafeText, but tabs and line breaks are allowed.
+// The rule for multi-line prose: as for run-time text, but tabs and line breaks are allowed.
 export const isUnsafeProse = (value: string): boolean =>
   CONTROL_OR_BIDIRECTIONAL_IN_PROSE.test(value) || SCRIPT_LIKE.some((pattern) => pattern.test(value));
 
@@ -81,6 +92,17 @@ export const isUnsafeSource = (value: string): boolean =>
 // True when `input` is one of `values`, narrowing it to that union.
 export const isOneOf = <Value extends string>(values: readonly Value[], input: string): input is Value =>
   values.some((value) => value === input);
+
+// True for a list with a place no value was ever put in. Nothing written as JSON has one, and
+// walking the list would pass over it without reading anything there.
+export const hasHoles = (list: readonly unknown[]): boolean => {
+  for (let index = 0; index < list.length; index += 1) {
+    if (!Object.hasOwn(list, index)) {
+      return true;
+    }
+  }
+  return false;
+};
 
 // A plain object whose keys are all in `allowed` and include every key in `required`.
 export function readRecord(
@@ -122,10 +144,10 @@ export function readText(
   return brand<string, 'SafeText'>(input);
 }
 
-// Text made at run time, such as a generated value, branded only once it passes the same safety
-// rules and length limit as text in a plan. Undefined means it failed them.
+// Text made at run time, such as a generated value, branded only once it passes the safety rules
+// for run-time text and its length limit. Undefined means it failed them.
 export function runTimeText(value: string, maximumLength: number): SafeText | undefined {
-  return value.length <= maximumLength && !isUnsafeText(value) ? brand<string, 'SafeText'>(value) : undefined;
+  return value.length <= maximumLength && !isUnsafeRunTimeText(value) ? brand<string, 'SafeText'>(value) : undefined;
 }
 
 // Text from outside input that is kept whatever it holds, such as a test title in a suite's report:
@@ -150,6 +172,7 @@ export function readList(
   if (!Array.isArray(input)) { issues.push({ code: 'wrong_type', path }); return INVALID; }
   if (input.length < minimumLength) { issues.push({ code: 'empty', path }); return INVALID; }
   if (input.length > maximumLength) { issues.push({ code: 'too_large', path }); return INVALID; }
+  if (hasHoles(input)) { issues.push({ code: 'wrong_type', path }); return INVALID; }
   return input;
 }
 

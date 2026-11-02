@@ -45,10 +45,10 @@ import {
   ALL_LOCATOR_KINDS, ASSERTION_STEP_TYPES, ATTRIBUTE_NAME, CAPTURE_NAME, CLASS_TOKEN, CLEANUP_STEP_TYPES, CRITERION_FIELD, CRITERION_ID, CURRENT_PLAN_VERSION,
   DATABASE_COMMAND_FEATURE, DOM_CHECKS_FEATURE, DOWNLOAD_KINDS, DOWNLOAD_NAME, ELEMENT_KINDS, FEATURE_ID,
   FROM_FIELD, INLINE_SCRIPT_FEATURE, LARGEST_DOWNLOAD_BYTES, LOCATOR_FEATURES, LOCATOR_FIELDS, MAXIMUM_EXPECTED_COUNT, MAXIMUM_INLINE_SCRIPT_LENGTH,
-  MAXIMUM_INSIDE_DEPTH, MAXIMUM_META_NAME_LENGTH, MAXIMUM_MODIFIERS, MAXIMUM_PATH_SEGMENTS, MAXIMUM_POSITION, MAXIMUM_QUERY_VALUES,
+  MAXIMUM_INSIDE_DEPTH, MAXIMUM_LITERAL_NAME_LENGTH, MAXIMUM_META_NAME_LENGTH, MAXIMUM_MODIFIERS, MAXIMUM_PATH_SEGMENTS, MAXIMUM_POSITION, MAXIMUM_QUERY_VALUES,
   MAXIMUM_SELECTOR_LENGTH, MAXIMUM_SPEC_REFERENCE_LENGTH, MAXIMUM_STYLE_VALUE_LENGTH, MAXIMUM_TEST_ID_LENGTH, MAXIMUM_TITLE_LENGTH, MAXIMUM_URL_LENGTH,
   META_FIELDS, NAMED_SCRIPT_FEATURE, OPTIONAL_LOCATOR_FIELDS, OPTIONAL_PLAN_FIELDS, PAGE_KINDS, PLAN_FIELDS, QUERY_KEY, RESPONSE_STATUS,
-  SELECTOR_FORBIDDEN_CHARACTERS, STEP_FIELDS, STEP_TYPES, STYLE_PROPERTY, TOP_LEVEL_STEP_TYPES,
+  SELECTOR_FORBIDDEN_CHARACTERS, STEP_FIELDS, STEP_TYPES, STYLE_PROPERTY, TOP_LEVEL_STEP_TYPES, WRITTEN_URL,
   isDatabaseCommandStepType, isPageScriptStepType,
 } from './plan-grammar.ts';
 import { readGeneratedValues, readPlanClock, readValueName, type ValueContext } from './plan-values.ts';
@@ -149,9 +149,11 @@ function readUrl(input: unknown, path: string, context: ParseContext): Parsed<Al
   let url: URL;
   try { url = new URL(text, RELATIVE_BASE); } catch { context.issues.push({ code: 'invalid_url', path }); return INVALID; }
   if (url.protocol !== 'http:' && url.protocol !== 'https:') { context.issues.push({ code: 'scheme_not_allowed', path }); return INVALID; }
-  if (url.username !== '' || url.password !== '') { context.issues.push({ code: 'invalid_url', path }); return INVALID; }
+  if (url.username !== '' || url.password !== '' || !WRITTEN_URL.test(text)) { context.issues.push({ code: 'invalid_url', path }); return INVALID; }
   if (url.origin === RELATIVE_BASE.origin) {
     if (!text.startsWith('/')) { context.issues.push({ code: 'invalid_url', path }); return INVALID; }
+    // Stored as it stands, this would read as a path but take a browser to another host.
+    if (url.pathname.startsWith('//')) { context.issues.push({ code: 'invalid_url', path }); return INVALID; }
     return brand<string, 'AllowedUrl'>(url.pathname + url.search + url.hash);
   }
   if (!context.rules.origins.some((origin) => origin === url.origin)) {
@@ -189,6 +191,7 @@ function readPathTemplate(input: unknown, path: string, context: ParseContext): 
   if (Object.keys(query).length > MAXIMUM_QUERY_VALUES) { context.issues.push({ code: 'too_large', path: `${path}.query` }); return INVALID; }
   const entries = Object.entries(query).map(([key, value]): Parsed<readonly [string, TextOrValue]> => {
     if (!QUERY_KEY.test(key)) { context.issues.push({ code: 'unknown_value', path: `${path}.query` }); return INVALID; }
+    if (looksLikeCredential(key)) { context.issues.push({ code: 'literal_secret', path: `${path}.query` }); return INVALID; }
     const text = readTextOrValue(value, `${path}.query.${key}`, context, context.rules.limits.maximumTextLength, 0);
     return text === INVALID ? INVALID : [key, text];
   });
@@ -315,7 +318,7 @@ function isComparedUrl(text: SafeText, path: string, context: ParseContext): boo
   let url: URL;
   try { url = new URL(text, RELATIVE_BASE); } catch { context.issues.push({ code: 'invalid_url', path }); return false; }
   if (url.protocol !== 'http:' && url.protocol !== 'https:') { context.issues.push({ code: 'scheme_not_allowed', path }); return false; }
-  if (url.origin === RELATIVE_BASE.origin && !text.startsWith('/')) { context.issues.push({ code: 'invalid_url', path }); return false; }
+  if (!WRITTEN_URL.test(text) || (url.origin === RELATIVE_BASE.origin && !text.startsWith('/'))) { context.issues.push({ code: 'invalid_url', path }); return false; }
   return true;
 }
 
@@ -350,7 +353,7 @@ function readElementAssertion(input: unknown, path: string, context: ParseContex
 // A literal name that must match `pattern`, such as a class token or an attribute name: never a
 // value reference, since it says what the check reads. The error never repeats the name.
 function readLiteralName(input: unknown, path: string, context: ParseContext, pattern: RegExp): Parsed<SafeText> {
-  const name = readPlanText(input, path, context, Number.POSITIVE_INFINITY);
+  const name = readPlanText(input, path, context, MAXIMUM_LITERAL_NAME_LENGTH);
   if (name !== INVALID && !pattern.test(name)) { context.issues.push({ code: 'unknown_value', path }); return INVALID; }
   return name;
 }
@@ -498,6 +501,7 @@ function readModifiers(input: unknown, path: string, context: ParseContext): Par
 function readCaptureName(input: unknown, path: string, context: ParseContext): Parsed<Step> {
   if (typeof input !== 'string') { context.issues.push({ code: 'wrong_type', path }); return INVALID; }
   if (!CAPTURE_NAME.test(input)) { context.issues.push({ code: 'unknown_value', path }); return INVALID; }
+  if (looksLikeCredential(input)) { context.issues.push({ code: 'literal_secret', path }); return INVALID; }
   return { type: 'capture', name: brand<string, 'CaptureName'>(input) };
 }
 
@@ -559,6 +563,7 @@ function readRemember(head: Readonly<Record<string, unknown>>, path: string, con
 function readDownloadName(input: unknown, path: string, context: ParseContext): Parsed<DownloadName> {
   if (typeof input !== 'string') { context.issues.push({ code: 'wrong_type', path }); return INVALID; }
   if (!DOWNLOAD_NAME.test(input)) { context.issues.push({ code: 'unknown_value', path }); return INVALID; }
+  if (looksLikeCredential(input)) { context.issues.push({ code: 'literal_secret', path }); return INVALID; }
   return brand<string, 'DownloadName'>(input);
 }
 
@@ -658,8 +663,9 @@ function readPlainArgument(input: unknown, path: string, type: ScriptParameterTy
   }
   let value: SafeText | number | boolean;
   if (typeof input === 'string') {
-    // The parameter's own length rule applies below, as too_long.
-    const text = readPlanText(input, path, context, Number.POSITIVE_INFINITY, 0);
+    // A text parameter's own limit comes first, as too_long; the other types judge length by their
+    // own rules below.
+    const text = readPlanText(input, path, context, type.kind === 'text' ? type.maximumLength : Number.POSITIVE_INFINITY, 0);
     if (text === INVALID) return INVALID;
     value = text;
   } else if (typeof input === 'number' || typeof input === 'boolean') {
@@ -802,12 +808,25 @@ function readScriptSource(input: unknown, path: string, context: ParseContext): 
   return brand<string, 'ScriptSource'>(input);
 }
 
+// An inline script's result fields. The pointers are written by the plan, not by a person in the
+// trusted project, and the approver reads them, so they are held to the rules of plan text too. An
+// empty pointer names the whole result.
+function readInlineFields(input: unknown, path: string, context: ParseContext): Parsed<Readonly<Record<FieldName, JsonPointer>>> {
+  const fields = readFields(input, path, context.issues);
+  if (fields === INVALID) {
+    return INVALID;
+  }
+  const longest = context.rules.limits.maximumTextLength;
+  const pointers = Object.entries(fields).map(([name, pointer]) => readPlanText(pointer, `${path}.${name}`, context, longest, 0));
+  return allValid(pointers) ? fields : INVALID;
+}
+
 // An inline script: its source, its effect as the plan claims it, and its result fields. It takes
 // no parameters, so its arguments are always {}.
 function readInlineScript(input: unknown, path: string, context: ParseContext): Parsed<InlineScript> {
   const fields = readRecord(input, path, context.issues, ['source', 'effect', 'fields'], ['source', 'effect']);
   if (fields === INVALID) return INVALID;
-  const resultFields = Object.hasOwn(fields, 'fields') ? readFields(fields['fields'], `${path}.fields`, context.issues) : undefined;
+  const resultFields = Object.hasOwn(fields, 'fields') ? readInlineFields(fields['fields'], `${path}.fields`, context) : undefined;
   const parts = [
     readScriptSource(fields['source'], `${path}.source`, context), readOneOf(fields['effect'], `${path}.effect`, context.issues, CALL_EFFECTS),
   ] as const;

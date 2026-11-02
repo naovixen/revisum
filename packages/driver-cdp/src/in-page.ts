@@ -403,6 +403,11 @@ export function inThisDocument(element: Element): string {
   return element.ownerDocument === document ? 'yes' : 'no';
 }
 
+// Called on an element, as `this`, so it runs in that element's own world and document.
+export function isConnectedToItsDocument(this: Element): boolean {
+  return this.isConnected;
+}
+
 // Advances this document's virtual clock to `target` milliseconds after the frozen start, through
 // the determinism kit's advance controller in the page's main world, where the page's timers are.
 // A document without the controller, such as one loaded with scripts off, fires nothing. Gives

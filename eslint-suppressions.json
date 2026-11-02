@@ -258,7 +258,7 @@
       "count": 2
     },
     "curly": {
-      "count": 16
+      "count": 12
     },
     "revisum/file-name-matches-export": {
       "count": 1
@@ -415,11 +415,8 @@
     "@typescript-eslint/naming-convention": {
       "count": 2
     },
-    "@typescript-eslint/strict-boolean-expressions": {
-      "count": 1
-    },
     "curly": {
-      "count": 56
+      "count": 49
     },
     "max-lines": {
       "count": 1
@@ -429,9 +426,6 @@
     },
     "no-nested-ternary": {
       "count": 5
-    },
-    "no-useless-assignment": {
-      "count": 1
     },
     "revisum/file-name-matches-export": {
       "count": 1
@@ -702,7 +696,7 @@
   },
   "packages/engine/src/clock-and-clipboard-steps.ts": {
     "curly": {
-      "count": 14
+      "count": 12
     },
     "revisum/file-name-matches-export": {
       "count": 1
@@ -713,7 +707,7 @@
       "count": 1
     },
     "curly": {
-      "count": 28
+      "count": 27
     },
     "no-nested-ternary": {
       "count": 1
@@ -786,15 +780,12 @@
   },
   "packages/engine/src/evidence/evidence-result.ts": {
     "@typescript-eslint/naming-convention": {
-      "count": 3
+      "count": 2
     },
     "curly": {
       "count": 7
     },
     "no-control-regex": {
-      "count": 1
-    },
-    "no-nested-ternary": {
       "count": 1
     },
     "revisum/file-name-matches-export": {
@@ -930,7 +921,7 @@
       "count": 1
     },
     "curly": {
-      "count": 38
+      "count": 36
     },
     "no-nested-ternary": {
       "count": 2
@@ -963,7 +954,7 @@
   },
   "packages/engine/src/page-scripts/page-script-steps.ts": {
     "curly": {
-      "count": 24
+      "count": 23
     },
     "no-nested-ternary": {
       "count": 1
@@ -1308,7 +1299,7 @@
       "count": 1
     },
     "curly": {
-      "count": 67
+      "count": 65
     },
     "max-lines": {
       "count": 1
@@ -1352,10 +1343,10 @@
   },
   "packages/engine/src/secrets/secret-values.ts": {
     "@typescript-eslint/naming-convention": {
-      "count": 5
+      "count": 4
     },
     "curly": {
-      "count": 31
+      "count": 28
     },
     "revisum/file-name-matches-export": {
       "count": 1
@@ -1366,7 +1357,7 @@
       "count": 1
     },
     "curly": {
-      "count": 18
+      "count": 15
     },
     "no-nested-ternary": {
       "count": 3
@@ -3028,12 +3019,6 @@
     }
   },
   "test/proofs/shared-types.test.ts": {
-    "@typescript-eslint/naming-convention": {
-      "count": 2
-    },
-    "curly": {
-      "count": 3
-    },
     "revisum/file-name-matches-export": {
       "count": 1
     },

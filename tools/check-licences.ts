@@ -8,6 +8,7 @@
 //     vendor's release byte for byte (the sha256 the vendor publishes in its sri-history.json), or
 //     the installed package is not the pinned version, or a copy of it sits under packages/.
 // The installed-packages folder is node_modules unless `--modules <folder>` names another.
+import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -26,6 +27,7 @@ export const ROLE_LICENCES: Readonly<Record<PackageRole, readonly string[]>> = {
 };
 const SCHEMA_LICENCE = 'Apache-2.0';
 const SKIPPED_FOLDERS = new Set(['.git', 'node_modules', 'dist', '.browsers', '.idea', '.vscode', '.test-results']);
+const GIT_LISTING_BYTES = 64 * 1024 * 1024;
 
 type PinnedPackage = {
   readonly version: string;
@@ -75,17 +77,40 @@ export function decodeLicenceMap(input: unknown): LicenceMap {
 
 const isRole = (role: string): role is PackageRole => Object.hasOwn(ROLE_LICENCES, role);
 
-function listFiles(root: string, folder: string): string[] {
+function walkFiles(root: string, folder: string): string[] {
   const path = folder === '' ? root : join(root, folder);
   if (!existsSync(path)) return [];
   const files: string[] = [];
   for (const entry of readdirSync(path, { withFileTypes: true })) {
     if (SKIPPED_FOLDERS.has(entry.name)) continue;
     const child = folder === '' ? entry.name : `${folder}/${entry.name}`;
-    if (entry.isDirectory()) files.push(...listFiles(root, child));
+    if (entry.isDirectory()) files.push(...walkFiles(root, child));
     else if (entry.isFile()) files.push(child);
   }
   return files;
+}
+
+// The files git tracks that are still there, or null when git cannot say.
+function trackedFiles(root: string): string[] | null {
+  if (!existsSync(join(root, '.git'))) {
+    return null;
+  }
+  try {
+    const listed = execFileSync('git', ['ls-files', '--cached', '-z'], { cwd: root, encoding: 'utf8', ['maxBuffer']: GIT_LISTING_BYTES, stdio: ['ignore', 'pipe', 'ignore'] });
+    return listed.split('\0').filter((file) => file !== '' && !file.split('/').some((part) => SKIPPED_FOLDERS.has(part)) && existsSync(join(root, file)));
+  } catch {
+    return null;
+  }
+}
+
+// What the repository holds, so a helper's untracked worktree under .claude/ cannot fail the check.
+// A copy with no git history is walked instead, which can only find more.
+function listFiles(root: string, folder: string): string[] {
+  const tracked = trackedFiles(root);
+  if (tracked === null) {
+    return walkFiles(root, folder);
+  }
+  return folder === '' ? tracked : tracked.filter((file) => file.startsWith(`${folder}/`));
 }
 
 const integrityOf = (bytes: Buffer): string => `sha256-${createHash('sha256').update(bytes).digest('base64')}`;

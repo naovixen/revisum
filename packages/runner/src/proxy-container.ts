@@ -3,9 +3,10 @@
 // appends each decision and each applied rewrite as a JSON line to a file in the container's private
 // /tmp, which the runner reads back. For a workload's run it also answers name lookups and records
 // them the same way. The rules and those lines all cross a process boundary, so each is decoded here
-// before use.
+// before use. A write that fails does not stop the proxy: the state file says records were lost, and
+// the runner decides what that means for the run.
 import type { AppliedRewrite, ProxyDecision, ResponseRewrite } from '@revisum/contracts';
-import { appendFileSync } from 'node:fs';
+import { appendFileSync, openSync, writeSync } from 'node:fs';
 import { startProxyServer, type ProxyRules, type RewriteRule, type TcpRelay } from './egress-proxy.ts';
 import { startLookupRecorder } from './lookup-recorder.ts';
 
@@ -17,6 +18,11 @@ export const RULES_VARIABLE = 'EGRESS_PROXY_RULES';
 // in LOOKUPS_FILE, one JSON line each (lookup-recorder.ts).
 export const LOOKUPS_VARIABLE = 'EGRESS_PROXY_RECORDS_LOOKUPS';
 export const LOOKUPS_FILE = '/tmp/egress-lookups.jsonl';
+// Says whether every record reached its file. The two words have the same length on purpose: see
+// startRecordKeeping.
+export const RECORDS_STATE_FILE = '/tmp/egress-records-state';
+const RECORDS_KEPT = 'kept';
+export const RECORDS_LOST = 'lost';
 
 const field = (value: unknown, name: string): unknown =>
   typeof value === 'object' && value !== null && !Array.isArray(value) ? Object.getOwnPropertyDescriptor(value, name)?.value : undefined;
@@ -112,22 +118,47 @@ export function readAppliedRewrite(line: string): AppliedRewrite | null {
   return { origin, name };
 }
 
+export type RecordKeeper = { append(file: string, record: unknown): void };
+
+// Appends each record as a JSON line. A flood can fill /tmp, and a throw here would end the proxy
+// from inside a request's handler. The state file is written now, while there is room, and later
+// overwritten in place, since a full /tmp has no room for a new file or a longer one.
+export function startRecordKeeping(stateFile: string): RecordKeeper {
+  const state = openSync(stateFile, 'w');
+  writeSync(state, RECORDS_KEPT, 0);
+  return {
+    append(file, record) {
+      try {
+        appendFileSync(file, `${JSON.stringify(record)}\n`);
+      } catch {
+        try {
+          writeSync(state, RECORDS_LOST, 0);
+        } catch {
+          // A stopped proxy cannot be read back, which the runner takes as records lost too.
+          process.exit(1);
+        }
+      }
+    },
+  };
+}
+
 async function main(): Promise<number> {
   const rules = readProxyRules(process.env[RULES_VARIABLE] ?? '');
   if (rules === null) {
     console.error(`${RULES_VARIABLE} does not hold the egress proxy's rules`);
     return 2;
   }
+  const records = startRecordKeeping(RECORDS_STATE_FILE);
   const proxy = await startProxyServer(rules, {
     listenHost: '0.0.0.0', port: PROXY_PORT,
-    onDecision: (decision) => appendFileSync(DECISIONS_FILE, `${JSON.stringify(decision)}\n`),
-    onRewriteApplied: (applied) => appendFileSync(REWRITES_FILE, `${JSON.stringify(applied)}\n`),
+    onDecision: (decision) => records.append(DECISIONS_FILE, decision),
+    onRewriteApplied: (applied) => records.append(REWRITES_FILE, applied),
   });
   console.log(`egress proxy listening at ${proxy.url}`);
   if (process.env[LOOKUPS_VARIABLE] === '1') {
     // Without the recorder, egress is still blocked: only the record of ignored-proxy attempts is lost.
     try {
-      await startLookupRecorder((name) => appendFileSync(LOOKUPS_FILE, `${JSON.stringify({ name })}\n`));
+      await startLookupRecorder((name) => records.append(LOOKUPS_FILE, { name }));
       console.log('recording name lookups on port 53');
     } catch (error) {
       console.error(`name lookups are not recorded: ${error instanceof Error ? error.message : String(error)}`);

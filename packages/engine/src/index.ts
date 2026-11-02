@@ -15,7 +15,9 @@ export { assertBranded, planParser } from './plan/plan-parser.ts';
 export { unsafeFeaturesOf } from './plan/unsafe-features.ts';
 export { clockAdvanceMilliseconds, totalClockAdvanceMilliseconds } from './clock-advance.ts';
 export { planJsonSchema } from './plan/plan-schema.ts';
-export { readPlanText, readablePlanText, writePlanText, type DraftError, type TextErrorCode, type TextReading } from './plan/readable/plan-text.ts';
+export {
+  readPlanText, readablePlanText, writePlanText, type DraftError, type TextErrorCode, type TextPosition, type TextReading, type TextWarning,
+} from './plan/readable/plan-text.ts';
 export { writePlanJson } from './plan/plan-json.ts';
 export { admitCoreDraft, admitDraft, type PlanParse } from './plan/plan-drafts.ts';
 export { parseAiText, type AiText } from './ai-text.ts';
@@ -48,14 +50,14 @@ export * from './manifest.ts';
 // Replay from a manifest, and the recorded replies of calls and commands it feeds back.
 export { decodeManifest } from './replay/manifest-decoder.ts';
 export { recordingPorts } from './replay/run-recording.ts';
-export { replay, type ReplayOutcome } from './replay/replay.ts';
+export { replay, type ReplayError, type ReplayOutcome, type ReplayPorts, type ReplayRequest } from './replay/replay.ts';
 export * from './oracle.ts';
 export * as lifecycle from './lifecycle.ts';
 export * from './run.ts';
 export { adapterRegistry } from './target/adapter-registry.ts';
 export { testedOn } from './target/tested-on.ts';
 export { unavailableTargetOutcome } from './target/unavailable-target-outcome.ts';
-export { hashExecutable, lock, lockToFile } from './target/target-lock.ts';
+export { hashExecutable, lock, lockToFile, readLockfile } from './target/target-lock.ts';
 export { buildServiceRequest } from './service-calls/service-request.ts';
 export { generateValue, resolvePlanClock, type RunValues, type StepErrorCode } from './run-values.ts';
 export * from './ai-planning.ts';
@@ -64,7 +66,7 @@ export { guaranteeStatement } from './guarantees.ts';
 export { declaredSuite, isSuiteFile, suitePasses } from './evidence/suite-choice.ts';
 export { parseSuiteReport, type SuiteDecodeError, type SuiteDecodeErrorCode, type SuiteReport, type SuiteTrace } from './evidence/suite-report.ts';
 export { parseSuiteTrace } from './evidence/suite-trace.ts';
-export { SUITE_REPORT_FILE, suiteArguments } from './evidence/suite-arguments.ts';
+export { SUITE_EVIDENCE_PATHS, SUITE_REPORT_FILE, suiteArguments } from './evidence/suite-arguments.ts';
 export { suiteEnvironment, suiteRedactor } from './evidence/suite-environment.ts';
 export {
   evidenceMergeGateOpen, evidenceResult, refusedSuiteResult, unreadSuiteResult, type EvidenceContext,

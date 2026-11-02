@@ -36,6 +36,9 @@ export interface PageOperations<Handle> {
   // The selected, expanded and pressed states the browser's accessibility engine exposes for the
   // element; null for each it does not expose.
   exposedStates(element: Handle): Promise<ExposedStates>;
+  // True when the element is no longer in any document on screen: removed from its own, or its
+  // document was replaced or closed, or its page died. Throws when the page cannot say.
+  isElementGone(element: Handle): Promise<boolean>;
   // Points are in this document's viewport.
   click(element: Handle, at: Point): Promise<void>;
   hover(at: Point): Promise<void>;

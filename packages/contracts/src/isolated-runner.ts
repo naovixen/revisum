@@ -81,6 +81,8 @@ export interface RunnerHandle {
 
 export interface Runner {
   start(image: ImageDigest, policy: EgressPolicy): Promise<Result<RunnerHandle, RunnerError>>;
-  // 'isolated' only while egress is shown to be enforced for the latest run, else 'host'.
+  // 'isolated' only while egress is shown to be enforced for the latest run, else 'host'. It falls to
+  // 'host' when the proxy's record proves incomplete, which is known only after the handle's exec or
+  // stop, so a starter must read it again then before it claims anything for the run.
   guaranteeLevel(): GuaranteeLevel;
 }
