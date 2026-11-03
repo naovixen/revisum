@@ -2,8 +2,9 @@
 // egress proxy, comes later). The engine builds each request, judges its status against the
 // declaration, reads response fields, polls backend checks and runs cleanup:
 //   - a failed `call` ends the run Errored, skips the later steps, and cleanup still runs;
-//   - a failed `expectBackend` ends it Failed; read checks are polled until they pass or
-//     backendCheckTimeoutMilliseconds runs out, and a write is never sent twice;
+//   - a failed `expectBackend` ends it Failed, or Errored if the service gave no answer; while its
+//     call succeeds, a read check is polled until it passes or backendCheckTimeoutMilliseconds runs
+//     out, and a write is never sent twice;
 //   - cleanup runs in order whatever the outcome: a call needing a value never set is skipped,
 //     and a failing one is recorded cleanup-failed without changing the verdict;
 //   - secrets are resolved before any call, and no secret, header value or response body reaches
