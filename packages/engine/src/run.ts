@@ -644,11 +644,19 @@ async function openSession(planned: lifecycle.Planned, context: RunContext): Pro
 const failedStep = (step: Step, index: number, code: string): StepResult => ({ index, type: step.type, outcome: 'failed', code });
 
 const isCrashed = (session: DocumentSession): boolean => session.crashed?.() === true;
+const isHeldByDialog = (session: DocumentSession): boolean => session.isDialogOpen?.() === true;
+
+function adapterFailureCode(session: DocumentSession): string {
+  if (isCrashed(session)) {
+    return TARGET_CRASHED;
+  }
+  return isHeldByDialog(session) ? UnreadablePage.DialogOpen : ADAPTER_ERROR;
+}
 
 // The code for something that threw, whose text goes only to the log, which redacts it. A throw from
-// a dead page is the crash.
+// a dead page is the crash, and one from a page a dialog holds is that dialog.
 function codeForThrow(error: unknown, session: DocumentSession, logger: Logger): string {
-  const code = isCrashed(session) ? TARGET_CRASHED : ADAPTER_ERROR;
+  const code = adapterFailureCode(session);
   logger.log({ kind: 'step.end', outcome: 'failed', code, detail: errorText(error) });
   return code;
 }
@@ -727,10 +735,18 @@ async function runStepOnLivePage(step: Step, index: number, session: DocumentSes
   if (isCrashed(session)) {
     return failedStep(step, index, TARGET_CRASHED);
   }
+  const openingsBefore = session.unsupportedOpenings?.() ?? 0;
   try {
     const done = await executeStep(step, index, session, target, context);
-    const isUnfoundedPass = done.outcome === 'passed' && ASSERTION_STEP_TYPES.includes(step.type) && isCrashed(session);
-    return isUnfoundedPass ? failedStep(step, index, TARGET_CRASHED) : done;
+    if (done.outcome !== 'passed') {
+      return done;
+    }
+    if (ASSERTION_STEP_TYPES.includes(step.type) && isCrashed(session)) {
+      return failedStep(step, index, TARGET_CRASHED);
+    }
+    // A popup or a download that no step asked for fails the step under way, so a run cannot pass as
+    // if nothing had opened.
+    return (session.unsupportedOpenings?.() ?? 0) > openingsBefore ? failedStep(step, index, 'unsupported-step') : done;
   } catch (error) {
     return failedStep(step, index, codeForThrow(error, session, context.logger));
   }
@@ -1152,8 +1168,12 @@ async function poll(context: RunContext, session: DocumentSession, check: () => 
     try {
       verdict = await check();
     } catch (error) {
-      // A read that failed because the page died is the crash; any other failure is the adapter's.
+      // A read that failed because the page died is the crash, and one a dialog stopped is that
+      // dialog; any other failure is the adapter's.
       if (crashed()) return { pass: false, code: TARGET_CRASHED };
+      if (isHeldByDialog(session)) {
+        return { pass: false, code: UnreadablePage.DialogOpen };
+      }
       throw error;
     }
     // Looked at before a pass is accepted: what a dying page last showed proves nothing.

@@ -5,23 +5,29 @@
 // separators and control characters replaced. A file over the step's byte limit is cancelled and
 // its partial bytes deleted; a second download in the same step is cancelled the same way. The
 // folder and every file in it are removed when the session closes.
+// The browser does not say what started a download. A file is taken for the press's only if it
+// begins after the press was sent, in the frame the press acted in, and the press could start
+// something at all, so a file a page's timer starts on a press with a handler still passes.
 import { failure, success, type DownloadedFile, type DriverError, type Result } from '@revisum/contracts';
 import { createHash } from 'node:crypto';
 import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { errorText } from './browser-session.ts';
 import type { CdpConnection } from './cdp-connection.ts';
-import type { ArmedDownload, DownloadCapture } from './page-operations.ts';
+import type { ArmedDownload, DownloadCapture, DownloadPress } from './page-operations.ts';
 
 // What the browser says about a download, decoded from its events.
-type DownloadBegun = { readonly downloadId: string; readonly url: string; readonly suggestedFilename: string };
+type DownloadBegun = { readonly downloadId: string; readonly frameId: string; readonly url: string; readonly suggestedFilename: string };
 type DownloadState = 'inProgress' | 'completed' | 'canceled';
 type DownloadProgress = { readonly downloadId: string; readonly receivedBytes: number; readonly state: DownloadState };
 
 // The one download an armed step claimed, as it goes.
 type ClaimedDownload = DownloadBegun & { state: DownloadState; receivedBytes: number };
 
-type Armed = { claimed: ClaimedDownload | null; kept: boolean };
+// `discardsAside` are the discards of downloads the step did not claim, each ending with what went
+// wrong, or null. They begin in an event handler, so the step's release is what reports them.
+type Armed = { press: DownloadPress | null; claimed: ClaimedDownload | null; kept: boolean; discardsAside: Promise<Error | null>[] };
 
 const FOLDER_PREFIX = 'browser-downloads-';
 const POLL_INTERVAL_MILLISECONDS = 50;
@@ -32,6 +38,9 @@ const SHORTEST_FINISH_MILLISECONDS = 30_000;
 // The media type of a download whose response the session did not see, such as a blob.
 const UNKNOWN_MEDIA_TYPE = 'application/octet-stream';
 const LONGEST_FILE_NAME = 255;
+// How a cancel fails when there is nothing left to cancel: the browser has gone, the browser context
+// has gone with its session, or the browser no longer holds the download.
+const DOWNLOAD_ALREADY_GONE = /connection closed|Failed to find browser context|No download item found/;
 // The browser's download ids (its "guid" field). Nothing else is ever used as a file name in the folder.
 const DOWNLOAD_ID = /^[0-9A-Za-z-]{8,64}$/;
 const STATES: readonly DownloadState[] = ['inProgress', 'completed', 'canceled'];
@@ -41,9 +50,11 @@ const fieldsOf = (value: unknown): Record<string, unknown> => (typeof value === 
 
 function decodeBegun(event: unknown): DownloadBegun | undefined {
   const fields = fieldsOf(event);
-  const [downloadId, url, suggestedFilename] = [fields['guid'], fields['url'], fields['suggestedFilename']];
-  if (typeof downloadId !== 'string' || !DOWNLOAD_ID.test(downloadId) || typeof url !== 'string' || typeof suggestedFilename !== 'string') return undefined;
-  return { downloadId, url, suggestedFilename };
+  const [downloadId, frameId, url, suggestedFilename] = [fields['guid'], fields['frameId'], fields['url'], fields['suggestedFilename']];
+  if (typeof downloadId !== 'string' || !DOWNLOAD_ID.test(downloadId) || typeof frameId !== 'string' || typeof url !== 'string' || typeof suggestedFilename !== 'string') {
+    return undefined;
+  }
+  return { downloadId, frameId, url, suggestedFilename };
 }
 
 function decodeProgress(event: unknown): DownloadProgress | undefined {
@@ -98,13 +109,19 @@ export class DownloadFolder implements DownloadCapture {
   claims(event: unknown): boolean {
     const begun = decodeBegun(event);
     const armed = this.#armed;
-    if (begun === undefined || armed === null) return false;
-    if (armed.claimed === null) {
+    const press = armed?.press ?? null;
+    // The browser is refusing downloads then, so there is nothing to discard.
+    if (begun === undefined || armed === null || press === null || !press.canStartFile) {
+      return false;
+    }
+    if (armed.claimed?.downloadId === begun.downloadId) {
+      return true;
+    }
+    if (armed.claimed === null && begun.frameId === press.frameId) {
       armed.claimed = { ...begun, state: 'inProgress', receivedBytes: 0 };
       return true;
     }
-    if (armed.claimed.downloadId === begun.downloadId) return true;
-    void this.#discard(begun.downloadId);
+    armed.discardsAside.push(this.#discard(begun.downloadId).then(() => null, (error: unknown) => new Error(`a download could not be cancelled: ${errorText(error)}`)));
     return false;
   }
 
@@ -118,14 +135,19 @@ export class DownloadFolder implements DownloadCapture {
     });
   }
 
-  async arm(): Promise<ArmedDownload> {
+  arm(): ArmedDownload {
     const folder = this.#ensureFolder();
-    const armed: Armed = { claimed: null, kept: false };
+    const armed: Armed = { press: null, claimed: null, kept: false, discardsAside: [] };
     this.#mediaTypes.clear();
     this.#armed = armed;
-    await this.#behave({ behavior: 'allowAndName', downloadPath: folder });
     return {
-      finish: (maximumBytes, beginTimeoutMilliseconds) => this.#finish(armed, folder, maximumBytes, beginTimeoutMilliseconds),
+      expectFromPress: async (press) => {
+        armed.press = press;
+        if (press.canStartFile) {
+          await this.#behave({ behavior: 'allowAndName', downloadPath: folder });
+        }
+      },
+      finish: (maximumBytes, beginTimeoutMilliseconds, shouldStopWaiting) => this.#finish(armed, folder, maximumBytes, beginTimeoutMilliseconds, shouldStopWaiting),
       release: (keep) => this.#release(armed, keep),
     };
   }
@@ -147,10 +169,13 @@ export class DownloadFolder implements DownloadCapture {
     await this.#connection.send(undefined, 'Browser.setDownloadBehavior', { ...behaviour, browserContextId: this.#browserContextId, eventsEnabled: true });
   }
 
-  async #finish(armed: Armed, folder: string, maximumBytes: number, beginTimeoutMilliseconds: number): Promise<Result<DownloadedFile, DriverError>> {
+  async #finish(armed: Armed, folder: string, maximumBytes: number, beginTimeoutMilliseconds: number, shouldStopWaiting: () => boolean): Promise<Result<DownloadedFile, DriverError>> {
     const beginBy = Date.now() + beginTimeoutMilliseconds;
+    const noDownload = failure<DriverError>({ code: 'no-download', detail: `the click started no download within ${beginTimeoutMilliseconds} ms` });
     while (armed.claimed === null) {
-      if (Date.now() >= beginBy) return failure({ code: 'no-download', detail: `the click started no download within ${beginTimeoutMilliseconds} ms` });
+      if (shouldStopWaiting() || Date.now() >= beginBy) {
+        return noDownload;
+      }
       await pause(POLL_INTERVAL_MILLISECONDS);
     }
     const claimed = armed.claimed;
@@ -159,6 +184,9 @@ export class DownloadFolder implements DownloadCapture {
     // The bytes on disk are watched as well as the browser's progress events, which it sends
     // only now and then, so a file over the limit is stopped soon after it passes it.
     while (claimed.state !== 'completed') {
+      if (shouldStopWaiting()) {
+        return noDownload;
+      }
       if (claimed.state === 'canceled') {
         await this.#discard(claimed.downloadId);
         return failure({ code: 'no-download', detail: 'the download was cancelled before it finished' });
@@ -196,21 +224,46 @@ export class DownloadFolder implements DownloadCapture {
   async #release(armed: Armed, keep: boolean): Promise<void> {
     if (this.#armed === armed) this.#armed = null;
     const claimed = armed.claimed;
-    if (claimed !== null && !(keep && armed.kept)) await this.#discard(claimed.downloadId);
-    await this.#behave({ behavior: 'deny' }).catch(() => undefined);
+    try {
+      if (claimed !== null && !(keep && armed.kept)) {
+        await this.#discard(claimed.downloadId);
+      }
+      for (const failed of await Promise.all(armed.discardsAside)) {
+        if (failed !== null) {
+          throw failed;
+        }
+      }
+    } finally {
+      await this.#behave({ behavior: 'deny' }).catch(() => undefined);
+    }
   }
 
-  // Cancels a download, waits for the browser to stop writing it, and deletes its bytes.
+  // Cancels a download, waits for the browser to stop writing it, and deletes its bytes. A download
+  // already gone leaves no writing to wait for. Any other failure to cancel is the caller's, and the
+  // bytes stay until the session's folder goes, since the browser may still be writing them.
   async #discard(downloadId: string): Promise<void> {
     const folder = this.#folder;
-    if (this.#states.get(downloadId) !== 'completed') {
-      // The quoted key is the protocol's own parameter name.
-      await this.#connection.send(undefined, 'Browser.cancelDownload', { 'guid': downloadId, browserContextId: this.#browserContextId }).catch(() => undefined);
+    if (this.#states.get(downloadId) !== 'completed' && !await this.#isAlreadyGoneWhenCancelled(downloadId)) {
       const stopBy = Date.now() + CANCEL_WAIT_MILLISECONDS;
-      while (this.#states.get(downloadId) !== 'canceled' && this.#states.get(downloadId) !== 'completed' && Date.now() < stopBy) await pause(POLL_INTERVAL_MILLISECONDS);
+      while (this.#states.get(downloadId) !== 'canceled' && this.#states.get(downloadId) !== 'completed' && Date.now() < stopBy) {
+        await pause(POLL_INTERVAL_MILLISECONDS);
+      }
     }
     this.#states.delete(downloadId);
     if (folder !== null) this.#deleteBytes(folder, downloadId);
+  }
+
+  async #isAlreadyGoneWhenCancelled(downloadId: string): Promise<boolean> {
+    try {
+      // The quoted key is the protocol's own parameter name.
+      await this.#connection.send(undefined, 'Browser.cancelDownload', { 'guid': downloadId, browserContextId: this.#browserContextId });
+      return false;
+    } catch (error) {
+      if (DOWNLOAD_ALREADY_GONE.test(errorText(error))) {
+        return true;
+      }
+      throw error;
+    }
   }
 
   // The bytes of the download's files in the folder: the file, and any partial file beside it.

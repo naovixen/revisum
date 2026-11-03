@@ -11,6 +11,7 @@
 import { failure, success, type ClipboardPort, type DriverError, type Result } from '@revisum/contracts';
 import type { CdpConnection } from './cdp-connection.ts';
 import { readClipboardText } from './in-page.ts';
+import { PageHeldByDialog } from './PageHeldByDialog.ts';
 import type { PageCommand } from './web-storage.ts';
 
 type FrameTree = { readonly frameTree: { readonly frame: { readonly id: string; readonly securityOrigin?: string } } };
@@ -74,6 +75,9 @@ export class RunClipboard implements ClipboardPort {
       return success(text);
     } catch (error) {
       if (this.#crashed()) return failure({ code: 'target-crashed', detail: 'the page\'s renderer died' });
+      if (error instanceof PageHeldByDialog) {
+        return failure({ code: 'dialog-open', detail: errorText(error) });
+      }
       return failure({ code: 'clipboard-unavailable', detail: `the clipboard could not be read: ${errorText(error)}` });
     }
   }

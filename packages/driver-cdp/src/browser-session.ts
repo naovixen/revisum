@@ -11,13 +11,14 @@ import {
   UnreadablePage,
 } from '@revisum/contracts';
 import {
-  actionability, afterTwoFrames, armHitCheck, documentUrl, fontsReady, guardDetails, inThisDocument, linkAndCurrent, linkTargetList, maskElements, maskGivenElements, pageInfo, probeElement, readDomValue, readHitCheck, selectOption,
+  actionability, armHitCheck, documentUrl, fontsReady, guardDetails, inThisDocument, linkAndCurrent, linkTargetList, maskElements, maskGivenElements, pageInfo, probeElement, readDomValue, readHitCheck, selectOption,
   structuralSelectorValidity, unmaskElements, whatAClickActivates,
 } from './in-page.ts';
 import { findByLabel, findByTestId, findByText, findStructural, inDocumentOrder } from './FindByLabel.ts';
 import { heldModifierKeys } from './modifier-keys.ts';
 import { pageAudit, parseAudit, toFindings } from './page-audit.ts';
-import type { Actionability, DownloadCapture, DriverSession, PageEvents, PageFunction, PageOperations, Point } from './page-operations.ts';
+import type { Actionability, DownloadCapture, DriverSession, PageEvents, PageFunction, PageOperations, Point, ScriptCallOutcome } from './page-operations.ts';
+import { PageHeldByDialog } from './PageHeldByDialog.ts';
 import type { ConnectionFailure } from './SessionEgress.ts';
 
 const NOTHING_READ = { visible: false, enabled: false, text: '', value: null, sensitive: false, box: null } as const;
@@ -44,6 +45,13 @@ async function forAtMost<Value>(milliseconds: number, work: Promise<Value>): Pro
     return await Promise.race([work, timedOut]);
   } finally {
     clearTimeout(timer);
+  }
+}
+
+// Lets a catch that reads a failed look at the page as "nothing yet" keep to failures that can pass.
+function rethrowIfHeldByDialog(error: unknown): void {
+  if (error instanceof PageHeldByDialog) {
+    throw error;
   }
 }
 
@@ -84,6 +92,7 @@ export type SessionDetails = {
 const BROWSER_ERROR_PAGE = 'chrome-error:';
 
 const CRASHED: DriverError = { code: 'target-crashed', detail: 'the page\'s renderer died' };
+const DIALOG_OPEN: DriverError = { code: 'dialog-open', detail: 'a dialog is open: a dialog step must answer it first' };
 const SELECTOR_INVALID: DriverError = { code: 'selector-invalid', detail: 'the browser rejects a CSS selector or XPath expression of the locator' };
 const NO_GUARD: DriverError = { code: 'policy-denied', detail: 'no runtime guard was given, so nothing can allow the action' };
 
@@ -104,7 +113,8 @@ async function findElements<Handle>(operations: PageOperations<Handle>, locator:
 async function locate<Handle>(operations: PageOperations<Handle>, locator: ResolvedLocator): Promise<Handle[]> {
   try {
     return await findElements(operations, locator);
-  } catch {
+  } catch (error) {
+    rethrowIfHeldByDialog(error);
     return [];
   }
 }
@@ -133,7 +143,11 @@ async function rejectsSelector<Handle>(operations: PageOperations<Handle>, locat
   if (locator.by !== 'css' && locator.by !== 'xpath') return false;
   const text = locator.by === 'css' ? locator.selector : locator.expression;
   let validity = 'valid';
-  try { validity = await operations.callForString(structuralSelectorValidity, [locator.by, text]); } catch { /* taken as accepted */ }
+  try {
+    validity = await operations.callForString(structuralSelectorValidity, [locator.by, text]);
+  } catch (error) {
+    rethrowIfHeldByDialog(error);
+  }
   if (validity === 'invalid') return true;
   return locator.inside !== undefined && rejectsSelector(operations, locator.inside);
 }
@@ -169,7 +183,8 @@ async function lookForActionable<Handle>(operations: PageOperations<Handle>, loc
   }
   try {
     return { count: 1, element, check: JSON.parse(await operations.callForString(actionability, [{ element }])) as Actionability };
-  } catch {
+  } catch (error) {
+    rethrowIfHeldByDialog(error);
     return { count: 1, check: null }; // detached during the check: locate again
   }
 }
@@ -361,6 +376,10 @@ async function hasTypedFieldGone(typedFields: readonly SecretTypedField[], locat
 const textToFill = (value: Extract<ResolvedActionStep, { type: 'fill' }>['value']): string =>
   (typeof value === 'string' ? value : 'lines' in value ? value.lines.join('\n') : '');
 
+// What a click does with the element it found and where it will press, just before the press.
+type BeforePress<Handle> = (element: Handle, at: Point) => Promise<void>;
+const NOTHING_BEFORE_PRESS = (): Promise<void> => Promise.resolve();
+
 // The ports of one document. `masked` lists the documents a screenshot masks: this one and every
 // document it is framed in, so a capture from inside a frame hides what the top page hides. The
 // first of them is the top document.
@@ -376,10 +395,6 @@ function documentPorts<Handle>(
     // A value reference, or a locator this session cannot resolve, says nothing about the page.
     const locator = performableLocator(planLocator, SESSION_FEATURES);
     if (locator === undefined || crashed()) return READ_FAILED;
-    // An open dialog stops the page's scripts, so nothing can be read until it is answered.
-    if (events.openDialog() !== null) {
-      return DIALOG_HOLDS_PAGE;
-    }
     try {
       if (await rejectsSelector(operations, locator)) return { ...NOTHING_READ, count: 0, selectorInvalid: true };
       const found = await findElements(operations, locator);
@@ -398,50 +413,47 @@ function documentPorts<Handle>(
       // A DOM check's read: a class list, a computed style or an attribute, read from the document.
       const dom = read === undefined ? undefined : decodeDomValue(await operations.callForString(readDomValue, [{ element }, read.kind, domReadName(read)]), read);
       return { ...shown, states: { ...exposed, current }, href, ...(dom === undefined ? {} : { dom }) };
-    } catch {
-      // A dialog that opens during a read holds it up until the command times out.
-      return events.openDialog() === null ? READ_FAILED : DIALOG_HOLDS_PAGE;
+    } catch (error) {
+      return error instanceof PageHeldByDialog ? DIALOG_HOLDS_PAGE : READ_FAILED;
     }
   };
 
   // A read the page does not answer in time is one that says nothing about what is on it.
   const probe = async (planLocator: Locator, read?: DomRead): Promise<ElementProbe> => {
     const probed = await forAtMost(timeout, probeNow(planLocator, read));
-    if (probed !== TIMED_OUT) {
-      return probed;
-    }
-    return events.openDialog() === null ? READ_FAILED : DIALOG_HOLDS_PAGE;
+    return probed === TIMED_OUT ? READ_FAILED : probed;
   };
 
   // Input gets the step's timeout from the moment it is sent. The wait for the element is not counted:
-  // a click on an element found late is as entitled to its navigation as any other. A dialog that
-  // opens meanwhile is the input landing, as ever.
-  const inputWithinTimeout = async <Value>(input: Promise<Value>, onDialog: Value): Promise<Result<Value, DriverError>> => {
+  // a click on an element found late is as entitled to its navigation as any other.
+  const inputWithinTimeout = async <Value>(input: Promise<Value>): Promise<Result<Value, DriverError>> => {
     const ended = await forAtMost(timeout, input);
-    if (ended !== TIMED_OUT) {
-      return success(ended);
-    }
-    return events.openDialog() === null ? failure({ code: 'timeout', detail: `the input was still being handled after ${timeout} ms` }) : success(onDialog);
+    return ended === TIMED_OUT ? failure({ code: 'timeout', detail: `the input was still being handled after ${timeout} ms` }) : success(ended);
   };
 
-  // A read of the hit check that fails says the click landed only when the element it was sent to has
-  // gone, as it has when the click navigated. Otherwise nothing says where the click went, so the
-  // failure is the step's.
+  // What a press left in the hit check. A dialog the press opened stops the page until it is answered,
+  // which holds up the read: the press landed. With no check left to read, as after a navigation, or
+  // no answer, the press landed only if the element it was sent to has gone. Otherwise nothing says
+  // where it went, so the step fails.
   const readHitAfterClick = async (element: Handle): Promise<string> => {
+    let hit: string;
     try {
-      return await operations.callForString(readHitCheck, []);
+      hit = await operations.callForString(readHitCheck, []);
     } catch (readFailure) {
-      if (await operations.isElementGone(element)) {
+      if (readFailure instanceof PageHeldByDialog || await operations.isElementGone(element)) {
         return 'hit';
       }
       throw readFailure;
     }
+    return hit === 'none' && await operations.isElementGone(element) ? 'hit' : hit;
   };
 
   // A click is sent once. The wait may find a new element, and the guard is asked about the one it
   // finds, just before the send. A press that lands on another element is swallowed in the page and
-  // fails the step at once: sending it again could press whatever the page has put there since.
-  const click = async (locator: ResolvedLocator, guard: ActionGuard): Promise<Result<void, DriverError>> => {
+  // fails the step at once: sending it again could press whatever the page has put there since. A
+  // press the check never saw was stopped before it reached the page, by a listener of the page's
+  // that came first, so the click did nothing.
+  const click = async (locator: ResolvedLocator, guard: ActionGuard, beforePress: BeforePress<Handle>): Promise<Result<void, DriverError>> => {
     const waited = await waitUntilActionable(operations, locator, timeout, timeout, crashed);
     if (!waited.ok) return waited;
     const { element, at } = waited.value;
@@ -449,28 +461,28 @@ function documentPorts<Handle>(
     if (denied !== null) {
       return failure(denied);
     }
+    await beforePress(element, at);
     await operations.callForString(armHitCheck, [{ element }]);
     const clickAndReadHit = async (): Promise<string> => {
       await operations.click(element, at);
-      // A dialog the click opened stops the page until it is answered: the click landed.
-      if (events.openDialog() !== null) {
-        return 'hit';
-      }
       return readHitAfterClick(element);
     };
-    const hit = await inputWithinTimeout(clickAndReadHit(), 'hit');
+    const hit = await inputWithinTimeout(clickAndReadHit());
     if (!hit.ok) {
       return hit;
     }
     if (hit.value === 'miss') {
       return failure({ code: 'not-actionable', detail: 'the click landed on another element' });
     }
+    if (hit.value === 'none') {
+      return failure({ code: 'not-actionable', detail: 'the press never reached the page' });
+    }
     return success(undefined);
   };
 
   // The action itself, once the step is known to be performable.
-  const perform = async (action: ResolvedActionStep, guard: ActionGuard, typedSecret: Secret | null): Promise<Result<void, DriverError>> => {
-    if (action.type === 'click') return click(action.locator, guard);
+  const perform = async (action: ResolvedActionStep, guard: ActionGuard, typedSecret: Secret | null, beforePress: BeforePress<Handle>): Promise<Result<void, DriverError>> => {
+    if (action.type === 'click') return click(action.locator, guard, beforePress);
     if (action.type === 'upload') {
       const path = details.fixturePath(action.fixture);
       if (!path.ok) return path;
@@ -499,7 +511,7 @@ function documentPorts<Handle>(
         break;
       case 'press': {
         // Enter on a form or a link starts a navigation as a click does.
-        const pressed = await inputWithinTimeout(operations.press(element, action.key, heldModifierKeys(action.modifiers ?? [], process.platform)), undefined);
+        const pressed = await inputWithinTimeout(operations.press(element, action.key, heldModifierKeys(action.modifiers ?? [], process.platform)));
         if (!pressed.ok) {
           return pressed;
         }
@@ -540,7 +552,23 @@ function documentPorts<Handle>(
     return success(undefined);
   };
 
-  const act = async (step: ActionStep, guard: ActionGuard, secret?: Secret): Promise<Result<void, DriverError>> => {
+  // Waits for what an input started to show. A navigation it started has its effect only once it
+  // arrives, however long the old page goes on answering, and one that turns out to be a download
+  // ends a moment before the browser says so.
+  const inputSettled = async (): Promise<void> => {
+    await operations.twoFramesLater();
+    await events.navigationEnded();
+    await operations.twoFramesLater();
+  };
+
+  const failureOfThrow = (error: unknown): DriverError => {
+    if (error instanceof PageHeldByDialog) {
+      return DIALOG_OPEN;
+    }
+    return crashed() ? CRASHED : { code: 'not-actionable', detail: errorText(error) };
+  };
+
+  const actBeforePress = async (step: ActionStep, guard: ActionGuard, secret: Secret | undefined, beforePress: BeforePress<Handle>): Promise<Result<void, DriverError>> => {
     // The type requires a guard, but what calls this may not be checked against the type.
     if (typeof guard !== 'function') {
       return failure(NO_GUARD);
@@ -549,17 +577,9 @@ function documentPorts<Handle>(
     if (step.type === 'dialog') {
       try { return await answerDialog(step, guard); } catch (error) { return failure(crashed() ? CRASHED : { code: 'not-actionable', detail: errorText(error) }); }
     }
-    if (events.openDialog() !== null) return failure({ code: 'not-actionable', detail: 'a dialog is open: a dialog step must answer it first' });
     // Anything this driver cannot perform in full is refused before it touches the page.
     const action = literalActionStep(step, SESSION_FEATURES);
     if (action === undefined) return failure({ code: 'unsupported-step', detail: `this driver does not perform this ${step.type} step yet` });
-    const rejected = await forAtMost(timeout, rejectsSelector(operations, action.locator));
-    if (rejected === TIMED_OUT) {
-      return failure(notAnswering(timeout));
-    }
-    if (rejected) {
-      return failure(SELECTOR_INVALID);
-    }
     // A secret reference arrives with the secret the engine resolved for it. Without that secret
     // there is nothing to type, and typing nothing could pass a step that should fail.
     const typed = action.type === 'fill' ? action.value : '';
@@ -568,21 +588,26 @@ function documentPorts<Handle>(
     const openingsBefore = events.unsupportedOpenings();
     let acted: Result<void, DriverError>;
     try {
-      acted = await perform(action, guard, typedSecret);
+      const rejected = await forAtMost(timeout, rejectsSelector(operations, action.locator));
+      if (rejected === TIMED_OUT) {
+        return failure(notAnswering(timeout));
+      }
+      if (rejected) {
+        return failure(SELECTOR_INVALID);
+      }
+      acted = await perform(action, guard, typedSecret, beforePress);
+      if (acted.ok) {
+        const settled = await inputWithinTimeout(inputSettled());
+        if (!settled.ok) {
+          acted = settled;
+        }
+      }
     } catch (error) {
-      acted = failure({ code: 'not-actionable', detail: errorText(error) });
+      acted = failure(failureOfThrow(error));
     }
     // The audit log holds this denial, so nothing noticed in the same moment may take its place.
     if (!acted.ok && acted.error.code === 'policy-denied') {
       return acted;
-    }
-    // Whatever the action started reaches the browser within a frame or two; then the driver looks.
-    // A read that fails means the page navigated or died, which is looked at below.
-    if (acted.ok && events.openDialog() === null) {
-      const settled = await inputWithinTimeout(operations.callForString(afterTwoFrames, []).catch(() => ''), '');
-      if (!settled.ok) {
-        acted = settled;
-      }
     }
     if (crashed()) return failure(CRASHED);
     if (events.unsupportedOpenings() > openingsBefore) {
@@ -591,9 +616,11 @@ function documentPorts<Handle>(
     return acted;
   };
 
-  // A download step: the click, guarded as any click, with the browser armed to save the one
-  // download it starts. A popup the click opens, or a second download, fails the step with
-  // unsupported-step and nothing of it is kept.
+  const act = (step: ActionStep, guard: ActionGuard, secret?: Secret): Promise<Result<void, DriverError>> => actBeforePress(step, guard, secret, NOTHING_BEFORE_PRESS);
+
+  // A download step: the click, guarded as any click, with the browser armed, just before the press,
+  // to save the one download it starts. A popup the click opens, or a download that is not its own,
+  // fails the step with unsupported-step and nothing of it is kept.
   const download = async (step: DownloadStep, maximumBytes: number, guard: ActionGuard): Promise<Result<DownloadedFile, DriverError>> => {
     if (typeof guard !== 'function') {
       return failure(NO_GUARD);
@@ -602,18 +629,24 @@ function documentPorts<Handle>(
     const capture = details.downloads;
     const locator = performableLocator(step.locator, SESSION_FEATURES);
     if (capture === undefined || locator === undefined) return failure({ code: 'unsupported-step', detail: 'this driver does not perform this download step' });
-    if (await rejectsSelector(operations, locator)) return failure(SELECTOR_INVALID);
-    if (events.openDialog() !== null) return failure({ code: 'not-actionable', detail: 'a dialog is open: a dialog step must answer it first' });
+    try {
+      if (await rejectsSelector(operations, locator)) return failure(SELECTOR_INVALID);
+    } catch (error) {
+      return failure(failureOfThrow(error));
+    }
     const openingsBefore = events.unsupportedOpenings();
-    const armed = await capture.arm();
+    const hasOpenedAnother = (): boolean => events.unsupportedOpenings() > openingsBefore;
+    const armed = capture.arm();
     let kept = false;
     try {
-      const clicked = await act({ type: 'click', locator }, guard);
+      const clicked = await actBeforePress({ type: 'click', locator }, guard, undefined, async (element, at) => {
+        await armed.expectFromPress({ frameId: await operations.frameId(), canStartFile: await operations.canPressStartAnything(element, at) });
+      });
       if (!clicked.ok) return clicked;
-      const saved = await armed.finish(maximumBytes, timeout);
+      const saved = await armed.finish(maximumBytes, timeout, () => crashed() || hasOpenedAnother());
       if (crashed()) return failure(CRASHED);
-      if (events.unsupportedOpenings() > openingsBefore) {
-        return failure({ code: 'unsupported-step', detail: 'the click opened a popup or a second page, or started a second download' });
+      if (hasOpenedAnother()) {
+        return failure({ code: 'unsupported-step', detail: 'something other than the click started a file, or the click opened a popup, a second page or a second download' });
       }
       kept = saved.ok;
       return saved;
@@ -626,22 +659,18 @@ function documentPorts<Handle>(
   // the page: the run ends without it, and closing the session ends the page.
   const runScript = async (call: PageScriptCall): Promise<Result<string, DriverError>> => {
     if (crashed()) return failure(CRASHED);
-    if (events.openDialog() !== null) return failure({ code: 'not-actionable', detail: 'a dialog is open: a dialog step must answer it first' });
     const openingsBefore = events.unsupportedOpenings();
-    const called = operations.callScript(call.source, call.arguments, call.maximumResultBytes);
-    called.catch(() => undefined);
-    let timer: NodeJS.Timeout | undefined;
-    const timedOut = new Promise<'timed-out'>((resolveTimeout) => { timer = setTimeout(() => resolveTimeout('timed-out'), call.timeoutMilliseconds); });
-    let ended: Awaited<typeof called> | 'timed-out';
+    let ended: ScriptCallOutcome | typeof TIMED_OUT;
     try {
-      ended = await Promise.race([called, timedOut]);
+      ended = await forAtMost(call.timeoutMilliseconds, operations.callScript(call.source, call.arguments, call.maximumResultBytes));
     } catch (error) {
+      if (error instanceof PageHeldByDialog) {
+        return failure(DIALOG_OPEN);
+      }
       return failure(crashed() ? CRASHED : { code: 'script-failed', detail: errorText(error) });
-    } finally {
-      clearTimeout(timer);
     }
     if (crashed()) return failure(CRASHED);
-    if (ended === 'timed-out') return failure({ code: 'script-timeout', detail: `the script did not settle within ${call.timeoutMilliseconds} ms` });
+    if (ended === TIMED_OUT) return failure({ code: 'script-timeout', detail: `the script did not settle within ${call.timeoutMilliseconds} ms` });
     // A popup, second page or download the script started is closed or cancelled, as for an action.
     if (events.unsupportedOpenings() > openingsBefore) {
       return failure({ code: 'unsupported-step', detail: 'the script opened a popup or a second page, or started a download' });
@@ -677,6 +706,8 @@ function documentPorts<Handle>(
       if (scripts === 'disabled' && !isTopDocument) return failure({ code: 'unsupported-step', detail: 'scripts can be turned off only for the top document' });
       try {
         await operations.navigate(url, Math.max(timeout, 10_000), scripts);
+        // What the page started as it loaded is the navigate's, once it has reached the browser.
+        await forAtMost(timeout, operations.twoFramesLater());
         return success(undefined);
       } catch (error) {
         return failure(crashed() ? CRASHED : { code: 'navigation-failed', detail: errorText(error) });
@@ -745,6 +776,8 @@ function documentPorts<Handle>(
       return success(documentPorts(inner, [...masked, inner], environment, details));
     },
     crashed,
+    isDialogOpen: () => events.openDialog() !== null,
+    unsupportedOpenings: () => events.unsupportedOpenings(),
   };
   return ports;
 }

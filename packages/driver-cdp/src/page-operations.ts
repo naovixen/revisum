@@ -25,6 +25,10 @@ export interface PageOperations<Handle> {
   navigate(url: string, timeoutMilliseconds: number, scripts: 'enabled' | 'disabled'): Promise<void>;
   // Calls a page function that returns a string (JSON where structured). Promises are awaited.
   callForString(pageFunction: PageFunction, inputs: readonly PageArgument<Handle>[]): Promise<string>;
+  // Resolves two frames of this document later, which is how long whatever it just started takes to
+  // reach the browser, or as soon as no more frames can come: its document has been replaced or
+  // closed, its page has died, or a dialog holds its page. Any other failure rejects.
+  twoFramesLater(): Promise<void>;
   // Calls a page function that returns Element[], and returns their handles.
   callForElements(pageFunction: PageFunction, inputs: readonly PageArgument<Handle>[]): Promise<Handle[]>;
   // Elements with this role and exact accessible name, found by the browser's own accessibility engine.
@@ -39,6 +43,11 @@ export interface PageOperations<Handle> {
   // True when the element is no longer in any document on screen: removed from its own, or its
   // document was replaced or closed, or its page died. Throws when the page cannot say.
   isElementGone(element: Handle): Promise<boolean>;
+  // The browser's id for this document's frame, as it names the frame a download began in.
+  frameId(): Promise<string>;
+  // False when a press at the point can start nothing: neither it nor what holds it has a listener
+  // for a pointer's events or does anything by itself when pressed.
+  canPressStartAnything(element: Handle, at: Point): Promise<boolean>;
   // Points are in this document's viewport.
   click(element: Handle, at: Point): Promise<void>;
   hover(at: Point): Promise<void>;
@@ -72,14 +81,24 @@ export type ExposedStates = { readonly selected: boolean | null; readonly expand
 // The browser's downloads for one session and its tabs: saved into a folder of the session's own,
 // and refused at every other time.
 export interface DownloadCapture {
-  // Lets the browser save the next download the session starts, and claims it for the caller.
-  arm(): Promise<ArmedDownload>;
+  // Holds the session's downloads for one step. Nothing is saved or claimed until expectFromPress.
+  arm(): ArmedDownload;
 }
+// What a download step knows about the press it is about to send.
+export type DownloadPress = {
+  // The frame the press acts in. A file that begins in another frame is not the press's.
+  readonly frameId: string;
+  // False when the press can start nothing, so no file can be the press's.
+  readonly canStartFile: boolean;
+};
 export interface ArmedDownload {
+  // Called just before the press: lets the browser save the next download of the press's frame,
+  // and claims it for the caller. A download that began earlier is no download of the press.
+  expectFromPress(press: DownloadPress): Promise<void>;
   // Waits up to `beginTimeoutMilliseconds` for the claimed download to start (no-download), then
   // for its last byte. A file over `maximumBytes` is cancelled and its bytes deleted
-  // (download-too-large).
-  finish(maximumBytes: number, beginTimeoutMilliseconds: number): Promise<Result<DownloadedFile, DriverError>>;
+  // (download-too-large). Stops waiting as soon as `shouldStopWaiting` says the step is over.
+  finish(maximumBytes: number, beginTimeoutMilliseconds: number, shouldStopWaiting: () => boolean): Promise<Result<DownloadedFile, DriverError>>;
   // Refuses downloads again. Unless `keep` is true and the file finished, the download is
   // cancelled and its bytes deleted; a kept file stays until the session closes.
   release(keep: boolean): Promise<void>;
@@ -94,6 +113,9 @@ export interface PageEvents {
   openDialog(): string | null;
   // Accepts or dismisses the open dialog.
   answerDialog(accept: boolean): Promise<void>;
+  // Resolves once the top document is not on its way to another, or a dialog or a crash has stopped
+  // it from getting there: at once when it is not.
+  navigationEnded(): Promise<void>;
   // How many popups, second pages and downloads the page has started so far. Each is closed or
   // cancelled as soon as it starts.
   unsupportedOpenings(): number;

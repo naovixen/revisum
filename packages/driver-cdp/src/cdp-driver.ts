@@ -12,11 +12,13 @@ import type { CdpConnection, CdpSessionClient } from './cdp-connection.ts';
 import { DownloadFolder } from './downloads.ts';
 import { EgressRecorder } from './egress-records.ts';
 import { BrowserNetwork, atResponseStage, type HeldRequest } from './network-stubs.ts';
-import { focusAndSelect, focusElement, frameContentOffset, isConnectedToItsDocument, scriptResultText } from './in-page.ts';
+import { afterTwoFrames, focusAndSelect, focusElement, frameContentOffset, isConnectedToItsDocument, scriptResultText } from './in-page.ts';
 import type { HeldModifierKey } from './modifier-keys.ts';
 import type {
   DriverSession, ExposedStates, OwnBrowserDriver, PageArgument, PageFunction, PageOperations, Point, RoleAndName, ScriptCallOutcome,
 } from './page-operations.ts';
+import { nodesAPressPasses, pressActsByItself } from './NodesAPressPasses.ts';
+import { PageHeldByDialog } from './PageHeldByDialog.ts';
 import { PageWatch, type AttachedPage } from './page-watch.ts';
 import { RunClipboard, SHARED_BROWSER_CLIPBOARD, allowRunClipboard } from './run-clipboard.ts';
 import { mergeRefusedOrigins, openSessionEgress, type EgressSource, type OpenedSessionEgress } from './SessionEgress.ts';
@@ -344,7 +346,7 @@ async function createSession(
     clock: browser.clock,
     clipboard: attached.isShared
       ? SHARED_BROWSER_CLIPBOARD
-      : new RunClipboard(connection, browserContextId, (method, parameters) => watch.command(method, parameters), () => watch.crashed()),
+      : new RunClipboard(connection, browserContextId, (method, parameters) => watch.commandToRunningPage(method, parameters), () => watch.crashed()),
   };
   return buildSession(operations, environment, details);
 }
@@ -462,7 +464,7 @@ async function openTab(browser: SessionBrowser, firstWatch: PageWatch, firstDeta
 
 // The storage port of one page, whose commands fail at once once its renderer has died.
 const pageStorage = (watch: PageWatch): PageStorage =>
-  new PageStorage((method, parameters) => watch.command(method, parameters), () => watch.crashed());
+  new PageStorage((method, parameters) => watch.commandToRunningPage(method, parameters), () => watch.crashed());
 
 // An isolated script world of one frame: the page's own scripts cannot see or change it; it shares
 // only the document. The driver reads an iframe's document through one, and the top document
@@ -496,6 +498,10 @@ const HTTP_ERROR_STATUS = 'net::ERR_HTTP_RESPONSE_CODE_FAILURE';
 const LOST_CONTEXT = /context|Cannot find/i;
 // Messages of a command about an object whose document was replaced, or whose tab has closed.
 const LOST_OBJECT = /Cannot find context|Could not find object|Execution context was destroyed|Inspected target navigated or closed|Session with given id not found/i;
+// How making a script world fails for a frame the page has removed.
+const FRAME_REMOVED = /No frame for given id found/;
+// The events a pointer's press sends on its way, or sets off when it moves the focus.
+const PRESS_EVENT = /^(?:pointer|mouse|click|auxclick|dblclick|touch|focus|blur|contextmenu)/;
 
 // PageOperations over one flat CDP session, for its top document or one of its iframes' documents.
 // Element handles are remote object ids.
@@ -522,19 +528,21 @@ class CdpPage implements PageOperations<string> {
     this.#virtualTimers = virtualTimers && frame === null;
   }
 
-  // Every command goes through the watch, so a crashed page fails it at once.
+  // Every command goes through the watch, so a crashed page or one a dialog holds fails it at once.
   #send<Value = Record<string, unknown>>(method: string, parameters: Record<string, unknown> = {}): Promise<Value> {
-    return this.#watch.command<Value>(method, parameters);
+    return this.#watch.commandToRunningPage<Value>(method, parameters);
   }
 
-  // Waits for a command that a dialog may hold up, such as the mouse release whose click opens a
-  // dialog: it ends when the command does or when a dialog opens. The browser answers the command
-  // itself only once the dialog is answered.
-  async #untilDialog(command: Promise<unknown>): Promise<void> {
-    command.catch(() => undefined);
+  // Sends input to a page no dialog holds. A dialog that opens while it waits is the input landing,
+  // such as the mouse release whose click opens one: this ends then, since the browser answers the
+  // command itself only once the dialog is answered.
+  async #sendInput(method: string, parameters: Record<string, unknown>): Promise<void> {
+    if (this.#watch.openDialog() !== null) {
+      throw new PageHeldByDialog(method);
+    }
     const opened = this.#watch.dialogOpened();
     try {
-      await Promise.race([command, opened.promise]);
+      await Promise.race([this.#watch.command(method, parameters), opened.promise]);
     } finally {
       opened.cancel();
     }
@@ -574,7 +582,8 @@ class CdpPage implements PageOperations<string> {
       : this.#frameStoppedLoading(frameId, timeoutMilliseconds);
     loaded.promise.catch(() => undefined);
     try {
-      const navigated = await this.#send<{ errorText?: string }>('Page.navigate', { url, ...(frameId === undefined ? {} : { frameId }) });
+      // Sent whatever holds the page: a navigation away ends a dialog, and the browser answers it.
+      const navigated = await this.#watch.command<{ errorText?: string }>('Page.navigate', { url, ...(frameId === undefined ? {} : { frameId }) });
       // An HTTP error status with an empty body is a page the server did send: the browser shows
       // its own error page for it, and the plan's checks decide what that means.
       if (navigated.errorText && navigated.errorText !== HTTP_ERROR_STATUS) throw new Error(navigated.errorText);
@@ -641,6 +650,17 @@ class CdpPage implements PageOperations<string> {
 
   async callForString(pageFunction: PageFunction, inputs: readonly PageArgument<string>[]): Promise<string> {
     return String((await this.#call(pageFunction, inputs, true)).result.value ?? '');
+  }
+
+  async twoFramesLater(): Promise<void> {
+    try {
+      await this.callForString(afterTwoFrames, []);
+    } catch (error) {
+      const isDocumentGone = LOST_OBJECT.test(errorText(error)) || FRAME_REMOVED.test(errorText(error));
+      if (!(error instanceof PageHeldByDialog) && !this.#watch.crashed() && !isDocumentGone) {
+        throw error;
+      }
+    }
   }
 
   async callForElements(pageFunction: PageFunction, inputs: readonly PageArgument<string>[]): Promise<string[]> {
@@ -737,25 +757,77 @@ class CdpPage implements PageOperations<string> {
     }
   }
 
+  async frameId(): Promise<string> {
+    const framed = this.#frame?.world.frameId;
+    if (framed !== undefined) {
+      return framed;
+    }
+    const { frameTree } = await this.#send<{ frameTree: FrameTree }>('Page.getFrameTree');
+    return frameTree.frame.id;
+  }
+
+  async canPressStartAnything(element: string, at: Point): Promise<boolean> {
+    const passed = await this.callForElements(nodesAPressPasses, [{ element }, at.x, at.y]);
+    if (await this.callForString(pressActsByItself, passed.map((node) => ({ element: node }))) === 'yes') {
+      return true;
+    }
+    try {
+      for (const node of passed) {
+        if (await this.#hasPressListener(await this.#inMainWorld(node))) {
+          return true;
+        }
+      }
+      return await this.#hasPressListener(await this.#mainWorldWindow());
+    } finally {
+      await this.#releaseScriptObjects();
+    }
+  }
+
+  // The browser reports only the listeners of the script world the object is read through, and a
+  // page's own are in its main world.
+  async #inMainWorld(node: string): Promise<string> {
+    const described = await this.#send<DescribedNode>('DOM.describeNode', { objectId: node });
+    const resolved = await this.#send<{ object: { objectId?: string } }>('DOM.resolveNode', { backendNodeId: described.node.backendNodeId, objectGroup: SCRIPT_OBJECT_GROUP });
+    if (resolved.object.objectId === undefined) {
+      throw new Error('the node has no object in the page\'s main world');
+    }
+    return resolved.object.objectId;
+  }
+
+  async #mainWorldWindow(): Promise<string> {
+    const found = await this.#send<CallResult>('Runtime.callFunctionOn', {
+      functionDeclaration: 'function () { return this.defaultView; }', objectId: await this.#mainWorldDocument(), objectGroup: SCRIPT_OBJECT_GROUP,
+    });
+    if (found.result.objectId === undefined) {
+      throw new Error('the document has no window');
+    }
+    return found.result.objectId;
+  }
+
+  async #hasPressListener(objectId: string): Promise<boolean> {
+    const { listeners } = await this.#send<{ listeners: readonly { readonly type: string }[] }>('DOMDebugger.getEventListeners', { objectId });
+    return listeners.some((listener) => PRESS_EVENT.test(listener.type));
+  }
+
   async click(_element: string, at: Point): Promise<void> {
     const offset = await this.#viewportOffset();
     const point = { x: at.x + offset.x, y: at.y + offset.y };
     const pressed = { ...point, button: 'left' as const, clickCount: 1 };
-    await this.#send('Input.dispatchMouseEvent', { type: 'mouseMoved', ...point });
-    await this.#untilDialog(this.#send('Input.dispatchMouseEvent', { type: 'mousePressed', ...pressed }));
+    await this.#sendInput('Input.dispatchMouseEvent', { type: 'mouseMoved', ...point });
+    await this.#sendInput('Input.dispatchMouseEvent', { type: 'mousePressed', ...pressed });
     if (this.#watch.openDialog() !== null) return;
-    await this.#untilDialog(this.#send('Input.dispatchMouseEvent', { type: 'mouseReleased', ...pressed }));
+    await this.#sendInput('Input.dispatchMouseEvent', { type: 'mouseReleased', ...pressed });
   }
 
   async hover(at: Point): Promise<void> {
     const offset = await this.#viewportOffset();
-    await this.#untilDialog(this.#send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: at.x + offset.x, y: at.y + offset.y }));
+    await this.#sendInput('Input.dispatchMouseEvent', { type: 'mouseMoved', x: at.x + offset.x, y: at.y + offset.y });
   }
 
   async fill(element: string, value: string): Promise<void> {
     await this.callForString(focusAndSelect, [{ element }]);
     if (value === '') await this.#pressKey(KEY_DEFINITIONS.Backspace);
-    else await this.#untilDialog(this.#send('Input.insertText', { text: value }));
+    else await this.#sendInput('Input.insertText', { text: value });
   }
 
   async press(element: string, key: Key, modifiers: readonly HeldModifierKey[]): Promise<void> {
@@ -764,9 +836,9 @@ class CdpPage implements PageOperations<string> {
     for (const modifier of modifiers) {
       held.push(modifier);
       const definition = MODIFIER_KEY_DEFINITIONS[modifier];
-      await this.#untilDialog(this.#send('Input.dispatchKeyEvent', {
+      await this.#sendInput('Input.dispatchKeyEvent', {
         type: 'rawKeyDown', key: definition.key, code: definition.code, windowsVirtualKeyCode: definition.keyCode, location: LEFT_KEY, modifiers: modifierMask(held),
-      }));
+      });
       if (this.#watch.openDialog() !== null) return;
     }
     await this.#pressKey(heldKeyDefinition(KEY_DEFINITIONS[key], held), modifierMask(held));
@@ -774,19 +846,19 @@ class CdpPage implements PageOperations<string> {
       if (this.#watch.openDialog() !== null) return;
       held.splice(held.indexOf(modifier), 1);
       const definition = MODIFIER_KEY_DEFINITIONS[modifier];
-      await this.#untilDialog(this.#send('Input.dispatchKeyEvent', {
+      await this.#sendInput('Input.dispatchKeyEvent', {
         type: 'keyUp', key: definition.key, code: definition.code, windowsVirtualKeyCode: definition.keyCode, location: LEFT_KEY, modifiers: modifierMask(held),
-      }));
+      });
     }
   }
 
   async #pressKey(definition: KeyDefinition, modifiers = 0): Promise<void> {
     const common = { key: definition.key, code: definition.code, windowsVirtualKeyCode: definition.keyCode, modifiers };
-    await this.#untilDialog(this.#send('Input.dispatchKeyEvent', {
+    await this.#sendInput('Input.dispatchKeyEvent', {
       type: definition.text ? 'keyDown' : 'rawKeyDown', ...common, ...(definition.text ? { text: definition.text } : {}),
-    }));
+    });
     if (this.#watch.openDialog() !== null) return;
-    await this.#untilDialog(this.#send('Input.dispatchKeyEvent', { type: 'keyUp', ...common }));
+    await this.#sendInput('Input.dispatchKeyEvent', { type: 'keyUp', ...common });
   }
 
   async setFiles(element: string, paths: readonly string[]): Promise<void> {
@@ -849,8 +921,14 @@ class CdpPage implements PageOperations<string> {
       });
       return written.exceptionDetails ? { kind: 'not-json' } : decodeScriptResult(written.result.value);
     } finally {
-      await this.#send('Runtime.releaseObjectGroup', { objectGroup: SCRIPT_OBJECT_GROUP }).catch(() => undefined);
+      await this.#releaseScriptObjects();
     }
+  }
+
+  // Lets the browser forget them. A page that cannot answer has nothing left to free, or frees them
+  // with its document, so a failure here must not take the place of what the caller was doing.
+  async #releaseScriptObjects(): Promise<void> {
+    await this.#send('Runtime.releaseObjectGroup', { objectGroup: SCRIPT_OBJECT_GROUP }).catch(() => undefined);
   }
 
   async screenshotPng(): Promise<Uint8Array> {

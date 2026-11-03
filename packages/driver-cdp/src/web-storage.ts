@@ -5,6 +5,7 @@ import {
   failure, success,
   type DriverError, type Origin, type Result, type StorageArea, type StoragePort,
 } from '@revisum/contracts';
+import { PageHeldByDialog } from './PageHeldByDialog.ts';
 
 // Chrome DevTools Protocol answer shapes this port reads.
 type FrameTree = { readonly frameTree: { readonly frame: { readonly url: string; readonly securityOrigin?: string } } };
@@ -53,6 +54,9 @@ export class PageStorage implements StoragePort {
       if (shown !== origin) return failure({ code: 'storage-origin-mismatch', detail: 'the page is not on the storage entry\'s origin' });
       return success(await use({ securityOrigin: origin, isLocalStorage: area === 'local' }));
     } catch (error) {
+      if (error instanceof PageHeldByDialog) {
+        return failure({ code: 'dialog-open', detail: errorText(error) });
+      }
       return failure(this.#crashed() ? { code: 'target-crashed', detail: 'the page\'s renderer died' } : { code: 'not-actionable', detail: errorText(error) });
     }
   }

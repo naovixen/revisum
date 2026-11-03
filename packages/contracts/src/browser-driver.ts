@@ -30,7 +30,7 @@ import type { AdapterId, Target } from './target.ts';
 // script-timeout: a page script did not settle within its timeout.
 // script-result-invalid: a page script's result is not JSON: undefined, a function, or a cyclic value.
 // page-unreadable: every read of the page threw until a check's timeout, so nothing is known of it.
-// dialog-open: a dialog holds the page, so a check could not read it. Only a dialog step can free it.
+// dialog-open: a dialog holds the page, so a step could not act on it or read it. Only a dialog step can free it.
 export type DriverErrorCode =
   | 'not-found' | 'ambiguous' | 'not-actionable' | 'timeout' | 'navigation-failed' | 'policy-denied'
   | 'no-download' | 'download-too-large' | 'storage-origin-mismatch' | 'clock-runaway' | 'clipboard-unavailable'
@@ -269,6 +269,13 @@ export interface DocumentSession extends PageNavigator, ActionRunner, Prober, Ca
   // on a crashed page then fails with target-crashed rather than waiting out its timeout, whatever
   // its last read saw. A driver without it never reports a crash.
   crashed?(): boolean;
+  // True while a dialog holds the page, so whatever cannot read the page says dialog-open. A driver
+  // without it reports a dialog only through its results.
+  isDialogOpen?(): boolean;
+  // How many popups, second pages and downloads no step asked for the page has started so far. One
+  // that starts during a step fails it with unsupported-step, whatever the step was doing. A driver
+  // without it reports them only through its results.
+  unsupportedOpenings?(): number;
   // Clicks the step's element, asking the guard first as a click does, and waits for exactly one
   // download to start within the step timeout and to finish. A click that starts none fails with
   // no-download; a file over maximumBytes is cancelled, its partial bytes deleted, and fails with

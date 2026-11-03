@@ -1,5 +1,6 @@
 // Watches one driver page from outside any command: whether its renderer has died, the dialog it
-// has open, and the popups, second pages and downloads it starts. A popup or second page is held
+// has open, whether its top document is on its way to another, and the popups, second pages and
+// downloads it starts. A popup or second page is held
 // back from loading anything and closed, and a download is refused by the browser, so nothing of
 // either is kept and no request of a popup escapes the session's allow-list; the session layer
 // fails the step that started one with unsupported-step. Two openings are not counted: the
@@ -8,9 +9,12 @@
 // Once the page has crashed, every command to it fails at once: the browser never answers a
 // command sent to a dead renderer, so waiting would only run into each command's timeout. A browser
 // that dies or a connection that closes takes the page with it, so both count as a crash.
+// Once a dialog is open, every command that needs the page fails at once in the same way, and one
+// under way fails as the dialog opens, so this is the one place that dialog state is read for them.
 import { errorText } from './browser-session.ts';
 import { CdpError, type CdpConnection } from './cdp-connection.ts';
 import type { PageEvents } from './page-operations.ts';
+import { PageHeldByDialog } from './PageHeldByDialog.ts';
 
 // Chrome DevTools Protocol event shapes this watch reads.
 type TargetInfo = { readonly targetId: string; readonly type: string; readonly browserContextId?: string; readonly openerId?: string };
@@ -26,6 +30,10 @@ const POPUP_REQUEST_WAIT_MILLISECONDS = 1_000;
 // How a command fails when a popup closed itself first, or the browser or the session has gone.
 // Nothing is left to hold back then, so there is nothing to report.
 const POPUP_ALREADY_GONE = /Session with given id not found|No target with given id|connection closed/i;
+// A navigation that stays in this page's tab, as the browser says of one it was asked for.
+const THIS_TAB = 'currentTab';
+
+const fieldsOf = (value: unknown): Record<string, unknown> => (typeof value === 'object' && value !== null ? value as Record<string, unknown> : {});
 
 type WatchedPage = { readonly browserContextId: string; readonly targetId: string; readonly sessionId: string };
 
@@ -49,8 +57,10 @@ export class PageWatch implements PageEvents {
   #crashed = false;
   #dialog: string | null = null;
   #openings = 0;
+  #isNavigationUnderWay = false;
   readonly #onCrash = new Set<() => void>();
   readonly #onDialog = new Set<() => void>();
+  readonly #onNavigationEnded = new Set<() => void>();
   readonly #onPopupRequest: (url: string) => void;
   readonly #ownsBrowserContext: boolean;
   readonly #claimsDownload: (event: unknown) => boolean;
@@ -87,8 +97,16 @@ export class PageWatch implements PageEvents {
     listen(sessionId, 'Page.javascriptDialogOpening', (parameters) => {
       this.#dialog = (parameters as DialogOpening).message;
       for (const notify of [...this.#onDialog]) notify();
+      this.#notifyNavigationWaiters();
     });
-    listen(sessionId, 'Page.javascriptDialogClosed', () => { this.#dialog = null; });
+    listen(sessionId, 'Page.javascriptDialogClosed', (parameters) => {
+      this.#dialog = null;
+      // Dismissing what a page asks before it unloads cancels the navigation, and nothing else says so.
+      if (fieldsOf(parameters)['result'] === false) {
+        this.#endNavigation();
+      }
+    });
+    this.#watchNavigations();
     // Every new page in the browser is attached paused, before it loads anything. One in the
     // session's own browser context is a popup or a second page, and is closed, unless it is the
     // tab a newTab step is waiting for. A page of another context is never let run from here: that
@@ -124,6 +142,7 @@ export class PageWatch implements PageEvents {
   stop(): void {
     for (const stopListening of this.#stopListening.splice(0)) stopListening();
     this.#tabClaim = null;
+    this.#notifyNavigationWaiters();
   }
 
   // Resolves with the next page the browser context opens without an opener, still paused, which
@@ -178,11 +197,32 @@ export class PageWatch implements PageEvents {
     return { promise, cancel: () => { this.#onDialog.delete(notify); } };
   }
 
+  // Resolves once the top document is not on its way to another, or a dialog or a crash has stopped
+  // it from getting there: at once when it is not. A press sends its navigation before the browser
+  // has anything to show for it, and the old page goes on answering meanwhile.
+  navigationEnded(): Promise<void> {
+    if (!this.#isNavigationUnderWay || this.#dialog !== null || this.#crashed) {
+      return Promise.resolve();
+    }
+    return new Promise((resolve) => { this.#onNavigationEnded.add(resolve); });
+  }
+
   // Sends a command to the page. It fails at once on a crashed page, and as soon as the page
   // crashes while it waits.
   command<Value = Record<string, unknown>>(method: string, parameters: Record<string, unknown> = {}): Promise<Value> {
     if (this.#crashed) return Promise.reject(new CdpError(method, 'the page\'s renderer died'));
     return this.failingOnCrash(method, this.#connection.send<Value>(this.#page.sessionId, method, parameters));
+  }
+
+  // Sends a command only the running page can answer. On top of what command() does, it fails at
+  // once with PageHeldByDialog while a dialog is open, and as soon as one opens while it waits.
+  commandToRunningPage<Value = Record<string, unknown>>(method: string, parameters: Record<string, unknown> = {}): Promise<Value> {
+    if (this.#dialog !== null) {
+      return Promise.reject(new PageHeldByDialog(method));
+    }
+    const opened = this.dialogOpened();
+    const held = opened.promise.then((): never => { throw new PageHeldByDialog(method); });
+    return Promise.race([this.command<Value>(method, parameters), held]).finally(() => { opened.cancel(); });
   }
 
   // Waits for what the browser is doing on the page's behalf, for at most as long as the page lives.
@@ -197,6 +237,40 @@ export class PageWatch implements PageEvents {
       this.#onCrash.add(fail);
     });
     return Promise.race([waited, crash]).finally(stopWatching);
+  }
+
+  #watchNavigations(): void {
+    const { sessionId, targetId } = this.#page;
+    const connection = this.#connection;
+    const endIfTopDocument = (frameId: unknown): void => {
+      if (frameId === targetId) {
+        this.#endNavigation();
+      }
+    };
+    this.#stopListening.push(
+      connection.on(sessionId, 'Page.frameRequestedNavigation', (parameters) => {
+        const requested = fieldsOf(parameters);
+        if (requested['frameId'] === targetId && requested['disposition'] === THIS_TAB) {
+          this.#isNavigationUnderWay = true;
+        }
+      }),
+      connection.on(sessionId, 'Page.frameNavigated', (parameters) => { endIfTopDocument(fieldsOf(fieldsOf(parameters)['frame'])['id']); }),
+      connection.on(sessionId, 'Page.navigatedWithinDocument', (parameters) => { endIfTopDocument(fieldsOf(parameters)['frameId']); }),
+      // What ends a navigation that leaves the page where it was: a download, or an empty answer.
+      connection.on(sessionId, 'Page.frameStoppedLoading', (parameters) => { endIfTopDocument(fieldsOf(parameters)['frameId']); }),
+    );
+  }
+
+  #endNavigation(): void {
+    this.#isNavigationUnderWay = false;
+    this.#notifyNavigationWaiters();
+  }
+
+  #notifyNavigationWaiters(): void {
+    for (const notify of [...this.#onNavigationEnded]) {
+      notify();
+    }
+    this.#onNavigationEnded.clear();
   }
 
   // A popup that can reach its opener shares the opener's renderer process, so while it waits to
@@ -245,5 +319,6 @@ export class PageWatch implements PageEvents {
     this.#dialog = null;
     for (const fail of [...this.#onCrash]) fail();
     this.#onCrash.clear();
+    this.#notifyNavigationWaiters();
   }
 }
