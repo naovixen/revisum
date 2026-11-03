@@ -25,7 +25,7 @@ The study's largest gap is setup: 24 of the 62 inexpressible tests seed records 
   - **Failure semantics.**
     - A failed `call` ends the run `Errored`: it could not test, which is not a product failure. Cleanup still runs.
     - A failed `expectBackend` ends it `Failed`.
-    - `read` calls in `expectBackend` are retried until they pass or `backendCheckTimeoutMilliseconds` runs out, which covers background jobs. `write` calls are never retried.
+    - A `read` call in `expectBackend` is polled while the service answers with a status in `successStatuses` and the check has not passed, until `backendCheckTimeoutMilliseconds` runs out, which covers background jobs. A failed call is not sent again: no answer, a timeout, or a status outside `successStatuses` fails the step with that code (founder, 2026-11-03). A service that answers 404 until a job finishes declares 404 in `successStatuses`. `write` calls are sent once.
   - **Evidence and replay.**
     - Each call's record holds its name, method, service, status, timing and response sha256. Body excerpts are added only after redaction and only from SPEC-09 on. Header values are never recorded.
     - A run with calls lists `service-calls` in `nonHermeticInputs`.
@@ -145,7 +145,7 @@ export function buildServiceRequest(declaration: CallDeclaration, service: { ori
 - **Cleanup** holds call steps only. Any other step there is `misplaced_step`.
 - **Request bodies.** A body is always JSON text in parts, where a part may be an opaque `Secret` (founder, 2026-10-28: one shape). Engine builds it without reading any secret; runner's `bodyText()` is the only place that joins the parts and reveals a secret.
 - **Interpolation.** A secret parameter may fill a JSON body value only; in a path or query it is `unsafe_interpolation`. An integer may go inside a string only when its minimum is 0 or more, so a minus sign can't form `--`.
-- **Verdicts.** A failed `expectBackend` ends the run `Failed`; only a failed `call` gives `Errored`. A backend check is not retried after `parameter-invalid` or `egress-blocked`.
+- **Verdicts.** A failed `expectBackend` ends the run `Failed`; only a failed `call` gives `Errored`. A backend check is not sent again after a failed call, nor after `parameter-invalid` or `egress-blocked`.
 - **Golden plan.** The shared test project gains the test service, its secret names and its declared calls, so the 1.2 golden plan for `call` parses (founder, 2026-10-28).
 
 ## Acceptance criteria
