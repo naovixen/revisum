@@ -42,10 +42,11 @@ Architecture refactor:
 
 Where phase 3 stands, from `docs/decisions/refactor-defects.md`:
 
-- **Fix next:** 39, 47 and 49 (egress outside Fetch, proof first), 35, 36, 55-58, 92, 93, 118's remaining parts, 133, 137, 138, 139, 140, and the first-round leftovers 5, 6, 8, 14, 15, 20, 22, 26-30, 59, 61, 80.
+- **Fix next:** 39, 47 and 49 (egress outside Fetch, proof first), 35, 36, 55-58, 92, 93, 118's remaining parts, 133, 137, 138, 139, 140, 141-146, and the first-round leftovers 5, 6, 8, 14, 15, 20, 22, 26-30, 59, 61, 80.
 - **With SPEC-16:** 100-103, 107-112, the rest of 114, 115, 136, and re-reading the guarantee level after a plan run. Founder decided 103: mount tracked files only.
 - **Founder decided, still to build:** one real Playwright Test run in the weekly tier, after a dependency review (116).
 - **Founder decided:** closed shadow roots stay a documented limit, to revisit with SPEC-10 (129).
+- **Founder decided, being built:** host runs always go through the egress proxy with WebRTC UDP off, stay labelled `host` and claim nothing new (39, 47, 49, 141, 142).
 - **Calls made in the main session, which the founder can reverse:** refused connections in request counts (87, amended in SPEC-33) and allowing U+200C and U+200D in plan text (122).
 - **Machine leftovers:** a locked worktree in `.claude/worktrees/` from the break test. Leave it unless the founder says otherwise. `npm run check:linux` uses its own container, labelled `revisum.check=linux`.
 
