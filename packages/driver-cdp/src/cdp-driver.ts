@@ -388,12 +388,16 @@ async function preparePage(browser: SessionBrowser, sessionId: string): Promise<
       browser.blocked.push(url.origin);
     }
     const stubbed = allowed ? browser.network.answer(paused) : null;
-    const decision = stubbed !== null
-      ? page.send('Fetch.fulfillRequest', { requestId: paused.requestId, ...stubbed })
-      : allowed
-        ? page.send('Fetch.continueRequest', { requestId: paused.requestId, ...(browser.network.wantsResponseBody(paused) ? { interceptResponse: true } : {}) })
-        : page.send('Fetch.failRequest', { requestId: paused.requestId, errorReason: 'BlockedByClient' });
-    decision.catch(() => undefined);
+    const sendDecision = (): Promise<unknown> => {
+      if (stubbed !== null) {
+        return page.send('Fetch.fulfillRequest', { requestId: paused.requestId, ...stubbed });
+      }
+      if (!allowed) {
+        return page.send('Fetch.failRequest', { requestId: paused.requestId, errorReason: 'BlockedByClient' });
+      }
+      return page.send('Fetch.continueRequest', { requestId: paused.requestId, ...(browser.network.wantsResponseBody(paused) ? { interceptResponse: true } : {}) });
+    };
+    sendDecision().catch(() => undefined);
   });
   await page.send('Fetch.enable', { patterns: [{ urlPattern: '*', requestStage: 'Request' }] });
 }
@@ -588,7 +592,8 @@ class CdpPage implements PageOperations<string> {
       const navigated = await this.#watch.command<{ errorText?: string }>('Page.navigate', { url, ...(frameId === undefined ? {} : { frameId }) });
       // An HTTP error status with an empty body is a page the server did send: the browser shows
       // its own error page for it, and the plan's checks decide what that means.
-      if (navigated.errorText && navigated.errorText !== HTTP_ERROR_STATUS) throw new Error(navigated.errorText);
+      const navigationError = navigated.errorText ?? '';
+      if (navigationError !== '' && navigationError !== HTTP_ERROR_STATUS) throw new Error(navigationError);
       await this.#watch.failingOnCrash('Page.navigate', loaded.promise);
     } finally {
       loaded.cancel();
@@ -642,11 +647,11 @@ class CdpPage implements PageOperations<string> {
   async #call(pageFunction: PageFunction, inputs: readonly PageArgument<string>[], returnByValue: boolean): Promise<CallResult> {
     const objectId = await this.#documentObject();
     const callArguments: CallArgument[] = inputs.map((input) =>
-      (typeof input === 'object' && input !== null && 'element' in input ? { objectId: input.element } : { value: input }));
+      (typeof input === 'object' && 'element' in input ? { objectId: input.element } : { value: input }));
     const called = await this.#send<CallResult>('Runtime.callFunctionOn', {
       functionDeclaration: pageFunction.toString(), objectId, arguments: callArguments, awaitPromise: true, returnByValue,
     });
-    if (called.exceptionDetails) throw new Error(`page exception: ${called.exceptionDetails.exception?.value ?? called.exceptionDetails.text}`);
+    if (called.exceptionDetails !== undefined) throw new Error(`page exception: ${called.exceptionDetails.exception?.value ?? called.exceptionDetails.text}`);
     return called;
   }
 
@@ -672,7 +677,7 @@ class CdpPage implements PageOperations<string> {
     const properties = await this.#send<{ result: { name: string; value?: { objectId?: string } }[] }>('Runtime.getProperties', { objectId: list, ownProperties: true });
     return properties.result
       .filter((property) => /^\d+$/.test(property.name))
-      .flatMap((property) => (property.value?.objectId ? [property.value.objectId] : []));
+      .flatMap((property) => property.value?.objectId ?? []);
   }
 
   async byRole(role: string, name: string): Promise<string[]> {
@@ -691,7 +696,7 @@ class CdpPage implements PageOperations<string> {
       const resolved = await this.#send<{ object: { objectId?: string } }>('DOM.resolveNode', {
         backendNodeId: node.backendDOMNodeId, ...(world === null ? {} : { executionContextId: world.executionContextId }),
       });
-      if (resolved.object.objectId) handles.push(resolved.object.objectId);
+      if (resolved.object.objectId !== undefined) handles.push(resolved.object.objectId);
     }
     return handles;
   }
@@ -720,14 +725,14 @@ class CdpPage implements PageOperations<string> {
     const { nodes } = await this.#send<{ nodes: AccessibilityNode[] }>('Accessibility.getFullAXTree', frameId === undefined ? {} : { frameId });
     const byId = new Map(nodes.map((node) => [node.nodeId, node]));
     const build = (node: AccessibilityNode): A11yNode[] => {
-      const children = (node.childIds ?? []).flatMap((id) => { const child = byId.get(id); return child ? build(child) : []; });
+      const children = (node.childIds ?? []).flatMap((id) => { const child = byId.get(id); return child === undefined ? [] : build(child); });
       const role = String(node.role?.value ?? 'none');
       if (node.ignored || TRANSPARENT_ROLES.has(role)) return children;
       return [{ role: ROLE_NAMES[role] ?? role, name: String(node.name?.value ?? ''), children }];
     };
     const root = nodes.find((node) => node.parentId === undefined) ?? nodes[0];
-    const tree = root ? build(root) : [];
-    return tree.length === 1 && tree[0] ? tree[0] : { role: 'document', name: '', children: tree };
+    const tree = root === undefined ? [] : build(root);
+    return tree.length === 1 && tree[0] !== undefined ? tree[0] : { role: 'document', name: '', children: tree };
   }
 
   // Where this document's viewport starts in the top document's viewport: the sum of the frame
@@ -857,7 +862,7 @@ class CdpPage implements PageOperations<string> {
   async #pressKey(definition: KeyDefinition, modifiers = 0): Promise<void> {
     const common = { key: definition.key, code: definition.code, windowsVirtualKeyCode: definition.keyCode, modifiers };
     await this.#sendInput('Input.dispatchKeyEvent', {
-      type: definition.text ? 'keyDown' : 'rawKeyDown', ...common, ...(definition.text ? { text: definition.text } : {}),
+      type: definition.text === undefined ? 'rawKeyDown' : 'keyDown', ...common, ...(definition.text === undefined ? {} : { text: definition.text }),
     });
     if (this.#watch.openDialog() !== null) return;
     await this.#sendInput('Input.dispatchKeyEvent', { type: 'keyUp', ...common });
@@ -916,12 +921,12 @@ class CdpPage implements PageOperations<string> {
       const called = await this.#send<CallResult>('Runtime.callFunctionOn', {
         functionDeclaration: source, objectId, arguments: [{ value: scriptArguments }], awaitPromise: true, returnByValue: false, objectGroup: SCRIPT_OBJECT_GROUP,
       });
-      if (called.exceptionDetails) return { kind: 'threw' };
+      if (called.exceptionDetails !== undefined) return { kind: 'threw' };
       const written = await this.#send<CallResult>('Runtime.callFunctionOn', {
         functionDeclaration: scriptResultText.toString(), objectId, arguments: [callArgumentOf(called.result), { value: maximumResultBytes }],
         returnByValue: true, objectGroup: SCRIPT_OBJECT_GROUP,
       });
-      return written.exceptionDetails ? { kind: 'not-json' } : decodeScriptResult(written.result.value);
+      return written.exceptionDetails === undefined ? decodeScriptResult(written.result.value) : { kind: 'not-json' };
     } finally {
       await this.#releaseScriptObjects();
     }

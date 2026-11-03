@@ -59,7 +59,7 @@ function textRecord(value: unknown, field: string): Readonly<Record<string, stri
 
 export function decodeLicenceMap(input: unknown): LicenceMap {
   const pinned = fieldOf(input, 'pinnedThirdPartyFiles') ?? {};
-  if (typeof pinned !== 'object' || pinned === null || Array.isArray(pinned)) throw new Error('licences.json: pinnedThirdPartyFiles is not an object');
+  if (typeof pinned !== 'object' || Array.isArray(pinned)) throw new Error('licences.json: pinnedThirdPartyFiles is not an object');
   const pinnedThirdPartyFiles: Record<string, PinnedPackage> = {};
   for (const [name, entry] of Object.entries(pinned)) {
     const version = fieldOf(entry, 'version');

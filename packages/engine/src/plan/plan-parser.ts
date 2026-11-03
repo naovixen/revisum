@@ -1341,8 +1341,11 @@ function checkWholePlan(steps: readonly Step[], context: ParseContext): void {
   if (!all.some((step) => ASSERTION_STEP_TYPES.includes(step.type))) context.issues.push({ code: 'vacuous', path: '$.steps' });
 }
 
+// Whatever its type says, JSON.stringify gives undefined for undefined, a function or a symbol.
+const jsonTextOf = (input: unknown): string | undefined => JSON.stringify(input);
+
 function sizeInBytes(input: unknown): number {
-  try { return new TextEncoder().encode(JSON.stringify(input) ?? '').length; } catch { return Number.POSITIVE_INFINITY; }
+  try { return new TextEncoder().encode(jsonTextOf(input) ?? '').length; } catch { return Number.POSITIVE_INFINITY; }
 }
 
 const plainFields = (input: unknown): Readonly<Record<string, unknown>> | undefined =>

@@ -48,7 +48,7 @@ function readOrigin(value: unknown): string | null {
 function readOrigins(value: unknown): readonly string[] | null {
   if (!Array.isArray(value)) return null;
   const origins = value.map(readOrigin);
-  return origins.every((origin) => origin !== null) ? origins.filter((origin) => origin !== null) : null;
+  return origins.every((origin) => origin !== null) ? origins : null;
 }
 
 function readRewriteRule(value: unknown): RewriteRule | null {
@@ -88,14 +88,14 @@ export function readProxyRules(text: string): ProxyRules | null {
   if (allowedOrigins === null || privateOrigins === null || !Array.isArray(rawRewrites)) return null;
   const rewrites = rawRewrites.map(readRewriteRule);
   if (!rewrites.every((rule) => rule !== null)) return null;
-  const rules: ProxyRules = { allowedOrigins, privateOrigins, rewrites: rewrites.filter((rule) => rule !== null) };
+  const rules: ProxyRules = { allowedOrigins, privateOrigins, rewrites };
   // TCP relays are present only for a database command's run.
   const rawRelays = field(parsed, 'tcpRelays');
   if (rawRelays === undefined) return rules;
   if (!Array.isArray(rawRelays)) return null;
   const tcpRelays = rawRelays.map(readTcpRelay);
   if (!tcpRelays.every((relay) => relay !== null)) return null;
-  return { ...rules, tcpRelays: tcpRelays.filter((relay) => relay !== null) };
+  return { ...rules, tcpRelays };
 }
 
 // One decision line written by the proxy container, or null when the line is anything else.

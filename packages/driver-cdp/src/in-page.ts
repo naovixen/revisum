@@ -48,7 +48,8 @@ export function probeElement(element: Element, selectors: readonly string[]): st
   const sensitive = selectorList !== '' && (isInsideMatch() || hasMatchInside());
   return JSON.stringify({
     count: 1, visible, enabled: !disabled,
-    text: (element as HTMLElement).innerText ?? element.textContent ?? '',
+    // An SVG element has no innerText, whatever the type says.
+    text: (element as Partial<HTMLElement>).innerText ?? element.textContent,
     value: isField ? (element as HTMLInputElement).value : null,
     sensitive,
     box: { x: rectangle.x, y: rectangle.y, width: rectangle.width, height: rectangle.height },
@@ -160,10 +161,11 @@ export function armHitCheck(element: Element): string {
 // Reads and disarms the hit-target check: 'hit', 'miss', 'none', or 'no-click' for a press that landed
 // on the element with no click reaching it.
 export function readHitCheck(): string {
-  type WindowWithCheck = Window & { __clickHitCheck?: { state: string; hasClickArrived: boolean; disarm: () => void } };
+  // The page's own scripts can write to this property in the main world, null included.
+  type WindowWithCheck = Window & { __clickHitCheck?: { state: string; hasClickArrived: boolean; disarm: () => void } | null };
   const page = window as WindowWithCheck;
   const check = page.__clickHitCheck;
-  if (!check) return 'none';
+  if (check === undefined || check === null) return 'none';
   check.disarm();
   delete page.__clickHitCheck;
   return check.state === 'hit' && !check.hasClickArrived ? 'no-click' : check.state;
@@ -246,7 +248,7 @@ export function maskElements(selectors: readonly string[]): string {
 // What every field in the document holds, as JSON. The caller only compares it, and keeps none of it.
 export function fieldValues(): string {
   const fields = [...document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('input,textarea')].map((field) => field.value);
-  const editable = [...document.querySelectorAll('[contenteditable]:not([contenteditable="false"])')].map((element) => element.textContent ?? '');
+  const editable = [...document.querySelectorAll('[contenteditable]:not([contenteditable="false"])')].map((element) => element.textContent);
   return JSON.stringify([...fields, ...editable]);
 }
 
@@ -319,8 +321,7 @@ export function linkAndCurrent(element: Element): string {
   let link: Element | null = element;
   while (link !== null && !link.matches('a[href], area[href]')) link = parentOf(link);
   const href = link instanceof HTMLAnchorElement || link instanceof HTMLAreaElement ? link.href : null;
-  const CONTROL_ROLES = ['link', 'button', 'tab', 'menuitem', 'menuitemcheckbox', 'menuitemradio', 'option', 'treeitem', 'gridcell', 'row',
-    'checkbox', 'radio', 'switch'];
+  const CONTROL_ROLES = ['link', 'button', 'tab', 'menuitem', 'menuitemcheckbox', 'menuitemradio', 'option', 'treeitem', 'gridcell', 'row', 'checkbox', 'radio', 'switch'];
   const declared = element.getAttribute('aria-current');
   let current: string;
   if (declared !== null) current = declared.trim() === '' || declared.trim().toLowerCase() === 'false' ? 'false' : 'true';
@@ -358,8 +359,10 @@ export function guardDetails(element: Element): string {
       const text = normalise(labelledBy.split(/\s+/).map((id) => root.getElementById(id)?.textContent ?? '').join(' '));
       if (text !== '') return text;
     }
-    if (control instanceof HTMLInputElement) return normalise(control.type === 'image' ? control.alt : control.value || 'Submit');
-    return normalise((control as HTMLElement).innerText ?? control.textContent ?? '');
+    if (control instanceof HTMLInputElement && control.type === 'image') return normalise(control.alt);
+    if (control instanceof HTMLInputElement) { return normalise(control.value === '' ? 'Submit' : control.value); }
+    // An SVG element has no innerText, whatever the type says.
+    return normalise((control as Partial<HTMLElement>).innerText ?? control.textContent);
   };
   const rectangle = element.getBoundingClientRect();
   const field = element as HTMLInputElement;
@@ -395,7 +398,7 @@ export function selectOption(element: Element, option: string): string {
   const normalise = (text: string): string => text.replace(/\s+/g, ' ').trim();
   if (!(element instanceof HTMLSelectElement)) return 'not-a-select';
   const options = Array.from(element.options);
-  const chosen = options.find((candidate) => normalise(candidate.label || candidate.text) === normalise(option))
+  const chosen = options.find((candidate) => normalise(candidate.label === '' ? candidate.text : candidate.label) === normalise(option))
     ?? options.find((candidate) => candidate.value === option);
   if (chosen === undefined) return 'no-option';
   element.value = chosen.value;
@@ -412,7 +415,7 @@ export function frameContentOffset(frame: Element): string {
   if (!inView) frame.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' });
   const rectangle = frame.getBoundingClientRect();
   const style = getComputedStyle(frame);
-  const pixels = (value: string): number => Number.parseFloat(value) || 0;
+  const pixels = (value: string): number => { const parsed = Number.parseFloat(value); return Number.isNaN(parsed) ? 0 : parsed; };
   return JSON.stringify({
     x: rectangle.x + frame.clientLeft + pixels(style.paddingLeft),
     y: rectangle.y + frame.clientTop + pixels(style.paddingTop),

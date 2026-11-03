@@ -160,10 +160,18 @@ export function pageOutcome(targets: readonly TargetResult[]): Outcome {
 
 const isFiniteNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
 
+function isBoxOfFiniteSize(value: unknown): boolean {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+  const box = value as Record<string, unknown>;
+  return isFiniteNumber(box['x']) && isFiniteNumber(box['y']) && isFiniteNumber(box['width']) && isFiniteNumber(box['height'])
+    && box['width'] >= 0 && box['height'] >= 0;
+}
+
 export function isFinding(value: unknown): value is Finding {
   if (typeof value !== 'object' || value === null) return false;
   const finding = value as Record<string, unknown>;
-  const box = finding['box'] as Record<string, unknown> | undefined;
   return typeof finding['page'] === 'string'
     && typeof finding['ruleId'] === 'string' && finding['ruleId'] !== ''
     && (finding['kind'] === 'act-rule' || finding['kind'] === 'probe')
@@ -173,8 +181,6 @@ export function isFinding(value: unknown): value is Finding {
     && (finding['outcome'] === 'failed' || finding['outcome'] === 'cantTell')
     && Array.isArray(finding['selector']) && finding['selector'].length > 0
     && finding['selector'].every((selector) => typeof selector === 'string' && selector !== '')
-    && typeof box === 'object' && box !== null
-    && isFiniteNumber(box['x']) && isFiniteNumber(box['y']) && isFiniteNumber(box['width']) && isFiniteNumber(box['height'])
-    && (box['width'] as number) >= 0 && (box['height'] as number) >= 0
+    && isBoxOfFiniteSize(finding['box'])
     && typeof finding['message'] === 'string';
 }

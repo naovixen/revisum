@@ -151,8 +151,9 @@ export function readPlanText(text: string, limits: PlanLimits): Result<TextReadi
     // A line ending with ":" may open a block: a frame's or second tab's steps, or a source block.
     const blockLine = line.endsWith(':') ? line.slice(0, -1).replace(/ +$/, '') : undefined;
     for (const { type, syntax, opens } of STEP_STATEMENTS) {
-      const reading = opens !== undefined ? (blockLine === undefined ? undefined : syntax.read(blockLine, indent)) : syntax.read(line, indent);
-      if (reading === undefined) continue;
+      const statementText = opens === undefined ? line : blockLine;
+      if (statementText === undefined) continue;
+      const reading = syntax.read(statementText, indent);
       if (!reading.ok) { found = better(found, reading.failure); continue; }
       const step: Fields = isRecord(reading.value) ? { ...reading.value } : {};
       const needed = needsUnsafeMark(step);
@@ -221,7 +222,7 @@ export function readPlanText(text: string, limits: PlanLimits): Result<TextReadi
       return;
     }
     if (phase === 'cleanup') { refuse('unknown-statement', number, 1); return; }
-    found = better(found, better(valuesLine.ok ? undefined : valuesLine.failure, cleanupLine.ok ? undefined : cleanupLine.failure));
+    found = better(found, better(valuesLine.failure, cleanupLine.ok ? undefined : cleanupLine.failure));
     if (readStepLine(steps, '$.steps', line, indent, number, marked, found)) phase = 'steps';
   }
 

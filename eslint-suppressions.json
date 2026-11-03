@@ -1,8 +1,5 @@
 {
   "packages/auditor-act/src/accessibility-types.ts": {
-    "@typescript-eslint/no-unnecessary-type-assertion": {
-      "count": 2
-    },
     "curly": {
       "count": 4
     },
@@ -141,12 +138,6 @@
   "packages/auditor-act/src/snapshot-queries.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 2
-    },
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 1
-    },
-    "@typescript-eslint/strict-boolean-expressions": {
-      "count": 30
     },
     "curly": {
       "count": 30
@@ -461,16 +452,10 @@
     "@typescript-eslint/restrict-template-expressions": {
       "count": 1
     },
-    "@typescript-eslint/strict-boolean-expressions": {
-      "count": 11
-    },
     "curly": {
       "count": 38
     },
     "max-lines": {
-      "count": 1
-    },
-    "no-nested-ternary": {
       "count": 1
     },
     "revisum/file-name-matches-export": {
@@ -525,9 +510,6 @@
     "@typescript-eslint/naming-convention": {
       "count": 15
     },
-    "@typescript-eslint/strict-boolean-expressions": {
-      "count": 4
-    },
     "curly": {
       "count": 28
     },
@@ -560,9 +542,6 @@
   "packages/driver-cdp/src/page-audit.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 5
-    },
-    "@typescript-eslint/strict-boolean-expressions": {
-      "count": 6
     },
     "curly": {
       "count": 23
@@ -1067,9 +1046,6 @@
       "count": 1
     },
     "no-irregular-whitespace": {
-      "count": 1
-    },
-    "no-nested-ternary": {
       "count": 1
     },
     "revisum/file-name-matches-export": {
@@ -1696,7 +1672,7 @@
   },
   "test/containers/browser-channels-and-direct-connections.test.ts": {
     "curly": {
-      "count": 4
+      "count": 3
     },
     "revisum/file-name-matches-export": {
       "count": 1
@@ -1744,12 +1720,6 @@
     }
   },
   "test/containers/explore-isolated.test.ts": {
-    "@typescript-eslint/no-unsafe-assignment": {
-      "count": 1
-    },
-    "@typescript-eslint/no-unsafe-return": {
-      "count": 1
-    },
     "@typescript-eslint/require-await": {
       "count": 2
     },
@@ -1864,9 +1834,6 @@
     }
   },
   "test/contract/act-rule-agreement.test.ts": {
-    "@typescript-eslint/strict-boolean-expressions": {
-      "count": 1
-    },
     "revisum/file-name-matches-export": {
       "count": 1
     },
@@ -2221,9 +2188,6 @@
     }
   },
   "test/contract/page-script-egress.test.ts": {
-    "@typescript-eslint/no-unsafe-return": {
-      "count": 2
-    },
     "curly": {
       "count": 4
     },
@@ -2296,9 +2260,6 @@
   "test/contract/stub-egress.test.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 1
-    },
-    "@typescript-eslint/no-unsafe-return": {
-      "count": 2
     },
     "curly": {
       "count": 4
@@ -2423,9 +2384,6 @@
     }
   },
   "test/proofs/clipboard-leak-scan.test.ts": {
-    "@typescript-eslint/strict-boolean-expressions": {
-      "count": 1
-    },
     "curly": {
       "count": 1
     },
@@ -2566,9 +2524,6 @@
     }
   },
   "test/proofs/explore-hostile-page.test.ts": {
-    "@typescript-eslint/strict-boolean-expressions": {
-      "count": 1
-    },
     "revisum/file-name-matches-export": {
       "count": 1
     },
@@ -2636,9 +2591,6 @@
     }
   },
   "test/proofs/network-and-storage-leak-scan.test.ts": {
-    "@typescript-eslint/strict-boolean-expressions": {
-      "count": 1
-    },
     "curly": {
       "count": 1
     },
@@ -2650,9 +2602,6 @@
     }
   },
   "test/proofs/page-script-driver-dependencies.test.ts": {
-    "@typescript-eslint/no-unsafe-assignment": {
-      "count": 1
-    },
     "curly": {
       "count": 1
     },
@@ -2823,9 +2772,6 @@
     }
   },
   "test/proofs/remembered-value-leak-scan.test.ts": {
-    "@typescript-eslint/strict-boolean-expressions": {
-      "count": 1
-    },
     "curly": {
       "count": 1
     },
@@ -2913,9 +2859,6 @@
     }
   },
   "test/proofs/scratch-repository.ts": {
-    "@typescript-eslint/no-unsafe-assignment": {
-      "count": 1
-    },
     "curly": {
       "count": 4
     },
@@ -2935,9 +2878,6 @@
     }
   },
   "test/proofs/secret-leak-scan.test.ts": {
-    "@typescript-eslint/strict-boolean-expressions": {
-      "count": 1
-    },
     "curly": {
       "count": 2
     },
@@ -3017,9 +2957,6 @@
     }
   },
   "test/proofs/unsafe-page-leak-scan.test.ts": {
-    "@typescript-eslint/strict-boolean-expressions": {
-      "count": 2
-    },
     "curly": {
       "count": 1
     },
@@ -3206,9 +3143,6 @@
     }
   },
   "test/unit/auditor-act/browser-scan.test.ts": {
-    "@typescript-eslint/strict-boolean-expressions": {
-      "count": 4
-    },
     "curly": {
       "count": 1
     },
@@ -3352,7 +3286,7 @@
       "count": 1
     },
     "curly": {
-      "count": 11
+      "count": 5
     },
     "revisum/file-name-matches-export": {
       "count": 1
@@ -3414,7 +3348,7 @@
       "count": 1
     },
     "curly": {
-      "count": 4
+      "count": 3
     },
     "revisum/file-name-matches-export": {
       "count": 1
@@ -3471,7 +3405,7 @@
   },
   "test/unit/engine/code-owner-approval.test.ts": {
     "curly": {
-      "count": 8
+      "count": 4
     },
     "revisum/file-name-matches-export": {
       "count": 1
@@ -3482,7 +3416,7 @@
   },
   "test/unit/engine/code-owner-reviewed-bytes.test.ts": {
     "curly": {
-      "count": 3
+      "count": 2
     },
     "revisum/file-name-matches-export": {
       "count": 1
@@ -3580,12 +3514,6 @@
     }
   },
   "test/unit/engine/evidence-examples.ts": {
-    "@typescript-eslint/no-unsafe-assignment": {
-      "count": 1
-    },
-    "@typescript-eslint/no-unsafe-return": {
-      "count": 1
-    },
     "curly": {
       "count": 3
     },
@@ -3619,9 +3547,6 @@
     }
   },
   "test/unit/engine/evidence-suite-declarations.test.ts": {
-    "curly": {
-      "count": 3
-    },
     "revisum/file-name-matches-export": {
       "count": 1
     },
@@ -3630,11 +3555,8 @@
     }
   },
   "test/unit/engine/evidence-suite-trust.test.ts": {
-    "@typescript-eslint/no-unsafe-return": {
-      "count": 1
-    },
     "curly": {
-      "count": 2
+      "count": 1
     },
     "revisum/file-name-matches-export": {
       "count": 1
@@ -3724,9 +3646,6 @@
     }
   },
   "test/unit/engine/literal-secret-field-names.test.ts": {
-    "curly": {
-      "count": 1
-    },
     "revisum/file-name-matches-export": {
       "count": 1
     },
@@ -3736,7 +3655,7 @@
   },
   "test/unit/engine/literal-secret.test.ts": {
     "curly": {
-      "count": 2
+      "count": 1
     },
     "revisum/file-name-matches-export": {
       "count": 1
@@ -3814,7 +3733,7 @@
       "count": 1
     },
     "curly": {
-      "count": 7
+      "count": 6
     },
     "revisum/file-name-matches-export": {
       "count": 1
@@ -3852,14 +3771,11 @@
     }
   },
   "test/unit/engine/plan-drafts.test.ts": {
-    "@typescript-eslint/no-unsafe-member-access": {
-      "count": 3
-    },
     "@typescript-eslint/require-await": {
       "count": 1
     },
     "curly": {
-      "count": 14
+      "count": 11
     },
     "revisum/file-name-matches-export": {
       "count": 1
@@ -3884,7 +3800,7 @@
       "count": 1
     },
     "curly": {
-      "count": 2
+      "count": 1
     },
     "revisum/file-name-matches-export": {
       "count": 1
@@ -3902,9 +3818,6 @@
     }
   },
   "test/unit/engine/plan-vacuity.test.ts": {
-    "curly": {
-      "count": 1
-    },
     "revisum/file-name-matches-export": {
       "count": 1
     },
@@ -3924,12 +3837,6 @@
     }
   },
   "test/unit/engine/planner-endpoint-declarations.test.ts": {
-    "@typescript-eslint/no-unsafe-return": {
-      "count": 1
-    },
-    "curly": {
-      "count": 1
-    },
     "revisum/file-name-matches-export": {
       "count": 1
     },
@@ -4021,14 +3928,8 @@
     "@typescript-eslint/naming-convention": {
       "count": 1
     },
-    "@typescript-eslint/no-unsafe-assignment": {
-      "count": 1
-    },
-    "@typescript-eslint/no-unsafe-member-access": {
-      "count": 1
-    },
     "curly": {
-      "count": 11
+      "count": 10
     },
     "revisum/file-name-matches-export": {
       "count": 1
@@ -4039,7 +3940,7 @@
   },
   "test/unit/engine/policy-review-fixes.test.ts": {
     "curly": {
-      "count": 4
+      "count": 3
     },
     "revisum/file-name-matches-export": {
       "count": 1
@@ -4068,9 +3969,6 @@
     }
   },
   "test/unit/engine/policy-static-check.test.ts": {
-    "curly": {
-      "count": 1
-    },
     "revisum/file-name-matches-export": {
       "count": 1
     },
@@ -4107,9 +4005,6 @@
     "@typescript-eslint/naming-convention": {
       "count": 3
     },
-    "@typescript-eslint/strict-boolean-expressions": {
-      "count": 2
-    },
     "curly": {
       "count": 1
     },
@@ -4139,7 +4034,7 @@
   },
   "test/unit/engine/readable-plan-errors.test.ts": {
     "curly": {
-      "count": 11
+      "count": 9
     },
     "revisum/file-name-matches-export": {
       "count": 1
@@ -4149,9 +4044,6 @@
     }
   },
   "test/unit/engine/readable-plan-example.test.ts": {
-    "@typescript-eslint/no-unsafe-assignment": {
-      "count": 1
-    },
     "curly": {
       "count": 1
     },
@@ -4432,9 +4324,6 @@
     }
   },
   "test/unit/engine/short-secret-observations.test.ts": {
-    "@typescript-eslint/strict-boolean-expressions": {
-      "count": 1
-    },
     "revisum/file-name-matches-export": {
       "count": 1
     },
@@ -4465,11 +4354,8 @@
     }
   },
   "test/unit/engine/storage-state.test.ts": {
-    "@typescript-eslint/strict-boolean-expressions": {
-      "count": 1
-    },
     "curly": {
-      "count": 3
+      "count": 1
     },
     "revisum/file-name-matches-export": {
       "count": 1
@@ -4624,7 +4510,7 @@
   },
   "test/unit/engine/trusted-project.test.ts": {
     "curly": {
-      "count": 8
+      "count": 3
     },
     "revisum/file-name-matches-export": {
       "count": 1
@@ -4730,11 +4616,8 @@
     }
   },
   "test/unit/engine/unsafe-readable-conversion.test.ts": {
-    "@typescript-eslint/no-unsafe-argument": {
-      "count": 2
-    },
     "curly": {
-      "count": 12
+      "count": 11
     },
     "no-irregular-whitespace": {
       "count": 1
@@ -4829,9 +4712,6 @@
     }
   },
   "test/unit/engine/unverified-decisions.test.ts": {
-    "curly": {
-      "count": 1
-    },
     "revisum/file-name-matches-export": {
       "count": 1
     },
@@ -4855,7 +4735,7 @@
   },
   "test/unit/engine/working-copy-isolation.test.ts": {
     "curly": {
-      "count": 2
+      "count": 1
     },
     "revisum/file-name-matches-export": {
       "count": 1
@@ -4875,22 +4755,10 @@
     }
   },
   "test/unit/report/report-generator.test.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    },
-    "@typescript-eslint/no-unsafe-member-access": {
-      "count": 1
-    },
-    "@typescript-eslint/strict-boolean-expressions": {
-      "count": 8
-    },
     "curly": {
       "count": 24
     },
     "max-lines": {
-      "count": 1
-    },
-    "no-nested-ternary": {
       "count": 1
     },
     "revisum/file-name-matches-export": {
@@ -5174,9 +5042,6 @@
       "count": 1
     },
     "@typescript-eslint/require-await": {
-      "count": 1
-    },
-    "@typescript-eslint/strict-boolean-expressions": {
       "count": 1
     },
     "curly": {

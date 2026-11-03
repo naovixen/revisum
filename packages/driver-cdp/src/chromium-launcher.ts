@@ -10,6 +10,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { platform, tmpdir } from 'node:os';
 import { join } from 'node:path';
+import type { Readable } from 'node:stream';
 import { CdpConnection, type ConnectOptions } from './cdp-connection.ts';
 import { PORT_RANDOMISATION_FEATURE, WEBRTC_UDP_OFF_FLAGS } from './chrome-flags.ts';
 
@@ -106,6 +107,13 @@ async function endProcessGroup(groupId: number | undefined): Promise<void> {
   await groupEnded(groupId, GROUP_FORCED_MILLISECONDS);
 }
 
+// Whatever its type says, a process Node ran out of file handles to start has no streams at all:
+// Node stops before making them, and reports the failure through the 'error' event.
+function outputStreamsOf(child: ChildProcess): readonly Readable[] {
+  const streams: readonly (Readable | null | undefined)[] = [child.stdout, child.stderr];
+  return streams.filter((stream) => stream !== null && stream !== undefined);
+}
+
 export function launchChromium(executablePath: string, options: LaunchOptions = {}): Promise<LaunchedChromium> {
   const userDataFolder = mkdtempSync(join(tmpdir(), options.profilePrefix ?? 'chromium-profile-'));
   const chosen = options.arguments ?? ISOLATED_CHROMIUM_ARGUMENTS;
@@ -145,6 +153,7 @@ export function launchChromium(executablePath: string, options: LaunchOptions = 
   };
 
   return new Promise((resolve, reject) => {
+    const outputStreams = outputStreamsOf(browserProcess);
     let output = '';
     const timeout = options.launchTimeoutMilliseconds ?? 30_000;
     const fail = (error: Error): void => {
@@ -167,16 +176,17 @@ export function launchChromium(executablePath: string, options: LaunchOptions = 
     };
     function cleanUp(): void {
       clearTimeout(timer);
-      browserProcess.stdout?.off('data', onOutput);
-      browserProcess.stderr?.off('data', onOutput);
-      // Keep draining the browser's output so a full pipe can never block it.
-      browserProcess.stdout?.resume();
-      browserProcess.stderr?.resume();
+      for (const stream of outputStreams) {
+        stream.off('data', onOutput);
+        // Keep draining the browser's output so a full pipe can never block it.
+        stream.resume();
+      }
       browserProcess.off('exit', onExit);
       browserProcess.off('error', onError);
     }
-    browserProcess.stdout?.on('data', onOutput);
-    browserProcess.stderr?.on('data', onOutput);
+    for (const stream of outputStreams) {
+      stream.on('data', onOutput);
+    }
     browserProcess.once('exit', onExit);
     browserProcess.once('error', onError);
   });

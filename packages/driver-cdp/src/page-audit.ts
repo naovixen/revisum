@@ -43,7 +43,7 @@ export function pageAudit(): string {
       if (unique(current)) { parts.unshift(`#${escapeIdent(current.id)}`); return parts.join(' > '); }
       const tag = current.tagName.toLowerCase();
       const parent: Element | null = current.parentElement;
-      const sameTag = parent ? Array.from(parent.children).filter((sibling) => sibling.tagName === current?.tagName) : [];
+      const sameTag = parent === null ? [] : Array.from(parent.children).filter((sibling) => sibling.tagName === current?.tagName);
       parts.unshift(sameTag.length > 1 ? `${tag}:nth-of-type(${sameTag.indexOf(current) + 1})` : tag);
       current = parent;
     }
@@ -63,13 +63,14 @@ export function pageAudit(): string {
     return style.display === 'none' || style.visibility === 'hidden';
   };
   const labelledByText = (element: Element): string => normalise((element.getAttribute('aria-labelledby') ?? '').split(/\s+/)
-    .map((id) => (id ? document.getElementById(id)?.textContent ?? '' : '')).join(' '));
+    .map((id) => (id === '' ? '' : document.getElementById(id)?.textContent ?? '')).join(' '));
   const textName = (element: Element): string => {
     const alternatives = Array.from(element.querySelectorAll('img[alt]')).map((image) => image.getAttribute('alt') ?? '').join(' ');
-    return normalise(`${(element as HTMLElement).innerText ?? element.textContent ?? ''} ${alternatives}`);
+    // An SVG element has no innerText, whatever the type says.
+    return normalise(`${(element as Partial<HTMLElement>).innerText ?? element.textContent} ${alternatives}`);
   };
   const explicitName = (element: Element): string =>
-    normalise(element.getAttribute('aria-label')) || labelledByText(element) || normalise(element.getAttribute('title'));
+    [normalise(element.getAttribute('aria-label')), labelledByText(element), normalise(element.getAttribute('title'))].find((name) => name !== '') ?? '';
   const shown = (selector: string): Element[] => Array.from(document.querySelectorAll(selector)).filter((element) => !hidden(element));
   const rules: FailingRule[] = [];
   const add = (ruleId: string, actRule: string | null, wcag: string[], impact: string, elements: Element[]): void => {
@@ -96,7 +97,7 @@ export function pageAudit(): string {
   const unlabelledTypes = ['hidden', 'submit', 'reset', 'button', 'image'];
   add('label', 'e086e5', ['4.1.2', '1.3.1'], 'critical', shown('input, select, textarea').filter((element) => {
     if (element instanceof HTMLInputElement && unlabelledTypes.includes(element.type)) return false;
-    const labels = normalise(Array.from((element as HTMLInputElement).labels ?? []).map((label) => label.textContent ?? '').join(' '));
+    const labels = normalise(Array.from((element as HTMLInputElement).labels ?? []).map((label) => label.textContent).join(' '));
     return labels === '' && explicitName(element) === '' && normalise(element.getAttribute('placeholder')) === '';
   }));
 
@@ -151,7 +152,7 @@ export function pageAudit(): string {
   type Colour = [number, number, number, number];
   const parseColour = (text: string): Colour | null => {
     const match = /rgba?\(([^)]+)\)/.exec(text);
-    if (!match || match[1] === undefined) return null;
+    if (match === null || match[1] === undefined) return null;
     const channels = match[1].split(/[\s,/]+/).filter((part) => part !== '').map(Number);
     return [channels[0] ?? 0, channels[1] ?? 0, channels[2] ?? 0, channels[3] ?? 1];
   };
@@ -167,7 +168,7 @@ export function pageAudit(): string {
       const style = getComputedStyle(current);
       if (style.backgroundImage !== 'none') return null;
       const colour = parseColour(style.backgroundColor);
-      if (colour && colour[3] > 0) { layers.push(colour); if (colour[3] >= 1) break; }
+      if (colour !== null && colour[3] > 0) { layers.push(colour); if (colour[3] >= 1) break; }
     }
     let combined: Colour = [255, 255, 255, 1];
     for (const layer of layers.reverse()) combined = over(layer, combined);
