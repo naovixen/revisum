@@ -1269,17 +1269,6 @@
       "count": 1
     }
   },
-  "packages/engine/src/result-hash.ts": {
-    "@typescript-eslint/naming-convention": {
-      "count": 2
-    },
-    "@typescript-eslint/no-unused-vars": {
-      "count": 2
-    },
-    "revisum/file-name-matches-export": {
-      "count": 1
-    }
-  },
   "packages/engine/src/run-values.ts": {
     "curly": {
       "count": 15

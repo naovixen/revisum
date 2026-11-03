@@ -170,7 +170,7 @@ flowchart TD
   - **Declared:** the owner's approval under the agent lock-down in `15`. The coding agent may commit but can't push or merge, so a push or merge to the default branch is the founder's (`docs/decisions/single-session-workflow.md`). It suffices for every subject: plans, trusted files, review decisions, high-risk extra reviews and holdout plans. Anything built on it is labelled `declared`.
   - **Verified (optional):** a code owner's review from an account other than the author's, for teams that have one. No feature, level or metric requires it.
   - An agent's own approval never gates.
-- **Replay** re-runs a plan from its manifest and compares result hashes (SPEC-08).
+- **Replay** re-runs a plan from its manifest and compares result hashes (SPEC-08). The result hash leaves out `blockedOrigins`, which a request sent as a run ends can change; the evidence hash covers them. Both are unkeyed, so an edit to a result shows only against a copy of the hash held elsewhere.
 - **AI's only role** is to propose plans and suggestions as data. Parsing, the gates and the oracle are deterministic (`04` Finding 3).
 
 **Action:** build the stages in this order; each gets its contract tests before its code (`09` Finding 4).

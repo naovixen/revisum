@@ -45,7 +45,7 @@ import type { Project } from './project/project-parser.ts';
 import { declaredCommands } from './project/unsafe-feature-declarations.ts';
 import { SENSITIVE_PLACEHOLDER } from './redaction.ts';
 import { rememberedValues, type RememberedValues } from './RememberedValues.ts';
-import { withResultHash } from './result-hash.ts';
+import { withRunHashes } from './WithRunHashes.ts';
 import {
   generateRunValues, resolveActionStep, resolveElementAssertion, resolveLocator, resolvePathTemplate, resolvePlanClock, resolveText, type RunValues,
 } from './run-values.ts';
@@ -242,8 +242,11 @@ export type RunResult = {
   // Present when a stub answered a request: which stub and which of its responses (counted from 1)
   // answered each, in the order they were answered.
   readonly stubAnswers?: readonly StubAnswer[];
-  // Hash of everything above except the manifest body, which its own hash covers. Timings are excluded.
+  // What replay compares: everything above except the manifest body, which its own hash covers, and
+  // blockedOrigins, which a request sent as a run ends can change. Timings are excluded.
   readonly resultHash: string;
+  // The same, with blockedOrigins covered, so an edit to that list shows against a copy held elsewhere.
+  readonly evidenceHash: string;
   readonly timings: { readonly totalMilliseconds: number; readonly stepMilliseconds: readonly number[] };
 };
 
@@ -1287,9 +1290,9 @@ const planRunGuarantees = (inputs: RunInputs, unsafeFeatures: readonly UnsafeFea
 };
 
 // Adds the run mode, the guarantee statement, the unsafe label (for a plan using unsafe features),
-// the approval label (for an approved plan) and the result hash.
+// the approval label (for an approved plan) and the result's two hashes.
 function seal(
-  outcome: Omit<RunResult, 'resultHash' | 'approvalLabel' | 'mode' | 'guarantees' | 'unsafeFeatures'>,
+  outcome: Omit<RunResult, 'resultHash' | 'evidenceHash' | 'approvalLabel' | 'mode' | 'guarantees' | 'unsafeFeatures'>,
   context: Pick<RunContext, 'inputs' | 'determinismUnpinned'>,
 ): RunResult {
   const standing = context.inputs.standing;
@@ -1299,5 +1302,5 @@ function seal(
     ...outcome, mode: 'plan' as const, guarantees: planRunGuarantees(context.inputs, unsafeFeatures, context.determinismUnpinned, isEgressUnread),
     ...(unsafeFeatures.length === 0 ? {} : { unsafeFeatures }),
   };
-  return withResultHash(standing?.mode === 'approved' ? { ...labelled, approvalLabel: approvalLabel(standing.approval) } : labelled);
+  return withRunHashes(standing?.mode === 'approved' ? { ...labelled, approvalLabel: approvalLabel(standing.approval) } : labelled);
 }

@@ -15,7 +15,7 @@ import type { Refusal, TerminalState } from '../lifecycle.ts';
 import { manifestHash, type RunManifest } from '../manifest.ts';
 import { runTimeTextOrDigest } from '../plan/plan-decoders.ts';
 import { criterionIdFrom } from '../plan/plan-parser.ts';
-import { withResultHash } from '../result-hash.ts';
+import { withRunHashes } from '../WithRunHashes.ts';
 import type { EvidenceOutcomeCode, RunResult, RunReviewItem } from '../run.ts';
 import type { SuiteDecodeError, SuiteReport, SuiteReportTest, SuiteTrace } from './suite-report.ts';
 
@@ -184,7 +184,7 @@ export function evidenceResult(
   const outcomes = report.tests.map((test) => test.outcome);
   const outcomeCode = outcomeCodeOf(context, outcomes);
   const exitCodeMismatch = outcomeCode === undefined && exitCode !== agreeingExitCode(outcomes);
-  return withResultHash({
+  return withRunHashes({
     state: evidenceState(outcomes, exitCodeMismatch, outcomeCode),
     mode: 'evidence',
     guarantees: evidenceGuarantees(context),
@@ -206,7 +206,7 @@ export function unreadSuiteResult(
   decodeErrors: readonly SuiteDecodeError[] = [],
 ): RunResult {
   const { suite, pass, exitCode } = context;
-  return withResultHash({
+  return withRunHashes({
     state: 'Errored',
     mode: 'evidence',
     guarantees: evidenceGuarantees(context),
@@ -222,7 +222,7 @@ export function unreadSuiteResult(
 // The result of `run --suite` refused before any suite code ran. Its guarantee statement says
 // egress was not enforced when that is why it was refused.
 export function refusedSuiteResult(suiteName: string, refusal: Refusal): RunResult {
-  return withResultHash({
+  return withRunHashes({
     state: 'Refused',
     mode: 'evidence',
     guarantees: guaranteeStatement({

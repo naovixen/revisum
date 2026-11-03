@@ -20,7 +20,7 @@ Architecture refactor:
   - [x] First round of fixes: false passes, action guard, approval, secrets, parser, evidence mode
   - [x] Run `npm run check:linux` on a new container with `xclip`: green in 36 minutes, with the browser tests serial (24 minutes; CI splits them into 3). The clipboard proof and the symlinked report test ran and passed (findings 25, 99)
   - [x] Confirm host-user deletion of container-owned `test-results`: it fails for a host user with another uid (finding 140)
-  - [x] Clear the remaining open findings: nothing open but the founder's question on the result hash, and the deferred rows 159, 161, 163 and 165
+  - [x] Clear the remaining open findings: nothing open but the deferred rows 159, 161, 163, 165 and 167
   - [x] Before grounding the core: a fresh Opus helper assesses the decisions independently, with `docs/prompts/session-decision-assessment.md`, and the founder rules on what it raises (founder, 2026-11-03). Rulings: `docs/decisions/decision-assessment.md`
   - [ ] Ground the core. The plan is `C:\Users\naomi\.claude\plans\before-starting-on-the-jiggly-squirrel.md`. **Tick a part only when its review with `docs/prompts/session-core-review.md` is clear (founder, 2026-11-03).** Code a part touches leaves with no suppressed nested ternaries, loose conditions or unsafe types; these don't wait for phase 6.
     - [ ] Switch on `@typescript-eslint/no-unnecessary-condition`, fixing the 22 hits in their own commit, with no baseline
@@ -47,8 +47,7 @@ Architecture refactor:
 Where phase 3 stands, from `docs/decisions/refactor-defects.md`:
 
 - **Fix next:** nothing open. Findings 147 and the rest of 148 go with the parts that touch them.
-- **Checked at the end (2026-11-03):** Windows `test:browser` 907 of 953 passed, 46 skipped; `check:containers` 165 of 170, with one file fixed after and passing alone; Linux `check:linux` stopped on one test, since corrected and passing alone, then Linux proofs, replay and gates. Only the hash proof is red.
-- **For the founder:** a request sent as a run ends flips the result hash (`test/proofs/RepeatedRunsWithRefusedOrigins.test.ts`, red on purpose).
+- **Checked at the end (2026-11-03):** Windows `test:browser` 907 of 953 passed, 46 skipped; `check:containers` 165 of 170, with one file fixed after and passing alone; Linux `check:linux` stopped on one test, since corrected and passing alone, then Linux proofs, replay and gates.
 - **With SPEC-16:** 100-103, 107-112, the rest of 114, 115, 136, and re-reading the guarantee level after a plan run. Founder decided 103: mount tracked files only.
 - **Founder decided, still to build:** one real Playwright Test run in the weekly tier, after a dependency review (116).
 - **Founder decided:** closed shadow roots stay a documented limit, to revisit with SPEC-10 (129).

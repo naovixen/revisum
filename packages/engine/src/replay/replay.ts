@@ -9,7 +9,8 @@
 // fields differ, and a verdict. A replay whose only differences are the machine it ran on (host,
 // browser, its build, run image, fonts or versions) and that ended in the recorded state is a
 // per-environment baseline; any other difference is a mismatch, a changed verdict in either direction
-// among them. Neither is a pass.
+// among them. Neither is a pass. The result hash leaves out the blocked origins, so a replay that
+// differs only in those is identical.
 // Pure apart from calling run.
 import { failure, success, type DatabaseCommandRunner, type Result, type ServiceCaller } from '@revisum/contracts';
 import { canonicalJson, sha256 } from '../hashing.ts';
