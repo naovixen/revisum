@@ -79,7 +79,7 @@ Trial of the per-context proxy, on Chrome 156.0.8078.47 for Windows with the rep
 - **The experimental field may change at a browser pin.** If it goes, everything hits the dead proxy, so it fails loudly. The background proof catches a change at each pin.
 - **`AimEnabled` may be renamed at a pin.** The same proof would catch it.
 - **Unproven:** the per-context proxy on Linux, through the real driver across a whole suite, with downloads and stubs; browser test time; IPv6 in containers. Steps 7 and 11 test these. If one fails, fix the cause and loosen no assertions.
-- **Late requests may flip the hash.** Measured after step 8.
+- **Late requests flip the hash.** Measured on Windows: a page sending requests as a run ends gave 4 distinct hashes in 20 Chrome runs and 6 in 20 headless shell runs, and 1 hash in 12 with the late requests removed. The only difference is which late origins are listed. `test/proofs/RepeatedRunsWithRefusedOrigins.test.ts` stays red until the founder rules.
 - **The dead proxy.** A closed loopback port could be bound by another program, which would then receive Chrome's traffic. So the driver holds the port itself, with a listener that closes every connection, for as long as the browser runs.
 - **UDP was checked with witnesses and the page's ICE candidates,** not a packet capture. A reachability check to `[2001:4860:4860::8888]:443` appears in the network log; assumed to send nothing, not captured.
 - **Isolated browsers still get answered refusals.** `proxy-container.ts` leaves `client` at `service`, so a page in a container could read a 403 as content, the same reason host runs close the socket. Defect 157 covers this; the fix needs the container tests.
