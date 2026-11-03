@@ -29,22 +29,22 @@
   "runs": {
     "open-orders": {
       "state": "Passed",
-      "resultHash": "5e00a6eb1281fc36bf35e18eb2024c59561b12ca11c6e4add94a1dd6b0e9a73b",
+      "resultHash": "4bd6b9340d90ad0821cae5298eab02ca7170bc1085cbed6732c7802a544e2bf0",
       "manifestHash": "7ad891ba75fe2081530d76e88fd2da5c5c3b7f575918379e42b12d84696e2a72"
     },
     "signup": {
       "state": "Failed",
-      "resultHash": "029e203b6e5306e15633cf56b0ca9ae85f54e503dff5a0b39d68acc96b950754",
+      "resultHash": "2fcf857d80813f9db33fc8d809b343eeade2c2b448afa1e5264c20feeef1175c",
       "manifestHash": "bfae855dc6516002fece29886a5320ef449b9faf29065c07507453cd1f4b542d"
     },
     "order-page-by-path": {
       "state": "Passed",
-      "resultHash": "0ea0c84f7be6f3d6901dd06406451adae13d383fb3376af21549f1b571828aad",
+      "resultHash": "dd6804d63aeb5e3488ce53174b7b521f31f15d3cf008d8a69593906bc05260bc",
       "manifestHash": "9f99c866a432fa2974ec8d4e5b1c2154077aaf3ba0901e68a5d9d0fabf156ec7"
     },
     "order-backend-state": {
       "state": "Refused",
-      "resultHash": "d5aaa2c2d36790a6b3a5777f6381de757a372eee359456d1b196c82289ab35b2",
+      "resultHash": "a2dd438a342b51a334a252782c805372851f32bf0b94707ccebcaa598dfd9d29",
       "manifestHash": null
     }
   }
