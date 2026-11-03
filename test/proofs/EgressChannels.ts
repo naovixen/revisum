@@ -57,7 +57,7 @@ const workerStartedBy = (
         `fetch(${JSON.stringify(`${origin}${WORKER_FILE_PATH}`)}, { mode: "no-cors" });`,
 });
 
-const WEBRTC_STUN: EgressChannel = {
+export const WEBRTC_STUN: EgressChannel = {
     name: "webrtc-stun",
     attempt: "gathers WebRTC candidates from a STUN server",
     arrival: Arrival.Datagram,

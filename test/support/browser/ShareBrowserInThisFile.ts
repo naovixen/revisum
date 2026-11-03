@@ -18,11 +18,7 @@ import {
 } from "@revisum/driver-cdp";
 import type { SessionEnvironment, Target } from "@revisum/engine";
 import { startBrowserWatchdog, type BrowserWatchdog } from "./BrowserWatchdog.ts";
-import {
-    NO_BROWSER_WIDE_PROXY,
-    type EgressSourceForTest,
-    type SessionEgressForTest,
-} from "./SessionEgressForTest.ts";
+import type { EgressSourceForTest, SessionEgressForTest } from "./SessionEgressForTest.ts";
 import { driverWith, sessionWith } from "./WrappingSessions.ts";
 
 const CONTROL_TIMEOUT_MILLISECONDS = 5_000;
@@ -66,10 +62,7 @@ async function launchHeldBrowser(
     settings: LaunchSettings,
     launchTimeoutMilliseconds: number | undefined,
 ): Promise<HeldBrowser> {
-    const browser = await launchSharedBrowser(
-        { ...settings, ...NO_BROWSER_WIDE_PROXY },
-        launchTimeoutMilliseconds,
-    );
+    const browser = await launchSharedBrowser(settings, launchTimeoutMilliseconds);
     return { browser, watchdog: startBrowserWatchdog(browser), isStuck: false };
 }
 
@@ -176,7 +169,7 @@ export function shareBrowserInThisFile(): void {
 export const isSharingBrowserInThisFile = (): boolean => isSharingInThisFile;
 
 export function driverOnSharedBrowser(
-    options: Omit<CdpDriverOptions, "proxy" | "egress"> & {
+    options: Omit<CdpDriverOptions, "egress"> & {
         readonly egress: EgressSourceForTest;
     },
 ): OwnBrowserDriver {

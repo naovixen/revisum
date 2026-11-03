@@ -14,10 +14,6 @@ export type EgressSourceForTest = (
     allowedOrigins: readonly string[],
 ) => Promise<SessionEgressForTest>;
 
-// A session's proxy goes on its browser context, so a browser is launched with none of its own. Spread
-// into a browser's settings, this says so in one place.
-export const NO_BROWSER_WIDE_PROXY = { proxy: undefined };
-
 const refusedSince = (proxy: EgressProxy, firstDecision: number): readonly string[] =>
     proxy
         .decisions()

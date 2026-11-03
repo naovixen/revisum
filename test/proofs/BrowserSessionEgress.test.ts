@@ -8,7 +8,12 @@ import type { AddressInfo } from "node:net";
 import { join } from "node:path";
 import { after, before, describe, test } from "node:test";
 import { launchSharedBrowser, type OwnBrowserDriver } from "@revisum/driver-cdp";
-import { defaultRedactor, type SessionEnvironment, type Target } from "@revisum/engine";
+import {
+    defaultRedactor,
+    type LoggedEvent,
+    type SessionEnvironment,
+    type Target,
+} from "@revisum/engine";
 import {
     startBrowserHarness,
     type BrowserHarness,
@@ -21,7 +26,6 @@ import {
 } from "#test-support/browser/BrowserTarget.ts";
 import { navigate, testId, textEquals } from "#test-support/browser/RawPlan.ts";
 import {
-    NO_BROWSER_WIDE_PROXY,
     realEgressSource,
     type EgressSourceForTest,
     type SessionEgressForTest,
@@ -128,6 +132,9 @@ const sessionEnvironment = (): SessionEnvironment => ({
     sensitiveSelectors: defaultRedactor().selectors,
     timeoutMilliseconds: 5_000,
 });
+
+const connectionFailuresLogged = (ran: BrowserRun): readonly LoggedEvent[] =>
+    ran.events.read().filter((event) => String(event.kind) === "session.connection-failed");
 
 // A browser may try a refused tunnel more than once.
 const distinct = (hosts: readonly string[]): readonly string[] => [...new Set(hosts)];
@@ -253,7 +260,6 @@ describe("Using the driver's session egress", () => {
             const browser = await launchSharedBrowser({
                 executablePath: BROWSERS.chrome,
                 locale: LOCALE,
-                ...NO_BROWSER_WIDE_PROXY,
             });
             try {
                 const onBrowser = (proxy: RecordingProxy): OwnBrowserDriver =>
@@ -320,12 +326,28 @@ describe("Using the driver's session egress", () => {
                 assert.equal(ran.result.steps[0]?.code, "navigation-failed");
                 assert.deepEqual(ran.result.blockedOrigins, []);
             });
+
+            test("then it should log that nothing answered there", async () => {
+                const ran = await harness.runSteps(TARGET, stepsOnPage(`${deadOrigin}/`));
+                const failures = connectionFailuresLogged(ran);
+                assert.equal(failures.length, 1, JSON.stringify(ran.events.read()));
+                assert.match(failures[0]?.detail ?? "", /Nothing answered/);
+                assert.match(
+                    failures[0]?.origin ?? "",
+                    new RegExp(PAGE_HOST.replaceAll(".", "\\.")),
+                );
+            });
         });
 
         describe("when a plan navigates to an origin that answers", () => {
             test("then it should pass, so the failure means something", async () => {
                 const ran = await harness.runSteps(TARGET, stepsOnPage(QUIET_PATH));
                 assert.equal(ran.result.state, "Passed", JSON.stringify(ran.result));
+            });
+
+            test("then it should log no connection failure", async () => {
+                const ran = await harness.runSteps(TARGET, stepsOnPage(QUIET_PATH));
+                assert.deepEqual(connectionFailuresLogged(ran), []);
             });
         });
     });

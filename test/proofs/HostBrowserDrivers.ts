@@ -13,7 +13,7 @@ export const EXECUTABLE_OF_TARGET: Readonly<Record<BrowserTarget, string>> = {
 };
 
 export function driverWithEgress(
-    options: Omit<CdpDriverOptions, "proxy" | "egress"> & { readonly egress: EgressSourceForTest },
+    options: Omit<CdpDriverOptions, "egress"> & { readonly egress: EgressSourceForTest },
 ): OwnBrowserDriver {
     return cdpDriver(options);
 }

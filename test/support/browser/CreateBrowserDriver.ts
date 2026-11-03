@@ -6,7 +6,7 @@ import { ADAPTER_OF_TARGET, BrowserTarget } from "./BrowserTarget.ts";
 import { realEgressSource, type EgressSourceForTest } from "./SessionEgressForTest.ts";
 import { driverOnSharedBrowser, isSharingBrowserInThisFile } from "./ShareBrowserInThisFile.ts";
 
-export type BrowserDriverOptions = Omit<CdpDriverOptions, "proxy" | "egress"> & {
+export type BrowserDriverOptions = Omit<CdpDriverOptions, "egress"> & {
     // Absent, each session gets a real proxy of its own, as on a host run.
     readonly egress?: EgressSourceForTest;
 };

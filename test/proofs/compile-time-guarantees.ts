@@ -1,6 +1,7 @@
 // Compile-time guarantees. This file is type-checked by type-check.test.ts and never run.
 // Each @ts-expect-error line must fail to compile; if one ever compiles, tsc reports an unused
 // '@ts-expect-error' directive and the check fails.
+import { cdpDriver, type EgressSource } from '@revisum/driver-cdp';
 import {
   lifecycle, run,
   type AiPlanner, type Logger, type Plan, type RunInputs, type RunPorts,
@@ -13,6 +14,7 @@ declare const planner: AiPlanner;
 declare const planned: lifecycle.Planned;
 declare const resolved: lifecycle.Resolved;
 declare const running: lifecycle.Running;
+declare const egress: EgressSource;
 
 // ---- Logging manifest ---------------------------------------------------------------------------
 logger.log({ kind: 'step.end', stepIndex: 1, outcome: 'passed' }); // allowed
@@ -48,5 +50,12 @@ lifecycle.transition('Planned', 'Resolved'); // allowed
 lifecycle.transition('Passed', 'Running');
 // @ts-expect-error no skipping from Planned straight to Running
 lifecycle.transition('Planned', 'Running');
+
+// ---- Session egress -----------------------------------------------------------------------------
+cdpDriver({ executablePath: 'chrome', egress }); // allowed
+// @ts-expect-error a driver with no egress source could open a session that no proxy watches
+cdpDriver({ executablePath: 'chrome' });
+// @ts-expect-error a session's proxy comes from its egress source, never from the driver's options
+cdpDriver({ executablePath: 'chrome', egress, proxy: { server: 'http://127.0.0.1:1', includeLoopback: true } });
 
 export { asPlan };
