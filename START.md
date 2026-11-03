@@ -18,21 +18,21 @@ Architecture refactor:
 - [ ] Phase 3: cold bug review, fixes, then ground the core; the founder pushes and CI takes 10 minutes or less (moved from phase 2, founder, 2026-11-02)
   - [x] Cold reviews and the trust-path break test (21 of 24 breaks caught)
   - [x] First round of fixes: false passes, action guard, approval, secrets, parser, evidence mode
-  - [ ] **Next: run `npm run check:linux`.** It hasn't run since phase 1. Rebuild the dev container first so `xclip` is installed (finding 25)
-  - [ ] Fix what it finds. The symlinked report test is skipped on Windows, so this is its first real run (finding 99). Also confirm host-user deletion of container-owned `test-results`
-  - [ ] Clear the remaining open findings (see below), then ground the core: constant objects in `contracts`, foundation helpers, step tables, split `plan-parser` and `run`, pipeline and preflight, driver port, `RunResult` to contracts, cycle rule, in-page free-variable rule, split `cdp-driver`, `egress-proxy` and the runners' shared lifecycle, throwaway-step experiment. The plan is `C:\Users\naomi\.claude\plans\before-starting-on-the-jiggly-squirrel.md`
+  - [x] Run `npm run check:linux` on a new container with `xclip`: green in 36 minutes, with the browser tests serial (24 minutes; CI splits them into 3). The clipboard proof and the symlinked report test ran and passed (findings 25, 99)
+  - [x] Confirm host-user deletion of container-owned `test-results`: it fails for a host user with another uid (finding 140)
+  - [ ] **Next:** clear the remaining open findings (see below), then ground the core: constant objects in `contracts`, foundation helpers, step tables, split `plan-parser` and `run`, pipeline and preflight, driver port, `RunResult` to contracts, cycle rule, in-page free-variable rule, split `cdp-driver`, `egress-proxy` and the runners' shared lifecycle, throwaway-step experiment. The plan is `C:\Users\naomi\.claude\plans\before-starting-on-the-jiggly-squirrel.md`
 - [ ] Phase 4: move files, constants for magic strings, formatting
 - [ ] Phase 5: docs and final trust-path review; the founder pushes
 - [ ] Phase 6: test titles and remaining suppressions (may run alongside M3)
 
 Where phase 3 stands, from `docs/decisions/refactor-defects.md`:
 
-- **Fix next:** 39, 47 and 49 (egress outside Fetch, proof first), 35, 36, 55-58, 92, 93, 118's remaining parts, 133, 137, 138, 139, and the first-round leftovers 5, 6, 8, 14, 15, 20, 22, 26-30, 59, 61, 80.
+- **Fix next:** 39, 47 and 49 (egress outside Fetch, proof first), 35, 36, 55-58, 92, 93, 118's remaining parts, 133, 137, 138, 139, 140, and the first-round leftovers 5, 6, 8, 14, 15, 20, 22, 26-30, 59, 61, 80.
 - **With SPEC-16:** 100-103, 107-112, the rest of 114, 115, 136, and re-reading the guarantee level after a plan run. Founder decided 103: mount tracked files only.
 - **Founder decided, still to build:** one real Playwright Test run in the weekly tier, after a dependency review (116).
 - **Founder decided:** closed shadow roots stay a documented limit, to revisit with SPEC-10 (129).
 - **Calls made in the main session, which the founder can reverse:** refused connections in request counts (87, amended in SPEC-33) and allowing U+200C and U+200D in plan text (122).
-- **Machine leftovers:** a locked worktree in `.claude/worktrees/` from the break test, and the `elegant_mcclintock` container from 2026-10-28, which isn't from this work. Leave both unless the founder says otherwise.
+- **Machine leftovers:** a locked worktree in `.claude/worktrees/` from the break test, and the `elegant_mcclintock` container from 2026-10-28, which is an older dev container for this folder, with no `xclip`. Leave both unless the founder says otherwise. `npm run check:linux` now uses its own container, labelled `revisum.check=linux`.
 
 Setup and seed (done):
 
