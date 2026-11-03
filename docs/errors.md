@@ -708,6 +708,8 @@ Review items an evidence run can raise beside its outcome, each keeping the merg
 
 Evidence run outcome. What the egress proxy decided could not be read back, or the proxy could not write all of it, such as when its `/tmp` is full. That is not the same as a proxy that blocked nothing, so the run ends `Errored` and its guarantee statement does not claim egress was enforced. Rerun, and look at what flooded the proxy if it recurs.
 
+Plan run outcome, as a review item. The run's egress could not say what it refused, such as when an isolated run can't read its proxy's list as it closes. An empty `blockedOrigins` would claim nothing was refused, so the run ends `Errored`, whatever its steps found, and its guarantee statement does not claim egress was enforced. Each step keeps its own outcome, and the log holds why the read failed. Check that the proxy container is up, then rerun.
+
 ## suite-not-declared
 
 Run refusal. The trusted project's `evidenceMode` section declares no suite of the name `run --suite` was given, so no container starts. Names are exact and lowercase; use one from `evidenceMode.suites[].name`.

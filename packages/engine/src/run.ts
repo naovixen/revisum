@@ -7,7 +7,7 @@
 // through its clock and clipboard ports; page scripts through its script port. Database commands
 // go through the run's DatabaseCommandRunner port, which runs each in a workload container.
 import {
-  isElementCheckNoDriverDecides, needsDriverFeatures, UnreadablePage,
+  failure, isElementCheckNoDriverDecides, needsDriverFeatures, success, UnreadablePage,
   type A11yFinding, type ActionGuard, type AppliedRewrite, type ApprovalLabel, type ArtifactReference, type ArtifactStore, type Authorised,
   type BrowserDriver, type Clock, type DatabaseCommandRunner, type DocumentSession, type DomRead, type DownloadedFile, type DownloadName, type DriverFeature, type LockEntry, type DialogStep, type ElementProbe,
   type EventSink, type GuaranteeLevel, type GuardVerdict, type PageAssertion, type Plan, type PolicyRuleId, type Redactor,
@@ -175,7 +175,10 @@ export type RunReviewItem =
   | { readonly code: 'project-without-tests'; readonly project: SafeText }
   // Part of the suite's output was refused (the run's decodeErrors, at this index), so the result
   // shows less than the suite recorded.
-  | { readonly code: 'suite-output-unread'; readonly decodeErrorIndex: number };
+  | { readonly code: 'suite-output-unread'; readonly decodeErrorIndex: number }
+  // A plan run's egress could not say what it refused, so its empty blockedOrigins claims nothing and
+  // the run ended Errored.
+  | { readonly code: typeof EGRESS_UNREAD };
 
 // Why an evidence run ended as it did, beyond its tests' outcomes.
 //   vacuous: the report holds no test that ran, so the run checked nothing and ends Failed.
@@ -464,9 +467,14 @@ export async function run(given: RunInputs, ports: RunPorts): Promise<RunResult>
   }
   // Whatever the outcome. A failing cleanup step never changes the verdict; it raises a review item.
   const cleanup = inputs.plan.cleanup === undefined ? undefined : await runCleanup(inputs.plan.cleanup, inputs.plan.steps.length, calls, commands);
-  const reviewItems = (cleanup ?? []).flatMap((done): RunReviewItem[] => (done.outcome === 'failed' ? [{ code: 'cleanup-failed', cleanupIndex: done.index }] : []));
-  const blocked = readKeepingTheResult(() => [...new Set(session.blockedOrigins())].sort(), [], logger);
-  const endState = finished;
+  const cleanupItems = (cleanup ?? []).flatMap((done): RunReviewItem[] => (done.outcome === 'failed' ? [{ code: 'cleanup-failed', cleanupIndex: done.index }] : []));
+  const blockedRead = readBlockedOrigins(session);
+  if (!blockedRead.ok) {
+    logFailureAfterTheVerdict(EGRESS_UNREAD, blockedRead.error, logger);
+  }
+  const blocked = blockedRead.ok ? blockedRead.value : [];
+  const reviewItems: readonly RunReviewItem[] = blockedRead.ok ? cleanupItems : [...cleanupItems, { code: EGRESS_UNREAD }];
+  const endState = blockedRead.ok ? finished : lifecycle.finish(running, 'Errored');
   readKeepingTheResult(() => {
     for (const { origin, message } of session.connectionFailures?.() ?? []) {
       logger.log({ kind: 'session.connection-failed', origin, detail: message });
@@ -481,7 +489,7 @@ export async function run(given: RunInputs, ports: RunPorts): Promise<RunResult>
   }, undefined, logger);
   const manifest = rewrites.length === 0 ? finished.manifest : buildManifest({ ...manifestInputs, responseRewrites: rewrites });
   return seal({
-    state: finished.state, targetId: target.id, manifest, manifestHash: manifestHash(manifest),
+    state: endState.state, targetId: target.id, manifest, manifestHash: manifestHash(manifest),
     steps, blockedOrigins: blocked, unavailable: null, ...(finished.state === 'Denied' ? { denial: finished.denial } : {}),
     ...(cleanup === undefined ? {} : { cleanup }), ...(reviewItems.length === 0 ? {} : { reviewItems }),
     ...(stubAnswers.length === 0 ? {} : { stubAnswers: [...stubAnswers] }),
@@ -692,6 +700,19 @@ async function failureToObserveRequests(session: Session, context: RunContext): 
     return codeForThrow(`the requests the plan checks could not be observed: ${observing.error}`, session, context.logger);
   } catch (error) {
     return codeForThrow(error, session, context.logger);
+  }
+}
+
+const EGRESS_UNREAD = 'egress-unread';
+
+// The result claims what the egress refused and is hashed with that claim in it. So this is the one
+// record read after the verdict that can't take an empty default: an empty list says nothing was
+// refused, and when that isn't known the run has no verdict to give.
+function readBlockedOrigins(session: Session): Result<readonly string[], unknown> {
+  try {
+    return success([...new Set(session.blockedOrigins())].sort());
+  } catch (error) {
+    return failure(error);
   }
 }
 
@@ -1252,13 +1273,14 @@ function unavailableResult(targetId: string, unavailable: Unavailable, context: 
 }
 
 // What a plan run vouches for: decided by the plan, its project's recording setting, the run's
-// isolation and the target's adapter alone, never by what the run happened to do, so two runs of one
-// plan say the same. Egress, credentials and replay are claimed only for a run whose starter says the
-// isolated runner enforced egress (RunInputs.guaranteeLevel); any other run counts as running on the host.
-const planRunGuarantees = (inputs: RunInputs, unsafeFeatures: readonly UnsafeFeature[], determinismUnpinned: boolean): GuaranteeStatement => {
+// isolation and the target's adapter alone, so two runs of one plan say the same, unless one leaves its
+// egress unread, which loses the claim as it does for an evidence run. Egress, credentials and replay
+// are claimed only for a run whose starter says the isolated runner enforced egress
+// (RunInputs.guaranteeLevel); any other run counts as running on the host.
+const planRunGuarantees = (inputs: RunInputs, unsafeFeatures: readonly UnsafeFeature[], determinismUnpinned: boolean, isEgressUnread: boolean): GuaranteeStatement => {
   const repliesNotRecorded = callsServices(inputs.plan) && inputs.project.replay?.recordReplies !== true;
   return guaranteeStatement({
-    mode: 'plan', egressEnforced: inputs.guaranteeLevel === 'isolated', unmaskedScreenshotsKept: false, unsafeFeatures,
+    mode: 'plan', egressEnforced: inputs.guaranteeLevel === 'isolated' && !isEgressUnread, unmaskedScreenshotsKept: false, unsafeFeatures,
     ...(determinismUnpinned ? { determinismUnpinned } : {}),
     ...(repliesNotRecorded ? { repliesNotRecorded } : {}),
   });
@@ -1272,8 +1294,9 @@ function seal(
 ): RunResult {
   const standing = context.inputs.standing;
   const unsafeFeatures = unsafeFeaturesOf(context.inputs.plan);
+  const isEgressUnread = (outcome.reviewItems ?? []).some((item) => item.code === EGRESS_UNREAD);
   const labelled = {
-    ...outcome, mode: 'plan' as const, guarantees: planRunGuarantees(context.inputs, unsafeFeatures, context.determinismUnpinned),
+    ...outcome, mode: 'plan' as const, guarantees: planRunGuarantees(context.inputs, unsafeFeatures, context.determinismUnpinned, isEgressUnread),
     ...(unsafeFeatures.length === 0 ? {} : { unsafeFeatures }),
   };
   return withResultHash(standing?.mode === 'approved' ? { ...labelled, approvalLabel: approvalLabel(standing.approval) } : labelled);

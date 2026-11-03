@@ -46,7 +46,7 @@ Architecture refactor:
 
 Where phase 3 stands, from `docs/decisions/refactor-defects.md`:
 
-- **Fix next:** 164. Findings 147 and the rest of 148 go with the parts that touch them. Findings 8, 14, 22 and 59 travel with their parts.
+- **Fix next:** nothing open. Findings 147 and the rest of 148 go with the parts that touch them.
 - **At the end (founder, 2026-11-03):** one full `npm run test:browser`, then `check:linux` and `check:containers`, and fix what they find. A stopped browser run after egress step 6 showed its last 17 files failing in about 10 ms each. They pass on their own, and why they failed there isn't proven.
 - **For the founder:** a request sent as a run ends flips the result hash (`test/proofs/RepeatedRunsWithRefusedOrigins.test.ts`, red on purpose).
 - **With SPEC-16:** 100-103, 107-112, the rest of 114, 115, 136, and re-reading the guarantee level after a plan run. Founder decided 103: mount tracked files only.
