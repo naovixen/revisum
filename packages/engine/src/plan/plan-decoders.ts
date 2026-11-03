@@ -4,6 +4,7 @@
 import type { SafeText } from '@revisum/contracts';
 import { brand } from '../brand.ts';
 import { sha256 } from '../hashing.ts';
+import { looksLikeCredential } from './literal-secrets.ts';
 import { UNSAFE_TEXT_CHARACTERS } from './plan-grammar.ts';
 
 export const PLAN_ERROR_CODES = [
@@ -120,7 +121,9 @@ export function readRecord(
   }
   const before = issues.length;
   for (const key of Object.keys(input)) {
-    if (!allowed.includes(key)) issues.push({ code: 'unknown_field', path: `${path}.${key}` });
+    if (allowed.includes(key)) continue;
+    // Errors are kept and shown, so a key shaped like a credential is reported by where it sits.
+    issues.push(looksLikeCredential(key) ? { code: 'literal_secret', path } : { code: 'unknown_field', path: `${path}.${key}` });
   }
   const fields = input as Record<string, unknown>;
   for (const key of required) {
