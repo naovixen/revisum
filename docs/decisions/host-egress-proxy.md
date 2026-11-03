@@ -43,7 +43,7 @@ Commit order (step 1 is `e2b4f89`):
 4. Code, `address-check.ts`: wider metadata refusal and first-seen class.
 5. Code: held popups and the popup race.
 6. Code: `egress` beside `proxy?`, the context proxy, the dead browser-wide proxy, `AimEnabled` off, the WebRTC flags and the merge.
-7. Tests: repoint test support, with no port per file.
+7. Tests: repoint test support, with no port per file, and add a mix of public and private addresses on a name's first lookup, which only a script has checked so far.
 8. Code: delete `proxy?` and the proxy check in `whyRefused`, and make `egress` required. Then measure replay stability.
 9. Tests: `@ts-expect-error` in `compile-time-guarantees.ts`.
 10. Code: `explore-in-container` refuses with no `HTTP_PROXY`, the audit launch gets the WebRTC flags, and the report names the channels that are off.

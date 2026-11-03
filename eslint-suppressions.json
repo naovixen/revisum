@@ -1563,12 +1563,6 @@
     }
   },
   "packages/runner/src/address-check.ts": {
-    "@typescript-eslint/naming-convention": {
-      "count": 3
-    },
-    "curly": {
-      "count": 12
-    },
     "revisum/file-name-matches-export": {
       "count": 1
     }

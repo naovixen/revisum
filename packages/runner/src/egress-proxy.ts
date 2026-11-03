@@ -1,9 +1,10 @@
 // The egress proxy: the one way out of a run. It lets a request through only to a declared origin
-// or service, resolves the name itself, refuses it when any address the name resolves to is
-// private, loopback, link-local or a metadata service (unless the service is declared private),
-// and connects only to addresses it checked, each in turn, with no second lookup, so DNS rebinding
-// cannot swap an address in between. Every decision is recorded. A name that doesn't resolve and an
-// origin nobody listens on weren't refused, so they count as allowed and are noted as failures.
+// or service, resolves the name itself, and refuses it when any address the name resolves to is
+// link-local or a metadata service, private or loopback (unless the service is declared private), or
+// when the name's address class differs from its first accepted lookup in this run. It connects only
+// to addresses it checked, each in turn, with no second lookup, so DNS rebinding cannot swap an
+// address in between. Every decision is recorded. A name that doesn't resolve and an origin nobody
+// listens on weren't refused, so they count as allowed and are noted as failures.
 //
 // Plain HTTP arrives as an absolute-form request and is forwarded; HTTPS and WebSockets arrive as
 // CONNECT tunnels, of which the proxy sees only the host and port. On a declared fixture origin it
@@ -21,7 +22,7 @@ import { createServer, request, type IncomingHttpHeaders, type IncomingMessage, 
 import type { AddressInfo } from 'node:net';
 import { connect as connectSocket, createServer as createTcpServer, isIP, type Server as TcpServer, type Socket } from 'node:net';
 import type { Duplex } from 'node:stream';
-import { checkResolvedAddress } from './address-check.ts';
+import { classOfLookup, isLoopbackAddress, type NameClass } from './address-check.ts';
 import { hostAndPort, isPlainHttpOrigin } from './egress-events.ts';
 
 // Resolves a host name to every address it has. Tests pass a fake that never touches the network.
@@ -176,8 +177,6 @@ function isLoopbackName(host: string): boolean {
   return name === 'localhost' || name.endsWith('.localhost');
 }
 
-const isLoopbackAddress = (address: string): boolean => address === '::1' || address.startsWith('127.');
-
 // The proxy connects directly, on purpose, so a machine that reaches the network only through a proxy
 // of its own can't connect out. Nothing the proxy sees tells that from a dead origin: a firewall can
 // refuse, drop or fail a lookup just as a dead origin does, and a proxy setting in the environment
@@ -237,6 +236,8 @@ export async function startProxyServer(rules: ProxyRules, options: ProxyServerOp
   const applied = new Map<string, AppliedRewrite>();
   const failures = new Map<string, ConnectionFailure>();
   const openSockets = new Set<Duplex>();
+  // Keyed by name, not origin, so a name can't change class by being asked for on another port.
+  const fixedClassOfName = new Map<string, NameClass>();
 
   const record = (origin: string, decision: ProxyDecision['decision']): void => {
     const entry: ProxyDecision = { origin, decision };
@@ -263,7 +264,10 @@ export async function startProxyServer(rules: ProxyRules, options: ProxyServerOp
     const addresses = await addressesOf(host);
     if (addresses instanceof Error) { return addresses; }
     if (addresses.length === 0) { return new Error(`${host} resolved to no address`); }
-    return addresses.some((address) => checkResolvedAddress(address, { privateService }) === 'refused') ? null : addresses;
+    const nameClass = classOfLookup(addresses, { privateService, fixedClass: fixedClassOfName.get(host) });
+    if (nameClass === null) { return null; }
+    fixedClassOfName.set(host, nameClass);
+    return addresses;
   }
 
   function attemptConnection(address: string, port: number, abandoned: AbortSignal): Promise<Socket | Error> {
