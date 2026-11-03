@@ -66,7 +66,7 @@ Any `no-nested-ternary`, `strict-boolean-expressions`, `no-unnecessary-condition
 
 **Report** in at most 40 lines, most serious first. For each finding, give the file and line, the check it fails, what goes wrong in concrete terms (the change that becomes hard, or the input that breaks it) and the smallest fix. If you can't name what goes wrong, it's taste, and taste isn't a finding. Mark each one:
 
-- `must fix`: a broken guarantee or changed behaviour; a lint hit from the run above; or any other check failing in code this part changed, or in a caller that still has to make up for it.
+- `must fix`: a broken guarantee or changed behaviour; a hit from the four rule families named above; or any other check failing in code this part changed, or in a caller that still has to make up for it.
 - `consider`: the same kinds of problem in code this part didn't touch, or a change that would help though nothing is wrong yet.
 
 End with a verdict: `clear` if nothing is `must fix`, otherwise `not clear`. Say "no findings" if there are none.
