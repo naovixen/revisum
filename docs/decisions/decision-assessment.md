@@ -3,7 +3,7 @@
 ## In short
 
 - A fresh Opus helper assessed the refactor's decisions on 2026-11-03, with `docs/prompts/session-decision-assessment.md`. The founder ruled on what it raised.
-- Grounding the core stays closed until the rulings on network blocks are in: why each block exists, what dropping it would do, what others do, then a plan.
+- All of it is ruled, so grounding the core can start once the remaining findings are cleared.
 - The review brief is the oracle. Existing code gets fixed; it never justifies removing a requirement.
 
 ## Decisions
@@ -24,7 +24,7 @@
 | The review standard would send reviewers in circles | No requirement removed | "The review is the oracle, don't base removing requirements on the existing code. The existing code should be fixed." Each fix is done on its own, and anything else found goes under the check it belongs to, not into the fix in hand |
 | False passes would get past the review standard | Re-run the break test | Added as the last item of grounding the core |
 
-**Open:** Chrome's own traffic and private addresses. The founder rejected flag-by-flag blocking as likely to bring up subtle issues, and asked for the research above on all blocks and related code before ruling. Egress step 2 onwards waits for this.
+**Network blocks:** the founder rejected flag-by-flag blocking as likely to bring up subtle issues, and asked for research on all blocks and related code before ruling. The rulings and the research are in `docs/decisions/host-egress-proxy.md`.
 
 ## Findings
 
