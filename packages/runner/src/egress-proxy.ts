@@ -1,8 +1,9 @@
 // The egress proxy: the one way out of a run. It lets a request through only to a declared origin
 // or service, resolves the name itself, refuses it when any address the name resolves to is
 // private, loopback, link-local or a metadata service (unless the service is declared private),
-// and connects to the very address it checked, with no second lookup, so DNS rebinding cannot
-// swap the address in between. Every decision is recorded.
+// and connects only to addresses it checked, each in turn, with no second lookup, so DNS rebinding
+// cannot swap an address in between. Every decision is recorded. A name that doesn't resolve and an
+// origin nobody listens on weren't refused, so they count as allowed and are noted as failures.
 //
 // Plain HTTP arrives as an absolute-form request and is forwarded; HTTPS and WebSockets arrive as
 // CONNECT tunnels, of which the proxy sees only the host and port. On a declared fixture origin it
@@ -15,6 +16,7 @@
 // It runs in-process for tests and, in a run, in its own container (proxy-container.ts).
 import type { AppliedRewrite, DeclaredService, EgressPolicy, ProxyDecision, ResponseRewrite } from '@revisum/contracts';
 import { lookup } from 'node:dns/promises';
+import type { EventEmitter } from 'node:events';
 import { createServer, request, type IncomingHttpHeaders, type IncomingMessage, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { connect as connectSocket, createServer as createTcpServer, isIP, type Server as TcpServer, type Socket } from 'node:net';
@@ -43,7 +45,13 @@ export type ProxyRules = {
   readonly tcpRelays?: readonly TcpRelay[];
 };
 
+// Who sends requests through the proxy, which decides how it says no.
+export const ProxyClient = { Service: 'service', Browser: 'browser' } as const;
+export type ProxyClient = (typeof ProxyClient)[keyof typeof ProxyClient];
+
 export type ProxyServerOptions = {
+  // A service unless given.
+  readonly client?: ProxyClient;
   readonly resolve?: AddressResolver;
   readonly connect?: AddressConnector;
   // Where the proxy listens: 127.0.0.1 on a free port unless given.
@@ -61,6 +69,9 @@ export type EgressProxyOptions = ProxyServerOptions & {
   readonly services?: readonly DeclaredService[];
 };
 
+// A declared origin the proxy allowed but could not connect to.
+export type ConnectionFailure = { readonly origin: string; readonly message: string };
+
 export type EgressProxy = {
   // The proxy's address, such as "http://127.0.0.1:41234", for --proxy-server or HTTP_PROXY.
   readonly url: string;
@@ -68,10 +79,16 @@ export type EgressProxy = {
   decisions(): readonly ProxyDecision[];
   // Each rewrite applied so far, once per origin and mutant.
   rewritesApplied(): readonly AppliedRewrite[];
+  // Each origin it could not connect to so far, once per origin, with what to tell whoever is running.
+  connectionFailures(): readonly ConnectionFailure[];
   close(): Promise<void>;
 };
 
-const UPSTREAM_TIMEOUT_MILLISECONDS = 30_000;
+// How long one address may take to accept a connection, for every client.
+const CONNECT_LIMIT_MILLISECONDS = 30_000;
+// Above the service caller's longest call of 120 s, so the caller's own timeout decides. This limit
+// only clears a connection nothing is waiting on.
+const SERVICE_IDLE_LIMIT_MILLISECONDS = 130_000;
 // The header on every answer the proxy writes itself, rather than passes on from a service, so a
 // client such as runner's service caller can tell the proxy's refusal or failure from a status the
 // service sent. The proxy strips it from every service response, so a service cannot forge it.
@@ -89,6 +106,34 @@ const MALFORMED_REQUEST_ORIGIN = 'malformed-request';
 // A client's parser passes on any three digits, such as 000, and Node's server throws on a status
 // outside this range, which from inside a handler would end the proxy for every other request.
 const isWritableStatus = (status: number): boolean => status >= 100 && status <= 999;
+// These names are loopback by definition, so a lookup could only get that wrong. IPv4 goes first
+// because most local apps bind it, and a refused connection can take seconds on Windows.
+const LOOPBACK_ADDRESSES: readonly string[] = ['127.0.0.1', '::1'];
+
+type ClientTreatment = {
+  // How a plain request the proxy won't or can't carry through ends.
+  readonly declineRequest: (response: ServerResponse, status: number, mark: EgressDecisionMark, text: string) => void;
+  // How a tunnel the proxy won't or can't open ends.
+  readonly declineTunnel: (client: Duplex, statusLine: string) => void;
+  // How long a plain request's connection may sit with nothing moving. 0 is no limit.
+  readonly idleLimitMilliseconds: number;
+};
+
+// A service reads the proxy's answer and acts on it. A browser would show it to the page as content:
+// a page in a worker could read a 403, and a rendered 502 would pass for a page that loaded. A closed
+// socket is a network error to a browser. A page may also hold a quiet connection open on purpose.
+const TREATMENT_OF_CLIENT = {
+  [ProxyClient.Service]: {
+    declineRequest: answerFromProxy,
+    declineTunnel: (client, statusLine) => { client.end(`HTTP/1.1 ${statusLine}\r\n\r\n`); },
+    idleLimitMilliseconds: SERVICE_IDLE_LIMIT_MILLISECONDS,
+  },
+  [ProxyClient.Browser]: {
+    declineRequest: (response) => { response.destroy(); },
+    declineTunnel: (client) => { client.destroy(); },
+    idleLimitMilliseconds: 0,
+  },
+} satisfies Record<ProxyClient, ClientTreatment>;
 
 // The proxy's rules for a policy: its origins, the origins of the services it allows, which of
 // those services are private, its rewrites, and a TCP relay for each service it allows over TCP
@@ -125,6 +170,33 @@ const defaultConnector: AddressConnector = (address, port) => connectSocket({ ho
 
 const withoutBrackets = (hostname: string): string => hostname.replace(/^\[(.*)\]$/, '$1');
 
+// Only the whole label counts, so "notlocalhost" and "app.localhost.attacker.test" are looked up.
+function isLoopbackName(host: string): boolean {
+  const name = host.toLowerCase();
+  return name === 'localhost' || name.endsWith('.localhost');
+}
+
+const isLoopbackAddress = (address: string): boolean => address === '::1' || address.startsWith('127.');
+
+// The proxy connects directly, on purpose, so a machine that reaches the network only through a proxy
+// of its own can't connect out. Nothing the proxy sees tells that from a dead origin: a firewall can
+// refuse, drop or fail a lookup just as a dead origin does, and a proxy setting in the environment
+// says nothing about this connection. So the message names both. Loopback is the one certainty, since
+// a connection to this machine never crosses a machine proxy.
+function connectionFailureMessage(origin: string, addresses: readonly string[] | Error, failure: Error): string {
+  const isOnThisMachine = !(addresses instanceof Error) && addresses.every(isLoopbackAddress);
+  return isOnThisMachine
+    ? `Nothing answered at ${origin} (${failure.message}).`
+    : `Could not connect to ${origin} (${failure.message}). Either nothing answers there, or this machine reaches the network only through a proxy, and a machine proxy isn't supported yet.`;
+}
+
+// Aborts once the client's side has closed, so the proxy stops connecting on its behalf.
+function abortedOnClose(clientSide: EventEmitter): AbortSignal {
+  const controller = new AbortController();
+  clientSide.once('close', () => { controller.abort(); });
+  return controller.signal;
+}
+
 // The headers forwarded upstream: the client's, less the hop-by-hop ones, with the Host the URL names.
 function forwardedHeaders(headers: IncomingHttpHeaders, host: string, rewriting: boolean): IncomingHttpHeaders {
   const forwarded: IncomingHttpHeaders = {};
@@ -151,6 +223,7 @@ function answerFromProxy(response: ServerResponse, status: number, mark: EgressD
 }
 
 export async function startProxyServer(rules: ProxyRules, options: ProxyServerOptions = {}): Promise<EgressProxy> {
+  const treatment: ClientTreatment = TREATMENT_OF_CLIENT[options.client ?? ProxyClient.Service];
   const resolve = options.resolve ?? defaultResolver;
   const connect = options.connect ?? defaultConnector;
   const allowed = new Set(rules.allowedOrigins);
@@ -162,6 +235,7 @@ export async function startProxyServer(rules: ProxyRules, options: ProxyServerOp
   if (refusedRewrite !== undefined) throw new Error(`a response rewrite may change only a declared plain-HTTP origin, not ${refusedRewrite.origin}`);
   const decided: ProxyDecision[] = [];
   const applied = new Map<string, AppliedRewrite>();
+  const failures = new Map<string, ConnectionFailure>();
   const openSockets = new Set<Duplex>();
 
   const record = (origin: string, decision: ProxyDecision['decision']): void => {
@@ -170,62 +244,121 @@ export async function startProxyServer(rules: ProxyRules, options: ProxyServerOp
     options.onDecision?.(entry);
   };
 
-  // The address to connect to, or null when the request is refused: an origin that is not
-  // declared is refused before its name is looked up, so the lookup itself never leaves.
-  async function vettedAddress(hostname: string, declared: boolean, privateService: boolean): Promise<string | null> {
-    if (!declared) return null;
-    const host = withoutBrackets(hostname);
-    let addresses: readonly string[];
+  async function addressesOf(host: string): Promise<readonly string[] | Error> {
+    if (isLoopbackName(host)) { return LOOPBACK_ADDRESSES; }
+    if (isIP(host) !== 0) { return [host]; }
     try {
-      addresses = isIP(host) === 0 ? await resolve(host) : [host];
-    } catch {
-      return null;
+      return await resolve(host);
+    } catch (error) {
+      return error instanceof Error ? error : new Error(`the lookup of ${host} failed: ${String(error)}`);
     }
-    if (addresses.length === 0 || addresses.some((address) => checkResolvedAddress(address, { privateService }) === 'refused')) return null;
-    return addresses[0] ?? null;
+  }
+
+  // The addresses to connect to, null when the request is refused, or an error when the name has none,
+  // which isn't a refusal. An origin that is not declared is refused before its name is looked up, so
+  // the lookup itself never leaves.
+  async function vettedAddresses(hostname: string, declared: boolean, privateService: boolean): Promise<readonly string[] | Error | null> {
+    if (!declared) { return null; }
+    const host = withoutBrackets(hostname);
+    const addresses = await addressesOf(host);
+    if (addresses instanceof Error) { return addresses; }
+    if (addresses.length === 0) { return new Error(`${host} resolved to no address`); }
+    return addresses.some((address) => checkResolvedAddress(address, { privateService }) === 'refused') ? null : addresses;
+  }
+
+  function attemptConnection(address: string, port: number, abandoned: AbortSignal): Promise<Socket | Error> {
+    if (abandoned.aborted) { return Promise.resolve(new Error('the client left before a connection opened')); }
+    return new Promise((settleAttempt) => {
+      const socket = connect(address, port);
+      openSockets.add(socket);
+      socket.once('close', () => openSockets.delete(socket));
+      const onAbandoned = (): void => { socket.destroy(); };
+      const onLimitReached = (): void => { socket.destroy(new Error(`${address} did not accept a connection in time`)); };
+      const onClosedEarly = (): void => { settle(new Error(`the connection to ${address} closed before it opened`)); };
+      const settle = (outcome: Socket | Error): void => {
+        abandoned.removeEventListener('abort', onAbandoned);
+        socket.setTimeout(0, onLimitReached);
+        socket.off('error', settle);
+        socket.off('close', onClosedEarly);
+        settleAttempt(outcome);
+      };
+      abandoned.addEventListener('abort', onAbandoned, { once: true });
+      socket.setTimeout(CONNECT_LIMIT_MILLISECONDS, onLimitReached);
+      socket.once('error', settle);
+      socket.once('close', onClosedEarly);
+      socket.once('connect', () => { settle(socket); });
+    });
+  }
+
+  // Tries each address until one accepts. Nothing has been sent by then, so moving on can't repeat a request.
+  async function connectInTurn(addresses: readonly string[], port: number, abandoned: AbortSignal): Promise<Socket | Error> {
+    let outcome: Socket | Error = new Error('there was no address to connect to');
+    for (const address of addresses) {
+      outcome = await attemptConnection(address, port, abandoned);
+      if (!(outcome instanceof Error)) { return outcome; }
+    }
+    return outcome;
+  }
+
+  // A connection to one of the vetted addresses, or null when there is none to be had. Why is noted,
+  // unless it is only that the client left.
+  async function connectOut(seen: string, addresses: readonly string[] | Error, port: number, abandoned: AbortSignal): Promise<Socket | null> {
+    const connection = addresses instanceof Error ? addresses : await connectInTurn(addresses, port, abandoned);
+    if (!(connection instanceof Error)) { return connection; }
+    if (!abandoned.aborted && !failures.has(seen)) {
+      failures.set(seen, { origin: seen, message: connectionFailureMessage(seen, addresses, connection) });
+    }
+    return null;
   }
 
   async function forward(incoming: IncomingMessage, response: ServerResponse): Promise<void> {
-    let url: URL;
-    try {
-      url = new URL(incoming.url ?? '');
-    } catch {
+    const abandoned = abortedOnClose(response);
+    const url = URL.parse(incoming.url ?? '');
+    if (url === null) {
       record(MALFORMED_REQUEST_ORIGIN, 'blocked');
-      answerFromProxy(response, 400, 'blocked', 'not a request the egress proxy forwards');
+      treatment.declineRequest(response, 400, 'blocked', 'not a request the egress proxy forwards');
       return;
     }
     if (url.protocol !== 'http:') {
       // The URL parser writes "null" as the origin of a scheme it does not know.
       record(url.origin === 'null' ? MALFORMED_REQUEST_ORIGIN : url.origin, 'blocked');
-      answerFromProxy(response, 400, 'blocked', 'not a request the egress proxy forwards');
+      treatment.declineRequest(response, 400, 'blocked', 'not a request the egress proxy forwards');
       return;
     }
     const origin = url.origin;
-    const address = await vettedAddress(url.hostname, allowed.has(origin), privateOrigins.has(origin));
-    if (address === null) {
+    const addresses = await vettedAddresses(url.hostname, allowed.has(origin), privateOrigins.has(origin));
+    if (addresses === null) {
       record(origin, 'blocked');
-      answerFromProxy(response, 403, 'blocked', 'blocked by the egress proxy');
+      treatment.declineRequest(response, 403, 'blocked', 'blocked by the egress proxy');
       return;
     }
     record(origin, 'allowed');
+    const socket = await connectOut(origin, addresses, Number(url.port === '' ? 80 : url.port), abandoned);
+    if (socket === null) {
+      treatment.declineRequest(response, 502, 'unreachable', 'the service did not answer');
+      return;
+    }
     const rewrites = rules.rewrites.filter((rule) => rule.origin === origin);
-    const socket = connect(address, Number(url.port === '' ? 80 : url.port));
     const upstream = request({
       method: incoming.method, path: `${url.pathname}${url.search}`, headers: forwardedHeaders(incoming.headers, url.host, rewrites.length > 0),
-      createConnection: () => socket, timeout: UPSTREAM_TIMEOUT_MILLISECONDS,
+      createConnection: () => socket,
     });
-    upstream.on('timeout', () => upstream.destroy(new Error('the upstream server did not answer')));
+    // A request's timeout option never reaches a socket from createConnection, so the limit goes on the socket.
+    socket.setTimeout(treatment.idleLimitMilliseconds, () => { upstream.destroy(new Error('the upstream server did not answer')); });
     upstream.on('error', () => {
-      if (response.destroyed) return;
-      if (!response.headersSent) answerFromProxy(response, 502, 'unreachable', 'the service did not answer');
-      else response.destroy();
+      if (response.destroyed) { return; }
+      if (response.headersSent) {
+        response.destroy();
+      } else {
+        treatment.declineRequest(response, 502, 'unreachable', 'the service did not answer');
+      }
     });
     // A client that leaves early, such as one that stops reading at its size cap or gives up at its
     // timeout, ends the service's connection too, so the service stops sending.
     response.on('close', () => { if (!response.writableFinished) upstream.destroy(); });
     upstream.on('response', (answer) => {
       if (!isWritableStatus(answer.statusCode ?? 502)) {
-        answerFromProxy(response, 502, 'unreachable', 'the service sent a status HTTP does not have');
+        treatment.declineRequest(response, 502, 'unreachable', 'the service sent a status HTTP does not have');
         upstream.destroy();
         return;
       }
@@ -267,71 +400,60 @@ export async function startProxyServer(rules: ProxyRules, options: ProxyServerOp
     openSockets.add(client);
     client.on('close', () => openSockets.delete(client));
     client.on('error', () => client.destroy());
+    const abandoned = abortedOnClose(client);
     const authority = AUTHORITY.exec(incoming.url ?? '');
     const port = Number(authority?.[2] ?? 0);
-    let hostname: string;
-    try {
-      hostname = new URL(`http://${authority?.[1] ?? ''}`).hostname;
-    } catch {
-      hostname = '';
-    }
+    const hostname = URL.parse(`http://${authority?.[1] ?? ''}`)?.hostname ?? '';
     if (hostname === '' || port < 1 || port > 65_535) {
       record(hostname === '' ? MALFORMED_REQUEST_ORIGIN : `${hostname}:${port}`, 'blocked');
-      client.end('HTTP/1.1 400 Bad Request\r\n\r\n');
+      treatment.declineTunnel(client, '400 Bad Request');
       return;
     }
     const seen = `${hostname}:${port}`;
-    const address = await vettedAddress(hostname, allowedHosts.has(seen), privateHosts.has(seen));
-    if (address === null) {
+    const addresses = await vettedAddresses(hostname, allowedHosts.has(seen), privateHosts.has(seen));
+    if (addresses === null) {
       record(seen, 'blocked');
-      client.end('HTTP/1.1 403 Forbidden\r\n\r\n');
+      treatment.declineTunnel(client, '403 Forbidden');
       return;
     }
     record(seen, 'allowed');
-    const upstream = connect(address, port);
-    openSockets.add(upstream);
-    upstream.on('close', () => openSockets.delete(upstream));
-    let established = false;
-    upstream.setTimeout(UPSTREAM_TIMEOUT_MILLISECONDS, () => upstream.destroy());
-    upstream.once('connect', () => {
-      established = true;
-      upstream.setTimeout(0);
-      client.write('HTTP/1.1 200 Connection Established\r\n\r\n');
-      if (head.length > 0) upstream.write(head);
-      upstream.pipe(client);
-      client.pipe(upstream);
-    });
-    upstream.on('error', () => {
-      if (!established) client.end('HTTP/1.1 502 Bad Gateway\r\n\r\n');
-      else client.destroy();
-    });
+    const upstream = await connectOut(seen, addresses, port, abandoned);
+    if (upstream === null) {
+      treatment.declineTunnel(client, '502 Bad Gateway');
+      return;
+    }
+    upstream.on('error', () => client.destroy());
     client.on('close', () => upstream.destroy());
+    client.write('HTTP/1.1 200 Connection Established\r\n\r\n');
+    if (head.length > 0) { upstream.write(head); }
+    upstream.pipe(client);
+    client.pipe(upstream);
   }
 
-  // A TCP relay: the client's bytes go, unread, to the vetted address of the relay's host.
+  // A TCP relay: the client's bytes go, unread, to a vetted address of the relay's host.
   async function relay(client: Socket, target: TcpRelay): Promise<void> {
     openSockets.add(client);
     client.on('close', () => openSockets.delete(client));
     client.on('error', () => client.destroy());
+    const abandoned = abortedOnClose(client);
     const seen = relayOrigin(target);
-    const address = await vettedAddress(target.host, true, target.private);
-    if (address === null) {
+    const addresses = await vettedAddresses(target.host, true, target.private);
+    if (addresses === null) {
       record(seen, 'blocked');
       client.destroy();
       return;
     }
     record(seen, 'allowed');
-    const upstream = connect(address, target.port);
-    openSockets.add(upstream);
-    upstream.on('close', () => { openSockets.delete(upstream); client.destroy(); });
+    const upstream = await connectOut(seen, addresses, target.port, abandoned);
+    if (upstream === null) {
+      client.destroy();
+      return;
+    }
+    upstream.on('close', () => { client.destroy(); });
     upstream.on('error', () => upstream.destroy());
-    upstream.setTimeout(UPSTREAM_TIMEOUT_MILLISECONDS, () => upstream.destroy());
-    upstream.once('connect', () => {
-      upstream.setTimeout(0);
-      upstream.pipe(client);
-      client.pipe(upstream);
-    });
     client.on('close', () => upstream.destroy());
+    upstream.pipe(client);
+    client.pipe(upstream);
   }
 
   // Each relay listens before the proxy's own port does, so a proxy that answers relays too.
@@ -362,6 +484,7 @@ export async function startProxyServer(rules: ProxyRules, options: ProxyServerOp
     url: `http://${listenHost}:${port}`,
     decisions: () => [...decided],
     rewritesApplied: () => [...applied.values()],
+    connectionFailures: () => [...failures.values()],
     close: () => new Promise<void>((resolveClosed) => {
       for (const socket of openSockets) socket.destroy();
       for (const relayServer of relayServers) relayServer.close();

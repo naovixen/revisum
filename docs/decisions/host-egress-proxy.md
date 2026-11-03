@@ -22,8 +22,11 @@
 | Metadata: refuse all of `169.254.0.0/16` and `fe80::/10`, plus `168.63.129.16` and `fd20:ce::254`, for every origin (founder) | The exact-address list let ECS, EKS, GCP and Azure addresses through. An app on a link-local address is refused, which should be very rare |
 | Declared origins may reach private addresses, and each name's address class is fixed at its first lookup (founder) | Internal staging and localhost keep working, and a name changing from public to private mid-run is refused and recorded. A name that really moves mid-run is refused too |
 | `localhost` and `*.localhost` are loopback with no lookup, and the proxy tries each vetted address in turn | Declared `localhost` with an app on `127.0.0.1` answered 502 on Windows, because `::1` resolves first and only `addresses[0]` was tried. `*.localhost` failed lookup |
-| `ProxyServerOptions.client: 'service' \| 'browser'`, a table checked with `satisfies Record`. For `browser`, a refusal or dead declared origin closes the socket instead of answering, and there's no 30 s idle limit | A page in a worker or out-of-process frame could read a 403 as content, and a rendered 502 would lose `navigation-failed` |
+| `ProxyServerOptions.client: 'service' \| 'browser'`, a table checked with `satisfies Record`. For `browser`, a refusal or dead declared origin closes the socket instead of answering, and there's no idle limit. A service's idle limit is 130 s, above the caller's longest call of 120 s, so the caller's own timeout decides | A page in a worker or out-of-process frame could read a 403 as content, and a rendered 502 would lose `navigation-failed` |
+| `EgressProxy.connectionFailures()` returns `{ origin, message }`, once per origin, and `SessionEgress` carries it in step 6 so a run can show it. It's a diagnostic, kept out of the hashed result | The corporate proxy error: nothing reliably tells a machine proxy from a dead origin, so the message covers both, and loopback gets only "nothing answered". It isn't in a service's answer, because isolated containers run this code too |
 | A DNS failure is not `blocked` | A name that doesn't resolve wasn't refused |
+| A name with both public and private addresses is refused if any address is refused, and a private name that gains a public address is refused | The class is fixed per name, and a mix can't be fitted to one |
+| The host source passes every allowed origin as `privateOrigins`, and a proxy with none stays strict | Only host runs allow declared private addresses, so isolated runs' rule doesn't change |
 | `blockedOrigins` means "refused and seen", not "every attempt" (founder). Reword `browser-driver.ts`. The report says WebRTC and WebTransport are off | WebRTC UDP, WebTransport and cross-site prefetch never reach a proxy. Wrapping page APIs would let a hostile page forge evidence |
 | Proofs keep "sends nothing" for those three, with controls showing they do send with no proxy, and drop the entry assertion | Nothing is sent, so nothing can be refused |
 | `blockedOrigins` stays in the hash (founder). Measure replay stability once the host proxy is in; if hashes vary, fix the cause, and take it to the founder if that can't be done | Edits to the evidence stay detectable |
@@ -65,7 +68,7 @@ Each row says what the block stops, then what dropping it would do, then what ot
 
 Trial of the per-context proxy, on Chrome 156.0.8078.47 for Windows with the repo's flags and raw CDP, not the driver:
 
-- 70 runs on both builds: no page host reached the browser-wide proxy. Page fetch, WebSocket, frames, all three workers, prefetch and TURN over TCP reached the context proxy. Two contexts each used their own proxy with no cross-talk.
+- 70 runs on both builds: no page host reached the browser-wide proxy. Page fetch, WebSocket, frames, all three workers, same-origin prefetch and TURN over TCP reached the context proxy. Two contexts each used their own proxy with no cross-talk.
 - About 220 failure runs across 11 modes (proxy down, answering 403, resetting, killed mid-run, bad config and others): nothing reached a witness or the browser-wide proxy, and controls showed the witnesses work. The one exception is the empty `proxyServer` above.
 - Chrome's Google traffic went only to the browser-wide proxy. The headless shell sent none. The context still loads pages with that proxy refusing everything or on a closed port.
 - `AimEnabled` off gave 0 requests before the page's own in 15 of 15 runs. `PreconnectToSearch` off still gave 1 in every run, so the research's attribution of that request was wrong, and that flag isn't needed.
@@ -79,4 +82,4 @@ Trial of the per-context proxy, on Chrome 156.0.8078.47 for Windows with the rep
 - **Late requests may flip the hash.** Measured after step 8.
 - **The dead proxy's port.** A closed loopback port could be bound by another program on the machine, which would then receive Chrome's traffic. Step 6 picks how to close this.
 - **UDP was checked with witnesses and the page's ICE candidates,** not a packet capture. A reachability check to `[2001:4860:4860::8888]:443` appears in the network log; assumed to send nothing, not captured.
-- **Corporate proxy detection is untested,** and how the error tells that case from a dead origin is left to step 3.
+- **Isolated browsers still get answered refusals.** `proxy-container.ts` leaves `client` at `service`, so a page in a container could read a 403 as content, the same reason host runs close the socket. Defect 157 covers this; the fix needs the container tests.

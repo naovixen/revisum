@@ -1622,10 +1622,10 @@
       "count": 2
     },
     "@typescript-eslint/naming-convention": {
-      "count": 4
+      "count": 3
     },
     "curly": {
-      "count": 19
+      "count": 11
     },
     "max-lines-per-function": {
       "count": 1
