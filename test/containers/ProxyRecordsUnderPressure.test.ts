@@ -47,10 +47,11 @@ const askScript = (url: string): string => `
     answer.on('end', () => console.log(JSON.stringify({ status: answer.statusCode, mark: answer.headers['x-egress-decision'] ?? null })));
   }).on('error', (error) => { console.error(error.message); process.exit(1); }).end();`;
 
-// Asks in turn, and prints how many answers of each status came back.
+// Asks in turn, and prints how many answers of each status came back. A run container has a service
+// address that answers, and a suite's workload container has only HTTP_PROXY, which also answers.
 const floodScript = (url: string, count: number): string => `
   const http = require('node:http');
-  const proxy = new URL(process.env.SERVICE_PROXY);
+  const proxy = new URL(process.env.SERVICE_PROXY ?? process.env.HTTP_PROXY);
   const agent = new http.Agent();
   const ask = () => new Promise((resolve) => http.request({ agent, host: proxy.hostname, port: proxy.port, path: ${JSON.stringify(url)} }, (answer) => {
     answer.resume();
