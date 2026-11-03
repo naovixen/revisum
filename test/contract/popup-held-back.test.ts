@@ -1,10 +1,10 @@
 // A popup never loads. The driver holds it back before it sends anything, so a popup to a host that
 // is declared and reachable leaves that host's server with no request, and the run's egress events
-// say blocked. A real headless Chromium, through the own CDP driver, is pointed at the in-process
-// proxy, and both sites are real servers on loopback.
+// say it was held. Nothing refused it, so they don't say blocked. A real headless Chromium, through
+// the own CDP driver, is pointed at the in-process proxy, and both sites are real servers on loopback.
 // The counter-example goes to the same server directly from the same page: the server gets its
 // request and the proxy allows it, so the server can be reached and the empty list above means
-// something. That allowed decision is then the popup origin's only one, and the popup stays blocked.
+// something. That allowed decision is then the popup origin's only one, and the popup stays held.
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
@@ -100,13 +100,13 @@ test('a popup to a reachable host leaves that host\'s server with no request, an
     assert.deepEqual(reachable.requested, []);
     assert.deepEqual(proxy.decisions().filter((entry) => entry.origin === reachable.origin), []);
     const events = joinEgressEvents(session.egressRecords(), proxy.decisions());
-    assert.deepEqual(events.filter((event) => event.channel === 'popup'), [{ origin: reachable.origin, channel: 'popup', decision: 'blocked' }]);
+    assert.deepEqual(events.filter((event) => event.channel === 'popup'), [{ origin: reachable.origin, channel: 'popup', decision: 'held' }]);
   } finally {
     await session.close();
   }
 });
 
-test('counter-example: the same server gets a direct request, and the popup that came first stays blocked', async () => {
+test('counter-example: the same server gets a direct request, and the popup that came first stays held', async () => {
   const session = await openSession();
   try {
     await openPopup(session);
@@ -115,7 +115,7 @@ test('counter-example: the same server gets a direct request, and the popup that
     assert.ok(reachable.requested.includes('/welcome'), JSON.stringify(reachable.requested));
     assert.ok(proxy.decisions().some((entry) => entry.origin === reachable.origin && entry.decision === 'allowed'), JSON.stringify(proxy.decisions()));
     const forSite = joinEgressEvents(session.egressRecords(), proxy.decisions()).filter((event) => event.origin === reachable.origin);
-    assert.deepEqual(forSite.filter((event) => event.channel === 'popup').map((event) => event.decision), ['blocked']);
+    assert.deepEqual(forSite.filter((event) => event.channel === 'popup').map((event) => event.decision), ['held']);
     assert.ok(forSite.some((event) => event.channel === 'page' && event.decision === 'allowed'), JSON.stringify(forSite));
   } finally {
     await session.close();
