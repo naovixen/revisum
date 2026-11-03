@@ -7,8 +7,10 @@
 // a PlanDraft and nothing more, so it may not import the engine's run function (under any name)
 // or the brand constructor, nor import the engine whole, where either could hide. (A Plan made by
 // a cast is refused by tools/check-branded-casts.ts.)
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import type { Token } from './lint-names.ts';
+import { isIdentifier, isPunctuator, moduleSpecifiers, type ModuleSpecifier } from './source-files.ts';
 import { readWorkspacePackages, reportProblems, type WorkspacePackage } from './workspace-packages.ts';
 
 // Package folder, then the workspace package folders it may import.
@@ -21,12 +23,9 @@ const TRUSTED_PACKAGES: Readonly<Record<string, readonly string[]>> = {
 export const ROUTE_MODULES: readonly string[] = ['packages/cli/src/draft-command.ts'];
 // What route code may not take from a workspace package: the run function and the brand constructor.
 const NAMES_ROUTE_CODE_MAY_NOT_IMPORT = new Set(['run', 'brand']);
-// `import { a, b as c } from '@revisum/…'` and `export { … } from '@revisum/…'`, type-only or not.
-const NAMED_WORKSPACE_IMPORT = /\b(?:import|export)\s+(?:type\s+)?\{([^}]*)\}\s*from\s*['"](@revisum\/[^'"]+)['"]/g;
-// `import * as engine from '@revisum/…'`, `export * from '@revisum/…'`, a default import or a dynamic import.
-const WHOLE_WORKSPACE_IMPORT = /\b(?:import\s+(?:type\s+)?(?:\*\s+as\s+[\w$]+|[\w$]+\s*(?:,\s*(?:\{[^}]*\}|\*\s+as\s+[\w$]+))?)|export\s+(?:type\s+)?\*(?:\s+as\s+[\w$]+)?)\s+from\s*['"](@revisum\/[^'"]+)['"]|\bimport\s*\(\s*['"](@revisum\/[^'"]+)['"]/g;
-
-const IMPORT_SPECIFIER = /\bfrom\s*['"]([^'"]+)['"]|\bimport\s*\(?\s*['"]([^'"]+)['"]|\brequire\s*\(\s*['"]([^'"]+)['"]/g;
+const WORKSPACE_SCOPE = '@revisum/';
+// Each of these reaches a package's users when it is installed. Dev dependencies never run.
+const RUNTIME_DEPENDENCY_SECTIONS = ['dependencies', 'optionalDependencies', 'peerDependencies'] as const;
 
 function listSourceFiles(folder: string): string[] {
   const files: string[] = [];
@@ -43,31 +42,66 @@ function packageName(workspacePackages: readonly WorkspacePackage[], folder: str
   return typeof name === 'string' ? name : folder;
 }
 
+// The name an entry of `{ a, type b, c as d }` takes from the module, never its local alias.
+function importedName(entry: readonly Token[]): string | undefined {
+  const hasTypeModifier = isIdentifier(entry[0], 'type') && entry.length > 1 && !isIdentifier(entry[1], 'as');
+  return (hasTypeModifier ? entry[1] : entry[0])?.text;
+}
+
+// The names a statement's `{ … }` takes from the module.
+function importedNames(clause: readonly Token[]): string[] {
+  const open = clause.findIndex((token) => isPunctuator(token, '{'));
+  if (open === -1) {
+    return [];
+  }
+  const close = clause.findIndex((token) => isPunctuator(token, '}'));
+  const entries: Token[][] = [[]];
+  for (const token of clause.slice(open + 1, close)) {
+    if (isPunctuator(token, ',')) {
+      entries.push([]);
+    } else {
+      entries.at(-1)?.push(token);
+    }
+  }
+  return entries.map(importedName).filter((name) => name !== undefined);
+}
+
+// A dynamic import, a require, a namespace, a default import or `export *`: anything but `{ … }`,
+// or an import for its side effects, which takes no names at all.
+function takesModuleWhole({ clause, isTypeOnly }: ModuleSpecifier): boolean {
+  if (clause === undefined) {
+    return true;
+  }
+  const firstTaken = isTypeOnly ? clause[1] : clause[0];
+  return firstTaken !== undefined && !isPunctuator(firstTaken, '{');
+}
+
 // Each problem with a route module's imports: a forbidden name, or a workspace package imported whole.
 export function checkRouteImports(root: string): string[] {
   const problems: string[] = [];
   for (const module of ROUTE_MODULES) {
-    let source: string;
-    try {
-      source = readFileSync(join(root, module), 'utf8');
-    } catch {
+    const path = join(root, module);
+    if (!existsSync(path)) {
       problems.push(`${module} is listed as route code but does not exist`);
       continue;
     }
-    for (const match of source.matchAll(NAMED_WORKSPACE_IMPORT)) {
-      for (const entry of (match[1] ?? '').split(',')) {
-        const imported = entry.trim().replace(/^type\s+/, '').split(/\s+as\s+/)[0]?.trim() ?? '';
+    const workspaceImports = moduleSpecifiers(readFileSync(path, 'utf8')).filter((loaded) => loaded.specifier.startsWith(WORKSPACE_SCOPE));
+    for (const loaded of workspaceImports) {
+      for (const imported of importedNames(loaded.clause ?? [])) {
         if (NAMES_ROUTE_CODE_MAY_NOT_IMPORT.has(imported)) {
-          problems.push(`${module} imports "${imported}" from ${match[2] ?? ''}; route code hands on drafts, so it may not import the run function or the brand constructor`);
+          problems.push(`${module} imports "${imported}" from ${loaded.specifier}; route code hands on drafts, so it may not import the run function or the brand constructor`);
         }
       }
-    }
-    for (const match of source.matchAll(WHOLE_WORKSPACE_IMPORT)) {
-      problems.push(`${module} imports ${match[1] ?? match[2] ?? ''} whole; route code imports only the names it needs, so the run function cannot hide in it`);
+      if (takesModuleWhole(loaded)) {
+        problems.push(`${module} imports ${loaded.specifier} whole; route code imports only the names it needs, so the run function cannot hide in it`);
+      }
     }
   }
   return problems;
 }
+
+const hasEntries = (section: unknown): boolean =>
+  typeof section === 'object' && section !== null && Object.keys(section).length > 0;
 
 export function checkImports(root: string): string[] {
   const problems: string[] = [...checkRouteImports(root)];
@@ -79,17 +113,18 @@ export function checkImports(root: string): string[] {
       problems.push(`packages/${folder} is missing`);
       continue;
     }
-    const dependencies = workspacePackage.manifest.dependencies;
-    if (typeof dependencies === 'object' && dependencies !== null && Object.keys(dependencies).length > 0) {
-      problems.push(`packages/${folder}/package.json declares runtime dependencies; it must have none`);
+    for (const section of RUNTIME_DEPENDENCY_SECTIONS) {
+      if (hasEntries(workspacePackage.manifest[section])) {
+        problems.push(`packages/${folder}/package.json declares runtime dependencies in ${section}; it must have none`);
+      }
     }
     const allowedPackages = allowedFolders.map((allowed) => packageName(workspacePackages, allowed));
     for (const file of listSourceFiles(join(workspacePackage.path, 'src'))) {
-      const source = readFileSync(file, 'utf8');
-      for (const match of source.matchAll(IMPORT_SPECIFIER)) {
-        const specifier = match[1] ?? match[2] ?? match[3] ?? '';
-        const allowed = specifier.startsWith('node:') || specifier.startsWith('.') || allowedPackages.includes(specifier);
-        if (!allowed) problems.push(`${file.slice(root.length + 1)} imports "${specifier}"; ${folder} may import only Node built-ins (node:…), its own files${allowedPackages.length > 0 ? ` and ${allowedPackages.join(', ')}` : ''}`);
+      for (const { specifier } of moduleSpecifiers(readFileSync(file, 'utf8'))) {
+        const isAllowed = specifier.startsWith('node:') || specifier.startsWith('.') || allowedPackages.includes(specifier);
+        if (!isAllowed) {
+          problems.push(`${file.slice(root.length + 1)} imports "${specifier}"; ${folder} may import only Node built-ins (node:…), its own files${allowedPackages.length > 0 ? ` and ${allowedPackages.join(', ')}` : ''}`);
+        }
       }
     }
   }

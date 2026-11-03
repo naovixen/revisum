@@ -6,6 +6,8 @@ export type PackageManifest = {
   readonly name?: unknown;
   readonly license?: unknown;
   readonly dependencies?: unknown;
+  readonly optionalDependencies?: unknown;
+  readonly peerDependencies?: unknown;
 };
 
 export type WorkspacePackage = {

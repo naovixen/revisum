@@ -5273,11 +5273,8 @@
     }
   },
   "tools/check-branded-casts.ts": {
-    "@typescript-eslint/naming-convention": {
-      "count": 2
-    },
     "curly": {
-      "count": 11
+      "count": 8
     },
     "revisum/file-name-matches-export": {
       "count": 1
@@ -5310,7 +5307,7 @@
       "count": 2
     },
     "curly": {
-      "count": 12
+      "count": 11
     },
     "revisum/file-name-matches-export": {
       "count": 1
@@ -5336,11 +5333,8 @@
     }
   },
   "tools/check-imports.ts": {
-    "@typescript-eslint/naming-convention": {
-      "count": 1
-    },
     "curly": {
-      "count": 4
+      "count": 3
     },
     "revisum/file-name-matches-export": {
       "count": 1
@@ -5385,11 +5379,8 @@
     }
   },
   "tools/check-runtime-imports.ts": {
-    "@typescript-eslint/naming-convention": {
-      "count": 1
-    },
     "curly": {
-      "count": 5
+      "count": 3
     },
     "revisum/file-name-matches-export": {
       "count": 1
@@ -5400,7 +5391,7 @@
       "count": 1
     },
     "curly": {
-      "count": 17
+      "count": 16
     },
     "revisum/file-name-matches-export": {
       "count": 1

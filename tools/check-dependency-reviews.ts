@@ -5,11 +5,14 @@
 // browser installer) are off it; browser builds are locked separately.
 // The lint fails when such a package has no review; when a review's version is not the exact
 // version in the lock file and in every manifest that names it; when a check fails and the
-// decision is `default`; or when evidence that is a repository path does not exist. A `partial`
-// result does not fail. The reviews are in tools/dependency-reviews.ts.
+// decision is `default`; when evidence that is a repository path does not exist; or when evidence
+// that names a test does not match one in that file. A `partial` result does not fail. The reviews
+// are in tools/dependency-reviews.ts.
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { DEPENDENCY_REVIEWS } from './dependency-reviews.ts';
+import type { Token } from './lint-names.ts';
+import { closingParenthesis, CODE_FILE, codeTokens, isPunctuator } from './source-files.ts';
 import { readWorkspacePackages, reportProblems } from './workspace-packages.ts';
 
 // The checks every third-party component on the trust path must pass to stay on the default path.
@@ -30,9 +33,14 @@ export type DependencyReview = {
   readonly version: string;
   readonly results: Readonly<Record<DependencyCheck, DependencyCheckResult>>;
   readonly decision: 'default' | 'optional-adapter' | 'dropped';
-  // Test ids (<file>#<name>), licence files, repository docs or vendor URLs behind the results.
+  // Test ids (<file>#<name>, the name as test results give it: titles joined by " > "), licence
+  // files, repository docs or vendor URLs behind the results.
   readonly evidence: readonly string[];
 };
+
+const SUITE_CALLS = new Set(['describe', 'suite']);
+const TEST_CALLS = new Set([...SUITE_CALLS, 'test', 'it']);
+const TEST_CALL_MODIFIERS = new Set(['only', 'skip', 'todo']);
 
 type LockEntry = { readonly version?: unknown; readonly dev?: unknown; readonly dependencies?: unknown; readonly optionalDependencies?: unknown; readonly peerDependencies?: unknown };
 
@@ -105,6 +113,58 @@ function evidencePath(evidence: string): string | undefined {
   return /^[\w.-]+(?:\/[\w.-]+)+\.\w+$/.test(path) ? path : undefined;
 }
 
+// A test's title as the runner reports it, or undefined when it isn't one plain literal, as in a
+// loop's `when it ${how}`. Source text keeps its escapes; the runner's title has none.
+function literalTitle(tokens: readonly Token[], open: number): string | undefined {
+  const title = tokens[open + 1];
+  const isWholeArgument = isPunctuator(tokens[open + 2], ',') || isPunctuator(tokens[open + 2], ')');
+  if (!isWholeArgument || (title?.kind !== 'string' && title?.kind !== 'template')) {
+    return undefined;
+  }
+  return title.text.replace(/\\(.)/gs, '$1');
+}
+
+// The "(" of the node:test call starting at `index`: `test(…)`, or `test.only(…)` and its like.
+function testCallOpening(tokens: readonly Token[], index: number): number | undefined {
+  const token = tokens[index];
+  if (token?.kind !== 'identifier' || !TEST_CALLS.has(token.text) || isPunctuator(tokens[index - 1], '.')) {
+    return undefined;
+  }
+  const hasModifier = isPunctuator(tokens[index + 1], '.') && TEST_CALL_MODIFIERS.has(tokens[index + 2]?.text ?? '');
+  const opening = hasModifier ? index + 3 : index + 1;
+  return isPunctuator(tokens[opening], '(') ? opening : undefined;
+}
+
+// Whether a test file has a test with this full name. A title that isn't a plain literal matches any
+// text, since only a run can say what it becomes; the titles around it still have to match.
+function namesTest(source: string, name: string): boolean {
+  const tokens = codeTokens(source);
+  const open: { readonly title: string | undefined; readonly closesAt: number }[] = [];
+  const titlesOfTests: (readonly (string | undefined)[])[] = [];
+  tokens.forEach((token, index) => {
+    while ((open.at(-1)?.closesAt ?? index) < index) {
+      open.pop();
+    }
+    const opening = testCallOpening(tokens, index);
+    if (opening === undefined) {
+      return;
+    }
+    const title = literalTitle(tokens, opening);
+    if (!SUITE_CALLS.has(token.text)) {
+      titlesOfTests.push([...open.map((around) => around.title), title]);
+    }
+    open.push({ title, closesAt: closingParenthesis(tokens, opening) });
+  });
+  return titlesOfTests.some((titles) => {
+    const pattern = titles.map((title) => (title === undefined ? '.+' : title.replace(/[\\^$.*+?()[\]{}|]/g, '\\$&'))).join(' > ');
+    return new RegExp(`^${pattern}$`, 's').test(name);
+  });
+}
+
+// The test's full name when `evidence`, already known to name `path`, also names a test in a code file.
+const evidenceTestName = (evidence: string, path: string): string | undefined =>
+  evidence.length > path.length && CODE_FILE.test(path) ? evidence.slice(path.length + 1) : undefined;
+
 export function checkDependencyReviews(root: string, reviews: readonly DependencyReview[] = DEPENDENCY_REVIEWS): string[] {
   const problems: string[] = [];
   const installed = trustPath(root);
@@ -128,7 +188,17 @@ export function checkDependencyReviews(root: string, reviews: readonly Dependenc
     }
     for (const evidence of review.evidence) {
       const path = evidencePath(evidence);
-      if (path !== undefined && !existsSync(join(root, path))) problems.push(`${review.component}: the evidence ${path} does not exist`);
+      if (path === undefined) {
+        continue;
+      }
+      if (!existsSync(join(root, path))) {
+        problems.push(`${review.component}: the evidence ${path} does not exist`);
+        continue;
+      }
+      const testName = evidenceTestName(evidence, path);
+      if (testName !== undefined && !namesTest(readFileSync(join(root, path), 'utf8'), testName)) {
+        problems.push(`${review.component}: the evidence ${path} has no test named "${testName}"; name a test as its results do, with the titles around it joined by " > "`);
+      }
     }
   }
   return problems;

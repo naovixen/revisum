@@ -28,6 +28,7 @@ export const ROLE_LICENCES: Readonly<Record<PackageRole, readonly string[]>> = {
 const SCHEMA_LICENCE = 'Apache-2.0';
 const SKIPPED_FOLDERS = new Set(['.git', 'node_modules', 'dist', '.browsers', '.idea', '.vscode', '.test-results']);
 const GIT_LISTING_BYTES = 64 * 1024 * 1024;
+const MODULES_FLAG = '--modules';
 
 type PinnedPackage = {
   readonly version: string;
@@ -199,10 +200,33 @@ export function checkLicences(root: string, modules = join(root, 'node_modules')
   return [...checkPackageLicences(root, licenceMap), ...checkSchemas(root, licenceMap), ...checkPinnedFiles(root, modules, licenceMap)];
 }
 
+// The folder `--modules <folder>` names, or undefined with no words at all. Throws on anything else,
+// because falling back to node_modules would check a folder nobody asked for.
+function readModulesFolder(words: readonly string[]): string | undefined {
+  const [flag, folder] = words;
+  if (flag === undefined) {
+    return undefined;
+  }
+  if (flag !== MODULES_FLAG) {
+    throw new Error(`unknown word ${flag}; use ${MODULES_FLAG} <folder>`);
+  }
+  if (folder === undefined || folder.startsWith('--') || words.length > 2) {
+    throw new Error(`${MODULES_FLAG} needs one folder`);
+  }
+  return folder;
+}
+
+function runLicenceCheck(root: string, words: readonly string[]): number {
+  let modules: string | undefined;
+  try {
+    modules = readModulesFolder(words);
+  } catch (error) {
+    console.error(`licence check: ${error instanceof Error ? error.message : String(error)}`);
+    return 2;
+  }
+  return reportProblems('licence check', checkLicences(root, modules === undefined ? undefined : resolve(root, modules)));
+}
+
 if (import.meta.main) {
-  const words = process.argv.slice(2);
-  const flag = words.indexOf('--modules');
-  const modules = flag === -1 ? undefined : words[flag + 1];
-  const root = process.cwd();
-  process.exitCode = reportProblems('licence check', checkLicences(root, modules === undefined ? undefined : resolve(root, modules)));
+  process.exitCode = runLicenceCheck(process.cwd(), process.argv.slice(2));
 }

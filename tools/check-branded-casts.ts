@@ -1,7 +1,9 @@
 // Keeps branded types honest. A value of a branded type, such as SafeText or Plan, means "checked
 // by its owning parser", so only that module may create one. This check fails, naming the file,
 // when code elsewhere in packages/ or tools/ creates one by a cast (`as SafeText`,
-// `as unknown as SafeText`, `<SafeText>value`) or by the engine's brand() helper.
+// `as unknown as SafeText`, `<SafeText>value`, or a union or wrapper holding the brand, such as
+// `as undefined | SafeText` or `as Readonly<SafeText>`), by annotating what JSON.parse returns
+// (`const text: SafeText = JSON.parse(input)`, which needs no cast) or by the engine's brand() helper.
 //
 // The same rule keeps DerivedActor, the actor recorded on every audit event, out of callers' hands:
 // only the engine's actor module and the approval verifier may build one, so no caller can choose
@@ -91,6 +93,9 @@ const ACTOR_BRANDS = new Set(['ActorId', 'DerivedActor']);
 
 // After these words an angle bracket starts an expression, so `<Name>` there is a cast.
 const KEYWORDS_BEFORE_EXPRESSION = new Set(['return', 'yield', 'await', 'typeof', 'case', 'throw', 'void', 'in', 'of']);
+// These lead a type without being one.
+const WORDS_BEFORE_A_TYPE = new Set(['readonly', 'keyof', 'typeof', 'unique', 'infer', 'new', 'abstract']);
+const TYPE_BRACKETS: ReadonlyMap<string, string> = new Map([['(', ')'], ['[', ']'], ['{', '}'], ['<', '>']]);
 
 // The names declared as `type Name = Brand<...>`, plus every name in BRAND_OWNERS.
 function brandedTypeNames(fileTokens: readonly (readonly Token[])[]): Set<string> {
@@ -121,30 +126,122 @@ function brandCallName(tokens: readonly Token[], openIndex: number): string | un
   return undefined;
 }
 
+// The tokenizer splits "=>" into "=" and ">".
+const isArrow = (tokens: readonly Token[], index: number): boolean =>
+  isPunctuator(tokens[index], '=') && isPunctuator(tokens[index + 1], '>');
+
+// True when the token at `index`, just after a whole type, carries that type on: `A | B`, `A & B`,
+// `a.B`, `A<B>` or `A[]`. An array type's "[" must share a line with what it follows, and "||" or
+// "&&" is a logical operator, not a union or an intersection.
+function continuesType(tokens: readonly Token[], index: number): boolean {
+  const token = tokens[index];
+  if (isPunctuator(token, '|') || isPunctuator(token, '&')) {
+    return !isPunctuator(tokens[index + 1], token?.text ?? '');
+  }
+  if (isPunctuator(token, '[')) {
+    return token?.line === tokens[index - 1]?.line;
+  }
+  return isPunctuator(token, '.') || isPunctuator(token, '<');
+}
+
+type TypeRead = {
+  // The type names it holds, leaving out a property's own name and what `keyof` or `typeof` takes.
+  readonly names: readonly string[];
+  // The index just past the type.
+  readonly end: number;
+};
+
+// Reads the type starting at `start`. A function type's parameters are left out of its names: a
+// value of `(plan: Plan) => void` holds no Plan.
+function readType(tokens: readonly Token[], start: number): TypeRead {
+  const names: string[] = [];
+  const open: { readonly closer: string; readonly namesBefore: number }[] = [];
+  let isTypeExpected = true;
+  let index = start;
+  for (; index < tokens.length; index++) {
+    const token = tokens[index];
+    const closer = TYPE_BRACKETS.get(token?.text ?? '');
+    if (token === undefined) {
+      break;
+    }
+    if (isArrow(tokens, index) && isPunctuator(tokens[index - 1], ')')) {
+      index += 1;
+      isTypeExpected = true;
+    } else if (open.length === 0 && !isTypeExpected && !continuesType(tokens, index)) {
+      break;
+    } else if (token.kind === 'punctuator' && closer !== undefined) {
+      open.push({ closer, namesBefore: names.length });
+      isTypeExpected = true;
+    } else if (token.kind === 'punctuator' && [...TYPE_BRACKETS.values()].includes(token.text)) {
+      const closed = open.pop();
+      if (closed?.closer !== token.text) {
+        break;
+      }
+      if (token.text === ')' && isArrow(tokens, index + 1)) {
+        names.splice(closed.namesBefore);
+      }
+      isTypeExpected = false;
+    } else if (token.kind === 'punctuator') {
+      if (token.text === ';' && open.at(-1)?.closer !== '}') {
+        break;
+      }
+      isTypeExpected = true;
+    } else if (token.kind !== 'identifier' || !WORDS_BEFORE_A_TYPE.has(token.text)) {
+      const previous = tokens[index - 1];
+      const isQueried = isIdentifier(previous, 'keyof') || isIdentifier(previous, 'typeof');
+      const isPropertyName = isPunctuator(tokens[index + 1], ':') || (isPunctuator(tokens[index + 1], '?') && isPunctuator(tokens[index + 2], ':'));
+      if (token.kind === 'identifier' && !isQueried && !isPropertyName) {
+        names.push(token.text);
+      }
+      isTypeExpected = false;
+    }
+  }
+  return { names, end: index };
+}
+
+// `const plan: Plan = JSON.parse(text)`: JSON.parse returns any, so this needs no cast at all. True
+// when the ":" at `index` starts such an annotation, on a name or a destructuring pattern.
+function annotatesWhatJsonParseReturns(tokens: readonly Token[], index: number, end: number): boolean {
+  const annotated = tokens[index - 1];
+  const isAnnotation = annotated?.kind === 'identifier' || isPunctuator(annotated, '}') || isPunctuator(annotated, ']');
+  return isAnnotation && isPunctuator(tokens[end], '=')
+    && isIdentifier(tokens[end + 1], 'JSON') && isPunctuator(tokens[end + 2], '.') && isIdentifier(tokens[end + 3], 'parse');
+}
+
 type BrandCreation = { readonly name: string; readonly line: number; readonly how: string };
 
 function brandCreations(tokens: readonly Token[], brands: ReadonlySet<string>): BrandCreation[] {
   const found: BrandCreation[] = [];
+  const addBrandsIn = (type: TypeRead, line: number, how: string): void => {
+    for (const name of new Set(type.names)) {
+      if (brands.has(name)) {
+        found.push({ name, line, how });
+      }
+    }
+  };
   tokens.forEach((token, index) => {
     const previous = tokens[index - 1];
-    // `value as Name`, `value as unknown as Name`, `value as readonly Name[]`
+    // `value as Name`, `value as readonly Name[]`, `value as undefined | Name`, `value as Readonly<Name>`
     if (isIdentifier(token, 'as') && !isPunctuator(previous, '.')) {
-      let next = index + 1;
-      while (isIdentifier(tokens[next], 'unknown') && isIdentifier(tokens[next + 1], 'as')) next += 2;
-      if (isIdentifier(tokens[next], 'readonly')) next += 1;
-      const target = tokens[next];
-      if (target?.kind === 'identifier' && brands.has(target.text)) found.push({ name: target.text, line: token.line, how: 'a cast' });
+      addBrandsIn(readType(tokens, index + 1), token.line, 'a cast');
+    }
+    if (isPunctuator(token, ':')) {
+      const annotation = readType(tokens, index + 1);
+      if (annotatesWhatJsonParseReturns(tokens, index, annotation.end)) {
+        addBrandsIn(annotation, token.line, 'an annotation on what JSON.parse returns');
+      }
     }
     // `<Name>value`: an angle bracket where an expression starts, unlike the type argument in `Promise<Name>`.
-    if (isPunctuator(token, '<') && isPunctuator(tokens[index + 2], '>')) {
-      const target = tokens[index + 1];
-      // The tokenizer splits "=>" into "=" and ">"; after an arrow an expression starts.
-      const afterArrow = isPunctuator(previous, '>') && isPunctuator(tokens[index - 2], '=');
-      const startsExpression = previous === undefined || afterArrow
+    if (isPunctuator(token, '<')) {
+      // After an arrow an expression starts.
+      const isAfterArrow = isPunctuator(previous, '>') && isPunctuator(tokens[index - 2], '=');
+      const isExpressionStart = previous === undefined || isAfterArrow
         || (previous.kind === 'punctuator' && ![')', ']', '>', '.'].includes(previous.text))
         || (previous.kind === 'identifier' && KEYWORDS_BEFORE_EXPRESSION.has(previous.text));
-      if (startsExpression && target?.kind === 'identifier' && brands.has(target.text)) {
-        found.push({ name: target.text, line: token.line, how: 'an angle-bracket cast' });
+      // `<T extends Name>(…) => …` and `<T, U>(…) => …` declare type parameters; they make no value.
+      const isTypeParameterList = isIdentifier(tokens[index + 2], 'extends') || isPunctuator(tokens[index + 2], ',') || isPunctuator(tokens[index + 2], '=');
+      if (isExpressionStart && !isTypeParameterList) {
+        addBrandsIn(readType(tokens, index), token.line, 'an angle-bracket cast');
       }
     }
     // brand<Value, 'Name'>(value): the engine's helper that applies a brand.

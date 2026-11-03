@@ -6,7 +6,8 @@
 //     one strength by hand, such as `Approval & { strength: 'verified' }` (the type written inside
 //     a parameter list, directly or through a type alias declared anywhere in the code);
 //   - compares an approval's strength with 'verified' or 'declared' (with ===, !==, == or !=,
-//     either way round), or switches on it, which decides a result by strength.
+//     either way round), or switches on it, directly or through a local that holds it
+//     (`const level = approval.strength`), which decides a result by strength.
 // Choosing a label by looking the strength up in a table passes. Declaring VerifiedApproval, or
 // any narrowed type, passes too: only taking one as a parameter decides by strength.
 import { readFileSync } from 'node:fs';
@@ -148,10 +149,97 @@ function strengthTypeNames(aliases: readonly TypeAlias[]): Set<string> {
   return names;
 }
 
-// True when the `switch` at `index` switches on an expression ending in `strength`.
-function switchesOnStrength(tokens: readonly Token[], index: number): boolean {
+// A local that holds an approval's strength, from where it is set to the end of its block.
+type StrengthLocal = { readonly name: string; readonly from: number; readonly until: number };
+
+const holdsStrength = (locals: readonly StrengthLocal[], token: Token | undefined, index: number): boolean =>
+  token?.kind === 'identifier' && locals.some((local) => local.name === token.text && local.from < index && index <= local.until);
+
+const isAssignmentAt = (tokens: readonly Token[], index: number): boolean =>
+  isPunctuator(tokens[index], '=') && !isPunctuator(tokens[index + 1], '=') && !isPunctuator(tokens[index + 1], '>')
+  && !['=', '!', '<', '>'].some((text) => isPunctuator(tokens[index - 1], text));
+
+// The first token of the property read that ends at `end`, as in `this.approval?.strength`.
+function propertyReadStart(tokens: readonly Token[], end: number): number {
+  let start = end;
+  while (isPunctuator(tokens[start - 1], '.')) {
+    const hasMark = isPunctuator(tokens[start - 2], '?') || isPunctuator(tokens[start - 2], '!');
+    start -= hasMark ? 3 : 2;
+  }
+  return start;
+}
+
+// The local that `level = approval.strength` or `const level: Type = approval.strength` sets, when
+// the `strength` at `index` ends the whole value.
+function localSetToStrength(tokens: readonly Token[], index: number): string | undefined {
+  const after = tokens[index + 1];
+  const isWholeValue = after === undefined || isPunctuator(after, ';') || isPunctuator(after, ',')
+    || (after.line > (tokens[index]?.line ?? 0) && !isPunctuator(after, '.'));
+  const start = propertyReadStart(tokens, index);
+  if (!isWholeValue || start === index || !isAssignmentAt(tokens, start - 1)) {
+    return undefined;
+  }
+  const target = tokens[start - 2];
+  const annotated = isPunctuator(tokens[start - 3], ':') ? tokens[start - 4] : undefined;
+  if (target?.kind !== 'identifier' || isPunctuator(tokens[start - 3], '.')) {
+    return undefined;
+  }
+  return annotated?.kind === 'identifier' ? annotated.text : target.text;
+}
+
+// The local that `const { strength: level } = approval` sets, when the `strength` at `index` is that
+// pattern's key.
+function localRenamedFromStrength(tokens: readonly Token[], index: number, pattern: number | undefined): string | undefined {
+  const local = tokens[index + 2];
+  if (pattern === undefined || !isPunctuator(tokens[pattern], '{') || !isPunctuator(tokens[index + 1], ':') || local?.kind !== 'identifier') {
+    return undefined;
+  }
+  return isAssignmentAt(tokens, closingIndex(tokens, pattern) + 1) ? local.text : undefined;
+}
+
+// Every local holding an approval's strength, so comparing one is seen as comparing the strength.
+function strengthLocals(tokens: readonly Token[], innermost: readonly (number | undefined)[]): StrengthLocal[] {
+  const locals: StrengthLocal[] = [];
+  const blockEnd = (block: number | undefined): number => (block === undefined ? tokens.length : closingIndex(tokens, block));
+  tokens.forEach((token, index) => {
+    if (!isIdentifier(token, 'strength')) {
+      return;
+    }
+    const opening = innermost[index];
+    const assigned = localSetToStrength(tokens, index);
+    if (assigned !== undefined) {
+      locals.push({ name: assigned, from: index, until: blockEnd(opening) });
+      return;
+    }
+    const renamed = localRenamedFromStrength(tokens, index, opening);
+    if (renamed !== undefined && opening !== undefined) {
+      locals.push({ name: renamed, from: index, until: blockEnd(innermost[opening]) });
+    }
+  });
+  return locals;
+}
+
+// True when the strength literal at `index` is compared with a local holding a strength.
+function comparesStrengthLocal(tokens: readonly Token[], index: number, locals: readonly StrengthLocal[]): boolean {
+  if (isComparisonBefore(tokens, index)) {
+    const operand = pastOperatorBackwards(tokens, index - 1);
+    return !isPunctuator(tokens[operand - 1], '.') && holdsStrength(locals, tokens[operand], operand);
+  }
+  if (isComparisonAfter(tokens, index)) {
+    const operand = pastOperatorForwards(tokens, index + 1);
+    const isOptionalRead = isPunctuator(tokens[operand + 1], '?') && isPunctuator(tokens[operand + 2], '.');
+    const isWholeOperand = !isOptionalRead && !['.', '(', '['].some((text) => isPunctuator(tokens[operand + 1], text));
+    return isWholeOperand && holdsStrength(locals, tokens[operand], operand);
+  }
+  return false;
+}
+
+// True when the `switch` at `index` switches on an expression ending in `strength`, or on a local
+// holding a strength.
+function switchesOnStrength(tokens: readonly Token[], index: number, locals: readonly StrengthLocal[]): boolean {
   if (!isIdentifier(tokens[index], 'switch') || !isPunctuator(tokens[index + 1], '(')) return false;
-  return isIdentifier(tokens[closingIndex(tokens, index + 1) - 1], 'strength');
+  const isOnLocal = isPunctuator(tokens[index + 3], ')') && holdsStrength(locals, tokens[index + 2], index + 2);
+  return isOnLocal || isIdentifier(tokens[closingIndex(tokens, index + 1) - 1], 'strength');
 }
 
 export function checkApprovalStrength(root: string): string[] {
@@ -160,6 +248,7 @@ export function checkApprovalStrength(root: string): string[] {
   const problems: string[] = [];
   for (const { path, tokens } of files) {
     const innermost = innermostOpenings(tokens);
+    const locals = strengthLocals(tokens, innermost);
     // Open brackets, innermost last, so a type written inside "( … )" is known to be in a parameter list.
     const open: string[] = [];
     tokens.forEach((token, index) => {
@@ -175,10 +264,10 @@ export function checkApprovalStrength(root: string): string[] {
       if (inParameters && narrowsStrength(tokens, index, innermost[index])) {
         problems.push(`${path}:${token.line} takes an approval narrowed to strength '${token.text}'; take Approval, so a declared approval passes exactly as a verified one`);
       }
-      if (token.kind === 'string' && STRENGTHS.has(token.text) && comparesStrength(tokens, index)) {
+      if (token.kind === 'string' && STRENGTHS.has(token.text) && (comparesStrength(tokens, index) || comparesStrengthLocal(tokens, index, locals))) {
         problems.push(`${path}:${token.line} decides by comparing an approval's strength with '${token.text}'; strength may only choose a label, so test for an Approval instead`);
       }
-      if (switchesOnStrength(tokens, index)) {
+      if (switchesOnStrength(tokens, index, locals)) {
         problems.push(`${path}:${token.line} decides by switching on an approval's strength; strength may only choose a label, so test for an Approval instead`);
       }
     });

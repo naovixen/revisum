@@ -1,16 +1,18 @@
 // Keeps secret values where they belong. reveal() is the one way to read a secret's value, and only
 // the modules in REVEAL_ALLOWED_MODULES may import it. This check fails, naming the file, when any
 // other code in packages/ or tools/ imports or re-exports reveal, under its own name or another
-// (`import { reveal as show }`), reads it from a namespace import (`contracts.reveal`), or
-// destructures it out of a namespace import or a dynamic import
-// (`const { reveal: show } = contracts`, `const { reveal } = await import('…')`).
+// (`import { reveal as show }`), reads it from a namespace import or a dynamic import
+// (`contracts.reveal`, `contracts['reveal']`, `(await import('…')).reveal`), or destructures it out
+// of one (`const { reveal: show } = contracts`, `const { reveal } = await import('…')`,
+// `import('…').then(({ reveal }) => reveal)`).
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Token } from './lint-names.ts';
-import { codeTokens, isIdentifier, isPunctuator, listSourceFiles } from './source-files.ts';
+import { closingParenthesis, codeTokens, isIdentifier, isPunctuator, listSourceFiles } from './source-files.ts';
 import { reportProblems } from './workspace-packages.ts';
 
 const REVEAL = 'reveal';
+const THEN = 'then';
 // Where reveal is defined; contracts' index re-exports it with `export *`, which names nothing.
 const DEFINING_MODULE = 'packages/contracts/src/secret.ts';
 
@@ -38,10 +40,43 @@ function closingBrace(tokens: readonly Token[], open: number): number {
   return tokens.length;
 }
 
-// True when the tokens from `index` start a dynamic import, `import(…)`, with or without `await`.
+// The index just past a dynamic import whose keyword is at `importIndex`, and past any brackets that
+// close around it, as in `(await import(…))`.
+function pastDynamicImport(tokens: readonly Token[], importIndex: number): number {
+  let past = closingParenthesis(tokens, importIndex + 1) + 1;
+  while (isPunctuator(tokens[past], ')')) {
+    past += 1;
+  }
+  return past;
+}
+
+// The property read at `index`, in any of `.name`, `?.name`, `!.name`, `['name']` and `?.['name']`.
+function propertyNameAt(tokens: readonly Token[], index: number): string | undefined {
+  const isOptionalRead = isPunctuator(tokens[index], '?') && isPunctuator(tokens[index + 1], '.');
+  const start = isOptionalRead || isPunctuator(tokens[index], '!') ? index + 1 : index;
+  const isDotted = isPunctuator(tokens[start], '.');
+  const named = tokens[start + 1];
+  if (isDotted && named?.kind === 'identifier') {
+    return named.text;
+  }
+  const bracket = isDotted ? start + 1 : start;
+  const key = tokens[bracket + 1];
+  const isOneKey = isPunctuator(tokens[bracket], '[') && isPunctuator(tokens[bracket + 2], ']');
+  return isOneKey && (key?.kind === 'string' || key?.kind === 'template') ? key.text : undefined;
+}
+
+// True when the tokens from `index` start a dynamic import that gives the module whole: `import(…)`,
+// `await import(…)`, `(await import(…))`, and not a property read off it such as `.panel`.
 function startsDynamicImport(tokens: readonly Token[], index: number): boolean {
-  const start = isIdentifier(tokens[index], 'await') ? index + 1 : index;
-  return isIdentifier(tokens[start], 'import') && isPunctuator(tokens[start + 1], '(');
+  let start = index;
+  while (isPunctuator(tokens[start], '(') || isIdentifier(tokens[start], 'await')) {
+    start += 1;
+  }
+  if (!isIdentifier(tokens[start], 'import') || !isPunctuator(tokens[start + 1], '(')) {
+    return false;
+  }
+  const read = propertyNameAt(tokens, pastDynamicImport(tokens, start));
+  return read === undefined || read === THEN;
 }
 
 // True when the "=" at `index` is an assignment, not part of "==", "===" or "=>".
@@ -65,8 +100,45 @@ function revealKeysInPattern(tokens: readonly Token[], open: number, end: number
   return lines;
 }
 
-// Lines where `tokens` import or re-export reveal, read it from a namespace import, or destructure
-// it out of a namespace import or a dynamic import.
+// The first token of the parameter list of the callback passed to the call opened at `open`.
+function callbackParameter(tokens: readonly Token[], open: number): number {
+  let start = open + 1;
+  if (isIdentifier(tokens[start], 'async')) {
+    start += 1;
+  }
+  if (isIdentifier(tokens[start], 'function')) {
+    start += isPunctuator(tokens[start + 1], '(') ? 1 : 2;
+  }
+  return isPunctuator(tokens[start], '(') ? start + 1 : start;
+}
+
+type DynamicImportUse = {
+  readonly lines: readonly number[];
+  // A name that holds the module as a namespace does: `import(…).then((contracts) => …)`.
+  readonly namespace: string | undefined;
+};
+
+// What the dynamic import at `importIndex` does with the module straight away: reads reveal off it,
+// or hands it to a `then` callback that destructures reveal or names the module.
+function dynamicImportUse(tokens: readonly Token[], importIndex: number): DynamicImportUse {
+  const past = pastDynamicImport(tokens, importIndex);
+  const read = propertyNameAt(tokens, past);
+  if (read === REVEAL) {
+    return { lines: [tokens[importIndex]?.line ?? 0], namespace: undefined };
+  }
+  if (read !== THEN || !isPunctuator(tokens[past + 2], '(')) {
+    return { lines: [], namespace: undefined };
+  }
+  const parameter = callbackParameter(tokens, past + 2);
+  const first = tokens[parameter];
+  if (isPunctuator(first, '{')) {
+    return { lines: revealKeysInPattern(tokens, parameter, closingBrace(tokens, parameter)), namespace: undefined };
+  }
+  return { lines: [], namespace: first?.kind === 'identifier' ? first.text : undefined };
+}
+
+// Lines where `tokens` import or re-export reveal, read it from a namespace or a dynamic import, or
+// destructure it out of one.
 function revealUses(tokens: readonly Token[]): number[] {
   const lines: number[] = [];
   const namespaces = new Set<string>();
@@ -75,6 +147,14 @@ function revealUses(tokens: readonly Token[]): number[] {
     if (token.kind === 'identifier' && isAssignment(tokens, index + 1) && startsDynamicImport(tokens, index + 2)) namespaces.add(token.text);
     if (!isIdentifier(token, 'import') && !isIdentifier(token, 'export')) return;
     if (isPunctuator(tokens[index - 1], '.')) return;
+    if (isIdentifier(token, 'import') && isPunctuator(tokens[index + 1], '(')) {
+      const use = dynamicImportUse(tokens, index);
+      lines.push(...use.lines);
+      if (use.namespace !== undefined) {
+        namespaces.add(use.namespace);
+      }
+      return;
+    }
     let next = index + 1;
     if (isIdentifier(tokens[next], 'type')) next += 1;
     // `import * as name from …`
@@ -92,7 +172,9 @@ function revealUses(tokens: readonly Token[]): number[] {
     }
   });
   tokens.forEach((token, index) => {
-    if (isIdentifier(token, REVEAL) && isPunctuator(tokens[index - 1], '.') && namespaces.has(tokens[index - 2]?.text ?? '')) lines.push(token.line);
+    if (token.kind === 'identifier' && namespaces.has(token.text) && propertyNameAt(tokens, index + 1) === REVEAL) {
+      lines.push(token.line);
+    }
     // `{ … } = namespace` or `{ … } = await import(…)`: the pattern names what it takes.
     if (!isPunctuator(token, '{')) return;
     const end = closingBrace(tokens, index);

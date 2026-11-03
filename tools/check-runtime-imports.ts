@@ -1,15 +1,15 @@
 // Keeps third-party browser automation libraries out of the runtime set: every package under
 // packages/. A package fails when one of its code files imports a banned library at run time (a
-// static or dynamic import, a re-export or a require, a sub-path such as playwright-core/lib/server
-// included), or when its package.json declares one as a dependency or an optional dependency.
+// static or dynamic import, a re-export or a require, in quotes or a template literal, a sub-path
+// such as playwright-core/lib/server included), or when its package.json declares one as a
+// dependency or an optional dependency.
 // Type-only imports and exports, and dev dependencies, never run, so they do not count; nor does a
 // library's name written as data. The repository's own dev dependency on playwright-core, for the
 // evidence workload's test suite, is in the root package.json, which is not a package here.
 //   node tools/check-runtime-imports.ts    (reads packages/ under the working folder)
 import { join } from 'node:path';
 import { readFileSync } from 'node:fs';
-import type { Token } from './lint-names.ts';
-import { codeTokens, isIdentifier, isPunctuator, listSourceFiles } from './source-files.ts';
+import { listSourceFiles, moduleSpecifiers } from './source-files.ts';
 import { readWorkspacePackages, reportProblems } from './workspace-packages.ts';
 
 export const BANNED_LIBRARIES: readonly string[] = [
@@ -29,37 +29,10 @@ export type RuntimeImport = { readonly specifier: string; readonly line: number 
 
 // The module specifiers a file loads when it runs. A statement that starts `import type` or
 // `export type` is erased before anything runs, so it is left out.
-export function runtimeImports(source: string): RuntimeImport[] {
-  const tokens = codeTokens(source);
-  const found: RuntimeImport[] = [];
-  // Inside an import or export statement that may end in `from '<specifier>'`: whether it is type-only.
-  let statementIsTypeOnly: boolean | null = null;
-  const stringAt = (index: number): Token | undefined => (tokens[index]?.kind === 'string' ? tokens[index] : undefined);
-  for (const [index, token] of tokens.entries()) {
-    const next = tokens[index + 1];
-    const isMemberName = isPunctuator(tokens[index - 1], '.');
-    if (!isMemberName && (isIdentifier(token, 'import') || isIdentifier(token, 'require')) && isPunctuator(next, '(')) {
-      // A dynamic import or a require of a literal specifier.
-      const specifier = stringAt(index + 2);
-      if (specifier !== undefined) found.push({ specifier: specifier.text, line: specifier.line });
-      continue;
-    }
-    if (!isMemberName && isIdentifier(token, 'import') && next?.kind === 'string') {
-      // An import for its side effects only.
-      found.push({ specifier: next.text, line: next.line });
-      continue;
-    }
-    if (!isMemberName && (isIdentifier(token, 'import') || isIdentifier(token, 'export')) && !isPunctuator(next, '.')) {
-      statementIsTypeOnly = isIdentifier(next, 'type') && !isPunctuator(tokens[index + 2], ',') && !isIdentifier(tokens[index + 2], 'from');
-      continue;
-    }
-    if (statementIsTypeOnly !== null && isIdentifier(token, 'from') && next?.kind === 'string') {
-      if (!statementIsTypeOnly) found.push({ specifier: next.text, line: next.line });
-      statementIsTypeOnly = null;
-    }
-  }
-  return found;
-}
+export const runtimeImports = (source: string): RuntimeImport[] =>
+  moduleSpecifiers(source)
+    .filter((loaded) => !loaded.isTypeOnly)
+    .map(({ specifier, line }) => ({ specifier, line }));
 
 // The dependencies a manifest declares for run time, by name.
 function declaredRuntimeDependencies(manifestPath: string): string[] {
