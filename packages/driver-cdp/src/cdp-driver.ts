@@ -509,6 +509,18 @@ const FRAME_REMOVED = /No frame for given id found/;
 // The events a pointer's press sends on its way, or sets off when it moves the focus.
 const PRESS_EVENT = /^(?:pointer|mouse|click|auxclick|dblclick|touch|focus|blur|contextmenu)/;
 
+// How Runtime.callFunctionOn hands back what a page function returns.
+type CallDelivery = { readonly awaitPromise?: true; readonly returnByValue: boolean };
+const AWAITED_VALUE: CallDelivery = { awaitPromise: true, returnByValue: true };
+const AWAITED_OBJECT: CallDelivery = { awaitPromise: true, returnByValue: false };
+// Never awaited: awaiting a result looks up its `then`, and a getter the page's scripts put on
+// Object.prototype would be handed the object the page must not reach.
+const OBJECT_OUT_OF_REACH: CallDelivery = { returnByValue: false };
+
+function throwIfThePageThrew(called: CallResult): void {
+  if (called.exceptionDetails !== undefined) throw new Error(`page exception: ${called.exceptionDetails.exception?.value ?? called.exceptionDetails.text}`);
+}
+
 // PageOperations over one flat CDP session, for its top document or one of its iframes' documents.
 // Element handles are remote object ids.
 class CdpPage implements PageOperations<string> {
@@ -644,19 +656,19 @@ class CdpPage implements PageOperations<string> {
     return created.executionContextId;
   }
 
-  async #call(pageFunction: PageFunction, inputs: readonly PageArgument<string>[], returnByValue: boolean): Promise<CallResult> {
+  async #call(pageFunction: PageFunction, inputs: readonly PageArgument<string>[], delivery: CallDelivery): Promise<CallResult> {
     const objectId = await this.#documentObject();
     const callArguments: CallArgument[] = inputs.map((input) =>
       (typeof input === 'object' && 'element' in input ? { objectId: input.element } : { value: input }));
     const called = await this.#send<CallResult>('Runtime.callFunctionOn', {
-      functionDeclaration: pageFunction.toString(), objectId, arguments: callArguments, awaitPromise: true, returnByValue,
+      functionDeclaration: pageFunction.toString(), objectId, arguments: callArguments, ...delivery,
     });
-    if (called.exceptionDetails !== undefined) throw new Error(`page exception: ${called.exceptionDetails.exception?.value ?? called.exceptionDetails.text}`);
+    throwIfThePageThrew(called);
     return called;
   }
 
   async callForString(pageFunction: PageFunction, inputs: readonly PageArgument<string>[]): Promise<string> {
-    return String((await this.#call(pageFunction, inputs, true)).result.value ?? '');
+    return String((await this.#call(pageFunction, inputs, AWAITED_VALUE)).result.value ?? '');
   }
 
   async twoFramesLater(): Promise<void> {
@@ -671,13 +683,33 @@ class CdpPage implements PageOperations<string> {
   }
 
   async callForElements(pageFunction: PageFunction, inputs: readonly PageArgument<string>[]): Promise<string[]> {
-    const list = (await this.#call(pageFunction, inputs, false)).result.objectId;
+    const list = (await this.#call(pageFunction, inputs, AWAITED_OBJECT)).result.objectId;
     // Every function called here returns an array, so no object means the page got in the way.
     if (list === undefined) throw new Error('the page gave no list of elements');
     const properties = await this.#send<{ result: { name: string; value?: { objectId?: string } }[] }>('Runtime.getProperties', { objectId: list, ownProperties: true });
     return properties.result
       .filter((property) => /^\d+$/.test(property.name))
       .flatMap((property) => property.value?.objectId ?? []);
+  }
+
+  async callForObject(pageFunction: PageFunction, inputs: readonly PageArgument<string>[]): Promise<string> {
+    const { objectId } = (await this.#call(pageFunction, inputs, OBJECT_OUT_OF_REACH)).result;
+    if (objectId === undefined || objectId === '') {
+      throw new Error('the page gave no object to keep');
+    }
+    return objectId;
+  }
+
+  async callOnObject(object: string, pageFunction: PageFunction): Promise<unknown> {
+    const called = await this.#send<CallResult>('Runtime.callFunctionOn', {
+      functionDeclaration: pageFunction.toString(), objectId: object, returnByValue: true,
+    });
+    throwIfThePageThrew(called);
+    return called.result.value;
+  }
+
+  async releaseObject(object: string): Promise<void> {
+    await this.#send('Runtime.releaseObject', { objectId: object }).catch(() => undefined);
   }
 
   async byRole(role: string, name: string): Promise<string[]> {

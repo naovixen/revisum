@@ -31,6 +31,14 @@ export interface PageOperations<Handle> {
   twoFramesLater(): Promise<void>;
   // Calls a page function that returns Element[], and returns their handles.
   callForElements(pageFunction: PageFunction, inputs: readonly PageArgument<Handle>[]): Promise<Handle[]>;
+  // Calls a page function that returns an object, and keeps that object in the browser, with no name
+  // the page can reach it by. Whoever calls this must give it to releaseObject.
+  callForObject(pageFunction: PageFunction, inputs: readonly PageArgument<Handle>[]): Promise<Handle>;
+  // Calls a page function on a kept object, as `this`, in the script world that made it, and returns
+  // what it returns as the browser reports it. Throws when the object's document has gone.
+  callOnObject(object: Handle, pageFunction: PageFunction): Promise<unknown>;
+  // Lets the browser forget a kept object. Never throws, since nothing is left to free when this fails.
+  releaseObject(object: Handle): Promise<void>;
   // Elements with this role and exact accessible name, found by the browser's own accessibility engine.
   byRole(role: string, name: string): Promise<Handle[]>;
   accessibilityTree(): Promise<A11yNode>;

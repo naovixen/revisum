@@ -11,10 +11,11 @@ import {
   UnreadablePage,
 } from '@revisum/contracts';
 import {
-  actionability, armHitCheck, documentUrl, fieldValues, fontsReady, guardDetails, inThisDocument, linkAndCurrent, linkTargetList, maskElements, maskGivenElements, pageInfo, probeElement, readDomValue, readHitCheck, selectOption,
+  actionability, documentUrl, fieldValues, fontsReady, guardDetails, inThisDocument, linkAndCurrent, linkTargetList, maskElements, maskGivenElements, pageInfo, probeElement, readDomValue, selectOption,
   structuralSelectorValidity, unmaskElements, whatAClickActivates,
 } from './in-page.ts';
 import { findByLabel, findByTestId, findByText, findStructural, inDocumentOrder } from './FindByLabel.ts';
+import { HitCheckOutcome, hitChecks } from './HitChecks.ts';
 import { heldModifierKeys } from './modifier-keys.ts';
 import { pageAudit, parseAudit, toFindings } from './page-audit.ts';
 import type { Actionability, DownloadCapture, DriverSession, PageEvents, PageFunction, PageOperations, Point, ScriptCallOutcome } from './page-operations.ts';
@@ -166,13 +167,19 @@ async function rejectsSelector<Handle>(operations: PageOperations<Handle>, locat
   return locator.inside !== undefined && rejectsSelector(operations, locator.inside);
 }
 
+function indexAtPosition(position: Position, matchCount: number): number {
+  if (position === 'first') {
+    return 0;
+  }
+  return position === 'last' ? matchCount - 1 : position - 1;
+}
+
 // The one match at the position, counted in document order, or none when there are fewer matches.
 // The browser's accessibility search and the label search do not promise document order, so the
 // matches are sorted in the page first.
 async function atPosition<Handle>(operations: PageOperations<Handle>, found: readonly Handle[], position: Position): Promise<Handle[]> {
   const ordered = found.length < 2 ? [...found] : await operations.callForElements(inDocumentOrder, found.map((element) => ({ element })));
-  const index = position === 'first' ? 0 : position === 'last' ? ordered.length - 1 : position - 1;
-  const picked = ordered[index];
+  const picked = ordered[indexAtPosition(position, ordered.length)];
   return picked === undefined ? [] : [picked];
 }
 
@@ -267,13 +274,19 @@ async function waitUntilFound<Handle>(
   }
 }
 
+function decodeCurrent(current: unknown): boolean | null {
+  if (current === 'true') {
+    return true;
+  }
+  return current === 'false' ? false : null;
+}
+
 // Decodes what linkAndCurrent (in-page.ts) reports. A field of another shape is read as not shown.
 function decodeLinkAndCurrent(text: string): { readonly href: string | null; readonly current: boolean | null } {
   const parsed: unknown = JSON.parse(text);
   const fields = typeof parsed === 'object' && parsed !== null ? parsed as Record<string, unknown> : {};
   const href = fields['href'];
-  const current = fields['current'];
-  return { href: typeof href === 'string' ? href : null, current: current === 'true' ? true : current === 'false' ? false : null };
+  return { href: typeof href === 'string' ? href : null, current: decodeCurrent(fields['current']) };
 }
 
 // Decodes what linkTargetList (in-page.ts) reports. The page's own scripts may have changed what the
@@ -330,7 +343,13 @@ function decodeDomValue(text: string, read: DomRead): DomValue | undefined {
 }
 
 // The style property or attribute a DOM read names; empty for the class list.
-const domReadName = (read: DomRead): string => (read.kind === 'computedStyle' ? read.property : read.kind === 'attribute' ? read.name : '');
+const domReadName = (read: DomRead): string => {
+  switch (read.kind) {
+    case 'computedStyle': return read.property;
+    case 'attribute': return read.name;
+    case 'classes': return '';
+  }
+};
 
 // The element as the runtime guard sees it.
 async function resolvedElement<Handle>(operations: PageOperations<Handle>, element: Handle): Promise<ResolvedElement> {
@@ -408,8 +427,22 @@ async function hasFieldHoldingASecret<Handle>(documents: readonly PageOperations
 }
 
 // The text a fill of literal text or of lines types; a secret reference is revealed elsewhere.
-const textToFill = (value: Extract<ResolvedActionStep, { type: 'fill' }>['value']): string =>
-  (typeof value === 'string' ? value : 'lines' in value ? value.lines.join('\n') : '');
+const textToFill = (value: Extract<ResolvedActionStep, { type: 'fill' }>['value']): string => {
+  if (typeof value === 'string') {
+    return value;
+  }
+  return 'lines' in value ? value.lines.join('\n') : '';
+};
+
+// The secret an action types: null when it types none, and undefined when it should type one the
+// engine did not resolve for it.
+function secretToType(action: ResolvedActionStep, secret: Secret | undefined): Secret | null | undefined {
+  const typed = action.type === 'fill' ? action.value : '';
+  if (typeof typed === 'string' || 'lines' in typed) {
+    return null;
+  }
+  return secret?.name === typed.secretName ? secret : undefined;
+}
 
 // What a click does with the element it found and where it will press, just before the press.
 type BeforePress<Handle> = (element: Handle, at: Point) => Promise<void>;
@@ -425,6 +458,7 @@ function documentPorts<Handle>(
   const events = details.events;
   const crashed = (): boolean => events.crashed();
   const timeout = environment.timeoutMilliseconds;
+  const clickChecks = hitChecks(operations);
 
   const probeNow = async (planLocator: Locator, read?: DomRead): Promise<ElementProbe> => {
     // A value reference, or a locator this session cannot resolve, says nothing about the page.
@@ -472,17 +506,18 @@ function documentPorts<Handle>(
   // no answer, the press landed only if the element it was sent to has gone. So too if it landed and
   // no click followed: a press that takes the element away leaves no click to fire. Otherwise nothing
   // says where it went, so the step fails.
-  const readHitAfterClick = async (element: Handle): Promise<string> => {
-    let hit: string;
+  const readHitAfterClick = async (element: Handle, check: Handle): Promise<HitCheckOutcome> => {
+    let hit: HitCheckOutcome;
     try {
-      hit = await operations.callForString(readHitCheck, []);
+      hit = await clickChecks.read(check);
     } catch (readFailure) {
       if (readFailure instanceof PageHeldByDialog || await operations.isElementGone(element)) {
-        return 'hit';
+        return HitCheckOutcome.Hit;
       }
       throw readFailure;
     }
-    return (hit === 'none' || hit === 'no-click') && await operations.isElementGone(element) ? 'hit' : hit;
+    const isNoSignOfThePress = hit === HitCheckOutcome.None || hit === HitCheckOutcome.NoClick;
+    return isNoSignOfThePress && await operations.isElementGone(element) ? HitCheckOutcome.Hit : hit;
   };
 
   // A click is sent once. The wait may find a new element, and the guard is asked about the one it
@@ -500,25 +535,21 @@ function documentPorts<Handle>(
       return failure(denied);
     }
     await beforePress(element, at);
-    await operations.callForString(armHitCheck, [{ element }]);
-    const clickAndReadHit = async (): Promise<string> => {
+    const check = await clickChecks.arm(element);
+    const clickAndReadHit = async (): Promise<HitCheckOutcome> => {
       await operations.click(element, at);
-      return readHitAfterClick(element);
+      return readHitAfterClick(element, check);
     };
     const hit = await inputWithinTimeout(clickAndReadHit(), stepDeadline);
     if (!hit.ok) {
       return hit;
     }
-    if (hit.value === 'miss') {
-      return failure({ code: 'not-actionable', detail: 'the click landed on another element' });
+    switch (hit.value) {
+      case HitCheckOutcome.Hit: return success(undefined);
+      case HitCheckOutcome.Miss: return failure({ code: 'not-actionable', detail: 'the click landed on another element' });
+      case HitCheckOutcome.None: return failure({ code: 'not-actionable', detail: 'the press never reached the page' });
+      case HitCheckOutcome.NoClick: return failure({ code: 'not-actionable', detail: 'the page stopped the click before it reached the element' });
     }
-    if (hit.value === 'none') {
-      return failure({ code: 'not-actionable', detail: 'the press never reached the page' });
-    }
-    if (hit.value === 'no-click') {
-      return failure({ code: 'not-actionable', detail: 'the page stopped the click before it reached the element' });
-    }
-    return success(undefined);
   };
 
   // The action itself, once the step is known to be performable.
@@ -623,8 +654,7 @@ function documentPorts<Handle>(
     if (action === undefined) return failure({ code: 'unsupported-step', detail: `this driver does not perform this ${step.type} step yet` });
     // A secret reference arrives with the secret the engine resolved for it. Without that secret
     // there is nothing to type, and typing nothing could pass a step that should fail.
-    const typed = action.type === 'fill' ? action.value : '';
-    const typedSecret = typeof typed === 'string' || 'lines' in typed ? null : secret?.name === typed.secretName ? secret : undefined;
+    const typedSecret = secretToType(action, secret);
     if (typedSecret === undefined) return failure({ code: 'not-actionable', detail: 'a secret reference reached the driver without its secret' });
     const openingsBefore = events.unsupportedOpenings();
     const stepDeadline = Date.now() + timeout;

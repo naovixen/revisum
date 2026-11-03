@@ -415,9 +415,6 @@
     "max-lines-per-function": {
       "count": 1
     },
-    "no-nested-ternary": {
-      "count": 5
-    },
     "revisum/file-name-matches-export": {
       "count": 1
     }
@@ -438,7 +435,7 @@
   },
   "packages/driver-cdp/src/cdp-driver.ts": {
     "@typescript-eslint/naming-convention": {
-      "count": 5
+      "count": 4
     },
     "@typescript-eslint/no-base-to-string": {
       "count": 4
@@ -508,10 +505,10 @@
   },
   "packages/driver-cdp/src/in-page.ts": {
     "@typescript-eslint/naming-convention": {
-      "count": 15
+      "count": 14
     },
     "curly": {
-      "count": 28
+      "count": 23
     },
     "revisum/file-name-matches-export": {
       "count": 1

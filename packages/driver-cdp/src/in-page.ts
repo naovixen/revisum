@@ -110,67 +110,6 @@ export async function actionability(element: Element): Promise<string> {
   return JSON.stringify({ attached: element.isConnected, visible: true, stable, enabled: !disabled, receivesEvents, centre });
 }
 
-// Arms a one-shot hit-target check before a pointer click: pointer and mouse events whose target
-// is not the element (or its label) are swallowed and recorded as a miss, so a click that lands on
-// something else has no effect and fails its step. A listener on the element itself says whether the
-// click reached it: a page can let the press through and stop the click on its way down, and what the
-// button does with a click once it has it is the button's own.
-export function armHitCheck(element: Element): string {
-  type HitCheck = { state: string; hasClickArrived: boolean; disarm: () => void };
-  type WindowWithCheck = Window & { __clickHitCheck?: HitCheck };
-  const page = window as WindowWithCheck;
-  page.__clickHitCheck?.disarm();
-  const eventTypes = ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'];
-  const stopListeningOnWindow = (): void => { for (const eventType of eventTypes) window.removeEventListener(eventType, listen, true); };
-  const onClickAtElement = (): void => { check.hasClickArrived = true; };
-  const check: HitCheck = {
-    state: 'none',
-    hasClickArrived: false,
-    disarm: () => {
-      stopListeningOnWindow();
-      element.removeEventListener('click', onClickAtElement, true);
-    },
-  };
-  function listen(event: Event): void {
-    // Seen from the window, a target in a shadow root reads as its host; the composed path says
-    // what it really is, through every open root.
-    const path = event.composedPath();
-    const innermost = path[0];
-    const target = innermost instanceof Element ? innermost : null;
-    const label = target?.closest('label') as HTMLLabelElement | null;
-    const onElement = target !== null && (path.includes(element) || label?.control === element);
-    // The click event ends the pointer sequence, so the check stops listening there. It must not
-    // outlive the click: a dialog the click opens can stop the driver from reading it, and a
-    // check left armed would swallow the page's own later clicks. The element's own listener stays,
-    // since this click has yet to reach it, and only ever notes that it did.
-    if (event.type === 'click') stopListeningOnWindow();
-    if (onElement) {
-      if (check.state === 'none') check.state = 'hit';
-      return;
-    }
-    check.state = 'miss';
-    event.preventDefault();
-    event.stopImmediatePropagation();
-  }
-  for (const eventType of eventTypes) window.addEventListener(eventType, listen, true);
-  element.addEventListener('click', onClickAtElement, true);
-  page.__clickHitCheck = check;
-  return 'armed';
-}
-
-// Reads and disarms the hit-target check: 'hit', 'miss', 'none', or 'no-click' for a press that landed
-// on the element with no click reaching it.
-export function readHitCheck(): string {
-  // The page's own scripts can write to this property in the main world, null included.
-  type WindowWithCheck = Window & { __clickHitCheck?: { state: string; hasClickArrived: boolean; disarm: () => void } | null };
-  const page = window as WindowWithCheck;
-  const check = page.__clickHitCheck;
-  if (check === undefined || check === null) return 'none';
-  check.disarm();
-  delete page.__clickHitCheck;
-  return check.state === 'hit' && !check.hasClickArrived ? 'no-click' : check.state;
-}
-
 // What a pointer press at the point would really act on, other than `element`: the element it would
 // hit, and what is interactive around that, up to and including the nearest control. A handler or a
 // tab stop does not end the search, since a press goes on to the control around it. A label's press
