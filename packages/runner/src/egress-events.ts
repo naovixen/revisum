@@ -12,7 +12,8 @@ export const isPlainHttpOrigin = (origin: SeenOrigin): boolean => origin.startsW
 // for its origin belongs to another request.
 //
 // A record left with no decision of its own is, in this order:
-//   - `blocked` if its channel is popup, for the reason above;
+//   - if its channel is popup, for the reason above, `blocked` when its origin is undeclared and
+//     otherwise `held`, since nothing refused it;
 //   - given the latest decision for its host and port, since one tunnel carries many requests;
 //   - `allowed` if its host and port are in `directOrigins`, which the run knows the browser sends
 //     past the proxy, such as its own loopback;
@@ -38,7 +39,7 @@ export function joinEgressEvents(
     return { origin: record.origin, channel: record.channel, decision: decided.decision };
   });
   const decisionFor = (record: BrowserRequestRecord): EgressDecision => {
-    if (record.channel === 'popup') return 'blocked';
+    if (record.channel === 'popup') return record.undeclared === true ? 'blocked' : 'held';
     const key = hostAndPort(record.origin);
     return latest.get(key) ?? (direct.has(key) ? 'allowed' : 'blocked');
   };

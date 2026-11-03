@@ -116,8 +116,9 @@ export interface PageEvents {
   // Resolves once the top document is not on its way to another, or a dialog or a crash has stopped
   // it from getting there: at once when it is not.
   navigationEnded(): Promise<void>;
-  // How many popups, second pages and downloads the page has started so far. Each is closed or
-  // cancelled as soon as it starts.
+  // Grows with each popup, second page and download the page starts. Each is closed or cancelled as
+  // soon as it starts. Only growth means anything: a download counts as its file is asked for, and
+  // again as it begins.
   unsupportedOpenings(): number;
 }
 

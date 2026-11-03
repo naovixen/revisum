@@ -1,4 +1,4 @@
-import { failure, hostAndPort, success, type Brand, type Result } from "@revisum/contracts";
+import { failure, success, type Brand, type Result } from "@revisum/contracts";
 import { errorText } from "./browser-session.ts";
 import { LOOPBACK_THROUGH_PROXY, type ProxySettings } from "./chrome-flags.ts";
 
@@ -9,7 +9,7 @@ export type ConnectionFailure = { readonly origin: string; readonly message: str
 export type SessionEgress = {
     // What the source says. The driver parses it before any browser context uses it.
     readonly proxy: ProxySettings;
-    // What the egress refused, in its own form, such as "host:443".
+    // What the egress refused, in its own form, such as "host:443". Throws when that can't be known.
     refusedOrigins(): readonly string[];
     // A diagnostic for whoever is running, which stays out of the hashed result.
     connectionFailures(): readonly ConnectionFailure[];
@@ -20,19 +20,40 @@ export type SessionEgress = {
 // then. The driver may not import the runner, so whoever builds the driver hands this in.
 export type EgressSource = (allowedOrigins: readonly string[]) => Promise<SessionEgress>;
 
+// Everything a proxy has refused so far, oldest first, in its own form, or why that can't be read.
+export type RefusalReader = () => Promise<Result<readonly string[], string>>;
+
+const NO_REFUSALS_TO_READ: RefusalReader = () => Promise.resolve(success([]));
+
 // For a proxy that something else runs, such as an isolated run's, in a container of its own. That
-// proxy holds the allow-list and the record of what it refused, and whoever runs it reads the record,
-// so this session has nothing to report or close. The proxy can't reach this machine's loopback, so
-// loopback stays out of it.
+// proxy holds the allow-list and the record of what it refused, so all this session has to report is
+// what was added between its open and its close, which is when the browser has stopped asking. A
+// proxy that can't say at open has its whole list counted, which over-reports rather than hides. A
+// failed read is left for refusedOrigins to say, since a session with no need of the list still
+// closes. The proxy can't reach this machine's loopback, so loopback stays out of it.
 export const egressThroughExistingProxy =
-    (server: string): EgressSource =>
-    () =>
-        Promise.resolve({
+    (server: string, readRefusals: RefusalReader = NO_REFUSALS_TO_READ): EgressSource =>
+    async () => {
+        const atOpen = await readRefusals();
+        const refusedBeforeOpening = atOpen.ok ? atOpen.value.length : 0;
+        let sinceOpening: Result<readonly string[], string> = success([]);
+        return {
             proxy: { server, includeLoopback: false },
-            refusedOrigins: () => [],
+            refusedOrigins: () => {
+                if (!sinceOpening.ok) {
+                    throw new Error(sinceOpening.error);
+                }
+                return sinceOpening.value;
+            },
             connectionFailures: () => [],
-            close: () => Promise.resolve(),
-        });
+            close: async () => {
+                const atClose = await readRefusals();
+                sinceOpening = atClose.ok
+                    ? success(atClose.value.slice(refusedBeforeOpening))
+                    : atClose;
+            },
+        };
+    };
 
 type ProxyServer = Brand<string, "ProxyServer">;
 
@@ -81,19 +102,4 @@ export async function openSessionEgress(
     } catch (error) {
         return failure(errorText(error));
     }
-}
-
-// The one list of what was refused, so "https://x" and "x:443" can't both appear. The browser's form
-// says more, so it wins.
-export function mergeRefusedOrigins(
-    seenByBrowser: readonly string[],
-    refusedByEgress: readonly string[],
-): readonly string[] {
-    const inBrowserForm = new Set(seenByBrowser.map(hostAndPort));
-    const onlyEgressSaw = new Map(
-        refusedByEgress
-            .filter((origin) => !inBrowserForm.has(hostAndPort(origin)))
-            .map((origin) => [hostAndPort(origin), origin]),
-    );
-    return [...seenByBrowser, ...onlyEgressSaw.values()];
 }

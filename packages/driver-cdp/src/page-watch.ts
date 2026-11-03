@@ -6,6 +6,10 @@
 // fails the step that started one with unsupported-step. Two openings are not counted: the
 // download a download step claimed, and the tab a newTab step asked for, which is handed over
 // still paused, before it loads anything.
+// The browser says a download has begun only once its server answers, which may be after the run has
+// ended. A link with the download attribute says so sooner: the browser asks for its file as it asks
+// for a document, with no frame's navigation behind the request, so the Network domain has no id for
+// it. Every frame's navigation has one, whoever started it.
 // Once the page has crashed, every command to it fails at once: the browser never answers a
 // command sent to a dead renderer, so waiting would only run into each command's timeout. A browser
 // that dies or a connection that closes takes the page with it, so both count as a crash.
@@ -23,6 +27,7 @@ type TargetCrashed = { readonly targetId: string };
 type DetachedFromTarget = { readonly sessionId: string };
 type DialogOpening = { readonly message: string };
 type RequestPaused = { readonly request: { readonly url: string } };
+const DOCUMENT_REQUEST = 'Document';
 
 // How long a popup is given to ask for its first page, so that request can be recorded before the
 // popup is closed. A popup opened with no address asks for nothing and is closed after this wait.
@@ -34,6 +39,12 @@ const POPUP_ALREADY_GONE = /Session with given id not found|No target with given
 const THIS_TAB = 'currentTab';
 
 const fieldsOf = (value: unknown): Record<string, unknown> => (typeof value === 'object' && value !== null ? value as Record<string, unknown> : {});
+
+// A link's file, as the top of this file explains: a document asked for with no navigation behind it.
+function isRequestForAFile(paused: unknown): boolean {
+  const fields = fieldsOf(paused);
+  return fields['resourceType'] === DOCUMENT_REQUEST && fields['networkId'] === undefined && fields['responseStatusCode'] === undefined && fields['responseErrorReason'] === undefined;
+}
 
 type WatchedPage = { readonly browserContextId: string; readonly targetId: string; readonly sessionId: string };
 
@@ -49,6 +60,8 @@ type PageWatchOptions = {
   // Asked about every download the browser starts: true when a download step claimed it, so it
   // is not an unrequested opening.
   readonly claimsDownload?: (event: unknown) => boolean;
+  // True while a download step is waiting for its file, which then decides what each one is.
+  readonly isDownloadStepUnderWay?: () => boolean;
 };
 
 export class PageWatch implements PageEvents {
@@ -64,6 +77,7 @@ export class PageWatch implements PageEvents {
   readonly #onPopupRequest: (url: string) => void;
   readonly #ownsBrowserContext: boolean;
   readonly #claimsDownload: (event: unknown) => boolean;
+  readonly #isDownloadStepUnderWay: () => boolean;
   // A promise per popup still being given its chance to ask for its first page.
   readonly #popupFirstRequests = new Set<Promise<void>>();
   readonly #popupFailures: string[] = [];
@@ -77,6 +91,7 @@ export class PageWatch implements PageEvents {
     this.#onPopupRequest = options.onPopupRequest ?? (() => undefined);
     this.#ownsBrowserContext = options.ownsBrowserContext;
     this.#claimsDownload = options.claimsDownload ?? (() => false);
+    this.#isDownloadStepUnderWay = options.isDownloadStepUnderWay ?? (() => false);
   }
 
   // Starts listening. Called once, before the page loads anything.
@@ -129,6 +144,11 @@ export class PageWatch implements PageEvents {
     });
     listen(undefined, 'Browser.downloadWillBegin', (parameters) => {
       if (!this.#claimsDownload(parameters)) this.#openings += 1;
+    });
+    listen(sessionId, 'Fetch.requestPaused', (parameters) => {
+      if (isRequestForAFile(parameters) && !this.#isDownloadStepUnderWay()) {
+        this.#openings += 1;
+      }
     });
     await connection.send(sessionId, 'Inspector.enable');
     if (!this.#ownsBrowserContext) return;

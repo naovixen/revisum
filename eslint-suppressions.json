@@ -512,7 +512,7 @@
   },
   "packages/driver-cdp/src/egress-records.ts": {
     "curly": {
-      "count": 2
+      "count": 1
     },
     "no-nested-ternary": {
       "count": 1

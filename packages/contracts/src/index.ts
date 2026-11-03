@@ -17,6 +17,7 @@ export * from './evidence-mode.ts';
 export * from './unsafe-plan-features.ts';
 export * from './browser-driver.ts';
 export { hostAndPort } from './HostAndPort.ts';
+export { mergeRefusedOrigins } from './MergeRefusedOrigins.ts';
 export type * from './explore-mode.ts';
 export type * from './target-lock.ts';
 export * from './exit-codes.ts';

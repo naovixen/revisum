@@ -8,7 +8,7 @@ import { isAbsolute, join, normalize, sep } from 'node:path';
 import type { ContainerEngine, ContainerMount, ContainerOptions, ProbeTarget } from './container-engine.ts';
 import { proxyRules } from './egress-proxy.ts';
 import {
-  DECISIONS_FILE, LOOKUPS_FILE, LOOKUPS_VARIABLE, RECORDS_LOST, RECORDS_STATE_FILE, REWRITES_FILE, RULES_VARIABLE, PROXY_PORT, readAppliedRewrite, readProxyDecision,
+  DECISIONS_FILE, LOOKUPS_FILE, LOOKUPS_VARIABLE, RECORDS_LOST, RECORDS_STATE_FILE, REWRITES_FILE, RULES_VARIABLE, PROXY_PORT, RUN_ADDRESSES_VARIABLE, SERVICE_PROXY_PORT, readAppliedRewrite, readProxyDecision,
 } from './proxy-container.ts';
 
 // Where Revisum's own files appear inside the run image's containers.
@@ -87,6 +87,8 @@ export type ProxyContainerFields = {
   readonly mounts: readonly ContainerMount[];
   // Also answer and record the run network's name lookups, for a workload container.
   readonly recordLookups?: boolean;
+  // Give a run container's browser and its service calls an address each.
+  readonly hasRunAddresses?: boolean;
 };
 
 // The egress proxy's container, with its rules in its environment and nothing from the host's.
@@ -95,11 +97,13 @@ export const proxyContainer = (root: string, fields: ProxyContainerFields): Cont
   environment: {
     HOME: '/tmp', [RULES_VARIABLE]: JSON.stringify(proxyRules(fields.policy, fields.services)),
     ...(fields.recordLookups === true ? { [LOOKUPS_VARIABLE]: '1' } : {}),
+    ...(fields.hasRunAddresses === true ? { [RUN_ADDRESSES_VARIABLE]: '1' } : {}),
   },
   command: ['node', 'packages/runner/src/proxy-container.ts'],
 });
 
 export const proxyUrl = (proxyName: string): string => `http://${proxyName}:${PROXY_PORT}`;
+export const serviceProxyUrl = (proxyName: string): string => `http://${proxyName}:${SERVICE_PROXY_PORT}`;
 
 // The lines of a file inside a container, or null when it cannot be read, so a caller can keep what
 // it read before. A file not yet written reads as no lines, since the proxy writes each file only

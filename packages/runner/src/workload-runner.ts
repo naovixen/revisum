@@ -22,7 +22,7 @@
 // command speaks TCP, not HTTP.
 import {
   PRODUCT, WORKLOAD_CHECKOUT_PATH, WORKLOAD_OUTPUT_PATH, failure, hostAndPort, success,
-  type CapturedOutput, type EgressEvent, type EgressPolicy, type ExecOutcome, type ProxyDecision, type Result, type WorkloadErrorCode,
+  type CapturedOutput, type EgressEvent, type EgressPolicy, type ExecOutcome, type OutputRemoval, type ProxyDecision, type Result, type WorkloadErrorCode,
   type WorkloadOutcome, type WorkloadRequest, type WorkloadRunner,
 } from '@revisum/contracts';
 import { Buffer } from 'node:buffer';
@@ -141,12 +141,47 @@ function readyOutputFolder(folder: string): boolean {
   }
 }
 
+// The user a team's containers run as: never root.
+const containerUser = (imageUser: string | null): string => (imageUser === null || isRoot(imageUser) ? UNPRIVILEGED_USER : imageUser);
+
 type Outcome = Result<WorkloadOutcome, WorkloadErrorCode>;
 
 export function workloadRunner(options: WorkloadRunnerOptions): WorkloadRunner {
   const { engine, repositoryRoot: root, checkout } = options;
   const log = options.log ?? ((): void => undefined);
   const dependenciesVolume = dependenciesVolumeFor(options.dependenciesVolume);
+
+  // Removes what an earlier container of the image left, as its own user, in a container of the same
+  // image with no network and only the output folder. A mode the suite set on its own files could stop
+  // even its own user, so that is lifted first. Neither command's outcome is read, since the caller
+  // looks for itself, and an image that lacks them fails safe as a folder still there.
+  async function removeFromOutput(removal: OutputRemoval): Promise<void> {
+    const { image, outputDirectory, paths, hostFailure } = removal;
+    if (!isAbsolute(outputDirectory) || MOUNT_UNSAFE.test(outputDirectory) || MOUNT_UNSAFE.test(root) || await engine.imageId(image) !== image || !readyOutputFolder(outputDirectory)) {
+      log({ code: 'notice', detail: `the host could not remove what an earlier run left (${hostFailure}), and no container can be used to` });
+      return;
+    }
+    const insideOutput = paths.map((path) => `${WORKLOAD_OUTPUT_PATH}/${path}`);
+    const remover = await engine.startContainer({
+      name: `${PRODUCT.name}-output-removal-${randomBytes(6).toString('hex')}`, image, networks: [],
+      user: containerUser(await engine.imageUser?.(image) ?? null),
+      seccompProfile: join(root, SECCOMP_PROFILE),
+      workingFolder: WORKLOAD_OUTPUT_PATH,
+      environment: { HOME: '/tmp' },
+      mounts: [{ kind: 'folder', source: outputDirectory, target: WORKLOAD_OUTPUT_PATH, writable: true }],
+      ...KEEP_ALIVE,
+    });
+    if (!remover.ok) {
+      log({ code: 'notice', detail: `the host could not remove what an earlier run left (${hostFailure}), and the container to do it did not start: ${remover.error.detail}` });
+      return;
+    }
+    try {
+      await engine.exec(remover.value, ['chmod', '-R', 'u+rwx', ...insideOutput]);
+      await engine.exec(remover.value, ['rm', '-rf', ...insideOutput]);
+    } finally {
+      await engine.removeContainer(remover.value);
+    }
+  }
 
   async function run(request: WorkloadRequest): Promise<Outcome> {
     const refuse = (code: WorkloadErrorCode, detail: string): Outcome => {
@@ -252,7 +287,7 @@ export function workloadRunner(options: WorkloadRunnerOptions): WorkloadRunner {
 
       const team = await engine.startContainer({
         name: `${runId}-workload`, image: request.image, networks: [network],
-        user: imageUser === null || isRoot(imageUser) ? UNPRIVILEGED_USER : imageUser,
+        user: containerUser(imageUser),
         seccompProfile: join(root, SECCOMP_PROFILE),
         workingFolder: workingFolder === '' ? WORKLOAD_CHECKOUT_PATH : `${WORKLOAD_CHECKOUT_PATH}/${workingFolder}`,
         environment,
@@ -307,5 +342,5 @@ export function workloadRunner(options: WorkloadRunnerOptions): WorkloadRunner {
     }
   }
 
-  return { run };
+  return { run, removeFromOutput };
 }

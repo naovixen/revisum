@@ -18,7 +18,7 @@
 import { hostAndPort, type AppliedRewrite, type DeclaredService, type EgressPolicy, type ProxyDecision, type ResponseRewrite } from '@revisum/contracts';
 import { lookup } from 'node:dns/promises';
 import type { EventEmitter } from 'node:events';
-import { createServer, request, type IncomingHttpHeaders, type IncomingMessage, type ServerResponse } from 'node:http';
+import { createServer, request, type IncomingHttpHeaders, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { connect as connectSocket, createServer as createTcpServer, isIP, type Server as TcpServer, type Socket } from 'node:net';
 import type { Duplex } from 'node:stream';
@@ -58,8 +58,12 @@ export type ProxyServerOptions = {
   // Where the proxy listens: 127.0.0.1 on a free port unless given.
   readonly listenHost?: string;
   readonly port?: number;
-  // Called with each decision as it is made, such as to write it where the runner can read it.
-  readonly onDecision?: (decision: ProxyDecision) => void;
+  // A second port on the same proxy, with the same rules and the same record, whose clients are
+  // services, whatever `client` says of the first. Listening when the first port answers.
+  readonly servicePort?: number;
+  // Called with each decision as it is made, such as to write it where the runner can read it, and
+  // who it was made for.
+  readonly onDecision?: (decision: ProxyDecision, client: ProxyClient) => void;
   // Called once per origin and mutant, the first time a rewrite changes a response.
   readonly onRewriteApplied?: (applied: AppliedRewrite) => void;
 };
@@ -112,6 +116,7 @@ const isWritableStatus = (status: number): boolean => status >= 100 && status <=
 const LOOPBACK_ADDRESSES: readonly string[] = ['127.0.0.1', '::1'];
 
 type ClientTreatment = {
+  readonly client: ProxyClient;
   // How a plain request the proxy won't or can't carry through ends.
   readonly declineRequest: (response: ServerResponse, status: number, mark: EgressDecisionMark, text: string) => void;
   // How a tunnel the proxy won't or can't open ends.
@@ -125,11 +130,13 @@ type ClientTreatment = {
 // socket is a network error to a browser. A page may also hold a quiet connection open on purpose.
 const TREATMENT_OF_CLIENT = {
   [ProxyClient.Service]: {
+    client: ProxyClient.Service,
     declineRequest: answerFromProxy,
     declineTunnel: (client, statusLine) => { client.end(`HTTP/1.1 ${statusLine}\r\n\r\n`); },
     idleLimitMilliseconds: SERVICE_IDLE_LIMIT_MILLISECONDS,
   },
   [ProxyClient.Browser]: {
+    client: ProxyClient.Browser,
     declineRequest: (response) => { response.destroy(); },
     declineTunnel: (client) => { client.destroy(); },
     idleLimitMilliseconds: 0,
@@ -222,7 +229,6 @@ function answerFromProxy(response: ServerResponse, status: number, mark: EgressD
 }
 
 export async function startProxyServer(rules: ProxyRules, options: ProxyServerOptions = {}): Promise<EgressProxy> {
-  const treatment: ClientTreatment = TREATMENT_OF_CLIENT[options.client ?? ProxyClient.Service];
   const resolve = options.resolve ?? defaultResolver;
   const connect = options.connect ?? defaultConnector;
   const allowed = new Set(rules.allowedOrigins);
@@ -239,10 +245,10 @@ export async function startProxyServer(rules: ProxyRules, options: ProxyServerOp
   // Keyed by name, not origin, so a name can't change class by being asked for on another port.
   const fixedClassOfName = new Map<string, NameClass>();
 
-  const record = (origin: string, decision: ProxyDecision['decision']): void => {
+  const record = (origin: string, decision: ProxyDecision['decision'], client: ProxyClient): void => {
     const entry: ProxyDecision = { origin, decision };
     decided.push(entry);
-    options.onDecision?.(entry);
+    options.onDecision?.(entry, client);
   };
 
   async function addressesOf(host: string): Promise<readonly string[] | Error> {
@@ -315,28 +321,29 @@ export async function startProxyServer(rules: ProxyRules, options: ProxyServerOp
     return null;
   }
 
-  async function forward(incoming: IncomingMessage, response: ServerResponse): Promise<void> {
+  async function forward(incoming: IncomingMessage, response: ServerResponse, treatment: ClientTreatment): Promise<void> {
+    const { client } = treatment;
     const abandoned = abortedOnClose(response);
     const url = URL.parse(incoming.url ?? '');
     if (url === null) {
-      record(MALFORMED_REQUEST_ORIGIN, 'blocked');
+      record(MALFORMED_REQUEST_ORIGIN, 'blocked', client);
       treatment.declineRequest(response, 400, 'blocked', 'not a request the egress proxy forwards');
       return;
     }
     if (url.protocol !== 'http:') {
       // The URL parser writes "null" as the origin of a scheme it does not know.
-      record(url.origin === 'null' ? MALFORMED_REQUEST_ORIGIN : url.origin, 'blocked');
+      record(url.origin === 'null' ? MALFORMED_REQUEST_ORIGIN : url.origin, 'blocked', client);
       treatment.declineRequest(response, 400, 'blocked', 'not a request the egress proxy forwards');
       return;
     }
     const origin = url.origin;
     const addresses = await vettedAddresses(url.hostname, allowed.has(origin), privateOrigins.has(origin));
     if (addresses === null) {
-      record(origin, 'blocked');
+      record(origin, 'blocked', client);
       treatment.declineRequest(response, 403, 'blocked', 'blocked by the egress proxy');
       return;
     }
-    record(origin, 'allowed');
+    record(origin, 'allowed', client);
     const socket = await connectOut(origin, addresses, Number(url.port === '' ? 80 : url.port), abandoned);
     if (socket === null) {
       treatment.declineRequest(response, 502, 'unreachable', 'the service did not answer');
@@ -400,7 +407,7 @@ export async function startProxyServer(rules: ProxyRules, options: ProxyServerOp
     return text === original ? body : Buffer.from(text, 'utf8');
   }
 
-  async function tunnel(incoming: IncomingMessage, client: Duplex, head: Buffer): Promise<void> {
+  async function tunnel(incoming: IncomingMessage, client: Duplex, head: Buffer, treatment: ClientTreatment): Promise<void> {
     openSockets.add(client);
     client.on('close', () => openSockets.delete(client));
     client.on('error', () => client.destroy());
@@ -409,18 +416,18 @@ export async function startProxyServer(rules: ProxyRules, options: ProxyServerOp
     const port = Number(authority?.[2] ?? 0);
     const hostname = URL.parse(`http://${authority?.[1] ?? ''}`)?.hostname ?? '';
     if (hostname === '' || port < 1 || port > 65_535) {
-      record(hostname === '' ? MALFORMED_REQUEST_ORIGIN : `${hostname}:${port}`, 'blocked');
+      record(hostname === '' ? MALFORMED_REQUEST_ORIGIN : `${hostname}:${port}`, 'blocked', treatment.client);
       treatment.declineTunnel(client, '400 Bad Request');
       return;
     }
     const seen = `${hostname}:${port}`;
     const addresses = await vettedAddresses(hostname, allowedHosts.has(seen), privateHosts.has(seen));
     if (addresses === null) {
-      record(seen, 'blocked');
+      record(seen, 'blocked', treatment.client);
       treatment.declineTunnel(client, '403 Forbidden');
       return;
     }
-    record(seen, 'allowed');
+    record(seen, 'allowed', treatment.client);
     const upstream = await connectOut(seen, addresses, port, abandoned);
     if (upstream === null) {
       treatment.declineTunnel(client, '502 Bad Gateway');
@@ -443,11 +450,11 @@ export async function startProxyServer(rules: ProxyRules, options: ProxyServerOp
     const seen = relayOrigin(target);
     const addresses = await vettedAddresses(target.host, true, target.private);
     if (addresses === null) {
-      record(seen, 'blocked');
+      record(seen, 'blocked', ProxyClient.Service);
       client.destroy();
       return;
     }
-    record(seen, 'allowed');
+    record(seen, 'allowed', ProxyClient.Service);
     const upstream = await connectOut(seen, addresses, target.port, abandoned);
     if (upstream === null) {
       client.destroy();
@@ -477,23 +484,31 @@ export async function startProxyServer(rules: ProxyRules, options: ProxyServerOp
     throw error;
   }
 
-  const server = createServer((incoming, response) => { void forward(incoming, response); });
-  server.on('connect', (incoming: IncomingMessage, client: Duplex, head: Buffer) => { void tunnel(incoming, client, head); });
-  await new Promise<void>((resolveListening, reject) => {
-    server.once('error', reject);
-    server.listen(options.port ?? 0, listenHost, () => { server.off('error', reject); resolveListening(); });
-  });
+  const listeningFor = async (client: ProxyClient, port: number): Promise<Server> => {
+    const treatment = TREATMENT_OF_CLIENT[client];
+    const server = createServer((incoming, response) => { void forward(incoming, response, treatment); });
+    server.on('connect', (incoming: IncomingMessage, socket: Duplex, head: Buffer) => { void tunnel(incoming, socket, head, treatment); });
+    await new Promise<void>((resolveListening, reject) => {
+      server.once('error', reject);
+      server.listen(port, listenHost, () => { server.off('error', reject); resolveListening(); });
+    });
+    return server;
+  };
+  const serviceServers = options.servicePort === undefined ? [] : [await listeningFor(ProxyClient.Service, options.servicePort)];
+  const server = await listeningFor(options.client ?? ProxyClient.Service, options.port ?? 0);
   const { port } = server.address() as AddressInfo;
   return {
     url: `http://${listenHost}:${port}`,
     decisions: () => [...decided],
     rewritesApplied: () => [...applied.values()],
     connectionFailures: () => [...failures.values()],
-    close: () => new Promise<void>((resolveClosed) => {
+    close: async () => {
       for (const socket of openSockets) socket.destroy();
       for (const relayServer of relayServers) relayServer.close();
-      server.closeAllConnections();
-      server.close(() => resolveClosed());
-    }),
+      await Promise.all([server, ...serviceServers].map((listening) => new Promise<void>((resolveClosed) => {
+        listening.closeAllConnections();
+        listening.close(() => resolveClosed());
+      })));
+    },
   };
 }

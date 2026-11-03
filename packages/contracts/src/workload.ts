@@ -62,6 +62,20 @@ export type WorkloadOutcome = {
 //   workload-start-failed: the request is malformed, or the team's container did not start.
 export type WorkloadErrorCode = 'image-missing' | 'image-digest-mismatch' | 'egress-unenforceable' | 'workload-start-failed';
 
+// What an earlier container left in the output folder and this host's user could not remove.
+export type OutputRemoval = {
+  readonly image: string;
+  readonly outputDirectory: string;
+  // Relative to the output folder.
+  readonly paths: readonly string[];
+  // Why the host's user could not, for the runner's log.
+  readonly hostFailure: string;
+};
+
 export interface WorkloadRunner {
   run(request: WorkloadRequest): Promise<Result<WorkloadOutcome, WorkloadErrorCode>>;
+  // Tries to remove the paths as the user the image's containers run as, which owns what they made.
+  // It promises nothing, since only the host's own look can show they have gone. Optional: a runner
+  // without it leaves the host's user as the only one to try.
+  removeFromOutput?(removal: OutputRemoval): Promise<void>;
 }

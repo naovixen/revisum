@@ -10,9 +10,9 @@ import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSy
 import { isAbsolute, join, posix, relative, sep } from 'node:path';
 import {
   SUITE_EVIDENCE_PATHS, SUITE_REPORT_FILE, WORKLOAD_OUTPUT_PATH,
-  declaredSuite, defaultRedactor, evidenceManifest, evidenceResult, failure, isSuiteFile, parseSuiteReport, parseSuiteTrace, refusedSuiteResult,
+  declaredSuite, defaultRedactor, evidenceManifest, evidenceResult, failure, isSuiteFile, mergeRefusedOrigins, parseSuiteReport, parseSuiteTrace, refusedSuiteResult,
   success, suiteArguments, suiteEnvironment, suiteRedactor, unreadSuiteResult,
-  type EgressPolicy, type EvidenceContext, type EvidenceLimits, type EvidenceSuiteDeclaration, type HostInfo, type Project, type Redactor,
+  type EgressEvent, type EgressPolicy, type EvidenceContext, type EvidenceLimits, type EvidenceSuiteDeclaration, type HostInfo, type Project, type Redactor,
   type Result, type RunResult, type SecretStore, type SuiteDecodeError, type SuiteFile, type SuitePass, type SuiteReport, type SuiteTrace,
   type WorkloadErrorCode, type WorkloadRequest, type WorkloadRunner, type WorkloadVariable,
 } from '@revisum/engine';
@@ -92,17 +92,45 @@ function readyOutputFolder(outputDirectory: string, checkout: string): Result<vo
   }
 }
 
-// Links are removed, never followed. Refused when one cannot be removed, since a leftover could not
-// be told from what this run writes.
-function removeEarlierEvidence(outputDirectory: string): Result<void, WorkloadErrorCode> {
+// Why the host's user could not remove the path, or null when it could. Links are removed, never followed.
+function hostFailureRemoving(path: string): string | null {
   try {
-    for (const path of SUITE_EVIDENCE_PATHS) {
-      rmSync(join(outputDirectory, path), { recursive: true, force: true });
-    }
-    return success(undefined);
+    rmSync(path, { recursive: true, force: true });
+    return null;
+  } catch (error) {
+    return error instanceof Error ? error.message : String(error);
+  }
+}
+
+// A container's user may be another uid than the host's, and then only that user can empty a folder
+// the container made, so it gets to try what the host could not. Whatever removed them, the host's own
+// look decides: a leftover could not be told from what this run writes, so one that is still there, or
+// that can't be looked for, refuses the run.
+async function removeEarlierEvidence(workload: WorkloadRunner, image: string, outputDirectory: string): Promise<Result<void, WorkloadErrorCode>> {
+  const hostFailures = SUITE_EVIDENCE_PATHS.flatMap((path) => {
+    const hostFailure = hostFailureRemoving(join(outputDirectory, path));
+    return hostFailure === null ? [] : [{ path, hostFailure }];
+  });
+  const [firstFailure] = hostFailures;
+  if (firstFailure !== undefined) {
+    await workload.removeFromOutput?.({ image, outputDirectory, paths: hostFailures.map(({ path }) => path), hostFailure: firstFailure.hostFailure });
+  }
+  try {
+    const hasAllGone = SUITE_EVIDENCE_PATHS.every((path) => lstatSync(join(outputDirectory, path), { throwIfNoEntry: false }) === undefined);
+    return hasAllGone ? success(undefined) : failure('workload-start-failed');
   } catch {
     return failure('workload-start-failed');
   }
+}
+
+// Each refusal once. Only the browser's own records carry a form the browser saw.
+function blockedOriginsOf(events: readonly EgressEvent[]): readonly string[] {
+  const blocked = events.filter((event) => event.decision === 'blocked');
+  const isFromBrowser = (event: EgressEvent): boolean => event.channel !== 'unattributed' && event.channel !== 'process';
+  return mergeRefusedOrigins(
+    blocked.filter(isFromBrowser).map((event) => event.origin),
+    blocked.filter((event) => !isFromBrowser(event)).map((event) => event.origin),
+  );
 }
 
 type OutputFileProblem = 'missing' | 'refused';
@@ -234,7 +262,7 @@ export async function runSuite(project: Project, suiteName: string, ports: Suite
     }
   }
 
-  const evidenceRemoved = removeEarlierEvidence(ports.outputDirectory);
+  const evidenceRemoved = await removeEarlierEvidence(ports.workload, suite.image, ports.outputDirectory);
   if (!evidenceRemoved.ok) {
     return refusedSuiteResult(suiteName, refusalFor(evidenceRemoved.error));
   }
@@ -248,8 +276,7 @@ export async function runSuite(project: Project, suiteName: string, ports: Suite
   const ran = await ports.workload.run(request(built.argv, variables));
   if (!ran.ok) return refusedSuiteResult(suiteName, refusalFor(ran.error));
   const { exitCode, timedOut, egressEvents } = ran.value;
-  const blockedOrigins = egressEvents.filter((event) => event.decision === 'blocked').map((event) => event.origin);
-  const egress = { blockedOrigins, egressRecordUnread: ran.value.egressRecordUnread === true };
+  const egress = { blockedOrigins: blockedOriginsOf(egressEvents), egressRecordUnread: ran.value.egressRecordUnread === true };
 
   const read = readReport(ports.outputDirectory, limits);
   if (!read.ok) {

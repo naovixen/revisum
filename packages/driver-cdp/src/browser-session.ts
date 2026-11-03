@@ -469,8 +469,9 @@ function documentPorts<Handle>(
 
   // What a press left in the hit check. A dialog the press opened stops the page until it is answered,
   // which holds up the read: the press landed. With no check left to read, as after a navigation, or
-  // no answer, the press landed only if the element it was sent to has gone. Otherwise nothing says
-  // where it went, so the step fails.
+  // no answer, the press landed only if the element it was sent to has gone. So too if it landed and
+  // no click followed: a press that takes the element away leaves no click to fire. Otherwise nothing
+  // says where it went, so the step fails.
   const readHitAfterClick = async (element: Handle): Promise<string> => {
     let hit: string;
     try {
@@ -481,14 +482,15 @@ function documentPorts<Handle>(
       }
       throw readFailure;
     }
-    return hit === 'none' && await operations.isElementGone(element) ? 'hit' : hit;
+    return (hit === 'none' || hit === 'no-click') && await operations.isElementGone(element) ? 'hit' : hit;
   };
 
   // A click is sent once. The wait may find a new element, and the guard is asked about the one it
   // finds, just before the send. A press that lands on another element is swallowed in the page and
   // fails the step at once: sending it again could press whatever the page has put there since. A
   // press the check never saw was stopped before it reached the page, by a listener of the page's
-  // that came first, so the click did nothing.
+  // that came first, so the click did nothing. So did one whose click the page stopped on its way to
+  // the element.
   const click = async (locator: ResolvedLocator, guard: ActionGuard, beforePress: BeforePress<Handle>, stepDeadline: number): Promise<Result<void, DriverError>> => {
     const waited = await waitUntilActionable(operations, locator, timeout, timeout, crashed);
     if (!waited.ok) return waited;
@@ -512,6 +514,9 @@ function documentPorts<Handle>(
     }
     if (hit.value === 'none') {
       return failure({ code: 'not-actionable', detail: 'the press never reached the page' });
+    }
+    if (hit.value === 'no-click') {
+      return failure({ code: 'not-actionable', detail: 'the page stopped the click before it reached the element' });
     }
     return success(undefined);
   };
@@ -770,8 +775,9 @@ function documentPorts<Handle>(
       if (scripts === 'disabled' && !isTopDocument) return failure({ code: 'unsupported-step', detail: 'scripts can be turned off only for the top document' });
       try {
         await operations.navigate(url, Math.max(timeout, 10_000), scripts);
-        // What the page started as it loaded is the navigate's, once it has reached the browser.
-        await forAtMost(timeout, operations.twoFramesLater());
+        // What the page started as it loaded is the navigate's, once it has reached the browser, and
+        // a navigation of its own as it loaded may yet turn out to be a download.
+        await forAtMost(timeout, inputSettled());
         return success(undefined);
       } catch (error) {
         return failure(crashed() ? CRASHED : { code: 'navigation-failed', detail: errorText(error) });

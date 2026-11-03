@@ -7,10 +7,18 @@
 // the runner decides what that means for the run.
 import type { AppliedRewrite, ProxyDecision, ResponseRewrite } from '@revisum/contracts';
 import { appendFileSync, openSync, writeSync } from 'node:fs';
-import { startProxyServer, type ProxyRules, type RewriteRule, type TcpRelay } from './egress-proxy.ts';
+import { startRefusalsServer } from './ReadBrowserRefusals.ts';
+import { ProxyClient, startProxyServer, type ProxyRules, type RewriteRule, type TcpRelay } from './egress-proxy.ts';
 import { startLookupRecorder } from './lookup-recorder.ts';
 
 export const PROXY_PORT = 3128;
+// Set for a run container's proxy. PROXY_PORT then treats its clients as browsers, and this port as
+// services. Their requests look alike and a page could forge anything in one, so where each connects
+// is all that can tell them apart. A workload's proxy has one address, which answers.
+export const RUN_ADDRESSES_VARIABLE = 'EGRESS_PROXY_HAS_RUN_ADDRESSES';
+export const SERVICE_PROXY_PORT = 3129;
+// Where the run container is told to send its service calls.
+export const SERVICE_PROXY_VARIABLE = 'SERVICE_PROXY';
 export const DECISIONS_FILE = '/tmp/egress-decisions.jsonl';
 export const REWRITES_FILE = '/tmp/egress-rewrites.jsonl';
 export const RULES_VARIABLE = 'EGRESS_PROXY_RULES';
@@ -149,9 +157,21 @@ async function main(): Promise<number> {
     return 2;
   }
   const records = startRecordKeeping(RECORDS_STATE_FILE);
+  const hasRunAddresses = process.env[RUN_ADDRESSES_VARIABLE] === '1';
+  const browserRefusals: string[] = [];
+  // Up before the proxy, since a proxy that answers is taken to be ready.
+  if (hasRunAddresses) {
+    await startRefusalsServer(browserRefusals);
+  }
   const proxy = await startProxyServer(rules, {
     listenHost: '0.0.0.0', port: PROXY_PORT,
-    onDecision: (decision) => records.append(DECISIONS_FILE, decision),
+    ...(hasRunAddresses ? { client: ProxyClient.Browser, servicePort: SERVICE_PROXY_PORT } : {}),
+    onDecision: (decision, client) => {
+      records.append(DECISIONS_FILE, decision);
+      if (client === ProxyClient.Browser && decision.decision === 'blocked') {
+        browserRefusals.push(decision.origin);
+      }
+    },
     onRewriteApplied: (applied) => records.append(REWRITES_FILE, applied),
   });
   console.log(`egress proxy listening at ${proxy.url}`);

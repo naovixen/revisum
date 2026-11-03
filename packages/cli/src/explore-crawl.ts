@@ -150,7 +150,7 @@ export async function crawlInRunner(
   if (!started.ok) return failure('explore-runner-unavailable');
   const handle = started.value;
   try {
-    if (isolated.runner.guaranteeLevel() !== 'isolated') return failure('explore-runner-unavailable');
+    if (handle.guaranteeLevel() !== 'isolated') return failure('explore-runner-unavailable');
     const given: ContainerCrawlInput = isolated.browserPath === undefined ? input : { ...input, browserPath: isolated.browserPath };
     const outcome = await handle.exec(['node', CONTAINER_CRAWL_MODULE, JSON.stringify(given)], secretNames);
     if (outcome.exitCode === CONTAINER_EXIT.startUnreachable) return failure('explore-start-unreachable');
@@ -165,7 +165,7 @@ export async function crawlInRunner(
     const decoded = decodePageMap(printed, origin);
     if (!decoded.ok || decoded.value.guaranteeLevel !== 'isolated') return failure('explore-runner-unavailable');
     // The exec read the proxy's record back, so this says whether all of the crawl's egress was recorded.
-    if (isolated.runner.guaranteeLevel() !== 'isolated') {
+    if (handle.guaranteeLevel() !== 'isolated') {
       return failure('explore-runner-unavailable');
     }
     // Redacted again on the host, in case the container lacked a secret's value.

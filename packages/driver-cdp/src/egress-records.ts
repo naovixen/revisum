@@ -15,6 +15,13 @@ type AttachedToTarget = { readonly sessionId: string; readonly targetInfo: { rea
 
 const NETWORK_SCHEMES = new Set(['http:', 'https:', 'ws:', 'wss:']);
 
+// The origin of a URL whose scheme reaches the network. A URL that can't be parsed could not have been
+// sent anywhere.
+function networkOrigin(url: string): string | null {
+  const parsed = URL.parse(url);
+  return parsed !== null && NETWORK_SCHEMES.has(parsed.protocol) ? parsed.origin : null;
+}
+
 export class EgressRecorder {
   readonly #connection: CdpConnection;
   // Each record with the Network domain's id of its request, when it has one.
@@ -38,11 +45,17 @@ export class EgressRecorder {
 
   // Notes a request by its URL, when its scheme reaches the network.
   record(url: string, channel: BrowserChannel, requestId: string | null = null): void {
-    try {
-      const parsed = new URL(url);
-      if (NETWORK_SCHEMES.has(parsed.protocol)) this.#records.push({ record: { origin: parsed.origin, channel }, requestId });
-    } catch {
-      // A URL the browser could not have sent anywhere.
+    const origin = networkOrigin(url);
+    if (origin !== null) {
+      this.#records.push({ record: { origin, channel }, requestId });
+    }
+  }
+
+  // Notes a held-back popup whose origin the run may not reach, so its record says it was refused too.
+  recordUndeclaredPopup(url: string): void {
+    const origin = networkOrigin(url);
+    if (origin !== null) {
+      this.#records.push({ record: { origin, channel: 'popup', undeclared: true }, requestId: null });
     }
   }
 

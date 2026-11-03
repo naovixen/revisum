@@ -17,16 +17,20 @@ export type BrowserChannel = 'page' | 'websocket' | 'worker' | 'popup' | 'redire
 // process: a process in a workload container that ignored the proxy looked up an undeclared name.
 // It had no route out, so only the lookup shows the attempt.
 export type EgressChannel = BrowserChannel | 'unattributed' | 'process';
-export type EgressDecision = 'allowed' | 'blocked';
+// held: the driver held a popup back before it loaded, and nothing refused its origin.
+export type EgressDecision = 'allowed' | 'blocked' | 'held';
+// What a proxy can decide. Only a browser's driver holds anything back.
+export type ProxyVerdict = Exclude<EgressDecision, 'held'>;
 
 // An origin as it was seen on the wire, not as a project declared it, so it is plain text:
 // "scheme://host[:port]", or "host:port" for a tunnel whose scheme the proxy cannot see.
 export type SeenOrigin = string;
 
-// A request the browser reported, by its origin and channel.
-export type BrowserRequestRecord = { readonly origin: SeenOrigin; readonly channel: BrowserChannel };
+// A request the browser reported, by its origin and channel. `undeclared` marks a popup whose origin
+// the run may not reach, which only the driver can say, since the proxy never sees a held popup.
+export type BrowserRequestRecord = { readonly origin: SeenOrigin; readonly channel: BrowserChannel; readonly undeclared?: true };
 // What the egress proxy decided for one request, by origin. Over HTTPS it sees only the host and port.
-export type ProxyDecision = { readonly origin: SeenOrigin; readonly decision: EgressDecision };
+export type ProxyDecision = { readonly origin: SeenOrigin; readonly decision: ProxyVerdict };
 // One request that tried to leave the run, with the channel the browser saw and the proxy's decision.
 export type EgressEvent = { readonly origin: SeenOrigin; readonly channel: EgressChannel; readonly decision: EgressDecision };
 
@@ -77,12 +81,15 @@ export interface RunnerHandle {
   exec(command: readonly string[], environmentNames?: readonly string[]): Promise<ExecOutcome>;
   // Removes the run's containers and network.
   stop(): Promise<void>;
+  // 'isolated' only while egress is shown to be enforced for this run, else 'host'. It falls to 'host'
+  // when the proxy's record proves incomplete, which is known only after exec or stop, so a starter
+  // must read it again then before it claims anything for the run.
+  guaranteeLevel(): GuaranteeLevel;
 }
 
 export interface Runner {
   start(image: ImageDigest, policy: EgressPolicy): Promise<Result<RunnerHandle, RunnerError>>;
-  // 'isolated' only while egress is shown to be enforced for the latest run, else 'host'. It falls to
-  // 'host' when the proxy's record proves incomplete, which is known only after the handle's exec or
-  // stop, so a starter must read it again then before it claims anything for the run.
+  // The level of the latest run this runner started, or 'host' before it has one. A runner may hold
+  // several runs at once, so what a run claims for itself comes from its own handle.
   guaranteeLevel(): GuaranteeLevel;
 }

@@ -1,7 +1,7 @@
 // The own CDP driver: launches Chromium itself and speaks the Chrome DevTools Protocol over a
 // WebSocket, with no third-party automation library.
 import {
-  determinismScript, deviceProfile, failure, success,
+  determinismScript, deviceProfile, failure, mergeRefusedOrigins, success,
   type A11yNode, type DriverError, type Key, type Result, type SessionEnvironment, type Target,
 } from '@revisum/contracts';
 import { readFileSync, realpathSync } from 'node:fs';
@@ -21,7 +21,7 @@ import { nodesAPressPasses, pressActsByItself } from './NodesAPressPasses.ts';
 import { PageHeldByDialog } from './PageHeldByDialog.ts';
 import { PageWatch, type AttachedPage } from './page-watch.ts';
 import { RunClipboard, SHARED_BROWSER_CLIPBOARD, allowRunClipboard } from './run-clipboard.ts';
-import { mergeRefusedOrigins, openSessionEgress, type EgressSource, type OpenedSessionEgress } from './SessionEgress.ts';
+import { openSessionEgress, type EgressSource, type OpenedSessionEgress } from './SessionEgress.ts';
 import { attachToSharedBrowser, launchOwnBrowser, type AttachedBrowser, type BrowserSource } from './SharedBrowser.ts';
 import { BrowserClock } from './virtual-clock.ts';
 import { PageStorage } from './web-storage.ts';
@@ -270,11 +270,13 @@ type SessionBrowser = {
 // A held-back popup never loads, so it is always recorded as a request that went nowhere. Only an
 // undeclared address is a refusal of the origin: a run may well reach a declared one in its own tab.
 function recordPopupRequest(browser: SessionBrowser, requestedUrl: string): void {
-  browser.recorder.record(requestedUrl, 'popup');
   const url = URL.parse(requestedUrl);
   if (url !== null && !isAllowedUrl(url, browser.environment.allowedOrigins)) {
+    browser.recorder.recordUndeclaredPopup(requestedUrl);
     browser.blocked.push(url.origin);
+    return;
   }
+  browser.recorder.record(requestedUrl, 'popup');
 }
 
 // How long a new tab is given to attach after the browser creates it.
@@ -303,7 +305,7 @@ async function createSession(
 
   await connection.send(sessionId, 'Page.enable');
   const watch = new PageWatch(connection, { browserContextId, targetId, sessionId }, {
-    onPopupRequest: (url) => { recordPopupRequest(browser, url); }, ownsBrowserContext: true, claimsDownload: (event) => browser.downloads.claims(event),
+    onPopupRequest: (url) => { recordPopupRequest(browser, url); }, ownsBrowserContext: true, claimsDownload: (event) => browser.downloads.claims(event), isDownloadStepUnderWay: () => browser.downloads.isArmed(),
   });
   await watch.start();
   await browser.recorder.start(sessionId);
@@ -426,7 +428,7 @@ async function openTab(browser: SessionBrowser, firstWatch: PageWatch, firstDeta
     return failure({ code: 'navigation-failed', detail: `the new tab did not open: ${errorText(error)}` });
   }
   const watch = new PageWatch(connection, { browserContextId, targetId: attached.targetId, sessionId: attached.sessionId }, {
-    onPopupRequest: (url) => { recordPopupRequest(browser, url); }, ownsBrowserContext: false, claimsDownload: (event) => browser.downloads.claims(event),
+    onPopupRequest: (url) => { recordPopupRequest(browser, url); }, ownsBrowserContext: false, claimsDownload: (event) => browser.downloads.claims(event), isDownloadStepUnderWay: () => browser.downloads.isArmed(),
   });
   let stopResponses = (): void => undefined;
   let stopNetwork = (): void => undefined;

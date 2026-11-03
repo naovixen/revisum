@@ -125,6 +125,11 @@ export class DownloadFolder implements DownloadCapture {
     return false;
   }
 
+  // True while a download step is waiting for its file.
+  isArmed(): boolean {
+    return this.#armed !== null;
+  }
+
   // Notes the media type of each response a page of the session receives while a step is armed;
   // the download's own response says what the file is. Returns how to stop.
   watchResponses(sessionId: string): () => void {

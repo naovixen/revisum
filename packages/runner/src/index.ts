@@ -18,6 +18,7 @@ export {
   EGRESS_DECISION_HEADER, ProxyClient, proxyRules, startEgressProxy, startProxyServer,
   type AddressConnector, type ConnectionFailure, type EgressDecisionMark, type AddressResolver, type EgressProxy, type EgressProxyOptions, type ProxyRules, type ProxyServerOptions, type RewriteRule,
 } from './egress-proxy.ts';
+export { readBrowserRefusals } from './ReadBrowserRefusals.ts';
 export { readProxyDecision, readProxyRules } from './proxy-container.ts';
 export { RUN_IMAGE_RECORD, RUN_IMAGE_TAG, prepareRunImage, readImageDigest, type RunImage, type RunImageError } from './run-image.ts';
 export {

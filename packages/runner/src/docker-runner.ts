@@ -20,8 +20,9 @@ import type { ContainerEngine, ContainerMount } from './container-engine.ts';
 import { joinEgressEvents } from './egress-events.ts';
 import {
   DEFAULT_BRIDGE_NETWORK, WORKSPACE, dependenciesVolumeFor, hasProxyLostRecords, ownCodeMounts, probeRunNetwork, proxyContainer, proxyReadyScript, proxyUrl,
-  readAppliedRewrites, readDecisions, repositoryFolder, runImageContainer,
+  readAppliedRewrites, readDecisions, repositoryFolder, runImageContainer, serviceProxyUrl,
 } from './run-containers.ts';
+import { SERVICE_PROXY_VARIABLE } from './proxy-container.ts';
 import { RUN_IMAGE_TAG } from './run-image.ts';
 
 // A variable name Docker copies from the client's environment, never read as NAME=value.
@@ -48,12 +49,12 @@ export function dockerRunner(options: DockerRunnerOptions): Runner {
   const root = options.repositoryRoot;
   const log = options.log ?? ((): void => undefined);
   const dependenciesVolume = dependenciesVolumeFor(options.dependenciesVolume);
-  let level: GuaranteeLevel = 'host';
+  let latestRun: RunnerHandle | null = null;
 
   const sharedMounts = (): ContainerMount[] => ownCodeMounts(root, dependenciesVolume);
 
   async function start(image: ImageDigest, policy: EgressPolicy): Promise<Result<RunnerHandle, RunnerError>> {
-    level = 'host';
+    latestRun = null;
     const localId = await engine.imageId(RUN_IMAGE_TAG);
     if (localId === null) {
       // A daemon that does not answer says nothing about whether the image exists.
@@ -104,16 +105,20 @@ export function dockerRunner(options: DockerRunnerOptions): Runner {
     const proxyName = `${runId}-proxy`;
     const proxy = await engine.startContainer(proxyContainer(root, {
       name: proxyName, image, networks: unenforceable === null ? [network, DEFAULT_BRIDGE_NETWORK] : [network],
-      policy, services: options.services, mounts: sharedMounts(),
+      policy, services: options.services, mounts: sharedMounts(), hasRunAddresses: true,
     }));
     if (!proxy.ok) return refuse(`the proxy container did not start: ${proxy.error.detail}`);
     containers.push(proxy.value);
     const proxyId = proxy.value;
 
-    const proxyAddress = proxyUrl(proxyName);
+    // A browser takes HTTP_PROXY by default, so that is the address that closes the socket on a
+    // refusal. Whatever calls services has to ask for the one that answers. Wrongly used, that gives a
+    // service a failed call, never a page a readable answer.
+    const browserAddress = proxyUrl(proxyName);
     const runEnvironment = {
-      HOME: '/tmp', HTTP_PROXY: proxyAddress, HTTPS_PROXY: proxyAddress, NO_PROXY: 'localhost,127.0.0.1,::1',
-      'http_proxy': proxyAddress, 'https_proxy': proxyAddress, 'no_proxy': 'localhost,127.0.0.1,::1',
+      HOME: '/tmp', HTTP_PROXY: browserAddress, HTTPS_PROXY: browserAddress, NO_PROXY: 'localhost,127.0.0.1,::1',
+      'http_proxy': browserAddress, 'https_proxy': browserAddress, 'no_proxy': 'localhost,127.0.0.1,::1',
+      [SERVICE_PROXY_VARIABLE]: serviceProxyUrl(proxyName),
     };
     const runMounts: ContainerMount[] = [
       ...sharedMounts(),
@@ -135,6 +140,7 @@ export function dockerRunner(options: DockerRunnerOptions): Runner {
     if (unenforceable === null && await probeRunNetwork(engine, runContainerId, network) === 'reached') {
       unenforceable = 'a connection from inside the run container reached an address outside, or the Docker host, without the proxy';
     }
+    let level: GuaranteeLevel = 'host';
     if (unenforceable === null) level = 'isolated';
     else log({ code: 'egress-unenforceable', detail: unenforceable });
 
@@ -173,12 +179,14 @@ export function dockerRunner(options: DockerRunnerOptions): Runner {
         await refreshEvidence();
         await removeAll();
       },
+      guaranteeLevel: () => level,
     };
+    latestRun = handle;
     return success(handle);
   }
 
   return {
     start,
-    guaranteeLevel: () => level,
+    guaranteeLevel: () => latestRun?.guaranteeLevel() ?? 'host',
   };
 }
