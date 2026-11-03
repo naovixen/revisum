@@ -4,15 +4,10 @@
 // made. The browser's process, launch flags and clipboard stay, so sessions run strictly one at a
 // time, a browser only takes the settings it was launched with, and a session reads no clipboard.
 // A key press can still paste what an earlier session copied, so tests that copy or paste keep to a
-// browser of their own. Each session's egress proxy goes on its context, so a shared browser launched
-// with no proxy holds a dead browser-wide one for Chrome's own traffic.
+// browser of their own. Each session's egress proxy goes on its context, so every browser holds a dead
+// browser-wide one for Chrome's own traffic.
 import { CdpConnection } from "./cdp-connection.ts";
-import {
-    QUIET_CHROME_FLAGS,
-    proxyFlags,
-    sessionEgressChromeFlags,
-    type ProxySettings,
-} from "./chrome-flags.ts";
+import { sessionEgressChromeFlags } from "./chrome-flags.ts";
 import { launchChromium, type LaunchedChromium } from "./chromium-launcher.ts";
 import { holdDeadProxy } from "./HoldDeadProxy.ts";
 
@@ -26,7 +21,6 @@ const CONTEXT_POLL_MILLISECONDS = 5;
 type LaunchSettings = {
     readonly executablePath: string;
     readonly locale: string;
-    readonly proxy: ProxySettings | undefined;
 };
 
 export type SharedBrowser = LaunchSettings & {
@@ -41,8 +35,8 @@ export type LaunchedSharedBrowser = SharedBrowser & {
     stop(): Promise<void>;
 };
 
-// Asked once per session for a browser launched for that locale. The executable and proxy are the
-// driver's own, so a source serves one driver's settings and keeps a browser per locale.
+// Asked once per session for a browser launched for that locale. The executable is the driver's own,
+// so a source serves one driver's settings and keeps a browser per locale.
 export type BrowserSource = (locale: string) => Promise<SharedBrowser>;
 
 // The browser a session runs on, however it got it.
@@ -54,45 +48,21 @@ export type AttachedBrowser = {
     close(): Promise<void>;
 };
 
-const launchDriverChromium = (
-    settings: LaunchSettings,
-    flags: readonly string[],
-    launchTimeoutMilliseconds = DEFAULT_LAUNCH_TIMEOUT_MILLISECONDS,
-): Promise<LaunchedChromium> =>
-    launchChromium(settings.executablePath, {
-        arguments: [...flags, `--lang=${settings.locale}`],
-        launchTimeoutMilliseconds,
-        commandTimeoutMilliseconds: COMMAND_TIMEOUT_MILLISECONDS,
-        profilePrefix: "cdp-driver-",
-    });
-
-const launchWithoutSessionEgress = (
-    settings: LaunchSettings,
-    launchTimeoutMilliseconds?: number,
-): Promise<LaunchedChromium> =>
-    launchDriverChromium(
-        settings,
-        [
-            ...QUIET_CHROME_FLAGS,
-            ...(settings.proxy === undefined ? [] : proxyFlags(settings.proxy)),
-        ],
-        launchTimeoutMilliseconds,
-    );
-
 // The dead proxy lasts exactly as long as the browser: a port let go while the browser ran could be
 // taken by another program, so it closes only once the browser has ended, however it ended.
-async function launchForSessionEgress(
+async function launchDriverChromium(
     settings: LaunchSettings,
-    launchTimeoutMilliseconds?: number,
+    launchTimeoutMilliseconds = DEFAULT_LAUNCH_TIMEOUT_MILLISECONDS,
 ): Promise<LaunchedChromium> {
     const deadProxy = await holdDeadProxy();
     let launched: LaunchedChromium;
     try {
-        launched = await launchDriverChromium(
-            settings,
-            sessionEgressChromeFlags(deadProxy.server),
+        launched = await launchChromium(settings.executablePath, {
+            arguments: [...sessionEgressChromeFlags(deadProxy.server), `--lang=${settings.locale}`],
             launchTimeoutMilliseconds,
-        );
+            commandTimeoutMilliseconds: COMMAND_TIMEOUT_MILLISECONDS,
+            profilePrefix: "cdp-driver-",
+        });
     } catch (error) {
         await deadProxy.close();
         throw error;
@@ -121,21 +91,13 @@ export const launchOwnBrowser = async (
     settings: LaunchSettings,
     launchTimeoutMilliseconds?: number,
 ): Promise<AttachedBrowser> =>
-    browserOfItsOwn(await launchWithoutSessionEgress(settings, launchTimeoutMilliseconds));
-
-export const launchOwnBrowserForSessionEgress = async (
-    settings: LaunchSettings,
-    launchTimeoutMilliseconds?: number,
-): Promise<AttachedBrowser> =>
-    browserOfItsOwn(await launchForSessionEgress(settings, launchTimeoutMilliseconds));
+    browserOfItsOwn(await launchDriverChromium(settings, launchTimeoutMilliseconds));
 
 export async function launchSharedBrowser(
     settings: LaunchSettings,
     launchTimeoutMilliseconds?: number,
 ): Promise<LaunchedSharedBrowser> {
-    const launch =
-        settings.proxy === undefined ? launchForSessionEgress : launchWithoutSessionEgress;
-    const launched = await launch(settings, launchTimeoutMilliseconds);
+    const launched = await launchDriverChromium(settings, launchTimeoutMilliseconds);
     const { browserProcess } = launched;
     return {
         ...settings,
@@ -150,12 +112,6 @@ export async function launchSharedBrowser(
 // its browser here, so no later session can run alongside what is left of it.
 const browsersInUse = new WeakSet<SharedBrowser>();
 
-const isSameProxy = (
-    first: ProxySettings | undefined,
-    second: ProxySettings | undefined,
-): boolean =>
-    first?.server === second?.server && first?.includeLoopback === second?.includeLoopback;
-
 function whyRefused(shared: SharedBrowser, wanted: LaunchSettings): string | null {
     if (!shared.isAlive()) {
         return "the shared browser has died";
@@ -165,9 +121,6 @@ function whyRefused(shared: SharedBrowser, wanted: LaunchSettings): string | nul
     }
     if (shared.locale !== wanted.locale) {
         return `the shared browser was launched for locale ${shared.locale}, not ${wanted.locale}`;
-    }
-    if (!isSameProxy(shared.proxy, wanted.proxy)) {
-        return "the shared browser was launched with another proxy";
     }
     if (browsersInUse.has(shared)) {
         return "another session has not finished closing on the shared browser";

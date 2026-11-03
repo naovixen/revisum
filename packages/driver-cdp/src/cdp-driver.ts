@@ -9,7 +9,6 @@ import { isAbsolute, relative, resolve } from 'node:path';
 import { chromiumBuild } from './browser-build.ts';
 import { SESSION_FEATURES, buildSession, errorText, type SessionDetails } from './browser-session.ts';
 import type { CdpConnection, CdpSessionClient } from './cdp-connection.ts';
-import type { ProxySettings } from './chrome-flags.ts';
 import { DownloadFolder } from './downloads.ts';
 import { EgressRecorder } from './egress-records.ts';
 import { BrowserNetwork, atResponseStage, type HeldRequest } from './network-stubs.ts';
@@ -21,7 +20,7 @@ import type {
 import { PageWatch, type AttachedPage } from './page-watch.ts';
 import { RunClipboard, SHARED_BROWSER_CLIPBOARD, allowRunClipboard } from './run-clipboard.ts';
 import { mergeRefusedOrigins, openSessionEgress, type EgressSource, type OpenedSessionEgress } from './SessionEgress.ts';
-import { attachToSharedBrowser, launchOwnBrowser, launchOwnBrowserForSessionEgress, type AttachedBrowser, type BrowserSource } from './SharedBrowser.ts';
+import { attachToSharedBrowser, launchOwnBrowser, type AttachedBrowser, type BrowserSource } from './SharedBrowser.ts';
 import { BrowserClock } from './virtual-clock.ts';
 import { PageStorage } from './web-storage.ts';
 
@@ -154,10 +153,9 @@ export type CdpDriverOptions = {
   // serves one from here, never a file outside it. Without it, the driver refuses every upload and
   // every stub with a fixture body.
   readonly fixturesFolder?: string;
-  readonly proxy?: ProxySettings;
-  // Gives each session an egress proxy of its own, on its browser context. With it, `proxy` is ignored:
-  // the browser-wide proxy is a dead one, for Chrome's own traffic.
-  readonly egress?: EgressSource;
+  // Gives each session an egress proxy of its own, on its browser context. The browser-wide proxy is a
+  // dead one, for Chrome's own traffic.
+  readonly egress: EgressSource;
   // Where sessions get a browser someone else launched. Without it, as in production, every session
   // launches a browser of its own and ends it on close.
   readonly browserSource?: BrowserSource;
@@ -206,15 +204,12 @@ export function cdpDriver(options: CdpDriverOptions): OwnBrowserDriver {
     },
     async open(target, environment) {
       if (target.engine !== 'chromium') return failure({ reason: 'engine-not-supported', detail: 'CDP drives Chromium only' });
-      let sessionEgress: OpenedSessionEgress | null = null;
-      if (options.egress !== undefined) {
-        const opened = await openSessionEgress(options.egress, environment.allowedOrigins);
-        if (!opened.ok) {
-          return failure({ reason: 'launch-failed', detail: opened.error });
-        }
-        sessionEgress = opened.value;
+      const opened = await openSessionEgress(options.egress, environment.allowedOrigins);
+      if (!opened.ok) {
+        return failure({ reason: 'launch-failed', detail: opened.error });
       }
-      const closeEgress = async (): Promise<void> => { await sessionEgress?.egress.close(); };
+      const sessionEgress = opened.value;
+      const closeEgress = (): Promise<void> => sessionEgress.egress.close();
       let attached: AttachedBrowser;
       try {
         attached = await attachBrowser(options, target.locale);
@@ -233,13 +228,12 @@ export function cdpDriver(options: CdpDriverOptions): OwnBrowserDriver {
 }
 
 function attachBrowser(options: CdpDriverOptions, locale: string): Promise<AttachedBrowser> {
-  const { executablePath, egress, browserSource, launchTimeoutMilliseconds } = options;
-  const settings = { executablePath, locale, proxy: egress === undefined ? options.proxy : undefined };
+  const { executablePath, browserSource, launchTimeoutMilliseconds } = options;
+  const settings = { executablePath, locale };
   if (browserSource !== undefined) {
     return browserSource(locale).then((shared) => attachToSharedBrowser(shared, settings));
   }
-  const launch = egress === undefined ? launchOwnBrowser : launchOwnBrowserForSessionEgress;
-  return launch(settings, launchTimeoutMilliseconds);
+  return launchOwnBrowser(settings, launchTimeoutMilliseconds);
 }
 
 // Why a session did not open, then anything that also went wrong clearing up after it.
@@ -285,11 +279,11 @@ function recordPopupRequest(browser: SessionBrowser, requestedUrl: string): void
 const TAB_ATTACH_TIMEOUT_MILLISECONDS = 10_000;
 
 async function createSession(
-  attached: AttachedBrowser, sessionEgress: OpenedSessionEgress | null, target: Target, environment: SessionEnvironment, fixturesFolder: string | undefined,
+  attached: AttachedBrowser, sessionEgress: OpenedSessionEgress, target: Target, environment: SessionEnvironment, fixturesFolder: string | undefined,
 ): Promise<DriverSession> {
   const connection = attached.connection;
   const version = await connection.send<{ product: string; userAgent: string }>(undefined, 'Browser.getVersion');
-  const { browserContextId } = await connection.send<{ browserContextId: string }>(undefined, 'Target.createBrowserContext', { disposeOnDetach: true, ...sessionEgress?.contextProxy });
+  const { browserContextId } = await connection.send<{ browserContextId: string }>(undefined, 'Target.createBrowserContext', { disposeOnDetach: true, ...sessionEgress.contextProxy });
   const { targetId } = await connection.send<{ targetId: string }>(undefined, 'Target.createTarget', { url: 'about:blank', browserContextId });
   const { sessionId } = await connection.send<{ sessionId: string }>(undefined, 'Target.attachToTarget', { targetId, flatten: true });
   // Every request's origin and channel, for the run's egress events.
@@ -320,7 +314,7 @@ async function createSession(
   const details: SessionDetails = {
     browser: { name: 'chromium', version: /\/(\S+)$/.exec(version.product)?.[1] ?? version.product },
     processId: attached.processId,
-    blockedOrigins: () => mergeRefusedOrigins(browser.blocked, sessionEgress?.egress.refusedOrigins() ?? []),
+    blockedOrigins: () => mergeRefusedOrigins(browser.blocked, sessionEgress.egress.refusedOrigins()),
     egressRecords: () => browser.recorder.records(),
     // Popups settle first, so the blocked origins are complete once this ends. This page's watch sees
     // every popup of the browser context, whichever tab opened it. The download folder goes once the
@@ -336,7 +330,7 @@ async function createSession(
           browser.downloads.remove();
         }
       } finally {
-        await sessionEgress?.egress.close();
+        await sessionEgress.egress.close();
       }
     },
     events: watch,

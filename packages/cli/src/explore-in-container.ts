@@ -63,6 +63,10 @@ async function main(): Promise<number> {
   if (target === undefined || exploreStartOrigin(project.value, input.start) === undefined) return stop(CONTAINER_EXIT.failed, 'nothing may be crawled');
   const browserPath = input.browserPath ?? pinnedChrome();
   if (browserPath === undefined) return stop(CONTAINER_EXIT.failed, 'no browser is installed');
+  const proxyServer = process.env['HTTP_PROXY'];
+  if (proxyServer === undefined || proxyServer === '') {
+    return stop(CONTAINER_EXIT.failed, 'HTTP_PROXY is unset or empty, so the crawl has no egress proxy to run behind');
+  }
 
   // Only the declared secrets are read from the environment.
   const variables = Object.fromEntries(project.value.secretNames.map((name) => [name, process.env[name]]));
@@ -74,7 +78,7 @@ async function main(): Promise<number> {
     if (login === undefined) return stop(CONTAINER_EXIT.loginRefused, 'the --after plan was refused');
   }
 
-  const browser = buildAdapters.containerBrowserDriver({ executablePath: browserPath, proxyServer: process.env['HTTP_PROXY'] });
+  const browser = buildAdapters.containerBrowserDriver({ executablePath: browserPath, proxyServer });
   const crawled = await crawlInBrowser(browser, {
     project: project.value, target, redactor, secrets, audit: discardingAudit,
     options: {

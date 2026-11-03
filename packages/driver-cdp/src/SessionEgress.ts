@@ -12,7 +12,7 @@ export type SessionEgress = {
     // What the egress refused, in its own form, such as "host:443".
     refusedOrigins(): readonly string[];
     // A diagnostic for whoever is running, which stays out of the hashed result.
-    connectionFailures?(): readonly ConnectionFailure[];
+    connectionFailures(): readonly ConnectionFailure[];
     close(): Promise<void>;
 };
 

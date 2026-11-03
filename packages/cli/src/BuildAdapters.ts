@@ -35,14 +35,12 @@ export const buildAdapters = {
         proxyServer,
     }: {
         readonly executablePath: string;
-        readonly proxyServer: string | undefined;
+        readonly proxyServer: string;
     }): OwnBrowserDriver {
         return cdpDriver({
             executablePath,
             // Everything but the container's own loopback goes through the run's egress proxy.
-            ...(proxyServer === undefined || proxyServer === ""
-                ? {}
-                : { egress: egressThroughExistingProxy(proxyServer) }),
+            egress: egressThroughExistingProxy(proxyServer),
         });
     },
 };
