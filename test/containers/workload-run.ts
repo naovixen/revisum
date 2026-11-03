@@ -88,7 +88,7 @@ export async function runFixtureSuite(image: string, secretValue: string, engine
   const outputDirectory = outputFolder();
   const { runner } = realWorkloadRunner(engine);
   const result = await withSeededHost(() => runSuite(fixtureSuiteProject(image), SUITE_NAME, {
-    workload: runner, secrets: environmentSecretStore({ [DECLARED_SECRET]: secretValue }), checkout: REPOSITORY_ROOT, outputDirectory,
+    workload: runner, secrets: environmentSecretStore({ [DECLARED_SECRET]: secretValue }), checkout: REPOSITORY_ROOT, outputDirectory, pass: 'gating',
   }));
   return { result, outputDirectory };
 }

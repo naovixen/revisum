@@ -4,11 +4,18 @@
 // one must never produce text that does not read back.
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { planHash, readPlanText, writePlanText } from "@revisum/engine";
+import { parseProject, planHash, readPlanText, writePlanText } from "@revisum/engine";
 import { tokenShapedText } from "./evidence-examples.ts";
 import { accepted, type JsonRecord } from "./run-value-examples.ts";
 import { errorsOf, parserEnabling } from "./unsafe-feature-examples.ts";
-import { FEATURES, INLINE_SOURCE, OPEN_CART, unsafePlan } from "./unsafe-feature-steps.ts";
+import {
+    FEATURES,
+    INLINE_SOURCE,
+    OPEN_CART,
+    READ_CART,
+    unsafePlan,
+    unsafeProjectFile,
+} from "./unsafe-feature-steps.ts";
 import { unsafeLimits } from "./unsafe-readable-examples.ts";
 
 const parsePlan = parserEnabling(FEATURES);
@@ -54,11 +61,16 @@ const CREDENTIAL_SHAPED: readonly {
     },
 ];
 
-const UNSAFE_POINTERS: readonly { readonly name: string; readonly pointer: string }[] = [
-    { name: "a bidirectional override", pointer: "/total‮user" },
+const REFUSED_POINTERS: readonly {
+    readonly name: string;
+    readonly pointer: string;
+    readonly code: string;
+}[] = [
+    { name: "a bidirectional override", pointer: "/total‮user", code: "unsafe_text" },
     {
         name: "more characters than any plan text may hold",
         pointer: `/${"a".repeat(limits.maximumTextLength + 1)}`,
+        code: "too_long",
     },
 ];
 
@@ -74,6 +86,41 @@ const ORDINARY_STEPS: readonly { readonly name: string; readonly step: JsonRecor
     { name: "an inline script's field pointer", step: inlineStep("/items/0/name") },
     { name: "an inline script's field pointer with a space", step: inlineStep("/order total") },
 ];
+
+// Everywhere a plan may be given a key its grammar does not know, with the key as a function of the plan.
+const PLANS_WITH_AN_UNKNOWN_KEY: readonly {
+    readonly name: string;
+    readonly planWithKey: (key: string) => JsonRecord;
+}[] = [
+    { name: "a plan", planWithKey: (key) => ({ ...planWith(captureStep("ok")), [key]: "x" }) },
+    {
+        name: "a plan's meta",
+        planWithKey: (key) => {
+            const plan = planWith(captureStep("ok"));
+            return { ...plan, meta: { ...(plan["meta"] as JsonRecord), [key]: "x" } };
+        },
+    },
+    { name: "a step", planWithKey: (key) => planWith({ ...captureStep("ok"), [key]: "x" }) },
+    {
+        name: "a locator",
+        planWithKey: (key) =>
+            planWith({ ...downloadStep("ok"), locator: { ...EXPORT_BUTTON, [key]: "x" } }),
+    },
+    {
+        name: "a page script's arguments",
+        planWithKey: (key) =>
+            planWith({
+                ...READ_CART,
+                arguments: { ...(READ_CART["arguments"] as JsonRecord), [key]: "x" },
+            }),
+    },
+];
+
+const errorsOfProjectWithKey = (key: string): string => {
+    const parsed = parseProject({ ...unsafeProjectFile(), [key]: "x" });
+    assert.equal(parsed.ok, false, "the project was accepted");
+    return JSON.stringify(parsed);
+};
 
 const hashAfterWritingAndReading = (plan: JsonRecord): string => {
     const read = readPlanText(writePlanText(accepted(parsePlan, plan)), limits);
@@ -102,15 +149,46 @@ describe("Using the plan parser", () => {
         });
     }
 
-    for (const { name, pointer } of UNSAFE_POINTERS) {
+    for (const { name, planWithKey } of PLANS_WITH_AN_UNKNOWN_KEY) {
+        describe(`given ${name} with an unknown key shaped like a credential`, () => {
+            describe("when the plan is parsed", () => {
+                test("then it should refuse the plan", () => {
+                    assert.ok(errorsOf(parsePlan, planWithKey(MIXED_CASE_TOKEN)).length > 0);
+                });
+
+                test("then it should not repeat the key in its errors", () => {
+                    assert.ok(
+                        !JSON.stringify(
+                            errorsOf(parsePlan, planWithKey(MIXED_CASE_TOKEN)),
+                        ).includes(MIXED_CASE_TOKEN),
+                        "an error repeats the credential",
+                    );
+                });
+            });
+        });
+
+        describe(`given ${name} with an unknown key that is ordinary text`, () => {
+            describe("when the plan is parsed", () => {
+                test("then it should name the key in its errors", () => {
+                    assert.ok(
+                        JSON.stringify(errorsOf(parsePlan, planWithKey("shippingNote"))).includes(
+                            "shippingNote",
+                        ),
+                    );
+                });
+            });
+        });
+    }
+
+    for (const { name, pointer, code } of REFUSED_POINTERS) {
         describe(`given an inline script's field pointer holding ${name}`, () => {
             describe("when the plan is parsed", () => {
-                test("then it should refuse it as unsafe_text", () => {
+                test(`then it should refuse it as ${code}`, () => {
                     assert.deepEqual(
                         errorsOf(parsePlan, planWith(inlineStep(pointer))).map(
                             (error) => error.code,
                         ),
-                        ["unsafe_text"],
+                        [code],
                     );
                 });
             });
@@ -145,4 +223,25 @@ describe("Using the plan parser", () => {
             });
         });
     }
+});
+
+describe("Using the project parser", () => {
+    describe("given a project with an unknown key shaped like a credential", () => {
+        describe("when the project is parsed", () => {
+            test("then it should not repeat the key in its errors", () => {
+                assert.ok(
+                    !errorsOfProjectWithKey(MIXED_CASE_TOKEN).includes(MIXED_CASE_TOKEN),
+                    "an error repeats the credential",
+                );
+            });
+        });
+    });
+
+    describe("given a project with an unknown key that is ordinary text", () => {
+        describe("when the project is parsed", () => {
+            test("then it should name the key in its errors", () => {
+                assert.ok(errorsOfProjectWithKey("shippingNote").includes("shippingNote"));
+            });
+        });
+    });
 });

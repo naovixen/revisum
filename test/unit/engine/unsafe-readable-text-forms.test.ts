@@ -21,6 +21,15 @@ const NAMED_RUN_LINE = 'Unsafe: Run page script readCart with currency "eur" rem
 const stepsOf = (text: string, label: string): JsonRecord[] => (readingOf(text, label).json as { steps: JsonRecord[] }).steps;
 const cleanupOf = (text: string, label: string): JsonRecord[] => (readingOf(text, label).json as { cleanup: JsonRecord[] }).cleanup;
 
+// What a reading means as JSON, to compare with a literal: the reader's maps have a null prototype,
+// so that a key such as "__proto__" is only a key. A key whose value is undefined has no JSON, so a
+// copy would hide it: that fails here, and everything else the copy keeps is compared as it was.
+const asJson = (value: unknown): unknown =>
+  JSON.parse(JSON.stringify(value, (key, field: unknown) => {
+    assert.notEqual(field, undefined, `the reading holds a key with no JSON value: ${key}`);
+    return field;
+  }));
+
 // The golden text of `feature` with the line holding `statement` replaced by `replacement`.
 function changedGolden(feature: Parameters<typeof unsafeGoldenText>[0], statement: string, replacement: string | readonly string[]): string {
   const text = unsafeGoldenText(feature);
@@ -69,7 +78,7 @@ test('the spec\'s example of a nested locator and a multi-line inline check read
     '',
   ]);
   const steps = stepsOf(text, 'the spec example');
-  assert.deepEqual(steps.slice(1), [
+  assert.deepEqual(asJson(steps.slice(1)), [
     { type: 'click', locator: { by: 'css', selector: 'button', hasText: 'Add', inside: { by: 'css', selector: 'li.product', position: 2 } } },
     {
       type: 'expectScript',
@@ -142,7 +151,7 @@ test('a named script without "with" reads with empty arguments, and without "rem
 
 test('"remembering nothing" reads as an empty remember field', () => {
   const steps = stepsOf(changedGolden('page-script', NAMED_RUN_LINE, 'Unsafe: Run page script readCart with currency "eur" remembering nothing'), 'nothing');
-  assert.deepEqual(steps[1], { type: 'evaluate', script: 'readCart', arguments: { currency: 'eur' }, remember: {} });
+  assert.deepEqual(asJson(steps[1]), { type: 'evaluate', script: 'readCart', arguments: { currency: 'eur' }, remember: {} });
 });
 
 test('an inline script without "returning" leaves fields out, and "returning nothing" reads as empty fields', () => {
@@ -154,7 +163,7 @@ test('an inline script without "returning" leaves fields out, and "returning not
 
 test('a returned field at "" points at the whole result', () => {
   const steps = stepsOf(inlineText('Unsafe: Run inline read page script returning whole at "", count at "/count":', ['  "() => 1"']), 'whole');
-  assert.deepEqual(steps[1]?.['script'], { inline: { source: '() => 1', effect: 'read', fields: { whole: '', count: '/count' } } });
+  assert.deepEqual(asJson(steps[1]?.['script']), { inline: { source: '() => 1', effect: 'read', fields: { whole: '', count: '/count' } } });
 });
 
 for (const [words, assertion] of [
@@ -173,17 +182,17 @@ for (const [words, assertion] of [
 
 test('a database command check and a database command in Clean up: read as the spec gives them', () => {
   const text = unsafeGoldenText('database-command');
-  assert.deepEqual(stepsOf(text, 'database')[2], {
+  assert.deepEqual(asJson(stepsOf(text, 'database')[2]), {
     type: 'expectDatabase', command: 'countOrders', arguments: { email: 'ada@example.com' }, field: 'count', assert: { kind: 'equals', value: '3' },
     criterionId: 'orders.three-seeded',
   });
-  assert.deepEqual(cleanupOf(text, 'database'), [{ type: 'database', command: 'seedOrders', arguments: { count: 3 } }]);
+  assert.deepEqual(asJson(cleanupOf(text, 'database')), [{ type: 'database', command: 'seedOrders', arguments: { count: 3 } }]);
 });
 
 test('a secret argument reads like any other, and the parser refuses it with wrong_type on its line', () => {
   const statement = 'Unsafe: Run page script readCart with currency secret SHOP_DATABASE_PASSWORD';
   const text = changedGolden('page-script', NAMED_RUN_LINE, statement);
-  assert.deepEqual(stepsOf(text, 'secret')[1]?.['arguments'], { currency: { secretName: 'SHOP_DATABASE_PASSWORD' } });
+  assert.deepEqual(asJson(stepsOf(text, 'secret')[1]?.['arguments']), { currency: { secretName: 'SHOP_DATABASE_PASSWORD' } });
   assert.ok(placed(parserErrors(text)).includes(`wrong_type $.steps[1].arguments.currency ${lineOf(text, statement)}`), placed(parserErrors(text)).join('\n'));
 });
 

@@ -34,12 +34,32 @@ const REACHES_THE_DESTRUCTIVE_ROUTE: readonly string[] = [
     "/shop/..%252faccount/delete",
     "/shop/%252e%252e%252faccount/delete",
     "/shop/%252e%252e%252faccount%252fdelete",
+    "/shop/%252e%252e;x=1/account/delete",
+    "/account/delete/%252e%252e/settings",
+    "/account/delete//%252e%252e/settings",
+    "/account//delete",
+    "/account/%2f/delete",
+    "/account/%252e%252e//account/delete",
+    // Where "//" holds an empty segment, ".." climbs out of that alone.
+    "/account//%252e%252e/delete",
+    "/account/settings//%252e%252e/%252e%252e/delete",
+    // Where "//" is merged into one slash, ".." climbs out of the segment before it.
+    "/account/settings//%252e%252e/delete",
+    // On both readings.
+    "/shop//%252e%252e/%252e%252e/account/delete",
 ];
 
 const REACHES_ANOTHER_ROUTE: readonly string[] = [
     "/account/%252e%252e/account/settings",
     "/shop/%252e%252e/account/settings",
     "/account/%252e%252ehidden/delete",
+    "/shop/%252e%252e;x=1/account/settings",
+    "/account//settings",
+    "/account//%252e%252e/settings",
+    "/account/settings//%252e%252e/settings",
+    "/account//%252e%252edelete",
+    "/account/deleted",
+    "/account/deleted//%252e%252e/deleted",
 ];
 
 let tested: TestGate;

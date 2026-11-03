@@ -2,6 +2,8 @@
 // find its echoes grow beyond what the regular expression engine accepts. That must cost nothing: the
 // run still ends with its verdict, and an echo of the secret is still gone from what the run keeps.
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -14,21 +16,78 @@ import {
     type ElementProbe,
     type SecretName,
 } from "@revisum/engine";
+import { REPOSITORY_ROOT } from "../../support/repository.ts";
 import { fakeSession, runOnFakeSession } from "./RunOnFakeSession.ts";
 import { resolvedSecret } from "./secret-examples.ts";
 import { DATABASE_SECRET, OPEN_CART, unsafePlan, type JsonRecord } from "./unsafe-feature-steps.ts";
 
 const LENGTHS: readonly number[] = [5_200, 20_000];
 
-// Varied enough that no piece of it is another's repeat, and with the symbols secrets hold: each
-// takes more of a pattern than a letter does.
+// No piece of it repeats another, so finding one part of it says nothing about any other, and it has
+// the symbols secrets hold: each takes more of a pattern than a letter does.
 const secretOfLength = (length: number): string => {
-    const alphabet = "abcdefghijklmnopqrstuvwxyz0123456789/+=~?";
-    const characters = [...Array(length).keys()].map(
-        (index) => alphabet[(index * index + index) % alphabet.length],
-    );
-    return `rv${characters.join("")}`.slice(0, length);
+    let value = "rv";
+    for (let block = 0; value.length < length; block += 1) {
+        value += createHash("sha256")
+            .update(String(block))
+            .digest("base64")
+            .replaceAll("A", "~")
+            .replaceAll("B", "?");
+    }
+    return value.slice(0, length);
 };
+
+// Short enough that a part left behind shows, long enough that it cannot occur by chance in what
+// else a result holds, such as its hashes.
+const SLICE_LENGTH = 16;
+
+// The first slice of `written` still in `kept`, in any case, or undefined when none is.
+const sliceSurvivingIn = (kept: string, written: string): string | undefined => {
+    const foldedKept = kept.toLowerCase();
+    const foldedWritten = written.toLowerCase();
+    for (let start = 0; start + SLICE_LENGTH <= foldedWritten.length; start += 1) {
+        const slice = foldedWritten.slice(start, start + SLICE_LENGTH);
+        if (foldedKept.includes(slice)) {
+            return slice;
+        }
+    }
+    return undefined;
+};
+
+const ECHOES: readonly { readonly name: string; readonly written: (value: string) => string }[] = [
+    { name: "base64", written: (value) => Buffer.from(value).toString("base64") },
+    { name: "base64url", written: (value) => Buffer.from(value).toString("base64url") },
+    {
+        name: "base64 after a user name",
+        written: (value) => Buffer.from(`user:${value}`).toString("base64"),
+    },
+    {
+        name: "a JSON string with its slashes escaped",
+        written: (value) => JSON.stringify(value).slice(1, -1).replaceAll("/", "\\/"),
+    },
+    { name: "a URL", written: (value) => encodeURIComponent(value) },
+    {
+        name: "form encoding",
+        written: (value) => new URLSearchParams({ token: value }).toString().slice("token=".length),
+    },
+];
+
+const BACKSLASH_RUN_LENGTH = 20_000;
+const LONGEST_BACKSLASH_RUN_MILLISECONDS = 60_000;
+
+// In a process of its own, because a pattern that hangs holds its thread and no test's timeout could
+// end it. It prints what it was given back, so an answer proves the work was done.
+const BACKSLASH_RUN_SCRIPT = `
+  import { defaultRedactor, environmentSecretStore, withDeclaredSecretRedaction } from "@revisum/engine";
+  const run = "\\\\".repeat(${BACKSLASH_RUN_LENGTH});
+  const value = "z" + run + "q";
+  const redactor = withDeclaredSecretRedaction(defaultRedactor(), ["${DATABASE_SECRET}"], environmentSecretStore({ "${DATABASE_SECRET}": value }));
+  console.log(JSON.stringify({
+    withoutIt: redactor.text("Nothing to hide"),
+    nearly: redactor.text("before " + run.slice(1) + " after"),
+    holdingIt: redactor.text("before " + value + " after"),
+  }));
+`;
 
 const FILL_SECRET: JsonRecord = {
     type: "fill",
@@ -105,9 +164,38 @@ describe("Using secret redaction", () => {
                     const value = secretOfLength(length);
                     const { result, events } = await runShowing(value, `token ${value}`);
                     const kept = JSON.stringify(result) + JSON.stringify(events.read());
-                    assert.equal(kept.includes(value.slice(0, 40)), false);
+                    assert.equal(sliceSurvivingIn(kept, value), undefined);
                 });
             });
+
+            for (const { name, written } of ECHOES) {
+                describe(`when text holding it as ${name} is redacted`, () => {
+                    test("then it should keep no slice of it and keep the rest", () => {
+                        const echo = written(secretOfLength(length));
+                        const redacted = redactorHolding(secretOfLength(length)).text(
+                            `before ${echo} after`,
+                        );
+                        assert.equal(sliceSurvivingIn(redacted, echo), undefined);
+                        assert.ok(redacted.startsWith("before "), redacted.slice(0, 40));
+                        assert.ok(redacted.endsWith(" after"), redacted.slice(-40));
+                    });
+                });
+
+                describe(`when a run shows it as ${name} on a check that fails`, () => {
+                    test("then it should keep no slice of it in the result or the log", async () => {
+                        const value = secretOfLength(length);
+                        const echo = written(value);
+                        const { result, events } = await runShowing(value, `token ${echo}`);
+                        const kept = JSON.stringify(result) + JSON.stringify(events.read());
+                        assert.equal(sliceSurvivingIn(kept, echo), undefined);
+                        assert.equal(
+                            result.steps[2]?.observed?.startsWith("token "),
+                            true,
+                            "the run kept no observation to look in",
+                        );
+                    });
+                });
+            }
 
             describe("when a file holding it is scanned", () => {
                 test("then it should report the leak", () => {
@@ -143,7 +231,31 @@ describe("Using secret redaction", () => {
                 const { result, events } = await runShowing(value, `token ${value}`);
                 assert.equal(result.state, "Failed");
                 const kept = JSON.stringify(result) + JSON.stringify(events.read());
-                assert.equal(kept.includes(value.slice(0, 40)), false);
+                assert.equal(sliceSurvivingIn(kept, value), undefined);
+            });
+        });
+    });
+
+    describe("given a secret that is a very long run of backslashes", () => {
+        describe("when text without it, with nearly all of it, and holding it are redacted", () => {
+            test("then it should finish, keep the first and remove the secret from the others", () => {
+                const finished = spawnSync(
+                    process.execPath,
+                    ["--input-type=module", "--eval", BACKSLASH_RUN_SCRIPT],
+                    {
+                        cwd: REPOSITORY_ROOT,
+                        encoding: "utf8",
+                        timeout: LONGEST_BACKSLASH_RUN_MILLISECONDS,
+                        windowsHide: true,
+                    },
+                );
+                assert.equal(finished.error, undefined, "the redaction did not finish in time");
+                assert.equal(finished.status, 0, finished.stderr);
+                assert.deepEqual(JSON.parse(finished.stdout), {
+                    withoutIt: "Nothing to hide",
+                    nearly: "before [redacted:secret] after",
+                    holdingIt: "before [redacted:secret] after",
+                });
             });
         });
     });

@@ -81,7 +81,7 @@ for (const driver of DRIVERS) {
       revealCallLines(readFileSync(file, 'utf8')).map((line) => ({ file: relative(REPOSITORY_ROOT, file).split('\\').join('/'), line: line.trim() })));
     assert.equal(calls.length, 1, JSON.stringify(calls));
     assert.equal(calls[0]?.file, driver.inputModule);
-    assert.match(calls[0]?.line ?? '', /case 'fill'/, 'the one call is in the fill');
+    assert.match(calls[0]?.line ?? '', /\boperations\.fill\(/, 'the one call is in the fill');
   });
 }
 

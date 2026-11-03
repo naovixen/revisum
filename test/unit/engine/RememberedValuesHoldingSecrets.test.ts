@@ -1,6 +1,7 @@
 // A remembered value is hashed into the result and a later step can send it on, and a hash of a short
 // secret is as good as the secret. So a value that holds one of the plan's secrets is refused wherever
-// it was read from: a response, the clipboard, a page script, a database command or the page itself.
+// it was read from: a response, the clipboard, a page script, a database command, a declared call or
+// the page itself.
 // All values here are made up for the test.
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
@@ -14,6 +15,7 @@ import {
     type FakeRunOptions,
 } from "./RunOnFakeSession.ts";
 import { echoForms } from "./secret-examples.ts";
+import { jsonReply, requestLine, shopWith } from "./service-call-examples.ts";
 import { DATABASE_SECRET, OPEN_CART, unsafePlan, type JsonRecord } from "./unsafe-feature-steps.ts";
 
 const SHORT_SECRET = "4821";
@@ -113,6 +115,29 @@ const FORMS_OF_THE_SECRET: readonly {
     { name: "the secret cut short", written: (secret) => echoForms(secret).prefix },
 ];
 
+// A call keeps its values without a record of their own: its result records the response by sha256.
+const CREATE_ORDER_REMEMBERING: JsonRecord = {
+    type: "call",
+    call: "createOrder",
+    arguments: {
+        customerName: "Ada Lovelace",
+        contactEmail: "ada@example.com",
+        quantity: 2,
+        region: "eu",
+        giftWrap: false,
+        deliveryDay: "2026-11-02",
+    },
+    remember: { orderId: "orderId" },
+};
+
+const shopAnsweringOrderId = (orderId: string): FakeRunOptions => ({
+    serviceRoute: shopWith((request) =>
+        requestLine(request) === "POST /api/orders"
+            ? jsonReply(201, { id: orderId, status: "pending" })
+            : undefined,
+    ),
+});
+
 const planRemembering = (step: JsonRecord): JsonRecord =>
     unsafePlan([OPEN_CART, FILL_SECRET, step]);
 
@@ -186,4 +211,47 @@ describe("Using a run that remembers a value", () => {
             });
         });
     }
+
+    describe("given a value read from a declared call's response", () => {
+        for (const form of FORMS_OF_THE_SECRET) {
+            describe(`and it holds ${form.name}`, () => {
+                describe("when the step runs", () => {
+                    test("then it should refuse the value with value-holds-secret", async () => {
+                        const { result } = await runOnFakeSession(
+                            planRemembering(CREATE_ORDER_REMEMBERING),
+                            shopAnsweringOrderId(form.written(DATABASE_PASSWORD)),
+                        );
+                        assertRefused(result);
+                    });
+                });
+            });
+        }
+
+        describe("and it is exactly a secret too short to search for", () => {
+            describe("when the step runs", () => {
+                test("then it should refuse the value with value-holds-secret", async () => {
+                    const { result } = await runOnFakeSession(
+                        planRemembering(CREATE_ORDER_REMEMBERING),
+                        {
+                            ...shopAnsweringOrderId(SHORT_SECRET),
+                            secrets: environmentSecretStore({ [DATABASE_SECRET]: SHORT_SECRET }),
+                        },
+                    );
+                    assertRefused(result);
+                });
+            });
+        });
+
+        describe("and it holds no secret", () => {
+            describe("when the step runs", () => {
+                test("then it should keep it", async () => {
+                    const { result } = await runOnFakeSession(
+                        planRemembering(CREATE_ORDER_REMEMBERING),
+                        shopAnsweringOrderId(ORDINARY_VALUE),
+                    );
+                    assert.equal(result.state, "Passed", JSON.stringify(result.steps));
+                });
+            });
+        });
+    });
 });

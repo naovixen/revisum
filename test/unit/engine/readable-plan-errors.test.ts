@@ -50,8 +50,8 @@ const STEP_STATEMENTS: readonly (readonly [number, string])[] = [
 
 // Statements of the 1.2 golden plans, as the spec's addition prints them.
 const DISPLAY_NAME_VALUE = '  displayName is unique text starting "Tester"';
-const ORDER_PATH = 'Go to path "orders" / {orderCode} with query tab "items", highlight {orderCode}';
-const CREATE_ORDER = 'Call createOrder with customerName "Ada Lovelace", contactEmail "ada@example.com", quantity 2, region "eu", giftWrap false, deliveryDay "2026-11-02" remembering field orderId as orderId';
+const ORDER_PATH = 'Go to path "orders" / {orderCode} with query highlight {orderCode}, tab "items"';
+const CREATE_ORDER = 'Call createOrder with contactEmail "ada@example.com", customerName "Ada Lovelace", deliveryDay "2026-11-02", giftWrap false, quantity 2, region "eu" remembering field orderId as orderId';
 
 function textErrors(text: string): readonly DraftError[] {
   const read = readPlanText(text, limits);

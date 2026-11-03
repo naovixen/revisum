@@ -143,6 +143,7 @@ export async function runDeclaredSuite(options: SuiteRunOptions = {}): Promise<S
     secrets: environmentSecretStore({ [DECLARED_SECRET]: options.secretValue ?? 'shop-api-token-for-suite-runs-0042' }),
     checkout: options.checkout ?? suiteCheckout(),
     outputDirectory,
+    pass: 'gating',
   });
   return { result, runner, outputDirectory };
 }
