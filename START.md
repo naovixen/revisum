@@ -32,7 +32,7 @@ Where phase 3 stands, from `docs/decisions/refactor-defects.md`:
 - **Founder decided, still to build:** one real Playwright Test run in the weekly tier, after a dependency review (116).
 - **Founder decided:** closed shadow roots stay a documented limit, to revisit with SPEC-10 (129).
 - **Calls made in the main session, which the founder can reverse:** refused connections in request counts (87, amended in SPEC-33) and allowing U+200C and U+200D in plan text (122).
-- **Machine leftovers:** a locked worktree in `.claude/worktrees/` from the break test, and the `elegant_mcclintock` container from 2026-10-28, which is an older dev container for this folder, with no `xclip`. Leave both unless the founder says otherwise. `npm run check:linux` now uses its own container, labelled `revisum.check=linux`.
+- **Machine leftovers:** a locked worktree in `.claude/worktrees/` from the break test. Leave it unless the founder says otherwise. `npm run check:linux` uses its own container, labelled `revisum.check=linux`.
 
 Setup and seed (done):
 
