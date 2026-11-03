@@ -35,6 +35,8 @@ Architecture refactor:
     - [ ] Split `cdp-driver`
     - [ ] Split `egress-proxy`
     - [ ] The runners' shared lifecycle
+    - [ ] One composition root: the one file in `cli` that builds adapters, so no caller can open a browser without the egress proxy
+    - [ ] One complete fake per port, and `fakePorts(overrides)` for the whole set
     - [ ] Throwaway-step experiment: about 7 edits, each forced by the compiler
 - [ ] Phase 4: move files, constants for magic strings, formatting
 - [ ] Phase 5: docs and final trust-path review; the founder pushes

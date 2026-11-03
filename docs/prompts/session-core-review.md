@@ -55,11 +55,11 @@ In this brief, an adapter is anything that implements a port in `contracts`, fak
 | can fail in ways that are expected | a `Result` from `contracts`, or another union of outcomes, that the caller switches on | throwing, or an `undefined` that can mean several things |
 | needs a timeout, logging or redaction | a wrapper that returns the same type, such as `withSecretRedaction(redactor, secrets)` (decorator) | the same `try`/`catch` or call in each caller |
 | has an optional collaborator | a do-nothing implementation passed in, such as an `EventSink` that discards (null object) | `if (sink)` wherever it's used |
-| must be set up and cleaned up | a scope, such as `withSession(run)` | a call order callers have to remember |
+| must be set up and cleaned up | a scope, such as `withSession(run)`, which may use `await using` inside: a bare `await using` can be forgotten and still compile | a call order callers have to remember |
 | has a lifecycle | a union of states, and functions that only accept the state they need (typestate) | flags, nullable fields and `if (session === null)` checks |
 | runs several steps | a sequencer over a list of steps, each doing its own detail (pipeline) | one function that sequences and does the detail |
-| chooses an implementation: production or test, which driver | the composition root in `cli`, the only package that builds adapters and hands them in | `if (isProduction)` or a driver check in the core |
-| stands in for a port in tests | one complete fake per port, from a factory that takes overrides, such as `fakeDriver(overrides)` | a partial fake built in each test |
+| chooses an implementation: production or test, which driver | the composition root, the one file in `cli` that builds adapters and hands them in | `if (isProduction)` or a driver check in the core |
+| stands in for a port in tests | one complete fake per port, from a factory that takes overrides, such as `fakeDriver(overrides)`, and `fakePorts(overrides)` for the whole set | `{} as RunPorts`, or a partial fake built in each test |
 
 Pure logic (parser, policy, oracle, secrets) stays as pure functions, one role per file. A file that is a bag of loosely related functions passing the same arguments around is a missing service, or several files. Flag anything in the *Instead of* column, and a heavier shape than the job needs: a service or factory that wraps one function for no gain, or a seam with no second implementation or test double to justify it. A class hierarchy or DI container is also a finding.
 
