@@ -57,7 +57,29 @@ const workerStartedBy = (
         `fetch(${JSON.stringify(`${origin}${WORKER_FILE_PATH}`)}, { mode: "no-cors" });`,
 });
 
-// The channels a declared address may still use on a host run.
+const WEBRTC_STUN: EgressChannel = {
+    name: "webrtc-stun",
+    attempt: "gathers WebRTC candidates from a STUN server",
+    arrival: Arrival.Datagram,
+    page: ({ address: { hostname, datagramPort } }) =>
+        peerConnectionTo({ urls: `stun:${hostname}:${datagramPort}` }),
+};
+
+// TURN over TCP goes through a proxy, unlike the rest of WebRTC's traffic.
+export const WEBRTC_TURN: EgressChannel = {
+    name: "webrtc-turn",
+    attempt: "gathers WebRTC candidates from a TURN server over TCP",
+    arrival: Arrival.Connection,
+    page: ({ address: { hostname, port } }) =>
+        peerConnectionTo({
+            urls: `turn:${hostname}:${port}?transport=tcp`,
+            username: "probe",
+            credential: "probe",
+        }),
+};
+
+// The channels that reach the proxy: a declared address may still use them on a host run, and the
+// proxy refuses and records an undeclared one.
 export const REQUEST_CHANNELS: readonly EgressChannel[] = [
     {
         name: "websocket",
@@ -95,9 +117,26 @@ export const REQUEST_CHANNELS: readonly EgressChannel[] = [
         attempt: "starts a shared worker that fetches a file",
         ...workerStartedBy((scriptPath) => `new SharedWorker(${scriptPath});`),
     },
+    WEBRTC_TURN,
+];
+
+// The channels a browser context with a proxy never sends on, whatever the address. No attempt reaches
+// the proxy, so a run has nothing to record, and a declared address cannot show that these pages send.
+export const NEVER_PROXIED_CHANNELS: readonly EgressChannel[] = [
+    WEBRTC_STUN,
+    {
+        name: "webtransport",
+        attempt: "opens a WebTransport session",
+        arrival: Arrival.Datagram,
+        page: ({ address: { hostname, datagramPort } }) =>
+            inlineScript(`
+      const session = new WebTransport(${JSON.stringify(`https://${hostname}:${datagramPort}/channel`)});
+      session.ready.catch(() => undefined);
+      session.closed.catch(() => undefined);`),
+    },
     {
         name: "speculation-rules",
-        attempt: "asks for a prefetch through speculation rules",
+        attempt: "asks for a cross-site prefetch through speculation rules",
         arrival: requestArrival(SPECULATED_PATH),
         page: ({ address: { origin } }) =>
             `<script type="speculationrules">${JSON.stringify({
@@ -106,29 +145,12 @@ export const REQUEST_CHANNELS: readonly EgressChannel[] = [
     },
 ];
 
-// Off on a host run whatever the address, so a declared address cannot show that these pages send.
-export const WEBRTC_CHANNELS: readonly EgressChannel[] = [
-    {
-        name: "webrtc-stun",
-        attempt: "gathers WebRTC candidates from a STUN server",
-        arrival: Arrival.Datagram,
-        page: ({ address: { hostname, datagramPort } }) =>
-            peerConnectionTo({ urls: `stun:${hostname}:${datagramPort}` }),
-    },
-    {
-        name: "webrtc-turn",
-        attempt: "gathers WebRTC candidates from a TURN server over TCP",
-        arrival: Arrival.Connection,
-        page: ({ address: { hostname, port } }) =>
-            peerConnectionTo({
-                urls: `turn:${hostname}:${port}?transport=tcp`,
-                username: "probe",
-                credential: "probe",
-            }),
-    },
-];
+export const WEBRTC_CHANNELS: readonly EgressChannel[] = [WEBRTC_STUN, WEBRTC_TURN];
 
-export const EGRESS_CHANNELS: readonly EgressChannel[] = [...REQUEST_CHANNELS, ...WEBRTC_CHANNELS];
+export const EGRESS_CHANNELS: readonly EgressChannel[] = [
+    ...REQUEST_CHANNELS,
+    ...NEVER_PROXIED_CHANNELS,
+];
 
 export const preconnectTo = ({ origin }: ChannelAddress): string =>
     `<link rel="preconnect" href="${origin}">`;

@@ -1,6 +1,7 @@
-// A host run must keep a page's own tab, and any popup it opens, from an undeclared address. Fetch
-// only holds a navigation's request, which leaves room for Chrome to open the connection first, so
-// only the undeclared server's own record can show that nothing got through. Each page is tried
+// A host run must keep a page's own tab, and any popup it opens, from an undeclared address, through
+// the session's egress proxy as a host run builds it. Fetch only holds a navigation's request, which
+// leaves room for Chrome to open the connection first, so only the undeclared server's own record can
+// show that nothing got through. Each page is tried
 // against real servers on loopback: the page's own origin, a declared origin on another site, and an
 // undeclared one on a third. The same page aimed at the declared origin is the counter-example.
 import assert from "node:assert/strict";
@@ -13,7 +14,6 @@ import {
     type BrowserRun,
 } from "#test-support/browser/BrowserHarness.ts";
 import { BrowserTarget, englishMatrix } from "#test-support/browser/BrowserTarget.ts";
-import { driversForTargets } from "#test-support/browser/CreateBrowserDriver.ts";
 import { click, navigate, testId, textEquals } from "#test-support/browser/RawPlan.ts";
 import { FIXED_TIME_MILLISECONDS, SEED, capabilityPlan } from "#test-support/capability-harness.ts";
 import type { FixtureRoute } from "#test-support/fixture-server.ts";
@@ -26,6 +26,7 @@ import {
     attemptPage,
     type ChannelAddress,
 } from "./EgressChannels.ts";
+import { hostBrowserDrivers } from "./HostBrowserDrivers.ts";
 import {
     Arrival,
     requestArrival,
@@ -123,7 +124,7 @@ before(async () => {
         }),
         seed: SEED,
         fixedTimeMilliseconds: FIXED_TIME_MILLISECONDS,
-        drivers: driversForTargets(Object.values(BrowserTarget)),
+        drivers: hostBrowserDrivers(Object.values(BrowserTarget)),
         planFor: capabilityPlan,
     });
 });

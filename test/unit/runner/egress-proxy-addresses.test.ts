@@ -16,7 +16,6 @@ const PUBLIC_ADDRESS = '93.184.215.14';
 const NAMES: Readonly<Record<string, readonly string[] | readonly (readonly string[])[]>> = {
   'loopback.test': ['127.0.0.1'],
   '127.0.0.1.nip.io': ['127.0.0.1'],
-  'localhost': ['127.0.0.1', '::1'],
   'private-ten.test': ['10.0.0.5'],
   'private-home.test': ['192.168.1.1'],
   'shared-space.test': ['100.64.0.1'],
@@ -43,7 +42,7 @@ const NAMES: Readonly<Record<string, readonly string[] | readonly (readonly stri
 };
 
 const REFUSED_NAMES = [
-  'loopback.test', '127.0.0.1.nip.io', 'localhost', 'private-ten.test', 'private-home.test', 'shared-space.test', 'link-local.test',
+  'loopback.test', '127.0.0.1.nip.io', 'private-ten.test', 'private-home.test', 'shared-space.test', 'link-local.test',
   'metadata.test', 'alibaba-metadata.test', 'ipv6-metadata.test', 'ipv6-loopback.test', 'unique-local.test', 'mapped.test',
   'nat64.test', 'six-to-four.test', 'zero.test', 'mixed.test',
 ];

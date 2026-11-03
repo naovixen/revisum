@@ -53,6 +53,36 @@ export function connectThroughProxy(proxyUrl: string, authority: string, timeout
   });
 }
 
+// Writes `text` to the proxy over a socket of its own and returns every byte the proxy sent before it
+// closed the socket, so a test can tell an answer from a socket closed without one. A proxy that keeps
+// the socket open past the limit fails the exchange.
+export function exchangeWithProxy(proxyUrl: string, text: string, timeoutMilliseconds = 5000): Promise<string> {
+  const proxy = new URL(proxyUrl);
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    let isLeftOpen = false;
+    const socket = connect(Number(proxy.port), proxy.hostname);
+    socket.setTimeout(timeoutMilliseconds, () => { isLeftOpen = true; socket.destroy(); });
+    socket.on('data', (chunk: Buffer) => chunks.push(chunk));
+    // A reset is the proxy closing the socket too.
+    socket.on('error', () => undefined);
+    socket.on('close', () => {
+      if (isLeftOpen) {
+        reject(new Error(`the proxy left the socket open after: ${text}`));
+      } else {
+        resolve(Buffer.concat(chunks).toString('latin1'));
+      }
+    });
+    socket.write(text);
+  });
+}
+
+export const plainRequestText = (target: string): string =>
+  `GET ${target}/ HTTP/1.1\r\nHost: ${new URL(target).host}\r\nConnection: close\r\n\r\n`;
+
+export const tunnelRequestText = (authority: string): string =>
+  `CONNECT ${authority} HTTP/1.1\r\nHost: ${authority}\r\n\r\n`;
+
 export const UPSTREAM_BODY = 'reached the upstream server';
 
 export type Dialled = { readonly address: string; readonly port: number };

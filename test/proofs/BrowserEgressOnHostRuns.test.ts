@@ -1,14 +1,16 @@
-// A host run must keep a page from every undeclared address, whichever channel it uses. Each channel
-// here is tried through a whole run in a real headless browser, against real servers on loopback:
-// the page's own origin, a declared origin on another site, and an undeclared one on a third. Only
-// the undeclared server's own record can show that nothing got through. The same page aimed at the
-// declared origin is the counter-example, which shows the channel works in this fixture, so an empty
-// record means something.
+// A host run must keep a page from every undeclared address, whichever channel it uses: each session
+// has its own egress proxy on its browser context, which refuses what is undeclared and shows it. Each
+// channel here is tried through a whole run in a real headless browser, against real servers on
+// loopback: the page's own origin, a declared origin on another site, and an undeclared one on a third.
+// Only the undeclared server's own record can show that nothing got through. The same page aimed at
+// the declared origin is the counter-example, which shows the channel works in this fixture, so an
+// empty record means something.
 //
-// Three kinds of page have no such counter-example. WebRTC is off on a host run, whatever the
-// address, and Chromium makes neither a preconnect nor a dns-prefetch in the browser context a session
-// runs in. Their counter-example is the same page in a browser's default context, where the same
-// witness does see them.
+// Some pages have no such counter-example. WebRTC's UDP, WebTransport and a cross-site prefetch never
+// reach a proxy, so a context with one sends nothing on them whatever the address, and there is no
+// refused attempt to show. Chromium makes neither a preconnect nor a dns-prefetch in the browser
+// context a session runs in. The counter-example to those is the same page in a browser's default
+// context with no proxy, where the same witness does see them.
 import assert from "node:assert/strict";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -17,7 +19,6 @@ import { after, before, describe, test } from "node:test";
 import { setTimeout as pause } from "node:timers/promises";
 import {
     CdpConnection,
-    cdpDriver,
     launchChromium,
     launchSharedBrowser,
     type LaunchedChromium,
@@ -33,7 +34,6 @@ import {
     BrowserTarget,
     englishMatrix,
 } from "#test-support/browser/BrowserTarget.ts";
-import { driversForTargets } from "#test-support/browser/CreateBrowserDriver.ts";
 import { navigate, testId, textEquals } from "#test-support/browser/RawPlan.ts";
 import { BROWSERS } from "#test-support/browsers.ts";
 import { FIXED_TIME_MILLISECONDS, SEED, capabilityPlan } from "#test-support/capability-harness.ts";
@@ -44,14 +44,21 @@ import {
     ATTEMPT_SETTLED,
     ATTEMPT_STATE,
     EGRESS_CHANNELS,
+    NEVER_PROXIED_CHANNELS,
     REQUEST_CHANNELS,
-    WEBRTC_CHANNELS,
+    WEBRTC_TURN,
     attemptPage,
     dnsPrefetchOf,
     preconnectTo,
     type ChannelAddress,
     type EgressChannel,
 } from "./EgressChannels.ts";
+import {
+    EXECUTABLE_OF_TARGET,
+    driverWithEgress,
+    hostBrowserDrivers,
+    realEgressSource,
+} from "./HostBrowserDrivers.ts";
 import {
     Arrival,
     framePath,
@@ -101,7 +108,7 @@ const scriptRoute =
 let undeclared: RecordingOrigin;
 let declared: RecordingOrigin;
 let harness: BrowserHarness;
-const scratchFolder = mkdtempSync(join(tmpdir(), "egress-without-proxy-"));
+const scratchFolder = mkdtempSync(join(tmpdir(), "egress-on-host-runs-"));
 
 function channelRoutes(
     channel: EgressChannel,
@@ -129,7 +136,7 @@ before(async () => {
         ...EGRESS_CHANNELS.flatMap((channel) =>
             channelRoutes(channel, AddressKind.Undeclared, undeclared),
         ),
-        ...REQUEST_CHANNELS.flatMap((channel) =>
+        ...EGRESS_CHANNELS.flatMap((channel) =>
             channelRoutes(channel, AddressKind.Declared, declared),
         ),
         [PRECONNECT_PATH, htmlRoute(attemptPage(preconnectTo(undeclared)))],
@@ -145,7 +152,7 @@ before(async () => {
         }),
         seed: SEED,
         fixedTimeMilliseconds: FIXED_TIME_MILLISECONDS,
-        drivers: driversForTargets(Object.values(BrowserTarget)),
+        drivers: hostBrowserDrivers(Object.values(BrowserTarget)),
         planFor: capabilityPlan,
     });
 });
@@ -197,7 +204,11 @@ async function runWithNetworkLog(
     let ran: BrowserRun;
     try {
         const shared = sharedBrowserFrom(launched, executablePath);
-        const driver = cdpDriver({ executablePath, browserSource: () => Promise.resolve(shared) });
+        const driver = driverWithEgress({
+            executablePath,
+            browserSource: () => Promise.resolve(shared),
+            egress: realEgressSource,
+        });
         ran = await harness.runSteps(BrowserTarget.Chrome, stepsOnPage(path), {
             drivers: new Map([[ADAPTER_OF_TARGET[BrowserTarget.Chrome], driver]]),
         });
@@ -208,7 +219,7 @@ async function runWithNetworkLog(
     return { ran, networkLog: readFileSync(logFile, "utf8") };
 }
 
-// The page opened in a browser's default context, with no driver or allow-list, and left to run.
+// The page opened in a browser's default context, with no driver, proxy or allow-list, and left to run.
 // Returns the browser's network log.
 async function loadInDefaultContext(
     path: string,
@@ -239,7 +250,11 @@ async function outOfProcessFramesDuringRun(path: string): Promise<readonly strin
     const control = await CdpConnection.open(browser.webSocketUrl);
     let frameUrls: readonly string[] = [];
     try {
-        const driver = cdpDriver({ executablePath, browserSource: () => Promise.resolve(browser) });
+        const driver = driverWithEgress({
+            executablePath,
+            browserSource: () => Promise.resolve(browser),
+            egress: realEgressSource,
+        });
         await harness.runSteps(BrowserTarget.Chrome, stepsOnPage(path), {
             drivers: new Map([[ADAPTER_OF_TARGET[BrowserTarget.Chrome], driver]]),
             read: [],
@@ -257,11 +272,6 @@ async function outOfProcessFramesDuringRun(path: string): Promise<readonly strin
     return frameUrls;
 }
 
-const EXECUTABLE_OF_TARGET: Readonly<Record<BrowserTarget, string>> = {
-    [BrowserTarget.Chrome]: BROWSERS.chrome,
-    [BrowserTarget.HeadlessShell]: BROWSERS.chromeHeadlessShell,
-};
-
 const isConnection = (arrival: string): boolean => arrival === Arrival.Connection;
 
 const showsBlocked = (ran: BrowserRun, hostname: string): boolean =>
@@ -270,7 +280,7 @@ const showsBlocked = (ran: BrowserRun, hostname: string): boolean =>
 describe("Using a run on the host", () => {
     for (const targetId of Object.values(BrowserTarget)) {
         describe(`given a run on ${targetId}`, onTarget(targetId), () => {
-            for (const channel of EGRESS_CHANNELS) {
+            for (const channel of REQUEST_CHANNELS) {
                 describe(`and a page that ${channel.attempt}`, () => {
                     describe("when the address it uses is undeclared", () => {
                         let ran: BrowserRun;
@@ -298,8 +308,29 @@ describe("Using a run on the host", () => {
                         });
                     });
 
-                    if (WEBRTC_CHANNELS.includes(channel)) {
-                        describe("when a browser's default context opens it, with no driver", () => {
+                    describe("when the address it uses is declared", () => {
+                        let ran: BrowserRun;
+                        let arrivals: readonly string[];
+                        before(async () => {
+                            const path = pagePath(channel.name, AddressKind.Declared);
+                            ran = await runPage(targetId, path);
+                            arrivals = declared.arrivals();
+                        });
+
+                        test("then it should arrive at that address", () => {
+                            assert.ok(
+                                arrivals.includes(channel.arrival),
+                                `arrived: ${JSON.stringify(arrivals)}`,
+                            );
+                        });
+
+                        test("then it should block nothing", () => {
+                            assert.deepEqual(ran.result.blockedOrigins, []);
+                        });
+                    });
+
+                    if (channel === WEBRTC_TURN) {
+                        describe("when a browser's default context opens it, with no proxy", () => {
                             test("then it should arrive, so the run's silent address means something", async () => {
                                 await loadInDefaultContext(
                                     pagePath(channel.name, AddressKind.Undeclared),
@@ -311,28 +342,60 @@ describe("Using a run on the host", () => {
                                 );
                             });
                         });
-                    } else {
-                        describe("when the address it uses is declared", () => {
-                            let ran: BrowserRun;
-                            let arrivals: readonly string[];
-                            before(async () => {
-                                const path = pagePath(channel.name, AddressKind.Declared);
-                                ran = await runPage(targetId, path);
-                                arrivals = declared.arrivals();
-                            });
-
-                            test("then it should arrive at that address", () => {
-                                assert.ok(
-                                    arrivals.includes(channel.arrival),
-                                    `arrived: ${JSON.stringify(arrivals)}`,
-                                );
-                            });
-
-                            test("then it should block nothing", () => {
-                                assert.deepEqual(ran.result.blockedOrigins, []);
-                            });
-                        });
                     }
+                });
+            }
+
+            for (const channel of NEVER_PROXIED_CHANNELS) {
+                describe(`and a page that ${channel.attempt}`, () => {
+                    describe("when the address it uses is undeclared", () => {
+                        let arrivals: readonly string[];
+                        before(async () => {
+                            const path = pagePath(channel.name, AddressKind.Undeclared);
+                            await runPage(targetId, path);
+                            arrivals = undeclared.arrivals();
+                        });
+
+                        test("then it should send that address nothing", () => {
+                            const sent = arrivals.filter((arrival) => !isConnection(arrival));
+                            assert.deepEqual(sent, []);
+                        });
+
+                        test("then it should open no connection to that address", () => {
+                            assert.deepEqual(arrivals.filter(isConnection), []);
+                        });
+                    });
+
+                    describe("when the address it uses is declared", () => {
+                        let ran: BrowserRun;
+                        let arrivals: readonly string[];
+                        before(async () => {
+                            const path = pagePath(channel.name, AddressKind.Declared);
+                            ran = await runPage(targetId, path);
+                            arrivals = declared.arrivals();
+                        });
+
+                        test("then it should send that address nothing either", () => {
+                            assert.deepEqual(arrivals, []);
+                        });
+
+                        test("then it should block nothing", () => {
+                            assert.deepEqual(ran.result.blockedOrigins, []);
+                        });
+                    });
+
+                    describe("when a browser's default context opens it, with no proxy", () => {
+                        test("then it should arrive, so the run's silent address means something", async () => {
+                            await loadInDefaultContext(
+                                pagePath(channel.name, AddressKind.Undeclared),
+                                EXECUTABLE_OF_TARGET[targetId],
+                            );
+                            assert.ok(
+                                undeclared.arrivals().includes(channel.arrival),
+                                `arrived: ${JSON.stringify(undeclared.arrivals())}`,
+                            );
+                        });
+                    });
                 });
             }
 
@@ -369,7 +432,7 @@ describe("Using a run on the host", () => {
             });
         });
 
-        describe("when a browser's default context opens it, with no driver", () => {
+        describe("when a browser's default context opens it, with no proxy", () => {
             test("then it should look that name up, so the run's empty log means something", async () => {
                 const networkLog = await loadInDefaultContext(DNS_PREFETCH_PATH);
                 assert.ok(networkLog.includes(UNDECLARED_NAME), "the network log lacks the name");
@@ -378,7 +441,7 @@ describe("Using a run on the host", () => {
     });
 
     describe("given a page that asks to preconnect to an address", () => {
-        describe("when a browser's default context opens it, with no driver", () => {
+        describe("when a browser's default context opens it, with no proxy", () => {
             test("then it should connect, so the run's silent address means something", async () => {
                 await loadInDefaultContext(PRECONNECT_PATH);
                 assert.ok(
