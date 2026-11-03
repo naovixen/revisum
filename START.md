@@ -47,7 +47,7 @@ Architecture refactor:
 Where phase 3 stands, from `docs/decisions/refactor-defects.md`:
 
 - **Fix next:** nothing open. Findings 147 and the rest of 148 go with the parts that touch them.
-- **Checked at the end (2026-11-03):** Windows `test:browser` 907 of 953 passed, 46 skipped; `check:containers` 165 of 170, with one file fixed after and passing alone; Linux `check:linux` stopped on one test, since corrected and passing alone, then Linux proofs, replay and gates.
+- **Checked at the end (2026-11-03):** `npm run check:linux` green at `ad2946a`, the whole chain. Windows `test:browser` and `check:containers` ran before the last changes: 907 of 953 passed with 46 skipped, and 165 of 170 with one file fixed and passing alone. **Next:** the founder reads the deferred rows, then grounding the core starts.
 - **With SPEC-16:** 100-103, 107-112, the rest of 114, 115, 136, and re-reading the guarantee level after a plan run. Founder decided 103: mount tracked files only.
 - **Founder decided, still to build:** one real Playwright Test run in the weekly tier, after a dependency review (116).
 - **Founder decided:** closed shadow roots stay a documented limit, to revisit with SPEC-10 (129).
