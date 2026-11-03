@@ -20,7 +20,7 @@ Architecture refactor:
   - [x] First round of fixes: false passes, action guard, approval, secrets, parser, evidence mode
   - [x] Run `npm run check:linux` on a new container with `xclip`: green in 36 minutes, with the browser tests serial (24 minutes; CI splits them into 3). The clipboard proof and the symlinked report test ran and passed (findings 25, 99)
   - [x] Confirm host-user deletion of container-owned `test-results`: it fails for a host user with another uid (finding 140)
-  - [ ] **Next:** clear the remaining open findings (see below)
+  - [x] Clear the remaining open findings: nothing open but the founder's question on the result hash, and the deferred rows 159, 161, 163 and 165
   - [x] Before grounding the core: a fresh Opus helper assesses the decisions independently, with `docs/prompts/session-decision-assessment.md`, and the founder rules on what it raises (founder, 2026-11-03). Rulings: `docs/decisions/decision-assessment.md`
   - [ ] Ground the core. The plan is `C:\Users\naomi\.claude\plans\before-starting-on-the-jiggly-squirrel.md`. **Tick a part only when its review with `docs/prompts/session-core-review.md` is clear (founder, 2026-11-03).** Code a part touches leaves with no suppressed nested ternaries, loose conditions or unsafe types; these don't wait for phase 6.
     - [ ] Switch on `@typescript-eslint/no-unnecessary-condition`, fixing the 22 hits in their own commit, with no baseline
@@ -47,12 +47,12 @@ Architecture refactor:
 Where phase 3 stands, from `docs/decisions/refactor-defects.md`:
 
 - **Fix next:** nothing open. Findings 147 and the rest of 148 go with the parts that touch them.
-- **At the end (founder, 2026-11-03):** one full `npm run test:browser`, then `check:linux` and `check:containers`, and fix what they find. A stopped browser run after egress step 6 showed its last 17 files failing in about 10 ms each. They pass on their own, and why they failed there isn't proven.
+- **Checked at the end (2026-11-03):** Windows `test:browser` 907 of 953 passed, 46 skipped; `check:containers` 165 of 170, with one file fixed after and passing alone; Linux `check:linux` stopped on one test, since corrected and passing alone, then Linux proofs, replay and gates. Only the hash proof is red.
 - **For the founder:** a request sent as a run ends flips the result hash (`test/proofs/RepeatedRunsWithRefusedOrigins.test.ts`, red on purpose).
 - **With SPEC-16:** 100-103, 107-112, the rest of 114, 115, 136, and re-reading the guarantee level after a plan run. Founder decided 103: mount tracked files only.
 - **Founder decided, still to build:** one real Playwright Test run in the weekly tier, after a dependency review (116).
 - **Founder decided:** closed shadow roots stay a documented limit, to revisit with SPEC-10 (129).
-- **Founder decided, being built:** host runs always go through a per-session egress proxy set on the browser context, with WebRTC UDP off, stay labelled `host` and claim nothing new (39, 47, 49, 141, 142). The design and commit order are in `docs/decisions/host-egress-proxy.md`. Steps 1 to 10 are done. Step 11's `check:linux` and `check:containers` run at the end of the fix list, with the one full browser run.
+- **Founder decided, being built:** host runs always go through a per-session egress proxy set on the browser context, with WebRTC UDP off, stay labelled `host` and claim nothing new (39, 47, 49, 141, 142). The design and commit order are in `docs/decisions/host-egress-proxy.md`. All steps are done.
 - **Calls made in the main session, which the founder can reverse:** refused connections in request counts (87, amended in SPEC-33) and allowing U+200C and U+200D in plan text (122).
 - **Machine leftovers:** a locked worktree in `.claude/worktrees/` from the break test. Leave it unless the founder says otherwise. `npm run check:linux` uses its own container, labelled `revisum.check=linux`.
 
