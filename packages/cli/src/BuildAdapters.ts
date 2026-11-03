@@ -1,4 +1,9 @@
-import { cdpDriver, type EgressSource, type OwnBrowserDriver } from "@revisum/driver-cdp";
+import {
+    cdpDriver,
+    egressThroughExistingProxy,
+    type EgressSource,
+    type OwnBrowserDriver,
+} from "@revisum/driver-cdp";
 import { ProxyClient, startProxyServer } from "@revisum/runner";
 
 // A host run's session goes through its own proxy. Only host runs allow declared private addresses,
@@ -37,7 +42,7 @@ export const buildAdapters = {
             // Everything but the container's own loopback goes through the run's egress proxy.
             ...(proxyServer === undefined || proxyServer === ""
                 ? {}
-                : { proxy: { server: proxyServer, includeLoopback: false } }),
+                : { egress: egressThroughExistingProxy(proxyServer) }),
         });
     },
 };

@@ -20,6 +20,20 @@ export type SessionEgress = {
 // then. The driver may not import the runner, so whoever builds the driver hands this in.
 export type EgressSource = (allowedOrigins: readonly string[]) => Promise<SessionEgress>;
 
+// For a proxy that something else runs, such as an isolated run's, in a container of its own. That
+// proxy holds the allow-list and the record of what it refused, and whoever runs it reads the record,
+// so this session has nothing to report or close. The proxy can't reach this machine's loopback, so
+// loopback stays out of it.
+export const egressThroughExistingProxy =
+    (server: string): EgressSource =>
+    () =>
+        Promise.resolve({
+            proxy: { server, includeLoopback: false },
+            refusedOrigins: () => [],
+            connectionFailures: () => [],
+            close: () => Promise.resolve(),
+        });
+
 type ProxyServer = Brand<string, "ProxyServer">;
 
 // An empty proxyServer creates a browser context without error, and everything in it then goes
