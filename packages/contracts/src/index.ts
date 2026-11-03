@@ -1,6 +1,7 @@
 // Public entry point: shared types, the plan language's types and the port interfaces that the
 // engine, drivers, auditors and renderers agree on. No package logic lives here, apart from the
-// opaque Secret wrapper, which drivers need without importing the engine.
+// opaque Secret wrapper, which drivers need without importing the engine, and how an origin's host
+// and port read, which the driver and the runner must agree on.
 export { PRODUCT } from './product.ts';
 export type { Brand } from './brand.ts';
 export { failure, success, type Failure, type Result, type Success } from './result.ts';
@@ -15,6 +16,7 @@ export * from './clock-and-clipboard.ts';
 export * from './evidence-mode.ts';
 export * from './unsafe-plan-features.ts';
 export * from './browser-driver.ts';
+export { hostAndPort } from './HostAndPort.ts';
 export type * from './explore-mode.ts';
 export type * from './target-lock.ts';
 export * from './exit-codes.ts';

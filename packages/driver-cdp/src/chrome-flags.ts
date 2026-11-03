@@ -1,6 +1,6 @@
 // Chromium command-line flags for a driver session. They stop background traffic and first-run
-// screens and keep pixels stable. Network access is limited by request interception in the
-// driver, so blocked origins can be recorded as evidence.
+// screens and keep pixels stable. Network access is limited by the session's egress proxy and by
+// request interception in the driver, so blocked origins can be recorded as evidence.
 
 // The Chromium feature that asks Windows for a random local port on every connection
 // (SO_RANDOMIZE_PORT). Windows then fails about one connect in sixty with WSAENOBUFS, seen as
@@ -9,7 +9,7 @@
 // program. Chromium reads only the last --disable-features flag, so this name joins each list.
 export const PORT_RANDOMISATION_FEATURE = 'TcpPortRandomizationWin';
 
-export const QUIET_CHROME_FLAGS: readonly string[] = [
+const quietChromeFlags = (furtherFeaturesOff: readonly string[]): readonly string[] => [
   '--headless',
   '--no-first-run',
   '--no-default-browser-check',
@@ -21,7 +21,7 @@ export const QUIET_CHROME_FLAGS: readonly string[] = [
   '--disable-breakpad',
   '--disable-client-side-phishing-detection',
   '--disable-domain-reliability',
-  `--disable-features=Translate,OptimizationHints,MediaRouter,AutofillServerCommunication,InterestFeedContentSuggestions,CalculateNativeWinOcclusion,${PORT_RANDOMISATION_FEATURE}`,
+  `--disable-features=${['Translate', 'OptimizationHints', 'MediaRouter', 'AutofillServerCommunication', 'InterestFeedContentSuggestions', 'CalculateNativeWinOcclusion', PORT_RANDOMISATION_FEATURE, ...furtherFeaturesOff].join(',')}`,
   '--metrics-recording-only',
   '--mute-audio',
   '--hide-scrollbars',
@@ -30,12 +30,30 @@ export const QUIET_CHROME_FLAGS: readonly string[] = [
   '--use-mock-keychain',
 ];
 
+export const QUIET_CHROME_FLAGS = quietChromeFlags([]);
+
+// Creating a browser context otherwise sends one request of Chrome's own through that context's proxy.
+const NEW_CONTEXT_REQUEST_FEATURE = 'AimEnabled';
+const WEBRTC_POLICY = 'disable_non_proxied_udp';
+
+// For a browser whose sessions each have an egress proxy on their context. Chrome's own traffic goes to
+// the browser-wide proxy, which leads nowhere. Chrome honours only the first WebRTC flag and the
+// headless shell only the second.
+export const sessionEgressChromeFlags = (deadProxyServer: string): readonly string[] => [
+  ...quietChromeFlags([NEW_CONTEXT_REQUEST_FEATURE]),
+  `--proxy-server=${deadProxyServer}`,
+  `--webrtc-ip-handling-policy=${WEBRTC_POLICY}`,
+  `--force-webrtc-ip-handling-policy=${WEBRTC_POLICY}`,
+];
+
+// Takes 127.0.0.1, localhost and link-local addresses out of Chromium's built-in bypass list.
+export const LOOPBACK_THROUGH_PROXY = '<-loopback>';
+
 // The egress proxy every request goes through, such as the isolated runner's. includeLoopback
 // sends requests to 127.0.0.1 and localhost through it too; without it they go direct.
 export type ProxySettings = { readonly server: string; readonly includeLoopback: boolean };
 
-// Flags that send every request through an HTTP proxy. Chromium sends 127.0.0.1 and localhost
-// direct unless "<-loopback>" removes them from its built-in bypass list.
+// Flags that send every request through an HTTP proxy.
 export function proxyFlags(proxy: ProxySettings): readonly string[] {
-  return [`--proxy-server=${proxy.server}`, ...(proxy.includeLoopback ? ['--proxy-bypass-list=<-loopback>'] : [])];
+  return [`--proxy-server=${proxy.server}`, ...(proxy.includeLoopback ? [`--proxy-bypass-list=${LOOPBACK_THROUGH_PROXY}`] : [])];
 }

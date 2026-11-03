@@ -1,23 +1,7 @@
 // Turns what the browser saw and what the egress proxy decided into a run's egress events. Over
 // HTTPS and for WebSockets the proxy sees only a host and port, so the channel comes from the
 // browser.
-import type { BrowserRequestRecord, EgressDecision, EgressEvent, ProxyDecision, SeenOrigin } from '@revisum/contracts';
-
-const DEFAULT_PORTS: Readonly<Record<string, string>> = { 'http:': '80', 'ws:': '80', 'https:': '443', 'wss:': '443' };
-
-// The host and port an origin reaches, so "ws://socket.test" (as the browser reports a WebSocket)
-// meets "socket.test:80" (the tunnel the proxy was asked for).
-export function hostAndPort(origin: SeenOrigin): string {
-  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(origin)) {
-    try {
-      const url = new URL(origin);
-      return `${url.hostname}:${url.port === '' ? DEFAULT_PORTS[url.protocol] ?? '' : url.port}`;
-    } catch {
-      return origin.toLowerCase();
-    }
-  }
-  return origin.toLowerCase();
-}
+import { hostAndPort, type BrowserRequestRecord, type EgressDecision, type EgressEvent, type ProxyDecision, type SeenOrigin } from '@revisum/contracts';
 
 // True for an origin whose traffic the proxy can read, and so the only kind a rewrite may change.
 export const isPlainHttpOrigin = (origin: SeenOrigin): boolean => origin.startsWith('http://');

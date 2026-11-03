@@ -4,10 +4,17 @@
 // made. The browser's process, launch flags and clipboard stay, so sessions run strictly one at a
 // time, a browser only takes the settings it was launched with, and a session reads no clipboard.
 // A key press can still paste what an earlier session copied, so tests that copy or paste keep to a
-// browser of their own.
+// browser of their own. Each session's egress proxy goes on its context, so a shared browser launched
+// with no proxy holds a dead browser-wide one for Chrome's own traffic.
 import { CdpConnection } from "./cdp-connection.ts";
-import { QUIET_CHROME_FLAGS, proxyFlags, type ProxySettings } from "./chrome-flags.ts";
+import {
+    QUIET_CHROME_FLAGS,
+    proxyFlags,
+    sessionEgressChromeFlags,
+    type ProxySettings,
+} from "./chrome-flags.ts";
 import { launchChromium, type LaunchedChromium } from "./chromium-launcher.ts";
+import { holdDeadProxy } from "./HoldDeadProxy.ts";
 
 const COMMAND_TIMEOUT_MILLISECONDS = 30_000;
 const DEFAULT_LAUNCH_TIMEOUT_MILLISECONDS = 30_000;
@@ -49,37 +56,86 @@ export type AttachedBrowser = {
 
 const launchDriverChromium = (
     settings: LaunchSettings,
+    flags: readonly string[],
     launchTimeoutMilliseconds = DEFAULT_LAUNCH_TIMEOUT_MILLISECONDS,
 ): Promise<LaunchedChromium> =>
     launchChromium(settings.executablePath, {
-        arguments: [
-            ...QUIET_CHROME_FLAGS,
-            `--lang=${settings.locale}`,
-            ...(settings.proxy === undefined ? [] : proxyFlags(settings.proxy)),
-        ],
+        arguments: [...flags, `--lang=${settings.locale}`],
         launchTimeoutMilliseconds,
         commandTimeoutMilliseconds: COMMAND_TIMEOUT_MILLISECONDS,
         profilePrefix: "cdp-driver-",
     });
 
-export async function launchOwnBrowser(
+const launchWithoutSessionEgress = (
     settings: LaunchSettings,
     launchTimeoutMilliseconds?: number,
-): Promise<AttachedBrowser> {
-    const launched = await launchDriverChromium(settings, launchTimeoutMilliseconds);
+): Promise<LaunchedChromium> =>
+    launchDriverChromium(
+        settings,
+        [
+            ...QUIET_CHROME_FLAGS,
+            ...(settings.proxy === undefined ? [] : proxyFlags(settings.proxy)),
+        ],
+        launchTimeoutMilliseconds,
+    );
+
+// The dead proxy lasts exactly as long as the browser: a port let go while the browser ran could be
+// taken by another program, so it closes only once the browser has ended, however it ended.
+async function launchForSessionEgress(
+    settings: LaunchSettings,
+    launchTimeoutMilliseconds?: number,
+): Promise<LaunchedChromium> {
+    const deadProxy = await holdDeadProxy();
+    let launched: LaunchedChromium;
+    try {
+        launched = await launchDriverChromium(
+            settings,
+            sessionEgressChromeFlags(deadProxy.server),
+            launchTimeoutMilliseconds,
+        );
+    } catch (error) {
+        await deadProxy.close();
+        throw error;
+    }
+    void launched.exited.then(() => deadProxy.close());
     return {
-        connection: launched.connection,
-        processId: launched.browserProcess.pid ?? -1,
-        isShared: false,
-        close: () => launched.stop(),
+        ...launched,
+        stop: async () => {
+            try {
+                await launched.stop();
+            } finally {
+                await deadProxy.close();
+            }
+        },
     };
 }
+
+const browserOfItsOwn = (launched: LaunchedChromium): AttachedBrowser => ({
+    connection: launched.connection,
+    processId: launched.browserProcess.pid ?? -1,
+    isShared: false,
+    close: () => launched.stop(),
+});
+
+export const launchOwnBrowser = async (
+    settings: LaunchSettings,
+    launchTimeoutMilliseconds?: number,
+): Promise<AttachedBrowser> =>
+    browserOfItsOwn(await launchWithoutSessionEgress(settings, launchTimeoutMilliseconds));
+
+export const launchOwnBrowserForSessionEgress = async (
+    settings: LaunchSettings,
+    launchTimeoutMilliseconds?: number,
+): Promise<AttachedBrowser> =>
+    browserOfItsOwn(await launchForSessionEgress(settings, launchTimeoutMilliseconds));
 
 export async function launchSharedBrowser(
     settings: LaunchSettings,
     launchTimeoutMilliseconds?: number,
 ): Promise<LaunchedSharedBrowser> {
-    const launched = await launchDriverChromium(settings, launchTimeoutMilliseconds);
+    const launch =
+        settings.proxy === undefined ? launchForSessionEgress : launchWithoutSessionEgress;
+    const launched = await launch(settings, launchTimeoutMilliseconds);
     const { browserProcess } = launched;
     return {
         ...settings,

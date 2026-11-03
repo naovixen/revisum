@@ -20,7 +20,8 @@ import type {
 } from './page-operations.ts';
 import { PageWatch, type AttachedPage } from './page-watch.ts';
 import { RunClipboard, SHARED_BROWSER_CLIPBOARD, allowRunClipboard } from './run-clipboard.ts';
-import { attachToSharedBrowser, launchOwnBrowser, type AttachedBrowser, type BrowserSource } from './SharedBrowser.ts';
+import { mergeRefusedOrigins, openSessionEgress, type EgressSource, type OpenedSessionEgress } from './SessionEgress.ts';
+import { attachToSharedBrowser, launchOwnBrowser, launchOwnBrowserForSessionEgress, type AttachedBrowser, type BrowserSource } from './SharedBrowser.ts';
 import { BrowserClock } from './virtual-clock.ts';
 import { PageStorage } from './web-storage.ts';
 
@@ -154,6 +155,9 @@ export type CdpDriverOptions = {
   // every stub with a fixture body.
   readonly fixturesFolder?: string;
   readonly proxy?: ProxySettings;
+  // Gives each session an egress proxy of its own, on its browser context. With it, `proxy` is ignored:
+  // the browser-wide proxy is a dead one, for Chrome's own traffic.
+  readonly egress?: EgressSource;
   // Where sessions get a browser someone else launched. Without it, as in production, every session
   // launches a browser of its own and ends it on close.
   readonly browserSource?: BrowserSource;
@@ -202,25 +206,53 @@ export function cdpDriver(options: CdpDriverOptions): OwnBrowserDriver {
     },
     async open(target, environment) {
       if (target.engine !== 'chromium') return failure({ reason: 'engine-not-supported', detail: 'CDP drives Chromium only' });
-      const settings = { executablePath: options.executablePath, locale: target.locale, proxy: options.proxy };
+      let sessionEgress: OpenedSessionEgress | null = null;
+      if (options.egress !== undefined) {
+        const opened = await openSessionEgress(options.egress, environment.allowedOrigins);
+        if (!opened.ok) {
+          return failure({ reason: 'launch-failed', detail: opened.error });
+        }
+        sessionEgress = opened.value;
+      }
+      const closeEgress = async (): Promise<void> => { await sessionEgress?.egress.close(); };
       let attached: AttachedBrowser;
       try {
-        attached = options.browserSource === undefined
-          ? await launchOwnBrowser(settings, options.launchTimeoutMilliseconds)
-          : await attachToSharedBrowser(await options.browserSource(target.locale), settings);
+        attached = await attachBrowser(options, target.locale);
       } catch (error) {
-        return failure({ reason: 'launch-failed', detail: errorText(error) });
+        return failure({ reason: 'launch-failed', detail: await detailAfterClosing(error, [closeEgress]) });
       }
       try {
-        return success(await createSession(attached, target, environment, options.fixturesFolder));
+        return success(await createSession(attached, sessionEgress, target, environment, options.fixturesFolder));
       } catch (error) {
         // A shared browser that keeps this context stays refused to later sessions, so what to
-        // report here is what stopped this one opening.
-        await attached.close().catch(() => undefined);
-        return failure({ reason: 'launch-failed', detail: errorText(error) });
+        // report first here is what stopped this one opening.
+        return failure({ reason: 'launch-failed', detail: await detailAfterClosing(error, [() => attached.close(), closeEgress]) });
       }
     },
   };
+}
+
+function attachBrowser(options: CdpDriverOptions, locale: string): Promise<AttachedBrowser> {
+  const { executablePath, egress, browserSource, launchTimeoutMilliseconds } = options;
+  const settings = { executablePath, locale, proxy: egress === undefined ? options.proxy : undefined };
+  if (browserSource !== undefined) {
+    return browserSource(locale).then((shared) => attachToSharedBrowser(shared, settings));
+  }
+  const launch = egress === undefined ? launchOwnBrowser : launchOwnBrowserForSessionEgress;
+  return launch(settings, launchTimeoutMilliseconds);
+}
+
+// Why a session did not open, then anything that also went wrong clearing up after it.
+async function detailAfterClosing(error: unknown, closers: readonly (() => Promise<void>)[]): Promise<string> {
+  const details = [errorText(error)];
+  for (const close of closers) {
+    try {
+      await close();
+    } catch (closeError) {
+      details.push(`closing what it had opened failed too: ${errorText(closeError)}`);
+    }
+  }
+  return details.join('; ');
 }
 
 // What every page of one session shares: the browser's own context, the target and environment it
@@ -253,11 +285,11 @@ function recordPopupRequest(browser: SessionBrowser, requestedUrl: string): void
 const TAB_ATTACH_TIMEOUT_MILLISECONDS = 10_000;
 
 async function createSession(
-  attached: AttachedBrowser, target: Target, environment: SessionEnvironment, fixturesFolder: string | undefined,
+  attached: AttachedBrowser, sessionEgress: OpenedSessionEgress | null, target: Target, environment: SessionEnvironment, fixturesFolder: string | undefined,
 ): Promise<DriverSession> {
   const connection = attached.connection;
   const version = await connection.send<{ product: string; userAgent: string }>(undefined, 'Browser.getVersion');
-  const { browserContextId } = await connection.send<{ browserContextId: string }>(undefined, 'Target.createBrowserContext', { disposeOnDetach: true });
+  const { browserContextId } = await connection.send<{ browserContextId: string }>(undefined, 'Target.createBrowserContext', { disposeOnDetach: true, ...sessionEgress?.contextProxy });
   const { targetId } = await connection.send<{ targetId: string }>(undefined, 'Target.createTarget', { url: 'about:blank', browserContextId });
   const { sessionId } = await connection.send<{ sessionId: string }>(undefined, 'Target.attachToTarget', { targetId, flatten: true });
   // Every request's origin and channel, for the run's egress events.
@@ -288,18 +320,23 @@ async function createSession(
   const details: SessionDetails = {
     browser: { name: 'chromium', version: /\/(\S+)$/.exec(version.product)?.[1] ?? version.product },
     processId: attached.processId,
-    blockedOrigins: () => browser.blocked,
+    blockedOrigins: () => mergeRefusedOrigins(browser.blocked, sessionEgress?.egress.refusedOrigins() ?? []),
     egressRecords: () => browser.recorder.records(),
     // Popups settle first, so the blocked origins are complete once this ends. This page's watch sees
     // every popup of the browser context, whichever tab opened it. The download folder goes once the
     // browser can no longer write into it. A shared browser that keeps the session's context rejects
-    // here, and the folder stays for the same reason.
+    // here, and the folder stays for the same reason. The egress goes last, whatever happened, since
+    // nothing else ends it.
     close: async () => {
       try {
-        await watch.settleHeldPopups();
+        try {
+          await watch.settleHeldPopups();
+        } finally {
+          await attached.close();
+          browser.downloads.remove();
+        }
       } finally {
-        await attached.close();
-        browser.downloads.remove();
+        await sessionEgress?.egress.close();
       }
     },
     events: watch,

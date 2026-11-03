@@ -11,7 +11,8 @@ export {
 export { dockerRunner, type DockerRunnerOptions, type RunnerLogEntry } from './docker-runner.ts';
 export { workloadRunner, type WorkloadLogEntry, type WorkloadRunnerOptions } from './workload-runner.ts';
 export { noSuchNameAnswer, readDnsQuestion, type DnsQuestion } from './lookup-recorder.ts';
-export { hostAndPort, joinEgressEvents } from './egress-events.ts';
+export { hostAndPort } from '@revisum/contracts';
+export { joinEgressEvents } from './egress-events.ts';
 export { buildEgressPolicy, type EgressPolicyError, type EgressPolicyInput } from './egress-policy.ts';
 export {
   EGRESS_DECISION_HEADER, ProxyClient, proxyRules, startEgressProxy, startProxyServer,

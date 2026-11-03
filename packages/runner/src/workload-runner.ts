@@ -21,7 +21,7 @@
 // Every other address still has no route. Such a request asks for no proxy variables, since the
 // command speaks TCP, not HTTP.
 import {
-  PRODUCT, WORKLOAD_CHECKOUT_PATH, WORKLOAD_OUTPUT_PATH, failure, success,
+  PRODUCT, WORKLOAD_CHECKOUT_PATH, WORKLOAD_OUTPUT_PATH, failure, hostAndPort, success,
   type CapturedOutput, type EgressEvent, type EgressPolicy, type ExecOutcome, type ProxyDecision, type Result, type WorkloadErrorCode,
   type WorkloadOutcome, type WorkloadRequest, type WorkloadRunner,
 } from '@revisum/contracts';
@@ -32,7 +32,7 @@ import { isIP } from 'node:net';
 import { platform } from 'node:os';
 import { isAbsolute, join } from 'node:path';
 import type { ContainerEngine, ContainerMount, EngineProblem, HostEntry } from './container-engine.ts';
-import { hostAndPort, joinEgressEvents } from './egress-events.ts';
+import { joinEgressEvents } from './egress-events.ts';
 import { relayOrigin, tcpRelaysFor } from './egress-proxy.ts';
 import { PROXY_PORT } from './proxy-container.ts';
 import {

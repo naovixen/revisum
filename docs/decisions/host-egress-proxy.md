@@ -13,7 +13,7 @@
 |---|---|
 | `driver-cdp/src/SessionEgress.ts`: `type SessionEgress = { readonly proxy: ProxySettings; refusedOrigins(): readonly string[]; close(): Promise<void> }` and `type EgressSource = (allowedOrigins: readonly string[]) => Promise<SessionEgress>` | `driver-cdp` may not import `runner`, so `cli` hands it the source |
 | `CdpDriverOptions.egress: EgressSource` is required, and `proxy?` goes | A driver with no proxy can't be built |
-| `ProxySettings.server` is a parsed non-empty value | In the trial, an empty `proxyServer` created the context without error and everything went direct, even with a browser-wide proxy up, in 20 of 20 runs |
+| `open` parses the proxy value with `parseProxyServer`, the only maker of the `ProxyServer` brand, and an empty one fails the session | In the trial, an empty `proxyServer` created the context without error and everything went direct, even with a browser-wide proxy up, in 20 of 20 runs |
 | `cli/src/BuildAdapters.ts` is the composition root: `buildAdapters.hostBrowserDriver({ executablePath, fixturesFolder? })` and `buildAdapters.containerBrowserDriver({ executablePath, proxyServer })`, with options added as the steps below need them. A lint proof lets only this file in `packages/` import `cdpDriver` | One place to wire, and no way round it |
 | `open` checks the engine, starts the egress, then calls `Target.createBrowserContext({ proxyServer, proxyBypassList: '<-loopback>' })`. `close` settles popups, closes the browser and context, then closes the egress in a `finally`. A failed start returns `launch-failed` | The allow-list first exists at `open`. Without `<-loopback>`, pages reach loopback and link-local addresses directly |
 | Launch adds a dead browser-wide proxy, `--disable-features=AimEnabled` and both WebRTC flags | Chrome's own traffic reaches only the dead proxy. `AimEnabled` stops the one request that creating a context otherwise sends through the session's proxy, `GET www.google.com/async/folae` |
@@ -46,7 +46,7 @@ Commit order (step 1 is `e2b4f89`):
 7. Tests: repoint test support, with no port per file, and add a mix of public and private addresses on a name's first lookup, which only a script has checked so far.
 8. Code: delete `proxy?` and the proxy check in `whyRefused`, and make `egress` required. Then measure replay stability.
 9. Tests: `@ts-expect-error` in `compile-time-guarantees.ts`.
-10. Code: `explore-in-container` refuses with no `HTTP_PROXY`, the audit launch gets the WebRTC flags, and the report names the channels that are off.
+10. Code: `explore-in-container` refuses with no `HTTP_PROXY`, the audit launch gets the WebRTC flags, the report names the channels that are off, and a run shows `connectionFailures()`, which step 7 makes required.
 11. Docs: the defect rows, then `check:linux` and `check:containers`.
 
 ## Findings
@@ -80,6 +80,6 @@ Trial of the per-context proxy, on Chrome 156.0.8078.47 for Windows with the rep
 - **`AimEnabled` may be renamed at a pin.** The same proof would catch it.
 - **Unproven:** the per-context proxy on Linux, through the real driver across a whole suite, with downloads and stubs; browser test time; IPv6 in containers. Steps 7 and 11 test these. If one fails, fix the cause and loosen no assertions.
 - **Late requests may flip the hash.** Measured after step 8.
-- **The dead proxy's port.** A closed loopback port could be bound by another program on the machine, which would then receive Chrome's traffic. Step 6 picks how to close this.
+- **The dead proxy.** A closed loopback port could be bound by another program, which would then receive Chrome's traffic. So the driver holds the port itself, with a listener that closes every connection, for as long as the browser runs.
 - **UDP was checked with witnesses and the page's ICE candidates,** not a packet capture. A reachability check to `[2001:4860:4860::8888]:443` appears in the network log; assumed to send nothing, not captured.
 - **Isolated browsers still get answered refusals.** `proxy-container.ts` leaves `client` at `service`, so a page in a container could read a 403 as content, the same reason host runs close the socket. Defect 157 covers this; the fix needs the container tests.

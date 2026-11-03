@@ -42,6 +42,8 @@ export type LaunchedChromium = {
   readonly browserProcess: ChildProcess;
   readonly webSocketUrl: string;
   readonly userDataFolder: string;
+  // Settles once the browser process has ended, whatever ended it.
+  readonly exited: Promise<void>;
   // Asks the browser to close, forces it after a grace period, and removes the profile folder.
   stop(): Promise<void>;
 };
@@ -157,7 +159,7 @@ export function launchChromium(executablePath: string, options: LaunchOptions = 
       const webSocketUrl = match[1];
       cleanUp();
       CdpConnection.open(webSocketUrl, options).then(
-        (connection) => resolve({ connection, browserProcess, webSocketUrl, userDataFolder, stop: () => stop(connection) }),
+        (connection) => resolve({ connection, browserProcess, webSocketUrl, userDataFolder, exited, stop: () => stop(connection) }),
         (error: unknown) => { void stop(null).then(() => reject(error)); },
       );
     };

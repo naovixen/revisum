@@ -290,7 +290,9 @@ export interface DocumentSession extends PageNavigator, ActionRunner, Prober, Ca
 // One open browser session: every driver port together.
 export interface Session extends DocumentSession {
   readonly browser: { readonly name: string; readonly version: string };
-  // Origins of the requests the session refused, as evidence that the run stayed hermetic.
+  // Origins of the requests that were refused and seen by the browser or the proxy, as evidence that
+  // the run stayed hermetic. Not every attempt: what never reaches either, such as WebRTC's UDP, sends
+  // nothing and leaves nothing to show.
   blockedOrigins(): readonly string[];
   // Ends the session; every process it started exits.
   close(): Promise<void>;

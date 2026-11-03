@@ -39,6 +39,8 @@ export const BRAND_OWNERS: Readonly<Record<string, readonly string[]>> = {
   // A suite's criterion annotations name criteria by the same rule as a plan.
   CriterionId: [PLAN_PARSER, EVIDENCE_RESULT],
   ValueName: ['packages/engine/src/plan/plan-values.ts'],
+  // An empty proxy server would send a session's traffic direct.
+  ProxyServer: ['packages/driver-cdp/src/SessionEgress.ts'],
   Project: [PROJECT_PARSER],
   SecretName: [PROJECT_PARSER],
   FixtureName: [PROJECT_PARSER],

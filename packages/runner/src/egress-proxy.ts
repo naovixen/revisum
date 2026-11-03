@@ -15,7 +15,7 @@
 // connection is vetted like a request (resolved by the proxy, metadata addresses refused) and
 // recorded as a decision on "host:port".
 // It runs in-process for tests and, in a run, in its own container (proxy-container.ts).
-import type { AppliedRewrite, DeclaredService, EgressPolicy, ProxyDecision, ResponseRewrite } from '@revisum/contracts';
+import { hostAndPort, type AppliedRewrite, type DeclaredService, type EgressPolicy, type ProxyDecision, type ResponseRewrite } from '@revisum/contracts';
 import { lookup } from 'node:dns/promises';
 import type { EventEmitter } from 'node:events';
 import { createServer, request, type IncomingHttpHeaders, type IncomingMessage, type ServerResponse } from 'node:http';
@@ -23,7 +23,7 @@ import type { AddressInfo } from 'node:net';
 import { connect as connectSocket, createServer as createTcpServer, isIP, type Server as TcpServer, type Socket } from 'node:net';
 import type { Duplex } from 'node:stream';
 import { classOfLookup, isLoopbackAddress, type NameClass } from './address-check.ts';
-import { hostAndPort, isPlainHttpOrigin } from './egress-events.ts';
+import { isPlainHttpOrigin } from './egress-events.ts';
 
 // Resolves a host name to every address it has. Tests pass a fake that never touches the network.
 export type AddressResolver = (hostname: string) => Promise<readonly string[]>;
