@@ -6,6 +6,8 @@ The main session replaces `<PART>` and `<COMMITS>`, then gives everything below 
 
 If the verdict is `not clear`, a code helper fixes the `must fix` findings, and any `consider` ones the main session accepts, in a commit of their own. A new entry on `REVEAL_ALLOWED_MODULES` is the exception: it goes straight to the founder. A new reviewer with a fresh context then reviews the part again, that commit included. After two rounds, anything still open goes to the founder with a recommendation, rather than going round again.
 
+This review is the oracle: never remove or relax a requirement because existing code fails it, because the code is what gets fixed (founder, 2026-11-03). To avoid going in circles, do each fix on its own. Anything else found goes under the check it belongs to, not into the fix in hand.
+
 ---
 
 Review the core refactor part **<PART>**, commits `<COMMITS>`, as an independent reader. Read the changed code, everything that calls it, and the ports and types it uses, not just the diff. Treat commit messages as claims to check. Judge the design as it stands now, even where the code was already like that before this part.
@@ -69,7 +71,7 @@ Pure logic (parser, policy, oracle, secrets) stays as pure functions, one role p
 - **Guarantees kept.** Deny by default, decoders report code and path only, a fresh browser per run in production, and the version check.
 - **Secrets stay opaque.** Code may carry a `Secret` but not read it. Secrets are wrapped as soon as they're loaded, only the modules in `REVEAL_ALLOWED_MODULES` call `reveal()`, and none of them hands the plain value back to its caller. A new entry on that list is a `must fix` that goes to the founder, not the code helper.
 - **Behaviour unchanged.** No refactor commit changes a golden. Tests may change how they call the code, but not what they assert: flag a test that was skipped, deleted or loosened.
-- **Nothing retries.** Flag anything that tries again or carries on as if a failure hadn't happened: a retry loop, a fallback to another locator or path, a `catch` that discards an error, or a test runner's `retries` setting. Clean-up can't change a verdict, but a clean-up that fails is reported, not discarded. A `catch` may handle only the specific expected case it names, such as a process that has already ended. A `.catch(() => undefined)` usually means the call should return an outcome instead of rejecting, so the fix is in what it calls. Waiting for a condition with one deadline isn't a retry; doing something again after it failed is.
+- **Nothing retries.** Flag anything that tries again or carries on as if a failure hadn't happened: a retry loop, a fallback to another locator or path, a `catch` that discards an error, or a test runner's `retries` setting. Clean-up can't change a verdict, but a clean-up that fails is reported, not discarded. A `catch` may handle only the specific expected case it names, such as a process that has already ended. A `.catch(() => undefined)` usually means the call should return an outcome instead of rejecting, so the fix is in what it calls. A command whose effect may have happened is never re-sent. Re-reading, re-locating, or re-sending an input the page proved it swallowed, under one deadline, is waiting.
 
 **Run** ESLint on the files `<COMMITS>` changed, with every suppression ignored. `--no-inline-config` ignores `eslint-disable` comments, and an empty suppressions file outside the repo stands in for `eslint-suppressions.json`:
 

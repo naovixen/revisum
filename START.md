@@ -21,35 +21,36 @@ Architecture refactor:
   - [x] Run `npm run check:linux` on a new container with `xclip`: green in 36 minutes, with the browser tests serial (24 minutes; CI splits them into 3). The clipboard proof and the symlinked report test ran and passed (findings 25, 99)
   - [x] Confirm host-user deletion of container-owned `test-results`: it fails for a host user with another uid (finding 140)
   - [ ] **Next:** clear the remaining open findings (see below)
-  - [ ] Before grounding the core: a fresh Opus helper assesses the decisions independently, with `docs/prompts/session-decision-assessment.md`, and the founder rules on what it raises (founder, 2026-11-03)
+  - [ ] Before grounding the core: a fresh Opus helper assesses the decisions independently, with `docs/prompts/session-decision-assessment.md`, and the founder rules on what it raises (founder, 2026-11-03). Assessed, and ruled except the network blocks: `docs/decisions/decision-assessment.md`
   - [ ] Ground the core. The plan is `C:\Users\naomi\.claude\plans\before-starting-on-the-jiggly-squirrel.md`. **Tick a part only when its review with `docs/prompts/session-core-review.md` is clear (founder, 2026-11-03).** Code a part touches leaves with no suppressed nested ternaries, loose conditions or unsafe types; these don't wait for phase 6.
-    - [ ] Switch on `@typescript-eslint/no-unnecessary-condition`, baselining what exists
+    - [ ] Switch on `@typescript-eslint/no-unnecessary-condition`, fixing the 22 hits in their own commit, with no baseline
     - [ ] Constant objects in `contracts`
     - [ ] Foundation helpers
+    - [ ] One complete fake per port, and `fakePorts(overrides)` for the whole set
+    - [ ] Driver port, with findings 14 and 59
+    - [ ] Cleared run, with the pipeline and preflight: the gate returns one value holding plan, project, target and standing; `baseUrl` is parsed; `act` and `probe` take resolved types, with the secret carried on the fill; the guarantee level is read at seal through a port
     - [ ] Step tables
-    - [ ] Split `plan-parser`
     - [ ] Split `run`
-    - [ ] Pipeline and preflight
-    - [ ] Driver port
-    - [ ] `RunResult` to contracts
+    - [ ] `RunResult` to contracts, as a union with the same bytes, with findings 8 and 22
+    - [ ] Split `plan-parser`
     - [ ] Cycle rule and in-page free-variable rule
     - [ ] Split `cdp-driver`
     - [ ] Split `egress-proxy`
     - [ ] The runners' shared lifecycle
-    - [ ] One composition root: the one file in `cli` that builds adapters, so no caller can open a browser without the egress proxy
-    - [ ] One complete fake per port, and `fakePorts(overrides)` for the whole set
+    - [ ] One composition root: finish `cli/src/BuildAdapters.ts`, so no caller can open a browser without the egress proxy
     - [ ] Throwaway-step experiment: about 7 edits, each forced by the compiler
+    - [ ] Re-run the trust-path break test; a break that goes uncaught becomes a finding to fix
 - [ ] Phase 4: move files, constants for magic strings, formatting
 - [ ] Phase 5: docs and final trust-path review; the founder pushes
 - [ ] Phase 6: test titles and remaining suppressions (may run alongside M3)
 
 Where phase 3 stands, from `docs/decisions/refactor-defects.md`:
 
-- **Fix next:** 39, 47 and 49 (egress outside Fetch, proof first), 35, 36, 55-58, 92, 93, 118's remaining parts, 133, 137, 138, 139, 140, 141-151, 153, and the first-round leftovers 5, 6, 8, 14, 15, 20, 22, 26-30, 59, 61, 80.
+- **Fix next:** 39, 47 and 49 (egress outside Fetch, proof first), 35, 36, 55-58, 92, 93, 118's remaining parts, 133, 137, 138, 139, 140, 141-151, 153, the first-round leftovers 5, 6, 15, 20, 26-30, 61, 80, and the founder's backend check ruling: 502, 503 and 504 end `Errored`, with `pendingStatuses` used only by the backend check. Findings 8, 14, 22 and 59 travel with their parts.
 - **With SPEC-16:** 100-103, 107-112, the rest of 114, 115, 136, and re-reading the guarantee level after a plan run. Founder decided 103: mount tracked files only.
 - **Founder decided, still to build:** one real Playwright Test run in the weekly tier, after a dependency review (116).
 - **Founder decided:** closed shadow roots stay a documented limit, to revisit with SPEC-10 (129).
-- **Founder decided, being built:** host runs always go through the egress proxy with WebRTC UDP off, stay labelled `host` and claim nothing new (39, 47, 49, 141, 142). The design and commit order are in `docs/decisions/host-egress-proxy.md`.
+- **Founder decided, being built:** host runs always go through the egress proxy with WebRTC UDP off, stay labelled `host` and claim nothing new (39, 47, 49, 141, 142). The design and commit order are in `docs/decisions/host-egress-proxy.md`. Step 1 is done; step 2 onwards waits for the founder's rulings on network blocks, because they may change the design (`docs/decisions/decision-assessment.md`).
 - **Calls made in the main session, which the founder can reverse:** refused connections in request counts (87, amended in SPEC-33) and allowing U+200C and U+200D in plan text (122).
 - **Machine leftovers:** a locked worktree in `.claude/worktrees/` from the break test. Leave it unless the founder says otherwise. `npm run check:linux` uses its own container, labelled `revisum.check=linux`.
 
