@@ -197,11 +197,11 @@ test('a run under a declared approval carries the "declared, not verified" label
 });
 
 test('a run under a declared approval equals one under a verified approval except for its label', async () => {
-  // Metamorphic: swap the approval's route and only the label (and the hash over it) may change.
+  // Metamorphic: swap the approval's route and only the label (and the hashes over it) may change.
   const plan = parsedSignupPlan();
   const comparable = (result: unknown, label: string): string => {
     const { resultHash: _hash, timings: _timings, ...rest } = result as Record<string, unknown>;
-    return JSON.stringify(rest).replaceAll(label, '<label>');
+    return JSON.stringify({ ...rest, evidenceHash: undefined }).replaceAll(label, '<label>');
   };
   const declared = await runPlan(plan, { mode: 'approved', approval: await approvalIn('solo', declaredPlanApproval) }, ORIGIN);
   const verified = await runPlan(plan, { mode: 'approved', approval: await approvalIn('team', verifiedPlanApproval) }, ORIGIN);

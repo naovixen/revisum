@@ -1,9 +1,9 @@
-// Blocked origins are in the result's hash, so the hash can only be repeated if every run refuses and sees
-// the same origins. Refusals made well before a run ends should be; a request sent as the run ends races
-// the session's close. This measures that, by repeating one plan against a page that asks undeclared
-// origins by fetch, WebSocket and a worker, and then, at the moment the run's last check can pass, by
-// fetches staggered around it. The names are reserved for examples, and an undeclared name is refused
-// before it is looked up, so nothing leaves the machine.
+// A request sent as a run ends races the session's close, so which origins a run refuses can differ from
+// one run to the next. The result hash leaves that list out, so it must repeat regardless; the evidence
+// hash covers the list, so it follows whatever each run saw. This repeats one plan against a page that
+// asks undeclared origins by fetch, WebSocket and a worker, and then, at the moment the run's last check
+// can pass, by fetches staggered around it. The names are reserved for examples, and an undeclared name is
+// refused before it is looked up, so nothing leaves the machine.
 import assert from "node:assert/strict";
 import { join } from "node:path";
 import { after, before, describe, test } from "node:test";
@@ -13,7 +13,9 @@ import { navigate, testId, textEquals } from "#test-support/browser/RawPlan.ts";
 import { FIXED_TIME_MILLISECONDS, SEED, capabilityPlan } from "#test-support/capability-harness.ts";
 import type { FixtureRoute } from "#test-support/fixture-server.ts";
 import { FIXTURES } from "#test-support/repository.ts";
+import { evidenceHashOf, expectedEvidenceHash } from "#test-support/ExpectedEvidenceHash.ts";
 import { determinismRuns, onTarget } from "#test-support/TestTier.ts";
+import type { RunResult } from "@revisum/engine";
 import {
     ATTEMPT_SETTLED,
     ATTEMPT_STATE,
@@ -57,8 +59,16 @@ const STEPS: readonly unknown[] = [
     navigate(PAGE_PATH),
     textEquals(testId(ATTEMPT_STATE), ATTEMPT_SETTLED, "repeated-runs.attempt-settled"),
 ];
+const STEPS_WITH_ONE_MORE_CHECK: readonly unknown[] = [
+    ...STEPS,
+    textEquals(testId(ATTEMPT_STATE), ATTEMPT_SETTLED, "repeated-runs.attempt-stays-settled"),
+];
 
-type RunMeasure = { readonly resultHash: string; readonly blockedOrigins: readonly string[] };
+type RunMeasure = {
+    readonly result: RunResult;
+    readonly resultHash: string;
+    readonly blockedOrigins: readonly string[];
+};
 
 let harness: BrowserHarness;
 let pageServed = ASKING_PAGE;
@@ -97,12 +107,20 @@ after(async () => {
     await harness.close();
 });
 
-async function repeatRuns(targetId: BrowserTarget, count: number): Promise<readonly RunMeasure[]> {
+async function repeatRuns(
+    targetId: BrowserTarget,
+    count: number,
+    steps: readonly unknown[] = STEPS,
+): Promise<readonly RunMeasure[]> {
     const measures: RunMeasure[] = [];
     for (let index = 0; index < count; index += 1) {
-        const { result } = await harness.runSteps(targetId, STEPS);
+        const { result } = await harness.runSteps(targetId, steps);
         assert.equal(result.state, "Passed", JSON.stringify(result));
-        measures.push({ resultHash: result.resultHash, blockedOrigins: result.blockedOrigins });
+        measures.push({
+            result,
+            resultHash: result.resultHash,
+            blockedOrigins: result.blockedOrigins,
+        });
     }
     return measures;
 }
@@ -139,7 +157,7 @@ describe("Using the result hash of a run on the host", () => {
                         measures = await repeatRuns(targetId, RUNS);
                     });
 
-                    test("then it should give every run the same hash", (context) => {
+                    test("then it should give every run the same result hash", (context) => {
                         const summary = summaryOf(measures);
                         context.diagnostic(summary);
                         assert.equal(
@@ -147,6 +165,12 @@ describe("Using the result hash of a run on the host", () => {
                             1,
                             summary,
                         );
+                    });
+
+                    test("then it should give every run the evidence hash of what that run refused", () => {
+                        for (const { result } of measures) {
+                            assert.equal(evidenceHashOf(result), expectedEvidenceHash(result));
+                        }
                     });
 
                     for (const name of EARLY_NAMES) {
@@ -173,9 +197,38 @@ describe("Using the result hash of a run on the host", () => {
                             pageServed = ASKING_PAGE;
                         });
 
-                        test("then it should give those runs one hash of their own, so the same hash means something", () => {
-                            const hashes = new Set(quiet.map((measure) => measure.resultHash));
-                            assert.equal(hashes.size, 1, JSON.stringify(quiet));
+                        test("then it should give those runs the same result hash, since only the list differs", () => {
+                            const hashes = new Set(
+                                [...measures, ...quiet].map((measure) => measure.resultHash),
+                            );
+                            assert.equal(hashes.size, 1, summaryOf([...measures, ...quiet]));
+                        });
+
+                        test("then it should give those runs an evidence hash of their own, so the list is still covered", () => {
+                            const hashes = new Set(
+                                quiet.map((measure) => evidenceHashOf(measure.result)),
+                            );
+                            assert.equal(hashes.size, 1, summaryOf(quiet));
+                            for (const measure of measures) {
+                                assert.equal(hashes.has(evidenceHashOf(measure.result)), false);
+                            }
+                        });
+                    });
+
+                    describe("and a plan with one more check runs on the same page", () => {
+                        let longer: readonly RunMeasure[];
+                        before(async () => {
+                            pageServed = ASKING_PAGE;
+                            longer = await repeatRuns(
+                                targetId,
+                                CONTROL_RUNS,
+                                STEPS_WITH_ONE_MORE_CHECK,
+                            );
+                        });
+
+                        test("then it should give those runs another result hash, so the same hash means something", () => {
+                            const hashes = new Set(longer.map((measure) => measure.resultHash));
+                            assert.equal(hashes.size, 1, summaryOf(longer));
                             for (const measure of measures) {
                                 assert.equal(hashes.has(measure.resultHash), false);
                             }

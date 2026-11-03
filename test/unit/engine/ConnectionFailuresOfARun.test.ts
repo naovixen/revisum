@@ -10,6 +10,7 @@ import {
     type Session,
 } from "@revisum/engine";
 import { memoryRunEventSink } from "../../support/memory-ports.ts";
+import { evidenceHashOf } from "../../support/ExpectedEvidenceHash.ts";
 import { fakeSession, runOnFakeSession } from "./RunOnFakeSession.ts";
 import { OPEN_CART, unsafePlan, type JsonRecord } from "./unsafe-feature-steps.ts";
 
@@ -209,7 +210,7 @@ describe("Using the run", () => {
 
     describe("given a session that blocked an origin and could not connect to another", () => {
         describe("when the run ends", () => {
-            test("then it should give the hash of the same blocked origin with no failures", async () => {
+            test("then it should give the hashes of the same blocked origin with no failures", async () => {
                 const raw = unsafePlan([OPEN_CART]);
                 const blockedOrigins = (): readonly string[] => [BLOCKED_ORIGIN];
                 const blockedOnly = await runOnFakeSession(raw, {
@@ -220,9 +221,10 @@ describe("Using the run", () => {
                 });
                 assert.deepEqual(result.blockedOrigins, [BLOCKED_ORIGIN]);
                 assert.equal(result.resultHash, blockedOnly.result.resultHash);
+                assert.equal(evidenceHashOf(result), evidenceHashOf(blockedOnly.result));
             });
 
-            test("then it should change the hash from a session that blocked nothing, so the sameness means something", async () => {
+            test("then it should change the evidence hash from a session that blocked nothing, so the sameness means something", async () => {
                 const raw = unsafePlan([OPEN_CART]);
                 const quiet = await runOnFakeSession(raw);
                 const { result } = await runOnFakeSession(raw, {
@@ -230,7 +232,7 @@ describe("Using the run", () => {
                         blockedOrigins: () => [BLOCKED_ORIGIN],
                     }),
                 });
-                assert.notEqual(result.resultHash, quiet.result.resultHash);
+                assert.notEqual(evidenceHashOf(result), evidenceHashOf(quiet.result));
             });
         });
     });
