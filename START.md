@@ -20,7 +20,22 @@ Architecture refactor:
   - [x] First round of fixes: false passes, action guard, approval, secrets, parser, evidence mode
   - [x] Run `npm run check:linux` on a new container with `xclip`: green in 36 minutes, with the browser tests serial (24 minutes; CI splits them into 3). The clipboard proof and the symlinked report test ran and passed (findings 25, 99)
   - [x] Confirm host-user deletion of container-owned `test-results`: it fails for a host user with another uid (finding 140)
-  - [ ] **Next:** clear the remaining open findings (see below), then ground the core: constant objects in `contracts`, foundation helpers, step tables, split `plan-parser` and `run`, pipeline and preflight, driver port, `RunResult` to contracts, cycle rule, in-page free-variable rule, split `cdp-driver`, `egress-proxy` and the runners' shared lifecycle, throwaway-step experiment. The plan is `C:\Users\naomi\.claude\plans\before-starting-on-the-jiggly-squirrel.md`
+  - [ ] **Next:** clear the remaining open findings (see below)
+  - [ ] Ground the core. The plan is `C:\Users\naomi\.claude\plans\before-starting-on-the-jiggly-squirrel.md`. **Tick a part only when its review with `docs/prompts/session-core-review.md` is clear (founder, 2026-11-03).** Code a part touches leaves with no suppressed nested ternaries, loose conditions or unsafe types; these don't wait for phase 6.
+    - [ ] Switch on `@typescript-eslint/no-unnecessary-condition`, baselining what exists
+    - [ ] Constant objects in `contracts`
+    - [ ] Foundation helpers
+    - [ ] Step tables
+    - [ ] Split `plan-parser`
+    - [ ] Split `run`
+    - [ ] Pipeline and preflight
+    - [ ] Driver port
+    - [ ] `RunResult` to contracts
+    - [ ] Cycle rule and in-page free-variable rule
+    - [ ] Split `cdp-driver`
+    - [ ] Split `egress-proxy`
+    - [ ] The runners' shared lifecycle
+    - [ ] Throwaway-step experiment: about 7 edits, each forced by the compiler
 - [ ] Phase 4: move files, constants for magic strings, formatting
 - [ ] Phase 5: docs and final trust-path review; the founder pushes
 - [ ] Phase 6: test titles and remaining suppressions (may run alongside M3)
