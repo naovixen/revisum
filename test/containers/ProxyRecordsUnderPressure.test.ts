@@ -41,7 +41,7 @@ type ProxiedAnswer = { readonly status: number; readonly mark: string | null };
 
 // Asks the run's proxy for a URL from inside the run container, and prints its status and its mark.
 const askScript = (url: string): string => `
-  const proxy = new URL(process.env.SERVICE_PROXY ?? process.env.HTTP_PROXY);
+  const proxy = new URL(process.env.SERVICE_PROXY);
   require('node:http').request({ host: proxy.hostname, port: proxy.port, path: ${JSON.stringify(url)} }, (answer) => {
     answer.resume();
     answer.on('end', () => console.log(JSON.stringify({ status: answer.statusCode, mark: answer.headers['x-egress-decision'] ?? null })));
@@ -50,7 +50,7 @@ const askScript = (url: string): string => `
 // Asks in turn, and prints how many answers of each status came back.
 const floodScript = (url: string, count: number): string => `
   const http = require('node:http');
-  const proxy = new URL(process.env.SERVICE_PROXY ?? process.env.HTTP_PROXY);
+  const proxy = new URL(process.env.SERVICE_PROXY);
   const agent = new http.Agent();
   const ask = () => new Promise((resolve) => http.request({ agent, host: proxy.hostname, port: proxy.port, path: ${JSON.stringify(url)} }, (answer) => {
     answer.resume();

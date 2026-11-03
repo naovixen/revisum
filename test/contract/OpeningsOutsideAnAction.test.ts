@@ -92,6 +92,11 @@ const afterAMoment = (id: string, action: string): string => `
     });
   </script>`;
 
+const whileParsing = (address: string): string => `<script>location.href = ${address};</script>`;
+
+const atLoadEvent = (address: string): string =>
+    `<script>addEventListener('load', () => { location.href = ${address}; });</script>`;
+
 const startPage = (heldOrigin: string): string => `
   <a href="${heldOrigin}${ATTACHMENT_PATH}?by=link">Export by link</a>
   <button type="button" onclick="location.href='${heldOrigin}${ATTACHMENT_PATH}?by=script'">Export by script</button>
@@ -141,6 +146,10 @@ before(async () => {
                 "/download-as-it-loads.html",
                 htmlPage(`<p data-testid="status">Ready</p><script>${START_A_DOWNLOAD}</script>`),
             ],
+            ["/attachment-at-load-event.html", htmlPage(atLoadEvent("'/report.csv'"))],
+            ["/attachment-while-parsing.html", htmlPage(whileParsing("'/report.csv'"))],
+            ["/next-page-at-load-event.html", htmlPage(atLoadEvent("'/plain.html'"))],
+            ["/next-page-while-parsing.html", htmlPage(whileParsing("'/plain.html'"))],
             ["/plain.html", htmlPage('<p data-testid="status">Ready</p>')],
             [
                 "/report.csv",
@@ -188,9 +197,9 @@ const assertOutcomes = async (
 // the page has loaded, so which step it lands on is the browser's timing and not a promise. What
 // must hold is that the run fails for it. The run's own folder goes when the session closes, so the
 // disk is searched just before that as well as after it.
-const assertRunFailsForTheOpeningAndKeepsNoFile = async (
+const assertRunFailsAndKeepsNoFile = async (
     steps: readonly JsonRecord[],
-): Promise<void> => {
+): Promise<readonly (string | undefined)[]> => {
     const startedAt = Date.now();
     let filesAtClose: readonly string[] | undefined;
     const { result } = await harness.runSteps(TARGET, steps, {
@@ -200,13 +209,16 @@ const assertRunFailsForTheOpeningAndKeepsNoFile = async (
             return Promise.resolve();
         },
     });
-    const failedCodes = result.steps
-        .filter((step) => step.outcome === "failed")
-        .map((step) => step.code);
-    assert.deepEqual(failedCodes, ["unsupported-step"], JSON.stringify(result.steps));
-    assert.equal(result.state, "Failed");
+    assert.equal(result.state, "Failed", JSON.stringify(result.steps));
     assert.deepEqual(filesAtClose, [], "no file was kept while the session was open");
     assert.deepEqual(filesHolding(REPORT_MARKER, startedAt), [], "no file was left after the run");
+    return result.steps.filter((step) => step.outcome === "failed").map((step) => step.code);
+};
+
+const assertRunFailsForTheOpeningAndKeepsNoFile = async (
+    steps: readonly JsonRecord[],
+): Promise<void> => {
+    assert.deepEqual(await assertRunFailsAndKeepsNoFile(steps), ["unsupported-step"]);
 };
 
 describe("Using a run in a real browser", () => {
@@ -322,6 +334,66 @@ describe("Using a run in a real browser", () => {
             });
         });
     });
+
+    describe("given a page whose script moves it to an attachment at its load event", () => {
+        describe("and the navigate step that loads it is the plan's last step", () => {
+            describe("when the run ends", () => {
+                test("then it should fail with unsupported-step and keep no file", async () => {
+                    await assertRunFailsForTheOpeningAndKeepsNoFile([
+                        navigate("/plain.html"),
+                        STATUS_SHOWN,
+                        navigate("/attachment-at-load-event.html"),
+                    ]);
+                });
+            });
+        });
+    });
+
+    describe("given a page whose script moves it to an attachment while it is parsed", () => {
+        describe("and the navigate step that loads it is the plan's last step", () => {
+            describe("when the run ends", () => {
+                test("then it should fail and keep no file", async () => {
+                    await assertRunFailsAndKeepsNoFile([
+                        navigate("/plain.html"),
+                        STATUS_SHOWN,
+                        navigate("/attachment-while-parsing.html"),
+                    ]);
+                });
+            });
+        });
+    });
+
+    for (const { name, path } of [
+        { name: "at its load event", path: "/next-page-at-load-event.html" },
+        { name: "while it is parsed", path: "/next-page-while-parsing.html" },
+    ]) {
+        describe(`given a page whose script moves it to an ordinary page ${name}`, () => {
+            describe("and the navigate step that loads it is the plan's last step", () => {
+                describe("when the run ends", () => {
+                    test("then it should pass the run", async () => {
+                        const { result } = await harness.runSteps(TARGET, [
+                            navigate("/plain.html"),
+                            STATUS_SHOWN,
+                            navigate(path),
+                        ]);
+                        assert.equal(result.state, "Passed", JSON.stringify(result.steps));
+                    });
+                });
+            });
+
+            describe("and a check of the ordinary page follows", () => {
+                describe("when the run ends", () => {
+                    test("then it should pass the run", async () => {
+                        const { result } = await harness.runSteps(TARGET, [
+                            navigate(path),
+                            STATUS_SHOWN,
+                        ]);
+                        assert.equal(result.state, "Passed", JSON.stringify(result.steps));
+                    });
+                });
+            });
+        });
+    }
 
     describe("given a page that starts nothing as it loads", () => {
         describe("when a navigate step loads it", () => {

@@ -148,6 +148,7 @@ function watchedRunner(image: ImageDigest, watch: RunnerWatch): { readonly runne
         egressEvents: () => handle.egressEvents(),
         proxyDecisions: () => handle.proxyDecisions(),
         rewritesApplied: () => handle.rewritesApplied(),
+        guaranteeLevel: () => handle.guaranteeLevel(),
         async exec(command, environmentNames = []) {
           const outcome = await handle.exec(command, environmentNames);
           watch.execs.push({ command, environmentNames, outcome });

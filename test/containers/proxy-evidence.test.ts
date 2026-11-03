@@ -33,7 +33,7 @@ type ProxiedAnswer = { readonly status: number; readonly body: string };
 
 // Asks the run's proxy for a URL, from inside the run container, and prints the answer.
 const throughProxy = (url: string): string => `
-  const proxy = new URL(process.env.SERVICE_PROXY ?? process.env.HTTP_PROXY);
+  const proxy = new URL(process.env.SERVICE_PROXY);
   const target = new URL(${JSON.stringify(url)});
   const outgoing = require('node:http').request({ host: proxy.hostname, port: proxy.port, path: target.href, headers: { host: target.host } }, (response) => {
     const chunks = [];

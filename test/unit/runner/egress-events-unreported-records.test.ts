@@ -1,5 +1,6 @@
 // What a browser record with no proxy decision of its own becomes, in the order the spec gives:
-//   1. blocked if its channel is popup, because the driver holds a popup back before it loads;
+//   1. if its channel is popup, which the driver holds back before it loads, blocked when the driver
+//      marks its origin undeclared and otherwise held;
 //   2. otherwise the latest decision for the same host and port, because one tunnel carries many
 //      requests;
 //   3. otherwise allowed if its origin is one the run knows the browser sends past the proxy;
@@ -8,7 +9,7 @@
 // Each rule has a neighbouring case the next rule would decide differently, so a join that skipped
 // or reordered a rule fails here.
 import assert from 'node:assert/strict';
-import { test } from 'node:test';
+import { describe, test } from 'node:test';
 import type { BrowserChannel, EgressEvent } from '@revisum/contracts';
 import { joinEgressEvents } from '@revisum/runner';
 import { origin } from './runner-examples.ts';
@@ -19,6 +20,7 @@ const LOOPBACK = origin('http://127.0.0.1:4310');
 const LOOPBACK_OTHER_PORT = origin('http://127.0.0.1:4311');
 
 const record = (seen: string, channel: BrowserChannel) => ({ origin: seen, channel });
+const undeclaredPopup = (seen: string) => ({ origin: seen, channel: 'popup' as const, undeclared: true as const });
 const allowed = (seen: string) => ({ origin: seen, decision: 'allowed' as const });
 const blocked = (seen: string) => ({ origin: seen, decision: 'blocked' as const });
 
@@ -27,26 +29,49 @@ const decisionsOn = (events: readonly EgressEvent[], channel: BrowserChannel): r
 
 // ---- A popup ------------------------------------------------------------------------------------
 
-test('a popup is blocked even though the proxy allowed its origin for the page\'s own request', () => {
+test('a popup is held even though the proxy allowed its origin for the page\'s own request', () => {
   const events = joinEgressEvents([record(APP, 'page'), record(APP, 'popup')], [allowed(APP)]);
-  assert.deepEqual(decisionsOn(events, 'popup'), ['blocked']);
+  assert.deepEqual(decisionsOn(events, 'popup'), ['held']);
   assert.deepEqual(decisionsOn(events, 'page'), ['allowed']);
 });
 
 test('a popup recorded before the page\'s own request does not take that request\'s allowed decision', () => {
   const events = joinEgressEvents([record(APP, 'popup'), record(APP, 'page')], [allowed(APP)]);
-  assert.deepEqual(decisionsOn(events, 'popup'), ['blocked']);
+  assert.deepEqual(decisionsOn(events, 'popup'), ['held']);
   assert.deepEqual(decisionsOn(events, 'page'), ['allowed']);
 });
 
-test('a popup is blocked when an allowed decision for its origin is the only decision there is', () => {
+test('a popup is held when an allowed decision for its origin is the only decision there is', () => {
   const events = joinEgressEvents([record(APP, 'popup')], [allowed(APP)]);
-  assert.deepEqual(decisionsOn(events, 'popup'), ['blocked']);
+  assert.deepEqual(decisionsOn(events, 'popup'), ['held']);
 });
 
-test('a popup is blocked even when its origin is one the browser sends past the proxy', () => {
+test('a popup is held even when its origin is one the browser sends past the proxy', () => {
   const events = joinEgressEvents([record(LOOPBACK, 'popup')], [], [LOOPBACK]);
-  assert.deepEqual(events, [{ origin: LOOPBACK, channel: 'popup', decision: 'blocked' }]);
+  assert.deepEqual(events, [{ origin: LOOPBACK, channel: 'popup', decision: 'held' }]);
+});
+
+describe('Using the join of browser records and proxy decisions', () => {
+  describe('given a popup the driver marks as undeclared', () => {
+    describe('and a page request the proxy allowed to the same origin', () => {
+      describe('when they are joined', () => {
+        test('then it should block the popup and allow the page request', () => {
+          const events = joinEgressEvents([record(APP, 'page'), undeclaredPopup(APP)], [allowed(APP)]);
+          assert.deepEqual(decisionsOn(events, 'popup'), ['blocked']);
+          assert.deepEqual(decisionsOn(events, 'page'), ['allowed']);
+        });
+      });
+    });
+
+    describe('and an origin the browser sends past the proxy', () => {
+      describe('when they are joined', () => {
+        test('then it should block the popup', () => {
+          const events = joinEgressEvents([undeclaredPopup(LOOPBACK)], [], [LOOPBACK]);
+          assert.deepEqual(events, [{ origin: LOOPBACK, channel: 'popup', decision: 'blocked' }]);
+        });
+      });
+    });
+  });
 });
 
 // ---- The latest decision for the same host and port -------------------------------------------------

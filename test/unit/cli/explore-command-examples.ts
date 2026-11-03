@@ -273,6 +273,7 @@ export function fakeRunner(options: FakeRunnerOptions): FakeRunner {
     egressEvents: () => [],
     proxyDecisions: () => [],
     rewritesApplied: () => [],
+    guaranteeLevel: () => options.level,
     async exec(command: readonly string[], environmentNames?: unknown): Promise<ExecOutcome> {
       execs.push({ command, environmentNames });
       return { exitCode: 0, stdout: options.output ?? '', stderr: '' };

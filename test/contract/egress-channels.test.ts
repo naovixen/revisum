@@ -1,6 +1,6 @@
-// The egress proxy blocks every channel a page can use to reach an undeclared origin: an ordinary
-// request, a WebSocket, a worker's request, a popup, a redirect and a beacon. Each fixture page
-// sends one kind to a .invalid origin, so nothing can reach the network whatever happens.
+// Nothing a page sends to an undeclared origin gets out: the egress proxy blocks an ordinary request,
+// a WebSocket, a worker's request, a redirect and a beacon, and the driver holds a popup back. Each
+// fixture page sends one kind to a .invalid origin, so nothing can reach the network whatever happens.
 //
 // The proxy runs in-process and a real headless Chromium, through the own CDP driver, is pointed
 // at it. The browser's own allow-list is deliberately widened to let every undeclared origin
@@ -85,14 +85,16 @@ async function sendThrough(channel: ChannelName): Promise<{ readonly events: rea
   return { events: eventsOf(session), session };
 }
 
-describe('every channel to an undeclared origin is blocked and recorded as an egress event', () => {
+describe('every channel to an undeclared origin is stopped and recorded as an egress event', () => {
   for (const channel of CHANNEL_NAMES) {
     const host = CHANNEL_HOSTS[channel];
-    test(`${channel} traffic to ${host} is recorded as a blocked ${channel} event`, async () => {
+    // The widened allow-list declares the popup's origin to the driver, and nothing refused it.
+    const decision = channel === 'popup' ? 'held' : 'blocked';
+    test(`${channel} traffic to ${host} is recorded as a ${decision} ${channel} event`, async () => {
       const { events, session } = await sendThrough(channel);
       try {
         const forHost = events.filter((event) => hostOf(String(event.origin)) === host);
-        assert.ok(forHost.some((event) => event.channel === channel && event.decision === 'blocked'), JSON.stringify(events));
+        assert.ok(forHost.some((event) => event.channel === channel && event.decision === decision), JSON.stringify(events));
         assert.deepEqual(forHost.filter((event) => event.decision === 'allowed'), [], 'nothing to the undeclared origin was let through');
         const proxyAllowed = proxy.decisions().filter((entry) => entry.decision === 'allowed' && hostOf(String(entry.origin)) === host);
         assert.deepEqual(proxyAllowed, [], 'the proxy let nothing through to the undeclared origin');

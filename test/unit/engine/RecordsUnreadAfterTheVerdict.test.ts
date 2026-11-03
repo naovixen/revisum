@@ -1,6 +1,7 @@
 // Once the steps have a verdict, a person needs it more than anything a broken session or log has
-// left to say. Stub answers, blocked origins, the session's close and the log may all throw by then,
-// and the result must still come back, as it would have been, with the browser closed.
+// left to say. Stub answers, the session's close and the log may all throw by then, and the result
+// must still come back, as it would have been, with the browser closed. Blocked origins are not among
+// them, because the result claims them.
 import assert from "node:assert/strict";
 import { describe, test, type TestContext } from "node:test";
 import type { LoggedEvent, RunEventSink, Session } from "@revisum/engine";
@@ -60,17 +61,15 @@ const BROKEN_READS: readonly {
         changes: { network: { ...fakeNetwork(), stubAnswers: throws } },
         isLogged: true,
     },
-    { name: "blockedOrigins throws", changes: { blockedOrigins: throws }, isLogged: true },
     {
         name: "close rejects",
         changes: { close: () => Promise.reject(new Error(BROKEN)) },
         isLogged: false,
     },
     {
-        name: "stubAnswers, blockedOrigins and close all fail",
+        name: "stubAnswers and close both fail",
         changes: {
             network: { ...fakeNetwork(), stubAnswers: throws },
-            blockedOrigins: throws,
             close: () => Promise.reject(new Error(BROKEN)),
         },
         isLogged: true,
