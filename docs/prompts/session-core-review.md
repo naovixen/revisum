@@ -4,7 +4,7 @@ The founder requires this after every part of grounding the core (2026-11-03). A
 
 The main session replaces `<PART>` and `<COMMITS>`, then gives everything below the line, as its whole brief, to a helper agent with a fresh context that didn't write the part. It passes on no notes from the authors.
 
-If the verdict is `not clear`, a code helper fixes the `must fix` findings, and any `consider` ones the main session accepts, in a commit of their own. A new reviewer with a fresh context then reviews the part again, that commit included. After two rounds, anything still open goes to the founder with a recommendation, rather than going round again.
+If the verdict is `not clear`, a code helper fixes the `must fix` findings, and any `consider` ones the main session accepts, in a commit of their own. A new entry on `REVEAL_ALLOWED_MODULES` is the exception: it goes straight to the founder. A new reviewer with a fresh context then reviews the part again, that commit included. After two rounds, anything still open goes to the founder with a recommendation, rather than going round again.
 
 ---
 
@@ -14,7 +14,8 @@ Review the core refactor part **<PART>**, commits `<COMMITS>`, as an independent
 
 - A call that type-checks is a correct call: a caller can't pass anything the core can't handle.
 - The core has a defined outcome for every value its types allow, and its return type names every outcome, failures included.
-- Code that uses the core needs no branch, check, default or retry of its own to make the core behave. It only handles the outcomes it gets back.
+- Code that uses the core needs no branch, check or default of its own to make the core behave. It only handles the outcomes it gets back.
+- Nothing is retried, anywhere. The core works first time, or the run ends with an outcome that says what failed.
 
 The test for each part: could someone add a new adapter or caller from the ports, the core's exported types and their doc comments alone, without reading the core's code or copying a workaround from existing code, and have it work first time? Wherever the answer is no, there's a finding.
 
@@ -23,7 +24,7 @@ In this brief, an adapter is anything that implements a port in `contracts`, fak
 **Check the main goal first:**
 
 - **Callers don't compensate.** Trace every caller of what this part changed. Each of these is fixed in the core, or in a wrapper around a port, never in the caller. Flag a caller that:
-  - validates, normalises, defaults, retries or guards something the core should settle, or now already does;
+  - validates, normalises, defaults or guards something the core should settle, or now already does;
   - catches an exception, or probes the result, to find out what happened, because the return type doesn't say;
   - casts, or uses `!`, on what the core returns;
   - has to call things in a set order (set up, use, clean up) that the core could enforce;
@@ -65,8 +66,10 @@ Pure logic (parser, policy, oracle, secrets) stays as pure functions, one role p
 
 **And the guarantees, which are always `must fix`:**
 
-- **Guarantees kept.** Deny by default, only the fill executor receives secrets, decoders report code and path only, a fresh browser per run in production, and the version check.
+- **Guarantees kept.** Deny by default, decoders report code and path only, a fresh browser per run in production, and the version check.
+- **Secrets stay opaque.** Code may carry a `Secret` but not read it. Secrets are wrapped as soon as they're loaded, only the modules in `REVEAL_ALLOWED_MODULES` call `reveal()`, and none of them hands the plain value back to its caller. A new entry on that list is a `must fix` that goes to the founder, not the code helper.
 - **Behaviour unchanged.** No refactor commit changes a golden. Tests may change how they call the code, but not what they assert: flag a test that was skipped, deleted or loosened.
+- **Nothing retries.** Flag anything that tries again or carries on after a failure: a retry loop, a fallback to another locator or path, a `catch` that swallows the error, or a test runner's `retries` setting. Waiting for a condition with one deadline isn't a retry; doing something again after it failed is.
 
 **Run** ESLint on the files `<COMMITS>` changed, with every suppression ignored. `--no-inline-config` ignores `eslint-disable` comments, and an empty suppressions file outside the repo stands in for `eslint-suppressions.json`:
 
@@ -76,6 +79,8 @@ node tools/eslint/node_modules/eslint/bin/eslint.js --config tools/eslint/eslint
 ```
 
 Any `no-nested-ternary`, `strict-boolean-expressions`, `no-unnecessary-condition` or `no-unsafe-*` hit in code this part touched is a `must fix`: these don't wait for the later clean-up.
+
+Then run the secret reveal check, `tools/check-secret-reveal.ts`, the way the repo runs it. A failure is a broken guarantee.
 
 **Report** in at most 40 lines, most serious first. For each finding, give the file and line, the check it fails, what goes wrong in concrete terms (the change that becomes hard, or the input that breaks it) and the smallest fix. If you can't name what goes wrong, it's taste, and taste isn't a finding. Mark each one:
 
