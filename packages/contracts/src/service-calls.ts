@@ -87,8 +87,15 @@ export type CallDeclaration = {
   readonly body?: JsonTemplate;
   readonly parameters: Readonly<Record<ParameterName, ParameterType>>;
   readonly effect: CallEffect;
-  // Any other status fails the call with unexpected-status.
+  // Any other status fails a call with unexpected-status, pending statuses included. A backend check
+  // stops on any other status too, with unexpected-status, or service-unreachable for a 502, 503 or
+  // 504, which says a gateway could not get an answer, unless it is a pending status.
   readonly successStatuses: readonly number[];
+  // Read calls only, and never a status of successStatuses. Statuses that mean "not ready yet": a
+  // backend check polls on them under its timeout without reading the body. A plain call ignores
+  // them. At the timeout the last status decides: 502, 503 or 504 ends the run Errored, any other
+  // Failed.
+  readonly pendingStatuses?: readonly number[];
   readonly fields?: Readonly<Record<FieldName, JsonPointer>>;
   readonly allowInProposals: boolean;
   // Defaults: 10 s and 1 MiB.

@@ -1354,10 +1354,7 @@
   },
   "packages/engine/src/service-calls/call-steps.ts": {
     "curly": {
-      "count": 12
-    },
-    "no-nested-ternary": {
-      "count": 2
+      "count": 11
     },
     "revisum/file-name-matches-export": {
       "count": 1

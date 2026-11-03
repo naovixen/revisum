@@ -33,7 +33,7 @@ Plan error. A step's `type` is not one of the plan language's steps. Use one of 
 
 ## unknown_value
 
-Plan error. A value is not one of those allowed, such as an unknown role, key or audit mode, a malformed feature id, criterion id or capture name, a number out of range, or a secret name or fixture file the project does not declare.
+Plan error. A value is not one of those allowed, such as an unknown role, key or audit mode, a malformed feature id, criterion id or capture name, a number out of range, or a secret name or fixture file the project does not declare. A project's `write` call declaration that lists `pendingStatuses` is refused with it too: only a backend check reads them, and it only runs a `read`.
 
 ## invalid_url
 
@@ -67,7 +67,7 @@ Plan error. A text value is longer than allowed.
 
 ## duplicate
 
-Plan error. A target is listed twice, two capture steps share a name, a run value is defined twice (in `values` and by a `remember` step, or by two `remember` steps), or a `press` step holds the same modifier twice.
+Plan error. A target is listed twice, two capture steps share a name, a run value is defined twice (in `values` and by a `remember` step, or by two `remember` steps), or a `press` step holds the same modifier twice. In a project, a call declaration lists a status twice in `successStatuses` or in `pendingStatuses`, or lists one in both.
 
 ## version_unsupported
 
@@ -267,7 +267,9 @@ Service call error. The response is JSON, but a field's JSON pointer names nothi
 
 ## service-unreachable
 
-Service call error. The caller could not connect to the declared service. A `call` or a backend check that cannot connect ends the run `Errored`: it could not test, which is not a product failure. A backend check stops there, without waiting out its timeout or sending its read again. Cleanup still runs. Check that the service is up and its origin in `services` is right.
+Service call error. The caller could not connect to the declared service, or a backend check got a 502, 503 or 504, which says a gateway could not get an answer from it. Either way the run ends `Errored`: it could not test, which is not a product failure. A `call` that cannot connect ends it the same way. A backend check stops there, without waiting out its timeout or sending its read again. Cleanup still runs. Check that the service is up and its origin in `services` is right.
+
+The step's record shows which happened: a status of 502, 503 or 504 is a gateway's answer, and no status means no connection. Declaring the status changes this. In `successStatuses` it is judged as a success. In `pendingStatuses` the check polls on it, and ends `Errored` with this code only if it is still the last status when the check timeout runs out. A `call` is not affected: it reports any status it does not count as success as `unexpected-status`.
 
 ## call-timeout
 
@@ -275,7 +277,7 @@ Service call error. The service did not answer within the declaration's `timeout
 
 ## unexpected-status
 
-Service call error. The service answered with a status the declaration's `successStatuses` does not list. A redirect is never followed: it is judged like any other status. A `call` that gets one ends the run `Errored`. Add the status to `successStatuses` if it means success.
+Service call error. The service answered with a status the declaration's `successStatuses` does not list. A redirect is never followed: it is judged like any other status. A `call` that gets one ends the run `Errored`, and `pendingStatuses` mean nothing to it. A backend check that gets one stops there and ends the run `Failed`, unless `pendingStatuses` lists it or it is a 502, 503 or 504 (see `service-unreachable`). Add the status to `successStatuses` if it means success, or to `pendingStatuses` on a `read` declaration if it means "not ready yet", such as a 404 until a background job finishes.
 
 ## egress-blocked
 
@@ -353,6 +355,8 @@ Driver error. The step needs something this run cannot do yet: the driver does n
 ## assertion-failed
 
 Driver error. A `dialog` step's `expectText` is not the text of the dialog the page opened, so nothing answered the dialog. Check the expected text, or the step before it that opens the dialog.
+
+A backend check fails with it too, ending the run `Failed`, when the check timeout runs out on a field that does not pass, or on a status in `pendingStatuses` other than 502, 503 or 504. The step's record keeps the last status. A pending answer's body is never read, so raise the timeout, or check why the job did not finish.
 
 ## selector-invalid
 

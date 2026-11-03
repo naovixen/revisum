@@ -1,6 +1,6 @@
-// Reads a declared call's response: whether its status is one the declaration counts as success,
-// its JSON body within the size cap, and a field by its JSON pointer. Nothing here keeps the body:
-// a run records only its status and sha256 until redacted excerpts land.
+// Reads a declared call's response: what its status says, its JSON body within the size cap, and a
+// field by its JSON pointer. Nothing here keeps the body: a run records only its status and sha256
+// until redacted excerpts land.
 import {
   failure, success,
   type BackendAssertion, type CallDeclaration, type JsonPointer, type ResponseReadErrorCode, type Result, type SafeText, type ServiceResponse,
@@ -13,6 +13,15 @@ const JSON_MEDIA_TYPE = /^application\/([A-Za-z0-9.!#$&^_-]+\+)?json\s*(;|$)/i;
 // the caller never follows one.
 export const isSuccessStatus = (declaration: CallDeclaration, response: ServiceResponse): boolean =>
   declaration.successStatuses.includes(response.status);
+
+// True when the declaration lists the status as meaning "not ready yet".
+export const isPendingStatus = (declaration: CallDeclaration, response: ServiceResponse): boolean =>
+  declaration.pendingStatuses?.includes(response.status) === true;
+
+// 502, 503 and 504 say a gateway could not get an answer from the service.
+const GATEWAY_STATUSES: readonly number[] = [502, 503, 504];
+
+export const isGatewayStatus = (response: ServiceResponse): boolean => GATEWAY_STATUSES.includes(response.status);
 
 // The body as JSON. The caller stops reading at the cap; a body over it is refused here as well.
 export function responseJson(response: ServiceResponse, maximumResponseBytes: number): Result<unknown, ResponseReadErrorCode> {

@@ -1,9 +1,10 @@
 // Runs the steps that call declared services, through the run's ServiceCaller port:
 //   - a call sends its request once, judges the status against the declaration and remembers the
 //     response fields the step names as run values; a write is never retried;
-//   - a backend check repeats its read call while the service answers with a status the declaration
-//     lists and the field has not passed the check, until the project's backend check timeout runs
-//     out, which covers background jobs. A call that fails stops the check at once, with its code;
+//   - a backend check repeats its read call while the service answers with a pending status, or with
+//     a success status and a field that has not passed the check, until the project's backend check
+//     timeout runs out, which covers background jobs. A call that fails stops the check at once, with
+//     its code;
 //   - cleanup calls and cleanup database commands run in order after the steps, whatever the
 //     outcome. One that needs a value never set, because the run stopped first, is skipped; one
 //     that fails is recorded and raises a review item, and never changes the verdict.
@@ -24,7 +25,7 @@ import type { Project } from '../project/project-parser.ts';
 import type { RememberedValues } from '../RememberedValues.ts';
 import { resolveText, type RunValues, type StepErrorCode } from '../run-values.ts';
 import { buildServiceRequest } from './service-request.ts';
-import { checkBackendField, fieldAt, fieldText, isSuccessStatus, responseJson } from './service-response.ts';
+import { checkBackendField, fieldAt, fieldText, isGatewayStatus, isPendingStatus, isSuccessStatus, responseJson } from './service-response.ts';
 
 // How long a backend check waits between two reads of its call.
 const BACKEND_POLL_INTERVAL_MILLISECONDS = 250;
@@ -49,8 +50,8 @@ type CallStepOutcome = {
   readonly serviceCall?: ServiceCallRecord;
 };
 
-// The codes of a call the service never answered. A check then learned nothing about the product,
-// so the run could not test, in whatever step the call stood.
+// The codes of a call that got no answer from the service, not even through a gateway. A check then
+// learned nothing about the product, so the run could not test, in whatever step the call stood.
 export const NO_ANSWER_CODES: readonly string[] = ['service-unreachable', 'call-timeout'] satisfies readonly ServiceCallErrorCode[];
 
 // A cleanup step's record, naming its call or its database command. A failed one is always
@@ -86,29 +87,65 @@ function declared(call: CallName, project: Project): Declared | undefined {
 const failedWith = (code: CallStepCode, serviceCall?: ServiceCallRecord): CallStepOutcome =>
   ({ outcome: 'failed', code, ...(serviceCall === undefined ? {} : { serviceCall }) });
 
+// What a status says of an answer. `code` is what the step fails with on it: at once when failed, and
+// at the check timeout when pending, the status meaning "not ready yet" and nothing about its body.
+type StatusJudgement =
+  | { readonly outcome: 'passed' }
+  | { readonly outcome: 'pending'; readonly code: CallStepCode }
+  | { readonly outcome: 'failed'; readonly code: CallStepCode };
+type JudgeStatus = (declaration: CallDeclaration, response: ServiceResponse) => StatusJudgement;
+
+// A call is sent once, so it has nothing to wait for: only its success statuses count.
+const judgeForCall: JudgeStatus = (declaration, response) =>
+  isSuccessStatus(declaration, response) ? { outcome: 'passed' } : { outcome: 'failed', code: 'unexpected-status' };
+
+// What a backend check's declaration lists wins. Beyond that, a gateway's status says nothing about
+// the product, so it is the code of a call the service did not answer, and the run could not test.
+const judgeForBackendCheck: JudgeStatus = (declaration, response) => {
+  if (isSuccessStatus(declaration, response)) {
+    return { outcome: 'passed' };
+  }
+  const isGateway = isGatewayStatus(response);
+  if (isPendingStatus(declaration, response)) {
+    return { outcome: 'pending', code: isGateway ? 'service-unreachable' : 'assertion-failed' };
+  }
+  return { outcome: 'failed', code: isGateway ? 'service-unreachable' : 'unexpected-status' };
+};
+
 // What one request came to: the judgement, and the response itself even when its status failed
 // the judgement, since that call is the one a person most needs the record of. A body over the
 // cap was cut short, so it has no record: its sha256 would not be the response's.
-type SentRequest = { readonly judged: Result<ServiceResponse, ServiceCallErrorCode>; readonly received: ServiceResponse | null };
+type SentRequest =
+  | { readonly outcome: 'passed'; readonly received: ServiceResponse }
+  | { readonly outcome: 'pending'; readonly code: CallStepCode; readonly received: ServiceResponse }
+  | { readonly outcome: 'failed'; readonly code: CallStepCode; readonly received: ServiceResponse | null };
 
-// Sends one request, logs it, and judges its status.
+function judgeAnswer(answered: Result<ServiceResponse, ServiceCallErrorCode>, request: ServiceRequest, found: Declared, judgeStatus: JudgeStatus): SentRequest {
+  if (!answered.ok) {
+    return { outcome: 'failed', code: answered.error, received: null };
+  }
+  // The caller stops reading at the cap; a body over it is refused here as well.
+  if (answered.value.body.length > request.maximumResponseBytes) {
+    return { outcome: 'failed', code: 'response-too-large', received: null };
+  }
+  return { ...judgeStatus(found.declaration, answered.value), received: answered.value };
+}
+
+// Sends one request, logs it, and judges its status. A pending answer logs as neither passed nor
+// failed: nothing is sent after a failed call, and a pending one is sent again.
 async function send(
-  request: ServiceRequest, found: Declared, stepIndex: number, stepType: Step['type'], context: CallStepContext,
+  request: ServiceRequest, found: Declared, judgeStatus: JudgeStatus, stepIndex: number, stepType: Step['type'], context: CallStepContext,
 ): Promise<SentRequest> {
   const startedAt = context.clock.now();
   const answered = await context.caller.call(request);
-  // The caller stops reading at the cap; a body over it is refused here as well.
-  const response: Result<ServiceResponse, ServiceCallErrorCode> = !answered.ok ? answered
-    : answered.value.body.length > request.maximumResponseBytes ? failure('response-too-large')
-      : !isSuccessStatus(found.declaration, answered.value) ? failure('unexpected-status') : answered;
+  const sent = judgeAnswer(answered, request, found, judgeStatus);
   context.logger.log({
-    kind: 'service.call', stepIndex, stepType, outcome: response.ok ? 'passed' : 'failed',
-    ...(response.ok ? {} : { code: response.error }),
+    kind: 'service.call', stepIndex, stepType, outcome: sent.outcome,
+    ...(sent.outcome === 'failed' ? { code: sent.code } : {}),
     ...(answered.ok ? { sha256: sha256(answered.value.body) } : {}),
     durationMilliseconds: context.clock.now() - startedAt,
   });
-  const isWithinCap = response.ok || response.error === 'unexpected-status';
-  return { judged: response, received: answered.ok && isWithinCap ? answered.value : null };
+  return sent;
 }
 
 function record(step: { readonly call: CallName }, found: Declared, response: ServiceResponse | null, attempts: number): ServiceCallRecord {
@@ -148,11 +185,12 @@ export async function runCallStep(step: CallStep, stepIndex: number, context: Ca
   if (found === undefined) return failedWith('egress-blocked');
   const request = buildServiceRequest(found.declaration, found.service, step.arguments, context.values, context.secrets);
   if (!request.ok) return failedWith(request.error, record(step, found, null, 0));
-  const sent = await send(request.value, found, stepIndex, step.type, context);
-  const answered = sent.judged;
+  const sent = await send(request.value, found, judgeForCall, stepIndex, step.type, context);
   const serviceCall = record(step, found, sent.received, 1);
-  if (!answered.ok) return failedWith(answered.error, serviceCall);
-  const texts = textsToRemember(step, found.declaration, answered.value, request.value.maximumResponseBytes);
+  if (sent.outcome !== 'passed') {
+    return failedWith(sent.code, serviceCall);
+  }
+  const texts = textsToRemember(step, found.declaration, sent.received, request.value.maximumResponseBytes);
   if (!texts.ok) return failedWith(texts.error, serviceCall);
   const kept = context.remembered.keepUnrecorded(texts.value);
   return kept.ok ? { outcome: 'passed', serviceCall } : failedWith(kept.error, serviceCall);
@@ -176,9 +214,9 @@ function checkAnswer(
   return failure(!field.ok && assertion.kind !== 'present' && assertion.kind !== 'absent' ? 'field-missing' : 'assertion-failed');
 }
 
-// A backend check: its read call repeated while the service answers with a status the declaration
-// lists and the field has not passed, until the check timeout runs out. A request that cannot be
-// built would fail the same way every time, so it fails at once.
+// A backend check: its read call repeated while the service answers with a pending status, or with a
+// success status and a field that has not passed, until the check timeout runs out. A request that
+// cannot be built would fail the same way every time, so it fails at once.
 export async function runBackendCheck(step: Extract<Step, { type: 'expectBackend' }>, stepIndex: number, context: CallStepContext): Promise<CallStepOutcome> {
   const found = declared(step.call, context.project);
   if (found === undefined) return failedWith('egress-blocked');
@@ -191,14 +229,16 @@ export async function runBackendCheck(step: Extract<Step, { type: 'expectBackend
   if (pointer === undefined) return failedWith('field-missing', record(step, found, null, 0));
   const deadline = context.clock.now() + context.project.limits.backendCheckTimeoutMilliseconds;
   for (let attempts = 1; ; attempts++) {
-    const sent = await send(request.value, found, stepIndex, step.type, context);
+    const sent = await send(request.value, found, judgeForBackendCheck, stepIndex, step.type, context);
     const serviceCall = record(step, found, sent.received, attempts);
     // A call that failed is not sent again, so an outage is reported at once, not waited out or
     // hidden by a later answer.
-    if (!sent.judged.ok) {
-      return failedWith(sent.judged.error, serviceCall);
+    if (sent.outcome === 'failed') {
+      return failedWith(sent.code, serviceCall);
     }
-    const checked = checkAnswer(step.assert, sent.judged.value, pointer, expected.value, request.value.maximumResponseBytes);
+    const checked = sent.outcome === 'pending'
+      ? failure(sent.code)
+      : checkAnswer(step.assert, sent.received, pointer, expected.value, request.value.maximumResponseBytes);
     if (checked.ok) {
       return { outcome: 'passed', serviceCall };
     }

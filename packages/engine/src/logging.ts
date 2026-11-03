@@ -14,7 +14,7 @@ export const LOGGING_MANIFEST = {
   adapter: { type: 'string', why: 'Which adapter and protocol ran the target.', retentionDays: 30 },
   stepIndex: { type: 'number', why: 'Position of the step in the plan.', retentionDays: 30 },
   stepType: { type: 'string', why: 'Step type from the closed plan language.', retentionDays: 30 },
-  outcome: { type: 'string', why: 'passed, failed or skipped.', retentionDays: 30 },
+  outcome: { type: 'string', why: 'passed, failed or skipped, or pending for a service call whose status the declaration lists as not ready yet.', retentionDays: 30 },
   code: { type: 'string', why: 'Machine-readable failure code from a closed set.', retentionDays: 30 },
   detail: { type: 'string', why: 'Short diagnostic text. Always passed through the Redactor first.', retentionDays: 7 },
   artifact: { type: 'string', why: 'Name of an artefact produced by a capture step.', retentionDays: 30 },

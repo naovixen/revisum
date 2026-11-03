@@ -1,12 +1,12 @@
 // Reads the trusted project's declared services and calls. A person declares each call: its
 // service, method, path, query, headers and JSON body as templates, its typed parameters, its
-// effect, the statuses that count as success and the response fields a plan may read. The parser
-// refuses a declaration that could reach an undeclared service, splice text into a string, set a
-// header that changes where or how a request travels, or read a field by a broken pointer, so
-// every declaration it accepts builds requests of one fixed shape.
+// effect, the statuses that count as success or mean "not ready yet" and the response fields a plan
+// may read. The parser refuses a declaration that could reach an undeclared service, splice text into
+// a string, set a header that changes where or how a request travels, or read a field by a broken
+// pointer, so every declaration it accepts builds requests of one fixed shape.
 import {
   CALL_EFFECTS, HEADER_SCHEMES, HTTP_METHODS, PARAMETER_KINDS,
-  type Brand, type CallDeclaration, type CallName, type DeclaredService, type FieldName, type HeaderValue, type JsonPointer, type JsonTemplate,
+  type Brand, type CallDeclaration, type CallEffect, type CallName, type DeclaredService, type FieldName, type HeaderValue, type JsonPointer, type JsonTemplate,
   type ParameterName, type ParameterType, type SafeText, type SecretName, type ServiceName,
 } from '@revisum/contracts';
 import { brand } from '../brand.ts';
@@ -43,13 +43,13 @@ const MAXIMUM_TEMPLATE_DEPTH = 32;
 const MAXIMUM_PATH_LENGTH = 2048;
 const MAXIMUM_HEADER_LITERAL_LENGTH = 1024;
 const MAXIMUM_TEXT_PARAMETER_LENGTH = 4000;
-const MAXIMUM_SUCCESS_STATUSES = 32;
+const MAXIMUM_STATUSES = 32;
 const MAXIMUM_CALL_TIMEOUT_MILLISECONDS = 120_000;
 const MAXIMUM_RESPONSE_BYTES = 16 * 1024 * 1024;
 
 const DECLARATION_FIELDS = [
-  'service', 'method', 'path', 'query', 'headers', 'body', 'parameters', 'effect', 'successStatuses', 'fields', 'allowInProposals',
-  'timeoutMilliseconds', 'maximumResponseBytes',
+  'service', 'method', 'path', 'query', 'headers', 'body', 'parameters', 'effect', 'successStatuses', 'pendingStatuses', 'fields',
+  'allowInProposals', 'timeoutMilliseconds', 'maximumResponseBytes',
 ] as const;
 const REQUIRED_DECLARATION_FIELDS = ['service', 'method', 'path', 'parameters', 'effect', 'successStatuses'] as const;
 
@@ -141,7 +141,9 @@ function readDeclaration(input: unknown, path: string, context: DeclarationConte
   const service = readServiceName(fields['service'], `${path}.service`, context);
   const method = readOneOf(fields['method'], `${path}.method`, issues, HTTP_METHODS);
   const effect = readOneOf(fields['effect'], `${path}.effect`, issues, CALL_EFFECTS);
-  const successStatuses = readSuccessStatuses(fields['successStatuses'], `${path}.successStatuses`, issues);
+  const successStatuses = readStatuses(fields['successStatuses'], `${path}.successStatuses`, issues);
+  const pendingStatuses = Object.hasOwn(fields, 'pendingStatuses')
+    ? readPendingStatuses(fields['pendingStatuses'], `${path}.pendingStatuses`, issues, effect, successStatuses) : undefined;
   const responseFields = Object.hasOwn(fields, 'fields') ? readFields(fields['fields'], `${path}.fields`, issues) : undefined;
   const allowInProposals = fields['allowInProposals'] ?? false;
   if (typeof allowInProposals !== 'boolean') issues.push({ code: 'wrong_type', path: `${path}.allowInProposals` });
@@ -158,7 +160,7 @@ function readDeclaration(input: unknown, path: string, context: DeclarationConte
   const query = Object.hasOwn(fields, 'query') ? readQuery(fields['query'], `${path}.query`, templates) : undefined;
   const body = Object.hasOwn(fields, 'body') ? readTemplate(fields['body'], `${path}.body`, templates, 'body', 0) : undefined;
   const parts = [service, method, effect, successStatuses, requestPath] as const;
-  if (!allValid(parts) || typeof allowInProposals !== 'boolean' || responseFields === INVALID || timeoutMilliseconds === INVALID
+  if (!allValid(parts) || pendingStatuses === INVALID || typeof allowInProposals !== 'boolean' || responseFields === INVALID || timeoutMilliseconds === INVALID
     || maximumResponseBytes === INVALID || headers === INVALID || query === INVALID || body === INVALID) return INVALID;
   // Optional parts are left out when absent.
   return {
@@ -167,6 +169,7 @@ function readDeclaration(input: unknown, path: string, context: DeclarationConte
     ...(headers === undefined ? {} : { headers }),
     ...(body === undefined ? {} : { body }),
     parameters, effect: parts[2], successStatuses: parts[3],
+    ...(pendingStatuses === undefined ? {} : { pendingStatuses }),
     ...(responseFields === undefined ? {} : { fields: responseFields }),
     allowInProposals,
     ...(timeoutMilliseconds === undefined ? {} : { timeoutMilliseconds }),
@@ -189,12 +192,32 @@ function readName<Name extends string>(
   return brand<string, Name>(name);
 }
 
-function readSuccessStatuses(input: unknown, path: string, issues: Issues): Parsed<readonly number[]> {
-  const raw = readList(input, path, issues, MAXIMUM_SUCCESS_STATUSES);
+function readStatuses(input: unknown, path: string, issues: Issues): Parsed<readonly number[]> {
+  const raw = readList(input, path, issues, MAXIMUM_STATUSES);
   if (raw === INVALID) return INVALID;
   const statuses = raw.map((status, index) => readInteger(status, `${path}[${index}]`, issues, 100, 599));
   if (!allValid(statuses)) return INVALID;
   if (new Set(statuses).size !== statuses.length) { issues.push({ code: 'duplicate', path }); return INVALID; }
+  return statuses;
+}
+
+// A backend check, the only reader of these statuses, repeats its call, so it only ever runs a read:
+// a write has no use for them. A status in both lists would mean both "done" and "not ready yet".
+function readPendingStatuses(
+  input: unknown, path: string, issues: Issues, effect: Parsed<CallEffect>, successStatuses: Parsed<readonly number[]>,
+): Parsed<readonly number[]> {
+  if (effect === 'write') {
+    issues.push({ code: 'unknown_value', path });
+    return INVALID;
+  }
+  const statuses = readStatuses(input, path, issues);
+  if (statuses === INVALID) {
+    return INVALID;
+  }
+  if (successStatuses !== INVALID && statuses.some((status) => successStatuses.includes(status))) {
+    issues.push({ code: 'duplicate', path });
+    return INVALID;
+  }
   return statuses;
 }
 

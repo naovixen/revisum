@@ -24,8 +24,9 @@ The study's largest gap is setup: 24 of the 62 inexpressible tests seed records 
     - a service on a production origin is denied (`production-origin`).
   - **Failure semantics.**
     - A failed `call` ends the run `Errored`: it could not test, which is not a product failure. Cleanup still runs.
-    - A failed `expectBackend` ends it `Failed`, except that no answer or a timeout ends it `Errored`, since the check learned nothing about the product (founder, 2026-11-03).
-    - A `read` call in `expectBackend` is polled while the service answers with a status in `successStatuses` and the check has not passed, until `backendCheckTimeoutMilliseconds` runs out, which covers background jobs. A failed call is not sent again: no answer, a timeout, a status outside `successStatuses` or an oversized response fails the step with that code (founder, 2026-11-03). A service that answers 404 until a job finishes declares 404 in `successStatuses`. `write` calls are sent once.
+    - A failed `expectBackend` ends it `Failed`, except that no answer, a timeout or an undeclared 502, 503 or 504 ends it `Errored`, since the check learned nothing about the product (founder, 2026-11-03).
+    - A `read` call in `expectBackend` is polled while the service answers with a status in `pendingStatuses`, or with one in `successStatuses` and the check has not passed, until `backendCheckTimeoutMilliseconds` runs out, which covers background jobs. A failed call is not sent again: no answer, a timeout, any other status or an oversized response fails the step with its code (founder, 2026-11-03). At the timeout on a pending status, a last status of 502, 503 or 504 ends the run `Errored`, and any other `Failed`.
+    - A service that answers 404 until a job finishes declares 404 in `pendingStatuses`, which a plain `call` ignores, so `call` can't pass on it. Only `read` calls may declare `pendingStatuses`, and a status can't be in both lists. A declared status always wins over the 502, 503 and 504 rule. `write` calls are sent once.
   - **Evidence and replay.**
     - Each call's record holds its name, method, service, status, timing and response sha256. Body excerpts are added only after redaction and only from SPEC-09 on. Header values are never recorded.
     - A run with calls lists `service-calls` in `nonHermeticInputs`.
