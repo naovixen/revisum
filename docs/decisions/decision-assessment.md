@@ -17,7 +17,8 @@
 | CI has never run on this branch | Push at phase 3's end | Nothing. CI results stay unknown until then |
 | A single 502, 503 or 504 in `expectBackend` is at once `Failed`, and declaring 404 lets a plain `call` pass on it | `Errored`, and `pendingStatuses` | 502, 503 and 504 end `Errored`. A new `pendingStatuses` field is used only by the backend check. Stopping on anything else stays |
 | Finding 147 carries a `Secret` into stub bytes in the driver | Reveal in `browser-session.ts` | No new `REVEAL_ALLOWED_MODULES` entry |
-| The wording of "nothing retries" catches the click loop | Use the assessor's sentence | Reworded in `docs/prompts/session-core-review.md` |
+| The wording of "nothing retries" catches the click loop | Prevent the loop | The founder first chose the assessor's sentence, then asked for wording that prevents the loop. An input is sent once, so a swallowed click fails the step. Finding 154 removes the loop |
+| "Deleted test" is `must fix`, but the driver port part has to delete tests | Allow deleting tests | A test may go once what it covers can no longer happen. One whose behaviour can still happen is flagged, because deleting it would loosen the suite |
 | Constant-object sweep, about 1,540 sites | Keep the sweep | Nothing. Typed result codes stay open as findings 8 and 22 |
 | `no-unnecessary-condition` baseline | Fix the 22 hits | No baseline. The fixes get their own commit |
 | The review standard would send reviewers in circles | No requirement removed | "The review is the oracle, don't base removing requirements on the existing code. The existing code should be fixed." Each fix is done on its own, and anything else found goes under the check it belongs to, not into the fix in hand |
@@ -32,5 +33,4 @@
 
 ## Risks
 
-- The driver port part must delete tests that exercise unsupported steps, and the brief still makes a deleted test `must fix`. The first review of that part will flag it, so the rule on replacing them needs settling then.
-- The assessor's sentence keeps the click loop at `browser-session.ts:425-458`. It didn't test that the hit check catches every swallowed event.
+- Removing the click loop may turn overlays and animations into `not-actionable` failures. The assessor assumed this and nobody has tested it, so finding 154 measures it, and any new failures go to the founder rather than bringing a retry back.
