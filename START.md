@@ -50,7 +50,7 @@ Where phase 3 stands, from `docs/decisions/refactor-defects.md`:
 - **With SPEC-16:** 100-103, 107-112, the rest of 114, 115, 136, and re-reading the guarantee level after a plan run. Founder decided 103: mount tracked files only.
 - **Founder decided, still to build:** one real Playwright Test run in the weekly tier, after a dependency review (116).
 - **Founder decided:** closed shadow roots stay a documented limit, to revisit with SPEC-10 (129).
-- **Founder decided, being built:** host runs always go through a per-session egress proxy set on the browser context, with WebRTC UDP off, stay labelled `host` and claim nothing new (39, 47, 49, 141, 142). The design and commit order are in `docs/decisions/host-egress-proxy.md`. Step 1 is done, and step 2 is next.
+- **Founder decided, being built:** host runs always go through a per-session egress proxy set on the browser context, with WebRTC UDP off, stay labelled `host` and claim nothing new (39, 47, 49, 141, 142). The design and commit order are in `docs/decisions/host-egress-proxy.md`. Steps 1 to 4 are done, and step 5 is next.
 - **Calls made in the main session, which the founder can reverse:** refused connections in request counts (87, amended in SPEC-33) and allowing U+200C and U+200D in plan text (122).
 - **Machine leftovers:** a locked worktree in `.claude/worktrees/` from the break test. Leave it unless the founder says otherwise. `npm run check:linux` uses its own container, labelled `revisum.check=linux`.
 
