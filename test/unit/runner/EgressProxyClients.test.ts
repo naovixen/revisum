@@ -19,7 +19,9 @@ import {
 import { fakeResolver } from "./runner-examples.ts";
 
 const APP_BODY = "reached the app";
-const IDLE_LIMIT_MILLISECONDS = 30_000;
+const IDLE_LIMIT_MILLISECONDS = 130_000;
+// The service caller's own limit on one call, which it keeps to itself.
+const LONGEST_SERVICE_CALL_MILLISECONDS = 120_000;
 const BROWSER_CLIENT = { client: "browser" } as const;
 const SERVICE_CLIENT = { client: "service" } as const;
 
@@ -287,6 +289,11 @@ describe("Using the egress proxy", () => {
                     await idleLimitWhileAnswering(SERVICE_CLIENT),
                     IDLE_LIMIT_MILLISECONDS,
                 );
+            });
+
+            test("then it should wait longer than the service caller's longest call, so the caller's timeout decides", async () => {
+                const limit = await idleLimitWhileAnswering(SERVICE_CLIENT);
+                assert.ok(limit > LONGEST_SERVICE_CALL_MILLISECONDS, `the idle limit is ${limit}`);
             });
         });
     });
