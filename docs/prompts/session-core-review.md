@@ -30,7 +30,7 @@ In this brief, an adapter is anything that implements a port in `contracts`, fak
   - repeats a workaround that another caller also has.
 - **Total core.** Flag a value the types accept that makes the core throw, hang or return something half-built, and a precondition that lives in a comment or a caller rather than in a type.
 - **Parse at the edge.** Input from outside the program is typed `unknown` and parsed once, where it enters, into the precise type the core needs. Nothing downstream checks it again. A function that needs checked or normalised input says so in its parameter type, such as a branded type only the parser can make.
-- **No special cases.** Flag a branch that tests for one particular value, such as `if (step.name === 'login')` or a check for one fixture or test, where a rule should hold for every input of that type. Flag core code that branches on a particular driver, runner or target. These are mostly left over from getting one test to pass. The fix is the general rule the special case is an instance of, or a type that tells the cases apart, never another branch.
+- **No special cases.** Flag a branch that tests for one particular value, such as a check for one origin, locator, fixture or test, where a rule should hold for every input of that type. Flag core code that branches on a particular driver, runner or target. These are mostly left over from getting one test to pass. The fix is the general rule the special case is an instance of, or a type that tells the cases apart, never another branch.
 
 **Then the types and conditionals that make it hold:**
 
@@ -52,14 +52,14 @@ In this brief, an adapter is anything that implements a port in `contracts`, fak
 | makes a decision and needs no collaborators | a pure function | a service |
 | does work that needs collaborators or state | a service from a factory that's handed its ports, such as `createRunService(ports)` | loose functions passing the same arguments around |
 | behaves differently for each case of a union | a table keyed by the union, checked with `satisfies Record<Kind, …>` so a new case won't compile without an entry | a `switch` on the same union in several places |
-| can fail in ways that are expected | a union of outcomes, such as `{ ok: true, value }` or `{ ok: false, error }`, that the caller switches on | throwing, or an `undefined` that can mean several things |
-| needs retry, timeout, logging or redaction | a wrapper that returns the same port, such as `withRetry(driver)` (decorator) | the same loop or `try`/`catch` in each caller |
-| has an optional collaborator | a do-nothing implementation passed in, such as `noopReporter` (null object) | `if (reporter)` wherever it's used |
-| must be set up and cleaned up | a scope, such as `withBrowser(run)` or `await using` | a call order callers have to remember |
-| has a lifecycle | a union of states, and functions that only accept the state they need (typestate) | flags, nullable fields and `if (!browser)` checks |
+| can fail in ways that are expected | a `Result` from `contracts`, or another union of outcomes, that the caller switches on | throwing, or an `undefined` that can mean several things |
+| needs a timeout, logging or redaction | a wrapper that returns the same type, such as `withSecretRedaction(redactor, secrets)` (decorator) | the same `try`/`catch` or call in each caller |
+| has an optional collaborator | a do-nothing implementation passed in, such as an `EventSink` that discards (null object) | `if (sink)` wherever it's used |
+| must be set up and cleaned up | a scope, such as `withSession(run)` | a call order callers have to remember |
+| has a lifecycle | a union of states, and functions that only accept the state they need (typestate) | flags, nullable fields and `if (session === null)` checks |
 | runs several steps | a sequencer over a list of steps, each doing its own detail (pipeline) | one function that sequences and does the detail |
-| chooses an implementation: production or test, which driver | the composition root, the one file that builds adapters and hands them in | `if (isProduction)` or a driver check in the core |
-| stands in for a port in tests | one complete fake per port, from a factory that takes overrides, such as `makeFakePorts(overrides)` | `{} as Ports`, or a partial fake built in each test |
+| chooses an implementation: production or test, which driver | the composition root in `cli`, the only package that builds adapters and hands them in | `if (isProduction)` or a driver check in the core |
+| stands in for a port in tests | one complete fake per port, from a factory that takes overrides, such as `fakeDriver(overrides)` | a partial fake built in each test |
 
 Pure logic (parser, policy, oracle, secrets) stays as pure functions, one role per file. A file that is a bag of loosely related functions passing the same arguments around is a missing service, or several files. Flag anything in the *Instead of* column, and a heavier shape than the job needs: a service or factory that wraps one function for no gain, or a seam with no second implementation or test double to justify it. A class hierarchy or DI container is also a finding.
 
