@@ -282,7 +282,7 @@ export function describeReplayErrorForgettingOne(code: ReplayErrorCode): string 
 // ---- Run refusals (declared in engine beside the lifecycle): all hyphens, as every run-time code is -
 export function describeRefusal(code: lifecycle.RefusalCode): string {
   switch (code) {
-    case 'origin-not-allowed': case 'secret-missing': case 'services-unavailable': case 'storage-state-unsupported':
+    case 'element-check-unsupported': case 'origin-not-allowed': case 'secret-missing': case 'services-unavailable': case 'storage-state-unsupported':
     case 'database-commands-unavailable': case 'evidence-mode-disabled': case 'suite-not-declared': case 'egress-unenforceable':
     case 'script-source-missing': case 'image-missing': case 'image-digest-mismatch': case 'workload-start-failed': case 'clearance-standing-mismatch':
       return 'run refused';
@@ -292,7 +292,7 @@ export function describeRefusal(code: lifecycle.RefusalCode): string {
 }
 export function describeRefusalForgettingOne(code: lifecycle.RefusalCode): string {
   switch (code) {
-    case 'origin-not-allowed': case 'secret-missing': case 'services-unavailable': case 'storage-state-unsupported':
+    case 'element-check-unsupported': case 'origin-not-allowed': case 'secret-missing': case 'services-unavailable': case 'storage-state-unsupported':
     case 'evidence-mode-disabled': case 'suite-not-declared': case 'egress-unenforceable':
     case 'script-source-missing': case 'image-missing': case 'image-digest-mismatch': case 'workload-start-failed': case 'clearance-standing-mismatch':
       return 'run refused';

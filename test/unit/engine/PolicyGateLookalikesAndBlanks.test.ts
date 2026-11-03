@@ -65,6 +65,7 @@ const FILLERS: readonly { readonly written: string; readonly filler: string }[] 
 ];
 
 const ORDINARY_NAMES: readonly string[] = [
+    "USB연결",
     "Item 1",
     "Page 11",
     "Top10",
