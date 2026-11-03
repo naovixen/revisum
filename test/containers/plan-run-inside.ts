@@ -7,7 +7,7 @@
 // The plan opens a page whose WebSocket goes to an undeclared origin and passes only once the
 // page shows that WebSocket was closed.
 import { arch, platform } from 'node:os';
-import { cdpDriver } from '@revisum/driver-cdp';
+import { cdpDriver, egressThroughExistingProxy } from '@revisum/driver-cdp';
 import { defaultRedactor, parseProject, planParser, run, type BrowserDriver, type BrowserRequestRecord, type TargetId } from '@revisum/engine';
 import { BROWSERS } from '../support/browsers.ts';
 import { memoryArtifactStore, memoryEventSink, memoryRunEventSink, systemClock } from '../support/memory-ports.ts';
@@ -53,7 +53,7 @@ async function main(): Promise<number> {
     // cannot reach; everything else goes through the proxy.
     const browserRecords: BrowserRequestRecord[] = [];
     const drivers = new Map<string, BrowserDriver>([
-      ['cdp', keepingBrowserRecords(cdpDriver({ executablePath: BROWSERS.chrome, proxy: { server: proxyServer, includeLoopback: false } }), (kept) => { browserRecords.push(...kept); })],
+      ['cdp', keepingBrowserRecords(cdpDriver({ executablePath: BROWSERS.chrome, egress: egressThroughExistingProxy(proxyServer) }), (kept) => { browserRecords.push(...kept); })],
     ]);
     // The target id comes from the project written just above, so it is used as the branded value directly.
     const result = await run({

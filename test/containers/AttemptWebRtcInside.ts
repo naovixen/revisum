@@ -7,7 +7,7 @@ import { arch, platform } from "node:os";
 import { join } from "node:path";
 import { setTimeout as pause } from "node:timers/promises";
 import type { RunnerHandle } from "@revisum/contracts";
-import { cdpDriver, launchChromium } from "@revisum/driver-cdp";
+import { cdpDriver, egressThroughExistingProxy, launchChromium } from "@revisum/driver-cdp";
 import { defaultRedactor, parseProject, planParser, run } from "@revisum/engine";
 import { navigate, rawPlan, testId, textEquals } from "../support/browser/RawPlan.ts";
 import { BROWSERS } from "../support/browsers.ts";
@@ -146,7 +146,7 @@ async function openInRun(fixture: FixtureServer): Promise<string> {
                     "cdp",
                     cdpDriver({
                         executablePath: BROWSERS.chrome,
-                        proxy: { server: proxyServer, includeLoopback: false },
+                        egress: egressThroughExistingProxy(proxyServer),
                     }),
                 ],
             ]),
