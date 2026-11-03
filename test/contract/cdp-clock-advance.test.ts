@@ -140,11 +140,12 @@ test('two advances of 60 ms give the same order as one of 120 ms: a timer not ye
   assertPassed(ran);
 });
 
-test('counter-example: without an advance no timer has fired, so the order check fails', async () => {
+// A plan with no advance keeps real timers, so only an advance later in the plan holds the clock still here.
+test('counter-example: before the plan advances the clock no timer has fired, so the order check fails', async () => {
   const ran = await harness.runSteps(BrowserTarget.Chrome, [
-    navigate('/timer-order.html'), timerCounts(NOTHING_RUN_COUNTS, 'timers.nothing-run'), timerLog(RUN_TIMERS_LOG, 'timers.never-advanced'),
+    navigate('/timer-order.html'), timerCounts(NOTHING_RUN_COUNTS, 'timers.nothing-run'), timerLog(RUN_TIMERS_LOG, 'timers.never-advanced'), advanceClock(120, 'milliseconds'),
   ]);
-  assert.deepEqual(outcomes(ran.result), [[0, 'passed', undefined], [1, 'passed', undefined], [2, 'failed', 'assertion-failed']]);
+  assert.deepEqual(outcomes(ran.result), [[0, 'passed', undefined], [1, 'passed', undefined], [2, 'failed', 'assertion-failed'], [3, 'skipped', undefined]]);
 });
 
 // ---- Timer loops that never end -----------------------------------------------------------------
