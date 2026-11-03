@@ -422,39 +422,48 @@ function documentPorts<Handle>(
     return events.openDialog() === null ? failure({ code: 'timeout', detail: `the input was still being handled after ${timeout} ms` }) : success(onDialog);
   };
 
-  // A click with a hit-target check: a click that lands on another element is swallowed in the
-  // page and retried. The guard is asked on every attempt: the page may have re-rendered, so the
-  // locator may now find another element than the guard last allowed.
-  const click = async (locator: ResolvedLocator, guard: ActionGuard): Promise<Result<void, DriverError>> => {
-    const deadline = Date.now() + timeout;
-    for (;;) {
-      const waited = await waitUntilActionable(operations, locator, Math.max(deadline - Date.now(), 0), timeout, crashed);
-      if (!waited.ok) return waited;
-      const denied = await clickDenial(operations, waited.value.element, waited.value.at, guard);
-      if (denied !== null) {
-        return failure(denied);
+  // A read of the hit check that fails says the click landed only when the element it was sent to has
+  // gone, as it has when the click navigated. Otherwise nothing says where the click went, so the
+  // failure is the step's.
+  const readHitAfterClick = async (element: Handle): Promise<string> => {
+    try {
+      return await operations.callForString(readHitCheck, []);
+    } catch (readFailure) {
+      if (await operations.isElementGone(element)) {
+        return 'hit';
       }
-      await operations.callForString(armHitCheck, [{ element: waited.value.element }]);
-      const clickAndReadHit = async (): Promise<string> => {
-        await operations.click(waited.value.element, waited.value.at);
-        // A dialog the click opened stops the page until it is answered: the click landed.
-        if (events.openDialog() !== null) {
-          return 'hit';
-        }
-        // A read that fails means the click navigated, so it landed.
-        return operations.callForString(readHitCheck, []).catch(() => 'hit');
-      };
-      const hit = await inputWithinTimeout(clickAndReadHit(), 'hit');
-      if (!hit.ok) {
-        return hit;
-      }
-      if (hit.value !== 'miss') {
-        return success(undefined);
-      }
-      if (Date.now() >= deadline) {
-        return failure({ code: 'not-actionable', detail: `click landed on another element until ${timeout} ms` });
-      }
+      throw readFailure;
     }
+  };
+
+  // A click is sent once. The wait may find a new element, and the guard is asked about the one it
+  // finds, just before the send. A press that lands on another element is swallowed in the page and
+  // fails the step at once: sending it again could press whatever the page has put there since.
+  const click = async (locator: ResolvedLocator, guard: ActionGuard): Promise<Result<void, DriverError>> => {
+    const waited = await waitUntilActionable(operations, locator, timeout, timeout, crashed);
+    if (!waited.ok) return waited;
+    const { element, at } = waited.value;
+    const denied = await clickDenial(operations, element, at, guard);
+    if (denied !== null) {
+      return failure(denied);
+    }
+    await operations.callForString(armHitCheck, [{ element }]);
+    const clickAndReadHit = async (): Promise<string> => {
+      await operations.click(element, at);
+      // A dialog the click opened stops the page until it is answered: the click landed.
+      if (events.openDialog() !== null) {
+        return 'hit';
+      }
+      return readHitAfterClick(element);
+    };
+    const hit = await inputWithinTimeout(clickAndReadHit(), 'hit');
+    if (!hit.ok) {
+      return hit;
+    }
+    if (hit.value === 'miss') {
+      return failure({ code: 'not-actionable', detail: 'the click landed on another element' });
+    }
+    return success(undefined);
   };
 
   // The action itself, once the step is known to be performable.

@@ -111,7 +111,7 @@ export async function actionability(element: Element): Promise<string> {
 
 // Arms a one-shot hit-target check before a pointer click: pointer and mouse events whose target
 // is not the element (or its label) are swallowed and recorded as a miss, so a click that lands on
-// something else has no effect and can be retried.
+// something else has no effect and fails its step.
 export function armHitCheck(element: Element): string {
   type HitCheck = { state: string; disarm: () => void };
   type WindowWithCheck = Window & { __clickHitCheck?: HitCheck };
