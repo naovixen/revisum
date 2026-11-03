@@ -95,7 +95,7 @@ export type DialogInfo = { readonly kind: 'alert' | 'confirm' | 'prompt' | 'befo
 // One open browser or device session: every driver port together.
 export interface Session extends PageNavigator, ActionRunner, Prober, Camera, Auditor {
   readonly browser: { readonly name: string; readonly version: string };
-  blockedOrigins(): readonly string[];                                 // origins refused, as evidence the run stayed hermetic
+  blockedOrigins(): readonly string[];                                 // origins refused so far, complete once close resolves; a datagram never sent has no refusal
   close(): Promise<void>;                                              // every started process exits
   frame(locator: Locator): Promise<Result<Session, DriverError>>;      // addition: scoped to an iframe
   onDialog(action: 'accept' | 'dismiss'): Promise<Result<DialogInfo, DriverError>>;      // addition
