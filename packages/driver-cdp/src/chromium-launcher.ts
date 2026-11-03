@@ -11,11 +11,12 @@ import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { platform, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { CdpConnection, type ConnectOptions } from './cdp-connection.ts';
-import { PORT_RANDOMISATION_FEATURE } from './chrome-flags.ts';
+import { PORT_RANDOMISATION_FEATURE, WEBRTC_UDP_OFF_FLAGS } from './chrome-flags.ts';
 
-// Flags for an isolated, repeatable page: no network outside 127.0.0.1, no first-run UI or
-// background traffic, fixed scale factor and font hinting, and no random local ports (see
-// chrome-flags.ts). Used by default.
+// Flags for an isolated, repeatable page: no network outside 127.0.0.1, which takes turning WebRTC's
+// UDP off as well as the resolver rule, since a page can send it to an address with no name to resolve.
+// No first-run UI or background traffic, fixed scale factor and font hinting, and no random local ports
+// (see chrome-flags.ts). Used by default.
 const ISOLATED_CHROMIUM_ARGUMENTS: readonly string[] = [
   '--headless=new', '--no-first-run', '--no-default-browser-check', '--disable-extensions', '--disable-sync',
   '--disable-background-networking', '--disable-component-update', '--disable-default-apps',
@@ -23,6 +24,7 @@ const ISOLATED_CHROMIUM_ARGUMENTS: readonly string[] = [
   '--force-device-scale-factor=1', '--font-render-hinting=none',
   '--host-resolver-rules=MAP * ~NOTFOUND , EXCLUDE 127.0.0.1',
   `--disable-features=${PORT_RANDOMISATION_FEATURE}`,
+  ...WEBRTC_UDP_OFF_FLAGS,
 ];
 
 // Added to every launch, even when the caller passes its own flags, so no caller can open a

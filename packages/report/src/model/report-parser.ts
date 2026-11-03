@@ -56,14 +56,13 @@ function readOneOf<Value extends string>(errors: ErrorList, path: string, value:
   errors.add(path, code);
   return allowed[0] as Value;
 }
+function readTextWithNoSecret(errors: ErrorList, path: string, value: unknown, shortest: number): string {
+  const text = readText(errors, path, value, LIMITS.line, shortest);
+  if (SECRET_SHAPES.some((pattern) => pattern.test(text))) errors.add(path, 'secret_shape');
+  return text;
+}
 function readLines(errors: ErrorList, path: string, value: unknown, longest: number = LIMITS.lines): readonly string[] {
-  const lines: string[] = [];
-  readList(errors, path, value, longest).forEach((line, index) => {
-    const text = readText(errors, `${path}[${index}]`, line, LIMITS.line, 0);
-    if (SECRET_SHAPES.some((pattern) => pattern.test(text))) errors.add(`${path}[${index}]`, 'secret_shape');
-    lines.push(text);
-  });
-  return lines;
+  return readList(errors, path, value, longest).map((line, index) => readTextWithNoSecret(errors, `${path}[${index}]`, line, 0));
 }
 
 function readBox(errors: ErrorList, path: string, value: unknown): PixelBox | null {
@@ -171,10 +170,14 @@ function readAcceptanceCriterion(errors: ErrorList, path: string, value: unknown
   };
 }
 
+function readBlockedOrigins(errors: ErrorList, path: string, value: unknown): readonly string[] {
+  return readList(errors, path, value).map((origin, index) => readTextWithNoSecret(errors, `${path}[${index}]`, origin, 1));
+}
+
 function readRun(errors: ErrorList, path: string, value: unknown): RunInfo {
   const empty: RunInfo = { runId: '', recordedAt: '', target: '', tool: '', manifestHash: null, inputs: [] };
   if (!isFields(value)) { errors.add(path, 'not_object'); return empty; }
-  rejectUnknownKeys(errors, path, value, ['runId', 'recordedAt', 'target', 'tool', 'manifestHash', 'inputs']);
+  rejectUnknownKeys(errors, path, value, ['runId', 'recordedAt', 'target', 'tool', 'manifestHash', 'inputs', 'blockedOrigins']);
   const recordedAt = readText(errors, `${path}.recordedAt`, value['recordedAt'], 40);
   if (recordedAt !== '' && !/^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d+)?Z)?$/.test(recordedAt)) errors.add(`${path}.recordedAt`, 'bad_time');
   const manifestHash = value['manifestHash'] === null ? null : readText(errors, `${path}.manifestHash`, value['manifestHash'], 64);
@@ -190,6 +193,7 @@ function readRun(errors: ErrorList, path: string, value: unknown): RunInfo {
   return {
     runId: readId(errors, `${path}.runId`, value['runId']), recordedAt, target: readText(errors, `${path}.target`, value['target']),
     tool: readText(errors, `${path}.tool`, value['tool']), manifestHash, inputs,
+    ...(value['blockedOrigins'] === undefined ? {} : { blockedOrigins: readBlockedOrigins(errors, `${path}.blockedOrigins`, value['blockedOrigins']) }),
   };
 }
 

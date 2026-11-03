@@ -21,7 +21,7 @@ export const LOGGING_MANIFEST = {
   sha256: { type: 'string', why: 'Content hash of an artefact, of a service call response body, of a page script result, of a database command output or of a remembered value, for replay proofs. Never the body, result, output or value itself.', retentionDays: 30 },
   valueName: { type: 'string', why: 'Name of a run value a remember step read from the page. Never the value: its sha256 is logged instead.', retentionDays: 30 },
   findings: { type: 'number', why: 'Count of accessibility findings (rule ids live in the run result).', retentionDays: 30 },
-  origin: { type: 'string', why: 'Origin (scheme, host, port) of a blocked request. Never path or query.', retentionDays: 7 },
+  origin: { type: 'string', why: 'Origin (scheme, host, port) of a blocked request or of a connection that failed. Never path or query.', retentionDays: 7 },
   durationMilliseconds: { type: 'number', why: 'Step timing for performance budgets. Excluded from the result hash.', retentionDays: 30 },
 } as const satisfies Record<string, FieldPolicy>;
 
@@ -32,9 +32,11 @@ type FieldValue<Field extends LogField> = (typeof LOGGING_MANIFEST)[Field]['type
 // value.remembered: a remember step kept a value from the page, by step, value name and sha256.
 // page.script: one run of a page script, by step, outcome, code, result sha256 and duration.
 // database.command: one run of a database command, by step, outcome, code, output sha256 and duration.
+// session.connection-failed: a declared origin the session could not connect to, by origin, with what to
+// tell whoever is running as its detail.
 export const EVENT_KINDS = [
   'run.state', 'step.start', 'step.end', 'artifact', 'audit', 'network.blocked', 'service.call', 'value.remembered', 'page.script',
-  'database.command',
+  'database.command', 'session.connection-failed',
 ] as const;
 export type EventKind = (typeof EVENT_KINDS)[number];
 

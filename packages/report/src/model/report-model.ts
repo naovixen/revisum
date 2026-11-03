@@ -67,6 +67,9 @@ export interface RunInfo {
   readonly tool: string;
   readonly manifestHash: string | null;
   readonly inputs: readonly { readonly name: string; readonly sha256: string }[];
+  // The origins the run refused and saw. Absent when the input says nothing of them, which is not the
+  // same as an empty list.
+  readonly blockedOrigins?: readonly string[];
 }
 export interface ReportInput {
   readonly schema: typeof REPORT_INPUT_SCHEMA;

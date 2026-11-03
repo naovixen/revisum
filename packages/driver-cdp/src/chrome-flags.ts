@@ -13,9 +13,15 @@ export const PORT_RANDOMISATION_FEATURE = 'TcpPortRandomizationWin';
 const NEW_CONTEXT_REQUEST_FEATURE = 'AimEnabled';
 const WEBRTC_POLICY = 'disable_non_proxied_udp';
 
+// WebRTC's UDP reaches no proxy and no allow-list, so it stays off. Chrome honours only the first flag
+// and the headless shell only the second.
+export const WEBRTC_UDP_OFF_FLAGS: readonly string[] = [
+  `--webrtc-ip-handling-policy=${WEBRTC_POLICY}`,
+  `--force-webrtc-ip-handling-policy=${WEBRTC_POLICY}`,
+];
+
 // For a browser whose sessions each have an egress proxy on their context. Chrome's own traffic goes to
-// the browser-wide proxy, which leads nowhere. Chrome honours only the first WebRTC flag and the
-// headless shell only the second.
+// the browser-wide proxy, which leads nowhere.
 export const sessionEgressChromeFlags = (deadProxyServer: string): readonly string[] => [
   '--headless',
   '--no-first-run',
@@ -36,8 +42,7 @@ export const sessionEgressChromeFlags = (deadProxyServer: string): readonly stri
   '--password-store=basic',
   '--use-mock-keychain',
   `--proxy-server=${deadProxyServer}`,
-  `--webrtc-ip-handling-policy=${WEBRTC_POLICY}`,
-  `--force-webrtc-ip-handling-policy=${WEBRTC_POLICY}`,
+  ...WEBRTC_UDP_OFF_FLAGS,
 ];
 
 // Takes 127.0.0.1, localhost and link-local addresses out of Chromium's built-in bypass list.

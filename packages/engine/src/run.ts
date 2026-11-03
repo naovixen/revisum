@@ -456,6 +456,11 @@ export async function run(given: RunInputs, ports: RunPorts): Promise<RunResult>
   const blocked = readKeepingTheResult(() => [...new Set(session.blockedOrigins())].sort(), [], logger);
   const endState = finished;
   readKeepingTheResult(() => {
+    for (const { origin, message } of session.connectionFailures?.() ?? []) {
+      logger.log({ kind: 'session.connection-failed', origin, detail: message });
+    }
+  }, undefined, logger);
+  readKeepingTheResult(() => {
     for (const origin of blocked) logger.log({ kind: 'network.blocked', origin });
     logger.log({
       kind: 'run.state', state: endState.state, targetId: target.id,

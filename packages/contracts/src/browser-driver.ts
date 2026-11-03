@@ -294,6 +294,10 @@ export interface Session extends DocumentSession {
   // the run stayed hermetic. Not every attempt: what never reaches either, such as WebRTC's UDP, sends
   // nothing and leaves nothing to show.
   blockedOrigins(): readonly string[];
+  // Declared origins the session could not connect to, each with what to tell whoever is running. A
+  // machine's network says nothing about the app, so these go to the run's log and stay out of the
+  // result and its hash. Complete once the session has closed. A driver without it reports none.
+  connectionFailures?(): readonly { readonly origin: string; readonly message: string }[];
   // Ends the session; every process it started exits.
   close(): Promise<void>;
   // Opens the URL in a new tab of the session's own browser context, so it shares cookies and

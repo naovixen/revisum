@@ -315,6 +315,7 @@ async function createSession(
     browser: { name: 'chromium', version: /\/(\S+)$/.exec(version.product)?.[1] ?? version.product },
     processId: attached.processId,
     blockedOrigins: () => mergeRefusedOrigins(browser.blocked, sessionEgress.egress.refusedOrigins()),
+    connectionFailures: () => sessionEgress.egress.connectionFailures(),
     egressRecords: () => browser.recorder.records(),
     // Popups settle first, so the blocked origins are complete once this ends. This page's watch sees
     // every popup of the browser context, whichever tab opened it. The download folder goes once the
@@ -452,6 +453,7 @@ async function openTab(browser: SessionBrowser, firstWatch: PageWatch, firstDeta
   // A tab opens no tab of its own: newTab is allowed only at the top level of a plan.
   return success(buildSession(operations, browser.environment, {
     browser: firstDetails.browser, processId: firstDetails.processId, blockedOrigins: firstDetails.blockedOrigins,
+    connectionFailures: firstDetails.connectionFailures,
     egressRecords: firstDetails.egressRecords, fixturePath: firstDetails.fixturePath, downloads: browser.downloads, events: watch, close,
     secretTypedFields: firstDetails.secretTypedFields, network: browser.network, storage: pageStorage(watch), clock: browser.clock,
     ...(firstDetails.clipboard === undefined ? {} : { clipboard: firstDetails.clipboard }),

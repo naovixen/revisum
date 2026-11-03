@@ -18,6 +18,7 @@ import { findByLabel, findByTestId, findByText, findStructural, inDocumentOrder 
 import { heldModifierKeys } from './modifier-keys.ts';
 import { pageAudit, parseAudit, toFindings } from './page-audit.ts';
 import type { Actionability, DownloadCapture, DriverSession, PageEvents, PageFunction, PageOperations, Point } from './page-operations.ts';
+import type { ConnectionFailure } from './SessionEgress.ts';
 
 const NOTHING_READ = { visible: false, enabled: false, text: '', value: null, sensitive: false, box: null } as const;
 const READ_FAILED: ElementProbe = { ...NOTHING_READ, count: UnreadablePage.ReadFailed };
@@ -55,6 +56,7 @@ export type SessionDetails = {
   readonly browser: { readonly name: string; readonly version: string };
   readonly processId: number;
   readonly blockedOrigins: () => readonly string[];
+  readonly connectionFailures: () => readonly ConnectionFailure[];
   // Every request's origin and the channel it left the browser by.
   readonly egressRecords: () => readonly BrowserRequestRecord[];
   readonly close: () => Promise<void>;
@@ -771,6 +773,7 @@ export function buildSession<Handle>(operations: PageOperations<Handle>, environ
     browser: details.browser,
     processId: details.processId,
     blockedOrigins: details.blockedOrigins,
+    connectionFailures: details.connectionFailures,
     egressRecords: details.egressRecords,
     evaluate: (pageFunction: PageFunction, inputs = []) => operations.callForString(pageFunction, inputs),
     close: details.close,

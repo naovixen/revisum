@@ -184,6 +184,17 @@ function metricsPanel(history: History): string {
     + `<tbody>${rows.join('')}</tbody></table>`;
 }
 
+// An empty list still gets the note, since it does not mean nothing was tried.
+function refusedOrigins(blockedOrigins: readonly string[] | undefined): string {
+  if (blockedOrigins === undefined) {
+    return '';
+  }
+  const list = blockedOrigins.length === 0
+    ? '<p>None.</p>'
+    : `<ul>${blockedOrigins.map((origin) => `<li>${escapeHtml(origin)}</li>`).join('')}</ul>`;
+  return labelledValue('Refused origins', `${list}<p class="muted">WebRTC and WebTransport are off in browser sessions, so they leave nothing to refuse. This list shows what was refused and seen, not every attempt.</p>`);
+}
+
 function footer(report: ReportInput): string {
   const legend = SEVERITIES.map((severity) =>
     `<li><span class="sev sev-${severity}">${severity}</span> ${escapeHtml(SEVERITY_MEANING[severity])}. Drawn as a ${escapeHtml(SEVERITY_STYLE[severity].word)}.</li>`).join('');
@@ -191,7 +202,7 @@ function footer(report: ReportInput): string {
   return `<footer><h2 id="manifest">Run manifest</h2>${labelledValue('Report', escapeHtml(report.reportId))}${labelledValue('Subject', escapeHtml(report.subject))}`
     + `${labelledValue('Run', escapeHtml(report.run.runId))}${labelledValue('Recorded', escapeHtml(report.run.recordedAt))}`
     + `${labelledValue('Target', escapeHtml(report.run.target))}${labelledValue('Tool', escapeHtml(report.run.tool))}`
-    + `${labelledValue('Manifest hash', escapeHtml(report.run.manifestHash ?? 'none'))}${labelledValue('Generator', escapeHtml(REPORT_GENERATOR))}`
+    + `${labelledValue('Manifest hash', escapeHtml(report.run.manifestHash ?? 'none'))}${labelledValue('Generator', escapeHtml(REPORT_GENERATOR))}${refusedOrigins(report.run.blockedOrigins)}`
     + `<h3>Severity key (provisional)</h3><ul class="legend">${legend}<li><span class="sev sev-none">unrated</span> not yet rated by a person. A question mark after a severity means needs review.</li></ul>`
     + (inputs ? `${captionedTable('inputs', 'Inputs (first 16 hex digits of each SHA-256)')}<thead><tr><th scope="col">Input</th><th scope="col">SHA-256</th></tr></thead><tbody>${inputs}</tbody></table>` : '')
     + `</footer>`;
