@@ -6,11 +6,11 @@
 // output. Secrets come from its environment, where the runner copied them by name.
 import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { cdpDriver } from '@revisum/driver-cdp';
 import {
   defaultRedactor, environmentSecretStore, exploreStartOrigin, pageMapText, parseProject, planParser, policyGate, readPlanText, success,
   withDeclaredSecretRedaction, type EventSink, type Project,
 } from '@revisum/engine';
+import { buildAdapters } from './BuildAdapters.ts';
 import { CONTAINER_EXIT, crawlInBrowser, crawlTarget, decodeContainerCrawlInput, type BrowserCrawl } from './explore-crawl.ts';
 
 // Where the run image keeps the pinned Chrome for Testing builds, relative to the working folder.
@@ -74,12 +74,7 @@ async function main(): Promise<number> {
     if (login === undefined) return stop(CONTAINER_EXIT.loginRefused, 'the --after plan was refused');
   }
 
-  // Everything but the container's own loopback goes through the run's egress proxy.
-  const proxyServer = process.env['HTTP_PROXY'];
-  const browser = cdpDriver({
-    executablePath: browserPath,
-    ...(proxyServer === undefined || proxyServer === '' ? {} : { proxy: { server: proxyServer, includeLoopback: false } }),
-  });
+  const browser = buildAdapters.containerBrowserDriver({ executablePath: browserPath, proxyServer: process.env['HTTP_PROXY'] });
   const crawled = await crawlInBrowser(browser, {
     project: project.value, target, redactor, secrets, audit: discardingAudit,
     options: {

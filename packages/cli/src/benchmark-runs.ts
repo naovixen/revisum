@@ -3,7 +3,6 @@
 // run to the first step.start, and its peak memory, the highest combined resident memory of Node
 // and every process it started (Chromium), sampled from /proc every 100 ms. tools/benchmark.ts
 // calls this and compares the medians with the stored Linux baseline; it is never a gate.
-import { cdpDriver } from '@revisum/driver-cdp';
 import {
   defaultRedactor, failure, loadTrustedProject, parseProject, planParser, policyGate, run, sha256, success,
   type ArtifactReference, type ArtifactStore, type Clock, type EventSink, type FixtureReference, type LoggedEvent, type RunEventSink,
@@ -13,6 +12,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
 import { arch, platform } from 'node:os';
 import { extname, join } from 'node:path';
+import { buildAdapters } from './BuildAdapters.ts';
 
 export type BenchmarkSample = { readonly setupMilliseconds: number; readonly peakMemoryMegabytes: number };
 export type BenchmarkRunsOptions = {
@@ -155,7 +155,7 @@ export async function benchmarkRuns(options: BenchmarkRunsOptions): Promise<Benc
     if (target === undefined) throw new Error('the benchmark project has no headless-shell target');
     const decision = policyGate({ project: trusted, events: discardingAudit }).decide(parsed.value, [target]);
     if (decision.kind === 'deny') throw new Error(`the policy gate denied the benchmark plan: ${decision.rule}`);
-    const drivers = new Map([['cdp', cdpDriver({ executablePath: options.executablePath })]]);
+    const drivers = new Map([['cdp', buildAdapters.hostBrowserDriver({ executablePath: options.executablePath })]]);
     const samples: BenchmarkSample[] = [];
     for (let index = 0; index < options.runs; index++) {
       // Set by the event sink, which the run calls back.
