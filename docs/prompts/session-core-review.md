@@ -22,7 +22,7 @@ In this brief, an adapter is anything that implements a port in `contracts`, fak
 
 **Check the main goal first:**
 
-- **Callers don't compensate.** Trace every caller of what this part changed. Each of these is fixed in the core, not the caller. Flag a caller that:
+- **Callers don't compensate.** Trace every caller of what this part changed. Each of these is fixed in the core, or in a wrapper around a port, never in the caller. Flag a caller that:
   - validates, normalises, defaults, retries or guards something the core should settle, or now already does;
   - catches an exception, or probes the result, to find out what happened, because the return type doesn't say;
   - casts, or uses `!`, on what the core returns;
@@ -43,12 +43,25 @@ In this brief, an adapter is anything that implements a port in `contracts`, fak
 - **Open to extension.** Adding a step or a concern means adding a table entry or a new file the compiler demands, not editing scattered lists and switches. Flag two lists or switches that have to be kept in step by hand.
 - **Substitution.** Every implementation of a port, fakes included, honours the same contract, with no special cases for one of them. Flag a fake that's more forgiving than the real thing.
 - **Narrow ports.** A consumer depends only on what it uses. Flag a wide port that callers only partly use.
-- **Dependencies point inward.** The core depends on ports in `contracts`, is handed them, and never builds its own collaborators.
-- **Services and factories, used well.**
-  - Work with collaborators or state belongs in a factory or service that is handed its ports, such as `createRunService(ports)`.
-  - Flag a file that is a bag of loosely related functions passing the same arguments around: that is a missing service, or several files.
-  - Pure logic (parser, policy, oracle, secrets) stays as pure functions, with one role per file.
-  - Flag a service or factory that wraps one function for no gain, or that has no second implementation or test double to justify the seam. A class hierarchy or DI container is also a finding.
+- **Dependencies point inward.** The core depends on ports in `contracts`, is handed them, and never builds its own collaborators. It reads no globals either: time, randomness, environment, files, network and console come in through ports, so a run repeats exactly and goldens stay stable.
+
+**Then the shape of each piece.** Use the smallest shape that fits:
+
+| When the code… | Use | Instead of |
+|---|---|---|
+| makes a decision and needs no collaborators | a pure function | a service |
+| does work that needs collaborators or state | a service from a factory that's handed its ports, such as `createRunService(ports)` | loose functions passing the same arguments around |
+| behaves differently for each case of a union | a table keyed by the union, checked with `satisfies Record<Kind, …>` so a new case won't compile without an entry | a `switch` on the same union in several places |
+| can fail in ways that are expected | a union of outcomes, such as `{ ok: true, value }` or `{ ok: false, error }`, that the caller switches on | throwing, or an `undefined` that can mean several things |
+| needs retry, timeout, logging or redaction | a wrapper that returns the same port, such as `withRetry(driver)` (decorator) | the same loop or `try`/`catch` in each caller |
+| has an optional collaborator | a do-nothing implementation passed in, such as `noopReporter` (null object) | `if (reporter)` wherever it's used |
+| must be set up and cleaned up | a scope, such as `withBrowser(run)` or `await using` | a call order callers have to remember |
+| has a lifecycle | a union of states, and functions that only accept the state they need (typestate) | flags, nullable fields and `if (!browser)` checks |
+| runs several steps | a sequencer over a list of steps, each doing its own detail (pipeline) | one function that sequences and does the detail |
+| chooses an implementation: production or test, which driver | the composition root, the one file that builds adapters and hands them in | `if (isProduction)` or a driver check in the core |
+| stands in for a port in tests | one complete fake per port, from a factory that takes overrides, such as `makeFakePorts(overrides)` | `{} as Ports`, or a partial fake built in each test |
+
+Pure logic (parser, policy, oracle, secrets) stays as pure functions, one role per file. A file that is a bag of loosely related functions passing the same arguments around is a missing service, or several files. Flag anything in the *Instead of* column, and a heavier shape than the job needs: a service or factory that wraps one function for no gain, or a seam with no second implementation or test double to justify it. A class hierarchy or DI container is also a finding.
 
 **And the guarantees, which are always `must fix`:**
 
