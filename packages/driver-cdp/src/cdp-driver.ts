@@ -27,6 +27,8 @@ import { PageStorage } from './web-storage.ts';
 const CDP_ADAPTER_VERSION = '0.1.0';
 // Schemes the page may load without an allow-list check: they never reach the network.
 const LOCAL_SCHEMES = ['data:', 'about:', 'blob:', 'chrome-error:'];
+const isAllowedUrl = (url: URL, allowedOrigins: readonly string[]): boolean =>
+  allowedOrigins.includes(url.origin) || LOCAL_SCHEMES.includes(url.protocol);
 
 type KeyDefinition = { readonly key: string; readonly code: string; readonly keyCode: number; readonly text?: string };
 // Letters, digits and function keys follow the US keyboard layout's key codes, as Chromium expects.
@@ -237,6 +239,16 @@ type SessionBrowser = {
   readonly clock: BrowserClock;
 };
 
+// A held-back popup never loads, so it is always recorded as a request that went nowhere. Only an
+// undeclared address is a refusal of the origin: a run may well reach a declared one in its own tab.
+function recordPopupRequest(browser: SessionBrowser, requestedUrl: string): void {
+  browser.recorder.record(requestedUrl, 'popup');
+  const url = URL.parse(requestedUrl);
+  if (url !== null && !isAllowedUrl(url, browser.environment.allowedOrigins)) {
+    browser.blocked.push(url.origin);
+  }
+}
+
 // How long a new tab is given to attach after the browser creates it.
 const TAB_ATTACH_TIMEOUT_MILLISECONDS = 10_000;
 
@@ -263,7 +275,7 @@ async function createSession(
 
   await connection.send(sessionId, 'Page.enable');
   const watch = new PageWatch(connection, { browserContextId, targetId, sessionId }, {
-    onPopupRequest: (url) => browser.recorder.record(url, 'popup'), ownsBrowserContext: true, claimsDownload: (event) => browser.downloads.claims(event),
+    onPopupRequest: (url) => { recordPopupRequest(browser, url); }, ownsBrowserContext: true, claimsDownload: (event) => browser.downloads.claims(event),
   });
   await watch.start();
   await browser.recorder.start(sessionId);
@@ -278,11 +290,17 @@ async function createSession(
     processId: attached.processId,
     blockedOrigins: () => browser.blocked,
     egressRecords: () => browser.recorder.records(),
-    // The download folder goes once the browser can no longer write into it. A shared browser that
-    // keeps the session's context rejects here, and the folder stays for the same reason.
+    // Popups settle first, so the blocked origins are complete once this ends. This page's watch sees
+    // every popup of the browser context, whichever tab opened it. The download folder goes once the
+    // browser can no longer write into it. A shared browser that keeps the session's context rejects
+    // here, and the folder stays for the same reason.
     close: async () => {
-      await attached.close();
-      browser.downloads.remove();
+      try {
+        await watch.settleHeldPopups();
+      } finally {
+        await attached.close();
+        browser.downloads.remove();
+      }
     },
     events: watch,
     fixturePath: (fixture) => fixtureFilePath(fixturesFolder, fixture),
@@ -327,12 +345,12 @@ async function preparePage(browser: SessionBrowser, sessionId: string): Promise<
   page.on('Fetch.requestPaused', (parameters) => {
     const paused = parameters as RequestPaused;
     if (atResponseStage(paused)) { void takeResponseBody(page, browser.network, paused); return; }
-    let allowed = false;
-    try {
-      const url = new URL(paused.request.url);
-      allowed = environment.allowedOrigins.includes(url.origin) || LOCAL_SCHEMES.includes(url.protocol);
-      if (!allowed) browser.blocked.push(url.origin);
-    } catch { /* a URL that cannot be parsed is blocked */ }
+    const url = URL.parse(paused.request.url);
+    // A URL that cannot be parsed is blocked, with no origin to show.
+    const allowed = url !== null && isAllowedUrl(url, environment.allowedOrigins);
+    if (url !== null && !allowed) {
+      browser.blocked.push(url.origin);
+    }
     const stubbed = allowed ? browser.network.answer(paused) : null;
     const decision = stubbed !== null
       ? page.send('Fetch.fulfillRequest', { requestId: paused.requestId, ...stubbed })
@@ -374,7 +392,7 @@ async function openTab(browser: SessionBrowser, firstWatch: PageWatch, firstDeta
     return failure({ code: 'navigation-failed', detail: `the new tab did not open: ${errorText(error)}` });
   }
   const watch = new PageWatch(connection, { browserContextId, targetId: attached.targetId, sessionId: attached.sessionId }, {
-    onPopupRequest: (url) => browser.recorder.record(url, 'popup'), ownsBrowserContext: false, claimsDownload: (event) => browser.downloads.claims(event),
+    onPopupRequest: (url) => { recordPopupRequest(browser, url); }, ownsBrowserContext: false, claimsDownload: (event) => browser.downloads.claims(event),
   });
   let stopResponses = (): void => undefined;
   let stopNetwork = (): void => undefined;

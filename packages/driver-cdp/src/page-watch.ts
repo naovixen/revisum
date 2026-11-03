@@ -8,6 +8,7 @@
 // Once the page has crashed, every command to it fails at once: the browser never answers a
 // command sent to a dead renderer, so waiting would only run into each command's timeout. A browser
 // that dies or a connection that closes takes the page with it, so both count as a crash.
+import { errorText } from './browser-session.ts';
 import { CdpError, type CdpConnection } from './cdp-connection.ts';
 import type { PageEvents } from './page-operations.ts';
 
@@ -22,6 +23,9 @@ type RequestPaused = { readonly request: { readonly url: string } };
 // How long a popup is given to ask for its first page, so that request can be recorded before the
 // popup is closed. A popup opened with no address asks for nothing and is closed after this wait.
 const POPUP_REQUEST_WAIT_MILLISECONDS = 1_000;
+// How a command fails when a popup closed itself first, or the browser or the session has gone.
+// Nothing is left to hold back then, so there is nothing to report.
+const POPUP_ALREADY_GONE = /Session with given id not found|No target with given id|connection closed/i;
 
 type WatchedPage = { readonly browserContextId: string; readonly targetId: string; readonly sessionId: string };
 
@@ -50,6 +54,9 @@ export class PageWatch implements PageEvents {
   readonly #onPopupRequest: (url: string) => void;
   readonly #ownsBrowserContext: boolean;
   readonly #claimsDownload: (event: unknown) => boolean;
+  // A promise per popup still being given its chance to ask for its first page.
+  readonly #popupFirstRequests = new Set<Promise<void>>();
+  readonly #popupFailures: string[] = [];
   // Hands the next page opened without an opener to the newTab step waiting for it.
   #tabClaim: ((page: AttachedPage) => void) | null = null;
   readonly #stopListening: (() => void)[] = [];
@@ -149,6 +156,17 @@ export class PageWatch implements PageEvents {
     return this.#openings;
   }
 
+  // Waits until each popup open now has asked for its first page or used up its wait, so the
+  // session's record of them is complete, and rejects with whatever could not be done about one.
+  // Popups opened during the wait are not waited for, so a page that keeps opening them cannot
+  // hold the session's close.
+  async settleHeldPopups(): Promise<void> {
+    await Promise.all(this.#popupFirstRequests);
+    if (this.#popupFailures.length > 0) {
+      throw new Error(`a popup could not be held back or closed: ${this.#popupFailures.join('; ')}`);
+    }
+  }
+
   // Resolves as soon as a dialog is open, at once when one already is.
   dialogOpened(): { readonly promise: Promise<void>; cancel(): void } {
     let notify = (): void => undefined;
@@ -186,27 +204,39 @@ export class PageWatch implements PageEvents {
   // it is let start, its first request (held back) is recorded, and it is closed.
   async #closePopup(popupSessionId: string, popupTargetId: string): Promise<void> {
     const connection = this.#connection;
-    let stopListening = (): void => undefined;
-    let timer: NodeJS.Timeout | undefined;
+    let endWait = (): void => undefined;
+    // Its own timer settles it, whatever the commands below do, and the session's close awaits it.
     const firstRequest = new Promise<void>((resolve) => {
-      timer = setTimeout(resolve, POPUP_REQUEST_WAIT_MILLISECONDS);
-      stopListening = connection.on(popupSessionId, 'Fetch.requestPaused', (parameters) => {
-        stopListening();
+      const timer = setTimeout(() => { endWait(); }, POPUP_REQUEST_WAIT_MILLISECONDS);
+      const stopListening = connection.on(popupSessionId, 'Fetch.requestPaused', (parameters) => {
         this.#onPopupRequest((parameters as RequestPaused).request.url);
-        resolve();
+        endWait();
       });
+      endWait = () => {
+        clearTimeout(timer);
+        stopListening();
+        resolve();
+      };
     });
+    this.#popupFirstRequests.add(firstRequest);
     try {
       await connection.send(popupSessionId, 'Fetch.enable', { patterns: [{ urlPattern: '*', requestStage: 'Request' }] });
       await connection.send(popupSessionId, 'Runtime.runIfWaitingForDebugger');
       await firstRequest;
-    } catch {
-      // The popup closed itself first; closing it below is then harmless.
+    } catch (error) {
+      this.#notePopupFailure(error);
     } finally {
-      clearTimeout(timer);
-      stopListening();
+      endWait();
+      this.#popupFirstRequests.delete(firstRequest);
     }
-    await connection.send(undefined, 'Target.closeTarget', { targetId: popupTargetId }).catch(() => undefined);
+    await connection.send(undefined, 'Target.closeTarget', { targetId: popupTargetId }).catch((error: unknown) => { this.#notePopupFailure(error); });
+  }
+
+  #notePopupFailure(error: unknown): void {
+    const text = errorText(error);
+    if (!POPUP_ALREADY_GONE.test(text)) {
+      this.#popupFailures.push(text);
+    }
   }
 
   #crash(): void {

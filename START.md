@@ -46,11 +46,11 @@ Architecture refactor:
 
 Where phase 3 stands, from `docs/decisions/refactor-defects.md`:
 
-- **Fix next:** 39, 47 and 49 (egress outside Fetch, proof first), 35, 36, 55-58, 92, 93, 118's remaining parts, 133, 137, 138, 139, 140, 141-151, 153, 155, 156, 157, the first-round leftovers 5, 6, 15, 20, 26-30, 61 and 80. Findings 8, 14, 22 and 59 travel with their parts.
+- **Fix next:** 39, 47 and 49 (egress outside Fetch, proof first), 35, 36, 55-58, 92, 93, 118's remaining parts, 133, 137, 138, 139, 140, 141-151, 153, 155, 156, 157, 158, the first-round leftovers 5, 6, 15, 20, 26-30, 61 and 80. Findings 8, 14, 22 and 59 travel with their parts.
 - **With SPEC-16:** 100-103, 107-112, the rest of 114, 115, 136, and re-reading the guarantee level after a plan run. Founder decided 103: mount tracked files only.
 - **Founder decided, still to build:** one real Playwright Test run in the weekly tier, after a dependency review (116).
 - **Founder decided:** closed shadow roots stay a documented limit, to revisit with SPEC-10 (129).
-- **Founder decided, being built:** host runs always go through a per-session egress proxy set on the browser context, with WebRTC UDP off, stay labelled `host` and claim nothing new (39, 47, 49, 141, 142). The design and commit order are in `docs/decisions/host-egress-proxy.md`. Steps 1 to 4 are done, and step 5 is next.
+- **Founder decided, being built:** host runs always go through a per-session egress proxy set on the browser context, with WebRTC UDP off, stay labelled `host` and claim nothing new (39, 47, 49, 141, 142). The design and commit order are in `docs/decisions/host-egress-proxy.md`. Steps 1 to 5 are done, and step 6 is next.
 - **Calls made in the main session, which the founder can reverse:** refused connections in request counts (87, amended in SPEC-33) and allowing U+200C and U+200D in plan text (122).
 - **Machine leftovers:** a locked worktree in `.claude/worktrees/` from the break test. Leave it unless the founder says otherwise. `npm run check:linux` uses its own container, labelled `revisum.check=linux`.
 
