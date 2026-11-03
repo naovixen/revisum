@@ -57,7 +57,7 @@ import { SECRET_PLACEHOLDER } from './secrets/secret-values.ts';
 import { adapterRegistry } from './target/adapter-registry.ts';
 import { BROWSER_BUILD_INPUT, checkPinnedBuild } from './target/target-lock.ts';
 import {
-  runBackendCheck, runCallStep, runCleanup, type CallStepContext, type CleanupResult, type ServiceCallRecord,
+  NO_ANSWER_CODES, runBackendCheck, runCallStep, runCleanup, type CallStepContext, type CleanupResult, type ServiceCallRecord,
 } from './service-calls/call-steps.ts';
 
 export type RunInputs = {
@@ -426,8 +426,8 @@ export async function run(given: RunInputs, ports: RunPorts): Promise<RunResult>
     }
     // A denied action failed its step, so every later step was skipped and nothing ran after it.
     // A failed call, page script or database command could not set up or reach what the test
-    // needs, and a page script that threw, hung or gave no usable result could not check it,
-    // which is not a product failure.
+    // needs, and a page script that threw, hung or gave no usable result, or a backend check whose
+    // call got no answer, could not check it, which is not a product failure.
     const denial = context.denials[0];
     finished = denial !== undefined && steps.some((done) => done.code === 'policy-denied')
       ? lifecycle.deny(running, denial)
@@ -505,10 +505,10 @@ const SETUP_STEP_TYPES: readonly Step['type'][] = ['call', 'evaluate', 'database
 // content or a secret.
 const ADAPTER_ERROR = 'adapter-error';
 // The codes of a page script or a database command that could not give a result to check, in
-// whatever step it ran, and of an adapter that threw: the run could not test, which is not a
-// product failure.
+// whatever step it ran, of a service call that got no answer, and of an adapter that threw: the run
+// could not test, which is not a product failure.
 const UNUSABLE_RESULT_CODES: readonly string[] = [
-  'script-failed', 'script-timeout', 'script-result-invalid', 'script-result-too-large', ADAPTER_ERROR, ...COMMAND_ERROR_CODES,
+  'script-failed', 'script-timeout', 'script-result-invalid', 'script-result-too-large', ADAPTER_ERROR, ...COMMAND_ERROR_CODES, ...NO_ANSWER_CODES,
 ];
 
 // True when a failed step means the run could not test, wherever in the plan the step stands.

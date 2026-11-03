@@ -1353,14 +1353,11 @@
     }
   },
   "packages/engine/src/service-calls/call-steps.ts": {
-    "@typescript-eslint/naming-convention": {
-      "count": 1
-    },
     "curly": {
-      "count": 15
+      "count": 12
     },
     "no-nested-ternary": {
-      "count": 3
+      "count": 2
     },
     "revisum/file-name-matches-export": {
       "count": 1

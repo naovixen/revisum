@@ -255,8 +255,9 @@ export type Step =
   // Makes a call the trusted project declares, by name, and may remember response fields as run
   // values for the steps after it. Only the plan's own list of steps, or its cleanup, may hold one.
   | { readonly type: 'call'; readonly call: CallName; readonly arguments: CallArguments; readonly remember?: Readonly<Record<ValueName, FieldName>> }
-  // Makes a declared read call and checks one field of its response, repeating the call until the
-  // check passes or the project's backend check timeout runs out.
+  // Makes a declared read call and checks one field of its response, repeating the call while the
+  // service answers with a status the declaration lists and the check has not passed, until the
+  // project's backend check timeout runs out. A call that fails is not sent again.
   | {
     readonly type: 'expectBackend'; readonly call: CallName; readonly arguments: CallArguments; readonly field: FieldName;
     readonly assert: BackendAssertion; readonly criterionId: CriterionId;

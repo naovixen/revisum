@@ -1,8 +1,9 @@
 // Runs the steps that call declared services, through the run's ServiceCaller port:
 //   - a call sends its request once, judges the status against the declaration and remembers the
 //     response fields the step names as run values; a write is never retried;
-//   - a backend check repeats its read call until the field passes the check or the project's
-//     backend check timeout runs out, which covers background jobs;
+//   - a backend check repeats its read call while the service answers with a status the declaration
+//     lists and the field has not passed the check, until the project's backend check timeout runs
+//     out, which covers background jobs. A call that fails stops the check at once, with its code;
 //   - cleanup calls and cleanup database commands run in order after the steps, whatever the
 //     outcome. One that needs a value never set, because the run stopped first, is skipped; one
 //     that fails is recorded and raises a review item, and never changes the verdict.
@@ -10,7 +11,7 @@
 // argument, a header or the response itself.
 import {
   failure, success,
-  type CallArguments, type CallDeclaration, type CallName, type CallStep, type CleanupStep, type Clock, type CommandName, type DeclaredService, type HttpMethod, type JsonPointer, type Result,
+  type BackendAssertion, type CallArguments, type CallDeclaration, type CallName, type CallStep, type CleanupStep, type Clock, type CommandName, type DeclaredService, type HttpMethod, type JsonPointer, type ResponseReadErrorCode, type Result,
   type SafeText,
   type ScriptArguments, type SecretStore, type ServiceCallErrorCode, type ServiceCaller, type ServiceName, type ServiceRequest, type ServiceResponse,
   type Step, type ValueName,
@@ -47,6 +48,10 @@ type CallStepOutcome = {
   readonly code?: CallStepCode;
   readonly serviceCall?: ServiceCallRecord;
 };
+
+// The codes of a call the service never answered. A check then learned nothing about the product,
+// so the run could not test, in whatever step the call stood.
+export const NO_ANSWER_CODES: readonly string[] = ['service-unreachable', 'call-timeout'] satisfies readonly ServiceCallErrorCode[];
 
 // A cleanup step's record, naming its call or its database command. A failed one is always
 // cleanup-failed; `cause` says what failed.
@@ -153,9 +158,27 @@ export async function runCallStep(step: CallStep, stepIndex: number, context: Ca
   return kept.ok ? { outcome: 'passed', serviceCall } : failedWith(kept.error, serviceCall);
 }
 
-// A backend check: its read call repeated until the field passes or the check timeout runs out.
-// A request that cannot be built, or that egress blocks, would fail the same way every time, so it
-// fails at once.
+// What a backend check made of one answer: it passed, or why it has not passed yet.
+type AnswerCheck = Result<null, ResponseReadErrorCode | 'assertion-failed'>;
+
+// A response that is not JSON says nothing about the field, so it passes no check, absent included.
+function checkAnswer(
+  assertion: BackendAssertion, answer: ServiceResponse, pointer: JsonPointer, expected: SafeText | null, maximumResponseBytes: number,
+): AnswerCheck {
+  const document = responseJson(answer, maximumResponseBytes);
+  if (!document.ok) {
+    return document;
+  }
+  const field = fieldAt(document.value, pointer);
+  if (checkBackendField(assertion, field.ok ? { value: field.value } : undefined, expected)) {
+    return success(null);
+  }
+  return failure(!field.ok && assertion.kind !== 'present' && assertion.kind !== 'absent' ? 'field-missing' : 'assertion-failed');
+}
+
+// A backend check: its read call repeated while the service answers with a status the declaration
+// lists and the field has not passed, until the check timeout runs out. A request that cannot be
+// built would fail the same way every time, so it fails at once.
 export async function runBackendCheck(step: Extract<Step, { type: 'expectBackend' }>, stepIndex: number, context: CallStepContext): Promise<CallStepOutcome> {
   const found = declared(step.call, context.project);
   if (found === undefined) return failedWith('egress-blocked');
@@ -169,23 +192,19 @@ export async function runBackendCheck(step: Extract<Step, { type: 'expectBackend
   const deadline = context.clock.now() + context.project.limits.backendCheckTimeoutMilliseconds;
   for (let attempts = 1; ; attempts++) {
     const sent = await send(request.value, found, stepIndex, step.type, context);
-    const answered = sent.judged;
     const serviceCall = record(step, found, sent.received, attempts);
-    let code: CallStepCode;
-    if (!answered.ok) {
-      code = answered.error;
-      if (code === 'egress-blocked') return failedWith(code, serviceCall);
-    } else {
-      const document = responseJson(answered.value, request.value.maximumResponseBytes);
-      const field = document.ok ? fieldAt(document.value, pointer) : document;
-      // A response that is not JSON says nothing about the field, so it passes no check, absent included.
-      const passed = document.ok
-        && checkBackendField(step.assert, field.ok ? { value: field.value } : undefined, expected.value);
-      if (passed) return { outcome: 'passed', serviceCall };
-      code = !document.ok ? document.error
-        : !field.ok && step.assert.kind !== 'present' && step.assert.kind !== 'absent' ? 'field-missing' : 'assertion-failed';
+    // A call that failed is not sent again, so an outage is reported at once, not waited out or
+    // hidden by a later answer.
+    if (!sent.judged.ok) {
+      return failedWith(sent.judged.error, serviceCall);
     }
-    if (context.clock.now() >= deadline) return failedWith(code, serviceCall);
+    const checked = checkAnswer(step.assert, sent.judged.value, pointer, expected.value, request.value.maximumResponseBytes);
+    if (checked.ok) {
+      return { outcome: 'passed', serviceCall };
+    }
+    if (context.clock.now() >= deadline) {
+      return failedWith(checked.error, serviceCall);
+    }
     await context.clock.sleep(BACKEND_POLL_INTERVAL_MILLISECONDS);
   }
 }

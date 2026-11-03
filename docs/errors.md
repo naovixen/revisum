@@ -267,11 +267,11 @@ Service call error. The response is JSON, but a field's JSON pointer names nothi
 
 ## service-unreachable
 
-Service call error. The caller could not connect to the declared service. A `call` that cannot connect ends the run `Errored`: it could not test, which is not a product failure. Cleanup still runs. Check that the service is up and its origin in `services` is right.
+Service call error. The caller could not connect to the declared service. A `call` or a backend check that cannot connect ends the run `Errored`: it could not test, which is not a product failure. A backend check stops there, without waiting out its timeout or sending its read again. Cleanup still runs. Check that the service is up and its origin in `services` is right.
 
 ## call-timeout
 
-Service call error. The service did not answer within the declaration's `timeoutMilliseconds` (default 10 s). A `write` call is never sent again. Raise the timeout in the declaration, or make the test API faster.
+Service call error. The service did not answer within the declaration's `timeoutMilliseconds` (default 10 s). A `call` or a backend check that times out ends the run `Errored`: it could not test, which is not a product failure. The call is never sent again, whether a `write` or a backend check's read. Cleanup still runs. Raise the timeout in the declaration, or make the test API faster.
 
 ## unexpected-status
 

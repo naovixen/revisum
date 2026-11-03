@@ -181,10 +181,10 @@ export type ReplayedPort<Port> = { readonly port: Port; mismatchAt(): number | n
 
 // Answers requests from recorded replies, in order. Once one does not match, every later request
 // fails too, and the replay ends at the first mismatch.
-// A backend or database check repeats its request until it passes. When a recorded reply was
-// changed, such a check can repeat more often than it did in the recorded run, so a request that
-// repeats the one just answered gets the same reply again rather than counting as a mismatch: the
-// run then goes its own way, and its result hash shows it.
+// A backend or database check repeats its request while the request succeeds and the check has not
+// passed. When a recorded reply was changed, such a check can repeat more often than it did in the
+// recorded run, so a request that repeats the one just answered gets the same reply again rather
+// than counting as a mismatch: the run then goes its own way, and its result hash shows it.
 function replayedReplies<Reply, Answer>(
   replies: readonly (Reply & { readonly requestSha256: string })[], answer: (reply: Reply) => Answer, refused: Answer,
 ): { answerFor(request: ServiceRequest | DatabaseCommandRequest): Answer; mismatchAt(): number | null } {

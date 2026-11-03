@@ -45,7 +45,7 @@ Architecture refactor:
 
 Where phase 3 stands, from `docs/decisions/refactor-defects.md`:
 
-- **Fix next:** 39, 47 and 49 (egress outside Fetch, proof first), 35, 36, 55-58, 92, 93, 118's remaining parts, 133, 137, 138, 139, 140, 141-151, and the first-round leftovers 5, 6, 8, 14, 15, 20, 22, 26-30, 59, 61, 80.
+- **Fix next:** 39, 47 and 49 (egress outside Fetch, proof first), 35, 36, 55-58, 92, 93, 118's remaining parts, 133, 137, 138, 139, 140, 141-151, 153, and the first-round leftovers 5, 6, 8, 14, 15, 20, 22, 26-30, 59, 61, 80.
 - **With SPEC-16:** 100-103, 107-112, the rest of 114, 115, 136, and re-reading the guarantee level after a plan run. Founder decided 103: mount tracked files only.
 - **Founder decided, still to build:** one real Playwright Test run in the weekly tier, after a dependency review (116).
 - **Founder decided:** closed shadow roots stay a documented limit, to revisit with SPEC-10 (129).
