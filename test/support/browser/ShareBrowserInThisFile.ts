@@ -18,12 +18,19 @@ import {
 } from "@revisum/driver-cdp";
 import type { SessionEnvironment, Target } from "@revisum/engine";
 import { startBrowserWatchdog, type BrowserWatchdog } from "./BrowserWatchdog.ts";
+import {
+    NO_BROWSER_WIDE_PROXY,
+    type EgressSourceForTest,
+    type SessionEgressForTest,
+} from "./SessionEgressForTest.ts";
 import { driverWith, sessionWith } from "./WrappingSessions.ts";
 
 const CONTROL_TIMEOUT_MILLISECONDS = 5_000;
 const EXIT_POLL_MILLISECONDS = 10;
 
-type LaunchSettings = Parameters<typeof launchSharedBrowser>[0];
+// Each session's proxy goes on its own browser context, so what a browser is launched for is only its
+// executable and locale.
+type LaunchSettings = { readonly executablePath: string; readonly locale: string };
 
 type HeldBrowser = {
     readonly browser: LaunchedSharedBrowser;
@@ -34,15 +41,35 @@ type HeldBrowser = {
 
 let isSharingInThisFile = false;
 const heldBrowsers = new Map<string, Promise<HeldBrowser>>();
+const egressStillOpen = new Set<SessionEgressForTest>();
 
-const keyOf = ({ executablePath, locale, proxy }: LaunchSettings): string =>
-    JSON.stringify([executablePath, locale, proxy?.server, proxy?.includeLoopback]);
+// A session a failed test left open never closes its egress, whose listening proxy would keep the
+// file's process from exiting, so what it costs is no longer only that test.
+const closedWithTheFile =
+    (source: EgressSourceForTest): EgressSourceForTest =>
+    async (allowedOrigins) => {
+        const egress = await source(allowedOrigins);
+        egressStillOpen.add(egress);
+        return {
+            ...egress,
+            close: () => {
+                egressStillOpen.delete(egress);
+                return egress.close();
+            },
+        };
+    };
+
+const keyOf = ({ executablePath, locale }: LaunchSettings): string =>
+    JSON.stringify([executablePath, locale]);
 
 async function launchHeldBrowser(
     settings: LaunchSettings,
     launchTimeoutMilliseconds: number | undefined,
 ): Promise<HeldBrowser> {
-    const browser = await launchSharedBrowser(settings, launchTimeoutMilliseconds);
+    const browser = await launchSharedBrowser(
+        { ...settings, ...NO_BROWSER_WIDE_PROXY },
+        launchTimeoutMilliseconds,
+    );
     return { browser, watchdog: startBrowserWatchdog(browser), isStuck: false };
 }
 
@@ -129,11 +156,14 @@ async function markStuck(settings: LaunchSettings): Promise<void> {
 export async function stopSharedBrowsers(): Promise<void> {
     const held = [...heldBrowsers.values()];
     heldBrowsers.clear();
-    await Promise.allSettled(
-        held.map(async (launching) => {
+    const egress = [...egressStillOpen];
+    egressStillOpen.clear();
+    await Promise.allSettled([
+        ...held.map(async (launching) => {
             await stopHeldBrowser(await launching);
         }),
-    );
+        ...egress.map((left) => left.close()),
+    ]);
 }
 
 export function shareBrowserInThisFile(): void {
@@ -145,11 +175,16 @@ export function shareBrowserInThisFile(): void {
 
 export const isSharingBrowserInThisFile = (): boolean => isSharingInThisFile;
 
-export function driverOnSharedBrowser(options: CdpDriverOptions): OwnBrowserDriver {
-    const { executablePath, proxy, launchTimeoutMilliseconds } = options;
-    const settingsFor = (locale: string): LaunchSettings => ({ executablePath, locale, proxy });
+export function driverOnSharedBrowser(
+    options: Omit<CdpDriverOptions, "proxy" | "egress"> & {
+        readonly egress: EgressSourceForTest;
+    },
+): OwnBrowserDriver {
+    const { executablePath, launchTimeoutMilliseconds } = options;
+    const settingsFor = (locale: string): LaunchSettings => ({ executablePath, locale });
     const inner = cdpDriver({
         ...options,
+        egress: closedWithTheFile(options.egress),
         browserSource: (locale) => sharedBrowserFor(settingsFor(locale), launchTimeoutMilliseconds),
     });
     return driverWith(inner, {

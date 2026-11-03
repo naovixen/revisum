@@ -13,6 +13,7 @@ import { after, before, describe, test } from 'node:test';
 import type { DriverSession } from '@revisum/driver-cdp';
 import { allowEveryAction } from '#test-support/browser/AllowEveryAction.ts';
 import { createBrowserDriver } from '#test-support/browser/CreateBrowserDriver.ts';
+import { egressThrough } from '#test-support/browser/SessionEgressForTest.ts';
 import { defaultRedactor, type SessionEnvironment } from '@revisum/engine';
 import { joinEgressEvents, startEgressProxy, type EgressProxy } from '@revisum/runner';
 import type { EgressEvent } from '@revisum/contracts';
@@ -59,7 +60,7 @@ const widenedEnvironment = (): SessionEnvironment => ({
 });
 
 async function openThroughProxy(): Promise<DriverSession> {
-  const driver = createBrowserDriver({ executablePath: BROWSERS.chrome, proxy: { server: proxy.url, includeLoopback: true } });
+  const driver = createBrowserDriver({ executablePath: BROWSERS.chrome, egress: egressThrough(proxy) });
   const opened = await driver.open(capability.target(BrowserTarget.Chrome), widenedEnvironment());
   assert.ok(opened.ok, `the session opens: ${opened.ok ? '' : JSON.stringify(opened.error)}`);
   return opened.value;

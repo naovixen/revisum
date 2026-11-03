@@ -6,7 +6,7 @@ import { sharedBrowserFor, stopSharedBrowsers } from "./ShareBrowserInThisFile.t
 const HOLD_TICK_MILLISECONDS = 60_000;
 
 const [executablePath = "", mode = ""] = process.argv.slice(2);
-const browser = await sharedBrowserFor({ executablePath, locale: "en-GB", proxy: undefined });
+const browser = await sharedBrowserFor({ executablePath, locale: "en-GB" });
 const { processId, webSocketUrl } = browser;
 process.stdout.write(`${JSON.stringify({ processId, webSocketUrl })}\n`);
 if (mode === "stop") {

@@ -20,18 +20,18 @@ import {
     englishMatrix,
 } from "#test-support/browser/BrowserTarget.ts";
 import { navigate, testId, textEquals } from "#test-support/browser/RawPlan.ts";
+import {
+    NO_BROWSER_WIDE_PROXY,
+    realEgressSource,
+    type EgressSourceForTest,
+    type SessionEgressForTest,
+} from "#test-support/browser/SessionEgressForTest.ts";
 import { BROWSERS } from "#test-support/browsers.ts";
 import { FIXED_TIME_MILLISECONDS, SEED, capabilityPlan } from "#test-support/capability-harness.ts";
 import type { FixtureRoute } from "#test-support/fixture-server.ts";
 import { FIXTURES } from "#test-support/repository.ts";
 import { ATTEMPT_SETTLED, ATTEMPT_STATE, attemptPage } from "./EgressChannels.ts";
-import {
-    driverWithEgress,
-    hostBrowserDrivers,
-    realEgressSource,
-    type EgressSourceForTest,
-    type SessionEgressForTest,
-} from "./HostBrowserDrivers.ts";
+import { driverWithEgress, hostBrowserDrivers } from "./HostBrowserDrivers.ts";
 import { startRecordingProxy, type RecordingProxy } from "./StartRecordingProxy.ts";
 
 const TARGET = BrowserTarget.Chrome;
@@ -163,6 +163,7 @@ const egressOn = (
     const egress: SessionEgressForTest = {
         proxy: { server: proxy.server, includeLoopback: true },
         refusedOrigins: () => refusedOrigins,
+        connectionFailures: () => [],
         close: () => Promise.resolve(),
     };
     return () => Promise.resolve(egress);
@@ -184,6 +185,7 @@ describe("Using the driver's session egress", () => {
                     Promise.resolve({
                         proxy: { server: "", includeLoopback: true },
                         refusedOrigins: () => [],
+                        connectionFailures: () => [],
                         close: () => Promise.resolve(),
                     });
                 const opened = await openOutcome(driverOn(emptyProxy));
@@ -251,7 +253,7 @@ describe("Using the driver's session egress", () => {
             const browser = await launchSharedBrowser({
                 executablePath: BROWSERS.chrome,
                 locale: LOCALE,
-                proxy: undefined,
+                ...NO_BROWSER_WIDE_PROXY,
             });
             try {
                 const onBrowser = (proxy: RecordingProxy): OwnBrowserDriver =>

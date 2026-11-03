@@ -14,6 +14,7 @@ import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
 import type { OwnBrowserDriver } from '@revisum/driver-cdp';
 import { createBrowserDriver } from '#test-support/browser/CreateBrowserDriver.ts';
+import { egressThrough } from '#test-support/browser/SessionEgressForTest.ts';
 import type { BrowserDriver, BrowserRequestRecord, EgressEvent, SessionEnvironment, Target } from '@revisum/engine';
 import { hostAndPort, joinEgressEvents, startEgressProxy, type EgressProxy } from '@revisum/runner';
 import { BROWSERS } from '#test-support/browsers.ts';
@@ -75,7 +76,7 @@ type ProxiedRun = NetworkRun & { readonly egressEvents: readonly EgressEvent[] }
 // this run's proxy decisions only.
 async function runThroughProxy(steps: readonly unknown[]): Promise<ProxiedRun> {
   const records: BrowserRequestRecord[] = [];
-  const driver = createBrowserDriver({ executablePath: BROWSERS.chrome, fixturesFolder: FIXTURE_FOLDER, proxy: { server: proxy.url, includeLoopback: true } });
+  const driver = createBrowserDriver({ executablePath: BROWSERS.chrome, fixturesFolder: FIXTURE_FOLDER, egress: egressThrough(proxy) });
   const drivers = new Map<string, BrowserDriver>([['cdp', keepingRecords(driver, (kept) => { records.push(...kept); })]]);
   const firstDecision = proxy.decisions().length;
   const ran = await harness.runSteps(BrowserTarget.Chrome, steps, { drivers });

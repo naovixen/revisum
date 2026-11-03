@@ -12,6 +12,7 @@ import { after, before, test } from 'node:test';
 import type { DriverSession } from '@revisum/driver-cdp';
 import { allowEveryAction } from '#test-support/browser/AllowEveryAction.ts';
 import { createBrowserDriver } from '#test-support/browser/CreateBrowserDriver.ts';
+import { egressThrough } from '#test-support/browser/SessionEgressForTest.ts';
 import { defaultRedactor, type SessionEnvironment } from '@revisum/engine';
 import { joinEgressEvents, startEgressProxy, type EgressProxy } from '@revisum/runner';
 import { BROWSERS } from '#test-support/browsers.ts';
@@ -73,7 +74,7 @@ async function openSession(): Promise<DriverSession> {
     baseUrl: opener.origin, allowedOrigins: [opener.origin, reachable.origin], seed: SEED, fixedTimeMilliseconds: FIXED_TIME_MILLISECONDS,
     sensitiveSelectors: defaultRedactor().selectors, timeoutMilliseconds: 5000,
   };
-  const driver = createBrowserDriver({ executablePath: BROWSERS.chrome, proxy: { server: proxy.url, includeLoopback: true } });
+  const driver = createBrowserDriver({ executablePath: BROWSERS.chrome, egress: egressThrough(proxy) });
   const opened = await driver.open(capability.target(BrowserTarget.Chrome), environment);
   assert.ok(opened.ok, `the session opens: ${opened.ok ? '' : JSON.stringify(opened.error)}`);
   return opened.value;

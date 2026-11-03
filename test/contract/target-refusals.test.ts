@@ -4,11 +4,11 @@
 import assert from 'node:assert/strict';
 import { arch, platform } from 'node:os';
 import { test } from 'node:test';
-import { cdpDriver } from '@revisum/driver-cdp';
 import {
   adapterRegistry, defaultRedactor, parseProject, planParser, run,
   type BrowserDriver, type Project, type Target,
 } from '@revisum/engine';
+import { buildAdapters } from '../../packages/cli/src/BuildAdapters.ts';
 import { memoryArtifactStore, memoryEventSink, memoryRunEventSink, systemClock } from '../support/memory-ports.ts';
 import { authorise, trustedProjectFrom } from '../support/policy-clearance.ts';
 
@@ -70,7 +70,7 @@ async function runOn(targetId: string, drivers: ReadonlyMap<string, BrowserDrive
 }
 
 test('when the only registered adapter is CDP, it refuses a WebKit target with engine-not-supported', () => {
-  const registry = adapterRegistry(new Map([['cdp', cdpDriver({ executablePath: 'never-launched' })]]));
+  const registry = adapterRegistry(new Map([['cdp', buildAdapters.hostBrowserDriver({ executablePath: 'never-launched' })]]));
   for (const driver of registry.all()) {
     const answer = driver.supports(target('cdp-webkit'));
     assert.ok(!answer.ok);
@@ -79,8 +79,8 @@ test('when the only registered adapter is CDP, it refuses a WebKit target with e
 });
 
 test('a WebKit run on CDP ends engine-not-supported; another registered adapter is not used instead', async () => {
-  const cdp = watched(cdpDriver({ executablePath: 'never-launched' }));
-  const bystander = watched(cdpDriver({ executablePath: 'never-launched' }));
+  const cdp = watched(buildAdapters.hostBrowserDriver({ executablePath: 'never-launched' }));
+  const bystander = watched(buildAdapters.hostBrowserDriver({ executablePath: 'never-launched' }));
   const { result, store } = await runOn('cdp-webkit', new Map<string, BrowserDriver>([['cdp', cdp], ['other', bystander]]));
   assert.equal(result.state, 'TargetUnavailable');
   assert.equal(result.unavailable?.reason, 'engine-not-supported');
@@ -89,7 +89,7 @@ test('a WebKit run on CDP ends engine-not-supported; another registered adapter 
 });
 
 test('a run on an adapter nobody registered ends adapter-not-registered, and the registered CDP driver opens no browser', async () => {
-  const cdp = watched(cdpDriver({ executablePath: 'never-launched' }));
+  const cdp = watched(buildAdapters.hostBrowserDriver({ executablePath: 'never-launched' }));
   const { result, store } = await runOn('appium-android', new Map<string, BrowserDriver>([['cdp', cdp]]));
   assert.equal(result.state, 'TargetUnavailable');
   assert.equal(result.unavailable?.reason, 'adapter-not-registered');

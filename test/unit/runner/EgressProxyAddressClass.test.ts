@@ -27,6 +27,9 @@ const NAME_ANSWERS = {
     "stays-private.test": [[PRIVATE_ADDRESS], [OTHER_PRIVATE_ADDRESS]],
     "tunnel-moves.test": [[PUBLIC_ADDRESS], [PRIVATE_ADDRESS]],
     "private-then-public-beside-it.test": [[PRIVATE_ADDRESS], [PRIVATE_ADDRESS, PUBLIC_ADDRESS]],
+    "public-beside-private-at-first.test": [[PUBLIC_ADDRESS, PRIVATE_ADDRESS]],
+    "private-beside-public-at-first.test": [[PRIVATE_ADDRESS, PUBLIC_ADDRESS]],
+    "tunnel-mixed-at-first.test": [[PUBLIC_ADDRESS, PRIVATE_ADDRESS]],
 };
 
 const NAMES = Object.keys(NAME_ANSWERS);
@@ -98,6 +101,35 @@ describe("Using the egress proxy", () => {
                 assert.equal(await connectThroughProxy(proxy.url, authority), 403);
                 assert.equal(upstream.dialled.length, dialledBefore);
                 assert.deepEqual(decisionsOf(authority), ["allowed", "blocked"]);
+            });
+        });
+    });
+
+    for (const { name, order } of [
+        { name: "public-beside-private-at-first.test", order: "a public address first" },
+        { name: "private-beside-public-at-first.test", order: "a private address first" },
+    ]) {
+        describe(`given the declared name ${name}, whose first lookup finds ${order} and the other class beside it`, () => {
+            describe("when the first request asks for it", () => {
+                test("then it should refuse, connect to nothing, and record the block", async () => {
+                    const dialledBefore = upstream.dialled.length;
+                    const answer = await getThroughProxy(proxy.url, `http://${name}/`);
+                    assert.equal(answer.status, 403);
+                    assert.equal(upstream.dialled.length, dialledBefore);
+                    assert.deepEqual(decisionsOf(`http://${name}`), ["blocked"]);
+                });
+            });
+        });
+    }
+
+    describe("given a tunnelled name whose first lookup finds public and private addresses together", () => {
+        describe("when the first tunnel opens", () => {
+            test("then it should refuse, connect to nothing, and record the block", async () => {
+                const authority = "tunnel-mixed-at-first.test:443";
+                const dialledBefore = upstream.dialled.length;
+                assert.equal(await connectThroughProxy(proxy.url, authority), 403);
+                assert.equal(upstream.dialled.length, dialledBefore);
+                assert.deepEqual(decisionsOf(authority), ["blocked"]);
             });
         });
     });

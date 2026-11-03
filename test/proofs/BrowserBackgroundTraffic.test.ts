@@ -17,16 +17,13 @@ import {
     englishMatrix,
 } from "#test-support/browser/BrowserTarget.ts";
 import { navigate, testId, textEquals } from "#test-support/browser/RawPlan.ts";
+import type { EgressSourceForTest } from "#test-support/browser/SessionEgressForTest.ts";
 import { FIXED_TIME_MILLISECONDS, SEED, capabilityPlan } from "#test-support/capability-harness.ts";
 import type { FixtureRoute } from "#test-support/fixture-server.ts";
 import { FIXTURES } from "#test-support/repository.ts";
 import { onTarget } from "#test-support/TestTier.ts";
 import { ATTEMPT_SETTLED, ATTEMPT_STATE, attemptPage } from "./EgressChannels.ts";
-import {
-    EXECUTABLE_OF_TARGET,
-    driverWithEgress,
-    type EgressSourceForTest,
-} from "./HostBrowserDrivers.ts";
+import { EXECUTABLE_OF_TARGET, driverWithEgress } from "./HostBrowserDrivers.ts";
 import { startRecordingProxy, type RecordingProxy } from "./StartRecordingProxy.ts";
 
 const BACKGROUND_HOSTS = [
@@ -71,6 +68,7 @@ const egressOnRecordingProxy: EgressSourceForTest = () =>
     Promise.resolve({
         proxy: { server: proxy.server, includeLoopback: true },
         refusedOrigins: () => [],
+        connectionFailures: () => [],
         close: () => Promise.resolve(),
     });
 

@@ -35,6 +35,10 @@ import {
     englishMatrix,
 } from "#test-support/browser/BrowserTarget.ts";
 import { navigate, testId, textEquals } from "#test-support/browser/RawPlan.ts";
+import {
+    NO_BROWSER_WIDE_PROXY,
+    realEgressSource,
+} from "#test-support/browser/SessionEgressForTest.ts";
 import { BROWSERS } from "#test-support/browsers.ts";
 import { FIXED_TIME_MILLISECONDS, SEED, capabilityPlan } from "#test-support/capability-harness.ts";
 import type { FixtureRoute } from "#test-support/fixture-server.ts";
@@ -57,7 +61,6 @@ import {
     EXECUTABLE_OF_TARGET,
     driverWithEgress,
     hostBrowserDrivers,
-    realEgressSource,
 } from "./HostBrowserDrivers.ts";
 import {
     Arrival,
@@ -183,7 +186,7 @@ async function runPage(targetId: BrowserTarget, path: string): Promise<BrowserRu
 const sharedBrowserFrom = (launched: LaunchedChromium, executablePath: string): SharedBrowser => ({
     executablePath,
     locale: LOCALE,
-    proxy: undefined,
+    ...NO_BROWSER_WIDE_PROXY,
     webSocketUrl: launched.webSocketUrl,
     processId: launched.browserProcess.pid ?? -1,
     isAlive: () => launched.browserProcess.exitCode === null,
@@ -246,7 +249,11 @@ async function loadInDefaultContext(
 // frame the browser runs in the page's own process has no target.
 async function outOfProcessFramesDuringRun(path: string): Promise<readonly string[]> {
     const executablePath = BROWSERS.chrome;
-    const browser = await launchSharedBrowser({ executablePath, locale: LOCALE, proxy: undefined });
+    const browser = await launchSharedBrowser({
+        executablePath,
+        locale: LOCALE,
+        ...NO_BROWSER_WIDE_PROXY,
+    });
     const control = await CdpConnection.open(browser.webSocketUrl);
     let frameUrls: readonly string[] = [];
     try {

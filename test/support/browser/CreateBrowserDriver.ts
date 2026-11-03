@@ -3,10 +3,17 @@ import { cdpDriver, type CdpDriverOptions, type OwnBrowserDriver } from "@revisu
 import type { BrowserDriver } from "@revisum/engine";
 import { BROWSERS } from "../browsers.ts";
 import { ADAPTER_OF_TARGET, BrowserTarget } from "./BrowserTarget.ts";
+import { realEgressSource, type EgressSourceForTest } from "./SessionEgressForTest.ts";
 import { driverOnSharedBrowser, isSharingBrowserInThisFile } from "./ShareBrowserInThisFile.ts";
 
-export function createBrowserDriver(options: CdpDriverOptions): OwnBrowserDriver {
-    return isSharingBrowserInThisFile() ? driverOnSharedBrowser(options) : cdpDriver(options);
+export type BrowserDriverOptions = Omit<CdpDriverOptions, "proxy" | "egress"> & {
+    // Absent, each session gets a real proxy of its own, as on a host run.
+    readonly egress?: EgressSourceForTest;
+};
+
+export function createBrowserDriver(options: BrowserDriverOptions): OwnBrowserDriver {
+    const withEgress = { ...options, egress: options.egress ?? realEgressSource };
+    return isSharingBrowserInThisFile() ? driverOnSharedBrowser(withEgress) : cdpDriver(withEgress);
 }
 
 const EXECUTABLE_OF_TARGET: Readonly<Record<BrowserTarget, string>> = {
@@ -14,7 +21,7 @@ const EXECUTABLE_OF_TARGET: Readonly<Record<BrowserTarget, string>> = {
     [BrowserTarget.HeadlessShell]: BROWSERS.chromeHeadlessShell,
 };
 
-type SharedDriverOptions = Omit<CdpDriverOptions, "executablePath">;
+type SharedDriverOptions = Omit<BrowserDriverOptions, "executablePath">;
 
 export const driverForTarget = (
     target: BrowserTarget,
