@@ -123,6 +123,7 @@ export default defineConfig([
             "@typescript-eslint/no-useless-constructor": "error",
 
             "@typescript-eslint/prefer-nullish-coalescing": "error",
+            "@typescript-eslint/no-unnecessary-condition": "error",
             "@typescript-eslint/strict-boolean-expressions": [
                 "error",
                 { allowString: false, allowNumber: false, allowNullableObject: false },
