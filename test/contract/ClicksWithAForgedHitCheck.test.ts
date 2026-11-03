@@ -1,8 +1,10 @@
 // A page cannot talk its way past the click check. What decides a click must be out of the page's
 // reach: a page that writes over whatever the driver left on its window, or holds that place from the
 // start, has still had a click that reached nothing, and the step fails.
-// Every page here keeps the click from its button, so the step has only one honest outcome however
-// the driver comes to know that.
+// Nor can it by rewriting the built-ins the check might call, or by acting a click out with events of
+// its own. The tally counts only clicks the browser made. The forging pages keep those from the button,
+// so the step has only one honest outcome however the driver comes to know that; the pages whose click
+// arrives show that a patched page is still given the verdict its click earned.
 import assert from "node:assert/strict";
 import { after, before, describe, test } from "node:test";
 import { allowEveryAction } from "#test-support/browser/AllowEveryAction.ts";
@@ -35,7 +37,8 @@ const pageWith =
         let clicks = 0;
         const button = document.querySelector('[data-testid="${BUTTON}"]');
         const cover = document.getElementById('cover');
-        button.addEventListener('click', () => {
+        button.addEventListener('click', (event) => {
+          if (!event.isTrusted) return;
           clicks += 1;
           document.querySelector('[data-testid="${TALLY}"]').textContent = String(clicks);
         });
@@ -59,6 +62,65 @@ const replacedAsThePressStarts = (value: string): string =>
 
 const FORGED_WITH_AN_UNKNOWN_STATE = `{ state: 'x', hasClickArrived: true, disarm() {} }`;
 const FORGED_AS_A_HIT = `{ state: 'hit', hasClickArrived: true, disarm() {} }`;
+
+const TAKES_THE_LISTENERS_AND_CALLS_THEM_WITH_A_FAKE_EVENT = `
+  const takenListeners = [];
+  window.addEventListener('pointerdown', () => {
+    for (const { eventType, listener } of takenListeners) {
+      listener({
+        type: eventType,
+        composedPath: () => [button],
+        preventDefault() {},
+        stopImmediatePropagation() {},
+      });
+    }
+  }, true);
+  EventTarget.prototype.addEventListener = function (eventType, listener) {
+    takenListeners.push({ eventType, listener });
+  };`;
+
+const SYNTHETIC_EVENT_OPTIONS = `{ bubbles: true, composed: true }`;
+
+const STOPS_THE_REAL_PRESS_AND_DISPATCHES_ITS_OWN = `
+  for (const eventType of ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click']) {
+    window.addEventListener(eventType, (event) => {
+      if (!event.isTrusted) return;
+      event.stopImmediatePropagation();
+      if (event.type === 'pointerdown') {
+        button.dispatchEvent(new PointerEvent('pointerdown', ${SYNTHETIC_EVENT_OPTIONS}));
+        button.dispatchEvent(new MouseEvent('click', ${SYNTHETIC_EVENT_OPTIONS}));
+      }
+    }, true);
+  }`;
+
+const STOPS_THE_REAL_CLICK_AND_DISPATCHES_ITS_OWN = `
+  window.addEventListener('click', (event) => {
+    if (!event.isTrusted) return;
+    event.stopImmediatePropagation();
+    button.dispatchEvent(new MouseEvent('click', ${SYNTHETIC_EVENT_OPTIONS}));
+  }, true);`;
+
+// Each makes a press on the cover read as a press on the button. Narrowed to that, so that the driver's
+// other reads of the page still work.
+const INCLUDES_ALWAYS_FINDS_THE_BUTTON = `
+  const includes = Array.prototype.includes;
+  Array.prototype.includes = function (searched, ...rest) {
+    return searched === button || includes.call(this, searched, ...rest);
+  };`;
+const CLOSEST_LABEL_OF_THE_COVER_POINTS_AT_THE_BUTTON = `
+  const closest = Element.prototype.closest;
+  Element.prototype.closest = function (selector) {
+    return this === cover && selector === 'label' ? { control: button } : closest.call(this, selector);
+  };`;
+const COMPOSED_PATH_STARTS_AT_THE_BUTTON = `
+  const composedPath = Event.prototype.composedPath;
+  Event.prototype.composedPath = function () {
+    return [button, ...composedPath.call(this)];
+  };`;
+
+// A press seen on an element, with no click after it, passes if the element has gone: such a press took
+// its element away. So this page has its button leave, as well as skewing where the press landed.
+const BUTTON_LEAVES_AS_THE_PRESS_STARTS = `window.addEventListener('pointerdown', () => { button.remove(); }, true);`;
 
 const FORGING_PAGES = [
     {
@@ -84,6 +146,78 @@ const FORGING_PAGES = [
         script: `${COVER_ARRIVES_WITH_THE_POINTER}
           Object.defineProperty(window, '__clickHitCheck', { get: () => (${FORGED_AS_A_HIT}), set() {} });`,
     },
+    {
+        name: "that patches addEventListener to take the check's listeners and call them with a fake event, and a cover takes the press",
+        path: "/fake-event-over-a-cover.html",
+        script:
+            COVER_ARRIVES_WITH_THE_POINTER + TAKES_THE_LISTENERS_AND_CALLS_THEM_WITH_A_FAKE_EVENT,
+    },
+    {
+        name: "that stops the real press and dispatches a synthetic press and click at the button",
+        path: "/synthetic-press-and-click.html",
+        script: STOPS_THE_REAL_PRESS_AND_DISPATCHES_ITS_OWN,
+    },
+    {
+        name: "that stops the real click and dispatches a synthetic click at the button",
+        path: "/synthetic-click.html",
+        script: STOPS_THE_REAL_CLICK_AND_DISPATCHES_ITS_OWN,
+    },
+    {
+        name: "that patches Array includes to always find the button, and a cover takes the press",
+        path: "/includes-over-a-cover.html",
+        script: COVER_ARRIVES_WITH_THE_POINTER + INCLUDES_ALWAYS_FINDS_THE_BUTTON,
+    },
+    {
+        name: "that patches Array includes to always find the button, a cover takes the press and the button leaves",
+        path: "/includes-over-a-cover-and-button-leaves.html",
+        script:
+            COVER_ARRIVES_WITH_THE_POINTER +
+            INCLUDES_ALWAYS_FINDS_THE_BUTTON +
+            BUTTON_LEAVES_AS_THE_PRESS_STARTS,
+    },
+    {
+        name: "that patches Element closest to give the cover a label for the button, and a cover takes the press",
+        path: "/closest-over-a-cover.html",
+        script: COVER_ARRIVES_WITH_THE_POINTER + CLOSEST_LABEL_OF_THE_COVER_POINTS_AT_THE_BUTTON,
+    },
+    {
+        name: "that patches Element closest to give the cover a label for the button, a cover takes the press and the button leaves",
+        path: "/closest-over-a-cover-and-button-leaves.html",
+        script:
+            COVER_ARRIVES_WITH_THE_POINTER +
+            CLOSEST_LABEL_OF_THE_COVER_POINTS_AT_THE_BUTTON +
+            BUTTON_LEAVES_AS_THE_PRESS_STARTS,
+    },
+    {
+        name: "that patches Event composedPath to start at the button, and a cover takes the press",
+        path: "/composed-path-over-a-cover.html",
+        script: COVER_ARRIVES_WITH_THE_POINTER + COMPOSED_PATH_STARTS_AT_THE_BUTTON,
+    },
+    {
+        name: "that patches Event composedPath to start at the button, a cover takes the press and the button leaves",
+        path: "/composed-path-over-a-cover-and-button-leaves.html",
+        script:
+            COVER_ARRIVES_WITH_THE_POINTER +
+            COMPOSED_PATH_STARTS_AT_THE_BUTTON +
+            BUTTON_LEAVES_AS_THE_PRESS_STARTS,
+    },
+];
+
+const PAGES_WHOSE_CLICK_ARRIVES = [
+    {
+        name: "that patches addEventListener harmlessly",
+        path: "/add-listener-passed-through.html",
+        script: `
+          const add = EventTarget.prototype.addEventListener;
+          EventTarget.prototype.addEventListener = function (...callArguments) {
+            return add.apply(this, callArguments);
+          };`,
+    },
+    {
+        name: "that patches addEventListener to add nothing from then on",
+        path: "/add-listener-does-nothing.html",
+        script: `EventTarget.prototype.addEventListener = function () {};`,
+    },
 ];
 
 const CLOBBERING_PAGES = [
@@ -94,6 +228,7 @@ const CLOBBERING_PAGES = [
 
 const ROUTES = new Map<string, FixtureRoute>([
     ...FORGING_PAGES.map(({ path, script }) => [path, pageWith(script)] as const),
+    ...PAGES_WHOSE_CLICK_ARRIVES.map(({ path, script }) => [path, pageWith(script)] as const),
     ...CLOBBERING_PAGES.map(
         ({ path, value }) =>
             [
@@ -139,6 +274,16 @@ describe("Using the real browser driver", () => {
                         failureCode: "not-actionable",
                         tally: "0",
                     });
+                });
+            });
+        });
+    }
+
+    for (const { name, path } of PAGES_WHOSE_CLICK_ARRIVES) {
+        describe(`given a page ${name}`, () => {
+            describe("when a plan clicks the button", () => {
+                test("then it should pass the step, with one click", async () => {
+                    assert.deepEqual(await clickOn(path), { failureCode: null, tally: "1" });
                 });
             });
         });

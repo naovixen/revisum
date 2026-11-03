@@ -1,8 +1,8 @@
 // A click passes only when its press is known to have reached the page. A window listener the page
 // added at load runs before anything the driver adds later, so it can stop a press before the
 // driver sees it; the driver then has nothing to say the click landed, and a click that did nothing
-// must not pass. A page that has moved on, or an element that has gone, says the press arrived, even
-// when the read of what it did fails.
+// must not pass. A page that has moved on, or an element that has gone, says the press arrived. A
+// page that breaks its own listener functions changes none of this: the click gets the verdict it earned.
 import assert from "node:assert/strict";
 import { after, before, describe, test } from "node:test";
 import { allowEveryAction } from "#test-support/browser/AllowEveryAction.ts";
@@ -55,9 +55,8 @@ const ONLY_WATCHES_POINTER_EVENTS = `
     window.addEventListener(eventType, () => undefined, true);
   }`;
 
-// Once the press has ended, no listener can be taken off this page, which is what the read of a
-// click's hit check needs to do, so that read fails.
-const READS_FAIL_AFTER_THE_PRESS = `
+// Once the press has started, the page's own function for taking a listener off throws.
+const BREAKS_REMOVING_LISTENERS_AS_THE_PRESS_STARTS = `
   const remove = EventTarget.prototype.removeEventListener;
   let isPressed = false;
   window.addEventListener('pointerdown', () => { isPressed = true; }, true);
@@ -69,14 +68,28 @@ const READS_FAIL_AFTER_THE_PRESS = `
 const AND_THE_BUTTON_LEAVES = `
   button.addEventListener('click', () => { button.remove(); });`;
 
+const AND_A_COVER_TAKES_THE_PRESS = `
+  const cover = document.createElement('div');
+  cover.style.cssText = 'display:none;position:fixed;inset:0';
+  document.body.append(cover);
+  window.addEventListener('mousemove', () => { cover.style.display = 'block'; }, { once: true });`;
+
 const ROUTES = new Map<string, FixtureRoute>([
     ["/swallows.html", pageWith(SWALLOWS_EVERY_POINTER_EVENT)],
     ["/watches.html", pageWith(ONLY_WATCHES_POINTER_EVENTS)],
     ["/plain.html", pageWith("")],
-    ["/read-fails.html", pageWith(READS_FAIL_AFTER_THE_PRESS)],
+    ["/broken-remove.html", pageWith(BREAKS_REMOVING_LISTENERS_AS_THE_PRESS_STARTS)],
     [
-        "/read-fails-and-button-leaves.html",
-        pageWith(READS_FAIL_AFTER_THE_PRESS + AND_THE_BUTTON_LEAVES),
+        "/broken-remove-and-button-leaves.html",
+        pageWith(BREAKS_REMOVING_LISTENERS_AS_THE_PRESS_STARTS + AND_THE_BUTTON_LEAVES),
+    ],
+    [
+        "/broken-remove-and-press-stopped.html",
+        pageWith(BREAKS_REMOVING_LISTENERS_AS_THE_PRESS_STARTS + SWALLOWS_EVERY_POINTER_EVENT),
+    ],
+    [
+        "/broken-remove-and-cover.html",
+        pageWith(BREAKS_REMOVING_LISTENERS_AS_THE_PRESS_STARTS + AND_A_COVER_TAKES_THE_PRESS),
     ],
     ["/moved.html", pageWith("")],
 ]);
@@ -157,21 +170,47 @@ describe("Using the real browser driver", () => {
         });
     });
 
-    describe("given a page where the read of what the press hit fails", () => {
-        describe("and the button is still on the page", () => {
+    describe("given a page that breaks removeEventListener as the press starts", () => {
+        describe("and the click reaches the button", () => {
             describe("when a plan clicks it", () => {
-                test("then it should fail the step as not-actionable", async () => {
-                    const outcome = await clickOn("/read-fails.html");
-                    assert.equal(outcome.failureCode, "not-actionable");
+                test("then it should pass the step, with one click", async () => {
+                    assert.deepEqual(await clickOn("/broken-remove.html"), {
+                        failureCode: null,
+                        tally: "1",
+                    });
                 });
             });
         });
 
-        describe("and the press has taken the button off the page", () => {
+        describe("and the click takes the button off the page", () => {
             describe("when a plan clicks it", () => {
-                test("then it should pass the step", async () => {
-                    const outcome = await clickOn("/read-fails-and-button-leaves.html");
-                    assert.equal(outcome.failureCode, null);
+                test("then it should pass the step, with one click", async () => {
+                    assert.deepEqual(await clickOn("/broken-remove-and-button-leaves.html"), {
+                        failureCode: null,
+                        tally: "1",
+                    });
+                });
+            });
+        });
+
+        describe("and its earlier window listeners stop every pointer event", () => {
+            describe("when a plan clicks the button", () => {
+                test("then it should fail the step as not-actionable, with no click", async () => {
+                    assert.deepEqual(await clickOn("/broken-remove-and-press-stopped.html"), {
+                        failureCode: "not-actionable",
+                        tally: "0",
+                    });
+                });
+            });
+        });
+
+        describe("and a cover takes the press", () => {
+            describe("when a plan clicks the button", () => {
+                test("then it should fail the step as not-actionable, with no click", async () => {
+                    assert.deepEqual(await clickOn("/broken-remove-and-cover.html"), {
+                        failureCode: "not-actionable",
+                        tally: "0",
+                    });
                 });
             });
         });
