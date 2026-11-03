@@ -25,6 +25,7 @@ import {
     type JsonRecord,
 } from "#test-support/browser/RawPlan.ts";
 import { shareBrowserInThisFile } from "#test-support/browser/ShareBrowserInThisFile.ts";
+import { filesHolding } from "#test-support/stored-files.ts";
 import { download } from "./page-states-support.ts";
 import { TARGET, htmlPage, routedPagesHarness } from "./RoutedPagesHarness.ts";
 
@@ -38,6 +39,7 @@ const ATTACHMENT_PATH = "/attachment";
 const SLOW_PAGE_PATH = "/slow-page";
 const STATUS = testId("status");
 const SEARCH_FIELD = "Search";
+const REPORT_MARKER = "opening-outside-an-action-report-marker";
 
 const ATTACHMENT_REQUESTS = [
     {
@@ -147,7 +149,7 @@ before(async () => {
                         "content-type": "text/csv",
                         "content-disposition": 'attachment; filename="report.csv"',
                     },
-                    body: "name\nReport\n",
+                    body: `name\n${REPORT_MARKER}\n`,
                 }),
             ],
         ]),
@@ -180,6 +182,31 @@ const assertOutcomes = async (
     const { result } = await harness.runSteps(TARGET, steps, options);
     assert.deepEqual(outcomes(result), expected, JSON.stringify(result.steps));
     assert.equal(result.state, "Failed");
+};
+
+// The browser reports a download some time after the page's script starts it, which may be after
+// the page has loaded, so which step it lands on is the browser's timing and not a promise. What
+// must hold is that the run fails for it. The run's own folder goes when the session closes, so the
+// disk is searched just before that as well as after it.
+const assertRunFailsForTheOpeningAndKeepsNoFile = async (
+    steps: readonly JsonRecord[],
+): Promise<void> => {
+    const startedAt = Date.now();
+    let filesAtClose: readonly string[] | undefined;
+    const { result } = await harness.runSteps(TARGET, steps, {
+        read: [],
+        beforePageRead: () => {
+            filesAtClose = filesHolding(REPORT_MARKER, startedAt);
+            return Promise.resolve();
+        },
+    });
+    const failedCodes = result.steps
+        .filter((step) => step.outcome === "failed")
+        .map((step) => step.code);
+    assert.deepEqual(failedCodes, ["unsupported-step"], JSON.stringify(result.steps));
+    assert.equal(result.state, "Failed");
+    assert.deepEqual(filesAtClose, [], "no file was kept while the session was open");
+    assert.deepEqual(filesHolding(REPORT_MARKER, startedAt), [], "no file was left after the run");
 };
 
 describe("Using a run in a real browser", () => {
@@ -272,15 +299,26 @@ describe("Using a run in a real browser", () => {
     });
 
     describe("given a page that starts a download as it loads", () => {
-        describe("when a navigate step loads it", () => {
-            test("then it should fail the navigate with unsupported-step", async () => {
-                await assertOutcomes(
-                    [navigate("/download-as-it-loads.html"), STATUS_SHOWN],
-                    [
-                        [0, "failed", "unsupported-step"],
-                        [1, "skipped", undefined],
-                    ],
-                );
+        describe("and a check follows the navigate step that loads it", () => {
+            describe("when the run ends", () => {
+                test("then it should fail with unsupported-step and keep no file", async () => {
+                    await assertRunFailsForTheOpeningAndKeepsNoFile([
+                        navigate("/download-as-it-loads.html"),
+                        STATUS_SHOWN,
+                    ]);
+                });
+            });
+        });
+
+        describe("and the navigate step that loads it is the plan's last step", () => {
+            describe("when the run ends", () => {
+                test("then it should fail with unsupported-step and keep no file", async () => {
+                    await assertRunFailsForTheOpeningAndKeepsNoFile([
+                        navigate("/plain.html"),
+                        STATUS_SHOWN,
+                        navigate("/download-as-it-loads.html"),
+                    ]);
+                });
             });
         });
     });
