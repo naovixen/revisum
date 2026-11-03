@@ -1,13 +1,14 @@
-// A click starts a navigation to a server that takes its time to answer, or never does. The click
-// must give up at the step's timeout, rather than hold the run for as long as the server holds its
-// answer. A form's button and an Enter press may give up themselves, or pass and leave the next
-// check a page it cannot read, depending on the browser's state. Either way the run must fail with
-// one of those codes and must not pass on a page that is not there yet.
+// A click or a key press starts a navigation to a server that takes its time to answer, or never
+// does. The step that started it must give up at its timeout, rather than hold the run for as long
+// as the server holds its answer or pass and leave the next check a page it cannot read: it is the
+// step whose effect has not arrived. This holds for every way of starting one, on a browser's first
+// page as on a later one.
 import assert from "node:assert/strict";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { after, before, describe, test } from "node:test";
-import { type BrowserHarness } from "#test-support/browser/BrowserHarness.ts";
+import { outcomes, type BrowserHarness } from "#test-support/browser/BrowserHarness.ts";
+import { driversOnFreshBrowsers } from "#test-support/browser/CreateBrowserDriver.ts";
 import {
     click,
     label,
@@ -53,7 +54,14 @@ const FORM_SUBMISSIONS: readonly { readonly name: string; readonly step: JsonRec
 ];
 
 const CLICK_STEP = 1;
-const CODES_FOR_A_PAGE_HELD_BACK = ["timeout", "page-unreadable"];
+
+const BROWSERS_OF_A_RUN = [
+    { name: "a shared browser", runOptions: () => ({}) },
+    {
+        name: "a browser launched for the run",
+        runOptions: () => ({ drivers: driversOnFreshBrowsers([TARGET]) }),
+    },
+];
 
 let harness: BrowserHarness;
 let heldServer: Server;
@@ -116,22 +124,39 @@ describe("Using a run in a real browser", () => {
     }
 
     for (const { name, step } of FORM_SUBMISSIONS) {
-        describe(`given ${name} that sends a form to a page the server holds back`, () => {
-            describe("when a check follows it", () => {
-                test("then it should fail the run with timeout or page-unreadable", async () => {
-                    const { result } = await harness.runSteps(TARGET, [
-                        navigate("/start.html"),
-                        step,
-                        NEVER_SHOWN_CHECK,
-                    ]);
-                    assert.equal(result.state, "Failed", JSON.stringify(result.steps));
-                    const failed = result.steps.find((run) => run.outcome === "failed");
-                    assert.ok(
-                        CODES_FOR_A_PAGE_HELD_BACK.includes(failed?.code ?? ""),
-                        JSON.stringify(result.steps),
-                    );
+        for (const { name: browser, runOptions } of BROWSERS_OF_A_RUN) {
+            describe(`given ${name} that sends a form to a page the server holds back`, () => {
+                describe(`and the run on ${browser}`, () => {
+                    describe("when a check follows it", () => {
+                        test("then it should fail that step with timeout at about the step's timeout, and skip the check", async () => {
+                            const { result } = await harness.runSteps(
+                                TARGET,
+                                [navigate("/start.html"), step, NEVER_SHOWN_CHECK],
+                                runOptions(),
+                            );
+                            assert.deepEqual(
+                                outcomes(result),
+                                [
+                                    [0, "passed", undefined],
+                                    [CLICK_STEP, "failed", "timeout"],
+                                    [2, "skipped", undefined],
+                                ],
+                                JSON.stringify(result.steps),
+                            );
+                            assert.equal(result.state, "Failed");
+                            const took = result.timings.stepMilliseconds[CLICK_STEP] ?? Infinity;
+                            assert.ok(
+                                took >= STEP_TIMEOUT_MILLISECONDS / 2,
+                                `gave up after ${took} ms`,
+                            );
+                            assert.ok(
+                                took < LONGEST_CLICK_MILLISECONDS,
+                                `gave up after ${took} ms`,
+                            );
+                        });
+                    });
                 });
             });
-        });
+        }
     }
 });

@@ -29,6 +29,18 @@ export const driverForTarget = (
 ): OwnBrowserDriver =>
     createBrowserDriver({ executablePath: EXECUTABLE_OF_TARGET[target], ...options });
 
+// A browser launched per session, as production does, even in a file that shares one: a browser's
+// first page behaves differently from a later one.
+export const driversOnFreshBrowsers = (
+    targets: readonly BrowserTarget[],
+): ReadonlyMap<string, BrowserDriver> =>
+    new Map<string, BrowserDriver>(
+        targets.map((target) => [
+            ADAPTER_OF_TARGET[target],
+            cdpDriver({ executablePath: EXECUTABLE_OF_TARGET[target], egress: realEgressSource }),
+        ]),
+    );
+
 // One new driver per target, by the adapter the project's matrix names for it.
 export const driversForTargets = (
     targets: readonly BrowserTarget[],
