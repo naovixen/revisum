@@ -1,7 +1,8 @@
 // The runtime guard must judge what a click really does, in a real browser. A session given no guard
 // must not click at all. A wrapper or an icon must not lend its harmless name to the destructive
-// button it sits in or around. And a retry that finds a new element under the same test id must
-// ask the guard about that element, not rely on what the first attempt was told.
+// button it sits in or around. A wait that finds a new element under the same test id must ask the
+// guard about that element, not rely on what it first found. And a click that misses is not sent
+// again, so whatever the page then puts under that test id is neither judged nor pressed.
 import assert from "node:assert/strict";
 import { after, before, describe, test } from "node:test";
 import { BrowserTarget } from "#test-support/browser/BrowserTarget.ts";
@@ -48,8 +49,8 @@ const NAMED_ICON = `<span data-testid="icon" role="img" aria-label="Information"
 
 // The pointer's arrival covers the page, so the first press lands on the cover. Taking the cover
 // away is the page's re-render, which leaves `afterCover` under the test id "primary". Only that
-// second button changes the state, so a change shows the retry pressed it. The page's listeners run
-// before anything added later, so nothing can hold them up.
+// second button changes the state, so a change would show a second press reached it. The page's
+// listeners run before anything added later, so nothing can hold them up.
 const coveredOnArrival = (first: string, afterCover: string): string => `
   <div id="slot"><button type="button" data-testid="primary">${first}</button></div>
   <div id="cover" style="display:none;position:fixed;inset:0"></div>
@@ -70,6 +71,25 @@ const coveredOnArrival = (first: string, afterCover: string): string => `
     }, true);
   </script>`;
 
+// The page is covered from the start, and well into the click's wait it puts `afterCover` under the
+// test id "primary" and takes the cover away. Only then can a press reach anything.
+const replacedWhileCovered = (first: string, afterCover: string): string => `
+  <div id="slot"><button type="button" data-testid="primary">${first}</button></div>
+  <div id="cover" style="position:fixed;inset:0"></div>
+  <script>
+    setTimeout(() => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.dataset.testid = 'primary';
+      button.textContent = '${afterCover}';
+      button.addEventListener('click', () => {
+        document.querySelector('[data-testid="${STATE}"]').textContent = '${CLICKED}';
+      });
+      document.getElementById('slot').replaceChildren(button);
+      document.getElementById('cover').remove();
+    }, 800);
+  </script>`;
+
 const ROUTES = new Map<string, FixtureRoute>([
     ["/plain.html", pageWith(buttonNamed("Save"))],
     ["/wrapped-delete.html", pageWith(wrapperAround("Delete"))],
@@ -85,6 +105,8 @@ const ROUTES = new Map<string, FixtureRoute>([
     ],
     ["/save-becomes-delete.html", pageWith(coveredOnArrival("Save", "Delete account"))],
     ["/save-stays-save.html", pageWith(coveredOnArrival("Save", "Save"))],
+    ["/replaced-by-delete.html", pageWith(replacedWhileCovered("Save", "Delete account"))],
+    ["/replaced-by-save.html", pageWith(replacedWhileCovered("Save", "Save"))],
 ]);
 
 let harness: CapabilityHarness;
@@ -116,6 +138,28 @@ const clickThrough = async (page: string, locator: JsonRecord) => {
         { read: [STATE] },
     );
     return { state: ran.result.state, shown: ran.atClose?.shown[STATE] };
+};
+
+// The same, when the click is meant to fail on a step of its own, with no denial to its name.
+const clickThatFails = async (page: string, locator: JsonRecord) => {
+    const ran = await harness.runSteps(
+        TARGET,
+        [navigate(page), click(locator), textEquals(testId(STATE), UNTOUCHED, "page.state-read")],
+        { read: [STATE] },
+    );
+    return {
+        state: ran.result.state,
+        failedWith: ran.result.steps[1]?.code,
+        denial: ran.result.denial,
+        shown: ran.atClose?.shown[STATE],
+    };
+};
+
+const MISSED_UNTOUCHED = {
+    state: "Failed",
+    failedWith: "not-actionable",
+    denial: undefined,
+    shown: UNTOUCHED,
 };
 
 const DENIED_UNTOUCHED = {
@@ -240,10 +284,10 @@ describe("Using the real browser driver", () => {
     describe("given a Save button whose first click misses", () => {
         describe("and the page then puts Delete account under the same test id", () => {
             describe("when a plan clicks that test id", () => {
-                test("then it should be denied and Delete account should not be pressed", async () => {
+                test("then it should fail as not-actionable and Delete account should not be pressed", async () => {
                     assert.deepEqual(
-                        await clickOn("/save-becomes-delete.html", testId("primary")),
-                        DENIED_UNTOUCHED,
+                        await clickThatFails("/save-becomes-delete.html", testId("primary")),
+                        MISSED_UNTOUCHED,
                     );
                 });
             });
@@ -251,9 +295,33 @@ describe("Using the real browser driver", () => {
 
         describe("and the page then puts Save back under the same test id", () => {
             describe("when a plan clicks that test id", () => {
-                test("then it should retry and press Save", async () => {
+                test("then it should fail as not-actionable and Save should not be pressed", async () => {
                     assert.deepEqual(
-                        await clickThrough("/save-stays-save.html", testId("primary")),
+                        await clickThatFails("/save-stays-save.html", testId("primary")),
+                        MISSED_UNTOUCHED,
+                    );
+                });
+            });
+        });
+    });
+
+    describe("given a Save button covered while the click waits", () => {
+        describe("and the page puts Delete account under the same test id before the cover goes", () => {
+            describe("when a plan clicks that test id", () => {
+                test("then it should be denied and Delete account should not be pressed", async () => {
+                    assert.deepEqual(
+                        await clickOn("/replaced-by-delete.html", testId("primary")),
+                        DENIED_UNTOUCHED,
+                    );
+                });
+            });
+        });
+
+        describe("and the page puts another Save under the same test id before the cover goes", () => {
+            describe("when a plan clicks that test id", () => {
+                test("then it should press the new Save", async () => {
+                    assert.deepEqual(
+                        await clickThrough("/replaced-by-save.html", testId("primary")),
                         WENT_THROUGH,
                     );
                 });
