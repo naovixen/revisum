@@ -11,7 +11,7 @@ import {
   UnreadablePage,
 } from '@revisum/contracts';
 import {
-  actionability, armHitCheck, documentUrl, fontsReady, guardDetails, inThisDocument, linkAndCurrent, linkTargetList, maskElements, maskGivenElements, pageInfo, probeElement, readDomValue, readHitCheck, selectOption,
+  actionability, armHitCheck, documentUrl, fieldValues, fontsReady, guardDetails, inThisDocument, linkAndCurrent, linkTargetList, maskElements, maskGivenElements, pageInfo, probeElement, readDomValue, readHitCheck, selectOption,
   structuralSelectorValidity, unmaskElements, whatAClickActivates,
 } from './in-page.ts';
 import { findByLabel, findByTestId, findByText, findStructural, inDocumentOrder } from './FindByLabel.ts';
@@ -56,6 +56,20 @@ function rethrowIfHeldByDialog(error: unknown): void {
 }
 
 const notAnswering = (timeoutMilliseconds: number): DriverError => ({ code: 'timeout', detail: `the page did not answer within ${timeoutMilliseconds} ms` });
+
+// What a page is asked for at most this long, or the failure to answer. Throws, as a read of the page
+// that fails does: the run's step says the page could not be read.
+async function answeredWithin<Value>(milliseconds: number, work: Promise<Value>): Promise<Value> {
+  const answered = await forAtMost(milliseconds, work);
+  if (answered === TIMED_OUT) {
+    throw new Error(notAnswering(milliseconds).detail);
+  }
+  return answered;
+}
+
+// However late an element was found, its input gets this long, or the input could never be seen to
+// land. So a step ends within about its timeout and this, never twice its timeout.
+const SHORTEST_INPUT_MILLISECONDS = 1_000;
 
 // A field a secret was typed into: the locator that found it, and whether that very element has gone.
 export type SecretTypedField = { readonly locator: ResolvedLocator; readonly isGone: () => Promise<boolean> };
@@ -372,6 +386,27 @@ async function hasTypedFieldGone(typedFields: readonly SecretTypedField[], locat
   }
 }
 
+// Decodes what fieldValues (in-page.ts) reports. A page's own scripts may have changed what the
+// browser hands back, so a list of another shape throws, and that shows nothing either way.
+function decodeFieldValues(text: string): readonly string[] {
+  const parsed: unknown = JSON.parse(text);
+  if (!Array.isArray(parsed)) {
+    throw new TypeError('the page did not report its fields as a list');
+  }
+  return parsed.filter((value): value is string => typeof value === 'string');
+}
+
+// True when some field in the documents holds a secret: a page may render a field afresh under another
+// label, still holding what was typed, and no locator finds that one.
+async function hasFieldHoldingASecret<Handle>(documents: readonly PageOperations<Handle>[], holdsSecret: (text: string) => boolean): Promise<boolean> {
+  for (const document of documents) {
+    if (decodeFieldValues(await document.callForString(fieldValues, [])).some(holdsSecret)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 // The text a fill of literal text or of lines types; a secret reference is revealed elsewhere.
 const textToFill = (value: Extract<ResolvedActionStep, { type: 'fill' }>['value']): string =>
   (typeof value === 'string' ? value : 'lines' in value ? value.lines.join('\n') : '');
@@ -424,10 +459,11 @@ function documentPorts<Handle>(
     return probed === TIMED_OUT ? READ_FAILED : probed;
   };
 
-  // Input gets the step's timeout from the moment it is sent. The wait for the element is not counted:
-  // a click on an element found late is as entitled to its navigation as any other.
-  const inputWithinTimeout = async <Value>(input: Promise<Value>): Promise<Result<Value, DriverError>> => {
-    const ended = await forAtMost(timeout, input);
+  // A step has one timeout, whatever it spent the time on, so input gets what the wait for the element
+  // left of it.
+  const inputWithinTimeout = async <Value>(input: Promise<Value>, stepDeadline: number): Promise<Result<Value, DriverError>> => {
+    const left = Math.max(stepDeadline - Date.now(), Math.min(SHORTEST_INPUT_MILLISECONDS, timeout));
+    const ended = await forAtMost(left, input);
     return ended === TIMED_OUT ? failure({ code: 'timeout', detail: `the input was still being handled after ${timeout} ms` }) : success(ended);
   };
 
@@ -453,7 +489,7 @@ function documentPorts<Handle>(
   // fails the step at once: sending it again could press whatever the page has put there since. A
   // press the check never saw was stopped before it reached the page, by a listener of the page's
   // that came first, so the click did nothing.
-  const click = async (locator: ResolvedLocator, guard: ActionGuard, beforePress: BeforePress<Handle>): Promise<Result<void, DriverError>> => {
+  const click = async (locator: ResolvedLocator, guard: ActionGuard, beforePress: BeforePress<Handle>, stepDeadline: number): Promise<Result<void, DriverError>> => {
     const waited = await waitUntilActionable(operations, locator, timeout, timeout, crashed);
     if (!waited.ok) return waited;
     const { element, at } = waited.value;
@@ -467,7 +503,7 @@ function documentPorts<Handle>(
       await operations.click(element, at);
       return readHitAfterClick(element);
     };
-    const hit = await inputWithinTimeout(clickAndReadHit());
+    const hit = await inputWithinTimeout(clickAndReadHit(), stepDeadline);
     if (!hit.ok) {
       return hit;
     }
@@ -481,8 +517,8 @@ function documentPorts<Handle>(
   };
 
   // The action itself, once the step is known to be performable.
-  const perform = async (action: ResolvedActionStep, guard: ActionGuard, typedSecret: Secret | null, beforePress: BeforePress<Handle>): Promise<Result<void, DriverError>> => {
-    if (action.type === 'click') return click(action.locator, guard, beforePress);
+  const perform = async (action: ResolvedActionStep, guard: ActionGuard, typedSecret: Secret | null, beforePress: BeforePress<Handle>, stepDeadline: number): Promise<Result<void, DriverError>> => {
+    if (action.type === 'click') return click(action.locator, guard, beforePress, stepDeadline);
     if (action.type === 'upload') {
       const path = details.fixturePath(action.fixture);
       if (!path.ok) return path;
@@ -511,7 +547,7 @@ function documentPorts<Handle>(
         break;
       case 'press': {
         // Enter on a form or a link starts a navigation as a click does.
-        const pressed = await inputWithinTimeout(operations.press(element, action.key, heldModifierKeys(action.modifiers ?? [], process.platform)));
+        const pressed = await inputWithinTimeout(operations.press(element, action.key, heldModifierKeys(action.modifiers ?? [], process.platform)), stepDeadline);
         if (!pressed.ok) {
           return pressed;
         }
@@ -586,6 +622,7 @@ function documentPorts<Handle>(
     const typedSecret = typeof typed === 'string' || 'lines' in typed ? null : secret?.name === typed.secretName ? secret : undefined;
     if (typedSecret === undefined) return failure({ code: 'not-actionable', detail: 'a secret reference reached the driver without its secret' });
     const openingsBefore = events.unsupportedOpenings();
+    const stepDeadline = Date.now() + timeout;
     let acted: Result<void, DriverError>;
     try {
       const rejected = await forAtMost(timeout, rejectsSelector(operations, action.locator));
@@ -595,9 +632,9 @@ function documentPorts<Handle>(
       if (rejected) {
         return failure(SELECTOR_INVALID);
       }
-      acted = await perform(action, guard, typedSecret, beforePress);
+      acted = await perform(action, guard, typedSecret, beforePress, stepDeadline);
       if (acted.ok) {
-        const settled = await inputWithinTimeout(inputSettled());
+        const settled = await inputWithinTimeout(inputSettled(), stepDeadline);
         if (!settled.ok) {
           acted = settled;
         }
@@ -698,6 +735,33 @@ function documentPorts<Handle>(
     }
   };
 
+  const screenshotWithFieldsHidden = async (
+    mask: readonly string[], fields: readonly ResolvedLocator[], holdsSecret: (text: string) => boolean,
+  ): Promise<Result<Uint8Array, DriverError>> => {
+    // True when a field no locator finds has gone, and what was typed into it with it.
+    const canBeLeftUnmasked = async (field: ResolvedLocator): Promise<boolean> =>
+      await hasTypedFieldGone(details.secretTypedFields, field) && !await hasFieldHoldingASecret(masked, holdsSecret);
+    const toPaint: { readonly framed: PageOperations<Handle>; readonly elements: readonly Handle[] }[] = [];
+    for (const field of fields) {
+      let isFound = false;
+      let isEveryDocumentRead = true;
+      for (const framed of masked) {
+        const elements = await findElements(framed, field).catch(() => null);
+        isEveryDocumentRead &&= elements !== null;
+        isFound ||= elements !== null && elements.length > 0;
+        toPaint.push({ framed, elements: elements ?? [] });
+      }
+      if (!isFound && !(isEveryDocumentRead && await canBeLeftUnmasked(field))) {
+        return failure({ code: 'not-found', detail: 'a field a secret was typed into cannot be found to hide it' });
+      }
+    }
+    return success(await maskedScreenshot(mask, async () => {
+      for (const { framed, elements } of toPaint) {
+        await framed.callForString(maskGivenElements, elements.map((element) => ({ element })));
+      }
+    }));
+  };
+
   const ports: DocumentSession = {
     async navigate(url, options) {
       if (crashed()) return failure(CRASHED);
@@ -714,11 +778,7 @@ function documentPorts<Handle>(
       }
     },
     async page(): Promise<PageProbe> {
-      const answered = await forAtMost(timeout, operations.callForString(pageInfo, []));
-      if (answered === TIMED_OUT) {
-        throw new Error(notAnswering(timeout).detail);
-      }
-      const shown = decodePageInfo(answered);
+      const shown = decodePageInfo(await answeredWithin(timeout, operations.callForString(pageInfo, [])));
       // In place of a page it could not show, the browser shows its own error page at an internal
       // URL. The address bar still shows the URL it wanted, which is not a page that loaded.
       if (!shown.url.startsWith(BROWSER_ERROR_PAGE)) return shown;
@@ -728,33 +788,17 @@ function documentPorts<Handle>(
     probe,
     download,
     runScript,
-    screenshot: (mask) => maskedScreenshot(mask, () => Promise.resolve()),
+    screenshot: (mask) => answeredWithin(timeout, maskedScreenshot(mask, () => Promise.resolve())),
     // Each field is found before anything is painted, so no image exists for a field that cannot be.
     // A field its locator no longer finds holds nothing on screen only if the element typed into has
-    // gone: one still on the page may still show what was typed. A read that throws shows neither.
-    async screenshotHidingFields(mask, fields) {
-      const toPaint: { readonly framed: PageOperations<Handle>; readonly elements: readonly Handle[] }[] = [];
-      for (const field of fields) {
-        let isFound = false;
-        let isEveryDocumentRead = true;
-        for (const framed of masked) {
-          const elements = await findElements(framed, field).catch(() => null);
-          isEveryDocumentRead &&= elements !== null;
-          isFound ||= elements !== null && elements.length > 0;
-          toPaint.push({ framed, elements: elements ?? [] });
-        }
-        if (!isFound && !(isEveryDocumentRead && await hasTypedFieldGone(details.secretTypedFields, field))) {
-          return failure({ code: 'not-found', detail: 'a field a secret was typed into cannot be found to hide it' });
-        }
-      }
-      return success(await maskedScreenshot(mask, async () => {
-        for (const { framed, elements } of toPaint) {
-          await framed.callForString(maskGivenElements, elements.map((element) => ({ element })));
-        }
-      }));
+    // gone and no other field holds what was typed: one still on the page may still show it, and a
+    // page may have rendered it afresh under another label. A read that throws shows neither.
+    async screenshotHidingFields(mask, fields, holdsSecret) {
+      const taken = await forAtMost(timeout, screenshotWithFieldsHidden(mask, fields, holdsSecret));
+      return taken === TIMED_OUT ? failure(notAnswering(timeout)) : taken;
     },
     async audit() {
-      return toFindings(parseAudit(await operations.callForString(pageAudit, [])));
+      return toFindings(parseAudit(await answeredWithin(timeout, operations.callForString(pageAudit, []))));
     },
     accessibilitySnapshot: () => operations.accessibilityTree(),
     async linkTargets() {

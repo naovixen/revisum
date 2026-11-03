@@ -7,8 +7,8 @@
 // through its clock and clipboard ports; page scripts through its script port. Database commands
 // go through the run's DatabaseCommandRunner port, which runs each in a workload container.
 import {
-  needsDriverFeatures, UnreadablePage,
-  type A11yFinding, type ActionGuard, type ApprovalLabel, type ArtifactReference, type ArtifactStore, type Authorised,
+  isElementCheckNoDriverDecides, needsDriverFeatures, UnreadablePage,
+  type A11yFinding, type ActionGuard, type AppliedRewrite, type ApprovalLabel, type ArtifactReference, type ArtifactStore, type Authorised,
   type BrowserDriver, type Clock, type DatabaseCommandRunner, type DocumentSession, type DomRead, type DownloadedFile, type DownloadName, type DriverFeature, type LockEntry, type DialogStep, type ElementProbe,
   type EventSink, type GuaranteeLevel, type GuardVerdict, type PageAssertion, type Plan, type PolicyRuleId, type Redactor,
   type DownloadStep, type ResolvedElement, type ResolvedLocator, type Result, type SafeText, type SecretStore, type ServiceCaller, type Session, type Step, type Target, type TargetId,
@@ -113,6 +113,9 @@ export type RunPorts = {
   // workload runner. Without one, a plan with a database command, cleanup included, is refused
   // before any side effect.
   readonly databaseCommands?: DatabaseCommandRunner;
+  // The browser mutants' rewrites the egress proxy applied (EgressProxy.rewritesApplied). Only the
+  // proxy knows, and only once the steps have run, so the run reads it after them.
+  readonly rewritesApplied?: () => readonly AppliedRewrite[];
 };
 
 export type StepOutcome = 'passed' | 'failed' | 'skipped';
@@ -260,6 +263,8 @@ type RunContext = {
   readonly isShortSecret: (observed: string) => boolean;
   // Removes every echo of the plan's secrets, and nothing else, from text as the page wrote it.
   readonly withoutSecrets: (text: string) => string;
+  // True when text holds one of the plan's secrets, in any form.
+  readonly holdsSecret: (text: string) => boolean;
   // The fields, by their resolved locator as canonical JSON, whose last fill typed a secret. What a
   // check reads back from one is the secret, whatever its length, so it is never kept; a remember
   // step may not read one; and a capture masks each.
@@ -320,18 +325,19 @@ export async function run(given: RunInputs, ports: RunPorts): Promise<RunResult>
   const isShortSecret = shortSecretObservation(secrets);
   const withoutSecrets = secretEchoRemoval(secrets);
   const rememberedTexts = new Set<string>();
+  const holdsSecret = (text: string): boolean => isShortSecret(text) || withoutSecrets(text) !== text;
   const remembered = rememberedValues({
-    values, rememberedTexts, hasSecret: (text) => isShortSecret(text) || withoutSecrets(text) !== text,
+    values, rememberedTexts, hasSecret: holdsSecret,
     maximumTextLength: inputs.project.limits.maximumTextLength, logger,
   });
   const calls: CallStepContext | undefined = ports.services === undefined ? undefined : {
-    caller: ports.services, project: inputs.project, values, remembered, secrets: resolvedSecretStore(secrets), clock: ports.clock, logger,
+    caller: ports.services, project: inputs.project, values, remembered, secrets: resolvedSecretStore(secrets), clock: ports.clock, logger, holdsSecret,
   };
   const commands: DatabaseCommandContext | undefined = ports.databaseCommands === undefined ? undefined : {
-    runner: ports.databaseCommands, project: inputs.project, values, remembered, secrets: commandSecretStore(secrets), clock: ports.clock, logger,
+    runner: ports.databaseCommands, project: inputs.project, values, remembered, secrets: commandSecretStore(secrets), clock: ports.clock, logger, holdsSecret,
   };
   const context: RunContext = {
-    inputs, ports, logger, gate, denials: [], redactor, secrets, isShortSecret, withoutSecrets, secretFilledFields: new Map(), values, remembered, calls,
+    inputs, ports, logger, gate, denials: [], redactor, secrets, isShortSecret, withoutSecrets, holdsSecret, secretFilledFields: new Map(), values, remembered, calls,
     commands, rememberedTexts, performs: [], session: null, downloads: new Map(), activeStubs: new Set(), setupFailedInside: new Set(),
     determinismUnpinned: target !== undefined && cannotPinDeterminism(ports.drivers, target),
   };
@@ -385,7 +391,7 @@ export async function run(given: RunInputs, ports: RunPorts): Promise<RunResult>
   const unpinned = [...opened.value.unpinned, ...(runsDatabaseCommands(inputs.plan) ? [DATABASE_COMMANDS_INPUT] : [])];
   // From here on, a step needing an optional feature is refused only when this driver lacks it.
   const stepContext: RunContext = { ...context, performs: driver.info.performs ?? [], session };
-  const manifest = buildManifest({
+  const manifestInputs: Parameters<typeof buildManifest>[0] = {
     plan: inputs.plan, target, adapter: driver.info, browser: session.browser,
     seed: inputs.seed, fixedTimeMilliseconds: inputs.fixedTimeMilliseconds, fixtures: inputs.fixtures, host: inputs.host,
     ...secretRecords(secrets), callsServices: callsServices(inputs.plan),
@@ -394,17 +400,20 @@ export async function run(given: RunInputs, ports: RunPorts): Promise<RunResult>
     ...(executableSha256 === undefined ? {} : { executableSha256 }),
     ...(inputs.pins === undefined ? {} : { pins: { pins: inputs.pins, project: inputs.project } }),
     recordsReplies: inputs.project.replay?.recordReplies === true,
-  });
-  const resolved = lifecycle.resolve(planned, session, manifest, manifestHash(manifest));
+  };
+  const manifestBeforeTheSteps = buildManifest(manifestInputs);
+  const resolved = lifecycle.resolve(planned, session, manifestBeforeTheSteps, manifestHash(manifestBeforeTheSteps));
   const running = lifecycle.start(resolved);
   const steps: StepResult[] = [];
   const stepMilliseconds: number[] = [];
   let stubAnswers: readonly StubAnswer[] = [];
+  let rewrites: readonly AppliedRewrite[];
   let finished: lifecycle.Finished<'Passed' | 'Failed' | 'Errored'> | lifecycle.DeniedRun;
   try {
     if (!isPlanLogged) {
       throw new Error('the log could not be written');
     }
+    // The hash as it stands before the steps: a run whose proxy then rewrites a response ends with another.
     logger.log({ kind: 'run.state', state: resolved.state, targetId: target.id, adapter: driver.info.id, sha256: resolved.manifestHash });
     logger.log({ kind: 'run.state', state: running.state, targetId: target.id });
     const notObserved = await failureToObserveRequests(session, stepContext);
@@ -424,6 +433,8 @@ export async function run(given: RunInputs, ports: RunPorts): Promise<RunResult>
         durationMilliseconds: stepMilliseconds[stepMilliseconds.length - 1] ?? 0, ...(result.code ? { code: result.code } : {}),
       });
     }
+    // In the try: a port that cannot say what it rewrote must not leave a mutated run reading as plain.
+    rewrites = ports.rewritesApplied?.() ?? [];
     // A denied action failed its step, so every later step was skipped and nothing ran after it.
     // A failed call, page script or database command could not set up or reach what the test
     // needs, and a page script that threw, hung or gave no usable result, or a backend check whose
@@ -445,6 +456,7 @@ export async function run(given: RunInputs, ports: RunPorts): Promise<RunResult>
       steps.push({ index: steps.length, type: step.type, outcome: 'skipped' });
     }
     finished = lifecycle.finish(running, 'Errored');
+    rewrites = readKeepingTheResult(() => ports.rewritesApplied?.() ?? [], [], logger);
   } finally {
     // Read before the browser goes, with every answer the stubs gave.
     stubAnswers = readKeepingTheResult(() => session.network?.stubAnswers() ?? [], [], logger);
@@ -467,8 +479,9 @@ export async function run(given: RunInputs, ports: RunPorts): Promise<RunResult>
       ...(endState.state === 'Denied' ? { code: endState.denial.rule, stepIndex: endState.denial.stepIndex } : {}),
     });
   }, undefined, logger);
+  const manifest = rewrites.length === 0 ? finished.manifest : buildManifest({ ...manifestInputs, responseRewrites: rewrites });
   return seal({
-    state: finished.state, targetId: target.id, manifest, manifestHash: finished.manifestHash,
+    state: finished.state, targetId: target.id, manifest, manifestHash: manifestHash(manifest),
     steps, blockedOrigins: blocked, unavailable: null, ...(finished.state === 'Denied' ? { denial: finished.denial } : {}),
     ...(cleanup === undefined ? {} : { cleanup }), ...(reviewItems.length === 0 ? {} : { reviewItems }),
     ...(stubAnswers.length === 0 ? {} : { stubAnswers: [...stubAnswers] }),
@@ -537,6 +550,9 @@ function refusalOfWhatThisRunCannotDo(plan: Plan, context: RunContext): lifecycl
   // environment; until then no run can honour it, so the plan parses and every run of it is refused.
   if (plan.storageState !== undefined) {
     return { code: 'storage-state-unsupported' };
+  }
+  if (everyPlanStep(plan).some(isElementCheckNoDriverDecides)) {
+    return { code: 'element-check-unsupported' };
   }
   // Cleanup counts too: with no way to run it, the steps would leave their test data behind.
   if (runsDatabaseCommands(plan) && context.commands === undefined) {
@@ -803,7 +819,7 @@ const clockAndClipboardContext = (context: RunContext): ClockAndClipboardContext
 // What the page-script steps use: the run's values and the declared scripts' sources.
 const pageScriptContext = (context: RunContext): PageScriptContext => ({
   project: context.inputs.project, scriptSources: context.inputs.scriptSources ?? {}, values: context.values,
-  remembered: context.remembered, clock: context.ports.clock, logger: context.logger,
+  remembered: context.remembered, clock: context.ports.clock, logger: context.logger, holdsSecret: context.holdsSecret,
 });
 
 // What the runtime guard is given for a step that acts on no element.
@@ -976,7 +992,7 @@ async function pixelsWithSecretsHidden(session: DocumentSession, context: RunCon
   if (session.screenshotHidingFields === undefined) {
     return null;
   }
-  const taken = await session.screenshotHidingFields(selectors, fields);
+  const taken = await session.screenshotHidingFields(selectors, fields, context.holdsSecret);
   return taken.ok ? taken.value : null;
 }
 

@@ -62,7 +62,45 @@ const LATIN_FOR_LOOKALIKE: ReadonlyMap<string, string> = new Map(
 );
 const LOOKALIKE = new RegExp(`[${[...LATIN_FOR_LOOKALIKE.keys()].join('')}]`, 'gu');
 
-const withoutInvisibleForms = (text: string): string => text.normalize('NFKC').replace(/\p{Cf}/gu, '');
+// What draws nothing a person could read: format characters, code points every font leaves blank such
+// as a Hangul filler or a variation selector, the Braille blank, which the Unicode tables class as a
+// symbol, and control characters other than white space.
+const DRAWS_NOTHING = /[\p{Cf}\p{Default_Ignorable_Code_Point}\u2800]|[^\P{Cc}\s]/gu;
+
+const withoutInvisibleForms = (text: string): string => text.normalize('NFKC').replace(DRAWS_NOTHING, '');
+
+// A run of letters and digits, marks included, as far as one word of a name goes.
+const WORD = /[\p{L}\p{N}\p{M}]+/gu;
+const HOLDS_A_LETTER = /\p{L}/u;
+// The Latin letters and digits people swap for one another. Only inside a word that holds a letter:
+// "Item 1" and "Step 5" are numbers, and "5end" and "de1ete" are not.
+const LATIN_FOR_SWAPPED: ReadonlyMap<string, string> = new Map([['I', 'l'], ['1', 'l'], ['0', 'o'], ['5', 's']]);
+const SWAPPED = /[I105]/gu;
+const UPPER_CASE_LETTER = /\p{Lu}/u;
+
+// The letter stands in the case of what is beside it, so DE1ETE reads as one word and not as DEl ETE.
+function letterForSwapped(swapped: string, at: number, word: string): string {
+  const letter = LATIN_FOR_SWAPPED.get(swapped) ?? swapped;
+  return UPPER_CASE_LETTER.test(word[at - 1] ?? word[at + 1] ?? '') ? letter.toUpperCase() : letter;
+}
+
+const withSwappedCharactersFolded = (text: string): string =>
+  text.replace(WORD, (word) => (HOLDS_A_LETTER.test(word) ? word.replace(SWAPPED, letterForSwapped) : word));
+
+// Letters of a script written together with Latin in ordinary names, and letters that belong to no
+// one script, such as the kana length mark.
+const WRITTEN_BESIDE_LATIN = /[\p{Script=Latin}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Han}\p{Script=Common}\p{Script=Inherited}]/u;
+const LATIN_LETTER = /\p{Script=Latin}/u;
+
+// True when a word mixes Latin with a letter the patterns cannot read: no table can list every letter
+// that passes for a Latin one, so such a word might say anything.
+function isUnreadableMix(word: string): boolean {
+  const letters = [...word].filter((character) => HOLDS_A_LETTER.test(character));
+  return letters.some((letter) => LATIN_LETTER.test(letter))
+    && letters.some((letter) => !WRITTEN_BESIDE_LATIN.test(letter) && !LATIN_FOR_LOOKALIKE.has(letter));
+}
+
+const holdsUnreadableMix = (text: string): boolean => (withoutInvisibleForms(text).match(WORD) ?? []).some(isUnreadableMix);
 
 // Lookalikes are folded after the words are split: folding gives lower-case letters, which would
 // hide a capital's join.
@@ -70,8 +108,8 @@ const readingWithJoin = (text: string, join: RegExp): string =>
   normalised(withoutInvisibleForms(text).replace(join, ' ').replace(LOOKALIKE, (lookalike) => LATIN_FOR_LOOKALIKE.get(lookalike) ?? lookalike));
 
 // Text as the patterns read it, so a name cannot slip past them by how it is written:
-// compatibility forms folded (NFKC turns full-width letters into ordinary ones), invisible format
-// characters such as a soft hyphen or a zero-width joiner removed, lookalike letters folded and
+// compatibility forms folded (NFKC turns full-width letters into ordinary ones), characters that
+// draw nothing, such as a soft hyphen or a Hangul filler, removed, lookalike letters folded and
 // camelCase words split. Folding may make an unrelated name match ("PayPal" reads "Pay Pal"); that
 // errs on the safe side.
 const comparable = (text: string): string => readingWithJoin(text, CAMEL_CASE_JOIN);
@@ -84,17 +122,28 @@ const REGULAR_EXPRESSION_SYNTAX = /[\\^$.*+?()[\]{}|/]/gu;
 // A pattern as a whole-word, case-insensitive expression: no letter, digit or combining mark may
 // touch it on either side, so "delete" matches "Delete account" but not "Deleted items".
 function wholeWord(pattern: string): RegExp {
-  const escaped = comparable(pattern).replace(REGULAR_EXPRESSION_SYNTAX, '\\$&').replace(/ /gu, '\\s+');
+  const escaped = pattern.replace(REGULAR_EXPRESSION_SYNTAX, '\\$&').replace(/ /gu, '\\s+');
   return new RegExp(`(?<![\\p{L}\\p{N}\\p{M}])${escaped}(?![\\p{L}\\p{N}\\p{M}])`, 'iu');
 }
 
-// True when any pattern appears in `text` as a whole word.
+// The text as written and with swapped characters read as the letters they stand for. Before the
+// words are split: a capital I for an l would otherwise read as the start of a camelCase word.
+const formsOf = (text: string): readonly string[] => {
+  const written = withoutInvisibleForms(text);
+  return [written, withSwappedCharactersFolded(written)];
+};
+
+// True when any pattern appears in `text` as a whole word, or a word of it cannot be read.
 export function matchesIrreversiblePattern(text: string, patterns: readonly string[]): boolean {
-  const readings = [comparable(text), readingWithJoin(text, CAPITALS_JOIN)];
-  return patterns.some((pattern) => {
-    const word = wholeWord(pattern);
-    return readings.some((reading) => word.test(reading));
-  });
+  if (holdsUnreadableMix(text)) {
+    return true;
+  }
+  const readings = formsOf(text).flatMap((form) => [comparable(form), readingWithJoin(form, CAPITALS_JOIN)]);
+  return patterns.some((pattern) =>
+    formsOf(pattern).some((form) => {
+      const word = wholeWord(comparable(form));
+      return readings.some((reading) => word.test(reading));
+    }));
 }
 
 // True when `name` is exactly one of the names the project allows, ignoring case and spacing.

@@ -14,7 +14,7 @@ import {
 import { sha256 } from '../hashing.ts';
 import { normalise } from '../oracle.ts';
 import {
-  BASE64_ALPHABETS, base64Pattern, encodedEchoes, foldCase, mergedRanges, needsPieces, occurrences, percentEscapes,
+  BASE64_ALPHABETS, base64Pattern, encodedEchoes, foldCase, fragmentRuns, mergedRanges, needsPieces, occurrences, percentEscapes,
   prefixRuns, uriWritings, wholeBase64Writings, wholeEncodedCharacters, writtenPattern, type EncodedEcho, type Range,
 } from './EncodedEchoes.ts';
 import { htmlWritings, jsonWritings } from './JsonWritings.ts';
@@ -46,10 +46,11 @@ function replaceRanges(text: string, ranges: readonly Range[]): string {
 
 // The text with every encoded echo of the value replaced. The pieces of a long value are all looked
 // for in the text as it came, and what they cover goes as one: replacing them in turn could use up
-// a piece's rightful place on another piece that repeats it, and leave part of the value behind.
-function withoutEncodedEchoes(text: string, value: string, echoes: readonly EncodedEcho[]): string {
+// a piece's rightful place on another piece that repeats it, and leave part of the value behind. A
+// part from its middle goes with them whole, or its ends could stay as too short to find afterwards.
+function withoutEncodedEchoes(text: string, value: string, echoes: readonly EncodedEcho[], fragmentsIn: (foldedText: string) => readonly Range[]): string {
   if (needsPieces(value)) {
-    return replaceRanges(text, mergedRanges(echoes.flatMap((echo) => echo.rangesIn(text))));
+    return replaceRanges(text, mergedRanges([...echoes.flatMap((echo) => echo.rangesIn(text)), ...fragmentsIn(foldCase(text))]));
   }
   let redacted = text;
   for (const echo of echoes) {
@@ -59,7 +60,8 @@ function withoutEncodedEchoes(text: string, value: string, echoes: readonly Enco
 }
 
 // A function that replaces every echo of one value: its encoded forms, then the value in any case,
-// then any prefix of it at least the minimum secret length long. A search that cannot be built or run
+// then any prefix of it at least the minimum secret length long, and, for a long value, any part of
+// it that long from anywhere within it. A search that cannot be built or run
 // says nothing about what a text holds, so the whole text goes rather than a value that may be in it.
 function valueRedaction(value: string): (text: string) => string {
   let echoes: readonly EncodedEcho[];
@@ -69,9 +71,10 @@ function valueRedaction(value: string): (text: string) => string {
     return () => SECRET_PLACEHOLDER;
   }
   const foldedValue = foldCase(value);
+  const fragmentsIn = needsPieces(value) ? fragmentRuns(foldedValue) : () => [];
   return (text) => {
     try {
-      let redacted = withoutEncodedEchoes(text, value, echoes);
+      let redacted = withoutEncodedEchoes(text, value, echoes, fragmentsIn);
       redacted = replaceRanges(redacted, occurrences(foldCase(redacted), foldedValue));
       return replaceRanges(redacted, prefixRuns(foldCase(redacted), foldedValue));
     } catch {
@@ -144,7 +147,8 @@ function echoFormsOfValueIn(text: string, value: string): readonly LeakForm[] {
     forms.add('case');
   }
   // Its words found while the whole value is not can only be one piece of a long value: a value cut short.
-  if (!wholeInAnyCase && (hasItsWords || prefixRuns(foldedText, foldedValue).length > 0)) forms.add('prefix');
+  const hasPartOfIt = hasItsWords || prefixRuns(foldedText, foldedValue).length > 0 || (needsPieces(value) && fragmentRuns(foldedValue)(foldedText).length > 0);
+  if (!wholeInAnyCase && hasPartOfIt) forms.add('prefix');
   return [...forms];
 }
 
@@ -368,7 +372,8 @@ const prefixEchoes = (text: string, candidate: EchoCandidate): Found[] =>
 
 // The same search for a value too long for one pattern. Its base64 and the value as typed are found
 // as plain text and go back exactly. What is left is found piece by piece, and goes back as the whole
-// value typed, so a replay of it gives another result and is no pass.
+// value typed, or for a part from its middle as a prefix as long, so a replay of it gives another
+// result and is no pass.
 function echoesOfLongValue(text: string, candidate: EchoCandidate): Found[] {
   const named = { secretName: candidate.secretName, ...(candidate.scheme === undefined ? {} : { scheme: candidate.scheme }) };
   for (const { form, alignment, written } of wholeBase64Writings(candidate.value)) {
@@ -388,7 +393,13 @@ function echoesOfLongValue(text: string, candidate: EchoCandidate): Found[] {
       return covered.map((range): Found => ({ ...range, echo: { ...named, form, approximate: true } }));
     }
   }
-  return prefixEchoes(text, candidate);
+  const prefixes = prefixEchoes(text, candidate);
+  if (prefixes.length > 0) {
+    return prefixes;
+  }
+  return fragmentRuns(foldCase(candidate.value))(foldCase(text)).map((range): Found => ({
+    ...range, echo: { ...named, form: 'prefix', characters: [...text.slice(range.start, range.end)].length, approximate: true },
+  }));
 }
 
 // Cuts every echo of the given secrets out of a reply's text, in any form the leak scanner looks

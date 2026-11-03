@@ -109,6 +109,8 @@ const needsLocatorFeatures = (locator: Locator, performs: readonly DriverFeature
 // Element checks no driver's probe decides yet: it reports no checked or focused state, so these
 // checks could never pass on their merits.
 const ELEMENT_CHECKS_NO_DRIVER_DECIDES: readonly ElementAssertion['kind'][] = ['checked', 'unchecked', 'focused'];
+// True for a check that can only ever fail, whichever driver runs it. A run refuses a plan holding one.
+export const isElementCheckNoDriverDecides = (step: Step): boolean => step.type === 'expect' && ELEMENT_CHECKS_NO_DRIVER_DECIDES.includes(step.assert.kind);
 // Element checks of classes, computed styles and attributes, which a driver reads when it declares domChecks.
 const DOM_CHECKS: readonly ElementAssertion['kind'][] = DOM_CHECK_KINDS;
 // Element checks of the accessibility states a driver reports when it declares pageStates.
@@ -134,7 +136,7 @@ export function needsDriverFeatures(step: Step, performs: readonly DriverFeature
     case 'press': return needsLocatorFeatures(step.locator, performs) || (step.modifiers !== undefined && lacks('keyChords'));
     case 'fill': return needsLocatorFeatures(step.locator, performs) || (isMultiLine(step.value) && lacks('multiLineFills'));
     case 'expect':
-      return needsLocatorFeatures(step.locator, performs) || ELEMENT_CHECKS_NO_DRIVER_DECIDES.includes(step.assert.kind)
+      return needsLocatorFeatures(step.locator, performs) || isElementCheckNoDriverDecides(step)
         || (DOM_CHECKS.includes(step.assert.kind) && lacks('domChecks'))
         || (ACCESSIBLE_STATE_CHECKS.includes(step.assert.kind) && lacks('pageStates'))
         || (step.assert.kind === 'hrefEquals' && lacks('linkTargets'));

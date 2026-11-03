@@ -300,6 +300,61 @@ function endOfPrefixRun(foldedText: string, wanted: string, start: number): numb
     return end;
 }
 
+// How many places in a long value a stretch of it is tried at. A value that repeats itself has a
+// stretch in many places, and whichever is tried, what follows a run is searched for again.
+const MOST_PLACES_TRIED = 8;
+
+function longestRunFrom(
+    foldedText: string,
+    start: number,
+    foldedValue: string,
+    places: readonly number[],
+): number {
+    let end = start;
+    for (const place of places) {
+        let length = MINIMUM_SECRET_LENGTH;
+        while (
+            start + length < foldedText.length &&
+            foldedText[start + length] === foldedValue[place + length]
+        ) {
+            length++;
+        }
+        end = Math.max(end, start + length);
+    }
+    return end;
+}
+
+// A function that finds the runs in a text that match a long value anywhere in it for at least the
+// minimum secret length, in folded form: a part from the middle of the value, as a page that shows a
+// long token in part would show it. A part under two pieces long may hold no whole piece, so looking
+// for the pieces can miss it. Only for a value that needs pieces: a stretch of a shorter one is too
+// likely to be an ordinary word.
+export function fragmentRuns(foldedValue: string): (foldedText: string) => Range[] {
+    const places = new Map<string, number[]>();
+    for (let place = 0; place + MINIMUM_SECRET_LENGTH <= foldedValue.length; place++) {
+        const stretch = foldedValue.slice(place, place + MINIMUM_SECRET_LENGTH);
+        const known = places.get(stretch) ?? [];
+        if (known.length < MOST_PLACES_TRIED) {
+            places.set(stretch, [...known, place]);
+        }
+    }
+    return (foldedText) => {
+        const runs: Range[] = [];
+        let start = 0;
+        while (start + MINIMUM_SECRET_LENGTH <= foldedText.length) {
+            const found = places.get(foldedText.slice(start, start + MINIMUM_SECRET_LENGTH));
+            if (found === undefined) {
+                start++;
+            } else {
+                const end = longestRunFrom(foldedText, start, foldedValue, found);
+                runs.push({ start, end });
+                start = end;
+            }
+        }
+        return runs;
+    };
+}
+
 // Runs in `foldedText` that match the start of `foldedValue` for at least the minimum secret
 // length: a value cut short, as a log line or a page that truncates a token would show it.
 export function prefixRuns(foldedText: string, foldedValue: string): Range[] {

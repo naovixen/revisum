@@ -3,7 +3,8 @@
 //   - An advance hands the driver its amount in milliseconds, once, and starts no real timer: it
 //     never becomes a real wait.
 //   - A clipboard check reads the clipboard's plain text and compares it, retrying until it passes
-//     or the step times out, since a page copies asynchronously. The text is page content: it is
+//     or the step times out, since a page copies asynchronously. Text past the project's limit fails
+//     at once, as a remember does: nothing says a later copy will fit. The text is page content: it is
 //     compared, never kept. A failed check says only "empty" or "differs", and an empty clipboard
 //     fails every check, so textExcludes cannot pass on nothing.
 //   - A remember from the clipboard keeps the text as a run value only when it passes the same
@@ -110,7 +111,7 @@ export async function checkClipboard(step: ExpectClipboardStep, context: ClockAn
   if (session?.clipboard === undefined) return UNSUPPORTED;
   const expected = expectedText(step.assert, context.values, context.project);
   if (!expected.ok) return failedWith(expected.error);
-  const read = await readUntil(session, context, (seen) => seen.kind === 'text' && seen.text !== '' && holds(step.assert, seen.text, expected.value));
+  const read = await readUntil(session, context, (seen) => seen.kind === 'too-long' || (seen.kind === 'text' && seen.text !== '' && holds(step.assert, seen.text, expected.value)));
   switch (read.kind) {
     case 'error': return failedWith(read.error.code);
     case 'too-long': return failedWith('value-too-long');

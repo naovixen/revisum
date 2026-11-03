@@ -7,11 +7,13 @@
 //
 // The outcome says whether the result hash matches the recorded one, which top-level manifest
 // fields differ, and a verdict. A replay whose only differences are the machine it ran on (host,
-// browser, its build, run image, fonts or versions) is a per-environment baseline; any other
-// difference is a mismatch. Neither is a pass.
+// browser, its build, run image, fonts or versions) and that ended in the recorded state is a
+// per-environment baseline; any other difference is a mismatch, a changed verdict in either direction
+// among them. Neither is a pass.
 // Pure apart from calling run.
 import { failure, success, type DatabaseCommandRunner, type Result, type ServiceCaller } from '@revisum/contracts';
 import { canonicalJson, sha256 } from '../hashing.ts';
+import type { TerminalState } from '../lifecycle.ts';
 import {
   DATABASE_COMMANDS_INPUT, SERVICE_CALLS_INPUT, manifestHash, planHash, replayManifest, type RunManifest,
 } from '../manifest.ts';
@@ -23,12 +25,14 @@ import {
 } from './run-recording.ts';
 
 // What a replay is given: the recorded manifest and, for a run that recorded replies, its
-// recording (null when none was kept), both as read from disk; the recorded result hash; and the
-// run's inputs apart from the seed, clock start and fixtures, which come from the manifest.
+// recording (null when none was kept), both as read from disk; the recorded result hash and the
+// state the recorded run ended in; and the run's inputs apart from the seed, clock start and
+// fixtures, which come from the manifest.
 export type ReplayRequest = {
   readonly manifest: unknown;
   readonly recording: unknown;
   readonly recordedResultHash: string;
+  readonly recordedState: TerminalState;
   readonly inputs: Omit<RunInputs, 'seed' | 'fixedTimeMilliseconds' | 'fixtures'>;
 };
 
@@ -41,8 +45,8 @@ export type ReplayPorts = Omit<RunPorts, 'services' | 'databaseCommands'> & { re
 
 export type ReplayVerdict = 'identical' | 'per-environment-baseline' | 'mismatch';
 
-// identical is true exactly when the replay's result hash is the recorded one and its manifest is
-// the one given (a recorded hash cannot stand for another manifest). manifestHash is the
+// identical is true exactly when the replay's result hash and end state are the recorded ones and its
+// manifest is the one given (a recorded hash cannot stand for another manifest). manifestHash is the
 // replay's own, null when it made no manifest. differingInputs lists the top-level manifest fields
 // whose canonical JSON differs from the recorded manifest's.
 export type ReplayOutcome = {
@@ -131,6 +135,7 @@ export async function replay(request: ReplayRequest, ports: ReplayPorts): Promis
   const runPorts: RunPorts = {
     drivers: ports.drivers, clock: ports.clock, artifacts: ports.artifacts, redactor: ports.redactor, events: ports.events, audit: ports.audit,
     ...(ports.secrets === undefined ? {} : { secrets: ports.secrets }),
+    ...(ports.rewritesApplied === undefined ? {} : { rewritesApplied: ports.rewritesApplied }),
     ...(services === undefined ? {} : { services: services.port }),
     ...(databaseCommands === undefined ? {} : { databaseCommands: databaseCommands.port }),
   };
@@ -145,11 +150,19 @@ export async function replay(request: ReplayRequest, ports: ReplayPorts): Promis
 
   // The result hash covers the manifest's hash, so a recorded result hash can only stand for the
   // manifest given when the replay's own manifest is that manifest too.
-  const identical = result.resultHash === request.recordedResultHash && result.manifestHash === manifestHash(manifest);
+  const hasSameState = result.state === request.recordedState;
+  const isIdentical = hasSameState && result.resultHash === request.recordedResultHash && result.manifestHash === manifestHash(manifest);
   const differingInputs = result.manifest === null ? [] : differingFields(manifest, result.manifest);
-  const perEnvironment = differingInputs.length > 0 && differingInputs.every((field) => PER_ENVIRONMENT_INPUTS.includes(field));
+  const isPerEnvironment = hasSameState && differingInputs.length > 0 && differingInputs.every((field) => PER_ENVIRONMENT_INPUTS.includes(field));
   return success({
-    identical, resultHash: result.resultHash, manifestHash: result.manifestHash, differingInputs,
-    verdict: identical ? 'identical' : perEnvironment ? 'per-environment-baseline' : 'mismatch',
+    identical: isIdentical, resultHash: result.resultHash, manifestHash: result.manifestHash, differingInputs,
+    verdict: replayVerdict(isIdentical, isPerEnvironment),
   });
+}
+
+function replayVerdict(isIdentical: boolean, isPerEnvironment: boolean): ReplayVerdict {
+  if (isIdentical) {
+    return 'identical';
+  }
+  return isPerEnvironment ? 'per-environment-baseline' : 'mismatch';
 }

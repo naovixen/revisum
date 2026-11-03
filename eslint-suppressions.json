@@ -1246,13 +1246,10 @@
   },
   "packages/engine/src/replay/replay.ts": {
     "@typescript-eslint/naming-convention": {
-      "count": 4
+      "count": 2
     },
     "curly": {
       "count": 15
-    },
-    "no-nested-ternary": {
-      "count": 1
     },
     "revisum/file-name-matches-export": {
       "count": 1
@@ -1674,7 +1671,7 @@
       "count": 1
     },
     "curly": {
-      "count": 5
+      "count": 3
     },
     "revisum/file-name-matches-export": {
       "count": 1

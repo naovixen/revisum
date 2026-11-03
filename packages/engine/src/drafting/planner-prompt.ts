@@ -31,7 +31,7 @@ const READABLE_SYNTAX = [
   'Select "<option>" in <locator>',
   'Press <Key> in <locator>',
   'Accept dialog | Dismiss dialog',
-  'Expect <locator> is visible|hidden|absent|enabled|disabled|checked|unchecked|focused',
+  'Expect <locator> is visible|hidden|absent|enabled|disabled',
   'Expect <locator> has text|value ["containing"] "<text>"',
   'Expect <locator> count is <integer>',
   'Expect page URL is "<url>"',

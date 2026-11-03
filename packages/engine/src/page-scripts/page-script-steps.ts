@@ -16,13 +16,13 @@ import {
   type JsonPointer, type ParameterName, type Result, type SafeText, type ScriptArguments, type ScriptChoice, type ScriptName,
   type ScriptParameterType, type ValueName,
 } from '@revisum/contracts';
-import { sha256 } from '../hashing.ts';
 import type { Logger } from '../logging.ts';
 import { rememberedFieldEntries } from '../plan/plan-values.ts';
 import type { Project } from '../project/project-parser.ts';
 import { declaredScripts } from '../project/unsafe-feature-declarations.ts';
 import type { RememberedRecord, RememberedValues } from '../RememberedValues.ts';
 import { resolveText, type RunValues } from '../run-values.ts';
+import { sha256UnlessHoldingASecret } from '../secrets/secret-resolution.ts';
 import { argumentProblem, runValueArgument, type ArgumentValue } from '../service-calls/parameter-values.ts';
 import { checkBackendField, fieldAt, fieldText } from '../service-calls/service-response.ts';
 import { decodeScriptResult } from './page-script-result.ts';
@@ -42,10 +42,13 @@ export type PageScriptContext = {
   readonly remembered: RememberedValues;
   readonly clock: Clock;
   readonly logger: Logger;
+  // True when text holds one of the run's secrets, in any form.
+  readonly holdsSecret: (text: string) => boolean;
 };
 
 // What a run keeps of a page-script step: the script's name (null for one written in the plan),
-// how many times it ran, and the sha256 of the last result text it accepted (null when none was).
+// how many times it ran, and the sha256 of the last result text it accepted (null when none was, or
+// when it held a secret).
 export type PageScriptRecord = { readonly script: ScriptName | null; readonly attempts: number; readonly resultSha256: string | null };
 
 // What one of these steps gives its step result. An evaluate that remembers one value records it
@@ -144,7 +147,7 @@ async function runOnce(
   });
   const result: Result<unknown, string> = ran.ok ? decodeScriptResult(ran.value, script.maximumResultBytes) : failure(ran.error.code);
   // Only a result text accepted in full is hashed: an oversized one may have been cut short.
-  const resultSha256 = ran.ok && result.ok ? sha256(ran.value) : null;
+  const resultSha256 = ran.ok && result.ok ? sha256UnlessHoldingASecret(ran.value, context.holdsSecret) : null;
   context.logger.log({
     kind: 'page.script', stepIndex, stepType, outcome: result.ok ? 'passed' : 'failed',
     ...(result.ok ? {} : { code: result.error }), ...(resultSha256 === null ? {} : { sha256: resultSha256 }),

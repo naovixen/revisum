@@ -19,7 +19,6 @@ import {
   type DeclaredService, type ExpectDatabaseStep, type FieldName, type ParameterName, type Result, type ScriptArguments,
   type SecretStore, type ServiceName, type ValueName, type WorkloadErrorCode, type WorkloadOutcome, type WorkloadVariable,
 } from '@revisum/contracts';
-import { sha256 } from '../hashing.ts';
 import type { Logger } from '../logging.ts';
 import { MAXIMUM_SCRIPT_RESULT_DEPTH, nestingDepth } from '../page-scripts/page-script-result.ts';
 import { rememberedFieldEntries } from '../plan/plan-values.ts';
@@ -27,6 +26,7 @@ import type { Project } from '../project/project-parser.ts';
 import { declaredCommands } from '../project/unsafe-feature-declarations.ts';
 import type { RememberedRecord, RememberedValues } from '../RememberedValues.ts';
 import { resolveText, type RunValues, type StepErrorCode } from '../run-values.ts';
+import { sha256UnlessHoldingASecret } from '../secrets/secret-resolution.ts';
 import { argumentProblem, argumentText, runValueArgument, type ArgumentValue } from '../service-calls/parameter-values.ts';
 import { checkBackendField, fieldAt, fieldText } from '../service-calls/service-response.ts';
 
@@ -47,7 +47,7 @@ export const COMMAND_ERROR_CODES: readonly string[] = [
 
 // What a run keeps of a database step: the command, its service, how many times it ran, and of
 // its last run the exit code and the sha256 of what it printed on standard output (null when it
-// did not run, or its output was cut short). Never the output or an environment value.
+// did not run, or its output was cut short or held a secret). Never the output or an environment value.
 export type DatabaseCommandRecord = {
   readonly command: CommandName;
   readonly service: ServiceName;
@@ -82,6 +82,8 @@ export type DatabaseCommandContext = {
   readonly secrets: SecretStore;
   readonly clock: Clock;
   readonly logger: Logger;
+  // True when text holds one of the run's secrets, in any form.
+  readonly holdsSecret: (text: string) => boolean;
 };
 
 type Declared = { readonly name: CommandName; readonly declaration: DatabaseCommandDeclaration; readonly service: DeclaredService };
@@ -221,7 +223,7 @@ async function runOnce(
   }
   const result = judgedReply(reply, declaration, request.maximumOutputBytes);
   // Output cut short is only part of what was printed, so it has no hash to keep.
-  const outputSha256 = reply.ok && !reply.value.stdout.truncated ? sha256(reply.value.stdout.bytes) : null;
+  const outputSha256 = reply.ok && !reply.value.stdout.truncated ? sha256UnlessHoldingASecret(reply.value.stdout.bytes, context.holdsSecret) : null;
   context.logger.log({
     kind: 'database.command', stepIndex, stepType, outcome: result.ok ? 'passed' : 'failed',
     ...(result.ok ? {} : { code: result.error }), ...(outputSha256 === null ? {} : { sha256: outputSha256 }),

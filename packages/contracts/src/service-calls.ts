@@ -149,8 +149,9 @@ export type ResponseReadErrorCode = 'response-not-json' | 'response-too-large' |
 export type ServiceCallErrorCode = ResponseReadErrorCode
   | 'service-unreachable' | 'call-timeout' | 'unexpected-status' | 'egress-blocked' | 'parameter-invalid' | 'cleanup-failed';
 
-// Sends one request and reads the response, up to the request's size cap. Redirects are never
-// followed: a redirect is a status like any other.
+// Sends one request and reads the response, to one byte past the request's size cap: a longer body
+// answers with its status and the body cut there, for whoever set the cap to refuse. Redirects are
+// never followed: a redirect is a status like any other.
 export interface ServiceCaller {
   call(request: ServiceRequest): Promise<Result<ServiceResponse, ServiceCallErrorCode>>;
 }

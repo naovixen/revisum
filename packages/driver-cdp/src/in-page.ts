@@ -229,6 +229,13 @@ export function maskElements(selectors: readonly string[]): string {
 }
 
 // Paints the same box over each of the given elements. unmaskElements takes these away too.
+// What every field in the document holds, as JSON. The caller only compares it, and keeps none of it.
+export function fieldValues(): string {
+  const fields = [...document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('input,textarea')].map((field) => field.value);
+  const editable = [...document.querySelectorAll('[contenteditable]:not([contenteditable="false"])')].map((element) => element.textContent ?? '');
+  return JSON.stringify([...fields, ...editable]);
+}
+
 export function maskGivenElements(...elements: Element[]): string {
   for (const element of elements) {
     const rectangle = element.getBoundingClientRect();

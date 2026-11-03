@@ -219,7 +219,7 @@ Step error. A step would have remembered a secret: its element is a field a secr
 
 Step error, on a step that passes. A `capture` took no image, because a field a secret was typed into is still on the page but its locator no longer finds it, such as when its label has changed or been removed, so it could not be masked and what it holds may still be on screen. Text drawn as pixels is out of reach of any later scan, so no image is kept rather than one that may show the secret. The step does not fail, because a capture checks nothing: the steps' verdict stands.
 
-A field that has gone does not cause this: when the page has removed it, or its document was replaced, as after most sign-ins, there is nothing left to mask and the capture is taken as usual. If you do see this code, make the field's locator still find it when the capture runs, capture before typing the secret, or type plain text into that field first.
+A field that has gone does not cause this: when the page has removed it, or its document was replaced, as after most sign-ins, there is nothing left to mask and the capture is taken as usual. The exception is a page that has rendered the field afresh under another label, still holding what was typed or part of it: no locator finds that one, so no image is kept. If you do see this code, make the field's locator still find it when the capture runs, capture before typing the secret, or type plain text into that field first.
 
 ## state-not-exposed
 
@@ -259,7 +259,7 @@ Service call error. A call that remembers a field, or a backend check, got a res
 
 ## response-too-large
 
-Service call error. The response is larger than the declaration's `maximumResponseBytes` (default 1 MiB). Reading stops at the limit and the step fails. Ask the API for less, or raise the limit in the declaration.
+Service call error. The response is larger than the declaration's `maximumResponseBytes` (default 1 MiB). Reading stops just past the limit and the step fails, with no hash of the body. A backend check that gets a 502, 503 or 504 its declaration does not list fails with `service-unreachable` instead, however long the gateway's page. Ask the API for less, or raise the limit in the declaration.
 
 ## field-missing
 
@@ -350,7 +350,7 @@ Driver error. The page's renderer died, its browser target closed, the browser d
 
 ## unsupported-step
 
-Driver error. The step needs something this run cannot do yet: the driver does not perform this kind of step, or the step made the page open a popup or a second page, or start a download. The popup is closed and the download cancelled, with nothing of it kept, and every later step is skipped. Run the plan on a target whose driver performs the step, or change the step.
+Driver error. The step needs something this run cannot do yet: the driver does not perform this kind of step, or the step made the page open a popup or a second page, or start a download. The popup is closed and the download cancelled, with nothing of it kept, and every later step is skipped. Run the plan on a target whose driver performs the step, or change the step. A backend check whose call the run's project declares a write fails with this code too, with nothing sent: a check polls, and a write is never sent twice.
 
 ## assertion-failed
 
@@ -666,6 +666,10 @@ Run refusal. The plan makes a `call` or `expectBackend`, or has `cleanup` calls,
 ## storage-state-unsupported
 
 Run refusal. The plan names saved browser storage state in `storageState`, and no driver can load it into a session yet. A plan that names it relies on being signed in, so the run ends `Refused` before any browser opens, rather than running without it. Sign in through the plan's own steps for now.
+
+## element-check-unsupported
+
+Run refusal. The plan checks that an element is `checked`, `unchecked` or `focused`, and no driver's probe reports those states yet, so the check could only ever fail. A plan holding one, inside a frame or a new tab too, still parses, and its run ends `Refused` before any browser opens, so no earlier step acts for nothing. Check what the state changes on the page instead, or leave the check out.
 
 ## database-commands-unavailable
 

@@ -249,9 +249,10 @@ export interface Camera {
   screenshot(mask: readonly string[]): Promise<Uint8Array>;
   // The same, with every element each of `fields` finds painted black too: the fields a secret was
   // typed into, which no selector need match. A field that finds nothing, in this document or one
-  // it is framed in, gives not-found and no image, since what it holds may still be on screen. A
+  // it is framed in, gives not-found and no image, since what it holds may still be on screen; unless
+  // the element typed into has gone and no field holds what `holdsSecret` says is a secret. A
   // driver without it cannot hide such a field, so a run takes no capture while there is one.
-  screenshotHidingFields?(mask: readonly string[], fields: readonly ResolvedLocator[]): Promise<Result<Uint8Array, DriverError>>;
+  screenshotHidingFields?(mask: readonly string[], fields: readonly ResolvedLocator[], holdsSecret: (text: string) => boolean): Promise<Result<Uint8Array, DriverError>>;
 }
 export interface Auditor {
   audit(): Promise<readonly A11yFinding[]>;

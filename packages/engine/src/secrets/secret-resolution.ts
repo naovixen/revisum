@@ -7,6 +7,7 @@ import {
   failure, success,
   type CallDeclaration, type CallName, type CommandName, type DatabaseCommandDeclaration, type Plan, type Redactor, type Result, type Secret, type SecretName, type SecretStore, type Step,
 } from '@revisum/contracts';
+import { sha256 } from '../hashing.ts';
 import type { SecretRecord, StorageStateRecord } from '../manifest.ts';
 import { redactionModeOf, secretRedaction, secretSha256, shortSecretMatch, storageStateSecrets } from './secret-values.ts';
 
@@ -141,6 +142,13 @@ export function withDeclaredSecretRedaction(redactor: Redactor, secretNames: rea
 // Whether a whole observed text is one of the run's short secrets, which redaction by value never
 // looks for: a failed check that observed exactly such a value keeps a placeholder instead.
 export const shortSecretObservation = (secrets: ResolvedSecrets): ((observed: string) => boolean) => shortSecretMatch(watchedSecrets(secrets));
+
+// A hash of text holding a secret lets anyone who can guess the rest try secrets against it offline,
+// so what a run keeps of such text has none.
+export function sha256UnlessHoldingASecret(content: string | Uint8Array, holdsSecret: (text: string) => boolean): string | null {
+  const text = typeof content === 'string' ? content : new TextDecoder().decode(content);
+  return holdsSecret(text) ? null : sha256(content);
+}
 
 // What the manifest records: each fill's, call's, stub's, storage write's and command's secret by name and
 // redaction mode, once, and the storage state's name and content hash.

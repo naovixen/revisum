@@ -5,9 +5,10 @@
 //
 // serviceCaller() is the real caller. It sends every request through the egress proxy, so the
 // proxy's allow-list and resolve-time address check decide where a call may go; it never connects
-// to a service itself. It never follows a redirect, stops reading at the request's size cap, and
-// sends each request once: nothing here retries, so a write is never sent twice. No header value is
-// written anywhere but the wire, and a failure answers with its code alone.
+// to a service itself. It never follows a redirect, stops reading one byte past the request's size
+// cap, leaving the engine to judge the status and refuse a body that long, and sends each request
+// once: nothing here retries, so a write is never sent twice. No header value is written anywhere but
+// the wire, and a failure answers with its code alone.
 import {
   failure, reveal, success,
   type Result, type ServiceCallErrorCode, type ServiceCaller, type ServiceRequest, type ServiceRequestHeader, type ServiceResponse, type WorkloadVariable,
@@ -180,9 +181,9 @@ function sendThroughTunnel(
 }
 
 // Reads one answer. An answer the proxy marked as its own is its refusal or failure; any other is
-// the service's, returned with its status as received, a redirect included. The body is read up to
-// `maximumResponseBytes` and no further: a longer one, by its declared length or by what arrives,
-// fails at once and the connection is closed.
+// the service's, returned with its status as received, a redirect included. The body is read one byte
+// past `maximumResponseBytes` and no further: only the engine can say what a status means, so a longer
+// one answers with its status and the body cut there, and the connection is closed.
 function readAnswer(answer: IncomingMessage, maximumResponseBytes: number, finish: (result: CallResult) => void): void {
   answer.on('error', () => finish(failure('service-unreachable')));
   const mark = answer.headers[EGRESS_DECISION_HEADER];
@@ -190,21 +191,20 @@ function readAnswer(answer: IncomingMessage, maximumResponseBytes: number, finis
     finish(failure(mark === 'blocked' ? 'egress-blocked' : 'service-unreachable'));
     return;
   }
-  const declaredLength = Number(answer.headers['content-length'] ?? Number.NaN);
-  if (Number.isFinite(declaredLength) && declaredLength > maximumResponseBytes) {
-    finish(failure('response-too-large'));
-    return;
-  }
   const chunks: Buffer[] = [];
   let length = 0;
+  const finishWithBody = (body: Buffer): void => {
+    finish(success({ status: answer.statusCode ?? 0, mediaType: answer.headers['content-type'] ?? null, body: new Uint8Array(body) }));
+  };
   answer.on('data', (chunk: Buffer) => {
+    chunks.push(chunk);
     length += chunk.length;
-    if (length > maximumResponseBytes) finish(failure('response-too-large'));
-    else chunks.push(chunk);
+    if (length > maximumResponseBytes) {
+      finishWithBody(Buffer.concat(chunks).subarray(0, maximumResponseBytes + 1));
+    }
   });
   answer.on('end', () => {
-    const mediaType = answer.headers['content-type'] ?? null;
-    finish(success({ status: answer.statusCode ?? 0, mediaType, body: new Uint8Array(Buffer.concat(chunks)) }));
+    finishWithBody(Buffer.concat(chunks));
   });
   // A connection that closes before the body ends: the service or the proxy dropped it.
   answer.on('close', () => finish(failure('service-unreachable')));

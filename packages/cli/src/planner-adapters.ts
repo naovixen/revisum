@@ -77,6 +77,10 @@ export function plannerAdapter(endpoint: PlannerEndpoint, origin: Origin, connec
         timeoutMilliseconds: PLANNER_TIMEOUT_MILLISECONDS, maximumResponseBytes: MAXIMUM_PLANNER_REPLY_BYTES,
       });
       if (!answered.ok) throw new PlannerCallError(answered.error);
+      // The caller reads one byte past the cap and leaves whoever set it to refuse a body that long.
+      if (answered.value.body.length > MAXIMUM_PLANNER_REPLY_BYTES) {
+        throw new PlannerCallError('response-too-large');
+      }
       if (answered.value.status < 200 || answered.value.status > 299) throw new PlannerCallError('planner-status');
       // The reply as received, for the engine to decode.
       return answered.value.body;

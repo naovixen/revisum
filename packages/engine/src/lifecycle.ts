@@ -2,7 +2,6 @@
 // is legal from, so an illegal transition does not compile.
 //
 //   Planned ──► Resolved ──► Running ──► Passed | Failed | Errored | Denied
-//      │            └──────────────────► Errored
 //      ├──► TargetUnavailable   (explicit; the engine never substitutes a target)
 //      └──► Refused             (production it may not reach, a secret the store lacks, or something the plan needs
 //                                that this run can't do; no driver is called and no call is made)
@@ -14,7 +13,7 @@ import type { RunManifest } from './manifest.ts';
 
 type Transitions = {
   readonly Planned: 'Resolved' | 'TargetUnavailable' | 'Refused';
-  readonly Resolved: 'Running' | 'Errored';
+  readonly Resolved: 'Running';
   readonly Running: 'Passed' | 'Failed' | 'Errored' | 'Denied';
   readonly Passed: never;
   readonly Failed: never;
@@ -44,6 +43,8 @@ type TargetUnavailableRun = Omit<Planned, 'state'> & { readonly state: 'TargetUn
 //     cannot resolve. The refusal names the secret, never a value.
 //   services-unavailable: the plan calls a declared service, but the run was given no service caller.
 //   storage-state-unsupported: the plan names saved storage state, which no driver can load yet.
+//   element-check-unsupported: the plan checks that an element is checked, unchecked or focused, which
+//     no driver's probe can decide, so no earlier step may act for a check that was always going to fail.
 //   database-commands-unavailable: the plan runs a database command, in its steps or its cleanup, but
 //     the run was given no command runner.
 //   script-source-missing: the plan names a page script whose source the run was not given, so the
@@ -60,11 +61,11 @@ type TargetUnavailableRun = Omit<Planned, 'state'> & { readonly state: 'TargetUn
 export type RefusalCode =
   | 'origin-not-allowed' | 'secret-missing' | 'services-unavailable' | 'storage-state-unsupported' | 'database-commands-unavailable'
   | 'evidence-mode-disabled' | 'suite-not-declared' | 'egress-unenforceable' | 'script-source-missing' | 'image-missing' | 'image-digest-mismatch'
-  | 'workload-start-failed' | 'clearance-standing-mismatch';
+  | 'workload-start-failed' | 'clearance-standing-mismatch' | 'element-check-unsupported';
 export type Refusal =
   | { readonly code: Extract<RefusalCode, 'origin-not-allowed'>; readonly origin: string }
   | { readonly code: Extract<RefusalCode, 'secret-missing'>; readonly secretName: SecretName }
-  | { readonly code: Extract<RefusalCode, 'services-unavailable' | 'storage-state-unsupported' | 'database-commands-unavailable' | 'clearance-standing-mismatch'> }
+  | { readonly code: Extract<RefusalCode, 'services-unavailable' | 'storage-state-unsupported' | 'database-commands-unavailable' | 'clearance-standing-mismatch' | 'element-check-unsupported'> }
   // The plan names a page script whose source file the run was not given, by its declared path.
   | { readonly code: Extract<RefusalCode, 'script-source-missing'>; readonly file: string }
   | EvidenceRefusal;

@@ -26,11 +26,15 @@ import {
 import { deriveActor, pseudonymousActorId, sourceActorId } from '../actor.ts';
 import { brand } from '../brand.ts';
 import { canonicalJson, sha256 } from '../hashing.ts';
+import { planHash } from '../manifest.ts';
+import { planParser } from '../plan/plan-parser.ts';
+import { readPlanText } from '../plan/readable/plan-text.ts';
 import { CODE_OWNERS_PATHS, parseJson, repositoryPath, type TrustedProject } from '../project/trusted-project.ts';
 import {
   REQUIRED_DENIED_ACTIONS, deniesRequiredActions, holdoutPlanHashes, parseApproversFile, parseDenyRules, type ApproversFile,
 } from './approvers-file.ts';
 import { isCodeOwner, parseCodeOwners, type CodeOwnerRule } from './code-owners.ts';
+import { mintedApprovals } from './MintedApprovals.ts';
 
 const APPROVERS_FILE = 'approvers.json';
 const HOLDOUTS_FILE = 'holdouts.json';
@@ -68,13 +72,27 @@ const PERSON_FOR_STRENGTH: Readonly<Record<ApprovalStrength, ActorType>> = { ver
 
 const passed = <Value>(value: Value): Checked<Value> => ({ ok: true, value });
 
+// The hash of the plan a file holds as a person wrote it, readable text or JSON the parser tidies, or
+// null when it holds no plan this project's parser accepts.
+function hashOfPlanAsWritten(bytes: Uint8Array, decoded: unknown, trusted: TrustedProject): string | null {
+  const written = decoded === undefined ? readPlanText(new TextDecoder().decode(bytes), trusted.limits) : success({ json: decoded });
+  if (!written.ok) {
+    return null;
+  }
+  const parsed = planParser(trusted)(written.value.json);
+  return parsed.ok ? planHash(parsed.value) : null;
+}
+
 // True when a file's bytes are the subject: for a holdout plan, a holdouts.json listing its hash;
-// otherwise a file whose bytes, or whose canonical JSON (a plan's hash is over its canonical JSON),
-// have the subject's hash.
-function holdsSubject(subject: ApprovalSubject, bytes: Uint8Array): boolean {
+// otherwise a file whose bytes, or whose canonical JSON, have the subject's hash; and for a plan, whose
+// hash is over the plan as the parser returns it, a file that reads as that plan.
+function holdsSubject(subject: ApprovalSubject, bytes: Uint8Array, trusted: TrustedProject): boolean {
   const decoded = parseJson(bytes);
   if (subject.kind === 'holdout-plan') return holdoutPlanHashes(decoded).includes(subject.hash);
-  return sha256(bytes) === subject.hash || (decoded !== undefined && sha256(canonicalJson(decoded)) === subject.hash);
+  if (sha256(bytes) === subject.hash || (decoded !== undefined && sha256(canonicalJson(decoded)) === subject.hash)) {
+    return true;
+  }
+  return subject.kind === 'plan' && hashOfPlanAsWritten(bytes, decoded, trusted) === subject.hash;
 }
 
 // The repository file an approval of this subject is about, or null when it can be about none. A
@@ -127,7 +145,7 @@ export function approvalVerifier(options: ApprovalVerifierOptions): ApprovalVeri
   }
 
   async function checkCodeOwnerReview(
-    subject: ApprovalSubject, proof: Extract<ApprovalProof, { kind: 'code-owner-review' }>, versionControl: VersionControlPort,
+    subject: ApprovalSubject, proof: Extract<ApprovalProof, { kind: 'code-owner-review' }>, trusted: TrustedProject, versionControl: VersionControlPort,
   ): Promise<Checked<Approved>> {
     const unknownReviewer = deriveActor(sourceActorId('code-owner review'), 'unverified');
     const reviews = await versionControl.reviews(proof.pullRequest);
@@ -164,7 +182,7 @@ export function approvalVerifier(options: ApprovalVerifierOptions): ApprovalVeri
     // The review covered the file at the subject's path in the reviewed commit, not the hash the
     // caller offers with it, so the hash must match those bytes. The protected branch is never
     // consulted: it may still hold the version the change replaces.
-    const reviewed = await reviewedBytes(subject, path, review.commit, versionControl, reviewer);
+    const reviewed = await reviewedBytes(subject, path, review.commit, trusted, versionControl, reviewer);
     if (!reviewed.ok) return reviewed;
     return passed({ login: review.reviewer.login, strength: 'verified', at: review.submittedAt });
   }
@@ -172,17 +190,17 @@ export function approvalVerifier(options: ApprovalVerifierOptions): ApprovalVeri
   // The subject's file as the reviewed commit holds it must have the subject's hash. For a holdout
   // plan that file is holdouts.json, which lists the hash.
   async function reviewedBytes(
-    subject: ApprovalSubject, path: string, commit: string, versionControl: VersionControlPort, actor: DerivedActor,
+    subject: ApprovalSubject, path: string, commit: string, trusted: TrustedProject, versionControl: VersionControlPort, actor: DerivedActor,
   ): Promise<Checked<true>> {
     // A port that cannot read a file at a commit cannot show what the reviewer saw.
     if (versionControl.fileAtCommit === undefined) return refusedBy('version-control-unavailable', actor);
     const read = await versionControl.fileAtCommit(path, commit);
     if (!read.ok) return refusedBy(read.error === 'unavailable' ? 'version-control-unavailable' : 'subject-mismatch', actor);
-    return holdsSubject(subject, read.value.bytes) ? passed(true) : refusedBy('subject-mismatch', actor);
+    return holdsSubject(subject, read.value.bytes, trusted) ? passed(true) : refusedBy('subject-mismatch', actor);
   }
 
   async function checkAgentLockdown(
-    subject: ApprovalSubject, proof: Extract<ApprovalProof, { kind: 'agent-lockdown-merge' }>, versionControl: VersionControlPort,
+    subject: ApprovalSubject, proof: Extract<ApprovalProof, { kind: 'agent-lockdown-merge' }>, trusted: TrustedProject, versionControl: VersionControlPort,
   ): Promise<Checked<Approved>> {
     const claimed = loginActor(proof.mergedBy);
     const approversJson = await protectedJson(versionControl, APPROVERS_FILE, claimed);
@@ -206,7 +224,7 @@ export function approvalVerifier(options: ApprovalVerifierOptions): ApprovalVeri
     const proofAgrees = landed.value.login.toLowerCase() === proof.mergedBy.toLowerCase();
     if (landed.value.type !== 'user' || !isMaintainer || !proofAgrees) return refusedBy('not-maintainer', lander);
 
-    const onBranch = await subjectOnProtectedBranch(subject, proof.commit, versionControl, lander);
+    const onBranch = await subjectOnProtectedBranch(subject, proof.commit, trusted, versionControl, lander);
     if (!onBranch.ok) return onBranch;
     return passed({ login: landed.value.login, strength: 'declared', at: landed.value.at });
   }
@@ -215,7 +233,7 @@ export function approvalVerifier(options: ApprovalVerifierOptions): ApprovalVeri
   // commit must be the last to touch it there: a commit the maintainer landed earlier says nothing
   // about bytes someone else landed since. For a holdout plan the file is holdouts.json.
   async function subjectOnProtectedBranch(
-    subject: ApprovalSubject, commit: string, versionControl: VersionControlPort, actor: DerivedActor,
+    subject: ApprovalSubject, commit: string, trusted: TrustedProject, versionControl: VersionControlPort, actor: DerivedActor,
   ): Promise<Checked<true>> {
     const path = subjectFile(subject);
     if (path === null) {
@@ -223,7 +241,7 @@ export function approvalVerifier(options: ApprovalVerifierOptions): ApprovalVeri
     }
     const read = await versionControl.protectedFile(path);
     if (!read.ok) return refusedBy(read.error === 'unavailable' ? 'version-control-unavailable' : 'not-protected-branch', actor);
-    if (!holdsSubject(subject, read.value.bytes)) {
+    if (!holdsSubject(subject, read.value.bytes, trusted)) {
       return refusedBy('not-protected-branch', actor);
     }
     return read.value.commit === commit ? passed(true) : refusedBy('stale-commit', actor);
@@ -242,10 +260,10 @@ export function approvalVerifier(options: ApprovalVerifierOptions): ApprovalVeri
     return refusedBy('bad-signature', signer);
   }
 
-  const checkProof = (subject: ApprovalSubject, proof: ApprovalProof, versionControl: VersionControlPort): Promise<Checked<Approved>> => {
+  const checkProof = (subject: ApprovalSubject, proof: ApprovalProof, trusted: TrustedProject, versionControl: VersionControlPort): Promise<Checked<Approved>> => {
     switch (proof.kind) {
-      case 'code-owner-review': return checkCodeOwnerReview(subject, proof, versionControl);
-      case 'agent-lockdown-merge': return checkAgentLockdown(subject, proof, versionControl);
+      case 'code-owner-review': return checkCodeOwnerReview(subject, proof, trusted, versionControl);
+      case 'agent-lockdown-merge': return checkAgentLockdown(subject, proof, trusted, versionControl);
       case 'signature': return checkSignature(proof, versionControl);
     }
   };
@@ -260,7 +278,7 @@ export function approvalVerifier(options: ApprovalVerifierOptions): ApprovalVeri
       if (trusted.provenance.kind === 'protected-branch' && trusted.provenance.branch !== versionControl.protectedBranch) {
         return refuse({ code: 'not-protected-branch', actor: deriveActor(sourceActorId('approval proof'), 'unverified') });
       }
-      const checked = await checkProof(subject, proof, versionControl);
+      const checked = await checkProof(subject, proof, trusted, versionControl);
       if (!checked.ok) return refuse(checked.refusal);
 
       const { login, strength, at } = checked.value;
@@ -275,6 +293,7 @@ export function approvalVerifier(options: ApprovalVerifierOptions): ApprovalVeri
       const recorded = events.append({ kind: 'plan.approved', subjectHash: subject.hash, proofKind: proof.kind }, actor);
       // An approval the audit sink did not record does not exist: it is absent, never assumed.
       if (!recorded.ok) return failure('version-control-unavailable');
+      mintedApprovals.record(approval);
       return success({ approval, actor });
     },
   };
