@@ -113,7 +113,7 @@ describe('encoded echoes of short secrets never reach a run\'s outputs', () => {
           const check = ran.result.steps[3];
           assert.equal(fill?.outcome, 'passed', `${echo}: the secret was typed (${JSON.stringify(fill)})`);
           assert.equal(check?.outcome, 'failed', `${echo}: the echo check failed as planned`);
-          assert.ok(check?.observed !== undefined && check.observed.length > 0, `${echo}: the run kept an observation`);
+          assert.ok(check.observed !== undefined && check.observed.length > 0, `${echo}: the run kept an observation`);
           assert.equal(holdsSecret(check.observed, secretValue), false, `${echo}: the observation still holds the secret: ${check.observed}`);
           assert.equal(holdsSecret(JSON.stringify(ran.result), secretValue), false, `${echo}: the result still holds the secret`);
           assert.equal(holdsSecret(ran.eventLines, secretValue), false, `${echo}: the event log still holds the secret`);
@@ -138,7 +138,7 @@ describe('encoded echoes of short secrets never reach a run\'s outputs', () => {
         const ran = await runEcho(targetId, echo, plainText, fakeSecretValue(), 'Note');
         const check = ran.result.steps[3];
         assert.equal(check?.outcome, 'failed', `${echo}: the echo check failed as planned`);
-        assert.ok(check?.observed !== undefined && holdsSecret(check.observed, plainText), `${echo}: the observation should echo the plain text: ${check?.observed ?? '(none)'}`);
+        assert.ok(check.observed !== undefined && holdsSecret(check.observed, plainText), `${echo}: the observation should echo the plain text: ${check.observed ?? '(none)'}`);
       }
     });
   }

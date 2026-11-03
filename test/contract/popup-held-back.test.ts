@@ -63,10 +63,10 @@ before(async () => {
   });
 });
 after(async () => {
-  await proxy?.close();
-  await reachable?.close();
-  await opener?.close();
-  await capability?.close();
+  await proxy.close();
+  await reachable.close();
+  await opener.close();
+  await capability.close();
 });
 
 async function openSession(): Promise<DriverSession> {

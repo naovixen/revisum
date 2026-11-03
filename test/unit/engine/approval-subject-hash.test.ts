@@ -31,7 +31,6 @@ function assertSubjectRefused(
   repository: TestRepository, verified: Result<{ approval: Approval; actor: DerivedActor }, ApprovalErrorCode>,
 ): void {
   assert.equal(verified.ok, false, `an unreviewed subject verified: ${JSON.stringify(verified)}`);
-  if (verified.ok) return;
   assert.ok(MISMATCH_CODES.includes(verified.error), `expected one of ${MISMATCH_CODES.join(', ')}, got ${verified.error}`);
   assert.equal(eventsOfKind(repository.events, 'plan.approved').length, 0, 'a refused attempt left a plan.approved event');
   assert.ok(eventsOfKind(repository.events, 'approval.refused').some(({ event }) => event.code === verified.error),

@@ -116,7 +116,7 @@ describe('secret echoes never reach a run\'s outputs', () => {
         const check = ran.result.steps[4];
         assert.equal(fill?.outcome, 'passed', `${echo}: the secret was typed (${JSON.stringify(fill)})`);
         assert.equal(check?.outcome, 'failed', `${echo}: the echo check failed as planned`);
-        assert.ok(check?.observed !== undefined && check.observed.length > 0, `${echo}: the run kept an observation`);
+        assert.ok(check.observed !== undefined && check.observed.length > 0, `${echo}: the run kept an observation`);
         // Checked directly, without the engine's scanner.
         assert.deepEqual(echoesIn(JSON.stringify(ran.result), secretValue), [], `${echo}: forms in the result`);
         assert.deepEqual(echoesIn(ran.eventLines, secretValue), [], `${echo}: forms in the event log`);
@@ -144,7 +144,7 @@ describe('secret echoes never reach a run\'s outputs', () => {
       const ran = await runEcho(targetId, 'raw', plainText, fakeSecretValue(), 'Note');
       const check = ran.result.steps[4];
       assert.equal(check?.outcome, 'failed');
-      assert.ok(check?.observed?.includes(plainText), `the observation should echo the plain text: ${check?.observed ?? '(none)'}`);
+      assert.ok(check.observed?.includes(plainText) === true, `the observation should echo the plain text: ${check.observed ?? '(none)'}`);
     });
   }
 });

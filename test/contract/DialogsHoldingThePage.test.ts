@@ -165,7 +165,7 @@ describe("Using a run in a real browser", () => {
                 assert.equal(result.state, "Errored", JSON.stringify(result.steps));
                 assert.equal(result.steps[scriptStep]?.outcome, "failed");
                 assert.equal(
-                    result.steps[scriptStep]?.code,
+                    result.steps[scriptStep].code,
                     "dialog-open",
                     JSON.stringify(result.steps),
                 );

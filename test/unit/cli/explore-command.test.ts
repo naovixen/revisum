@@ -316,7 +316,7 @@ test('the draft is left unapproved and nothing runs it: no approval, no run, and
     assert.deepEqual(eventKinds(run).filter((kind) => kind.startsWith('run.') || kind === 'plan.approved' || kind === 'approval.refused'), []);
     // Each crawled page was opened once, and nothing else: the draft's Go to lines opened nothing.
     assert.equal(run.browser?.navigations().length, writtenMap(run).pages.length);
-    assert.deepEqual(methods(run.browser?.calls ?? []).filter((method) => ACTING_CALLS.includes(method)), []);
+    assert.deepEqual(methods(run.browser.calls).filter((method) => ACTING_CALLS.includes(method)), []);
     assert.equal(run.planner.received.length, 1, 'the planner was called more than once');
   });
 });
@@ -550,8 +550,8 @@ test('counter-example: in the isolated runner, the map is the container\'s, writ
     assert.equal(exploreData(run)['egressEnforced'], true);
     assert.deepEqual(run.browser?.opened, [], 'a host browser was opened');
     assert.equal(run.runner?.started.length, 1);
-    assert.deepEqual(run.runner?.started[0]?.allowOrigins, [run.site.origin], 'the run container may reach more than the start origin');
-    assert.deepEqual(run.runner?.started[0]?.allowServices, []);
+    assert.deepEqual(run.runner.started[0]?.allowOrigins, [run.site.origin], 'the run container may reach more than the start origin');
+    assert.deepEqual(run.runner.started[0].allowServices, []);
   });
 });
 

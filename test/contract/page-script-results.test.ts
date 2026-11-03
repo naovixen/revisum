@@ -58,7 +58,7 @@ for (const targetId of UNSAFE_PAGE_TARGETS) {
         assert.equal(ran.result.state, 'Errored', JSON.stringify(ran.result.steps));
         assert.deepEqual(outcomes(ran.result), [[0, 'passed', undefined], [1, 'failed', code], [2, 'skipped', undefined], [3, 'skipped', undefined]]);
         assert.equal(ran.atClose?.shown['input-events'], '0', 'no input event reached the page');
-        assert.equal(ran.atClose?.shown['continue-state'], 'Not continued');
+        assert.equal(ran.atClose.shown['continue-state'], 'Not continued');
       });
     }
 

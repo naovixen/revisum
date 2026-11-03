@@ -63,7 +63,7 @@ describe("Using the call step", () => {
                     assert.equal(ran.clock.elapsed(), 0);
                     const record = ran.result.steps[0]?.serviceCall;
                     assert.equal(record?.attempts, 1, JSON.stringify(record));
-                    assert.equal(record?.status, 404, JSON.stringify(record));
+                    assert.equal(record.status, 404, JSON.stringify(record));
                 });
             });
 

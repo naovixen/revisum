@@ -58,7 +58,7 @@ const DELETE_ACCOUNT_LOCATORS: readonly { readonly name: string; readonly locato
 ];
 
 for (const targetId of UNSAFE_PAGE_TARGETS) {
-  const declaredBefore = listedFeatures(unsafePageDrivers().get(ADAPTER_OF_TARGET[targetId] ?? ''));
+  const declaredBefore = listedFeatures(unsafePageDrivers().get(ADAPTER_OF_TARGET[targetId]));
   const locators = DELETE_ACCOUNT_LOCATORS.filter((entry) => entry.alsoNeeds === undefined || declaredBefore.includes(entry.alsoNeeds));
 
   describe(`irreversible actions found by structure: ${targetId}`, () => {

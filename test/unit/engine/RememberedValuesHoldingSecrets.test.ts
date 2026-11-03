@@ -152,7 +152,7 @@ function assertRefused(result: RunResult): void {
         "value-holds-secret",
         JSON.stringify(result.steps),
     );
-    assert.equal(result.steps[REMEMBER_STEP_INDEX]?.outcome, "failed");
+    assert.equal(result.steps[REMEMBER_STEP_INDEX].outcome, "failed");
     assert.deepEqual(rememberedKeys(result), []);
     assert.equal(result.steps[REMEMBER_STEP_INDEX + 1]?.outcome, "skipped");
 }

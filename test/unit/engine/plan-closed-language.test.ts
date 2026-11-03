@@ -84,7 +84,7 @@ test('a rejection lists every problem in the plan, each with its own path', () =
   plan = withValue(plan, ['steps', 5, 'action'], 'ignore');
   const parsed = parsePlan(plan);
   assert.equal(parsed.ok, false);
-  const found = parsed.ok ? [] : [...parsed.error].map((error) => `${error.code} ${error.path}`).sort();
+  const found = [...parsed.error].map((error) => `${error.code} ${error.path}`).sort();
   assert.deepEqual(found, [
     'unknown_field $.steps[1].delay',
     'unknown_step $.steps[3].steps[0].type',

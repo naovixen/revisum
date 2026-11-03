@@ -64,7 +64,7 @@ for (const [index, described] of HOSTILE_NAMES.entries()) {
 
     // While the session was open: one stored copy, under a name the driver chose, in its own folder.
     assert.equal(atClose.stored?.length, 1, `${file.kind}: one stored copy: ${JSON.stringify(atClose.stored)}`);
-    const storedPath = atClose.stored?.[0] ?? '';
+    const storedPath = atClose.stored[0] ?? '';
     const storedName = basename(storedPath);
     assert.notEqual(storedName.toLowerCase(), lastPart(file.fileName).toLowerCase(), `${file.kind}: stored under the server's name`);
     assert.ok(!isDeviceName(storedName), `${file.kind}: stored under a device name: ${storedName}`);

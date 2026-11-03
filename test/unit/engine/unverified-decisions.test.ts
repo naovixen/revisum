@@ -43,7 +43,6 @@ test("the maintainer's declared approval of the same plan does open the merge ga
   await withRepository('solo', async (repository) => {
     const verified = await repository.verify(repository.subject('plan'), repository.lockdownProof());
     assert.equal(verified.ok, true, JSON.stringify(verified));
-    if (!verified.ok) return;
     assert.equal(mergeGateOpen(planStanding(parsedSignupPlan(), memoryApprovalStore([verified.value.approval]))), true);
   });
 });

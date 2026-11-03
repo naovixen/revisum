@@ -15,7 +15,6 @@ const ASSERTION_TYPES = ['expect', 'expectPage'];
 function assertRejectedAsVacuous(input: unknown, pathPrefix: string): void {
   const parsed = parsePlan(input);
   assert.equal(parsed.ok, false, 'the plan was accepted');
-  if (parsed.ok) return;
   assert.ok(parsed.error.length > 0, 'a rejection names at least one problem');
   for (const error of parsed.error) {
     assert.equal(error.code, 'vacuous', `expected only vacuous, got ${JSON.stringify(parsed.error)}`);

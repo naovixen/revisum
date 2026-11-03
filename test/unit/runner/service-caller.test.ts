@@ -297,12 +297,12 @@ test('the caller reveals secret headers and body parts only on the wire: the con
     const consoleText = await consoleWrittenDuring(async () => { answered = await caller.call(request); });
 
     // The probe is live: the secrets reached the service, so a leak had something to leak.
-    assert.ok(answered?.ok, JSON.stringify(answered));
+    assert.ok(answered?.ok === true, JSON.stringify(answered));
     const sent = service.received[0];
     assert.equal(sent?.headers.authorization, `Bearer ${token}`);
-    assert.equal(sent?.headers['x-admin-login'], `Basic ${loginForm}`);
-    assert.equal(sent?.headers['x-test-suite'], HEADER_MARKER);
-    assert.deepEqual(JSON.parse(sent?.body ?? ''), { password });
+    assert.equal(sent.headers['x-admin-login'], `Basic ${loginForm}`);
+    assert.equal(sent.headers['x-test-suite'], HEADER_MARKER);
+    assert.deepEqual(JSON.parse(sent.body), { password });
 
     for (const [name, value] of [['token', token], ['login', login], ['password', password]] as const) {
       assert.deepEqual(echoesIn(consoleText, value), [], `the ${name} reached the console`);

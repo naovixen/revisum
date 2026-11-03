@@ -185,7 +185,7 @@ describe("Using the backend check", () => {
                         assert.equal(readsOf(ran.requests).length, 3);
                         const record = ran.result.steps[0]?.serviceCall;
                         assert.equal(record?.attempts, 3, JSON.stringify(record));
-                        assert.equal(record?.status, 200, JSON.stringify(record));
+                        assert.equal(record.status, 200, JSON.stringify(record));
                     });
 
                     test("then it should finish before the check timeout, having waited between reads", async () => {
@@ -234,7 +234,7 @@ describe("Using the backend check", () => {
                             readsOf(ran.requests).length,
                             JSON.stringify(record),
                         );
-                        assert.equal(record?.status, pending.status, JSON.stringify(record));
+                        assert.equal(record.status, pending.status, JSON.stringify(record));
                     });
                 });
             });
@@ -252,7 +252,7 @@ describe("Using the backend check", () => {
                         assert.equal(readsOf(ran.requests).length, 3);
                         const record = ran.result.steps[0]?.serviceCall;
                         assert.equal(record?.attempts, 3, JSON.stringify(record));
-                        assert.equal(record?.status, 200, JSON.stringify(record));
+                        assert.equal(record.status, 200, JSON.stringify(record));
                     });
                 });
 
@@ -320,7 +320,7 @@ describe("Using the backend check", () => {
                         assert.deepEqual(ran.requests.map(requestLine), [READ_ORDER, READ_ORDER]);
                         const record = ran.result.steps[0]?.serviceCall;
                         assert.equal(record?.attempts, 2, JSON.stringify(record));
-                        assert.equal(record?.status, failed.status, JSON.stringify(record));
+                        assert.equal(record.status, failed.status, JSON.stringify(record));
                     });
 
                     test(`then it should fail the step with ${failed.code} and end the run ${failed.verdict}`, async () => {

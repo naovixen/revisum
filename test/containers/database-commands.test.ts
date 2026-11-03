@@ -38,7 +38,7 @@ before(async () => {
   listeners = { database: await startFixtureService(image, DATABASE_BANNER), otherService: await startFixtureService(image, 'other-service') };
 }, { timeout: TIMEOUT });
 after(async () => {
-  await Promise.all([listeners?.database.close(), listeners?.otherService.close()]);
+  await Promise.all([listeners.database.close(), listeners.otherService.close()]);
 }, { timeout: TIMEOUT });
 
 const step = (command: string, commandArguments: Readonly<Record<string, unknown>> = {}) => ({ type: 'database', command, arguments: commandArguments });

@@ -100,7 +100,6 @@ test('approvals of other subjects leave a plan standing as a proposal', async ()
   await withRepository('solo', async (repository) => {
     const verified = await repository.verify(repository.subject('trusted-file'), repository.lockdownProof());
     assert.equal(verified.ok, true, JSON.stringify(verified));
-    if (!verified.ok) return;
     const store = memoryApprovalStore([verified.value.approval]);
     assert.equal(approvalFor(parsedSignupPlan(), store), null);
     assert.deepEqual(planStanding(parsedSignupPlan(), store), { mode: 'proposal' });

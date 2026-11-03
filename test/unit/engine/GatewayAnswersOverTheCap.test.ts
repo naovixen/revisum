@@ -63,8 +63,8 @@ describe("Using the backend check", () => {
                         assert.deepEqual(ran.requests.map(requestLine), [READ_ORDER]);
                         const record = ran.result.steps[0]?.serviceCall;
                         assert.equal(record?.status, status, JSON.stringify(record));
-                        assert.equal(record?.responseSha256, null);
-                        assert.equal(record?.attempts, 1);
+                        assert.equal(record.responseSha256, null);
+                        assert.equal(record.attempts, 1);
                     });
 
                     test("then it should log no hash of the body cut short", async () => {

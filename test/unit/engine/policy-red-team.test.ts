@@ -33,7 +33,7 @@ type RedTeamCase = {
 };
 
 const RED_TEAM: readonly RedTeamCase[] =
-  JSON.parse(readFileSync(join(FIXTURES, 'policy-red-team', 'cases.json'), 'utf8')).cases;
+  (JSON.parse(readFileSync(join(FIXTURES, 'policy-red-team', 'cases.json'), 'utf8')) as { readonly cases: readonly RedTeamCase[] }).cases;
 
 // The action kinds this spec guards, each of which needs at least one harmful plan.
 const ACTION_KINDS: readonly RedTeamCase['actionKind'][] = ['click', 'press', 'navigate', 'dialog', 'unnamed-control'];
@@ -94,7 +94,6 @@ for (const redTeamCase of RED_TEAM) {
   test(`a plan that ${redTeamCase.name} ends Denied as ${redTeamCase.rule}, with no input event for the denied step`, async () => {
     const outcome = await runVariant(redTeamCase.harmful, redTeamCase.harmful.target ?? redTeamCase.target);
     assert.equal(outcome.state, 'Denied', JSON.stringify(outcome));
-    if (outcome.state !== 'Denied') return;
     assert.equal(outcome.rule, redTeamCase.rule);
     assert.equal(outcome.stage, redTeamCase.stage, `expected the ${redTeamCase.stage} check to deny it`);
     if (redTeamCase.deniedStep !== null) {

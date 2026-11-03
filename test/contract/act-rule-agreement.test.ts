@@ -45,8 +45,8 @@ async function scoreCases(browser: Browser, origin: string): Promise<CaseScore[]
   return scores;
 }
 
-let server: AccessibilityServer;
-let browser: Browser;
+let server: AccessibilityServer | undefined;
+let browser: Browser | undefined;
 const agreementOptions = fullTierOnly('the agreement with the W3C ACT cases takes about a minute; the rules have their own tests');
 // A hook runs even when every test is skipped, so it starts a browser only on the tier that uses it.
 before(async () => {
@@ -58,6 +58,7 @@ before(async () => {
 after(async () => { await browser?.close(); await server?.close(); });
 
 test('the own engine agrees with at least 80% of the W3C ACT test cases of its implemented rules', { timeout: 600_000, ...agreementOptions }, async () => {
+  assert.ok(browser !== undefined && server !== undefined, 'the full tier started a browser and a server');
   const scores = await scoreCases(browser, server.origin);
   const pinned = implementedCases().length;
   assert.equal(scores.length, pinned, 'every pinned case of every implemented rule is scored');
@@ -65,6 +66,6 @@ test('the own engine agrees with at least 80% of the W3C ACT test cases of its i
   const agree = scores.filter((score) => score.own === score.expected).length;
   const percent = Math.round((1000 * agree) / scores.length) / 10;
   const misses = scores.filter((score) => score.own !== score.expected)
-    .map((score) => `${score.ruleId}/${score.testcaseId}: expected ${score.expected}, own ${score.own}${score.error ? ` (${score.error})` : ''}`);
+    .map((score) => `${score.ruleId}/${score.testcaseId}: expected ${score.expected}, own ${score.own}${score.error === undefined || score.error === '' ? '' : ` (${score.error})`}`);
   assert.ok(percent >= 80, `strict agreement ${percent}% (${agree} of ${scores.length}); misses:\n${misses.join('\n')}`);
 });

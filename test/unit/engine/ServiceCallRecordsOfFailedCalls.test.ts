@@ -40,9 +40,9 @@ describe("Using the run", () => {
                     });
                     const step = ran.result.steps[0];
                     assert.equal(step?.code, "unexpected-status", JSON.stringify(step));
-                    assert.equal(step?.serviceCall?.status, 500, JSON.stringify(step));
+                    assert.equal(step.serviceCall?.status, 500, JSON.stringify(step));
                     assert.equal(
-                        step?.serviceCall?.responseSha256,
+                        step.serviceCall.responseSha256,
                         bodyHash(SERVER_ERROR_BODY),
                         JSON.stringify(step),
                     );
@@ -66,8 +66,8 @@ describe("Using the run", () => {
                     });
                     const step = ran.result.steps[0];
                     assert.equal(step?.outcome, "passed", JSON.stringify(step));
-                    assert.equal(step?.serviceCall?.status, 201);
-                    assert.equal(step?.serviceCall?.responseSha256, bodyHash(body));
+                    assert.equal(step.serviceCall?.status, 201);
+                    assert.equal(step.serviceCall.responseSha256, bodyHash(body));
                 });
             });
         });
@@ -80,8 +80,8 @@ describe("Using the run", () => {
                     });
                     const step = ran.result.steps[0];
                     assert.equal(step?.code, "service-unreachable");
-                    assert.equal(step?.serviceCall?.status, null);
-                    assert.equal(step?.serviceCall?.responseSha256, null);
+                    assert.equal(step.serviceCall?.status, null);
+                    assert.equal(step.serviceCall.responseSha256, null);
                 });
             });
         });
@@ -96,9 +96,9 @@ describe("Using the run", () => {
                     });
                     const step = ran.result.steps[0];
                     assert.equal(step?.code, "unexpected-status", JSON.stringify(step));
-                    assert.equal(step?.serviceCall?.status, 500, JSON.stringify(step));
+                    assert.equal(step.serviceCall?.status, 500, JSON.stringify(step));
                     assert.equal(
-                        step?.serviceCall?.responseSha256,
+                        step.serviceCall.responseSha256,
                         bodyHash(SERVER_ERROR_BODY),
                         JSON.stringify(step),
                     );

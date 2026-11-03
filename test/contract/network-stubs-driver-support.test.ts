@@ -60,7 +60,7 @@ describe(`the own CDP driver with the step's feature taken off its list: ${Brows
         [0, 'passed', undefined], [1, 'passed', undefined], [2, 'failed', 'unsupported-step'], [3, 'skipped', undefined], [4, 'skipped', undefined],
       ]);
       assert.equal(ran.atClose?.shown['input-events'], '0', 'no input event reached the page');
-      assert.equal(ran.atClose?.shown['continue-state'], 'Not continued');
+      assert.equal(ran.atClose.shown['continue-state'], 'Not continued');
     });
   }
 

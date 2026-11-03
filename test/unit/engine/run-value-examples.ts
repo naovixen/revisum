@@ -68,7 +68,7 @@ export function accepted(parse: ParsePlan, raw: unknown): Plan {
 export function rejection(parse: ParsePlan, raw: unknown): string[] {
   const parsed = parse(raw);
   assert.equal(parsed.ok, false, 'the plan was accepted');
-  return parsed.ok ? [] : parsed.error.map((error) => `${error.code} ${error.path}`);
+  return parsed.error.map((error) => `${error.code} ${error.path}`);
 }
 
 // A value name as the plan parser brands it. Tests take the generated value itself from a parsed

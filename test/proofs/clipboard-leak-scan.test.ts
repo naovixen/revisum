@@ -151,7 +151,7 @@ test('control: a failed check of the element showing the canary keeps it in the 
   const ran = await harness.runSteps(BrowserTarget.Chrome, [navigate('/leaks.html'), textEquals(testId('contact-name'), 'deliberately wrong', 'leaks.contact-shown')]);
   const check = ran.result.steps[1];
   assert.equal(check?.outcome, 'failed');
-  assert.ok(check?.observed?.includes(harness.canaries.contactName), `the observation should hold the canary: ${check?.observed ?? '(none)'}`);
+  assert.ok(check.observed?.includes(harness.canaries.contactName) === true, `the observation should hold the canary: ${check.observed ?? '(none)'}`);
   const outputs = writeOutputs('control', ran);
   const leaks = leakScanner().scan(outputs, [resolvedSecret('CONTACT_NAME_CANARY', harness.canaries.contactName)]);
   assert.ok(leaks.some((leak) => leak.file.endsWith('control.result.json')), 'the scan found the canary in the control result');

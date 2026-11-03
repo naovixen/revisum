@@ -32,7 +32,6 @@ const fill = (label: string, value: unknown) => ({ type: 'fill', locator: { by: 
 function assertLiteralSecret(raw: unknown, path: string, literal: string): void {
   const parsed = parse(raw);
   assert.equal(parsed.ok, false, 'the plan was accepted');
-  if (parsed.ok) return;
   assert.ok(parsed.error.some((error) => error.code === 'literal_secret' && error.path === path), `expected literal_secret at ${path}, got ${JSON.stringify(parsed.error)}`);
   assert.equal(JSON.stringify(parsed.error).includes(literal), false, 'the error echoes the literal');
 }

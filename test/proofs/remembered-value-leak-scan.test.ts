@@ -99,7 +99,7 @@ test('control: a failed check of the canary element keeps it in the result, and 
   ]);
   const check = ran.result.steps[1];
   assert.equal(check?.outcome, 'failed');
-  assert.ok(check?.observed?.includes(CANARY), `the observation should hold the canary: ${check?.observed ?? '(none)'}`);
+  assert.ok(check.observed?.includes(CANARY) === true, `the observation should hold the canary: ${check.observed ?? '(none)'}`);
   const outputs = writeOutputs('control', ran);
   const leaks = leakScanner().scan(outputs, [resolvedSecret('REMEMBERED_CANARY', CANARY)]);
   assert.ok(leaks.some((leak) => leak.file.endsWith('control.result.json')), 'the scan found the canary in the control result');

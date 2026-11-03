@@ -23,7 +23,7 @@ const HOME_CREDENTIAL_FILES = [
 
 let run: IsolatedRun;
 before(async () => { run = await startIsolatedRun(); }, { timeout: TIMEOUT });
-after(async () => { await run?.stop(); }, { timeout: TIMEOUT });
+after(async () => { await run.stop(); }, { timeout: TIMEOUT });
 
 type Environment = Readonly<Record<string, string>>;
 const environmentInside = async (): Promise<Environment> =>

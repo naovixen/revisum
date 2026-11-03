@@ -15,18 +15,18 @@ before(async () => {
   browser = await launchBrowser(BROWSERS.chrome);
   page = await browser.newPage();
 }, { timeout: 60_000 });
-after(async () => { await page?.close(); await browser?.close(); await server?.close(); });
+after(async () => { await page.close(); await browser.close(); await server.close(); });
 
 test('the snapshot holds DOM nodes, computed styles, layout boxes and accessibility-tree role and name', { timeout: 60_000 }, async () => {
   await page.goto(`${server.origin}/keyboard-pairs/k10-sequence.clean.html`);
   const snapshot = await page.snapshot();
   const button = snapshot.nodes.find((node) => node.attributes['id'] === 's1');
-  assert.ok(button, 'button node');
+  assert.ok(button !== undefined, 'button node');
   assert.equal(button.name, 'button');
-  assert.ok(button.style && button.style['display'], 'computed style');
-  assert.ok(button.bounds && button.bounds.width > 0 && button.bounds.height > 0, 'layout box');
+  assert.ok(button.style !== null && (button.style['display'] ?? '') !== '', 'computed style');
+  assert.ok(button.bounds !== null && button.bounds.width > 0 && button.bounds.height > 0, 'layout box');
   assert.equal(button.accessibility?.role, 'button');
-  assert.equal(button.accessibility?.name, 'One');
+  assert.equal(button.accessibility.name, 'One');
   const input = snapshot.nodes.find((node) => node.attributes['id'] === 's4');
   assert.equal(input?.accessibility?.name, 'Four');
 });

@@ -144,7 +144,6 @@ for (const source of DECLARABLE) {
     const spy = spyParser(log);
     const admitted = admitDraft(draftOf(source, signupPlan()), spy.parse, memoryEventSink(), someActor());
     assert.equal(admitted.ok, true, JSON.stringify(admitted));
-    if (!admitted.ok) return;
     assert.deepEqual(log, ['parse']);
     assert.equal(admitted.value, spy.plans[0], 'the admitted plan is not the object the parser returned');
   });
@@ -175,7 +174,6 @@ for (const source of DECLARABLE) {
     const refusing: PlanParse = () => failure(refusal);
     const admitted = admitDraft(draftOf(source, signupPlan()), refusing, memoryEventSink(), someActor());
     assert.equal(admitted.ok, false);
-    if (admitted.ok) return;
     assert.ok(admitted.error.some((error) => error.stage === 'plan' && error.code === 'unknown_step' && error.path === '$.steps[0]'), shown(admitted.error));
   });
 
@@ -184,7 +182,7 @@ for (const source of DECLARABLE) {
     const substitute = parsedSignupPlan(accountClosurePlan());
     const admitted = admitDraft(draftOf(source, signupPlan()), () => success(substitute), memoryEventSink(), someActor());
     assert.equal(admitted.ok, true, JSON.stringify(admitted));
-    if (admitted.ok) assert.equal(admitted.value, substitute);
+    assert.equal(admitted.value, substitute);
   });
 }
 
@@ -262,9 +260,9 @@ for (const source of DECLARABLE) {
     assert.equal(events.recorded.length, 1, JSON.stringify(events.recorded));
     const recorded = events.recorded[0];
     assert.equal(recorded?.event.kind, 'plan.submitted');
-    assert.deepEqual(recorded?.event.planProvenance, provenanceOf(source));
+    assert.deepEqual(recorded.event.planProvenance, provenanceOf(source));
     // The source is recorded, never trusted: the actor is the one core derived, whatever the source says.
-    assert.equal(recorded?.actor, actor);
+    assert.equal(recorded.actor, actor);
   });
 
   for (const format of ['text', 'json'] as const) {
@@ -318,9 +316,10 @@ for (const { name, plan, decision, approved } of [
     const first = treatments[0]?.treatment;
     // The expected treatment, so a test that compared nothing with nothing would fail.
     assert.ok(first !== undefined);
-    assert.equal(JSON.parse(first).decision, decision);
-    assert.equal(JSON.parse(first).withoutApproval, 'proposal');
-    assert.equal(JSON.parse(first).withTheSignUpApproval, approved);
+    const read = JSON.parse(first) as { decision: unknown; withoutApproval: unknown; withTheSignUpApproval: unknown };
+    assert.equal(read.decision, decision);
+    assert.equal(read.withoutApproval, 'proposal');
+    assert.equal(read.withTheSignUpApproval, approved);
     for (const { label, treatment } of treatments) assert.equal(treatment, first, `${label} was treated differently`);
   });
 }

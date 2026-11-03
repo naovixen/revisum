@@ -19,7 +19,7 @@ const assertReadNoReport = (result: RunResult): void => {
     assert.equal(result.state, "Errored", JSON.stringify(result.evidence));
     assert.equal(result.evidence?.outcomeCode, "suite-report-unread");
     assert.deepEqual(
-        result.evidence?.decodeErrors?.map((error) => error.code),
+        result.evidence.decodeErrors?.map((error) => error.code),
         ["suite-report-missing"],
     );
     assert.deepEqual(testsOf(result), []);

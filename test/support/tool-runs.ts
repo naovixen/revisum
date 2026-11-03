@@ -20,6 +20,12 @@ export type ToolRunOptions = {
   readonly timeout?: number;
 };
 
+// What a finished child process printed. The types say both streams are strings, but a process
+// that failed to start leaves them null.
+export function printedBy(ran: { readonly stdout: string | null; readonly stderr: string | null }): string {
+  return `${ran.stdout ?? ''}${ran.stderr ?? ''}`;
+}
+
 // Runs `tools/<name>` from this repository (or `script` as given when it is absolute).
 export function runTool(script: string, words: readonly string[], options: ToolRunOptions): ToolRun {
   const path = isAbsolute(script) ? script : join(REPOSITORY_ROOT, 'tools', script);
@@ -34,7 +40,7 @@ export function runTool(script: string, words: readonly string[], options: ToolR
     ...(options.input === undefined ? {} : { input: options.input }),
     timeout: options.timeout ?? 240_000,
   });
-  const output = `${ran.stdout ?? ''}${ran.stderr ?? ''}${ran.error === undefined ? '' : String(ran.error)}`;
+  const output = `${printedBy(ran)}${ran.error === undefined ? '' : String(ran.error)}`;
   return { status: ran.status, passed: ran.status === 0, output };
 }
 

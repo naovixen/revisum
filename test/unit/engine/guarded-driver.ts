@@ -67,13 +67,11 @@ export function guardedDriver(steps: readonly JsonRecord[], page: PageViews = {}
       const raw = steps[index] ?? {};
       const seen = page[String(index)];
       const kind: string = step.type;
-      if (guard !== undefined) {
-        guardCalls++;
-        // A guard may read the open dialog's text as a second argument; one that does not ignores it.
-        const ask: (resolved: ResolvedElement, dialogText: string | null) => GuardVerdict = guard;
-        const verdict = ask(elementFor(raw, seen), kind === 'dialog' ? (seen?.dialogText ?? null) : null);
-        if (verdict.kind === 'deny') return { ok: false, error: { code: 'policy-denied', detail: verdict.rule } };
-      }
+      guardCalls++;
+      // A guard may read the open dialog's text as a second argument; one that does not ignores it.
+      const ask: (resolved: ResolvedElement, dialogText: string | null) => GuardVerdict = guard;
+      const verdict = ask(elementFor(raw, seen), kind === 'dialog' ? (seen?.dialogText ?? null) : null);
+      if (verdict.kind === 'deny') return { ok: false, error: { code: 'policy-denied', detail: verdict.rule } };
       if (index >= 0) inputEvents[index] = (inputEvents[index] ?? 0) + 1;
       return { ok: true, value: undefined };
     },

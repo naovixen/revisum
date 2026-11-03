@@ -66,7 +66,7 @@ describe(`the own CDP driver with the step's feature taken off its list: ${Brows
       assert.deepEqual(outcomes(ran.result), [[0, 'passed', undefined], [1, 'failed', 'unsupported-step'], [2, 'skipped', undefined], [3, 'skipped', undefined]]);
       assert.ok(stepMilliseconds(ran.result, 1) < 1000, `the refused step took ${stepMilliseconds(ran.result, 1)} ms of real time`);
       assert.equal(ran.atClose?.shown['input-events'], '0', 'no input event reached the page');
-      assert.equal(ran.atClose?.shown['continue-state'], 'Not continued');
+      assert.equal(ran.atClose.shown['continue-state'], 'Not continued');
     });
   }
 

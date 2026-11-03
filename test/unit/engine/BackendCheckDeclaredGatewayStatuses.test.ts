@@ -84,7 +84,7 @@ describe("Using the backend check", () => {
                         assert.equal(ran.result.state, "Passed");
                         const record = ran.result.steps[0]?.serviceCall;
                         assert.equal(record?.attempts, 1, JSON.stringify(record));
-                        assert.equal(record?.status, status, JSON.stringify(record));
+                        assert.equal(record.status, status, JSON.stringify(record));
                     });
                 });
             });
@@ -140,7 +140,7 @@ describe("Using the backend check", () => {
                         assert.equal(ran.result.state, "Passed");
                         const record = ran.result.steps[0]?.serviceCall;
                         assert.equal(record?.attempts, 3, JSON.stringify(record));
-                        assert.equal(record?.status, 200, JSON.stringify(record));
+                        assert.equal(record.status, 200, JSON.stringify(record));
                     });
                 });
 

@@ -84,7 +84,7 @@ test('with the edited project.json reachable in the working copy, core loads the
     const reads = await readsFromWorkingCopy(repository, async () => {
       const loaded = await loadForChange(repository.versionControl(), [PROJECT_PATH, APPLICATION_CODE], memoryEventSink());
       assert.equal(loaded.ok, true, JSON.stringify(loaded));
-      if (loaded.ok) origins = loaded.value.project.origins;
+      origins = loaded.value.project.origins;
     });
     assert.ok(!JSON.stringify(origins).includes(PRODUCTION_ORIGIN), 'the origin from the working copy was trusted');
     assert.deepEqual(reads, []);

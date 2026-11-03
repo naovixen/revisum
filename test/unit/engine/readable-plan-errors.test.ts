@@ -102,7 +102,7 @@ function assertPlaced(text: string, errors: readonly DraftError[]): void {
 test('the sign-up plan\'s canonical text reads with no error and no warning', () => {
   const read = readPlanText(signupText(), limits);
   assert.equal(read.ok, true, JSON.stringify(read));
-  if (read.ok) assert.deepEqual(read.value.warnings, []);
+  assert.deepEqual(read.value.warnings, []);
 });
 
 test('reading text gives the line each step came from', () => {
@@ -381,7 +381,7 @@ test('the parser refuses a lone surrogate in JSON as unsafe_text, and accepts a 
   for (const lone of ['\uD800', '\uDC00', 'Create \uDBFF']) {
     const parsed = parsePlan(named(lone));
     assert.equal(parsed.ok, false, `a lone surrogate was accepted: ${JSON.stringify(lone)}`);
-    if (!parsed.ok) assert.deepEqual(parsed.error, [{ code: 'unsafe_text', path: '$.steps[8].locator.name' }]);
+    assert.deepEqual(parsed.error, [{ code: 'unsafe_text', path: '$.steps[8].locator.name' }]);
   }
   // The counter-example: the pair that makes one emoji.
   assert.equal(parsePlan(named('Create 🙂 account')).ok, true);

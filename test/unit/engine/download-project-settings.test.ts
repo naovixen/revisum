@@ -19,7 +19,7 @@ function parsed(fields: Record<string, unknown> = {}, limits: Readonly<Record<st
 const refusal = (fields: Record<string, unknown>, limits: Readonly<Record<string, number>> = {}): string[] => {
   const outcome = parseProject(projectFileWith(fields, limits));
   assert.equal(outcome.ok, false, 'the project was accepted');
-  return outcome.ok ? [] : outcome.error.map((error) => `${error.code} ${error.path}`);
+  return outcome.error.map((error) => `${error.code} ${error.path}`);
 };
 
 // The project's fields as plain data, read by name.

@@ -38,10 +38,9 @@ const planWith = (...steps: unknown[]): JsonRecord => ({ ...signupPlan(), steps:
 const assertOnlyTooLarge = (input: unknown): void => {
   const parsed = parsePlan(input);
   assert.equal(parsed.ok, false, 'the plan was accepted');
-  if (parsed.ok) return;
   assert.equal(parsed.error.length, 1, `expected one error, got ${JSON.stringify(parsed.error)}`);
   assert.equal(parsed.error[0]?.code, 'too_large');
-  assert.ok(parsed.error[0]?.path.startsWith('$'), 'the path is a JSON path');
+  assert.ok(parsed.error[0].path.startsWith('$'), 'the path is a JSON path');
 };
 
 // ---- Size ---------------------------------------------------------------------------------------

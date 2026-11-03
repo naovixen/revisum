@@ -10,6 +10,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import type { RepositoryRuleName } from '../../tools/RunRepositoryRules.ts';
 import { REPOSITORY_ROOT } from '../support/repository.ts';
+import { printedBy } from '../support/tool-runs.ts';
 
 export type CommandOutcome = { readonly command: string; readonly status: number | null; readonly output: string };
 
@@ -55,7 +56,7 @@ function repositoryFiles(): string[] {
 }
 
 function lintCommands(root: string): string[][] {
-  const manifest: { readonly scripts?: Readonly<Record<string, string>> } = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
+  const manifest: { readonly scripts?: Readonly<Record<string, string>> } = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as { readonly scripts?: Readonly<Record<string, string>> };
   const commands: string[][] = [];
   for (const script of LINT_SCRIPTS) {
     const line = manifest.scripts?.[script];
@@ -103,7 +104,7 @@ export function copyRepository(): ScratchRepository {
     const root = copied();
     const commands = chosenCommands(root, choice).map((words): CommandOutcome => {
       const ran = spawnSync(process.execPath, words, { cwd: root, encoding: 'utf8', timeout: 240_000 });
-      return { command: words.join(' '), status: ran.status, output: (ran.stdout ?? '') + (ran.stderr ?? '') };
+      return { command: words.join(' '), status: ran.status, output: printedBy(ran) };
     });
     const failed = commands.filter((command) => command.status !== 0);
     return {

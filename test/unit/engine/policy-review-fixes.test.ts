@@ -68,7 +68,6 @@ async function runClearedUnderA(runProjectInput: Record<string, unknown>) {
   const plan = parsedPlan(planOf(DELETE_STEPS), ALLOWS_DELETE);
   const decision = policyGate({ project: projectA, events: memoryEventSink() }).decide(plan, targetsOf(projectA, plan));
   assert.equal(decision.kind, 'allow', JSON.stringify(decision));
-  if (decision.kind !== 'allow') throw new Error('unreachable');
   const targetId = plan.targets[0];
   if (targetId === undefined) throw new Error('the test plan has no target');
   const driven = guardedDriver([...DELETE_STEPS, CLOSING_CHECK]);

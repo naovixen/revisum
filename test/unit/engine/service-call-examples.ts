@@ -162,7 +162,7 @@ export const callParser = (calls: JsonRecord = {}, limits: Readonly<Record<strin
 export function projectRefusal(projectFile: unknown): string[] {
   const parsed = parseProject(projectFile);
   assert.equal(parsed.ok, false, 'the project was accepted');
-  return parsed.ok ? [] : parsed.error.map((error) => `${error.code} ${error.path}`);
+  return parsed.error.map((error) => `${error.code} ${error.path}`);
 }
 
 // ---- Plan parts ---------------------------------------------------------------------------------

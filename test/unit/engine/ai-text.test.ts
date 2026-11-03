@@ -31,7 +31,7 @@ for (const [name, input] of NOT_TEXT) {
   test(`rejects ${name} as wrong_type`, () => {
     const parsed = parseAiText(input, LIMIT);
     assert.equal(parsed.ok, false);
-    assert.equal(parsed.ok ? undefined : parsed.error.code, 'wrong_type');
+    assert.equal(parsed.error.code, 'wrong_type');
     assert.ok(!JSON.stringify(parsed).includes(PRIVATE_MARKER), 'the error does not echo the input');
   });
 }
@@ -41,7 +41,7 @@ for (const [name, input] of SCRIPT_BEARING) {
     assert.ok(input.length <= LIMIT, 'short enough that only the content can be the reason');
     const parsed = parseAiText(input, LIMIT);
     assert.equal(parsed.ok, false);
-    assert.equal(parsed.ok ? undefined : parsed.error.code, 'unsafe_text');
+    assert.equal(parsed.error.code, 'unsafe_text');
     assert.ok(!JSON.stringify(parsed).includes(PRIVATE_MARKER), 'the error does not echo the input');
   });
 }
@@ -49,13 +49,13 @@ for (const [name, input] of SCRIPT_BEARING) {
 test('rejects text one character over the limit as too_long', () => {
   const parsed = parseAiText('a'.repeat(LIMIT + 1), LIMIT);
   assert.equal(parsed.ok, false);
-  assert.equal(parsed.ok ? undefined : parsed.error.code, 'too_long');
+  assert.equal(parsed.error.code, 'too_long');
 });
 
 test('rejects a very long text as too_long', () => {
   const parsed = parseAiText(`${PRIVATE_MARKER} `.repeat(100_000), LIMIT);
   assert.equal(parsed.ok, false);
-  assert.equal(parsed.ok ? undefined : parsed.error.code, 'too_long');
+  assert.equal(parsed.error.code, 'too_long');
   assert.ok(!JSON.stringify(parsed).includes(PRIVATE_MARKER), 'the error does not echo the input');
 });
 

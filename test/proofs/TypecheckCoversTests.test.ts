@@ -18,6 +18,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, describe, test } from "node:test";
 import { REPOSITORY_ROOT } from "../support/repository.ts";
+import { printedBy } from "../support/tool-runs.ts";
 import { withEdits } from "./scratch-edits.ts";
 
 const TIMEOUT = 300_000;
@@ -45,7 +46,7 @@ const runTypecheck = (cwd: string): { readonly status: number | null; readonly o
         shell: true,
         timeout: 240_000,
     });
-    return { status: ran.status, output: `${ran.stdout ?? ""}${ran.stderr ?? ""}` };
+    return { status: ran.status, output: printedBy(ran) };
 };
 
 describe("Using the typecheck script", () => {

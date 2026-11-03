@@ -48,7 +48,7 @@ const READ = ['input-events', 'script-runs'];
 const pageShown = (): JsonRecord => check(testId('input-events'), { kind: 'visible' }, 'support.page-shown');
 
 for (const targetId of UNSAFE_PAGE_TARGETS) {
-  const adapter = ADAPTER_OF_TARGET[targetId] ?? '';
+  const adapter = ADAPTER_OF_TARGET[targetId];
   // The steps this driver can run once it declares this spec's features: each step's other
   // feature, if any, is one the driver declares already.
   const declaredBefore = listedFeatures(unsafePageDrivers().get(adapter));
@@ -82,7 +82,7 @@ for (const targetId of UNSAFE_PAGE_TARGETS) {
           assert.deepEqual(outcomes(ran.result), [[0, 'passed', undefined], [1, 'failed', 'unsupported-step'], [2, 'skipped', undefined]], `${name}: ${JSON.stringify(ran.result.steps)}`);
           assert.ok(stepMilliseconds(ran.result, 1) < 1000, `${name}: the refused step waited no real time`);
           assert.equal(ran.atClose?.shown['input-events'], '0', `${name}: no input event reached the page`);
-          if (page === '/') assert.equal(ran.atClose?.shown['script-runs'], '0', `${name}: the script never ran`);
+          if (page === '/') assert.equal(ran.atClose.shown['script-runs'], '0', `${name}: the script never ran`);
         }
       });
     }

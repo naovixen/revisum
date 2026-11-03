@@ -68,7 +68,7 @@ test('with the default limits an advance of one hour is accepted and one of an h
     const errors = rejection(parserFor(), planOf([OPEN_ORDERS, over]));
     assert.equal(errors.length, 1, JSON.stringify(errors));
     assert.equal(errors[0]?.split(' ')[0], 'too_large', JSON.stringify(over));
-    assert.ok((errors[0]?.split(' ')[1] ?? '').startsWith('$.steps[1].by'), JSON.stringify(errors));
+    assert.ok((errors[0].split(' ')[1] ?? '').startsWith('$.steps[1].by'), JSON.stringify(errors));
   }
 });
 
@@ -159,7 +159,7 @@ function refusal(limits: Readonly<Record<string, unknown>>): string[] {
   const file = projectFileWith();
   const outcome = parseProject({ ...file, limits: { ...(file['limits'] as Record<string, unknown>), ...limits } });
   assert.equal(outcome.ok, false, `the project was accepted with ${JSON.stringify(limits)}`);
-  return outcome.ok ? [] : outcome.error.map((error) => `${error.code} ${error.path}`);
+  return outcome.error.map((error) => `${error.code} ${error.path}`);
 }
 
 // The project's limits as plain data, read by name.

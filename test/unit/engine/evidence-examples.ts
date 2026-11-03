@@ -89,7 +89,7 @@ export type ReportName = 'each-outcome' | 'passing-with-criteria';
 
 // A fresh copy of a recorded report, as JSON.parse reads it from disk.
 export const recordedReport = (name: ReportName): JsonRecord =>
-  JSON.parse(readFileSync(join(FIXTURES, 'evidence-mode', 'reports', `${name}.json`), 'utf8'));
+  JSON.parse(readFileSync(join(FIXTURES, 'evidence-mode', 'reports', `${name}.json`), 'utf8')) as JsonRecord;
 
 // The JSON path of spec `index` in the recorded reports' one describe block, as a withValue path.
 export const specPath = (index: number): (string | number)[] => ['suites', 0, 'suites', 0, 'specs', index];
@@ -132,7 +132,7 @@ export function decodedReport(report: unknown, limits: EvidenceLimits = evidence
 export function refusal(report: unknown, limits: EvidenceLimits = evidenceLimits()): readonly SuiteDecodeError[] {
   const decoded = decodeReport(report, limits);
   assert.equal(decoded.ok, false, 'the report was accepted');
-  return decoded.ok ? [] : decoded.error;
+  return decoded.error;
 }
 
 // ---- Evidence results ---------------------------------------------------------------------------
@@ -153,7 +153,7 @@ function resultStatuses(value: unknown): string[] {
   if (Array.isArray(value)) return value.flatMap(resultStatuses);
   if (typeof value !== 'object' || value === null) return [];
   const entries = Object.entries(value);
-  const results = entries.find(([key]) => key === 'results')?.[1];
+  const results: unknown = entries.find(([key]) => key === 'results')?.[1];
   const own = Array.isArray(results)
     ? results.map((entry: unknown) => (typeof entry === 'object' && entry !== null ? String(Object.entries(entry).find(([key]) => key === 'status')?.[1]) : ''))
     : [];

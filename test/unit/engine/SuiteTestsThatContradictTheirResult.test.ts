@@ -67,7 +67,7 @@ describe("Using an evidence result", () => {
             test("then it should end Passed and open the merge gate", () => {
                 const result = resultOf(reportWhoseFirstTestIs("expected"), 0);
                 assert.equal(result?.state, "Passed");
-                assert.equal(result !== null && evidenceMergeGateOpen(result), true);
+                assert.equal(evidenceMergeGateOpen(result), true);
             });
         });
     });

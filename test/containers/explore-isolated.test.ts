@@ -45,18 +45,19 @@ const CRAWL_MODULE = 'packages/cli/src/explore-in-container.ts';
 // The runner starts the Docker client with child_process.spawn. Replacing spawn on the module's
 // CommonJS exports and syncing the built-in ES module bindings lets the test see each argument
 // list exactly as the client receives it, then hands the call on unchanged.
-const childProcess: object = createRequire(import.meta.url)('node:child_process');
+const childProcess = createRequire(import.meta.url)('node:child_process') as object;
 
 type CommandLineSpy = { readonly lines: readonly (readonly string[])[]; restore(): void };
 
 function spyOnDockerCommandLines(): CommandLineSpy {
   const original: unknown = Reflect.get(childProcess, 'spawn');
   assert.ok(typeof original === 'function', 'child_process has no spawn');
+  const spawnOriginal = original as (...inputs: readonly unknown[]) => unknown;
   const lines: (readonly string[])[] = [];
   Reflect.set(childProcess, 'spawn', (...inputs: readonly unknown[]) => {
     const [command, words] = inputs;
     if (command === 'docker' && Array.isArray(words)) lines.push(['docker', ...words.map(String)]);
-    return Reflect.apply(original, childProcess, inputs);
+    return spawnOriginal.call(childProcess, ...inputs);
   });
   syncBuiltinESMExports();
   return {
@@ -291,7 +292,7 @@ test('the run container\'s egress policy allows the start origin and nothing els
   const crawl = await crawled();
   assert.equal(crawl.watch.policies.length, 1);
   assert.deepEqual(crawl.watch.policies[0]?.allowOrigins, [INSIDE_SITE_ORIGIN]);
-  assert.deepEqual(crawl.watch.policies[0]?.allowServices, []);
+  assert.deepEqual(crawl.watch.policies[0].allowServices, []);
 });
 
 test('the run\'s containers and network are removed once the crawl ends', { timeout: TIMEOUT }, async () => {

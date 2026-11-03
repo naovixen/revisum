@@ -17,7 +17,7 @@ import { FIXTURES, GOLDEN } from '../../support/repository.ts';
 type JsonRecord = Record<string, unknown>;
 
 const EXAMPLE_TEXT = readFileSync(join(FIXTURES, 'readable-plans', 'sign-in.plan'), 'utf8');
-const EXPECTED: JsonRecord = JSON.parse(readFileSync(join(GOLDEN, 'readable-plans', 'sign-in.json'), 'utf8'));
+const EXPECTED: JsonRecord = JSON.parse(readFileSync(join(GOLDEN, 'readable-plans', 'sign-in.json'), 'utf8')) as JsonRecord;
 const ORIGIN_HEADER = 'Origin: https://staging.example.org';
 
 function readExample(text: string = EXAMPLE_TEXT): TextReading {
@@ -44,7 +44,7 @@ test('in the founder\'s example, Go to /login resolves against the Origin: heade
 test('in the founder\'s example, Type secret TEST_USER is a fill step carrying the secret by name', () => {
   const fill = stepsOf(readExample().json)[1];
   assert.equal(fill?.['type'], 'fill');
-  assert.deepEqual(fill?.['value'], { secretName: 'TEST_USER' });
+  assert.deepEqual(fill['value'], { secretName: 'TEST_USER' });
 });
 
 test('a different Origin: header resolves the same path against that origin instead', () => {

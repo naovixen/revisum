@@ -146,7 +146,7 @@ describe(`an attribute remembered: ${BrowserTarget.Chrome}`, () => {
     ]);
     const typed = ran.result.steps[2];
     assert.equal(typed?.outcome, 'failed');
-    assert.ok(typed?.observed?.includes(harness.canaries.orderId), `the observation should hold the canary: ${typed?.observed ?? '(none)'}`);
+    assert.ok(typed.observed?.includes(harness.canaries.orderId) === true, `the observation should hold the canary: ${typed.observed ?? '(none)'}`);
     const leaks = leakScanner().scan(writeOutputs('order-control', ran), [resolvedSecret('ORDER_ID_CANARY', harness.canaries.orderId)]);
     assert.ok(leaks.some((leak) => leak.file.endsWith('order-control.result.json')), 'the scan found the canary in the control result');
   });
@@ -205,7 +205,7 @@ for (const targetId of UNSAFE_PAGE_TARGETS) {
       const ran = await harness.runSteps(targetId, [navigate('/leaks.html'), textEquals(testId('session-shown'), 'deliberately wrong', 'leaks.session-shown')]);
       const shown = ran.result.steps[1];
       assert.equal(shown?.outcome, 'failed');
-      assert.ok(shown?.observed?.includes(harness.canaries.sessionCookie), `the observation should hold the cookie: ${shown?.observed ?? '(none)'}`);
+      assert.ok(shown.observed?.includes(harness.canaries.sessionCookie) === true, `the observation should hold the cookie: ${shown.observed ?? '(none)'}`);
       const leaks = leakScanner().scan(writeOutputs(`script-${targetId}-control`, ran), [resolvedSecret('SESSION_COOKIE_CANARY', harness.canaries.sessionCookie)]);
       assert.ok(leaks.some((leak) => leak.file.endsWith(`script-${targetId}-control.result.json`)), 'the scan found the cookie in the control result');
     });

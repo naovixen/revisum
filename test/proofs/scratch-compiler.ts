@@ -6,6 +6,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { REPOSITORY_ROOT } from '../support/repository.ts';
+import { printedBy } from '../support/tool-runs.ts';
 
 export type CompileOutcome = {
   readonly passed: boolean;
@@ -43,7 +44,7 @@ export function compileFiles(files: readonly (string | { readonly name: string; 
     }, null, 2));
     const compiler = join(REPOSITORY_ROOT, 'node_modules', 'typescript', 'bin', 'tsc');
     const checked = spawnSync(process.execPath, [compiler, '--noEmit', '-p', configPath], { encoding: 'utf8', timeout: 240_000 });
-    const output = (checked.stdout ?? '') + (checked.stderr ?? '');
+    const output = printedBy(checked);
     const errors = output.split(/\r?\n/).filter((line) => /error TS\d+/.test(line));
     return { passed: checked.status === 0, output, errors };
   } finally {

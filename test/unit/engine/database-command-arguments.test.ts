@@ -37,7 +37,7 @@ for (const { name, value } of HOSTILE_ARGUMENTS) {
 test('"; rm -rf /", "$(id)" and text with spaces, side by side, are three arguments, each as written', async () => {
   const ran = await runWithCommands(commandPlan([echo('; rm -rf /', '$(id)', 'Ada Lovelace')]));
   assert.deepEqual(ran.commands[0]?.argv, echoed('; rm -rf /', '$(id)', 'Ada Lovelace'));
-  assert.equal(ran.commands[0]?.argv.length, PROGRAM.length + 4, 'an argument was split or joined');
+  assert.equal(ran.commands[0].argv.length, PROGRAM.length + 4, 'an argument was split or joined');
 });
 
 test('non-Latin text and quotes reach the program unchanged', async () => {

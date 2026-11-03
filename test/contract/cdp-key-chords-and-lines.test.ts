@@ -72,8 +72,8 @@ describe('key chords and the runtime guard', () => {
       assert.deepEqual(result.denial, { rule: 'irreversible-submit', stepIndex: 1 });
       assert.equal(result.steps[1]?.code, 'policy-denied');
       assert.equal(atClose?.shown['input-events'], '0', 'no input event reached the page, not even the modifier');
-      assert.equal(atClose?.shown['reason-enters'], '0');
-      assert.equal(atClose?.shown['submitted'], 'nothing');
+      assert.equal(atClose.shown['reason-enters'], '0');
+      assert.equal(atClose.shown['submitted'], 'nothing');
     });
 
     // Counter-example: the same chord in a form whose submit control is not irreversible reaches

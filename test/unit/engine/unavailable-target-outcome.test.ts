@@ -25,7 +25,7 @@ test('a target that does not say whether it is required is required', () => {
 test('an unavailable optional target is skipped with a warning that names it, and does not fail the run', () => {
   const outcome = unavailableTargetOutcome(targetOf(project, 'webkit-optional'));
   assert.equal(outcome.exitCode, 0);
-  assert.ok('skipped' in outcome && outcome.skipped === true, 'marked skipped');
+  assert.ok('skipped' in outcome && outcome.skipped, 'marked skipped');
   assert.ok('warning' in outcome && typeof outcome.warning === 'string', 'carries a warning');
   assert.ok(outcome.warning.includes('webkit-optional'), `the warning names the target: ${outcome.warning}`);
 });

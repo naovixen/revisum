@@ -192,7 +192,6 @@ async function clearedWith(plan: Plan, standing: PlanStanding): Promise<Authoris
         standing,
     );
     assert.equal(decision.kind, "allow", JSON.stringify(decision));
-    assert.ok(decision.kind === "allow");
     return decision.plan;
 }
 

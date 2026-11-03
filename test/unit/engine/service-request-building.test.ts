@@ -51,7 +51,7 @@ function refusedBuild(name: string, callArguments: CallArguments, values: RunVal
   const declaration = declarationOf(project, name);
   const outcome = buildServiceRequest(declaration, serviceOf(project, declaration.service), callArguments, values, store);
   assert.equal(outcome.ok, false, 'the request was built');
-  return outcome.ok ? '' : outcome.error;
+  return outcome.error;
 }
 
 // A request body is JSON text in parts, where a part may be a hidden secret. These tests read

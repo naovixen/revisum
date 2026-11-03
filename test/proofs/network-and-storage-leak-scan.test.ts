@@ -130,8 +130,8 @@ test('a failed storage check says only that the value differs', { timeout: TIMEO
   ]);
   const check = ran.result.steps[1];
   assert.equal(check?.outcome, 'failed');
-  assert.equal(check?.code, 'assertion-failed', JSON.stringify(check));
-  assert.equal(check?.observed ?? 'differs', 'differs', `the observation, if any, is only "differs": ${JSON.stringify(check)}`);
+  assert.equal(check.code, 'assertion-failed', JSON.stringify(check));
+  assert.equal(check.observed ?? 'differs', 'differs', `the observation, if any, is only "differs": ${JSON.stringify(check)}`);
 });
 
 // Control: the canary name, observed by a failed check of the element that shows it, does reach
@@ -143,7 +143,7 @@ test('control: a failed check of the element showing the canary name keeps it in
   ]);
   const check = ran.result.steps[1];
   assert.equal(check?.outcome, 'failed');
-  assert.ok(check?.observed?.includes(harness.canaries.profileName), `the observation should hold the canary name: ${check?.observed ?? '(none)'}`);
+  assert.ok(check.observed?.includes(harness.canaries.profileName) === true, `the observation should hold the canary name: ${check.observed ?? '(none)'}`);
   const outputs = writeOutputs('control', ran);
   const leaks = leakScanner().scan(outputs, [resolvedSecret('PROFILE_NAME_CANARY', harness.canaries.profileName)]);
   assert.ok(leaks.some((leak) => leak.file.endsWith('control.result.json')), 'the scan found the canary name in the control result');

@@ -53,7 +53,7 @@ export function acceptedBy(parse: ParsePlan, raw: unknown): Plan {
 export function errorsOf(parse: ParsePlan, raw: unknown): readonly PlanError[] {
   const parsed = parse(raw);
   assert.equal(parsed.ok, false, 'the plan was accepted');
-  return parsed.ok ? [] : parsed.error;
+  return parsed.error;
 }
 
 // The errors of a rejected plan as "code path" lines, in the parser's order.

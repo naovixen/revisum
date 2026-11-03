@@ -58,7 +58,7 @@ function revealAllowList(): string[] {
 
 for (const driver of DRIVERS) {
   test(`${driver.name}'s package manifest declares no runtime dependency beyond the ones it had`, () => {
-    const manifest: Record<string, unknown> = JSON.parse(readFileSync(join(PACKAGES, driver.name, 'package.json'), 'utf8'));
+    const manifest: Record<string, unknown> = JSON.parse(readFileSync(join(PACKAGES, driver.name, 'package.json'), 'utf8')) as Record<string, unknown>;
     const declared: Record<string, unknown> = {};
     for (const field of DEPENDENCY_FIELDS) {
       const value = manifest[field];
@@ -81,7 +81,7 @@ for (const driver of DRIVERS) {
       revealCallLines(readFileSync(file, 'utf8')).map((line) => ({ file: relative(REPOSITORY_ROOT, file).split('\\').join('/'), line: line.trim() })));
     assert.equal(calls.length, 1, JSON.stringify(calls));
     assert.equal(calls[0]?.file, driver.inputModule);
-    assert.match(calls[0]?.line ?? '', /\boperations\.fill\(/, 'the one call is in the fill');
+    assert.match(calls[0].line, /\boperations\.fill\(/, 'the one call is in the fill');
   });
 }
 

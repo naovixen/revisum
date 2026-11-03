@@ -94,9 +94,9 @@ before(async () => {
   });
 }, { timeout: TIMEOUT });
 after(async () => {
-  await run?.stop();
-  if (dockerHostService !== undefined) await runDocker(['stop', '--time', '1', dockerHostService.name]);
-  machineService?.close();
+  await run.stop();
+  await runDocker(['stop', '--time', '1', dockerHostService.name]);
+  machineService.close();
 }, { timeout: TIMEOUT });
 
 // ---- The browser's records --------------------------------------------------------------------------

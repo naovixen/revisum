@@ -46,7 +46,7 @@ test('a position of 0, 1001, 2.5, "second" or "2" is refused at the position', (
   for (const position of [0, 1001, 2.5, 'second', '2', -1]) {
     const errors = rejection(parsePlan, planOf([OPEN_ORDERS, click(BUTTON({ position }))]));
     assert.equal(errors.length, 1, `${JSON.stringify(position)}: ${JSON.stringify(errors)}`);
-    assert.ok(errors[0]?.endsWith(' $.steps[1].locator.position'), `${JSON.stringify(position)}: ${JSON.stringify(errors)}`);
+    assert.ok(errors[0]?.endsWith(' $.steps[1].locator.position') === true, `${JSON.stringify(position)}: ${JSON.stringify(errors)}`);
   }
 });
 
@@ -83,7 +83,7 @@ for (const attribute of REFUSED_ATTRIBUTES) {
   test(`a project declaring the test-id attribute "${attribute}" fails to parse, at that entry`, () => {
     const parsed = parseProject(projectFileWith({ testIdAttributes: ['data-testid', attribute] }));
     assert.equal(parsed.ok, false, 'the project was accepted');
-    assert.ok(!parsed.ok && parsed.error.some((error) => error.path === '$.testIdAttributes[1]'), JSON.stringify(parsed));
+    assert.ok(parsed.error.some((error) => error.path === '$.testIdAttributes[1]'), JSON.stringify(parsed));
   });
 }
 
@@ -120,7 +120,7 @@ test('an unknown modifier is refused with unknown_value at that modifier', () =>
 test('an empty modifier list is refused', () => {
   const errors = rejection(parsePlan, planOf([OPEN_ORDERS, press('k', [])]));
   assert.equal(errors.length, 1, JSON.stringify(errors));
-  assert.ok(errors[0]?.endsWith(' $.steps[1].modifiers'), JSON.stringify(errors));
+  assert.ok(errors[0]?.endsWith(' $.steps[1].modifiers') === true, JSON.stringify(errors));
 });
 
 // Counter-example: one to four distinct modifiers are accepted, in the order written, which is
@@ -204,7 +204,7 @@ test('the project accepts fill limits up to 500 lines and 20,000 characters, and
   for (const [field, value] of [['maximumFillLines', 501], ['maximumFillLines', 0], ['maximumFillCharacters', 20_001], ['maximumFillCharacters', 0]] as const) {
     const parsed = parseProject(projectFileWith({}, { [field]: value }));
     assert.equal(parsed.ok, false, `${field} ${value} was accepted`);
-    assert.ok(!parsed.ok && parsed.error.some((error) => error.path === `$.limits.${field}`), JSON.stringify(parsed));
+    assert.ok(parsed.error.some((error) => error.path === `$.limits.${field}`), JSON.stringify(parsed));
   }
 });
 

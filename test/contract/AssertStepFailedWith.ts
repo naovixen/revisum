@@ -10,5 +10,5 @@ export function assertStepFailedWith(result: RunResult, index: number, code: str
     );
     assert.equal(result.state, "Failed", JSON.stringify(result.steps));
     assert.equal(result.steps[index]?.outcome, "failed", JSON.stringify(result.steps));
-    assert.equal(result.steps[index]?.code, code, JSON.stringify(result.steps));
+    assert.equal(result.steps[index].code, code, JSON.stringify(result.steps));
 }

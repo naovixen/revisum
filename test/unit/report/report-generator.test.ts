@@ -16,7 +16,10 @@ import { PACKAGES } from '../../support/repository.ts';
 
 const REPORT_SOURCES = join(PACKAGES, 'report', 'src');
 const sourceFiles = (folder: string): string[] => readdirSync(folder, { withFileTypes: true })
-  .flatMap((entry) => (entry.isDirectory() ? sourceFiles(join(folder, entry.name)) : entry.name.endsWith('.ts') ? [join(folder, entry.name)] : []));
+  .flatMap((entry) => {
+    if (entry.isDirectory()) return sourceFiles(join(folder, entry.name));
+    return entry.name.endsWith('.ts') ? [join(folder, entry.name)] : [];
+  });
 
 test('each HTML file is self-contained: inline css, no script, no handler, no external reference', () => {
   for (const kind of ALL_KINDS) {
@@ -98,13 +101,11 @@ test('the verdict banner is the first element in main and shows the counts and h
     ...empty, acceptance: empty.acceptance.map((criterion) => ({ ...criterion, evidence: [{ kind: 'step', id: criterion.stepIds[0], label: 'ok' }] })),
   })));
   assert.ok(parsed.ok, 'an all-passed report parses');
-  if (parsed.ok) {
-    const file = generate(parsed.value, { png: new Map() }, loaded.history).find((output) => output.name === 'report.html');
-    const html = new TextDecoder().decode(file?.bytes);
-    assert.match(html, /PASSED/);
-    assert.match(html, /<strong>none<\/strong>/);
-    assert.match(html, /Nothing to review/);
-  }
+  const file = generate(parsed.value, { png: new Map() }, loaded.history).find((output) => output.name === 'report.html');
+  const html = new TextDecoder().decode(file?.bytes);
+  assert.match(html, /PASSED/);
+  assert.match(html, /<strong>none<\/strong>/);
+  assert.match(html, /Nothing to review/);
 });
 
 test('the banner counts equal an independent count and sum to the number of criteria', () => {
@@ -140,13 +141,13 @@ test('every embedded screenshot is the original PNG byte for byte', () => {
     const pinned = new Map(report.images.map((image) => [image.sha256, image]));
     for (const embedded of dataUris(html)) {
       const meta = pinned.get(sha256(embedded.bytes));
-      assert.ok(meta, `${kind}: an embedded image does not match any pinned hash`);
-      assert.deepEqual(pngSize(embedded.bytes), { width: meta?.width, height: meta?.height });
+      assert.ok(meta !== undefined, `${kind}: an embedded image does not match any pinned hash`);
+      assert.deepEqual(pngSize(embedded.bytes), { width: meta.width, height: meta.height });
       seen++;
     }
     for (const image of report.images) {
       const original = assets.get(image.id);
-      assert.ok(original && sha256(original) === image.sha256);
+      assert.ok(original !== undefined && sha256(original) === image.sha256);
       assert.ok(dataUris(html).some((embedded) => embedded.bytes.equals(Buffer.from(original))), `${image.id} is embedded unchanged`);
     }
   }
@@ -178,11 +179,11 @@ test('the SVG uses the PNG pixel grid; each callout is the clamped box and carri
       assert.ok(viewX >= 0 && viewY >= 0 && viewX + viewWidth <= figure.image.width + 1e-6 && viewY + viewHeight <= figure.image.height + 1e-6, 'viewBox inside the image');
       for (const callout of figure.callouts) {
         const numbered = view.numbered.find((entry) => entry.number === callout.number);
-        assert.ok(numbered && numbered.finding.image, `callout ${callout.number} belongs to a finding with an image`);
-        const meta = report.images.find((image) => image.id === numbered?.finding.image?.imageId);
-        const expected = usableBox(numbered?.finding.image?.box ?? null, meta?.width ?? 0, meta?.height ?? 0);
-        assert.ok(expected, `callout ${callout.number} has a usable box`);
-        assert.deepEqual(callout.box, [expected?.x, expected?.y, expected?.width, expected?.height]);
+        assert.ok(numbered !== undefined && numbered.finding.image !== null, `callout ${callout.number} belongs to a finding with an image`);
+        const meta = report.images.find((image) => image.id === numbered.finding.image?.imageId);
+        const expected = usableBox(numbered.finding.image.box ?? null, meta?.width ?? 0, meta?.height ?? 0);
+        assert.ok(expected !== null, `callout ${callout.number} has a usable box`);
+        assert.deepEqual(callout.box, [expected.x, expected.y, expected.width, expected.height]);
         assert.ok(callout.label.startsWith(`${callout.number} `), `label ${callout.label} starts with its number`);
         total++;
       }
@@ -316,7 +317,7 @@ test('the review queue lists exactly the needs-review findings, with reason and 
     if (expected === 0) assert.match(section, /Nothing to review/);
     else assert.equal((section.match(/<tr><th scope="row" class="n">/g) ?? []).length, expected);
     for (const entry of view.review) {
-      assert.ok(entry.finding.reason && entry.finding.action);
+      assert.ok((entry.finding.reason ?? '') !== '' && (entry.finding.action ?? '') !== '');
       assert.ok(section.includes(`<th scope="row" class="n">${entry.number}</th>`));
     }
   }
@@ -378,7 +379,8 @@ test('the PR comment has the verdict line, one image, a report link, at most 5 f
     const report = byKind(kind);
     const view = deriveView(report);
     const comment = outputText(outputs(report), 'pr-comment.md');
-    assert.ok(comment.length <= MAXIMUM_PR_COMMENT_CHARACTERS && MAXIMUM_PR_COMMENT_CHARACTERS === 1800, `${kind}: ${comment.length} chars`);
+    assert.ok(comment.length <= MAXIMUM_PR_COMMENT_CHARACTERS, `${kind}: ${comment.length} chars`);
+    assert.equal(MAXIMUM_PR_COMMENT_CHARACTERS, 1800);
     assert.match(comment, new RegExp(`${view.counts.failed} failed, ${view.counts.needsReview} need review, ${view.counts.passed} passed`));
     assert.equal((comment.match(/!\[[^\]]*\]\([^)]+\)/g) ?? []).length, 1, 'exactly one image');
     assert.match(comment, /\(top-finding\.svg\)/);
@@ -437,7 +439,6 @@ test('hostile strings in every free-text field are escaped or neutralised', () =
     const raw = poison(JSON.parse(JSON.stringify(base)), 'report', counter);
     const parsed = parseReportInput(raw);
     assert.ok(parsed.ok, `${kind}: poisoned report parses ${parsed.ok ? '' : JSON.stringify(parsed.error.slice(0, 3))}`);
-    if (!parsed.ok) continue;
     const files = generate(parsed.value, { png: assetsOf(base).png }, hostileHistory);
     for (const name of ['report.html', 'top-finding.svg', 'pr-comment.md']) {
       const text = outputText(files, name);
@@ -461,8 +462,10 @@ test('hostile strings in every free-text field are escaped or neutralised', () =
 });
 
 test('the model rejects hostile ids and the generator refuses an image that does not match its hash', () => {
-  const base = JSON.parse(JSON.stringify(byKind('functional'))) as Record<string, any>;
-  base.acceptance[0].id = 'x" onmouseover="1';
+  const base = JSON.parse(JSON.stringify(byKind('functional'))) as { acceptance: { id: string }[] };
+  const firstCriterion = base.acceptance[0];
+  assert.ok(firstCriterion !== undefined);
+  firstCriterion.id = 'x" onmouseover="1';
   assert.equal(parseReportInput(base).ok, false);
   const report = byKind('functional');
   const wrong = new Map(assetsOf(report).png);
@@ -485,7 +488,7 @@ test('the accessibility report covers all 102 mapping-pair pages with the right 
     else assert.ok(criterion.status !== 'passed', `${criterion.id}: a fixture page with a seeded failure is never "passed"`);
     if (criterion.status === 'failed') assert.ok(criterion.evidence.some((evidence) => evidence.kind === 'image'), `${criterion.id} has a screenshot`);
   }
-  const annotated = new Set(report.findings.filter((finding) => finding.status === 'failed' && finding.image?.box).map((finding) => finding.image?.imageId));
+  const annotated = new Set(report.findings.filter((finding) => finding.status === 'failed' && (finding.image?.box ?? null) !== null).map((finding) => finding.image?.imageId));
   assert.ok(annotated.size >= 20, `${annotated.size} pages carry a callout`);
   assert.equal(report.findings.filter((finding) => finding.status === 'needs-review' && finding.severity === null).length, 27);
 });

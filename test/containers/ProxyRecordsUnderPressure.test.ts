@@ -306,7 +306,7 @@ describe("Using the egress proxy on real Docker", () => {
 
             test("then it should report the egress guarantee lost", () => {
                 assert.ok(
-                    result.guarantees?.lost.some((entry) => entry.guarantee === "egress-enforced"),
+                    result.guarantees.lost.some((entry) => entry.guarantee === "egress-enforced"),
                     JSON.stringify(result.guarantees),
                 );
             });

@@ -17,7 +17,7 @@ const SECCOMP_FILTER_MODE = '2';
 
 let run: IsolatedRun;
 before(async () => { run = await startIsolatedRun(); }, { timeout: TIMEOUT });
-after(async () => { await run?.stop(); }, { timeout: TIMEOUT });
+after(async () => { await run.stop(); }, { timeout: TIMEOUT });
 
 type ProcessStatus = { readonly uid: string; readonly seccomp: string; readonly capabilities: readonly string[]; readonly noNewPrivileges: string };
 

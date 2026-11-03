@@ -9,13 +9,16 @@ import { customerKeyPlanner, localPlanner, projectFile, PLANNER_HOST } from '../
 
 // The fields every endpoint keeps as written: its kind, address, model and wire format.
 const keptFields = (endpoint: unknown): readonly unknown[] =>
-  ['kind', 'url', 'model', 'wire'].map((field) => (typeof endpoint === 'object' && endpoint !== null ? Reflect.get(endpoint, field) : undefined));
+  ['kind', 'url', 'model', 'wire'].map((field) => {
+    const kept: unknown = typeof endpoint === 'object' && endpoint !== null ? Reflect.get(endpoint, field) : undefined;
+    return kept;
+  });
 
 test('a customer-key endpoint over plain http is refused with scheme_not_allowed at its url', () => {
   for (const wire of ['anthropic-messages', 'openai-chat'] as const) {
     const parsed = parseProject(projectFile(customerKeyPlanner(wire, `http://${PLANNER_HOST}`)));
     assert.equal(parsed.ok, false, `${wire}: the http endpoint was accepted`);
-    if (!parsed.ok) assert.deepEqual(parsed.error, [{ code: 'scheme_not_allowed', path: '$.planner.url' }]);
+    assert.deepEqual(parsed.error, [{ code: 'scheme_not_allowed', path: '$.planner.url' }]);
   }
 });
 

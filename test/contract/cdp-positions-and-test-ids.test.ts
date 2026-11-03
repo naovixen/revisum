@@ -66,7 +66,7 @@ describe('positions on a page with three matches', () => {
     assert.equal(result.state, 'Failed');
     assert.deepEqual(outcomes(result), [[0, 'passed', undefined], [1, 'failed', 'not-found'], [2, 'skipped', undefined]]);
     assert.equal(atClose?.shown['input-events'], '0', 'no input event reached the page');
-    assert.equal(atClose?.shown['opened'], 'none');
+    assert.equal(atClose.shown['opened'], 'none');
   });
 
   // Counter-example: without a position the same locator matches all three, so it is the
@@ -106,7 +106,7 @@ describe('declared test-id attributes on a page of look-alikes', () => {
     assert.equal(result.state, 'Failed');
     assert.deepEqual(outcomes(result), [[0, 'passed', undefined], [1, 'failed', 'not-found'], [2, 'skipped', undefined]]);
     assert.equal(atClose?.shown['input-events'], '0', 'no input event reached the page');
-    assert.equal(atClose?.shown['clicked'], 'none');
+    assert.equal(atClose.shown['clicked'], 'none');
   });
 
   // Counter-example: the look-alike itself is clickable, so the not-found above is the exact match's doing.

@@ -23,7 +23,6 @@ test("the maintainer's merge to the protected branch records a declared approval
     const subject = repository.subject('plan');
     const verified = await repository.verify(subject, repository.lockdownProof());
     assert.equal(verified.ok, true, JSON.stringify(verified));
-    if (!verified.ok) return;
     const { approval, actor } = verified.value;
     assert.equal(approval.strength, 'declared');
     assert.equal(approval.proofKind, 'agent-lockdown-merge');
@@ -53,7 +52,6 @@ test('the declared approval is dated by when GitHub says the commit landed, not 
   await withRepository('solo', async (repository) => {
     const verified = await repository.verify(repository.subject('plan'), repository.lockdownProof());
     assert.equal(verified.ok, true, JSON.stringify(verified));
-    if (!verified.ok) return;
     const landing = repository.fixture.landings.find((candidate) => candidate.commit === repository.fixture.protectedCommit);
     assert.equal(verified.value.approval.at, landing?.at);
   });
@@ -64,7 +62,7 @@ const approvesWith = (title: string, edit: (fixture: FixtureRepository) => void)
     await withRepository('solo', async (repository) => {
       const verified = await repository.verify(repository.subject('plan'), repository.lockdownProof());
       assert.equal(verified.ok, true, JSON.stringify(verified));
-      if (verified.ok) assert.equal(verified.value.approval.strength, 'declared');
+      assert.equal(verified.value.approval.strength, 'declared');
     }, edit);
   });
 };
@@ -201,7 +199,6 @@ test('a lock-down approval is labelled "declared, not verified", whatever the ma
     await withRepository('solo', async (repository) => {
       const verified = await repository.verify(repository.subject('plan'), repository.lockdownProof());
       assert.equal(verified.ok, true, JSON.stringify(verified));
-      if (!verified.ok) return;
       assert.equal(verified.value.approval.strength, 'declared');
       assert.equal(approvalLabel(verified.value.approval), 'declared, not verified');
     }, (fixture) => {
@@ -230,7 +227,6 @@ for (const kind of SUBJECT_KINDS) {
       const subject = repository.subject(kind);
       const verified = await repository.verify(subject, repository.lockdownProof());
       assert.equal(verified.ok, true, JSON.stringify(verified));
-      if (!verified.ok) return;
       assert.deepEqual({ kind: verified.value.approval.subject.kind, hash: verified.value.approval.subject.hash }, { kind, hash: subject.hash });
       assert.equal(verified.value.approval.strength, 'declared');
       assert.equal(PERSON_ACTOR_TYPES.includes(verified.value.actor.actorType), true, 'a declared approval did not count as a person');
@@ -259,7 +255,6 @@ test("in the solo repository the plan gate opens on the maintainer's declared ap
   await withRepository('solo', async (repository) => {
     const verified = await repository.verify(repository.subject('plan'), repository.lockdownProof());
     assert.equal(verified.ok, true, JSON.stringify(verified));
-    if (!verified.ok) return;
     assert.equal(mergeGateOpen(planStanding(parsedSignupPlan(), memoryApprovalStore([verified.value.approval]))), true);
   });
 });

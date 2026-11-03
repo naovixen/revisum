@@ -25,7 +25,6 @@ test('a current review by a code owner verifies as a verified approval with a pe
     const subject = repository.subject('plan');
     const verified = await repository.verify(subject, repository.codeOwnerProof('review-grace'));
     assert.equal(verified.ok, true, JSON.stringify(verified));
-    if (!verified.ok) return;
     const { approval, actor } = verified.value;
     assert.equal(approval.strength, 'verified');
     assert.equal(approval.proofKind, 'code-owner-review');
@@ -40,7 +39,6 @@ test('a verified review appends one plan.approved event with the subject hash, p
     const subject = repository.subject('plan');
     const verified = await repository.verify(subject, repository.codeOwnerProof('review-grace'));
     assert.equal(verified.ok, true, JSON.stringify(verified));
-    if (!verified.ok) return;
     const approved = eventsOfKind(repository.events, 'plan.approved');
     assert.equal(approved.length, 1, JSON.stringify(repository.events.recorded));
     const [recorded] = approved;
@@ -56,7 +54,6 @@ test('the approver on the approval and its event is pseudonymous, never the logi
   await withRepository('team', async (repository) => {
     const verified = await repository.verify(repository.subject('plan'), repository.codeOwnerProof('review-grace'));
     assert.equal(verified.ok, true, JSON.stringify(verified));
-    if (!verified.ok) return;
     assert.ok(!verified.value.approval.approver.includes(PLAN_OWNER), 'the approver id holds the raw login');
     assert.ok(!JSON.stringify(repository.events.recorded).includes(PLAN_OWNER), 'an event holds the raw login');
   });
@@ -66,7 +63,6 @@ test('the approval is dated by the review GitHub submitted, not by the run', asy
   await withRepository('team', async (repository) => {
     const verified = await repository.verify(repository.subject('plan'), repository.codeOwnerProof('review-grace'));
     assert.equal(verified.ok, true, JSON.stringify(verified));
-    if (!verified.ok) return;
     assert.equal(verified.value.approval.at, reviewSubmittedAt(repository.fixture, 'review-grace'));
   });
 });

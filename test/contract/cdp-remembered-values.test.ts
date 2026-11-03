@@ -47,7 +47,7 @@ describe('a remember step whose text cannot be used', () => {
         [0, 'passed', undefined], [1, 'failed', refused.code], [2, 'skipped', undefined], [3, 'skipped', undefined], [4, 'skipped', undefined],
       ]);
       assert.equal(atClose?.shown['input-events'], '0', 'no input event reached the page');
-      assert.equal(atClose?.shown['save-clicks'], '0');
+      assert.equal(atClose.shown['save-clicks'], '0');
     });
   }
 });
@@ -63,7 +63,7 @@ describe('a remember step whose text can be used', () => {
     ], { read: READ_AT_CLOSE });
     assert.equal(result.state, 'Passed', JSON.stringify(result.steps));
     assert.equal(atClose?.shown['save-clicks'], '1');
-    assert.notEqual(atClose?.shown['input-events'], '0', 'the later steps sent input');
+    assert.notEqual(atClose.shown['input-events'], '0', 'the later steps sent input');
   });
 
   test('an input\'s value is remembered with read "value"', async () => {

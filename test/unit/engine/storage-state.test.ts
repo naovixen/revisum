@@ -32,7 +32,6 @@ test('a plan naming declared storage state parses and keeps the name', () => {
 test('a plan naming storage state the project does not declare is rejected as unknown_value', () => {
   const parsed = planParser(secretProject(['OTHER_SESSION']))(withStorageState(SAVED));
   assert.equal(parsed.ok, false);
-  if (parsed.ok) return;
   assert.deepEqual(parsed.error.filter((error) => error.path.startsWith('$.storageState')), [{ code: 'unknown_value', path: '$.storageState.secretName' }]);
 });
 
@@ -42,7 +41,6 @@ test('a plan holding literal storage-state JSON, as an object or as text, is rej
   for (const literal of [JSON.parse(state.json), state.json]) {
     const parsed = parse(secretFillPlan([], { storageState: literal }));
     assert.equal(parsed.ok, false, `accepted literal storage state ${typeof literal}`);
-    if (parsed.ok) continue;
     assert.ok(parsed.error.some((error) => error.path.startsWith('$.storageState')), JSON.stringify(parsed.error));
     const errors = JSON.stringify(parsed.error);
     assert.deepEqual([...echoesIn(errors, state.cookieValue), ...echoesIn(errors, state.tokenValue)], [], 'the error echoes a value');
@@ -89,7 +87,7 @@ test('storage state the store cannot resolve ends the run with secret-missing be
 
 test('a run whose plan names no storage state has no storageState field in its manifest', async () => {
   const ran = await runWithSecrets([SAVED], secretFillPlan([]), { [SAVED]: fakeStorageState().json }, quietDriver());
-  assert.ok(ran.result.manifest, 'the run reached its manifest');
+  assert.ok(ran.result.manifest !== null, 'the run reached its manifest');
   assert.equal(Object.hasOwn(ran.result.manifest, 'storageState'), false, JSON.stringify(ran.result.manifest));
 });
 

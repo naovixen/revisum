@@ -146,7 +146,7 @@ describe("Using the approval verifier", () => {
                             );
                             assert.equal(verified.ok, true, JSON.stringify(verified));
                             assert.equal(
-                                verified.ok ? verified.value.approval.strength : "",
+                                verified.value.approval.strength,
                                 "declared",
                             );
                         },

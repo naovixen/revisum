@@ -23,7 +23,7 @@ import {
 type HostileChange = { readonly description: string; readonly changedFiles: readonly string[]; readonly workingCopy: Record<string, unknown> };
 
 const hostileChange = (): HostileChange =>
-  JSON.parse(readFileSync(join(FIXTURES, 'evidence-mode', 'hostile-change.json'), 'utf8'));
+  JSON.parse(readFileSync(join(FIXTURES, 'evidence-mode', 'hostile-change.json'), 'utf8')) as HostileChange;
 
 // The project.json the hostile change writes: the solo project with evidence mode turned on.
 const projectWithEvidence = (): JsonRecord => structuredClone(hostileChange().workingCopy[PROJECT_PATH]) as JsonRecord;
@@ -50,7 +50,7 @@ test('so the change\'s own suite cannot be run: run --suite is refused with evid
     assert.ok(loaded.ok, JSON.stringify(loaded));
     const chosen = chooseSuite(loaded.value.project, SUITE_NAME);
     assert.equal(chosen.ok, false, 'the change\'s own suite was chosen to run');
-    if (!chosen.ok) assert.equal(chosen.error.code, 'evidence-mode-disabled');
+    assert.equal(chosen.error.code, 'evidence-mode-disabled');
   }, applyHostileChange);
 });
 

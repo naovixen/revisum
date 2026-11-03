@@ -47,7 +47,6 @@ test('the same project.json on the protected branch is trusted, with protected-b
   await withRepository('solo', async (repository) => {
     const loaded = await loadForChange(repository.versionControl(), [], memoryEventSink());
     assert.equal(loaded.ok, true, JSON.stringify(loaded));
-    if (!loaded.ok) return;
     assert.deepEqual(loaded.value.project.provenance, { kind: 'protected-branch', branch: 'main', commit: repository.fixture.protectedCommit });
   });
 });
@@ -58,7 +57,6 @@ test('when the change edits project.json with application code, core uses the pr
   await withRepository('solo', async (repository) => {
     const loaded = await loadForChange(repository.versionControl(), [PROJECT_PATH, APPLICATION_CODE], memoryEventSink());
     assert.equal(loaded.ok, true, JSON.stringify(loaded));
-    if (!loaded.ok) return;
     assert.deepEqual(loaded.value.project.secretNames, ['SIGNUP_PASSWORD'], 'the secret the change added was trusted');
     assert.ok(!JSON.stringify(loaded.value.project.origins).includes(PRODUCTION_ORIGIN), 'the origin the change added was trusted');
     assert.equal(loaded.value.project.provenance.kind, 'protected-branch');
@@ -69,7 +67,6 @@ test('a trusted file edited with application code raises one changed-with-code r
   await withRepository('solo', async (repository) => {
     const loaded = await loadForChange(repository.versionControl(), [PROJECT_PATH, APPLICATION_CODE], memoryEventSink());
     assert.equal(loaded.ok, true, JSON.stringify(loaded));
-    if (!loaded.ok) return;
     assert.deepEqual(loaded.value.reviewItems, [{ code: 'changed-with-code', path: PROJECT_PATH }]);
   }, editsProjectWithCode);
 });
@@ -79,7 +76,6 @@ test('each trusted file the change edits gets its own review item and trusted.ch
     const events = memoryEventSink();
     const loaded = await loadForChange(repository.versionControl(), [PROJECT_PATH, APPLICATION_CODE, PLAN_PATH], events);
     assert.equal(loaded.ok, true, JSON.stringify(loaded));
-    if (!loaded.ok) return;
     const named = loaded.value.reviewItems.map((item) => [item.code, item.path]).sort();
     assert.deepEqual(named, [['changed-with-code', PLAN_PATH], ['changed-with-code', PROJECT_PATH]]);
     assert.equal(eventsOfKind(events, 'trusted.changed-with-code').length, 2, JSON.stringify(events.recorded));
@@ -93,7 +89,6 @@ test('a change that edits only application code raises no review item and append
     const events = memoryEventSink();
     const loaded = await loadForChange(repository.versionControl(), [APPLICATION_CODE], events);
     assert.equal(loaded.ok, true, JSON.stringify(loaded));
-    if (!loaded.ok) return;
     assert.deepEqual(loaded.value.reviewItems, []);
     assert.deepEqual(events.recorded, []);
   });

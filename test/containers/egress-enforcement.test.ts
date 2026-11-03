@@ -18,7 +18,7 @@ before(async () => {
   // The plan run below needs its script, the test helpers it imports and the fixture app.
   run = await startIsolatedRun({ inputs: ['test', 'fixtures'] });
 }, { timeout: TIMEOUT });
-after(async () => { await run?.stop(); }, { timeout: TIMEOUT });
+after(async () => { await run.stop(); }, { timeout: TIMEOUT });
 
 // Tries a direct TCP connection from inside the container, bypassing the proxy, and prints
 // "reached" or "blocked" within a few seconds.

@@ -113,7 +113,7 @@ before(
 
 after(
     async () => {
-        await run?.stop();
+        await run.stop();
         if (fixtureName !== undefined) {
             await runDocker(["stop", "--time", "1", fixtureName]);
         }

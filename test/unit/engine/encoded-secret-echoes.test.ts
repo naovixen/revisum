@@ -75,7 +75,7 @@ async function observedAfterEcho(secretValue: string, text: string): Promise<{ r
   const ran = await runWithSecrets([SECRET], plan, { [SECRET]: secretValue }, driver);
   const check = ran.result.steps[2];
   assert.equal(check?.outcome, 'failed', JSON.stringify(ran.result.steps));
-  assert.ok(check?.observed !== undefined && check.observed.length > 0, 'the failed check kept an observation');
+  assert.ok(check.observed !== undefined && check.observed.length > 0, 'the failed check kept an observation');
   return { observed: check.observed, everything: ran.everything };
 }
 

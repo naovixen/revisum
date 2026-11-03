@@ -86,7 +86,6 @@ test('with the allowed name removed from the project, the same click is denied',
 test('the plan an allow decision carries is the parsed plan, unchanged, and still passes run()\'s brand check', async () => {
   const { decision, plan } = await decide(clickOn('Save changes'));
   assert.equal(decision.kind, 'allow', JSON.stringify(decision));
-  if (decision.kind !== 'allow') return;
   assert.equal(canonicalJson(decision.plan), canonicalJson(plan));
   assert.doesNotThrow(() => assertBranded(decision.plan));
 });

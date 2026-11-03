@@ -51,11 +51,11 @@ before(async () => {
   session = opened.value;
 });
 after(async () => {
-  await session?.close();
-  await proxy?.close();
-  await secondApp?.close();
-  await fixtureApp?.close();
-  await capability?.close();
+  await session.close();
+  await proxy.close();
+  await secondApp.close();
+  await fixtureApp.close();
+  await capability.close();
 });
 
 test('counter-example: the same page on a declared origin that is not a fixture origin is not rewritten', async () => {

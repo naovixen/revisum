@@ -48,9 +48,9 @@ before(async () => {
   });
 });
 after(async () => {
-  await proxy?.close();
-  await fixture?.close();
-  await capability?.close();
+  await proxy.close();
+  await fixture.close();
+  await capability.close();
 });
 
 // A browser allow-list that lets every channel's undeclared origin through, so only the proxy blocks.

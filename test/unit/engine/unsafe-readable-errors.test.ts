@@ -262,7 +262,7 @@ for (const feature of FEATURES) {
     assert.ok(disabled.length >= 1, shown(errors));
     for (const error of disabled) {
       assert.ok(error.position !== null, shown([error]));
-      assert.match(lineAt(text, error.position?.line ?? 0), MARK_OR_CLEANUP, shown([error]));
+      assert.match(lineAt(text, error.position.line), MARK_OR_CLEANUP, shown([error]));
     }
   });
 
@@ -271,7 +271,7 @@ for (const feature of FEATURES) {
     const parsePlan = parserEnabling(allBut(feature));
     const fromJson = parsePlan(unsafeGoldenPlan(feature));
     assert.equal(fromJson.ok, false, 'the JSON was accepted');
-    const expected = fromJson.ok ? [] : fromJson.error.map((error) => `${error.code} ${error.path}`);
+    const expected = fromJson.error.map((error) => `${error.code} ${error.path}`);
     const fromText = admittedErrors(unsafeGoldenText(feature), parsePlan).map((error) => `${error.code} ${error.stage === 'plan' ? error.path : error.stage}`);
     assert.deepEqual(fromText, expected);
   });

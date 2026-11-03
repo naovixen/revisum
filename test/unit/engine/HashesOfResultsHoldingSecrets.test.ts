@@ -103,7 +103,7 @@ describe("Using a run that records a service's response", () => {
                     const ran = await readAnswering(body);
                     assert.equal(ran.result.state, "Passed", JSON.stringify(ran.result.steps));
                     assert.equal(ran.result.steps[0]?.serviceCall?.status, 200);
-                    assert.equal(ran.result.steps[0]?.serviceCall?.responseSha256, null);
+                    assert.equal(ran.result.steps[0].serviceCall.responseSha256, null);
                     assert.equal(ran.everything.includes(sha256(JSON.stringify(body))), false);
                 });
             });

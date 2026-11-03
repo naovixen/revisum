@@ -54,7 +54,7 @@ for (const feature of FEATURES) {
   test(`the ${feature} golden text reads with no error and no warning`, () => {
     const read = readPlanText(unsafeGoldenText(feature), unsafeLimits());
     assert.equal(read.ok, true, JSON.stringify(read));
-    if (read.ok) assert.deepEqual(read.value.warnings, []);
+    assert.deepEqual(read.value.warnings, []);
   });
 }
 
@@ -78,7 +78,7 @@ for (const { name, plan } of EXAMPLES) {
 for (const { name, plan } of EXAMPLES) {
   test(`${name}: canonical JSON written as text and read back gives byte-identical canonical JSON`, () => {
     const canonical = writePlanJson(parsed(plan, name));
-    const fromCanonical = parsed(JSON.parse(canonical), `${name} from canonical JSON`);
+    const fromCanonical = parsed(JSON.parse(canonical) as JsonRecord, `${name} from canonical JSON`);
     assert.equal(writePlanJson(throughText(fromCanonical, name)), canonical);
   });
 
@@ -136,7 +136,7 @@ test('seeded plans with awkward selectors and script sources survive the trip th
   const failures: string[] = [];
   for (const { seed, name, plan } of generated) {
     const canonical = writePlanJson(parsed(plan, `seed ${seed}`));
-    const read = readPlanText(writePlanText(parsed(JSON.parse(canonical), `seed ${seed}`)), unsafeLimits());
+    const read = readPlanText(writePlanText(parsed(JSON.parse(canonical) as JsonRecord, `seed ${seed}`)), unsafeLimits());
     if (!read.ok) { failures.push(`seed ${seed} (${name}): the text was refused: ${JSON.stringify(read.error)}`); continue; }
     const again = parseAll(read.value.json);
     if (!again.ok) { failures.push(`seed ${seed} (${name}): the read JSON was refused: ${JSON.stringify(again.error)}`); continue; }

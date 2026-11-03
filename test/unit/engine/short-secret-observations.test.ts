@@ -40,10 +40,10 @@ test('a failed check of a field filled from a short secret keeps no trace of the
   assert.ok(driver.calls.probes > 0, 'the check read the field');
   const check = ran.result.steps[2];
   assert.equal(check?.outcome, 'failed', JSON.stringify(ran.result.steps));
-  assert.ok(check?.observed !== undefined && check.observed.length > 0, 'the failed check kept an observation');
+  assert.ok(check.observed !== undefined && check.observed.length > 0, 'the failed check kept an observation');
   assert.equal(check.observed.includes(SHORT_VALUE), false, `the observation keeps the short secret: ${check.observed}`);
   assert.equal(ran.everything.includes(SHORT_VALUE), false, 'the short secret appears in the result or the event log');
-  assert.ok(ran.result.manifest, 'the run reached its manifest');
+  assert.ok(ran.result.manifest !== null, 'the run reached its manifest');
   assert.equal(JSON.stringify(ran.result.manifest).includes(SHORT_VALUE), false, 'the manifest holds the short secret');
   assert.deepEqual(manifestField(ran.result, 'secrets'), [{ name: SECRET, mode: 'key-only' }]);
 });
@@ -54,7 +54,7 @@ test('a failed check whose observation is exactly a short secret, shown elsewher
   const ran = await runWithSecrets([SECRET], planOf([fillCode({ secretName: SECRET }), wrongCheck(shownCode, 'textEquals')]), { [SECRET]: SHORT_VALUE }, driver);
   const check = ran.result.steps[2];
   assert.equal(check?.outcome, 'failed', JSON.stringify(ran.result.steps));
-  assert.ok(check?.observed !== undefined && check.observed.length > 0, 'the failed check kept an observation');
+  assert.ok(check.observed !== undefined && check.observed.length > 0, 'the failed check kept an observation');
   assert.equal(check.observed.includes(SHORT_VALUE), false, `the observation keeps the short secret: ${check.observed}`);
   assert.equal(ran.everything.includes(SHORT_VALUE), false, 'the short secret appears in the result or the event log');
 });
@@ -65,7 +65,7 @@ test('counter-example: with a short secret in the run, a failed check of a field
   const ran = await runWithSecrets([SECRET], plan, { [SECRET]: SHORT_VALUE }, driver);
   const check = ran.result.steps[3];
   assert.equal(check?.outcome, 'failed', JSON.stringify(ran.result.steps));
-  assert.equal(check?.observed, 'Morning tea');
+  assert.equal(check.observed, 'Morning tea');
 });
 
 test('counter-example: the same seven characters typed as literal text, with no secret in the run, are kept', async () => {
@@ -73,5 +73,5 @@ test('counter-example: the same seven characters typed as literal text, with no 
   const ran = await runWithSecrets([SECRET], planOf([fillCode(SHORT_VALUE), wrongCheck(ACCESS_CODE, 'valueEquals')]), { [SECRET]: SHORT_VALUE }, driver);
   const check = ran.result.steps[2];
   assert.equal(check?.outcome, 'failed', JSON.stringify(ran.result.steps));
-  assert.equal(check?.observed, SHORT_VALUE, 'the stub page returns what was typed, so the probe above is not vacuous');
+  assert.equal(check.observed, SHORT_VALUE, 'the stub page returns what was typed, so the probe above is not vacuous');
 });

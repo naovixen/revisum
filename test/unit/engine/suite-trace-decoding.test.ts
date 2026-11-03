@@ -29,7 +29,7 @@ function accepted(archive: Uint8Array, limits: EvidenceLimits = evidenceLimits()
 function refusal(archive: Uint8Array, limits: EvidenceLimits = evidenceLimits()): SuiteDecodeError {
   const decoded = parseSuiteTrace(archive, limits);
   assert.equal(decoded.ok, false, 'the trace was accepted');
-  return decoded.ok ? { code: 'trace-invalid', path: '' } : decoded.error;
+  return decoded.error;
 }
 
 // ---- A well-formed trace, the counter-example to every refusal below -----------------------------

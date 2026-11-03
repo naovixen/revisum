@@ -61,7 +61,7 @@ for (const targetId of UNSAFE_PAGE_TARGETS) {
     });
 
     // A remember from an attribute also needs rememberedValues, which a driver may not declare.
-    const remembers = listedFeatures(unsafePageDrivers().get(ADAPTER_OF_TARGET[targetId] ?? '')).includes('rememberedValues');
+    const remembers = listedFeatures(unsafePageDrivers().get(ADAPTER_OF_TARGET[targetId])).includes('rememberedValues');
     test('an attribute remembered from one twin passes attributeEquals on that twin and fails it on the other', { skip: !remembers }, async () => {
       const ran = await harness.runSteps(targetId, [
         navigate('/dom-checks.html'),

@@ -77,6 +77,7 @@ test('a plan without newer steps keeps every step, in order', () => {
 
 test('a run of a plan with a newer step is refused before any driver is touched', async () => {
   let calls = 0;
+  const callCount = (): number => calls;
   const spy: BrowserDriver = {
     info: { id: 'cdp', version: 'spy', protocol: 'none' },
     supports() { calls++; return { ok: true, value: true }; },
@@ -93,11 +94,11 @@ test('a run of a plan with a newer step is refused before any driver is touched'
   const parse = defaultParser();
   const refused = await runUntrusted(insertAt(signupPlan(), 8, NEWER_STEPS[1] ?? {}), parse, base, ports);
   assert.ok(!Array.isArray(refused) && 'errors' in refused, 'the run was refused');
-  assert.equal(calls, 0, 'no driver method was called');
+  assert.equal(callCount(), 0, 'no driver method was called');
   assert.equal(ports.events.read().length, 0, 'nothing was logged');
 
   // Positive control: the plan without the newer step does reach the driver.
   const accepted = await runUntrusted(signupPlan(), parse, base, ports);
   assert.ok(Array.isArray(accepted), JSON.stringify(accepted));
-  assert.ok(calls > 0, 'a valid plan reaches the driver, so the zero above is meaningful');
+  assert.ok(callCount() > 0, 'a valid plan reaches the driver, so the zero above is meaningful');
 });

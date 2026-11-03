@@ -52,7 +52,6 @@ for (const field of SENSITIVE) {
   test(`a fill with literal text into the field named by ${field.title} is rejected as literal_secret`, () => {
     const parsed = field.parse(field.plan);
     assert.equal(parsed.ok, false, 'the plan was accepted');
-    if (parsed.ok) return;
     assert.ok(parsed.error.some((error) => error.code === 'literal_secret' && error.path === '$.steps[1].value'), JSON.stringify(parsed.error));
     assert.equal(JSON.stringify(parsed.error).includes(LITERAL), false, 'the error echoes the literal');
   });

@@ -317,7 +317,7 @@ describe("Using a run in a real browser", () => {
                         WRONG_HOLDER_CHECK,
                     ]);
                     assert.equal(result.steps[1]?.code, "assertion-failed");
-                    assert.equal(result.steps[1]?.observed, SENSITIVE_PLACEHOLDER);
+                    assert.equal(result.steps[1].observed, SENSITIVE_PLACEHOLDER);
                     assert.equal(JSON.stringify(result).includes(FIRST_HOLDER), false);
                 });
             });

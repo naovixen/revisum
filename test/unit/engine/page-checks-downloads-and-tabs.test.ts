@@ -313,6 +313,7 @@ test('a newTab takes no other field, such as a window name or a popup flag', () 
 
 test('a plan with a misplaced or off-list newTab is refused before any driver is touched', async () => {
   let calls = 0;
+  const callCount = (): number => calls;
   const spy: BrowserDriver = {
     info: { id: 'cdp', version: 'spy', protocol: 'none' },
     supports() { calls++; return { ok: true, value: true }; },
@@ -325,10 +326,10 @@ test('a plan with a misplaced or off-list newTab is refused before any driver is
     const outcome = await runUntrusted(plan, parsePlan, base, ports);
     assert.ok(!Array.isArray(outcome) && 'errors' in outcome, JSON.stringify(outcome));
   }
-  assert.equal(calls, 0, 'no driver method was called');
+  assert.equal(callCount(), 0, 'no driver method was called');
   assert.equal(events.read().length, 0, 'nothing was logged');
 
   // Positive control: a plan with a valid newTab does reach the driver.
   await runUntrusted(planOf([OPEN_ORDERS, newTab('/account')]), parsePlan, base, ports);
-  assert.ok(calls > 0, 'a valid plan reaches the driver, so the zero above is meaningful');
+  assert.ok(callCount() > 0, 'a valid plan reaches the driver, so the zero above is meaningful');
 });

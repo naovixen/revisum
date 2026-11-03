@@ -36,7 +36,7 @@ const entries = (): Record<string, unknown>[] =>
 function appendOk(event: EventInput, actor: DerivedActor): number {
   const appended = sink.append(event, actor);
   assert.equal(appended.ok, true, `append was refused: ${JSON.stringify(appended)}`);
-  return appended.ok ? appended.value.sequence : Number.NaN;
+  return appended.value.sequence;
 }
 
 // ---- One entry per event ------------------------------------------------------------------------
@@ -59,12 +59,12 @@ test('each entry records the event and the derived actor it was appended with', 
 
   const [submitted, approved] = entries();
   assert.equal(submitted?.['runId'], 'run-0001');
-  assert.equal(submitted?.['subjectHash'], 'plan-hash-1');
-  assert.deepEqual(submitted?.['criterionIds'], ['signup.creates-account']);
-  assert.equal(submitted?.['actor'], 'actor-hash-agent');
-  assert.equal(submitted?.['actorType'], 'agent');
+  assert.equal(submitted['subjectHash'], 'plan-hash-1');
+  assert.deepEqual(submitted['criterionIds'], ['signup.creates-account']);
+  assert.equal(submitted['actor'], 'actor-hash-agent');
+  assert.equal(submitted['actorType'], 'agent');
   assert.equal(approved?.['actor'], 'actor-hash-founder');
-  assert.equal(approved?.['actorType'], 'person-declared');
+  assert.equal(approved['actorType'], 'person-declared');
 });
 
 test('returns consecutive sequence numbers, one per appended event', () => {

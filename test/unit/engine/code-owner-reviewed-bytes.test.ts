@@ -42,7 +42,6 @@ test('a code owner\'s review of the commit holding the plan verifies before the 
     assert.notEqual(subject.hash, repository.subject('plan').hash, 'the protected branch already holds the reviewed plan');
     const verified = await repository.verify(subject, repository.codeOwnerProof('review-grace'));
     assert.equal(verified.ok, true, JSON.stringify(verified));
-    if (!verified.ok) return;
     assert.equal(verified.value.approval.strength, 'verified');
     assert.equal(verified.value.approval.proofKind, 'code-owner-review');
     assert.deepEqual({ kind: verified.value.approval.subject.kind, hash: verified.value.approval.subject.hash }, { kind: 'plan', hash: subject.hash });

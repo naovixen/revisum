@@ -306,6 +306,6 @@ export function commandRecordOf(result: RunResult, index: number, name: string):
   const step = result.steps.find((candidate) => candidate.index === index);
   assert.ok(step !== undefined, `the result has no step ${index}`);
   const record = Object.values(step).find((value: unknown) => fieldOf(value, 'command') === name);
-  assert.ok(typeof record === 'object' && record !== null, `step ${index} records no command named ${name}: ${JSON.stringify(step)}`);
+  assert.ok(typeof record === 'object', `step ${index} records no command named ${name}: ${JSON.stringify(step)}`);
   return Object.fromEntries(Object.entries(record));
 }

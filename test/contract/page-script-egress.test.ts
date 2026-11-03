@@ -48,15 +48,18 @@ before(async () => {
   });
 });
 after(async () => {
-  await proxy?.close();
-  await harness?.close();
+  await proxy.close();
+  await harness.close();
 });
 
 // Wraps the own driver so each session keeps its browser's request records as it closes.
 function keepingRecords(inner: OwnBrowserDriver, keep: (records: readonly BrowserRequestRecord[]) => void): BrowserDriver {
   return new Proxy(inner, {
     get(target, key) {
-      if (key !== 'open') return Reflect.get(target, key, target);
+      if (key !== 'open') {
+        const passedThrough: unknown = Reflect.get(target, key, target);
+        return passedThrough;
+      }
       return async (openTarget: Target, environment: SessionEnvironment) => {
         const opened = await target.open(openTarget, environment);
         if (!opened.ok) return opened;
@@ -68,7 +71,9 @@ function keepingRecords(inner: OwnBrowserDriver, keep: (records: readonly Browse
           get(sessionTarget, sessionKey) {
             if (sessionKey === 'close') return close;
             const value: unknown = Reflect.get(sessionTarget, sessionKey, sessionTarget);
-            return typeof value === 'function' ? value.bind(sessionTarget) : value;
+            if (typeof value !== 'function') return value;
+            const bound: unknown = value.bind(sessionTarget);
+            return bound;
           },
         });
         return { ok: true as const, value: wrapped };

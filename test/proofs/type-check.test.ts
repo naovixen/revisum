@@ -6,11 +6,12 @@ import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { REPOSITORY_ROOT } from '../support/repository.ts';
+import { printedBy } from '../support/tool-runs.ts';
 
 test('the test set and the package sources it imports type-check strictly', { timeout: 300_000 }, () => {
   const compiler = join(REPOSITORY_ROOT, 'node_modules', 'typescript', 'bin', 'tsc');
   const checked = spawnSync(process.execPath, [compiler, '--noEmit', '-p', join(REPOSITORY_ROOT, 'test', 'tsconfig.json')], {
     encoding: 'utf8', timeout: 240_000,
   });
-  assert.equal(checked.status, 0, (checked.stdout ?? '') + (checked.stderr ?? ''));
+  assert.equal(checked.status, 0, printedBy(checked));
 });

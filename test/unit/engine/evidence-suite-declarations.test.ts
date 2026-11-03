@@ -102,7 +102,6 @@ for (const declaration of CASES) {
   test(`a suite declaring ${declaration.name} is refused with ${declaration.code} at ${declaration.path}`, () => {
     const parsed = parseProject(projectWithSuite(declaration.fields));
     assert.equal(parsed.ok, false, 'the declaration was accepted');
-    if (parsed.ok) return;
     assert.ok(
       parsed.error.some((error) => error.code === declaration.code && error.path === declaration.path),
       `expected ${declaration.code} at ${declaration.path}, got ${JSON.stringify(parsed.error)}`,
@@ -135,7 +134,7 @@ test('environment names that only resemble reserved ones are accepted', () => {
 test('run --suite on a project with no evidenceMode section is refused with evidence-mode-disabled', () => {
   const chosen = chooseSuite(parsedProject(projectFileWith()), SUITE_NAME);
   assert.equal(chosen.ok, false, 'a suite was chosen from a project without evidence mode');
-  if (!chosen.ok) assert.equal(chosen.error.code, 'evidence-mode-disabled');
+  assert.equal(chosen.error.code, 'evidence-mode-disabled');
 });
 
 test('run --suite naming a suite the project does not declare is refused with suite-not-declared', () => {
@@ -143,7 +142,7 @@ test('run --suite naming a suite the project does not declare is refused with su
   for (const name of ['smoke', 'Checkout', 'checkout ', '']) {
     const chosen = chooseSuite(project, name);
     assert.equal(chosen.ok, false, `"${name}" was chosen`);
-    if (!chosen.ok) assert.equal(chosen.error.code, 'suite-not-declared', `"${name}"`);
+    assert.equal(chosen.error.code, 'suite-not-declared', `"${name}"`);
   }
 });
 

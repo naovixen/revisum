@@ -83,6 +83,7 @@ test('a value remembered inside a frame is visible to the steps after the frame'
 
 test('a plan with an undefined or duplicate value is refused before any driver is touched', async () => {
   let calls = 0;
+  const callCount = (): number => calls;
   const spy: BrowserDriver = {
     info: { id: 'cdp', version: 'spy', protocol: 'none' },
     supports() { calls++; return { ok: true, value: true }; },
@@ -98,12 +99,12 @@ test('a plan with an undefined or duplicate value is refused before any driver i
     const outcome = await runUntrusted(plan, parsePlan, base, ports);
     assert.ok(!Array.isArray(outcome) && 'errors' in outcome, JSON.stringify(outcome));
   }
-  assert.equal(calls, 0, 'no driver method was called');
+  assert.equal(callCount(), 0, 'no driver method was called');
   assert.equal(events.read().length, 0, 'nothing was logged');
 
   // Positive control: a valid plan using a value does reach the driver.
   await runUntrusted(withValues([OPEN_ORDERS, fill(MARKED_REFERENCE)]), parsePlan, base, ports);
-  assert.ok(calls > 0, 'a valid plan reaches the driver, so the zero above is meaningful');
+  assert.ok(callCount() > 0, 'a valid plan reaches the driver, so the zero above is meaningful');
 });
 
 // ---- Places a reference may not stand ------------------------------------------------------------
@@ -144,7 +145,7 @@ for (const place of PLACES) {
   test(`a value reference in ${place.name} is refused with wrong_type or unknown_field at ${place.path}`, () => {
     const parsed = parsePlan(place.plan);
     assert.equal(parsed.ok, false, 'the plan was accepted');
-    const errors = parsed.ok ? [] : parsed.error;
+    const errors = parsed.error;
     assert.ok(
       errors.some((error) => (error.code === 'wrong_type' || error.code === 'unknown_field') && atOrBelow(error.path, place.path)),
       JSON.stringify(errors),
