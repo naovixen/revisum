@@ -89,7 +89,7 @@ const withSwappedCharactersFolded = (text: string): string =>
 
 // Letters of a script written together with Latin in ordinary names, and letters that belong to no
 // one script, such as the kana length mark.
-const WRITTEN_BESIDE_LATIN = /[\p{Script=Latin}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Han}\p{Script=Common}\p{Script=Inherited}]/u;
+const WRITTEN_BESIDE_LATIN = /[\p{Script=Latin}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Han}\p{Script=Hangul}\p{Script=Common}\p{Script=Inherited}]/u;
 const LATIN_LETTER = /\p{Script=Latin}/u;
 
 // True when a word mixes Latin with a letter the patterns cannot read: no table can list every letter
