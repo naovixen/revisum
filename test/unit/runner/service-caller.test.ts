@@ -1,8 +1,8 @@
 // Runner's real service caller, against a local node:http service through the in-process egress
 // proxy. The caller sends each declared call's request through the proxy, so the proxy's allow-list
 // and resolve-time address check apply, and a refusal there is egress-blocked. It returns a
-// redirect as received, never following it; it stops reading at the request's size cap; it sends a
-// write once, never again, even after a timeout; and it writes no header value anywhere but the
+// redirect as received, never following it; it stops reading one byte past the request's size cap
+// and leaves the engine to refuse a body that long; it sends a write once, never again, even after a timeout; and it writes no header value anywhere but the
 // wire. How the engine judges what the caller returns is tested with a fake caller in
 // test/unit/engine/service-call-runs.test.ts; the same runs with this caller are in
 // service-caller-runs.test.ts.
@@ -247,9 +247,12 @@ test('a response of exactly maximumResponseBytes is read whole', async () => {
 });
 
 for (const [name, chunked] of [['with its length declared', false], ['sent chunked, with no length', true]] as const) {
-  test(`a response one byte over maximumResponseBytes, ${name}, fails with response-too-large`, async () => {
+  test(`a response one byte over maximumResponseBytes, ${name}, answers with its status and the body cut one byte past the cap`, async () => {
     await withCallerHarness({ answer: sizedAnswer(CAP + 1, chunked) }, async ({ caller, service }) => {
-      assert.deepEqual(await caller.call(serviceRequest(service.origin, { maximumResponseBytes: CAP })), failure('response-too-large'));
+      const answered = await caller.call(serviceRequest(service.origin, { maximumResponseBytes: CAP }));
+      assert.ok(answered.ok, JSON.stringify(answered));
+      assert.equal(answered.value.status, 200);
+      assert.equal(answered.value.body.length, CAP + 1);
     });
   });
 }
@@ -260,7 +263,8 @@ test('reading stops at the cap: an endless response ends the call long before th
   await withCallerHarness({ answer: endless.answer }, async ({ caller, service }) => {
     const answered = await caller.call(serviceRequest(service.origin, { maximumResponseBytes: 4096, timeoutMilliseconds: 30_000 }));
     const sentWhenAnswered = endless.sentBytes();
-    assert.deepEqual(answered, failure('response-too-large'));
+    assert.ok(answered.ok, JSON.stringify(answered));
+    assert.equal(answered.value.body.length, 4097);
     assert.ok(sentWhenAnswered < total / 8, `the service had sent ${sentWhenAnswered} of ${total} bytes when the caller answered`);
   });
 });

@@ -21,6 +21,7 @@
 //   - a replay error is { code } with, for replay-mismatch, `fixture` (the fixture's path), `path`
 //     (the JSON path of a known field of the wrong shape) or `kind` and `position` (a recorded reply);
 //   - a replay whose inputs all match but whose result hash differs ends with verdict `mismatch`;
+//   - a replay is told the state the recorded run ended in, as `recordedState` in its request;
 //   - a recording names its schema in a `schema` field, as the manifest does; in it, each reply's
 //     entry holds its request's sha256 as the entry's only 64-hex string, and a text body or output
 //     is kept as its text, so a test can find and change both.
@@ -386,6 +387,7 @@ export async function replayRun(ran: ScenarioRun, options: ReplayOptions = {}): 
     manifest: 'manifest' in options ? options.manifest : JSON.parse(JSON.stringify(ran.manifest)),
     recording: options.recording === undefined ? ran.recording : options.recording,
     recordedResultHash: options.recordedResultHash ?? ran.result.resultHash,
+    recordedState: ran.result.state,
     inputs: options.host === undefined ? inputs : { ...inputs, host: options.host },
   };
   const replay = await engineFunction('replay');

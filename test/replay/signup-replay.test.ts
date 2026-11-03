@@ -53,7 +53,7 @@ async function replaySignup(rawPlan: unknown, targetId: string, manifest: unknow
   const trusted = await trustedProjectFrom(makeProjectFile(testHarness.server.origin));
   const { seed: _seed, fixedTimeMilliseconds: _clock, fixtures: _fixtures, ...inputs } = testHarness.runInputs();
   const request = {
-    manifest, recording: null, recordedResultHash,
+    manifest, recording: null, recordedResultHash, recordedState: 'Passed',
     inputs: { ...inputs, plan: authorise(testHarness.plan(rawPlan), trusted), targetId: targetOf(targetId) },
   };
   const ports = {
