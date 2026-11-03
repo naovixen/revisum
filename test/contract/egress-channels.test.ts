@@ -18,6 +18,7 @@ import { defaultRedactor, type SessionEnvironment } from '@revisum/engine';
 import { joinEgressEvents, startEgressProxy, type EgressProxy } from '@revisum/runner';
 import type { EgressEvent } from '@revisum/contracts';
 import { BROWSERS } from '#test-support/browsers.ts';
+import { createCleanUpScope } from '#test-support/CleanUpScope.ts';
 import { BrowserTarget } from '#test-support/browser/BrowserTarget.ts';
 import { click, role } from '#test-support/browser/RawPlan.ts';
 import { FIXED_TIME_MILLISECONDS, SEED, capabilityHarness, type CapabilityHarness } from '#test-support/capability-harness.ts';
@@ -30,6 +31,7 @@ import {
 const WAIT_MILLISECONDS = 10_000;
 const POLL_MILLISECONDS = 50;
 
+const cleanUps = createCleanUpScope();
 let capability: CapabilityHarness;
 let fixture: EgressFixtureServer;
 let resolver: FakeResolver;
@@ -37,7 +39,9 @@ let proxy: EgressProxy;
 
 before(async () => {
   capability = await capabilityHarness(5000);
+  cleanUps.add(() => capability.close());
   fixture = await startEgressFixtureServer();
+  cleanUps.add(() => fixture.close());
   // No name is ever resolved: the fixture origin is an IP literal and every other origin is undeclared.
   resolver = fakeResolver({});
   proxy = await startEgressProxy({
@@ -46,12 +50,9 @@ before(async () => {
     services: [declaredService('fixture-app', fixture.origin, true)],
     resolve: resolver.resolve,
   });
+  cleanUps.add(() => proxy.close());
 });
-after(async () => {
-  await proxy.close();
-  await fixture.close();
-  await capability.close();
-});
+after(() => cleanUps.runAll());
 
 // A browser allow-list that lets every channel's undeclared origin through, so only the proxy blocks.
 const widenedEnvironment = (): SessionEnvironment => ({

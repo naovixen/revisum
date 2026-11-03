@@ -16,6 +16,7 @@ import {
     type RunnerLogEntry,
 } from "@revisum/runner";
 import type { RunResult } from "@revisum/engine";
+import { createCleanUpScope } from "../support/CleanUpScope.ts";
 import { REPOSITORY_ROOT } from "../support/repository.ts";
 import { declaredService, egressPolicy } from "../unit/runner/runner-examples.ts";
 import { jsonInside, pinnedRunImage } from "./isolated-run.ts";
@@ -151,6 +152,7 @@ describe("Using the egress proxy on real Docker", () => {
     describe("given a plan run through a proxy that can reach a declared server", () => {
         const logged: RunnerLogEntry[] = [];
         const { engine, execInProxy } = engineWatchingTheProxy(dockerCliEngine());
+        const cleanUps = createCleanUpScope();
         let runner: Runner;
         let handle: RunnerHandle;
         const ask = async (url: string) =>
@@ -173,16 +175,12 @@ describe("Using the egress proxy on real Docker", () => {
                 );
                 assert.ok(started.ok, JSON.stringify(started));
                 handle = started.value;
+                cleanUps.add(() => handle.stop());
             },
             { timeout: TIMEOUT },
         );
 
-        after(
-            async () => {
-                await handle.stop();
-            },
-            { timeout: TIMEOUT },
-        );
+        after(() => cleanUps.runAll(), { timeout: TIMEOUT });
 
         describe("when the server answers one request with a status 000", () => {
             let zeroAnswer: ProxiedAnswer;

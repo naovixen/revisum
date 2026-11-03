@@ -7,18 +7,21 @@
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
 import { hostOf } from '../unit/runner/runner-examples.ts';
+import { createCleanUpScope } from '../support/CleanUpScope.ts';
 import { jsonInside, startIsolatedRun, type IsolatedRun } from './isolated-run.ts';
 
 const TIMEOUT = 600_000;
 // Public addresses that answer on these ports from any ordinary network.
 const OUTSIDE_TARGETS = [{ host: '1.1.1.1', port: 443 }, { host: '8.8.8.8', port: 53 }, { host: 'example.com', port: 80 }];
 
+const cleanUps = createCleanUpScope();
 let run: IsolatedRun;
 before(async () => {
   // The plan run below needs its script, the test helpers it imports and the fixture app.
   run = await startIsolatedRun({ inputs: ['test', 'fixtures'] });
+  cleanUps.add(() => run.stop());
 }, { timeout: TIMEOUT });
-after(async () => { await run.stop(); }, { timeout: TIMEOUT });
+after(() => cleanUps.runAll(), { timeout: TIMEOUT });
 
 // Tries a direct TCP connection from inside the container, bypassing the proxy, and prints
 // "reached" or "blocked" within a few seconds.

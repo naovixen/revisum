@@ -8,6 +8,7 @@
 // default profile refuses to a process without capabilities, tells the two apart.
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
+import { createCleanUpScope } from '../support/CleanUpScope.ts';
 import { jsonInside, startIsolatedRun, type IsolatedRun } from './isolated-run.ts';
 
 const TIMEOUT = 600_000;
@@ -15,9 +16,13 @@ const NO_CAPABILITIES = '0000000000000000';
 // Seccomp's filter mode in /proc/<pid>/status: 0 off, 1 strict, 2 filter.
 const SECCOMP_FILTER_MODE = '2';
 
+const cleanUps = createCleanUpScope();
 let run: IsolatedRun;
-before(async () => { run = await startIsolatedRun(); }, { timeout: TIMEOUT });
-after(async () => { await run.stop(); }, { timeout: TIMEOUT });
+before(async () => {
+  run = await startIsolatedRun();
+  cleanUps.add(() => run.stop());
+}, { timeout: TIMEOUT });
+after(() => cleanUps.runAll(), { timeout: TIMEOUT });
 
 type ProcessStatus = { readonly uid: string; readonly seccomp: string; readonly capabilities: readonly string[]; readonly noNewPrivileges: string };
 

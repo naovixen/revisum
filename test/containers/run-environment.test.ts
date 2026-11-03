@@ -7,6 +7,7 @@
 // that show the inspection itself sees what is there.
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
+import { createCleanUpScope } from '../support/CleanUpScope.ts';
 import { SEEDED_CREDENTIALS, jsonInside, startIsolatedRun, type IsolatedRun } from './isolated-run.ts';
 
 const TIMEOUT = 600_000;
@@ -21,9 +22,13 @@ const HOME_CREDENTIAL_FILES = [
   '.config/gcloud/credentials.db', '.ssh/id_rsa', '.ssh/id_ed25519', '.netrc',
 ];
 
+const cleanUps = createCleanUpScope();
 let run: IsolatedRun;
-before(async () => { run = await startIsolatedRun(); }, { timeout: TIMEOUT });
-after(async () => { await run.stop(); }, { timeout: TIMEOUT });
+before(async () => {
+  run = await startIsolatedRun();
+  cleanUps.add(() => run.stop());
+}, { timeout: TIMEOUT });
+after(() => cleanUps.runAll(), { timeout: TIMEOUT });
 
 type Environment = Readonly<Record<string, string>>;
 const environmentInside = async (): Promise<Environment> =>

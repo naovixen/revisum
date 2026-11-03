@@ -13,6 +13,7 @@ import { egressThrough } from '#test-support/browser/SessionEgressForTest.ts';
 import { buildManifest, defaultRedactor, type SessionEnvironment } from '@revisum/engine';
 import { startEgressProxy, type EgressProxy, type ResponseRewrite } from '@revisum/runner';
 import { BROWSERS } from '#test-support/browsers.ts';
+import { createCleanUpScope } from '#test-support/CleanUpScope.ts';
 import { BrowserTarget } from '#test-support/browser/BrowserTarget.ts';
 import { FIXED_TIME_MILLISECONDS, SEED, capabilityHarness, type CapabilityHarness } from '#test-support/capability-harness.ts';
 import { defaultParser, signupPlan } from '../unit/engine/plan-examples.ts';
@@ -22,6 +23,7 @@ import { declaredService, egressPolicy, fakeResolver, origin } from '../unit/run
 const HEADING_CHANGED: ResponseRewrite = { name: 'heading-changed', find: 'Original heading', replace: 'Mutated heading' };
 const readHeading = (): string => document.querySelector('[data-testid="heading"]')?.textContent ?? '';
 
+const cleanUps = createCleanUpScope();
 let capability: CapabilityHarness;
 let fixtureApp: EgressFixtureServer;
 let secondApp: EgressFixtureServer;
@@ -30,8 +32,11 @@ let session: DriverSession;
 
 before(async () => {
   capability = await capabilityHarness(5000);
+  cleanUps.add(() => capability.close());
   fixtureApp = await startEgressFixtureServer();
+  cleanUps.add(() => fixtureApp.close());
   secondApp = await startEgressFixtureServer();
+  cleanUps.add(() => secondApp.close());
   proxy = await startEgressProxy({
     policy: egressPolicy({
       allowOrigins: [fixtureApp.origin, secondApp.origin], allowServices: ['fixture-app', 'second-app'], fixtureOrigins: [fixtureApp.origin],
@@ -41,6 +46,7 @@ before(async () => {
     services: [declaredService('fixture-app', fixtureApp.origin, true), declaredService('second-app', secondApp.origin, true)],
     resolve: fakeResolver({}).resolve,
   });
+  cleanUps.add(() => proxy.close());
   const environment: SessionEnvironment = {
     baseUrl: fixtureApp.origin, allowedOrigins: [fixtureApp.origin, secondApp.origin], seed: SEED,
     fixedTimeMilliseconds: FIXED_TIME_MILLISECONDS, sensitiveSelectors: defaultRedactor().selectors, timeoutMilliseconds: 5000,
@@ -49,14 +55,9 @@ before(async () => {
   const opened = await driver.open(capability.target(BrowserTarget.Chrome), environment);
   assert.ok(opened.ok, `the session opens: ${opened.ok ? '' : JSON.stringify(opened.error)}`);
   session = opened.value;
+  cleanUps.add(() => session.close());
 });
-after(async () => {
-  await session.close();
-  await proxy.close();
-  await secondApp.close();
-  await fixtureApp.close();
-  await capability.close();
-});
+after(() => cleanUps.runAll());
 
 test('counter-example: the same page on a declared origin that is not a fixture origin is not rewritten', async () => {
   const navigated = await session.navigate(secondApp.url('/mutant.html'));

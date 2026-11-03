@@ -18,6 +18,7 @@ import { egressThrough } from '#test-support/browser/SessionEgressForTest.ts';
 import type { BrowserDriver, BrowserRequestRecord, EgressEvent, SessionEnvironment, Target } from '@revisum/engine';
 import { hostAndPort, joinEgressEvents, startEgressProxy, type EgressProxy } from '@revisum/runner';
 import { BROWSERS } from '#test-support/browsers.ts';
+import { createCleanUpScope } from '#test-support/CleanUpScope.ts';
 import { declaredService, egressPolicy, fakeResolver, hostOf, type FakeResolver } from '../unit/runner/runner-examples.ts';
 import { BrowserTarget } from '#test-support/browser/BrowserTarget.ts';
 import { click, navigate, role, testId, textEquals } from '#test-support/browser/RawPlan.ts';
@@ -25,12 +26,14 @@ import { FIXTURE_FOLDER, SERVER_ASSETS, networkHarness, startStub, stopStub, tim
 
 const BLOCKED_ORIGIN = 'http://blocked.invalid';
 
+const cleanUps = createCleanUpScope();
 let harness: NetworkHarness;
 let resolver: FakeResolver;
 let proxy: EgressProxy;
 
 before(async () => {
   harness = await networkHarness({ extraOrigins: [BLOCKED_ORIGIN] });
+  cleanUps.add(() => harness.close());
   // No name is ever resolved: the fixture origins are IP literals and blocked.invalid is undeclared.
   resolver = fakeResolver({});
   proxy = await startEgressProxy({
@@ -39,11 +42,9 @@ before(async () => {
     services: [declaredService('fixture-app', harness.origin, true), declaredService('other-fixture-app', harness.otherOrigin, true)],
     resolve: resolver.resolve,
   });
+  cleanUps.add(() => proxy.close());
 });
-after(async () => {
-  await proxy.close();
-  await harness.close();
-});
+after(() => cleanUps.runAll());
 
 // Wraps the own driver so each session keeps its browser's request records as it closes.
 function keepingRecords(inner: OwnBrowserDriver, keep: (records: readonly BrowserRequestRecord[]) => void): BrowserDriver {

@@ -18,6 +18,7 @@ import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
 import type { EgressEvent } from '@revisum/contracts';
 import { fakeSecretValue } from '../unit/engine/secret-examples.ts';
+import { createCleanUpScope } from '../support/CleanUpScope.ts';
 import { hostOf } from '../unit/runner/runner-examples.ts';
 import { DISTINCTIVE_HOST_VALUES } from '../unit/runner/workload-examples.ts';
 import {
@@ -28,6 +29,7 @@ import { imageEnvironmentNames } from './workload-run.ts';
 
 const TIMEOUT = 600_000;
 
+const cleanUps = createCleanUpScope();
 let image: string;
 let listeners: Listeners;
 // The Docker host as the default bridge sees it: the CI host, which no command may reach.
@@ -35,11 +37,13 @@ let dockerHost: string;
 before(async () => {
   image = await fixtureCommandImage();
   dockerHost = await bridgeGateway();
-  listeners = { database: await startFixtureService(image, DATABASE_BANNER), otherService: await startFixtureService(image, 'other-service') };
+  const database = await startFixtureService(image, DATABASE_BANNER);
+  cleanUps.add(() => database.close());
+  const otherService = await startFixtureService(image, 'other-service');
+  cleanUps.add(() => otherService.close());
+  listeners = { database, otherService };
 }, { timeout: TIMEOUT });
-after(async () => {
-  await Promise.all([listeners.database.close(), listeners.otherService.close()]);
-}, { timeout: TIMEOUT });
+after(() => cleanUps.runAll(), { timeout: TIMEOUT });
 
 const step = (command: string, commandArguments: Readonly<Record<string, unknown>> = {}) => ({ type: 'database', command, arguments: commandArguments });
 

@@ -16,6 +16,7 @@ import { egressThrough } from '#test-support/browser/SessionEgressForTest.ts';
 import { defaultRedactor, type SessionEnvironment } from '@revisum/engine';
 import { joinEgressEvents, startEgressProxy, type EgressProxy } from '@revisum/runner';
 import { BROWSERS } from '#test-support/browsers.ts';
+import { createCleanUpScope } from '#test-support/CleanUpScope.ts';
 import { BrowserTarget } from '#test-support/browser/BrowserTarget.ts';
 import { click, role } from '#test-support/browser/RawPlan.ts';
 import { FIXED_TIME_MILLISECONDS, SEED, capabilityHarness, type CapabilityHarness } from '#test-support/capability-harness.ts';
@@ -45,6 +46,7 @@ async function startSite(page: () => string): Promise<Site> {
   };
 }
 
+const cleanUps = createCleanUpScope();
 let capability: CapabilityHarness;
 let reachable: Site;
 let opener: Site;
@@ -52,22 +54,21 @@ let proxy: EgressProxy;
 
 before(async () => {
   capability = await capabilityHarness(5000);
+  cleanUps.add(() => capability.close());
   reachable = await startSite(() => '<!doctype html><html lang="en"><title>Partner</title><h1>Partner</h1></html>');
+  cleanUps.add(() => reachable.close());
   opener = await startSite(() => `<!doctype html><html lang="en"><title>Opener</title><h1>Opener</h1>
     <button type="button" onclick="window.open('${reachable.origin}/welcome', 'partner', 'width=400,height=300')">${OPEN_BUTTON}</button></html>`);
+  cleanUps.add(() => opener.close());
   proxy = await startEgressProxy({
     policy: egressPolicy({ allowOrigins: [opener.origin, reachable.origin], allowServices: ['opener-site', 'partner-site'] }),
     // Both sites listen on loopback, so both are declared as private services.
     services: [declaredService('opener-site', opener.origin, true), declaredService('partner-site', reachable.origin, true)],
     resolve: fakeResolver({}).resolve,
   });
+  cleanUps.add(() => proxy.close());
 });
-after(async () => {
-  await proxy.close();
-  await reachable.close();
-  await opener.close();
-  await capability.close();
-});
+after(() => cleanUps.runAll());
 
 async function openSession(): Promise<DriverSession> {
   const environment: SessionEnvironment = {

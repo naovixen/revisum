@@ -23,6 +23,7 @@ import { WEBRTC_CHANNELS } from '../proofs/EgressChannels.ts';
 import { Arrival, startRecordingOrigin, type RecordingOrigin } from '../proofs/StartRecordingOrigin.ts';
 import { declaredService, egressPolicy, hostOf } from '../unit/runner/runner-examples.ts';
 import { attemptWebRtcInside, WebRtcBrowser, BARE_BROWSER_STATE } from './AttemptWebRtcInside.ts';
+import { createCleanUpScope } from '../support/CleanUpScope.ts';
 import { jsonInside, pinnedRunImage, startIsolatedRun, type IsolatedRun } from './isolated-run.ts';
 
 const TIMEOUT = 600_000;
@@ -77,13 +78,16 @@ async function gatewayOf(network: string): Promise<string> {
   return `${subnet[1]}.1`;
 }
 
+const cleanUps = createCleanUpScope();
 let dockerHostService: DockerHostService;
 let dockerHostServiceOrigin: string;
 let machineService: TcpServer;
 let run: IsolatedRun;
 before(async () => {
   dockerHostService = await startDockerHostService();
+  cleanUps.add(() => runDocker(['stop', '--time', '1', dockerHostService.name]));
   machineService = await startMachineService();
+  cleanUps.add(() => machineService.close());
   dockerHostServiceOrigin = `http://${await gatewayOf('bridge')}:${dockerHostService.port}`;
   run = await startIsolatedRun({
     // The plan run below needs its script, the test helpers it imports and the fixture app.
@@ -92,12 +96,9 @@ before(async () => {
     policy: egressPolicy({ allowOrigins: [dockerHostServiceOrigin], allowServices: [DOCKER_HOST_SERVICE_NAME] }),
     services: [declaredService(DOCKER_HOST_SERVICE_NAME, dockerHostServiceOrigin, true)],
   });
+  cleanUps.add(() => run.stop());
 }, { timeout: TIMEOUT });
-after(async () => {
-  await run.stop();
-  await runDocker(['stop', '--time', '1', dockerHostService.name]);
-  machineService.close();
-}, { timeout: TIMEOUT });
+after(() => cleanUps.runAll(), { timeout: TIMEOUT });
 
 // ---- The browser's records --------------------------------------------------------------------------
 

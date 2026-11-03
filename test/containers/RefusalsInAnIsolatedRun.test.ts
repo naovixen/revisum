@@ -15,6 +15,7 @@ import { PRODUCT } from "@revisum/contracts";
 import { runDocker } from "@revisum/runner";
 import { plainRequestText, tunnelRequestText } from "../unit/runner/proxy-requests.ts";
 import { declaredService, egressPolicy } from "../unit/runner/runner-examples.ts";
+import { createCleanUpScope } from "../support/CleanUpScope.ts";
 import { jsonInside, pinnedRunImage, startIsolatedRun, type IsolatedRun } from "./isolated-run.ts";
 import {
     REFUSED_BY_BOTH_HOST,
@@ -53,7 +54,7 @@ const exchangeThrough = (addressVariable: string, requestText: string): string =
   socket.on('error', () => undefined);
   socket.on('close', () => { console.log(JSON.stringify(received)); process.exit(0); });`;
 
-let fixtureName: string | undefined;
+const cleanUps = createCleanUpScope();
 let fixtureOrigin: string;
 let run: IsolatedRun;
 
@@ -82,7 +83,7 @@ before(
             fixtureServerScript,
         ]);
         assert.equal(started.status, 0, `the fixture server did not start: ${started.stderr}`);
-        fixtureName = name;
+        cleanUps.add(() => runDocker(["stop", "--time", "1", name]));
         for (
             let tries = 0;
             tries < 50 && !(await runDocker(["logs", name])).stdout.includes("listening");
@@ -107,19 +108,12 @@ before(
             }),
             services: [declaredService(FIXTURE_SERVICE, fixtureOrigin, true)],
         });
+        cleanUps.add(() => run.stop());
     },
     { timeout: TIMEOUT },
 );
 
-after(
-    async () => {
-        await run.stop();
-        if (fixtureName !== undefined) {
-            await runDocker(["stop", "--time", "1", fixtureName]);
-        }
-    },
-    { timeout: TIMEOUT },
-);
+after(() => cleanUps.runAll(), { timeout: TIMEOUT });
 
 const exchange = async (addressVariable: string, requestText: string): Promise<string> => {
     const received = await jsonInside(run.handle, exchangeThrough(addressVariable, requestText));

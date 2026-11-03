@@ -6,16 +6,21 @@ import { launchBrowser, scan, tabWalk, type Browser, type PageDriver } from '@re
 import { launchChromium } from '@revisum/driver-cdp';
 import { startAccessibilityServer, type AccessibilityServer } from '../../support/accessibility-server.ts';
 import { BROWSERS } from '../../support/browsers.ts';
+import { createCleanUpScope } from '../../support/CleanUpScope.ts';
 
+const cleanUps = createCleanUpScope();
 let browser: Browser;
 let page: PageDriver;
 let server: AccessibilityServer;
 before(async () => {
   server = await startAccessibilityServer();
+  cleanUps.add(() => server.close());
   browser = await launchBrowser(BROWSERS.chrome);
+  cleanUps.add(() => browser.close());
   page = await browser.newPage();
+  cleanUps.add(() => page.close());
 }, { timeout: 60_000 });
-after(async () => { await page.close(); await browser.close(); await server.close(); });
+after(() => cleanUps.runAll());
 
 test('the snapshot holds DOM nodes, computed styles, layout boxes and accessibility-tree role and name', { timeout: 60_000 }, async () => {
   await page.goto(`${server.origin}/keyboard-pairs/k10-sequence.clean.html`);
