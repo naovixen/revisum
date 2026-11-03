@@ -6,15 +6,23 @@
 //     these probes, and an ordinary container does reach it, and the same probe does reach the
 //     run's proxy: the counter-examples that show the probe can succeed;
 //   - cutting the gateway off does not cut the run off: the runner still reports the isolated level,
-//     the proxy still carries a declared request out, and the network's peers still reach each other.
+//     the proxy still carries a declared request out, and the network's peers still reach each other;
+//   - WebRTC reaches nothing outside, from a run and from a browser whose WebRTC nothing has turned
+//     off. Witnesses at the addresses it aims for are the only ones who can say so: a page never
+//     hears whether a STUN datagram landed. The same page does reach a witness on the run's own
+//     network, and an ordinary container does reach the outside witnesses: the counter-examples.
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import { createServer as createTcpServer, type AddressInfo, type Server as TcpServer } from 'node:net';
 import { platform } from 'node:os';
-import { after, before, test } from 'node:test';
+import { after, before, describe, test } from 'node:test';
+import { setTimeout as pause } from 'node:timers/promises';
 import { PRODUCT, type BrowserRequestRecord } from '@revisum/contracts';
 import { runDocker } from '@revisum/runner';
+import { WEBRTC_CHANNELS } from '../proofs/EgressChannels.ts';
+import { Arrival, startRecordingOrigin, type RecordingOrigin } from '../proofs/StartRecordingOrigin.ts';
 import { declaredService, egressPolicy, hostOf } from '../unit/runner/runner-examples.ts';
+import { attemptWebRtcInside, WebRtcBrowser, BARE_BROWSER_STATE } from './AttemptWebRtcInside.ts';
 import { jsonInside, pinnedRunImage, startIsolatedRun, type IsolatedRun } from './isolated-run.ts';
 
 const TIMEOUT = 600_000;
@@ -246,4 +254,248 @@ test('peers on the run\'s network still reach each other by name, in both direct
   }
   assert.equal(fromProxy, 'reached', 'the proxy reached the run container');
   assert.equal(await jsonInside(run.handle, directConnection(proxyContainer, 3128)), 'reached', 'the run container reached the proxy');
+});
+
+// ---- WebRTC -----------------------------------------------------------------------------------------
+
+// Something at an address that notes each datagram and connection it gets. A datagram has no answer,
+// so this record is the only way to see one land.
+type WebRtcWitness = {
+  readonly hostname: string;
+  readonly port: number;
+  readonly datagramPort: number;
+  arrivals(): Promise<readonly string[]>;
+};
+
+type WitnessContainer = WebRtcWitness & { stop(): Promise<void> };
+
+const WITNESS_LISTENING = /listening (\d+) (\d+)/;
+const WITNESS_ARRIVED = /^arrived (\S+)$/gm;
+
+const witnessScript = `
+  const stream = require('node:net').createServer((socket) => {
+    console.log('arrived ${Arrival.Connection}');
+    socket.on('error', () => {});
+    socket.resume();
+  });
+  const datagrams = require('node:dgram').createSocket('udp4');
+  datagrams.on('message', () => console.log('arrived ${Arrival.Datagram}'));
+  stream.listen(0, '0.0.0.0', () => datagrams.bind(0, '0.0.0.0', () => {
+    console.log('listening ' + stream.address().port + ' ' + datagrams.address().port);
+  }));`;
+
+const HOST_NETWORK = 'host';
+
+// A witness in a container of its own, on the network named.
+async function startWitnessContainer(network: string): Promise<WitnessContainer> {
+  const image = await pinnedRunImage();
+  const name = `${PRODUCT.name}-webrtc-witness-${randomBytes(6).toString('hex')}`;
+  const started = await runDocker([
+    'run', '--detach', '--rm', '--name', name, '--network', network, '--read-only', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges',
+    '--user', 'node', image, 'node', '-e', witnessScript,
+  ]);
+  assert.equal(started.status, 0, `the witness did not start: ${started.stderr}`);
+  const logs = async (): Promise<string> => (await runDocker(['logs', name])).stdout;
+  let listening: RegExpExecArray | null = null;
+  for (let tries = 0; tries < 50 && listening === null; tries++) {
+    listening = WITNESS_LISTENING.exec(await logs());
+    if (listening === null) { await pause(200); }
+  }
+  assert.ok(listening !== null, 'the witness never said it was listening');
+  const inspected = await runDocker(['inspect', name, '--format', '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}']);
+  assert.equal(inspected.status, 0, inspected.stderr);
+  return {
+    hostname: inspected.stdout.trim(),
+    port: Number(listening[1]),
+    datagramPort: Number(listening[2]),
+    arrivals: async () => [...(await logs()).matchAll(WITNESS_ARRIVED)].flatMap((arrived) => arrived[1] ?? []),
+    stop: async () => { await runDocker(['stop', '--time', '1', name]); },
+  };
+}
+
+const atAddress = (witness: WebRtcWitness, hostname: string): WebRtcWitness => ({ ...witness, hostname });
+
+// The address this machine's Docker Desktop gives host.docker.internal, as an ordinary container sees it.
+async function machineAddress(image: string): Promise<string> {
+  const looked = await runDocker([
+    'run', '--rm', '--network', 'bridge', '--add-host', 'host.docker.internal:host-gateway', '--user', 'node', image,
+    'node', '-e', `require('node:dns').lookup('host.docker.internal', (error, address) => console.log(address));`,
+  ]);
+  assert.equal(looked.status, 0, looked.stderr);
+  return looked.stdout.trim();
+}
+
+const machineWitness = (recording: RecordingOrigin, hostname: string): WebRtcWitness => ({
+  hostname,
+  port: recording.port,
+  datagramPort: recording.datagramPort,
+  arrivals: () => Promise.resolve(recording.arrivals()),
+});
+
+// Sends one datagram and opens one connection, without a browser, and prints what the system said.
+const directDatagramAndConnection = ({ hostname, port, datagramPort }: WebRtcWitness): string => `
+  const socket = require('node:dgram').createSocket('udp4');
+  socket.send('probe', ${datagramPort}, ${JSON.stringify(hostname)}, (error) => {
+    socket.close();
+    const finish = (connection) => { console.log(JSON.stringify({ datagram: error === null ? 'sent' : error.code, connection })); process.exit(0); };
+    const stream = require('node:net').connect({ host: ${JSON.stringify(hostname)}, port: ${port} });
+    stream.setTimeout(4000, () => finish('timed out'));
+    stream.on('connect', () => { finish('reached'); });
+    stream.on('error', (failure) => finish(failure.code));
+  });`;
+
+// How long a datagram gets to land, since nothing answers to say it has.
+const LANDING_MILLISECONDS = 1_000;
+
+// What reached the witness while the action ran.
+async function arrivalsDuring(witness: WebRtcWitness, action: () => Promise<unknown>): Promise<readonly string[]> {
+  const already = (await witness.arrivals()).length;
+  await action();
+  await pause(LANDING_MILLISECONDS);
+  return (await witness.arrivals()).slice(already);
+}
+
+// The addresses outside the run's network that a page might aim for. Under Docker Desktop this
+// machine is reached by an address of its own; on Linux that address is the Docker host's, already here.
+const OutsideAddress = {
+  BridgeContainer: 'a container on the default bridge',
+  HostThroughBridgeGateway: 'the Docker host, through the default bridge\'s gateway',
+  WhereRunGatewayWouldBe: 'the first address of the run\'s own network, where a gateway would be',
+  Machine: 'the machine running Docker Desktop',
+} as const;
+type OutsideAddress = (typeof OutsideAddress)[keyof typeof OutsideAddress];
+
+const OUTSIDE_ADDRESSES: readonly OutsideAddress[] = platform() === 'linux'
+  ? [OutsideAddress.BridgeContainer, OutsideAddress.HostThroughBridgeGateway, OutsideAddress.WhereRunGatewayWouldBe]
+  : Object.values(OutsideAddress);
+
+// A run's network has no gateway, so a peer holds its first address and what is sent there stops at
+// that peer. An ordinary container has no route there, so nothing can show the witness hearing at that
+// address, and the witness behind it is the one that hears through the default bridge's gateway.
+const ADDRESSES_AN_ORDINARY_CONTAINER_REACHES: readonly OutsideAddress[] = OUTSIDE_ADDRESSES.filter((address) => address !== OutsideAddress.WhereRunGatewayWouldBe);
+
+describe('Using the network of a run in the isolated container', () => {
+  const outside = new Map<OutsideAddress, WebRtcWitness>();
+  let image: string;
+  let bridgeWitness: WitnessContainer | undefined;
+  let hostWitness: WitnessContainer | undefined;
+  let peerWitness: WitnessContainer | undefined;
+  let machineRecording: RecordingOrigin | undefined;
+  let peer: WebRtcWitness;
+
+  const witnessAt = (address: OutsideAddress): WebRtcWitness => {
+    const witness = outside.get(address);
+    assert.ok(witness !== undefined, `a witness at ${address}`);
+    return witness;
+  };
+
+  before(async () => {
+    image = await pinnedRunImage();
+    bridgeWitness = await startWitnessContainer('bridge');
+    hostWitness = await startWitnessContainer(HOST_NETWORK);
+    peerWitness = await startWitnessContainer(`${run.handle.runId}-network`);
+    peer = peerWitness;
+    outside.set(OutsideAddress.BridgeContainer, bridgeWitness);
+    outside.set(OutsideAddress.HostThroughBridgeGateway, atAddress(hostWitness, await gatewayOf('bridge')));
+    outside.set(OutsideAddress.WhereRunGatewayWouldBe, atAddress(hostWitness, await gatewayOf(`${run.handle.runId}-network`)));
+    if (OUTSIDE_ADDRESSES.includes(OutsideAddress.Machine)) {
+      machineRecording = await startRecordingOrigin('127.0.0.1');
+      outside.set(OutsideAddress.Machine, machineWitness(machineRecording, await machineAddress(image)));
+    }
+  }, { timeout: TIMEOUT });
+
+  // The witness on the run's network has to go first, or the run could not remove that network.
+  after(async () => {
+    await peerWitness?.stop();
+    await hostWitness?.stop();
+    await bridgeWitness?.stop();
+    await machineRecording?.close();
+  }, { timeout: TIMEOUT });
+
+  for (const channel of WEBRTC_CHANNELS) {
+    describe(`given a page that ${channel.attempt}`, () => {
+      const attempting = (witness: WebRtcWitness, browser: WebRtcBrowser) => attemptWebRtcInside(run.handle, {
+        channelName: channel.name,
+        address: { hostname: witness.hostname, port: witness.port, datagramPort: witness.datagramPort },
+        browser,
+      });
+
+      for (const address of OUTSIDE_ADDRESSES) {
+        describe(`and an address on ${address}`, () => {
+          describe('when a run opens it through the driver', () => {
+            let state: string;
+            let arrivals: readonly string[];
+            before(async () => {
+              const witness = witnessAt(address);
+              arrivals = await arrivalsDuring(witness, async () => {
+                state = await attempting(witness, WebRtcBrowser.Run);
+              });
+            }, { timeout: TIMEOUT });
+
+            test('then it should reach nothing there', () => {
+              assert.deepEqual(arrivals, []);
+            });
+
+            test('then it should finish the plan, so the page did run', () => {
+              assert.equal(state, 'Passed');
+            });
+
+            test('then it should have every proxy decision about that address blocked', () => {
+              const { hostname, port } = witnessAt(address);
+              const about = run.handle.proxyDecisions().filter((decision) => decision.origin.includes(`${hostname}:${port}`));
+              assert.ok(about.every((decision) => decision.decision === 'blocked'), JSON.stringify(about));
+            });
+          });
+
+          describe('when a browser with no driver and no proxy opens it', () => {
+            test('then it should reach nothing there', { timeout: TIMEOUT }, async () => {
+              const witness = witnessAt(address);
+              const arrivals = await arrivalsDuring(witness, () => attempting(witness, WebRtcBrowser.Bare));
+              assert.deepEqual(arrivals, []);
+            });
+          });
+        });
+      }
+
+      describe('and an address on a peer on the run\'s own network', () => {
+        describe('when a browser with no driver and no proxy opens it', () => {
+          test('then it should arrive, so the silence of the addresses outside means something', { timeout: TIMEOUT }, async () => {
+            let state = '';
+            const arrivals = await arrivalsDuring(peer, async () => {
+              state = await attempting(peer, WebRtcBrowser.Bare);
+            });
+            assert.equal(state, BARE_BROWSER_STATE);
+            assert.ok(arrivals.includes(channel.arrival), JSON.stringify(arrivals));
+          });
+        });
+      });
+    });
+  }
+
+  for (const address of OUTSIDE_ADDRESSES) {
+    describe(`given an address on ${address}`, () => {
+      describe('when the run container sends it a datagram and a connection, without a browser', () => {
+        test('then it should reach nothing there', { timeout: TIMEOUT }, async (context) => {
+          const witness = witnessAt(address);
+          const arrivals = await arrivalsDuring(witness, async () => {
+            context.diagnostic(JSON.stringify(await jsonInside(run.handle, directDatagramAndConnection(witness))));
+          });
+          assert.deepEqual(arrivals, []);
+        });
+      });
+
+      if (ADDRESSES_AN_ORDINARY_CONTAINER_REACHES.includes(address)) {
+        describe('when an ordinary container on the default bridge sends the same', () => {
+          test('then it should arrive, so the witness can hear', { timeout: TIMEOUT }, async () => {
+            const witness = witnessAt(address);
+            const arrivals = await arrivalsDuring(witness, () => runDocker([
+              'run', '--rm', '--network', 'bridge', '--user', 'node', image, 'node', '-e', directDatagramAndConnection(witness),
+            ]));
+            assert.ok(arrivals.includes(Arrival.Datagram), JSON.stringify(arrivals));
+            assert.ok(arrivals.includes(Arrival.Connection), JSON.stringify(arrivals));
+          });
+        });
+      }
+    });
+  }
 });

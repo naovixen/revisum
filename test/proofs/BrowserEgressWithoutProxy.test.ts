@@ -1,13 +1,14 @@
-// Where no egress proxy runs, the driver's own allow-list is all that stands between a page and an
-// undeclared address. Each channel here is tried through a whole run in a real headless browser,
-// against real servers on loopback: the page's own origin, a declared origin on another site, and
-// an undeclared one on a third. Only the undeclared server's own record can show that nothing got
-// through. The same page aimed at the declared origin is the counter-example, which shows the
-// channel works in this fixture, so an empty record means something.
+// A host run must keep a page from every undeclared address, whichever channel it uses. Each channel
+// here is tried through a whole run in a real headless browser, against real servers on loopback:
+// the page's own origin, a declared origin on another site, and an undeclared one on a third. Only
+// the undeclared server's own record can show that nothing got through. The same page aimed at the
+// declared origin is the counter-example, which shows the channel works in this fixture, so an empty
+// record means something.
 //
-// Preconnect and dns-prefetch have no such counter-example, because Chromium makes neither in the
-// browser context a session runs in, whatever the address. Their counter-example is the same page
-// in a browser's default context, where the same witness does see them.
+// Three kinds of page have no such counter-example. WebRTC is off on a host run, whatever the
+// address, and Chromium makes neither a preconnect nor a dns-prefetch in the browser context a session
+// runs in. Their counter-example is the same page in a browser's default context, where the same
+// witness does see them.
 import assert from "node:assert/strict";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -43,6 +44,8 @@ import {
     ATTEMPT_SETTLED,
     ATTEMPT_STATE,
     EGRESS_CHANNELS,
+    REQUEST_CHANNELS,
+    WEBRTC_CHANNELS,
     attemptPage,
     dnsPrefetchOf,
     preconnectTo,
@@ -123,10 +126,12 @@ before(async () => {
     undeclared = await startRecordingOrigin("127.0.0.2");
     declared = await startRecordingOrigin("127.0.0.3");
     const routes = new Map<string, FixtureRoute>([
-        ...EGRESS_CHANNELS.flatMap((channel) => [
-            ...channelRoutes(channel, AddressKind.Undeclared, undeclared),
-            ...channelRoutes(channel, AddressKind.Declared, declared),
-        ]),
+        ...EGRESS_CHANNELS.flatMap((channel) =>
+            channelRoutes(channel, AddressKind.Undeclared, undeclared),
+        ),
+        ...REQUEST_CHANNELS.flatMap((channel) =>
+            channelRoutes(channel, AddressKind.Declared, declared),
+        ),
         [PRECONNECT_PATH, htmlRoute(attemptPage(preconnectTo(undeclared)))],
         [DNS_PREFETCH_PATH, htmlRoute(attemptPage(dnsPrefetchOf(UNDECLARED_NAME)))],
     ]);
@@ -205,10 +210,13 @@ async function runWithNetworkLog(
 
 // The page opened in a browser's default context, with no driver or allow-list, and left to run.
 // Returns the browser's network log.
-async function loadInDefaultContext(path: string): Promise<string> {
+async function loadInDefaultContext(
+    path: string,
+    executablePath: string = BROWSERS.chrome,
+): Promise<string> {
     undeclared.forgetArrivals();
     const logFile = networkLogFile("default-context");
-    const launched = await launchChromium(BROWSERS.chrome, {
+    const launched = await launchChromium(executablePath, {
         arguments: networkLogFlags(logFile),
         profilePrefix: "egress-default-context-",
     });
@@ -249,12 +257,17 @@ async function outOfProcessFramesDuringRun(path: string): Promise<readonly strin
     return frameUrls;
 }
 
+const EXECUTABLE_OF_TARGET: Readonly<Record<BrowserTarget, string>> = {
+    [BrowserTarget.Chrome]: BROWSERS.chrome,
+    [BrowserTarget.HeadlessShell]: BROWSERS.chromeHeadlessShell,
+};
+
 const isConnection = (arrival: string): boolean => arrival === Arrival.Connection;
 
 const showsBlocked = (ran: BrowserRun, hostname: string): boolean =>
     ran.result.blockedOrigins.some((origin) => origin.includes(hostname));
 
-describe("Using the browser allow-list of a run with no egress proxy", () => {
+describe("Using a run on the host", () => {
     for (const targetId of Object.values(BrowserTarget)) {
         describe(`given a run on ${targetId}`, onTarget(targetId), () => {
             for (const channel of EGRESS_CHANNELS) {
@@ -285,26 +298,41 @@ describe("Using the browser allow-list of a run with no egress proxy", () => {
                         });
                     });
 
-                    describe("when the address it uses is declared", () => {
-                        let ran: BrowserRun;
-                        let arrivals: readonly string[];
-                        before(async () => {
-                            const path = pagePath(channel.name, AddressKind.Declared);
-                            ran = await runPage(targetId, path);
-                            arrivals = declared.arrivals();
+                    if (WEBRTC_CHANNELS.includes(channel)) {
+                        describe("when a browser's default context opens it, with no driver", () => {
+                            test("then it should arrive, so the run's silent address means something", async () => {
+                                await loadInDefaultContext(
+                                    pagePath(channel.name, AddressKind.Undeclared),
+                                    EXECUTABLE_OF_TARGET[targetId],
+                                );
+                                assert.ok(
+                                    undeclared.arrivals().includes(channel.arrival),
+                                    `arrived: ${JSON.stringify(undeclared.arrivals())}`,
+                                );
+                            });
                         });
+                    } else {
+                        describe("when the address it uses is declared", () => {
+                            let ran: BrowserRun;
+                            let arrivals: readonly string[];
+                            before(async () => {
+                                const path = pagePath(channel.name, AddressKind.Declared);
+                                ran = await runPage(targetId, path);
+                                arrivals = declared.arrivals();
+                            });
 
-                        test("then it should arrive at that address", () => {
-                            assert.ok(
-                                arrivals.includes(channel.arrival),
-                                `arrived: ${JSON.stringify(arrivals)}`,
-                            );
-                        });
+                            test("then it should arrive at that address", () => {
+                                assert.ok(
+                                    arrivals.includes(channel.arrival),
+                                    `arrived: ${JSON.stringify(arrivals)}`,
+                                );
+                            });
 
-                        test("then it should block nothing", () => {
-                            assert.deepEqual(ran.result.blockedOrigins, []);
+                            test("then it should block nothing", () => {
+                                assert.deepEqual(ran.result.blockedOrigins, []);
+                            });
                         });
-                    });
+                    }
                 });
             }
 

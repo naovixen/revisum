@@ -22,7 +22,7 @@ export const Arrival = {
     Datagram: "datagram",
 } as const;
 
-export const requestArrival = (path: string): string => `GET ${path}`;
+export const requestArrival = (path: string, method = "GET"): string => `${method} ${path}`;
 export const websocketArrival = (path: string): string => `websocket ${path}`;
 
 const WEBSOCKET_ACCEPT_SUFFIX = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
@@ -41,7 +41,7 @@ export async function startRecordingOrigin(hostname: string): Promise<RecordingO
     const sockets = new Set<Socket>();
     const server = createServer((request, response) => {
         const url = new URL(request.url ?? "/", "http://localhost");
-        arrived.push(requestArrival(url.pathname));
+        arrived.push(requestArrival(url.pathname, request.method));
         if (url.pathname === FRAME_PATH) {
             response
                 .writeHead(200, { "content-type": "text/html; charset=utf-8" })

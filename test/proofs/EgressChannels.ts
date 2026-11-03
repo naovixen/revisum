@@ -11,7 +11,7 @@ import {
 
 export const ATTEMPT_STATE = "attempt-state";
 export const ATTEMPT_SETTLED = "Settled";
-const SETTLE_MILLISECONDS = 2_000;
+export const SETTLE_MILLISECONDS = 2_000;
 
 export type ChannelAddress = Pick<RecordingOrigin, "origin" | "hostname" | "port" | "datagramPort">;
 
@@ -57,7 +57,8 @@ const workerStartedBy = (
         `fetch(${JSON.stringify(`${origin}${WORKER_FILE_PATH}`)}, { mode: "no-cors" });`,
 });
 
-export const EGRESS_CHANNELS: readonly EgressChannel[] = [
+// The channels a declared address may still use on a host run.
+export const REQUEST_CHANNELS: readonly EgressChannel[] = [
     {
         name: "websocket",
         attempt: "opens a WebSocket",
@@ -103,6 +104,10 @@ export const EGRESS_CHANNELS: readonly EgressChannel[] = [
                 prefetch: [{ source: "list", urls: [`${origin}${SPECULATED_PATH}`] }],
             })}</script>`,
     },
+];
+
+// Off on a host run whatever the address, so a declared address cannot show that these pages send.
+export const WEBRTC_CHANNELS: readonly EgressChannel[] = [
     {
         name: "webrtc-stun",
         attempt: "gathers WebRTC candidates from a STUN server",
@@ -122,6 +127,8 @@ export const EGRESS_CHANNELS: readonly EgressChannel[] = [
             }),
     },
 ];
+
+export const EGRESS_CHANNELS: readonly EgressChannel[] = [...REQUEST_CHANNELS, ...WEBRTC_CHANNELS];
 
 export const preconnectTo = ({ origin }: ChannelAddress): string =>
     `<link rel="preconnect" href="${origin}">`;
