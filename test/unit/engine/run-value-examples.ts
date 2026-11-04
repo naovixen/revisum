@@ -99,11 +99,13 @@ export const PAGE_TITLE = 'Orders';
 // every call. Its adapter id is the shared test project's. `performs` is what it says it can do.
 export function recordingDriver(performs?: readonly DriverFeature[]): { readonly driver: BrowserDriver; readonly recording: Recording } {
   const recording: Recording = { environments: [], navigations: [], actions: [], probes: 0 };
+  const page = fakeSession();
   const session = fakeSession({
     browser: { name: 'recording-browser', version: '1.0' },
     navigate: (url) => { recording.navigations.push(url); return Promise.resolve(success(undefined)); },
     page: () => Promise.resolve({ url: recording.navigations.at(-1) ?? `${ORIGIN}/`, title: PAGE_TITLE }),
-    act: (step) => { recording.actions.push(step); return Promise.resolve(success(undefined)); },
+    // Answers as a fake page does, so a step the engine left unresolved is refused here too.
+    act: (step, guard, secret) => { recording.actions.push(step); return page.act(step, guard, secret); },
     probe: () => { recording.probes++; return Promise.resolve(FAKE_ELEMENT); },
   });
   const driver = fakeDriver({

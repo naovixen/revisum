@@ -19,7 +19,7 @@ import { systemClock } from "../support/memory-ports.ts";
 import { authorise, trustedProjectFrom } from "../support/policy-clearance.ts";
 import { FIXTURES } from "../support/repository.ts";
 import { buildAdapters } from "../../packages/cli/src/BuildAdapters.ts";
-import { fakePorts } from "../support/fakes/FakePorts.ts";
+import { realRunPorts } from "../support/RealRunPorts.ts";
 
 const THIS_FILE_IN_THE_WORKSPACE = "test/containers/RunBrowserPastRefusalsInside.ts";
 const PAGE_PATH = "/refusals.html";
@@ -125,7 +125,7 @@ async function runPlanAgainst(fixture: FixtureServer, proxyServer: string): Prom
             plan: authorise(parsedPlan.value, await trustedProjectFrom(projectFile)),
             targetId: target.id,
         },
-        fakePorts({
+        realRunPorts({
             drivers: new Map([
                 [
                     "cdp",

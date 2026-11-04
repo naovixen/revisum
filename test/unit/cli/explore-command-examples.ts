@@ -35,7 +35,6 @@ import {
 import { BROWSERS } from '#test-support/browsers.ts';
 import { startFixtureServer, type FixtureRoute } from '#test-support/fixture-server.ts';
 import { fakeApprovalStore } from '#test-support/fakes/FakeApprovalStore.ts';
-import { fakeDriver } from '#test-support/fakes/FakeDriver.ts';
 import { fakeRunner } from '#test-support/fakes/FakeRunner.ts';
 import { fakeRunnerHandle } from '#test-support/fakes/FakeRunnerHandle.ts';
 import { memoryEventSink, type MemoryEventSink } from '#test-support/memory-ports.ts';
@@ -205,9 +204,10 @@ function recordingPort(name: string, port: object, calls: SessionCall[]): object
     get(target, property) {
       const value: unknown = Reflect.get(target, property, target);
       if (typeof property !== 'string' || typeof value !== 'function') return value;
-      return (...inputs: readonly unknown[]) => {
+      return (...inputs: readonly unknown[]): unknown => {
         calls.push({ method: `${name}.${property}` });
-        return Reflect.apply(value, target, inputs);
+        const answer: unknown = Reflect.apply(value, target, inputs);
+        return answer;
       };
     },
   });
@@ -220,10 +220,11 @@ function recordingSession(session: Session, calls: SessionCall[]): Session {
       if (typeof property !== 'string') return value;
       if (PORTS.includes(property) && typeof value === 'object' && value !== null) return recordingPort(property, value, calls);
       if (typeof value !== 'function') return value;
-      return (...inputs: readonly unknown[]) => {
+      return (...inputs: readonly unknown[]): unknown => {
         const first = inputs[0];
         calls.push(property === 'navigate' && typeof first === 'string' ? { method: property, url: first } : { method: property });
-        return Reflect.apply(value, target, inputs);
+        const answer: unknown = Reflect.apply(value, target, inputs);
+        return answer;
       };
     },
   });
@@ -234,17 +235,18 @@ export function spyBrowser(): SpyBrowser {
   const opened: SessionEnvironment[] = [];
   const calls: SessionCall[] = [];
   const build = inner.build;
+  const driver: BrowserDriver = {
+    info: inner.info,
+    supports: (target) => inner.supports(target),
+    async open(target, environment) {
+      opened.push(environment);
+      const session = await inner.open(target, environment);
+      return session.ok ? success(recordingSession(session.value, calls)) : session;
+    },
+    ...(build === undefined ? {} : { build: (target) => Reflect.apply(build, inner, [target]) }),
+  };
   return {
-    driver: fakeDriver({
-      info: inner.info,
-      supports: (target) => inner.supports(target),
-      async open(target, environment) {
-        opened.push(environment);
-        const session = await inner.open(target, environment);
-        return session.ok ? success(recordingSession(session.value, calls)) : session;
-      },
-      ...(build === undefined ? {} : { build: (target) => Reflect.apply(build, inner, [target]) }),
-    }, build === undefined ? ['build'] : []),
+    driver,
     opened,
     calls,
     navigations: () => calls.flatMap((call) => (call.method === 'navigate' && call.url !== undefined ? [call.url] : [])),

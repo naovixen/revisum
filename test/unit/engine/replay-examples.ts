@@ -35,7 +35,6 @@ import { authorise, trustedProjectFrom } from '../../support/policy-clearance.ts
 import { DEFAULT_ROUTE, fakeCommandRunner, type CommandRoute, type SeenCommand } from './database-command-examples.ts';
 import { DEFAULT_CLOCK_START, DEFAULT_SEED, ORIGIN, accepted, recordingDriver, type JsonRecord } from './run-value-examples.ts';
 import { SHOP_ROUTE, routedServiceCaller, type Route } from './service-call-examples.ts';
-import { fakeDriver } from '#test-support/fakes/FakeDriver.ts';
 import { driversOf, fakePorts } from '#test-support/fakes/FakePorts.ts';
 import { fakeSecretStore } from '#test-support/fakes/FakeSecretStore.ts';
 
@@ -242,7 +241,7 @@ export function scenarioDriver(scenario: Scenario): { readonly driver: BrowserDr
   const { driver: inner } = recordingDriver();
   const calls: DriverCalls = { order: [] };
   const executable = scenario.executable;
-    const overrides: Partial<BrowserDriver> = {
+  const driver: BrowserDriver = {
     info: {
       id: inner.info.id, version: scenario.adapterVersion, protocol: inner.info.protocol,
       ...(scenario.cannotPin.length === 0 ? {} : { cannotPin: [...scenario.cannotPin] }),
@@ -253,14 +252,13 @@ export function scenarioDriver(scenario: Scenario): { readonly driver: BrowserDr
       const opened = await inner.open(target, environment);
       return opened.ok ? success({ ...opened.value, browser: { name: 'recording-browser', version: scenario.browserVersion } }) : opened;
     },
+    ...(executable === null ? {} : {
+      build: () => {
+        calls.order.push('build');
+        return Promise.resolve(success({ version: scenario.reportedBuildVersion, executablePath: scenario.executablePath ?? fakeExecutable(executable) }));
+      },
+    }),
   };
-  const driver = executable === null ? fakeDriver(overrides, ['build']) : fakeDriver({
-    ...overrides,
-    build: () => {
-      calls.order.push('build');
-      return Promise.resolve(success({ version: scenario.reportedBuildVersion, executablePath: scenario.executablePath ?? fakeExecutable(executable) }));
-    },
-  });
   return { driver, calls };
 }
 

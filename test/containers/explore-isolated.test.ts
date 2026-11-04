@@ -19,7 +19,7 @@ import assert from 'node:assert/strict';
 import { createRequire, syncBuiltinESMExports } from 'node:module';
 import { before, test } from 'node:test';
 import {
-  success, type EgressEvent, type EgressPolicy, type ExecOutcome, type ImageDigest, type Runner,
+  success, type EgressEvent, type EgressPolicy, type ExecOutcome, type ImageDigest, type Runner, type RunnerHandle,
 } from '@revisum/contracts';
 import { dockerCliEngine, dockerRunner } from '@revisum/runner';
 import { REPOSITORY_ROOT } from '../support/repository.ts';
@@ -34,8 +34,6 @@ import {
   INSIDE_SECOND_ORIGIN, INSIDE_SITE_ORIGIN, INSIDE_SITE_PORT, REQUESTS_FILE, SITE_MODULE,
 } from './explore-site-inside.ts';
 import { dockerIds, newIds, pinnedRunImage } from './isolated-run.ts';
-import { fakeRunner } from '../support/fakes/FakeRunner.ts';
-import { fakeRunnerHandle } from '../support/fakes/FakeRunnerHandle.ts';
 
 const TIMEOUT = 600_000;
 const START = `${INSIDE_SITE_ORIGIN}/`;
@@ -134,7 +132,7 @@ function parsedRequests(outcome: ExecOutcome): readonly SiteRequest[] {
 // the test sees what the draft command asks of it.
 function watchedRunner(image: ImageDigest, watch: RunnerWatch): { readonly runner: Runner; readonly image: ImageDigest } {
   const inner = dockerRunner({ engine: dockerCliEngine(), repositoryRoot: REPOSITORY_ROOT, inputs: ['test', 'fixtures', 'golden'] });
-  const runner = fakeRunner({
+  const runner: Runner = {
     guaranteeLevel: () => inner.guaranteeLevel(),
     async start(started, policy) {
       watch.policies.push(policy);
@@ -146,7 +144,7 @@ function watchedRunner(image: ImageDigest, watch: RunnerWatch): { readonly runne
         await handle.stop();
         assert.fail(`the fixture site did not start inside the run container: ${site.stdout} ${site.stderr}`);
       }
-      const watched = fakeRunnerHandle({
+      const watched: RunnerHandle = {
         runId: handle.runId,
         egressEvents: () => handle.egressEvents(),
         proxyDecisions: () => handle.proxyDecisions(),
@@ -167,10 +165,10 @@ function watchedRunner(image: ImageDigest, watch: RunnerWatch): { readonly runne
             await handle.stop();
           }
         },
-      });
+      };
       return success(watched);
     },
-  });
+  };
   return { runner, image };
 }
 

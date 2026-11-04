@@ -24,7 +24,7 @@ import { determinismRuns } from '#test-support/TestTier.ts';
 import type { BrowserHarness } from '#test-support/browser/BrowserHarness.ts';
 import { signupHarness, makeDrivers, makeProjectFile, signupPlan } from '#test-support/signup-harness.ts';
 import { PER_ENVIRONMENT_FIELDS, engineFunction, replayAnswerOf, replayed, type ReplayAnswer } from '../unit/engine/replay-examples.ts';
-import { fakePorts } from '#test-support/fakes/FakePorts.ts';
+import { realRunPorts } from '#test-support/RealRunPorts.ts';
 
 const REPLAYS = determinismRuns();
 const HEADLESS_SHELL = 'cdp-chromium-headless-shell';
@@ -57,7 +57,7 @@ async function replaySignup(rawPlan: unknown, targetId: string, manifest: unknow
     manifest, recording: null, recordedResultHash, recordedState: 'Passed',
     inputs: { ...inputs, plan: authorise(testHarness.plan(rawPlan), trusted), targetId: targetOf(targetId) },
   };
-  const ports = { ...fakePorts({ drivers: makeDrivers(), clock: systemClock }), fixtures: fixtureReader };
+  const ports = { ...realRunPorts({ drivers: makeDrivers(), clock: systemClock }), fixtures: fixtureReader };
   const replay = await engineFunction('replay');
   return replayAnswerOf(await replay(request, ports));
 }
@@ -103,8 +103,8 @@ function goldenRecord(): { readonly plan: unknown; readonly manifest: Readonly<R
   const hashes = readJson('result-hash.json');
   assert.ok(typeof manifest === 'object' && manifest !== null && !Array.isArray(manifest), 'the golden manifest is not an object');
   assert.ok(typeof hashes === 'object' && hashes !== null, 'the golden hashes are not an object');
-  const resultHash = Reflect.get(hashes, 'resultHash');
-  const manifestHash = Reflect.get(hashes, 'manifestHash');
+  const resultHash: unknown = Reflect.get(hashes, 'resultHash');
+  const manifestHash: unknown = Reflect.get(hashes, 'manifestHash');
   assert.ok(typeof resultHash === 'string' && typeof manifestHash === 'string', 'the golden has no result or manifest hash');
   return { plan: readJson('plan.json'), manifest: Object.fromEntries(Object.entries(manifest)), resultHash, manifestHash };
 }

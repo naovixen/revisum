@@ -29,8 +29,18 @@ type RedTeamCase = {
   readonly benign: Variant;
 };
 
-const RED_TEAM: readonly RedTeamCase[] =
-  JSON.parse(readFileSync(join(FIXTURES, 'policy-red-team', 'cases.json'), 'utf8')).cases;
+const isRedTeamCase = (value: unknown): value is RedTeamCase =>
+  typeof value === 'object' && value !== null && ['name', 'actionKind', 'stage', 'target', 'deniedStep', 'rule', 'harmful', 'benign'].every((field) => field in value);
+
+function redTeamCases(): readonly RedTeamCase[] {
+  const file: unknown = JSON.parse(readFileSync(join(FIXTURES, 'policy-red-team', 'cases.json'), 'utf8'));
+  assert.ok(typeof file === 'object' && file !== null, 'the red team file holds an object');
+  const cases: unknown = Reflect.get(file, 'cases');
+  assert.ok(Array.isArray(cases) && cases.every(isRedTeamCase), 'the red team file lists its cases in full');
+  return cases;
+}
+
+const RED_TEAM = redTeamCases();
 
 async function runVariant(variant: Variant, targetId: string) {
   const steps = [...variant.steps, CLOSING_CHECK];

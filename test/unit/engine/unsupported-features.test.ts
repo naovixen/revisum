@@ -7,7 +7,12 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { OPEN_ORDERS, label, planOf, projectFileWith, runPlan, type JsonRecord } from './run-value-examples.ts';
 
-const PROJECT_FILE = projectFileWith({ testIdAttributes: ['data-testid', 'data-qa'] });
+// The counter-example clicks a control named only by its test id, which a guard allows only when the
+// project says so.
+const PROJECT_FILE = projectFileWith({
+  testIdAttributes: ['data-testid', 'data-qa'],
+  policy: { unnamedControlsAllowedByTestId: ['save'] },
+});
 const AFTER: JsonRecord = { type: 'click', locator: { by: 'role', role: 'button', name: 'Continue' } };
 
 type Feature = { readonly name: string; readonly withFeature: JsonRecord; readonly without: JsonRecord };

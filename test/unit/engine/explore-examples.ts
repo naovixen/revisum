@@ -78,7 +78,10 @@ async function engineFunction(name: string): Promise<(...inputs: readonly unknow
   const loaded: unknown = await import('@revisum/engine');
   const exported: unknown = typeof loaded === 'object' && loaded !== null ? Object.getOwnPropertyDescriptor(loaded, name)?.value : undefined;
   if (typeof exported !== 'function') throw new Error(`@revisum/engine does not export a function named ${name}`);
-  return (...inputs) => Reflect.apply(exported, undefined, inputs);
+  return (...inputs): unknown => {
+    const answer: unknown = Reflect.apply(exported, undefined, inputs);
+    return answer;
+  };
 }
 
 const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
@@ -208,8 +211,8 @@ export function spyExploreDriver(site: FakeSite): SpyExploreDriver {
   });
   const spy = new Proxy(driver, {
     get(target, property, receiver) {
-      if (typeof property !== 'string' || property === 'then') return Reflect.get(target, property, receiver);
-      if (Object.hasOwn(target, property)) return Reflect.get(target, property, receiver);
+      const own: unknown = Reflect.get(target, property, receiver);
+      if (typeof property !== 'string' || property === 'then' || Object.hasOwn(target, property)) return own;
       return (...inputs: readonly unknown[]) => {
         calls.push({ method: property });
         return Promise.resolve(success(inputs.length));

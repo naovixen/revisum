@@ -14,7 +14,7 @@ import { systemClock } from '../support/memory-ports.ts';
 import { authorise, trustedProjectFrom } from '../support/policy-clearance.ts';
 import { startEgressFixtureServer } from '../unit/runner/egress-fixture-server.ts';
 import { keepingBrowserRecords } from '../support/browser/KeepingBrowserRecords.ts';
-import { fakePorts } from '../support/fakes/FakePorts.ts';
+import { realRunPorts } from '../support/RealRunPorts.ts';
 
 const TARGET_ID = 'cdp-chromium';
 const SEED = 7;
@@ -60,7 +60,7 @@ async function main(): Promise<number> {
     const result = await run({
       project: project.value, baseUrl: fixture.origin, seed: SEED, fixedTimeMilliseconds: FIXED_TIME_MILLISECONDS, fixtures: fixture.fixtures,
       host: { platform: platform(), arch: arch() }, plan: authorise(parsed.value, trusted), targetId: TARGET_ID as TargetId,
-    }, fakePorts({ drivers, clock: systemClock }));
+    }, realRunPorts({ drivers, clock: systemClock }));
     console.log(JSON.stringify({ browserRecords, fixtureOrigin: fixture.origin }));
     console.log(JSON.stringify({ state: result.state }));
     return 0;

@@ -111,12 +111,14 @@ describe("Using a fake port", () => {
         });
 
         describe("when a new tab is opened", () => {
-            test("then it should give the same session, so its calls are noted too", async () => {
+            test("then it should give a fake of its own, that notes the tab's calls apart", async () => {
                 const session = fakeSession();
                 const tab = await session.newTab?.("https://app.example/other");
                 assert.ok(tab?.ok === true);
                 await tab.value.page();
-                assert.equal(session.calls.count("page"), 1);
+                assert.equal(session.calls.count("page"), 0);
+                const [openedTab] = session.openedTabs();
+                assert.equal(openedTab?.calls.count("page"), 1);
                 assert.deepEqual(session.calls.to("newTab"), [
                     { method: "newTab", arguments: ["https://app.example/other"] },
                 ]);

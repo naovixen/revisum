@@ -1,5 +1,6 @@
 // What a fake session does with an action: it asks the guard, honours the byte limit and refuses once
-// closed, as the port says a driver must, so a run on it ends as a run on a driver would.
+// closed, as the port says a driver must, so a run on it ends as a run on a driver would. What it
+// shares with the real driver is pinned in SessionContractOnTheFake; this is what only a fake can say.
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import {
@@ -9,15 +10,18 @@ import {
     type ActionStep,
     type DownloadStep,
     type GuardVerdict,
+    type Origin,
     type ResolvedElement,
 } from "@revisum/engine";
 import { FAKE_DOWNLOAD, fakeSession } from "#test-support/fakes/FakeSession.ts";
+import { testProject } from "../engine/plan-examples.ts";
 import {
     OPEN_ACCOUNT_PAGE,
     acceptDialog,
     click,
     parsedPlan,
     planOf,
+    policyProjectInput,
     role,
     stepAt,
     testId,
@@ -35,6 +39,9 @@ const UNNAMED_ELEMENT: ResolvedElement = {
     linkUrl: null,
 };
 const CLICK_EXPORT: JsonRecord = click(NAMED_BUTTON);
+const TOLD_PAGE = { url: "https://app.example/told", title: "Told" };
+const [ORIGIN = assert.fail("the test project declares an origin")]: readonly Origin[] =
+    testProject().origins;
 
 // A guard that answers `verdict` and keeps what it was asked.
 function guardAnswering(verdict: GuardVerdict): {
@@ -86,10 +93,42 @@ describe("Using a fake session", () => {
             });
         });
 
-        describe("when a dialog step is acted on", () => {
-            test("then it should ask the guard about no element", async () => {
+        describe("when a dialog step is acted on with a dialog open", () => {
+            test("then it should ask the guard about no element, with the dialog's text", async () => {
+                const session = fakeSession();
+                session.openDialog("Keep the draft?");
+                const { guard, asked } = guardAnswering(ALLOW);
+                const acted = await session.act(actionStep(acceptDialog), guard);
+                assert.deepEqual(acted, success(undefined));
+                assert.deepEqual(asked, [[UNNAMED_ELEMENT, "Keep the draft?"]]);
+            });
+        });
+
+        describe("when a dialog step is acted on with no dialog open", () => {
+            test("then it should answer not-found, having asked no guard", async () => {
                 const { guard, asked } = guardAnswering(ALLOW);
                 const acted = await fakeSession().act(actionStep(acceptDialog), guard);
+                assert.deepEqual(
+                    acted,
+                    failure({ code: "not-found", detail: "no dialog is open" }),
+                );
+                assert.deepEqual(asked, []);
+            });
+        });
+
+        describe("when a click on a css selector is acted on", () => {
+            test("then it should tell the guard nothing of the element", async () => {
+                const { guard, asked } = guardAnswering(ALLOW);
+                const css = { by: "css", selector: "#save" };
+                const step = stepAt(
+                    parsedPlan(
+                        planOf([OPEN_ACCOUNT_PAGE, click(css)]),
+                        policyProjectInput({ unsafeFeatures: { cssLocators: true } }),
+                    ),
+                    1,
+                );
+                assert.ok(step.type === "click", JSON.stringify(step));
+                const acted = await fakeSession().act(step, guard);
                 assert.deepEqual(acted, success(undefined));
                 assert.deepEqual(asked, [[UNNAMED_ELEMENT, null]]);
             });
@@ -207,6 +246,88 @@ describe("Using a fake session", () => {
                 assert.equal((await session.act(step, guard)).ok, true);
                 await session.close();
                 assert.equal((await session.act(step, guard)).ok, false);
+            });
+        });
+
+        describe("when the session was told how to answer", () => {
+            test("then it should have the tab answer the same way, with its own calls", async () => {
+                const session = fakeSession({ page: () => Promise.resolve(TOLD_PAGE) });
+                const tab = await session.newTab?.("https://app.example/other");
+                assert.ok(tab?.ok === true);
+                assert.deepEqual(await tab.value.page(), TOLD_PAGE);
+                assert.equal(session.calls.count("page"), 0);
+            });
+        });
+
+        describe("when a dialog opens on the tab", () => {
+            test("then it should hold the tab and leave the session's page free", async () => {
+                const session = fakeSession();
+                await session.newTab?.("https://app.example/other");
+                const [tab] = session.openedTabs();
+                tab?.openDialog("Keep the draft?");
+                assert.equal(tab?.isDialogOpen?.(), true);
+                assert.equal(session.isDialogOpen?.(), false);
+            });
+        });
+
+        describe("when the tab's storage is written", () => {
+            test("then it should reach the session's, until the tab closes", async () => {
+                const session = fakeSession();
+                const opened = await session.newTab?.("https://app.example/other");
+                assert.ok(opened?.ok === true);
+                const tab = opened.value;
+                await tab.storage?.write("local", ORIGIN, "key", "value");
+                assert.deepEqual(
+                    await session.storage?.read("local", ORIGIN, "key"),
+                    success("value"),
+                );
+                await tab.close();
+                const read = await tab.storage?.read("local", ORIGIN, "key");
+                assert.ok(read?.ok === false);
+                assert.equal(read.error.code, "not-actionable");
+            });
+        });
+    });
+
+    describe("given a session left without a feature", () => {
+        describe("when it has closed", () => {
+            test("then it should still be without it", async () => {
+                const session = fakeSession({}, ["frame", "newTab"]);
+                await session.close();
+                assert.equal("frame" in session, false);
+                assert.equal("newTab" in session, false);
+            });
+        });
+
+        describe("when it opens a tab", () => {
+            test("then it should leave the tab without it too", async () => {
+                const session = fakeSession({}, ["frame"]);
+                const tab = await session.newTab?.("https://app.example/other");
+                assert.ok(tab?.ok === true);
+                assert.equal("frame" in tab.value, false);
+            });
+        });
+    });
+
+    describe("given a test's own answer", () => {
+        describe("when it is asked for after the session has closed", () => {
+            test("then it should give way to the closed session's", async () => {
+                const session = fakeSession({ page: () => Promise.resolve(TOLD_PAGE) });
+                await session.close();
+                await assert.rejects(session.page());
+            });
+        });
+    });
+
+    describe("given a copy of the session made while it was open", () => {
+        describe("when the session closes", () => {
+            test("then it should end the copy with it", async () => {
+                const session = fakeSession();
+                const copy = { ...session };
+                await session.close();
+                const acted = await copy.act(actionStep(CLICK_EXPORT), guardAnswering(ALLOW).guard);
+                assert.ok(!acted.ok);
+                assert.equal(acted.error.code, "target-crashed");
             });
         });
     });

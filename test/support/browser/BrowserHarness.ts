@@ -35,7 +35,7 @@ import { authorise, trustedProjectFrom } from "../policy-clearance.ts";
 import { BrowserTarget } from "./BrowserTarget.ts";
 import { navigate, testId, visible, type JsonRecord } from "./RawPlan.ts";
 import { runningAtClose } from "./WrappingSessions.ts";
-import { fakePorts } from "../fakes/FakePorts.ts";
+import { realRunPorts } from "../RealRunPorts.ts";
 
 export type BrowserHarnessDefinition = {
     readonly fixtureFolder: string;
@@ -248,7 +248,7 @@ async function runPlan(
             ...(scriptSources === undefined ? {} : { scriptSources }),
             ...(options.standing === undefined ? {} : { standing: options.standing }),
         },
-        fakePorts({
+        realRunPorts({
             drivers: driversForRun(context, options, startedAt, pages),
             clock: systemClock,
             artifacts: store,

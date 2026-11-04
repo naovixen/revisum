@@ -1,0 +1,287 @@
+// What the engine may count on from any session, once it has closed, once a tab has closed, and when
+// it is given a step no driver may perform or a dialog to answer. One run of this goes over the fake
+// session and one over the real driver, so the two cannot drift apart.
+import assert from "node:assert/strict";
+import { describe, test } from "node:test";
+import { ClockAdvanceMode, success, type Result, type Session } from "@revisum/engine";
+import { dialogContract } from "./DialogContract.ts";
+import { refusalsContract } from "./RefusalsContract.ts";
+import {
+    ACCEPT,
+    CLICK_EXPORT,
+    EXPORT_BUTTON,
+    HOLDING_A_VALUE,
+    NO_GUARD,
+    actionStep,
+    allowing,
+    assertNothingRead,
+    downloadStep,
+    failureCode,
+    firstOrigin,
+    locatorFindingNothing,
+    locatorOf,
+    openTab,
+    type OpenSessionUnderTest,
+} from "./SessionUnderTest.ts";
+
+const SCRIPT = {
+    source: "() => 1",
+    arguments: {},
+    timeoutMilliseconds: 500,
+    maximumResultBytes: 9,
+};
+
+type ResultCall = {
+    readonly name: string;
+    readonly call: (
+        session: Session,
+    ) => Promise<Result<unknown, { readonly code: string }> | undefined> | undefined;
+};
+
+// Each thing a closed page's tab and session both answer with a result, and how to ask it.
+const PAGE_RESULT_CALLS = {
+    navigate: { name: "navigate", call: (session) => session.navigate("/") },
+    frame: { name: "frame", call: (session) => session.frame?.(locatorFindingNothing()) },
+    runScript: { name: "runScript", call: (session) => session.runScript?.(SCRIPT) },
+    storageRead: {
+        name: "storage.read",
+        call: (session) => session.storage?.read("local", firstOrigin(), "k"),
+    },
+    storageWrite: {
+        name: "storage.write",
+        call: (session) => session.storage?.write("local", firstOrigin(), "k", "v"),
+    },
+    storageRemove: {
+        name: "storage.remove",
+        call: (session) => session.storage?.remove("local", firstOrigin(), "k"),
+    },
+} as const satisfies Readonly<Record<string, ResultCall>>;
+
+const CRASH_ONLY_CALLS: readonly ResultCall[] = [
+    { name: "newTab", call: (session) => session.newTab?.("/") },
+    {
+        name: "clock.advance",
+        call: (session) => session.clock?.advance(10, ClockAdvanceMode.RunTimers, 10),
+    },
+    { name: "clipboard.readText", call: (session) => session.clipboard?.readText(10) },
+];
+
+const READS_THAT_THROW: readonly {
+    readonly name: string;
+    readonly call: (session: Session) => Promise<unknown> | undefined;
+}[] = [
+    { name: "page", call: (session) => session.page() },
+    { name: "screenshot", call: (session) => session.screenshot([]) },
+    {
+        name: "screenshotHidingFields",
+        call: (session) => session.screenshotHidingFields?.([], [], () => false),
+    },
+    { name: "audit", call: (session) => session.audit() },
+    { name: "accessibilitySnapshot", call: (session) => session.accessibilitySnapshot() },
+    { name: "linkTargets", call: (session) => session.linkTargets?.() },
+];
+
+const CODES_ON_A_CLOSED_TAB: readonly (readonly [ResultCall, string])[] = [
+    [PAGE_RESULT_CALLS.navigate, "navigation-failed"],
+    [PAGE_RESULT_CALLS.frame, "not-found"],
+    [PAGE_RESULT_CALLS.runScript, "script-failed"],
+    [PAGE_RESULT_CALLS.storageRead, "not-actionable"],
+    [PAGE_RESULT_CALLS.storageWrite, "not-actionable"],
+    [PAGE_RESULT_CALLS.storageRemove, "not-actionable"],
+];
+
+function membersOfAClosedSession(open: OpenSessionUnderTest): void {
+    for (const { name, call } of [...Object.values(PAGE_RESULT_CALLS), ...CRASH_ONLY_CALLS]) {
+        describe(`when ${name} is asked`, () => {
+            test("then it should answer target-crashed", async () => {
+                const { session } = await open();
+                await session.close();
+                assert.equal(failureCode(await call(session)), "target-crashed");
+            });
+        });
+    }
+
+    for (const { name, call } of READS_THAT_THROW) {
+        describe(`when ${name} is asked`, () => {
+            test("then it should throw", async () => {
+                const { session } = await open();
+                await session.close();
+                await assert.rejects(async () => call(session));
+            });
+        });
+    }
+}
+
+function closedSessionContract(open: OpenSessionUnderTest): void {
+    describe("given it has closed", () => {
+        membersOfAClosedSession(open);
+
+        describe("when an action or a download is asked of it", () => {
+            test("then it should answer target-crashed without asking the guard", async () => {
+                const { session } = await open();
+                await session.close();
+                const { guard, asked } = allowing();
+                const step = actionStep(CLICK_EXPORT);
+                assert.equal(failureCode(await session.act(step, guard)), "target-crashed");
+                const saved = await session.download?.(downloadStep(EXPORT_BUTTON), 100, guard);
+                assert.equal(failureCode(saved), "target-crashed");
+                assert.deepEqual(asked, []);
+            });
+        });
+
+        describe("when an action or a download is asked of it with no guard", () => {
+            test("then it should answer policy-denied, as ever", async () => {
+                const { session } = await open();
+                await session.close();
+                const step = actionStep(CLICK_EXPORT);
+                assert.equal(failureCode(await session.act(step, NO_GUARD)), "policy-denied");
+                const saved = await session.download?.(downloadStep(EXPORT_BUTTON), 100, NO_GUARD);
+                assert.equal(failureCode(saved), "policy-denied");
+            });
+        });
+
+        describe("when an element is probed", () => {
+            test("then it should read nothing", async () => {
+                const { session } = await open();
+                await session.close();
+                assertNothingRead(await session.probe(locatorOf(EXPORT_BUTTON)));
+            });
+        });
+
+        describe("when it is asked what it noted, and whether it crashed", () => {
+            test("then it should still answer, and say it has", async () => {
+                const { session } = await open();
+                await session.close();
+                assert.deepEqual(session.blockedOrigins(), []);
+                assert.deepEqual(session.connectionFailures?.(), []);
+                assert.deepEqual(session.refusedRequestDecisions?.(), []);
+                assert.equal(session.unsupportedOpenings?.(), 0);
+                assert.equal(session.isDialogOpen?.(), false);
+                assert.equal(session.crashed?.(), true);
+            });
+        });
+
+        describe("when it is closed again", () => {
+            test("then it should do nothing", async () => {
+                const { session } = await open();
+                await session.close();
+                await session.close();
+                assert.equal(session.crashed?.(), true);
+            });
+        });
+    });
+}
+
+function pageOfAClosedTab(open: OpenSessionUnderTest): void {
+    describe("when the tab's page is asked for", () => {
+        for (const [{ name, call }, code] of CODES_ON_A_CLOSED_TAB) {
+            test(`then it should answer ${name} with ${code}`, async () => {
+                const tab = await openTab(await open());
+                await tab.close();
+                assert.equal(failureCode(await call(tab)), code);
+            });
+        }
+
+        for (const { name, call } of READS_THAT_THROW) {
+            test(`then it should throw from ${name}`, async () => {
+                const tab = await openTab(await open());
+                await tab.close();
+                await assert.rejects(async () => call(tab));
+            });
+        }
+
+        test("then it should read nothing on a probe", async () => {
+            const tab = await openTab(await open());
+            await tab.close();
+            assertNothingRead(await tab.probe(locatorOf(EXPORT_BUTTON)));
+        });
+    });
+}
+
+function closedTabContract(open: OpenSessionUnderTest): void {
+    describe("given a second tab that has closed", () => {
+        pageOfAClosedTab(open);
+
+        describe("when a step is acted on in the tab", () => {
+            test("then it should find nothing, report no crash, and leave the session going", async () => {
+                const subject = await open();
+                const tab = await openTab(subject);
+                await tab.close();
+                const step = actionStep(CLICK_EXPORT);
+                const { guard, asked } = allowing();
+                assert.equal(failureCode(await tab.act(step, guard)), "not-found");
+                assert.deepEqual(asked, []);
+                assert.equal(tab.crashed?.(), false);
+                assert.deepEqual(await subject.session.act(step, guard), success(undefined));
+            });
+        });
+
+        describe("when a download or a dialog step runs in the tab", () => {
+            test("then it should find nothing", async () => {
+                const tab = await openTab(await open());
+                await tab.close();
+                const { guard } = allowing();
+                const saved = await tab.download?.(downloadStep(EXPORT_BUTTON), 100, guard);
+                assert.equal(failureCode(saved), "not-found");
+                assert.equal(failureCode(await tab.act(actionStep(ACCEPT), guard)), "not-found");
+            });
+        });
+
+        describe("when a step holding a value reference reaches the tab", () => {
+            test("then it should still refuse it as unsupported-step", async () => {
+                const tab = await openTab(await open());
+                await tab.close();
+                const step = actionStep({ type: "click", locator: HOLDING_A_VALUE });
+                const acted = await tab.act(step, allowing().guard);
+                assert.equal(failureCode(acted), "unsupported-step");
+            });
+        });
+
+        describe("when the session closes after it", () => {
+            test("then it should crash the session, and the tab answer as a closed tab still", async () => {
+                const subject = await open();
+                const tab = await openTab(subject);
+                await tab.close();
+                await subject.session.close();
+                assert.equal(subject.session.crashed?.(), true);
+                assert.equal(tab.crashed?.(), false);
+                const acted = await tab.act(actionStep(CLICK_EXPORT), allowing().guard);
+                assert.equal(failureCode(acted), "not-found");
+            });
+        });
+    });
+}
+
+function openTabContract(open: OpenSessionUnderTest): void {
+    describe("given a second tab", () => {
+        describe("when the tab is asked to open a tab of its own", () => {
+            test("then it should have no way to", async () => {
+                const tab = await openTab(await open());
+                assert.equal("newTab" in tab, false);
+            });
+        });
+
+        describe("when the session closes with the tab still open", () => {
+            test("then it should end the tab with it, answering target-crashed", async () => {
+                const subject = await open();
+                const tab = await openTab(subject);
+                await subject.session.close();
+                const { guard, asked } = allowing();
+                const acted = await tab.act(actionStep(CLICK_EXPORT), guard);
+                assert.equal(failureCode(acted), "target-crashed");
+                assert.deepEqual(asked, []);
+                assert.equal(tab.crashed?.(), true);
+                assertNothingRead(await tab.probe(locatorOf(EXPORT_BUTTON)));
+                await assert.rejects(tab.page());
+            });
+        });
+    });
+}
+
+export function sessionContract(open: OpenSessionUnderTest): void {
+    closedSessionContract(open);
+    closedTabContract(open);
+    openTabContract(open);
+    refusalsContract(open);
+    dialogContract(open);
+}

@@ -22,7 +22,7 @@ import {
     attemptPage,
     type ChannelAddress,
 } from "../proofs/EgressChannels.ts";
-import { fakePorts } from "../support/fakes/FakePorts.ts";
+import { realRunPorts } from "../support/RealRunPorts.ts";
 
 const THIS_FILE_IN_THE_WORKSPACE = "test/containers/AttemptWebRtcInside.ts";
 const PAGE_PATH = "/attempt.html";
@@ -134,7 +134,7 @@ async function openInRun(fixture: FixtureServer): Promise<string> {
             plan: authorise(parsedPlan.value, await trustedProjectFrom(projectFile)),
             targetId: target.id,
         },
-        fakePorts({
+        realRunPorts({
             // The page is on the container's own loopback, which the proxy, in another container,
             // cannot reach; everything else goes through the proxy.
             drivers: new Map([
