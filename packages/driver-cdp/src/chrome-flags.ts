@@ -24,6 +24,9 @@ export const WEBRTC_UDP_OFF_FLAGS: readonly string[] = [
 // the browser-wide proxy, which leads nowhere.
 export const sessionEgressChromeFlags = (deadProxyServer: string): readonly string[] => [
   '--headless',
+  // On the GPU, Chrome redraws only part of a tile, so a screenshot's bytes depend on earlier frames
+  // and on the machine's graphics card. A run must replay to the same hash.
+  '--disable-gpu',
   '--no-first-run',
   '--no-default-browser-check',
   '--disable-background-networking',
