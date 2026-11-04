@@ -20,6 +20,7 @@ import { driverWith, sessionWith } from "#test-support/browser/WrappingSessions.
 import { capabilityHarness, type CapabilityHarness } from "#test-support/capability-harness.ts";
 import type { FixtureRoute } from "#test-support/fixture-server.ts";
 import {
+    expectResponse,
     FIXTURE_FOLDER,
     networkHarness,
     startStub,
@@ -36,6 +37,10 @@ const PAGE_THAT_WAITS_FOR_A_SCRIPT = "/waits-for-a-script.html";
 const PAGE_NEVER_REACHED = "/never-reached.html";
 const PAGE_THAT_GIVES_UP_ON_DATA = "/gives-up-on-data.html";
 const DATA_GIVEN_UP_ON = "/data-given-up-on.json";
+const SCRIPT_FROM_A_BLOCKED_ORIGIN = "http://blocked-origin.example.test/script.js";
+const PAGE_THAT_WAITS_FOR_A_BLOCKED_SCRIPT = "/waits-for-a-blocked-script.html";
+const ADAPTER_ERROR = "adapter-error";
+const ITEMS_PATH = "/api/items";
 
 const html: (body: string) => FixtureRoute = (body) => () => ({
     headers: { "content-type": "text/html; charset=utf-8" },
@@ -48,6 +53,10 @@ const ROUTES = new Map<string, FixtureRoute>([
     [
         PAGE_THAT_GIVES_UP_ON_DATA,
         html(`<script>fetch("${DATA_GIVEN_UP_ON}").catch(() => undefined);</script>`),
+    ],
+    [
+        PAGE_THAT_WAITS_FOR_A_BLOCKED_SCRIPT,
+        html(`<script src="${SCRIPT_FROM_A_BLOCKED_ORIGIN}"></script>`),
     ],
     [
         SCRIPT_THE_PAGE_WAITS_FOR,
@@ -100,9 +109,10 @@ describe("Using the real browser driver", () => {
         const navigateRefusing = async (
             page: string,
             refusedPath: string,
+            method = "Fetch.continueRequest",
         ): Promise<Result<void, DriverError>> => {
             relayed.relay.tamperWith({
-                method: "Fetch.continueRequest",
+                method,
                 applies: ({ pausedUrl }) => pausedUrl?.endsWith(refusedPath) ?? false,
                 change: { refusal: WHY_THE_BROWSER_REFUSED },
             });
@@ -139,6 +149,81 @@ describe("Using the real browser driver", () => {
                     assert.ok(!navigated.ok, "the navigation fails");
                     assert.match(navigated.error.detail, /this decision was refused/);
                 });
+            });
+        });
+
+        describe("and the decision was to fail a request for a blocked origin", () => {
+            describe("when a plan navigates to a page whose load waits for it", () => {
+                test("then it should fail the navigation, saying why the browser refused", async () => {
+                    const navigated = await navigateRefusing(
+                        PAGE_THAT_WAITS_FOR_A_BLOCKED_SCRIPT,
+                        SCRIPT_FROM_A_BLOCKED_ORIGIN,
+                        "Fetch.failRequest",
+                    );
+                    assert.equal(relayed.relay.timesTampered(), 1, "the failing was refused");
+                    assert.ok(!navigated.ok, "the navigation fails");
+                    assert.match(navigated.error.detail, /this decision was refused/);
+                });
+            });
+        });
+    });
+
+    describe("given the browser refuses to let a held response go on", () => {
+        let harness: NetworkHarness;
+
+        before(async () => {
+            harness = await networkHarness();
+        });
+        after(async () => {
+            await harness.close();
+        });
+
+        describe("when a plan loads the items whose response it checks", () => {
+            test("then it should end Errored, with the step under way marked adapter-error", async () => {
+                const relayed = await startRelayedDriver(FIXTURE_FOLDER);
+                relayed.relay.tamperWith({
+                    method: "Fetch.continueRequest",
+                    // The request's own decision asks for its response to be held. Only the decision
+                    // on the response that was held has no such ask.
+                    applies: ({ pausedUrl, parameters }) =>
+                        (pausedUrl?.endsWith(ITEMS_PATH) ?? false) &&
+                        parameters["interceptResponse"] !== true,
+                    change: { refusal: WHY_THE_BROWSER_REFUSED },
+                });
+                try {
+                    const { result } = await harness.runSteps(
+                        TARGET,
+                        [
+                            navigate("/requests.html"),
+                            click(role("button", "Load items")),
+                            visible(testId("first-item"), "responses.items-shown"),
+                            expectResponse(
+                                "items",
+                                { kind: "statusEquals", value: 200 },
+                                "responses.status",
+                            ),
+                        ],
+                        {
+                            drivers: new Map([[ADAPTER_OF_TARGET[TARGET], relayed.driver]]),
+                        },
+                    );
+                    const heldForItsResponse = relayed.relay
+                        .commands()
+                        .filter(
+                            ({ pausedUrl, parameters }) =>
+                                (pausedUrl?.endsWith(ITEMS_PATH) ?? false) &&
+                                parameters["interceptResponse"] === true,
+                        );
+                    assert.equal(heldForItsResponse.length, 1, "the response was held");
+                    assert.equal(relayed.relay.timesTampered(), 1, "its decision was refused");
+                    assert.equal(result.state, "Errored", JSON.stringify(result.steps));
+                    const codes = result.steps.flatMap((step) =>
+                        step.outcome === "failed" ? [step.code] : [],
+                    );
+                    assert.deepEqual(codes, [ADAPTER_ERROR], JSON.stringify(result.steps));
+                } finally {
+                    await relayed.relay.close();
+                }
             });
         });
     });
