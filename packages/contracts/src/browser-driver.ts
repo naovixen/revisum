@@ -87,9 +87,13 @@ export type Unavailable = { readonly reason: UnavailableReason; readonly detail:
 export type BrowserBuild = { readonly version: string; readonly executablePath: string };
 // lock-download-failed: the build could not be fetched or is not where it should be.
 // lock-offline: fetching the build needs the network, and there is none.
-export const BuildFailureCode = {
+export const BuildFetchFailureCode = {
   LockDownloadFailed: 'lock-download-failed',
   LockOffline: 'lock-offline',
+} as const;
+export type BuildFetchFailureCode = (typeof BuildFetchFailureCode)[keyof typeof BuildFetchFailureCode];
+export const BuildFailureCode = {
+  ...BuildFetchFailureCode,
   ...UnavailableReason,
 } as const;
 export type BuildFailureCode = (typeof BuildFailureCode)[keyof typeof BuildFailureCode];

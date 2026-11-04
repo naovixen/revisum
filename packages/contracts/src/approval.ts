@@ -72,7 +72,7 @@ export type ApprovalFields = {
   readonly subject: ApprovalSubject;
   // Pseudonymous id, never the raw identity.
   readonly approver: ActorId;
-  readonly proofKind: ApprovalProofKind;
+  readonly proofKind: ApprovalProof['kind'];
   readonly strength: ApprovalStrength;
   // From GitHub or the signed payload, never the run's clock.
   readonly at: string;

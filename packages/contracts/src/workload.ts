@@ -3,7 +3,7 @@
 // Playwright suite through it. The types live here so cli can join engine and runner without
 // either importing the other.
 import type { ImageDigest } from './evidence-mode.ts';
-import type { EgressEvent, EgressPolicy } from './isolated-runner.ts';
+import { ContainerRefusalCode, type EgressEvent, type EgressPolicy } from './isolated-runner.ts';
 import type { Result } from './result.ts';
 import type { Secret } from './secret.ts';
 import type { DeclaredService } from './service-calls.ts';
@@ -61,9 +61,7 @@ export type WorkloadOutcome = {
 //   egress-unenforceable: the network with no route out, the proxy or the egress probe failed.
 //   workload-start-failed: the request is malformed, or the team's container did not start.
 export const WorkloadErrorCode = {
-  ImageMissing: 'image-missing',
-  ImageDigestMismatch: 'image-digest-mismatch',
-  EgressUnenforceable: 'egress-unenforceable',
+  ...ContainerRefusalCode,
   WorkloadStartFailed: 'workload-start-failed',
 } as const;
 export type WorkloadErrorCode = (typeof WorkloadErrorCode)[keyof typeof WorkloadErrorCode];

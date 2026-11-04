@@ -12,7 +12,7 @@ import type { EgressPolicy } from './isolated-runner.ts';
 import type { Result } from './result.ts';
 import type { WorkloadErrorCode, WorkloadOutcome, WorkloadVariable } from './workload.ts';
 import type { EnvironmentValue, ImageDigest } from './evidence-mode.ts';
-import type { CriterionId, SafeText, TextOrValue, ValueName } from './plan.ts';
+import type { CriterionId, SafeText, StepType, TextOrValue, ValueName } from './plan.ts';
 import type { BackendAssertion, CallEffect, FieldName, JsonPointer, ParameterKind, ParameterName, ParameterType, ServiceName } from './service-calls.ts';
 
 export const UnsafeFeature = {
@@ -117,23 +117,23 @@ export type ScriptArguments = Readonly<Record<ParameterName, ScriptArgument>>;
 
 // Runs a page script and may remember fields of its result as run values.
 export type EvaluateStep = {
-  readonly type: 'evaluate'; readonly script: ScriptChoice; readonly arguments: ScriptArguments;
+  readonly type: typeof StepType.Evaluate; readonly script: ScriptChoice; readonly arguments: ScriptArguments;
   readonly remember?: Readonly<Record<ValueName, FieldName>>;
 };
 // Runs a read script and checks one field of its result, repeating until the check passes or the
 // project's script check timeout runs out.
 export type ExpectScriptStep = {
-  readonly type: 'expectScript'; readonly script: ScriptChoice; readonly arguments: ScriptArguments; readonly field: FieldName;
+  readonly type: typeof StepType.ExpectScript; readonly script: ScriptChoice; readonly arguments: ScriptArguments; readonly field: FieldName;
   readonly assert: BackendAssertion; readonly criterionId: CriterionId;
 };
 // Runs a declared database command and may remember fields of its JSON output.
 export type DatabaseStep = {
-  readonly type: 'database'; readonly command: CommandName; readonly arguments: ScriptArguments;
+  readonly type: typeof StepType.Database; readonly command: CommandName; readonly arguments: ScriptArguments;
   readonly remember?: Readonly<Record<ValueName, FieldName>>;
 };
 // Runs a declared read command and checks one field of its output, repeating like a backend check.
 export type ExpectDatabaseStep = {
-  readonly type: 'expectDatabase'; readonly command: CommandName; readonly arguments: ScriptArguments; readonly field: FieldName;
+  readonly type: typeof StepType.ExpectDatabase; readonly command: CommandName; readonly arguments: ScriptArguments; readonly field: FieldName;
   readonly assert: BackendAssertion; readonly criterionId: CriterionId;
 };
 export type PageScriptStep = EvaluateStep | ExpectScriptStep;

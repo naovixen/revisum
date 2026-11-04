@@ -14,7 +14,7 @@
 // fixture it reads from its own fixtures folder.
 import type { Brand } from './brand.ts';
 import type { DriverError } from './browser-driver.ts';
-import type { CriterionId, FixtureName, SafeText, TextOrValue } from './plan.ts';
+import type { CriterionId, FixtureName, SafeText, StepType, TextOrValue } from './plan.ts';
 import type { Result } from './result.ts';
 import type { CallArguments, FieldName, HttpMethod, JsonPointer, JsonTemplate, ParameterName, ParameterType } from './service-calls.ts';
 import type { Origin } from './target.ts';
@@ -176,18 +176,18 @@ export type ResponseRead = (typeof ResponseRead)[keyof typeof ResponseRead];
 export const RESPONSE_READS: readonly ResponseRead[] = Object.values(ResponseRead);
 
 // The plan steps of this file, as plan.ts's Step union holds them.
-export type StubStep = { readonly type: 'stub'; readonly stub: StubName; readonly action: StubAction; readonly arguments?: CallArguments };
-export type ResetRequestsStep = { readonly type: 'resetRequests'; readonly request: RequestName };
+export type StubStep = { readonly type: typeof StepType.Stub; readonly stub: StubName; readonly action: StubAction; readonly arguments?: CallArguments };
+export type ResetRequestsStep = { readonly type: typeof StepType.ResetRequests; readonly request: RequestName };
 export type ExpectRequestsStep = {
-  readonly type: 'expectRequests'; readonly request: RequestName; readonly count: RequestCount; readonly criterionId: CriterionId;
+  readonly type: typeof StepType.ExpectRequests; readonly request: RequestName; readonly count: RequestCount; readonly criterionId: CriterionId;
 };
 export type ExpectResponseStep = {
-  readonly type: 'expectResponse'; readonly request: RequestName; readonly assert: ResponseAssertion; readonly criterionId: CriterionId;
+  readonly type: typeof StepType.ExpectResponse; readonly request: RequestName; readonly assert: ResponseAssertion; readonly criterionId: CriterionId;
 };
-export type SetStorageStep = { readonly type: 'setStorage'; readonly entry: StorageEntryName; readonly arguments?: CallArguments };
-export type RemoveStorageStep = { readonly type: 'removeStorage'; readonly entry: StorageEntryName };
+export type SetStorageStep = { readonly type: typeof StepType.SetStorage; readonly entry: StorageEntryName; readonly arguments?: CallArguments };
+export type RemoveStorageStep = { readonly type: typeof StepType.RemoveStorage; readonly entry: StorageEntryName };
 export type ExpectStorageStep = {
-  readonly type: 'expectStorage'; readonly entry: StorageEntryName; readonly assert: StorageAssertion; readonly criterionId: CriterionId;
+  readonly type: typeof StepType.ExpectStorage; readonly entry: StorageEntryName; readonly assert: StorageAssertion; readonly criterionId: CriterionId;
 };
 export type NetworkAndStorageStep =
   | StubStep | ResetRequestsStep | ExpectRequestsStep | ExpectResponseStep | SetStorageStep | RemoveStorageStep | ExpectStorageStep;

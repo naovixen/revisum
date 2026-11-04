@@ -18,6 +18,9 @@ export const ERROR_CODE_UNIONS: readonly { readonly file: string; readonly name:
   { file: 'packages/engine/src/run-values.ts', name: 'StepErrorCode' },
   { file: 'packages/engine/src/evidence/suite-report.ts', name: 'SuiteDecodeErrorCode' },
   { file: 'packages/contracts/src/browser-driver.ts', name: 'DriverErrorCode' },
+  // RunnerErrorCode and WorkloadErrorCode share these, and CliErrorCode these build-fetch codes.
+  { file: 'packages/contracts/src/isolated-runner.ts', name: 'ContainerRefusalCode' },
+  { file: 'packages/contracts/src/browser-driver.ts', name: 'BuildFetchFailureCode' },
   { file: 'packages/contracts/src/error-codes.ts', name: 'RunnerErrorCode' },
   { file: 'packages/runner/src/egress-policy.ts', name: 'EgressPolicyError' },
   { file: 'packages/runner/src/run-image.ts', name: 'RunImageError' },
@@ -38,22 +41,50 @@ export const ERROR_CODE_UNIONS: readonly { readonly file: string; readonly name:
   { file: 'packages/contracts/src/service-calls.ts', name: 'ServiceCallErrorCode' },
 ];
 
-// The string literals from `type Name =` or `const Name =` up to the ";" that ends the declaration.
-function declaredCodes(tokens: readonly Token[], name: string): string[] | undefined {
+// What a declaration holds: its own codes, and the sets whose codes it takes by name, which only
+// those sets' own entries can show.
+export type DeclaredCodes = { readonly codes: readonly string[]; readonly borrowedSets: readonly string[] };
+
+// True for the Set in `...Set`, `Set.Member`, `Key: Set,` and `| Set`.
+function namesBorrowedSet(tokens: readonly Token[], index: number): boolean {
+  const before = tokens[index - 1];
+  const after = tokens[index + 1];
+  if (isPunctuator(before, '.')) {
+    return isPunctuator(tokens[index - 2], '.') && isPunctuator(tokens[index - 3], '.');
+  }
+  return isPunctuator(after, '.') || isPunctuator(before, '|') || isPunctuator(before, '=')
+    || (isPunctuator(before, ':') && (isPunctuator(after, ',') || isPunctuator(after, '}')));
+}
+
+// The string literals from `type Name =` or `const Name =` up to the ";" that ends the declaration,
+// and the sets it names on the way.
+export function readDeclaredCodes(tokens: readonly Token[], name: string): DeclaredCodes | undefined {
   const start = tokens.findIndex((token, index) =>
     isIdentifier(token, name) && (isIdentifier(tokens[index - 1], 'type') || isIdentifier(tokens[index - 1], 'const'))
     && isPunctuator(tokens[index + 1], '='));
   if (start === -1) return undefined;
   const codes: string[] = [];
+  const borrowedSets = new Set<string>();
   let depth = 0;
-  for (const token of tokens.slice(start + 2)) {
+  for (let index = start + 2; index < tokens.length; index++) {
+    const token = tokens[index];
+    if (token === undefined) {
+      break;
+    }
     if (isPunctuator(token, '{') || isPunctuator(token, '[') || isPunctuator(token, '(')) depth += 1;
     else if (isPunctuator(token, '}') || isPunctuator(token, ']') || isPunctuator(token, ')')) depth -= 1;
     else if (isPunctuator(token, ';') && depth === 0) break;
     else if (token.kind === 'string') codes.push(token.text);
+    else if (token.kind === 'identifier' && namesBorrowedSet(tokens, index)) {
+      borrowedSets.add(token.text);
+    }
   }
-  return codes;
+  return { codes, borrowedSets: [...borrowedSets] };
 }
+
+// The sets a declaration borrows codes from that the check does not read, so their codes go unchecked.
+export const unlistedBorrowedSets = (declared: DeclaredCodes, listedNames: readonly string[]): readonly string[] =>
+  declared.borrowedSets.filter((set) => !listedNames.includes(set));
 
 const headingsIn = (text: string): Set<string> =>
   new Set(text.split(/\r?\n/).flatMap((line) => {
@@ -70,12 +101,15 @@ export function checkErrorAnchors(root: string): string[] {
 
   for (const union of ERROR_CODE_UNIONS) {
     const filePath = join(root, union.file);
-    const declared = existsSync(filePath) ? declaredCodes(codeTokens(readFileSync(filePath, 'utf8')), union.name) : undefined;
-    if (declared === undefined || declared.length === 0) {
+    const declared = existsSync(filePath) ? readDeclaredCodes(codeTokens(readFileSync(filePath, 'utf8')), union.name) : undefined;
+    if (declared === undefined || (declared.codes.length === 0 && declared.borrowedSets.length === 0)) {
       problems.push(`cannot read the codes of ${union.name} from ${union.file}; update ERROR_CODE_UNIONS in tools/check-error-anchors.ts`);
       continue;
     }
-    for (const code of declared) {
+    for (const set of unlistedBorrowedSets(declared, ERROR_CODE_UNIONS.map((listed) => listed.name))) {
+      problems.push(`${union.name} in ${union.file} takes codes from ${set}, which ERROR_CODE_UNIONS does not list, so they go unchecked; add ${set} to tools/check-error-anchors.ts`);
+    }
+    for (const code of declared.codes) {
       codes.add(code);
       if (!headings.has(code)) problems.push(`${ERRORS_PAGE} has no "## ${code}" heading, so errors#${code} does not resolve (${union.name} in ${union.file})`);
     }

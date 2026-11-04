@@ -2,7 +2,7 @@
 // its ids follow. The plan parser reads these tables to decode a plan, and planJsonSchema() reads
 // the same tables to build the published JSON Schema, so the two cannot drift apart.
 import {
-  DOM_CHECK_KINDS, DOWNLOAD_SIZE_KINDS, DOWNLOAD_TEXT_KINDS, ELEMENT_STATE_KINDS, ELEMENT_TEXT_KINDS, LOCATOR_KINDS, PAGE_TEXT_KINDS,
+  DOM_CHECK_KINDS, DOWNLOAD_SIZE_KINDS, DOWNLOAD_TEXT_KINDS, ELEMENT_STATE_KINDS, ELEMENT_TEXT_KINDS, SEMANTIC_LOCATOR_KINDS, PAGE_TEXT_KINDS,
   PLAN_VERSION, STRUCTURAL_LOCATOR_KINDS,
   type DatabaseCommandStep, type PageScriptStep, type StepType, type StructuralLocatorKind, type UnsafeFeature,
 } from '@revisum/contracts';
@@ -121,7 +121,7 @@ export const OPTIONAL_LOCATOR_FIELDS = {
 } as const;
 export type LocatorKind = keyof typeof LOCATOR_FIELDS;
 // Every locator kind.
-export const ALL_LOCATOR_KINDS: readonly LocatorKind[] = [...LOCATOR_KINDS, ...STRUCTURAL_LOCATOR_KINDS];
+export const ALL_LOCATOR_KINDS: readonly LocatorKind[] = [...SEMANTIC_LOCATOR_KINDS, ...STRUCTURAL_LOCATOR_KINDS];
 // How many `inside` links a css or XPath locator may chain: the fourth is refused.
 export const MAXIMUM_INSIDE_DEPTH = 3;
 // A css selector or XPath expression: literal plan text of at most this many characters, on one

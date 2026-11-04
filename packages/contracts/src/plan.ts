@@ -101,7 +101,8 @@ export const SemanticLocatorKind = {
   TestId: 'testId',
 } as const;
 export type SemanticLocatorKind = (typeof SemanticLocatorKind)[keyof typeof SemanticLocatorKind];
-export const LOCATOR_KINDS: readonly SemanticLocatorKind[] = Object.values(SemanticLocatorKind);
+export const SEMANTIC_LOCATOR_KINDS: readonly SemanticLocatorKind[] = Object.values(SemanticLocatorKind);
+export const LOCATOR_KINDS = SEMANTIC_LOCATOR_KINDS;
 export const StructuralLocatorKind = {
   Css: 'css',
   Xpath: 'xpath',
@@ -192,9 +193,9 @@ export const ELEMENT_TEXT_KINDS: readonly ElementTextKind[] = Object.values(Elem
 export type ObservableElementAssertionWith<Text> =
   | { readonly kind: ElementStateKind }
   | { readonly kind: ElementTextKind; readonly value: Text }
-  | { readonly kind: 'countEquals'; readonly value: number }
+  | { readonly kind: typeof ElementAssertionKind.CountEquals; readonly value: number }
   // A link's href, resolved to an absolute URL, compared as text. The link is never followed.
-  | { readonly kind: 'hrefEquals'; readonly value: Text };
+  | { readonly kind: typeof ElementAssertionKind.HrefEquals; readonly value: Text };
 // DOM checks: an unsafe feature a trusted project may enable (unsafe-plan-features.ts). They read
 // implementation details: one class token, a computed style compared with the text
 // getComputedStyle gives (such as "rgb(220, 38, 38)"), or an attribute by its lowercase name.
@@ -212,6 +213,14 @@ export type DomCheckWith<Text> =
   | { readonly kind: typeof DomCheckKind.ComputedStyleEquals; readonly property: SafeText; readonly value: SafeText }
   | { readonly kind: typeof DomCheckKind.AttributeEquals; readonly name: SafeText; readonly value: Text }
   | { readonly kind: typeof DomCheckKind.AttributeAbsent; readonly name: SafeText };
+export const ElementAssertionKind = {
+  ...ElementStateKind,
+  ...ElementTextKind,
+  CountEquals: 'countEquals',
+  HrefEquals: 'hrefEquals',
+  ...DomCheckKind,
+} as const;
+export type ElementAssertionKind = (typeof ElementAssertionKind)[keyof typeof ElementAssertionKind];
 export type ElementAssertionWith<Text> = ObservableElementAssertionWith<Text> | DomCheckWith<Text>;
 export type ElementAssertion = ElementAssertionWith<TextOrValue>;
 // An element assertion whose expected text is final: what the oracle compares against. A DOM check
@@ -224,16 +233,24 @@ export const PageTextKind = {
 } as const;
 export type PageTextKind = (typeof PageTextKind)[keyof typeof PageTextKind];
 export const PAGE_TEXT_KINDS: readonly PageTextKind[] = Object.values(PageTextKind);
+export const PageAssertionKind = {
+  ...PageTextKind,
+  Url: 'url',
+  UrlPathStartsWith: 'urlPathStartsWith',
+  MetaContent: 'metaContent',
+  CanonicalUrl: 'canonicalUrl',
+} as const;
+export type PageAssertionKind = (typeof PageAssertionKind)[keyof typeof PageAssertionKind];
 export type PageAssertion =
   | { readonly kind: PageTextKind; readonly value: SafeText }
   // The whole URL, compared after resolving it against the page's own URL.
-  | { readonly kind: 'url'; readonly value: AllowedUrl }
+  | { readonly kind: typeof PageAssertionKind.Url; readonly value: AllowedUrl }
   // The page's path starts with this text, which starts with "/". A plain text prefix.
-  | { readonly kind: 'urlPathStartsWith'; readonly value: SafeText }
+  | { readonly kind: typeof PageAssertionKind.UrlPathStartsWith; readonly value: SafeText }
   // The content of the <meta> whose name or property is `name`, such as "og:title".
-  | { readonly kind: 'metaContent'; readonly name: SafeText; readonly value: TextOrValue }
+  | { readonly kind: typeof PageAssertionKind.MetaContent; readonly name: SafeText; readonly value: TextOrValue }
   // The resolved href of <link rel="canonical">. It may name any origin: it is compared, never visited.
-  | { readonly kind: 'canonicalUrl'; readonly value: SafeText };
+  | { readonly kind: typeof PageAssertionKind.CanonicalUrl; readonly value: SafeText };
 
 // ---- Downloads ------------------------------------------------------------------------------
 
@@ -256,9 +273,15 @@ export const DownloadSizeKind = {
 } as const;
 export type DownloadSizeKind = (typeof DownloadSizeKind)[keyof typeof DownloadSizeKind];
 export const DOWNLOAD_SIZE_KINDS: readonly DownloadSizeKind[] = Object.values(DownloadSizeKind);
+export const DownloadAssertionKind = {
+  ...DownloadTextKind,
+  MediaTypeEquals: 'mediaTypeEquals',
+  ...DownloadSizeKind,
+} as const;
+export type DownloadAssertionKind = (typeof DownloadAssertionKind)[keyof typeof DownloadAssertionKind];
 export type DownloadAssertion =
   | { readonly kind: DownloadTextKind; readonly value: TextOrValue }
-  | { readonly kind: 'mediaTypeEquals'; readonly value: SafeText }
+  | { readonly kind: typeof DownloadAssertionKind.MediaTypeEquals; readonly value: SafeText }
   // sizeAtLeast is at least 1: a size of at least 0 holds for any file.
   | { readonly kind: DownloadSizeKind; readonly value: number };
 
@@ -295,10 +318,15 @@ export const RememberRead = {
 } as const;
 export type RememberRead = (typeof RememberRead)[keyof typeof RememberRead];
 export const REMEMBER_READS: readonly RememberRead[] = Object.values(RememberRead);
-export const REMEMBER_ATTRIBUTE_READ = 'attribute';
+export const RememberElementRead = {
+  ...RememberRead,
+  Attribute: 'attribute',
+} as const;
+export type RememberElementRead = (typeof RememberElementRead)[keyof typeof RememberElementRead];
+export const REMEMBER_ATTRIBUTE_READ = RememberElementRead.Attribute;
 export type RememberSource =
   | { readonly element: Locator; readonly read: RememberRead }
-  | { readonly element: Locator; readonly read: typeof REMEMBER_ATTRIBUTE_READ; readonly attribute: SafeText }
+  | { readonly element: Locator; readonly read: typeof RememberElementRead.Attribute; readonly attribute: SafeText }
   | { readonly response: RequestName; readonly field: FieldName; readonly read: ResponseRead }
   | { readonly clipboard: ClipboardRead };
 
@@ -325,41 +353,77 @@ export const AuditMode = {
 export type AuditMode = (typeof AuditMode)[keyof typeof AuditMode];
 export const AUDIT_MODES: readonly AuditMode[] = Object.values(AuditMode);
 
+export const StepType = {
+  Navigate: 'navigate',
+  Click: 'click',
+  Download: 'download',
+  Hover: 'hover',
+  Fill: 'fill',
+  Select: 'select',
+  Upload: 'upload',
+  Press: 'press',
+  Frame: 'frame',
+  Dialog: 'dialog',
+  Expect: 'expect',
+  ExpectPage: 'expectPage',
+  ExpectDownload: 'expectDownload',
+  NewTab: 'newTab',
+  A11yAudit: 'a11yAudit',
+  Capture: 'capture',
+  Remember: 'remember',
+  Call: 'call',
+  ExpectBackend: 'expectBackend',
+  Stub: 'stub',
+  ResetRequests: 'resetRequests',
+  ExpectRequests: 'expectRequests',
+  ExpectResponse: 'expectResponse',
+  SetStorage: 'setStorage',
+  RemoveStorage: 'removeStorage',
+  ExpectStorage: 'expectStorage',
+  AdvanceClock: 'advanceClock',
+  ExpectClipboard: 'expectClipboard',
+  Evaluate: 'evaluate',
+  ExpectScript: 'expectScript',
+  Database: 'database',
+  ExpectDatabase: 'expectDatabase',
+} as const;
+export type StepType = (typeof StepType)[keyof typeof StepType];
+
 export type Step =
   // A URL, or a path template on the run's base URL.
-  | { readonly type: 'navigate'; readonly url: AllowedUrl | PathTemplate; readonly scripts?: ScriptMode }
-  | { readonly type: 'click'; readonly locator: Locator }
+  | { readonly type: typeof StepType.Navigate; readonly url: AllowedUrl | PathTemplate; readonly scripts?: ScriptMode }
+  | { readonly type: typeof StepType.Click; readonly locator: Locator }
   // A click that must start exactly one download, which later steps check by its name.
-  | { readonly type: 'download'; readonly name: DownloadName; readonly locator: Locator }
-  | { readonly type: 'hover'; readonly locator: Locator }
-  | { readonly type: 'fill'; readonly locator: Locator; readonly value: TextOrValue | SecretReference | MultiLineText }
-  | { readonly type: 'select'; readonly locator: Locator; readonly option: TextOrValue }
-  | { readonly type: 'upload'; readonly locator: Locator; readonly fixture: FixtureName }
+  | { readonly type: typeof StepType.Download; readonly name: DownloadName; readonly locator: Locator }
+  | { readonly type: typeof StepType.Hover; readonly locator: Locator }
+  | { readonly type: typeof StepType.Fill; readonly locator: Locator; readonly value: TextOrValue | SecretReference | MultiLineText }
+  | { readonly type: typeof StepType.Select; readonly locator: Locator; readonly option: TextOrValue }
+  | { readonly type: typeof StepType.Upload; readonly locator: Locator; readonly fixture: FixtureName }
   // Modifiers, when given, are 1 to 4 distinct keys held down while the key is pressed.
-  | { readonly type: 'press'; readonly locator: Locator; readonly key: Key; readonly modifiers?: readonly Modifier[] }
+  | { readonly type: typeof StepType.Press; readonly locator: Locator; readonly key: Key; readonly modifiers?: readonly Modifier[] }
   // Runs its steps inside the iframe the locator finds.
-  | { readonly type: 'frame'; readonly locator: Locator; readonly steps: readonly Step[] }
+  | { readonly type: typeof StepType.Frame; readonly locator: Locator; readonly steps: readonly Step[] }
   // Answers the next dialog the page opens, optionally checking its text first.
-  | { readonly type: 'dialog'; readonly action: DialogAction; readonly expectText?: TextOrValue }
-  | { readonly type: 'expect'; readonly locator: Locator; readonly assert: ElementAssertion; readonly criterionId: CriterionId }
-  | { readonly type: 'expectPage'; readonly assert: PageAssertion; readonly criterionId: CriterionId }
+  | { readonly type: typeof StepType.Dialog; readonly action: DialogAction; readonly expectText?: TextOrValue }
+  | { readonly type: typeof StepType.Expect; readonly locator: Locator; readonly assert: ElementAssertion; readonly criterionId: CriterionId }
+  | { readonly type: typeof StepType.ExpectPage; readonly assert: PageAssertion; readonly criterionId: CriterionId }
   // Checks the file an earlier download step started.
-  | { readonly type: 'expectDownload'; readonly download: DownloadName; readonly assert: DownloadAssertion; readonly criterionId: CriterionId }
+  | { readonly type: typeof StepType.ExpectDownload; readonly download: DownloadName; readonly assert: DownloadAssertion; readonly criterionId: CriterionId }
   // Opens a URL in a new tab of the same browser context, so cookies and storage are shared, runs
   // its steps there and closes the tab. Only the top level of a plan may hold one.
-  | { readonly type: 'newTab'; readonly url: AllowedUrl | PathTemplate; readonly steps: readonly Step[] }
-  | { readonly type: 'a11yAudit'; readonly mode: AuditMode }
-  | { readonly type: 'capture'; readonly name: CaptureName }
+  | { readonly type: typeof StepType.NewTab; readonly url: AllowedUrl | PathTemplate; readonly steps: readonly Step[] }
+  | { readonly type: typeof StepType.A11yAudit; readonly mode: AuditMode }
+  | { readonly type: typeof StepType.Capture; readonly name: CaptureName }
   // Reads a value from the page under `name`, for the steps after it to use.
-  | { readonly type: 'remember'; readonly name: ValueName; readonly from: RememberSource }
+  | { readonly type: typeof StepType.Remember; readonly name: ValueName; readonly from: RememberSource }
   // Makes a call the trusted project declares, by name, and may remember response fields as run
   // values for the steps after it. Only the plan's own list of steps, or its cleanup, may hold one.
-  | { readonly type: 'call'; readonly call: CallName; readonly arguments: CallArguments; readonly remember?: Readonly<Record<ValueName, FieldName>> }
+  | { readonly type: typeof StepType.Call; readonly call: CallName; readonly arguments: CallArguments; readonly remember?: Readonly<Record<ValueName, FieldName>> }
   // Makes a declared read call and checks one field of its response, repeating the call while the
   // service answers with a status the declaration lists and the check has not passed, until the
   // project's backend check timeout runs out. A call that fails is not sent again.
   | {
-    readonly type: 'expectBackend'; readonly call: CallName; readonly arguments: CallArguments; readonly field: FieldName;
+    readonly type: typeof StepType.ExpectBackend; readonly call: CallName; readonly arguments: CallArguments; readonly field: FieldName;
     readonly assert: BackendAssertion; readonly criterionId: CriterionId;
   }
   // Starts or stops a stub, resets or checks the requests a declared matcher sees, checks the
@@ -372,32 +436,31 @@ export type Step =
   // what one returns: unsafe features. See unsafe-plan-features.ts.
   | PageScriptStep
   | DatabaseCommandStep;
-export type StepType = Step['type'];
 // The steps that send input to the page; the driver's ActionRunner port performs them, asking the
 // policy gate's runtime guard first. All but a dialog act on an element; answering a dialog acts
 // on the dialog the page opened, so the guard reads its text. The policy gate judges a download as
 // the click it is.
-export type ActionStep = Extract<Step, { type: 'click' | 'hover' | 'fill' | 'select' | 'upload' | 'press' | 'download' | 'dialog' }>;
+export type ActionStep = Extract<Step, { type: typeof StepType.Click | typeof StepType.Hover | typeof StepType.Fill | typeof StepType.Select | typeof StepType.Upload | typeof StepType.Press | typeof StepType.Download | typeof StepType.Dialog }>;
 // Accepts or dismisses the next dialog the page opens.
-export type DialogStep = Extract<Step, { type: 'dialog' }>;
+export type DialogStep = Extract<Step, { type: typeof StepType.Dialog }>;
 // A click that must start exactly one download, which the driver's download port performs.
-export type DownloadStep = Extract<Step, { type: 'download' }>;
+export type DownloadStep = Extract<Step, { type: typeof StepType.Download }>;
 // Lines of a multi-line fill with every value reference replaced by its text.
 export type ResolvedMultiLineText = { readonly lines: readonly SafeText[] };
 // An action step with every value reference replaced by its text, as the engine hands it to a
 // driver.
 export type ResolvedActionStep =
-  | { readonly type: 'click'; readonly locator: ResolvedLocator }
-  | { readonly type: 'hover'; readonly locator: ResolvedLocator }
-  | { readonly type: 'fill'; readonly locator: ResolvedLocator; readonly value: SafeText | SecretReference | ResolvedMultiLineText }
-  | { readonly type: 'select'; readonly locator: ResolvedLocator; readonly option: SafeText }
-  | { readonly type: 'upload'; readonly locator: ResolvedLocator; readonly fixture: FixtureName }
-  | { readonly type: 'press'; readonly locator: ResolvedLocator; readonly key: Key; readonly modifiers?: readonly Modifier[] };
+  | { readonly type: typeof StepType.Click; readonly locator: ResolvedLocator }
+  | { readonly type: typeof StepType.Hover; readonly locator: ResolvedLocator }
+  | { readonly type: typeof StepType.Fill; readonly locator: ResolvedLocator; readonly value: SafeText | SecretReference | ResolvedMultiLineText }
+  | { readonly type: typeof StepType.Select; readonly locator: ResolvedLocator; readonly option: SafeText }
+  | { readonly type: typeof StepType.Upload; readonly locator: ResolvedLocator; readonly fixture: FixtureName }
+  | { readonly type: typeof StepType.Press; readonly locator: ResolvedLocator; readonly key: Key; readonly modifiers?: readonly Modifier[] };
 // A step that calls a declared service.
-export type CallStep = Extract<Step, { type: 'call' }>;
+export type CallStep = Extract<Step, { type: typeof StepType.Call }>;
 // What a plan's cleanup list holds: calls and database commands.
 export type CleanupStep = CallStep | DatabaseStep;
-export type ServiceCallStep = Extract<Step, { type: 'call' | 'expectBackend' }>;
+export type ServiceCallStep = Extract<Step, { type: typeof StepType.Call | typeof StepType.ExpectBackend }>;
 
 export type PlanMeta = { readonly featureId: FeatureId; readonly specReference: SafeText; readonly title: SafeText };
 

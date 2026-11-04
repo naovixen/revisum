@@ -9,9 +9,9 @@
 // locators, DOM checks and page scripts. A driver declares the ones it performs in its
 // AdapterInfo; the run refuses a step needing one its driver does not declare with
 // unsupported-step, before anything of it reaches the driver.
-import { DOM_CHECK_KINDS, ElementStateKind, REMEMBER_ATTRIBUTE_READ, SemanticLocatorKind, StructuralLocatorKind } from './plan.ts';
+import { DOM_CHECK_KINDS, ElementAssertionKind, ElementStateKind, PageAssertionKind, REMEMBER_ATTRIBUTE_READ, SemanticLocatorKind, StepType, StructuralLocatorKind } from './plan.ts';
 import type {
-  ActionStep, ElementAssertion, Locator, PageAssertion, ResolvedActionStep, ResolvedLocator, SafeText, SemanticLocatorWith, Step, TextOrValue,
+  ActionStep, Locator, ResolvedActionStep, ResolvedLocator, SafeText, SemanticLocatorWith, Step, TextOrValue,
   ValueName,
 } from './plan.ts';
 
@@ -126,20 +126,20 @@ const needsLocatorFeatures = (locator: Locator, performs: readonly DriverFeature
 
 // Element checks no driver's probe decides yet: it reports no checked or focused state, so these
 // checks could never pass on their merits.
-const ELEMENT_CHECKS_NO_DRIVER_DECIDES: readonly ElementAssertion['kind'][] = [ElementStateKind.Checked, ElementStateKind.Unchecked, ElementStateKind.Focused];
+const ELEMENT_CHECKS_NO_DRIVER_DECIDES: readonly ElementAssertionKind[] = [ElementStateKind.Checked, ElementStateKind.Unchecked, ElementStateKind.Focused];
 // True for a check that can only ever fail, whichever driver runs it. A run refuses a plan holding one.
-export const isElementCheckNoDriverDecides = (step: Step): boolean => step.type === 'expect' && ELEMENT_CHECKS_NO_DRIVER_DECIDES.includes(step.assert.kind);
+export const isElementCheckNoDriverDecides = (step: Step): boolean => step.type === StepType.Expect && ELEMENT_CHECKS_NO_DRIVER_DECIDES.includes(step.assert.kind);
 // Element checks of classes, computed styles and attributes, which a driver reads when it declares domChecks.
-const DOM_CHECKS: readonly ElementAssertion['kind'][] = DOM_CHECK_KINDS;
+const DOM_CHECKS: readonly ElementAssertionKind[] = DOM_CHECK_KINDS;
 // Element checks of the accessibility states a driver reports when it declares pageStates.
-const ACCESSIBLE_STATE_CHECKS: readonly ElementAssertion['kind'][] = [
+const ACCESSIBLE_STATE_CHECKS: readonly ElementAssertionKind[] = [
   ElementStateKind.Selected, ElementStateKind.Unselected, ElementStateKind.Expanded, ElementStateKind.Collapsed, ElementStateKind.Pressed,
   ElementStateKind.Unpressed, ElementStateKind.Current,
 ];
 // Page checks of the document head, which a driver reports when it declares pageMetadata.
-const PAGE_METADATA_CHECKS: readonly PageAssertion['kind'][] = ['metaContent', 'canonicalUrl'];
+const PAGE_METADATA_CHECKS: readonly PageAssertionKind[] = [PageAssertionKind.MetaContent, PageAssertionKind.CanonicalUrl];
 
-const isMultiLine = (value: Extract<Step, { type: 'fill' }>['value']): boolean => typeof value === 'object' && 'lines' in value;
+const isMultiLine = (value: Extract<Step, { type: typeof StepType.Fill }>['value']): boolean => typeof value === 'object' && 'lines' in value;
 
 // True when the step needs what its driver does not perform: an optional feature above that
 // `performs` does not list (an accessibility state, a link target, the document head, a page
@@ -153,40 +153,40 @@ const isMultiLine = (value: Extract<Step, { type: 'fill' }>['value']): boolean =
 export function needsDriverFeatures(step: Step, performs: readonly DriverFeature[] = NO_FEATURES): boolean {
   const lacks = (feature: DriverFeature): boolean => !performs.includes(feature);
   switch (step.type) {
-    case 'click': case 'hover': case 'select': case 'upload': case 'frame': return needsLocatorFeatures(step.locator, performs);
-    case 'press': return needsLocatorFeatures(step.locator, performs) || (step.modifiers !== undefined && lacks(DriverFeature.KeyChords));
-    case 'fill': return needsLocatorFeatures(step.locator, performs) || (isMultiLine(step.value) && lacks(DriverFeature.MultiLineFills));
-    case 'expect':
+    case StepType.Click: case StepType.Hover: case StepType.Select: case StepType.Upload: case StepType.Frame: return needsLocatorFeatures(step.locator, performs);
+    case StepType.Press: return needsLocatorFeatures(step.locator, performs) || (step.modifiers !== undefined && lacks(DriverFeature.KeyChords));
+    case StepType.Fill: return needsLocatorFeatures(step.locator, performs) || (isMultiLine(step.value) && lacks(DriverFeature.MultiLineFills));
+    case StepType.Expect:
       return needsLocatorFeatures(step.locator, performs) || isElementCheckNoDriverDecides(step)
         || (DOM_CHECKS.includes(step.assert.kind) && lacks(DriverFeature.DomChecks))
         || (ACCESSIBLE_STATE_CHECKS.includes(step.assert.kind) && lacks(DriverFeature.PageStates))
-        || (step.assert.kind === 'hrefEquals' && lacks(DriverFeature.LinkTargets));
-    case 'expectPage': return PAGE_METADATA_CHECKS.includes(step.assert.kind) && lacks(DriverFeature.PageMetadata);
-    case 'navigate': return step.scripts !== undefined && lacks(DriverFeature.ScriptsDisabled);
-    case 'download': return lacks(DriverFeature.Downloads) || needsLocatorFeatures(step.locator, performs);
-    case 'expectDownload': return lacks(DriverFeature.Downloads);
+        || (step.assert.kind === ElementAssertionKind.HrefEquals && lacks(DriverFeature.LinkTargets));
+    case StepType.ExpectPage: return PAGE_METADATA_CHECKS.includes(step.assert.kind) && lacks(DriverFeature.PageMetadata);
+    case StepType.Navigate: return step.scripts !== undefined && lacks(DriverFeature.ScriptsDisabled);
+    case StepType.Download: return lacks(DriverFeature.Downloads) || needsLocatorFeatures(step.locator, performs);
+    case StepType.ExpectDownload: return lacks(DriverFeature.Downloads);
     // The tab's own steps are checked one by one as they run, as a frame's are.
-    case 'newTab': return lacks(DriverFeature.NewTabs);
+    case StepType.NewTab: return lacks(DriverFeature.NewTabs);
     // The driver's network and storage ports carry these out.
-    case 'stub': return lacks(DriverFeature.NetworkStubs);
-    case 'resetRequests': case 'expectRequests': case 'expectResponse': return lacks(DriverFeature.RequestChecks);
-    case 'setStorage': case 'removeStorage': case 'expectStorage': return lacks(DriverFeature.Storage);
+    case StepType.Stub: return lacks(DriverFeature.NetworkStubs);
+    case StepType.ResetRequests: case StepType.ExpectRequests: case StepType.ExpectResponse: return lacks(DriverFeature.RequestChecks);
+    case StepType.SetStorage: case StepType.RemoveStorage: case StepType.ExpectStorage: return lacks(DriverFeature.Storage);
     // The driver's clock and clipboard ports carry these out.
-    case 'advanceClock': return lacks(DriverFeature.ClockControl);
-    case 'expectClipboard': return lacks(DriverFeature.Clipboard);
+    case StepType.AdvanceClock: return lacks(DriverFeature.ClockControl);
+    case StepType.ExpectClipboard: return lacks(DriverFeature.Clipboard);
     // Reading an element's text or value needs only the prober, of a driver that declares it reads
     // values for later steps. Reading a response field needs the request checks of the network
     // port; reading the clipboard needs the clipboard port and reading an attribute the DOM reads too.
-    case 'remember':
+    case StepType.Remember:
       if ('response' in step.from) return lacks(DriverFeature.RequestChecks);
       if ('clipboard' in step.from) return lacks(DriverFeature.Clipboard);
       return lacks(DriverFeature.RememberedValues) || (step.from.read === REMEMBER_ATTRIBUTE_READ && lacks(DriverFeature.DomChecks)) || needsLocatorFeatures(step.from.element, performs);
-    case 'dialog': case 'a11yAudit': case 'capture': return false;
+    case StepType.Dialog: case StepType.A11yAudit: case StepType.Capture: return false;
     // Page scripts run through the driver's script port, in the document the step stands in.
-    case 'evaluate': case 'expectScript': return lacks(DriverFeature.PageScripts);
+    case StepType.Evaluate: case StepType.ExpectScript: return lacks(DriverFeature.PageScripts);
     // Calls never reach a driver: the engine sends them through the run's service caller. Database
     // commands neither: they run in a workload container.
-    case 'call': case 'expectBackend': case 'database': case 'expectDatabase': return false;
+    case StepType.Call: case StepType.ExpectBackend: case StepType.Database: case StepType.ExpectDatabase: return false;
   }
 }
 
@@ -199,19 +199,19 @@ export const performableLocator = (locator: Locator, performs: readonly DriverFe
 // means the driver must refuse the step.
 export function literalActionStep(step: ActionStep, performs: readonly DriverFeature[] = NO_FEATURES): ResolvedActionStep | undefined {
   // A dialog acts on no element: a driver that answers dialogs does so before calling this.
-  if (step.type === 'dialog' || needsDriverFeatures(step, performs)) return undefined;
+  if (step.type === StepType.Dialog || needsDriverFeatures(step, performs)) return undefined;
   const locator = literalLocatorOfAnyKind(step.locator);
   if (locator === undefined) return undefined;
   switch (step.type) {
-    case 'click': case 'hover': return { type: step.type, locator };
-    case 'upload': return { type: step.type, locator, fixture: step.fixture };
-    case 'press':
+    case StepType.Click: case StepType.Hover: return { type: step.type, locator };
+    case StepType.Upload: return { type: step.type, locator, fixture: step.fixture };
+    case StepType.Press:
       return step.modifiers === undefined ? { type: step.type, locator, key: step.key } : { type: step.type, locator, key: step.key, modifiers: step.modifiers };
-    case 'select': {
+    case StepType.Select: {
       const option = literalText(step.option);
       return option === undefined ? undefined : { type: step.type, locator, option };
     }
-    case 'fill': {
+    case StepType.Fill: {
       if (typeof step.value === 'object' && 'secretName' in step.value) return { type: step.type, locator, value: step.value };
       if (typeof step.value === 'object' && 'lines' in step.value) {
         const lines: SafeText[] = [];
@@ -226,6 +226,6 @@ export function literalActionStep(step: ActionStep, performs: readonly DriverFea
       return value === undefined ? undefined : { type: step.type, locator, value };
     }
     // A download goes through the driver's download port, never through act.
-    case 'download': return undefined;
+    case StepType.Download: return undefined;
   }
 }

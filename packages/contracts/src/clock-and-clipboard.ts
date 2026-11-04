@@ -11,7 +11,7 @@
 // clipboard port; a run refuses these steps, and a remember from the clipboard, with
 // unsupported-step otherwise, and never falls back to a real wait.
 import type { DriverError } from './browser-driver.ts';
-import type { CriterionId, MultiLineText, TextOrValue } from './plan.ts';
+import type { CriterionId, MultiLineText, StepType, TextOrValue } from './plan.ts';
 import type { Result } from './result.ts';
 
 // The units an advance may be written in. A day is 86,400,000 ms of elapsed time; wall-clock
@@ -61,8 +61,8 @@ export const CLIPBOARD_READS: readonly ClipboardRead[] = Object.values(Clipboard
 
 // The plan steps of this file, as plan.ts's Step union holds them. Neither acts on an element, so
 // the policy gate's runtime guard never sees them, and a proposal may hold both.
-export type AdvanceClockStep = { readonly type: 'advanceClock'; readonly by: ClockAdvance; readonly mode?: ClockAdvanceMode };
-export type ExpectClipboardStep = { readonly type: 'expectClipboard'; readonly assert: ClipboardAssertion; readonly criterionId: CriterionId };
+export type AdvanceClockStep = { readonly type: typeof StepType.AdvanceClock; readonly by: ClockAdvance; readonly mode?: ClockAdvanceMode };
+export type ExpectClipboardStep = { readonly type: typeof StepType.ExpectClipboard; readonly assert: ClipboardAssertion; readonly criterionId: CriterionId };
 export type ClockAndClipboardStep = AdvanceClockStep | ExpectClipboardStep;
 
 // ---- The driver ports -------------------------------------------------------------------------

@@ -1,13 +1,14 @@
 // The closed error-code unions that have no other home yet. Each code has a heading in
 // docs/errors.md, so the link errors#<code> explains it. Plan errors live beside the plan parser
 // in engine; driver errors beside the driver ports; sink errors beside the event sink.
+import { TrustErrorCode } from './approval.ts';
+import { BuildFetchFailureCode } from './browser-driver.ts';
 import { ExploreErrorCode } from './explore-mode.ts';
+import { ContainerRefusalCode } from './isolated-runner.ts';
 
 // Why the isolated runner could not start a run.
 export const RunnerErrorCode = {
-  ImageMissing: 'image-missing',
-  ImageDigestMismatch: 'image-digest-mismatch',
-  EgressUnenforceable: 'egress-unenforceable',
+  ...ContainerRefusalCode,
   StartFailed: 'start-failed',
 } as const;
 export type RunnerErrorCode = (typeof RunnerErrorCode)[keyof typeof RunnerErrorCode];
@@ -27,11 +28,10 @@ export type RecorderError = { readonly code: RecorderErrorCode };
 export const CliErrorCode = {
   Usage: 'usage',
   ConfigInvalid: 'config-invalid',
-  UntrustedSource: 'untrusted-source',
+  UntrustedSource: TrustErrorCode.UntrustedSource,
   PlanRejected: 'plan-rejected',
   TargetUnavailable: 'target-unavailable',
-  LockDownloadFailed: 'lock-download-failed',
-  LockOffline: 'lock-offline',
+  ...BuildFetchFailureCode,
   ApprovalRefused: 'approval-refused',
   ReplayMismatch: 'replay-mismatch',
   Internal: 'internal',
