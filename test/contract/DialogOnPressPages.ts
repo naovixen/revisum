@@ -90,7 +90,44 @@ const framingPage = (framedPage: string): FixtureRoute =>
         `<iframe data-testid="${FRAME}" title="Inner" src="${framedPage}" style="width:600px;height:300px;border:0"></iframe>`,
     );
 
+// Pages where an element answers to the name the driver's click check once kept on its own window.
+export const ADDER = "adder";
+const NAME_OF_THE_CLICK_CHECK = "armedHitCheck";
+const NAMED_BY_ID = `<div id="${NAME_OF_THE_CLICK_CHECK}"></div>`;
+const NAMED_BY_FORM = `<form name="${NAME_OF_THE_CLICK_CHECK}"><input name="disarm" aria-label="Disarm"></form>`;
+const NAMED_BY_FRAME = `<iframe name="${NAME_OF_THE_CLICK_CHECK}" title="Named" src="about:blank" style="width:20px;height:20px"></iframe>`;
+const ADDS_THE_NAMED_ELEMENT = `document.body.append(Object.assign(document.createElement('div'), { id: '${NAME_OF_THE_CLICK_CHECK}' }));`;
+
+export const NAMED_BY_ID_PAGE = "/named-by-id.html";
+export const NAMED_BY_FORM_PAGE = "/named-by-form.html";
+export const NAMED_BY_FRAME_PAGE = "/named-by-frame.html";
+export const NAMED_AT_LOAD_PAGE = "/named-at-load.html";
+export const NAMED_AFTER_A_CLICK_PAGE = "/named-after-a-click.html";
+export const NAMED_AND_COVERED_PAGE = "/named-and-covered.html";
+export const NAMED_AND_ASKING_PAGE = "/named-and-asking.html";
+
 export const DIALOG_ON_PRESS_PAGES = new Map<string, FixtureRoute>([
+    [
+        NAMED_BY_ID_PAGE,
+        pageWith("", `${NAMED_BY_ID}<input data-testid="${FIELD}" aria-label="Field">`),
+    ],
+    [NAMED_BY_FORM_PAGE, pageWith("", NAMED_BY_FORM)],
+    [NAMED_BY_FRAME_PAGE, pageWith("", NAMED_BY_FRAME)],
+    [NAMED_AT_LOAD_PAGE, pageWith("", "", ADDS_THE_NAMED_ELEMENT)],
+    [
+        NAMED_AFTER_A_CLICK_PAGE,
+        pageWith(
+            "",
+            `<button type="button" data-testid="${ADDER}">Add</button>`,
+            `document.querySelector('[data-testid="${ADDER}"]').addEventListener('click', () => { ${ADDS_THE_NAMED_ELEMENT} });`,
+        ),
+    ],
+    [
+        NAMED_AND_COVERED_PAGE,
+        pageWith("", NAMED_BY_ID, COVER_ARRIVES_WITH_THE_POINTER_OVER_THE_BUTTON),
+    ],
+    [NAMED_AND_ASKING_PAGE, pageWith(opensDialogAt("pointerdown"), NAMED_BY_ID)],
+    [framing(NAMED_BY_ID_PAGE), framingPage(NAMED_BY_ID_PAGE)],
     [CONTROLS_PAGE, pageWith(opensDialogAt("pointerdown"), CONTROLS, CONTROLS_SCRIPT)],
     [DIALOG_AT_POINTERDOWN_PAGE, pageWith(opensDialogAt("pointerdown"))],
     [DIALOG_AT_MOUSEDOWN_PAGE, pageWith(opensDialogAt("mousedown"))],
