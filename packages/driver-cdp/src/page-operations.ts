@@ -31,11 +31,12 @@ export interface PageOperations<Handle> {
   twoFramesLater(): Promise<void>;
   // Calls a page function that returns Element[], and returns their handles.
   callForElements(pageFunction: PageFunction, inputs: readonly PageArgument<Handle>[]): Promise<Handle[]>;
-  // Calls a page function that returns an object, and keeps that object in the browser, with no name
-  // the page can reach it by. Whoever calls this must give it to releaseObject.
-  callForObject(pageFunction: PageFunction, inputs: readonly PageArgument<Handle>[]): Promise<Handle>;
+  // Calls a page function with the element, in a script world of the driver's own, which the page's
+  // scripts cannot see or patch, and keeps the object it returns in the browser. Whoever calls this
+  // must give that object to releaseObject.
+  callForObjectOutOfReach(pageFunction: PageFunction, element: Handle): Promise<Handle>;
   // Calls a page function on a kept object, as `this`, in the script world that made it, and returns
-  // what it returns as the browser reports it. Throws when the object's document has gone.
+  // what it returns as the browser reports it. Throws KeptObjectGone when the object no longer exists.
   callOnObject(object: Handle, pageFunction: PageFunction): Promise<unknown>;
   // Lets the browser forget a kept object. Never throws, since nothing is left to free when this fails.
   releaseObject(object: Handle): Promise<void>;

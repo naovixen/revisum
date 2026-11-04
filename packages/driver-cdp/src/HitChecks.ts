@@ -1,7 +1,10 @@
 /// <reference lib="dom" />
 // What decides whether a click's press reached its element. The page must not be able to write that
-// answer, so the check has no name on the page: the object lives only in the closures of its
-// listeners, and the driver holds it through the browser, by handle.
+// answer or skew it, so the check lives in a script world of the driver's own: the page's scripts cannot
+// reach its listeners, and what they patch is not what it calls. It has no name there either: the driver
+// holds it through the browser, by handle. Only events the browser made count, since a page can
+// dispatch any other event it likes.
+import { KeptObjectGone } from "./KeptObjectGone.ts";
 import type { PageOperations } from "./page-operations.ts";
 
 export const HitCheckOutcome = {
@@ -33,8 +36,10 @@ function armHitCheck(element: Element): ArmedHitCheck {
             window.removeEventListener(eventType, onPointerEvent, true);
         }
     };
-    const onClickAtElement = (): void => {
-        check.hasClickArrived = true;
+    const onClickAtElement = (event: Event): void => {
+        if (event.isTrusted) {
+            check.hasClickArrived = true;
+        }
     };
     const check: ArmedHitCheck = {
         state: "none",
@@ -45,6 +50,9 @@ function armHitCheck(element: Element): ArmedHitCheck {
         },
     };
     function onPointerEvent(event: Event): void {
+        if (!event.isTrusted) {
+            return;
+        }
         // Seen from the window, a target in a shadow root reads as its host; the composed path says
         // what it really is, through every open root.
         const path = event.composedPath();
@@ -95,7 +103,7 @@ export type HitChecks<Handle> = {
     // Arms one check before a press, first disarming any check an earlier click left unread.
     arm(element: Handle): Promise<Handle>;
     // Disarms the check and says what it saw. Throws when it cannot be read: its document has gone, a
-    // dialog holds the page, the page's own scripts broke the disarming, or the answer is no outcome.
+    // dialog holds the page, or the answer is no outcome.
     read(check: Handle): Promise<HitCheckOutcome>;
 };
 
@@ -109,15 +117,23 @@ export function hitChecks<Handle>(operations: PageOperations<Handle>): HitChecks
         unread.delete(check);
         void operations.releaseObject(check);
     };
+    // A check that has gone with its document has no listeners left to take off.
+    const disarmLeftOver = async (check: Handle): Promise<void> => {
+        try {
+            await operations.callOnObject(check, readHitCheck);
+        } catch (error) {
+            if (!(error instanceof KeptObjectGone)) {
+                throw error;
+            }
+        }
+        forget(check);
+    };
     return {
         async arm(element) {
             for (const leftOver of unread) {
-                // A check that still cannot be read may still swallow this press, which fails the
-                // step, so this click need not fail for it now.
-                await operations.callOnObject(leftOver, readHitCheck).catch(() => undefined);
-                forget(leftOver);
+                await disarmLeftOver(leftOver);
             }
-            const check = await operations.callForObject(armHitCheck, [{ element }]);
+            const check = await operations.callForObjectOutOfReach(armHitCheck, element);
             unread.add(check);
             return check;
         },

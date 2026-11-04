@@ -18,6 +18,7 @@ import type {
   DriverSession, ExposedStates, OwnBrowserDriver, PageArgument, PageFunction, PageOperations, Point, RoleAndName, ScriptCallOutcome,
 } from './page-operations.ts';
 import { nodesAPressPasses, pressActsByItself } from './NodesAPressPasses.ts';
+import { KeptObjectGone } from './KeptObjectGone.ts';
 import { PageHeldByDialog } from './PageHeldByDialog.ts';
 import { PageWatch, type AttachedPage } from './page-watch.ts';
 import { RunClipboard, SHARED_BROWSER_CLIPBOARD, allowRunClipboard } from './run-clipboard.ts';
@@ -498,6 +499,9 @@ function stateValue(value: unknown): boolean | null {
 
 // The name of the isolated script world the driver reads a frame's document through.
 const FRAME_WORLD_NAME = 'driver-frame';
+// The name of the isolated script world click checks live in. The browser gives a frame's document one
+// world for each name, so this makes no more of them however many clicks there are.
+const CLICK_CHECK_WORLD_NAME = 'driver-click-check';
 // What Page.navigate reports for a response whose HTTP status is an error and whose body is empty.
 const HTTP_ERROR_STATUS = 'net::ERR_HTTP_RESPONSE_CODE_FAILURE';
 // Messages of a command that named an execution context the page has since destroyed.
@@ -510,12 +514,9 @@ const FRAME_REMOVED = /No frame for given id found/;
 const PRESS_EVENT = /^(?:pointer|mouse|click|auxclick|dblclick|touch|focus|blur|contextmenu)/;
 
 // How Runtime.callFunctionOn hands back what a page function returns.
-type CallDelivery = { readonly awaitPromise?: true; readonly returnByValue: boolean };
+type CallDelivery = { readonly awaitPromise: true; readonly returnByValue: boolean };
 const AWAITED_VALUE: CallDelivery = { awaitPromise: true, returnByValue: true };
 const AWAITED_OBJECT: CallDelivery = { awaitPromise: true, returnByValue: false };
-// Never awaited: awaiting a result looks up its `then`, and a getter the page's scripts put on
-// Object.prototype would be handed the object the page must not reach.
-const OBJECT_OUT_OF_REACH: CallDelivery = { returnByValue: false };
 
 function throwIfThePageThrew(called: CallResult): void {
   if (called.exceptionDetails !== undefined) throw new Error(`page exception: ${called.exceptionDetails.exception?.value ?? called.exceptionDetails.text}`);
@@ -651,8 +652,8 @@ class CdpPage implements PageOperations<string> {
     return evaluated.result.objectId;
   }
 
-  async #isolatedWorld(frameId: string): Promise<number> {
-    const created = await this.#send<{ executionContextId: number }>('Page.createIsolatedWorld', { frameId, worldName: FRAME_WORLD_NAME });
+  async #isolatedWorld(frameId: string, worldName = FRAME_WORLD_NAME): Promise<number> {
+    const created = await this.#send<{ executionContextId: number }>('Page.createIsolatedWorld', { frameId, worldName });
     return created.executionContextId;
   }
 
@@ -692,18 +693,41 @@ class CdpPage implements PageOperations<string> {
       .flatMap((property) => property.value?.objectId ?? []);
   }
 
-  async callForObject(pageFunction: PageFunction, inputs: readonly PageArgument<string>[]): Promise<string> {
-    const { objectId } = (await this.#call(pageFunction, inputs, OBJECT_OUT_OF_REACH)).result;
-    if (objectId === undefined || objectId === '') {
-      throw new Error('the page gave no object to keep');
+  async callForObjectOutOfReach(pageFunction: PageFunction, element: string): Promise<string> {
+    const executionContextId = await this.#isolatedWorld(await this.frameId(), CLICK_CHECK_WORLD_NAME);
+    const described = await this.#send<DescribedNode>('DOM.describeNode', { objectId: element });
+    const resolved = await this.#send<{ object: { objectId?: string } }>('DOM.resolveNode', { backendNodeId: described.node.backendNodeId, executionContextId });
+    const elementInWorld = resolved.object.objectId;
+    if (elementInWorld === undefined || elementInWorld === '') {
+      throw new Error('the element has no object in the driver\'s script world');
     }
-    return objectId;
+    try {
+      const called = await this.#send<CallResult>('Runtime.callFunctionOn', {
+        functionDeclaration: pageFunction.toString(), executionContextId, arguments: [{ objectId: elementInWorld }], returnByValue: false,
+      });
+      throwIfThePageThrew(called);
+      const kept = called.result.objectId;
+      if (kept === undefined || kept === '') {
+        throw new Error('the page function gave no object to keep');
+      }
+      return kept;
+    } finally {
+      await this.releaseObject(elementInWorld);
+    }
   }
 
   async callOnObject(object: string, pageFunction: PageFunction): Promise<unknown> {
-    const called = await this.#send<CallResult>('Runtime.callFunctionOn', {
-      functionDeclaration: pageFunction.toString(), objectId: object, returnByValue: true,
-    });
+    let called: CallResult;
+    try {
+      called = await this.#send<CallResult>('Runtime.callFunctionOn', {
+        functionDeclaration: pageFunction.toString(), objectId: object, returnByValue: true,
+      });
+    } catch (error) {
+      if (LOST_OBJECT.test(errorText(error))) {
+        throw new KeptObjectGone();
+      }
+      throw error;
+    }
     throwIfThePageThrew(called);
     return called.result.value;
   }
