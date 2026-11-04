@@ -3,30 +3,20 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import {
-    DRIVER_FEATURES,
-    defaultRedactor,
-    environmentSecretStore,
     policyGate,
     run,
     success,
     type Authorised,
-    type BrowserDriver,
     type Plan,
     type PlanStanding,
-    type RunPorts,
-    type StoragePort,
 } from "@revisum/engine";
-import {
-    memoryArtifactStore,
-    memoryEventSink,
-    memoryRunEventSink,
-} from "../../support/memory-ports.ts";
+import { memoryEventSink } from "../../support/memory-ports.ts";
 import { trustedProjectFrom } from "../../support/policy-clearance.ts";
 import { DATABASE_PASSWORD, fakeCommandRunner } from "./database-command-examples.ts";
 import { TEST_SERVICE } from "./plan-examples.ts";
 import { PROPOSAL, approvedStanding, parsedPlan } from "./policy-examples.ts";
-import { fakeNetwork, fakeSession } from "./RunOnFakeSession.ts";
-import { fakeServiceCaller, virtualClock } from "./service-call-examples.ts";
+import { fakeSession } from "./RunOnFakeSession.ts";
+import { fakeServiceCaller } from "./service-call-examples.ts";
 import { matcher, setStorage, startStub } from "./stub-and-storage-examples.ts";
 import { DEFAULT_CLOCK_START, DEFAULT_SEED } from "./run-value-examples.ts";
 import { parsedProject, sourceBytes } from "./unsafe-feature-examples.ts";
@@ -44,6 +34,11 @@ import {
     unsafeProjectFile,
     type JsonRecord,
 } from "./unsafe-feature-steps.ts";
+import { fakeDriverOpening } from "#test-support/fakes/FakeDriver.ts";
+import { fakeNetworkPort } from "#test-support/fakes/FakeNetworkPort.ts";
+import { driversOf, fakePorts } from "#test-support/fakes/FakePorts.ts";
+import { fakeSecretStore } from "#test-support/fakes/FakeSecretStore.ts";
+import { fakeStoragePort } from "#test-support/fakes/FakeStoragePort.ts";
 
 const ENGLISH_TARGET: JsonRecord = {
     id: TARGET_ID,
@@ -120,44 +115,32 @@ async function runOnCountingSession(
         commands: () => commandRunner.commands.length,
         serviceCalls: () => services.requests.length,
     };
-    const storage: StoragePort = {
+    const storage = fakeStoragePort({
         write: () => {
             effects.storageWrites++;
             return Promise.resolve(success(undefined));
         },
-        remove: () => Promise.resolve(success(undefined)),
-        read: () => Promise.resolve(success(null)),
-    };
+    });
     const session = fakeSession({
         runScript: () => {
             effects.scripts++;
             return Promise.resolve(success(JSON.stringify({ count: 3, blocks: 1 })));
         },
-        network: {
-            ...fakeNetwork(),
+        network: fakeNetworkPort({
             startStub: () => {
                 effects.stubsStarted++;
                 return Promise.resolve(success(undefined));
             },
-        },
+        }),
         storage,
     });
-    const driver: BrowserDriver = {
-        info: { id: "cdp", version: "counting", protocol: "none", performs: DRIVER_FEATURES },
-        supports: () => success(true),
-        open: () => Promise.resolve(success(session)),
-    };
-    const ports: RunPorts = {
-        drivers: new Map([[driver.info.id, driver]]),
-        clock: virtualClock(),
-        artifacts: memoryArtifactStore(),
-        redactor: defaultRedactor(),
-        audit: memoryEventSink(),
-        events: memoryRunEventSink(),
-        secrets: environmentSecretStore({ [DATABASE_SECRET]: DATABASE_PASSWORD }),
+    const driver = fakeDriverOpening(session);
+    const ports = fakePorts({
+        drivers: driversOf(driver),
+        secrets: fakeSecretStore({ [DATABASE_SECRET]: DATABASE_PASSWORD }),
         services: services.caller,
         databaseCommands: commandRunner.port,
-    };
+    });
     const project = parsedProject(BARRED_PROJECT);
     const target = project.matrix[0];
     assert.ok(target !== undefined, "the test project has a target");

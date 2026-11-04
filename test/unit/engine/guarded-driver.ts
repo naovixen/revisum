@@ -8,14 +8,16 @@
 //
 // A dialog step acts on no element: the driver asks the guard with an element whose fields are all
 // null, and passes the open dialog's text as the guard's second argument.
-import {
-  defaultRedactor, planParser, runUntrusted,
-  type BrowserDriver, type ElementProbe, type GuardVerdict, type Plan, type PlanError, type ResolvedElement, type Result,
-  type RunInputs, type RunPorts, type RunResult, type Session,
-} from '@revisum/engine';
+import { failure, planParser, runUntrusted, success, type BrowserDriver, type GuardVerdict, type Plan, type PlanError, type ResolvedElement, type Result, type RunInputs, type RunPorts, type RunResult } from '@revisum/engine';
 import { arch, platform } from 'node:os';
-import { memoryArtifactStore, memoryRunEventSink, systemClock } from '../../support/memory-ports.ts';
 import { ORIGIN, element, parserProject, policyProjectInput, type JsonRecord } from './policy-examples.ts';
+import { fakeArtifactStore } from '#test-support/fakes/FakeArtifactStore.ts';
+import { fakeClock } from '#test-support/fakes/FakeClock.ts';
+import { fakeDriverOpening } from '#test-support/fakes/FakeDriver.ts';
+import { driversOf } from '#test-support/fakes/FakePorts.ts';
+import { fakeRedactor } from '#test-support/fakes/FakeRedactor.ts';
+import { fakeRunEventSink } from '#test-support/fakes/FakeRunEventSink.ts';
+import { fakeSession } from '#test-support/fakes/FakeSession.ts';
 
 // What the page shows for one step: the element its locator resolves to, or an open dialog's text.
 export type PageView = { readonly element?: Partial<ResolvedElement>; readonly dialogText?: string };
@@ -23,8 +25,6 @@ export type PageViews = Readonly<Record<string, PageView>>;
 
 // Steps that send input to the page, and so pass the guard first.
 const ACTING_STEP_TYPES: readonly string[] = ['click', 'hover', 'fill', 'select', 'upload', 'press', 'download', 'dialog'];
-
-const SHOWN: ElementProbe = { count: 1, visible: true, enabled: true, text: 'Ready', value: null, sensitive: false, box: null };
 
 export type GuardedDriver = {
   readonly driver: BrowserDriver;
@@ -54,14 +54,13 @@ function elementFor(step: JsonRecord, seen: PageView | undefined): ResolvedEleme
 export function guardedDriver(steps: readonly JsonRecord[], page: PageViews = {}, adapterId = 'cdp'): GuardedDriver {
   const actingIndexes = steps.flatMap((step, index) => (ACTING_STEP_TYPES.includes(String(step['type'])) ? [index] : []));
   const inputEvents = steps.map(() => 0);
-  let opens = 0;
+
   let actions = 0;
   let guardCalls = 0;
-  const session: Session = {
+  const session = fakeSession({
     browser: { name: 'guarded-browser', version: '1.0' },
-    navigate: async () => ({ ok: true, value: undefined }),
-    page: async () => ({ url: `${ORIGIN}/`, title: 'Account' }),
-    act: async (step, guard) => {
+    page: () => Promise.resolve({ url: `${ORIGIN}/`, title: 'Account' }),
+    act: (step, guard) => {
       const index = actingIndexes[actions] ?? -1;
       actions++;
       const raw = steps[index] ?? {};
@@ -71,23 +70,13 @@ export function guardedDriver(steps: readonly JsonRecord[], page: PageViews = {}
       // A guard may read the open dialog's text as a second argument; one that does not ignores it.
       const ask: (resolved: ResolvedElement, dialogText: string | null) => GuardVerdict = guard;
       const verdict = ask(elementFor(raw, seen), kind === 'dialog' ? (seen?.dialogText ?? null) : null);
-      if (verdict.kind === 'deny') return { ok: false, error: { code: 'policy-denied', detail: verdict.rule } };
+      if (verdict.kind === 'deny') return Promise.resolve(failure({ code: 'policy-denied', detail: verdict.rule }));
       if (index >= 0) inputEvents[index] = (inputEvents[index] ?? 0) + 1;
-      return { ok: true, value: undefined };
+      return Promise.resolve(success(undefined));
     },
-    probe: async () => SHOWN,
-    screenshot: async () => new Uint8Array([137, 80, 78, 71]),
-    audit: async () => [],
-    accessibilitySnapshot: async () => ({ role: 'document', name: '', children: [] }),
-    blockedOrigins: () => [],
-    close: async () => undefined,
-  };
-  const driver: BrowserDriver = {
-    info: { id: adapterId, version: 'guarded', protocol: 'none' },
-    supports: () => ({ ok: true, value: true }),
-    open: async () => { opens++; return { ok: true, value: session }; },
-  };
-  return { driver, opens: () => opens, inputEvents, guardCalls: () => guardCalls };
+  });
+  const driver = fakeDriverOpening(session, { info: { id: adapterId, version: 'guarded', protocol: 'none' } });
+  return { driver, opens: () => driver.calls.count('open'), inputEvents, guardCalls: () => guardCalls };
 }
 
 // What a run needs besides the plan and target, for the policy test project.
@@ -98,8 +87,8 @@ export const runBase = (projectInput: JsonRecord = policyProjectInput()): Omit<R
 
 // The ports of a run on `driver`, without an audit sink; tests add one where they need it.
 export const portsWithoutAudit = (driver: BrowserDriver): Omit<RunPorts, 'audit'> => ({
-  drivers: new Map([[driver.info.id, driver]]), clock: systemClock, artifacts: memoryArtifactStore(),
-  redactor: defaultRedactor(), events: memoryRunEventSink(),
+  drivers: driversOf(driver), clock: fakeClock(), artifacts: fakeArtifactStore(),
+  redactor: fakeRedactor(), events: fakeRunEventSink(),
 });
 
 export const parserFor = (projectInput: JsonRecord = policyProjectInput()) =>

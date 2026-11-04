@@ -6,14 +6,11 @@ import assert from 'node:assert/strict';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
-import { defaultRedactor, planParser, run, sha256, type RunResult } from '@revisum/engine';
-import { memoryArtifactStore, memoryEventSink, memoryRunEventSink } from '../../support/memory-ports.ts';
+import { planParser, run, sha256, type RunResult } from '@revisum/engine';
 import { authorise, trustedProjectFrom } from '../../support/policy-clearance.ts';
-import {
-  closedScenario, fixtureReferences, parsedProject, removeFakeExecutables, runScenario, scenarioDriver, type Scenario,
-} from './replay-examples.ts';
+import { fixtureReferences, parsedProject, removeFakeExecutables, runScenario, scenarioDriver, type Scenario , closedScenario } from './replay-examples.ts';
 import { OPEN_ORDERS, accepted, planOf, projectFileWith } from './run-value-examples.ts';
-import { virtualClock } from './service-call-examples.ts';
+import { driversOf, fakePorts } from '#test-support/fakes/FakePorts.ts';
 
 after(removeFakeExecutables);
 
@@ -74,9 +71,6 @@ async function runKeepingAnyOutcome(scenario: Scenario): Promise<{ readonly resu
     plan: authorise(plan, await trustedProjectFrom(scenario.projectFile)), project, targetId: project.matrix[0]?.id ?? assert.fail('no target'),
     baseUrl: scenario.baseUrl, seed: scenario.seed, fixedTimeMilliseconds: scenario.clockStartMilliseconds,
     fixtures: fixtureReferences(scenario.fixtures), host: scenario.host,
-  }, {
-    drivers: new Map([[driver.info.id, driver]]), clock: virtualClock(), artifacts: memoryArtifactStore(), redactor: defaultRedactor(),
-    audit: memoryEventSink(), events: memoryRunEventSink(),
-  });
+  }, fakePorts({ drivers: driversOf(driver) }));
   return { result, calls: calls.order };
 }

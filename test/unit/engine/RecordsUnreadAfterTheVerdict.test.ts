@@ -4,10 +4,10 @@
 // them, because the result claims them.
 import assert from "node:assert/strict";
 import { describe, test, type TestContext } from "node:test";
-import type { LoggedEvent, RunEventSink, Session } from "@revisum/engine";
-import { memoryRunEventSink } from "../../support/memory-ports.ts";
-import { fakeNetwork, fakeSession, runOnFakeSession, stepSummaries } from "./RunOnFakeSession.ts";
+import type { RunEventSink, Session } from "@revisum/engine";
+import { fakeSession, runOnFakeSession, stepSummaries, fakeNetwork } from "./RunOnFakeSession.ts";
 import { OPEN_CART, unsafePlan, type JsonRecord } from "./unsafe-feature-steps.ts";
+import { fakeRunEventSinkFailingOn } from "#test-support/fakes/FakeRunEventSink.ts";
 
 const BROKEN = "the session has gone";
 const throws = (): never => {
@@ -35,21 +35,12 @@ const VERDICTS: readonly {
 const FINAL_STATES: readonly unknown[] = ["Passed", "Failed", "Errored", "Denied"];
 
 // A log that works until the steps have a verdict, and then fails on everything.
-function logFailingAfterTheVerdict(): RunEventSink {
-    const kept = memoryRunEventSink();
-    return {
-        read: () => kept.read(),
-        append(event: LoggedEvent) {
-            const isAfterTheVerdict =
-                event.kind === "network.blocked" ||
-                (event.kind === "run.state" && FINAL_STATES.includes(event.state));
-            if (isAfterTheVerdict) {
-                throw new Error("the log could not be written");
-            }
-            kept.append(event);
-        },
-    };
-}
+const logFailingAfterTheVerdict = (): RunEventSink =>
+    fakeRunEventSinkFailingOn(
+        (event) =>
+            event.kind === "network.blocked" ||
+            (event.kind === "run.state" && FINAL_STATES.includes(event.state)),
+    );
 
 const BROKEN_READS: readonly {
     readonly name: string;

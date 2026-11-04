@@ -7,15 +7,10 @@ import { fakeSession, runOnFakeSession } from "./RunOnFakeSession.ts";
 import { ORIGIN } from "./run-value-examples.ts";
 import { expectStorage } from "./stub-and-storage-examples.ts";
 import { OPEN_CART, unsafePlan, type JsonRecord } from "./unsafe-feature-steps.ts";
+import { fakeStoragePort } from "#test-support/fakes/FakeStoragePort.ts";
 
 const STORED_VALUE = "stored-value";
 const EQUALS_STORED_VALUE: JsonRecord = { kind: "equals", value: STORED_VALUE };
-
-const fakeStorage = (read: StoragePort["read"]): StoragePort => ({
-    write: () => Promise.resolve(success(undefined)),
-    remove: () => Promise.resolve(success(undefined)),
-    read,
-});
 
 const storageCheckOf = (result: RunResult) => {
     const step = result.steps.find((candidate) => candidate.type === "expectStorage");
@@ -26,7 +21,7 @@ const storageCheckOf = (result: RunResult) => {
 const runCheck = async (assertion: JsonRecord, read: StoragePort["read"]) => {
     const { result } = await runOnFakeSession(
         unsafePlan([OPEN_CART, expectStorage("privateKey", assertion)]),
-        { session: fakeSession({ storage: fakeStorage(read) }) },
+        { session: fakeSession({ storage: fakeStoragePort({ read }) }) },
     );
     return storageCheckOf(result);
 };

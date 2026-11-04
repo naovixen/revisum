@@ -1,0 +1,8 @@
+import type { ArtifactStore } from "@revisum/engine";
+import { memoryArtifactStore, type MemoryArtifactStore } from "../memory-ports.ts";
+import { recordCalls, type Recorded } from "./RecordCalls.ts";
+
+// An artefact store that keeps everything in memory, where a test can read it back.
+export const fakeArtifactStore = (
+    overrides: Partial<ArtifactStore> = {},
+): Recorded<MemoryArtifactStore> => recordCalls({ ...memoryArtifactStore(), ...overrides });

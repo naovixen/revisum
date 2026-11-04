@@ -9,14 +9,11 @@
 //     unnamed control by its test id. It allows no irreversible name.
 // The gate is built by policyGate({ project, events }); each denial appends one plan.denied event
 // whose code is the rule. A dialog step acts on no element, so the guard receives NO_ELEMENT for it.
-import {
-  failure, loadTrustedProject, parseProject, planHash, planParser, policyGate, success,
-  type EventSink, type Locale, type Plan, type PlanStanding, type PolicyDecision, type PolicyGate, type PolicyRuleId,
-  type Project, type ResolvedElement, type Step, type Target, type TrustedProject, type VersionControlPort,
-} from '@revisum/engine';
+import { loadTrustedProject, parseProject, planHash, planParser, policyGate, type EventSink, type Locale, type Plan, type PlanStanding, type PolicyDecision, type PolicyGate, type PolicyRuleId, type Project, type ResolvedElement, type Step, type Target, type TrustedProject } from '@revisum/engine';
 import {
   PLAN_PATH, eventsOfKind, memoryEventSink, withRepository, type MemoryEventSink, type RecordedEvent,
 } from './approval-repositories.ts';
+import { fakeProtectedBranchHolding } from '#test-support/fakes/FakeVersionControlPort.ts';
 
 export const ORIGIN = 'http://127.0.0.1:4173';
 export const PRODUCTION_ORIGIN = 'https://shop.example.com';
@@ -68,26 +65,9 @@ export const withPolicy = (changes: JsonRecord): JsonRecord => policyProjectInpu
 export const withPatterns = (irreversiblePatterns: Readonly<Record<string, readonly string[]>>): JsonRecord =>
   withPolicy({ irreversiblePatterns });
 
-// A protected branch that holds only project.json. No other port method is needed to load it.
-function protectedBranchWith(project: JsonRecord): VersionControlPort {
-  return {
-    protectedBranch: 'main',
-    async protectedFile(path) {
-      return path === 'project.json'
-        ? success({ bytes: new TextEncoder().encode(JSON.stringify(project)), commit: 'commit-protected' })
-        : failure('not-found');
-    },
-    reviews: async () => failure('unavailable'),
-    changedFiles: async () => failure('unavailable'),
-    pullRequest: async () => failure('unavailable'),
-    lastCommitTouching: async () => failure('unavailable'),
-    landedBy: async () => failure('unavailable'),
-  };
-}
-
 // The project as core trusts it: read from the protected branch.
 export async function trustedProject(input: JsonRecord = policyProjectInput()): Promise<TrustedProject> {
-  const loaded = await loadTrustedProject('project.json', protectedBranchWith(input), { files: [], events: memoryEventSink() });
+  const loaded = await loadTrustedProject('project.json', fakeProtectedBranchHolding(input), { files: [], events: memoryEventSink() });
   if (!loaded.ok) throw new Error(`the policy test project was not trusted: ${JSON.stringify(loaded.error)}`);
   return loaded.value.project;
 }

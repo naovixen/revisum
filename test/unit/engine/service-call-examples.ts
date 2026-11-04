@@ -17,18 +17,19 @@
 //     order, each with an `outcome` (passed, failed or skipped) and, on failure, a `code`;
 //   - a review item a run raises is in RunResult.reviewItems, each with a `code`.
 import assert from 'node:assert/strict';
-import {
-  defaultRedactor, environmentSecretStore, failure, parseProject, planParser, run, success,
-  type Clock, type LoggedEvent, type PlanStanding, type Project, type Result, type RunResult,
-  type ServiceCallErrorCode, type ServiceCaller, type ServiceRequest, type ServiceResponse,
-} from '@revisum/engine';
-import { memoryArtifactStore, memoryEventSink, memoryRunEventSink } from '../../support/memory-ports.ts';
+import { failure, parseProject, planParser, run, success, type LoggedEvent, type PlanStanding, type Project, type Result, type RunPorts, type RunResult, type ServiceCallErrorCode, type ServiceCaller, type ServiceRequest, type ServiceResponse } from '@revisum/engine';
 import { authorise, trustedProjectFrom } from '../../support/policy-clearance.ts';
 import {
   DEFAULT_CLOCK_START, DEFAULT_SEED, CURRENT_VERSION, ORIGIN, TARGET_ID, accepted, projectFileWith, recordingDriver,
   type JsonRecord, type ParsePlan, type Recording,
 } from './run-value-examples.ts';
 import { fakeSecretValue } from './secret-examples.ts';
+import { fakeClock, type FakeClock } from '#test-support/fakes/FakeClock.ts';
+import { driversOf, fakePorts } from '#test-support/fakes/FakePorts.ts';
+import { fakeRunEventSink } from '#test-support/fakes/FakeRunEventSink.ts';
+import { fakeSecretStore } from '#test-support/fakes/FakeSecretStore.ts';
+import { fakeServiceCaller as fakeServiceCallerPort } from '#test-support/fakes/FakeServiceCaller.ts';
+import { leaveOut } from '#test-support/fakes/LeaveOut.ts';
 
 export { CURRENT_VERSION, ORIGIN, TARGET_ID, type JsonRecord };
 
@@ -239,29 +240,17 @@ export type FakeServiceCaller = { readonly caller: ServiceCaller; readonly reque
 
 export function fakeServiceCaller(route: Route = SHOP_ROUTE): FakeServiceCaller {
   const requests: ServiceRequest[] = [];
-  const caller: ServiceCaller = {
-    async call(request) {
+  const caller = fakeServiceCallerPort({ call(request) {
       const earlier = [...requests];
       requests.push(request);
-      return route(request, earlier);
-    },
-  };
+      return Promise.resolve(route(request, earlier)); }, });
   return { caller, requests };
 }
 
 // ---- A virtual clock ----------------------------------------------------------------------------
 
-export type VirtualClock = Clock & { readonly elapsed: () => number };
-
-// Time moves only when the run sleeps, so a 10 s backend check takes no real time.
-export function virtualClock(): VirtualClock {
-  let time = 0;
-  return {
-    now: () => time,
-    sleep: async (milliseconds) => { time += Math.max(0, milliseconds); },
-    elapsed: () => time,
-  };
-}
+export type VirtualClock = FakeClock;
+export const virtualClock = (): VirtualClock => fakeClock();
 
 // ---- Running a plan with calls ------------------------------------------------------------------
 
@@ -288,6 +277,8 @@ export type CallRun = {
   readonly everything: string;
 };
 
+const serviceCallPorts = (ports: RunPorts, hasCaller: boolean): RunPorts => (hasCaller ? ports : leaveOut<RunPorts>(ports, ['services']));
+
 export async function runWithCalls(raw: unknown, options: CallRunOptions = {}): Promise<CallRun> {
   const projectFile = options.projectFile ?? callProjectFile();
   const parsedProject = parseProject(projectFile);
@@ -298,15 +289,14 @@ export async function runWithCalls(raw: unknown, options: CallRunOptions = {}): 
   const { driver, recording } = recordingDriver();
   const { caller, requests } = fakeServiceCaller(options.route);
   const clock = virtualClock();
-  const events = memoryRunEventSink();
+  const events = fakeRunEventSink();
   const result = await run({
     plan: authorise(plan, trusted, options.standing), project, targetId: project.matrix[0]?.id ?? assert.fail('no target'),
     baseUrl: ORIGIN, seed: DEFAULT_SEED, fixedTimeMilliseconds: DEFAULT_CLOCK_START, fixtures: [], host: { platform: 'test', arch: 'test' },
     ...(options.standing === undefined ? {} : { standing: options.standing }),
-  }, {
-    drivers: new Map([[driver.info.id, driver]]), clock, artifacts: memoryArtifactStore(), redactor: defaultRedactor(), audit: memoryEventSink(), events,
-    secrets: environmentSecretStore(options.environment ?? SECRET_VALUES), ...(options.withCaller === false ? {} : { services: options.caller ?? caller }),
-  });
+  }, serviceCallPorts(fakePorts({
+    drivers: driversOf(driver), clock, events, secrets: fakeSecretStore(options.environment ?? SECRET_VALUES), services: options.caller ?? caller,
+  }), options.withCaller !== false));
   const logged = events.read();
   return { result, recording, requests, events: logged, clock, everything: `${JSON.stringify(result)}\n${JSON.stringify(logged)}` };
 }

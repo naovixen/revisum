@@ -2,36 +2,28 @@
 // the logging manifest, redaction, no target substitution and deterministic release notes.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
-import {
-  LOGGING_MANIFEST, LoggingManifestViolation, SENSITIVE_PLACEHOLDER, defaultRedactor, failure, manifestLogger,
-  planWithAi, releaseNoteDraft, runUntrusted, writeReleaseNotes,
-  type AiPlanner, type AiWriter, type Box, type BrowserDriver, type RunResult, type Step,
-} from '@revisum/engine';
+import { LOGGING_MANIFEST, LoggingManifestViolation, SENSITIVE_PLACEHOLDER, defaultRedactor, manifestLogger, planWithAi, releaseNoteDraft, runUntrusted, writeReleaseNotes, type Box, type BrowserDriver, type RunResult, type Step } from '@revisum/engine';
 import { allowEveryAction } from '#test-support/browser/AllowEveryAction.ts';
 import { hostilePlans } from '#test-support/hostile-plans.ts';
-import { memoryArtifactStore, memoryEventSink, memoryRunEventSink, systemClock } from '#test-support/memory-ports.ts';
+import { memoryArtifactStore, memoryRunEventSink } from '#test-support/memory-ports.ts';
 import { decodePng } from '#test-support/png-decoder.ts';
 import { onTarget } from '#test-support/TestTier.ts';
 import type { BrowserHarness } from '#test-support/browser/BrowserHarness.ts';
 import { CONTRACT_TARGETS, EMAIL, FIXED_TIME_MILLISECONDS, NAME, SEED, signupHarness, makeDrivers, signupPlan, stepsPlan } from '#test-support/signup-harness.ts';
+import { fakeAiPlanner } from '#test-support/fakes/FakeAiPlanner.ts';
+import { fakeAiWriter } from '#test-support/fakes/FakeAiWriter.ts';
+import { fakeArtifactStore } from '#test-support/fakes/FakeArtifactStore.ts';
+import { fakeDriverNeverLaunching } from '#test-support/fakes/FakeDriver.ts';
+import { fakePorts } from '#test-support/fakes/FakePorts.ts';
 
 let testHarness: BrowserHarness;
 before(async () => { testHarness = await signupHarness(); });
 after(async () => { await testHarness.close(); });
 
 // A driver that counts every call. If containment works, it is never called.
-function spyDriver(id: string): BrowserDriver & { calls: number } {
-  const spy = {
-    calls: 0,
-    info: { id, version: 'spy', protocol: 'none' },
-    supports() { spy.calls++; return { ok: true as const, value: true as const }; },
-    async open() { spy.calls++; return failure({ reason: 'launch-failed' as const, detail: 'spy never launches' }); },
-  };
-  return spy;
-}
-const spyPorts = (drivers: ReadonlyMap<string, BrowserDriver>) => ({
-  drivers, clock: systemClock, artifacts: { put: async () => { throw new Error('no side effects allowed'); } },
-  redactor: defaultRedactor(), audit: memoryEventSink(), events: memoryRunEventSink(),
+const spyDriver = (id: string) => fakeDriverNeverLaunching({ info: { id, version: 'spy', protocol: 'none' } }, ['build']);
+const spyPorts = (drivers: ReadonlyMap<string, BrowserDriver>) => fakePorts({
+  drivers, artifacts: fakeArtifactStore({ put: () => Promise.reject(new Error('no side effects allowed')) }),
 });
 
 // ---- (a) Replay ---------------------------------------------------------------------------------
@@ -79,7 +71,7 @@ describe('(b) AI containment: hostile plans are rejected before any side effect'
       assert.ok(!Array.isArray(outcome) && 'errors' in outcome, `${plan.name}: rejected`);
       assert.ok(outcome.errors.some((error) => error.code === plan.code), `${plan.name}: expected ${plan.code}, got ${JSON.stringify(outcome.errors)}`);
     }
-    const driverCalls = spies.reduce((total, spy) => total + spy.calls, 0);
+    const driverCalls = spies.reduce((total, spy) => total + spy.calls.count(), 0);
     assert.equal(driverCalls, 0, 'no driver method was called');
     assert.ok(hostile.length >= 12);
   });
@@ -89,13 +81,13 @@ describe('(b) AI containment: hostile plans are rejected before any side effect'
     const outcome = await runUntrusted(signupPlan(['cdp-chromium']), testHarness.parse, testHarness.runInputs(), spyPorts(new Map([['cdp', spy]])));
     assert.ok(Array.isArray(outcome));
     assert.equal(outcome[0]?.state, 'TargetUnavailable');
-    assert.equal(spy.calls, 2);
+    assert.equal(spy.calls.count(), 2);
   });
 
   test('an AI planner\'s output is only usable after parsing', async () => {
-    const hostile: AiPlanner = { propose: async () => ({ ...signupPlan(['cdp-chromium']), steps: [{ type: 'eval', code: '1' }] }) };
-    const honest: AiPlanner = { propose: async () => signupPlan(['cdp-chromium']) };
-    const throws: AiPlanner = { propose: async () => { throw new Error('model refused'); } };
+    const hostile = fakeAiPlanner({ propose: () => Promise.resolve({ ...signupPlan(['cdp-chromium']), steps: [{ type: 'eval', code: '1' }] }) });
+    const honest = fakeAiPlanner({ propose: () => Promise.resolve(signupPlan(['cdp-chromium'])) });
+    const throws = fakeAiPlanner({ propose: () => Promise.reject(new Error('model refused')) });
     const spec = { specReference: 'specs/signup.md', text: 'A user can sign up.' };
     assert.equal((await planWithAi(hostile, spec, testHarness.parse)).ok, false);
     assert.equal((await planWithAi(throws, spec, testHarness.parse)).ok, false);
@@ -235,7 +227,7 @@ describe('(f) release artefacts', () => {
     assert.ok(draft.includes('image-alt'));
 
     const store = memoryArtifactStore();
-    const polite: AiWriter = { suggest: async (text) => `${text}\n\nNow with friendlier wording.` };
+    const polite = fakeAiWriter({ suggest: (text) => Promise.resolve(`${text}\n\nNow with friendlier wording.`) });
     const written = await writeReleaseNotes(plan, [first.result], store, polite);
     assert.equal(new TextDecoder().decode(store.get('release-notes.md')), draft, 'draft stored unchanged');
     assert.equal(written.suggestion?.name, 'release-notes.suggestion.md');

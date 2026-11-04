@@ -6,13 +6,10 @@
 import assert from 'node:assert/strict';
 import { arch, platform } from 'node:os';
 import { test } from 'node:test';
-import { defaultRedactor, runUntrusted } from '@revisum/engine';
-import { memoryArtifactStore, memoryEventSink, memoryRunEventSink, systemClock } from '../../support/memory-ports.ts';
-import {
-  OPEN_ACCOUNT_PAGE, ORIGIN, approvedStanding, comparable, decideOn, deniedCodes, parsedPlan, parserProject, planOf, policyProjectInput,
-  testGate, type JsonRecord,
-} from './policy-examples.ts';
+import { runUntrusted } from '@revisum/engine';
+import { OPEN_ACCOUNT_PAGE, ORIGIN, approvedStanding, comparable, decideOn, deniedCodes, parsedPlan, parserProject, policyProjectInput, testGate, type JsonRecord , planOf } from './policy-examples.ts';
 import { spyDriver } from './secret-examples.ts';
+import { fakePorts } from '#test-support/fakes/FakePorts.ts';
 
 const request = (method: string, path: string): JsonRecord => ({ origin: ORIGIN, method, path, match: 'exact' });
 const unavailable = { status: 503, mediaType: 'application/json', body: { json: { error: 'unavailable' } } };
@@ -112,9 +109,7 @@ test('a denied stub start is found after steps the gate allows, at its own index
 test('a plan the gate denies for a stub or a storage write opens no browser', async () => {
   const input = projectInput();
   const spy = spyDriver();
-  const ports = {
-    drivers: new Map([['cdp', spy]]), clock: systemClock, artifacts: memoryArtifactStore(), redactor: defaultRedactor(), audit: memoryEventSink(), events: memoryRunEventSink(),
-  };
+  const ports = fakePorts({ drivers: new Map([['cdp', spy]]) });
   const base = { project: parserProject(input), baseUrl: ORIGIN, seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() } };
   const parse = (raw: unknown) => ({ ok: true as const, value: parsedPlan(raw as JsonRecord, input) });
   const rules: string[] = [];
@@ -124,18 +119,16 @@ test('a plan the gate denies for a stub or a storage write opens no browser', as
     if ('rule' in outcome) rules.push(outcome.rule);
   }
   assert.deepEqual(rules, ['side-effect-in-proposal', 'side-effect-in-proposal']);
-  assert.equal(spy.opens, 0, 'no browser was opened');
+  assert.equal(spy.calls.count('open'), 0, 'no browser was opened');
 });
 
 // Counter-example: the same spy is opened for a plan the gate allows, so the count above can fail.
 test('counter-example: a proposal with a stub allowed in proposals opens the browser', async () => {
   const input = projectInput();
   const spy = spyDriver();
-  const ports = {
-    drivers: new Map([['cdp', spy]]), clock: systemClock, artifacts: memoryArtifactStore(), redactor: defaultRedactor(), audit: memoryEventSink(), events: memoryRunEventSink(),
-  };
+  const ports = fakePorts({ drivers: new Map([['cdp', spy]]) });
   const base = { project: parserProject(input), baseUrl: ORIGIN, seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() } };
   const parse = (raw: unknown) => ({ ok: true as const, value: parsedPlan(raw as JsonRecord, input) });
   await runUntrusted(newerPlan([OPEN_ACCOUNT_PAGE, startStub('noNotifications')]), parse, base, ports);
-  assert.ok(spy.opens > 0, 'the browser was opened');
+  assert.ok(spy.calls.count('open') > 0, 'the browser was opened');
 });

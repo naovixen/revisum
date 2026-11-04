@@ -7,18 +7,15 @@
 import assert from 'node:assert/strict';
 import { arch, platform } from 'node:os';
 import { test } from 'node:test';
-import { defaultRedactor, runUntrusted } from '@revisum/engine';
-import { memoryArtifactStore, memoryEventSink, memoryRunEventSink, systemClock } from '../../support/memory-ports.ts';
+import { runUntrusted } from '@revisum/engine';
 import { PRIVATE_MARKER, defaultParser } from './plan-examples.ts';
 import { spyDriver } from './secret-examples.ts';
 import { fakeServiceCaller } from './service-call-examples.ts';
 import {
   acceptedBy, allBut, disabledPaths, errorsOf, parsedProject, parserEnabling, rejection,
 } from './unsafe-feature-examples.ts';
-import {
-  ALL_FEATURES_PATHS, ALL_FEATURES_PLAN, CSS_CHECK, FEATURES, FEATURE_EXAMPLES, INLINE_READ, OPEN_CART, ORIGIN, XPATH_CHECK,
-  css, unsafePlan, unsafeProjectFile, xpath, type FeatureName, type JsonRecord,
-} from './unsafe-feature-steps.ts';
+import { ALL_FEATURES_PLAN, CSS_CHECK, FEATURES, FEATURE_EXAMPLES, INLINE_READ, OPEN_CART, ORIGIN, XPATH_CHECK, css, unsafePlan, unsafeProjectFile, xpath, type FeatureName, type JsonRecord , ALL_FEATURES_PATHS } from './unsafe-feature-steps.ts';
+import { fakePorts } from '#test-support/fakes/FakePorts.ts';
 
 const NOTHING_ENABLED: readonly FeatureName[] = [];
 
@@ -101,10 +98,7 @@ test('a plan refused for a disabled feature opens no browser, makes no call and 
   const parse = parserEnabling(NOTHING_ENABLED);
   const spy = spyDriver();
   const { caller, requests } = fakeServiceCaller();
-  const ports = {
-    drivers: new Map([['cdp', spy]]), clock: systemClock, artifacts: memoryArtifactStore(), redactor: defaultRedactor(), audit: memoryEventSink(),
-    events: memoryRunEventSink(), services: caller,
-  };
+  const ports = fakePorts({ drivers: new Map([['cdp', spy]]), services: caller });
   const base = { project, baseUrl: ORIGIN, seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() } };
   const plans: readonly JsonRecord[] = [...FEATURE_EXAMPLES.map((example) => unsafePlan(example.steps)), ALL_FEATURES_PLAN()];
   for (const plan of plans) {
@@ -112,7 +106,7 @@ test('a plan refused for a disabled feature opens no browser, makes no call and 
     assert.ok('state' in outcome && outcome.state === 'Rejected', JSON.stringify(outcome));
     if ('errors' in outcome) assert.ok(outcome.errors.some((error) => error.code === 'unsafe_feature_disabled'), JSON.stringify(outcome.errors));
   }
-  assert.equal(spy.opens, 0, 'a browser was opened, so a script could have run in it');
+  assert.equal(spy.calls.count('open'), 0, 'a browser was opened, so a script could have run in it');
   assert.equal(requests.length, 0, 'a call was made');
 });
 

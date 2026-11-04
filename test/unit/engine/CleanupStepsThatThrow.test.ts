@@ -4,11 +4,11 @@
 // writes that step's record is what makes the step throw.
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import type { LoggedEvent, RunEventSink, RunResult } from "@revisum/engine";
-import { memoryRunEventSink } from "../../support/memory-ports.ts";
+import type { RunEventSink, RunResult } from "@revisum/engine";
 import { SEED_ORDERS, WIPE_ORDERS, commandProjectFile } from "./database-command-examples.ts";
 import { runOnFakeSession, stepSummaries } from "./RunOnFakeSession.ts";
 import { OPEN_CART, unsafePlan, type JsonRecord } from "./unsafe-feature-steps.ts";
+import { fakeRunEventSinkFailingOn } from "#test-support/fakes/FakeRunEventSink.ts";
 
 const FAILING_CHECK: JsonRecord = {
     type: "expect",
@@ -46,18 +46,12 @@ const VERDICTS: readonly {
 
 // A log that fails once, as a full disk or a closed file does, on the first database command's record.
 function logFailingOnFirstDatabaseCommand(): RunEventSink {
-    const kept = memoryRunEventSink();
     let hasFailed = false;
-    return {
-        read: () => kept.read(),
-        append(event: LoggedEvent) {
-            if (event.kind === "database.command" && !hasFailed) {
-                hasFailed = true;
-                throw new Error("the log could not be written");
-            }
-            kept.append(event);
-        },
-    };
+    return fakeRunEventSinkFailingOn((event) => {
+        const isFirst = event.kind === "database.command" && !hasFailed;
+        hasFailed ||= isFirst;
+        return isFirst;
+    });
 }
 
 const runWithFailingLog = (

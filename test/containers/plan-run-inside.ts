@@ -13,7 +13,7 @@ import { BROWSERS } from '../support/browsers.ts';
 import { memoryArtifactStore, memoryEventSink, memoryRunEventSink, systemClock } from '../support/memory-ports.ts';
 import { authorise, trustedProjectFrom } from '../support/policy-clearance.ts';
 import { startEgressFixtureServer } from '../unit/runner/egress-fixture-server.ts';
-import { keepingBrowserRecords } from './keeping-browser-records.ts';
+import { keepingBrowserRecords } from '../support/browser/KeepingBrowserRecords.ts';
 
 const TARGET_ID = 'cdp-chromium';
 const SEED = 7;

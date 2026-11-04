@@ -22,15 +22,12 @@
 // "Konto löschen" (delete account) is denied as irreversible there, and "Create account" is not.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import {
-  admitDraft, assertBranded, defaultRedactor, failure, planHash, planStanding, policyGate, readPlanText, run, success, unverified, writePlanText,
-  type BrowserDriver, type DerivedActor, type DraftError, type Plan, type PlanDraft, type PlanError, type PlanFormat, type PlanParse,
-  type PlanProvenance, type PlanSource, type ProvenanceBasis,
-} from '@revisum/engine';
-import { memoryArtifactStore, memoryRunEventSink, systemClock } from '../../support/memory-ports.ts';
+import { admitDraft, assertBranded, failure, planHash, planStanding, policyGate, readPlanText, run, success, unverified, writePlanText, type BrowserDriver, type DerivedActor, type DraftError, type Plan, type PlanDraft, type PlanError, type PlanFormat, type PlanParse, type PlanProvenance, type PlanSource, type ProvenanceBasis } from '@revisum/engine';
 import { authorise, trustedProjectFrom } from '../../support/policy-clearance.ts';
 import { memoryApprovalStore, memoryEventSink, parsedSignupPlan, withRepository } from './approval-repositories.ts';
 import { ORIGIN, accountClosurePlan, defaultParser, signupPlan, testProject, testProjectInput, withValue, type JsonRecord } from './plan-examples.ts';
+import { fakeDriver } from '#test-support/fakes/FakeDriver.ts';
+import { driversOf, fakePorts } from '#test-support/fakes/FakePorts.ts';
 
 // ---- One draft fixture per route ------------------------------------------------------------------------
 
@@ -110,14 +107,13 @@ function spyParser(log: CallLog, inner: PlanParse = defaultParser()) {
 
 // A driver that logs each call and opens no browser.
 function loggingDriver(log: CallLog): BrowserDriver {
-  return {
-    info: { id: 'cdp', version: 'test', protocol: 'none' },
-    supports() { log.push('driver'); return success(true as const); },
-    async open() {
+  return fakeDriver({
+    supports: () => { log.push('driver'); return success(true); },
+    open: () => {
       log.push('driver');
-      return failure({ reason: 'launch-failed' as const, detail: 'the logging driver opens no browser' });
+      return Promise.resolve(failure({ reason: 'launch-failed', detail: 'the logging driver opens no browser' }));
     },
-  };
+  });
 }
 
 // Runs an admitted plan as every run must: through the policy gate, then run().
@@ -130,10 +126,7 @@ async function runAdmitted(plan: Plan, log: CallLog): Promise<void> {
   await run({
     plan: authorised, project: testProject(), targetId, baseUrl: ORIGIN, seed: 7, fixedTimeMilliseconds: 0,
     fixtures: [], host: { platform: 'test', arch: 'test' },
-  }, {
-    drivers: new Map([['cdp', loggingDriver(log)]]), clock: systemClock, artifacts: memoryArtifactStore(),
-    redactor: defaultRedactor(), audit: memoryEventSink(), events: memoryRunEventSink(),
-  });
+  }, fakePorts({ drivers: driversOf(loggingDriver(log)) }));
 }
 
 // ---- Every route's draft is parsed first ------------------------------------------------------------------

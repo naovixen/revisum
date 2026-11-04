@@ -14,12 +14,14 @@
 //     the secret's value is the storage-state JSON.
 import { randomBytes } from 'node:crypto';
 import type { Secret, SecretStore } from '@revisum/contracts';
-import {
-  defaultRedactor, environmentSecretStore, failure, parseProject, planParser, run,
-  type BrowserDriver, type ElementProbe, type Plan, type Project, type RunResult, type SecretName, type Session, type TargetId,
-} from '@revisum/engine';
-import { memoryArtifactStore, memoryEventSink, memoryRunEventSink, systemClock } from '../../support/memory-ports.ts';
+import { environmentSecretStore, parseProject, planParser, run, type BrowserDriver, type Plan, type RunPorts, type Project, type RunResult, type SecretName, type TargetId } from '@revisum/engine';
 import { authorise, trustedProjectFrom } from '../../support/policy-clearance.ts';
+import { fakeArtifactStore } from '#test-support/fakes/FakeArtifactStore.ts';
+import { fakeDriverNeverLaunching, fakeDriverOpening, type FakeDriver } from '#test-support/fakes/FakeDriver.ts';
+import { fakePorts } from '#test-support/fakes/FakePorts.ts';
+import { fakeRunEventSink } from '#test-support/fakes/FakeRunEventSink.ts';
+import { fakeSession } from '#test-support/fakes/FakeSession.ts';
+import { leaveOut } from '#test-support/fakes/LeaveOut.ts';
 
 // The forms a leak scan looks for, as the Leak type names them.
 export const LEAK_FORMS = ['raw', 'uri', 'base64', 'base64url', 'prefix', 'case'] as const;
@@ -149,38 +151,11 @@ export function fakeStorageState(): { readonly json: string; readonly cookieValu
 // ---- Drivers that need no browser ---------------------------------------------------------------
 
 // A driver that counts its calls and never opens a session.
-export function spyDriver(): BrowserDriver & { opens: number } {
-  const spy = {
-    opens: 0,
-    info: { id: 'fake', version: 'spy', protocol: 'none' },
-    supports() { return { ok: true as const, value: true as const }; },
-    async open() { spy.opens++; return failure({ reason: 'launch-failed' as const, detail: 'the spy never launches' }); },
-  };
-  return spy;
-}
-
-const SHOWN: ElementProbe = { count: 1, visible: true, enabled: true, text: 'Ready', value: null, sensitive: false, box: null };
+export const spyDriver = (): FakeDriver => fakeDriverNeverLaunching({ info: { id: 'fake', version: 'spy', protocol: 'none' } });
 
 // A driver whose page accepts every action and shows one status element, so a run reaches its manifest.
-export function quietDriver(): BrowserDriver {
-  const session: Session = {
-    browser: { name: 'fake-browser', version: '1.0' },
-    navigate: async () => ({ ok: true, value: undefined }),
-    page: async () => ({ url: `${ORIGIN}/`, title: 'Fake' }),
-    act: async () => ({ ok: true, value: undefined }),
-    probe: async () => SHOWN,
-    screenshot: async () => new Uint8Array([137, 80, 78, 71]),
-    audit: async () => [],
-    accessibilitySnapshot: async () => ({ role: 'document', name: '', children: [] }),
-    blockedOrigins: () => [],
-    close: async () => undefined,
-  };
-  return {
-    info: { id: 'fake', version: '1.0', protocol: 'none' },
-    supports: () => ({ ok: true, value: true }),
-    open: async () => ({ ok: true, value: session }),
-  };
-}
+export const quietDriver = (): BrowserDriver =>
+  fakeDriverOpening(fakeSession({ page: () => Promise.resolve({ url: `${ORIGIN}/`, title: 'Fake' }) }), { info: { id: 'fake', version: '1.0', protocol: 'none' } });
 
 // ---- Running a plan with a secret store ----------------------------------------------------------
 
@@ -199,13 +174,13 @@ export async function runWithSecrets(
 ): Promise<SecretRun> {
   const project = secretProject(declared);
   const trusted = await trustedProjectFrom(secretProjectFile(declared));
-  const events = memoryRunEventSink();
-  const artifacts = memoryArtifactStore();
-  const ports = { drivers: new Map([['fake', driver]]), clock: systemClock, artifacts, redactor: defaultRedactor(), audit: memoryEventSink(), events };
+  const events = fakeRunEventSink();
+  const artifacts = fakeArtifactStore();
+  const ports = fakePorts({ drivers: new Map([['fake', driver]]), artifacts, events });
   const result = await run({
     plan: authorise(parsedPlan(project, plan), trusted), project, targetId: FAKE_TARGET as TargetId, baseUrl: ORIGIN,
     seed: 7, fixedTimeMilliseconds: Date.UTC(2026, 0, 1), fixtures: [], host: { platform: 'test', arch: 'test' },
-  }, environment === null ? ports : { ...ports, secrets: fakeEnvironmentStore(environment) });
+  }, environment === null ? leaveOut<RunPorts>(ports, ['secrets']) : { ...ports, secrets: fakeEnvironmentStore(environment) });
   const eventLines = events.read().map((event) => JSON.stringify(event)).join('\n');
   return { result, everything: JSON.stringify([result, events.read()]), eventLines, artifactsStored: artifacts.references().length };
 }

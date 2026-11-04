@@ -8,14 +8,13 @@
 //   - runPlan() runs a parsed plan through the policy gate and run() on a driver that needs no
 //     browser and records every call, so a test can see what reached the page.
 import assert from 'node:assert/strict';
-import {
-  defaultRedactor, parseProject, planParser, run,
-  type ActionStep, type BrowserDriver, type DriverFeature, type ElementProbe, type GeneratedValue, type Plan, type PlanError, type Project,
-  type Result, type RunResult, type Session, type SessionEnvironment, type ValueName,
-} from '@revisum/engine';
-import { memoryArtifactStore, memoryEventSink, memoryRunEventSink, systemClock } from '../../support/memory-ports.ts';
+import { parseProject, planParser, run, success, type ActionStep, type BrowserDriver, type DriverFeature, type GeneratedValue, type Plan, type PlanError, type Project, type Result, type RunPorts, type RunResult, type SessionEnvironment, type ValueName } from '@revisum/engine';
 import { authorise, trustedProjectFrom } from '../../support/policy-clearance.ts';
 import { ORIGIN, TARGET_ID, testProjectInput, type JsonRecord } from './plan-examples.ts';
+import { fakeDriver } from '#test-support/fakes/FakeDriver.ts';
+import { driversOf, fakePorts } from '#test-support/fakes/FakePorts.ts';
+import { FAKE_ELEMENT, fakeSession } from '#test-support/fakes/FakeSession.ts';
+import { leaveOut } from '#test-support/fakes/LeaveOut.ts';
 
 export { ORIGIN, TARGET_ID, type JsonRecord };
 
@@ -93,8 +92,6 @@ export type Recording = {
   probes: number;
 };
 
-const SHOWN: ElementProbe = { count: 1, visible: true, enabled: true, text: 'Ready', value: null, sensitive: false, box: null };
-
 // The page title every recorded page shows.
 export const PAGE_TITLE = 'Orders';
 
@@ -102,23 +99,17 @@ export const PAGE_TITLE = 'Orders';
 // every call. Its adapter id is the shared test project's. `performs` is what it says it can do.
 export function recordingDriver(performs?: readonly DriverFeature[]): { readonly driver: BrowserDriver; readonly recording: Recording } {
   const recording: Recording = { environments: [], navigations: [], actions: [], probes: 0 };
-  const session: Session = {
+  const session = fakeSession({
     browser: { name: 'recording-browser', version: '1.0' },
-    navigate: async (url) => { recording.navigations.push(url); return { ok: true, value: undefined }; },
-    page: async () => ({ url: recording.navigations.at(-1) ?? `${ORIGIN}/`, title: PAGE_TITLE }),
-    act: async (step) => { recording.actions.push(step); return { ok: true, value: undefined }; },
-    probe: async () => { recording.probes++; return SHOWN; },
-    screenshot: async () => new Uint8Array([137, 80, 78, 71]),
-    audit: async () => [],
-    accessibilitySnapshot: async () => ({ role: 'document', name: '', children: [] }),
-    blockedOrigins: () => [],
-    close: async () => undefined,
-  };
-  const driver: BrowserDriver = {
+    navigate: (url) => { recording.navigations.push(url); return Promise.resolve(success(undefined)); },
+    page: () => Promise.resolve({ url: recording.navigations.at(-1) ?? `${ORIGIN}/`, title: PAGE_TITLE }),
+    act: (step) => { recording.actions.push(step); return Promise.resolve(success(undefined)); },
+    probe: () => { recording.probes++; return Promise.resolve(FAKE_ELEMENT); },
+  });
+  const driver = fakeDriver({
     info: { id: 'cdp', version: 'recording', protocol: 'none', ...(performs === undefined ? {} : { performs }) },
-    supports: () => ({ ok: true, value: true }),
-    open: async (_target, environment) => { recording.environments.push(environment); return { ok: true, value: session }; },
-  };
+    open: (_target, environment) => { recording.environments.push(environment); return Promise.resolve(success(session)); },
+  }, ['build']);
   return { driver, recording };
 }
 
@@ -149,9 +140,6 @@ export async function runPlan(raw: unknown, options: RunOptions = {}): Promise<{
     plan: authorise(plan, trusted), project, targetId: target.id, baseUrl: options.baseUrl ?? ORIGIN,
     seed: options.seed ?? DEFAULT_SEED, fixedTimeMilliseconds: options.clockStartMilliseconds ?? DEFAULT_CLOCK_START,
     fixtures: [], host: { platform: 'test', arch: 'test' },
-  }, {
-    drivers: new Map([[driver.info.id, driver]]), clock: systemClock, artifacts: memoryArtifactStore(),
-    redactor: defaultRedactor(), audit: memoryEventSink(), events: memoryRunEventSink(),
-  });
+  }, leaveOut<RunPorts>(fakePorts({ drivers: driversOf(driver) }), ['secrets', 'services', 'databaseCommands', 'rewritesApplied']));
   return { result, recording };
 }

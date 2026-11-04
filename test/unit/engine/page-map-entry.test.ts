@@ -16,6 +16,7 @@ import {
   DROPPED_ROLES, KEPT_ROLES, MAXIMUM_NAME_LENGTH, allNodes, pageMapEntry, type PageMapEntry, type PageMapNode,
 } from './explore-examples.ts';
 import { letterNonce } from './secret-examples.ts';
+import { fakeRedactor } from '#test-support/fakes/FakeRedactor.ts';
 
 // The seeded canaries, letters only so no personal-data pattern changes them.
 const SECRET_VALUE = `Officekey${letterNonce(24)}`;
@@ -31,10 +32,10 @@ const PAGE_URL = 'http://127.0.0.1:4310/contact.html?from=newsletter&reader=ada#
 // The project's redaction: the declared secret first, then the default personal-data rules.
 const projectRedactor = (): Redactor => {
   const personalData = defaultRedactor();
-  return { selectors: personalData.selectors, text: (value) => personalData.text(value.replaceAll(SECRET_VALUE, SECRET_PLACEHOLDER)) };
+  return fakeRedactor({ selectors: personalData.selectors, text: (value) => personalData.text(value.replaceAll(SECRET_VALUE, SECRET_PLACEHOLDER)) });
 };
 // The counter-example's redactor: it redacts nothing.
-const noRedaction: Redactor = { selectors: [], text: (value) => value };
+const noRedaction = fakeRedactor({ selectors: [], text: (value) => value });
 
 const node = (role: string, name: string, children: readonly A11yNode[] = []): A11yNode => ({ role, name, children });
 const text = (value: string): A11yNode => node('StaticText', value);

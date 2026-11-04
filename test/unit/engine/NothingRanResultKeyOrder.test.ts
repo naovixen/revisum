@@ -13,6 +13,7 @@ import {
     unsafePlan,
     unsafeProjectFile,
 } from "./unsafe-feature-steps.ts";
+import { fakeClock } from "#test-support/fakes/FakeClock.ts";
 
 const SUITE_NAME = "checkout-suite";
 const TIME_TAKEN = 7;
@@ -20,14 +21,13 @@ const TIME_TAKEN = 7;
 // Reads as the start of the run the first time, and as TIME_TAKEN later every time after.
 const clockThatTakes = (milliseconds: number): Clock => {
     let hasStarted = false;
-    return {
+    return fakeClock({
         now: () => {
             const reading = hasStarted ? milliseconds : 0;
             hasStarted = true;
             return reading;
         },
-        sleep: () => Promise.resolve(),
-    };
+    });
 };
 
 const keysAsSerialised = (result: object): readonly string[] =>

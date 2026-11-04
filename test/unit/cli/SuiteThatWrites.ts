@@ -14,7 +14,7 @@ import {
     type WorkloadOutcome,
     type WorkloadRunner,
 } from "@revisum/engine";
-import { recordedReport, specPath, type JsonRecord } from "../engine/evidence-examples.ts";
+import { recordedReport, type JsonRecord, specPath } from "../engine/evidence-examples.ts";
 import { withValue } from "../engine/plan-examples.ts";
 import {
     DECLARED_SECRET,
@@ -24,6 +24,7 @@ import {
     outputFolder,
     suiteCheckout,
 } from "./suite-run-examples.ts";
+import { fakeWorkloadRunner } from "#test-support/fakes/FakeWorkloadRunner.ts";
 
 // The recorded passing report with its two malformed criterion annotations left out: they would
 // raise a review item, which keeps the merge gate shut for a reason of its own.
@@ -45,21 +46,24 @@ export type WrittenSuite = {
 const nothingPrinted = () => ({ bytes: new Uint8Array(), truncated: false });
 
 export function suiteThatWrites(suite: WrittenSuite): WorkloadRunner {
-    return {
-        run(request) {
-            mkdirSync(request.outputDirectory, { recursive: true });
-            const isSuite = isSuiteRequest(request);
-            (isSuite ? suite.duringSuite : suite.duringSetup)?.(request.outputDirectory);
-            const outcome: WorkloadOutcome = {
-                exitCode: isSuite ? (suite.exitCode ?? 0) : 0,
-                timedOut: isSuite && suite.timedOut === true,
-                egressEvents: [],
-                stdout: nothingPrinted(),
-                stderr: nothingPrinted(),
-            };
-            return Promise.resolve(success(outcome));
+    return fakeWorkloadRunner(
+        {
+            run(request) {
+                mkdirSync(request.outputDirectory, { recursive: true });
+                const isSuite = isSuiteRequest(request);
+                (isSuite ? suite.duringSuite : suite.duringSetup)?.(request.outputDirectory);
+                const outcome: WorkloadOutcome = {
+                    exitCode: isSuite ? (suite.exitCode ?? 0) : 0,
+                    timedOut: isSuite && suite.timedOut === true,
+                    egressEvents: [],
+                    stdout: nothingPrinted(),
+                    stderr: nothingPrinted(),
+                };
+                return Promise.resolve(success(outcome));
+            },
         },
-    };
+        ["removeFromOutput"],
+    );
 }
 
 export const writeReportInto = (folder: string, report: unknown): void => {

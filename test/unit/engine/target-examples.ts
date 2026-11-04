@@ -4,14 +4,13 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { arch, platform, tmpdir } from 'node:os';
 import { join } from 'node:path';
-import {
-  defaultRedactor, failure, parseProject, planParser, run, sha256, success,
-  type BrowserBuild, type BrowserDriver, type BuildFailure, type Project, type Result, type RunInputs, type RunResult, type Target,
-  type TrustedProject, type Unavailable,
-} from '@revisum/engine';
-import { memoryArtifactStore, memoryEventSink, memoryRunEventSink, systemClock, type MemoryArtifactStore } from '../../support/memory-ports.ts';
+import { failure, parseProject, planParser, run, sha256, success, type BrowserBuild, type BrowserDriver, type BuildFailure, type Project, type Result, type RunInputs, type RunResult, type Target, type TrustedProject, type Unavailable } from '@revisum/engine';
+import { type MemoryArtifactStore } from '../../support/memory-ports.ts';
 import { authorise, trustedProjectFrom } from '../../support/policy-clearance.ts';
 import { ORIGIN, signupPlan, testProjectInput, withValue, type JsonRecord } from './plan-examples.ts';
+import { fakeArtifactStore } from '#test-support/fakes/FakeArtifactStore.ts';
+import { fakeDriverNeverLaunching, type FakeDriver } from '#test-support/fakes/FakeDriver.ts';
+import { fakePorts } from '#test-support/fakes/FakePorts.ts';
 
 // One matrix entry as a person writes it in project.json; `extra` adds or replaces fields.
 export const targetInput = (id: string, adapter: string, engine: string, device: string, extra: JsonRecord = {}): JsonRecord => ({
@@ -58,42 +57,29 @@ export function fakeBrowserBuild(text: string): FakeBrowserBuild {
 }
 
 export type BuildOutcome = Result<BrowserBuild, BuildFailure>;
-export type DriverCalls = { supports: number; open: number; build: number };
-export type FakeDriver = BrowserDriver & { readonly calls: DriverCalls };
 
-export type FakeDriverOptions = {
+export type TargetDriverOptions = {
   // The refusal for a target the fake does not support; null when it supports it.
   readonly refuse?: (target: Target) => Unavailable | null;
   // What `build` reports, asked afresh on every call. Absent: the driver has no `build`.
   readonly build?: (target: Target) => BuildOutcome;
 };
 
-// The optional build port, typed against BrowserDriver itself, so a driver port without it fails to compile.
-const withBuild = (build: NonNullable<BrowserDriver['build']>): Pick<BrowserDriver, 'build'> => ({ build });
-
-// A driver that counts every call. Its `open` never launches a browser: it always reports
-// launch-failed, so a run that reaches it ends TargetUnavailable with that reason.
-export function fakeDriver(id: string, options: FakeDriverOptions = {}): FakeDriver {
-  const calls: DriverCalls = { supports: 0, open: 0, build: 0 };
+// A driver under its own id whose `open` never launches a browser: it always reports launch-failed,
+// so a run that reaches it ends TargetUnavailable with that reason.
+export function targetDriver(id: string, options: TargetDriverOptions = {}): FakeDriver {
   const reportBuild = options.build;
-  const driver: FakeDriver = {
-    calls,
+  const overrides: Partial<BrowserDriver> = {
     info: { id, version: 'fake', protocol: 'none' },
     supports(target) {
-      calls.supports++;
       const refusal = options.refuse?.(target) ?? null;
       return refusal === null ? success(true) : failure(refusal);
     },
-    async open() {
-      calls.open++;
-      return failure({ reason: 'launch-failed', detail: 'the fake driver never launches a browser' });
-    },
-    ...(reportBuild === undefined ? {} : withBuild(async (target) => { calls.build++; return reportBuild(target); })),
   };
-  return driver;
+  return reportBuild === undefined
+    ? fakeDriverNeverLaunching(overrides, ['build'])
+    : fakeDriverNeverLaunching({ ...overrides, build: (target) => Promise.resolve(reportBuild(target)) });
 }
-
-export const totalCalls = (driver: FakeDriver): number => driver.calls.supports + driver.calls.open + driver.calls.build;
 
 // A build outcome naming the fake executable at the given version.
 export const builtAt = (version: string, build: FakeBrowserBuild): BuildOutcome => success({ version, executablePath: build.executablePath });
@@ -116,14 +102,11 @@ export async function runOnTarget(options: {
 }): Promise<TargetRun> {
   const parsed = planParser(options.planProject ?? options.runProject)(withValue(signupPlan(), ['targets'], [...options.planTargets]));
   if (!parsed.ok) throw new Error(`bad test plan: ${JSON.stringify(parsed.error)}`);
-  const store = memoryArtifactStore();
+  const store = fakeArtifactStore();
   const result = await run({
     plan: authorise(parsed.value, options.trusted), project: options.runProject, targetId: options.target.id,
     baseUrl: ORIGIN, seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() },
     ...(options.lockEntries === undefined ? {} : pinnedTo(options.lockEntries)),
-  }, {
-    drivers: options.drivers, clock: systemClock, artifacts: store,
-    redactor: defaultRedactor(), audit: memoryEventSink(), events: memoryRunEventSink(),
-  });
+  }, fakePorts({ drivers: options.drivers, artifacts: store }));
   return { result, store };
 }

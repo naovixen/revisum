@@ -3,8 +3,10 @@
 // an element found by its test id shows a text the test chooses, such as a careless echo of a
 // secret. The test hands in the values of the secrets it planted, so the driver never needs
 // reveal: it looks the typed value up by the secret's name, as a real page would hold it.
-import type { BrowserDriver, ElementProbe, Locator, Session } from '@revisum/engine';
+import { success, type BrowserDriver, type ElementProbe, type Locator } from '@revisum/engine';
 import { ORIGIN } from './secret-examples.ts';
+import { fakeSession } from '#test-support/fakes/FakeSession.ts';
+import { fakeDriverOpening } from '#test-support/fakes/FakeDriver.ts';
 
 export type EchoPage = {
   // Texts shown by elements found by test id, keyed by the test id.
@@ -26,36 +28,29 @@ export function echoPageDriver(page: EchoPage): BrowserDriver & { readonly calls
   const calls: EchoPageCalls = { navigations: 0, actions: 0, probes: 0 };
   const fieldValues = new Map<string, string>();
   const shown = (text: string, value: string | null): ElementProbe => ({ count: 1, visible: true, enabled: true, text, value, sensitive: false, box: null });
-  const session: Session = {
+  const session = fakeSession({
     browser: { name: 'echo-page-browser', version: '1.0' },
-    navigate: async () => { calls.navigations++; return { ok: true, value: undefined }; },
-    page: async () => ({ url: `${ORIGIN}/`, title: 'Echo page' }),
-    act: async (step, _guard, secret) => {
+    navigate: () => { calls.navigations++; return Promise.resolve(success(undefined)); },
+    page: () => Promise.resolve({ url: `${ORIGIN}/`, title: 'Echo page' }),
+    act: (step, _guard, secret) => {
       calls.actions++;
       if (step.type === 'fill') {
         const typed = secret !== undefined ? page.secretValues?.[secret.name] ?? '' : typeof step.value === 'string' ? step.value : '';
         fieldValues.set(elementKey(step.locator), typed);
       }
-      return { ok: true, value: undefined };
+      return Promise.resolve(success(undefined));
     },
-    probe: async (locator) => {
+    probe: (locator) => {
       calls.probes++;
       const key = elementKey(locator);
       const typed = fieldValues.get(key);
-      if (typed !== undefined) return shown('', typed);
+      if (typed !== undefined) return Promise.resolve(shown('', typed));
       const text = locator.by === 'testId' && typeof locator.testId === 'string' ? page.texts?.[locator.testId] : undefined;
-      return text === undefined ? { count: 0, visible: false, enabled: false, text: '', value: null, sensitive: false, box: null } : shown(text, null);
+      return Promise.resolve(text === undefined ? { count: 0, visible: false, enabled: false, text: '', value: null, sensitive: false, box: null } : shown(text, null));
     },
-    screenshot: async () => new Uint8Array([137, 80, 78, 71]),
-    audit: async () => [],
-    accessibilitySnapshot: async () => ({ role: 'document', name: '', children: [] }),
-    blockedOrigins: () => [],
-    close: async () => undefined,
-  };
+  });
   return {
-    info: { id: 'fake', version: 'echo-page', protocol: 'none' },
-    supports: () => ({ ok: true, value: true }),
-    open: async () => ({ ok: true, value: session }),
+    ...fakeDriverOpening(session, { info: { id: 'fake', version: 'echo-page', protocol: 'none' } }),
     calls,
     fieldValues,
   };

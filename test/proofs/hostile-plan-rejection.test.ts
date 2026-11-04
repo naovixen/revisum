@@ -11,13 +11,11 @@
 import assert from 'node:assert/strict';
 import { arch, platform } from 'node:os';
 import { afterEach, beforeEach, test } from 'node:test';
-import {
-  defaultRedactor, failure, planParser, runUntrusted,
-  type BrowserDriver, type Plan, type PlanError, type Result,
-} from '@revisum/engine';
+import { planParser, runUntrusted, type Plan, type PlanError, type Result } from '@revisum/engine';
 import { hostilePlans, type HostilePlan } from '#test-support/hostile-plans.ts';
-import { memoryArtifactStore, memoryEventSink, memoryRunEventSink, systemClock } from '#test-support/memory-ports.ts';
 import { makeProject, signupPlan } from '#test-support/signup-harness.ts';
+import { fakeDriverNeverLaunching } from '#test-support/fakes/FakeDriver.ts';
+import { driversOf, fakePorts } from '#test-support/fakes/FakePorts.ts';
 
 const ORIGIN = 'http://127.0.0.1:4173';
 const project = makeProject(ORIGIN);
@@ -26,26 +24,17 @@ type RawObject = Record<string, unknown>;
 
 // ---- Counting every driver call and every network request ---------------------------------------
 
-let driverCalls = 0;
+let spy = fakeDriverNeverLaunching();
 let networkRequests = 0;
 const realFetch = globalThis.fetch;
 beforeEach(() => {
-  driverCalls = 0;
+  spy = fakeDriverNeverLaunching();
   networkRequests = 0;
   globalThis.fetch = async () => { networkRequests++; throw new Error('no network allowed in this proof'); };
 });
 afterEach(() => { globalThis.fetch = realFetch; });
 
-const spyDriver = (id: string): BrowserDriver => ({
-  info: { id, version: 'spy', protocol: 'none' },
-  supports() { driverCalls++; return { ok: true, value: true }; },
-  async open() { driverCalls++; return failure({ reason: 'launch-failed', detail: 'the spy never launches' }); },
-});
-
-const ports = () => ({
-  drivers: new Map<string, BrowserDriver>([['cdp', spyDriver('cdp')]]),
-  clock: systemClock, artifacts: memoryArtifactStore(), redactor: defaultRedactor(), audit: memoryEventSink(), events: memoryRunEventSink(),
-});
+const ports = () => fakePorts({ drivers: driversOf(spy) });
 const base = {
   project, baseUrl: ORIGIN, seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() },
 };
@@ -130,7 +119,7 @@ for (const [suiteName, cases, fewest] of suites) {
       const errors = await rejectedErrors(plan.input);
       assert.ok(errors.some((error) => error.code === plan.code), `${plan.name}: expected ${plan.code}, got ${JSON.stringify(errors)}`);
     }
-    assert.equal(driverCalls, 0, 'no driver method was called');
+    assert.equal(spy.calls.count(), 0, 'no driver method was called');
     assert.equal(networkRequests, 0, 'no network request was made');
   });
 }
@@ -141,7 +130,7 @@ test('every API-step plan is rejected with no driver call or network request', a
     assert.ok(errors.length > 0, `${name}: rejected with a reason`);
     assert.ok(errors.every((error) => !JSON.stringify(error).includes('hunter2') && !JSON.stringify(error).includes('eyJhbGci')), `${name}: no value echoed`);
   }
-  assert.equal(driverCalls, 0, 'no driver method was called');
+  assert.equal(spy.calls.count(), 0, 'no driver method was called');
   assert.equal(networkRequests, 0, 'no network request was made');
 });
 
@@ -149,5 +138,5 @@ test('every API-step plan is rejected with no driver call or network request', a
 test('positive control: a valid plan does reach the spy driver', async () => {
   const outcome = await runUntrusted(valid(), parsePlan, base, ports());
   assert.ok(Array.isArray(outcome), JSON.stringify(outcome));
-  assert.ok(driverCalls > 0, 'the driver was asked to open a session');
+  assert.ok(spy.calls.count() > 0, 'the driver was asked to open a session');
 });

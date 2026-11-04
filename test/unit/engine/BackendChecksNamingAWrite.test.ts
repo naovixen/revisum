@@ -4,19 +4,12 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import {
-    defaultRedactor,
-    environmentSecretStore,
     planParser,
     run,
     type Project,
     type RunResult,
     type ServiceRequest,
 } from "@revisum/engine";
-import {
-    memoryArtifactStore,
-    memoryEventSink,
-    memoryRunEventSink,
-} from "../../support/memory-ports.ts";
 import { authorise, trustedProjectFrom } from "../../support/policy-clearance.ts";
 import {
     DEFAULT_CLOCK_START,
@@ -37,10 +30,12 @@ import {
     jsonReply,
     requestLine,
     shopWith,
-    virtualClock,
     type JsonRecord,
     type Reply,
 } from "./service-call-examples.ts";
+import { fakeClock } from "#test-support/fakes/FakeClock.ts";
+import { driversOf, fakePorts } from "#test-support/fakes/FakePorts.ts";
+import { fakeSecretStore } from "#test-support/fakes/FakeSecretStore.ts";
 
 const BACKEND_CHECK = 0;
 const READ_ORDER = `GET /api/orders/${ORDER_ID}`;
@@ -82,7 +77,7 @@ const runUnder = async (
     const trusted = await trustedProjectFrom(callProjectFile(getOrderDeclaredAs(changes)));
     const { driver } = recordingDriver();
     const { caller, requests } = fakeServiceCaller(route);
-    const clock = virtualClock();
+    const clock = fakeClock();
     const result = await run(
         {
             plan: authorise(plan, trusted),
@@ -94,16 +89,12 @@ const runUnder = async (
             fixtures: [],
             host: { platform: "test", arch: "test" },
         },
-        {
-            drivers: new Map([[driver.info.id, driver]]),
+        fakePorts({
+            drivers: driversOf(driver),
             clock,
-            artifacts: memoryArtifactStore(),
-            redactor: defaultRedactor(),
-            audit: memoryEventSink(),
-            events: memoryRunEventSink(),
-            secrets: environmentSecretStore(SECRET_VALUES),
+            secrets: fakeSecretStore(SECRET_VALUES),
             services: caller,
-        },
+        }),
     );
     return { result, requests, elapsed: clock.elapsed() };
 };

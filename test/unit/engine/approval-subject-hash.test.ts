@@ -7,17 +7,14 @@
 //     origin and no approval label.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import {
-  defaultRedactor, failure, planHash, planParser, planStanding, policyGate, run, runUntrusted, success,
-  type Approval, type ApprovalErrorCode, type ApprovalSubject, type BrowserDriver, type DerivedActor, type Plan,
-  type PlanStanding, type Project, type Result, type TargetId,
-} from '@revisum/engine';
-import { memoryArtifactStore, memoryRunEventSink, systemClock } from '../../support/memory-ports.ts';
+import { planHash, planParser, planStanding, policyGate, run, runUntrusted, type Approval, type ApprovalErrorCode, type ApprovalSubject, type BrowserDriver, type DerivedActor, type Plan, type PlanStanding, type Project, type Result, type TargetId } from '@revisum/engine';
 import { authorise, trustedProjectFrom } from '../../support/policy-clearance.ts';
 import {
   PLAN_PATH, eventsOfKind, memoryApprovalStore, memoryEventSink, parsedSignupPlan, withRepository, type TestRepository,
 } from './approval-repositories.ts';
 import { ORIGIN, TARGET_ID, signupPlan, testProject, testProjectInput, withValue, type JsonRecord } from './plan-examples.ts';
+import { fakeDriverNeverLaunching } from '#test-support/fakes/FakeDriver.ts';
+import { driversOf, fakePorts } from '#test-support/fakes/FakePorts.ts';
 
 const PRODUCTION_ORIGIN = 'https://shop.example.com';
 const UNREVIEWED_HASH = 'f'.repeat(64);
@@ -99,25 +96,7 @@ async function standingOf(plan: Plan): Promise<PlanStanding> {
   return standing;
 }
 
-type CountingDriver = BrowserDriver & { calls: number };
-
-function countingDriver(): CountingDriver {
-  const driver: CountingDriver = {
-    info: { id: 'cdp', version: 'test', protocol: 'none' },
-    calls: 0,
-    supports() { driver.calls += 1; return success(true as const); },
-    async open() {
-      driver.calls += 1;
-      return failure({ reason: 'launch-failed' as const, detail: 'the counting driver opens no browser' });
-    },
-  };
-  return driver;
-}
-
-const runPorts = (driver: BrowserDriver) => ({
-  drivers: new Map([['cdp', driver]]), clock: systemClock, artifacts: memoryArtifactStore(),
-  redactor: defaultRedactor(), audit: memoryEventSink(), events: memoryRunEventSink(),
-});
+const runPorts = (driver: BrowserDriver) => fakePorts({ drivers: driversOf(driver) });
 
 const runBase = (standing: PlanStanding) => ({
   project: productionProject(), baseUrl: PRODUCTION_ORIGIN, seed: 7, fixedTimeMilliseconds: 0, fixtures: [],
@@ -126,18 +105,18 @@ const runBase = (standing: PlanStanding) => ({
 
 test("an AI plan given another plan's approved standing does not reach the production origin", async () => {
   const standingOfPlanA = await standingOf(parsedForProduction(signupPlan()));
-  const driver = countingDriver();
+  const driver = fakeDriverNeverLaunching();
   const outcome = await runUntrusted(retitledSignupInput(), parseForProduction, runBase(standingOfPlanA), runPorts(driver));
-  assert.equal(driver.calls, 0, `plan B reached a driver on the production origin: ${JSON.stringify(outcome)}`);
+  assert.equal(driver.calls.count(), 0, `plan B reached a driver on the production origin: ${JSON.stringify(outcome)}`);
   assert.ok(!JSON.stringify(outcome).includes('approvalLabel'), `plan B's result carries plan A's approval label: ${JSON.stringify(outcome)}`);
 });
 
 test('the same run with the plan whose approval the standing holds does reach the production origin', async () => {
   // The counter-example: only the plan differs from the refused run above.
   const standingOfPlanA = await standingOf(parsedForProduction(signupPlan()));
-  const driver = countingDriver();
+  const driver = fakeDriverNeverLaunching();
   const outcome = await runUntrusted(signupPlan(), parseForProduction, runBase(standingOfPlanA), runPorts(driver));
-  assert.ok(driver.calls > 0, `plan A did not reach the driver: ${JSON.stringify(outcome)}`);
+  assert.ok(driver.calls.count() > 0, `plan A did not reach the driver: ${JSON.stringify(outcome)}`);
   assert.ok(JSON.stringify(outcome).includes('declared, not verified'), JSON.stringify(outcome));
 });
 
@@ -145,9 +124,9 @@ test("a cleared plan run with another plan's standing is refused the production 
   const standingOfPlanA = await standingOf(parsedForProduction(signupPlan()));
   const planB = parsedForProduction(retitledSignupInput());
   const trusted = await trustedProjectFrom(testProjectInput({}, productionPolicy));
-  const driver = countingDriver();
+  const driver = fakeDriverNeverLaunching();
   const result = await run({ ...runBase(standingOfPlanA), plan: authorise(planB, trusted), targetId: TARGET_ID as TargetId }, runPorts(driver));
-  assert.equal(driver.calls, 0, `plan B reached a driver on the production origin: ${JSON.stringify(result)}`);
+  assert.equal(driver.calls.count(), 0, `plan B reached a driver on the production origin: ${JSON.stringify(result)}`);
   assert.equal(result.refusal?.code, 'origin-not-allowed', JSON.stringify(result));
   assert.equal(result.approvalLabel, undefined, "plan B's result carries plan A's approval label");
 });

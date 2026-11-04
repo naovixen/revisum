@@ -30,15 +30,14 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { GuaranteeLevel } from '@revisum/contracts';
-import {
-  defaultRedactor, environmentSecretStore, parseProject, planParser, run, sha256, success,
-  type BrowserDriver, type FixtureReference, type Plan, type Project, type RunManifest, type RunResult, type ServiceRequest,
-} from '@revisum/engine';
-import { memoryArtifactStore, memoryEventSink, memoryRunEventSink } from '../../support/memory-ports.ts';
+import { parseProject, planParser, run, sha256, success, type BrowserDriver, type FixtureReference, type Plan, type Project, type RunManifest, type RunResult, type ServiceRequest } from '@revisum/engine';
 import { authorise, trustedProjectFrom } from '../../support/policy-clearance.ts';
 import { DEFAULT_ROUTE, fakeCommandRunner, type CommandRoute, type SeenCommand } from './database-command-examples.ts';
 import { DEFAULT_CLOCK_START, DEFAULT_SEED, ORIGIN, accepted, recordingDriver, type JsonRecord } from './run-value-examples.ts';
-import { SHOP_ROUTE, fakeServiceCaller, virtualClock, type Route } from './service-call-examples.ts';
+import { SHOP_ROUTE, fakeServiceCaller, type Route } from './service-call-examples.ts';
+import { fakeDriver } from '#test-support/fakes/FakeDriver.ts';
+import { driversOf, fakePorts } from '#test-support/fakes/FakePorts.ts';
+import { fakeSecretStore } from '#test-support/fakes/FakeSecretStore.ts';
 
 export { DEFAULT_CLOCK_START, DEFAULT_SEED, ORIGIN, type JsonRecord };
 
@@ -243,7 +242,7 @@ export function scenarioDriver(scenario: Scenario): { readonly driver: BrowserDr
   const { driver: inner } = recordingDriver();
   const calls: DriverCalls = { order: [] };
   const executable = scenario.executable;
-  const driver: BrowserDriver = {
+    const overrides: Partial<BrowserDriver> = {
     info: {
       id: inner.info.id, version: scenario.adapterVersion, protocol: inner.info.protocol,
       ...(scenario.cannotPin.length === 0 ? {} : { cannotPin: [...scenario.cannotPin] }),
@@ -254,13 +253,14 @@ export function scenarioDriver(scenario: Scenario): { readonly driver: BrowserDr
       const opened = await inner.open(target, environment);
       return opened.ok ? success({ ...opened.value, browser: { name: 'recording-browser', version: scenario.browserVersion } }) : opened;
     },
-    ...(executable === null ? {} : {
-      build: async () => {
-        calls.order.push('build');
-        return success({ version: scenario.reportedBuildVersion, executablePath: scenario.executablePath ?? fakeExecutable(executable) });
-      },
-    }),
   };
+  const driver = executable === null ? fakeDriver(overrides, ['build']) : fakeDriver({
+    ...overrides,
+    build: () => {
+      calls.order.push('build');
+      return Promise.resolve(success({ version: scenario.reportedBuildVersion, executablePath: scenario.executablePath ?? fakeExecutable(executable) }));
+    },
+  });
   return { driver, calls };
 }
 
@@ -327,8 +327,7 @@ export async function runScenario(scenario: Scenario, options: { readonly record
   const live = { services: caller, databaseCommands: port };
   const recorder = options.record === true ? await recordedPorts(live) : null;
   const ports = {
-    drivers: new Map([[driver.info.id, driver]]), clock: virtualClock(), artifacts: memoryArtifactStore(), redactor: defaultRedactor(),
-    audit: memoryEventSink(), events: memoryRunEventSink(), secrets: environmentSecretStore(scenario.environment),
+    ...fakePorts({ drivers: driversOf(driver), secrets: fakeSecretStore(scenario.environment) }),
     ...(recorder === null ? live : recorder.ports),
   };
   const runInputs = {
@@ -376,8 +375,7 @@ export async function replayRun(ran: ScenarioRun, options: ReplayOptions = {}): 
   const spyRunner = fakeCommandRunner(scenario.commandRoute);
   const fixtureFiles = new Map(scenario.fixtures.map((fixture) => [fixture.path, new TextEncoder().encode(fixture.text)]));
   const ports = {
-    drivers: new Map([[driver.info.id, driver]]), clock: virtualClock(), artifacts: memoryArtifactStore(), redactor: defaultRedactor(),
-    audit: memoryEventSink(), events: memoryRunEventSink(), secrets: environmentSecretStore(scenario.environment),
+    ...fakePorts({ drivers: driversOf(driver), secrets: fakeSecretStore(scenario.environment) }),
     fixtures: { read: async (path: string) => (options.readFixture === undefined ? fixtureFiles.get(path) ?? null : options.readFixture(path)) },
     // Not part of ReplayPorts: a replay that used either would send a call or run a command.
     services: spyCaller.caller, databaseCommands: spyRunner.port,

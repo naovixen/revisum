@@ -6,14 +6,11 @@
 import assert from 'node:assert/strict';
 import { arch, platform } from 'node:os';
 import { test } from 'node:test';
-import { defaultRedactor, runUntrusted } from '@revisum/engine';
-import { memoryArtifactStore, memoryEventSink, memoryRunEventSink, systemClock } from '../../support/memory-ports.ts';
-import {
-  OPEN_ACCOUNT_PAGE, ORIGIN, POLICY, PRODUCTION_ORIGIN, approvedStanding, comparable, decideOn, deniedCodes, parsedPlan, parserProject,
-  planOf, policyProjectInput, testGate, type JsonRecord,
-} from './policy-examples.ts';
+import { runUntrusted } from '@revisum/engine';
+import { OPEN_ACCOUNT_PAGE, ORIGIN, PRODUCTION_ORIGIN, approvedStanding, comparable, decideOn, deniedCodes, parsedPlan, parserProject, policyProjectInput, testGate, type JsonRecord , POLICY , planOf } from './policy-examples.ts';
 import { fakeServiceCaller } from './service-call-examples.ts';
 import { spyDriver } from './secret-examples.ts';
+import { fakePorts } from '#test-support/fakes/FakePorts.ts';
 
 const SHOP_ORIGIN = 'http://127.0.0.1:4180';
 const SERVICES = [
@@ -158,10 +155,7 @@ test('a plan the gate denies for any of these rules makes zero calls and opens n
   const project = parserProject(input);
   const { caller, requests } = fakeServiceCaller();
   const spy = spyDriver();
-  const ports = {
-    drivers: new Map([['cdp', spy]]), clock: systemClock, artifacts: memoryArtifactStore(), redactor: defaultRedactor(), audit: memoryEventSink(),
-    events: memoryRunEventSink(), services: caller,
-  };
+  const ports = fakePorts({ drivers: new Map([['cdp', spy]]), services: caller });
   const base = { project, baseUrl: ORIGIN, seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() } };
   const planParserFor = (raw: unknown) => ({ ok: true as const, value: parsedPlan(raw as JsonRecord, input) });
   const denied = [
@@ -177,5 +171,5 @@ test('a plan the gate denies for any of these rules makes zero calls and opens n
   }
   assert.deepEqual(rules, ['side-effect-in-proposal', 'over-limit', 'production-origin']);
   assert.equal(requests.length, 0, 'no call was made');
-  assert.equal(spy.opens, 0, 'no browser was opened');
+  assert.equal(spy.calls.count('open'), 0, 'no browser was opened');
 });

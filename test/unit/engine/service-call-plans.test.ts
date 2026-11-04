@@ -7,14 +7,16 @@
 import assert from 'node:assert/strict';
 import { arch, platform } from 'node:os';
 import { test } from 'node:test';
-import { defaultRedactor, failure, runUntrusted, type BrowserDriver, type PlanErrorCode } from '@revisum/engine';
-import { memoryArtifactStore, memoryEventSink, memoryRunEventSink, systemClock } from '../../support/memory-ports.ts';
+import { runUntrusted, type PlanErrorCode } from '@revisum/engine';
 import { PRIVATE_MARKER } from './plan-examples.ts';
 import { accepted, rejection } from './run-value-examples.ts';
 import {
   CREATE_ORDER, DELETE_ORDER, ORIGIN, RESET_SHOP, SECRET_VALUES, asJson, call, callParser, callPlanOf, callProject,
   expectBackend, fakeServiceCaller, orderArguments, withCleanup, type JsonRecord,
 } from './service-call-examples.ts';
+import { fakeDriverNeverLaunching } from '#test-support/fakes/FakeDriver.ts';
+import { driversOf, fakePorts } from '#test-support/fakes/FakePorts.ts';
+import { fakeRunEventSink } from '#test-support/fakes/FakeRunEventSink.ts';
 
 const parsePlan = callParser();
 
@@ -257,25 +259,18 @@ test('a cleanup call naming a value no step defines is refused with undefined_va
 // ---- No call is made for a refused plan -----------------------------------------------------------------
 
 test('a refused plan reaches neither the service caller nor the driver, and nothing is logged', async () => {
-  let driverCalls = 0;
-  const spy: BrowserDriver = {
-    info: { id: 'cdp', version: 'spy', protocol: 'none' },
-    supports() { driverCalls++; return { ok: true, value: true }; },
-    async open() { driverCalls++; return failure({ reason: 'launch-failed', detail: 'the spy never launches' }); },
-  };
+
+  const spy = fakeDriverNeverLaunching();
   const { caller, requests } = fakeServiceCaller();
-  const events = memoryRunEventSink();
-  const ports = {
-    drivers: new Map([['cdp', spy]]), clock: systemClock, artifacts: memoryArtifactStore(), redactor: defaultRedactor(), audit: memoryEventSink(), events,
-    services: caller,
-  };
+  const events = fakeRunEventSink();
+  const ports = fakePorts({ drivers: driversOf(spy), events, services: caller });
   const base = { project: callProject(), baseUrl: ORIGIN, seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() } };
   for (const refused of REFUSED) {
     const outcome = await runUntrusted(refused.plan, parsePlan, base, ports);
     assert.ok('errors' in outcome, `${refused.name}: ${JSON.stringify(outcome)}`);
   }
   assert.equal(requests.length, 0, 'no call was made');
-  assert.equal(driverCalls, 0, 'no driver method was called');
+  assert.equal(spy.calls.count(), 0, 'no driver method was called');
   assert.equal(events.read().length, 0, 'nothing was logged');
 });
 

@@ -6,12 +6,11 @@
 import assert from 'node:assert/strict';
 import { arch, platform } from 'node:os';
 import { test } from 'node:test';
-import {
-  defaultRedactor, parseProject, planParser, run,
-  type ActionGuard, type ActionStep, type BrowserDriver, type ElementProbe, type Session, type TargetId,
-} from '@revisum/engine';
-import { memoryArtifactStore, memoryEventSink, memoryRunEventSink, systemClock } from '../support/memory-ports.ts';
+import { parseProject, planParser, run, success, type ActionGuard, type ActionStep, type BrowserDriver, type ElementProbe, type TargetId } from '@revisum/engine';
 import { authorise, trustedProjectFrom } from '../support/policy-clearance.ts';
+import { fakeDriverOpening } from '#test-support/fakes/FakeDriver.ts';
+import { driversOf, fakePorts } from '#test-support/fakes/FakePorts.ts';
+import { fakeSession } from '#test-support/fakes/FakeSession.ts';
 
 const ORIGIN = 'http://127.0.0.1:4173';
 const TARGET_ID = 'cdp-chromium';
@@ -55,23 +54,14 @@ const SHOWN: ElementProbe = { count: 1, visible: true, enabled: true, text: 'Sav
 // A driver that needs no browser and records each act() call and the guard it was given.
 function recordingDriver(): { readonly driver: BrowserDriver; readonly calls: ActCall[] } {
   const calls: ActCall[] = [];
-  const session: Session = {
+  const session = fakeSession({
     browser: { name: 'recording-browser', version: '1.0' },
-    navigate: async () => ({ ok: true, value: undefined }),
-    page: async () => ({ url: `${ORIGIN}/drafts`, title: 'Drafts' }),
-    act: async (step, guard) => { calls.push({ type: step.type, guard }); return { ok: true, value: undefined }; },
-    probe: async () => SHOWN,
-    screenshot: async () => new Uint8Array(),
-    audit: async () => [],
-    accessibilitySnapshot: async () => ({ role: 'document', name: '', children: [] }),
-    blockedOrigins: () => [],
-    close: async () => undefined,
-  };
-  const driver: BrowserDriver = {
-    info: { id: 'cdp', version: 'recording', protocol: 'none' },
-    supports: () => ({ ok: true, value: true }),
-    open: async () => ({ ok: true, value: session }),
-  };
+    page: () => Promise.resolve({ url: `${ORIGIN}/drafts`, title: 'Drafts' }),
+    act: (step, guard) => { calls.push({ type: step.type, guard }); return Promise.resolve(success(undefined)); },
+    probe: () => Promise.resolve(SHOWN),
+    screenshot: () => Promise.resolve(new Uint8Array()),
+  });
+  const driver = fakeDriverOpening(session, { info: { id: 'cdp', version: 'recording', protocol: 'none' } });
   return { driver, calls };
 }
 
@@ -88,10 +78,7 @@ test('every act() call of a run carries the runtime guard, for every kind of act
   const result = await run({
     project: parsedProject.value, plan: authorise(parsedPlan.value, trusted), targetId: TARGET_ID as TargetId, baseUrl: ORIGIN,
     seed: 7, fixedTimeMilliseconds: Date.UTC(2026, 9, 29, 9, 0, 0), fixtures: [], host: { platform: platform(), arch: arch() },
-  }, {
-    drivers: new Map([['cdp', driver]]), clock: systemClock, artifacts: memoryArtifactStore(), redactor: defaultRedactor(),
-    audit: memoryEventSink(), events: memoryRunEventSink(),
-  });
+  }, fakePorts({ drivers: driversOf(driver) }));
   assert.equal(result.state, 'Passed', JSON.stringify(result.steps.filter((step) => step.outcome !== 'passed')));
   assert.deepEqual(calls.map((call) => call.type), ['click', 'hover', 'fill', 'select', 'upload', 'press', 'click', 'dialog']);
   assert.deepEqual(callsWithoutGuard(calls), []);

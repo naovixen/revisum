@@ -8,7 +8,7 @@ import { join } from 'node:path';
 import { after, describe, test } from 'node:test';
 import { adapterRegistry, canonicalJson, failure, lock, lockToFile, type TrustedProject } from '@revisum/engine';
 import {
-  builtAt, fakeBrowserBuild, fakeDriver, targetInput, trustedProjectWith, type BuildOutcome, type FakeBrowserBuild,
+  builtAt, fakeBrowserBuild, targetDriver, targetInput, trustedProjectWith, type BuildOutcome, type FakeBrowserBuild,
 } from './target-examples.ts';
 
 const LOCKFILE = 'targets.lock.json';
@@ -53,8 +53,8 @@ async function setup(): Promise<Setup> {
     chromium: () => builtAt('156.0.7258.5', chromiumBuild),
     firefox: () => builtAt('140.0.2', firefoxBuild),
     registry: () => adapterRegistry(new Map([
-      ['fake-chromium', fakeDriver('fake-chromium', { build: () => state.chromium() })],
-      ['fake-firefox', fakeDriver('fake-firefox', { build: () => state.firefox() })],
+      ['fake-chromium', targetDriver('fake-chromium', { build: () => state.chromium() })],
+      ['fake-firefox', targetDriver('fake-firefox', { build: () => state.firefox() })],
     ])),
   };
   return state;

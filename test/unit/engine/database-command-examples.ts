@@ -23,17 +23,17 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { success, type EgressEvent, type WorkloadErrorCode, type WorkloadOutcome } from '@revisum/contracts';
-import {
-  defaultRedactor, environmentSecretStore, parseProject, planParser, run, runUntrusted,
-  type LoggedEvent, type PlanStanding, type Project, type Result, type RunResult,
-} from '@revisum/engine';
-import { memoryArtifactStore, memoryEventSink, memoryRunEventSink } from '../../support/memory-ports.ts';
+import { parseProject, planParser, run, runUntrusted, type LoggedEvent, type PlanStanding, type Project, type Result, type RunPorts, type RunResult } from '@revisum/engine';
 import { authorise, trustedProjectFrom } from '../../support/policy-clearance.ts';
-import { TEST_SERVICE, TEST_SERVICE_SECRET_NAMES, testProjectInput } from './plan-examples.ts';
+import { TEST_SERVICE, testProjectInput , TEST_SERVICE_SECRET_NAMES } from './plan-examples.ts';
 import { DEFAULT_CLOCK_START, DEFAULT_SEED, accepted, recordingDriver, type Recording } from './run-value-examples.ts';
 import { fakeSecretValue } from './secret-examples.ts';
 import { virtualClock, type VirtualClock } from './service-call-examples.ts';
 import { COMMAND_IMAGE, DATABASE_SECRET, DATABASE_SERVICE, ORIGIN, OPEN_CART, unsafePlan, type JsonRecord } from './unsafe-feature-steps.ts';
+import { driversOf, fakePorts } from '#test-support/fakes/FakePorts.ts';
+import { fakeRunEventSink } from '#test-support/fakes/FakeRunEventSink.ts';
+import { fakeSecretStore } from '#test-support/fakes/FakeSecretStore.ts';
+import { leaveOut } from '#test-support/fakes/LeaveOut.ts';
 
 export { OPEN_CART, ORIGIN, type JsonRecord };
 export { cleanupRecords, stepLines } from './service-call-examples.ts';
@@ -250,9 +250,7 @@ export type CommandRun = {
   readonly everything: string;
 };
 
-// The port as RunPorts carries it; see the assumptions at the top.
-const portFields = (port: FakeCommandRunner['port'] | undefined): Readonly<Record<string, unknown>> =>
-  (port === undefined ? {} : { databaseCommands: port });
+const withPortIf = (isWired: boolean, ports: RunPorts): RunPorts => (isWired ? ports : leaveOut<RunPorts>(ports, ['databaseCommands']));
 
 export async function runWithCommands(raw: unknown, options: CommandRunOptions = {}): Promise<CommandRun> {
   const projectFile = options.projectFile ?? commandProjectFile();
@@ -261,18 +259,16 @@ export async function runWithCommands(raw: unknown, options: CommandRunOptions =
   const trusted = await trustedProjectFrom(projectFile);
   const { driver, recording } = recordingDriver();
   const { port, commands } = fakeCommandRunner(options.route);
-  const wired = portFields(options.withPort === false ? undefined : port);
+
   const clock = virtualClock();
-  const events = memoryRunEventSink();
+  const events = fakeRunEventSink();
   const result = await run({
     plan: authorise(plan, trusted, options.standing), project, targetId: project.matrix[0]?.id ?? assert.fail('no target'),
     baseUrl: ORIGIN, seed: DEFAULT_SEED, fixedTimeMilliseconds: DEFAULT_CLOCK_START, fixtures: [], host: { platform: 'test', arch: 'test' },
     ...(options.standing === undefined ? {} : { standing: options.standing }),
-  }, {
-    drivers: new Map([[driver.info.id, driver]]), clock, artifacts: memoryArtifactStore(), redactor: defaultRedactor(), audit: memoryEventSink(), events,
-    secrets: environmentSecretStore({ [DATABASE_SECRET]: DATABASE_PASSWORD }),
-    ...wired,
-  });
+  }, withPortIf(options.withPort !== false, fakePorts({
+    drivers: driversOf(driver), clock, events, secrets: fakeSecretStore({ [DATABASE_SECRET]: DATABASE_PASSWORD }), databaseCommands: port,
+  })));
   const logged = events.read();
   return { result, recording, commands, events: logged, clock, everything: `${JSON.stringify(result)}\n${JSON.stringify(logged)}` };
 }
@@ -286,14 +282,10 @@ export async function runUntrustedWithCommands(raw: unknown, projectFile: JsonRe
   const project = commandProject(projectFile);
   const { driver, recording } = recordingDriver();
   const { port, commands } = fakeCommandRunner();
-  const wired = portFields(port);
+
   const outcome = await runUntrusted(raw, planParser(project), {
     project, baseUrl: ORIGIN, seed: DEFAULT_SEED, fixedTimeMilliseconds: DEFAULT_CLOCK_START, fixtures: [], host: { platform: 'test', arch: 'test' },
-  }, {
-    drivers: new Map([[driver.info.id, driver]]), clock: virtualClock(), artifacts: memoryArtifactStore(), redactor: defaultRedactor(),
-    audit: memoryEventSink(), events: memoryRunEventSink(), secrets: environmentSecretStore({ [DATABASE_SECRET]: DATABASE_PASSWORD }),
-    ...wired,
-  });
+  }, fakePorts({ drivers: driversOf(driver), secrets: fakeSecretStore({ [DATABASE_SECRET]: DATABASE_PASSWORD }), databaseCommands: port }));
   return { outcome, commands, opens: recording.environments.length };
 }
 

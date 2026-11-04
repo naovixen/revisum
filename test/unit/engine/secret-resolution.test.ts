@@ -27,7 +27,7 @@ test('a plan naming a secret the store cannot resolve ends with secret-missing b
   const ran = await runWithSecrets(
     ['ACCOUNT_TOKEN', 'MISSING_TOKEN'], secretFillPlan(['ACCOUNT_TOKEN', 'MISSING_TOKEN']), { ACCOUNT_TOKEN: resolvableValue }, spy,
   );
-  assert.equal(spy.opens, 0, 'no browser session was opened');
+  assert.equal(spy.calls.count('open'), 0, 'no browser session was opened');
   assert.equal(ran.artifactsStored, 0, 'no artefact was stored');
   assert.equal(ran.result.state, 'Refused');
   assert.equal(ran.result.refusal?.code, 'secret-missing');
@@ -49,7 +49,7 @@ test('a missing secret named only inside a frame step still ends the run before 
     ],
   };
   const ran = await runWithSecrets(['MISSING_TOKEN'], plan, {}, spy);
-  assert.equal(spy.opens, 0, 'no browser session was opened');
+  assert.equal(spy.calls.count('open'), 0, 'no browser session was opened');
   assert.equal(ran.result.refusal?.code, 'secret-missing');
   assert.ok(JSON.stringify(ran.result.refusal).includes('MISSING_TOKEN'));
 });
@@ -57,7 +57,7 @@ test('a missing secret named only inside a frame step still ends the run before 
 test('a run with no secret store refuses every secret reference with secret-missing', async () => {
   const spy = spyDriver();
   const ran = await runWithSecrets(['ACCOUNT_TOKEN'], secretFillPlan(['ACCOUNT_TOKEN']), null, spy);
-  assert.equal(spy.opens, 0, 'no browser session was opened');
+  assert.equal(spy.calls.count('open'), 0, 'no browser session was opened');
   assert.equal(ran.result.state, 'Refused');
   assert.equal(ran.result.refusal?.code, 'secret-missing');
   assert.ok(JSON.stringify(ran.result.refusal).includes('ACCOUNT_TOKEN'));
@@ -66,7 +66,7 @@ test('a run with no secret store refuses every secret reference with secret-miss
 test('control: a plan with no secret reference runs without a secret store', async () => {
   const spy = spyDriver();
   const ran = await runWithSecrets([], secretFillPlan([]), null, spy);
-  assert.equal(spy.opens, 1, 'the run reached the driver');
+  assert.equal(spy.calls.count('open'), 1, 'the run reached the driver');
   assert.notEqual(ran.result.refusal?.code, 'secret-missing');
 });
 
@@ -76,7 +76,7 @@ test('control: when the store resolves every named secret, the run goes on to op
     ['ACCOUNT_TOKEN', 'MISSING_TOKEN'], secretFillPlan(['ACCOUNT_TOKEN', 'MISSING_TOKEN']),
     { ACCOUNT_TOKEN: fakeSecretValue(), MISSING_TOKEN: fakeSecretValue() }, spy,
   );
-  assert.equal(spy.opens, 1, 'the run reached the driver');
+  assert.equal(spy.calls.count('open'), 1, 'the run reached the driver');
   assert.notEqual(ran.result.refusal?.code, 'secret-missing');
 });
 

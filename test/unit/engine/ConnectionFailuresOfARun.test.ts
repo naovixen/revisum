@@ -9,10 +9,10 @@ import {
     type RunEventSink,
     type Session,
 } from "@revisum/engine";
-import { memoryRunEventSink } from "../../support/memory-ports.ts";
 import { evidenceHashOf } from "../../support/ExpectedEvidenceHash.ts";
 import { fakeSession, runOnFakeSession } from "./RunOnFakeSession.ts";
 import { OPEN_CART, unsafePlan, type JsonRecord } from "./unsafe-feature-steps.ts";
+import { fakeRunEventSinkFailingOn } from "#test-support/fakes/FakeRunEventSink.ts";
 
 type ConnectionFailure = { readonly origin: string; readonly message: string };
 
@@ -73,18 +73,8 @@ const failuresLoggedIn = (events: RunEventSink): readonly ConnectionFailure[] =>
     }));
 
 // A log that works until it is told of a connection failure.
-function logFailingOnAConnectionFailure(): RunEventSink {
-    const kept = memoryRunEventSink();
-    return {
-        read: () => kept.read(),
-        append(event: LoggedEvent) {
-            if (String(event.kind) === CONNECTION_FAILED) {
-                throw new Error("the log could not be written");
-            }
-            kept.append(event);
-        },
-    };
-}
+const logFailingOnAConnectionFailure = (): RunEventSink =>
+    fakeRunEventSinkFailingOn((event) => String(event.kind) === CONNECTION_FAILED);
 
 describe("Using the run", () => {
     for (const verdict of VERDICTS) {

@@ -9,19 +9,15 @@
 import assert from 'node:assert/strict';
 import { arch, platform } from 'node:os';
 import { test } from 'node:test';
-import { defaultRedactor, runUntrusted, type Plan } from '@revisum/engine';
-import { memoryArtifactStore, memoryEventSink, memoryRunEventSink, systemClock } from '../../support/memory-ports.ts';
+import { runUntrusted, type Plan } from '@revisum/engine';
 import { TEST_SERVICE } from './plan-examples.ts';
 import {
   ALLOWED, PROPOSAL, approvedStanding, comparable, decideOn, deniedCodes, denied, element, localeOf, parsedPlan, parserProject, stepAt,
   testGate,
 } from './policy-examples.ts';
 import { spyDriver } from './secret-examples.ts';
-import {
-  ALLOWED_UNNAMED_SELECTOR, CART_COUNT_CHECK, CLEAR_EDITOR, DATABASE_COMMANDS, DATABASE_SERVICE, FEATURES, INLINE_READ, OPEN_CART, ORDER_COUNT_CHECK,
-  ORIGIN, READ_CART, SEED_EDITOR, SEED_ORDERS, TARGET_ID, WIPE_ORDERS, css, unsafePlan, unsafeProjectFile, unsafeSection, xpath,
-  type JsonRecord,
-} from './unsafe-feature-steps.ts';
+import { ALLOWED_UNNAMED_SELECTOR, CART_COUNT_CHECK, CLEAR_EDITOR, DATABASE_COMMANDS, DATABASE_SERVICE, FEATURES, INLINE_READ, OPEN_CART, ORDER_COUNT_CHECK, ORIGIN, READ_CART, SEED_EDITOR, SEED_ORDERS, TARGET_ID, WIPE_ORDERS, css, unsafePlan, unsafeProjectFile, xpath, type JsonRecord , unsafeSection } from './unsafe-feature-steps.ts';
+import { fakePorts } from '#test-support/fakes/FakePorts.ts';
 
 // The shared unsafe project, every feature on, with its one target in British English so the
 // engine's English irreversible patterns apply.
@@ -107,7 +103,7 @@ test('the same write script and write command in an approved plan are allowed', 
 test('a plan the gate denies for any of these rules opens no browser, so no script or command runs', async () => {
   const project = parserProject(PROJECT);
   const spy = spyDriver();
-  const ports = { drivers: new Map([['cdp', spy]]), clock: systemClock, artifacts: memoryArtifactStore(), redactor: defaultRedactor(), audit: memoryEventSink(), events: memoryRunEventSink() };
+  const ports = fakePorts({ drivers: new Map([['cdp', spy]]) });
   const base = { project, baseUrl: ORIGIN, seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() } };
   const parse = (raw: unknown) => ({ ok: true as const, value: parsedPlan(raw as JsonRecord, PROJECT) });
   const rules: string[] = [];
@@ -117,7 +113,7 @@ test('a plan the gate denies for any of these rules opens no browser, so no scri
     if ('rule' in outcome) rules.push(outcome.rule);
   }
   assert.deepEqual(rules, ['inline-script-in-proposal', 'side-effect-in-proposal', 'side-effect-in-proposal']);
-  assert.equal(spy.opens, 0, 'a browser was opened');
+  assert.equal(spy.calls.count('open'), 0, 'a browser was opened');
 });
 
 // ---- Commands on production --------------------------------------------------------------------------
@@ -149,14 +145,14 @@ test('a database command whose service is on a production origin is denied in an
 
 test('a production command is denied before anything starts: no browser is opened', async () => {
   const spy = spyDriver();
-  const ports = { drivers: new Map([['cdp', spy]]), clock: systemClock, artifacts: memoryArtifactStore(), redactor: defaultRedactor(), audit: memoryEventSink(), events: memoryRunEventSink() };
+  const ports = fakePorts({ drivers: new Map([['cdp', spy]]) });
   const base = {
     project: parserProject(PRODUCTION_PROJECT), baseUrl: ORIGIN, seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() },
   };
   const parse = (raw: unknown) => ({ ok: true as const, value: parsedPlan(raw as JsonRecord, PRODUCTION_PROJECT) });
   const outcome = await runUntrusted(unsafePlan([OPEN_CART, LIVE_COUNT_CHECK]), parse, base, ports);
   assert.ok('rule' in outcome && outcome.rule === 'production-origin', JSON.stringify(outcome));
-  assert.equal(spy.opens, 0);
+  assert.equal(spy.calls.count('open'), 0);
 });
 
 // Counter-example: the same command on the private test database is allowed in the same project.

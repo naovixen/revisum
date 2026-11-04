@@ -80,7 +80,7 @@ test('a different storage state under the same name changes the recorded sha256 
 test('storage state the store cannot resolve ends the run with secret-missing before any driver opens', async () => {
   const spy = spyDriver();
   const ran = await runWithSecrets([SAVED], withStorageState(SAVED), {}, spy);
-  assert.equal(spy.opens, 0, 'no browser session was opened');
+  assert.equal(spy.calls.count('open'), 0, 'no browser session was opened');
   assert.equal(ran.result.refusal?.code, 'secret-missing');
   assert.ok(JSON.stringify(ran.result.refusal).includes(SAVED));
 });

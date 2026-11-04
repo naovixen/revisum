@@ -4,7 +4,7 @@
 // opens has its refusal to report, whether or not the log can take it.
 import assert from "node:assert/strict";
 import { describe, test, type TestContext } from "node:test";
-import type { LoggedEvent, RunEventSink } from "@revisum/engine";
+import type { RunEventSink } from "@revisum/engine";
 import { memoryRunEventSink } from "../../support/memory-ports.ts";
 import { fakeSession, runOnFakeSession } from "./RunOnFakeSession.ts";
 import { environmentSecretStore } from "@revisum/engine";
@@ -15,6 +15,7 @@ import {
     unsafePlan,
     type JsonRecord,
 } from "./unsafe-feature-steps.ts";
+import { fakeRunEventSinkFailingOn } from "#test-support/fakes/FakeRunEventSink.ts";
 
 const STATES_LOGGED_BEFORE_THE_STEPS = ["Planned", "Resolved", "Running"] as const;
 const STATES_LOGGED_FOR_A_REFUSAL: readonly {
@@ -31,18 +32,10 @@ const FILL_SECRET: JsonRecord = {
     value: { secretName: DATABASE_SECRET },
 };
 
-function logFailingOnStates(states: readonly string[]): RunEventSink {
-    const kept = memoryRunEventSink();
-    return {
-        read: () => kept.read(),
-        append(event: LoggedEvent) {
-            if (event.kind === "run.state" && states.some((state) => state === event.state)) {
-                throw new Error("the log could not be written");
-            }
-            kept.append(event);
-        },
-    };
-}
+const logFailingOnStates = (states: readonly string[]): RunEventSink =>
+    fakeRunEventSinkFailingOn(
+        (event) => event.kind === "run.state" && states.some((state) => state === event.state),
+    );
 
 const logFailingOnState = (state: string): RunEventSink => logFailingOnStates([state]);
 

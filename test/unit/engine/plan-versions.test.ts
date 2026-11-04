@@ -4,16 +4,14 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { arch, platform } from 'node:os';
-import {
-  defaultRedactor, failure, runUntrusted,
-  type BrowserDriver,
-} from '@revisum/engine';
-import { memoryArtifactStore, memoryEventSink, memoryRunEventSink, systemClock } from '../../support/memory-ports.ts';
-import { futureVersions } from '../../support/plan-changelog.ts';
+import { runUntrusted } from '@revisum/engine';
 import {
   CURRENT_VERSION, ORIGIN, accountClosurePlan, defaultParser, signupPlan, stepsOf, testProject, withValue,
   type JsonRecord,
 } from './plan-examples.ts';
+import { fakeDriverNeverLaunching } from '#test-support/fakes/FakeDriver.ts';
+import { driversOf, fakePorts } from '#test-support/fakes/FakePorts.ts';
+import { futureVersions } from '../../support/plan-changelog.ts';
 
 const parsePlan = defaultParser();
 
@@ -76,29 +74,21 @@ test('a plan without newer steps keeps every step, in order', () => {
 // ---- At run time --------------------------------------------------------------------------------
 
 test('a run of a plan with a newer step is refused before any driver is touched', async () => {
-  let calls = 0;
-  const callCount = (): number => calls;
-  const spy: BrowserDriver = {
-    info: { id: 'cdp', version: 'spy', protocol: 'none' },
-    supports() { calls++; return { ok: true, value: true }; },
-    async open() { calls++; return failure({ reason: 'launch-failed', detail: 'the spy never launches' }); },
-  };
+
+  const spy = fakeDriverNeverLaunching();
   const project = testProject();
-  const ports = {
-    drivers: new Map([['cdp', spy]]), clock: systemClock, artifacts: memoryArtifactStore(),
-    redactor: defaultRedactor(), audit: memoryEventSink(), events: memoryRunEventSink(),
-  };
+  const ports = fakePorts({ drivers: driversOf(spy) });
   const base = {
     project, baseUrl: ORIGIN, seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() },
   };
   const parse = defaultParser();
   const refused = await runUntrusted(insertAt(signupPlan(), 8, NEWER_STEPS[1] ?? {}), parse, base, ports);
   assert.ok(!Array.isArray(refused) && 'errors' in refused, 'the run was refused');
-  assert.equal(callCount(), 0, 'no driver method was called');
+  assert.equal(spy.calls.count(), 0, 'no driver method was called');
   assert.equal(ports.events.read().length, 0, 'nothing was logged');
 
   // Positive control: the plan without the newer step does reach the driver.
   const accepted = await runUntrusted(signupPlan(), parse, base, ports);
   assert.ok(Array.isArray(accepted), JSON.stringify(accepted));
-  assert.ok(callCount() > 0, 'a valid plan reaches the driver, so the zero above is meaningful');
+  assert.ok(spy.calls.count() > 0, 'a valid plan reaches the driver, so the zero above is meaningful');
 });

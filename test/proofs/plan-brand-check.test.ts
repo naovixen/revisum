@@ -4,13 +4,12 @@
 import assert from 'node:assert/strict';
 import { arch, platform } from 'node:os';
 import { test } from 'node:test';
-import {
-  assertBranded, defaultRedactor, failure, planParser, run,
-  type Authorised, type BrowserDriver, type Plan, type TargetId,
-} from '@revisum/engine';
-import { memoryArtifactStore, memoryEventSink, memoryRunEventSink, systemClock } from '../support/memory-ports.ts';
+import { assertBranded, planParser, run, type Authorised, type Plan, type TargetId } from '@revisum/engine';
 import { authorise, trustedProjectFrom } from '../support/policy-clearance.ts';
 import { ORIGIN, TARGET_ID, signupPlan, testProject, testProjectInput } from '../unit/engine/plan-examples.ts';
+import { fakeArtifactStore } from '#test-support/fakes/FakeArtifactStore.ts';
+import { fakeDriverNeverLaunching } from '#test-support/fakes/FakeDriver.ts';
+import { driversOf, fakePorts } from '#test-support/fakes/FakePorts.ts';
 
 const project = testProject();
 const parsePlan = planParser(project);
@@ -36,22 +35,12 @@ const FORGERIES: readonly (readonly [string, () => Plan])[] = [
 type Watched = { readonly ports: Parameters<typeof run>[1]; readonly driverCalls: () => number; readonly storeWrites: () => number };
 
 function watchedPorts(): Watched {
-  let driverCalls = 0;
-  let storeWrites = 0;
-  const spy: BrowserDriver = {
-    info: { id: 'cdp', version: 'spy', protocol: 'none' },
-    supports() { driverCalls++; return { ok: true, value: true }; },
-    async open() { driverCalls++; return failure({ reason: 'launch-failed', detail: 'the spy never launches' }); },
-  };
-  const store = memoryArtifactStore();
-  const events = memoryRunEventSink();
+  const spy = fakeDriverNeverLaunching();
+  const artifacts = fakeArtifactStore();
   return {
-    ports: {
-      drivers: new Map([['cdp', spy]]), clock: systemClock, redactor: defaultRedactor(), audit: memoryEventSink(), events,
-      artifacts: { put: async (name, bytes, mediaType) => { storeWrites++; return store.put(name, bytes, mediaType); } },
-    },
-    driverCalls: () => driverCalls,
-    storeWrites: () => storeWrites,
+    ports: fakePorts({ drivers: driversOf(spy), artifacts }),
+    driverCalls: () => spy.calls.count(),
+    storeWrites: () => artifacts.calls.count('put'),
   };
 }
 

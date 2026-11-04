@@ -40,7 +40,7 @@ import { dirname, join } from 'node:path';
 import { createServer as createHttpServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { createServer as createHttpsServer } from 'node:https';
 import { connect as connectTcp, type Socket } from 'node:net';
-import { failure, success, type EventSink, type SecretStore, type VersionControlPort } from '@revisum/contracts';
+import { type EventSink, type SecretStore, type VersionControlPort } from '@revisum/contracts';
 import { environmentSecretStore } from '@revisum/engine';
 import type { AddressConnector, AddressResolver } from '@revisum/runner';
 import { FIXTURES, GOLDEN } from '../../support/repository.ts';
@@ -48,6 +48,7 @@ import { memoryEventSink, type MemoryEventSink } from '../../support/memory-port
 import { consoleWrittenDuring, jsonAnswer, type Answer, type Dialled, type ReceivedRequest } from '../runner/local-service.ts';
 import { fakeResolver, type FakeResolver } from '../runner/runner-examples.ts';
 import { fakeSecretValue } from '../engine/secret-examples.ts';
+import { fakeProtectedBranchHolding } from '#test-support/fakes/FakeVersionControlPort.ts';
 
 // ---- The command's assumed shape -----------------------------------------------------------------
 
@@ -269,21 +270,7 @@ export function draftWorkspace(options: WorkspaceOptions): DraftWorkspace {
 
 // A protected branch that holds just `project` as project.json, as the run's trust step reads it.
 // Every other question is unavailable: the draft command needs no review or pull request.
-export function protectedBranchWith(project: JsonRecord): VersionControlPort {
-  return {
-    protectedBranch: 'main',
-    async protectedFile(path) {
-      return path === 'project.json'
-        ? success({ bytes: new TextEncoder().encode(JSON.stringify(project)), commit: 'commit-protected' })
-        : failure('not-found');
-    },
-    reviews: async () => failure('unavailable'),
-    changedFiles: async () => failure('unavailable'),
-    pullRequest: async () => failure('unavailable'),
-    lastCommitTouching: async () => failure('unavailable'),
-    landedBy: async () => failure('unavailable'),
-  };
-}
+export const protectedBranchWith = (project: JsonRecord): VersionControlPort => fakeProtectedBranchHolding(project);
 
 // ---- The fake planner -------------------------------------------------------------------------------
 

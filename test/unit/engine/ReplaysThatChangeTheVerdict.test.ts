@@ -5,13 +5,9 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import {
-    DRIVER_FEATURES,
-    defaultRedactor,
     planParser,
     replay,
     run,
-    success,
-    type BrowserDriver,
     type ElementProbe,
     type Plan,
     type Project,
@@ -19,11 +15,6 @@ import {
     type RunResult,
     type Session,
 } from "@revisum/engine";
-import {
-    memoryArtifactStore,
-    memoryEventSink,
-    memoryRunEventSink,
-} from "../../support/memory-ports.ts";
 import { authorise, trustedProjectFrom } from "../../support/policy-clearance.ts";
 import { NO_ELEMENT, SHOWN_ELEMENT, fakeSession } from "./RunOnFakeSession.ts";
 import {
@@ -36,7 +27,8 @@ import {
     projectFileWith,
     projectWith,
 } from "./run-value-examples.ts";
-import { virtualClock } from "./service-call-examples.ts";
+import { fakeDriverOpening } from "#test-support/fakes/FakeDriver.ts";
+import { driversOf, fakePorts } from "#test-support/fakes/FakePorts.ts";
 
 const THIS_MACHINE = { platform: "test", arch: "test" };
 const OTHER_MACHINE = { platform: "linux", arch: "x64" };
@@ -46,23 +38,7 @@ const PLAN = planOf([OPEN_ORDERS]);
 const showing = (probe: ElementProbe): Session =>
     fakeSession({ probe: () => Promise.resolve(probe) });
 
-const driverOf = (session: Session): BrowserDriver => ({
-    info: { id: "cdp", version: "fake", protocol: "none", performs: DRIVER_FEATURES },
-    supports: () => success(true),
-    open: () => Promise.resolve(success(session)),
-});
-
-const portsOf = (session: Session) => {
-    const driver = driverOf(session);
-    return {
-        drivers: new Map([[driver.info.id, driver]]),
-        clock: virtualClock(),
-        artifacts: memoryArtifactStore(),
-        redactor: defaultRedactor(),
-        audit: memoryEventSink(),
-        events: memoryRunEventSink(),
-    };
-};
+const portsOf = (session: Session) => fakePorts({ drivers: driversOf(fakeDriverOpening(session)) });
 
 type Recorded = {
     readonly project: Project;

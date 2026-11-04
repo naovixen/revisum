@@ -12,10 +12,10 @@
 // A script, style sheet, frame, worker or image that matches a stub also goes through the proxy.
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
-import type { OwnBrowserDriver } from '@revisum/driver-cdp';
 import { createBrowserDriver } from '#test-support/browser/CreateBrowserDriver.ts';
+import { keepingBrowserRecords } from '#test-support/browser/KeepingBrowserRecords.ts';
 import { egressThrough } from '#test-support/browser/SessionEgressForTest.ts';
-import type { BrowserDriver, BrowserRequestRecord, EgressEvent, SessionEnvironment, Target } from '@revisum/engine';
+import type { BrowserDriver, BrowserRequestRecord, EgressEvent } from '@revisum/engine';
 import { hostAndPort, joinEgressEvents, startEgressProxy, type EgressProxy } from '@revisum/runner';
 import { BROWSERS } from '#test-support/browsers.ts';
 import { createCleanUpScope } from '#test-support/CleanUpScope.ts';
@@ -46,36 +46,6 @@ before(async () => {
 });
 after(() => cleanUps.runAll());
 
-// Wraps the own driver so each session keeps its browser's request records as it closes.
-function keepingRecords(inner: OwnBrowserDriver, keep: (records: readonly BrowserRequestRecord[]) => void): BrowserDriver {
-  return new Proxy(inner, {
-    get(target, key) {
-      if (key !== 'open') {
-        const passedThrough: unknown = Reflect.get(target, key, target);
-        return passedThrough;
-      }
-      return async (openTarget: Target, environment: SessionEnvironment) => {
-        const opened = await target.open(openTarget, environment);
-        if (!opened.ok) return opened;
-        const session = opened.value;
-        const close = async (): Promise<void> => {
-          try { keep(session.egressRecords()); } finally { await session.close(); }
-        };
-        const wrapped = new Proxy(session, {
-          get(sessionTarget, sessionKey) {
-            if (sessionKey === 'close') return close;
-            const value: unknown = Reflect.get(sessionTarget, sessionKey, sessionTarget);
-            if (typeof value !== 'function') return value;
-            const bound: unknown = value.bind(sessionTarget);
-            return bound;
-          },
-        });
-        return { ok: true as const, value: wrapped };
-      };
-    },
-  });
-}
-
 type ProxiedRun = NetworkRun & { readonly egressEvents: readonly EgressEvent[] };
 
 // Runs the steps through the proxy and gives the run's egress events, from this run's records and
@@ -83,7 +53,7 @@ type ProxiedRun = NetworkRun & { readonly egressEvents: readonly EgressEvent[] }
 async function runThroughProxy(steps: readonly unknown[]): Promise<ProxiedRun> {
   const records: BrowserRequestRecord[] = [];
   const driver = createBrowserDriver({ executablePath: BROWSERS.chrome, fixturesFolder: FIXTURE_FOLDER, egress: egressThrough(proxy) });
-  const drivers = new Map<string, BrowserDriver>([['cdp', keepingRecords(driver, (kept) => { records.push(...kept); })]]);
+  const drivers = new Map<string, BrowserDriver>([['cdp', keepingBrowserRecords(driver, (kept) => { records.push(...kept); })]]);
   const firstDecision = proxy.decisions().length;
   const ran = await harness.runSteps(BrowserTarget.Chrome, steps, { drivers });
   return { ...ran, egressEvents: joinEgressEvents(records, proxy.decisions().slice(firstDecision)) };

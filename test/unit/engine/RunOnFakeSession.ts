@@ -4,9 +4,6 @@
 // and run, under a virtual clock, so a check that waits out its timeout costs no real time.
 import assert from "node:assert/strict";
 import {
-    DRIVER_FEATURES,
-    defaultRedactor,
-    environmentSecretStore,
     planParser,
     run,
     success,
@@ -21,22 +18,25 @@ import {
     type Session,
     type StepResult,
 } from "@revisum/engine";
-import {
-    memoryArtifactStore,
-    memoryEventSink,
-    memoryRunEventSink,
-    type MemoryEventSink,
-} from "../../support/memory-ports.ts";
+import { type MemoryEventSink } from "../../support/memory-ports.ts";
 import { authorise, trustedProjectFrom } from "../../support/policy-clearance.ts";
 import {
     DATABASE_PASSWORD,
     fakeCommandRunner,
     type CommandRoute,
 } from "./database-command-examples.ts";
-import { fakeServiceCaller, virtualClock, type Route } from "./service-call-examples.ts";
+import { fakeServiceCaller, type Route } from "./service-call-examples.ts";
 import { DEFAULT_CLOCK_START, DEFAULT_SEED, ORIGIN } from "./run-value-examples.ts";
 import { parsedProject, sourceBytes } from "./unsafe-feature-examples.ts";
 import { DATABASE_SECRET, unsafeProjectFile, type JsonRecord } from "./unsafe-feature-steps.ts";
+import { fakeClock } from "#test-support/fakes/FakeClock.ts";
+import { fakeDriver } from "#test-support/fakes/FakeDriver.ts";
+import { fakeEventSink } from "#test-support/fakes/FakeEventSink.ts";
+import { fakeNetworkPort } from "#test-support/fakes/FakeNetworkPort.ts";
+import { driversOf, fakePorts } from "#test-support/fakes/FakePorts.ts";
+import { fakeRunEventSink } from "#test-support/fakes/FakeRunEventSink.ts";
+import { fakeSecretStore } from "#test-support/fakes/FakeSecretStore.ts";
+import { fakeSession as completeFakeSession } from "#test-support/fakes/FakeSession.ts";
 
 export const SHOWN_ELEMENT: ElementProbe = {
     count: 1,
@@ -50,35 +50,17 @@ export const SHOWN_ELEMENT: ElementProbe = {
 export const NO_ELEMENT: ElementProbe = { ...SHOWN_ELEMENT, count: 0, text: "", value: null };
 
 // A session whose frames and tabs are the session itself, unless `changes` says otherwise.
-export function fakeSession(changes: Partial<Session> = {}): Session {
-    const session: Session = {
-        browser: { name: "fake-browser", version: "1.0" },
-        navigate: () => Promise.resolve(success(undefined)),
+export const fakeSession = (changes: Partial<Session> = {}): Session =>
+    completeFakeSession({
         page: () => Promise.resolve({ url: `${ORIGIN}/orders`, title: "Orders" }),
-        act: () => Promise.resolve(success(undefined)),
         probe: () => Promise.resolve(SHOWN_ELEMENT),
-        screenshot: () => Promise.resolve(new Uint8Array([137, 80, 78, 71])),
-        audit: () => Promise.resolve([]),
-        accessibilitySnapshot: () => Promise.resolve({ role: "document", name: "", children: [] }),
-        blockedOrigins: () => [],
-        close: () => Promise.resolve(),
-        frame: () => Promise.resolve(success(session)),
-        newTab: () => Promise.resolve(success(session)),
         ...changes,
-    };
-    return session;
-}
+    });
 
 // A network port that knows only what it has recorded, as the real one does: it has no idea whether
 // the page is still alive.
-export const fakeNetwork = (exchanges: readonly ObservedExchange[] = []): NetworkPort => ({
-    startStub: () => Promise.resolve(success(undefined)),
-    stopStub: () => Promise.resolve(success(undefined)),
-    stubAnswers: () => [],
-    observe: () => Promise.resolve(success(undefined)),
-    exchanges: () => exchanges,
-    quiet: () => Promise.resolve(success(undefined)),
-});
+export const fakeNetwork = (exchanges: readonly ObservedExchange[] = []): NetworkPort =>
+    fakeNetworkPort({ exchanges: () => exchanges });
 
 // One finished exchange of the shared project's "likes" request.
 export const likesExchange = (status: number, firstName: string): ObservedExchange => ({
@@ -120,13 +102,11 @@ export async function runOnFakeSession(
     const target = project.matrix[0];
     assert.ok(target !== undefined, "the test project has a target");
     const session = options.session ?? fakeSession();
-    const driver: BrowserDriver = {
-        info: { id: "cdp", version: "fake", protocol: "none", performs: DRIVER_FEATURES },
-        supports: () => success(true),
+    const driver = fakeDriver({
         open: options.open ?? (() => Promise.resolve(success(session))),
-    };
-    const audit = memoryEventSink();
-    const events = options.events ?? memoryRunEventSink();
+    });
+    const audit = fakeEventSink();
+    const events = options.events ?? fakeRunEventSink();
     const result = await run(
         {
             plan: authorise(parsed.value, trusted),
@@ -139,18 +119,15 @@ export async function runOnFakeSession(
             host: { platform: "test", arch: "test" },
             scriptSources: sourceBytes(),
         },
-        {
-            drivers: new Map([[driver.info.id, driver]]),
-            clock: options.clock ?? virtualClock(),
-            artifacts: memoryArtifactStore(),
-            redactor: defaultRedactor(),
+        fakePorts({
+            drivers: driversOf(driver),
+            clock: options.clock ?? fakeClock(),
             audit,
             events,
-            secrets:
-                options.secrets ?? environmentSecretStore({ [DATABASE_SECRET]: DATABASE_PASSWORD }),
+            secrets: options.secrets ?? fakeSecretStore({ [DATABASE_SECRET]: DATABASE_PASSWORD }),
             services: fakeServiceCaller(options.serviceRoute).caller,
             databaseCommands: fakeCommandRunner(options.commandRoute).port,
-        },
+        }),
     );
     return { result, audit, events };
 }

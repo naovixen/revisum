@@ -3,19 +3,7 @@
 // production to needs it there, or the run it was approved for can't work.
 import assert from "node:assert/strict";
 import { describe, test, type TestContext } from "node:test";
-import {
-    defaultRedactor,
-    run,
-    success,
-    type BrowserDriver,
-    type PlanStanding,
-} from "@revisum/engine";
-import {
-    memoryArtifactStore,
-    memoryEventSink,
-    memoryRunEventSink,
-    systemClock,
-} from "../../support/memory-ports.ts";
+import { run, success, type BrowserDriver, type PlanStanding } from "@revisum/engine";
 import { authorise, trustedProjectFrom } from "../../support/policy-clearance.ts";
 import { parsedSignupPlan, withRepository } from "./approval-repositories.ts";
 import {
@@ -26,6 +14,8 @@ import {
     type JsonRecord,
 } from "./plan-examples.ts";
 import { fakeSession } from "./RunOnFakeSession.ts";
+import { fakeDriver } from "#test-support/fakes/FakeDriver.ts";
+import { driversOf, fakePorts } from "#test-support/fakes/FakePorts.ts";
 
 const PRODUCTION_ORIGIN = "https://shop.example.com";
 const OPEN_TO_APPROVED_PLANS: JsonRecord = { allowProductionForApprovedPlans: true };
@@ -61,11 +51,7 @@ async function allowedOriginsOfRun(
     const open = context.mock.fn<BrowserDriver["open"]>(() =>
         Promise.resolve(success(fakeSession())),
     );
-    const driver: BrowserDriver = {
-        info: { id: "cdp", version: "fake", protocol: "none" },
-        supports: () => success(true),
-        open,
-    };
+    const driver = fakeDriver({ info: { id: "cdp", version: "fake", protocol: "none" }, open });
     const plan = parsedSignupPlan();
     const authorised = authorise(
         plan,
@@ -87,14 +73,7 @@ async function allowedOriginsOfRun(
             host: { platform: "test", arch: "test" },
             standing,
         },
-        {
-            drivers: new Map([["cdp", driver]]),
-            clock: systemClock,
-            artifacts: memoryArtifactStore(),
-            redactor: defaultRedactor(),
-            audit: memoryEventSink(),
-            events: memoryRunEventSink(),
-        },
+        fakePorts({ drivers: driversOf(driver) }),
     );
     assert.equal(open.mock.callCount(), OPENED_ONCE);
     const environment = open.mock.calls[0]?.arguments[1];

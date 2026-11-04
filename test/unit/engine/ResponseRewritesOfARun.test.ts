@@ -5,20 +5,13 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import {
-    DRIVER_FEATURES,
-    defaultRedactor,
     manifestHash,
     planParser,
     run,
     success,
-    type BrowserDriver,
+    type RunPorts,
     type RunResult,
 } from "@revisum/engine";
-import {
-    memoryArtifactStore,
-    memoryEventSink,
-    memoryRunEventSink,
-} from "../../support/memory-ports.ts";
 import { authorise, trustedProjectFrom } from "../../support/policy-clearance.ts";
 import { fakeSession } from "./RunOnFakeSession.ts";
 import {
@@ -31,7 +24,9 @@ import {
     projectFileWith,
     projectWith,
 } from "./run-value-examples.ts";
-import { virtualClock } from "./service-call-examples.ts";
+import { fakeDriverOpening } from "#test-support/fakes/FakeDriver.ts";
+import { driversOf, fakePorts } from "#test-support/fakes/FakePorts.ts";
+import { leaveOut } from "#test-support/fakes/LeaveOut.ts";
 
 const HEADING_CHANGED = { origin: ORIGIN, name: "heading-changed" };
 const STATUS_FLIPPED = { origin: ORIGIN, name: "status-flipped" };
@@ -53,21 +48,11 @@ const runWithRewrites = async (
             return Promise.resolve(success(undefined));
         },
     });
-    const driver: BrowserDriver = {
-        info: { id: "cdp", version: "fake", protocol: "none", performs: DRIVER_FEATURES },
-        supports: () => success(true),
-        open: () => Promise.resolve(success(session)),
-    };
+    const driver = fakeDriverOpening(session);
     const rewritesApplied: RewritesApplied = () => (isPageOpened ? (applied ?? []) : []);
-    const ports = {
-        drivers: new Map([[driver.info.id, driver]]),
-        clock: virtualClock(),
-        artifacts: memoryArtifactStore(),
-        redactor: defaultRedactor(),
-        audit: memoryEventSink(),
-        events: memoryRunEventSink(),
-        ...(applied === undefined ? {} : { rewritesApplied }),
-    };
+    const everyPort = fakePorts({ drivers: driversOf(driver), rewritesApplied });
+    const ports =
+        applied === undefined ? leaveOut<RunPorts>(everyPort, ["rewritesApplied"]) : everyPort;
     return run(
         {
             plan: authorise(plan, trusted),

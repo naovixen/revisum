@@ -6,12 +6,14 @@
 import assert from 'node:assert/strict';
 import { arch, platform } from 'node:os';
 import { test } from 'node:test';
-import { defaultRedactor, failure, runUntrusted, type BrowserDriver } from '@revisum/engine';
-import { memoryArtifactStore, memoryEventSink, memoryRunEventSink, systemClock } from '../../support/memory-ports.ts';
+import { runUntrusted } from '@revisum/engine';
 import {
   CLOSING_CHECK, OPEN_ORDERS, ORIGIN, accepted, label, navigate, parserFor, planOf, projectWith, reference, rejection,
   type JsonRecord,
 } from './run-value-examples.ts';
+import { fakeDriverNeverLaunching } from '#test-support/fakes/FakeDriver.ts';
+import { driversOf, fakePorts } from '#test-support/fakes/FakePorts.ts';
+import { fakeRunEventSink } from '#test-support/fakes/FakeRunEventSink.ts';
 
 // The project declares one secret and one fixture, so that their names are real declarations.
 const PROJECT_FIELDS: JsonRecord = { secretNames: ['ORDER_PIN'], fixtures: ['invoice.pdf'], testIdAttributes: ['data-testid', 'data-qa'] };
@@ -82,15 +84,10 @@ test('a value remembered inside a frame is visible to the steps after the frame'
 });
 
 test('a plan with an undefined or duplicate value is refused before any driver is touched', async () => {
-  let calls = 0;
-  const callCount = (): number => calls;
-  const spy: BrowserDriver = {
-    info: { id: 'cdp', version: 'spy', protocol: 'none' },
-    supports() { calls++; return { ok: true, value: true }; },
-    async open() { calls++; return failure({ reason: 'launch-failed', detail: 'the spy never launches' }); },
-  };
-  const events = memoryRunEventSink();
-  const ports = { drivers: new Map([['cdp', spy]]), clock: systemClock, artifacts: memoryArtifactStore(), redactor: defaultRedactor(), audit: memoryEventSink(), events };
+
+  const spy = fakeDriverNeverLaunching();
+  const events = fakeRunEventSink();
+  const ports = fakePorts({ drivers: driversOf(spy), events });
   const base = {
     project: projectWith(PROJECT_FIELDS), baseUrl: ORIGIN, seed: 42, fixedTimeMilliseconds: 0, fixtures: [],
     host: { platform: platform(), arch: arch() },
@@ -99,12 +96,12 @@ test('a plan with an undefined or duplicate value is refused before any driver i
     const outcome = await runUntrusted(plan, parsePlan, base, ports);
     assert.ok(!Array.isArray(outcome) && 'errors' in outcome, JSON.stringify(outcome));
   }
-  assert.equal(callCount(), 0, 'no driver method was called');
+  assert.equal(spy.calls.count(), 0, 'no driver method was called');
   assert.equal(events.read().length, 0, 'nothing was logged');
 
   // Positive control: a valid plan using a value does reach the driver.
   await runUntrusted(withValues([OPEN_ORDERS, fill(MARKED_REFERENCE)]), parsePlan, base, ports);
-  assert.ok(callCount() > 0, 'a valid plan reaches the driver, so the zero above is meaningful');
+  assert.ok(spy.calls.count() > 0, 'a valid plan reaches the driver, so the zero above is meaningful');
 });
 
 // ---- Places a reference may not stand ------------------------------------------------------------

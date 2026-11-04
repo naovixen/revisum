@@ -5,11 +5,11 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { GuaranteeLevel } from '@revisum/contracts';
-import { defaultRedactor, guaranteeStatement, parseProject, planParser, run, type RunResult } from '@revisum/engine';
-import { memoryArtifactStore, memoryEventSink, memoryRunEventSink, systemClock } from '../../support/memory-ports.ts';
+import { guaranteeStatement, parseProject, planParser, run, type RunResult } from '@revisum/engine';
 import { authorise, trustedProjectFrom } from '../../support/policy-clearance.ts';
 import { ORIGIN } from './plan-examples.ts';
 import { DEFAULT_CLOCK_START, DEFAULT_SEED, OPEN_ORDERS, accepted, planOf, projectFileWith, recordingDriver } from './run-value-examples.ts';
+import { driversOf, fakePorts } from '#test-support/fakes/FakePorts.ts';
 
 // Runs one plan on the shared test project, at the level given, or with no level at all.
 async function runAt(level?: GuaranteeLevel): Promise<RunResult> {
@@ -25,10 +25,7 @@ async function runAt(level?: GuaranteeLevel): Promise<RunResult> {
   return run({
     plan: authorise(plan, trusted), project, targetId: target.id, baseUrl: ORIGIN, seed: DEFAULT_SEED, fixedTimeMilliseconds: DEFAULT_CLOCK_START,
     fixtures: [], host: { platform: 'test', arch: 'test' }, ...(level === undefined ? {} : { guaranteeLevel: level }),
-  }, {
-    drivers: new Map([[driver.info.id, driver]]), clock: systemClock, artifacts: memoryArtifactStore(), redactor: defaultRedactor(),
-    audit: memoryEventSink(), events: memoryRunEventSink(),
-  });
+  }, fakePorts({ drivers: driversOf(driver) }));
 }
 
 const statementWith = (egressEnforced: boolean) => guaranteeStatement({ mode: 'plan', egressEnforced, unmaskedScreenshotsKept: false, unsafeFeatures: [] });

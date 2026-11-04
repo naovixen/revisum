@@ -7,14 +7,16 @@
 import assert from 'node:assert/strict';
 import { arch, platform } from 'node:os';
 import { test } from 'node:test';
-import { defaultRedactor, failure, runUntrusted, type BrowserDriver, type PlanErrorCode } from '@revisum/engine';
-import { memoryArtifactStore, memoryEventSink, memoryRunEventSink, systemClock } from '../../support/memory-ports.ts';
+import { runUntrusted, type PlanErrorCode } from '@revisum/engine';
 import { PRIVATE_MARKER } from './plan-examples.ts';
 import { accepted, rejection, type ParsePlan } from './run-value-examples.ts';
 import {
   ORIGIN, TOKEN_SECRET, asJson, expectRequests, expectResponse, expectStorage, planOf, rememberResponse, removeStorage, resetRequests,
   setStorage, startStub, stopStub, stubParser, stubProject, type JsonRecord,
 } from './stub-and-storage-examples.ts';
+import { fakeDriverNeverLaunching } from '#test-support/fakes/FakeDriver.ts';
+import { driversOf, fakePorts } from '#test-support/fakes/FakePorts.ts';
+import { fakeRunEventSink } from '#test-support/fakes/FakeRunEventSink.ts';
 
 // Built on first use, so each test reports its own failure while the project parser lacks a section.
 let parser: ParsePlan | undefined;
@@ -241,33 +243,25 @@ test('an assertion step of this spec without a criterion id is refused', () => {
 // ---- No driver call for a refused plan ---------------------------------------------------------------
 
 test('a refused plan reaches no driver method, and nothing is logged', async () => {
-  let driverCalls = 0;
-  const spy: BrowserDriver = {
-    info: { id: 'cdp', version: 'spy', protocol: 'none' },
-    supports() { driverCalls++; return { ok: true, value: true }; },
-    async open() { driverCalls++; return failure({ reason: 'launch-failed', detail: 'the spy never launches' }); },
-  };
-  const events = memoryRunEventSink();
-  const ports = { drivers: new Map([['cdp', spy]]), clock: systemClock, artifacts: memoryArtifactStore(), redactor: defaultRedactor(), audit: memoryEventSink(), events };
+
+  const spy = fakeDriverNeverLaunching();
+  const events = fakeRunEventSink();
+  const ports = fakePorts({ drivers: driversOf(spy), events });
   const base = { project: stubProject(), baseUrl: ORIGIN, seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() } };
   for (const refused of REFUSED) {
     const outcome = await runUntrusted(refused.plan, parsePlan, base, ports);
     assert.ok('errors' in outcome, `${refused.name}: ${JSON.stringify(outcome)}`);
   }
-  assert.equal(driverCalls, 0, 'no driver method was called');
+  assert.equal(spy.calls.count(), 0, 'no driver method was called');
   assert.equal(events.read().length, 0, 'nothing was logged');
 });
 
 // Counter-example: an accepted plan with a stub does reach the driver, so the spy above can fail.
 test('counter-example: an accepted plan with a stub step does reach the driver', async () => {
-  let opens = 0;
-  const spy: BrowserDriver = {
-    info: { id: 'cdp', version: 'spy', protocol: 'none' },
-    supports() { return { ok: true, value: true }; },
-    async open() { opens++; return failure({ reason: 'launch-failed', detail: 'the spy never launches' }); },
-  };
-  const ports = { drivers: new Map([['cdp', spy]]), clock: systemClock, artifacts: memoryArtifactStore(), redactor: defaultRedactor(), audit: memoryEventSink(), events: memoryRunEventSink() };
+
+  const spy = fakeDriverNeverLaunching();
+  const ports = fakePorts({ drivers: driversOf(spy) });
   const base = { project: stubProject(), baseUrl: ORIGIN, seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() } };
   await runUntrusted(planOf([OPEN_LOGIN, startStub('cartEmpty')]), parsePlan, base, ports);
-  assert.equal(opens, 1);
+  assert.equal(spy.calls.count('open'), 1);
 });

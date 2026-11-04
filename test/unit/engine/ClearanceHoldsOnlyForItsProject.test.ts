@@ -3,16 +3,8 @@
 // names the clearing project does not declare are denied.
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { runUntrusted, type RunPorts } from "@revisum/engine";
-import { memoryEventSink } from "../../support/memory-ports.ts";
-import {
-    finalState,
-    guardedDriver,
-    parserFor,
-    portsWithoutAudit,
-    runBase,
-} from "./guarded-driver.ts";
-import { TEST_SERVICE_SECRET_NAMES } from "./plan-examples.ts";
+import { runUntrusted } from "@revisum/engine";
+import { finalState, guardedDriver, parserFor, runBase } from "./guarded-driver.ts";
 import {
     ALLOWED,
     PROPOSAL,
@@ -40,6 +32,8 @@ import {
     unsafeProjectFile,
     type JsonRecord,
 } from "./unsafe-feature-steps.ts";
+import { driversOf, fakePorts } from "#test-support/fakes/FakePorts.ts";
+import { TEST_SERVICE_SECRET_NAMES } from "./plan-examples.ts";
 
 const ENGLISH_TARGET: JsonRecord = {
     id: TARGET_ID,
@@ -189,10 +183,7 @@ describe("Using the policy gate", () => {
         const untrustedRun = async (runProject: JsonRecord) => {
             const plan = parsedPlan(unsafePlan(steps), LOOSER);
             const guarded = guardedDriver(steps);
-            const ports: RunPorts = {
-                ...portsWithoutAudit(guarded.driver),
-                audit: memoryEventSink(),
-            };
+            const ports = fakePorts({ drivers: driversOf(guarded.driver) });
             const outcome = await runUntrusted(
                 unsafePlan(steps),
                 parserFor(LOOSER),

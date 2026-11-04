@@ -37,6 +37,7 @@ import {
 import { memoryEventSink, type MemoryEventSink, type RecordedEvent } from '../../support/memory-ports.ts';
 import { FIXTURES } from '../../support/repository.ts';
 import { defaultParser, signupPlan, type JsonRecord } from './plan-examples.ts';
+import { fakeApprovalStore } from '#test-support/fakes/FakeApprovalStore.ts';
 
 export const PLAN_PATH = 'plans/signup.json';
 export const PROJECT_PATH = 'project.json';
@@ -109,9 +110,7 @@ export { memoryEventSink, type MemoryEventSink, type RecordedEvent };
 export const eventsOfKind = (events: MemoryEventSink, kind: EventInput['kind']): readonly RecordedEvent[] =>
   events.recorded.filter((recorded) => recorded.event.kind === kind);
 
-export function memoryApprovalStore(approvals: readonly Approval[]): ApprovalStore {
-  return { forSubject: (subjectHash) => approvals.filter((approval) => approval.subject.hash === subjectHash) };
-}
+export const memoryApprovalStore = (approvals: readonly Approval[]): ApprovalStore => fakeApprovalStore(approvals);
 
 // What loading the project for one change gives back, in the shape this file assumes.
 export type LoadedProject = Awaited<ReturnType<typeof loadTrustedProject>>;

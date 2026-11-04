@@ -8,8 +8,7 @@
 import assert from 'node:assert/strict';
 import { arch, platform } from 'node:os';
 import { afterEach, beforeEach, test } from 'node:test';
-import { defaultRedactor, failure, runUntrusted, type BrowserDriver, type PlanErrorCode } from '@revisum/engine';
-import { memoryArtifactStore, memoryEventSink, memoryRunEventSink, systemClock } from '../../support/memory-ports.ts';
+import { runUntrusted, type PlanErrorCode } from '@revisum/engine';
 import { PRIVATE_MARKER } from './plan-examples.ts';
 import { projectWith } from './run-value-examples.ts';
 import { fakeServiceCaller } from './service-call-examples.ts';
@@ -17,6 +16,9 @@ import {
   COPY_LINK, OPEN_ORDERS, ORIGIN, accepted, advanceClock, assertRefusedInside, expectClipboard, frame, newTab,
   parserFor, planOf, rejection, rememberClipboard, type JsonRecord,
 } from './clock-and-clipboard-examples.ts';
+import { fakeDriverNeverLaunching } from '#test-support/fakes/FakeDriver.ts';
+import { driversOf, fakePorts } from '#test-support/fakes/FakePorts.ts';
+import { fakeRunEventSink } from '#test-support/fakes/FakeRunEventSink.ts';
 
 const parsePlan = parserFor();
 
@@ -266,30 +268,24 @@ beforeEach(() => {
 afterEach(() => { globalThis.fetch = realFetch; });
 
 function countingPorts() {
-  const counts = { driverCalls: 0 };
-  const spy: BrowserDriver = {
-    info: { id: 'cdp', version: 'spy', protocol: 'none' },
-    supports() { counts.driverCalls++; return { ok: true, value: true }; },
-    async open() { counts.driverCalls++; return failure({ reason: 'launch-failed', detail: 'the spy never launches' }); },
-  };
+
+  const spy = fakeDriverNeverLaunching();
   const { caller, requests } = fakeServiceCaller();
-  const events = memoryRunEventSink();
-  const ports = {
-    drivers: new Map([['cdp', spy]]), clock: systemClock, artifacts: memoryArtifactStore(), redactor: defaultRedactor(), audit: memoryEventSink(), events, services: caller,
-  };
-  return { ports, counts, requests, events };
+  const events = fakeRunEventSink();
+  const ports = fakePorts({ drivers: driversOf(spy), events, services: caller });
+  return { ports, spy, requests, events };
 }
 
 const base = () => ({ project: projectWith(), baseUrl: ORIGIN, seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() } });
 
 async function assertNothingReached(plans: readonly JsonRecord[]): Promise<void> {
-  const { ports, counts, requests, events } = countingPorts();
+  const { ports, spy, requests, events } = countingPorts();
   assert.ok(plans.length >= 15, 'enough hostile plans');
   for (const plan of plans) {
     const outcome = await runUntrusted(plan, parsePlan, base(), ports);
     assert.ok('errors' in outcome, JSON.stringify(outcome));
   }
-  assert.equal(counts.driverCalls, 0, 'no driver method was called');
+  assert.equal(spy.calls.count(), 0, 'no driver method was called');
   assert.equal(networkRequests, 0, 'no network request was made');
   assert.equal(requests.length, 0, 'no service call was made');
   assert.equal(events.read().length, 0, 'nothing was logged');
@@ -306,7 +302,7 @@ test('every refused plan with a clipboard step reaches no driver, network or ser
 // Counter-example: an accepted plan with an advance and a clipboard check does reach the driver,
 // so the zero above can fail.
 test('counter-example: an accepted plan that advances the clock and checks the clipboard reaches the driver', async () => {
-  const { ports, counts } = countingPorts();
+  const { ports, spy } = countingPorts();
   await runUntrusted(planOf([OPEN_ORDERS, advanceClock(10, 'minutes'), COPY_LINK, expectClipboard('textContains', '/invite/')]), parsePlan, base(), ports);
-  assert.ok(counts.driverCalls > 0, 'the driver was asked to open a session');
+  assert.ok(spy.calls.count() > 0, 'the driver was asked to open a session');
 });

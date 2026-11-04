@@ -9,16 +9,10 @@ import {
     type RefusalReader,
     type SessionEgress,
 } from "@revisum/driver-cdp";
-import {
-    failure,
-    success,
-    type LoggedEvent,
-    type RunEventSink,
-    type Session,
-} from "@revisum/engine";
-import { memoryRunEventSink } from "../../support/memory-ports.ts";
-import { fakeNetwork, fakeSession, runOnFakeSession, stepSummaries } from "./RunOnFakeSession.ts";
+import { failure, success, type RunEventSink, type Session } from "@revisum/engine";
+import { fakeSession, runOnFakeSession, stepSummaries, fakeNetwork } from "./RunOnFakeSession.ts";
 import { OPEN_CART, unsafePlan, type JsonRecord } from "./unsafe-feature-steps.ts";
+import { fakeRunEventSinkFailingOn } from "#test-support/fakes/FakeRunEventSink.ts";
 
 const REFUSALS_UNREAD = "egress-unread";
 const BROKEN = "the proxy's refusals could not be read: connect ECONNREFUSED";
@@ -98,18 +92,10 @@ const lastRunState = (events: RunEventSink): unknown =>
 const FINAL_STATES: readonly unknown[] = ["Passed", "Failed", "Errored", "Denied"];
 
 // A log that works until it is told how the run ended.
-function logFailingAtTheEnd(): RunEventSink {
-    const kept = memoryRunEventSink();
-    return {
-        read: () => kept.read(),
-        append(event: LoggedEvent) {
-            if (event.kind === "run.state" && FINAL_STATES.includes(event.state)) {
-                throw new Error("the log could not be written");
-            }
-            kept.append(event);
-        },
-    };
-}
+const logFailingAtTheEnd = (): RunEventSink =>
+    fakeRunEventSinkFailingOn(
+        (event) => event.kind === "run.state" && FINAL_STATES.includes(event.state),
+    );
 
 describe("Using the run", () => {
     for (const verdict of VERDICTS) {

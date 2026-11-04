@@ -4,23 +4,15 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import {
-    DRIVER_FEATURES,
-    defaultRedactor,
     evidenceResult,
     failure,
     planParser,
     refusedSuiteResult,
     run,
     unreadSuiteResult,
-    type BrowserDriver,
     type RunManifest,
     type RunResult,
 } from "@revisum/engine";
-import {
-    memoryArtifactStore,
-    memoryEventSink,
-    memoryRunEventSink,
-} from "../../support/memory-ports.ts";
 import { authorise, trustedProjectFrom } from "../../support/policy-clearance.ts";
 import {
     evidenceHashOf,
@@ -32,10 +24,10 @@ import {
     SUITE_NAME,
     declaredCheckoutSuite,
     decodedReport,
-    evidenceContext,
     recordedReport,
-    specPath,
     type JsonRecord,
+    evidenceContext,
+    specPath,
 } from "./evidence-examples.ts";
 import { withValue } from "./plan-examples.ts";
 import { fakeSession, runOnFakeSession } from "./RunOnFakeSession.ts";
@@ -49,8 +41,9 @@ import {
     projectFileWith,
     projectWith,
 } from "./run-value-examples.ts";
-import { virtualClock } from "./service-call-examples.ts";
 import { OPEN_CART, unsafePlan } from "./unsafe-feature-steps.ts";
+import { fakeDriver } from "#test-support/fakes/FakeDriver.ts";
+import { driversOf, fakePorts } from "#test-support/fakes/FakePorts.ts";
 
 const EARLY_ORIGIN = "https://early.example.test";
 const LATE_ORIGIN = "https://late.example.test";
@@ -146,11 +139,10 @@ const LIST_EDITS: readonly ListEdit[] = [
     { name: "the list is reordered", origins: REFUSED_ORIGINS.toReversed() },
 ];
 
-const unavailableDriver: BrowserDriver = {
-    info: { id: "cdp", version: "fake", protocol: "none", performs: DRIVER_FEATURES },
+const unavailableDriver = fakeDriver({
     supports: () => failure({ reason: "engine-not-supported", detail: "not this engine" }),
     open: () => assert.fail("a target that is unavailable is never opened"),
-};
+});
 
 const planRunOnAnUnavailableTarget = async (): Promise<RunResult> => {
     const project = projectWith();
@@ -167,14 +159,7 @@ const planRunOnAnUnavailableTarget = async (): Promise<RunResult> => {
             fixtures: [],
             host: { platform: "test", arch: "test" },
         },
-        {
-            drivers: new Map([[unavailableDriver.info.id, unavailableDriver]]),
-            clock: virtualClock(),
-            artifacts: memoryArtifactStore(),
-            redactor: defaultRedactor(),
-            audit: memoryEventSink(),
-            events: memoryRunEventSink(),
-        },
+        fakePorts({ drivers: driversOf(unavailableDriver) }),
     );
 };
 

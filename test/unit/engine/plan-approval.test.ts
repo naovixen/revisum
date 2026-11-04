@@ -9,14 +9,12 @@
 // `standing` in its inputs.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import {
-  PERSON_ACTOR_TYPES, approvalFor, defaultRedactor, failure, mergeGateOpen, planHash, planStanding, run, success, unverified,
-  type Approval, type BrowserDriver, type Plan, type Project, type TargetId,
-} from '@revisum/engine';
-import { memoryArtifactStore, memoryEventSink, memoryRunEventSink, systemClock } from '../../support/memory-ports.ts';
+import { PERSON_ACTOR_TYPES, approvalFor, mergeGateOpen, planHash, planStanding, run, unverified, type Approval, type Plan, type Project, type TargetId } from '@revisum/engine';
 import { authorise, trustedProjectFrom } from '../../support/policy-clearance.ts';
 import { memoryApprovalStore, parsedSignupPlan, withRepository, type TestRepository } from './approval-repositories.ts';
 import { ORIGIN, TARGET_ID, signupPlan, testProject, testProjectInput, withValue, type JsonRecord } from './plan-examples.ts';
+import { fakeDriverNeverLaunching } from '#test-support/fakes/FakeDriver.ts';
+import { driversOf, fakePorts } from '#test-support/fakes/FakePorts.ts';
 
 const PRODUCTION_ORIGIN = 'https://shop.example.com';
 
@@ -53,21 +51,6 @@ const stringAt = (plan: JsonRecord, path: readonly (string | number)[]): string 
 
 // ---- Runs with a driver that counts calls and opens no browser -----------------------------------
 
-type CountingDriver = BrowserDriver & { calls: number };
-
-function countingDriver(): CountingDriver {
-  const driver: CountingDriver = {
-    info: { id: 'cdp', version: 'test', protocol: 'none' },
-    calls: 0,
-    supports() { driver.calls += 1; return success(true as const); },
-    async open() {
-      driver.calls += 1;
-      return failure({ reason: 'launch-failed' as const, detail: 'the counting driver opens no browser' });
-    },
-  };
-  return driver;
-}
-
 // A project whose allowed origins include a production one, declared as production.
 // `policy` optionally adds the project's policy, such as the allowance for approved plans on production.
 const productionFields = (policy?: JsonRecord): JsonRecord =>
@@ -75,17 +58,14 @@ const productionFields = (policy?: JsonRecord): JsonRecord =>
 const projectWithProduction = (policy?: JsonRecord): Project => testProject({}, productionFields(policy));
 
 async function runPlan(plan: Plan, standing: ReturnType<typeof planStanding>, baseUrl: string, policy?: JsonRecord) {
-  const driver = countingDriver();
+  const driver = fakeDriverNeverLaunching();
   // Every run takes a plan the policy gate authorised, under the plan's standing.
   const authorised = authorise(plan, await trustedProjectFrom(testProjectInput({}, productionFields(policy))), standing);
   const result = await run({
     plan: authorised, project: projectWithProduction(policy), targetId: TARGET_ID as TargetId, baseUrl, seed: 7, fixedTimeMilliseconds: 0,
     fixtures: [], host: { platform: 'test', arch: 'test' }, standing,
-  }, {
-    drivers: new Map([['cdp', driver]]), clock: systemClock, artifacts: memoryArtifactStore(),
-    redactor: defaultRedactor(), audit: memoryEventSink(), events: memoryRunEventSink(),
-  });
-  return { result, driverCalls: driver.calls };
+  }, fakePorts({ drivers: driversOf(driver) }));
+  return { result, driverCalls: driver.calls.count() };
 }
 
 // ---- No approval: a proposal ---------------------------------------------------------------------

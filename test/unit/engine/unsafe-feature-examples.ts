@@ -15,16 +15,13 @@
 //   - a run on the recording driver, which declares no page scripts, still builds its manifest, and
 //     reports those steps as unsupported-step. Its database commands go to a fake runner.
 import assert from 'node:assert/strict';
-import {
-  defaultRedactor, environmentSecretStore, guaranteeStatement, parseProject, planParser, run, unsafeFeaturesOf,
-  type GuaranteeId, type GuaranteeStatement, type Plan, type PlanError, type PlanStanding, type Project, type Result, type RunResult,
-  type UnsafeFeature,
-} from '@revisum/engine';
-import { memoryArtifactStore, memoryEventSink, memoryRunEventSink, systemClock } from '../../support/memory-ports.ts';
+import { guaranteeStatement, parseProject, planParser, run, unsafeFeaturesOf, type GuaranteeId, type GuaranteeStatement, type Plan, type PlanError, type PlanStanding, type Project, type Result, type RunResult, type UnsafeFeature } from '@revisum/engine';
 import { authorise, trustedProjectFrom } from '../../support/policy-clearance.ts';
 import { DATABASE_PASSWORD, fakeCommandRunner } from './database-command-examples.ts';
 import { DEFAULT_CLOCK_START, DEFAULT_SEED, recordingDriver, type Recording } from './run-value-examples.ts';
 import { DATABASE_SECRET, FEATURES, ORIGIN, SCRIPT_SOURCES, unsafeProjectFile, type FeatureName, type JsonRecord } from './unsafe-feature-steps.ts';
+import { driversOf, fakePorts } from '#test-support/fakes/FakePorts.ts';
+import { fakeSecretStore } from '#test-support/fakes/FakeSecretStore.ts';
 
 export type ParsePlan = (input: unknown) => Result<Plan, readonly PlanError[]>;
 
@@ -123,11 +120,7 @@ export async function runUnsafePlan(raw: unknown, options: UnsafeRunOptions = {}
     seed: options.seed ?? DEFAULT_SEED, fixedTimeMilliseconds: DEFAULT_CLOCK_START, fixtures: [], host: { platform: 'test', arch: 'test' },
     scriptSources: sourceBytes(options.scriptSources),
     ...(options.standing === undefined ? {} : { standing: options.standing }),
-  }, {
-    drivers: new Map([[driver.info.id, driver]]), clock: systemClock, artifacts: memoryArtifactStore(),
-    redactor: defaultRedactor(), audit: memoryEventSink(), events: memoryRunEventSink(),
-    secrets: environmentSecretStore({ [DATABASE_SECRET]: DATABASE_PASSWORD }), databaseCommands: fakeCommandRunner().port,
-  });
+  }, fakePorts({ drivers: driversOf(driver), secrets: fakeSecretStore({ [DATABASE_SECRET]: DATABASE_PASSWORD }), databaseCommands: fakeCommandRunner().port }));
   return { result, recording };
 }
 
