@@ -15,10 +15,10 @@ import {
   structuralSelectorValidity, unmaskElements, whatAClickActivates,
 } from './in-page.ts';
 import { findByLabel, findByTestId, findByText, findStructural, inDocumentOrder } from './FindByLabel.ts';
-import { HitCheckOutcome, hitChecks } from './HitChecks.ts';
+import { HitCheckOutcome, hitChecks, type ArmedClick, type HitChecks } from './HitChecks.ts';
 import { heldModifierKeys } from './modifier-keys.ts';
 import { pageAudit, parseAudit, toFindings } from './page-audit.ts';
-import type { Actionability, DownloadCapture, DriverSession, PageEvents, PageFunction, PageOperations, Point, ScriptCallOutcome } from './page-operations.ts';
+import type { Actionability, DownloadCapture, DriverSession, PageEvents, PageFunction, PageOperations, PageWithInput, Point, ScriptCallOutcome } from './page-operations.ts';
 import { PageHeldByDialog } from './PageHeldByDialog.ts';
 import type { ConnectionFailure } from './SessionEgress.ts';
 
@@ -450,15 +450,14 @@ const NOTHING_BEFORE_PRESS = (): Promise<void> => Promise.resolve();
 
 // The ports of one document. `masked` lists the documents a screenshot masks: this one and every
 // document it is framed in, so a capture from inside a frame hides what the top page hides. The
-// first of them is the top document.
+// first of them is the top document. Input goes only through `clickChecks`.
 function documentPorts<Handle>(
-  operations: PageOperations<Handle>, masked: readonly PageOperations<Handle>[], environment: SessionEnvironment, details: SessionDetails,
+  operations: PageOperations<Handle>, clickChecks: HitChecks<Handle>, masked: readonly PageOperations<Handle>[], environment: SessionEnvironment, details: SessionDetails,
 ): DocumentSession {
   const isTopDocument = masked.length === 1;
   const events = details.events;
   const crashed = (): boolean => events.crashed();
   const timeout = environment.timeoutMilliseconds;
-  const clickChecks = hitChecks(operations);
   // A refusal the session holds, from whenever it came, as the failure of what is under way.
   const failureOfRefusedDecision = (code: DriverErrorCode): DriverError | null => {
     const [refusal] = events.refusedRequestDecisions();
@@ -511,10 +510,10 @@ function documentPorts<Handle>(
   // no answer, the press landed only if the element it was sent to has gone. So too if it landed and
   // no click followed: a press that takes the element away leaves no click to fire. Otherwise nothing
   // says where it went, so the step fails.
-  const readHitAfterClick = async (element: Handle, check: Handle): Promise<HitCheckOutcome> => {
+  const readHitAfterClick = async (element: Handle, armed: ArmedClick): Promise<HitCheckOutcome> => {
     let hit: HitCheckOutcome;
     try {
-      hit = await clickChecks.read(check);
+      hit = await armed.read();
     } catch (readFailure) {
       if (readFailure instanceof PageHeldByDialog || await operations.isElementGone(element)) {
         return HitCheckOutcome.Hit;
@@ -540,10 +539,10 @@ function documentPorts<Handle>(
       return failure(denied);
     }
     await beforePress(element, at);
-    const check = await clickChecks.arm(element);
+    const armed = await clickChecks.arm(element);
     const clickAndReadHit = async (): Promise<HitCheckOutcome> => {
-      await operations.click(element, at);
-      return readHitAfterClick(element, check);
+      await armed.press(at);
+      return readHitAfterClick(element, armed);
     };
     const hit = await inputWithinTimeout(clickAndReadHit(), stepDeadline);
     if (!hit.ok) {
@@ -567,7 +566,7 @@ function documentPorts<Handle>(
       if (!found.ok) return found;
       const denied = await denial(operations, found.value, guard);
       if (denied !== null) return failure(denied);
-      await operations.setFiles(found.value, [path.value]);
+      await clickChecks.input.setFiles(found.value, [path.value]);
       return success(undefined);
     }
     const waited = await waitUntilActionable(operations, action.locator, timeout, timeout, crashed);
@@ -576,7 +575,7 @@ function documentPorts<Handle>(
     const denied = await denial(operations, element, guard);
     if (denied !== null) return failure(denied);
     switch (action.type) {
-      case 'hover': await operations.hover(at); break;
+      case 'hover': await clickChecks.input.hover(at); break;
       // The secret is revealed here, as it is typed, and nowhere else in this driver. Lines are
       // joined by line feeds and inserted as text, so no Enter key press can send a form early.
       // Noted before typing: a fill that fails part way may still have typed some of it.
@@ -584,11 +583,11 @@ function documentPorts<Handle>(
         if (typedSecret !== null) {
           details.secretTypedFields.push({ locator: action.locator, isGone: () => operations.isElementGone(element) });
         }
-        await operations.fill(element, typedSecret === null ? textToFill(action.value) : reveal(typedSecret));
+        await clickChecks.input.fill(element, typedSecret === null ? textToFill(action.value) : reveal(typedSecret));
         break;
       case 'press': {
         // Enter on a form or a link starts a navigation as a click does.
-        const pressed = await inputWithinTimeout(operations.press(element, action.key, heldModifierKeys(action.modifiers ?? [], process.platform)), stepDeadline);
+        const pressed = await inputWithinTimeout(clickChecks.input.press(element, action.key, heldModifierKeys(action.modifiers ?? [], process.platform)), stepDeadline);
         if (!pressed.ok) {
           return pressed;
         }
@@ -863,7 +862,7 @@ function documentPorts<Handle>(
       if (await rejectsSelector(operations, locator)) return failure(SELECTOR_INVALID);
       const found = await waitUntilFound(operations, locator, timeout, crashed);
       if (!found.ok) return found;
-      let inner: PageOperations<Handle> | null;
+      let inner: PageWithInput<Handle> | null;
       try {
         inner = await operations.frame(found.value);
       } catch (error) {
@@ -871,7 +870,7 @@ function documentPorts<Handle>(
       }
       // An element that is no iframe, or an iframe whose document runs in another process.
       if (inner === null) return failure({ code: 'unsupported-step', detail: 'the element is not an iframe whose document this driver can reach' });
-      return success(documentPorts(inner, [...masked, inner], environment, details));
+      return success(documentPorts(inner, hitChecks(inner), [...masked, inner], environment, details));
     },
     crashed,
     isDialogOpen: () => events.openDialog() !== null,
@@ -892,10 +891,10 @@ async function newTabAt(openTab: () => Promise<Result<DriverSession, DriverError
   return navigated;
 }
 
-export function buildSession<Handle>(operations: PageOperations<Handle>, environment: SessionEnvironment, details: SessionDetails): DriverSession {
+export function buildSession<Handle>(operations: PageWithInput<Handle>, environment: SessionEnvironment, details: SessionDetails): DriverSession {
   const openTab = details.openTab;
   return {
-    ...documentPorts(operations, [operations], environment, details),
+    ...documentPorts(operations, hitChecks(operations), [operations], environment, details),
     ...(openTab === undefined ? {} : { newTab: (url: string) => newTabAt(openTab, url, () => details.events.crashed()) }),
     ...(details.network === undefined ? {} : { network: details.network }),
     ...(details.storage === undefined ? {} : { storage: details.storage }),

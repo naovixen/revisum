@@ -19,7 +19,7 @@ import { BrowserNetwork, atResponseStage } from './network-stubs.ts';
 import { afterTwoFrames, focusAndSelect, focusElement, frameContentOffset, isConnectedToItsDocument, scriptResultText } from './in-page.ts';
 import type { HeldModifierKey } from './modifier-keys.ts';
 import type {
-  DriverSession, ExposedStates, OwnBrowserDriver, PageArgument, PageFunction, PageOperations, Point, RoleAndName, ScriptCallOutcome,
+  DriverSession, ExposedStates, OwnBrowserDriver, PageArgument, PageFunction, PageWithInput, Point, RoleAndName, ScriptCallOutcome,
 } from './page-operations.ts';
 import { nodesAPressPasses, pressActsByItself } from './NodesAPressPasses.ts';
 import { KeptObjectGone } from './KeptObjectGone.ts';
@@ -504,6 +504,8 @@ const FRAME_WORLD_NAME = 'driver-frame';
 // The name of the isolated script world click checks live in. The browser gives a frame's document one
 // world for each name, so this makes no more of them however many clicks there are.
 const CLICK_CHECK_WORLD_NAME = 'driver-click-check';
+// The group of the objects kept in that world, so that one nobody holds any more can still be let go.
+const OUT_OF_REACH_OBJECT_GROUP = 'driver-kept-out-of-reach';
 // What Page.navigate reports for a response whose HTTP status is an error and whose body is empty.
 const HTTP_ERROR_STATUS = 'net::ERR_HTTP_RESPONSE_CODE_FAILURE';
 // Messages of a command that named an execution context the page has since destroyed.
@@ -526,7 +528,7 @@ function throwIfThePageThrew(called: CallResult): void {
 
 // PageOperations over one flat CDP session, for its top document or one of its iframes' documents.
 // Element handles are remote object ids.
-class CdpPage implements PageOperations<string> {
+class CdpPage implements PageWithInput<string> {
   readonly protocol = 'cdp' as const;
   readonly accessibilityTreeSource = 'browser' as const;
   readonly #connection: CdpConnection;
@@ -709,7 +711,7 @@ class CdpPage implements PageOperations<string> {
     const elementInWorld = resolved.object.objectId;
     try {
       const called = await this.#ask(CALL_FUNCTION_ON, {
-        functionDeclaration: pageFunction.toString(), executionContextId, arguments: [{ objectId: elementInWorld }], returnByValue: false,
+        functionDeclaration: pageFunction.toString(), executionContextId, arguments: [{ objectId: elementInWorld }], returnByValue: false, objectGroup: OUT_OF_REACH_OBJECT_GROUP,
       });
       throwIfThePageThrew(called);
       const kept = called.result.objectId;
@@ -720,6 +722,21 @@ class CdpPage implements PageOperations<string> {
     } finally {
       await this.releaseObject(elementInWorld);
     }
+  }
+
+  async callOutOfReach(pageFunction: PageFunction): Promise<unknown> {
+    let called: CallResult;
+    try {
+      const executionContextId = await this.#isolatedWorld(await this.frameId(), CLICK_CHECK_WORLD_NAME);
+      called = await this.#ask(CALL_FUNCTION_ON, { functionDeclaration: pageFunction.toString(), executionContextId, returnByValue: true });
+    } catch (error) {
+      if (LOST_OBJECT.test(errorText(error)) || FRAME_REMOVED.test(errorText(error))) {
+        throw new KeptObjectGone();
+      }
+      throw error;
+    }
+    throwIfThePageThrew(called);
+    return called.result.value;
   }
 
   async callOnObject(object: string, pageFunction: PageFunction): Promise<unknown> {
@@ -738,9 +755,17 @@ class CdpPage implements PageOperations<string> {
     return called.result.value;
   }
 
-  async releaseObject(object: string): Promise<void> {
+  releaseObject(object: string): Promise<void> {
+    return this.#releaseKept('Runtime.releaseObject', { objectId: object });
+  }
+
+  releaseObjectsOutOfReach(): Promise<void> {
+    return this.#releaseKept('Runtime.releaseObjectGroup', { objectGroup: OUT_OF_REACH_OBJECT_GROUP });
+  }
+
+  async #releaseKept(method: string, parameters: Record<string, unknown>): Promise<void> {
     try {
-      await this.#send('Runtime.releaseObject', { objectId: object });
+      await this.#send(method, parameters);
     } catch (error) {
       // An object whose document or page has gone has gone too, and one a dialog holds goes with its
       // document, so none of these has anything to report.
@@ -940,7 +965,7 @@ class CdpPage implements PageOperations<string> {
     await this.#send('DOM.setFileInputFiles', { files: [...paths], objectId: element });
   }
 
-  async frame(element: string): Promise<PageOperations<string> | null> {
+  async frame(element: string): Promise<PageWithInput<string> | null> {
     const described = await this.#send<DescribedNode>('DOM.describeNode', { objectId: element });
     const frameId = described.node.frameId;
     if (frameId === undefined) return null;

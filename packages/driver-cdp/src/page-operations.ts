@@ -33,14 +33,21 @@ export interface PageOperations<Handle> {
   callForElements(pageFunction: PageFunction, inputs: readonly PageArgument<Handle>[]): Promise<Handle[]>;
   // Calls a page function with the element, in a script world of the driver's own, which the page's
   // scripts cannot see or patch, and keeps the object it returns in the browser. Whoever calls this
-  // must give that object to releaseObject.
+  // must give that object to releaseObject or releaseObjectsOutOfReach.
   callForObjectOutOfReach(pageFunction: PageFunction, element: Handle): Promise<Handle>;
+  // Calls a page function in that script world of this document, and returns what it returns as the
+  // browser reports it. The world is the document's, so any PageOperations of the document reaches what
+  // an earlier call left there. Throws KeptObjectGone when the document has gone.
+  callOutOfReach(pageFunction: PageFunction): Promise<unknown>;
   // Calls a page function on a kept object, as `this`, in the script world that made it, and returns
   // what it returns as the browser reports it. Throws KeptObjectGone when the object no longer exists.
   callOnObject(object: Handle, pageFunction: PageFunction): Promise<unknown>;
   // Lets the browser forget a kept object. Never throws, since a caller is no better off for it: a
   // failure other than the object having gone is kept for the session's close to report.
   releaseObject(object: Handle): Promise<void>;
+  // Lets the browser forget every object callForObjectOutOfReach has kept in this page's documents.
+  // Never throws, for the same reason.
+  releaseObjectsOutOfReach(): Promise<void>;
   // Elements with this role and exact accessible name, found by the browser's own accessibility engine.
   byRole(role: string, name: string): Promise<Handle[]>;
   accessibilityTree(): Promise<A11yNode>;
@@ -58,18 +65,9 @@ export interface PageOperations<Handle> {
   // False when a press at the point can start nothing: neither it nor what holds it has a listener
   // for a pointer's events or does anything by itself when pressed.
   canPressStartAnything(element: Handle, at: Point): Promise<boolean>;
-  // Points are in this document's viewport.
-  click(element: Handle, at: Point): Promise<void>;
-  hover(at: Point): Promise<void>;
-  // Inserts the text as typed text, line feeds included, with no key press for them.
-  fill(element: Handle, value: string): Promise<void>;
-  // Holds the modifier keys down in order, presses the key, then releases them in reverse.
-  press(element: Handle, key: Key, modifiers: readonly HeldModifierKey[]): Promise<void>;
-  // Gives a file input these files, by absolute path, firing its input and change events.
-  setFiles(element: Handle, paths: readonly string[]): Promise<void>;
   // The document of the iframe element, as operations of its own; null when the element is not an
   // iframe whose document this protocol can reach.
-  frame(element: Handle): Promise<PageOperations<Handle> | null>;
+  frame(element: Handle): Promise<PageWithInput<Handle> | null>;
   // A PNG of the viewport.
   screenshotPng(): Promise<Uint8Array>;
   // The URL the browser could not show, while it shows its own error page in its place, such as
@@ -80,6 +78,22 @@ export interface PageOperations<Handle> {
   // page (scriptResultText in in-page.ts). It never times out by itself: the session races it.
   callScript(source: string, scriptArguments: Readonly<Record<string, string | number | boolean>>, maximumResultBytes: number): Promise<ScriptCallOutcome>;
 }
+
+// The input a session sends a document. It is apart from PageOperations so that a session can reach it
+// only through hitChecks (HitChecks.ts), and a new kind of input does not compile until it goes there.
+export interface PageInput<Handle> {
+  // Points are in this document's viewport.
+  click(element: Handle, at: Point): Promise<void>;
+  hover(at: Point): Promise<void>;
+  // Inserts the text as typed text, line feeds included, with no key press for them.
+  fill(element: Handle, value: string): Promise<void>;
+  // Holds the modifier keys down in order, presses the key, then releases them in reverse.
+  press(element: Handle, key: Key, modifiers: readonly HeldModifierKey[]): Promise<void>;
+  // Gives a file input these files, by absolute path, firing its input and change events.
+  setFiles(element: Handle, paths: readonly string[]): Promise<void>;
+}
+
+export type PageWithInput<Handle> = PageOperations<Handle> & PageInput<Handle>;
 
 // How one call of a page script ended: with its result as JSON text, with a throw or a rejection,
 // or with a result JSON cannot write.

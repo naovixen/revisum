@@ -1,11 +1,11 @@
 /// <reference lib="dom" />
 // What decides whether a click's press reached its element. The page must not be able to write that
 // answer or skew it, so the check lives in a script world of the driver's own: the page's scripts cannot
-// reach its listeners, and what they patch is not what it calls. It has no name there either: the driver
-// holds it through the browser, by handle. Only events the browser made count, since a page can
-// dispatch any other event it likes.
+// reach its listeners, and what they patch is not what it calls. The window it is held on there is that
+// world's own, not the one the page's scripts see, so it has no name they can read. Only events the
+// browser made count, since a page can dispatch any other event it likes.
 import { KeptObjectGone } from "./KeptObjectGone.ts";
-import type { PageOperations } from "./page-operations.ts";
+import type { PageInput, PageWithInput, Point } from "./page-operations.ts";
 
 export const HitCheckOutcome = {
     Hit: "hit",
@@ -24,6 +24,8 @@ type ArmedHitCheck = {
     disarm: () => void;
 };
 
+type WindowHoldingAHitCheck = Window & { armedHitCheck?: ArmedHitCheck | undefined };
+
 // Sent with toString(), like the functions of in-page.ts: no imports and no closures over Node values.
 // Pointer and mouse events whose target is not the element (or its label) are swallowed and recorded
 // as a miss, so a click that lands on something else has no effect and fails its step. A listener on
@@ -31,6 +33,7 @@ type ArmedHitCheck = {
 // click on its way down, and what the button does with a click once it has it is the button's own.
 function armHitCheck(element: Element): ArmedHitCheck {
     const eventTypes = ["pointerdown", "mousedown", "pointerup", "mouseup", "click"];
+    const world: WindowHoldingAHitCheck = window;
     const stopListeningOnWindow = (): void => {
         for (const eventType of eventTypes) {
             window.removeEventListener(eventType, onPointerEvent, true);
@@ -47,6 +50,7 @@ function armHitCheck(element: Element): ArmedHitCheck {
         disarm: () => {
             stopListeningOnWindow();
             element.removeEventListener("click", onClickAtElement, true);
+            world.armedHitCheck = undefined;
         },
     };
     function onPointerEvent(event: Event): void {
@@ -82,6 +86,7 @@ function armHitCheck(element: Element): ArmedHitCheck {
         window.addEventListener(eventType, onPointerEvent, true);
     }
     element.addEventListener("click", onClickAtElement, true);
+    world.armedHitCheck = check;
     return check;
 }
 
@@ -89,6 +94,14 @@ function armHitCheck(element: Element): ArmedHitCheck {
 function readHitCheck(this: ArmedHitCheck): string {
     this.disarm();
     return this.state === "hit" && !this.hasClickArrived ? "no-click" : this.state;
+}
+
+// Called in the check's world. Says whether a check was still armed there.
+function disarmArmedHitCheck(): boolean {
+    const world: WindowHoldingAHitCheck = window;
+    const armed = world.armedHitCheck;
+    armed?.disarm();
+    return armed !== undefined;
 }
 
 function decodedOutcome(reported: unknown): HitCheckOutcome {
@@ -99,48 +112,75 @@ function decodedOutcome(reported: unknown): HitCheckOutcome {
     return outcome;
 }
 
-export type HitChecks<Handle> = {
-    // Arms one check before a press, first disarming any check an earlier click left unread.
-    arm(element: Handle): Promise<Handle>;
+export type ArmedClick = {
+    // Sends the press the check is armed for.
+    press(at: Point): Promise<void>;
     // Disarms the check and says what it saw. Throws when it cannot be read: its document has gone, a
     // dialog holds the page, or the answer is no outcome.
-    read(check: Handle): Promise<HitCheckOutcome>;
+    read(): Promise<HitCheckOutcome>;
 };
 
-// The click checks of one document. A check nobody could read keeps its listeners on the page and
-// cannot be disarmed once it is forgotten, so it is held until the next arm, or goes with its document.
-export function hitChecks<Handle>(operations: PageOperations<Handle>): HitChecks<Handle> {
-    const unread = new Set<Handle>();
-    // Not waited for: the answer the step needs is in, and the browser answers nothing to a page that
-    // has started to navigate, which a click often makes it do.
-    const forget = (check: Handle): void => {
-        unread.delete(check);
-        void operations.releaseObject(check);
-    };
-    // A check that has gone with its document has no listeners left to take off.
-    const disarmLeftOver = async (check: Handle): Promise<void> => {
+export type HitChecks<Handle> = {
+    // Arms one check for a press, first disarming any check an earlier press left armed.
+    arm(element: Handle): Promise<ArmedClick>;
+    // All other input to the page, each sent only once any check an earlier press left armed is off.
+    // Such a check would cancel a click the input makes, and the input would still seem to have worked.
+    // A disarm that fails stops the input, and the check stays armed for the next one to try.
+    readonly input: Omit<PageInput<Handle>, "click">;
+};
+
+// The click checks of one document, and the only way a session sends that document input. A check
+// nobody could read keeps its listeners on the page: a dialog that opens during a press holds up both
+// the read and the release. So its world holds it, where any later input reaches it, whichever ports
+// object sends that input, until it is disarmed or goes with its document.
+export function hitChecks<Handle>(page: PageWithInput<Handle>): HitChecks<Handle> {
+    // A document that has gone took its check with it, so there are no listeners left to take off. The
+    // object kept for a check nobody could read is let go here: while the dialog held the page it could
+    // not be. Not waited for, as a page that has started to navigate answers nothing, and the browser
+    // has it before anything sent after this.
+    const disarmLeftOver = async (): Promise<void> => {
         try {
-            await operations.callOnObject(check, readHitCheck);
+            if ((await page.callOutOfReach(disarmArmedHitCheck)) === true) {
+                void page.releaseObjectsOutOfReach();
+            }
         } catch (error) {
             if (!(error instanceof KeptObjectGone)) {
                 throw error;
             }
         }
-        forget(check);
     };
     return {
         async arm(element) {
-            for (const leftOver of unread) {
-                await disarmLeftOver(leftOver);
-            }
-            const check = await operations.callForObjectOutOfReach(armHitCheck, element);
-            unread.add(check);
-            return check;
+            await disarmLeftOver();
+            const check = await page.callForObjectOutOfReach(armHitCheck, element);
+            return {
+                press: (at) => page.click(element, at),
+                async read() {
+                    const reported = await page.callOnObject(check, readHitCheck);
+                    // Not waited for: the answer the step needs is in, and the browser answers nothing
+                    // to a page that has started to navigate, which a click often makes it do.
+                    void page.releaseObject(check);
+                    return decodedOutcome(reported);
+                },
+            };
         },
-        async read(check) {
-            const outcome = decodedOutcome(await operations.callOnObject(check, readHitCheck));
-            forget(check);
-            return outcome;
+        input: {
+            async hover(at) {
+                await disarmLeftOver();
+                await page.hover(at);
+            },
+            async fill(element, value) {
+                await disarmLeftOver();
+                await page.fill(element, value);
+            },
+            async press(element, key, modifiers) {
+                await disarmLeftOver();
+                await page.press(element, key, modifiers);
+            },
+            async setFiles(element, paths) {
+                await disarmLeftOver();
+                await page.setFiles(element, paths);
+            },
         },
     };
 }
