@@ -15,8 +15,8 @@
 // broken test and throws. Readable text is written by hand only in the statements the spec gives
 // (its grammar, the plan 1.2 addition and its examples); otherwise it comes from writePlanText.
 import {
-  CLOCK_ADVANCE_MODES, CLOCK_UNITS, DATE_ANCHORS, DATE_FORMATS, ELEMENT_STATE_KINDS, GENERATED_VALUE_KINDS, KEYS, LOCATOR_KINDS, MODIFIERS,
-  REQUEST_COUNT_KINDS, ROLES, planParser,
+  CLOCK_ADVANCE_MODES, CLOCK_UNITS, DATE_ANCHORS, DATE_FORMATS, ELEMENT_STATE_KINDS, GENERATED_VALUE_KINDS, KEYS, MODIFIERS,
+  REQUEST_COUNT_KINDS, ROLES, SEMANTIC_LOCATOR_KINDS, planParser,
   type Plan, type Project, type StepType,
 } from '@revisum/engine';
 import { TARGET_ID, TEST_SERVICE_SECRET_NAMES, goldenPlan, goldenPlanNames, testProject, type JsonRecord } from './plan-examples.ts';
@@ -449,7 +449,7 @@ export function languageFeatures(): readonly string[] {
   };
   return [
     ...EVERY_STEP_TYPE.map((type) => `step ${type}`),
-    ...LOCATOR_KINDS.map((kind) => `locator ${kind}`),
+    ...SEMANTIC_LOCATOR_KINDS.map((kind) => `locator ${kind}`),
     ...ROLES.map((roleName) => `role ${roleName}`),
     'position first', 'position last', 'position 1', 'position ordinal', 'locator attribute',
     'reference in locator', 'reference in check', 'reference in option',
