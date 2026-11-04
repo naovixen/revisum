@@ -31,12 +31,14 @@ type WindowHoldingAHitCheck = Window & { armedHitCheck?: ArmedHitCheck | undefin
 // as a miss, so a click that lands on something else has no effect and fails its step. A listener on
 // the element itself says whether the click reached it: a page can let the press through and stop the
 // click on its way down, and what the button does with a click once it has it is the button's own.
+// A form's named inputs hide its methods, and a page's named elements hide the window's, in this world
+// as in the page's. So nothing here is called by looking it up on either: it comes from the prototypes.
 function armHitCheck(element: Element): ArmedHitCheck {
     const eventTypes = ["pointerdown", "mousedown", "pointerup", "mouseup", "click"];
     const world: WindowHoldingAHitCheck = window;
     const stopListeningOnWindow = (): void => {
         for (const eventType of eventTypes) {
-            window.removeEventListener(eventType, onPointerEvent, true);
+            EventTarget.prototype.removeEventListener.call(window, eventType, onPointerEvent, true);
         }
     };
     const onClickAtElement = (event: Event): void => {
@@ -48,9 +50,17 @@ function armHitCheck(element: Element): ArmedHitCheck {
         state: "none",
         hasClickArrived: false,
         disarm: () => {
+            // A timed-out read can disarm late, once a later press has armed a check of its own.
+            if (world.armedHitCheck === check) {
+                world.armedHitCheck = undefined;
+            }
             stopListeningOnWindow();
-            element.removeEventListener("click", onClickAtElement, true);
-            world.armedHitCheck = undefined;
+            EventTarget.prototype.removeEventListener.call(
+                element,
+                "click",
+                onClickAtElement,
+                true,
+            );
         },
     };
     function onPointerEvent(event: Event): void {
@@ -62,9 +72,11 @@ function armHitCheck(element: Element): ArmedHitCheck {
         const path = event.composedPath();
         const innermost = path[0];
         const target = innermost instanceof Element ? innermost : null;
-        const label = target?.closest("label");
+        const label = target === null ? null : Element.prototype.closest.call(target, "label");
         const isOnElement =
-            target !== null && (path.includes(element) || label?.control === element);
+            target !== null &&
+            (path.includes(element) ||
+                (label instanceof HTMLLabelElement && label.control === element));
         // The click event ends the pointer sequence, so the check stops listening there. It must not
         // outlive the click: a dialog the click opens can stop the driver from reading it, and a
         // check left armed would swallow the page's own later clicks. The element's own listener stays,
@@ -83,9 +95,9 @@ function armHitCheck(element: Element): ArmedHitCheck {
         event.stopImmediatePropagation();
     }
     for (const eventType of eventTypes) {
-        window.addEventListener(eventType, onPointerEvent, true);
+        EventTarget.prototype.addEventListener.call(window, eventType, onPointerEvent, true);
     }
-    element.addEventListener("click", onClickAtElement, true);
+    EventTarget.prototype.addEventListener.call(element, "click", onClickAtElement, true);
     world.armedHitCheck = check;
     return check;
 }

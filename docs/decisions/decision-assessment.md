@@ -24,6 +24,7 @@
 | The review standard would send reviewers in circles | No requirement removed | "The review is the oracle, don't base removing requirements on the existing code. The existing code should be fixed." Each fix is done on its own, and anything else found goes under the check it belongs to, not into the fix in hand |
 | False passes would get past the review standard | Re-run the break test | Added as the last item of grounding the core |
 | The condition lint part's second review was `not clear` (2026-11-04) | Fix two, then tick | A recorded exception to ticking only on a clear review: 180 and 181 are fixed with their own limited review, and the part then ticks. 176, 177, 178, 182, 183 and 185 become requirements of the driver port, which can't clear without them, and 184 goes with split `run` |
+| The limited review of that fix was `not clear` on its second round (2026-11-04) | Fix 189, 190 and 191, then tick | No third review, so the review doesn't circle; the driver port's review re-checks the file. The reproduced false pass in 186 stays with the driver port, which can't clear without it |
 
 **Network blocks:** the founder rejected flag-by-flag blocking as likely to bring up subtle issues, and asked for research on all blocks and related code before ruling. The rulings and the research are in `docs/decisions/host-egress-proxy.md`.
 
