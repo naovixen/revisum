@@ -60,7 +60,14 @@ export function readFields(
             return [];
         }
         const readField = typeof field === "function" ? field : field.readWhenPresent;
-        return [[key, readField(fields[key], `${path}.${key}`, issues)]];
+        const fieldPath = `${path}.${key}`;
+        const issuesBeforeField = issues.length;
+        const value = readField(fields[key], fieldPath, issues);
+        // A rejection must give its reason, even when the reader doesn't.
+        if (value === INVALID && issues.length === issuesBeforeField) {
+            issues.push({ code: "wrong_type", path: fieldPath });
+        }
+        return [[key, value]];
     });
     const hasInvalidField = read.some(([, value]) => value === INVALID);
     return hasInvalidField || issues.length !== before ? INVALID : Object.fromEntries(read);
