@@ -1718,17 +1718,6 @@
       "count": 1
     }
   },
-  "test/containers/keeping-browser-records.ts": {
-    "@typescript-eslint/no-unsafe-return": {
-      "count": 2
-    },
-    "curly": {
-      "count": 3
-    },
-    "revisum/file-name-matches-export": {
-      "count": 1
-    }
-  },
   "test/containers/plan-run-inside.ts": {
     "curly": {
       "count": 3
@@ -2147,7 +2136,7 @@
   },
   "test/contract/page-script-egress.test.ts": {
     "curly": {
-      "count": 4
+      "count": 1
     },
     "revisum/file-name-matches-export": {
       "count": 1
@@ -2220,7 +2209,7 @@
       "count": 1
     },
     "curly": {
-      "count": 4
+      "count": 1
     },
     "revisum/file-name-matches-export": {
       "count": 1
@@ -2257,9 +2246,6 @@
     }
   },
   "test/proofs/action-guard-passing.test.ts": {
-    "@typescript-eslint/require-await": {
-      "count": 9
-    },
     "revisum/file-name-matches-export": {
       "count": 1
     },
@@ -2525,7 +2511,7 @@
       "count": 1
     },
     "@typescript-eslint/require-await": {
-      "count": 2
+      "count": 1
     },
     "revisum/file-name-matches-export": {
       "count": 1
@@ -2572,9 +2558,6 @@
   },
   "test/proofs/plan-brand-check.test.ts": {
     "@typescript-eslint/no-unnecessary-type-assertion": {
-      "count": 1
-    },
-    "@typescript-eslint/require-await": {
       "count": 1
     },
     "curly": {
@@ -2751,7 +2734,7 @@
       "count": 1
     },
     "@typescript-eslint/require-await": {
-      "count": 10
+      "count": 4
     },
     "@typescript-eslint/strict-boolean-expressions": {
       "count": 4
@@ -3037,9 +3020,6 @@
     }
   },
   "test/support/policy-clearance.ts": {
-    "@typescript-eslint/require-await": {
-      "count": 6
-    },
     "curly": {
       "count": 2
     },
@@ -3128,9 +3108,6 @@
     },
     "@typescript-eslint/no-unsafe-assignment": {
       "count": 2
-    },
-    "@typescript-eslint/require-await": {
-      "count": 6
     },
     "curly": {
       "count": 13
@@ -3302,9 +3279,6 @@
     }
   },
   "test/unit/engine/approval-subject-hash.test.ts": {
-    "@typescript-eslint/require-await": {
-      "count": 1
-    },
     "curly": {
       "count": 3
     },
@@ -3352,7 +3326,7 @@
       "count": 1
     },
     "@typescript-eslint/require-await": {
-      "count": 2
+      "count": 1
     },
     "revisum/file-name-matches-export": {
       "count": 1
@@ -3449,9 +3423,6 @@
   "test/unit/engine/echo-page-driver.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 1
-    },
-    "@typescript-eslint/require-await": {
-      "count": 9
     },
     "curly": {
       "count": 3
@@ -3574,9 +3545,6 @@
     }
   },
   "test/unit/engine/guarded-driver.ts": {
-    "@typescript-eslint/require-await": {
-      "count": 9
-    },
     "curly": {
       "count": 10
     },
@@ -3651,9 +3619,6 @@
     "@typescript-eslint/no-unused-vars": {
       "count": 1
     },
-    "@typescript-eslint/require-await": {
-      "count": 1
-    },
     "revisum/file-name-matches-export": {
       "count": 1
     },
@@ -3686,9 +3651,6 @@
     },
     "@typescript-eslint/no-unused-vars": {
       "count": 2
-    },
-    "@typescript-eslint/require-await": {
-      "count": 1
     },
     "curly": {
       "count": 6
@@ -3729,9 +3691,6 @@
     }
   },
   "test/unit/engine/plan-drafts.test.ts": {
-    "@typescript-eslint/require-await": {
-      "count": 1
-    },
     "curly": {
       "count": 11
     },
@@ -3784,9 +3743,6 @@
     }
   },
   "test/unit/engine/plan-versions.test.ts": {
-    "@typescript-eslint/require-await": {
-      "count": 1
-    },
     "revisum/file-name-matches-export": {
       "count": 1
     },
@@ -3850,9 +3806,6 @@
     }
   },
   "test/unit/engine/policy-examples.ts": {
-    "@typescript-eslint/require-await": {
-      "count": 6
-    },
     "curly": {
       "count": 7
     },
@@ -4065,7 +4018,7 @@
       "count": 2
     },
     "@typescript-eslint/require-await": {
-      "count": 2
+      "count": 1
     },
     "curly": {
       "count": 12
@@ -4130,9 +4083,6 @@
     "@typescript-eslint/naming-convention": {
       "count": 1
     },
-    "@typescript-eslint/require-await": {
-      "count": 9
-    },
     "curly": {
       "count": 2
     },
@@ -4163,9 +4113,6 @@
   "test/unit/engine/secret-examples.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 1
-    },
-    "@typescript-eslint/require-await": {
-      "count": 10
     },
     "curly": {
       "count": 9
@@ -4220,9 +4167,6 @@
     }
   },
   "test/unit/engine/service-call-examples.ts": {
-    "@typescript-eslint/require-await": {
-      "count": 2
-    },
     "curly": {
       "count": 8
     },
@@ -4238,9 +4182,6 @@
       "count": 1
     },
     "@typescript-eslint/no-unused-vars": {
-      "count": 1
-    },
-    "@typescript-eslint/require-await": {
       "count": 1
     },
     "revisum/file-name-matches-export": {
@@ -4351,9 +4292,6 @@
     "@typescript-eslint/no-unused-vars": {
       "count": 1
     },
-    "@typescript-eslint/require-await": {
-      "count": 2
-    },
     "curly": {
       "count": 1
     },
@@ -4426,9 +4364,6 @@
     }
   },
   "test/unit/engine/target-examples.ts": {
-    "@typescript-eslint/require-await": {
-      "count": 2
-    },
     "curly": {
       "count": 3
     },
@@ -4678,9 +4613,6 @@
     }
   },
   "test/unit/engine/value-references.test.ts": {
-    "@typescript-eslint/require-await": {
-      "count": 1
-    },
     "curly": {
       "count": 2
     },
