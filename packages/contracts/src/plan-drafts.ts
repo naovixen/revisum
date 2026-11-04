@@ -11,16 +11,35 @@ import type { Origin, TargetId } from './target.ts';
 
 // Every route a draft may come by.
 // explore-draft is the draft command's explore mode, which drafts from a crawl of the running app.
-export const PLAN_SOURCES = ['hand-written', 'customer-llm', 'draft-command', 'ticket', 'builder', 'recorder', 'chat', 'explore-draft'] as const;
-export type PlanSource = (typeof PLAN_SOURCES)[number];
+export const PlanSource = {
+  HandWritten: 'hand-written',
+  CustomerLlm: 'customer-llm',
+  DraftCommand: 'draft-command',
+  Ticket: 'ticket',
+  Builder: 'builder',
+  Recorder: 'recorder',
+  Chat: 'chat',
+  ExploreDraft: 'explore-draft',
+} as const;
+export type PlanSource = (typeof PlanSource)[keyof typeof PlanSource];
+export const PLAN_SOURCES: readonly PlanSource[] = Object.values(PlanSource);
 
 // The sources an author may name for a file. The others are core's own routes, which only core
 // can record.
-export const DECLARABLE_PLAN_SOURCES = ['hand-written', 'customer-llm'] as const satisfies readonly PlanSource[];
+export const DeclarablePlanSource = {
+  HandWritten: PlanSource.HandWritten,
+  CustomerLlm: PlanSource.CustomerLlm,
+} as const;
+export type DeclarablePlanSource = (typeof DeclarablePlanSource)[keyof typeof DeclarablePlanSource];
+export const DECLARABLE_PLAN_SOURCES: readonly DeclarablePlanSource[] = Object.values(DeclarablePlanSource);
 
 // core-recorded: core produced the draft itself. declared: an author named the source of a file;
 // it is never checked or trusted.
-export type ProvenanceBasis = 'core-recorded' | 'declared';
+export const ProvenanceBasis = {
+  CoreRecorded: 'core-recorded',
+  Declared: 'declared',
+} as const;
+export type ProvenanceBasis = (typeof ProvenanceBasis)[keyof typeof ProvenanceBasis];
 
 export type PlanProvenance = {
   readonly source: PlanSource;
@@ -29,7 +48,11 @@ export type PlanProvenance = {
   readonly reference?: string;
 };
 
-export type PlanFormat = 'json' | 'text';
+export const PlanFormat = {
+  Json: 'json',
+  Text: 'text',
+} as const;
+export type PlanFormat = (typeof PlanFormat)[keyof typeof PlanFormat];
 
 // The text of a plan in one of its two forms. `provenance` is the source the caller declares; left
 // out, the draft is hand-written, basis declared.
@@ -54,8 +77,18 @@ export type DraftRequest = {
 
 // The two request formats a planner endpoint may speak: Anthropic's Messages API, and the
 // OpenAI-compatible chat completions format, which local servers such as Ollama also speak.
-export const PLANNER_WIRES = ['anthropic-messages', 'openai-chat'] as const;
-export type PlannerWire = (typeof PLANNER_WIRES)[number];
+export const PlannerWire = {
+  AnthropicMessages: 'anthropic-messages',
+  OpenaiChat: 'openai-chat',
+} as const;
+export type PlannerWire = (typeof PlannerWire)[keyof typeof PlannerWire];
+export const PLANNER_WIRES: readonly PlannerWire[] = Object.values(PlannerWire);
+
+export const PlannerEndpointKind = {
+  CustomerKey: 'customer-key',
+  Local: 'local',
+} as const;
+export type PlannerEndpointKind = (typeof PlannerEndpointKind)[keyof typeof PlannerEndpointKind];
 
 // The planner the draft command calls, declared in the trusted project.json. `url` is the full
 // address the request is posted to. A customer-key endpoint is reached over https only, with the
@@ -63,10 +96,10 @@ export type PlannerWire = (typeof PLANNER_WIRES)[number];
 // model served by Ollama, and may need no key.
 export type PlannerEndpoint =
   | {
-    readonly kind: 'customer-key'; readonly url: string; readonly model: string; readonly wire: PlannerWire;
+    readonly kind: typeof PlannerEndpointKind.CustomerKey; readonly url: string; readonly model: string; readonly wire: PlannerWire;
     readonly apiKey: { readonly secretName: SecretName };
   }
   | {
-    readonly kind: 'local'; readonly url: string; readonly model: string; readonly wire: PlannerWire;
+    readonly kind: typeof PlannerEndpointKind.Local; readonly url: string; readonly model: string; readonly wire: PlannerWire;
     readonly apiKey?: { readonly secretName: SecretName };
   };

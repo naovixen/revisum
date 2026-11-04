@@ -6,10 +6,22 @@ import type { Locale } from './target.ts';
 import type { Plan } from './plan.ts';
 
 // Why the gate denied a plan or an action. Each rule has a heading in docs/errors.md.
-export type PolicyRuleId =
-  | 'irreversible-action' | 'irreversible-submit' | 'destructive-navigation' | 'irreversible-dialog'
-  | 'unnamed-control' | 'no-locale-patterns' | 'undeclared-origin' | 'production-origin' | 'over-limit'
-  | 'side-effect-in-proposal' | 'inline-script-in-proposal' | 'unsafe-feature-disabled' | 'undeclared-secret';
+export const PolicyRuleId = {
+  IrreversibleAction: 'irreversible-action',
+  IrreversibleSubmit: 'irreversible-submit',
+  DestructiveNavigation: 'destructive-navigation',
+  IrreversibleDialog: 'irreversible-dialog',
+  UnnamedControl: 'unnamed-control',
+  NoLocalePatterns: 'no-locale-patterns',
+  UndeclaredOrigin: 'undeclared-origin',
+  ProductionOrigin: 'production-origin',
+  OverLimit: 'over-limit',
+  SideEffectInProposal: 'side-effect-in-proposal',
+  InlineScriptInProposal: 'inline-script-in-proposal',
+  UnsafeFeatureDisabled: 'unsafe-feature-disabled',
+  UndeclaredSecret: 'undeclared-secret',
+} as const;
+export type PolicyRuleId = (typeof PolicyRuleId)[keyof typeof PolicyRuleId];
 
 // The key of the Authorised mark. It is a unique symbol that is declared here and never exported,
 // so no code outside this file can name the key, and an object written by hand, by spreading a
@@ -21,19 +33,25 @@ declare const authorisedMark: unique symbol;
 // `__brand` would conflict with the Plan brand and reduce the type to never.
 export type Authorised = Plan & { readonly [authorisedMark]: 'policy-gate' };
 
+export const PolicyVerdictKind = {
+  Allow: 'allow',
+  Deny: 'deny',
+} as const;
+export type PolicyVerdictKind = (typeof PolicyVerdictKind)[keyof typeof PolicyVerdictKind];
+
 // What the gate decided about a whole plan. The step index is the first offending step (a step
 // inside a frame counts as the frame's step), or null when the rule concerns the whole plan. A
 // denial the audit sink failed to record says so with `unrecorded`, so a lost audit record changes
 // the outcome instead of passing silently.
 export type PolicyDecision =
-  | { readonly kind: 'allow'; readonly plan: Authorised }
-  | { readonly kind: 'deny'; readonly rule: PolicyRuleId; readonly stepIndex: number | null; readonly unrecorded?: true };
+  | { readonly kind: typeof PolicyVerdictKind.Allow; readonly plan: Authorised }
+  | { readonly kind: typeof PolicyVerdictKind.Deny; readonly rule: PolicyRuleId; readonly stepIndex: number | null; readonly unrecorded?: true };
 
 // What the gate's runtime guard decided about one action, just before it is performed. As above,
 // `unrecorded` marks a denial the audit sink failed to record.
 export type GuardVerdict =
-  | { readonly kind: 'allow' }
-  | { readonly kind: 'deny'; readonly rule: PolicyRuleId; readonly stepIndex: number; readonly unrecorded?: true };
+  | { readonly kind: typeof PolicyVerdictKind.Allow }
+  | { readonly kind: typeof PolicyVerdictKind.Deny; readonly rule: PolicyRuleId; readonly stepIndex: number; readonly unrecorded?: true };
 
 // Words, per locale, whose appearance as a whole word in a control's name, a form's submit
 // control or a dialog's text marks the action as irreversible. Matched case-insensitively, after

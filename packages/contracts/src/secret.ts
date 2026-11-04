@@ -11,7 +11,11 @@ import type { SecretName } from './plan.ts';
 // Below this length a value is too short to search for in outputs without matching ordinary text,
 // so it is redacted by key (the field that holds it is never kept) rather than by value.
 export const MINIMUM_SECRET_LENGTH = 8;
-export type RedactionMode = 'value' | 'key-only';
+export const RedactionMode = {
+  Value: 'value',
+  KeyOnly: 'key-only',
+} as const;
+export type RedactionMode = (typeof RedactionMode)[keyof typeof RedactionMode];
 
 export interface Secret {
   readonly name: SecretName;
@@ -25,8 +29,18 @@ export interface SecretStore {
 // The forms in which a secret can echo into an output: as typed, whatever its white space,
 // URI-encoded, base64 or base64url encoded, cut short to a prefix, with its letters' case changed,
 // or written with JSON escapes or HTML entities.
-export const LEAK_FORMS = ['raw', 'uri', 'base64', 'base64url', 'prefix', 'case', 'json', 'html'] as const;
-export type LeakForm = (typeof LEAK_FORMS)[number];
+export const LeakForm = {
+  Raw: 'raw',
+  Uri: 'uri',
+  Base64: 'base64',
+  Base64Url: 'base64url',
+  Prefix: 'prefix',
+  Case: 'case',
+  Json: 'json',
+  Html: 'html',
+} as const;
+export type LeakForm = (typeof LeakForm)[keyof typeof LeakForm];
+export const LEAK_FORMS: readonly LeakForm[] = Object.values(LeakForm);
 export type Leak = { readonly file: string; readonly secret: SecretName; readonly form: LeakForm };
 
 // Looks for echoes of secrets in files a run produced. The caller plants a canary secret in one

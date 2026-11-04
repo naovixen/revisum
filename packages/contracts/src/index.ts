@@ -7,6 +7,8 @@ export type { Brand } from './brand.ts';
 export { failure, success, type Failure, type Result, type Success } from './result.ts';
 export * from './target.ts';
 export * from './plan.ts';
+export * from './Key.ts';
+export * from './Role.ts';
 export * from './plan-drafts.ts';
 export * from './literal-steps.ts';
 export * from './secret.ts';
@@ -19,14 +21,25 @@ export * from './browser-driver.ts';
 export { hostAndPort } from './HostAndPort.ts';
 export { mergeRefusedOrigins } from './MergeRefusedOrigins.ts';
 export type * from './explore-mode.ts';
+export { DraftWarningCode, ExploreErrorCode } from './explore-mode.ts';
 export type * from './target-lock.ts';
+export { LockfileFailureCode } from './target-lock.ts';
 export * from './exit-codes.ts';
 export type * from './policy.ts';
+export { PolicyRuleId, PolicyVerdictKind } from './policy.ts';
 export type * from './run-ports.ts';
+export { GuaranteeLevel } from './run-ports.ts';
 export type * from './isolated-runner.ts';
+export { BrowserChannel, EgressChannel, EgressDecision } from './isolated-runner.ts';
 export * from './workload.ts';
 export * from './audit-events.ts';
 export type * from './approval.ts';
+export {
+  AccountType, AgentLockdownAction, ApprovalErrorCode, ApprovalLabel, ApprovalProofKind, ApprovalStrength, ApprovalSubjectKind, TrustErrorCode,
+  VersionControlFailure, VersionControlReviewState,
+} from './approval.ts';
 export type * from './error-codes.ts';
+export { CliErrorCode, RecorderErrorCode, RunnerErrorCode } from './error-codes.ts';
 export type * from './run-history.ts';
+export { ThresholdMetric } from './run-history.ts';
 export { CLOCK_CONTROLLER_KEY, determinismScript, virtualClockScript } from './determinism.ts';

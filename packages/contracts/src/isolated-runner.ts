@@ -11,16 +11,34 @@ import type { Origin } from './target.ts';
 
 // How a page sent a request, as the browser reports it: an ordinary request of the page, a
 // WebSocket, a request of a worker, the first load of a popup, a redirect it followed, or a beacon.
-export type BrowserChannel = 'page' | 'websocket' | 'worker' | 'popup' | 'redirect' | 'beacon';
+export const BrowserChannel = {
+  Page: 'page',
+  Websocket: 'websocket',
+  Worker: 'worker',
+  Popup: 'popup',
+  Redirect: 'redirect',
+  Beacon: 'beacon',
+} as const;
+export type BrowserChannel = (typeof BrowserChannel)[keyof typeof BrowserChannel];
 // unattributed: the proxy decided on a request the browser never reported, such as a declared
 // service call or traffic from inside the container that was not the browser's.
 // process: a process in a workload container that ignored the proxy looked up an undeclared name.
 // It had no route out, so only the lookup shows the attempt.
-export type EgressChannel = BrowserChannel | 'unattributed' | 'process';
+export const EgressChannel = {
+  ...BrowserChannel,
+  Unattributed: 'unattributed',
+  Process: 'process',
+} as const;
+export type EgressChannel = (typeof EgressChannel)[keyof typeof EgressChannel];
 // held: the driver held a popup back before it loaded, and nothing refused its origin.
-export type EgressDecision = 'allowed' | 'blocked' | 'held';
+export const EgressDecision = {
+  Allowed: 'allowed',
+  Blocked: 'blocked',
+  Held: 'held',
+} as const;
+export type EgressDecision = (typeof EgressDecision)[keyof typeof EgressDecision];
 // What a proxy can decide. Only a browser's driver holds anything back.
-export type ProxyVerdict = Exclude<EgressDecision, 'held'>;
+export type ProxyVerdict = Exclude<EgressDecision, typeof EgressDecision.Held>;
 
 // An origin as it was seen on the wire, not as a project declared it, so it is plain text:
 // "scheme://host[:port]", or "host:port" for a tunnel whose scheme the proxy cannot see.

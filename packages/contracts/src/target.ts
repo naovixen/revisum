@@ -3,8 +3,13 @@
 // ever invents or substitutes a target.
 import type { Brand } from './brand.ts';
 
-export const ENGINES = ['chromium', 'firefox', 'webkit'] as const;
-export type Engine = (typeof ENGINES)[number];
+export const Engine = {
+  Chromium: 'chromium',
+  Firefox: 'firefox',
+  Webkit: 'webkit',
+} as const;
+export type Engine = (typeof Engine)[keyof typeof Engine];
+export const ENGINES: readonly Engine[] = Object.values(Engine);
 
 // A closed set of device profiles owned by this package, so no vendor's device list decides
 // what a target looks like. Sizes are css pixels.
@@ -17,10 +22,18 @@ export const DEVICE_PROFILES = {
 export type DeviceProfileId = keyof typeof DEVICE_PROFILES;
 export type DeviceProfile = (typeof DEVICE_PROFILES)[DeviceProfileId];
 
-export const COLOR_SCHEMES = ['light', 'dark'] as const;
-export type ColorScheme = (typeof COLOR_SCHEMES)[number];
-export const MOTION_PREFERENCES = ['reduce', 'no-preference'] as const;
-export type MotionPreference = (typeof MOTION_PREFERENCES)[number];
+export const ColorScheme = {
+  Light: 'light',
+  Dark: 'dark',
+} as const;
+export type ColorScheme = (typeof ColorScheme)[keyof typeof ColorScheme];
+export const COLOR_SCHEMES: readonly ColorScheme[] = Object.values(ColorScheme);
+export const MotionPreference = {
+  Reduce: 'reduce',
+  NoPreference: 'no-preference',
+} as const;
+export type MotionPreference = (typeof MotionPreference)[keyof typeof MotionPreference];
+export const MOTION_PREFERENCES: readonly MotionPreference[] = Object.values(MotionPreference);
 
 export type TargetId = Brand<string, 'TargetId'>;
 export type AdapterId = Brand<string, 'AdapterId'>;
@@ -34,8 +47,15 @@ export type Origin = Brand<string, 'Origin'>;
 // How close the target is to what a user holds. engine: the browser engine itself;
 // engine-emulated: the engine with a device's viewport and input emulated; emulator and simulator:
 // a device emulated or simulated as a whole; real: a real device.
-export const FIDELITIES = ['engine', 'engine-emulated', 'emulator', 'simulator', 'real'] as const;
-export type Fidelity = (typeof FIDELITIES)[number];
+export const Fidelity = {
+  Engine: 'engine',
+  EngineEmulated: 'engine-emulated',
+  Emulator: 'emulator',
+  Simulator: 'simulator',
+  Real: 'real',
+} as const;
+export type Fidelity = (typeof Fidelity)[keyof typeof Fidelity];
+export const FIDELITIES: readonly Fidelity[] = Object.values(Fidelity);
 
 // A vendor's own setting, keyed "vendor:name" so it can never clash with a core field.
 export type VendorExtensionKey = `${string}:${string}`;

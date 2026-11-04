@@ -40,12 +40,19 @@ export type PageMap = {
 // explore-runner-unavailable: there is no isolated runner, it did not start, or it could not
 // enforce egress, and --host was not given.
 // explore-start-unreachable: the start page did not load.
-// planner-endpoint-not-loopback, planner-call-failed: as for the draft command's planner.
-type ExploreErrorCode =
-  | 'explore-origin-refused' | 'after-plan-unapproved' | 'explore-runner-unavailable' | 'explore-start-unreachable'
-  | 'planner-endpoint-not-loopback' | 'planner-call-failed';
+// planner-endpoint-not-loopback: the draft command's local planner endpoint is off the loopback interface.
+// planner-call-failed: a planner call failed on the network, at the egress proxy or with the planner's status.
+export const ExploreErrorCode = {
+  ExploreOriginRefused: 'explore-origin-refused',
+  AfterPlanUnapproved: 'after-plan-unapproved',
+  ExploreRunnerUnavailable: 'explore-runner-unavailable',
+  ExploreStartUnreachable: 'explore-start-unreachable',
+  PlannerEndpointNotLoopback: 'planner-endpoint-not-loopback',
+  PlannerCallFailed: 'planner-call-failed',
+} as const;
+export type ExploreErrorCode = (typeof ExploreErrorCode)[keyof typeof ExploreErrorCode];
 // The two a crawl itself can stop with.
-export type CrawlErrorCode = Extract<ExploreErrorCode, 'explore-origin-refused' | 'explore-start-unreachable'>;
+export type CrawlErrorCode = Extract<ExploreErrorCode, typeof ExploreErrorCode.ExploreOriginRefused | typeof ExploreErrorCode.ExploreStartUnreachable>;
 
 // What a crawl may ask of a browser session: navigation and reads, nothing that acts on the page.
 export type ExploreDriver = Pick<DocumentSession, 'navigate' | 'page' | 'accessibilitySnapshot'> & {
@@ -54,8 +61,13 @@ export type ExploreDriver = Pick<DocumentSession, 'navigate' | 'page' | 'accessi
 
 // A step of an explore draft whose locator does not match its page in the map: no element at all,
 // or more than one. A warning, never an error: the draft is still written and admitted.
+export const DraftWarningCode = {
+  LocatorNotOnPage: 'locator-not-on-page',
+  LocatorAmbiguous: 'locator-ambiguous',
+} as const;
+export type DraftWarningCode = (typeof DraftWarningCode)[keyof typeof DraftWarningCode];
 export type DraftWarning = {
-  readonly code: 'locator-not-on-page' | 'locator-ambiguous';
+  readonly code: DraftWarningCode;
   // Where the step is in the written draft, the command's notice counted.
   readonly position: { readonly line: number; readonly column: number };
 };

@@ -27,7 +27,12 @@ export type StubName = Brand<string, 'StubName'>;
 export type RequestName = Brand<string, 'RequestName'>;
 export type StorageEntryName = Brand<string, 'StorageEntryName'>;
 
-export const PATH_MATCHES = ['exact', 'prefix'] as const;
+export const PathMatch = {
+  Exact: 'exact',
+  Prefix: 'prefix',
+} as const;
+export type PathMatch = (typeof PathMatch)[keyof typeof PathMatch];
+export const PATH_MATCHES: readonly PathMatch[] = Object.values(PathMatch);
 // Which requests a stub answers or a request check records. The origin is an allowed origin or a
 // declared service's. The path starts with "/" and is compared with the request's path, without
 // its query: exactly, or as a plain text prefix.
@@ -35,13 +40,19 @@ export type RequestMatcher = {
   readonly origin: Origin;
   readonly method: HttpMethod;
   readonly path: string;
-  readonly match: (typeof PATH_MATCHES)[number];
+  readonly match: PathMatch;
 };
 
 // The only media types a stub may serve: data, never markup, script, style or anything a browser
 // could run. Each is written exactly, with no parameters such as a charset.
-export const STUB_MEDIA_TYPES = ['application/json', 'application/problem+json', 'text/plain', 'text/csv'] as const;
-export type StubMediaType = (typeof STUB_MEDIA_TYPES)[number];
+export const StubMediaType = {
+  Json: 'application/json',
+  ProblemJson: 'application/problem+json',
+  PlainText: 'text/plain',
+  Csv: 'text/csv',
+} as const;
+export type StubMediaType = (typeof StubMediaType)[keyof typeof StubMediaType];
+export const STUB_MEDIA_TYPES: readonly StubMediaType[] = Object.values(StubMediaType);
 
 // What a stub response's body is: a file from the project's fixtures folder, a JSON template filled
 // from the stub's parameters, plain text, or nothing.
@@ -74,11 +85,19 @@ export type ObservedRequestDeclaration = {
   readonly maximumResponseBytes: number;
 };
 
-export const STORAGE_AREAS = ['local', 'session'] as const;
-export type StorageArea = (typeof STORAGE_AREAS)[number];
+export const StorageArea = {
+  Local: 'local',
+  Session: 'session',
+} as const;
+export type StorageArea = (typeof StorageArea)[keyof typeof StorageArea];
+export const STORAGE_AREAS: readonly StorageArea[] = Object.values(StorageArea);
 // read: a plan may only check the entry. readWrite: it may also write and remove it.
-export const STORAGE_ACCESS = ['read', 'readWrite'] as const;
-export type StorageAccess = (typeof STORAGE_ACCESS)[number];
+export const StorageAccess = {
+  Read: 'read',
+  ReadWrite: 'readWrite',
+} as const;
+export type StorageAccess = (typeof StorageAccess)[keyof typeof StorageAccess];
+export const STORAGE_ACCESS: readonly StorageAccess[] = Object.values(StorageAccess);
 export type StorageEntryDeclaration = {
   readonly area: StorageArea;
   // An allowed origin: the page must be on it for a write.
@@ -94,29 +113,67 @@ export type StorageEntryDeclaration = {
 
 // ---- What a plan writes -----------------------------------------------------------------------
 
-export const STUB_ACTIONS = ['start', 'stop'] as const;
-export type StubAction = (typeof STUB_ACTIONS)[number];
+export const StubAction = {
+  Start: 'start',
+  Stop: 'stop',
+} as const;
+export type StubAction = (typeof StubAction)[keyof typeof StubAction];
+export const STUB_ACTIONS: readonly StubAction[] = Object.values(StubAction);
 
 // How many matching requests a check expects. atLeast is at least 1: any page sends at least 0.
-export const REQUEST_COUNT_KINDS = ['equals', 'atLeast', 'atMost'] as const;
+export const RequestCountKind = {
+  Equals: 'equals',
+  AtLeast: 'atLeast',
+  AtMost: 'atMost',
+} as const;
+export type RequestCountKind = (typeof RequestCountKind)[keyof typeof RequestCountKind];
+export const REQUEST_COUNT_KINDS: readonly RequestCountKind[] = Object.values(RequestCountKind);
 export type RequestCount = { readonly equals: number } | { readonly atLeast: number } | { readonly atMost: number };
 
-export const RESPONSE_FIELD_PRESENCE_KINDS = ['fieldPresent', 'fieldAbsent'] as const;
-export const RESPONSE_FIELD_TEXT_KINDS = ['fieldEquals', 'fieldContains'] as const;
-export const RESPONSE_ASSERTION_KINDS = ['statusEquals', ...RESPONSE_FIELD_PRESENCE_KINDS, ...RESPONSE_FIELD_TEXT_KINDS] as const;
+export const ResponseFieldPresenceKind = {
+  FieldPresent: 'fieldPresent',
+  FieldAbsent: 'fieldAbsent',
+} as const;
+export type ResponseFieldPresenceKind = (typeof ResponseFieldPresenceKind)[keyof typeof ResponseFieldPresenceKind];
+export const RESPONSE_FIELD_PRESENCE_KINDS: readonly ResponseFieldPresenceKind[] = Object.values(ResponseFieldPresenceKind);
+export const ResponseFieldTextKind = {
+  FieldEquals: 'fieldEquals',
+  FieldContains: 'fieldContains',
+} as const;
+export type ResponseFieldTextKind = (typeof ResponseFieldTextKind)[keyof typeof ResponseFieldTextKind];
+export const RESPONSE_FIELD_TEXT_KINDS: readonly ResponseFieldTextKind[] = Object.values(ResponseFieldTextKind);
+export const ResponseAssertionKind = {
+  StatusEquals: 'statusEquals',
+  ...ResponseFieldPresenceKind,
+  ...ResponseFieldTextKind,
+} as const;
+export type ResponseAssertionKind = (typeof ResponseAssertionKind)[keyof typeof ResponseAssertionKind];
+export const RESPONSE_ASSERTION_KINDS: readonly ResponseAssertionKind[] = Object.values(ResponseAssertionKind);
 // A check on the latest matching exchange: its status, or one of the fields the request declares.
 export type ResponseAssertion =
-  | { readonly kind: 'statusEquals'; readonly value: number }
-  | { readonly kind: (typeof RESPONSE_FIELD_PRESENCE_KINDS)[number]; readonly field: FieldName }
-  | { readonly kind: (typeof RESPONSE_FIELD_TEXT_KINDS)[number]; readonly field: FieldName; readonly value: TextOrValue };
+  | { readonly kind: typeof ResponseAssertionKind.StatusEquals; readonly value: number }
+  | { readonly kind: ResponseFieldPresenceKind; readonly field: FieldName }
+  | { readonly kind: ResponseFieldTextKind; readonly field: FieldName; readonly value: TextOrValue };
 
-export const STORAGE_ASSERTION_KINDS = ['present', 'absent', 'equals'] as const;
+export const StorageAssertionKind = {
+  Present: 'present',
+  Absent: 'absent',
+  Equals: 'equals',
+} as const;
+export type StorageAssertionKind = (typeof StorageAssertionKind)[keyof typeof StorageAssertionKind];
+export const STORAGE_ASSERTION_KINDS: readonly StorageAssertionKind[] = Object.values(StorageAssertionKind);
 // A check on a storage entry. The value read is compared, never recorded.
-export type StorageAssertion = { readonly kind: 'present' | 'absent' } | { readonly kind: 'equals'; readonly value: TextOrValue };
+export type StorageAssertion =
+  | { readonly kind: typeof StorageAssertionKind.Present | typeof StorageAssertionKind.Absent }
+  | { readonly kind: typeof StorageAssertionKind.Equals; readonly value: TextOrValue };
 
 // How a remember step reads a response field: its text, or the decimal length of an array.
-export const RESPONSE_READS = ['text', 'arrayLength'] as const;
-export type ResponseRead = (typeof RESPONSE_READS)[number];
+export const ResponseRead = {
+  Text: 'text',
+  ArrayLength: 'arrayLength',
+} as const;
+export type ResponseRead = (typeof ResponseRead)[keyof typeof ResponseRead];
+export const RESPONSE_READS: readonly ResponseRead[] = Object.values(ResponseRead);
 
 // The plan steps of this file, as plan.ts's Step union holds them.
 export type StubStep = { readonly type: 'stub'; readonly stub: StubName; readonly action: StubAction; readonly arguments?: CallArguments };

@@ -5,7 +5,7 @@
 import type { Brand } from './brand.ts';
 import type { CriterionId, SafeText, SecretName } from './plan.ts';
 import type { ArtifactReference, GuaranteeLevel } from './run-ports.ts';
-import type { UnsafeFeature } from './unsafe-plan-features.ts';
+import { UnsafeFeature } from './unsafe-plan-features.ts';
 
 // A declared suite's name, as `run --suite <name>` gives it: a lowercase letter, then up to 39
 // lowercase letters, digits or hyphens.
@@ -61,27 +61,28 @@ export type EvidenceMode = { readonly suites: readonly EvidenceSuiteDeclaration[
 
 // ---- What a run vouches for ----------------------------------------------------------------------
 
-export const GUARANTEE_IDS = [
+export const GuaranteeId = {
   // Only closed, parsed plan steps acted on the page.
-  'plan-closed',
+  PlanClosed: 'plan-closed',
   // The policy gate's runtime guard saw every action.
-  'actions-guarded',
+  ActionsGuarded: 'actions-guarded',
   // Elements were found by role, label, text or test id.
-  'semantic-locators',
+  SemanticLocators: 'semantic-locators',
   // Every check reads what the page shows or exposes to assistive technology.
-  'observable-checks',
+  ObservableChecks: 'observable-checks',
   // Every request went through the egress proxy, which allows only declared origins.
-  'egress-enforced',
+  EgressEnforced: 'egress-enforced',
   // The run's environment held no cloud, production or publishing credential.
-  'no-ambient-credentials',
+  NoAmbientCredentials: 'no-ambient-credentials',
   // Secret values are replaced in every output.
-  'secrets-redacted',
+  SecretsRedacted: 'secrets-redacted',
   // Personal data is masked in every image an output holds.
-  'pii-masked',
+  PiiMasked: 'pii-masked',
   // Running the manifest again gives the same result hash.
-  'replay-identical',
-] as const;
-export type GuaranteeId = (typeof GUARANTEE_IDS)[number];
+  ReplayIdentical: 'replay-identical',
+} as const;
+export type GuaranteeId = (typeof GuaranteeId)[keyof typeof GuaranteeId];
+export const GUARANTEE_IDS: readonly GuaranteeId[] = Object.values(GuaranteeId);
 // Why a guarantee does not hold.
 //   evidence-mode: the run executed the team's own test code, which Revisum cannot vouch for.
 //   egress-unenforceable: the run was not inside the isolated runner, so egress was not enforced.
@@ -90,7 +91,14 @@ export type GuaranteeId = (typeof GUARANTEE_IDS)[number];
 //   replies-not-recorded: the plan calls declared services and the project does not record their
 //     replies, so a replay, which never sends a call again, has nothing to answer them with.
 //   an unsafe feature's name: the plan uses that feature, which gives the guarantee up.
-export type GuaranteeLossReason = 'evidence-mode' | 'egress-unenforceable' | 'determinism-unpinned' | 'replies-not-recorded' | UnsafeFeature;
+export const GuaranteeLossReason = {
+  EvidenceMode: 'evidence-mode',
+  EgressUnenforceable: 'egress-unenforceable',
+  DeterminismUnpinned: 'determinism-unpinned',
+  RepliesNotRecorded: 'replies-not-recorded',
+  ...UnsafeFeature,
+} as const;
+export type GuaranteeLossReason = (typeof GuaranteeLossReason)[keyof typeof GuaranteeLossReason];
 // The level is the summary: 'isolated' only when every guarantee holds.
 export type GuaranteeStatement = {
   readonly level: GuaranteeLevel;
@@ -101,13 +109,29 @@ export type GuaranteeStatement = {
 // ---- An evidence run's tests ---------------------------------------------------------------------
 
 // How a run came about: a parsed plan, or a team's own suite.
-export type RunMode = 'plan' | 'evidence';
+export const RunMode = {
+  Plan: 'plan',
+  Evidence: 'evidence',
+} as const;
+export type RunMode = (typeof RunMode)[keyof typeof RunMode];
 // The gating pass runs the protected branch's suite files and may open the merge gate. The
 // proposal pass runs the change's own version of them and never does.
-export type SuitePass = 'gating' | 'proposal';
+export const SuitePass = {
+  Gating: 'gating',
+  Proposal: 'proposal',
+} as const;
+export type SuitePass = (typeof SuitePass)[keyof typeof SuitePass];
 // expected-failure: a test the suite marked as expected to fail (Playwright's test.fail()) that
 // failed. Playwright counts it as expected, but a person should look at why it is kept.
-export type SuiteTestOutcome = 'passed' | 'failed' | 'timed-out' | 'skipped' | 'interrupted' | 'expected-failure';
+export const SuiteTestOutcome = {
+  Passed: 'passed',
+  Failed: 'failed',
+  TimedOut: 'timed-out',
+  Skipped: 'skipped',
+  Interrupted: 'interrupted',
+  ExpectedFailure: 'expected-failure',
+} as const;
+export type SuiteTestOutcome = (typeof SuiteTestOutcome)[keyof typeof SuiteTestOutcome];
 // The sha256 of a test's file, title path and project.
 export type SuiteTestId = Brand<string, 'SuiteTestId'>;
 // Shown beside criterion ids that come from a suite's annotations: the suite's code makes the

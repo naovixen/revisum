@@ -3,7 +3,7 @@
 import type { ClipboardPort, ClockPort } from './clock-and-clipboard.ts';
 import type { DriverFeature } from './literal-steps.ts';
 import type { NetworkPort, StoragePort } from './network-and-storage.ts';
-import type { ActionStep, DownloadStep, Locator, ResolvedLocator } from './plan.ts';
+import { ScriptMode, type ActionStep, type DownloadStep, type Locator, type ResolvedLocator } from './plan.ts';
 import type { GuardVerdict } from './policy.ts';
 import type { Secret } from './secret.ts';
 import type { Result } from './result.ts';
@@ -31,31 +31,55 @@ import type { AdapterId, Target } from './target.ts';
 // script-result-invalid: a page script's result is not JSON: undefined, a function, or a cyclic value.
 // page-unreadable: every read of the page threw until a check's timeout, so nothing is known of it.
 // dialog-open: a dialog holds the page, so a step could not act on it or read it. Only a dialog step can free it.
-export type DriverErrorCode =
-  | 'not-found' | 'ambiguous' | 'not-actionable' | 'timeout' | 'navigation-failed' | 'policy-denied'
-  | 'no-download' | 'download-too-large' | 'storage-origin-mismatch' | 'clock-runaway' | 'clipboard-unavailable'
-  | 'target-crashed' | 'unsupported-step' | 'assertion-failed'
-  | 'selector-invalid' | 'script-failed' | 'script-timeout' | 'script-result-invalid'
-  | 'page-unreadable' | 'dialog-open';
+export const DriverErrorCode = {
+  NotFound: 'not-found',
+  Ambiguous: 'ambiguous',
+  NotActionable: 'not-actionable',
+  Timeout: 'timeout',
+  NavigationFailed: 'navigation-failed',
+  PolicyDenied: 'policy-denied',
+  NoDownload: 'no-download',
+  DownloadTooLarge: 'download-too-large',
+  StorageOriginMismatch: 'storage-origin-mismatch',
+  ClockRunaway: 'clock-runaway',
+  ClipboardUnavailable: 'clipboard-unavailable',
+  TargetCrashed: 'target-crashed',
+  UnsupportedStep: 'unsupported-step',
+  AssertionFailed: 'assertion-failed',
+  SelectorInvalid: 'selector-invalid',
+  ScriptFailed: 'script-failed',
+  ScriptTimeout: 'script-timeout',
+  ScriptResultInvalid: 'script-result-invalid',
+  PageUnreadable: 'page-unreadable',
+  DialogOpen: 'dialog-open',
+} as const;
+export type DriverErrorCode = (typeof DriverErrorCode)[keyof typeof DriverErrorCode];
 export type DriverError = { readonly code: DriverErrorCode; readonly detail: string };
 
 // Why a probe could not read the page. It is never a count of 0, which a check of absence passes
 // on: a page the run cannot read must not look like an empty page. Each value is also the code the
 // check fails with.
 export const UnreadablePage = {
-  ReadFailed: 'page-unreadable',
-  DialogOpen: 'dialog-open',
+  ReadFailed: DriverErrorCode.PageUnreadable,
+  DialogOpen: DriverErrorCode.DialogOpen,
   // The browser shows its own error page, so the page the check is about never loaded.
-  BrowserErrorPage: 'navigation-failed',
-} as const satisfies Record<string, DriverErrorCode>;
+  BrowserErrorPage: DriverErrorCode.NavigationFailed,
+} as const;
 export type UnreadablePage = (typeof UnreadablePage)[keyof typeof UnreadablePage];
 
 // Why a declared target cannot run. A driver explains a "no"; it never substitutes another target.
 // provider-unavailable: the cloud or device provider could not supply the target.
 // build-mismatch: the browser build on this machine is not the one the lockfile pins.
-export type UnavailableReason =
-  | 'not-declared' | 'adapter-not-registered' | 'engine-not-supported' | 'device-not-supported' | 'launch-failed'
-  | 'provider-unavailable' | 'build-mismatch';
+export const UnavailableReason = {
+  NotDeclared: 'not-declared',
+  AdapterNotRegistered: 'adapter-not-registered',
+  EngineNotSupported: 'engine-not-supported',
+  DeviceNotSupported: 'device-not-supported',
+  LaunchFailed: 'launch-failed',
+  ProviderUnavailable: 'provider-unavailable',
+  BuildMismatch: 'build-mismatch',
+} as const;
+export type UnavailableReason = (typeof UnavailableReason)[keyof typeof UnavailableReason];
 export type Unavailable = { readonly reason: UnavailableReason; readonly detail: string };
 
 // The exact browser build an adapter would run for a target: its version and the executable whose
@@ -63,7 +87,12 @@ export type Unavailable = { readonly reason: UnavailableReason; readonly detail:
 export type BrowserBuild = { readonly version: string; readonly executablePath: string };
 // lock-download-failed: the build could not be fetched or is not where it should be.
 // lock-offline: fetching the build needs the network, and there is none.
-export type BuildFailureCode = 'lock-download-failed' | 'lock-offline' | UnavailableReason;
+export const BuildFailureCode = {
+  LockDownloadFailed: 'lock-download-failed',
+  LockOffline: 'lock-offline',
+  ...UnavailableReason,
+} as const;
+export type BuildFailureCode = (typeof BuildFailureCode)[keyof typeof BuildFailureCode];
 export type BuildFailure = { readonly code: BuildFailureCode; readonly detail: string };
 
 // A rectangle in css pixels.
@@ -124,16 +153,22 @@ type ElementsRead = {
 // What a probe reads of the element's DOM besides what it always reads: its class tokens, the
 // computed value of one style property (a lowercase css property name), or one attribute's value
 // (by its lowercase name).
+export const DomReadKind = {
+  Classes: 'classes',
+  ComputedStyle: 'computedStyle',
+  Attribute: 'attribute',
+} as const;
+export type DomReadKind = (typeof DomReadKind)[keyof typeof DomReadKind];
 export type DomRead =
-  | { readonly kind: 'classes' }
-  | { readonly kind: 'computedStyle'; readonly property: string }
-  | { readonly kind: 'attribute'; readonly name: string };
+  | { readonly kind: typeof DomReadKind.Classes }
+  | { readonly kind: typeof DomReadKind.ComputedStyle; readonly property: string }
+  | { readonly kind: typeof DomReadKind.Attribute; readonly name: string };
 // What it read: the class tokens in order; the text getComputedStyle gives, such as
 // "rgb(220, 38, 38)"; the attribute's value, or null when the element has no such attribute.
 export type DomValue =
-  | { readonly kind: 'classes'; readonly classes: readonly string[] }
-  | { readonly kind: 'computedStyle'; readonly value: string }
-  | { readonly kind: 'attribute'; readonly value: string | null };
+  | { readonly kind: typeof DomReadKind.Classes; readonly classes: readonly string[] }
+  | { readonly kind: typeof DomReadKind.ComputedStyle; readonly value: string }
+  | { readonly kind: typeof DomReadKind.Attribute; readonly value: string | null };
 // One <meta> tag of the document head: its name or property attribute, and its content.
 export type PageMetaTag = { readonly name: string; readonly content: string };
 export type PageProbe = {
@@ -162,7 +197,12 @@ export type DownloadedFile = {
 
 // How a navigate loads its page. 'disabled' turns script execution off for that page, until the
 // next navigate, so checks see what the server sent (the scriptsDisabled feature).
-export type NavigateOptions = { readonly scripts: 'enabled' | 'disabled' };
+export const NavigateScripts = {
+  Enabled: 'enabled',
+  Disabled: ScriptMode.Disabled,
+} as const;
+export type NavigateScripts = (typeof NavigateScripts)[keyof typeof NavigateScripts];
+export type NavigateOptions = { readonly scripts: NavigateScripts };
 
 // The element a step's locator resolved to, as the policy gate's runtime guard sees it just before
 // the action. A null field is one the page does not show, such as a control with no accessible name.
@@ -187,8 +227,15 @@ export type ResolvedElement = {
 // irreversible; for every other step it is null.
 export type ActionGuard = (element: ResolvedElement, dialogText: string | null) => GuardVerdict;
 
-export const IMPACTS = ['minor', 'moderate', 'serious', 'critical', 'unknown'] as const;
-export type Impact = (typeof IMPACTS)[number];
+export const Impact = {
+  Minor: 'minor',
+  Moderate: 'moderate',
+  Serious: 'serious',
+  Critical: 'critical',
+  Unknown: 'unknown',
+} as const;
+export type Impact = (typeof Impact)[keyof typeof Impact];
+export const IMPACTS: readonly Impact[] = Object.values(Impact);
 // One accessibility rule that failed on the page, and on how many elements.
 export type A11yFinding = { readonly ruleId: string; readonly impact: Impact; readonly elementCount: number };
 export type A11yNode = { readonly role: string; readonly name: string; readonly children: readonly A11yNode[] };

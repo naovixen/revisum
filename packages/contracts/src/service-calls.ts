@@ -33,22 +33,41 @@ export type FieldName = Brand<string, 'FieldName'>;
 // A JSON pointer (RFC 6901): "" for the whole document, or "/"-separated reference tokens.
 export type JsonPointer = Brand<string, 'JsonPointer'>;
 
-export const HTTP_METHODS = ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE'] as const;
-export type HttpMethod = (typeof HTTP_METHODS)[number];
+export const HttpMethod = {
+  Get: 'GET',
+  Head: 'HEAD',
+  Post: 'POST',
+  Put: 'PUT',
+  Patch: 'PATCH',
+  Delete: 'DELETE',
+} as const;
+export type HttpMethod = (typeof HttpMethod)[keyof typeof HttpMethod];
+export const HTTP_METHODS: readonly HttpMethod[] = Object.values(HttpMethod);
 
-export const PARAMETER_KINDS = ['text', 'identifier', 'integer', 'boolean', 'email', 'yearMonthDay', 'oneOf', 'secret'] as const;
+export const ParameterKind = {
+  Text: 'text',
+  Identifier: 'identifier',
+  Integer: 'integer',
+  Boolean: 'boolean',
+  Email: 'email',
+  YearMonthDay: 'yearMonthDay',
+  OneOf: 'oneOf',
+  Secret: 'secret',
+} as const;
+export type ParameterKind = (typeof ParameterKind)[keyof typeof ParameterKind];
+export const PARAMETER_KINDS: readonly ParameterKind[] = Object.values(ParameterKind);
 // What a parameter accepts. A text parameter holds safe text of at most maximumLength characters;
 // an identifier is a letter or "_", then up to 62 letters, digits or "_"; a yearMonthDay is a
 // real calendar day written "2026-11-02"; a secret parameter takes only { secretName }.
 export type ParameterType =
-  | { readonly kind: 'text'; readonly maximumLength: number }
-  | { readonly kind: 'identifier' }
-  | { readonly kind: 'integer'; readonly minimum: number; readonly maximum: number }
-  | { readonly kind: 'boolean' }
-  | { readonly kind: 'email' }
-  | { readonly kind: 'yearMonthDay' }
-  | { readonly kind: 'oneOf'; readonly values: readonly SafeText[] }
-  | { readonly kind: 'secret' };
+  | { readonly kind: typeof ParameterKind.Text; readonly maximumLength: number }
+  | { readonly kind: typeof ParameterKind.Identifier }
+  | { readonly kind: typeof ParameterKind.Integer; readonly minimum: number; readonly maximum: number }
+  | { readonly kind: typeof ParameterKind.Boolean }
+  | { readonly kind: typeof ParameterKind.Email }
+  | { readonly kind: typeof ParameterKind.YearMonthDay }
+  | { readonly kind: typeof ParameterKind.OneOf; readonly values: readonly SafeText[] }
+  | { readonly kind: typeof ParameterKind.Secret };
 
 // A JSON template for a body or a query value. Object keys starting with "$" are reserved for the
 // two placeholder forms: a parameter filling a whole JSON value, or parameters written into a
@@ -60,19 +79,29 @@ export type JsonTemplate =
   | ParameterPlaceholder | InterpolatedString
   | { readonly [key: string]: JsonTemplate };
 
-export const HEADER_SCHEMES = ['bearer', 'basic', 'token', 'raw'] as const;
 // How a secret becomes a header value: bearer "Bearer <value>"; basic "Basic " and the base64 of
 // the value, which holds "user:password"; token and raw the value as it is.
-export type HeaderScheme = (typeof HEADER_SCHEMES)[number];
+export const HeaderScheme = {
+  Bearer: 'bearer',
+  Basic: 'basic',
+  Token: 'token',
+  Raw: 'raw',
+} as const;
+export type HeaderScheme = (typeof HeaderScheme)[keyof typeof HeaderScheme];
+export const HEADER_SCHEMES: readonly HeaderScheme[] = Object.values(HeaderScheme);
 export type HeaderValue =
   | { readonly literal: SafeText }
   | { readonly secretName: SecretName; readonly scheme: HeaderScheme };
 
-export const CALL_EFFECTS = ['read', 'write'] as const;
 // read: the person declares the call changes nothing, so a backend check may repeat it.
 // write: it changes something, so it is never retried, and a proposal may make it only when the
 // declaration allows it in proposals.
-export type CallEffect = (typeof CALL_EFFECTS)[number];
+export const CallEffect = {
+  Read: 'read',
+  Write: 'write',
+} as const;
+export type CallEffect = (typeof CallEffect)[keyof typeof CallEffect];
+export const CALL_EFFECTS: readonly CallEffect[] = Object.values(CallEffect);
 
 export type CallDeclaration = {
   readonly service: ServiceName;
@@ -109,13 +138,21 @@ export type CallDeclaration = {
 export type CallArgument = TextOrValue | number | boolean | SecretReference;
 export type CallArguments = Readonly<Record<ParameterName, CallArgument>>;
 
-export const BACKEND_ASSERTION_KINDS = ['present', 'absent', 'equals', 'contains', 'numberEquals'] as const;
+export const BackendAssertionKind = {
+  Present: 'present',
+  Absent: 'absent',
+  Equals: 'equals',
+  Contains: 'contains',
+  NumberEquals: 'numberEquals',
+} as const;
+export type BackendAssertionKind = (typeof BackendAssertionKind)[keyof typeof BackendAssertionKind];
+export const BACKEND_ASSERTION_KINDS: readonly BackendAssertionKind[] = Object.values(BackendAssertionKind);
 // A check on one response field. present and absent ask whether the field's pointer resolves;
 // equals and contains compare the field as text; numberEquals compares it as a JSON number.
 export type BackendAssertion =
-  | { readonly kind: 'present' | 'absent' }
-  | { readonly kind: 'equals' | 'contains'; readonly value: TextOrValue }
-  | { readonly kind: 'numberEquals'; readonly value: number };
+  | { readonly kind: typeof BackendAssertionKind.Present | typeof BackendAssertionKind.Absent }
+  | { readonly kind: typeof BackendAssertionKind.Equals | typeof BackendAssertionKind.Contains; readonly value: TextOrValue }
+  | { readonly kind: typeof BackendAssertionKind.NumberEquals; readonly value: number };
 
 // ---- The port ---------------------------------------------------------------------------------
 
@@ -142,12 +179,25 @@ export type ServiceResponse = { readonly status: number; readonly mediaType: str
 
 // Why reading a response failed: it is not JSON, it is larger than the declaration allows, or the
 // field's pointer does not resolve.
-export type ResponseReadErrorCode = 'response-not-json' | 'response-too-large' | 'field-missing';
+export const ResponseReadErrorCode = {
+  ResponseNotJson: 'response-not-json',
+  ResponseTooLarge: 'response-too-large',
+  FieldMissing: 'field-missing',
+} as const;
+export type ResponseReadErrorCode = (typeof ResponseReadErrorCode)[keyof typeof ResponseReadErrorCode];
 // Why a call failed. Besides the reading errors: the service could not be reached, did not answer
 // in time, answered with a status the declaration does not list, or resolved to an address the
 // egress rules block; a run value did not fit its parameter; a cleanup call failed.
-export type ServiceCallErrorCode = ResponseReadErrorCode
-  | 'service-unreachable' | 'call-timeout' | 'unexpected-status' | 'egress-blocked' | 'parameter-invalid' | 'cleanup-failed';
+export const ServiceCallErrorCode = {
+  ...ResponseReadErrorCode,
+  ServiceUnreachable: 'service-unreachable',
+  CallTimeout: 'call-timeout',
+  UnexpectedStatus: 'unexpected-status',
+  EgressBlocked: 'egress-blocked',
+  ParameterInvalid: 'parameter-invalid',
+  CleanupFailed: 'cleanup-failed',
+} as const;
+export type ServiceCallErrorCode = (typeof ServiceCallErrorCode)[keyof typeof ServiceCallErrorCode];
 
 // Sends one request and reads the response, to one byte past the request's size cap: a longer body
 // answers with its status and the body cut there, for whoever set the cap to refuse. Redirects are

@@ -17,9 +17,16 @@ export type RunRecord = {
   readonly decisions: readonly { readonly itemId: string; readonly actorType: ActorType }[];
 };
 
-export type ThresholdMetric =
-  | 'agentAuthoredShare' | 'specLinkedShare' | 'tracedCriteriaShare' | 'mutantsCaughtShare'
-  | 'verifiedWithoutReviewShare' | 'unreviewedMergeShare' | 'flakyRunRate';
+export const ThresholdMetric = {
+  AgentAuthoredShare: 'agentAuthoredShare',
+  SpecLinkedShare: 'specLinkedShare',
+  TracedCriteriaShare: 'tracedCriteriaShare',
+  MutantsCaughtShare: 'mutantsCaughtShare',
+  VerifiedWithoutReviewShare: 'verifiedWithoutReviewShare',
+  UnreviewedMergeShare: 'unreviewedMergeShare',
+  FlakyRunRate: 'flakyRunRate',
+} as const;
+export type ThresholdMetric = (typeof ThresholdMetric)[keyof typeof ThresholdMetric];
 
 // The level each metric must reach, over how many consecutive windows, before the ladder moves.
 // A window with fewer changes than minimumChangesPerWindow does not count.

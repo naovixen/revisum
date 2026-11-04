@@ -12,21 +12,41 @@ export type ActorId = Brand<string, 'ActorId'>;
 
 // Set by core from the approval proof, never by the caller. A declared person rests on the
 // founder's own push or merge (the agent lock-down route); a verified person on a checked account.
-export type ActorType = 'person-verified' | 'person-declared' | 'agent' | 'ci' | 'unverified';
+export const ActorType = {
+  PersonVerified: 'person-verified',
+  PersonDeclared: 'person-declared',
+  Agent: 'agent',
+  Ci: 'ci',
+  Unverified: 'unverified',
+} as const;
+export type ActorType = (typeof ActorType)[keyof typeof ActorType];
 
 // The actor types that count as a person. Both gate and count alike; only the label differs.
 // Nothing requires a second person. Every gate, metric and level tests membership of this list
 // rather than comparing with one person type, so a declared approval is never left out.
-export const PERSON_ACTOR_TYPES: readonly ActorType[] = Object.freeze(['person-verified', 'person-declared']);
+export const PERSON_ACTOR_TYPES: readonly ActorType[] = Object.freeze([ActorType.PersonVerified, ActorType.PersonDeclared]);
 
 // Only the approval verifier and core's runtime build this, so a caller cannot choose its own actor
 // type. Code that records an event receives one and passes it on.
 export type DerivedActor = Brand<{ readonly actor: ActorId; readonly actorType: ActorType }, 'DerivedActor'>;
 
-export type AuditEventKind =
-  | 'plan.submitted' | 'plan.rejected' | 'plan.denied' | 'plan.approved' | 'approval.refused'
-  | 'trusted.changed-with-code' | 'run.finished' | 'review.decided' | 'severity.overridden' | 'adapter.admitted'
-  | 'pack.admitted' | 'check.removed' | 'tracker.changed' | 'holdout.access-refused';
+export const AuditEventKind = {
+  PlanSubmitted: 'plan.submitted',
+  PlanRejected: 'plan.rejected',
+  PlanDenied: 'plan.denied',
+  PlanApproved: 'plan.approved',
+  ApprovalRefused: 'approval.refused',
+  TrustedChangedWithCode: 'trusted.changed-with-code',
+  RunFinished: 'run.finished',
+  ReviewDecided: 'review.decided',
+  SeverityOverridden: 'severity.overridden',
+  AdapterAdmitted: 'adapter.admitted',
+  PackAdmitted: 'pack.admitted',
+  CheckRemoved: 'check.removed',
+  TrackerChanged: 'tracker.changed',
+  HoldoutAccessRefused: 'holdout.access-refused',
+} as const;
+export type AuditEventKind = (typeof AuditEventKind)[keyof typeof AuditEventKind];
 
 // What a caller records. The actor is passed separately, as a DerivedActor.
 export type EventInput = {
@@ -46,7 +66,12 @@ export type EventInput = {
 
 // not-append-only: the file no longer holds exactly what the sink wrote, so something else
 // truncated or rewrote it. write-failed: the file system refused the write.
-export type SinkError = { readonly code: 'not-append-only' | 'write-failed' };
+export const SinkErrorCode = {
+  NotAppendOnly: 'not-append-only',
+  WriteFailed: 'write-failed',
+} as const;
+export type SinkErrorCode = (typeof SinkErrorCode)[keyof typeof SinkErrorCode];
+export type SinkError = { readonly code: SinkErrorCode };
 
 // The audit sink: append-only, one entry per event. The audit log later wraps it with a hash
 // chain and an anchor. A run's step log (RunEventSink in engine) is separate.

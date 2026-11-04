@@ -13,10 +13,18 @@ import type { Result } from './result.ts';
 import type { WorkloadErrorCode, WorkloadOutcome, WorkloadVariable } from './workload.ts';
 import type { EnvironmentValue, ImageDigest } from './evidence-mode.ts';
 import type { CriterionId, SafeText, TextOrValue, ValueName } from './plan.ts';
-import type { BackendAssertion, CallEffect, FieldName, JsonPointer, ParameterName, ParameterType, ServiceName } from './service-calls.ts';
+import type { BackendAssertion, CallEffect, FieldName, JsonPointer, ParameterKind, ParameterName, ParameterType, ServiceName } from './service-calls.ts';
 
-export const UNSAFE_FEATURES = ['css-locator', 'xpath-locator', 'dom-checks', 'page-script', 'inline-page-script', 'database-command'] as const;
-export type UnsafeFeature = (typeof UNSAFE_FEATURES)[number];
+export const UnsafeFeature = {
+  CssLocator: 'css-locator',
+  XpathLocator: 'xpath-locator',
+  DomChecks: 'dom-checks',
+  PageScript: 'page-script',
+  InlinePageScript: 'inline-page-script',
+  DatabaseCommand: 'database-command',
+} as const;
+export type UnsafeFeature = (typeof UnsafeFeature)[keyof typeof UnsafeFeature];
+export const UNSAFE_FEATURES: readonly UnsafeFeature[] = Object.values(UnsafeFeature);
 
 // ---- Declarations in the trusted project ------------------------------------------------------
 
@@ -27,7 +35,7 @@ export type CommandName = Brand<string, 'CommandName'>;
 
 // What a script's or command's parameter accepts: any call parameter type but a secret. A secret
 // never reaches a page script, and reaches a command only through its declared environment.
-export type ScriptParameterType = Exclude<ParameterType, { readonly kind: 'secret' }>;
+export type ScriptParameterType = Exclude<ParameterType, { readonly kind: typeof ParameterKind.Secret }>;
 
 // A script file under plans/scripts/, which is a trusted path: the protected branch's version is
 // the one that runs. The script is one function; its arguments are passed as JSON values, never
@@ -49,8 +57,12 @@ export type PageScriptDeclaration = {
 // parameter. There is no shell, so no argument can become two.
 export type CommandArgument = { readonly literal: SafeText } | { readonly $parameter: ParameterName };
 
-export const COMMAND_OUTPUTS = ['none', 'json'] as const;
-export type CommandOutput = (typeof COMMAND_OUTPUTS)[number];
+export const CommandOutput = {
+  None: 'none',
+  Json: 'json',
+} as const;
+export type CommandOutput = (typeof CommandOutput)[keyof typeof CommandOutput];
+export const COMMAND_OUTPUTS: readonly CommandOutput[] = Object.values(CommandOutput);
 
 // A command run in a workload container whose network reaches only its service's address and port.
 export type DatabaseCommandDeclaration = {

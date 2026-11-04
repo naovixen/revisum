@@ -9,7 +9,7 @@
 // locators, DOM checks and page scripts. A driver declares the ones it performs in its
 // AdapterInfo; the run refuses a step needing one its driver does not declare with
 // unsupported-step, before anything of it reaches the driver.
-import { DOM_CHECK_KINDS } from './plan.ts';
+import { DOM_CHECK_KINDS, ElementStateKind, REMEMBER_ATTRIBUTE_READ, SemanticLocatorKind, StructuralLocatorKind } from './plan.ts';
 import type {
   ActionStep, ElementAssertion, Locator, PageAssertion, ResolvedActionStep, ResolvedLocator, SafeText, SemanticLocatorWith, Step, TextOrValue,
   ValueName,
@@ -47,13 +47,29 @@ export const DEFAULT_TEST_ID_ATTRIBUTE = 'data-testid';
 //   domChecks         reads an element's classes, one computed style or one attribute in its probe,
 //                     for the DOM checks (a remember from an attribute needs rememberedValues too);
 //   pageScripts       runs a declared or inline page script in the page, through its script port.
-export const DRIVER_FEATURES = [
-  'positions', 'testIdAttributes', 'keyChords', 'multiLineFills', 'rememberedValues',
-  'pageStates', 'linkTargets', 'pageMetadata', 'scriptsDisabled', 'downloads', 'newTabs',
-  'networkStubs', 'requestChecks', 'storage', 'clockControl', 'clipboard',
-  'structuralLocators', 'domChecks', 'pageScripts',
-] as const;
-export type DriverFeature = (typeof DRIVER_FEATURES)[number];
+export const DriverFeature = {
+  Positions: 'positions',
+  TestIdAttributes: 'testIdAttributes',
+  KeyChords: 'keyChords',
+  MultiLineFills: 'multiLineFills',
+  RememberedValues: 'rememberedValues',
+  PageStates: 'pageStates',
+  LinkTargets: 'linkTargets',
+  PageMetadata: 'pageMetadata',
+  ScriptsDisabled: 'scriptsDisabled',
+  Downloads: 'downloads',
+  NewTabs: 'newTabs',
+  NetworkStubs: 'networkStubs',
+  RequestChecks: 'requestChecks',
+  Storage: 'storage',
+  ClockControl: 'clockControl',
+  Clipboard: 'clipboard',
+  StructuralLocators: 'structuralLocators',
+  DomChecks: 'domChecks',
+  PageScripts: 'pageScripts',
+} as const;
+export type DriverFeature = (typeof DriverFeature)[keyof typeof DriverFeature];
+export const DRIVER_FEATURES: readonly DriverFeature[] = Object.values(DriverFeature);
 
 const NO_FEATURES: readonly DriverFeature[] = [];
 
@@ -66,18 +82,18 @@ export const referencedValueName = (text: TextOrValue): ValueName | undefined =>
 // value reference is left or when it is a css or XPath locator (performableLocator takes those).
 export function literalLocator(locator: Locator): SemanticLocatorWith<SafeText> | undefined {
   switch (locator.by) {
-    case 'role': { const name = literalText(locator.name); return name === undefined ? undefined : { ...locator, name }; }
-    case 'label': { const label = literalText(locator.label); return label === undefined ? undefined : { ...locator, label }; }
-    case 'text': { const text = literalText(locator.text); return text === undefined ? undefined : { ...locator, text }; }
-    case 'testId': { const testId = literalText(locator.testId); return testId === undefined ? undefined : { ...locator, testId }; }
-    case 'css': case 'xpath': return undefined;
+    case SemanticLocatorKind.Role: { const name = literalText(locator.name); return name === undefined ? undefined : { ...locator, name }; }
+    case SemanticLocatorKind.Label: { const label = literalText(locator.label); return label === undefined ? undefined : { ...locator, label }; }
+    case SemanticLocatorKind.Text: { const text = literalText(locator.text); return text === undefined ? undefined : { ...locator, text }; }
+    case SemanticLocatorKind.TestId: { const testId = literalText(locator.testId); return testId === undefined ? undefined : { ...locator, testId }; }
+    case StructuralLocatorKind.Css: case StructuralLocatorKind.Xpath: return undefined;
   }
 }
 
 // Any locator with its texts typed as literal text, the locators it is inside included, or
 // undefined when a value reference is left anywhere in it.
 function literalLocatorOfAnyKind(locator: Locator): ResolvedLocator | undefined {
-  if (locator.by !== 'css' && locator.by !== 'xpath') return literalLocator(locator);
+  if (locator.by !== StructuralLocatorKind.Css && locator.by !== StructuralLocatorKind.Xpath) return literalLocator(locator);
   const hasText = locator.hasText === undefined ? undefined : literalText(locator.hasText);
   if (locator.hasText !== undefined && hasText === undefined) return undefined;
   const inside = locator.inside === undefined ? undefined : literalLocatorOfAnyKind(locator.inside);
@@ -86,16 +102,18 @@ function literalLocatorOfAnyKind(locator: Locator): ResolvedLocator | undefined 
     ...(hasText === undefined ? {} : { hasText }), ...(inside === undefined ? {} : { inside }),
     ...(locator.position === undefined ? {} : { position: locator.position }),
   };
-  return locator.by === 'css' ? { by: 'css', selector: locator.selector, ...optional } : { by: 'xpath', expression: locator.expression, ...optional };
+  return locator.by === StructuralLocatorKind.Css
+    ? { by: StructuralLocatorKind.Css, selector: locator.selector, ...optional }
+    : { by: StructuralLocatorKind.Xpath, expression: locator.expression, ...optional };
 }
 
 // The optional driver features a locator uses, the locators it is inside included.
 function locatorFeatures(locator: Locator): DriverFeature[] {
   const features: DriverFeature[] = [];
-  if (locator.position !== undefined) features.push('positions');
-  if (locator.by === 'testId' && locator.attribute !== undefined && locator.attribute !== DEFAULT_TEST_ID_ATTRIBUTE) features.push('testIdAttributes');
-  if (locator.by === 'css' || locator.by === 'xpath') {
-    features.push('structuralLocators');
+  if (locator.position !== undefined) features.push(DriverFeature.Positions);
+  if (locator.by === SemanticLocatorKind.TestId && locator.attribute !== undefined && locator.attribute !== DEFAULT_TEST_ID_ATTRIBUTE) features.push(DriverFeature.TestIdAttributes);
+  if (locator.by === StructuralLocatorKind.Css || locator.by === StructuralLocatorKind.Xpath) {
+    features.push(DriverFeature.StructuralLocators);
     if (locator.inside !== undefined) features.push(...locatorFeatures(locator.inside));
   }
   return features;
@@ -108,13 +126,16 @@ const needsLocatorFeatures = (locator: Locator, performs: readonly DriverFeature
 
 // Element checks no driver's probe decides yet: it reports no checked or focused state, so these
 // checks could never pass on their merits.
-const ELEMENT_CHECKS_NO_DRIVER_DECIDES: readonly ElementAssertion['kind'][] = ['checked', 'unchecked', 'focused'];
+const ELEMENT_CHECKS_NO_DRIVER_DECIDES: readonly ElementAssertion['kind'][] = [ElementStateKind.Checked, ElementStateKind.Unchecked, ElementStateKind.Focused];
 // True for a check that can only ever fail, whichever driver runs it. A run refuses a plan holding one.
 export const isElementCheckNoDriverDecides = (step: Step): boolean => step.type === 'expect' && ELEMENT_CHECKS_NO_DRIVER_DECIDES.includes(step.assert.kind);
 // Element checks of classes, computed styles and attributes, which a driver reads when it declares domChecks.
 const DOM_CHECKS: readonly ElementAssertion['kind'][] = DOM_CHECK_KINDS;
 // Element checks of the accessibility states a driver reports when it declares pageStates.
-const ACCESSIBLE_STATE_CHECKS: readonly ElementAssertion['kind'][] = ['selected', 'unselected', 'expanded', 'collapsed', 'pressed', 'unpressed', 'current'];
+const ACCESSIBLE_STATE_CHECKS: readonly ElementAssertion['kind'][] = [
+  ElementStateKind.Selected, ElementStateKind.Unselected, ElementStateKind.Expanded, ElementStateKind.Collapsed, ElementStateKind.Pressed,
+  ElementStateKind.Unpressed, ElementStateKind.Current,
+];
 // Page checks of the document head, which a driver reports when it declares pageMetadata.
 const PAGE_METADATA_CHECKS: readonly PageAssertion['kind'][] = ['metaContent', 'canonicalUrl'];
 
@@ -133,36 +154,36 @@ export function needsDriverFeatures(step: Step, performs: readonly DriverFeature
   const lacks = (feature: DriverFeature): boolean => !performs.includes(feature);
   switch (step.type) {
     case 'click': case 'hover': case 'select': case 'upload': case 'frame': return needsLocatorFeatures(step.locator, performs);
-    case 'press': return needsLocatorFeatures(step.locator, performs) || (step.modifiers !== undefined && lacks('keyChords'));
-    case 'fill': return needsLocatorFeatures(step.locator, performs) || (isMultiLine(step.value) && lacks('multiLineFills'));
+    case 'press': return needsLocatorFeatures(step.locator, performs) || (step.modifiers !== undefined && lacks(DriverFeature.KeyChords));
+    case 'fill': return needsLocatorFeatures(step.locator, performs) || (isMultiLine(step.value) && lacks(DriverFeature.MultiLineFills));
     case 'expect':
       return needsLocatorFeatures(step.locator, performs) || isElementCheckNoDriverDecides(step)
-        || (DOM_CHECKS.includes(step.assert.kind) && lacks('domChecks'))
-        || (ACCESSIBLE_STATE_CHECKS.includes(step.assert.kind) && lacks('pageStates'))
-        || (step.assert.kind === 'hrefEquals' && lacks('linkTargets'));
-    case 'expectPage': return PAGE_METADATA_CHECKS.includes(step.assert.kind) && lacks('pageMetadata');
-    case 'navigate': return step.scripts !== undefined && lacks('scriptsDisabled');
-    case 'download': return lacks('downloads') || needsLocatorFeatures(step.locator, performs);
-    case 'expectDownload': return lacks('downloads');
+        || (DOM_CHECKS.includes(step.assert.kind) && lacks(DriverFeature.DomChecks))
+        || (ACCESSIBLE_STATE_CHECKS.includes(step.assert.kind) && lacks(DriverFeature.PageStates))
+        || (step.assert.kind === 'hrefEquals' && lacks(DriverFeature.LinkTargets));
+    case 'expectPage': return PAGE_METADATA_CHECKS.includes(step.assert.kind) && lacks(DriverFeature.PageMetadata);
+    case 'navigate': return step.scripts !== undefined && lacks(DriverFeature.ScriptsDisabled);
+    case 'download': return lacks(DriverFeature.Downloads) || needsLocatorFeatures(step.locator, performs);
+    case 'expectDownload': return lacks(DriverFeature.Downloads);
     // The tab's own steps are checked one by one as they run, as a frame's are.
-    case 'newTab': return lacks('newTabs');
+    case 'newTab': return lacks(DriverFeature.NewTabs);
     // The driver's network and storage ports carry these out.
-    case 'stub': return lacks('networkStubs');
-    case 'resetRequests': case 'expectRequests': case 'expectResponse': return lacks('requestChecks');
-    case 'setStorage': case 'removeStorage': case 'expectStorage': return lacks('storage');
+    case 'stub': return lacks(DriverFeature.NetworkStubs);
+    case 'resetRequests': case 'expectRequests': case 'expectResponse': return lacks(DriverFeature.RequestChecks);
+    case 'setStorage': case 'removeStorage': case 'expectStorage': return lacks(DriverFeature.Storage);
     // The driver's clock and clipboard ports carry these out.
-    case 'advanceClock': return lacks('clockControl');
-    case 'expectClipboard': return lacks('clipboard');
+    case 'advanceClock': return lacks(DriverFeature.ClockControl);
+    case 'expectClipboard': return lacks(DriverFeature.Clipboard);
     // Reading an element's text or value needs only the prober, of a driver that declares it reads
     // values for later steps. Reading a response field needs the request checks of the network
     // port; reading the clipboard needs the clipboard port and reading an attribute the DOM reads too.
     case 'remember':
-      if ('response' in step.from) return lacks('requestChecks');
-      if ('clipboard' in step.from) return lacks('clipboard');
-      return lacks('rememberedValues') || (step.from.read === 'attribute' && lacks('domChecks')) || needsLocatorFeatures(step.from.element, performs);
+      if ('response' in step.from) return lacks(DriverFeature.RequestChecks);
+      if ('clipboard' in step.from) return lacks(DriverFeature.Clipboard);
+      return lacks(DriverFeature.RememberedValues) || (step.from.read === REMEMBER_ATTRIBUTE_READ && lacks(DriverFeature.DomChecks)) || needsLocatorFeatures(step.from.element, performs);
     case 'dialog': case 'a11yAudit': case 'capture': return false;
     // Page scripts run through the driver's script port, in the document the step stands in.
-    case 'evaluate': case 'expectScript': return lacks('pageScripts');
+    case 'evaluate': case 'expectScript': return lacks(DriverFeature.PageScripts);
     // Calls never reach a driver: the engine sends them through the run's service caller. Database
     // commands neither: they run in a workload container.
     case 'call': case 'expectBackend': case 'database': case 'expectDatabase': return false;

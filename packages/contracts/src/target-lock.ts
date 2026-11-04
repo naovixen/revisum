@@ -9,5 +9,10 @@ export type LockEntry = { readonly targetId: TargetId; readonly version: string;
 // build-mismatch when a re-lock finds the pinned version with other bytes.
 export type TargetLockFailure = { readonly targetId: TargetId; readonly code: BuildFailureCode; readonly detail: string };
 // Why the lockfile itself could not be used: it does not parse, or it could not be written.
-export type LockfileFailure = { readonly targetId: null; readonly code: 'lockfile-invalid' | 'lockfile-unwritable'; readonly detail: string };
+export const LockfileFailureCode = {
+  LockfileInvalid: 'lockfile-invalid',
+  LockfileUnwritable: 'lockfile-unwritable',
+} as const;
+export type LockfileFailureCode = (typeof LockfileFailureCode)[keyof typeof LockfileFailureCode];
+export type LockfileFailure = { readonly targetId: null; readonly code: LockfileFailureCode; readonly detail: string };
 export type LockFailure = TargetLockFailure | LockfileFailure;

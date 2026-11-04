@@ -60,7 +60,13 @@ export type WorkloadOutcome = {
 //   image-digest-mismatch: the local image has another id than the request pins.
 //   egress-unenforceable: the network with no route out, the proxy or the egress probe failed.
 //   workload-start-failed: the request is malformed, or the team's container did not start.
-export type WorkloadErrorCode = 'image-missing' | 'image-digest-mismatch' | 'egress-unenforceable' | 'workload-start-failed';
+export const WorkloadErrorCode = {
+  ImageMissing: 'image-missing',
+  ImageDigestMismatch: 'image-digest-mismatch',
+  EgressUnenforceable: 'egress-unenforceable',
+  WorkloadStartFailed: 'workload-start-failed',
+} as const;
+export type WorkloadErrorCode = (typeof WorkloadErrorCode)[keyof typeof WorkloadErrorCode];
 
 // What an earlier container left in the output folder and this host's user could not remove.
 export type OutputRemoval = {

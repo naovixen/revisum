@@ -17,27 +17,47 @@ import type { Result } from './result.ts';
 // The units an advance may be written in. A day is 86,400,000 ms of elapsed time; wall-clock
 // dates follow from the new instant, so a daylight-saving change needs no special case. There is
 // no week or month: a month's length varies.
-export const CLOCK_UNITS = ['milliseconds', 'seconds', 'minutes', 'hours', 'days'] as const;
-export type ClockUnit = (typeof CLOCK_UNITS)[number];
+export const ClockUnit = {
+  Milliseconds: 'milliseconds',
+  Seconds: 'seconds',
+  Minutes: 'minutes',
+  Hours: 'hours',
+  Days: 'days',
+} as const;
+export type ClockUnit = (typeof ClockUnit)[keyof typeof ClockUnit];
+export const CLOCK_UNITS: readonly ClockUnit[] = Object.values(ClockUnit);
 // amount is a whole number, at least 1.
 export type ClockAdvance = { readonly amount: number; readonly unit: ClockUnit };
 
 // runTimers fires every timer that comes due within the advance, at its own virtual time, in
 // due-time order. skipAhead jumps, then fires each timer now due once, as after a computer wakes
 // from sleep. An advance without a mode runs timers.
-export const CLOCK_ADVANCE_MODES = ['runTimers', 'skipAhead'] as const;
-export type ClockAdvanceMode = (typeof CLOCK_ADVANCE_MODES)[number];
+export const ClockAdvanceMode = {
+  RunTimers: 'runTimers',
+  SkipAhead: 'skipAhead',
+} as const;
+export type ClockAdvanceMode = (typeof ClockAdvanceMode)[keyof typeof ClockAdvanceMode];
+export const CLOCK_ADVANCE_MODES: readonly ClockAdvanceMode[] = Object.values(ClockAdvanceMode);
 
 // Checks on the clipboard's plain text. An empty clipboard fails every one, so textExcludes cannot
 // pass on nothing. Only textEquals may compare against several lines, joined by "\n".
-export const CLIPBOARD_ASSERTION_KINDS = ['textEquals', 'textContains', 'textExcludes'] as const;
+export const ClipboardAssertionKind = {
+  TextEquals: 'textEquals',
+  TextContains: 'textContains',
+  TextExcludes: 'textExcludes',
+} as const;
+export type ClipboardAssertionKind = (typeof ClipboardAssertionKind)[keyof typeof ClipboardAssertionKind];
+export const CLIPBOARD_ASSERTION_KINDS: readonly ClipboardAssertionKind[] = Object.values(ClipboardAssertionKind);
 export type ClipboardAssertion =
-  | { readonly kind: 'textEquals'; readonly value: TextOrValue | MultiLineText }
-  | { readonly kind: 'textContains' | 'textExcludes'; readonly value: TextOrValue };
+  | { readonly kind: typeof ClipboardAssertionKind.TextEquals; readonly value: TextOrValue | MultiLineText }
+  | { readonly kind: typeof ClipboardAssertionKind.TextContains | typeof ClipboardAssertionKind.TextExcludes; readonly value: TextOrValue };
 
 // What a remember step may read from the clipboard: its plain text only.
-export const CLIPBOARD_READS = ['text'] as const;
-export type ClipboardRead = (typeof CLIPBOARD_READS)[number];
+export const ClipboardRead = {
+  Text: 'text',
+} as const;
+export type ClipboardRead = (typeof ClipboardRead)[keyof typeof ClipboardRead];
+export const CLIPBOARD_READS: readonly ClipboardRead[] = Object.values(ClipboardRead);
 
 // The plan steps of this file, as plan.ts's Step union holds them. Neither acts on an element, so
 // the policy gate's runtime guard never sees them, and a proposal may hold both.
