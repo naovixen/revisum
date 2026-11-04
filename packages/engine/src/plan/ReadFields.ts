@@ -1,12 +1,18 @@
+import { isNonArrayObject } from "@revisum/contracts";
 import { INVALID, readRecord, type Issues, type Parsed } from "./plan-decoders.ts";
 
-// Reads one field's value, recording what is wrong with it at `path` in `issues`.
+// Reads one field's value. A bad value must give INVALID and record an issue at `path` in `issues`.
+// The type can't require that: a function can't be typed to record anything, and Parsed<unknown>
+// collapses to unknown, so a FieldReader<unknown> may return anything at all.
 export type FieldReader<Value> = (input: unknown, path: string, issues: Issues) => Parsed<Value>;
 
-// A field that may be left out, and is then left out of what readFields returns too.
+// A field that may be left out, and is then left out of what readFields returns too. When the field
+// is there, its reader has the same duty as any other.
 export type OptionalField<Value> = { readonly readWhenPresent: FieldReader<Value> };
 
-type FieldTable = Readonly<Record<string, FieldReader<unknown> | OptionalField<unknown>>>;
+type Field = FieldReader<unknown> | OptionalField<unknown>;
+
+type FieldTable = Readonly<Record<string, Field>>;
 
 type RequiredKeys<Table extends FieldTable> = {
     [Key in keyof Table]: Table[Key] extends FieldReader<unknown> ? Key : never;
@@ -31,10 +37,26 @@ export const optionalField = <Value>(
     readWhenPresent,
 });
 
+const isField = (value: unknown): value is Field =>
+    typeof value === "function" ||
+    (isNonArrayObject(value) && Object.hasOwn(value, "readWhenPresent"));
+
+// `{ __proto__: reader }` in an object literal sets the table's prototype instead of a key. Its type
+// still names a field, exactly as `{ ["__proto__"]: reader }` does, so the type can't refuse one and
+// keep the other: both mean the field __proto__. JavaScript keeps no position for the first form,
+// so that field comes last.
+const fieldsOf = (table: FieldTable): readonly (readonly [string, Field])[] => {
+    const prototype: unknown = Object.getPrototypeOf(table);
+    return isField(prototype)
+        ? [...Object.entries(table), ["__proto__", prototype]]
+        : Object.entries(table);
+};
+
 // A plain object holding exactly the fields `table` names, each read by its reader. The record is
 // checked first, as by readRecord, with the same codes and paths, and a record that fails stops
 // there. Otherwise every field is read, in the table's order, so that every field's issues are
-// reported, in that order, under `path.field`.
+// reported, in that order, under `path.field`. The result's keys follow the table's order too, not
+// the input's.
 export function readFields<Table extends FieldTable>(
     input: unknown,
     path: string,
@@ -47,9 +69,10 @@ export function readFields(
     issues: Issues,
     table: FieldTable,
 ): Parsed<Readonly<Record<string, unknown>>> {
-    const entries = Object.entries(table);
+    const entries = fieldsOf(table);
     const required = entries.flatMap(([key, field]) => (typeof field === "function" ? [key] : []));
-    const fields = readRecord(input, path, issues, Object.keys(table), required);
+    const allowed = entries.map(([key]) => key);
+    const fields = readRecord(input, path, issues, allowed, required);
     if (fields === INVALID) {
         return INVALID;
     }

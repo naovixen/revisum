@@ -34,8 +34,7 @@ import {
   type FixtureReference, type HostInfo, type RunManifest, type RunPins,
 } from './manifest.ts';
 import { checkElement, checkPage, domReadFor, normalise, type Verdict } from './oracle.ts';
-import { nothingRanResult } from './NothingRanResult.ts';
-import { refusedResult } from './RefusedResult.ts';
+import { refusedResult, targetUnavailableResult } from './NothingRanResult.ts';
 import { runEvaluate, runScriptCheck, type PageScriptContext, type PageScriptRecord } from './page-scripts/page-script-steps.ts';
 import type { SuiteDecodeError } from './evidence/suite-report.ts';
 import type { PlanError } from './plan/plan-decoders.ts';
@@ -1296,7 +1295,7 @@ const errorText = (error: unknown): string => (error instanceof Error ? error.me
 
 function unavailableResult(targetId: string, unavailable: Unavailable, context: RunContext, startedAt: number): RunResult {
   logKeepingTheResult({ kind: 'run.state', state: 'TargetUnavailable', targetId, code: unavailable.reason }, context.logger);
-  return seal(nothingRanResult('TargetUnavailable', targetId, context.ports.clock.now() - startedAt, { unavailable }), context);
+  return seal(targetUnavailableResult(unavailable, targetId, context.ports.clock.now() - startedAt), context);
 }
 
 // What a plan run vouches for: decided by the plan, its project's recording setting, the run's

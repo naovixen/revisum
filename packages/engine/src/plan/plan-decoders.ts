@@ -167,10 +167,11 @@ export function readList(
   input: unknown, path: string, issues: Issues, maximumLength: number, minimumLength = 1,
 ): Parsed<readonly unknown[]> {
   if (!Array.isArray(input)) { issues.push({ code: 'wrong_type', path }); return INVALID; }
-  if (input.length < minimumLength) { issues.push({ code: 'empty', path }); return INVALID; }
-  if (input.length > maximumLength) { issues.push({ code: 'too_large', path }); return INVALID; }
-  if (hasHoles(input)) { issues.push({ code: 'wrong_type', path }); return INVALID; }
-  return input;
+  const list: readonly unknown[] = input;
+  if (list.length < minimumLength) { issues.push({ code: 'empty', path }); return INVALID; }
+  if (list.length > maximumLength) { issues.push({ code: 'too_large', path }); return INVALID; }
+  if (hasHoles(list)) { issues.push({ code: 'wrong_type', path }); return INVALID; }
+  return list;
 }
 
 export function readInteger(input: unknown, path: string, issues: Issues, lowest: number, highest: number): Parsed<number> {

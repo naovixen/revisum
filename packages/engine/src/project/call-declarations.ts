@@ -5,7 +5,7 @@
 // a string, set a header that changes where or how a request travels, or read a field by a broken
 // pointer, so every declaration it accepts builds requests of one fixed shape.
 import {
-  CALL_EFFECTS, HEADER_SCHEMES, HTTP_METHODS, PARAMETER_KINDS, isNonArrayObject,
+  CALL_EFFECTS, HEADER_SCHEMES, HTTP_METHODS, PARAMETER_KINDS, isNonArrayObject, isPlainObject,
   type Brand, type CallDeclaration, type CallEffect, type CallName, type DeclaredService, type FieldName, type HeaderValue, type JsonPointer, type JsonTemplate,
   type ParameterName, type ParameterType, type SafeText, type SecretName, type ServiceName,
 } from '@revisum/contracts';
@@ -397,7 +397,7 @@ function readTemplate(input: unknown, path: string, context: TemplateContext, wh
     const items = input.map((item, index) => readTemplate(item, `${path}[${index}]`, context, where, depth + 1));
     return allValid(items) ? items : INVALID;
   }
-  if (!isNonArrayObject(input)) { issues.push({ code: 'wrong_type', path }); return INVALID; }
+  if (!isPlainObject(input)) { issues.push({ code: 'wrong_type', path }); return INVALID; }
   if (Object.hasOwn(input, '$parameter')) return readParameterPlaceholder(input, path, context, where);
   if (Object.hasOwn(input, '$interpolate')) return readInterpolatedString(input, path, context);
   if (where === 'query') { issues.push({ code: 'wrong_type', path }); return INVALID; }

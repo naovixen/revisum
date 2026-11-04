@@ -147,6 +147,9 @@ function readRewrite(input: unknown, path: string, issues: Issues): Parsed<{ rea
   return origin === INVALID || name === INVALID ? INVALID : { origin, name };
 }
 
+const readStringOrNull = (input: unknown, path: string, issues: Issues): Parsed<string | null> =>
+  (input === null ? null : readString(input, path, issues));
+
 function readEvidence(input: unknown, path: string, issues: Issues): Parsed<EvidenceManifestRecord> {
   const fields = readRecord(input, path, issues, ['suite', 'suiteFiles', 'commandSha256', 'image', 'selfReported']);
   if (fields === INVALID) return INVALID;
@@ -157,8 +160,7 @@ function readEvidence(input: unknown, path: string, issues: Issues): Parsed<Evid
   const commandSha256 = readSha256(fields['commandSha256'], `${path}.commandSha256`, issues);
   const image = readImageDigest(fields['image'], `${path}.image`, issues);
   const reported = readRecord(fields['selfReported'], `${path}.selfReported`, issues, ['playwrightVersion', 'browsers']);
-  const playwrightVersion = reported === INVALID ? INVALID
-    : reported['playwrightVersion'] === null ? null : readString(reported['playwrightVersion'], `${path}.selfReported.playwrightVersion`, issues);
+  const playwrightVersion = reported === INVALID ? INVALID : readStringOrNull(reported['playwrightVersion'], `${path}.selfReported.playwrightVersion`, issues);
   const browsers = reported === INVALID ? INVALID : readStrings(reported['browsers'], `${path}.selfReported.browsers`, issues);
   if (suite === INVALID || count === INVALID || filesHash === INVALID || commandSha256 === INVALID || image === INVALID
     || playwrightVersion === INVALID || browsers === INVALID) return INVALID;

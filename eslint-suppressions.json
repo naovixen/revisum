@@ -793,9 +793,6 @@
     "curly": {
       "count": 35
     },
-    "no-nested-ternary": {
-      "count": 1
-    },
     "revisum/file-name-matches-export": {
       "count": 1
     }
@@ -933,9 +930,6 @@
     }
   },
   "packages/engine/src/plan/plan-decoders.ts": {
-    "@typescript-eslint/no-unsafe-return": {
-      "count": 1
-    },
     "curly": {
       "count": 2
     },
@@ -1143,9 +1137,6 @@
     "@typescript-eslint/naming-convention": {
       "count": 5
     },
-    "@typescript-eslint/strict-boolean-expressions": {
-      "count": 3
-    },
     "curly": {
       "count": 20
     },
@@ -1191,9 +1182,6 @@
   "packages/engine/src/replay/manifest-decoder.ts": {
     "curly": {
       "count": 20
-    },
-    "no-nested-ternary": {
-      "count": 1
     },
     "revisum/file-name-matches-export": {
       "count": 1
@@ -1414,9 +1402,6 @@
   "packages/report/src/model/report-parser.ts": {
     "curly": {
       "count": 42
-    },
-    "no-nested-ternary": {
-      "count": 2
     },
     "revisum/file-name-matches-export": {
       "count": 1

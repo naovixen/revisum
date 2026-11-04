@@ -15,7 +15,7 @@
 // fixed when the plan is approved.
 import {
   AUDIT_MODES, BACKEND_ASSERTION_KINDS, CALL_EFFECTS, CLIPBOARD_ASSERTION_KINDS, CLIPBOARD_READS, CLOCK_ADVANCE_MODES, CLOCK_UNITS, DIALOG_ACTIONS,
-  DOM_CHECK_KINDS, DOWNLOAD_SIZE_KINDS, isNonArrayObject, literalText, ELEMENT_STATE_KINDS, KEYS, MODIFIERS, PAGE_TEXT_KINDS,
+  DOM_CHECK_KINDS, DOWNLOAD_SIZE_KINDS, isNonArrayObject, isPlainObject, literalText, ELEMENT_STATE_KINDS, KEYS, MODIFIERS, PAGE_TEXT_KINDS,
   POSITION_WORDS, REMEMBER_ATTRIBUTE_READ, REMEMBER_READS, REQUEST_COUNT_KINDS, RESPONSE_ASSERTION_KINDS, RESPONSE_FIELD_PRESENCE_KINDS, RESPONSE_READS,
   ROLES, SCRIPT_MODES, STORAGE_ASSERTION_KINDS, STRUCTURAL_LOCATOR_KINDS, STUB_ACTIONS,
   failure, success,
@@ -708,7 +708,7 @@ const readScriptArguments = (
 function readRememberedFields(
   input: unknown, path: string, declaredFields: Readonly<Record<FieldName, JsonPointer>> | undefined, context: ParseContext,
 ): Parsed<Readonly<Record<ValueName, FieldName>>> {
-  if (!isNonArrayObject(input)) { context.issues.push({ code: 'wrong_type', path }); return INVALID; }
+  if (!isPlainObject(input)) { context.issues.push({ code: 'wrong_type', path }); return INVALID; }
   const declared = Object.keys(declaredFields ?? {});
   const entries = Object.entries(input).map(([key, field]): Parsed<readonly [ValueName, FieldName]> => {
     const at = `${path}.${key}`;

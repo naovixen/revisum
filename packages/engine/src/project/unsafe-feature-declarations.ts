@@ -27,7 +27,6 @@ type UnsafeFeaturesContext = {
 };
 
 const SECTION_FIELDS = ['cssLocators', 'xpathLocators', 'domChecks', 'pageScripts', 'databaseCommands', 'unnamedControlsAllowed'] as const;
-const SWITCHES = ['cssLocators', 'xpathLocators', 'domChecks'] as const;
 const PAGE_SCRIPTS_FIELDS = ['scripts', 'allowInline'] as const;
 const SCRIPT_FIELDS = ['file', 'parameters', 'effect', 'fields', 'allowInProposals', 'timeoutMilliseconds', 'maximumResultBytes'] as const;
 const REQUIRED_SCRIPT_FIELDS = ['file', 'parameters', 'effect'] as const;
@@ -63,7 +62,11 @@ export function readUnsafeFeatures(input: unknown, context: UnsafeFeaturesContex
   const path = '$.unsafeFeatures';
   const fields = readRecord(input, path, issues, SECTION_FIELDS, []);
   if (fields === INVALID) return INVALID;
-  const switches = SWITCHES.map((key) => readSwitch(fields, key, path, issues));
+  const switches = [
+    readSwitch(fields, 'cssLocators', path, issues),
+    readSwitch(fields, 'xpathLocators', path, issues),
+    readSwitch(fields, 'domChecks', path, issues),
+  ] as const;
   const pageScripts = Object.hasOwn(fields, 'pageScripts') ? readPageScripts(fields['pageScripts'], `${path}.pageScripts`, issues) : undefined;
   const databaseCommands = Object.hasOwn(fields, 'databaseCommands')
     ? readDatabaseCommands(fields['databaseCommands'], `${path}.databaseCommands`, context) : undefined;

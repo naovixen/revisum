@@ -9,7 +9,7 @@
 // A page map that comes back from the isolated runner is outside data: decodePageMap checks every
 // field and bound before the command uses it.
 import {
-  failure, isNonArrayObject, success,
+  failure, isPlainObject, success,
   type A11yNode, type Origin, type PageMap, type PageMapEntry, type PageMapNode, type Redactor, type Result,
 } from '@revisum/contracts';
 import { canonicalJson, sha256 } from '../hashing.ts';
@@ -104,14 +104,14 @@ export function decodePageMap(input: unknown, origin: Origin): Result<PageMap, P
     return value.map((node: unknown, index: number): PageMapNode => {
       const at = `${path}[${index}]`;
       nodes += 1;
-      if (nodes > MAXIMUM_DECODED_NODES || !isNonArrayObject(node) || !hasExactly(node, ['role', 'name', 'children'])) throw new Refusal(at);
+      if (nodes > MAXIMUM_DECODED_NODES || !isPlainObject(node) || !hasExactly(node, ['role', 'name', 'children'])) throw new Refusal(at);
       const { role, name } = node;
       if (typeof role !== 'string' || !KEPT_ROLES.has(role) || !isBoundedText(name)) throw new Refusal(at);
       return { role, name, children: decodeNodes(node['children'], `${at}.children`, nesting + 1) };
     });
   };
   const decodePage = (value: unknown, path: string): PageMapEntry => {
-    if (!isNonArrayObject(value) || !hasExactly(value, ['path', 'title', 'depth', 'tree'])) throw new Refusal(path);
+    if (!isPlainObject(value) || !hasExactly(value, ['path', 'title', 'depth', 'tree'])) throw new Refusal(path);
     const { path: pagePath, title, depth } = value;
     if (typeof pagePath !== 'string' || !pagePath.startsWith('/') || pagePath.length > MAXIMUM_PATH_LENGTH) throw new Refusal(`${path}.path`);
     if (!isBoundedText(title)) throw new Refusal(`${path}.title`);
@@ -119,7 +119,7 @@ export function decodePageMap(input: unknown, origin: Origin): Result<PageMap, P
     return { path: pagePath, title, depth, tree: decodeNodes(value['tree'], `${path}.tree`, 0) };
   };
   try {
-    if (!isNonArrayObject(input) || !hasExactly(input, ['origin', 'pages', 'truncated', 'guaranteeLevel'])) throw new Refusal('$');
+    if (!isPlainObject(input) || !hasExactly(input, ['origin', 'pages', 'truncated', 'guaranteeLevel'])) throw new Refusal('$');
     if (input['origin'] !== origin) throw new Refusal('$.origin');
     const { truncated, guaranteeLevel } = input;
     if (typeof truncated !== 'boolean') throw new Refusal('$.truncated');

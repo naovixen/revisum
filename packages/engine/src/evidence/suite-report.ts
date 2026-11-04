@@ -284,12 +284,18 @@ function readOnlyResult(input: unknown, path: string, context: DecodeContext): P
   const rawAttachments = readOptionalList(fields, 'attachments', resultPath, context);
   const attachments = rawAttachments === INVALID
     ? INVALID : rawAttachments.map((attachment, index) => readAttachment(attachment, `${resultPath}.attachments[${index}]`, context));
-  const duration = fields['duration'];
-  const durationMilliseconds = duration === undefined ? 0
-    : typeof duration === 'number' && Number.isFinite(duration) && duration >= 0 ? duration : refuse(`${resultPath}.duration`, context);
+  const durationMilliseconds = readDuration(fields['duration'], `${resultPath}.duration`, context);
   if (outcome === undefined || errors === INVALID || !allValid(errors) || attachments === INVALID || !allValid(attachments)
     || durationMilliseconds === INVALID) return INVALID;
   return { outcome, errors, attachments, durationMilliseconds };
+}
+
+// A duration left out counts as none.
+function readDuration(input: unknown, path: string, context: DecodeContext): Parsed<number> {
+  if (input === undefined) {
+    return 0;
+  }
+  return typeof input === 'number' && Number.isFinite(input) && input >= 0 ? input : refuse(path, context);
 }
 
 function readError(input: unknown, path: string, context: DecodeContext): Parsed<SuiteReportError> {

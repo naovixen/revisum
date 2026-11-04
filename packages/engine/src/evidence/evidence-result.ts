@@ -15,7 +15,7 @@ import type { Refusal, TerminalState } from '../lifecycle.ts';
 import { manifestHash, type RunManifest } from '../manifest.ts';
 import { runTimeTextOrDigest } from '../plan/plan-decoders.ts';
 import { criterionIdFrom } from '../plan/plan-parser.ts';
-import { refusedResult } from '../RefusedResult.ts';
+import { refusedResult } from '../NothingRanResult.ts';
 import { withRunHashes } from '../WithRunHashes.ts';
 import type { EvidenceOutcomeCode, RunResult, RunReviewItem } from '../run.ts';
 import type { SuiteDecodeError, SuiteReport, SuiteReportTest, SuiteTrace } from './suite-report.ts';
