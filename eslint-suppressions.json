@@ -11,14 +11,8 @@
     "@typescript-eslint/naming-convention": {
       "count": 2
     },
-    "@typescript-eslint/strict-boolean-expressions": {
-      "count": 13
-    },
     "curly": {
-      "count": 13
-    },
-    "no-restricted-syntax": {
-      "count": 8
+      "count": 11
     },
     "prefer-template": {
       "count": 2
@@ -28,17 +22,8 @@
     }
   },
   "packages/auditor-act/src/page-snapshot.ts": {
-    "@typescript-eslint/no-base-to-string": {
-      "count": 2
-    },
-    "@typescript-eslint/prefer-nullish-coalescing": {
-      "count": 1
-    },
-    "@typescript-eslint/strict-boolean-expressions": {
-      "count": 17
-    },
     "curly": {
-      "count": 25
+      "count": 24
     },
     "max-lines-per-function": {
       "count": 1
@@ -417,11 +402,8 @@
     }
   },
   "packages/driver-cdp/src/cdp-connection.ts": {
-    "@typescript-eslint/strict-boolean-expressions": {
-      "count": 1
-    },
     "curly": {
-      "count": 6
+      "count": 3
     },
     "no-restricted-syntax": {
       "count": 9
@@ -432,10 +414,10 @@
   },
   "packages/driver-cdp/src/cdp-driver.ts": {
     "@typescript-eslint/naming-convention": {
-      "count": 4
+      "count": 3
     },
     "@typescript-eslint/no-base-to-string": {
-      "count": 2
+      "count": 1
     },
     "@typescript-eslint/no-unused-vars": {
       "count": 1
@@ -447,7 +429,7 @@
       "count": 1
     },
     "curly": {
-      "count": 36
+      "count": 34
     },
     "max-lines": {
       "count": 1
@@ -491,9 +473,6 @@
   },
   "packages/driver-cdp/src/egress-records.ts": {
     "curly": {
-      "count": 1
-    },
-    "no-nested-ternary": {
       "count": 1
     },
     "revisum/file-name-matches-export": {
@@ -557,7 +536,7 @@
       "count": 2
     },
     "curly": {
-      "count": 10
+      "count": 9
     },
     "revisum/file-name-matches-export": {
       "count": 1
