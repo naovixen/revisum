@@ -16,7 +16,7 @@ import {
 import { brand } from '../brand.ts';
 import { INVALID, allValid, readInteger, readList, readOneOf, readRecord, readText, type Issues, type Parsed } from '../plan/plan-decoders.ts';
 import { MAXIMUM_SELECTOR_LENGTH, SELECTOR_FORBIDDEN_CHARACTERS } from '../plan/plan-grammar.ts';
-import { readDeclarationSection, readFields, readParameters } from './call-declarations.ts';
+import { readDeclarationSection, readFieldPointers, readParameters } from './call-declarations.ts';
 import { readEnvironmentVariables, readImageDigest } from './evidence-declarations.ts';
 
 // What the section may refer to: the project's services and secret names.
@@ -135,7 +135,7 @@ function readPageScripts(input: unknown, path: string, issues: Issues): Parsed<N
 function readPageScript(input: unknown, path: string, issues: Issues): Parsed<PageScriptDeclaration> {
   const fields = readRecord(input, path, issues, SCRIPT_FIELDS, REQUIRED_SCRIPT_FIELDS);
   if (fields === INVALID) return INVALID;
-  const resultFields = Object.hasOwn(fields, 'fields') ? readFields(fields['fields'], `${path}.fields`, issues) : undefined;
+  const resultFields = Object.hasOwn(fields, 'fields') ? readFieldPointers(fields['fields'], `${path}.fields`, issues) : undefined;
   const timeoutMilliseconds = readOptionalLimit(fields, 'timeoutMilliseconds', path, issues, MAXIMUM_SCRIPT_TIMEOUT_MILLISECONDS);
   const maximumResultBytes = readOptionalLimit(fields, 'maximumResultBytes', path, issues, MAXIMUM_SCRIPT_RESULT_BYTES);
   const parts = [
@@ -186,7 +186,7 @@ function readCommand(input: unknown, path: string, context: UnsafeFeaturesContex
   // Only JSON output has fields to read.
   const hasFields = Object.hasOwn(fields, 'fields');
   if (hasFields && output === 'none') { issues.push({ code: 'unknown_field', path: `${path}.fields` }); return INVALID; }
-  const outputFields = hasFields ? readFields(fields['fields'], `${path}.fields`, issues) : undefined;
+  const outputFields = hasFields ? readFieldPointers(fields['fields'], `${path}.fields`, issues) : undefined;
   const environment = Object.hasOwn(fields, 'environment')
     ? readEnvironmentVariables(fields['environment'], `${path}.environment`, issues, context.secretNames) : undefined;
   const successExitCodes = Object.hasOwn(fields, 'successExitCodes')

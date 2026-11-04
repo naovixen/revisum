@@ -8,7 +8,7 @@
 // Every refusal is a bare code and JSON path. Neither ever holds text from the report: the paths
 // name only the fields this decoder reads, and any other key is written "*".
 import { Buffer } from 'node:buffer';
-import { failure, success, type Brand, type EvidenceLimits, type Result, type SuiteTestOutcome } from '@revisum/contracts';
+import { failure, isPlainObject, success, type Brand, type EvidenceLimits, type Result, type SuiteTestOutcome } from '@revisum/contracts';
 import { brand } from '../brand.ts';
 import { INVALID, allValid, type Parsed } from '../plan/plan-decoders.ts';
 import { staysInside } from '../relative-paths.ts';
@@ -140,7 +140,7 @@ function walkValue(value: unknown, segments: string[], state: WalkState): SuiteD
     }
     return state.bytes > state.maximumBytes ? tooLarge() : undefined;
   }
-  if (typeof value !== 'object' || !isPlainObject(value)) return invalidAt(segments);
+  if (!isPlainObject(value)) return invalidAt(segments);
   const keys = Object.keys(value);
   state.bytes += 1 + Math.max(keys.length, 1);
   for (const key of keys) {
@@ -156,11 +156,6 @@ function walkValue(value: unknown, segments: string[], state: WalkState): SuiteD
 
 const invalidAt = (segments: readonly string[]): SuiteDecodeError => ({ code: 'suite-report-invalid', path: segments.join('') });
 const tooLarge = (): SuiteDecodeError => ({ code: 'too-large', path: '$' });
-
-const isPlainObject = (value: object): boolean => {
-  const prototype = Object.getPrototypeOf(value);
-  return prototype === Object.prototype || prototype === null;
-};
 
 // ---- The second pass: the fields Revisum reads ---------------------------------------------------
 

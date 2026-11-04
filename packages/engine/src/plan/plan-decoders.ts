@@ -1,7 +1,7 @@
 // Small "parse, don't validate" helpers for outside input. Each helper either returns a precise
 // value or records a PlanError and returns INVALID. Errors carry a code and a JSON path, never
 // the offending value, so hostile or private text is never echoed back.
-import type { SafeText } from '@revisum/contracts';
+import { isPlainObject, type SafeText } from '@revisum/contracts';
 import { brand } from '../brand.ts';
 import { sha256 } from '../hashing.ts';
 import { looksLikeCredential } from './literal-secrets.ts';
@@ -110,12 +110,7 @@ export function readRecord(
   input: unknown, path: string, issues: Issues,
   allowed: readonly string[], required: readonly string[] = allowed,
 ): Parsed<Readonly<Record<string, unknown>>> {
-  if (typeof input !== 'object' || input === null || Array.isArray(input)) {
-    issues.push({ code: 'not_object', path });
-    return INVALID;
-  }
-  const prototype = Object.getPrototypeOf(input);
-  if (prototype !== Object.prototype && prototype !== null) {
+  if (!isPlainObject(input)) {
     issues.push({ code: 'not_object', path });
     return INVALID;
   }
@@ -125,11 +120,10 @@ export function readRecord(
     // Errors are kept and shown, so a key shaped like a credential is reported by where it sits.
     issues.push(looksLikeCredential(key) ? { code: 'literal_secret', path } : { code: 'unknown_field', path: `${path}.${key}` });
   }
-  const fields = input as Record<string, unknown>;
   for (const key of required) {
-    if (!Object.hasOwn(fields, key)) issues.push({ code: 'missing_field', path: `${path}.${key}` });
+    if (!Object.hasOwn(input, key)) issues.push({ code: 'missing_field', path: `${path}.${key}` });
   }
-  return issues.length === before ? fields : INVALID;
+  return issues.length === before ? input : INVALID;
 }
 
 // A plain object with any keys, to read a discriminant before the strict check.

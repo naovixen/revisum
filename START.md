@@ -34,7 +34,7 @@ Architecture refactor:
     - [ ] Step tables
     - [ ] Split `run`
     - [ ] `RunResult` to contracts, as a union with the same bytes, with findings 8 and 22
-    - [ ] Split `plan-parser`
+    - [ ] Split `plan-parser`, adopting `readFields` as it goes
     - [ ] Cycle rule and in-page free-variable rule
     - [ ] Split `cdp-driver`
     - [ ] Split `egress-proxy`

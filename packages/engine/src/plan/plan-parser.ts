@@ -15,7 +15,7 @@
 // fixed when the plan is approved.
 import {
   AUDIT_MODES, BACKEND_ASSERTION_KINDS, CALL_EFFECTS, CLIPBOARD_ASSERTION_KINDS, CLIPBOARD_READS, CLOCK_ADVANCE_MODES, CLOCK_UNITS, DIALOG_ACTIONS,
-  DOM_CHECK_KINDS, DOWNLOAD_SIZE_KINDS, literalText, ELEMENT_STATE_KINDS, KEYS, MODIFIERS, PAGE_TEXT_KINDS,
+  DOM_CHECK_KINDS, DOWNLOAD_SIZE_KINDS, isNonArrayObject, literalText, ELEMENT_STATE_KINDS, KEYS, MODIFIERS, PAGE_TEXT_KINDS,
   POSITION_WORDS, REMEMBER_ATTRIBUTE_READ, REMEMBER_READS, REQUEST_COUNT_KINDS, RESPONSE_ASSERTION_KINDS, RESPONSE_FIELD_PRESENCE_KINDS, RESPONSE_READS,
   ROLES, SCRIPT_MODES, STORAGE_ASSERTION_KINDS, STRUCTURAL_LOCATOR_KINDS, STUB_ACTIONS,
   failure, success,
@@ -33,7 +33,7 @@ import {
 import { brand } from '../brand.ts';
 import { clockAdvanceMilliseconds } from '../clock-advance.ts';
 import { normalise } from '../oracle.ts';
-import { readFields } from '../project/call-declarations.ts';
+import { readFieldPointers } from '../project/call-declarations.ts';
 import { readId, type Limits, type Project } from '../project/project-parser.ts';
 import type { TrustedProject } from '../project/trusted-project.ts';
 import { declaredCommands, declaredScripts, enabledUnsafeFeatures } from '../project/unsafe-feature-declarations.ts';
@@ -108,9 +108,6 @@ const rulesOf = (project: Project | TrustedProject): PlanRules => ({
   databaseCommands: declaredCommands(project.unsafeFeatures),
 });
 
-const isPlainObject = (input: unknown): input is Readonly<Record<string, unknown>> =>
-  typeof input === 'object' && input !== null && !Array.isArray(input);
-
 // True when the trusted project enables `feature`. A disabled feature is refused at `path`, the
 // field that names it, and the caller reads nothing under it, so no part of it is echoed or judged.
 function featureEnabled(feature: UnsafeFeature, path: string, context: ParseContext): boolean {
@@ -139,7 +136,7 @@ function readValueReference(input: unknown, path: string, context: ParseContext)
 
 // Text the plan writes for the page: literal text, or a value reference.
 function readTextOrValue(input: unknown, path: string, context: ParseContext, maximumLength: number, minimumLength = 1): Parsed<TextOrValue> {
-  if (isPlainObject(input)) return readValueReference(input, path, context);
+  if (isNonArrayObject(input)) return readValueReference(input, path, context);
   return readPlanText(input, path, context, maximumLength, minimumLength);
 }
 
@@ -182,7 +179,7 @@ function readPathTemplate(input: unknown, path: string, context: ParseContext): 
   const rawSegments = readList(fields['segments'], `${path}.segments`, context.issues, MAXIMUM_PATH_SEGMENTS);
   const segments = (rawSegments === INVALID ? [] : rawSegments).map((segment, index): Parsed<TextOrValue> => {
     const at = `${path}.segments[${index}]`;
-    return isPlainObject(segment) ? readValueReference(segment, at, context) : readLiteralSegment(segment, at, context);
+    return isNonArrayObject(segment) ? readValueReference(segment, at, context) : readLiteralSegment(segment, at, context);
   });
   if (rawSegments === INVALID) return INVALID;
   if (!Object.hasOwn(fields, 'query')) return allValid(segments) ? { segments } : INVALID;
@@ -201,7 +198,7 @@ function readPathTemplate(input: unknown, path: string, context: ParseContext): 
 
 // Where a navigate step goes: a URL, or a path template.
 function readNavigation(input: unknown, path: string, context: ParseContext): Parsed<AllowedUrl | PathTemplate> {
-  if (isPlainObject(input)) return readPathTemplate(input, path, context);
+  if (isNonArrayObject(input)) return readPathTemplate(input, path, context);
   return readUrl(input, path, context);
 }
 
@@ -472,7 +469,7 @@ function readMultiLineText(input: unknown, path: string, context: ParseContext):
 // A fill value: literal text, a reference to a secret the project declares, a value reference or
 // lines of text.
 function readFillValue(input: unknown, path: string, context: ParseContext): Parsed<TextOrValue | SecretReference | MultiLineText> {
-  if (!isPlainObject(input)) return readPlanText(input, path, context, context.rules.limits.maximumTextLength, 0);
+  if (!isNonArrayObject(input)) return readPlanText(input, path, context, context.rules.limits.maximumTextLength, 0);
   if (Object.hasOwn(input, 'lines')) return readMultiLineText(input, path, context);
   if (Object.hasOwn(input, 'valueName')) return readValueReference(input, path, context);
   const fields = readRecord(input, path, context.issues, ['secretName']);
@@ -513,13 +510,13 @@ const isNameTaken = (name: string, context: ParseContext): boolean => context.de
 function readRememberSource(input: unknown, path: string, context: ParseContext): Parsed<RememberSource> {
   const { issues } = context;
   // The clipboard's plain text, the only clipboard format a plan may read.
-  if (isPlainObject(input) && Object.hasOwn(input, 'clipboard')) {
+  if (isNonArrayObject(input) && Object.hasOwn(input, 'clipboard')) {
     const fields = readRecord(input, path, issues, ['clipboard']);
     if (fields === INVALID) return INVALID;
     const clipboard = readOneOf(fields['clipboard'], `${path}.clipboard`, issues, CLIPBOARD_READS);
     return clipboard === INVALID ? INVALID : { clipboard };
   }
-  if (isPlainObject(input) && Object.hasOwn(input, 'response')) {
+  if (isNonArrayObject(input) && Object.hasOwn(input, 'response')) {
     const fields = readRecord(input, path, issues, ['response', 'field', 'read']);
     if (fields === INVALID) return INVALID;
     const named = readRequestName(fields['response'], `${path}.response`, context);
@@ -530,7 +527,7 @@ function readRememberSource(input: unknown, path: string, context: ParseContext)
     return field === INVALID || read === INVALID ? INVALID : { response: named[0], field, read };
   }
   // One of an element's attributes: a DOM check, so read only once the project enables them.
-  if (isPlainObject(input) && input['read'] === REMEMBER_ATTRIBUTE_READ) {
+  if (isNonArrayObject(input) && input['read'] === REMEMBER_ATTRIBUTE_READ) {
     if (!featureEnabled(DOM_CHECKS_FEATURE, `${path}.read`, context)) return INVALID;
     const fields = readRecord(input, path, issues, ['element', 'read', 'attribute']);
     if (fields === INVALID) return INVALID;
@@ -640,7 +637,7 @@ function readDeclaredField(
 // known, by the request builder, under the same rules.
 function readCallArgument(input: unknown, path: string, type: ParameterType, context: ParseContext): Parsed<CallArgument> {
   if (type.kind === 'secret') {
-    if (isPlainObject(input) && Object.hasOwn(input, 'secretName')) {
+    if (isNonArrayObject(input) && Object.hasOwn(input, 'secretName')) {
       const fields = readRecord(input, path, context.issues, ['secretName']);
       if (fields === INVALID) return INVALID;
       const secretName = readDeclared(fields['secretName'], `${path}.secretName`, context, context.rules.secretNames);
@@ -656,7 +653,7 @@ function readCallArgument(input: unknown, path: string, type: ParameterType, con
 // An argument for a parameter that is not a secret: a literal value or a run value by name. A
 // secret reference here is the wrong type: a page script or a command never takes one.
 function readPlainArgument(input: unknown, path: string, type: ScriptParameterType, context: ParseContext): Parsed<ScriptArgument> {
-  if (isPlainObject(input)) {
+  if (isNonArrayObject(input)) {
     if (Object.hasOwn(input, 'valueName')) return readValueReference(input, path, context);
     context.issues.push({ code: 'wrong_type', path });
     return INVALID;
@@ -686,7 +683,7 @@ function readArgumentsWith<Type, Argument>(
   input: unknown, path: string, declared: Readonly<Record<ParameterName, Type>>, context: ParseContext,
   readOne: (input: unknown, path: string, type: Type, context: ParseContext) => Parsed<Argument>,
 ): Parsed<Readonly<Record<ParameterName, Argument>>> {
-  if (!isPlainObject(input)) { context.issues.push({ code: 'wrong_type', path }); return INVALID; }
+  if (!isNonArrayObject(input)) { context.issues.push({ code: 'wrong_type', path }); return INVALID; }
   const parameters = Object.entries<Type>(declared);
   const names = parameters.map(([name]) => name);
   if (readRecord(input, path, context.issues, names) === INVALID) return INVALID;
@@ -711,7 +708,7 @@ const readScriptArguments = (
 function readRememberedFields(
   input: unknown, path: string, declaredFields: Readonly<Record<FieldName, JsonPointer>> | undefined, context: ParseContext,
 ): Parsed<Readonly<Record<ValueName, FieldName>>> {
-  if (!isPlainObject(input)) { context.issues.push({ code: 'wrong_type', path }); return INVALID; }
+  if (!isNonArrayObject(input)) { context.issues.push({ code: 'wrong_type', path }); return INVALID; }
   const declared = Object.keys(declaredFields ?? {});
   const entries = Object.entries(input).map(([key, field]): Parsed<readonly [ValueName, FieldName]> => {
     const at = `${path}.${key}`;
@@ -782,7 +779,7 @@ function unsafeStepEnabled(type: StepType, head: Readonly<Record<string, unknown
   if (isDatabaseCommandStepType(type)) return featureEnabled(DATABASE_COMMAND_FEATURE, `${path}.type`, context);
   if (!isPageScriptStepType(type)) return true;
   const script = head['script'];
-  if (isPlainObject(script) && Object.hasOwn(script, 'inline')) return featureEnabled(INLINE_SCRIPT_FEATURE, `${path}.script.inline`, context);
+  if (isNonArrayObject(script) && Object.hasOwn(script, 'inline')) return featureEnabled(INLINE_SCRIPT_FEATURE, `${path}.script.inline`, context);
   return featureEnabled(NAMED_SCRIPT_FEATURE, `${path}.type`, context);
 }
 
@@ -812,7 +809,7 @@ function readScriptSource(input: unknown, path: string, context: ParseContext): 
 // trusted project, and the approver reads them, so they are held to the rules of plan text too. An
 // empty pointer names the whole result.
 function readInlineFields(input: unknown, path: string, context: ParseContext): Parsed<Readonly<Record<FieldName, JsonPointer>>> {
-  const fields = readFields(input, path, context.issues);
+  const fields = readFieldPointers(input, path, context.issues);
   if (fields === INVALID) {
     return INVALID;
   }
@@ -836,7 +833,7 @@ function readInlineScript(input: unknown, path: string, context: ParseContext): 
 
 // The script a step runs: a name the project declares, or { "inline": … }.
 function readScriptChoice(input: unknown, path: string, context: ParseContext): Parsed<ScriptUse> {
-  if (isPlainObject(input)) {
+  if (isNonArrayObject(input)) {
     const fields = readRecord(input, path, context.issues, ['inline']);
     if (fields === INVALID) return INVALID;
     const inline = readInlineScript(fields['inline'], `${path}.inline`, context);
@@ -1100,7 +1097,7 @@ function readClipboardAssertion(input: unknown, path: string, context: ParseCont
   if (readRecord(input, path, context.issues, ['kind', 'value']) === INVALID) return INVALID;
   const valuePath = `${path}.value`;
   const value = head['value'];
-  const writtenAsLines = isPlainObject(value) && Object.hasOwn(value, 'lines');
+  const writtenAsLines = isNonArrayObject(value) && Object.hasOwn(value, 'lines');
   if (writtenAsLines && kind === 'textEquals') {
     const lines = readExpectedLines(value, valuePath, context);
     return lines === INVALID ? INVALID : { kind, value: lines };
@@ -1349,7 +1346,7 @@ function sizeInBytes(input: unknown): number {
 }
 
 const plainFields = (input: unknown): Readonly<Record<string, unknown>> | undefined =>
-  isPlainObject(input) ? Object.fromEntries(Object.entries(input)) : undefined;
+  isNonArrayObject(input) ? Object.fromEntries(Object.entries(input)) : undefined;
 
 // The path of the first frame step nested deeper than `maximumDepth`, or undefined. It looks only
 // at frame steps and their step lists, without recursion, so even a plan nested thousands deep is

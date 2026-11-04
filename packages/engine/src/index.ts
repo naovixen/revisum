@@ -4,6 +4,7 @@
 export * from '@revisum/contracts';
 export { schemaId } from './version.ts';
 export * from './plan/plan-decoders.ts';
+export { optionalField, readFields, type FieldReader, type FieldValues, type OptionalField } from './plan/ReadFields.ts';
 export * from './project/project-parser.ts';
 export { loadTrustedProject, isTrustedFile, type LoadedProject, type TrustedProject } from './project/trusted-project.ts';
 export { approvalVerifier, unverified, type ApprovalVerifier } from './approval/approval-verifier.ts';

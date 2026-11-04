@@ -5,7 +5,7 @@
 // a string, set a header that changes where or how a request travels, or read a field by a broken
 // pointer, so every declaration it accepts builds requests of one fixed shape.
 import {
-  CALL_EFFECTS, HEADER_SCHEMES, HTTP_METHODS, PARAMETER_KINDS,
+  CALL_EFFECTS, HEADER_SCHEMES, HTTP_METHODS, PARAMETER_KINDS, isNonArrayObject,
   type Brand, type CallDeclaration, type CallEffect, type CallName, type DeclaredService, type FieldName, type HeaderValue, type JsonPointer, type JsonTemplate,
   type ParameterName, type ParameterType, type SafeText, type SecretName, type ServiceName,
 } from '@revisum/contracts';
@@ -52,9 +52,6 @@ const DECLARATION_FIELDS = [
   'allowInProposals', 'timeoutMilliseconds', 'maximumResponseBytes',
 ] as const;
 const REQUIRED_DECLARATION_FIELDS = ['service', 'method', 'path', 'parameters', 'effect', 'successStatuses'] as const;
-
-const isPlainObject = (input: unknown): input is Readonly<Record<string, unknown>> =>
-  typeof input === 'object' && input !== null && !Array.isArray(input);
 
 // ---- Services ---------------------------------------------------------------------------------
 
@@ -144,7 +141,7 @@ function readDeclaration(input: unknown, path: string, context: DeclarationConte
   const successStatuses = readStatuses(fields['successStatuses'], `${path}.successStatuses`, issues);
   const pendingStatuses = Object.hasOwn(fields, 'pendingStatuses')
     ? readPendingStatuses(fields['pendingStatuses'], `${path}.pendingStatuses`, issues, effect, successStatuses) : undefined;
-  const responseFields = Object.hasOwn(fields, 'fields') ? readFields(fields['fields'], `${path}.fields`, issues) : undefined;
+  const responseFields = Object.hasOwn(fields, 'fields') ? readFieldPointers(fields['fields'], `${path}.fields`, issues) : undefined;
   const allowInProposals = fields['allowInProposals'] ?? false;
   if (typeof allowInProposals !== 'boolean') issues.push({ code: 'wrong_type', path: `${path}.allowInProposals` });
   const timeoutMilliseconds = Object.hasOwn(fields, 'timeoutMilliseconds')
@@ -221,7 +218,7 @@ function readPendingStatuses(
   return statuses;
 }
 
-export function readFields(input: unknown, path: string, issues: Issues): Parsed<Readonly<Record<FieldName, JsonPointer>>> {
+export function readFieldPointers(input: unknown, path: string, issues: Issues): Parsed<Readonly<Record<FieldName, JsonPointer>>> {
   const fields = peekRecord(input, path, issues);
   if (fields === INVALID) return INVALID;
   const entries = Object.entries(fields).map(([key, pointer]): Parsed<readonly [FieldName, JsonPointer]> => {
@@ -261,7 +258,7 @@ function readHeaders(input: unknown, path: string, context: DeclarationContext):
 // secret the project declares, by name, with the scheme that turns it into the header value.
 function readHeaderValue(input: unknown, path: string, context: DeclarationContext): Parsed<HeaderValue> {
   const { issues } = context;
-  if (isPlainObject(input) && Object.hasOwn(input, 'literal')) {
+  if (isNonArrayObject(input) && Object.hasOwn(input, 'literal')) {
     const fields = readRecord(input, path, issues, ['literal']);
     if (fields === INVALID) return INVALID;
     const literal = readText(fields['literal'], `${path}.literal`, issues, MAXIMUM_HEADER_LITERAL_LENGTH);
@@ -400,7 +397,7 @@ function readTemplate(input: unknown, path: string, context: TemplateContext, wh
     const items = input.map((item, index) => readTemplate(item, `${path}[${index}]`, context, where, depth + 1));
     return allValid(items) ? items : INVALID;
   }
-  if (!isPlainObject(input)) { issues.push({ code: 'wrong_type', path }); return INVALID; }
+  if (!isNonArrayObject(input)) { issues.push({ code: 'wrong_type', path }); return INVALID; }
   if (Object.hasOwn(input, '$parameter')) return readParameterPlaceholder(input, path, context, where);
   if (Object.hasOwn(input, '$interpolate')) return readInterpolatedString(input, path, context);
   if (where === 'query') { issues.push({ code: 'wrong_type', path }); return INVALID; }

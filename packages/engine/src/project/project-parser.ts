@@ -4,7 +4,7 @@
 // policy gate applies, written by a person. AI output never reaches this type. The person declares
 // every target; the engine never invents one.
 import {
-  COLOR_SCHEMES, DEFAULT_TEST_ID_ATTRIBUTE, DEVICE_PROFILES, ENGINES, FIDELITIES, MOTION_PREFERENCES, PLANNER_WIRES, success, failure,
+  COLOR_SCHEMES, DEFAULT_TEST_ID_ATTRIBUTE, DEVICE_PROFILES, ENGINES, FIDELITIES, MOTION_PREFERENCES, PLANNER_WIRES, isPlainObject, success, failure,
   type Brand, type CallDeclaration, type CallName, type DeclaredService, type DeviceProfileId, type FixtureName, type IrreversiblePatterns, type Locale, type Origin, type Result,
   type EmailDomain, type EvidenceMode, type PlannerEndpoint, type SafeText, type SecretName, type Target, type TestIdAttribute, type TimeZone,
   type ObservedRequestDeclaration, type RequestName, type StorageEntryDeclaration, type StorageEntryName, type StubDeclaration, type StubName,
@@ -216,8 +216,7 @@ function isJsonValue(input: unknown, depth: number): boolean {
   if (typeof input === 'number') return Number.isFinite(input);
   if (depth >= MAXIMUM_EXTENSION_DEPTH || typeof input !== 'object') return false;
   if (Array.isArray(input)) return !hasHoles(input) && input.every((item) => isJsonValue(item, depth + 1));
-  const prototype = Object.getPrototypeOf(input);
-  if (prototype !== Object.prototype && prototype !== null) return false;
+  if (!isPlainObject(input)) return false;
   return Object.values(input).every((item) => isJsonValue(item, depth + 1));
 }
 

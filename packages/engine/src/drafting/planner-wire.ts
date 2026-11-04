@@ -3,7 +3,7 @@
 // plannerReplyText decodes a reply, which is outside input, by hand and takes out its text, still
 // typed unknown, for parseAiText to bound. A reply that holds no text, such as a tool call, has
 // nothing to draft from.
-import { failure, success, type PlannerWire, type Result } from '@revisum/contracts';
+import { failure, isNonArrayObject, success, type PlannerWire, type Result } from '@revisum/contracts';
 import type { PlannerPrompt } from './planner-prompt.ts';
 
 // The draft is deterministic as far as the planner allows, and short: a plan is never long.
@@ -34,9 +34,6 @@ export function plannerRequestBody(wire: PlannerWire, model: string, prompt: Pla
 
 type PlannerReplyError = { readonly code: 'reply-not-json' | 'no-text' };
 
-const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
-
 // The reply's JSON, from the body bytes the planner adapter answered with.
 function replyJson(reply: unknown): unknown {
   if (!(reply instanceof Uint8Array)) return undefined;
@@ -53,7 +50,7 @@ function replyJson(reply: unknown): unknown {
 function anthropicText(json: Readonly<Record<string, unknown>>): unknown {
   const content = json['content'];
   if (!Array.isArray(content)) return undefined;
-  const texts: unknown[] = content.filter((block) => isRecord(block) && block['type'] === 'text').map((block) => (isRecord(block) ? block['text'] : undefined));
+  const texts: unknown[] = content.filter((block) => isNonArrayObject(block) && block['type'] === 'text').map((block) => (isNonArrayObject(block) ? block['text'] : undefined));
   if (texts.length === 0) return undefined;
   if (texts.length === 1) return texts[0];
   return texts.every((text) => typeof text === 'string') ? texts.join('') : texts;
@@ -64,16 +61,16 @@ function openAiText(json: Readonly<Record<string, unknown>>): unknown {
   const choices = json['choices'];
   if (!Array.isArray(choices)) return undefined;
   const first: unknown = choices[0];
-  if (!isRecord(first)) return undefined;
+  if (!isNonArrayObject(first)) return undefined;
   const message = first['message'];
-  if (!isRecord(message)) return undefined;
+  if (!isNonArrayObject(message)) return undefined;
   const content = message['content'];
   return content === null ? undefined : content;
 }
 
 export function plannerReplyText(wire: PlannerWire, reply: unknown): Result<unknown, PlannerReplyError> {
   const json = replyJson(reply);
-  if (!isRecord(json)) return failure({ code: 'reply-not-json' });
+  if (!isNonArrayObject(json)) return failure({ code: 'reply-not-json' });
   const text = wire === 'anthropic-messages' ? anthropicText(json) : openAiText(json);
   return text === undefined ? failure({ code: 'no-text' }) : success(text);
 }

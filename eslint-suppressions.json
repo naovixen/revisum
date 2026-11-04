@@ -790,9 +790,6 @@
     }
   },
   "packages/engine/src/evidence/suite-report.ts": {
-    "@typescript-eslint/no-unsafe-assignment": {
-      "count": 1
-    },
     "curly": {
       "count": 35
     },
@@ -936,9 +933,6 @@
     }
   },
   "packages/engine/src/plan/plan-decoders.ts": {
-    "@typescript-eslint/no-unsafe-assignment": {
-      "count": 1
-    },
     "@typescript-eslint/no-unsafe-return": {
       "count": 1
     },
@@ -1123,9 +1117,6 @@
   "packages/engine/src/project/project-parser.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 4
-    },
-    "@typescript-eslint/no-unsafe-assignment": {
-      "count": 1
     },
     "curly": {
       "count": 52

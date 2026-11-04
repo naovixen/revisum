@@ -12,7 +12,7 @@
 // Each request sent is logged by step, outcome, code, response sha256 and duration only: never an
 // argument, a header or the response itself. A body cut short or holding a secret has no sha256.
 import {
-  failure, stepFailed, success,
+  failure, StepCode, stepFailed, success,
   type BackendAssertion, type CallArguments, type CallDeclaration, type CallName, type CallStep, type CleanupStep, type Clock, type CommandName, type DeclaredService, type HttpMethod, type JsonPointer, type ResponseReadErrorCode, type Result,
   type SafeText,
   type ScriptArguments, type SecretStore, type ServiceCallErrorCode, type ServiceCaller, type ServiceName, type ServiceRequest, type ServiceResponse,
@@ -294,7 +294,7 @@ export async function runCleanup(
       try {
         done = await runDatabaseStep(step, firstIndex + index, commands);
       } catch {
-        done = { outcome: 'failed', code: 'command-failed' };
+        done = stepFailed(StepCode.CommandFailed);
       }
       results.push(done.outcome === 'passed'
         ? { ...base, outcome: 'passed' }

@@ -12,7 +12,7 @@
 //     reply never used is a mismatch at its position.
 // Stderr and egress events are dropped: the engine reads neither.
 import {
-  LEAK_FORMS, failure, isSecret, success,
+  LEAK_FORMS, failure, isPlainObject, isSecret, success,
   type DatabaseCommandRequest, type DatabaseCommandRunner, type Result, type Secret, type SecretStore, type ServiceCallErrorCode,
   type ServiceCaller, type ServiceRequest, type ServiceResponse, type WorkloadErrorCode, type WorkloadOutcome,
 } from '@revisum/contracts';
@@ -21,7 +21,7 @@ import { INVALID, allValid, readInteger, readList, readOneOf, readRecord, type I
 import { readSecretName } from '../project/project-parser.ts';
 import { cutSecretEchoes, restoreSecretEchoes, type SecretEcho } from '../secrets/secret-values.ts';
 import { schemaId } from '../version.ts';
-import { decodeErrorOf, isPlainRecord, readSha256, readString, type DecodeError } from './manifest-decoder.ts';
+import { decodeErrorOf, readSha256, readString, type DecodeError } from './manifest-decoder.ts';
 
 export const RECORDING_SCHEMA = schemaId('run-recording', 1);
 
@@ -360,7 +360,7 @@ function readReplies<Reply>(
 // version does not know, is version-unsupported; a known field of the wrong shape, a mismatch at
 // its JSON path.
 export function decodeRecording(input: unknown): Result<RunRecording, DecodeError> {
-  if (!isPlainRecord(input)) return failure({ code: 'version-unsupported', path: '$' });
+  if (!isPlainObject(input)) return failure({ code: 'version-unsupported', path: '$' });
   if (input['schema'] !== RECORDING_SCHEMA) return failure({ code: 'version-unsupported', path: '$.schema' });
   const issues: Issues = [];
   const fields = readRecord(input, '$', issues, ['schema', 'manifestHash', 'serviceCalls', 'databaseCommands'], ['schema', 'manifestHash']);

@@ -8,7 +8,7 @@
 // secret echoes are cut out when it is recorded and put back from the replay's own store just
 // before a replay hands the reply to the engine.
 import {
-  MINIMUM_SECRET_LENGTH, createSecret, isSecret, reveal,
+  MINIMUM_SECRET_LENGTH, createSecret, isNonArrayObject, isSecret, reveal,
   type HeaderScheme, type JsonBodyWithSecrets, type LeakForm, type RedactionMode, type Secret, type SecretName,
 } from '@revisum/contracts';
 import { sha256 } from '../hashing.ts';
@@ -154,8 +154,6 @@ function echoFormsOfValueIn(text: string, value: string): readonly LeakForm[] {
 
 // ---- Saved browser storage state ----------------------------------------------------------------
 
-const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
 const listIn = (record: Readonly<Record<string, unknown>>, key: string): readonly unknown[] => {
   const value = record[key];
   return Array.isArray(value) ? value : [];
@@ -168,13 +166,13 @@ const listIn = (record: Readonly<Record<string, unknown>>, key: string): readonl
 export function storageStateSecrets(storageState: Secret): readonly Secret[] {
   let parsed: unknown;
   try { parsed = JSON.parse(reveal(storageState)); } catch { return []; }
-  if (!isRecord(parsed)) return [];
+  if (!isNonArrayObject(parsed)) return [];
   const entries = [
     ...listIn(parsed, 'cookies'),
-    ...listIn(parsed, 'origins').flatMap((origin) => (isRecord(origin) ? [...listIn(origin, 'localStorage'), ...listIn(origin, 'sessionStorage')] : [])),
+    ...listIn(parsed, 'origins').flatMap((origin) => (isNonArrayObject(origin) ? [...listIn(origin, 'localStorage'), ...listIn(origin, 'sessionStorage')] : [])),
   ];
   return entries.flatMap((entry) => {
-    const value = isRecord(entry) ? entry['value'] : undefined;
+    const value = isNonArrayObject(entry) ? entry['value'] : undefined;
     return typeof value === 'string' && value.length >= MINIMUM_SECRET_LENGTH ? [createSecret(storageState.name, value)] : [];
   });
 }

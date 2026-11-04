@@ -14,7 +14,7 @@ import {
 import {
   INVALID, allValid, peekRecord, readInteger, readList, readOneOf, readRecord, readText, type Issues, type Parsed,
 } from '../plan/plan-decoders.ts';
-import { HEADER_NAME, readDeclarationSection, readFields, readJsonTemplate, readParameters } from './call-declarations.ts';
+import { HEADER_NAME, readDeclarationSection, readFieldPointers, readJsonTemplate, readParameters } from './call-declarations.ts';
 import { readOrigin } from './project-parser.ts';
 
 // What a declaration may refer to: the origins a matcher may name, and the fixture files a stub may serve.
@@ -223,7 +223,7 @@ function readObservedRequest(input: unknown, path: string, context: NetworkDecla
   const fields = readRecord(input, path, issues, OBSERVED_REQUEST_FIELDS, ['request']);
   if (fields === INVALID) return INVALID;
   const request = readMatcher(fields['request'], `${path}.request`, context);
-  const responseFields = Object.hasOwn(fields, 'fields') ? readFields(fields['fields'], `${path}.fields`, issues) : undefined;
+  const responseFields = Object.hasOwn(fields, 'fields') ? readFieldPointers(fields['fields'], `${path}.fields`, issues) : undefined;
   const maximumResponseBytes = Object.hasOwn(fields, 'maximumResponseBytes')
     ? readInteger(fields['maximumResponseBytes'], `${path}.maximumResponseBytes`, issues, 1, MAXIMUM_OBSERVED_RESPONSE_BYTES)
     : DEFAULT_OBSERVED_RESPONSE_BYTES;

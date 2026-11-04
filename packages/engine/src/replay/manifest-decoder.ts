@@ -2,7 +2,7 @@
 // of another schema version, or with a key this version does not know, is refused as
 // version-unsupported: a newer engine may have recorded an input this one would silently ignore.
 // A known field of the wrong shape is a replay-mismatch at its JSON path. Nothing is guessed.
-import { UNSAFE_FEATURES, failure, success, type Result } from '@revisum/contracts';
+import { UNSAFE_FEATURES, failure, isPlainObject, success, type Result } from '@revisum/contracts';
 import type {
   EvidenceManifestRecord, FixtureReference, HostInfo, RunManifest, RunVersions, SecretRecord, StorageStateRecord, UnsafeDeclarationRecord,
 } from '../manifest.ts';
@@ -30,10 +30,6 @@ const SHA256_HEX = /^[0-9a-f]{64}$/;
 // Generous bounds that a real manifest never reaches, so a hostile one cannot exhaust memory.
 const MAXIMUM_TEXT_LENGTH = 4096;
 const MAXIMUM_LIST_LENGTH = 100_000;
-
-export const isPlainRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value)
-  && (Object.getPrototypeOf(value) === Object.prototype || Object.getPrototypeOf(value) === null);
 
 // Issues as a decode error: an unknown key anywhere means another version; otherwise the first
 // field of the wrong shape.
@@ -197,7 +193,7 @@ function optional<Value>(
 }
 
 export function decodeManifest(input: unknown): Result<RunManifest, DecodeError> {
-  if (!isPlainRecord(input)) return failure({ code: 'version-unsupported', path: '$' });
+  if (!isPlainObject(input)) return failure({ code: 'version-unsupported', path: '$' });
   // The schema first: a manifest of another version is refused whole, before any field is read.
   if (input['schema'] !== MANIFEST_SCHEMA) return failure({ code: 'version-unsupported', path: '$.schema' });
   const issues: Issues = [];

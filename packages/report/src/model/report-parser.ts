@@ -1,6 +1,7 @@
 // parseReportInput and parseHistory: the only way to get typed values from report data. Input is
 // unknown; the output is a typed value or a list of { path, code }. They never throw, and unknown
 // keys are rejected, so a typo or an injected field cannot slip through.
+import { isNonArrayObject } from '@revisum/contracts';
 import { isHex64, isId, wordCount } from '../text-safety.ts';
 import {
   HISTORY_SCHEMA, MAXIMUM_CAPTION_WORDS, REPORT_INPUT_SCHEMA, SEVERITIES,
@@ -10,7 +11,6 @@ import {
 } from './report-model.ts';
 
 type Fields = Readonly<Record<string, unknown>>;
-const isFields = (value: unknown): value is Fields => typeof value === 'object' && value !== null && !Array.isArray(value);
 const KINDS: readonly ReportKind[] = ['a11y', 'functional', 'api'];
 const VERDICTS: readonly Verdict[] = ['passed', 'failed', 'needs-review'];
 const EVIDENCE_KINDS = ['finding', 'image', 'exchange', 'step'] as const;
@@ -67,7 +67,7 @@ function readLines(errors: ErrorList, path: string, value: unknown, longest: num
 
 function readBox(errors: ErrorList, path: string, value: unknown): PixelBox | null {
   if (value === null) return null;
-  if (!isFields(value)) { errors.add(path, 'not_object'); return null; }
+  if (!isNonArrayObject(value)) { errors.add(path, 'not_object'); return null; }
   rejectUnknownKeys(errors, path, value, ['x', 'y', 'width', 'height']);
   return {
     x: readNumber(errors, `${path}.x`, value['x'], -1e6), y: readNumber(errors, `${path}.y`, value['y'], -1e6),
@@ -76,7 +76,7 @@ function readBox(errors: ErrorList, path: string, value: unknown): PixelBox | nu
 }
 
 function readCriterion(errors: ErrorList, path: string, value: unknown): Criterion {
-  if (!isFields(value)) { errors.add(path, 'not_object'); return { kind: 'assertion', text: '' }; }
+  if (!isNonArrayObject(value)) { errors.add(path, 'not_object'); return { kind: 'assertion', text: '' }; }
   if (value['kind'] === 'wcag') {
     rejectUnknownKeys(errors, path, value, ['kind', 'successCriterion', 'title', 'level']);
     const successCriterion = readText(errors, `${path}.successCriterion`, value['successCriterion'], 12);
@@ -96,7 +96,7 @@ function readCriterion(errors: ErrorList, path: string, value: unknown): Criteri
 
 function readExchange(errors: ErrorList, path: string, value: unknown): Exchange {
   const empty: Exchange = { id: '', method: '', path: '', status: null, requestLines: [], responseLines: [] };
-  if (!isFields(value)) { errors.add(path, 'not_object'); return empty; }
+  if (!isNonArrayObject(value)) { errors.add(path, 'not_object'); return empty; }
   rejectUnknownKeys(errors, path, value, ['id', 'method', 'path', 'status', 'requestLines', 'responseLines']);
   const status = value['status'] === null ? null : readNumber(errors, `${path}.status`, value['status'], 100);
   if (status !== null && status > 599) errors.add(`${path}.status`, 'out_of_range');
@@ -116,7 +116,7 @@ function readFinding(errors: ErrorList, path: string, value: unknown): Finding {
     id: '', status: 'failed', severity: 'P4', title: '', caption: '', rule: '', criterion: { kind: 'assertion', text: '' },
     criterionIds: [], stepIds: [], steps: [], image: null, exchanges: [], log: [], reason: null, action: null,
   };
-  if (!isFields(value)) { errors.add(path, 'not_object'); return empty; }
+  if (!isNonArrayObject(value)) { errors.add(path, 'not_object'); return empty; }
   rejectUnknownKeys(errors, path, value, FINDING_KEYS);
   const status = readOneOf(errors, `${path}.status`, value['status'], ['failed', 'needs-review'] as const, 'unknown_status');
   const severity = value['severity'] === null ? null : readOneOf<Severity>(errors, `${path}.severity`, value['severity'], SEVERITIES, 'unknown_severity');
@@ -128,7 +128,7 @@ function readFinding(errors: ErrorList, path: string, value: unknown): Finding {
   let image: Finding['image'] = null;
   if (value['image'] !== null) {
     const rawImage = value['image'];
-    if (!isFields(rawImage)) errors.add(`${path}.image`, 'not_object');
+    if (!isNonArrayObject(rawImage)) errors.add(`${path}.image`, 'not_object');
     else {
       rejectUnknownKeys(errors, `${path}.image`, rawImage, ['imageId', 'box']);
       image = { imageId: readId(errors, `${path}.image.imageId`, rawImage['imageId']), box: readBox(errors, `${path}.image.box`, rawImage['box']) };
@@ -150,13 +150,13 @@ function readFinding(errors: ErrorList, path: string, value: unknown): Finding {
 
 function readAcceptanceCriterion(errors: ErrorList, path: string, value: unknown): AcceptanceCriterion {
   const empty: AcceptanceCriterion = { id: '', text: '', status: 'passed', stepIds: [], evidence: [] };
-  if (!isFields(value)) { errors.add(path, 'not_object'); return empty; }
+  if (!isNonArrayObject(value)) { errors.add(path, 'not_object'); return empty; }
   rejectUnknownKeys(errors, path, value, ['id', 'text', 'status', 'stepIds', 'evidence']);
   const stepIds = readList(errors, `${path}.stepIds`, value['stepIds'], 500).map((id, index) => readId(errors, `${path}.stepIds[${index}]`, id));
   if (stepIds.length === 0) errors.add(`${path}.stepIds`, 'criterion_without_steps');
   const evidence: EvidenceReference[] = readList(errors, `${path}.evidence`, value['evidence'], 500).map((entry, index): EvidenceReference => {
     const entryPath = `${path}.evidence[${index}]`;
-    if (!isFields(entry)) { errors.add(entryPath, 'not_object'); return { kind: 'step', id: '', label: '' }; }
+    if (!isNonArrayObject(entry)) { errors.add(entryPath, 'not_object'); return { kind: 'step', id: '', label: '' }; }
     rejectUnknownKeys(errors, entryPath, entry, ['kind', 'id', 'label']);
     return {
       kind: readOneOf(errors, `${entryPath}.kind`, entry['kind'], EVIDENCE_KINDS, 'unknown_evidence_kind'),
@@ -176,7 +176,7 @@ function readBlockedOrigins(errors: ErrorList, path: string, value: unknown): re
 
 function readRun(errors: ErrorList, path: string, value: unknown): RunInfo {
   const empty: RunInfo = { runId: '', recordedAt: '', target: '', tool: '', manifestHash: null, inputs: [] };
-  if (!isFields(value)) { errors.add(path, 'not_object'); return empty; }
+  if (!isNonArrayObject(value)) { errors.add(path, 'not_object'); return empty; }
   rejectUnknownKeys(errors, path, value, ['runId', 'recordedAt', 'target', 'tool', 'manifestHash', 'inputs', 'blockedOrigins']);
   const recordedAt = readText(errors, `${path}.recordedAt`, value['recordedAt'], 40);
   if (recordedAt !== '' && !/^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d+)?Z)?$/.test(recordedAt)) errors.add(`${path}.recordedAt`, 'bad_time');
@@ -184,7 +184,7 @@ function readRun(errors: ErrorList, path: string, value: unknown): RunInfo {
   if (manifestHash !== null && !isHex64(manifestHash)) errors.add(`${path}.manifestHash`, 'bad_hash');
   const inputs = readList(errors, `${path}.inputs`, value['inputs'], 200).map((input, index) => {
     const inputPath = `${path}.inputs[${index}]`;
-    if (!isFields(input)) { errors.add(inputPath, 'not_object'); return { name: '', sha256: '' }; }
+    if (!isNonArrayObject(input)) { errors.add(inputPath, 'not_object'); return { name: '', sha256: '' }; }
     rejectUnknownKeys(errors, inputPath, input, ['name', 'sha256']);
     const hash = readText(errors, `${inputPath}.sha256`, input['sha256'], 64);
     if (!isHex64(hash)) errors.add(`${inputPath}.sha256`, 'bad_hash');
@@ -202,12 +202,12 @@ const REPORT_KEYS = ['schema', 'reportId', 'kind', 'title', 'subject', 'note', '
 export function parseReportInput(input: unknown): Parsed<ValidReport> {
   const errors = new ErrorList();
   try {
-    if (!isFields(input)) return { ok: false, error: [{ path: '$', code: 'not_object' }] };
+    if (!isNonArrayObject(input)) return { ok: false, error: [{ path: '$', code: 'not_object' }] };
     rejectUnknownKeys(errors, '$', input, REPORT_KEYS);
     if (input['schema'] !== REPORT_INPUT_SCHEMA) errors.add('$.schema', 'unknown_schema');
     const images: ImageMeta[] = readList(errors, '$.images', input['images'], 500).map((entry, index): ImageMeta => {
       const path = `$.images[${index}]`;
-      if (!isFields(entry)) { errors.add(path, 'not_object'); return { id: '', sha256: '', width: 0, height: 0, alt: '' }; }
+      if (!isNonArrayObject(entry)) { errors.add(path, 'not_object'); return { id: '', sha256: '', width: 0, height: 0, alt: '' }; }
       rejectUnknownKeys(errors, path, entry, ['id', 'sha256', 'width', 'height', 'alt']);
       const hash = readText(errors, `${path}.sha256`, entry['sha256'], 64);
       if (!isHex64(hash)) errors.add(`${path}.sha256`, 'bad_hash');
@@ -218,7 +218,7 @@ export function parseReportInput(input: unknown): Parsed<ValidReport> {
     });
     const steps: PlanStep[] = readList(errors, '$.steps', input['steps'], 2000).map((entry, index): PlanStep => {
       const path = `$.steps[${index}]`;
-      if (!isFields(entry)) { errors.add(path, 'not_object'); return { id: '', text: '', result: '' }; }
+      if (!isNonArrayObject(entry)) { errors.add(path, 'not_object'); return { id: '', text: '', result: '' }; }
       rejectUnknownKeys(errors, path, entry, ['id', 'text', 'result']);
       return {
         id: readId(errors, `${path}.id`, entry['id']), text: readText(errors, `${path}.text`, entry['text']),
@@ -277,7 +277,7 @@ const PERIOD_KEYS = ['id', 'changes', 'changesVerifiedWithoutReview', 'criteriaI
 export function parseHistory(input: unknown): Parsed<History> {
   const errors = new ErrorList();
   try {
-    if (!isFields(input)) return { ok: false, error: [{ path: '$', code: 'not_object' }] };
+    if (!isNonArrayObject(input)) return { ok: false, error: [{ path: '$', code: 'not_object' }] };
     rejectUnknownKeys(errors, '$', input, ['schema', 'synthetic', 'label', 'periods']);
     if (input['schema'] !== HISTORY_SCHEMA) errors.add('$.schema', 'unknown_schema');
     if (typeof input['synthetic'] !== 'boolean') errors.add('$.synthetic', 'not_boolean');
@@ -287,11 +287,11 @@ export function parseHistory(input: unknown): Parsed<History> {
         id: '', changes: 0, changesVerifiedWithoutReview: 0, criteriaInScope: 0, criteriaTraced: 0, runs: 0, flakyRuns: 0,
         escaped: { P1: 0, P2: 0, P3: 0, P4: 0 },
       };
-      if (!isFields(entry)) { errors.add(path, 'not_object'); return zero; }
+      if (!isNonArrayObject(entry)) { errors.add(path, 'not_object'); return zero; }
       rejectUnknownKeys(errors, path, entry, PERIOD_KEYS);
       const rawEscaped = entry['escaped'];
       let escaped: Fields = {};
-      if (isFields(rawEscaped)) escaped = rawEscaped;
+      if (isNonArrayObject(rawEscaped)) escaped = rawEscaped;
       else errors.add(`${path}.escaped`, 'not_object');
       rejectUnknownKeys(errors, `${path}.escaped`, escaped, SEVERITIES);
       const period: HistoryPeriod = {
