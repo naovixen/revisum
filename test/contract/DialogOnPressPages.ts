@@ -106,7 +106,85 @@ export const NAMED_AFTER_A_CLICK_PAGE = "/named-after-a-click.html";
 export const NAMED_AND_COVERED_PAGE = "/named-and-covered.html";
 export const NAMED_AND_ASKING_PAGE = "/named-and-asking.html";
 
+// Pages where a form's input answers to the name of a method the click check calls on that form, because
+// the browser exposes a form's named inputs as properties of the form.
+export const CLICKED_FORM = "clicked-form";
+export const NOTHING_SHOWN = "nothing";
+export const COVER_CLICKED = "cover clicked";
+
+const FORM_CONTROLS = `
+  <p data-testid="${SHOWN}">${NOTHING_SHOWN}</p>
+  <input data-testid="${FIELD}" aria-label="Field">`;
+const show = (shown: string): string =>
+    `document.querySelector('[data-testid="${SHOWN}"]').textContent = ${shown};`;
+const FORM_CONTROLS_SCRIPT = `
+  document.querySelector('[data-testid="${FIELD}"]').addEventListener('input', (event) => { ${show("event.target.value")} });
+  button.addEventListener('mouseover', () => { ${show(`'${HOVERED}'`)} });`;
+// The form's own method may be the one the input hides, so the page does not call it.
+const FORM_OPENS_DIALOG_AT_POINTERDOWN = `EventTarget.prototype.addEventListener.call(document.querySelector('[data-testid="${CLICKED_FORM}"]'), 'pointerdown', () => { alert('Are you sure?'); });`;
+
+const clickedForm = (inputAttributes: string): string =>
+    `<form data-testid="${CLICKED_FORM}" style="padding:40px;border:1px solid"><input ${inputAttributes} aria-label="Named"></form>`;
+
+export const formHoldingInputPage = (inputName: string): string =>
+    `/form-holding-input-${inputName}.html`;
+export const askingFormHoldingInputPage = (inputName: string): string =>
+    `/asking-form-holding-input-${inputName}.html`;
+
+const formHoldingInputRoutes = (inputName: string): readonly [string, FixtureRoute][] => {
+    const controls = `${FORM_CONTROLS}${clickedForm(`name="${inputName}"`)}`;
+    return [
+        [formHoldingInputPage(inputName), pageWith("", controls, FORM_CONTROLS_SCRIPT)],
+        [
+            askingFormHoldingInputPage(inputName),
+            pageWith(FORM_OPENS_DIALOG_AT_POINTERDOWN, controls, FORM_CONTROLS_SCRIPT),
+        ],
+    ];
+};
+
+export const FORM_INPUT_NAME_HIDING_NOTHING = "plain";
+export const FORM_INPUT_NAMES_HIDING_A_LISTENER_METHOD = [
+    "removeEventListener",
+    "addEventListener",
+];
+
+const COVERING_FORM_ID = "covering-form";
+const coveringFormPage = (hiddenInputName: string, onCoverClick: string): FixtureRoute =>
+    pageWith(
+        "",
+        `<p data-testid="${SHOWN}">${NOTHING_SHOWN}</p>
+         <form id="${COVERING_FORM_ID}" style="display:none;position:fixed;inset:0"><input type="hidden" name="${hiddenInputName}"></form>`,
+        `const coveringForm = document.getElementById('${COVERING_FORM_ID}');
+         coveringForm.addEventListener('click', () => { ${show(`'${COVER_CLICKED}'`)} ${onCoverClick} });
+         button.addEventListener('mousemove', () => { coveringForm.style.display = 'block'; }, { once: true });`,
+    );
+const REMOVES_THE_BUTTON = "button.remove();";
+
+export const COVER_REMOVING_THE_BUTTON_HOLDING_CLOSEST_PAGE =
+    "/cover-removing-the-button-holding-closest.html";
+export const COVER_REMOVING_THE_BUTTON_HOLDING_PLAIN_PAGE =
+    "/cover-removing-the-button-holding-plain.html";
+export const COVER_HOLDING_CLOSEST_PAGE = "/cover-holding-closest.html";
+export const COVER_HOLDING_PLAIN_PAGE = "/cover-holding-plain.html";
+
+// The browser exposes named elements as properties of the window too.
+export const divIdentifiedAsPage = (id: string): string => `/div-identified-as-${id}.html`;
+
 export const DIALOG_ON_PRESS_PAGES = new Map<string, FixtureRoute>([
+    ...[FORM_INPUT_NAME_HIDING_NOTHING, ...FORM_INPUT_NAMES_HIDING_A_LISTENER_METHOD].flatMap(
+        formHoldingInputRoutes,
+    ),
+    ...FORM_INPUT_NAMES_HIDING_A_LISTENER_METHOD.map((id): [string, FixtureRoute] => [
+        divIdentifiedAsPage(id),
+        pageWith("", `<div id="${id}"></div>`),
+    ]),
+    [
+        COVER_REMOVING_THE_BUTTON_HOLDING_CLOSEST_PAGE,
+        coveringFormPage("closest", REMOVES_THE_BUTTON),
+    ],
+    [COVER_REMOVING_THE_BUTTON_HOLDING_PLAIN_PAGE, coveringFormPage("plain", REMOVES_THE_BUTTON)],
+    [COVER_HOLDING_CLOSEST_PAGE, coveringFormPage("closest", "")],
+    [COVER_HOLDING_PLAIN_PAGE, coveringFormPage("plain", "")],
     [
         NAMED_BY_ID_PAGE,
         pageWith("", `${NAMED_BY_ID}<input data-testid="${FIELD}" aria-label="Field">`),
