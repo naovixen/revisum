@@ -99,7 +99,8 @@ function readHitCheck(this: ArmedHitCheck): string {
 // Called in the check's world. Says whether a check was still armed there.
 function disarmArmedHitCheck(): boolean {
     const world: WindowHoldingAHitCheck = window;
-    const armed = world.armedHitCheck;
+    // Named access to the page's elements reaches this world too, so only the world's own property counts.
+    const armed = Object.hasOwn(world, "armedHitCheck") ? world.armedHitCheck : undefined;
     armed?.disarm();
     return armed !== undefined;
 }
