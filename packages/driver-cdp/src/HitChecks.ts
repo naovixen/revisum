@@ -5,7 +5,7 @@
 // world's own, not the one the page's scripts see, so it has no name they can read. Only events the
 // browser made count, since a page can dispatch any other event it likes.
 import { KeptObjectGone } from "./KeptObjectGone.ts";
-import type { PageInput, PageWithInput, Point } from "./page-operations.ts";
+import type { PageInput, PageOperations, PageWithInput, Point } from "./page-operations.ts";
 
 export const HitCheckOutcome = {
     Hit: "hit",
@@ -140,6 +140,14 @@ export type HitChecks<Handle> = {
     // Such a check would cancel a click the input makes, and the input would still seem to have worked.
     // A disarm that fails stops the input, and the check stays armed for the next one to try.
     readonly input: Omit<PageInput<Handle>, "click">;
+    // The document of the iframe element, with the checks that are the only way to send it input; null
+    // when the element is not an iframe whose document the protocol can reach.
+    frame(element: Handle): Promise<CheckedDocument<Handle> | null>;
+};
+
+export type CheckedDocument<Handle> = {
+    readonly operations: PageOperations<Handle>;
+    readonly checks: HitChecks<Handle>;
 };
 
 // The click checks of one document, and the only way a session sends that document input. A check
@@ -194,6 +202,10 @@ export function hitChecks<Handle>(page: PageWithInput<Handle>): HitChecks<Handle
                 await disarmLeftOver();
                 await page.setFiles(element, paths);
             },
+        },
+        async frame(element) {
+            const inner = await page.frame(element);
+            return inner === null ? null : { operations: inner, checks: hitChecks(inner) };
         },
     };
 }

@@ -65,9 +65,6 @@ export interface PageOperations<Handle> {
   // False when a press at the point can start nothing: neither it nor what holds it has a listener
   // for a pointer's events or does anything by itself when pressed.
   canPressStartAnything(element: Handle, at: Point): Promise<boolean>;
-  // The document of the iframe element, as operations of its own; null when the element is not an
-  // iframe whose document this protocol can reach.
-  frame(element: Handle): Promise<PageWithInput<Handle> | null>;
   // A PNG of the viewport.
   screenshotPng(): Promise<Uint8Array>;
   // The URL the browser could not show, while it shows its own error page in its place, such as
@@ -93,7 +90,13 @@ export interface PageInput<Handle> {
   setFiles(element: Handle, paths: readonly string[]): Promise<void>;
 }
 
-export type PageWithInput<Handle> = PageOperations<Handle> & PageInput<Handle>;
+// One document with its input, which only hitChecks (HitChecks.ts) is given. It also gives the document
+// of an iframe, input included, so that document's input stays out of a session's reach too.
+export type PageWithInput<Handle> = PageOperations<Handle> & PageInput<Handle> & {
+  // The document of the iframe element; null when the element is not an iframe whose document this
+  // protocol can reach.
+  frame(element: Handle): Promise<PageWithInput<Handle> | null>;
+};
 
 // How one call of a page script ended: with its result as JSON text, with a throw or a rejection,
 // or with a result JSON cannot write.

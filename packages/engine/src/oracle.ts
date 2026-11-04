@@ -1,7 +1,7 @@
 // The assertion oracle: pure functions from a probe to a verdict. It lives in the engine so that
 // neither a driver nor an AI can change what "passed" means.
 import {
-  literalText, type AccessibleStates, type DomCheckWith, type DomRead, type ElementProbe, type PageAssertion, type PageProbe,
+  literalText, type AccessibleStates, type DomCheckWith, type DomRead, type ElementProbe, type ElementsRead, type PageAssertion, type PageProbe,
   type ResolvedElementAssertion, type SafeText, type UnreadablePage,
 } from '@revisum/contracts';
 
@@ -37,7 +37,7 @@ export function domReadFor(assertion: ResolvedElementAssertion): DomRead | undef
 // A DOM check on the one element found. A probe that read nothing, or read something else, fails
 // the check: it never passes by accident. Values are compared exactly, as the page holds them;
 // only a computed style has its white space normalised, since browsers space their own text.
-function checkDom(assertion: DomCheckWith<SafeText>, probe: ElementProbe): Verdict {
+function checkDom(assertion: DomCheckWith<SafeText>, probe: ElementsRead): Verdict {
   const read = probe.dom;
   switch (assertion.kind) {
     case 'hasClass': case 'lacksClass': {
@@ -64,7 +64,7 @@ const STATE_CHECKS = {
 
 // A state check passes only on an element that exposes the state; a probe with no states at all
 // exposes none, so the check never passes by accident.
-function checkState(kind: keyof typeof STATE_CHECKS, probe: ElementProbe): Verdict {
+function checkState(kind: keyof typeof STATE_CHECKS, probe: ElementsRead): Verdict {
   const [state, wanted] = STATE_CHECKS[kind];
   const exposed = probe.states?.[state] ?? null;
   if (exposed === null) return STATE_NOT_EXPOSED;
@@ -119,7 +119,7 @@ export function checkElement(assertion: ResolvedElementAssertion, probe: Element
     // The link's resolved href, never followed. An element in no link fails.
     case 'hrefEquals': return sameUrl(assertion.value, probe.href, baseUrl) ? PASSED : FAILED;
     // The probe does not report checked or focused state yet, so these checks can never pass by
-    // accident. The run refuses them before probing; see needsDriverFeatures in the contracts package.
+    // accident. The run refuses them before probing; see isElementCheckNoDriverDecides in the contracts package.
     case 'checked': case 'unchecked': case 'focused':
       return FAILED;
     case 'hasClass': case 'lacksClass': case 'computedStyleEquals': case 'attributeEquals': case 'attributeAbsent':
@@ -142,12 +142,12 @@ export function checkPage(assertion: PageAssertion, probe: PageProbe, baseUrl?: 
     case 'url': return new URL(assertion.value, probe.url).href === new URL(probe.url).href ? PASSED : FAILED;
     // A plain text prefix of the path: the query and fragment are not part of it.
     case 'urlPathStartsWith': return new URL(probe.url).pathname.startsWith(assertion.value) ? PASSED : FAILED;
-    // Passes when a meta tag of that name or property has the content. A head with no such tag,
-    // or a probe that read no head, fails. A value reference left in the check never matches.
+    // Passes when a meta tag of that name or property has the content. A head with no such tag
+    // fails. A value reference left in the check never matches.
     case 'metaContent': {
       const expected = literalText(assertion.value);
       if (expected === undefined) return FAILED;
-      const found = (probe.meta ?? []).some((tag) => sameMetaName(tag.name, assertion.name) && normalise(tag.content) === normalise(expected));
+      const found = probe.meta.some((tag) => sameMetaName(tag.name, assertion.name) && normalise(tag.content) === normalise(expected));
       return found ? PASSED : FAILED;
     }
     // A head with no canonical link fails, even against the page's own URL.

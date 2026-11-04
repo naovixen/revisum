@@ -7,7 +7,9 @@
 // selector finds a host: each function holds its own short walk, a list of roots that grows as it is
 // read. A selector matches within one root, as everywhere in a browser. Closed roots and XPath cannot
 // be searched this way (see not-found in docs/errors.md). A template's content belongs to no tree, so
-// it is never searched.
+// it is never searched. A form's named inputs hide what it inherits, as in-page.ts says, so what may be
+// a form is read through the prototypes. A form cannot host a shadow root, so a shadowRoot its input
+// hides only adds an input to search, which holds nothing.
 
 // Elements labelled exactly `label`: label[for], a wrapping label, aria-label or aria-labelledby.
 export function findByLabel(label: string): Element[] {
@@ -27,7 +29,7 @@ export function findByLabel(label: string): Element[] {
       }
     }
     for (const element of Array.from(root.querySelectorAll("[aria-label]"))) {
-      if (normalise(element.getAttribute("aria-label") ?? "") === wanted) {
+      if (normalise(Element.prototype.getAttribute.call(element, "aria-label") ?? "") === wanted) {
         found.add(element);
       }
     }
@@ -35,10 +37,13 @@ export function findByLabel(label: string): Element[] {
       // An id names an element in the same root. Only the browser's element reference can reach out
       // of a root, into a root around it.
       const references = (element as Element & { ariaLabelledByElements?: readonly Element[] | null }).ariaLabelledByElements ?? [];
-      const ids = (element.getAttribute("aria-labelledby") ?? "").split(/\s+/);
+      const ids = (Element.prototype.getAttribute.call(element, "aria-labelledby") ?? "").split(/\s+/);
       const texts = references.length > 0
-        ? references.map((reference) => reference.textContent)
-        : ids.map((id) => root.getElementById(id)?.textContent ?? "");
+        ? references.map((reference) => Reflect.get(Node.prototype, "textContent", reference) as string)
+        : ids.map((id) => {
+            const labelledBy = root.getElementById(id);
+            return labelledBy === null ? "" : (Reflect.get(Node.prototype, "textContent", labelledBy) as string);
+          });
       if (normalise(texts.join(" ")) === wanted) {
         found.add(element);
       }
@@ -51,13 +56,15 @@ export function findByLabel(label: string): Element[] {
 export function findByText(text: string): Element[] {
   const normalise = (value: string): string => value.replace(/\s+/g, " ").trim();
   const parentOf = (node: Element): Element | null => {
-    if (node.assignedSlot !== null) {
-      return node.assignedSlot;
+    const slot = Reflect.get(Element.prototype, "assignedSlot", node);
+    if (slot !== null) {
+      return slot;
     }
-    if (node.parentElement !== null) {
-      return node.parentElement;
+    const parent = Reflect.get(Node.prototype, "parentElement", node);
+    if (parent !== null) {
+      return parent;
     }
-    const root = node.getRootNode();
+    const root = Node.prototype.getRootNode.call(node);
     return root instanceof ShadowRoot ? root.host : null;
   };
   const wanted = normalise(text);
@@ -69,8 +76,9 @@ export function findByText(text: string): Element[] {
         scopes.push(element.shadowRoot);
       }
       const isContent = !["SCRIPT", "STYLE", "TEMPLATE"].includes(element.tagName);
-      // An SVG element has no innerText, whatever the type says.
-      if (isContent && normalise((element as Partial<HTMLElement>).innerText ?? "") === wanted) {
+      // An SVG element has no innerText.
+      const text = element instanceof HTMLElement ? Reflect.get(HTMLElement.prototype, "innerText", element) : "";
+      if (isContent && normalise(text) === wanted) {
         matches.push(element);
       }
     }
@@ -94,7 +102,7 @@ export function findByTestId(testId: string, attribute: string): Element[] {
       if (element.shadowRoot !== null) {
         roots.push(element.shadowRoot);
       }
-      if (element.getAttribute(attribute) === testId) {
+      if (Element.prototype.getAttribute.call(element, attribute) === testId) {
         found.push(element);
       }
     }
@@ -167,7 +175,7 @@ export function findStructural(kind: string, text: string, hasText: string, ...s
         }
       }
     }
-    return searches.map((searched) => searched.textContent).join(" ");
+    return searches.map((searched) => Reflect.get(Node.prototype, "textContent", searched) as string).join(" ");
   };
   const wanted = normalise(hasText);
   return found.filter((element) => normalise(textUnder(element)).includes(wanted));

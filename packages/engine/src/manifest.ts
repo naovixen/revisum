@@ -62,10 +62,7 @@ export type RunManifest = {
   // The target, adapter and browser of a plan run. An evidence run has none of its own: the
   // suite's own browser is self-reported in its evidence record.
   readonly target?: Target;
-  // The driver, without the features it performs, which are not an input of their own: a step that
-  // needs one shows the answer in the result, so a driver that gains one leaves other plans' hashes
-  // as they were.
-  readonly adapter?: Omit<AdapterInfo, 'performs'>;
+  readonly adapter?: AdapterInfo;
   readonly browser?: { readonly name: string; readonly version: string };
   // An evidence run fixes neither, so both are 0 for it; its evidence record says why.
   readonly seeds: { readonly random: number };
@@ -135,9 +132,16 @@ export type EvidenceManifestInputs = {
   readonly host: HostInfo;
 };
 
+const compareText = (left: string, right: string): number => {
+  if (left === right) {
+    return 0;
+  }
+  return left < right ? -1 : 1;
+};
+
 export function evidenceManifest(inputs: EvidenceManifestInputs): RunManifest {
   const files = inputs.suiteFiles.map((file) => ({ path: file.path, sha256: sha256(file.bytes) }))
-    .sort((left, right) => (left.path < right.path ? -1 : left.path > right.path ? 1 : 0));
+    .sort((left, right) => compareText(left.path, right.path));
   const { suite } = inputs;
   return {
     schema: schemaId('run-manifest', 1),
@@ -282,7 +286,7 @@ export function buildManifest(inputs: {
   const recorded = inputs.recordsReplies === true && needsReplies ? [RECORDED_REPLIES_INPUT] : [];
   const secrets = inputs.secrets === undefined || inputs.secrets.length === 0
     ? {}
-    : { secrets: [...inputs.secrets].sort((left, right) => (left.name < right.name ? -1 : left.name > right.name ? 1 : 0)) };
+    : { secrets: [...inputs.secrets].sort((left, right) => compareText(left.name, right.name)) };
   return {
     schema: schemaId('run-manifest', 1),
     engineVersion: ENGINE_VERSION,
@@ -300,7 +304,7 @@ export function buildManifest(inputs: {
     ...(inputs.unsafe === undefined ? {} : inputs.unsafe),
     ...(inputs.responseRewrites === undefined || inputs.responseRewrites.length === 0 ? {} : {
       responseRewrites: inputs.responseRewrites.map((applied) => ({ origin: applied.origin, name: applied.name }))
-        .sort((left, right) => (left.origin === right.origin ? (left.name < right.name ? -1 : 1) : (left.origin < right.origin ? -1 : 1))),
+        .sort((left, right) => (left.origin === right.origin ? compareText(left.name, right.name) : compareText(left.origin, right.origin))),
     }),
     ...(inputs.executableSha256 === undefined ? {} : { executableSha256: inputs.executableSha256 }),
     ...pinned,

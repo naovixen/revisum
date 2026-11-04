@@ -64,7 +64,6 @@ type PageScriptOutcome = {
 
 const failedWith = (code: StepCode, pageScript?: PageScriptRecord): PageScriptOutcome =>
   ({ ...stepFailed(code), ...(pageScript === undefined ? {} : { pageScript }) });
-const UNSUPPORTED = failedWith('unsupported-step');
 
 // A script ready to run: its source text and what its declaration, or the plan, says of it.
 type ScriptToRun = {
@@ -140,7 +139,6 @@ async function runOnce(
   session: DocumentSession, script: ScriptToRun, callArguments: Readonly<Record<string, ArgumentValue>>, stepIndex: number,
   stepType: 'evaluate' | 'expectScript', context: PageScriptContext,
 ): Promise<OneRun> {
-  if (session.runScript === undefined) return { result: failure('unsupported-step'), resultSha256: null };
   const startedAt = context.clock.now();
   const ran = await session.runScript({
     source: script.source, arguments: callArguments, timeoutMilliseconds: script.timeoutMilliseconds, maximumResultBytes: script.maximumResultBytes,
@@ -176,7 +174,6 @@ function textsToRemember(step: EvaluateStep, document: unknown, script: ScriptTo
 }
 
 export async function runEvaluate(step: EvaluateStep, stepIndex: number, session: DocumentSession, context: PageScriptContext): Promise<PageScriptOutcome> {
-  if (session.runScript === undefined) return UNSUPPORTED;
   const script = scriptToRun(step.script, context);
   if (!script.ok) return failedWith(script.error);
   const callArguments = scriptArguments(step.arguments, script.value, context);
@@ -198,7 +195,6 @@ function expectedText(assertion: BackendAssertion, context: PageScriptContext): 
 }
 
 export async function runScriptCheck(step: ExpectScriptStep, stepIndex: number, session: DocumentSession, context: PageScriptContext): Promise<PageScriptOutcome> {
-  if (session.runScript === undefined) return UNSUPPORTED;
   const script = scriptToRun(step.script, context);
   if (!script.ok) return failedWith(script.error);
   const callArguments = scriptArguments(step.arguments, script.value, context);

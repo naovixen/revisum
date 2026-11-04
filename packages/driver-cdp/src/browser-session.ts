@@ -1,13 +1,11 @@
 // Turns any protocol's PageOperations into a Session. Auto-waiting, the runtime guard, probing,
 // masking and auditing live here once, so every protocol behaves the same way.
-// for css
-// and XPath locators, DOM reads and page scripts.
 import { isDeepStrictEqual } from 'node:util';
 import {
-  DEFAULT_TEST_ID_ATTRIBUTE, DRIVER_FEATURES, failure, literalActionStep, literalText, performableLocator, reveal, success,
+  DEFAULT_TEST_ID_ATTRIBUTE, failure, literalActionStep, literalText, performableLocator, reveal, success,
   type ActionGuard, type ActionStep, type BrowserRequestRecord, type DialogStep, type DocumentSession, type DomRead, type DomValue, type DownloadedFile,
-  type DownloadStep, type DriverError, type DriverFeature, type ElementProbe, type Locator, type PageScriptCall, type PageMetaTag, type PageProbe, type Position, type ResolvedActionStep,
-  type ClipboardPort, type ClockPort, type DriverErrorCode, type GuardVerdict, type NetworkPort, type ResolvedElement, type ResolvedLocator, type Result, type Secret, type SessionEnvironment, type StoragePort,
+  type DownloadStep, type DriverError, type ElementProbe, type ElementsRead, type Locator, type PageScriptCall, type PageMetaTag, type PageProbe, type Position, type ResolvedActionStep,
+  type ClipboardPort, type ClockPort, type DriverErrorCode, type GuardVerdict, type NetworkPort, type ResolvedElement, type ResolvedLocator, type Result, type Secret, type SessionEnvironment, type SessionTab, type StoragePort,
   UnreadablePage,
 } from '@revisum/contracts';
 import {
@@ -15,7 +13,7 @@ import {
   structuralSelectorValidity, unmaskElements, whatAClickActivates,
 } from './in-page.ts';
 import { findByLabel, findByTestId, findByText, findStructural, inDocumentOrder } from './FindByLabel.ts';
-import { HitCheckOutcome, hitChecks, type ArmedClick, type HitChecks } from './HitChecks.ts';
+import { HitCheckOutcome, hitChecks, type ArmedClick, type CheckedDocument, type HitChecks } from './HitChecks.ts';
 import { heldModifierKeys } from './modifier-keys.ts';
 import { pageAudit, parseAudit, toFindings } from './page-audit.ts';
 import type { Actionability, DownloadCapture, DriverSession, PageEvents, PageFunction, PageOperations, PageWithInput, Point, ScriptCallOutcome } from './page-operations.ts';
@@ -23,9 +21,9 @@ import { PageHeldByDialog } from './PageHeldByDialog.ts';
 import type { ConnectionFailure } from './SessionEgress.ts';
 
 const NOTHING_READ = { visible: false, enabled: false, text: '', value: null, sensitive: false, box: null } as const;
-const READ_FAILED: ElementProbe = { ...NOTHING_READ, count: UnreadablePage.ReadFailed };
-const DIALOG_HOLDS_PAGE: ElementProbe = { ...NOTHING_READ, count: UnreadablePage.DialogOpen };
-const ON_BROWSER_ERROR_PAGE: ElementProbe = { ...NOTHING_READ, count: UnreadablePage.BrowserErrorPage };
+const READ_FAILED: ElementProbe = { count: UnreadablePage.ReadFailed };
+const DIALOG_HOLDS_PAGE: ElementProbe = { count: UnreadablePage.DialogOpen };
+const ON_BROWSER_ERROR_PAGE: ElementProbe = { count: UnreadablePage.BrowserErrorPage };
 const POLL_INTERVAL_MILLISECONDS = 50;
 const TIMED_OUT = Symbol('timed out');
 // What the runtime guard is told for a dialog step, which acts on no element.
@@ -75,32 +73,35 @@ const SHORTEST_INPUT_MILLISECONDS = 1_000;
 // A field a secret was typed into: the locator that found it, and whether that very element has gone.
 export type SecretTypedField = { readonly locator: ResolvedLocator; readonly isGone: () => Promise<boolean> };
 
-export type SessionDetails = {
+// What a tab, the first one included, is made of.
+export type TabDetails = {
+  readonly close: () => Promise<void>;
+  readonly events: PageEvents;
+  // The absolute path of a declared upload fixture, or why it cannot be sent.
+  readonly fixturePath: (fixture: string) => Result<string, DriverError>;
+  // Where a download step's file is saved.
+  readonly downloads: DownloadCapture;
+  // Every field the session and its tabs have typed a secret into, in the order they were typed.
+  readonly secretTypedFields: SecretTypedField[];
+};
+
+export type SessionDetails = TabDetails & {
   readonly browser: { readonly name: string; readonly version: string };
   readonly processId: number;
   readonly blockedOrigins: () => readonly string[];
   readonly connectionFailures: () => readonly ConnectionFailure[];
   // Every request's origin and the channel it left the browser by.
   readonly egressRecords: () => readonly BrowserRequestRecord[];
-  readonly close: () => Promise<void>;
-  readonly events: PageEvents;
-  // The absolute path of a declared upload fixture, or why it cannot be sent.
-  readonly fixturePath: (fixture: string) => Result<string, DriverError>;
-  // Where a download step's file is saved. Without it, the session refuses download steps.
-  readonly downloads?: DownloadCapture;
-  // Every field the session and its tabs have typed a secret into, in the order they were typed.
-  readonly secretTypedFields: SecretTypedField[];
-  // Opens a second tab of the session's browser context, still on about:blank. Without it, the
-  // session opens no tabs.
-  readonly openTab?: () => Promise<Result<DriverSession, DriverError>>;
-  // Stubs and request checks for the whole browser context. Without it, the session has none.
-  readonly network?: NetworkPort;
-  // The page's local and session storage. Without it, the session has none.
-  readonly storage?: StoragePort;
-  // The session's virtual clock, shared by every tab. Without it, the session advances no clock.
-  readonly clock?: ClockPort;
-  // The browser's own clipboard. Without it, the session reads no clipboard.
-  readonly clipboard?: ClipboardPort;
+  // Opens a second tab of the session's browser context, still on about:blank.
+  readonly openTab: () => Promise<Result<SessionTab, DriverError>>;
+  // Stubs and request checks for the whole browser context.
+  readonly network: NetworkPort;
+  // The page's local and session storage.
+  readonly storage: StoragePort;
+  // The session's virtual clock, shared by every tab.
+  readonly clock: ClockPort;
+  // The browser's own clipboard.
+  readonly clipboard: ClipboardPort;
 };
 
 // The scheme of the page the browser shows in place of one it could not show.
@@ -109,12 +110,6 @@ const BROWSER_ERROR_PAGE = 'chrome-error:';
 const CRASHED: DriverError = { code: 'target-crashed', detail: 'the page\'s renderer died' };
 const DIALOG_OPEN: DriverError = { code: 'dialog-open', detail: 'a dialog is open: a dialog step must answer it first' };
 const SELECTOR_INVALID: DriverError = { code: 'selector-invalid', detail: 'the browser rejects a CSS selector or XPath expression of the locator' };
-const NO_GUARD: DriverError = { code: 'policy-denied', detail: 'no runtime guard was given, so nothing can allow the action' };
-
-// The optional plan features every session buildSession makes performs, whatever its protocol:
-// positions, test-id attributes and css and XPath selectors in locate, chords and multi-line text
-// in perform, the probe a remember step and a DOM check read through, and the script runner.
-export const SESSION_FEATURES: readonly DriverFeature[] = DRIVER_FEATURES;
 
 // The elements a locator matches. Throws when the page cannot answer, which says nothing about
 // what is on it.
@@ -452,7 +447,7 @@ const NOTHING_BEFORE_PRESS = (): Promise<void> => Promise.resolve();
 // document it is framed in, so a capture from inside a frame hides what the top page hides. The
 // first of them is the top document. Input goes only through `clickChecks`.
 function documentPorts<Handle>(
-  operations: PageOperations<Handle>, clickChecks: HitChecks<Handle>, masked: readonly PageOperations<Handle>[], environment: SessionEnvironment, details: SessionDetails,
+  operations: PageOperations<Handle>, clickChecks: HitChecks<Handle>, masked: readonly PageOperations<Handle>[], environment: SessionEnvironment, details: TabDetails,
 ): DocumentSession {
   const isTopDocument = masked.length === 1;
   const events = details.events;
@@ -465,8 +460,8 @@ function documentPorts<Handle>(
   };
 
   const probeNow = async (planLocator: Locator, read?: DomRead): Promise<ElementProbe> => {
-    // A value reference, or a locator this session cannot resolve, says nothing about the page.
-    const locator = performableLocator(planLocator, SESSION_FEATURES);
+    // A value reference says nothing about the page.
+    const locator = performableLocator(planLocator);
     if (locator === undefined || crashed()) return READ_FAILED;
     try {
       if (await rejectsSelector(operations, locator)) return { ...NOTHING_READ, count: 0, selectorInvalid: true };
@@ -478,7 +473,7 @@ function documentPorts<Handle>(
       }
       const element = found[0];
       if (found.length !== 1 || element === undefined) return { ...NOTHING_READ, count: found.length };
-      const shown = JSON.parse(await operations.callForString(probeElement, [{ element }, environment.sensitiveSelectors])) as Extract<ElementProbe, { readonly count: number }>;
+      const shown = JSON.parse(await operations.callForString(probeElement, [{ element }, environment.sensitiveSelectors])) as ElementsRead;
       // The link target and aria-current come from the document, the other states from the
       // browser's accessibility engine, as assistive technology reads them.
       const { href, current } = decodeLinkAndCurrent(await operations.callForString(linkAndCurrent, [{ element }]));
@@ -645,10 +640,6 @@ function documentPorts<Handle>(
   };
 
   const actBeforePress = async (step: ActionStep, guard: ActionGuard, secret: Secret | undefined, beforePress: BeforePress<Handle>): Promise<Result<void, DriverError>> => {
-    // The type requires a guard, but what calls this may not be checked against the type.
-    if (typeof guard !== 'function') {
-      return failure(NO_GUARD);
-    }
     if (crashed()) return failure(CRASHED);
     const alreadyRefused = failureOfRefusedDecision('not-actionable');
     if (alreadyRefused !== null) {
@@ -657,9 +648,10 @@ function documentPorts<Handle>(
     if (step.type === 'dialog') {
       try { return await answerDialog(step, guard); } catch (error) { return failure(crashed() ? CRASHED : { code: 'not-actionable', detail: errorText(error) }); }
     }
-    // Anything this driver cannot perform in full is refused before it touches the page.
-    const action = literalActionStep(step, SESSION_FEATURES);
-    if (action === undefined) return failure({ code: 'unsupported-step', detail: `this driver does not perform this ${step.type} step yet` });
+    // A step left holding a value reference, and a download, which has a port of its own, are refused
+    // before they touch the page.
+    const action = literalActionStep(step);
+    if (action === undefined) return failure({ code: 'unsupported-step', detail: `this ${step.type} step cannot be performed as it stands` });
     // A secret reference arrives with the secret the engine resolved for it. Without that secret
     // there is nothing to type, and typing nothing could pass a step that should fail.
     const typedSecret = secretToType(action, secret);
@@ -706,13 +698,9 @@ function documentPorts<Handle>(
   // to save the one download it starts. A popup the click opens, or a download that is not its own,
   // fails the step with unsupported-step and nothing of it is kept.
   const download = async (step: DownloadStep, maximumBytes: number, guard: ActionGuard): Promise<Result<DownloadedFile, DriverError>> => {
-    if (typeof guard !== 'function') {
-      return failure(NO_GUARD);
-    }
     if (crashed()) return failure(CRASHED);
-    const capture = details.downloads;
-    const locator = performableLocator(step.locator, SESSION_FEATURES);
-    if (capture === undefined || locator === undefined) return failure({ code: 'unsupported-step', detail: 'this driver does not perform this download step' });
+    const locator = performableLocator(step.locator);
+    if (locator === undefined) return failure({ code: 'unsupported-step', detail: 'a value reference reached the driver' });
     try {
       if (await rejectsSelector(operations, locator)) return failure(SELECTOR_INVALID);
     } catch (error) {
@@ -720,7 +708,7 @@ function documentPorts<Handle>(
     }
     const openingsBefore = events.unsupportedOpenings();
     const hasOpenedAnother = (): boolean => events.unsupportedOpenings() > openingsBefore;
-    const armed = capture.arm();
+    const armed = details.downloads.arm();
     let kept = false;
     try {
       const clicked = await actBeforePress({ type: 'click', locator }, guard, undefined, async (element, at) => {
@@ -862,15 +850,15 @@ function documentPorts<Handle>(
       if (await rejectsSelector(operations, locator)) return failure(SELECTOR_INVALID);
       const found = await waitUntilFound(operations, locator, timeout, crashed);
       if (!found.ok) return found;
-      let inner: PageWithInput<Handle> | null;
+      let inner: CheckedDocument<Handle> | null;
       try {
-        inner = await operations.frame(found.value);
+        inner = await clickChecks.frame(found.value);
       } catch (error) {
         return failure(crashed() ? CRASHED : { code: 'not-actionable', detail: errorText(error) });
       }
       // An element that is no iframe, or an iframe whose document runs in another process.
       if (inner === null) return failure({ code: 'unsupported-step', detail: 'the element is not an iframe whose document this driver can reach' });
-      return success(documentPorts(inner, hitChecks(inner), [...masked, inner], environment, details));
+      return success(documentPorts(inner.operations, inner.checks, [...masked, inner.operations], environment, details));
     },
     crashed,
     isDialogOpen: () => events.openDialog() !== null,
@@ -880,7 +868,7 @@ function documentPorts<Handle>(
 }
 
 // Opens a second tab and loads the URL in it. A tab whose page does not load is closed at once.
-async function newTabAt(openTab: () => Promise<Result<DriverSession, DriverError>>, url: string, crashed: () => boolean): Promise<Result<DriverSession, DriverError>> {
+async function newTabAt(openTab: () => Promise<Result<SessionTab, DriverError>>, url: string, crashed: () => boolean): Promise<Result<SessionTab, DriverError>> {
   const opened = await openTab();
   if (!opened.ok) return crashed() ? failure(CRASHED) : opened;
   const tab = opened.value;
@@ -891,15 +879,19 @@ async function newTabAt(openTab: () => Promise<Result<DriverSession, DriverError
   return navigated;
 }
 
+// One tab of a session: its document's ports, and its own close.
+export function buildTab<Handle>(operations: PageWithInput<Handle>, environment: SessionEnvironment, details: TabDetails): SessionTab {
+  return { ...documentPorts(operations, hitChecks(operations), [operations], environment, details), close: details.close };
+}
+
 export function buildSession<Handle>(operations: PageWithInput<Handle>, environment: SessionEnvironment, details: SessionDetails): DriverSession {
-  const openTab = details.openTab;
   return {
-    ...documentPorts(operations, hitChecks(operations), [operations], environment, details),
-    ...(openTab === undefined ? {} : { newTab: (url: string) => newTabAt(openTab, url, () => details.events.crashed()) }),
-    ...(details.network === undefined ? {} : { network: details.network }),
-    ...(details.storage === undefined ? {} : { storage: details.storage }),
-    ...(details.clock === undefined ? {} : { clock: details.clock }),
-    ...(details.clipboard === undefined ? {} : { clipboard: details.clipboard }),
+    ...buildTab(operations, environment, details),
+    newTab: (url: string) => newTabAt(details.openTab, url, () => details.events.crashed()),
+    network: details.network,
+    storage: details.storage,
+    clock: details.clock,
+    clipboard: details.clipboard,
     browser: details.browser,
     processId: details.processId,
     blockedOrigins: details.blockedOrigins,
@@ -907,6 +899,5 @@ export function buildSession<Handle>(operations: PageWithInput<Handle>, environm
     refusedRequestDecisions: () => details.events.refusedRequestDecisions(),
     egressRecords: details.egressRecords,
     evaluate: (pageFunction: PageFunction, inputs = []) => operations.callForString(pageFunction, inputs),
-    close: details.close,
   };
 }

@@ -193,8 +193,6 @@ export type NetworkAndStorageStep =
   | StubStep | ResetRequestsStep | ExpectRequestsStep | ExpectResponseStep | SetStorageStep | RemoveStorageStep | ExpectStorageStep;
 
 // ---- The driver ports -------------------------------------------------------------------------
-// A driver that declares networkStubs or requestChecks offers the network port, and one that
-// declares storage the storage port; a run refuses these steps with unsupported-step otherwise.
 
 // A stub response as the driver serves it. The engine has filled every template, so the body is
 // finished bytes, or a file from the project's fixtures folder, which the driver reads itself and

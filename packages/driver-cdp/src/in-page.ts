@@ -4,42 +4,52 @@
 // functions, so a probe or an actionability check means the same thing everywhere.
 // What a person sees includes what is drawn in open shadow roots, so these functions look through
 // them too; FindByLabel.ts says how, and holds the functions that find a locator's elements.
+// A form's named inputs hide whatever it inherits, methods and properties alike: a form holding an
+// input named closest has no closest method, and one named parentElement has a parent that leads
+// back into it. So whatever may be a form is read through the prototypes here, never directly.
 
 // A snapshot of one element as JSON, in the shape of ElementProbe.
 export function probeElement(element: Element, selectors: readonly string[]): string {
-  const rectangle = element.getBoundingClientRect();
+  const rectangle = Element.prototype.getBoundingClientRect.call(element);
   const style = getComputedStyle(element);
   const visible = rectangle.width > 0 && rectangle.height > 0 && style.visibility !== 'hidden' && style.display !== 'none';
-  const disabled = (element as HTMLInputElement).disabled === true || element.getAttribute('aria-disabled') === 'true';
+  const disabled = (element as HTMLInputElement).disabled === true || Element.prototype.getAttribute.call(element, 'aria-disabled') === 'true';
   const isField = element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement || element instanceof HTMLSelectElement;
   const selectorList = selectors.join(',');
   const parentOf = (node: Element): Element | null => {
-    if (node.assignedSlot !== null) {
-      return node.assignedSlot;
+    const slot = Reflect.get(Element.prototype, 'assignedSlot', node);
+    if (slot !== null) {
+      return slot;
     }
-    if (node.parentElement !== null) {
-      return node.parentElement;
+    const parent = Reflect.get(Node.prototype, 'parentElement', node);
+    if (parent !== null) {
+      return parent;
     }
-    const root = node.getRootNode();
+    const root = Node.prototype.getRootNode.call(node);
     return root instanceof ShadowRoot ? root.host : null;
   };
   const isInsideMatch = (): boolean => {
     for (let node: Element | null = element; node !== null; node = parentOf(node)) {
-      if (node.matches(selectorList)) {
+      if (Element.prototype.matches.call(node, selectorList)) {
         return true;
       }
     }
     return false;
   };
   const hasMatchInside = (): boolean => {
-    const scopes: (Element | ShadowRoot)[] = element.shadowRoot === null ? [element] : [element, element.shadowRoot];
+    const rootOf = (node: Element): ShadowRoot | null => Reflect.get(Element.prototype, 'shadowRoot', node);
+    const elementRoot = rootOf(element);
+    const scopes: (Element | ShadowRoot)[] = elementRoot === null ? [element] : [element, elementRoot];
     for (const scope of scopes) {
-      if (scope.querySelector(selectorList) !== null) {
+      const isElement = scope instanceof Element;
+      const inScope = (selector: string): NodeListOf<Element> => (isElement ? Element.prototype.querySelectorAll.call(scope, selector) : scope.querySelectorAll(selector));
+      if (inScope(selectorList).length > 0) {
         return true;
       }
-      for (const inner of Array.from(scope.querySelectorAll('*'))) {
-        if (inner.shadowRoot !== null) {
-          scopes.push(inner.shadowRoot);
+      for (const inner of Array.from(inScope('*'))) {
+        const innerRoot = rootOf(inner);
+        if (innerRoot !== null) {
+          scopes.push(innerRoot);
         }
       }
     }
@@ -48,8 +58,8 @@ export function probeElement(element: Element, selectors: readonly string[]): st
   const sensitive = selectorList !== '' && (isInsideMatch() || hasMatchInside());
   return JSON.stringify({
     count: 1, visible, enabled: !disabled,
-    // An SVG element has no innerText, whatever the type says.
-    text: (element as Partial<HTMLElement>).innerText ?? element.textContent,
+    // An SVG element has no innerText.
+    text: element instanceof HTMLElement ? Reflect.get(HTMLElement.prototype, 'innerText', element) : Reflect.get(Node.prototype, 'textContent', element),
     value: isField ? (element as HTMLInputElement).value : null,
     sensitive,
     box: { x: rectangle.x, y: rectangle.y, width: rectangle.width, height: rectangle.height },
@@ -66,48 +76,54 @@ export async function actionability(element: Element): Promise<string> {
     setTimeout(finish, 50); // a hidden or throttled page may not paint
   });
   const none = { attached: false, visible: false, stable: false, enabled: false, receivesEvents: false, centre: null };
-  if (!element.isConnected) return JSON.stringify(none);
+  const isConnected = (): boolean => Reflect.get(Node.prototype, 'isConnected', element);
+  const boxOf = (): DOMRect => Element.prototype.getBoundingClientRect.call(element);
+  const rootOf = (node: Element): ShadowRoot | null => Reflect.get(Element.prototype, 'shadowRoot', node);
+  if (!isConnected()) return JSON.stringify(none);
   const style = getComputedStyle(element);
-  const first = element.getBoundingClientRect();
+  const first = boxOf();
   const visible = first.width > 0 && first.height > 0 && style.visibility !== 'hidden' && style.display !== 'none';
-  const disabled = (element as HTMLButtonElement).disabled === true || element.getAttribute('aria-disabled') === 'true'
-    || element.closest('fieldset[disabled]') !== null;
+  const disabled = (element as HTMLButtonElement).disabled === true || Element.prototype.getAttribute.call(element, 'aria-disabled') === 'true'
+    || Element.prototype.closest.call(element, 'fieldset[disabled]') !== null;
   if (!visible) return JSON.stringify({ ...none, attached: true, enabled: !disabled });
   const inView = first.top >= 0 && first.left >= 0 && first.bottom <= innerHeight && first.right <= innerWidth;
-  if (!inView) element.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' });
+  if (!inView) Element.prototype.scrollIntoView.call(element, { block: 'center', inline: 'center', behavior: 'instant' });
   await nextFrame();
-  const before = element.getBoundingClientRect();
+  const before = boxOf();
   await nextFrame();
-  const after = element.getBoundingClientRect();
+  const after = boxOf();
   const stable = before.x === after.x && before.y === after.y && before.width === after.width && before.height === after.height;
   // An inline element that wraps onto a second line has one box per line, and the centre of the
   // box around them all may fall between them; the centre of its first box is on the element.
-  const firstBox = Array.from(element.getClientRects()).find((box) => box.width > 0 && box.height > 0) ?? after;
+  const firstBox = Array.from(Element.prototype.getClientRects.call(element)).find((box) => box.width > 0 && box.height > 0) ?? after;
   const centre = { x: firstBox.x + firstBox.width / 2, y: firstBox.y + firstBox.height / 2 };
   // The document answers with a shadow host; only its root can say what is drawn there.
   let hit = document.elementFromPoint(centre.x, centre.y);
-  let inner = hit?.shadowRoot?.elementFromPoint(centre.x, centre.y) ?? null;
+  let inner = hit === null ? null : rootOf(hit)?.elementFromPoint(centre.x, centre.y) ?? null;
   while (inner !== null && inner !== hit) {
     hit = inner;
-    inner = hit.shadowRoot?.elementFromPoint(centre.x, centre.y) ?? null;
+    inner = rootOf(hit)?.elementFromPoint(centre.x, centre.y) ?? null;
   }
   const parentOf = (node: Element): Element | null => {
-    if (node.assignedSlot !== null) {
-      return node.assignedSlot;
+    const slot = Reflect.get(Element.prototype, 'assignedSlot', node);
+    if (slot !== null) {
+      return slot;
     }
-    if (node.parentElement !== null) {
-      return node.parentElement;
+    const parent = Reflect.get(Node.prototype, 'parentElement', node);
+    if (parent !== null) {
+      return parent;
     }
-    const root = node.getRootNode();
+    const root = Node.prototype.getRootNode.call(node);
     return root instanceof ShadowRoot ? root.host : null;
   };
   let isHit = false;
   for (let node = hit; node !== null && !isHit; node = parentOf(node)) {
     isHit = node === element;
   }
-  const viaLabel = hit !== null && hit.closest('label') !== null && (hit.closest('label') as HTMLLabelElement).control === element;
+  const label = hit === null ? null : Element.prototype.closest.call(hit, 'label');
+  const viaLabel = label instanceof HTMLLabelElement && label.control === element;
   const receivesEvents = isHit || viaLabel;
-  return JSON.stringify({ attached: element.isConnected, visible: true, stable, enabled: !disabled, receivesEvents, centre });
+  return JSON.stringify({ attached: isConnected(), visible: true, stable, enabled: !disabled, receivesEvents, centre });
 }
 
 // What a pointer press at the point would really act on, other than `element`: the element it would
@@ -118,23 +134,26 @@ export async function actionability(element: Element): Promise<string> {
 export function whatAClickActivates(element: Element, x: number, y: number): Element[] {
   const controls = 'a[href], area[href], button, input, select, textarea, summary, option, label, [role="button"], [role="link"], [role="checkbox"], '
     + '[role="radio"], [role="switch"], [role="tab"], [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [role="option"], [role="treeitem"]';
+  const rootOf = (node: Element): ShadowRoot | null => Reflect.get(Element.prototype, 'shadowRoot', node);
   let hit = document.elementFromPoint(x, y);
-  let inner = hit?.shadowRoot?.elementFromPoint(x, y) ?? null;
+  let inner = hit === null ? null : rootOf(hit)?.elementFromPoint(x, y) ?? null;
   while (inner !== null && inner !== hit) {
     hit = inner;
-    inner = hit.shadowRoot?.elementFromPoint(x, y) ?? null;
+    inner = rootOf(hit)?.elementFromPoint(x, y) ?? null;
   }
   if (hit === null) {
     return [];
   }
   const parentOf = (node: Element): Element | null => {
-    if (node.assignedSlot !== null) {
-      return node.assignedSlot;
+    const slot = Reflect.get(Element.prototype, 'assignedSlot', node);
+    if (slot !== null) {
+      return slot;
     }
-    if (node.parentElement !== null) {
-      return node.parentElement;
+    const parent = Reflect.get(Node.prototype, 'parentElement', node);
+    if (parent !== null) {
+      return parent;
     }
-    const root = node.getRootNode();
+    const root = Node.prototype.getRootNode.call(node);
     return root instanceof ShadowRoot ? root.host : null;
   };
   const activated = new Set<Element>([hit]);
@@ -146,10 +165,10 @@ export function whatAClickActivates(element: Element, x: number, y: number): Ele
   addLabelled(hit);
   for (let node = parentOf(hit); node !== null; node = parentOf(node)) {
     addLabelled(node);
-    if (node.matches('[onclick], [tabindex]')) {
+    if (Element.prototype.matches.call(node, '[onclick], [tabindex]')) {
       activated.add(node);
     }
-    if (node.matches(controls)) {
+    if (Element.prototype.matches.call(node, controls)) {
       activated.add(node);
       break;
     }
@@ -168,13 +187,14 @@ export function maskElements(selectors: readonly string[]): string {
   for (const root of roots) {
     elements.push(...Array.from(root.querySelectorAll(selectorList)));
     for (const element of Array.from(root.querySelectorAll('*'))) {
-      if (element.shadowRoot !== null) {
-        roots.push(element.shadowRoot);
+      const shadowRoot = Reflect.get(Element.prototype, 'shadowRoot', element);
+      if (shadowRoot !== null) {
+        roots.push(shadowRoot);
       }
     }
   }
   for (const element of elements) {
-    const rectangle = element.getBoundingClientRect();
+    const rectangle = Element.prototype.getBoundingClientRect.call(element);
     const overlay = document.createElement('div');
     overlay.setAttribute('data-mask-overlay', '');
     overlay.style.cssText = `position:fixed;left:${rectangle.x}px;top:${rectangle.y}px;width:${rectangle.width}px;height:${rectangle.height}px;background:#000;z-index:2147483647;pointer-events:none`;
@@ -187,13 +207,13 @@ export function maskElements(selectors: readonly string[]): string {
 // What every field in the document holds, as JSON. The caller only compares it, and keeps none of it.
 export function fieldValues(): string {
   const fields = [...document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('input,textarea')].map((field) => field.value);
-  const editable = [...document.querySelectorAll('[contenteditable]:not([contenteditable="false"])')].map((element) => element.textContent);
+  const editable = [...document.querySelectorAll('[contenteditable]:not([contenteditable="false"])')].map((element) => Reflect.get(Node.prototype, 'textContent', element));
   return JSON.stringify([...fields, ...editable]);
 }
 
 export function maskGivenElements(...elements: Element[]): string {
   for (const element of elements) {
-    const rectangle = element.getBoundingClientRect();
+    const rectangle = Element.prototype.getBoundingClientRect.call(element);
     const overlay = document.createElement('div');
     overlay.setAttribute('data-mask-overlay', '');
     overlay.style.cssText = `position:fixed;left:${rectangle.x}px;top:${rectangle.y}px;width:${rectangle.width}px;height:${rectangle.height}px;background:#000;z-index:2147483647;pointer-events:none`;
@@ -248,25 +268,28 @@ export function linkTargetList(): string {
 // does not expose the state ("none").
 export function linkAndCurrent(element: Element): string {
   const parentOf = (node: Element): Element | null => {
-    if (node.assignedSlot !== null) {
-      return node.assignedSlot;
+    const slot = Reflect.get(Element.prototype, 'assignedSlot', node);
+    if (slot !== null) {
+      return slot;
     }
-    if (node.parentElement !== null) {
-      return node.parentElement;
+    const parent = Reflect.get(Node.prototype, 'parentElement', node);
+    if (parent !== null) {
+      return parent;
     }
-    const root = node.getRootNode();
+    const root = Node.prototype.getRootNode.call(node);
     return root instanceof ShadowRoot ? root.host : null;
   };
   let link: Element | null = element;
-  while (link !== null && !link.matches('a[href], area[href]')) link = parentOf(link);
+  while (link !== null && !Element.prototype.matches.call(link, 'a[href], area[href]')) link = parentOf(link);
   const href = link instanceof HTMLAnchorElement || link instanceof HTMLAreaElement ? link.href : null;
   const CONTROL_ROLES = ['link', 'button', 'tab', 'menuitem', 'menuitemcheckbox', 'menuitemradio', 'option', 'treeitem', 'gridcell', 'row', 'checkbox', 'radio', 'switch'];
-  const declared = element.getAttribute('aria-current');
+  const attributeOf = (name: string): string | null => Element.prototype.getAttribute.call(element, name);
+  const declared = attributeOf('aria-current');
   let current: string;
   if (declared !== null) current = declared.trim() === '' || declared.trim().toLowerCase() === 'false' ? 'false' : 'true';
   else {
-    const role = (element.getAttribute('role') ?? '').trim().split(/\s+/)[0] ?? '';
-    const control = element.matches('a[href], area[href], button, input, select, textarea, summary, option') || CONTROL_ROLES.includes(role);
+    const role = (attributeOf('role') ?? '').trim().split(/\s+/)[0] ?? '';
+    const control = Element.prototype.matches.call(element, 'a[href], area[href], button, input, select, textarea, summary, option') || CONTROL_ROLES.includes(role);
     current = control ? 'false' : 'none';
   }
   return JSON.stringify({ href, current });
@@ -274,13 +297,13 @@ export function linkAndCurrent(element: Element): string {
 
 // Focuses an element and selects its contents, ready for a fill.
 export function focusAndSelect(element: HTMLInputElement): string {
-  element.focus();
+  HTMLElement.prototype.focus.call(element);
   if (typeof element.select === 'function') element.select();
   return 'ok';
 }
 
 export function focusElement(element: HTMLElement): string {
-  element.focus();
+  HTMLElement.prototype.focus.call(element);
   return 'ok';
 }
 
@@ -290,43 +313,50 @@ export function focusElement(element: HTMLElement): string {
 export function guardDetails(element: Element): string {
   const normalise = (text: string): string => text.replace(/\s+/g, ' ').trim();
   const nameOf = (control: Element): string => {
-    const ariaLabel = control.getAttribute('aria-label');
+    const ariaLabel = Element.prototype.getAttribute.call(control, 'aria-label');
     if (ariaLabel !== null && normalise(ariaLabel) !== '') return normalise(ariaLabel);
-    const labelledBy = control.getAttribute('aria-labelledby');
+    const labelledBy = Element.prototype.getAttribute.call(control, 'aria-labelledby');
     if (labelledBy !== null) {
-      const root = control.getRootNode() as Document | ShadowRoot;
-      const text = normalise(labelledBy.split(/\s+/).map((id) => root.getElementById(id)?.textContent ?? '').join(' '));
+      const root = Node.prototype.getRootNode.call(control) as Document | ShadowRoot;
+      const textOfId = (id: string): string => {
+        const labelling = root.getElementById(id);
+        return labelling === null ? '' : (Reflect.get(Node.prototype, 'textContent', labelling) as string);
+      };
+      const text = normalise(labelledBy.split(/\s+/).map(textOfId).join(' '));
       if (text !== '') return text;
     }
     if (control instanceof HTMLInputElement && control.type === 'image') return normalise(control.alt);
     if (control instanceof HTMLInputElement) { return normalise(control.value === '' ? 'Submit' : control.value); }
-    // An SVG element has no innerText, whatever the type says.
-    return normalise((control as Partial<HTMLElement>).innerText ?? control.textContent);
+    // An SVG element has no innerText.
+    return normalise((control instanceof HTMLElement ? Reflect.get(HTMLElement.prototype, 'innerText', control) : Reflect.get(Node.prototype, 'textContent', control)) as string);
   };
-  const rectangle = element.getBoundingClientRect();
+  const rectangle = Element.prototype.getBoundingClientRect.call(element);
   const field = element as HTMLInputElement;
-  const form = field.form instanceof HTMLFormElement ? field.form : element.closest('form');
-  const submit = form === null ? undefined : Array.from(form.elements).find((control) =>
+  const form = field.form instanceof HTMLFormElement ? field.form : Element.prototype.closest.call(element, 'form');
+  const controlsOf = (owner: Element): HTMLFormControlsCollection => Reflect.get(HTMLFormElement.prototype, 'elements', owner);
+  const submit = form === null ? undefined : Array.from(controlsOf(form)).find((control) =>
     (control instanceof HTMLButtonElement && control.type === 'submit')
     || (control instanceof HTMLInputElement && (control.type === 'submit' || control.type === 'image')));
   const submitName = submit === undefined ? '' : nameOf(submit);
   const parentOf = (node: Element): Element | null => {
-    if (node.assignedSlot !== null) {
-      return node.assignedSlot;
+    const slot = Reflect.get(Element.prototype, 'assignedSlot', node);
+    if (slot !== null) {
+      return slot;
     }
-    if (node.parentElement !== null) {
-      return node.parentElement;
+    const parent = Reflect.get(Node.prototype, 'parentElement', node);
+    if (parent !== null) {
+      return parent;
     }
-    const root = node.getRootNode();
+    const root = Node.prototype.getRootNode.call(node);
     return root instanceof ShadowRoot ? root.host : null;
   };
   let link: Element | null = element;
-  while (link !== null && !link.matches('a[href]')) link = parentOf(link);
+  while (link !== null && !Element.prototype.matches.call(link, 'a[href]')) link = parentOf(link);
   return JSON.stringify({
     box: { x: rectangle.x, y: rectangle.y, width: rectangle.width, height: rectangle.height },
     formSubmitName: submitName === '' ? null : submitName,
     linkUrl: link instanceof HTMLAnchorElement ? link.href : null,
-    testId: element.getAttribute('data-testid'),
+    testId: Element.prototype.getAttribute.call(element, 'data-testid'),
   });
 }
 
@@ -363,12 +393,12 @@ export function frameContentOffset(frame: Element): string {
 
 // True when the element belongs to this document, not to a frame inside it.
 export function inThisDocument(element: Element): string {
-  return element.ownerDocument === document ? 'yes' : 'no';
+  return Reflect.get(Node.prototype, 'ownerDocument', element) === document ? 'yes' : 'no';
 }
 
 // Called on an element, as `this`, so it runs in that element's own world and document.
 export function isConnectedToItsDocument(this: Element): boolean {
-  return this.isConnected;
+  return Reflect.get(Node.prototype, 'isConnected', this);
 }
 
 // Advances this document's virtual clock to `target` milliseconds after the frozen start, through
@@ -420,9 +450,9 @@ export function structuralSelectorValidity(kind: string, text: string): string {
 // One DOM read of the element, as JSON in the shape of DomValue: its class tokens, the computed
 // value of the style property `name`, or the value of the attribute `name` (null when absent).
 export function readDomValue(element: Element, kind: string, name: string): string {
-  if (kind === 'classes') return JSON.stringify({ kind, classes: Array.from(element.classList) });
+  if (kind === 'classes') return JSON.stringify({ kind, classes: Array.from(Reflect.get(Element.prototype, 'classList', element)) });
   if (kind === 'computedStyle') return JSON.stringify({ kind, value: getComputedStyle(element).getPropertyValue(name) });
-  return JSON.stringify({ kind: 'attribute', value: element.getAttribute(name) });
+  return JSON.stringify({ kind: 'attribute', value: Element.prototype.getAttribute.call(element, name) });
 }
 
 // A page script's result written as JSON text, as ['text', text], or ['not-json'] when JSON cannot

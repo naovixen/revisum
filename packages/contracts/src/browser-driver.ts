@@ -1,7 +1,6 @@
 // The browser driver ports: what the engine needs from one browser session, split into small
 // interfaces. Each driver package implements them; the engine never imports a driver.
 import type { ClipboardPort, ClockPort } from './clock-and-clipboard.ts';
-import type { DriverFeature } from './literal-steps.ts';
 import type { NetworkPort, StoragePort } from './network-and-storage.ts';
 import { ScriptMode, type ActionStep, type DownloadStep, type Locator, type ResolvedLocator } from './plan.ts';
 import type { GuardVerdict } from './policy.ts';
@@ -9,8 +8,7 @@ import type { Secret } from './secret.ts';
 import type { Result } from './result.ts';
 import type { AdapterId, Target } from './target.ts';
 
-// policy-denied: the policy gate's runtime guard refused the action, or no guard was given to ask,
-// so no input event was sent.
+// policy-denied: the policy gate's runtime guard refused the action, so no input event was sent.
 // no-download: a download step's click started no download within the step timeout.
 // download-too-large: the file grew past the project's maximumDownloadBytes; its partial bytes are deleted.
 // storage-origin-mismatch: a storage write's page is not on the entry's declared origin, so nothing was written.
@@ -19,9 +17,11 @@ import type { AdapterId, Target } from './target.ts';
 // target-crashed: the page's renderer died, its target closed, the browser died or the connection
 // to it closed, while the step ran. The step fails, the rest of the run is skipped, and close()
 // still ends every process.
-// unsupported-step: the driver does not perform this kind of step, or the step made the page open
-// a popup or a second page, or start a download. The popup is closed and the download cancelled,
-// with nothing of it kept, so the step never passes with a partial result.
+// unsupported-step: the step made the page open a popup or a second page, or start a download no
+// download step claimed: the popup is closed and the download cancelled, with nothing of it kept, so
+// the step never passes with a partial result. Or the step reached the driver holding a value
+// reference, or asks what a document cannot do: an iframe whose document runs in another process, or
+// scripts turned off inside a frame.
 // assertion-failed: a dialog step's expected text is not the open dialog's text, so nothing
 // answered the dialog.
 // selector-invalid: the browser rejects a CSS selector or XPath expression the step's locator
@@ -74,7 +74,6 @@ export const UnavailableReason = {
   NotDeclared: 'not-declared',
   AdapterNotRegistered: 'adapter-not-registered',
   EngineNotSupported: 'engine-not-supported',
-  DeviceNotSupported: 'device-not-supported',
   LaunchFailed: 'launch-failed',
   ProviderUnavailable: 'provider-unavailable',
   BuildMismatch: 'build-mismatch',
@@ -115,25 +114,13 @@ export type AccessibleStates = {
 };
 
 // A read-only look at the element a locator matches. A count other than 1 means not found or
-// ambiguous. A count that is no number means the page could not be read, and nothing else in the
-// probe says anything: `count` cannot be compared as a number until that is ruled out.
+// ambiguous. A count that is no number means the page could not be read: such a probe holds nothing
+// else, so no other field can be read until `typeof probe.count` has ruled that out.
 export type ElementProbe = ElementsRead | UnreadablePageProbe;
 
-type UnreadablePageProbe = {
-  readonly count: UnreadablePage;
-  readonly visible: false;
-  readonly enabled: false;
-  readonly text: '';
-  readonly value: null;
-  readonly sensitive: false;
-  readonly box: null;
-  readonly states?: never;
-  readonly href?: never;
-  readonly dom?: never;
-  readonly selectorInvalid?: never;
-};
+type UnreadablePageProbe = { readonly count: UnreadablePage };
 
-type ElementsRead = {
+export type ElementsRead = {
   readonly count: number;
   readonly visible: boolean;
   readonly enabled: boolean;
@@ -142,13 +129,13 @@ type ElementsRead = {
   // True when the element, an ancestor or a descendant matches a sensitive (personal data) selector.
   readonly sensitive: boolean;
   readonly box: Box | null;
-  // Present when the driver reads accessibility states (the pageStates feature).
+  // Present when exactly one element matched.
   readonly states?: AccessibleStates;
   // The absolute URL of the link the element is, or is in, resolved against the page's URL; null
-  // when it is in no link. Present when the driver reads link targets (the linkTargets feature).
+  // when it is in no link. Present when exactly one element matched.
   readonly href?: string | null;
   // What the probe was asked to read of the element's DOM, for a DOM check or a remember from an
-  // attribute. Present when the driver reads them (the domChecks feature) and one was asked.
+  // attribute. Present when exactly one element matched and a read was asked for.
   readonly dom?: DomValue;
   // True when the browser rejects a CSS selector or XPath expression of the locator: nothing it
   // could ever match, so a check fails with selector-invalid rather than waiting.
@@ -182,11 +169,10 @@ export type PageProbe = {
   // connection, the allow-list blocked it, or an HTTP error status came with an empty body. The URL
   // is then the one the browser wanted, so it says nothing about having arrived.
   readonly browserErrorPage?: true;
-  // Present when the driver reads the document head (the pageMetadata feature): every <meta> with a
-  // name or property and a content, once per attribute, and the resolved href of
-  // <link rel="canonical">, or null when the head has none.
-  readonly meta?: readonly PageMetaTag[];
-  readonly canonicalUrl?: string | null;
+  // Every <meta> of the document head with a name or property and a content, once per attribute, and
+  // the resolved href of <link rel="canonical">, or null when the head has none.
+  readonly meta: readonly PageMetaTag[];
+  readonly canonicalUrl: string | null;
 };
 
 // A file a download step saved. The name is the server's suggested name as text only, with path
@@ -200,7 +186,7 @@ export type DownloadedFile = {
 };
 
 // How a navigate loads its page. 'disabled' turns script execution off for that page, until the
-// next navigate, so checks see what the server sent (the scriptsDisabled feature).
+// next navigate, so checks see what the server sent.
 export const NavigateScripts = {
   Enabled: 'enabled',
   Disabled: ScriptMode.Disabled,
@@ -265,18 +251,17 @@ export interface PageNavigator {
 }
 export interface ActionRunner {
   // The driver resolves the step's element, asks the guard with it, and acts only on an allow; on
-  // a deny it sends no input event and returns policy-denied. A caller that gets past the type and
-  // gives no guard is refused the same way: no guard never means allow. A dialog step asks the
-  // guard with the open dialog's text.
-  // A driver that does not perform a kind of step returns unsupported-step, with nothing sent.
+  // a deny it sends no input event and returns policy-denied. A dialog step asks the guard with the
+  // open dialog's text.
   // For a fill whose value is a secret reference, the engine passes the resolved secret; the driver
   // reveals it only at the moment it types, and never reports it back. The engine replaces value
-  // references before it acts; a driver refuses any step that still holds one.
+  // references before it acts; a driver refuses any step that still holds one with unsupported-step,
+  // with nothing sent, and a download step likewise, which goes through its own port.
   act(step: ActionStep, guard: ActionGuard, secret?: Secret): Promise<Result<void, DriverError>>;
 }
 export interface Prober {
   // The engine replaces a locator's value references with their text before it probes. Given a
-  // DOM read, a driver that declares domChecks reads that too, into the probe's `dom`.
+  // DOM read, the driver reads that too, into the probe's `dom`.
   probe(locator: Locator, read?: DomRead): Promise<ElementProbe>;
 }
 
@@ -301,9 +286,8 @@ export interface Camera {
   // The same, with every element each of `fields` finds painted black too: the fields a secret was
   // typed into, which no selector need match. A field that finds nothing, in this document or one
   // it is framed in, gives not-found and no image, since what it holds may still be on screen; unless
-  // the element typed into has gone and no field holds what `holdsSecret` says is a secret. A
-  // driver without it cannot hide such a field, so a run takes no capture while there is one.
-  screenshotHidingFields?(mask: readonly string[], fields: readonly ResolvedLocator[], holdsSecret: (text: string) => boolean): Promise<Result<Uint8Array, DriverError>>;
+  // the element typed into has gone and no field holds what `holdsSecret` says is a secret.
+  screenshotHidingFields(mask: readonly string[], fields: readonly ResolvedLocator[], holdsSecret: (text: string) => boolean): Promise<Result<Uint8Array, DriverError>>;
 }
 export interface Auditor {
   audit(): Promise<readonly A11yFinding[]>;
@@ -314,40 +298,42 @@ export interface Auditor {
 // inside it. A step acts and checks through them.
 export interface DocumentSession extends PageNavigator, ActionRunner, Prober, Camera, Auditor {
   // The document of the one iframe the locator finds, waited for as an action waits for its
-  // element. Steps given to it act and check inside that frame only. A driver without it does not
-  // run frame steps, and the run fails them with unsupported-step.
-  frame?(locator: ResolvedLocator): Promise<Result<DocumentSession, DriverError>>;
+  // element. Steps given to it act and check inside that frame only.
+  frame(locator: ResolvedLocator): Promise<Result<DocumentSession, DriverError>>;
   // True once the page's renderer or browser has died, or the connection to it has closed. A check
   // on a crashed page then fails with target-crashed rather than waiting out its timeout, whatever
-  // its last read saw. A driver without it never reports a crash.
-  crashed?(): boolean;
-  // True while a dialog holds the page, so whatever cannot read the page says dialog-open. A driver
-  // without it reports a dialog only through its results.
-  isDialogOpen?(): boolean;
+  // its last read saw.
+  crashed(): boolean;
+  // True while a dialog holds the page, so whatever cannot read the page says dialog-open.
+  isDialogOpen(): boolean;
   // How many popups, second pages and downloads no step asked for the page has started so far. One
-  // that starts during a step fails it with unsupported-step, whatever the step was doing. A driver
-  // without it reports them only through its results.
-  unsupportedOpenings?(): number;
+  // that starts during a step fails it with unsupported-step, whatever the step was doing.
+  unsupportedOpenings(): number;
   // Clicks the step's element, asking the guard first as a click does, and waits for exactly one
   // download to start within the step timeout and to finish. A click that starts none fails with
   // no-download; a file over maximumBytes is cancelled, its partial bytes deleted, and fails with
-  // download-too-large; a popup the click opens fails with unsupported-step. A driver without it
-  // does not perform downloads (the downloads feature).
-  download?(step: DownloadStep, maximumBytes: number, guard: ActionGuard): Promise<Result<DownloadedFile, DriverError>>;
+  // download-too-large; a popup the click opens fails with unsupported-step.
+  download(step: DownloadStep, maximumBytes: number, guard: ActionGuard): Promise<Result<DownloadedFile, DriverError>>;
   // Runs a page script in this document and gives its result written as JSON text in the page.
   // The text is outside data: the engine decodes it under its own size and depth limits and reads
   // only the declared fields. A throw or a rejection is script-failed, a value JSON cannot write
   // (undefined, a function, a cycle) is script-result-invalid, and a script that does not settle
-  // in time is script-timeout. A driver without it does not run page scripts (the pageScripts feature).
-  runScript?(call: PageScriptCall): Promise<Result<string, DriverError>>;
+  // in time is script-timeout.
+  runScript(call: PageScriptCall): Promise<Result<string, DriverError>>;
   // The absolute URLs of this document's links (a and area elements with an href), in document
-  // order, as the browser resolves them. A read only: nothing on the page is touched. A driver
-  // without it cannot be crawled (the linkTargets feature).
-  linkTargets?(): Promise<readonly string[]>;
+  // order, as the browser resolves them. A read only: nothing on the page is touched.
+  linkTargets(): Promise<readonly string[]>;
+}
+
+// A second tab of a session. Steps run in its document as in any other; it opens no tab of its own,
+// since a plan opens tabs only at its top level.
+export interface SessionTab extends DocumentSession {
+  // Closes only the tab.
+  close(): Promise<void>;
 }
 
 // One open browser session: every driver port together.
-export interface Session extends DocumentSession {
+export interface Session extends SessionTab {
   readonly browser: { readonly name: string; readonly version: string };
   // Origins of the requests that were refused and seen by the browser or the proxy, as evidence that
   // the run stayed hermetic. Not every attempt: what never reaches either, such as WebRTC's UDP, sends
@@ -355,31 +341,29 @@ export interface Session extends DocumentSession {
   blockedOrigins(): readonly string[];
   // Declared origins the session could not connect to, each with what to tell whoever is running. A
   // machine's network says nothing about the app, so these go to the run's log and stay out of the
-  // result and its hash. Complete once the session has closed. A driver without it reports none.
-  connectionFailures?(): readonly { readonly origin: string; readonly message: string }[];
+  // result and its hash. Complete once the session has closed.
+  connectionFailures(): readonly { readonly origin: string; readonly message: string }[];
   // Why the browser refused each of the driver's decisions on the session's requests, and each request
   // it held that the driver could not read to decide on. A refused request stays held, so nothing that
   // happens after it says anything about the app, and a run with one cannot pass. A page that gave up
   // on a request, or a tab that has gone, is no refusal. The text
   // goes to the run's log and stays out of the result and its hash. Complete once the session has
-  // closed. A driver without it reports none.
-  refusedRequestDecisions?(): readonly string[];
+  // closed.
+  refusedRequestDecisions(): readonly string[];
   // Ends the session; every process it started exits.
   close(): Promise<void>;
   // Opens the URL in a new tab of the session's own browser context, so it shares cookies and
   // storage, with the same environment, egress control and determinism script as the first tab.
-  // The tab's close() closes only the tab; its blocked origins join this session's. A driver
-  // without it does not open tabs (the newTabs feature).
-  newTab?(url: string): Promise<Result<Session, DriverError>>;
-  // Stubs and request checks for the whole browser context, so they reach every tab and frame. A
-  // driver without it declares neither networkStubs nor requestChecks.
-  readonly network?: NetworkPort;
-  // Local and session storage of the session's page. A driver without it does not declare storage.
-  readonly storage?: StoragePort;
-  // The run's virtual clock, shared by every tab and frame. A driver without it does not declare clockControl.
-  readonly clock?: ClockPort;
-  // The run's own in-memory clipboard. A driver without it does not declare clipboard.
-  readonly clipboard?: ClipboardPort;
+  // The tab's blocked origins join this session's.
+  newTab(url: string): Promise<Result<SessionTab, DriverError>>;
+  // Stubs and request checks for the whole browser context, so they reach every tab and frame.
+  readonly network: NetworkPort;
+  // Local and session storage of the session's page.
+  readonly storage: StoragePort;
+  // The run's virtual clock, shared by every tab and frame.
+  readonly clock: ClockPort;
+  // The run's own in-memory clipboard.
+  readonly clipboard: ClipboardPort;
 }
 
 export type AdapterInfo = {
@@ -389,10 +373,6 @@ export type AdapterInfo = {
   // Inputs this adapter cannot pin, such as a browser it does not install itself. The run manifest
   // lists them under nonHermeticInputs.
   readonly cannotPin?: readonly string[];
-  // The optional plan features this adapter performs (DRIVER_FEATURES), such as positions and key
-  // chords. The run refuses a step that needs one it does not list with unsupported-step, before
-  // anything of the step reaches the adapter. Absent means none.
-  readonly performs?: readonly DriverFeature[];
 };
 
 export interface BrowserDriver {

@@ -7,9 +7,7 @@
 //   - expectClipboard checks the plain text of the run's own in-memory clipboard, and a remember
 //     step may read that text into a run value. The text is page content: compared, never recorded.
 //
-// A driver that declares clockControl offers the clock port, and one that declares clipboard the
-// clipboard port; a run refuses these steps, and a remember from the clipboard, with
-// unsupported-step otherwise, and never falls back to a real wait.
+// An advance never falls back to a real wait.
 import type { DriverError } from './browser-driver.ts';
 import type { CriterionId, MultiLineText, StepType, TextOrValue } from './plan.ts';
 import type { Result } from './result.ts';

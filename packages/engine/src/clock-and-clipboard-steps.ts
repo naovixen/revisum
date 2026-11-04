@@ -24,8 +24,8 @@ const POLL_INTERVAL_MILLISECONDS = 50;
 // What the run hands these steps. `remembered` is how a remember step adds to the run's values.
 export type ClockAndClipboardContext = {
   readonly project: Project;
-  // The run's session, whose ports these steps use; null before one is open.
-  readonly session: Session | null;
+  // The run's session, whose ports these steps use.
+  readonly session: Session;
   readonly values: RunValues;
   readonly remembered: RememberedValues;
   readonly clock: Clock;
@@ -43,14 +43,11 @@ type ClockAndClipboardOutcome = {
 const passed: ClockAndClipboardOutcome = { outcome: 'passed' };
 const failedWith = (code: StepCode, observed?: string): ClockAndClipboardOutcome =>
   ({ ...stepFailed(code), ...(observed === undefined ? {} : { observed }) });
-const UNSUPPORTED = failedWith('unsupported-step');
 
 // ---- Advancing the clock ----------------------------------------------------------------------
 
 export async function advanceClock(step: AdvanceClockStep, context: ClockAndClipboardContext): Promise<ClockAndClipboardOutcome> {
-  const port = context.session?.clock;
-  if (port === undefined) return UNSUPPORTED;
-  const advanced = await port.advance(clockAdvanceMilliseconds(step.by), step.mode ?? 'runTimers', context.project.limits.maximumTimersPerAdvance);
+  const advanced = await context.session.clock.advance(clockAdvanceMilliseconds(step.by), step.mode ?? 'runTimers', context.project.limits.maximumTimersPerAdvance);
   return advanced.ok ? passed : failedWith(advanced.error.code);
 }
 
@@ -62,21 +59,19 @@ type ClipboardRead =
   | { readonly kind: 'too-long' }
   | { readonly kind: 'error'; readonly error: DriverError };
 
-async function readClipboard(session: Session, context: ClockAndClipboardContext): Promise<ClipboardRead> {
-  const port = session.clipboard;
-  if (port === undefined) return { kind: 'error', error: { code: 'unsupported-step', detail: 'the session has no clipboard port' } };
+async function readClipboard(context: ClockAndClipboardContext): Promise<ClipboardRead> {
   const maximum = context.project.limits.maximumClipboardCharacters;
-  const read: Result<string, DriverError> = await port.readText(maximum);
+  const read: Result<string, DriverError> = await context.session.clipboard.readText(maximum);
   if (!read.ok) return { kind: 'error', error: read.error };
   return read.value.length > maximum ? { kind: 'too-long' } : { kind: 'text', text: read.value };
 }
 
 // Reads the clipboard until `accept` takes what it holds, a read fails, or the step timeout runs
 // out, and gives the last read.
-async function readUntil(session: Session, context: ClockAndClipboardContext, accept: (read: ClipboardRead) => boolean): Promise<ClipboardRead> {
+async function readUntil(context: ClockAndClipboardContext, accept: (read: ClipboardRead) => boolean): Promise<ClipboardRead> {
   const deadline = context.clock.now() + context.project.limits.stepTimeoutMilliseconds;
   for (;;) {
-    const read = await readClipboard(session, context);
+    const read = await readClipboard(context);
     if (read.kind === 'error' || accept(read) || context.clock.now() >= deadline) return read;
     await context.clock.sleep(POLL_INTERVAL_MILLISECONDS);
   }
@@ -108,11 +103,9 @@ function holds(assertion: ClipboardAssertion, text: string, expected: string): b
 }
 
 export async function checkClipboard(step: ExpectClipboardStep, context: ClockAndClipboardContext): Promise<ClockAndClipboardOutcome> {
-  const session = context.session;
-  if (session?.clipboard === undefined) return UNSUPPORTED;
   const expected = expectedText(step.assert, context.values, context.project);
   if (!expected.ok) return failedWith(expected.error);
-  const read = await readUntil(session, context, (seen) => seen.kind === 'too-long' || (seen.kind === 'text' && seen.text !== '' && holds(step.assert, seen.text, expected.value)));
+  const read = await readUntil(context, (seen) => seen.kind === 'too-long' || (seen.kind === 'text' && seen.text !== '' && holds(step.assert, seen.text, expected.value)));
   switch (read.kind) {
     case 'error': return failedWith(read.error.code);
     case 'too-long': return failedWith('value-too-long');
@@ -128,9 +121,7 @@ export async function checkClipboard(step: ExpectClipboardStep, context: ClockAn
 export async function rememberFromClipboard(
   step: Extract<Step, { type: 'remember' }>, index: number, context: ClockAndClipboardContext,
 ): Promise<ClockAndClipboardOutcome> {
-  const session = context.session;
-  if (session?.clipboard === undefined) return UNSUPPORTED;
-  const read = await readUntil(session, context, (seen) => seen.kind !== 'text' || seen.text !== '');
+  const read = await readUntil(context, (seen) => seen.kind !== 'text' || seen.text !== '');
   if (read.kind === 'error') return failedWith(read.error.code);
   if (read.kind === 'too-long') return failedWith('value-too-long');
   if (read.text === '') return failedWith('value-empty');

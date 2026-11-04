@@ -350,7 +350,7 @@ Driver error. The page's renderer died, its browser target closed, the browser d
 
 ## unsupported-step
 
-Driver error. The step needs something this run cannot do yet: the driver does not perform this kind of step, or the step made the page open a popup or a second page, or start a download. The popup is closed and the download cancelled, with nothing of it kept, and every later step is skipped. Run the plan on a target whose driver performs the step, or change the step. A backend check whose call the run's project declares a write fails with this code too, with nothing sent: a check polls, and a write is never sent twice.
+Driver error. The step made the page open a popup or a second page, or start a download no download step claimed. The popup is closed and the download cancelled, with nothing of it kept, and every later step is skipped. Change the step, or claim the file with a download step. The same code means a step named an iframe whose document runs in another process, turned scripts off inside a frame, or reached the driver still holding a value reference. A backend check whose call the run's project declares a write fails with this code too, with nothing sent: a check polls, and a write is never sent twice.
 
 ## assertion-failed
 

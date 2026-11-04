@@ -7,9 +7,9 @@
 // through its clock and clipboard ports; page scripts through its script port. Database commands
 // go through the run's DatabaseCommandRunner port, which runs each in a workload container.
 import {
-  failure, isElementCheckNoDriverDecides, needsDriverFeatures, stepFailed, StepCode, success, UnreadablePage,
+  failure, isElementCheckNoDriverDecides, stepFailed, StepCode, success, UnreadablePage,
   type A11yFinding, type ActionGuard, type AppliedRewrite, type ApprovalLabel, type ArtifactReference, type ArtifactStore, type Authorised,
-  type BrowserDriver, type Clock, type DatabaseCommandRunner, type DocumentSession, type DomRead, type DownloadedFile, type DownloadName, type DriverFeature, type LockEntry, type DialogStep, type ElementProbe,
+  type BrowserDriver, type Clock, type DatabaseCommandRunner, type DocumentSession, type DomRead, type DownloadedFile, type DownloadName, type ElementsRead, type RememberedElementSource, type LockEntry, type DialogStep, type ElementProbe,
   type EventSink, type GuaranteeLevel, type GuardVerdict, type PageAssertion, type Plan, type PolicyRuleId, type Redactor,
   type DownloadStep, type StepOutcome, type ResolvedElement, type ResolvedLocator, type Result, type SafeText, type SecretStore, type ServiceCaller, type Session, type Step, type Target, type TargetId,
   type Unavailable, type ValueName, type GuaranteeStatement, type RunMode, type SuiteFinding, type SuiteName, type SuitePass,
@@ -282,10 +282,6 @@ type RunContext = {
   readonly remembered: RememberedValues;
   // The texts remember steps read from the page, which a failed check's observation never keeps.
   readonly rememberedTexts: Set<string>;
-  // The optional plan features the session's driver performs; none until a session is open.
-  readonly performs: readonly DriverFeature[];
-  // The open session, whose newTab port a newTab step uses; null until a session is open.
-  readonly session: Session | null;
   // The files download steps saved, by the name the plan gives each, for later checks. The bytes
   // stay in memory for the run only.
   readonly downloads: Map<DownloadName, DownloadedFile>;
@@ -302,6 +298,9 @@ type RunContext = {
   // reports under its own type, so its type alone cannot say the run could not test.
   readonly setupFailedInside: Set<number>;
 };
+
+// What a step runs with: the run's context, and the open session whose ports its steps use.
+type StepContext = RunContext & { readonly session: Session };
 
 const POLL_INTERVAL_MILLISECONDS = 50;
 
@@ -344,7 +343,7 @@ export async function run(given: RunInputs, ports: RunPorts): Promise<RunResult>
   };
   const context: RunContext = {
     inputs, ports, logger, gate, denials: [], redactor, secrets, isShortSecret, withoutSecrets, holdsSecret, secretFilledFields: new Map(), values, remembered, calls,
-    commands, rememberedTexts, performs: [], session: null, downloads: new Map(), activeStubs: new Set(), setupFailedInside: new Set(),
+    commands, rememberedTexts, downloads: new Map(), activeStubs: new Set(), setupFailedInside: new Set(),
     determinismUnpinned: target !== undefined && cannotPinDeterminism(ports.drivers, target),
   };
 
@@ -395,8 +394,7 @@ export async function run(given: RunInputs, ports: RunPorts): Promise<RunResult>
   const { session, driver, executableSha256 } = opened.value;
   // A database command's output, and the database it ran against, cannot be pinned.
   const unpinned = [...opened.value.unpinned, ...(runsDatabaseCommands(inputs.plan) ? [DATABASE_COMMANDS_INPUT] : [])];
-  // From here on, a step needing an optional feature is refused only when this driver lacks it.
-  const stepContext: RunContext = { ...context, performs: driver.info.performs ?? [], session };
+  const stepContext: StepContext = { ...context, session };
   const manifestInputs: Parameters<typeof buildManifest>[0] = {
     plan: inputs.plan, target, adapter: driver.info, browser: session.browser,
     seed: inputs.seed, fixedTimeMilliseconds: inputs.fixedTimeMilliseconds, fixtures: inputs.fixtures, host: inputs.host,
@@ -431,7 +429,7 @@ export async function run(given: RunInputs, ports: RunPorts): Promise<RunResult>
       const done = index === 0 && notObserved !== undefined ? failedStep(step, index, notObserved) : await runStep(step, index, session, target, stepContext);
       // With no later step to notice, a crash the last step did not report would go unseen.
       const isLastStep = index === inputs.plan.steps.length - 1;
-      const result = isLastStep && done.outcome === 'passed' && isCrashed(session) ? failedStep(step, index, TARGET_CRASHED) : done;
+      const result = isLastStep && done.outcome === 'passed' && session.crashed() ? failedStep(step, index, TARGET_CRASHED) : done;
       stepMilliseconds.push(ports.clock.now() - stepStartedAt);
       steps.push(result);
       logger.log({
@@ -467,13 +465,13 @@ export async function run(given: RunInputs, ports: RunPorts): Promise<RunResult>
     rewrites = readKeepingTheResult(() => ports.rewritesApplied?.() ?? [], [], logger);
   } finally {
     // Read before the browser goes, with every answer the stubs gave.
-    stubAnswers = readKeepingTheResult(() => session.network?.stubAnswers() ?? [], [], logger);
+    stubAnswers = readKeepingTheResult(() => session.network.stubAnswers(), [], logger);
     await closeKeepingTheResult(session, logger);
   }
   // Read once the session has closed, when no decision is left waiting for the browser's answer. With
   // no later step to report one the browser refused after the last step ended, the last step stands
   // for it, as it does for a crash it missed.
-  const refusedDecisions: readonly string[] = readKeepingTheResult(() => session.refusedRequestDecisions?.() ?? [], [], logger);
+  const refusedDecisions: readonly string[] = readKeepingTheResult(() => session.refusedRequestDecisions(), [], logger);
   for (const refusal of refusedDecisions) {
     logFailureAfterTheVerdict(ADAPTER_ERROR, refusal, logger);
   }
@@ -495,7 +493,7 @@ export async function run(given: RunInputs, ports: RunPorts): Promise<RunResult>
   const reviewItems: readonly RunReviewItem[] = blockedRead.ok ? cleanupItems : [...cleanupItems, { code: EGRESS_UNREAD }];
   const endState = blockedRead.ok ? finished : lifecycle.finish(running, 'Errored');
   readKeepingTheResult(() => {
-    for (const { origin, message } of session.connectionFailures?.() ?? []) {
+    for (const { origin, message } of session.connectionFailures()) {
       logger.log({ kind: 'session.connection-failed', origin, detail: message });
     }
   }, undefined, logger);
@@ -683,15 +681,13 @@ async function openSession(planned: lifecycle.Planned, context: RunContext): Pro
 // A failed step's result that holds only its code.
 const failedStep = (step: Step, index: number, code: StepCode): StepResult => ({ index, type: step.type, ...stepFailed(code) });
 
-const isCrashed = (session: DocumentSession): boolean => session.crashed?.() === true;
-const hasARefusedDecision = (context: RunContext): boolean => (context.session?.refusedRequestDecisions?.().length ?? 0) > 0;
-const isHeldByDialog = (session: DocumentSession): boolean => session.isDialogOpen?.() === true;
+const hasARefusedDecision = (context: StepContext): boolean => context.session.refusedRequestDecisions().length > 0;
 
 function adapterFailureCode(session: DocumentSession): StepCode {
-  if (isCrashed(session)) {
+  if (session.crashed()) {
     return TARGET_CRASHED;
   }
-  return isHeldByDialog(session) ? UnreadablePage.DialogOpen : ADAPTER_ERROR;
+  return session.isDialogOpen() ? UnreadablePage.DialogOpen : ADAPTER_ERROR;
 }
 
 // The code for something that threw, whose text goes only to the log, which redacts it. A throw from
@@ -703,12 +699,8 @@ function codeForThrow(error: unknown, session: DocumentSession, logger: Logger):
 }
 
 // The requests the plan checks are observed from its start, so what a page sends as it loads counts
-// too. A driver refused request checks observes nothing: those steps fail on their own. Gives the
-// code for what stopped it, or undefined when nothing did.
-async function failureToObserveRequests(session: Session, context: RunContext): Promise<StepCode | undefined> {
-  if (!context.performs.includes('requestChecks')) {
-    return undefined;
-  }
+// too. Gives the code for what stopped it, or undefined when nothing did.
+async function failureToObserveRequests(session: Session, context: StepContext): Promise<StepCode | undefined> {
   try {
     const observing = await startObserving(observedRequestNames(context.inputs.plan), networkContext(context));
     if (observing.ok) {
@@ -774,7 +766,7 @@ async function closeKeepingTheResult(session: Session, logger: Logger): Promise<
 
 // One step, wherever in the plan it stands, with what its driver alone cannot be trusted to report:
 // a browser already dead, a check that passed from memory while it died, a throw, and a denial.
-async function runStep(step: Step, index: number, session: DocumentSession, target: Target, context: RunContext): Promise<StepResult> {
+async function runStep(step: Step, index: number, session: DocumentSession, target: Target, context: StepContext): Promise<StepResult> {
   const denialsBefore = context.denials.length;
   const result = await runStepOnLivePage(step, index, session, target, context);
   // The audit log holds this denial, so whatever the driver reported from the same moment must not
@@ -785,11 +777,11 @@ async function runStep(step: Step, index: number, session: DocumentSession, targ
   return withActiveStubs(step, result, context.activeStubs);
 }
 
-async function runStepOnLivePage(step: Step, index: number, session: DocumentSession, target: Target, context: RunContext): Promise<StepResult> {
-  if (isCrashed(session)) {
+async function runStepOnLivePage(step: Step, index: number, session: DocumentSession, target: Target, context: StepContext): Promise<StepResult> {
+  if (session.crashed()) {
     return failedStep(step, index, TARGET_CRASHED);
   }
-  const openingsBefore = session.unsupportedOpenings?.() ?? 0;
+  const openingsBefore = session.unsupportedOpenings();
   try {
     const done = await executeStep(step, index, session, target, context);
     // A request the browser would not let go on stays held, so neither a pass nor a failure of this
@@ -800,12 +792,12 @@ async function runStepOnLivePage(step: Step, index: number, session: DocumentSes
     if (done.outcome !== 'passed') {
       return done;
     }
-    if (ASSERTION_STEP_TYPES.includes(step.type) && isCrashed(session)) {
+    if (ASSERTION_STEP_TYPES.includes(step.type) && session.crashed()) {
       return failedStep(step, index, TARGET_CRASHED);
     }
     // A popup or a download that no step asked for fails the step under way, so a run cannot pass as
     // if nothing had opened.
-    return (session.unsupportedOpenings?.() ?? 0) > openingsBefore ? failedStep(step, index, 'unsupported-step') : done;
+    return session.unsupportedOpenings() > openingsBefore ? failedStep(step, index, 'unsupported-step') : done;
   } catch (error) {
     return failedStep(step, index, codeForThrow(error, session, context.logger));
   }
@@ -818,7 +810,7 @@ const holdsARecord = (done: StepResult): boolean => Object.keys(done).some((key)
 // of their own in the plan's list: the first that fails fails the frame or newTab step, with its code,
 // observation and records, and the records of those before it are kept beside them.
 async function runInnerSteps(
-  container: Extract<Step, { type: 'frame' | 'newTab' }>, index: number, session: DocumentSession, target: Target, context: RunContext,
+  container: Extract<Step, { type: 'frame' | 'newTab' }>, index: number, session: DocumentSession, target: Target, context: StepContext,
 ): Promise<StepResult> {
   const kept: StepResult[] = [];
   const withKept = (result: StepResult, nested: readonly StepResult[] = []): StepResult =>
@@ -848,13 +840,13 @@ function withActiveStubs(step: Step, result: StepResult, activeStubs: ReadonlySe
 
 // What the stub, request-check and storage steps use: the run's session, values and the secrets
 // resolved for stub starts and storage writes.
-const networkContext = (context: RunContext): NetworkStepContext => ({
+const networkContext = (context: StepContext): NetworkStepContext => ({
   project: context.inputs.project, session: context.session, values: context.values, remembered: context.remembered,
   secrets: stubAndStorageSecretStore(context.secrets), clock: context.ports.clock, activeStubs: context.activeStubs,
 });
 
 // What the clock and clipboard steps use: the run's session and values.
-const clockAndClipboardContext = (context: RunContext): ClockAndClipboardContext => ({
+const clockAndClipboardContext = (context: StepContext): ClockAndClipboardContext => ({
   project: context.inputs.project, session: context.session, values: context.values, remembered: context.remembered,
   clock: context.ports.clock,
 });
@@ -870,15 +862,8 @@ const NO_ELEMENT: ResolvedElement = { role: null, name: null, box: null, formSub
 
 // Runs one step on a document of the page: the top document, or an iframe's for the steps inside a
 // frame step, which report under the frame step's own index.
-async function executeStep(step: Step, index: number, session: DocumentSession, target: Target, context: RunContext): Promise<StepResult> {
+async function executeStep(step: Step, index: number, session: DocumentSession, target: Target, context: StepContext): Promise<StepResult> {
   const base = { index, type: step.type } as const;
-  // Steps the plan language has but the run's driver does not perform. Each fails with
-  // unsupported-step, never passes or is skipped, and nothing of it reaches the driver, so a plan
-  // that relies on one cannot report a pass it did not earn or act in part. What a step needs from
-  // a driver, and which of it is optional, is decided in one place, in contracts; the driver declares
-  // the optional features it performs. Hover, select and upload go to the driver, which refuses them
-  // the same way when it does not perform them; a frame step needs the driver's frame port.
-  if (needsDriverFeatures(step, context.performs)) return { ...base, ...stepFailed(StepCode.UnsupportedStep) };
   switch (step.type) {
     case 'navigate': {
       let path = step.url;
@@ -895,8 +880,7 @@ async function executeStep(step: Step, index: number, session: DocumentSession, 
       }
       const url = new URL(path, context.inputs.baseUrl);
       if (!context.inputs.project.origins.some((origin) => origin === url.origin)) return { ...base, ...stepFailed(StepCode.OriginNotAllowed) };
-      // Scripts are named only when they are off, so a driver that never loads a page without them
-      // is called exactly as before.
+      // Scripts are named only when they are off: without options, they run as usual.
       const navigated = step.scripts === 'disabled' ? await session.navigate(url.href, { scripts: 'disabled' }) : await session.navigate(url.href);
       return navigated.ok ? { ...base, outcome: 'passed' } : { ...base, ...stepFailed(navigated.error.code) };
     }
@@ -930,7 +914,6 @@ async function executeStep(step: Step, index: number, session: DocumentSession, 
       return acted.ok ? { ...base, outcome: 'passed' } : { ...base, ...stepFailed(acted.error.code) };
     }
     case 'frame': {
-      if (session.frame === undefined) return { ...base, ...stepFailed(StepCode.UnsupportedStep) };
       const locator = resolveLocator(step.locator, context.values, context.inputs.project);
       if (!locator.ok) return { ...base, ...stepFailed(locator.error) };
       const entered = await session.frame(locator.value);
@@ -938,25 +921,23 @@ async function executeStep(step: Step, index: number, session: DocumentSession, 
       return runInnerSteps(step, index, entered.value, target, context);
     }
     case 'remember':
-      if ('response' in step.from) return { ...base, ...(await rememberFromResponse(step, index, networkContext(context))) };
+      if ('response' in step.from) return { ...base, ...(await rememberFromResponse(step, step.from, index, networkContext(context))) };
       if ('clipboard' in step.from) return { ...base, ...(await rememberFromClipboard(step, index, clockAndClipboardContext(context))) };
-      return rememberFromPage(step, index, session, context);
+      return rememberFromPage(step, step.from, index, session, context);
     case 'download': return downloadFile(step, index, session, target, context);
     case 'expectDownload': return checkDownload(step, index, context);
     case 'newTab': return runInNewTab(step, index, target, context);
-    // The session's network and storage ports carry these out, for a driver that declares them.
+    // The session's network and storage ports carry these out.
     case 'stub': return { ...base, ...(await runStubStep(step, networkContext(context))) };
     case 'resetRequests': return { ...base, ...(await resetRequests(step, networkContext(context))) };
     case 'expectRequests': return { ...base, ...(await checkRequests(step, networkContext(context))) };
     case 'expectResponse': return { ...base, ...(await checkResponse(step, networkContext(context))) };
     case 'setStorage': case 'removeStorage': return { ...base, ...(await writeStorage(step, networkContext(context))) };
     case 'expectStorage': return { ...base, ...(await checkStorage(step, networkContext(context))) };
-    // The session's clock and clipboard ports carry these out, for a driver that declares them;
-    // needsDriverFeatures refused them above otherwise, so an advance never becomes a real wait.
+    // The session's clock and clipboard ports carry these out.
     case 'advanceClock': return { ...base, ...(await advanceClock(step, clockAndClipboardContext(context))) };
     case 'expectClipboard': return { ...base, ...(await checkClipboard(step, clockAndClipboardContext(context))) };
-    // Page scripts run through the script port of the document the step stands in, for a driver
-    // that declares them; needsDriverFeatures refused them above otherwise.
+    // Page scripts run through the script port of the document the step stands in.
     case 'evaluate': return { ...base, ...(await runEvaluate(step, index, session, pageScriptContext(context))) };
     case 'expectScript': return { ...base, ...(await runScriptCheck(step, index, session, pageScriptContext(context))) };
     // Database commands run in a workload container through the run's port, not in the browser. A
@@ -1039,9 +1020,6 @@ async function pixelsWithSecretsHidden(session: DocumentSession, context: RunCon
   if (fields.length === 0) {
     return session.screenshot(selectors);
   }
-  if (session.screenshotHidingFields === undefined) {
-    return null;
-  }
   const taken = await session.screenshotHidingFields(selectors, fields, context.holdsSecret);
   return taken.ok ? taken.value : null;
 }
@@ -1051,11 +1029,10 @@ async function pixelsWithSecretsHidden(session: DocumentSession, context: RunCon
 // with a non-empty attribute, taken exactly as the page holds it.
 // The text must be safe text no longer than the project's maximumTextLength. Only the value's name
 // and sha256 are kept in the result and the events, never the text.
-async function rememberFromPage(step: Extract<Step, { type: 'remember' }>, index: number, session: DocumentSession, context: RunContext): Promise<StepResult> {
+async function rememberFromPage(
+  step: Extract<Step, { type: 'remember' }>, from: RememberedElementSource, index: number, session: DocumentSession, context: RunContext,
+): Promise<StepResult> {
   const base = { index, type: step.type } as const;
-  const from = step.from;
-  // needsDriverFeatures refused every other source before the step got here.
-  if (!('element' in from)) return { ...base, ...stepFailed(StepCode.UnsupportedStep) };
   const locator = resolveLocator(from.element, context.values, context.inputs.project);
   if (!locator.ok) return { ...base, ...stepFailed(locator.error) };
   // A remembered value is hashed into the result and can be sent on by a later step, and a hash of
@@ -1064,29 +1041,28 @@ async function rememberFromPage(step: Extract<Step, { type: 'remember' }>, index
     return { ...base, ...stepFailed(StepCode.ValueHoldsSecret) };
   }
   const read: DomRead | undefined = from.read === 'attribute' ? { kind: 'attribute', name: from.attribute } : undefined;
-  const textOf = (probe: ElementProbe): string => {
+  const textOf = (probe: ElementsRead): string => {
     if (from.read === 'attribute') return probe.dom?.kind === 'attribute' ? probe.dom.value ?? '' : '';
     return normalise(from.read === 'value' ? probe.value ?? '' : probe.text);
   };
-  const seen: { probe: ElementProbe | null } = { probe: null };
+  const seen = { text: '' };
   const verdict = await poll(context, session, async (): Promise<Verdict> => {
     const probe = read === undefined ? await session.probe(locator.value) : await session.probe(locator.value, read);
-    seen.probe = probe;
     if (typeof probe.count === 'string') {
       return { pass: false, code: probe.count };
     }
     if (probe.selectorInvalid === true) return { pass: false, code: 'selector-invalid' };
     if (probe.count === 0) return { pass: false, code: 'not-found' };
     if (probe.count > 1) return { pass: false, code: 'ambiguous' };
-    return textOf(probe) === '' ? { pass: false, code: null } : { pass: true, code: null };
+    seen.text = textOf(probe);
+    return seen.text === '' ? { pass: false, code: null } : { pass: true, code: null };
   });
   if (verdict.code === TARGET_CRASHED || verdict.code === 'not-found' || verdict.code === 'ambiguous' || verdict.code === 'selector-invalid'
     || verdict.code === UnreadablePage.ReadFailed || verdict.code === UnreadablePage.DialogOpen || verdict.code === UnreadablePage.BrowserErrorPage) {
     return { ...base, ...stepFailed(verdict.code) };
   }
-  const text = seen.probe === null ? '' : textOf(seen.probe);
-  if (text === '') return { ...base, ...stepFailed(StepCode.ValueEmpty) };
-  const kept = context.remembered.remember(step.name, text, index);
+  if (seen.text === '') return { ...base, ...stepFailed(StepCode.ValueEmpty) };
+  const kept = context.remembered.remember(step.name, seen.text, index);
   return kept.ok ? { ...base, outcome: 'passed', remembered: kept.value } : { ...base, ...stepFailed(kept.error) };
 }
 
@@ -1103,7 +1079,6 @@ function resolvePageAssertion(assertion: PageAssertion, context: RunContext): Re
 // media type, size and sha256.
 async function downloadFile(step: DownloadStep, index: number, session: DocumentSession, target: Target, context: RunContext): Promise<StepResult> {
   const base = { index, type: step.type } as const;
-  if (session.download === undefined) return { ...base, ...stepFailed(StepCode.UnsupportedStep) };
   const locator = resolveLocator(step.locator, context.values, context.inputs.project);
   if (!locator.ok) return { ...base, ...stepFailed(locator.error) };
   const resolved: DownloadStep = { ...step, locator: locator.value };
@@ -1165,10 +1140,8 @@ function checkDownload(step: Extract<Step, { type: 'expectDownload' }>, index: n
 // A newTab step: opens its URL in a second tab of the session's browser context, runs its steps
 // there in order and closes the tab, whatever they did. A tab that will not close fails a step that
 // had passed, and never takes the place of a real failure.
-async function runInNewTab(step: Extract<Step, { type: 'newTab' }>, index: number, target: Target, context: RunContext): Promise<StepResult> {
+async function runInNewTab(step: Extract<Step, { type: 'newTab' }>, index: number, target: Target, context: StepContext): Promise<StepResult> {
   const base = { index, type: step.type } as const;
-  const session = context.session;
-  if (session === null || session.newTab === undefined) return { ...base, ...stepFailed(StepCode.UnsupportedStep) };
   let path = step.url;
   if (typeof path !== 'string') {
     // As for a navigate: a path template's values are only known now, so the guard checks the final URL.
@@ -1183,7 +1156,7 @@ async function runInNewTab(step: Extract<Step, { type: 'newTab' }>, index: numbe
   }
   const url = new URL(path, context.inputs.baseUrl);
   if (!context.inputs.project.origins.some((origin) => origin === url.origin)) return { ...base, ...stepFailed(StepCode.OriginNotAllowed) };
-  const opened = await session.newTab(url.href);
+  const opened = await context.session.newTab(url.href);
   if (!opened.ok) return { ...base, ...stepFailed(opened.error.code) };
   const tab = opened.value;
   const done = await runInnerSteps(step, index, tab, target, context);
@@ -1227,7 +1200,6 @@ type PollVerdict = Verdict | { readonly pass: false; readonly code: typeof TARGE
 // wait at once: nothing on it can change any more. A read that threw is tried again, since the page
 // may be between two documents.
 async function poll(context: RunContext, session: DocumentSession, check: () => Promise<Verdict>): Promise<PollVerdict> {
-  const crashed = (): boolean => session.crashed?.() === true;
   const deadline = context.ports.clock.now() + context.inputs.project.limits.stepTimeoutMilliseconds;
   for (;;) {
     let verdict: Verdict;
@@ -1236,14 +1208,14 @@ async function poll(context: RunContext, session: DocumentSession, check: () => 
     } catch (error) {
       // A read that failed because the page died is the crash, and one a dialog stopped is that
       // dialog; any other failure is the adapter's.
-      if (crashed()) return { pass: false, code: TARGET_CRASHED };
-      if (isHeldByDialog(session)) {
+      if (session.crashed()) return { pass: false, code: TARGET_CRASHED };
+      if (session.isDialogOpen()) {
         return { pass: false, code: UnreadablePage.DialogOpen };
       }
       throw error;
     }
     // Looked at before a pass is accepted: what a dying page last showed proves nothing.
-    if (crashed()) return { pass: false, code: TARGET_CRASHED };
+    if (session.crashed()) return { pass: false, code: TARGET_CRASHED };
     // Waiting cannot change a selector the browser rejects, a dialog, which only a later step can
     // answer, or the browser's own error page, which runs no script that could leave it.
     if (verdict.pass || verdict.code === 'selector-invalid' || verdict.code === UnreadablePage.DialogOpen || verdict.code === 'navigation-failed') return verdict;
@@ -1252,18 +1224,18 @@ async function poll(context: RunContext, session: DocumentSession, check: () => 
   }
 }
 
+const UNREADABLE_PAGE_OBSERVATIONS = {
+  [UnreadablePage.ReadFailed]: '(page unreadable)',
+  [UnreadablePage.DialogOpen]: '(a dialog is open)',
+  [UnreadablePage.BrowserErrorPage]: '(the browser shows its own error page)',
+} as const satisfies Record<UnreadablePage, string>;
+
 // What a failed check saw, redacted: never the text of a sensitive element, nothing read from a
 // field a secret was typed into, and no text that is a whole short secret.
 function observe(probe: ElementProbe | null, context: RunContext, filledFromSecret: boolean): string {
   if (probe === null || probe.count === 0) return '(no element)';
-  if (probe.count === UnreadablePage.ReadFailed) {
-    return '(page unreadable)';
-  }
-  if (probe.count === UnreadablePage.DialogOpen) {
-    return '(a dialog is open)';
-  }
-  if (probe.count === UnreadablePage.BrowserErrorPage) {
-    return '(the browser shows its own error page)';
+  if (typeof probe.count === 'string') {
+    return UNREADABLE_PAGE_OBSERVATIONS[probe.count];
   }
   if (probe.count > 1) return `(${probe.count} elements)`;
   if (probe.sensitive) return SENSITIVE_PLACEHOLDER;

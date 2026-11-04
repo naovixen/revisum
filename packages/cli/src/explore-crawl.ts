@@ -59,7 +59,7 @@ const discardingRunEvents: RunEventSink = { append: () => undefined, read: () =>
 // open when the run ends, so the crawl reads the pages the run signed in to.
 function sharingDriver(browser: BrowserDriver, session: Session): BrowserDriver {
   const shared = new Proxy(session, {
-    get: (target, property) => (property === 'close' ? async (): Promise<void> => undefined : Reflect.get(target, property)),
+    get: (target, property): unknown => (property === 'close' ? async (): Promise<void> => undefined : Reflect.get(target, property)),
   });
   return { info: browser.info, supports: (target) => browser.supports(target), open: async () => success(shared) };
 }
@@ -88,13 +88,12 @@ export async function crawlInBrowser(browser: BrowserDriver, crawl: BrowserCrawl
       });
       if (loggedIn.state !== 'Passed') return failure('plan-rejected');
     }
-    if (session.linkTargets === undefined) return failure('target-unavailable');
     // Navigation and reads only: nothing else of the session is in reach of the crawl.
     const explorer: ExploreDriver = {
       navigate: (url) => session.navigate(url),
       page: () => session.page(),
       accessibilitySnapshot: () => session.accessibilitySnapshot(),
-      linkTargets: async () => (session.linkTargets === undefined ? [] : session.linkTargets()),
+      linkTargets: () => session.linkTargets(),
     };
     const crawled = await crawlSite(explorer, project, options, crawl.redactor);
     return crawled.ok ? crawled : failure(crawled.error.code);

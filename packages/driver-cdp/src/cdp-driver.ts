@@ -2,12 +2,12 @@
 // WebSocket, with no third-party automation library.
 import {
   determinismScript, deviceProfile, failure, mergeRefusedOrigins, success,
-  type A11yNode, type DriverError, type Key, type Result, type SessionEnvironment, type Target,
+  type A11yNode, type DriverError, type Key, type Result, type SessionEnvironment, type SessionTab, type Target,
 } from '@revisum/contracts';
 import { readFileSync, realpathSync } from 'node:fs';
 import { isAbsolute, relative, resolve } from 'node:path';
 import { chromiumBuild } from './browser-build.ts';
-import { SESSION_FEATURES, buildSession, errorText, type SessionDetails } from './browser-session.ts';
+import { buildSession, buildTab, errorText, type SessionDetails } from './browser-session.ts';
 import {
   CALL_FUNCTION_ON, EVALUATE, GET_FULL_ACCESSIBILITY_TREE, GET_PROPERTIES, NAVIGATE, RESOLVE_NODE,
   type BrowserCommand, type CallResult, type RemoteObject, type RequestPaused,
@@ -195,7 +195,7 @@ function fixtureFilePath(fixturesFolder: string | undefined, fixture: string): R
 
 export function cdpDriver(options: CdpDriverOptions): OwnBrowserDriver {
   return {
-    info: { id: 'cdp', version: CDP_ADAPTER_VERSION, protocol: 'Chrome DevTools Protocol (raw WebSocket)', performs: SESSION_FEATURES },
+    info: { id: 'cdp', version: CDP_ADAPTER_VERSION, protocol: 'Chrome DevTools Protocol (raw WebSocket)' },
     supports(target) {
       if (target.engine !== 'chromium') return failure({ reason: 'engine-not-supported', detail: 'CDP drives Chromium only' });
       return success(true);
@@ -423,7 +423,7 @@ async function takeResponseBody(page: CdpSessionClient, network: BrowserNetwork,
 // Opens a second tab in the session's own browser context, so it shares cookies and storage. The
 // first page's watch hands the tab over still paused; it is prepared exactly as the first page
 // was, then let run on about:blank. Closing it closes only the tab.
-async function openTab(browser: SessionBrowser, firstWatch: PageWatch, firstDetails: SessionDetails): Promise<Result<DriverSession, DriverError>> {
+async function openTab(browser: SessionBrowser, firstWatch: PageWatch, firstDetails: SessionDetails): Promise<Result<SessionTab, DriverError>> {
   const { connection, browserContextId } = browser;
   const attaching = firstWatch.nextTab(TAB_ATTACH_TIMEOUT_MILLISECONDS);
   let attached: AttachedPage;
@@ -461,13 +461,8 @@ async function openTab(browser: SessionBrowser, firstWatch: PageWatch, firstDeta
     return failure({ code: 'navigation-failed', detail: `the new tab could not be prepared: ${errorText(error)}` });
   }
   const operations = new CdpPage(connection, attached.sessionId, watch, null, browser.environment.virtualTimers === true);
-  // A tab opens no tab of its own: newTab is allowed only at the top level of a plan.
-  return success(buildSession(operations, browser.environment, {
-    browser: firstDetails.browser, processId: firstDetails.processId, blockedOrigins: firstDetails.blockedOrigins,
-    connectionFailures: firstDetails.connectionFailures,
-    egressRecords: firstDetails.egressRecords, fixturePath: firstDetails.fixturePath, downloads: browser.downloads, events: watch, close,
-    secretTypedFields: firstDetails.secretTypedFields, network: browser.network, storage: pageStorage(watch), clock: browser.clock,
-    ...(firstDetails.clipboard === undefined ? {} : { clipboard: firstDetails.clipboard }),
+  return success(buildTab(operations, browser.environment, {
+    fixturePath: firstDetails.fixturePath, downloads: browser.downloads, events: watch, close, secretTypedFields: firstDetails.secretTypedFields,
   }));
 }
 

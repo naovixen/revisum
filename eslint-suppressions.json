@@ -201,14 +201,11 @@
     }
   },
   "packages/cli/src/explore-crawl.ts": {
-    "@typescript-eslint/no-unsafe-return": {
-      "count": 1
-    },
     "@typescript-eslint/require-await": {
       "count": 3
     },
     "curly": {
-      "count": 15
+      "count": 14
     },
     "revisum/file-name-matches-export": {
       "count": 1
@@ -315,7 +312,7 @@
   },
   "packages/contracts/src/literal-steps.ts": {
     "curly": {
-      "count": 12
+      "count": 7
     },
     "revisum/file-name-matches-export": {
       "count": 1
@@ -672,7 +669,7 @@
   },
   "packages/engine/src/clock-and-clipboard-steps.ts": {
     "curly": {
-      "count": 12
+      "count": 8
     },
     "revisum/file-name-matches-export": {
       "count": 1
@@ -873,9 +870,6 @@
     "curly": {
       "count": 6
     },
-    "no-nested-ternary": {
-      "count": 3
-    },
     "revisum/file-name-matches-export": {
       "count": 1
     }
@@ -888,7 +882,7 @@
       "count": 1
     },
     "curly": {
-      "count": 36
+      "count": 33
     },
     "revisum/file-name-matches-export": {
       "count": 1
@@ -918,7 +912,7 @@
   },
   "packages/engine/src/page-scripts/page-script-steps.ts": {
     "curly": {
-      "count": 23
+      "count": 20
     },
     "revisum/file-name-matches-export": {
       "count": 1
@@ -1225,7 +1219,7 @@
       "count": 6
     },
     "curly": {
-      "count": 65
+      "count": 60
     },
     "max-lines": {
       "count": 1
@@ -1333,14 +1327,8 @@
     "@typescript-eslint/naming-convention": {
       "count": 1
     },
-    "@typescript-eslint/no-unsafe-argument": {
-      "count": 1
-    },
     "curly": {
       "count": 23
-    },
-    "no-nested-ternary": {
-      "count": 1
     },
     "revisum/file-name-matches-export": {
       "count": 1
@@ -2018,7 +2006,7 @@
       "count": 1
     },
     "revisum/test-title-format": {
-      "count": 18
+      "count": 12
     }
   },
   "test/contract/clock-and-clipboard-support.ts": {
@@ -2030,9 +2018,6 @@
     }
   },
   "test/contract/dom-checks.test.ts": {
-    "@typescript-eslint/naming-convention": {
-      "count": 1
-    },
     "revisum/file-name-matches-export": {
       "count": 1
     },
@@ -2109,7 +2094,7 @@
       "count": 1
     },
     "revisum/test-title-format": {
-      "count": 13
+      "count": 5
     }
   },
   "test/contract/network-stubs-support.ts": {
@@ -2154,14 +2139,11 @@
     }
   },
   "test/contract/page-states-driver-support.test.ts": {
-    "curly": {
-      "count": 1
-    },
     "revisum/file-name-matches-export": {
       "count": 1
     },
     "revisum/test-title-format": {
-      "count": 14
+      "count": 9
     }
   },
   "test/contract/page-states-support.ts": {
@@ -2177,7 +2159,7 @@
       "count": 1
     },
     "revisum/test-title-format": {
-      "count": 8
+      "count": 5
     }
   },
   "test/contract/plan-values-support.ts": {
@@ -2230,14 +2212,11 @@
     }
   },
   "test/contract/unsafe-page-driver-support.test.ts": {
-    "curly": {
-      "count": 1
-    },
     "revisum/file-name-matches-export": {
       "count": 1
     },
     "revisum/test-title-format": {
-      "count": 8
+      "count": 4
     }
   },
   "test/contract/unsafe-page-support.ts": {
@@ -4525,38 +4504,6 @@
     },
     "revisum/test-title-format": {
       "count": 30
-    }
-  },
-  "test/unit/engine/unsupported-clock-and-clipboard.test.ts": {
-    "revisum/file-name-matches-export": {
-      "count": 1
-    },
-    "revisum/test-title-format": {
-      "count": 6
-    }
-  },
-  "test/unit/engine/unsupported-features.test.ts": {
-    "revisum/file-name-matches-export": {
-      "count": 1
-    },
-    "revisum/test-title-format": {
-      "count": 3
-    }
-  },
-  "test/unit/engine/unsupported-network-and-storage.test.ts": {
-    "revisum/file-name-matches-export": {
-      "count": 1
-    },
-    "revisum/test-title-format": {
-      "count": 4
-    }
-  },
-  "test/unit/engine/unsupported-page-checks.test.ts": {
-    "revisum/file-name-matches-export": {
-      "count": 1
-    },
-    "revisum/test-title-format": {
-      "count": 8
     }
   },
   "test/unit/engine/unverified-decisions.test.ts": {

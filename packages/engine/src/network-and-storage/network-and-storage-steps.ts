@@ -13,7 +13,7 @@
 import {
   failure, isSecret, stepFailed, StorageAssertionKind, success,
   type StepCode, type CallArguments, type Clock, type FieldName, type JsonPointer, type ObservedExchange, type Plan, type RequestName, type ResolvedStub,
-  type ResolvedStubResponse, type ResponseAssertion, type Result, type SafeText, type SecretStore, type Session, type Step, type StubDeclaration,
+  type ResolvedStubResponse, type ResponseAssertion, type Result, type SafeText, type SecretStore, type RememberedResponseSource, type Session, type Step, type StubDeclaration,
   type StubName, type StubResponseBody,
 } from '@revisum/contracts';
 import type { Project } from '../project/project-parser.ts';
@@ -30,8 +30,8 @@ const POLL_INTERVAL_MILLISECONDS = 50;
 // `activeStubs` is the run's record of the stubs started and not yet stopped.
 export type NetworkStepContext = {
   readonly project: Project;
-  // The run's session, whose ports these steps use; null before one is open.
-  readonly session: Session | null;
+  // The run's session, whose ports these steps use.
+  readonly session: Session;
   readonly values: RunValues;
   readonly remembered: RememberedValues;
   // Only the secrets the run resolved for stub starts and storage writes.
@@ -85,12 +85,11 @@ export function observedRequestNames(plan: Plan): readonly RequestName[] {
 
 // Starts observing one declared request, or starts it again from nothing.
 async function observe(name: RequestName, context: NetworkStepContext): Promise<Result<void, StepCode>> {
-  const network = context.session?.network;
   const declaration = declaredIn(context.project.observedRequests, name);
-  if (network === undefined || declaration === undefined) return failure('unsupported-step');
+  if (declaration === undefined) return failure('unsupported-step');
   // Without fields no body is ever read, so none is kept.
   const cap = declaration.fields === undefined ? null : declaration.maximumResponseBytes;
-  const observed = await network.observe(name, declaration.request, cap);
+  const observed = await context.session.network.observe(name, declaration.request, cap);
   return observed.ok ? success(undefined) : failure(observed.error.code);
 }
 
@@ -129,8 +128,7 @@ const countObservation = (responses: number, attempts: number): string =>
 // tried. equals needs both counts to equal it. equals and atMost wait first until no matching request
 // has been in flight for the quiet window, so a request still to come is counted.
 export async function checkRequests(step: Extract<Step, { type: 'expectRequests' }>, context: NetworkStepContext): Promise<NetworkStepOutcome> {
-  const network = context.session?.network;
-  if (network === undefined) return UNSUPPORTED;
+  const network = context.session.network;
   const attempts = (): number => network.exchanges(step.request).length;
   const responses = (): number => network.exchanges(step.request).filter((exchange) => exchange.status !== null).length;
   const expected = step.count;
@@ -168,10 +166,7 @@ const REQUEST_NOT_SEEN = 'request-not-seen';
 // window: "latest" means the latest the page asked for, not the latest answered so far, which a
 // newer request in flight is about to replace. request-not-seen when there is none yet.
 async function latestSettledExchange(context: NetworkStepContext, request: RequestName): Promise<Result<ObservedExchange, StepCode>> {
-  const network = context.session?.network;
-  if (network === undefined) {
-    return failure('unsupported-step');
-  }
+  const network = context.session.network;
   const limits = context.project.limits;
   const quiet = await network.quiet(request, limits.requestQuietMilliseconds, limits.stepTimeoutMilliseconds);
   if (!quiet.ok) {
@@ -208,7 +203,6 @@ function judgeResponse(assertion: ResponseAssertion, exchange: ObservedExchange,
 
 // Checks the latest exchange, waiting as an element check waits: a later exchange may still come.
 export async function checkResponse(step: Extract<Step, { type: 'expectResponse' }>, context: NetworkStepContext): Promise<NetworkStepOutcome> {
-  if (context.session?.network === undefined) return UNSUPPORTED;
   const assertion = step.assert;
   let expected: SafeText | null = null;
   if (assertion.kind === 'fieldEquals' || assertion.kind === 'fieldContains') {
@@ -234,10 +228,8 @@ function rememberedText(found: { readonly value: unknown } | undefined, read: 't
 // A remember step that reads a field of the latest response. The value must pass the same rules as
 // plan text; only its name and sha256 are kept.
 export async function rememberFromResponse(
-  step: Extract<Step, { type: 'remember' }>, index: number, context: NetworkStepContext,
+  step: Extract<Step, { type: 'remember' }>, from: RememberedResponseSource, index: number, context: NetworkStepContext,
 ): Promise<NetworkStepOutcome> {
-  const from = step.from;
-  if (!('response' in from) || context.session?.network === undefined) return UNSUPPORTED;
   const cap = declaredIn(context.project.observedRequests, from.response)?.maximumResponseBytes ?? 0;
   const pointer = pointerOf(context.project, from.response, from.field);
   const seen = await poll(context, async () => {
@@ -285,9 +277,9 @@ function resolveStub(name: StubName, declaration: StubDeclaration, stubArguments
 }
 
 export async function runStubStep(step: Extract<Step, { type: 'stub' }>, context: NetworkStepContext): Promise<NetworkStepOutcome> {
-  const network = context.session?.network;
+  const network = context.session.network;
   const declaration = declaredIn(context.project.stubs, step.stub);
-  if (network === undefined || declaration === undefined) return UNSUPPORTED;
+  if (declaration === undefined) return UNSUPPORTED;
   if (step.action === 'stop') {
     const stopped = await network.stopStub(step.stub);
     if (!stopped.ok) return failedWith(stopped.error.code);
@@ -311,10 +303,10 @@ function storedText(filled: JsonWithSecrets): string {
 }
 
 export async function writeStorage(step: Extract<Step, { type: 'setStorage' | 'removeStorage' }>, context: NetworkStepContext): Promise<NetworkStepOutcome> {
-  const storage = context.session?.storage;
+  const storage = context.session.storage;
   const declaration = declaredIn(context.project.storageEntries, step.entry);
   // The parser refuses a write to a read entry; a run under another project is refused here too.
-  if (storage === undefined || declaration === undefined || declaration.access !== 'readWrite') return UNSUPPORTED;
+  if (declaration === undefined || declaration.access !== 'readWrite') return UNSUPPORTED;
   if (step.type === 'removeStorage') {
     const removed = await storage.remove(declaration.area, declaration.origin, declaration.key);
     return removed.ok ? passed : failedWith(removed.error.code);
@@ -341,9 +333,9 @@ function isStoredValueAsExpected(kind: StorageAssertionKind, value: string | nul
 }
 
 export async function checkStorage(step: Extract<Step, { type: 'expectStorage' }>, context: NetworkStepContext): Promise<NetworkStepOutcome> {
-  const storage = context.session?.storage;
+  const storage = context.session.storage;
   const declaration = declaredIn(context.project.storageEntries, step.entry);
-  if (storage === undefined || declaration === undefined) return UNSUPPORTED;
+  if (declaration === undefined) return UNSUPPORTED;
   const assertion = step.assert;
   let expected: SafeText | null = null;
   if (assertion.kind === 'equals') {

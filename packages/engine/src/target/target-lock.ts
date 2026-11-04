@@ -28,7 +28,12 @@ const SHA256_HEX = /^[0-9a-f]{64}$/;
 const MAXIMUM_LOCK_ENTRIES = 64;
 const ENTRY_KEYS = ['targetId', 'version', 'executableSha256'] as const;
 
-const compareText = (left: string, right: string): number => (left < right ? -1 : left > right ? 1 : 0);
+const compareText = (left: string, right: string): number => {
+  if (left === right) {
+    return 0;
+  }
+  return left < right ? -1 : 1;
+};
 const byTargetId = (left: LockEntry, right: LockEntry): number => compareText(left.targetId, right.targetId);
 
 const errorText = (error: unknown): string => (error instanceof Error ? error.message : String(error));
@@ -37,7 +42,7 @@ const errorText = (error: unknown): string => (error instanceof Error ? error.me
 export async function hashExecutable(path: string): Promise<Result<string, string>> {
   try {
     const hash = createHash('sha256');
-    for await (const chunk of createReadStream(path)) hash.update(chunk);
+    for await (const chunk of createReadStream(path) as AsyncIterable<Buffer>) hash.update(chunk);
     return success(hash.digest('hex'));
   } catch (error) {
     return failure(`cannot read the browser executable at ${path}: ${errorText(error)}`);
@@ -174,7 +179,7 @@ const runTimeReason = (code: BuildFailureCode): UnavailableReason =>
 
 // What a run learns of the browser build before it opens the browser.
 //   executableSha256: the sha256 core took of the executable the adapter will launch; absent for an
-//     adapter that cannot report its build, such as Playwright, which launches its own browser.
+//     adapter that cannot report its build.
 //   unpinned: a lockfile is in use but nothing in it pins this build, so the manifest lists
 //     browser-build as non-hermetic. Without a lockfile nothing is said about pinning.
 export type CheckedBuild = { readonly executableSha256?: string; readonly unpinned: boolean };

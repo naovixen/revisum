@@ -328,6 +328,8 @@ export type RememberSource =
   | { readonly element: Locator; readonly read: typeof RememberElementRead.Attribute; readonly attribute: SafeText }
   | { readonly response: RequestName; readonly field: FieldName; readonly read: ResponseRead }
   | { readonly clipboard: ClipboardRead };
+export type RememberedElementSource = Extract<RememberSource, { readonly element: Locator }>;
+export type RememberedResponseSource = Extract<RememberSource, { readonly response: RequestName }>;
 
 // How a navigate step may load the page. "disabled" turns script execution off until the next
 // navigate, so the checks see what the server sent: nothing runs in the page, not even the
