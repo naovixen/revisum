@@ -31,13 +31,13 @@ type ResponseReceived = { readonly requestId: string; readonly response: { reado
 type LoadingFailed = { readonly requestId: string };
 // What the Fetch domain says of a request it holds, before it is sent or once its response is in.
 export type HeldRequest = {
-  readonly resourceType?: string;
+  readonly resourceType?: string | undefined;
   readonly request: { readonly url: string; readonly method: string };
   // The Network domain's id for the same request, when that domain sees it.
-  readonly networkId?: string;
+  readonly networkId?: string | undefined;
   // Present only at the response stage.
-  readonly responseStatusCode?: number;
-  readonly responseErrorReason?: string;
+  readonly responseStatusCode?: number | undefined;
+  readonly responseErrorReason?: string | undefined;
 };
 // What a stub answers a held request with, as Fetch.fulfillRequest takes it.
 type StubbedResponse = {

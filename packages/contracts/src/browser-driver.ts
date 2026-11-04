@@ -306,9 +306,10 @@ export interface Session extends DocumentSession {
   // machine's network says nothing about the app, so these go to the run's log and stay out of the
   // result and its hash. Complete once the session has closed. A driver without it reports none.
   connectionFailures?(): readonly { readonly origin: string; readonly message: string }[];
-  // Why the browser refused each of the driver's decisions on the session's requests. A refused
-  // request stays held, so nothing that happens after it says anything about the app, and a run with
-  // one cannot pass. A page that gave up on a request, or a tab that has gone, is no refusal. The text
+  // Why the browser refused each of the driver's decisions on the session's requests, and each request
+  // it held that the driver could not read to decide on. A refused request stays held, so nothing that
+  // happens after it says anything about the app, and a run with one cannot pass. A page that gave up
+  // on a request, or a tab that has gone, is no refusal. The text
   // goes to the run's log and stays out of the result and its hash. Complete once the session has
   // closed. A driver without it reports none.
   refusedRequestDecisions?(): readonly string[];

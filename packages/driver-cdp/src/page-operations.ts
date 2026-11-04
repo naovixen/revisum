@@ -127,7 +127,7 @@ export interface PageEvents {
   // it from getting there: at once when it is not.
   navigationEnded(): Promise<void>;
   // What the browser refused of the driver's decisions on the session's requests, in any of its tabs,
-  // each with its reason.
+  // each with its reason, and each request it held that the driver could not read to decide on.
   refusedRequestDecisions(): readonly string[];
   // Grows with each popup, second page and download the page starts. Each is closed or cancelled as
   // soon as it starts. Only growth means anything: a download counts as its file is asked for, and

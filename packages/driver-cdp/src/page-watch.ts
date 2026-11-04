@@ -18,6 +18,7 @@
 // A request stays held until the browser takes the driver's decision on it, so a decision it refuses
 // is held here too, whenever its answer comes, for whatever reports next.
 import { errorText } from './browser-session.ts';
+import { decodeRequestPaused, type BrowserCommand, type RequestPaused } from './BrowserCommand.ts';
 import { CdpError, type CdpConnection } from './cdp-connection.ts';
 import type { PageEvents } from './page-operations.ts';
 import { PageHeldByDialog } from './PageHeldByDialog.ts';
@@ -28,7 +29,6 @@ type AttachedToTarget = { readonly sessionId: string; readonly targetInfo: Targe
 type TargetCrashed = { readonly targetId: string };
 type DetachedFromTarget = { readonly sessionId: string };
 type DialogOpening = { readonly message: string };
-type RequestPaused = { readonly request: { readonly url: string } };
 const DOCUMENT_REQUEST = 'Document';
 
 // How long a popup is given to ask for its first page, so that request can be recorded before the
@@ -240,11 +240,30 @@ export class PageWatch implements PageEvents {
     if (REQUEST_NO_LONGER_HELD.test(answer)) {
       return;
     }
-    const refusal = `the browser refused the driver's decision on a request: ${answer}`;
+    this.#holdRefusal(`the browser refused the driver's decision on a request: ${answer}`);
+  }
+
+  #holdRefusal(refusal: string): void {
     this.#failures.refusedDecisions.push(refusal);
     for (const notify of [...this.#onDecisionRefused]) {
       notify(refusal);
     }
+  }
+
+  // Calls handler for each request a session's page holds. Runs as the event arrives, with no step to
+  // hand a failure to. A request the driver cannot read stays held with no decision on it, so what
+  // comes after it says no more than after a refused decision, and it is kept with those.
+  onRequestPaused(pausedSessionId: string, handler: (paused: RequestPaused) => void): () => void {
+    return this.#connection.on(pausedSessionId, 'Fetch.requestPaused', (parameters) => {
+      let paused: RequestPaused;
+      try {
+        paused = decodeRequestPaused(parameters);
+      } catch (error) {
+        this.#holdRefusal(`the driver could not read a request the browser holds, so it decided nothing on it: ${errorText(error)}`);
+        return;
+      }
+      handler(paused);
+    });
   }
 
   // Waits for what cannot end while this page's requests stay held, such as its load, for at most
@@ -293,6 +312,16 @@ export class PageWatch implements PageEvents {
     const opened = this.dialogOpened();
     const held = opened.promise.then((): never => { throw new PageHeldByDialog(method); });
     return Promise.race([this.command<Value>(method, parameters), held]).finally(() => { opened.cancel(); });
+  }
+
+  // As command, with its reply parsed before anyone sees it.
+  async ask<Reply>(command: BrowserCommand<Reply>, parameters: Record<string, unknown>): Promise<Reply> {
+    return command.decode(await this.command<unknown>(command.method, parameters));
+  }
+
+  // As commandToRunningPage, with its reply parsed before anyone sees it.
+  async askRunningPage<Reply>(command: BrowserCommand<Reply>, parameters: Record<string, unknown>): Promise<Reply> {
+    return command.decode(await this.commandToRunningPage<unknown>(command.method, parameters));
   }
 
   // Waits for what the browser is doing on the page's behalf, for at most as long as the page lives.
@@ -352,8 +381,8 @@ export class PageWatch implements PageEvents {
     // Its own timer settles it, whatever the commands below do, and the session's close awaits it.
     const firstRequest = new Promise<void>((resolve) => {
       const timer = setTimeout(() => { endWait(); }, POPUP_REQUEST_WAIT_MILLISECONDS);
-      const stopListening = connection.on(popupSessionId, 'Fetch.requestPaused', (parameters) => {
-        this.#onPopupRequest((parameters as RequestPaused).request.url);
+      const stopListening = this.onRequestPaused(popupSessionId, (paused) => {
+        this.#onPopupRequest(paused.request.url);
         endWait();
       });
       endWait = () => {

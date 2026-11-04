@@ -8,10 +8,14 @@ import { readFileSync, realpathSync } from 'node:fs';
 import { isAbsolute, relative, resolve } from 'node:path';
 import { chromiumBuild } from './browser-build.ts';
 import { SESSION_FEATURES, buildSession, errorText, type SessionDetails } from './browser-session.ts';
+import {
+  CALL_FUNCTION_ON, EVALUATE, GET_FULL_ACCESSIBILITY_TREE, GET_PROPERTIES, NAVIGATE, RESOLVE_NODE,
+  type BrowserCommand, type CallResult, type RemoteObject, type RequestPaused,
+} from './BrowserCommand.ts';
 import type { CdpConnection, CdpSessionClient } from './cdp-connection.ts';
 import { DownloadFolder } from './downloads.ts';
 import { EgressRecorder } from './egress-records.ts';
-import { BrowserNetwork, atResponseStage, type HeldRequest } from './network-stubs.ts';
+import { BrowserNetwork, atResponseStage } from './network-stubs.ts';
 import { afterTwoFrames, focusAndSelect, focusElement, frameContentOffset, isConnectedToItsDocument, scriptResultText } from './in-page.ts';
 import type { HeldModifierKey } from './modifier-keys.ts';
 import type {
@@ -108,10 +112,6 @@ const ROLE_NAMES: Readonly<Record<string, string>> = { RootWebArea: 'document', 
 const TRANSPARENT_ROLES = new Set(['none', 'generic', 'StaticText', 'InlineTextBox', 'LineBreak', 'ignored', 'presentation']);
 
 // Chrome DevTools Protocol shapes this driver reads.
-type RemoteObject = {
-  readonly type: string; readonly subtype?: string; readonly value?: unknown; readonly unserializableValue?: string; readonly objectId?: string;
-};
-type CallResult = { readonly result: RemoteObject; readonly exceptionDetails?: { readonly text: string; readonly exception?: RemoteObject } };
 type CallArgument = { readonly value?: unknown; readonly unserializableValue?: string; readonly objectId?: string };
 type AccessibilityValue = { readonly type: string; readonly value?: unknown };
 type AccessibilityProperty = { readonly name: string; readonly value: AccessibilityValue };
@@ -125,7 +125,6 @@ type AccessibilityNode = {
   readonly parentId?: string;
   readonly backendDOMNodeId?: number;
 };
-type RequestPaused = HeldRequest & { readonly requestId: string };
 type FrameTree = { readonly frame: { readonly id: string; readonly unreachableUrl?: string }; readonly childFrames?: readonly FrameTree[] };
 type DescribedNode = {
   readonly node: { readonly backendNodeId: number; readonly frameId?: string; readonly contentDocument?: { readonly backendNodeId: number } };
@@ -383,8 +382,7 @@ async function preparePage(browser: SessionBrowser, sessionId: string, watch: Pa
   // Every request is paused and either let through (allowed origin) or failed and recorded. An
   // allowed fetch or XHR request an active stub matches is answered by the stub instead. A request
   // whose response fields a plan may read is held again once its response is in, for its body.
-  page.on('Fetch.requestPaused', (parameters) => {
-    const paused = parameters as RequestPaused;
+  watch.onRequestPaused(sessionId, (paused) => {
     if (atResponseStage(paused)) { void takeResponseBody(page, browser.network, paused, watch); return; }
     const url = URL.parse(paused.request.url);
     // A URL that cannot be parsed is blocked, with no origin to show.
@@ -556,6 +554,10 @@ class CdpPage implements PageOperations<string> {
     return this.#watch.commandToRunningPage<Value>(method, parameters);
   }
 
+  #ask<Reply>(command: BrowserCommand<Reply>, parameters: Record<string, unknown> = {}): Promise<Reply> {
+    return this.#watch.askRunningPage(command, parameters);
+  }
+
   // Sends input to a page no dialog holds. A dialog that opens while it waits is the input landing,
   // such as the mouse release whose click opens one: this ends then, since the browser answers the
   // command itself only once the dialog is answered.
@@ -608,7 +610,7 @@ class CdpPage implements PageOperations<string> {
       // Sent whatever holds the page: a navigation away ends a dialog, and the browser answers it.
       // The browser answers once the document's own request has gone on, which a refused decision stops.
       const navigated = await this.#watch.failingOnRefusedDecision(
-        this.#watch.command<{ errorText?: string }>('Page.navigate', { url, ...(frameId === undefined ? {} : { frameId }) }),
+        this.#watch.ask(NAVIGATE, { url, ...(frameId === undefined ? {} : { frameId }) }),
       );
       // An HTTP error status with an empty body is a page the server did send: the browser shows
       // its own error page for it, and the plan's checks decide what that means.
@@ -645,14 +647,14 @@ class CdpPage implements PageOperations<string> {
     const world = await this.#readingWorld();
     let evaluated: CallResult;
     if (world === null) {
-      evaluated = await this.#send<CallResult>('Runtime.evaluate', { expression: 'document' });
+      evaluated = await this.#ask(EVALUATE, { expression: 'document' });
     } else {
       try {
-        evaluated = await this.#send<CallResult>('Runtime.evaluate', { expression: 'document', contextId: world.executionContextId });
+        evaluated = await this.#ask(EVALUATE, { expression: 'document', contextId: world.executionContextId });
       } catch (error) {
         if (!LOST_CONTEXT.test(errorText(error)) || this.#watch.crashed()) throw error;
         world.executionContextId = await this.#isolatedWorld(world.frameId);
-        evaluated = await this.#send<CallResult>('Runtime.evaluate', { expression: 'document', contextId: world.executionContextId });
+        evaluated = await this.#ask(EVALUATE, { expression: 'document', contextId: world.executionContextId });
       }
     }
     if (evaluated.result.objectId === undefined) throw new Error('no document');
@@ -668,7 +670,7 @@ class CdpPage implements PageOperations<string> {
     const objectId = await this.#documentObject();
     const callArguments: CallArgument[] = inputs.map((input) =>
       (typeof input === 'object' && 'element' in input ? { objectId: input.element } : { value: input }));
-    const called = await this.#send<CallResult>('Runtime.callFunctionOn', {
+    const called = await this.#ask(CALL_FUNCTION_ON, {
       functionDeclaration: pageFunction.toString(), objectId, arguments: callArguments, ...delivery,
     });
     throwIfThePageThrew(called);
@@ -694,7 +696,7 @@ class CdpPage implements PageOperations<string> {
     const list = (await this.#call(pageFunction, inputs, AWAITED_OBJECT)).result.objectId;
     // Every function called here returns an array, so no object means the page got in the way.
     if (list === undefined) throw new Error('the page gave no list of elements');
-    const properties = await this.#send<{ result: { name: string; value?: { objectId?: string } }[] }>('Runtime.getProperties', { objectId: list, ownProperties: true });
+    const properties = await this.#ask(GET_PROPERTIES, { objectId: list, ownProperties: true });
     return properties.result
       .filter((property) => /^\d+$/.test(property.name))
       .flatMap((property) => property.value?.objectId ?? []);
@@ -703,18 +705,15 @@ class CdpPage implements PageOperations<string> {
   async callForObjectOutOfReach(pageFunction: PageFunction, element: string): Promise<string> {
     const executionContextId = await this.#isolatedWorld(await this.frameId(), CLICK_CHECK_WORLD_NAME);
     const described = await this.#send<DescribedNode>('DOM.describeNode', { objectId: element });
-    const resolved = await this.#send<{ object: { objectId?: string } }>('DOM.resolveNode', { backendNodeId: described.node.backendNodeId, executionContextId });
+    const resolved = await this.#ask(RESOLVE_NODE, { backendNodeId: described.node.backendNodeId, executionContextId });
     const elementInWorld = resolved.object.objectId;
-    if (elementInWorld === undefined || elementInWorld === '') {
-      throw new Error('the element has no object in the driver\'s script world');
-    }
     try {
-      const called = await this.#send<CallResult>('Runtime.callFunctionOn', {
+      const called = await this.#ask(CALL_FUNCTION_ON, {
         functionDeclaration: pageFunction.toString(), executionContextId, arguments: [{ objectId: elementInWorld }], returnByValue: false,
       });
       throwIfThePageThrew(called);
       const kept = called.result.objectId;
-      if (kept === undefined || kept === '') {
+      if (kept === undefined) {
         throw new Error('the page function gave no object to keep');
       }
       return kept;
@@ -726,7 +725,7 @@ class CdpPage implements PageOperations<string> {
   async callOnObject(object: string, pageFunction: PageFunction): Promise<unknown> {
     let called: CallResult;
     try {
-      called = await this.#send<CallResult>('Runtime.callFunctionOn', {
+      called = await this.#ask(CALL_FUNCTION_ON, {
         functionDeclaration: pageFunction.toString(), objectId: object, returnByValue: true,
       });
     } catch (error) {
@@ -765,10 +764,10 @@ class CdpPage implements PageOperations<string> {
     const handles: string[] = [];
     for (const node of queried.nodes) {
       if (node.ignored || node.backendDOMNodeId === undefined) continue;
-      const resolved = await this.#send<{ object: { objectId?: string } }>('DOM.resolveNode', {
+      const resolved = await this.#ask(RESOLVE_NODE, {
         backendNodeId: node.backendDOMNodeId, ...(world === null ? {} : { executionContextId: world.executionContextId }),
       });
-      if (resolved.object.objectId !== undefined) handles.push(resolved.object.objectId);
+      handles.push(resolved.object.objectId);
     }
     return handles;
   }
@@ -794,13 +793,13 @@ class CdpPage implements PageOperations<string> {
 
   async accessibilityTree(): Promise<A11yNode> {
     const frameId = this.#frame?.world.frameId;
-    const { nodes } = await this.#send<{ nodes: AccessibilityNode[] }>('Accessibility.getFullAXTree', frameId === undefined ? {} : { frameId });
+    const { nodes } = await this.#ask(GET_FULL_ACCESSIBILITY_TREE, frameId === undefined ? {} : { frameId });
     const byId = new Map(nodes.map((node) => [node.nodeId, node]));
-    const build = (node: AccessibilityNode): A11yNode[] => {
+    const build = (node: (typeof nodes)[number]): A11yNode[] => {
       const children = (node.childIds ?? []).flatMap((id) => { const child = byId.get(id); return child === undefined ? [] : build(child); });
-      const role = String(node.role?.value ?? 'none');
+      const role = node.role ?? 'none';
       if (node.ignored || TRANSPARENT_ROLES.has(role)) return children;
-      return [{ role: ROLE_NAMES[role] ?? role, name: String(node.name?.value ?? ''), children }];
+      return [{ role: ROLE_NAMES[role] ?? role, name: node.name ?? '', children }];
     };
     const root = nodes.find((node) => node.parentId === undefined) ?? nodes[0];
     const tree = root === undefined ? [] : build(root);
@@ -824,7 +823,7 @@ class CdpPage implements PageOperations<string> {
       return true;
     }
     try {
-      const called = await this.#send<CallResult>('Runtime.callFunctionOn', {
+      const called = await this.#ask(CALL_FUNCTION_ON, {
         functionDeclaration: isConnectedToItsDocument.toString(), objectId: element, returnByValue: true,
       });
       return called.exceptionDetails === undefined && called.result.value === false;
@@ -866,15 +865,12 @@ class CdpPage implements PageOperations<string> {
   // page's own are in its main world.
   async #inMainWorld(node: string): Promise<string> {
     const described = await this.#send<DescribedNode>('DOM.describeNode', { objectId: node });
-    const resolved = await this.#send<{ object: { objectId?: string } }>('DOM.resolveNode', { backendNodeId: described.node.backendNodeId, objectGroup: SCRIPT_OBJECT_GROUP });
-    if (resolved.object.objectId === undefined) {
-      throw new Error('the node has no object in the page\'s main world');
-    }
+    const resolved = await this.#ask(RESOLVE_NODE, { backendNodeId: described.node.backendNodeId, objectGroup: SCRIPT_OBJECT_GROUP });
     return resolved.object.objectId;
   }
 
   async #mainWorldWindow(): Promise<string> {
-    const found = await this.#send<CallResult>('Runtime.callFunctionOn', {
+    const found = await this.#ask(CALL_FUNCTION_ON, {
       functionDeclaration: 'function () { return this.defaultView; }', objectId: await this.#mainWorldDocument(), objectGroup: SCRIPT_OBJECT_GROUP,
     });
     if (found.result.objectId === undefined) {
@@ -973,15 +969,14 @@ class CdpPage implements PageOperations<string> {
   async #mainWorldDocument(): Promise<string> {
     const frame = this.#frame;
     if (frame === null) {
-      const evaluated = await this.#send<CallResult>('Runtime.evaluate', { expression: 'document', objectGroup: SCRIPT_OBJECT_GROUP });
+      const evaluated = await this.#ask(EVALUATE, { expression: 'document', objectGroup: SCRIPT_OBJECT_GROUP });
       if (evaluated.result.objectId === undefined) throw new Error('no document');
       return evaluated.result.objectId;
     }
     const described = await this.#send<DescribedNode>('DOM.describeNode', { objectId: frame.frameElement });
     const backendNodeId = described.node.contentDocument?.backendNodeId;
     if (backendNodeId === undefined) throw new Error('the frame has no document');
-    const resolved = await this.#send<{ object: { objectId?: string } }>('DOM.resolveNode', { backendNodeId, objectGroup: SCRIPT_OBJECT_GROUP });
-    if (resolved.object.objectId === undefined) throw new Error('no document');
+    const resolved = await this.#ask(RESOLVE_NODE, { backendNodeId, objectGroup: SCRIPT_OBJECT_GROUP });
     return resolved.object.objectId;
   }
 
@@ -990,11 +985,11 @@ class CdpPage implements PageOperations<string> {
   async callScript(source: string, scriptArguments: Readonly<Record<string, string | number | boolean>>, maximumResultBytes: number): Promise<ScriptCallOutcome> {
     try {
       const objectId = await this.#mainWorldDocument();
-      const called = await this.#send<CallResult>('Runtime.callFunctionOn', {
+      const called = await this.#ask(CALL_FUNCTION_ON, {
         functionDeclaration: source, objectId, arguments: [{ value: scriptArguments }], awaitPromise: true, returnByValue: false, objectGroup: SCRIPT_OBJECT_GROUP,
       });
       if (called.exceptionDetails !== undefined) return { kind: 'threw' };
-      const written = await this.#send<CallResult>('Runtime.callFunctionOn', {
+      const written = await this.#ask(CALL_FUNCTION_ON, {
         functionDeclaration: scriptResultText.toString(), objectId, arguments: [callArgumentOf(called.result), { value: maximumResultBytes }],
         returnByValue: true, objectGroup: SCRIPT_OBJECT_GROUP,
       });

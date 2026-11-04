@@ -438,7 +438,7 @@
       "count": 4
     },
     "@typescript-eslint/no-base-to-string": {
-      "count": 4
+      "count": 2
     },
     "@typescript-eslint/no-unused-vars": {
       "count": 1
@@ -450,7 +450,7 @@
       "count": 1
     },
     "curly": {
-      "count": 38
+      "count": 36
     },
     "max-lines": {
       "count": 1
