@@ -1,6 +1,7 @@
 // The Tab walk: presses Tab through the page and records the focus order, and, when asked,
 // whether focus is visible and whether the focused element is covered at each step.
-import type { PageDriver, PageSnapshot, TabWalk } from './accessibility-types.ts';
+import { isPlainObject } from '@revisum/contracts';
+import type { FocusOcclusion, PageDriver, PageSnapshot, TabWalk } from './accessibility-types.ts';
 import { inSequentialFocus } from './rules/rule-predicates.ts';
 
 // Keeps a handle on the deepest focused element, through shadow roots and same-origin frames.
@@ -40,6 +41,19 @@ const MEASURE_OCCLUSION = `(() => {
 const BLUR_HELD_ELEMENT = `(() => { const element = window.__focusedElement; if (element && element.blur) element.blur(); })()`;
 const REFOCUS_HELD_ELEMENT = `(() => { const element = window.__focusedElement; if (element && element.focus) element.focus({ preventScroll: true }); })()`;
 
+// The measure runs in the page's own world, where the page can patch what it calls. An answer that
+// makes no sense stops the walk, as a script that threw does. Leaving the element unmeasured would
+// let the rule say nothing about it, and the page pass.
+function decodeOcclusion(measured: unknown): FocusOcclusion {
+  if (isPlainObject(measured)) {
+    const { inView, hits, total } = measured;
+    if (typeof inView === 'boolean' && typeof hits === 'number' && Number.isInteger(hits) && typeof total === 'number' && Number.isInteger(total)) {
+      return { inView, hits, total };
+    }
+  }
+  throw new Error('the page gave an unreadable measure of what covers the focused element');
+}
+
 export interface WalkOptions { focusVisibility: boolean; occlusion: boolean; stepLimit?: number }
 
 export async function tabWalk(page: PageDriver, snapshot: PageSnapshot, options: WalkOptions): Promise<TabWalk> {
@@ -68,7 +82,9 @@ export async function tabWalk(page: PageDriver, snapshot: PageSnapshot, options:
     walk.sequence.push(index);
     if (active.box) walk.boxes.set(index, active.box);
     await page.evaluate(HOLD_FOCUSED_ELEMENT);
-    if (options.occlusion) walk.obscured.set(index, await page.evaluate<{ inView: boolean; hits: number; total: number }>(MEASURE_OCCLUSION));
+    if (options.occlusion) {
+      walk.obscured.set(index, decodeOcclusion(await page.evaluate(MEASURE_OCCLUSION)));
+    }
     if (options.focusVisibility) {
       const focused = await page.screenshot();
       await page.evaluate(BLUR_HELD_ELEMENT);

@@ -1,7 +1,7 @@
 // Keyboard-driven ACT rules, and probes for success criteria that have no automatable ACT rule.
 // ACT rules follow their W3C rule text; probes follow the WCAG 2.2 success criterion named in
 // meta.source.
-import type { Box } from '@revisum/contracts';
+import { isPlainObject, type Box } from '@revisum/contracts';
 import type { InteractiveRule, PageDriver, PageSnapshot, SnapshotNode, TargetResult } from '../accessibility-types.ts';
 import { snapshotExtras } from '../page-snapshot.ts';
 import { ancestors, descendants, isVisible, parentElement } from '../snapshot-queries.ts';
@@ -230,6 +230,18 @@ export const targetSizeProbe: InteractiveRule = {
 
 // WCAG 2.2 success criterion 1.4.10 Reflow: at 320 css pixels wide, content must not need
 // horizontal scrolling, except parts that need two-dimensional layout (left as cantTell).
+// The reading runs in the page's own world, where the page can patch what it calls. An answer that
+// makes no sense stops the scan, as a script that threw does, so it can't read as a page that fits.
+function decodeDocumentWidths(measured: unknown): { readonly scrollWidth: number; readonly clientWidth: number } {
+  if (isPlainObject(measured)) {
+    const { scrollWidth, clientWidth } = measured;
+    if (typeof scrollWidth === 'number' && Number.isFinite(scrollWidth) && typeof clientWidth === 'number' && Number.isFinite(clientWidth)) {
+      return { scrollWidth, clientWidth };
+    }
+  }
+  throw new Error('the page gave unreadable widths for its document');
+}
+
 const TWO_DIMENSIONAL = new Set(['table', 'pre', 'code', 'img', 'video', 'canvas', 'svg', 'iframe', 'map', 'math', 'object', 'embed']);
 export const reflowProbe: InteractiveRule = {
   meta: probeMeta('page-reflow', 'Content reflows at 320 CSS px without horizontal scrolling', ['1.4.10'], 'P2', WCAG_UNDERSTANDING + 'reflow'),
@@ -240,8 +252,8 @@ export const reflowProbe: InteractiveRule = {
     await page.setViewport(320, 256);
     try {
       await page.evaluate(`new Promise(r => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(r, 30))))`);
-      const widths = await page.evaluate<{ scrollWidth: number; clientWidth: number }>(
-        `({ scrollWidth: document.documentElement.scrollWidth, clientWidth: document.documentElement.clientWidth })`);
+      const widths = decodeDocumentWidths(await page.evaluate(
+        `({ scrollWidth: document.documentElement.scrollWidth, clientWidth: document.documentElement.clientWidth })`));
       if (widths.scrollWidth <= widths.clientWidth + 1) return [result(root.index, 'passed')];
       const narrow = await page.snapshot();
       const indexByBackend = new Map(snapshot.nodes.map((node) => [node.backendId, node.index]));

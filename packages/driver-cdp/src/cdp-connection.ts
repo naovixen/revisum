@@ -22,9 +22,6 @@ export interface CdpSessionClient {
   ask<CommandParameters, Reply>(command: BrowserCommand<CommandParameters, Reply>, parameters: NoInfer<CommandParameters>, timeoutMilliseconds?: number): Promise<Reply>;
   // Calls handler for every well-formed event, and onMalformed, with where it is malformed, for any other.
   listen<Payload>(event: BrowserEvent<Payload>, handler: (payload: Payload) => void, onMalformed: (detail: string) => void): () => void;
-  // For tests, which send what no command here describes.
-  send<Value = unknown>(method: string, parameters?: Record<string, unknown>, timeoutMilliseconds?: number): Promise<Value>;
-  on(event: string, handler: (parameters: unknown) => void): () => void;
 }
 
 type PendingCommand = { resolve: (value: unknown) => void; reject: (error: Error) => void; timer: NodeJS.Timeout; method: string };
@@ -108,14 +105,6 @@ export class CdpConnection {
     return command.decode(await this.#sendForAnswer(sessionId, command.method, parameters, timeoutMilliseconds));
   }
 
-  // For tests, which send what no command here describes. The driver itself goes through ask.
-  send<Value = unknown>(
-    sessionId: string | undefined, method: string, parameters: Record<string, unknown> = {},
-    timeoutMilliseconds: number = this.commandTimeoutMilliseconds,
-  ): Promise<Value> {
-    return this.#sendForAnswer(sessionId, method, parameters, timeoutMilliseconds) as Promise<Value>;
-  }
-
   #sendForAnswer(sessionId: string | undefined, method: string, parameters: unknown, timeoutMilliseconds: number): Promise<unknown> {
     if (this.closed) return Promise.reject(new CdpError(method, 'connection closed'));
     const id = this.nextId++;
@@ -157,17 +146,6 @@ export class CdpConnection {
     });
   }
 
-  // Resolves on the next `event` of one session, or rejects after timeoutMilliseconds.
-  once(sessionId: string, event: string, timeoutMilliseconds: number): { readonly promise: Promise<unknown>; cancel(): void } {
-    let stopListening = (): void => {};
-    let timer: NodeJS.Timeout | undefined;
-    const promise = new Promise<unknown>((resolve, reject) => {
-      stopListening = this.on(sessionId, event, (parameters) => { clearTimeout(timer); stopListening(); resolve(parameters); });
-      timer = setTimeout(() => { stopListening(); reject(new CdpError(event, `timeout after ${timeoutMilliseconds} ms`)); }, timeoutMilliseconds);
-    });
-    return { promise, cancel: () => { clearTimeout(timer); stopListening(); } };
-  }
-
   // Calls handler if the connection closes before expectClose: the browser died or the socket
   // dropped. Stops when the returned function is called.
   onLost(handler: () => void): () => void {
@@ -184,9 +162,6 @@ export class CdpConnection {
     return {
       ask: (command, parameters, timeoutMilliseconds) => this.ask(sessionId, command, parameters, timeoutMilliseconds),
       listen: (event, handler, onMalformed) => this.listen(sessionId, event, handler, onMalformed),
-      send: <Value = unknown>(method: string, parameters?: Record<string, unknown>, timeoutMilliseconds?: number) =>
-        this.send<Value>(sessionId, method, parameters ?? {}, timeoutMilliseconds ?? this.commandTimeoutMilliseconds),
-      on: (event, handler) => this.on(sessionId, event, handler),
     };
   }
 

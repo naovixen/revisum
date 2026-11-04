@@ -2,9 +2,9 @@
 // masking and auditing live here once, so every protocol behaves the same way.
 import { isDeepStrictEqual } from 'node:util';
 import {
-  DEFAULT_TEST_ID_ATTRIBUTE, failure, literalActionStep, literalText, performableLocator, reveal, success,
+  DEFAULT_TEST_ID_ATTRIBUTE, failure, isSeveralElements, literalActionStep, literalText, performableLocator, reveal, success,
   type ActionGuard, type ActionStep, type BrowserRequestRecord, type DialogStep, type DocumentSession, type DomRead, type DomValue, type DownloadedFile,
-  type DownloadStep, type DriverError, type ElementProbe, type ElementsRead, type Locator, type PageScriptCall, type PageMetaTag, type PageProbe, type Position, type ResolvedActionStep,
+  type DownloadStep, type DriverError, type ElementProbe, type Locator, type OneElementRead, type PageScriptCall, type PageMetaTag, type PageProbe, type Position, type ResolvedActionStep,
   type ClipboardPort, type ClockPort, type DriverErrorCode, type GuardVerdict, type NetworkPort, type ResolvedElement, type ResolvedLocator, type Result, type Secret, type SessionEnvironment, type SessionTab, type StoragePort,
   UnreadablePage,
 } from '@revisum/contracts';
@@ -307,7 +307,7 @@ function decodeActionability(text: string): Actionability {
 }
 
 // Decodes what probeElement (in-page.ts) reports, of the one element it was called on.
-function decodeShownElement(text: string): ElementsRead {
+function decodeShownElement(text: string): Omit<OneElementRead, 'states' | 'href'> {
   const source = 'probeElement';
   const fields = reportedFields(text, source);
   const [shownText, value, box] = [fields['text'], fields['value'], fields['box']];
@@ -535,8 +535,14 @@ function documentPorts<Handle>(
       if ((await operations.callForString(documentUrl, [])).startsWith(BROWSER_ERROR_PAGE)) {
         return ON_BROWSER_ERROR_PAGE;
       }
+      const count = found.length;
+      if (isSeveralElements(count)) {
+        return { ...NOTHING_READ, count };
+      }
       const element = found[0];
-      if (found.length !== 1 || element === undefined) return { ...NOTHING_READ, count: found.length };
+      if (element === undefined) {
+        return { ...NOTHING_READ, count: 0 };
+      }
       const shown = decodeShownElement(await operations.callForString(probeElement, [{ element }, environment.sensitiveSelectors]));
       // The link target and aria-current come from the document, the other states from the
       // browser's accessibility engine, as assistive technology reads them.

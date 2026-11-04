@@ -8,7 +8,7 @@ export { CdpConnection, DEFAULT_COMMAND_TIMEOUT_MILLISECONDS, type CdpSessionCli
 export { ATTACH_TO_TARGET, BRING_TO_FRONT, CAPTURE_SCREENSHOT, CLOSE_TARGET, CREATE_TARGET, ENABLE_ACCESSIBILITY, ENABLE_CSS, ENABLE_DOM, ENABLE_PAGE, ENABLE_RUNTIME, GET_FRAME_TREE, GET_LAYOUT_METRICS, GET_VERSION, NAVIGATE, SET_DEVICE_METRICS, SET_FOCUS_EMULATION, type AccessibilityTreeNode, type FrameTree } from './BrowserCommand.ts';
 export { CALL_FUNCTION_ON, CAPTURE_SNAPSHOT, DESCRIBE_NODE, EVALUATE, GET_DOCUMENT, GET_FULL_ACCESSIBILITY_TREE, GET_MATCHED_STYLES, PUSH_NODES_BY_BACKEND_IDS, RELEASE_OBJECT, RESOLVE_NODE } from './CallFunctionOn.ts';
 export { CONTINUE_REQUEST, DISPATCH_KEY_EVENT, ENABLE_REQUEST_HOLDING, FAIL_REQUEST } from './DispatchMouseEvent.ts';
-export { REQUEST_PAUSED } from './BrowserEvent.ts';
+export { LOAD_EVENT_FIRED, REQUEST_PAUSED } from './BrowserEvent.ts';
 export { launchChromium, type LaunchedChromium } from './chromium-launcher.ts';
 export type { DriverSession, OwnBrowserDriver } from './page-operations.ts';
 // For tests only, to save a launch per run. Production keeps a fresh browser per run, because

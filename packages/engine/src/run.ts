@@ -7,7 +7,7 @@
 // through its clock and clipboard ports; page scripts through its script port. Database commands
 // go through the run's DatabaseCommandRunner port, which runs each in a workload container.
 import {
-  failure, isElementCheckNoDriverDecides, stepFailed, StepCode, success, UnreadablePage,
+  failure, isElementCheckNoDriverDecides, isOneElementRead, stepFailed, StepCode, success, UnreadablePage,
   type A11yFinding, type ActionGuard, type AppliedRewrite, type ApprovalLabel, type ArtifactReference, type ArtifactStore, type Authorised,
   type BrowserDriver, type Clock, type DatabaseCommandRunner, type DocumentSession, type DomRead, type DownloadedFile, type DownloadName, type ElementsRead, type RememberedElementSource, type LockEntry, type DialogStep, type ElementProbe,
   type EventSink, type GuaranteeLevel, type GuardVerdict, type PageAssertion, type Plan, type PolicyRuleId, type Redactor,
@@ -1042,7 +1042,7 @@ async function rememberFromPage(
   }
   const read: DomRead | undefined = from.read === 'attribute' ? { kind: 'attribute', name: from.attribute } : undefined;
   const textOf = (probe: ElementsRead): string => {
-    if (from.read === 'attribute') return probe.dom?.kind === 'attribute' ? probe.dom.value ?? '' : '';
+    if (from.read === 'attribute') return isOneElementRead(probe) && probe.dom?.kind === 'attribute' ? probe.dom.value ?? '' : '';
     return normalise(from.read === 'value' ? probe.value ?? '' : probe.text);
   };
   const seen = { text: '' };

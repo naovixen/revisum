@@ -1,7 +1,7 @@
 // The assertion oracle: pure functions from a probe to a verdict. It lives in the engine so that
 // neither a driver nor an AI can change what "passed" means.
 import {
-  literalText, type AccessibleStates, type DomCheckWith, type DomRead, type ElementProbe, type ElementsRead, type PageAssertion, type PageProbe,
+  isOneElementRead, literalText, type AccessibleStates, type DomCheckWith, type DomRead, type ElementProbe, type OneElementRead, type PageAssertion, type PageProbe,
   type ResolvedElementAssertion, type SafeText, type UnreadablePage,
 } from '@revisum/contracts';
 
@@ -37,7 +37,7 @@ export function domReadFor(assertion: ResolvedElementAssertion): DomRead | undef
 // A DOM check on the one element found. A probe that read nothing, or read something else, fails
 // the check: it never passes by accident. Values are compared exactly, as the page holds them;
 // only a computed style has its white space normalised, since browsers space their own text.
-function checkDom(assertion: DomCheckWith<SafeText>, probe: ElementsRead): Verdict {
+function checkDom(assertion: DomCheckWith<SafeText>, probe: OneElementRead): Verdict {
   const read = probe.dom;
   switch (assertion.kind) {
     case 'hasClass': case 'lacksClass': {
@@ -62,11 +62,10 @@ const STATE_CHECKS = {
   current: ['current', true],
 } as const satisfies Record<string, readonly [keyof AccessibleStates, boolean]>;
 
-// A state check passes only on an element that exposes the state; a probe with no states at all
-// exposes none, so the check never passes by accident.
-function checkState(kind: keyof typeof STATE_CHECKS, probe: ElementsRead): Verdict {
+// A state check passes only on an element that exposes the state.
+function checkState(kind: keyof typeof STATE_CHECKS, probe: OneElementRead): Verdict {
   const [state, wanted] = STATE_CHECKS[kind];
-  const exposed = probe.states?.[state] ?? null;
+  const exposed = probe.states[state];
   if (exposed === null) return STATE_NOT_EXPOSED;
   return exposed === wanted ? PASSED : FAILED;
 }
@@ -104,8 +103,9 @@ export function checkElement(assertion: ResolvedElementAssertion, probe: Element
     if (probe.count === 0 || (probe.count === 1 && !probe.visible)) return PASSED;
     return probe.count > 1 ? AMBIGUOUS : FAILED;
   }
-  if (probe.count === 0) return NOT_FOUND;
-  if (probe.count > 1) return AMBIGUOUS;
+  if (!isOneElementRead(probe)) {
+    return probe.count === 0 ? NOT_FOUND : AMBIGUOUS;
+  }
   switch (assertion.kind) {
     case 'visible': return probe.visible ? PASSED : FAILED;
     case 'enabled': return probe.enabled ? PASSED : FAILED;

@@ -32,10 +32,14 @@ export interface PageDriver {
   focusBackend(backendId: number): Promise<boolean>;
   // The darkest and lightest pixels behind a text node, read with the text hidden.
   sampleBackground(textBackendId: number): Promise<{ dark: [number, number, number]; light: [number, number, number] } | null>;
-  evaluate<Value>(expression: string): Promise<Value>;
+  // Whatever the page's script gave. The page writes it, so a caller decodes it before trusting it.
+  evaluate(expression: string): Promise<unknown>;
   setViewport(width: number, height: number): Promise<void>;
   close(): Promise<void>;
 }
+
+// How much of a focused element the page shows: `hits` sample points on top, of `total` sampled.
+export interface FocusOcclusion { inView: boolean; hits: number; total: number }
 
 // What the browser's accessibility tree says about an element.
 export interface AccessibilityInfo {
@@ -106,7 +110,7 @@ export interface TabWalk {
   // True when focusing the element changed at least one viewport pixel.
   focusVisible: Map<number, boolean>;
   // How much of the focused element was visible at the moment of focus (WCAG 2.4.11).
-  obscured: Map<number, { inView: boolean; hits: number; total: number }>;
+  obscured: Map<number, FocusOcclusion>;
   // Page-coordinate box at the moment of focus.
   boxes: Map<number, Box>;
   // Viewport-coordinate box at the moment of focus.

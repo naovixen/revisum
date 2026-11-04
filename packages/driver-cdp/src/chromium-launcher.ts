@@ -5,7 +5,7 @@
 // utility and renderer processes join. Those may outlive the browser process by a moment, so
 // stopping waits until the whole group has exited, and ends what is left of it after a grace
 // period. Only that group is ever signalled: it holds nothing the driver did not start. On
-// Windows the browser's job object ends its children with it.
+// Windows there are no such groups, so stopping ends the browser's process tree instead.
 import { spawn, type ChildProcess } from 'node:child_process';
 import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { platform, tmpdir } from 'node:os';
@@ -108,6 +108,21 @@ async function endProcessGroup(groupId: number | undefined): Promise<void> {
   await groupEnded(groupId, GROUP_FORCED_MILLISECONDS);
 }
 
+// The browser's crashpad handlers answer to no job object, and under load outlive it by half a minute.
+// taskkill finds them through parent ids, so it has to run while the browser is alive: it replaces
+// asking the browser to close, rather than following it. Node holds the process's handle until it has
+// seen the exit, so until then the id can't belong to anything else. True when the tree has been ended.
+function endWindowsProcessTree(browserProcess: ChildProcess): Promise<boolean> {
+  if (OWN_PROCESS_GROUP || browserProcess.pid === undefined || hasExited(browserProcess)) {
+    return Promise.resolve(false);
+  }
+  return new Promise((resolve) => {
+    const taskkill = spawn('taskkill', ['/T', '/F', '/PID', String(browserProcess.pid)], { stdio: 'ignore', windowsHide: true });
+    taskkill.once('exit', (code) => { resolve(code === 0); });
+    taskkill.once('error', () => { resolve(false); });
+  });
+}
+
 // Whatever its type says, a process Node ran out of file handles to start has no streams at all:
 // Node stops before making them, and reports the failure through the 'error' event.
 function outputStreamsOf(child: ChildProcess): readonly Readable[] {
@@ -134,7 +149,10 @@ export function launchChromium(executablePath: string, options: LaunchOptions = 
 
   const stop = async (connection: CdpConnection | null): Promise<void> => {
     connection?.expectClose();
-    if (connection !== null) await connection.ask(undefined, CLOSE_BROWSER, {}, 5_000).catch(() => undefined);
+    const wasTreeEnded = await endWindowsProcessTree(browserProcess);
+    if (connection !== null && !wasTreeEnded) {
+      await connection.ask(undefined, CLOSE_BROWSER, {}, 5_000).catch(() => undefined);
+    }
     // Wait for a clean exit first; force the process after a grace period.
     const force = setTimeout(() => { try { browserProcess.kill(); } catch { /* already gone */ } }, 3_000);
     let gracePeriod: NodeJS.Timeout | undefined;

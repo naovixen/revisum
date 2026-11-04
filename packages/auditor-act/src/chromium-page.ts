@@ -3,7 +3,7 @@
 import type { Box } from '@revisum/contracts';
 import {
   ATTACH_TO_TARGET, BRING_TO_FRONT, CALL_FUNCTION_ON, CAPTURE_SCREENSHOT, CLOSE_TARGET, CONTINUE_REQUEST, CREATE_TARGET, DESCRIBE_NODE, DISPATCH_KEY_EVENT, ENABLE_ACCESSIBILITY, ENABLE_CSS, ENABLE_DOM, ENABLE_PAGE, ENABLE_REQUEST_HOLDING,
-  ENABLE_RUNTIME, EVALUATE, FAIL_REQUEST, GET_DOCUMENT, GET_FRAME_TREE, GET_MATCHED_STYLES, GET_VERSION, NAVIGATE, PUSH_NODES_BY_BACKEND_IDS, RELEASE_OBJECT, REQUEST_PAUSED, RESOLVE_NODE, SET_DEVICE_METRICS, SET_FOCUS_EMULATION,
+  ENABLE_RUNTIME, EVALUATE, FAIL_REQUEST, GET_DOCUMENT, GET_FRAME_TREE, GET_MATCHED_STYLES, GET_VERSION, LOAD_EVENT_FIRED, NAVIGATE, PUSH_NODES_BY_BACKEND_IDS, RELEASE_OBJECT, REQUEST_PAUSED, RESOLVE_NODE, SET_DEVICE_METRICS, SET_FOCUS_EMULATION,
   launchChromium, type CdpConnection, type CdpSessionClient, type LaunchedChromium,
 } from '@revisum/driver-cdp';
 import type { Browser, PageDriver, PageKey, PageSnapshot } from './accessibility-types.ts';
@@ -125,7 +125,7 @@ class ChromiumPage implements PageDriver {
   async goto(url: string, timeoutMilliseconds = 20_000): Promise<void> {
     const loaded = new Promise<void>((resolve, reject) => {
       const timer = setTimeout(() => { stopListening(); reject(new Error('load timeout ' + url)); }, timeoutMilliseconds);
-      const stopListening = this.#session.on('Page.loadEventFired', () => { clearTimeout(timer); stopListening(); resolve(); });
+      const stopListening = this.#session.listen(LOAD_EVENT_FIRED, () => { clearTimeout(timer); stopListening(); resolve(); }, (detail) => { this.#failures.push(`a page's load could not be read: ${detail}`); });
     });
     this.#allowedUrl = url;
     await this.#session.ask(BRING_TO_FRONT, {});
@@ -233,10 +233,10 @@ class ChromiumPage implements PageDriver {
     }
   }
 
-  async evaluate<Value>(expression: string): Promise<Value> {
+  async evaluate(expression: string): Promise<unknown> {
     const evaluated = await this.#session.ask(EVALUATE, { expression, returnByValue: true, awaitPromise: true });
     if (evaluated.exceptionDetails !== undefined) throw new Error('evaluate: ' + (evaluated.exceptionDetails.exception?.description ?? evaluated.exceptionDetails.text));
-    return evaluated.result.value as Value;
+    return evaluated.result.value;
   }
 
   async setViewport(width: number, height: number): Promise<void> {

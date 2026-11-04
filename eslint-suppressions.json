@@ -139,7 +139,7 @@
       "count": 2
     },
     "curly": {
-      "count": 6
+      "count": 5
     },
     "revisum/file-name-matches-export": {
       "count": 1
@@ -389,7 +389,7 @@
       "count": 2
     },
     "curly": {
-      "count": 46
+      "count": 45
     },
     "max-lines": {
       "count": 1
@@ -451,7 +451,7 @@
       "count": 1
     },
     "curly": {
-      "count": 9
+      "count": 8
     },
     "revisum/file-name-matches-export": {
       "count": 1
@@ -872,7 +872,7 @@
       "count": 3
     },
     "curly": {
-      "count": 10
+      "count": 8
     },
     "revisum/file-name-matches-export": {
       "count": 1

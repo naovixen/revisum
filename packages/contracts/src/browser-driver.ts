@@ -1,5 +1,6 @@
 // The browser driver ports: what the engine needs from one browser session, split into small
 // interfaces. Each driver package implements them; the engine never imports a driver.
+import type { Brand } from './brand.ts';
 import type { ClipboardPort, ClockPort } from './clock-and-clipboard.ts';
 import type { NetworkPort, StoragePort } from './network-and-storage.ts';
 import { ScriptMode, type ActionStep, type DownloadStep, type Locator, type ResolvedLocator } from './plan.ts';
@@ -120,8 +121,30 @@ export type ElementProbe = ElementsRead | UnreadablePageProbe;
 
 type UnreadablePageProbe = { readonly count: UnreadablePage };
 
-export type ElementsRead = {
-  readonly count: number;
+// A count of two or more. TypeScript has no type for "a number other than 1", so this brand is what
+// stops a read of one element from posing as a read of no single element, with its states left out.
+export type SeveralElements = Brand<number, 'SeveralElements'>;
+export const isSeveralElements = (count: number): count is SeveralElements => Number.isInteger(count) && count > 1;
+
+export type ElementsRead = OneElementRead | NoSingleElementRead;
+
+export type OneElementRead = ElementFields & {
+  readonly count: 1;
+  readonly states: AccessibleStates;
+  // The absolute URL of the link the element is, or is in, resolved against the page's URL; null
+  // when it is in no link.
+  readonly href: string | null;
+  // What the probe was asked to read of the element's DOM, for a DOM check or a remember from an
+  // attribute. Present when a read was asked for.
+  readonly dom?: DomValue;
+};
+
+type NoSingleElementRead = ElementFields & { readonly count: 0 | SeveralElements };
+
+// `count === 1` alone can't narrow a read: the compiler counts a branded number as possibly 1.
+export const isOneElementRead = (read: ElementsRead): read is OneElementRead => read.count === 1;
+
+type ElementFields = {
   readonly visible: boolean;
   readonly enabled: boolean;
   readonly text: string;
@@ -129,14 +152,6 @@ export type ElementsRead = {
   // True when the element, an ancestor or a descendant matches a sensitive (personal data) selector.
   readonly sensitive: boolean;
   readonly box: Box | null;
-  // Present when exactly one element matched.
-  readonly states?: AccessibleStates;
-  // The absolute URL of the link the element is, or is in, resolved against the page's URL; null
-  // when it is in no link. Present when exactly one element matched.
-  readonly href?: string | null;
-  // What the probe was asked to read of the element's DOM, for a DOM check or a remember from an
-  // attribute. Present when exactly one element matched and a read was asked for.
-  readonly dom?: DomValue;
   // True when the browser rejects a CSS selector or XPath expression of the locator: nothing it
   // could ever match, so a check fails with selector-invalid rather than waiting.
   readonly selectorInvalid?: true;
