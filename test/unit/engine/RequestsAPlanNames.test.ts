@@ -4,7 +4,7 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import { success } from "@revisum/engine";
-import { fakeNetwork, fakeSession, runOnFakeSession } from "./RunOnFakeSession.ts";
+import { fakeNetwork, fakeSessionOnOrders, runOnFakeSession } from "./RunOnFakeSession.ts";
 import {
     OBSERVED_REQUESTS,
     expectRequests,
@@ -38,7 +38,7 @@ const observedInARunOf = async (
     const beforeTheFirstStep: string[] = [];
     const overTheRun: string[] = [];
     let hasFirstStepBegun = false;
-    const session = fakeSession({
+    const session = fakeSessionOnOrders({
         navigate: () => {
             hasFirstStepBegun = true;
             return Promise.resolve(success(undefined));

@@ -9,7 +9,7 @@ import { environmentSecretStore, success, type RunResult, type Session } from "@
 import { DATABASE_PASSWORD } from "./database-command-examples.ts";
 import {
     fakeNetwork,
-    fakeSession,
+    fakeSessionOnOrders,
     likesExchange,
     runOnFakeSession,
     type FakeRunOptions,
@@ -42,14 +42,14 @@ const ROUTES: readonly {
             from: { response: "likes", field: "firstLiker", read: "text" },
         },
         holding: (value) => ({
-            session: fakeSession({ network: fakeNetwork([likesExchange(200, value)]) }),
+            session: fakeSessionOnOrders({ network: fakeNetwork([likesExchange(200, value)]) }),
         }),
     },
     {
         name: "the clipboard",
         step: { type: "remember", name: "copiedText", from: { clipboard: "text" } },
         holding: (value) => ({
-            session: fakeSession({
+            session: fakeSessionOnOrders({
                 clipboard: { readText: () => Promise.resolve(success(value)) },
             }),
         }),
@@ -63,7 +63,7 @@ const ROUTES: readonly {
             remember: { cartCount: "itemCount" },
         },
         holding: (value) => ({
-            session: fakeSession({
+            session: fakeSessionOnOrders({
                 runScript: () => Promise.resolve(success(JSON.stringify({ count: value }))),
             }),
         }),
@@ -98,7 +98,7 @@ const ROUTES: readonly {
                     sensitive: false,
                     box: null,
                 });
-            return { session: fakeSession({ probe }) };
+            return { session: fakeSessionOnOrders({ probe }) };
         },
     },
 ];

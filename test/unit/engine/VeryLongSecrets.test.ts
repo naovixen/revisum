@@ -17,7 +17,7 @@ import {
     type SecretName,
 } from "@revisum/engine";
 import { REPOSITORY_ROOT } from "../../support/repository.ts";
-import { fakeSession, runOnFakeSession } from "./RunOnFakeSession.ts";
+import { fakeSessionOnOrders, runOnFakeSession } from "./RunOnFakeSession.ts";
 import { resolvedSecret } from "./secret-examples.ts";
 import { DATABASE_SECRET, OPEN_CART, unsafePlan, type JsonRecord } from "./unsafe-feature-steps.ts";
 
@@ -78,7 +78,8 @@ const LONGEST_BACKSLASH_RUN_MILLISECONDS = 60_000;
 // In a process of its own, because a pattern that hangs holds its thread and no test's timeout could
 // end it. It prints what it was given back, so an answer proves the work was done.
 const BACKSLASH_RUN_SCRIPT = `
-  import { defaultRedactor, environmentSecretStore, withDeclaredSecretRedaction } from "@revisum/engine";
+  import { defaultRedactor, environmentSecretStore, withDeclaredSecretRedaction,
+} from "@revisum/engine";
   const run = "\\\\".repeat(${BACKSLASH_RUN_LENGTH});
   const value = "z" + run + "q";
   const redactor = withDeclaredSecretRedaction(defaultRedactor(), ["${DATABASE_SECRET}"], environmentSecretStore({ "${DATABASE_SECRET}": value }));
@@ -113,7 +114,7 @@ const showing = (text: string): ElementProbe => ({
 
 const runShowing = (value: string, shown: string) =>
     runOnFakeSession(unsafePlan([OPEN_CART, FILL_SECRET, FAILING_CHECK]), {
-        session: fakeSession({ probe: () => Promise.resolve(showing(shown)) }),
+        session: fakeSessionOnOrders({ probe: () => Promise.resolve(showing(shown)) }),
         secrets: environmentSecretStore({ [DATABASE_SECRET]: value }),
     });
 

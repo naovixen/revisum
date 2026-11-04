@@ -34,7 +34,7 @@ import { parseProject, planParser, run, sha256, success, type BrowserDriver, typ
 import { authorise, trustedProjectFrom } from '../../support/policy-clearance.ts';
 import { DEFAULT_ROUTE, fakeCommandRunner, type CommandRoute, type SeenCommand } from './database-command-examples.ts';
 import { DEFAULT_CLOCK_START, DEFAULT_SEED, ORIGIN, accepted, recordingDriver, type JsonRecord } from './run-value-examples.ts';
-import { SHOP_ROUTE, fakeServiceCaller, type Route } from './service-call-examples.ts';
+import { SHOP_ROUTE, routedServiceCaller, type Route } from './service-call-examples.ts';
 import { fakeDriver } from '#test-support/fakes/FakeDriver.ts';
 import { driversOf, fakePorts } from '#test-support/fakes/FakePorts.ts';
 import { fakeSecretStore } from '#test-support/fakes/FakeSecretStore.ts';
@@ -96,7 +96,7 @@ export async function engineFunction(name: string): Promise<(...inputs: readonly
   const loaded: unknown = await import('@revisum/engine');
   const exported: unknown = typeof loaded === 'object' && loaded !== null ? Object.getOwnPropertyDescriptor(loaded, name)?.value : undefined;
   if (typeof exported !== 'function') throw new Error(`@revisum/engine does not export a function named ${name}`);
-  return (...inputs) => Reflect.apply(exported, undefined, inputs);
+  return (...inputs): unknown => Reflect.apply(exported, undefined, inputs);
 }
 
 export const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
@@ -314,7 +314,7 @@ async function recordedPorts(ports: Readonly<Record<string, unknown>>): Promise<
   const make = wrapped['recording'];
   assert.ok(typeof make === 'function', 'recordingPorts gave no recording function');
   const kept = Object.fromEntries(['services', 'databaseCommands'].flatMap((name) => (wrapped[name] === undefined ? [] : [[name, wrapped[name]]])));
-  return { ports: kept, recording: (manifestHash) => JSON.parse(JSON.stringify(Reflect.apply(make, wrapped, [manifestHash]))) };
+  return { ports: kept, recording: (manifestHash): unknown => JSON.parse(JSON.stringify(Reflect.apply(make, wrapped, [manifestHash]))) };
 }
 
 // Runs the scenario. With `record`, its service and command ports are wrapped by recordingPorts, as
@@ -322,7 +322,7 @@ async function recordedPorts(ports: Readonly<Record<string, unknown>>): Promise<
 export async function runScenario(scenario: Scenario, options: { readonly record?: boolean } = {}): Promise<ScenarioRun> {
   const { project, plan, inputs } = await replayInputs(scenario);
   const { driver, calls } = scenarioDriver(scenario);
-  const { caller, requests } = fakeServiceCaller(scenario.serviceRoute);
+  const { caller, requests } = routedServiceCaller(scenario.serviceRoute);
   const { port, commands } = fakeCommandRunner(scenario.commandRoute);
   const live = { services: caller, databaseCommands: port };
   const recorder = options.record === true ? await recordedPorts(live) : null;
@@ -335,7 +335,7 @@ export async function runScenario(scenario: Scenario, options: { readonly record
   };
   // Built as values, not literals: until the code exists, pins and the wrapped ports are outside
   // the run's types, and an excess field is simply ignored.
-  const result: RunResult = await Reflect.apply(run, undefined, [runInputs, ports]);
+  const result = await (Reflect.apply(run, undefined, [runInputs, ports]) as Promise<RunResult>);
   const manifest: ManifestUnderTest | null = result.manifest;
   assert.ok(manifest !== null, `the run made no manifest: ${JSON.stringify(result)}`);
   return {
@@ -371,7 +371,7 @@ export async function replayRun(ran: ScenarioRun, options: ReplayOptions = {}): 
   const scenario = options.scenario ?? ran.scenario;
   const { inputs } = await replayInputs(scenario);
   const { driver, calls } = scenarioDriver(scenario);
-  const spyCaller = fakeServiceCaller(scenario.serviceRoute);
+  const spyCaller = routedServiceCaller(scenario.serviceRoute);
   const spyRunner = fakeCommandRunner(scenario.commandRoute);
   const fixtureFiles = new Map(scenario.fixtures.map((fixture) => [fixture.path, new TextEncoder().encode(fixture.text)]));
   const ports = {
@@ -382,7 +382,7 @@ export async function replayRun(ran: ScenarioRun, options: ReplayOptions = {}): 
   };
   const request = {
     // Only a missing option means the run's own manifest: a test may pass null on purpose.
-    manifest: 'manifest' in options ? options.manifest : JSON.parse(JSON.stringify(ran.manifest)),
+    manifest: 'manifest' in options ? options.manifest : (JSON.parse(JSON.stringify(ran.manifest)) as unknown),
     recording: options.recording === undefined ? ran.recording : options.recording,
     recordedResultHash: options.recordedResultHash ?? ran.result.resultHash,
     recordedState: ran.result.state,

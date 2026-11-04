@@ -5,12 +5,13 @@ import assert from 'node:assert/strict';
 import { arch, platform } from 'node:os';
 import { test } from 'node:test';
 import {
-  adapterRegistry, defaultRedactor, parseProject, planParser, run,
+  adapterRegistry, parseProject, planParser, run,
   type BrowserDriver, type Project, type Target,
 } from '@revisum/engine';
 import { buildAdapters } from '../../packages/cli/src/BuildAdapters.ts';
-import { memoryArtifactStore, memoryEventSink, memoryRunEventSink, systemClock } from '../support/memory-ports.ts';
+import { memoryArtifactStore, systemClock } from '../support/memory-ports.ts';
 import { authorise, trustedProjectFrom } from '../support/policy-clearance.ts';
+import { fakePorts } from '../support/fakes/FakePorts.ts';
 
 const ORIGIN = 'http://127.0.0.1:4173';
 // A one-check plan on one target, written as raw JSON the way a person writes it.
@@ -63,9 +64,7 @@ async function runOn(targetId: string, drivers: ReadonlyMap<string, BrowserDrive
   const result = await run({
     plan: authorise(parsed.value, await trustedProjectFrom(projectFile)), project, targetId: target(targetId).id,
     baseUrl: ORIGIN, seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() },
-  }, {
-    drivers, clock: systemClock, artifacts: store, redactor: defaultRedactor(), audit: memoryEventSink(), events: memoryRunEventSink(),
-  });
+  }, fakePorts({ drivers, clock: systemClock, artifacts: store }));
   return { result, store };
 }
 

@@ -26,7 +26,7 @@ import {
     callProject,
     callProjectFile,
     expectBackend,
-    fakeServiceCaller,
+    routedServiceCaller,
     jsonReply,
     requestLine,
     shopWith,
@@ -69,14 +69,14 @@ type RunUnderProject = {
 // that declaration.
 const runUnder = async (
     changes: JsonRecord,
-    route: Parameters<typeof fakeServiceCaller>[0],
+    route: Parameters<typeof routedServiceCaller>[0],
 ): Promise<RunUnderProject> => {
     const parsedUnder: Project = callProject();
     const plan = accepted(planParser(parsedUnder), CHECK_PLAN);
     const project = callProject(getOrderDeclaredAs(changes));
     const trusted = await trustedProjectFrom(callProjectFile(getOrderDeclaredAs(changes)));
     const { driver } = recordingDriver();
-    const { caller, requests } = fakeServiceCaller(route);
+    const { caller, requests } = routedServiceCaller(route);
     const clock = fakeClock();
     const result = await run(
         {

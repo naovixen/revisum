@@ -3,7 +3,7 @@
 // to close afterwards must not take the place of what its steps found.
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { fakeSession, runOnFakeSession, stepSummaries } from "./RunOnFakeSession.ts";
+import { fakeSessionOnOrders, runOnFakeSession, stepSummaries } from "./RunOnFakeSession.ts";
 import { CLOSING_CHECK, OPEN_CART, unsafePlan, type JsonRecord } from "./unsafe-feature-steps.ts";
 
 const ADAPTER_BROKE = "the adapter broke";
@@ -31,22 +31,22 @@ const newTabHolding = (step: JsonRecord): JsonRecord => ({
 const THROWING_STEPS: readonly {
     readonly name: string;
     readonly step: JsonRecord;
-    readonly session: () => ReturnType<typeof fakeSession>;
+    readonly session: () => ReturnType<typeof fakeSessionOnOrders>;
 }[] = [
     {
         name: "a capture whose screenshot",
         step: { type: "capture", name: "cart" },
-        session: () => fakeSession({ screenshot: breaks }),
+        session: () => fakeSessionOnOrders({ screenshot: breaks }),
     },
     {
         name: "an a11yAudit whose audit",
         step: { type: "a11yAudit", mode: "report" },
-        session: () => fakeSession({ audit: breaks }),
+        session: () => fakeSessionOnOrders({ audit: breaks }),
     },
     {
         name: "an expect whose probe",
         step: PASSING_CHECK,
-        session: () => fakeSession({ probe: breaks }),
+        session: () => fakeSessionOnOrders({ probe: breaks }),
     },
     {
         name: "an expectPage whose page read",
@@ -55,19 +55,19 @@ const THROWING_STEPS: readonly {
             assert: { kind: "title", value: "Orders" },
             criterionId: "cart.title-shown",
         },
-        session: () => fakeSession({ page: breaks }),
+        session: () => fakeSessionOnOrders({ page: breaks }),
     },
     {
         name: "a click whose action",
         step: { type: "click", locator: { by: "role", role: "button", name: "Pay" } },
-        session: () => fakeSession({ act: breaks }),
+        session: () => fakeSessionOnOrders({ act: breaks }),
     },
     {
         name: "a navigate whose load",
         step: { type: "navigate", url: "/orders" },
         session: () => {
             let loads = 0;
-            return fakeSession({
+            return fakeSessionOnOrders({
                 navigate: () => {
                     loads += 1;
                     return loads > 1 ? breaks() : Promise.resolve({ ok: true, value: undefined });
@@ -79,8 +79,8 @@ const THROWING_STEPS: readonly {
 
 // A session whose tabs fail to close.
 const sessionWithTabThatWillNotClose = () => {
-    const tab = fakeSession({ close: breaks });
-    return fakeSession({ newTab: () => Promise.resolve({ ok: true, value: tab }) });
+    const tab = fakeSessionOnOrders({ close: breaks });
+    return fakeSessionOnOrders({ newTab: () => Promise.resolve({ ok: true, value: tab }) });
 };
 
 describe("Using the run", () => {
@@ -124,7 +124,7 @@ describe("Using the run", () => {
                     steps: [{ type: "capture", name: "cart" }],
                 };
                 const { result } = await runOnFakeSession(unsafePlan([OPEN_CART, frame]), {
-                    session: fakeSession({ screenshot: breaks }),
+                    session: fakeSessionOnOrders({ screenshot: breaks }),
                 });
                 assert.deepEqual(
                     { state: result.state, steps: stepSummaries(result) },

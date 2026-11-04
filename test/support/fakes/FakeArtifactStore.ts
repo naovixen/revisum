@@ -3,6 +3,9 @@ import { memoryArtifactStore, type MemoryArtifactStore } from "../memory-ports.t
 import { recordCalls, type Recorded } from "./RecordCalls.ts";
 
 // An artefact store that keeps everything in memory, where a test can read it back.
-export const fakeArtifactStore = (
+export function fakeArtifactStore(
     overrides: Partial<ArtifactStore> = {},
-): Recorded<MemoryArtifactStore> => recordCalls({ ...memoryArtifactStore(), ...overrides });
+): Recorded<MemoryArtifactStore> {
+    const defaults: MemoryArtifactStore & Required<ArtifactStore> = memoryArtifactStore();
+    return recordCalls({ ...defaults, ...overrides });
+}

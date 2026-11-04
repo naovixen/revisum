@@ -13,7 +13,7 @@ import {
     type RunResult,
 } from "@revisum/engine";
 import { authorise, trustedProjectFrom } from "../../support/policy-clearance.ts";
-import { fakeSession } from "./RunOnFakeSession.ts";
+import { fakeSessionOnOrders } from "./RunOnFakeSession.ts";
 import {
     DEFAULT_CLOCK_START,
     DEFAULT_SEED,
@@ -42,7 +42,7 @@ const runWithRewrites = async (
     const plan = accepted(planParser(project), planOf([OPEN_ORDERS]));
     const trusted = await trustedProjectFrom(projectFileWith());
     let isPageOpened = false;
-    const session = fakeSession({
+    const session = fakeSessionOnOrders({
         navigate: () => {
             isPageOpened = true;
             return Promise.resolve(success(undefined));

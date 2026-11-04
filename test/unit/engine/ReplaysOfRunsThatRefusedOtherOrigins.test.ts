@@ -16,7 +16,7 @@ import {
 } from "@revisum/engine";
 import { authorise, trustedProjectFrom } from "../../support/policy-clearance.ts";
 import { evidenceHashOf } from "../../support/ExpectedEvidenceHash.ts";
-import { NO_ELEMENT, SHOWN_ELEMENT, fakeSession } from "./RunOnFakeSession.ts";
+import { NO_ELEMENT, SHOWN_ELEMENT, fakeSessionOnOrders } from "./RunOnFakeSession.ts";
 import {
     DEFAULT_CLOCK_START,
     DEFAULT_SEED,
@@ -52,7 +52,7 @@ const HIDDEN_ELEMENT: ElementProbe = {
 type PageState = { readonly probe: ElementProbe; readonly origins: readonly string[] };
 
 const sessionOn = ({ probe, origins }: PageState): Session =>
-    fakeSession({ probe: () => Promise.resolve(probe), blockedOrigins: () => origins });
+    fakeSessionOnOrders({ probe: () => Promise.resolve(probe), blockedOrigins: () => origins });
 
 const portsOn = (page: PageState) =>
     fakePorts({ drivers: driversOf(fakeDriverOpening(sessionOn(page))) });

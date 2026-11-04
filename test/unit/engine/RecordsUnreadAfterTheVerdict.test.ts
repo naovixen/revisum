@@ -5,7 +5,12 @@
 import assert from "node:assert/strict";
 import { describe, test, type TestContext } from "node:test";
 import type { RunEventSink, Session } from "@revisum/engine";
-import { fakeSession, runOnFakeSession, stepSummaries, fakeNetwork } from "./RunOnFakeSession.ts";
+import {
+    fakeSessionOnOrders,
+    runOnFakeSession,
+    stepSummaries,
+    fakeNetwork,
+} from "./RunOnFakeSession.ts";
 import { OPEN_CART, unsafePlan, type JsonRecord } from "./unsafe-feature-steps.ts";
 import { fakeRunEventSinkFailingOn } from "#test-support/fakes/FakeRunEventSink.ts";
 
@@ -79,7 +84,7 @@ describe("Using the run", () => {
                             const raw = unsafePlan(verdict.steps);
                             const sound = await runOnFakeSession(raw);
                             const broken = await runOnFakeSession(raw, {
-                                session: fakeSession(changes),
+                                session: fakeSessionOnOrders(changes),
                             });
                             assert.equal(broken.result.state, verdict.state);
                             assert.deepEqual(
@@ -95,14 +100,14 @@ describe("Using the run", () => {
                                 changes.close ?? (() => Promise.resolve()),
                             );
                             await runOnFakeSession(unsafePlan(verdict.steps), {
-                                session: fakeSession({ ...changes, close }),
+                                session: fakeSessionOnOrders({ ...changes, close }),
                             });
                             assert.equal(close.mock.callCount(), 1);
                         });
 
                         test("then it should keep the failure's text out of the result", async () => {
                             const { result } = await runOnFakeSession(unsafePlan(verdict.steps), {
-                                session: fakeSession(changes),
+                                session: fakeSessionOnOrders(changes),
                             });
                             assert.equal(JSON.stringify(result).includes(BROKEN), false);
                         });
@@ -111,7 +116,7 @@ describe("Using the run", () => {
                             test("then it should say so in the log", async () => {
                                 const { events } = await runOnFakeSession(
                                     unsafePlan(verdict.steps),
-                                    { session: fakeSession(changes) },
+                                    { session: fakeSessionOnOrders(changes) },
                                 );
                                 const logged = events
                                     .read()
@@ -131,12 +136,13 @@ describe("Using the run", () => {
                     describe("when the run ends", () => {
                         test("then it should give the verdict and the blocked origin", async () => {
                             const raw = unsafePlan(verdict.steps);
-                            const session = fakeSession({
-                                blockedOrigins: () => [BLOCKED_ORIGIN],
+                            const sessionOfOneRun = () =>
+                                fakeSessionOnOrders({ blockedOrigins: () => [BLOCKED_ORIGIN] });
+                            const sound = await runOnFakeSession(raw, {
+                                session: sessionOfOneRun(),
                             });
-                            const sound = await runOnFakeSession(raw, { session });
                             const { result } = await runOnFakeSession(raw, {
-                                session,
+                                session: sessionOfOneRun(),
                                 events: logFailingAfterTheVerdict(),
                             });
                             assert.equal(result.state, verdict.state);
@@ -147,7 +153,7 @@ describe("Using the run", () => {
                         test("then it should close the session once", async (context) => {
                             const close = spiedClose(context, () => Promise.resolve());
                             await runOnFakeSession(unsafePlan(verdict.steps), {
-                                session: fakeSession({
+                                session: fakeSessionOnOrders({
                                     blockedOrigins: () => [BLOCKED_ORIGIN],
                                     close,
                                 }),

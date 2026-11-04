@@ -16,7 +16,7 @@ import {
     type Session,
 } from "@revisum/engine";
 import { authorise, trustedProjectFrom } from "../../support/policy-clearance.ts";
-import { NO_ELEMENT, SHOWN_ELEMENT, fakeSession } from "./RunOnFakeSession.ts";
+import { NO_ELEMENT, SHOWN_ELEMENT, fakeSessionOnOrders } from "./RunOnFakeSession.ts";
 import {
     DEFAULT_CLOCK_START,
     DEFAULT_SEED,
@@ -36,7 +36,7 @@ const OTHER_MACHINE = { platform: "linux", arch: "x64" };
 const PLAN = planOf([OPEN_ORDERS]);
 
 const showing = (probe: ElementProbe): Session =>
-    fakeSession({ probe: () => Promise.resolve(probe) });
+    fakeSessionOnOrders({ probe: () => Promise.resolve(probe) });
 
 const portsOf = (session: Session) => fakePorts({ drivers: driversOf(fakeDriverOpening(session)) });
 

@@ -4,27 +4,33 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import { sha256, success } from "@revisum/engine";
-import { fakeNetwork, fakeSession, recordsNamed, runOnFakeSession } from "./RunOnFakeSession.ts";
+import {
+    fakeNetwork,
+    fakeSessionOnOrders,
+    recordsNamed,
+    runOnFakeSession,
+} from "./RunOnFakeSession.ts";
 import { OPEN_CART, READ_CART, unsafePlan, type JsonRecord } from "./unsafe-feature-steps.ts";
 
 const STATUS: JsonRecord = { by: "testId", testId: "status" };
 const FINDING = { ruleId: "image-alt", impact: "serious", elementCount: 2 } as const;
 const FILE_BYTES = new TextEncoder().encode("Report");
 
-const SESSION = fakeSession({
-    audit: () => Promise.resolve([FINDING]),
-    download: () =>
-        Promise.resolve(
-            success({
-                fileName: "report.csv",
-                mediaType: "text/csv",
-                bytes: FILE_BYTES,
-                sha256: sha256(FILE_BYTES),
-            }),
-        ),
-    runScript: () => Promise.resolve(success(JSON.stringify({ count: 3 }))),
-    network: fakeNetwork(),
-});
+const sessionOfOneRun = () =>
+    fakeSessionOnOrders({
+        audit: () => Promise.resolve([FINDING]),
+        download: () =>
+            Promise.resolve(
+                success({
+                    fileName: "report.csv",
+                    mediaType: "text/csv",
+                    bytes: FILE_BYTES,
+                    sha256: sha256(FILE_BYTES),
+                }),
+            ),
+        runScript: () => Promise.resolve(success(JSON.stringify({ count: 3 }))),
+        network: fakeNetwork(),
+    });
 
 const CONTAINERS: readonly {
     readonly name: string;
@@ -119,7 +125,7 @@ describe("Using the run", () => {
                         const { result } = await runOnFakeSession(
                             unsafePlan([OPEN_CART, around([step])]),
                             {
-                                session: SESSION,
+                                session: sessionOfOneRun(),
                             },
                         );
                         assert.equal(result.state, "Passed", JSON.stringify(result.steps));
@@ -143,7 +149,7 @@ describe("Using the run", () => {
                     const { result } = await runOnFakeSession(
                         unsafePlan([OPEN_CART, around(captures)]),
                         {
-                            session: SESSION,
+                            session: sessionOfOneRun(),
                         },
                     );
                     assert.equal(
@@ -161,7 +167,7 @@ describe("Using the run", () => {
                     test("then it should carry the stub's label", async () => {
                         const { result } = await runOnFakeSession(
                             unsafePlan([OPEN_CART, START_STUB, around([expectText("Ready")])]),
-                            { session: SESSION },
+                            { session: sessionOfOneRun() },
                         );
                         assert.equal(result.state, "Passed", JSON.stringify(result.steps));
                         assert.deepEqual(
@@ -176,7 +182,7 @@ describe("Using the run", () => {
                     test("then it should carry the stub's label", async () => {
                         const { result } = await runOnFakeSession(
                             unsafePlan([OPEN_CART, START_STUB, around([expectText("Not shown")])]),
-                            { session: SESSION },
+                            { session: sessionOfOneRun() },
                         );
                         assert.equal(result.state, "Failed", JSON.stringify(result.steps));
                         assert.deepEqual(
@@ -194,7 +200,7 @@ describe("Using the run", () => {
                         const { result } = await runOnFakeSession(
                             unsafePlan([OPEN_CART, around([expectText("Ready")])]),
                             {
-                                session: SESSION,
+                                session: sessionOfOneRun(),
                             },
                         );
                         assert.equal(result.state, "Passed", JSON.stringify(result.steps));
@@ -215,7 +221,7 @@ describe("Using the run", () => {
                         const { result } = await runOnFakeSession(
                             unsafePlan([OPEN_CART, START_STUB, around([click])]),
                             {
-                                session: SESSION,
+                                session: sessionOfOneRun(),
                             },
                         );
                         assert.equal(result.state, "Passed", JSON.stringify(result.steps));
@@ -235,7 +241,7 @@ describe("Using the run", () => {
                         { type: "capture", name: "top" },
                         { type: "a11yAudit", mode: "report" },
                     ]),
-                    { session: SESSION },
+                    { session: sessionOfOneRun() },
                 );
                 assert.ok(result.steps[1]?.artifact !== undefined, JSON.stringify(result.steps));
                 assert.deepEqual(result.steps[2]?.findings, [FINDING]);
@@ -250,7 +256,7 @@ describe("Using the run", () => {
                     const { result } = await runOnFakeSession(
                         unsafePlan([OPEN_CART, START_STUB, expectText("Ready")]),
                         {
-                            session: SESSION,
+                            session: sessionOfOneRun(),
                         },
                     );
                     assert.deepEqual(result.steps[2]?.activeStubs, ["loginNeedsCode"]);

@@ -503,8 +503,8 @@ export type GoldenRequest = { readonly method: string; readonly path: string; re
 export function goldenRequest(wire: WireFormat): GoldenRequest {
   const parsed: unknown = JSON.parse(readFileSync(join(GOLDEN, 'planner-requests', `${wire}.json`), 'utf8'));
   assert.ok(typeof parsed === 'object' && parsed !== null);
-  const method = Reflect.get(parsed, 'method');
-  const path = Reflect.get(parsed, 'path');
+  const method: unknown = Reflect.get(parsed, 'method');
+  const path: unknown = Reflect.get(parsed, 'path');
   const headers: unknown = Reflect.get(parsed, 'headers');
   const body: unknown = Reflect.get(parsed, 'body');
   assert.ok(typeof method === 'string' && typeof path === 'string');

@@ -5,7 +5,6 @@
 import assert from "node:assert/strict";
 import { arch, platform } from "node:os";
 import {
-    defaultRedactor,
     parseProject,
     planParser,
     run,
@@ -36,6 +35,7 @@ import { authorise, trustedProjectFrom } from "../policy-clearance.ts";
 import { BrowserTarget } from "./BrowserTarget.ts";
 import { navigate, testId, visible, type JsonRecord } from "./RawPlan.ts";
 import { runningAtClose } from "./WrappingSessions.ts";
+import { fakePorts } from "../fakes/FakePorts.ts";
 
 export type BrowserHarnessDefinition = {
     readonly fixtureFolder: string;
@@ -248,15 +248,14 @@ async function runPlan(
             ...(scriptSources === undefined ? {} : { scriptSources }),
             ...(options.standing === undefined ? {} : { standing: options.standing }),
         },
-        {
+        fakePorts({
             drivers: driversForRun(context, options, startedAt, pages),
             clock: systemClock,
             artifacts: store,
-            redactor: defaultRedactor(),
             audit,
             events,
             ...(options.secrets === undefined ? {} : { secrets: options.secrets }),
-        },
+        }),
     );
     return {
         result,

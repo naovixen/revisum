@@ -11,7 +11,7 @@ import {
     type Session,
 } from "@revisum/engine";
 import { BrowserTarget, englishMatrix } from "#test-support/browser/BrowserTarget.ts";
-import { fakeSession, runOnFakeSession } from "./RunOnFakeSession.ts";
+import { fakeSessionOnOrders, runOnFakeSession } from "./RunOnFakeSession.ts";
 import {
     OPEN_CART,
     unsafePlan,
@@ -39,7 +39,7 @@ const elementNamed = (name: string) => ({
 // A session whose act asks the guard about the element, as a driver must, then reports `reported`
 // whatever the guard said.
 const sessionReporting = (reported: DriverError | null, elementName: string): Session =>
-    fakeSession({
+    fakeSessionOnOrders({
         act: (step, guard?: ActionGuard) => {
             assert.equal(step.type, "click");
             const verdict = guard?.(elementNamed(elementName), null);

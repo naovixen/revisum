@@ -3,7 +3,7 @@
 // second tab. A check that fails stays a product failure in all three.
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { fakeSession, runOnFakeSession } from "./RunOnFakeSession.ts";
+import { fakeSessionOnOrders, runOnFakeSession } from "./RunOnFakeSession.ts";
 import { OPEN_CART, READ_CART, unsafePlan, type JsonRecord } from "./unsafe-feature-steps.ts";
 
 const STATUS: JsonRecord = { by: "testId", testId: "status" };
@@ -60,7 +60,7 @@ describe("Using the run", () => {
                             const { result } = await runOnFakeSession(
                                 unsafePlan([OPEN_CART, placed(READ_CART)]),
                                 {
-                                    session: fakeSession({
+                                    session: fakeSessionOnOrders({
                                         runScript: () => Promise.resolve(answer()),
                                     }),
                                 },

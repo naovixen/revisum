@@ -25,7 +25,7 @@ import {
     fakeCommandRunner,
     type CommandRoute,
 } from "./database-command-examples.ts";
-import { fakeServiceCaller, type Route } from "./service-call-examples.ts";
+import { routedServiceCaller, type Route } from "./service-call-examples.ts";
 import { DEFAULT_CLOCK_START, DEFAULT_SEED, ORIGIN } from "./run-value-examples.ts";
 import { parsedProject, sourceBytes } from "./unsafe-feature-examples.ts";
 import { DATABASE_SECRET, unsafeProjectFile, type JsonRecord } from "./unsafe-feature-steps.ts";
@@ -36,7 +36,7 @@ import { fakeNetworkPort } from "#test-support/fakes/FakeNetworkPort.ts";
 import { driversOf, fakePorts } from "#test-support/fakes/FakePorts.ts";
 import { fakeRunEventSink } from "#test-support/fakes/FakeRunEventSink.ts";
 import { fakeSecretStore } from "#test-support/fakes/FakeSecretStore.ts";
-import { fakeSession as completeFakeSession } from "#test-support/fakes/FakeSession.ts";
+import { fakeSession } from "#test-support/fakes/FakeSession.ts";
 
 export const SHOWN_ELEMENT: ElementProbe = {
     count: 1,
@@ -50,8 +50,8 @@ export const SHOWN_ELEMENT: ElementProbe = {
 export const NO_ELEMENT: ElementProbe = { ...SHOWN_ELEMENT, count: 0, text: "", value: null };
 
 // A session whose frames and tabs are the session itself, unless `changes` says otherwise.
-export const fakeSession = (changes: Partial<Session> = {}): Session =>
-    completeFakeSession({
+export const fakeSessionOnOrders = (changes: Partial<Session> = {}): Session =>
+    fakeSession({
         page: () => Promise.resolve({ url: `${ORIGIN}/orders`, title: "Orders" }),
         probe: () => Promise.resolve(SHOWN_ELEMENT),
         ...changes,
@@ -101,7 +101,7 @@ export async function runOnFakeSession(
     const trusted = await trustedProjectFrom(projectFile);
     const target = project.matrix[0];
     assert.ok(target !== undefined, "the test project has a target");
-    const session = options.session ?? fakeSession();
+    const session = options.session ?? fakeSessionOnOrders();
     const driver = fakeDriver({
         open: options.open ?? (() => Promise.resolve(success(session))),
     });
@@ -125,7 +125,7 @@ export async function runOnFakeSession(
             audit,
             events,
             secrets: options.secrets ?? fakeSecretStore({ [DATABASE_SECRET]: DATABASE_PASSWORD }),
-            services: fakeServiceCaller(options.serviceRoute).caller,
+            services: routedServiceCaller(options.serviceRoute).caller,
             databaseCommands: fakeCommandRunner(options.commandRoute).port,
         }),
     );

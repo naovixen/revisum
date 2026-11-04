@@ -8,16 +8,11 @@ import { join } from "node:path";
 import { setTimeout as pause } from "node:timers/promises";
 import type { RunnerHandle } from "@revisum/contracts";
 import { cdpDriver, egressThroughExistingProxy, launchChromium } from "@revisum/driver-cdp";
-import { defaultRedactor, parseProject, planParser, run } from "@revisum/engine";
+import { parseProject, planParser, run } from "@revisum/engine";
 import { navigate, rawPlan, testId, textEquals } from "../support/browser/RawPlan.ts";
 import { BROWSERS } from "../support/browsers.ts";
 import { startFixtureServer, type FixtureServer } from "../support/fixture-server.ts";
-import {
-    memoryArtifactStore,
-    memoryEventSink,
-    memoryRunEventSink,
-    systemClock,
-} from "../support/memory-ports.ts";
+import { systemClock } from "../support/memory-ports.ts";
 import { authorise, trustedProjectFrom } from "../support/policy-clearance.ts";
 import { FIXTURES } from "../support/repository.ts";
 import {
@@ -27,6 +22,7 @@ import {
     attemptPage,
     type ChannelAddress,
 } from "../proofs/EgressChannels.ts";
+import { fakePorts } from "../support/fakes/FakePorts.ts";
 
 const THIS_FILE_IN_THE_WORKSPACE = "test/containers/AttemptWebRtcInside.ts";
 const PAGE_PATH = "/attempt.html";
@@ -138,7 +134,7 @@ async function openInRun(fixture: FixtureServer): Promise<string> {
             plan: authorise(parsedPlan.value, await trustedProjectFrom(projectFile)),
             targetId: target.id,
         },
-        {
+        fakePorts({
             // The page is on the container's own loopback, which the proxy, in another container,
             // cannot reach; everything else goes through the proxy.
             drivers: new Map([
@@ -151,11 +147,7 @@ async function openInRun(fixture: FixtureServer): Promise<string> {
                 ],
             ]),
             clock: systemClock,
-            artifacts: memoryArtifactStore(),
-            redactor: defaultRedactor(),
-            audit: memoryEventSink(),
-            events: memoryRunEventSink(),
-        },
+        }),
     );
     return result.state;
 }

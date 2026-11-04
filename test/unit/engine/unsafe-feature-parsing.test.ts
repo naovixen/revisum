@@ -10,7 +10,7 @@ import { test } from 'node:test';
 import { runUntrusted } from '@revisum/engine';
 import { PRIVATE_MARKER, defaultParser } from './plan-examples.ts';
 import { spyDriver } from './secret-examples.ts';
-import { fakeServiceCaller } from './service-call-examples.ts';
+import { routedServiceCaller } from './service-call-examples.ts';
 import {
   acceptedBy, allBut, disabledPaths, errorsOf, parsedProject, parserEnabling, rejection,
 } from './unsafe-feature-examples.ts';
@@ -97,7 +97,7 @@ test('a plan refused for a disabled feature opens no browser, makes no call and 
   const project = parsedProject(unsafeProjectFile(NOTHING_ENABLED));
   const parse = parserEnabling(NOTHING_ENABLED);
   const spy = spyDriver();
-  const { caller, requests } = fakeServiceCaller();
+  const { caller, requests } = routedServiceCaller();
   const ports = fakePorts({ drivers: new Map([['cdp', spy]]), services: caller });
   const base = { project, baseUrl: ORIGIN, seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() } };
   const plans: readonly JsonRecord[] = [...FEATURE_EXAMPLES.map((example) => unsafePlan(example.steps)), ALL_FEATURES_PLAN()];

@@ -48,7 +48,7 @@ describe('(a) replay: same manifest, same result hash', () => {
   test('the manifest pins plan, target, adapter, browser, executable hash, seeds, clock, fixtures, host and engine version', async () => {
     const { result } = await testHarness.run(testHarness.plan(stepsPlan(['cdp-chromium'], [])), 'cdp-chromium');
     const manifest = result.manifest;
-    assert.ok(manifest);
+    assert.ok(manifest !== null);
     assert.deepEqual(Object.keys(manifest).sort(), [
       'adapter', 'browser', 'clock', 'engineVersion', 'executableSha256', 'fixtures', 'host', 'nonHermeticInputs', 'planHash', 'schema', 'seeds', 'target',
     ]);
@@ -79,7 +79,7 @@ describe('(b) AI containment: hostile plans are rejected before any side effect'
   test('positive control: a valid plan does reach the (spy) driver', async () => {
     const spy = spyDriver('cdp');
     const outcome = await runUntrusted(signupPlan(['cdp-chromium']), testHarness.parse, testHarness.runInputs(), spyPorts(new Map([['cdp', spy]])));
-    assert.ok(Array.isArray(outcome));
+    assert.ok(!('state' in outcome), JSON.stringify(outcome));
     assert.equal(outcome[0]?.state, 'TargetUnavailable');
     assert.equal(spy.calls.count(), 2);
   });
@@ -139,9 +139,9 @@ describe('(d) redaction by default', () => {
   for (const targetId of CONTRACT_TARGETS) {
     test(`${targetId}: PII fields are solid black in screenshots, and visible without the mask`, onTarget(targetId), async () => {
       const target = testHarness.project.matrix.find((candidate) => candidate.id === targetId);
-      assert.ok(target);
+      assert.ok(target !== undefined);
       const driver = makeDrivers().get(target.adapter);
-      assert.ok(driver);
+      assert.ok(driver !== undefined);
       const redactor = defaultRedactor();
       const opened = await driver.open(target, {
         baseUrl: testHarness.server.origin, allowedOrigins: testHarness.project.origins, seed: SEED,
@@ -163,7 +163,7 @@ describe('(d) redaction by default', () => {
         const masked = await session.screenshot(redactor.selectors);
         const unmasked = await session.screenshot([]);
         for (const box of boxes) {
-          assert.ok(box);
+          assert.ok(box !== null);
           assert.equal(blackFraction(masked, box), 1, 'masked region is fully black');
           assert.ok(blackFraction(unmasked, box) < 0.5, 'control: region is not black without the mask');
         }

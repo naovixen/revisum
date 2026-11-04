@@ -10,7 +10,7 @@ import { jsonAnswer } from '../unit/runner/local-service.ts';
 import { replyWithContent } from '../unit/cli/draft-command-examples.ts';
 import {
   ACTING_CALLS, EVIL_HOST, NOTICE_LINES, PLANNER_DRAFT,
-  containerPageMap, exploreArguments, exploreData, exploreErrorCodes, fakeRunner, plannerRequestTexts, withExploreRun, writtenMap,
+  containerPageMap, exploreArguments, exploreData, exploreErrorCodes, watchedFakeRunner, plannerRequestTexts, withExploreRun, writtenMap,
   type ExploreRun, type ExploreSetup,
 } from '../unit/cli/explore-command-examples.ts';
 
@@ -86,7 +86,7 @@ test('counter-example: the recorded draft without the obeyed lines is admitted w
 test('in the isolated runner, the obeying draft adds no runner call: one start and one exec, both the crawl\'s', async () => {
   await withExploreRun(hostile(GOES_ELSEWHERE.text, {
     argv: (site) => exploreArguments(`${site.origin}/`, ['--json']),
-    runner: (site) => fakeRunner({ level: 'isolated', output: containerPageMap(site.origin).printed }),
+    runner: (site) => watchedFakeRunner({ level: 'isolated', output: containerPageMap(site.origin).printed }),
   }), (run) => {
     assert.ok(errorLines(run).includes(GOES_ELSEWHERE.line), JSON.stringify(exploreData(run)['errors']));
     assert.equal(run.runner?.started.length, 1);

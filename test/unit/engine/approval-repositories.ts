@@ -34,6 +34,7 @@ import {
   type ApprovalVerifier, type DerivedActor, type EventInput, type EventSink, type Plan, type Result,
   type TrustedProject, type VersionControlPort, type VersionControlReview,
 } from '@revisum/engine';
+import { fakeVersionControlPort } from '../../support/fakes/FakeVersionControlPort.ts';
 import { memoryEventSink, type MemoryEventSink, type RecordedEvent } from '../../support/memory-ports.ts';
 import { FIXTURES } from '../../support/repository.ts';
 import { defaultParser, signupPlan, type JsonRecord } from './plan-examples.ts';
@@ -97,7 +98,7 @@ const fileBytes = (content: unknown): Uint8Array =>
   Buffer.from(typeof content === 'string' ? content : canonicalJson(content), 'utf8');
 
 export function readFixture(name: RepositoryName): FixtureRepository {
-  const fixture: FixtureRepository = JSON.parse(readFileSync(join(FIXTURES, 'approval-repositories', `${name}.json`), 'utf8'));
+  const fixture = JSON.parse(readFileSync(join(FIXTURES, 'approval-repositories', `${name}.json`), 'utf8')) as FixtureRepository;
   fixture.protectedFiles[PLAN_PATH] ??= parsedSignupPlan();
   fixture.protectedFiles[HOLDOUTS_PATH] ??= { changeClasses: [{ changeClassId: 'checkout', planHashes: [HOLDOUT_PLAN_HASH] }] };
   return fixture;
@@ -167,7 +168,7 @@ export function openRepository(name: RepositoryName, edit: (fixture: FixtureRepo
   const versionControl = (unavailable: readonly PortMethod[] = []): VersionControlPort => {
     const down = new Set<PortMethod>(unavailable);
     const pullRequestNumbered = (number: number): PullRequest | undefined => fixture.pullRequests[String(number)];
-    const port: Omit<VersionControlPort, 'fileAtCommit'> = {
+    return fakeVersionControlPort({
       protectedBranch: fixture.protectedBranch,
       async protectedFile(path) {
         calls.push(`protectedFile ${path}`);
@@ -205,12 +206,9 @@ export function openRepository(name: RepositoryName, edit: (fixture: FixtureRepo
         const landing = fixture.landings.find((candidate) => candidate.commit === commit && candidate.branch === branch);
         return success(landing === undefined ? null : { login: landing.login, type: landing.type, at: landing.at });
       },
-    };
-    // Added beside the literal, not inside it, so this file compiles whether or not the port
-    // declares the method yet. A commit's file is its own version where the fixture gives one, and
-    // otherwise the protected branch's.
-    return Object.assign(port, {
-      async fileAtCommit(path: string, commit: string): Promise<Result<{ readonly bytes: Uint8Array }, 'not-found' | 'unavailable'>> {
+      // A commit's file is its own version where the fixture gives one, and otherwise the protected
+      // branch's.
+      async fileAtCommit(path, commit) {
         calls.push(`fileAtCommit ${path} ${commit}`);
         if (down.has('fileAtCommit')) return failure('unavailable');
         const file = repositoryFile(path);

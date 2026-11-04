@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { arch, platform } from "node:os";
 import { join } from "node:path";
 import type { RunnerHandle } from "@revisum/contracts";
-import { defaultRedactor, parseProject, planParser, run, type RunResult } from "@revisum/engine";
+import { parseProject, planParser, run, type RunResult } from "@revisum/engine";
 import { navigate, rawPlan, testId, textEquals } from "../support/browser/RawPlan.ts";
 import { BROWSERS } from "../support/browsers.ts";
 import {
@@ -15,15 +15,11 @@ import {
     type FixtureRoute,
     type FixtureServer,
 } from "../support/fixture-server.ts";
-import {
-    memoryArtifactStore,
-    memoryEventSink,
-    memoryRunEventSink,
-    systemClock,
-} from "../support/memory-ports.ts";
+import { systemClock } from "../support/memory-ports.ts";
 import { authorise, trustedProjectFrom } from "../support/policy-clearance.ts";
 import { FIXTURES } from "../support/repository.ts";
 import { buildAdapters } from "../../packages/cli/src/BuildAdapters.ts";
+import { fakePorts } from "../support/fakes/FakePorts.ts";
 
 const THIS_FILE_IN_THE_WORKSPACE = "test/containers/RunBrowserPastRefusalsInside.ts";
 const PAGE_PATH = "/refusals.html";
@@ -129,7 +125,7 @@ async function runPlanAgainst(fixture: FixtureServer, proxyServer: string): Prom
             plan: authorise(parsedPlan.value, await trustedProjectFrom(projectFile)),
             targetId: target.id,
         },
-        {
+        fakePorts({
             drivers: new Map([
                 [
                     "cdp",
@@ -140,11 +136,7 @@ async function runPlanAgainst(fixture: FixtureServer, proxyServer: string): Prom
                 ],
             ]),
             clock: systemClock,
-            artifacts: memoryArtifactStore(),
-            redactor: defaultRedactor(),
-            audit: memoryEventSink(),
-            events: memoryRunEventSink(),
-        },
+        }),
     );
 }
 

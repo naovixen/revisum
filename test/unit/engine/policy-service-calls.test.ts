@@ -8,7 +8,7 @@ import { arch, platform } from 'node:os';
 import { test } from 'node:test';
 import { runUntrusted } from '@revisum/engine';
 import { OPEN_ACCOUNT_PAGE, ORIGIN, PRODUCTION_ORIGIN, approvedStanding, comparable, decideOn, deniedCodes, parsedPlan, parserProject, policyProjectInput, testGate, type JsonRecord , POLICY , planOf } from './policy-examples.ts';
-import { fakeServiceCaller } from './service-call-examples.ts';
+import { routedServiceCaller } from './service-call-examples.ts';
 import { spyDriver } from './secret-examples.ts';
 import { fakePorts } from '#test-support/fakes/FakePorts.ts';
 
@@ -153,7 +153,7 @@ test('a backend check counts once toward maximumCalls, as a call step does', asy
 test('a plan the gate denies for any of these rules makes zero calls and opens no browser', async () => {
   const input = projectInput({ maximumCalls: 2 });
   const project = parserProject(input);
-  const { caller, requests } = fakeServiceCaller();
+  const { caller, requests } = routedServiceCaller();
   const spy = spyDriver();
   const ports = fakePorts({ drivers: new Map([['cdp', spy]]), services: caller });
   const base = { project, baseUrl: ORIGIN, seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() } };

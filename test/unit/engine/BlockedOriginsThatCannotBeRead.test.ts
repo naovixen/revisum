@@ -10,7 +10,12 @@ import {
     type SessionEgress,
 } from "@revisum/driver-cdp";
 import { failure, success, type RunEventSink, type Session } from "@revisum/engine";
-import { fakeSession, runOnFakeSession, stepSummaries, fakeNetwork } from "./RunOnFakeSession.ts";
+import {
+    fakeSessionOnOrders,
+    runOnFakeSession,
+    stepSummaries,
+    fakeNetwork,
+} from "./RunOnFakeSession.ts";
 import { OPEN_CART, unsafePlan, type JsonRecord } from "./unsafe-feature-steps.ts";
 import { fakeRunEventSinkFailingOn } from "#test-support/fakes/FakeRunEventSink.ts";
 
@@ -57,7 +62,7 @@ const fakeEgress = (
 
 // A session that treats its egress as the driver does: closes it, and only then reads its refusals.
 const sessionOver = (egress: SessionEgress, changes: Partial<Session> = {}): Session =>
-    fakeSession({
+    fakeSessionOnOrders({
         blockedOrigins: () => mergeRefusedOrigins([], egress.refusedOrigins()),
         close: () => egress.close(),
         ...changes,

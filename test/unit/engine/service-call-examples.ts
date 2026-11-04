@@ -4,7 +4,7 @@
 //   - callProjectFile() is the shared test project (plan-examples.ts) with one declared service,
 //     the secrets its calls use and the call declarations below;
 //   - call(), expectBackend() and withCleanup() build the plan parts that name a declaration;
-//   - fakeServiceCaller() stands in for runner's ServiceCaller. It records every request it is
+//   - routedServiceCaller() stands in for runner's ServiceCaller. It records every request it is
 //     handed and answers from a route the test gives, so no request leaves the process;
 //   - runWithCalls() parses a plan, clears it through the policy gate and runs it with the fake
 //     caller as the run's `services` port, on a driver that needs no browser, under a virtual
@@ -28,7 +28,7 @@ import { fakeClock, type FakeClock } from '#test-support/fakes/FakeClock.ts';
 import { driversOf, fakePorts } from '#test-support/fakes/FakePorts.ts';
 import { fakeRunEventSink } from '#test-support/fakes/FakeRunEventSink.ts';
 import { fakeSecretStore } from '#test-support/fakes/FakeSecretStore.ts';
-import { fakeServiceCaller as fakeServiceCallerPort } from '#test-support/fakes/FakeServiceCaller.ts';
+import { fakeServiceCaller } from '#test-support/fakes/FakeServiceCaller.ts';
 import { leaveOut } from '#test-support/fakes/LeaveOut.ts';
 
 export { CURRENT_VERSION, ORIGIN, TARGET_ID, type JsonRecord };
@@ -236,11 +236,11 @@ export const SHOP_ROUTE: Route = (request) => {
 export const shopWith = (override: (request: ServiceRequest, earlier: readonly ServiceRequest[]) => Reply | undefined): Route =>
   (request, earlier) => override(request, earlier) ?? SHOP_ROUTE(request, earlier);
 
-export type FakeServiceCaller = { readonly caller: ServiceCaller; readonly requests: ServiceRequest[] };
+export type RoutedServiceCaller = { readonly caller: ServiceCaller; readonly requests: ServiceRequest[] };
 
-export function fakeServiceCaller(route: Route = SHOP_ROUTE): FakeServiceCaller {
+export function routedServiceCaller(route: Route = SHOP_ROUTE): RoutedServiceCaller {
   const requests: ServiceRequest[] = [];
-  const caller = fakeServiceCallerPort({ call(request) {
+  const caller = fakeServiceCaller({ call(request) {
       const earlier = [...requests];
       requests.push(request);
       return Promise.resolve(route(request, earlier)); }, });
@@ -287,7 +287,7 @@ export async function runWithCalls(raw: unknown, options: CallRunOptions = {}): 
   const plan = accepted(planParser(project), raw);
   const trusted = await trustedProjectFrom(projectFile);
   const { driver, recording } = recordingDriver();
-  const { caller, requests } = fakeServiceCaller(options.route);
+  const { caller, requests } = routedServiceCaller(options.route);
   const clock = virtualClock();
   const events = fakeRunEventSink();
   const result = await run({

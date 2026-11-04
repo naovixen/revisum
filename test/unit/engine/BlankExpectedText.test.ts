@@ -10,7 +10,7 @@ import {
     NO_ELEMENT,
     SHOWN_ELEMENT,
     fakeNetwork,
-    fakeSession,
+    fakeSessionOnOrders,
     likesExchange,
     runOnFakeSession,
 } from "./RunOnFakeSession.ts";
@@ -121,7 +121,7 @@ const probeOf = (locator: Locator): Promise<ElementProbe> =>
     Promise.resolve(locator.by === "text" ? NO_ELEMENT : SHOWN_ELEMENT);
 
 const readyWorld = (scriptField: string) =>
-    fakeSession({
+    fakeSessionOnOrders({
         probe: probeOf,
         download: () =>
             Promise.resolve(

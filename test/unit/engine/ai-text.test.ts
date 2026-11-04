@@ -4,7 +4,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { parseAiText, planParser, writeReleaseNotes, type AiWriter } from '@revisum/engine';
-import { memoryArtifactStore } from '../../support/memory-ports.ts';
+import { fakeAiWriter } from '../../support/fakes/FakeAiWriter.ts';
+import { fakeArtifactStore } from '../../support/fakes/FakeArtifactStore.ts';
 import { PRIVATE_MARKER, signupPlan, testProject } from './plan-examples.ts';
 
 const LIMIT = 200;
@@ -77,12 +78,12 @@ test('a rejected suggestion is never stored: only the deterministic draft is', a
   const parsed = planParser(testProject())(signupPlan());
   assert.ok(parsed.ok, JSON.stringify(parsed));
   const writers: readonly (readonly [string, AiWriter])[] = [
-    ['non-text', { suggest: async () => ({ markdown: 'an object, not text' }) }],
-    ['script-bearing', { suggest: async () => 'Great release! <script>steal()</script>' }],
-    ['over-long', { suggest: async () => 'a'.repeat(1_000_000) }],
+    ['non-text', fakeAiWriter({ suggest: () => Promise.resolve({ markdown: 'an object, not text' }) })],
+    ['script-bearing', fakeAiWriter({ suggest: () => Promise.resolve('Great release! <script>steal()</script>') })],
+    ['over-long', fakeAiWriter({ suggest: () => Promise.resolve('a'.repeat(1_000_000)) })],
   ];
   for (const [name, writer] of writers) {
-    const store = memoryArtifactStore();
+    const store = fakeArtifactStore();
     const written = await writeReleaseNotes(parsed.value, [], store, writer);
     assert.equal(written.suggestion, null, `${name}: no suggestion`);
     assert.notEqual(written.suggestionRejected, null, `${name}: the rejection is reported`);
@@ -90,7 +91,7 @@ test('a rejected suggestion is never stored: only the deterministic draft is', a
   }
 
   // Positive control: an acceptable suggestion is stored beside the draft.
-  const store = memoryArtifactStore();
+  const store = fakeArtifactStore();
   await writeReleaseNotes(parsed.value, [], store, { suggest: async (draft) => `${draft}\n\nNow with friendlier wording.` });
   assert.equal(store.references().length, 2, 'a safe suggestion is stored, so the checks above can fail');
 });

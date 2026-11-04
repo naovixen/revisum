@@ -30,7 +30,7 @@ import {
     specPath,
 } from "./evidence-examples.ts";
 import { withValue } from "./plan-examples.ts";
-import { fakeSession, runOnFakeSession } from "./RunOnFakeSession.ts";
+import { fakeSessionOnOrders, runOnFakeSession } from "./RunOnFakeSession.ts";
 import {
     DEFAULT_CLOCK_START,
     DEFAULT_SEED,
@@ -64,7 +64,7 @@ const planRunRefusing = async (
     steps: readonly JsonRecord[] = [OPEN_CART],
 ): Promise<RunResult> => {
     const { result } = await runOnFakeSession(unsafePlan(steps), {
-        session: fakeSession({ blockedOrigins: () => origins }),
+        session: fakeSessionOnOrders({ blockedOrigins: () => origins }),
     });
     return result;
 };

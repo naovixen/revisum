@@ -12,7 +12,7 @@ import {
     type StepResult,
 } from "@revisum/engine";
 import { DATABASE_PASSWORD } from "./database-command-examples.ts";
-import { fakeSession, runOnFakeSession } from "./RunOnFakeSession.ts";
+import { fakeSessionOnOrders, runOnFakeSession } from "./RunOnFakeSession.ts";
 import { echoForms } from "./secret-examples.ts";
 import {
     ORDER_ID,
@@ -82,7 +82,7 @@ const readAnswering = (body: unknown) =>
 const scriptGiving = async (text: string) => {
     const { result, events } = await runOnFakeSession(
         unsafePlan([OPEN_CART, FILL_SECRET, READ_CART_ONCE]),
-        { session: fakeSession({ runScript: () => Promise.resolve(success(text)) }) },
+        { session: fakeSessionOnOrders({ runScript: () => Promise.resolve(success(text)) }) },
     );
     return { step: stepOf(result, SCRIPT_STEP), kept: everythingKept(result, events.read()) };
 };

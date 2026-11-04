@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import { failure, success, type RunResult, type StoragePort } from "@revisum/engine";
-import { fakeSession, runOnFakeSession } from "./RunOnFakeSession.ts";
+import { fakeSessionOnOrders, runOnFakeSession } from "./RunOnFakeSession.ts";
 import { ORIGIN } from "./run-value-examples.ts";
 import { expectStorage } from "./stub-and-storage-examples.ts";
 import { OPEN_CART, unsafePlan, type JsonRecord } from "./unsafe-feature-steps.ts";
@@ -21,7 +21,7 @@ const storageCheckOf = (result: RunResult) => {
 const runCheck = async (assertion: JsonRecord, read: StoragePort["read"]) => {
     const { result } = await runOnFakeSession(
         unsafePlan([OPEN_CART, expectStorage("privateKey", assertion)]),
-        { session: fakeSession({ storage: fakeStoragePort({ read }) }) },
+        { session: fakeSessionOnOrders({ storage: fakeStoragePort({ read }) }) },
     );
     return storageCheckOf(result);
 };

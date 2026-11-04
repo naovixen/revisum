@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import {
     fakeNetwork,
-    fakeSession,
+    fakeSessionOnOrders,
     likesExchange,
     runOnFakeSession,
     stepSummaries,
@@ -69,7 +69,7 @@ const FINAL_CHECKS: readonly {
 // A session whose browser dies as the step before the final one ends, if `isDying` says so.
 function sessionThatMayDie(exchanges: readonly number[], isDying: boolean) {
     let isDead = false;
-    return fakeSession({
+    return fakeSessionOnOrders({
         network: fakeNetwork(exchanges.map((status) => likesExchange(status, "Ada"))),
         crashed: () => isDead,
         act: () => {

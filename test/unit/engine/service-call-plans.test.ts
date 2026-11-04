@@ -12,7 +12,7 @@ import { PRIVATE_MARKER } from './plan-examples.ts';
 import { accepted, rejection } from './run-value-examples.ts';
 import {
   CREATE_ORDER, DELETE_ORDER, ORIGIN, RESET_SHOP, SECRET_VALUES, asJson, call, callParser, callPlanOf, callProject,
-  expectBackend, fakeServiceCaller, orderArguments, withCleanup, type JsonRecord,
+  expectBackend, routedServiceCaller, orderArguments, withCleanup, type JsonRecord,
 } from './service-call-examples.ts';
 import { fakeDriverNeverLaunching } from '#test-support/fakes/FakeDriver.ts';
 import { driversOf, fakePorts } from '#test-support/fakes/FakePorts.ts';
@@ -261,7 +261,7 @@ test('a cleanup call naming a value no step defines is refused with undefined_va
 test('a refused plan reaches neither the service caller nor the driver, and nothing is logged', async () => {
 
   const spy = fakeDriverNeverLaunching();
-  const { caller, requests } = fakeServiceCaller();
+  const { caller, requests } = routedServiceCaller();
   const events = fakeRunEventSink();
   const ports = fakePorts({ drivers: driversOf(spy), events, services: caller });
   const base = { project: callProject(), baseUrl: ORIGIN, seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() } };

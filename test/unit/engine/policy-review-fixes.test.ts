@@ -8,12 +8,14 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { failure, policyGate, run, runUntrusted, type EventSink, type RunResult } from '@revisum/engine';
 import { memoryEventSink } from './approval-repositories.ts';
-import { finalState, guardedDriver, onlyRun, parserFor, portsWithoutAudit, runBase } from './guarded-driver.ts';
+import { finalState, guardedDriver, onlyRun, parserFor, runBase } from './guarded-driver.ts';
 import {
   CLOSING_CHECK, ENGLISH, OPEN_ACCOUNT_PAGE, ORIGIN, PRODUCTION_ORIGIN,
   click, decideOn, element, localeOf, navigate, parsedPlan, planOf, policyProjectInput, role, stepAt, targetsOf, testGate, testId,
   trustedProject, withPolicy,
 } from './policy-examples.ts';
+import { fakeEventSink } from '#test-support/fakes/FakeEventSink.ts';
+import { driversOf, fakePorts } from '#test-support/fakes/FakePorts.ts';
 
 // ---- Absolute URLs on the gate's own placeholder origin ------------------------------------------
 
@@ -28,7 +30,7 @@ test('a plan that navigates to an absolute URL on the placeholder origin never r
   const steps = [OPEN_ACCOUNT_PAGE, navigate(`${PLACEHOLDER_ORIGIN}/admin`)];
   for (const projectInput of [policyProjectInput(), WITH_PLACEHOLDER]) {
     const driven = guardedDriver([...steps, CLOSING_CHECK]);
-    const outcome = await runUntrusted(planOf(steps), parserFor(projectInput), runBase(projectInput), { ...portsWithoutAudit(driven.driver), audit: memoryEventSink() });
+    const outcome = await runUntrusted(planOf(steps), parserFor(projectInput), runBase(projectInput), fakePorts({ drivers: driversOf(driven.driver) }));
     assert.equal(finalState(outcome), 'Rejected', JSON.stringify(outcome));
     assert.equal(driven.opens(), 0);
   }
@@ -37,7 +39,7 @@ test('a plan that navigates to an absolute URL on the placeholder origin never r
 test('a plan that navigates to a relative path runs, on the base URL', async () => {
   const steps = [OPEN_ACCOUNT_PAGE, navigate('/admin')];
   const driven = guardedDriver([...steps, CLOSING_CHECK]);
-  const outcome = await runUntrusted(planOf(steps), parserFor(), runBase(), { ...portsWithoutAudit(driven.driver), audit: memoryEventSink() });
+  const outcome = await runUntrusted(planOf(steps), parserFor(), runBase(), fakePorts({ drivers: driversOf(driven.driver) }));
   assert.equal(finalState(outcome), 'Passed', JSON.stringify(onlyRun(outcome)?.steps ?? outcome));
   assert.equal(decideOn(await testGate(), parsedPlan(planOf(steps))).kind, 'allow');
 });
@@ -75,7 +77,7 @@ async function runClearedUnderA(runProjectInput: Record<string, unknown>) {
   let thrown: unknown;
   try {
     result = await run({ ...runBase(runProjectInput), plan: decision.plan, targetId },
-      { ...portsWithoutAudit(driven.driver), audit: memoryEventSink() });
+      fakePorts({ drivers: driversOf(driven.driver) }));
   } catch (error) {
     thrown = error;
   }
@@ -135,10 +137,7 @@ for (const name of LOOK_ALIKE_NAMES) {
 // ---- A denial the audit sink failed to record ----------------------------------------------------
 
 // A sink whose every append fails, as a full disc or a rewritten log would make it.
-const failingSink = (): EventSink & { attempts: number } => {
-  const sink = { attempts: 0, append: () => { sink.attempts++; return failure({ code: 'write-failed' as const }); } };
-  return sink;
-};
+const failingSink = () => fakeEventSink({ append: () => failure({ code: 'write-failed' as const }) });
 
 const DELETE_PLAN = planOf(DELETE_STEPS);
 // The red-team's runtime click: a test id that turns out to be the Delete account button.
@@ -156,8 +155,8 @@ async function settle<Value>(work: Promise<Value>): Promise<{ readonly value?: V
 test('when the audit sink fails to record a static denial, the outcome says so rather than a plain Denied', async () => {
   const driven = guardedDriver([...DELETE_STEPS, CLOSING_CHECK]);
   const sink = failingSink();
-  const settled = await settle(runUntrusted(DELETE_PLAN, parserFor(), runBase(), { ...portsWithoutAudit(driven.driver), audit: sink }));
-  assert.ok(sink.attempts > 0, 'the denial was never offered to the sink');
+  const settled = await settle(runUntrusted(DELETE_PLAN, parserFor(), runBase(), fakePorts({ drivers: driversOf(driven.driver), audit: sink })));
+  assert.ok(sink.calls.count('append') > 0, 'the denial was never offered to the sink');
   assert.equal(driven.opens(), 0, 'a denied plan opened a browser');
   if (settled.thrown !== undefined) return;
   assert.notDeepEqual(settled.value, { state: 'Denied', rule: 'irreversible-action', stepIndex: 1 },
@@ -167,14 +166,14 @@ test('when the audit sink fails to record a static denial, the outcome says so r
 test('when the audit sink records a static denial, the outcome is a plain Denied', async () => {
   const driven = guardedDriver([...DELETE_STEPS, CLOSING_CHECK]);
   const sink = memoryEventSink();
-  const outcome = await runUntrusted(DELETE_PLAN, parserFor(), runBase(), { ...portsWithoutAudit(driven.driver), audit: sink });
+  const outcome = await runUntrusted(DELETE_PLAN, parserFor(), runBase(), fakePorts({ drivers: driversOf(driven.driver), audit: sink }));
   assert.deepEqual(outcome, { state: 'Denied', rule: 'irreversible-action', stepIndex: 1 });
   assert.equal(sink.recorded.length, 1);
 });
 
 async function runtimeDenial(audit: EventSink) {
   const driven = guardedDriver([...RUNTIME_DELETE_STEPS, CLOSING_CHECK], RUNTIME_DELETE_PAGE);
-  const settled = await settle(runUntrusted(planOf(RUNTIME_DELETE_STEPS), parserFor(), runBase(), { ...portsWithoutAudit(driven.driver), audit }));
+  const settled = await settle(runUntrusted(planOf(RUNTIME_DELETE_STEPS), parserFor(), runBase(), fakePorts({ drivers: driversOf(driven.driver), audit })));
   return { settled, driven };
 }
 
@@ -182,7 +181,7 @@ test('when the audit sink fails to record a runtime denial, the run result diffe
   const recorded = await runtimeDenial(memoryEventSink());
   const sink = failingSink();
   const unrecorded = await runtimeDenial(sink);
-  assert.ok(sink.attempts > 0, 'the denial was never offered to the sink');
+  assert.ok(sink.calls.count('append') > 0, 'the denial was never offered to the sink');
   assert.equal(unrecorded.driven.inputEvents[1], 0, 'the denied click sent an input event');
   if (unrecorded.settled.thrown !== undefined) return;
   const failed = onlyRun(unrecorded.settled.value ?? []);

@@ -10,7 +10,7 @@ import {
     type Session,
 } from "@revisum/engine";
 import { evidenceHashOf } from "../../support/ExpectedEvidenceHash.ts";
-import { fakeSession, runOnFakeSession } from "./RunOnFakeSession.ts";
+import { fakeSessionOnOrders, runOnFakeSession } from "./RunOnFakeSession.ts";
 import { OPEN_CART, unsafePlan, type JsonRecord } from "./unsafe-feature-steps.ts";
 import { fakeRunEventSinkFailingOn } from "#test-support/fakes/FakeRunEventSink.ts";
 
@@ -52,14 +52,14 @@ const throws = (): never => {
     throw new Error(BROKEN);
 };
 
-// A session with the optional read, which fakeSession's sessions do not have.
+// A session with the optional read, which fakeSessionOnOrders's sessions do not have.
 function sessionReading(
     connectionFailures: () => readonly ConnectionFailure[],
     changes: Partial<Session> = {},
 ): Session {
     const session: Session & {
         connectionFailures(): readonly ConnectionFailure[];
-    } = { ...fakeSession(changes), connectionFailures };
+    } = { ...fakeSessionOnOrders(changes), connectionFailures };
     return session;
 }
 
@@ -204,7 +204,7 @@ describe("Using the run", () => {
                 const raw = unsafePlan([OPEN_CART]);
                 const blockedOrigins = (): readonly string[] => [BLOCKED_ORIGIN];
                 const blockedOnly = await runOnFakeSession(raw, {
-                    session: fakeSession({ blockedOrigins }),
+                    session: fakeSessionOnOrders({ blockedOrigins }),
                 });
                 const { result } = await runOnFakeSession(raw, {
                     session: sessionReading(() => FAILURES, { blockedOrigins }),

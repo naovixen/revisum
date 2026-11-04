@@ -11,7 +11,7 @@ import { afterEach, beforeEach, test } from 'node:test';
 import { runUntrusted, type PlanErrorCode } from '@revisum/engine';
 import { PRIVATE_MARKER } from './plan-examples.ts';
 import { projectWith } from './run-value-examples.ts';
-import { fakeServiceCaller } from './service-call-examples.ts';
+import { routedServiceCaller } from './service-call-examples.ts';
 import {
   COPY_LINK, OPEN_ORDERS, ORIGIN, accepted, advanceClock, assertRefusedInside, expectClipboard, frame, newTab,
   parserFor, planOf, rejection, rememberClipboard, type JsonRecord,
@@ -270,7 +270,7 @@ afterEach(() => { globalThis.fetch = realFetch; });
 function countingPorts() {
 
   const spy = fakeDriverNeverLaunching();
-  const { caller, requests } = fakeServiceCaller();
+  const { caller, requests } = routedServiceCaller();
   const events = fakeRunEventSink();
   const ports = fakePorts({ drivers: driversOf(spy), events, services: caller });
   return { ports, spy, requests, events };

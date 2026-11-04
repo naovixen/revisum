@@ -27,6 +27,7 @@ import {
   defaultRedactor, failure, success,
   type A11yNode, type DriverError, type PageProbe, type Plan, type Redactor, type Result, type TextReading, type TrustedProject,
 } from '@revisum/engine';
+import { fakeExploreDriver } from '#test-support/fakes/FakeExploreDriver.ts';
 
 // ---- The types the spec names, as these tests read them --------------------------------------------
 
@@ -184,7 +185,7 @@ export type SpyExploreDriver = { readonly driver: ExploreDriver; readonly calls:
 export function spyExploreDriver(site: FakeSite): SpyExploreDriver {
   const calls: DriverCall[] = [];
   let current: { readonly url: string; readonly page: FakePage } | undefined;
-  const driver: ExploreDriver = {
+  const driver = fakeExploreDriver({
     async navigate(url) {
       calls.push({ method: 'navigate', url });
       const page = pageAt(site, url);
@@ -204,7 +205,7 @@ export function spyExploreDriver(site: FakeSite): SpyExploreDriver {
       calls.push({ method: 'linkTargets' });
       return current?.page.links ?? [];
     },
-  };
+  });
   const spy = new Proxy(driver, {
     get(target, property, receiver) {
       if (typeof property !== 'string' || property === 'then') return Reflect.get(target, property, receiver);

@@ -3,7 +3,7 @@
 // calmer machine still matches, and only the log says the close failed.
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { fakeSession, runOnFakeSession, stepSummaries } from "./RunOnFakeSession.ts";
+import { fakeSessionOnOrders, runOnFakeSession, stepSummaries } from "./RunOnFakeSession.ts";
 import { OPEN_CART, unsafePlan, type JsonRecord } from "./unsafe-feature-steps.ts";
 
 const CLOSE_FAILURE = "the profile folder is still held";
@@ -26,7 +26,7 @@ const VERDICTS: readonly {
 ];
 
 const sessionThatWillNotClose = () =>
-    fakeSession({ close: () => Promise.reject(new Error(CLOSE_FAILURE)) });
+    fakeSessionOnOrders({ close: () => Promise.reject(new Error(CLOSE_FAILURE)) });
 
 describe("Using the run", () => {
     for (const verdict of VERDICTS) {

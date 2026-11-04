@@ -3,8 +3,10 @@ import { memoryRunEventSink } from "../memory-ports.ts";
 import { recordCalls, type Recorded } from "./RecordCalls.ts";
 
 // A run's event log, kept in memory and read back through the port's own read().
-export const fakeRunEventSink = (overrides: Partial<RunEventSink> = {}): Recorded<RunEventSink> =>
-    recordCalls({ ...memoryRunEventSink(), ...overrides });
+export function fakeRunEventSink(overrides: Partial<RunEventSink> = {}): Recorded<RunEventSink> {
+    const defaults: Required<RunEventSink> = memoryRunEventSink();
+    return recordCalls({ ...defaults, ...overrides });
+}
 
 // A log that keeps events as usual, but cannot write one that `isFailing` picks out.
 export function fakeRunEventSinkFailingOn(

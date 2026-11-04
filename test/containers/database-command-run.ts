@@ -20,9 +20,9 @@ import { randomBytes } from 'node:crypto';
 import { join } from 'node:path';
 import * as cliPackage from '@revisum/cli';
 import { PRODUCT, type DeclaredService, type Result, type WorkloadErrorCode, type WorkloadOutcome, type WorkloadRunner } from '@revisum/contracts';
-import { defaultRedactor, environmentSecretStore, parseProject, planParser, run, type Project, type RunResult } from '@revisum/engine';
+import { environmentSecretStore, parseProject, planParser, run, type Project, type RunResult } from '@revisum/engine';
 import { RUN_IMAGE_TAG, dockerCliEngine, runDocker } from '@revisum/runner';
-import { memoryArtifactStore, memoryEventSink, memoryRunEventSink, systemClock } from '../support/memory-ports.ts';
+import { systemClock } from '../support/memory-ports.ts';
 import { authorise, trustedProjectFrom } from '../support/policy-clearance.ts';
 import { FIXTURES } from '../support/repository.ts';
 import { TEST_SERVICE, TEST_SERVICE_SECRET_NAMES, testProjectInput, type JsonRecord } from '../unit/engine/plan-examples.ts';
@@ -31,6 +31,7 @@ import { ORIGIN, unsafePlan } from '../unit/engine/unsafe-feature-steps.ts';
 import { printed, withSeededHost } from '../unit/runner/workload-examples.ts';
 import { pinnedRunImage } from './isolated-run.ts';
 import { realWorkloadRunner } from './workload-run.ts';
+import { driversOf, fakePorts } from '../support/fakes/FakePorts.ts';
 
 export const COMMAND_IMAGE_TAG = `${PRODUCT.name}-database-command`;
 const BUILD_TIMEOUT_MILLISECONDS = 600_000;
@@ -180,11 +181,9 @@ export async function runCommandSteps(projectFile: JsonRecord, steps: readonly J
   const result = await withSeededHost(() => run({
     plan: authorise(plan, trusted), project, targetId: project.matrix[0]?.id ?? assert.fail('no target'),
     baseUrl: ORIGIN, seed: DEFAULT_SEED, fixedTimeMilliseconds: DEFAULT_CLOCK_START, fixtures: [], host: { platform: 'test', arch: 'test' },
-  }, {
-    drivers: new Map([[driver.info.id, driver]]), clock: systemClock, artifacts: memoryArtifactStore(), redactor: defaultRedactor(),
-    audit: memoryEventSink(), events: memoryRunEventSink(), secrets: environmentSecretStore({ [DATABASE_SECRET]: secretValue }),
-    ...{ databaseCommands: spy },
-  }));
+  }, fakePorts({
+    drivers: driversOf(driver), clock: systemClock, secrets: environmentSecretStore({ [DATABASE_SECRET]: secretValue }), databaseCommands: spy,
+  })));
   return { result, handed, runnerLog: JSON.stringify(logged) };
 }
 

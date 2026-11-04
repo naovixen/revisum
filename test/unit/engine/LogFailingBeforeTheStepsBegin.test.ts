@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { describe, test, type TestContext } from "node:test";
 import type { RunEventSink } from "@revisum/engine";
 import { memoryRunEventSink } from "../../support/memory-ports.ts";
-import { fakeSession, runOnFakeSession } from "./RunOnFakeSession.ts";
+import { fakeSessionOnOrders, runOnFakeSession } from "./RunOnFakeSession.ts";
 import { environmentSecretStore } from "@revisum/engine";
 import {
     CLOSING_CHECK,
@@ -49,7 +49,7 @@ const runRefused = (events: RunEventSink) =>
 const runWithLogFailingOn = async (context: TestContext, state: string) => {
     const close = context.mock.fn(() => Promise.resolve());
     const run = await runOnFakeSession(unsafePlan([OPEN_CART]), {
-        session: fakeSession({ close }),
+        session: fakeSessionOnOrders({ close }),
         events: logFailingOnState(state),
     });
     return { result: run.result, close };

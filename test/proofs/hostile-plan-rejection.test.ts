@@ -62,7 +62,7 @@ function apiSuiteBrowserCases(allowedOrigin: string): readonly HostilePlan[] {
     { name: 'CRLF injection in a fill value', input: withSteps({ type: 'fill', locator: { by: 'label', label: 'Email' }, value: 'a\r\nX-Injected: 1' }), code: 'unsafe_text' },
     {
       name: 'prototype pollution key in a nested locator',
-      input: withSteps({ type: 'click', locator: JSON.parse('{"__proto__":{"admin":true},"by":"label","label":"Email"}') }),
+      input: withSteps({ type: 'click', locator: JSON.parse('{"__proto__":{"admin":true},"by":"label","label":"Email"}') as unknown }),
       code: 'unknown_field',
     },
     { name: 'plan over the size limit', input: withSteps(...Array.from({ length: 400 }, (_unused, index) => navigate(`/notes?page=${index}&pad=${'p'.repeat(700)}`))), code: 'too_large' },

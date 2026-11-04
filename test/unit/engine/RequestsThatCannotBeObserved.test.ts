@@ -4,7 +4,12 @@
 import assert from "node:assert/strict";
 import { describe, test, type TestContext } from "node:test";
 import { failure, success, type NetworkPort } from "@revisum/engine";
-import { fakeNetwork, fakeSession, runOnFakeSession, stepSummaries } from "./RunOnFakeSession.ts";
+import {
+    fakeNetwork,
+    fakeSessionOnOrders,
+    runOnFakeSession,
+    stepSummaries,
+} from "./RunOnFakeSession.ts";
 import { OPEN_CART, unsafePlan, type JsonRecord } from "./unsafe-feature-steps.ts";
 
 const LIKES_CHECK: JsonRecord = {
@@ -32,7 +37,7 @@ const FAILED_OBSERVES: readonly {
 const sessionWithObserve = (context: TestContext, observe: NetworkPort["observe"]) => {
     const navigate = context.mock.fn(() => Promise.resolve(success(undefined)));
     const spiedObserve = context.mock.fn(observe);
-    const session = fakeSession({
+    const session = fakeSessionOnOrders({
         navigate,
         network: { ...fakeNetwork(), observe: spiedObserve },
     });

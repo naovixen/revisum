@@ -14,16 +14,17 @@ import { arch, platform } from 'node:os';
 import { join } from 'node:path';
 import { after, before, describe, test } from 'node:test';
 import {
-  defaultRedactor, hashExecutable, type RunResult, type TargetId,
+  hashExecutable, type RunResult, type TargetId,
 } from '@revisum/engine';
 import { BROWSERS } from '#test-support/browsers.ts';
-import { memoryArtifactStore, memoryEventSink, memoryRunEventSink, systemClock } from '#test-support/memory-ports.ts';
+import { systemClock } from '#test-support/memory-ports.ts';
 import { authorise, trustedProjectFrom } from '#test-support/policy-clearance.ts';
 import { FIXTURES, GOLDEN } from '#test-support/repository.ts';
 import { determinismRuns } from '#test-support/TestTier.ts';
 import type { BrowserHarness } from '#test-support/browser/BrowserHarness.ts';
 import { signupHarness, makeDrivers, makeProjectFile, signupPlan } from '#test-support/signup-harness.ts';
 import { PER_ENVIRONMENT_FIELDS, engineFunction, replayAnswerOf, replayed, type ReplayAnswer } from '../unit/engine/replay-examples.ts';
+import { fakePorts } from '#test-support/fakes/FakePorts.ts';
 
 const REPLAYS = determinismRuns();
 const HEADLESS_SHELL = 'cdp-chromium-headless-shell';
@@ -56,10 +57,7 @@ async function replaySignup(rawPlan: unknown, targetId: string, manifest: unknow
     manifest, recording: null, recordedResultHash, recordedState: 'Passed',
     inputs: { ...inputs, plan: authorise(testHarness.plan(rawPlan), trusted), targetId: targetOf(targetId) },
   };
-  const ports = {
-    drivers: makeDrivers(), clock: systemClock, artifacts: memoryArtifactStore(), redactor: defaultRedactor(), audit: memoryEventSink(),
-    events: memoryRunEventSink(), fixtures: fixtureReader,
-  };
+  const ports = { ...fakePorts({ drivers: makeDrivers(), clock: systemClock }), fixtures: fixtureReader };
   const replay = await engineFunction('replay');
   return replayAnswerOf(await replay(request, ports));
 }

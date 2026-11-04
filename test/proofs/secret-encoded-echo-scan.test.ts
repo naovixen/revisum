@@ -14,16 +14,17 @@ import { arch, platform, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, describe, test } from 'node:test';
 import {
-  defaultRedactor, leakScanner, parseProject, planParser, run,
+  leakScanner, parseProject, planParser, run,
   type Plan, type Project, type RunResult, type TargetId, type TrustedProject,
 } from '@revisum/engine';
 import { startFixtureServer, type FixtureServer } from '#test-support/fixture-server.ts';
-import { memoryArtifactStore, memoryEventSink, memoryRunEventSink, systemClock } from '#test-support/memory-ports.ts';
+import { memoryRunEventSink, systemClock } from '#test-support/memory-ports.ts';
 import { authorise, trustedProjectFrom } from '#test-support/policy-clearance.ts';
 import { FIXTURES } from '#test-support/repository.ts';
 import { FIXED_TIME_MILLISECONDS, SEED, makeDrivers, makeProjectFile } from '#test-support/signup-harness.ts';
 import { holdsSecret } from '../unit/engine/echo-page-driver.ts';
 import { fakeEnvironmentStore, fakeSecretOfLength, fakeSecretValue, resolvedSecret } from '../unit/engine/secret-examples.ts';
+import { fakePorts } from '#test-support/fakes/FakePorts.ts';
 
 const TIMEOUT = 300_000;
 const TARGETS = ['cdp-chromium'] as const;
@@ -86,10 +87,10 @@ async function runEcho(targetId: string, echo: string, value: unknown, secretVal
     plan: authorise(parsed(echoPlan(targetId, echo, value, field)), trusted), project, targetId: targetId as TargetId,
     baseUrl: server.origin, seed: SEED, fixedTimeMilliseconds: FIXED_TIME_MILLISECONDS, fixtures: server.fixtures,
     host: { platform: platform(), arch: arch() },
-  }, {
-    drivers: makeDrivers(), clock: systemClock, artifacts: memoryArtifactStore(), redactor: defaultRedactor(), audit: memoryEventSink(), events,
+  }, fakePorts({
+    drivers: makeDrivers(), clock: systemClock, events,
     secrets: fakeEnvironmentStore({ [SECRET]: secretValue }),
-  });
+  }));
   return { result, eventLines: events.read().map((event) => JSON.stringify(event)).join('\n') };
 }
 

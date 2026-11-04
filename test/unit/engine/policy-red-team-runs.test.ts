@@ -13,7 +13,8 @@ import { test } from 'node:test';
 import { runUntrusted, type PolicyRuleId } from '@revisum/engine';
 import { FIXTURES } from '../../support/repository.ts';
 import { memoryEventSink } from './approval-repositories.ts';
-import { finalState, guardedDriver, onlyRun, parserFor, portsWithoutAudit, runBase, type PageViews } from './guarded-driver.ts';
+import { finalState, guardedDriver, onlyRun, parserFor, runBase, type PageViews } from './guarded-driver.ts';
+import { driversOf, fakePorts } from '#test-support/fakes/FakePorts.ts';
 import { CLOSING_CHECK, planOf, type JsonRecord } from './policy-examples.ts';
 
 type Variant = { readonly target?: string; readonly steps: readonly JsonRecord[]; readonly page?: PageViews };
@@ -35,7 +36,7 @@ async function runVariant(variant: Variant, targetId: string) {
   const steps = [...variant.steps, CLOSING_CHECK];
   const driven = guardedDriver(steps, variant.page);
   const audit = memoryEventSink();
-  const outcome = await runUntrusted(planOf(variant.steps, [targetId]), parserFor(), runBase(), { ...portsWithoutAudit(driven.driver), audit });
+  const outcome = await runUntrusted(planOf(variant.steps, [targetId]), parserFor(), runBase(), fakePorts({ drivers: driversOf(driven.driver), audit }));
   return { outcome, driven, audit };
 }
 

@@ -32,6 +32,10 @@ const FORGERIES: readonly (readonly [string, () => Plan])[] = [
   ['a parsed plan with its steps swapped for raw ones', () => ({ ...genuinePlan(), steps: [{ type: 'navigate', url: '/' }] }) as unknown as Plan],
 ];
 
+// The brand check's own refusal. A later check refuses most forgeries too, so only the reason shows
+// that this one stopped them first.
+const REFUSED_AS_NOT_PARSED = { name: 'TypeError', message: 'refused a plan that the plan parser did not make' };
+
 type Watched = { readonly ports: Parameters<typeof run>[1]; readonly driverCalls: () => number; readonly storeWrites: () => number };
 
 function watchedPorts(): Watched {
@@ -56,19 +60,19 @@ for (const [name, forge] of FORGERIES) {
   test(`run() refuses ${name} before any side effect`, async () => {
     const watched = watchedPorts();
     // The forgery is cast past the gate too: the run-time check must catch it all the same.
-    await assert.rejects(run(inputs(forge() as Authorised), watched.ports));
+    await assert.rejects(run(inputs(forge() as Authorised), watched.ports), REFUSED_AS_NOT_PARSED);
     assert.equal(watched.driverCalls(), 0, 'no driver method was called');
     assert.equal(watched.ports.events.read().length, 0, 'nothing was logged');
     assert.equal(watched.storeWrites(), 0, 'nothing was stored');
   });
 
   test(`assertBranded rejects ${name}`, () => {
-    assert.throws(() => assertBranded(forge()));
+    assert.throws(() => assertBranded(forge()), REFUSED_AS_NOT_PARSED);
   });
 }
 
 test('assertBranded rejects values that are not plans at all', () => {
-  for (const value of [null, undefined, 'plan', 42, [], {}]) assert.throws(() => assertBranded(value), `accepted ${JSON.stringify(value)}`);
+  for (const value of [null, undefined, 'plan', 42, [], {}]) assert.throws(() => assertBranded(value), REFUSED_AS_NOT_PARSED, `accepted ${JSON.stringify(value)}`);
 });
 
 // Counter-examples: the parser's own output passes the check and reaches the driver, so the

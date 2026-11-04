@@ -15,8 +15,8 @@ import { trustedProjectFrom } from "../../support/policy-clearance.ts";
 import { DATABASE_PASSWORD, fakeCommandRunner } from "./database-command-examples.ts";
 import { TEST_SERVICE } from "./plan-examples.ts";
 import { PROPOSAL, approvedStanding, parsedPlan } from "./policy-examples.ts";
-import { fakeSession } from "./RunOnFakeSession.ts";
-import { fakeServiceCaller } from "./service-call-examples.ts";
+import { fakeSessionOnOrders } from "./RunOnFakeSession.ts";
+import { routedServiceCaller } from "./service-call-examples.ts";
 import { matcher, setStorage, startStub } from "./stub-and-storage-examples.ts";
 import { DEFAULT_CLOCK_START, DEFAULT_SEED } from "./run-value-examples.ts";
 import { parsedProject, sourceBytes } from "./unsafe-feature-examples.ts";
@@ -107,7 +107,7 @@ async function runOnCountingSession(
     standing: PlanStanding | undefined,
 ): Promise<Effects> {
     const commandRunner = fakeCommandRunner();
-    const services = fakeServiceCaller();
+    const services = routedServiceCaller();
     const effects: Effects = {
         scripts: 0,
         stubsStarted: 0,
@@ -121,7 +121,7 @@ async function runOnCountingSession(
             return Promise.resolve(success(undefined));
         },
     });
-    const session = fakeSession({
+    const session = fakeSessionOnOrders({
         runScript: () => {
             effects.scripts++;
             return Promise.resolve(success(JSON.stringify({ count: 3, blocks: 1 })));

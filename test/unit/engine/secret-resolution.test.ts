@@ -86,14 +86,15 @@ test('control: when the store resolves every named secret, the run goes on to op
 function recordedSecrets(result: RunResult): unknown {
   const recorded = manifestField(result, 'secrets');
   if (!Array.isArray(recorded)) return recorded;
-  return [...recorded].sort((left: unknown, right: unknown) =>
+  const entries: readonly unknown[] = recorded;
+  return [...entries].sort((left, right) =>
     String(Reflect.get(Object(left), 'name')).localeCompare(String(Reflect.get(Object(right), 'name'))));
 }
 
 test('a secret one character shorter than the minimum is redacted by key, and the manifest says so', async () => {
   const shortValue = fakeSecretOfLength(MINIMUM_SECRET_LENGTH - 1);
   const ran = await runWithSecrets(['SHORT_PIN'], secretFillPlan(['SHORT_PIN']), { SHORT_PIN: shortValue }, quietDriver());
-  assert.ok(ran.result.manifest, 'the run reached its manifest');
+  assert.ok(ran.result.manifest !== null, 'the run reached its manifest');
   assert.deepEqual(recordedSecrets(ran.result), [{ name: 'SHORT_PIN', mode: 'key-only' }]);
   assert.equal(JSON.stringify(ran.result.manifest).includes(shortValue), false, 'the manifest names the secret, not its value');
   assert.equal(ran.everything.includes(shortValue), false, 'the short value appears nowhere in the result or the log');
@@ -103,7 +104,7 @@ test('secrets of exactly the minimum length and longer are redacted by value, an
   const environment = { EIGHT_CHARACTER_CODE: fakeSecretOfLength(MINIMUM_SECRET_LENGTH), ACCOUNT_TOKEN: fakeSecretValue() };
   const names = Object.keys(environment);
   const ran = await runWithSecrets(names, secretFillPlan(names), environment, quietDriver());
-  assert.ok(ran.result.manifest, 'the run reached its manifest');
+  assert.ok(ran.result.manifest !== null, 'the run reached its manifest');
   assert.deepEqual(recordedSecrets(ran.result), [
     { name: 'ACCOUNT_TOKEN', mode: 'value' },
     { name: 'EIGHT_CHARACTER_CODE', mode: 'value' },
@@ -122,6 +123,6 @@ test('lengthening a short secret by one character turns its recorded mode from k
 
 test('a run whose plan uses no secret has no secrets field in its manifest', async () => {
   const ran = await runWithSecrets(['SHORT_PIN'], secretFillPlan([]), { SHORT_PIN: fakeSecretOfLength(4) }, quietDriver());
-  assert.ok(ran.result.manifest, 'the run reached its manifest');
+  assert.ok(ran.result.manifest !== null, 'the run reached its manifest');
   assert.equal(Object.hasOwn(ran.result.manifest, 'secrets'), false, JSON.stringify(ran.result.manifest));
 });

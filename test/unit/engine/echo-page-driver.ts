@@ -35,7 +35,8 @@ export function echoPageDriver(page: EchoPage): BrowserDriver & { readonly calls
     act: (step, _guard, secret) => {
       calls.actions++;
       if (step.type === 'fill') {
-        const typed = secret !== undefined ? page.secretValues?.[secret.name] ?? '' : typeof step.value === 'string' ? step.value : '';
+        const plainText = typeof step.value === 'string' ? step.value : '';
+        const typed = secret === undefined ? plainText : page.secretValues?.[secret.name] ?? '';
         fieldValues.set(elementKey(step.locator), typed);
       }
       return Promise.resolve(success(undefined));

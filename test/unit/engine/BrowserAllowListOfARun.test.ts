@@ -13,7 +13,7 @@ import {
     testProjectInput,
     type JsonRecord,
 } from "./plan-examples.ts";
-import { fakeSession } from "./RunOnFakeSession.ts";
+import { fakeSessionOnOrders } from "./RunOnFakeSession.ts";
 import { fakeDriver } from "#test-support/fakes/FakeDriver.ts";
 import { driversOf, fakePorts } from "#test-support/fakes/FakePorts.ts";
 
@@ -49,7 +49,7 @@ async function allowedOriginsOfRun(
     standing: PlanStanding,
 ): Promise<readonly string[]> {
     const open = context.mock.fn<BrowserDriver["open"]>(() =>
-        Promise.resolve(success(fakeSession())),
+        Promise.resolve(success(fakeSessionOnOrders())),
     );
     const driver = fakeDriver({ info: { id: "cdp", version: "fake", protocol: "none" }, open });
     const plan = parsedSignupPlan();

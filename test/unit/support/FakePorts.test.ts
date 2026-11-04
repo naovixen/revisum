@@ -4,6 +4,7 @@ import {
     failure,
     planParser,
     run,
+    runUntrusted,
     success,
     type Origin,
     type RunPorts,
@@ -11,17 +12,37 @@ import {
     type SessionEnvironment,
     type Target,
 } from "@revisum/engine";
+import { fakeAdapterRegistry } from "#test-support/fakes/FakeAdapterRegistry.ts";
+import { fakeDraftPlanner } from "#test-support/fakes/FakeDraftPlanner.ts";
 import {
     fakeDriver,
     fakeDriverNeverLaunching,
     fakeDriverOpening,
 } from "#test-support/fakes/FakeDriver.ts";
 import { driversOf, fakePorts } from "#test-support/fakes/FakePorts.ts";
+import { fakeEventSink } from "#test-support/fakes/FakeEventSink.ts";
+import { fakeLeakScanner } from "#test-support/fakes/FakeLeakScanner.ts";
+import { fakeRandom } from "#test-support/fakes/FakeRandom.ts";
 import { FAKE_PAGE, fakeSession } from "#test-support/fakes/FakeSession.ts";
 import { fakeStoragePort } from "#test-support/fakes/FakeStoragePort.ts";
 import { leaveOut } from "#test-support/fakes/LeaveOut.ts";
 import { authorise, trustedProjectFrom } from "#test-support/policy-clearance.ts";
+import {
+    finalState,
+    guardedDriver,
+    onlyRun,
+    parserFor,
+    runBase,
+} from "../engine/guarded-driver.ts";
 import { testProject } from "../engine/plan-examples.ts";
+import {
+    ALLOWED_UNNAMED_TEST_ID,
+    OPEN_ACCOUNT_PAGE,
+    click,
+    planOf as planOnThePolicyProject,
+    testId,
+    withPolicy,
+} from "../engine/policy-examples.ts";
 import {
     DEFAULT_CLOCK_START,
     DEFAULT_SEED,
@@ -66,6 +87,8 @@ const ENVIRONMENT: SessionEnvironment = {
     sensitiveSelectors: [],
     timeoutMilliseconds: 1000,
 };
+
+const DANGER_ZONE_STEPS = [OPEN_ACCOUNT_PAGE, click(testId("danger-zone-action"))];
 
 describe("Using a fake port", () => {
     describe("given a fake session with nothing overridden", () => {
@@ -206,6 +229,108 @@ describe("Using a fake port", () => {
                 const ports = leaveOut<RunPorts>(fakePorts(), ["services"]);
                 assert.equal(Object.hasOwn(ports, "services"), false);
                 assert.equal(Object.hasOwn(ports, "secrets"), true);
+            });
+        });
+    });
+
+    describe("given a plan clicking a control only a test id names", () => {
+        describe("when it runs on the default fake", () => {
+            test("then it should end Denied as an unnamed control, with the denial recorded", async () => {
+                const audit = fakeEventSink();
+                const outcome = await runUntrusted(
+                    planOnThePolicyProject(DANGER_ZONE_STEPS),
+                    parserFor(),
+                    runBase(),
+                    fakePorts({ audit }),
+                );
+                assert.equal(finalState(outcome), "Denied", JSON.stringify(outcome));
+                assert.equal(onlyRun(outcome)?.denial?.rule, "unnamed-control");
+                assert.equal(audit.calls.count("append"), 1);
+            });
+        });
+
+        describe("when it runs on the guarded driver", () => {
+            test("then it should end the same way as on the default fake", async () => {
+                const driven = guardedDriver(DANGER_ZONE_STEPS);
+                const outcome = await runUntrusted(
+                    planOnThePolicyProject(DANGER_ZONE_STEPS),
+                    parserFor(),
+                    runBase(),
+                    fakePorts({ drivers: driversOf(driven.driver) }),
+                );
+                assert.equal(finalState(outcome), "Denied", JSON.stringify(outcome));
+                assert.equal(onlyRun(outcome)?.denial?.rule, "unnamed-control");
+            });
+        });
+
+        describe("and a project that allows that test id", () => {
+            describe("when it runs on the default fake", () => {
+                test("then it should pass", async () => {
+                    const steps = [OPEN_ACCOUNT_PAGE, click(testId(ALLOWED_UNNAMED_TEST_ID))];
+                    const outcome = await runUntrusted(
+                        planOnThePolicyProject(steps),
+                        parserFor(withPolicy({})),
+                        runBase(withPolicy({})),
+                        fakePorts(),
+                    );
+                    assert.equal(finalState(outcome), "Passed", JSON.stringify(outcome));
+                });
+            });
+        });
+    });
+
+    describe("given a fake adapter registry of one driver", () => {
+        describe("when a test looks for that driver's id", () => {
+            test("then it should find the driver and note the call", () => {
+                const driver = fakeDriver();
+                const registry = fakeAdapterRegistry([driver]);
+                assert.equal(registry.find(TARGET.adapter), driver);
+                assert.deepEqual(registry.all(), [driver]);
+                assert.equal(registry.calls.count("find"), 1);
+            });
+        });
+
+        describe("when a test looks for another id", () => {
+            test("then it should find nothing", () => {
+                const other = fakeDriver({
+                    info: { id: "other", version: "1", protocol: "none" },
+                });
+                assert.equal(fakeAdapterRegistry([other]).find(TARGET.adapter), null);
+            });
+        });
+    });
+
+    describe("given a fake draft planner", () => {
+        describe("when it is asked for a draft", () => {
+            test("then it should reply with no text and note the request", async () => {
+                const planner = fakeDraftPlanner();
+                const request = { criteria: [], grammarVersion: "1", origins: [], targets: [] };
+                assert.deepEqual(await planner.draft(request), {});
+                assert.deepEqual(planner.calls.to("draft"), [
+                    { method: "draft", arguments: [request] },
+                ]);
+            });
+        });
+    });
+
+    describe("given a fake leak scanner", () => {
+        describe("when it scans", () => {
+            test("then it should find nothing and note the files", () => {
+                const scanner = fakeLeakScanner();
+                assert.deepEqual(scanner.scan(["result.json"], []), []);
+                assert.deepEqual(scanner.calls.to("scan"), [
+                    { method: "scan", arguments: [["result.json"], []] },
+                ]);
+            });
+        });
+    });
+
+    describe("given fake randomness", () => {
+        describe("when it is drawn from twice", () => {
+            test("then it should give the same value each time", () => {
+                const random = fakeRandom();
+                assert.equal(random.next(), random.next());
+                assert.equal(random.calls.count("next"), 2);
             });
         });
     });

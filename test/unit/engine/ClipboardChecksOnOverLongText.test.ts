@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import { success, type Session } from "@revisum/engine";
 import { DEFAULT_MAXIMUM_CLIPBOARD_CHARACTERS } from "./clock-and-clipboard-examples.ts";
-import { fakeSession, runOnFakeSession, stepSummaries } from "./RunOnFakeSession.ts";
+import { fakeSessionOnOrders, runOnFakeSession, stepSummaries } from "./RunOnFakeSession.ts";
 import { OPEN_CART, unsafePlan, type JsonRecord } from "./unsafe-feature-steps.ts";
 
 const OVER_LONG = "x".repeat(DEFAULT_MAXIMUM_CLIPBOARD_CHARACTERS + 1);
@@ -28,7 +28,7 @@ type CountedClipboard = { readonly session: Session; readonly reads: () => numbe
 const clipboardHolding = (text: string): CountedClipboard => {
     let reads = 0;
     return {
-        session: fakeSession({
+        session: fakeSessionOnOrders({
             clipboard: {
                 readText: () => {
                     reads += 1;

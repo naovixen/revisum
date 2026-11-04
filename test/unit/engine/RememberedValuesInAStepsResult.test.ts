@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import { sha256, success, type StepResult } from "@revisum/engine";
 import { copyOf } from "./stub-and-storage-examples.ts";
-import { fakeSession, runOnFakeSession, type FakeRunOptions } from "./RunOnFakeSession.ts";
+import { fakeSessionOnOrders, runOnFakeSession, type FakeRunOptions } from "./RunOnFakeSession.ts";
 import {
     DATABASE_COMMANDS,
     FEATURES,
@@ -60,7 +60,7 @@ const ROUTES: readonly {
     readonly name: string;
     readonly rememberingNothing: JsonRecord;
     readonly remembering: (remember: JsonRecord) => JsonRecord;
-    readonly options: FakeRunOptions;
+    readonly optionsOfOneRun: () => FakeRunOptions;
 }[] = [
     {
         name: "a page script",
@@ -71,10 +71,12 @@ const ROUTES: readonly {
             arguments: {},
             remember,
         }),
-        options: {
+        optionsOfOneRun: () => ({
             projectFile: PROJECT_FILE,
-            session: fakeSession({ runScript: () => Promise.resolve(success(READ_VALUES_JSON)) }),
-        },
+            session: fakeSessionOnOrders({
+                runScript: () => Promise.resolve(success(READ_VALUES_JSON)),
+            }),
+        }),
     },
     {
         name: "a database command",
@@ -85,10 +87,10 @@ const ROUTES: readonly {
             arguments: { email: "ada@example.com" },
             remember,
         }),
-        options: {
+        optionsOfOneRun: () => ({
             projectFile: PROJECT_FILE,
             commandRoute: () => ({ stdout: READ_VALUES_JSON }),
-        },
+        }),
     },
 ];
 
@@ -107,11 +109,11 @@ const rememberedFieldsOf = (stepResult: StepResult): Readonly<Record<string, unk
     Object.fromEntries(Object.entries(stepResult).filter(([key]) => key.startsWith("remembered")));
 
 describe("Using a run that remembers values from a step", () => {
-    for (const { name, rememberingNothing, remembering, options } of ROUTES) {
+    for (const { name, rememberingNothing, remembering, optionsOfOneRun } of ROUTES) {
         describe(`given ${name} that remembers nothing`, () => {
             describe("when the step's result is serialised", () => {
                 test("then it should hold neither field", async () => {
-                    const stepResult = await stepResultOf(rememberingNothing, options);
+                    const stepResult = await stepResultOf(rememberingNothing, optionsOfOneRun());
                     const keys = Object.keys(JSON.parse(JSON.stringify(stepResult)) as object);
                     assert.deepEqual(
                         keys.filter((key) => key.startsWith("remembered")),
@@ -120,7 +122,7 @@ describe("Using a run that remembers values from a step", () => {
                 });
 
                 test("then it should hold no key set to undefined", async () => {
-                    const stepResult = await stepResultOf(rememberingNothing, options);
+                    const stepResult = await stepResultOf(rememberingNothing, optionsOfOneRun());
                     assert.deepEqual(rememberedFieldsOf(stepResult), {});
                 });
             });
@@ -129,7 +131,10 @@ describe("Using a run that remembers values from a step", () => {
         describe(`given ${name} that remembers one value`, () => {
             describe("when the step's result is read", () => {
                 test("then it should hold the record on its own, with no list", async () => {
-                    const stepResult = await stepResultOf(remembering(REMEMBER_FIRST), options);
+                    const stepResult = await stepResultOf(
+                        remembering(REMEMBER_FIRST),
+                        optionsOfOneRun(),
+                    );
                     assert.deepEqual(rememberedFieldsOf(stepResult), { remembered: FIRST });
                 });
             });
@@ -140,7 +145,7 @@ describe("Using a run that remembers values from a step", () => {
                 test("then it should hold both in a list, in the plan's order, with no single record", async () => {
                     const stepResult = await stepResultOf(
                         remembering(REMEMBER_SECOND_THEN_FIRST),
-                        options,
+                        optionsOfOneRun(),
                     );
                     assert.deepEqual(rememberedFieldsOf(stepResult), {
                         rememberedValues: [SECOND, FIRST],
@@ -152,7 +157,10 @@ describe("Using a run that remembers values from a step", () => {
         describe(`given ${name} that remembers three values`, () => {
             describe("when the step's result is read", () => {
                 test("then it should hold all three in a list, in the plan's order", async () => {
-                    const stepResult = await stepResultOf(remembering(REMEMBER_ALL_THREE), options);
+                    const stepResult = await stepResultOf(
+                        remembering(REMEMBER_ALL_THREE),
+                        optionsOfOneRun(),
+                    );
                     assert.deepEqual(rememberedFieldsOf(stepResult), {
                         rememberedValues: [FIRST, SECOND, THIRD],
                     });

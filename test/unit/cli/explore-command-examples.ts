@@ -7,7 +7,7 @@
 //     200-character button name, the declared secret's value and an email address;
 //   - spyBrowser() is the real CDP driver, always headless, with every session it opens wrapped so
 //     each call made on the session is recorded, with the session environment it was opened with;
-//   - fakeRunner() is an isolated runner that starts nothing: it records each start and exec, and
+//   - watchedFakeRunner() is an isolated runner that starts nothing: it records each start and exec, and
 //     answers exec with a page map the test gives, as the crawl inside the container would print it;
 //   - approvalOfPlan() mints a real approval for a plan, through the approval verifier, as the
 //     maintainer's merge to the protected branch gives one;
@@ -29,11 +29,15 @@ import { join } from 'node:path';
 import { createBrowserDriver } from '#test-support/browser/CreateBrowserDriver.ts';
 import {
   canonicalJson, environmentSecretStore, failure, planHash, planParser, readPlanText, sha256, success,
-  type Approval, type ApprovalStore, type BrowserDriver, type EgressPolicy, type ExecOutcome, type GuaranteeLevel, type ImageDigest, type Plan,
-  type Runner, type RunnerHandle, type Session, type SessionEnvironment,
+  type Approval, type ApprovalStore, type BrowserDriver, type EgressPolicy, type GuaranteeLevel, type ImageDigest, type Plan,
+  type Runner, type Session, type SessionEnvironment,
 } from '@revisum/engine';
 import { BROWSERS } from '#test-support/browsers.ts';
 import { startFixtureServer, type FixtureRoute } from '#test-support/fixture-server.ts';
+import { fakeApprovalStore } from '#test-support/fakes/FakeApprovalStore.ts';
+import { fakeDriver } from '#test-support/fakes/FakeDriver.ts';
+import { fakeRunner } from '#test-support/fakes/FakeRunner.ts';
+import { fakeRunnerHandle } from '#test-support/fakes/FakeRunnerHandle.ts';
 import { memoryEventSink, type MemoryEventSink } from '#test-support/memory-ports.ts';
 import { trustedProjectFrom } from '#test-support/policy-clearance.ts';
 import { FIXTURES, GOLDEN } from '#test-support/repository.ts';
@@ -229,18 +233,18 @@ export function spyBrowser(): SpyBrowser {
   const inner = createBrowserDriver({ executablePath: BROWSERS.chrome });
   const opened: SessionEnvironment[] = [];
   const calls: SessionCall[] = [];
-  const driver: BrowserDriver = {
-    info: inner.info,
-    supports: (target) => inner.supports(target),
-    async open(target, environment) {
-      opened.push(environment);
-      const session = await inner.open(target, environment);
-      return session.ok ? success(recordingSession(session.value, calls)) : session;
-    },
-  };
   const build = inner.build;
   return {
-    driver: build === undefined ? driver : { ...driver, build: (target) => Reflect.apply(build, inner, [target]) },
+    driver: fakeDriver({
+      info: inner.info,
+      supports: (target) => inner.supports(target),
+      async open(target, environment) {
+        opened.push(environment);
+        const session = await inner.open(target, environment);
+        return session.ok ? success(recordingSession(session.value, calls)) : session;
+      },
+      ...(build === undefined ? {} : { build: (target) => Reflect.apply(build, inner, [target]) }),
+    }, build === undefined ? ['build'] : []),
     opened,
     calls,
     navigations: () => calls.flatMap((call) => (call.method === 'navigate' && call.url !== undefined ? [call.url] : [])),
@@ -250,43 +254,40 @@ export function spyBrowser(): SpyBrowser {
 // ---- The isolated runner, faked ----------------------------------------------------------------------
 
 export type ExecCall = { readonly command: readonly string[]; readonly environmentNames: unknown };
-export type FakeRunner = {
+export type WatchedFakeRunner = {
   readonly runner: Runner;
   readonly image: ImageDigest;
   readonly started: readonly EgressPolicy[];
   readonly execs: readonly ExecCall[];
   stops(): number;
 };
-export type FakeRunnerOptions = {
+export type WatchedFakeRunnerOptions = {
   readonly level: GuaranteeLevel;
   readonly startFails?: true;
   // What the crawl inside prints: the page map's JSON.
   readonly output?: string;
 };
 
-export function fakeRunner(options: FakeRunnerOptions): FakeRunner {
+export function watchedFakeRunner(options: WatchedFakeRunnerOptions): WatchedFakeRunner {
   const started: EgressPolicy[] = [];
   const execs: ExecCall[] = [];
   let stops = 0;
-  const handle: RunnerHandle = {
+  const handle = fakeRunnerHandle({
     runId: 'run-explore-fake',
-    egressEvents: () => [],
-    proxyDecisions: () => [],
-    rewritesApplied: () => [],
     guaranteeLevel: () => options.level,
-    async exec(command: readonly string[], environmentNames?: unknown): Promise<ExecOutcome> {
+    async exec(command, environmentNames) {
       execs.push({ command, environmentNames });
       return { exitCode: 0, stdout: options.output ?? '', stderr: '' };
     },
     async stop() { stops += 1; },
-  };
-  const runner: Runner = {
+  });
+  const runner = fakeRunner({
     async start(image, policy) {
       started.push(policy);
       return options.startFails === true ? failure({ code: 'start-failed' }) : success(handle);
     },
     guaranteeLevel: () => options.level,
-  };
+  });
   return { runner, image: imageDigest(PINNED_IMAGE_ID), started, execs, stops: () => stops };
 }
 
@@ -326,10 +327,6 @@ export async function approvalOfPlan(text: string, project: JsonRecord): Promise
   }
 }
 
-export const approvalStore = (approvals: readonly Approval[]): ApprovalStore => ({
-  forSubject: (subjectHash) => approvals.filter((approval) => approval.subject.hash === subjectHash),
-});
-
 // ---- Running the command -----------------------------------------------------------------------------
 
 export type ExploreCommandPorts = DraftCommandPorts & {
@@ -344,7 +341,7 @@ export type ExploreSetup = {
   readonly answer?: Answer;
   // The browser the command may use; a fresh spy unless given. `false` gives the command none.
   readonly browser?: SpyBrowser | false;
-  readonly runner?: (site: ExploreSite) => FakeRunner;
+  readonly runner?: (site: ExploreSite) => WatchedFakeRunner;
   // A real isolated runner instead of the fake one, and the site it reaches, which then runs
   // elsewhere (inside the run container) rather than on this machine's loopback.
   readonly isolatedRunner?: (site: ExploreSite) => { readonly runner: Runner; readonly image: ImageDigest };
@@ -362,7 +359,7 @@ export type ExploreRun = {
   readonly planner: FakePlanner;
   readonly workspace: DraftWorkspace;
   readonly browser: SpyBrowser | undefined;
-  readonly runner: FakeRunner | undefined;
+  readonly runner: WatchedFakeRunner | undefined;
   readonly outcome: CommandOutcome;
   readonly printed: string;
   readonly events: MemoryEventSink;
@@ -412,7 +409,7 @@ export async function withExploreRun(setup: ExploreSetup, body: (run: ExploreRun
       ...(browser === undefined ? {} : { browser: browser.driver }),
       ...(runner === undefined ? {} : { isolatedRunner: { runner: runner.runner, image: runner.image } }),
       ...(setup.isolatedRunner === undefined ? {} : { isolatedRunner: setup.isolatedRunner(site) }),
-      ...(approvals === undefined ? {} : { approvals: approvalStore(approvals) }),
+      ...(approvals === undefined ? {} : { approvals: fakeApprovalStore(approvals) }),
     };
     const command = await loadDraftCommand();
     let outcome: CommandOutcome | undefined;
