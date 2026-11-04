@@ -102,7 +102,6 @@ export const SemanticLocatorKind = {
 } as const;
 export type SemanticLocatorKind = (typeof SemanticLocatorKind)[keyof typeof SemanticLocatorKind];
 export const SEMANTIC_LOCATOR_KINDS: readonly SemanticLocatorKind[] = Object.values(SemanticLocatorKind);
-export const LOCATOR_KINDS = SEMANTIC_LOCATOR_KINDS;
 export const StructuralLocatorKind = {
   Css: 'css',
   Xpath: 'xpath',
