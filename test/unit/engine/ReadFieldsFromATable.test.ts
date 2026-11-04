@@ -4,12 +4,16 @@
 // credential is never repeated, and INVALID always comes with something to show a person.
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { INVALID, readInteger, readText, type Issues, type Parsed } from "@revisum/engine";
 import {
+    INVALID,
     optionalField,
     readFields,
+    readInteger,
+    readText,
     type FieldReader,
-} from "../../../packages/engine/src/plan/ReadFields.ts";
+    type Issues,
+    type Parsed,
+} from "@revisum/engine";
 import { tokenShapedText } from "./evidence-examples.ts";
 
 const MAXIMUM_NAME_LENGTH = 20;
@@ -264,6 +268,15 @@ describe("Using readFields", () => {
             test("then it should have the reader judge it, not treat it as left out", () => {
                 const issues = issuesAfterReading({ name: "Ada", age: undefined });
                 assert.deepEqual(issues, [{ code: "wrong_type", path: "$.age" }]);
+            });
+        });
+    });
+
+    describe("given a required field holding undefined, and a reader that accepts it", () => {
+        describe("when it is read", () => {
+            test("then it should keep the field in the result", () => {
+                const parsed = readFields({ note: undefined }, "$", [], { note: readAnything });
+                assert.deepEqual(Object.keys(valid(parsed)), ["note"]);
             });
         });
     });

@@ -3,8 +3,8 @@
 // names a request must count, wherever it sits in the plan.
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { planParser } from "@revisum/engine";
-import { observedRequestNames } from "../../../packages/engine/src/network-and-storage/network-and-storage-steps.ts";
+import { success } from "@revisum/engine";
+import { fakeNetwork, fakeSession, runOnFakeSession } from "./RunOnFakeSession.ts";
 import {
     OBSERVED_REQUESTS,
     expectRequests,
@@ -12,7 +12,6 @@ import {
     rememberResponse,
     resetRequests,
 } from "./stub-and-storage-examples.ts";
-import { parsedProject } from "./unsafe-feature-examples.ts";
 import {
     FEATURES,
     OPEN_CART,
@@ -25,14 +24,42 @@ import {
 const LIKES = "likes";
 const SCHEDULE_LOADS = "scheduleLoads";
 
-const parsePlan = planParser(
-    parsedProject(unsafeProjectFile(FEATURES, { observedRequests: OBSERVED_REQUESTS })),
-);
+const PROJECT_FILE = unsafeProjectFile(FEATURES, { observedRequests: OBSERVED_REQUESTS });
 
-const namesIn = (steps: readonly JsonRecord[]): readonly string[] => {
-    const parsed = parsePlan(unsafePlan([OPEN_CART, ...steps]));
-    assert.ok(parsed.ok, `the plan was rejected: ${JSON.stringify(parsed)}`);
-    return observedRequestNames(parsed.value);
+// Runs the steps after opening a page, and gives what was observed before that first step began and
+// over the whole run. A step that resets a request observes it again, so only the first says what
+// the run started from.
+const observedInARunOf = async (
+    steps: readonly JsonRecord[],
+): Promise<{
+    readonly beforeTheFirstStep: readonly string[];
+    readonly overTheRun: readonly string[];
+}> => {
+    const beforeTheFirstStep: string[] = [];
+    const overTheRun: string[] = [];
+    let hasFirstStepBegun = false;
+    const session = fakeSession({
+        navigate: () => {
+            hasFirstStepBegun = true;
+            return Promise.resolve(success(undefined));
+        },
+        network: {
+            ...fakeNetwork(),
+            observe: (name) => {
+                overTheRun.push(name);
+                if (!hasFirstStepBegun) {
+                    beforeTheFirstStep.push(name);
+                }
+                return Promise.resolve(success(undefined));
+            },
+        },
+    });
+    await runOnFakeSession(unsafePlan([OPEN_CART, ...steps]), {
+        session,
+        projectFile: PROJECT_FILE,
+    });
+    assert.ok(hasFirstStepBegun, "the run should reach its first step");
+    return { beforeTheFirstStep, overTheRun };
 };
 
 const inFrame = (steps: readonly JsonRecord[]): JsonRecord => ({
@@ -67,21 +94,23 @@ const CONTAINERS: readonly {
     { name: "a new tab", around: inNewTab },
 ];
 
-describe("Using the requests a plan names", () => {
+describe("Using a run of a plan that names requests", () => {
     for (const { name, step } of STEPS_NAMING_A_REQUEST) {
         describe(`given ${name}`, () => {
-            describe("when the requests to observe are listed", () => {
-                test("then it should list the request", () => {
-                    assert.deepEqual(namesIn([step]), [LIKES]);
+            describe("when the run starts", () => {
+                test("then it should observe the request before the first step", async () => {
+                    const { beforeTheFirstStep } = await observedInARunOf([step]);
+                    assert.deepEqual(beforeTheFirstStep, [LIKES]);
                 });
             });
         });
 
         for (const { name: containerName, around } of CONTAINERS) {
             describe(`given ${name} inside ${containerName}`, () => {
-                describe("when the requests to observe are listed", () => {
-                    test("then it should list the request", () => {
-                        assert.deepEqual(namesIn([around([step])]), [LIKES]);
+                describe("when the run starts", () => {
+                    test("then it should observe the request before the first step", async () => {
+                        const { beforeTheFirstStep } = await observedInARunOf([around([step])]);
+                        assert.deepEqual(beforeTheFirstStep, [LIKES]);
                     });
                 });
             });
@@ -89,39 +118,44 @@ describe("Using the requests a plan names", () => {
     }
 
     describe("given a plan naming no request", () => {
-        describe("when the requests to observe are listed", () => {
-            test("then it should list none", () => {
-                assert.deepEqual(namesIn([]), []);
+        describe("when the run ends", () => {
+            test("then it should have observed none", async () => {
+                const { overTheRun } = await observedInARunOf([]);
+                assert.deepEqual(overTheRun, []);
             });
         });
     });
 
     describe("given a remember that reads the page, not a response", () => {
-        describe("when the requests to observe are listed", () => {
-            test("then it should list none", () => {
-                assert.deepEqual(namesIn([REMEMBER_ATTRIBUTE]), []);
+        describe("when the run ends", () => {
+            test("then it should have observed none", async () => {
+                const { overTheRun } = await observedInARunOf([REMEMBER_ATTRIBUTE]);
+                assert.deepEqual(overTheRun, []);
             });
         });
     });
 
     describe("given requests named more than once, across containers", () => {
-        describe("when the requests to observe are listed", () => {
-            test("then it should list each once, in the order the plan first names it", () => {
-                const names = namesIn([
+        describe("when the run starts", () => {
+            test("then it should observe each once, in the order the plan first names it", async () => {
+                const { beforeTheFirstStep } = await observedInARunOf([
                     inFrame([resetRequests(SCHEDULE_LOADS)]),
                     resetRequests(LIKES),
                     resetRequests(SCHEDULE_LOADS),
                     inNewTab([resetRequests(LIKES)]),
                 ]);
-                assert.deepEqual(names, [SCHEDULE_LOADS, LIKES]);
+                assert.deepEqual(beforeTheFirstStep, [SCHEDULE_LOADS, LIKES]);
             });
         });
     });
 
     describe("given a request named only in a frame inside a new tab", () => {
-        describe("when the requests to observe are listed", () => {
-            test("then it should list the request", () => {
-                assert.deepEqual(namesIn([inNewTab([inFrame([resetRequests(LIKES)])])]), [LIKES]);
+        describe("when the run starts", () => {
+            test("then it should observe the request before the first step", async () => {
+                const { beforeTheFirstStep } = await observedInARunOf([
+                    inNewTab([inFrame([resetRequests(LIKES)])]),
+                ]);
+                assert.deepEqual(beforeTheFirstStep, [LIKES]);
             });
         });
     });

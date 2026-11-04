@@ -11,6 +11,7 @@ import {
     run,
     success,
     type BrowserDriver,
+    type Clock,
     type ElementProbe,
     type NetworkPort,
     type ObservedExchange,
@@ -96,6 +97,9 @@ export type FakeRunOptions = {
     readonly commandRoute?: CommandRoute;
     readonly events?: RunEventSink;
     readonly secrets?: SecretStore;
+    readonly clock?: Clock;
+    // What opening the browser does, when a test needs it to do other than give `session`.
+    readonly open?: BrowserDriver["open"];
 };
 
 export type FakeRun = {
@@ -119,7 +123,7 @@ export async function runOnFakeSession(
     const driver: BrowserDriver = {
         info: { id: "cdp", version: "fake", protocol: "none", performs: DRIVER_FEATURES },
         supports: () => success(true),
-        open: () => Promise.resolve(success(session)),
+        open: options.open ?? (() => Promise.resolve(success(session))),
     };
     const audit = memoryEventSink();
     const events = options.events ?? memoryRunEventSink();
@@ -137,7 +141,7 @@ export async function runOnFakeSession(
         },
         {
             drivers: new Map([[driver.info.id, driver]]),
-            clock: virtualClock(),
+            clock: options.clock ?? virtualClock(),
             artifacts: memoryArtifactStore(),
             redactor: defaultRedactor(),
             audit,
