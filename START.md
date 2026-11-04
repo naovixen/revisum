@@ -25,7 +25,7 @@ Architecture refactor:
   - [ ] Ground the core. The plan is `C:\Users\naomi\.claude\plans\before-starting-on-the-jiggly-squirrel.md`. **Tick a part only when its review with `docs/prompts/session-core-review.md` is clear (founder, 2026-11-03).** Code a part touches leaves with no suppressed nested ternaries, loose conditions or unsafe types; these don't wait for phase 6.
     - **Way of working, unless the founder objects:** the core spine runs in order, with at most two side tracks beside it in their own worktrees, applied as patches because the main session can't merge. Not yet run for all this: the full browser suite, `check:push`, `check:linux`, and the container tests beyond `container-hardening`.
     - [x] Switch on `@typescript-eslint/no-unnecessary-condition`, fixing the hits in their own commits, with no baseline. The rule is on at `8efce5f` with no hits (240, not the 22 first counted). Ticked as an exception the founder recorded (2026-11-04, `docs/decisions/decision-assessment.md`), with no `clear` verdict: 180, 181, 187, 189, 190 and 191 are fixed. These are requirements of the driver port, which can't clear without them: 176, 177, 178, 182, 183, 185, 186 (a reproduced false pass), 188 and 192. 184 goes with split `run`.
-    - [ ] Constant objects in `contracts`
+    - [ ] Constant objects in `contracts`. Committed (`c370118` to `deadce0`). Two review rounds are done and the second was `not clear`: rows 194 and 195 are `must fix`, 196 and 197 `consider`. **The founder's ruling is awaited.**
     - [ ] Foundation helpers
     - [ ] One complete fake per port, and `fakePorts(overrides)` for the whole set
     - [ ] Driver port, with findings 14 and 59
