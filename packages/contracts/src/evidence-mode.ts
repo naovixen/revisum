@@ -18,10 +18,15 @@ export type ImageDigest = Brand<string, 'ImageDigest'>;
 // through the secret store when the suite runs.
 export type EnvironmentValue = { readonly literal: SafeText } | { readonly secretName: SecretName };
 
+// The only framework in phase 1.
+export const SuiteFramework = {
+  PlaywrightTest: 'playwright-test',
+} as const;
+export type SuiteFramework = (typeof SuiteFramework)[keyof typeof SuiteFramework];
+
 export type EvidenceSuiteDeclaration = {
   readonly name: SuiteName;
-  // The only framework in phase 1.
-  readonly framework: 'playwright-test';
+  readonly framework: SuiteFramework;
   // Repository-relative globs of the suite's files, its helpers and config included. They are
   // trusted files: a change that edits one runs the protected-branch version.
   readonly paths: readonly string[];

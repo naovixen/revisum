@@ -6,6 +6,7 @@
 import type {
   EnvironmentValue, EvidenceLimits, EvidenceMode, EvidenceSuiteDeclaration, ImageDigest, SafeText, SecretName, SuiteName,
 } from '@revisum/contracts';
+import { SuiteFramework } from '@revisum/contracts';
 import { brand } from '../brand.ts';
 import { looksLikeCredential } from '../plan/literal-secrets.ts';
 import {
@@ -72,7 +73,7 @@ const SUITE_FIELDS = [
   'runChangedTestsAsProposal', 'keepTraces', 'keepSuiteScreenshots', 'timeoutMilliseconds',
 ] as const;
 const REQUIRED_SUITE_FIELDS = ['name', 'framework', 'paths', 'workingDirectory', 'image', 'command', 'projects'] as const;
-const FRAMEWORKS = ['playwright-test'] as const;
+const FRAMEWORKS = Object.values(SuiteFramework);
 
 // What a suite declaration may refer to: the project's secret names.
 type SuiteContext = { readonly issues: Issues; readonly secretNames: readonly SecretName[] };

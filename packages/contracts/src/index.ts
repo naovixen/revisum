@@ -30,7 +30,7 @@ export { PolicyRuleId, PolicyVerdictKind } from './policy.ts';
 export type * from './run-ports.ts';
 export { GuaranteeLevel } from './run-ports.ts';
 export type * from './isolated-runner.ts';
-export { BrowserChannel, EgressChannel, EgressDecision } from './isolated-runner.ts';
+export { BrowserChannel, ContainerRefusalCode, EgressChannel, EgressDecision } from './isolated-runner.ts';
 export * from './workload.ts';
 export * from './audit-events.ts';
 export type * from './approval.ts';
