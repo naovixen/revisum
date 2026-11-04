@@ -2507,9 +2507,6 @@
     "@typescript-eslint/naming-convention": {
       "count": 1
     },
-    "@typescript-eslint/no-unsafe-assignment": {
-      "count": 1
-    },
     "@typescript-eslint/require-await": {
       "count": 1
     },
@@ -2727,16 +2724,10 @@
     "@typescript-eslint/naming-convention": {
       "count": 1
     },
-    "@typescript-eslint/no-unsafe-member-access": {
-      "count": 1
-    },
     "@typescript-eslint/no-unused-vars": {
       "count": 1
     },
     "@typescript-eslint/require-await": {
-      "count": 4
-    },
-    "@typescript-eslint/strict-boolean-expressions": {
       "count": 4
     },
     "curly": {
@@ -3106,9 +3097,6 @@
     "@typescript-eslint/naming-convention": {
       "count": 1
     },
-    "@typescript-eslint/no-unsafe-assignment": {
-      "count": 2
-    },
     "curly": {
       "count": 13
     },
@@ -3232,7 +3220,7 @@
   },
   "test/unit/engine/ai-text.test.ts": {
     "@typescript-eslint/require-await": {
-      "count": 4
+      "count": 1
     },
     "revisum/file-name-matches-export": {
       "count": 1
@@ -3257,9 +3245,6 @@
   },
   "test/unit/engine/approval-repositories.ts": {
     "@typescript-eslint/no-unnecessary-type-assertion": {
-      "count": 1
-    },
-    "@typescript-eslint/no-unsafe-assignment": {
       "count": 1
     },
     "@typescript-eslint/require-await": {
@@ -3426,9 +3411,6 @@
     },
     "curly": {
       "count": 3
-    },
-    "no-nested-ternary": {
-      "count": 1
     },
     "revisum/file-name-matches-export": {
       "count": 1
@@ -4011,12 +3993,6 @@
     }
   },
   "test/unit/engine/replay-examples.ts": {
-    "@typescript-eslint/no-unsafe-assignment": {
-      "count": 2
-    },
-    "@typescript-eslint/no-unsafe-return": {
-      "count": 2
-    },
     "@typescript-eslint/require-await": {
       "count": 1
     },
@@ -4139,12 +4115,6 @@
     }
   },
   "test/unit/engine/secret-resolution.test.ts": {
-    "@typescript-eslint/no-unsafe-assignment": {
-      "count": 1
-    },
-    "@typescript-eslint/strict-boolean-expressions": {
-      "count": 3
-    },
     "curly": {
       "count": 2
     },
