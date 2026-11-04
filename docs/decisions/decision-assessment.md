@@ -30,6 +30,7 @@
 
 - The main session placed the lint switch, constant objects and foundation helpers ahead of the assessor's order, which didn't name them. The founder can reverse this.
 - `START.md`'s order replaces the order in the refactor plan file.
+- The 22 `no-unnecessary-condition` hits were an undercount: the real number was 240, 24 in code and 216 in tests. All were fixed with no baseline, as the ruling asks.
 
 ## Risks
 

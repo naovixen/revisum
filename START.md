@@ -23,7 +23,7 @@ Architecture refactor:
   - [x] Clear the remaining open findings: nothing open but the deferred rows 159, 161, 163, 165 and 167
   - [x] Before grounding the core: a fresh Opus helper assesses the decisions independently, with `docs/prompts/session-decision-assessment.md`, and the founder rules on what it raises (founder, 2026-11-03). Rulings: `docs/decisions/decision-assessment.md`
   - [ ] Ground the core. The plan is `C:\Users\naomi\.claude\plans\before-starting-on-the-jiggly-squirrel.md`. **Tick a part only when its review with `docs/prompts/session-core-review.md` is clear (founder, 2026-11-03).** Code a part touches leaves with no suppressed nested ternaries, loose conditions or unsafe types; these don't wait for phase 6.
-    - [ ] Switch on `@typescript-eslint/no-unnecessary-condition`, fixing the 22 hits in their own commit, with no baseline
+    - [ ] Switch on `@typescript-eslint/no-unnecessary-condition`, fixing the hits in their own commits, with no baseline. The rule is on at `8efce5f` with no hits (240, not the 22 first counted). Two review rounds are done and the second was `not clear`, so what's open waits for the founder's ruling: findings 176 to 185
     - [ ] Constant objects in `contracts`
     - [ ] Foundation helpers
     - [ ] One complete fake per port, and `fakePorts(overrides)` for the whole set
