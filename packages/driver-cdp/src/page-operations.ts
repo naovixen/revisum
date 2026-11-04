@@ -4,6 +4,7 @@
 import type {
   A11yNode, BrowserDriver, BrowserRequestRecord, DownloadedFile, DriverError, Key, Result, Session, SessionEnvironment, Target, Unavailable,
 } from '@revisum/contracts';
+import type { PressCheck, PressSent } from './HitChecks.ts';
 import type { HeldModifierKey } from './modifier-keys.ts';
 
 export type Point = { readonly x: number; readonly y: number };
@@ -20,10 +21,12 @@ export interface PageOperations<Handle> {
   readonly protocol: ProtocolId;
   // Where accessibilityTree() comes from, for notes in the manifest.
   readonly accessibilityTreeSource: 'browser' | 'in-page-approximation';
-  // With scripts 'disabled', the page loads with script execution off until the next navigate,
-  // and the page is read through an isolated script world, where the driver's own reads still run.
+  // With scripts 'disabled', the page loads with script execution off until the next navigate.
+  // Reads go through a script world of the driver's own either way, which the page's scripts can
+  // neither see nor patch, and where the driver's own reads still run.
   navigate(url: string, timeoutMilliseconds: number, scripts: 'enabled' | 'disabled'): Promise<void>;
-  // Calls a page function that returns a string (JSON where structured). Promises are awaited.
+  // Calls a page function that returns a string (JSON where structured). Promises are awaited. Rejects
+  // when it gives anything else.
   callForString(pageFunction: PageFunction, inputs: readonly PageArgument<Handle>[]): Promise<string>;
   // Resolves two frames of this document later, which is how long whatever it just started takes to
   // reach the browser, or as soon as no more frames can come: its document has been replaced or
@@ -31,23 +34,6 @@ export interface PageOperations<Handle> {
   twoFramesLater(): Promise<void>;
   // Calls a page function that returns Element[], and returns their handles.
   callForElements(pageFunction: PageFunction, inputs: readonly PageArgument<Handle>[]): Promise<Handle[]>;
-  // Calls a page function with the element, in a script world of the driver's own, which the page's
-  // scripts cannot see or patch, and keeps the object it returns in the browser. Whoever calls this
-  // must give that object to releaseObject or releaseObjectsOutOfReach.
-  callForObjectOutOfReach(pageFunction: PageFunction, element: Handle): Promise<Handle>;
-  // Calls a page function in that script world of this document, and returns what it returns as the
-  // browser reports it. The world is the document's, so any PageOperations of the document reaches what
-  // an earlier call left there. Throws KeptObjectGone when the document has gone.
-  callOutOfReach(pageFunction: PageFunction): Promise<unknown>;
-  // Calls a page function on a kept object, as `this`, in the script world that made it, and returns
-  // what it returns as the browser reports it. Throws KeptObjectGone when the object no longer exists.
-  callOnObject(object: Handle, pageFunction: PageFunction): Promise<unknown>;
-  // Lets the browser forget a kept object. Never throws, since a caller is no better off for it: a
-  // failure other than the object having gone is kept for the session's close to report.
-  releaseObject(object: Handle): Promise<void>;
-  // Lets the browser forget every object callForObjectOutOfReach has kept in this page's documents.
-  // Never throws, for the same reason.
-  releaseObjectsOutOfReach(): Promise<void>;
   // Elements with this role and exact accessible name, found by the browser's own accessibility engine.
   byRole(role: string, name: string): Promise<Handle[]>;
   accessibilityTree(): Promise<A11yNode>;
@@ -58,7 +44,7 @@ export interface PageOperations<Handle> {
   // element; null for each it does not expose.
   exposedStates(element: Handle): Promise<ExposedStates>;
   // True when the element is no longer in any document on screen: removed from its own, or its
-  // document was replaced or closed, or its page died. Throws when the page cannot say.
+  // document was replaced or closed, or its page died. Rejects when the page cannot say.
   isElementGone(element: Handle): Promise<boolean>;
   // The browser's id for this document's frame, as it names the frame a download began in.
   frameId(): Promise<string>;
@@ -70,17 +56,16 @@ export interface PageOperations<Handle> {
   // The URL the browser could not show, while it shows its own error page in its place, such as
   // for an HTTP error status with an empty body; null otherwise.
   unreachableUrl(): Promise<string | null>;
-  // Calls a page script's source, one function expression, once in this document's main world
-  // with one argument, the arguments object; awaits it and writes its result as JSON text in the
-  // page (scriptResultText in in-page.ts). It never times out by itself: the session races it.
-  callScript(source: string, scriptArguments: Readonly<Record<string, string | number | boolean>>, maximumResultBytes: number): Promise<ScriptCallOutcome>;
+  // Calls a page function that returns a string in the page's own main world, where the page's scripts
+  // run and can answer whatever they like, so what it gives is never evidence of what is on the page.
+  callForStringInMainWorld(pageFunction: PageFunction, inputs: readonly PageArgument<Handle>[]): Promise<string>;
 }
 
 // The input a session sends a document. It is apart from PageOperations so that a session can reach it
 // only through hitChecks (HitChecks.ts), and a new kind of input does not compile until it goes there.
 export interface PageInput<Handle> {
-  // Points are in this document's viewport.
-  click(element: Handle, at: Point): Promise<void>;
+  // Points are in this document's viewport. Says how far it got before a dialog stopped it.
+  click(element: Handle, at: Point): Promise<PressSent>;
   hover(at: Point): Promise<void>;
   // Inserts the text as typed text, line feeds included, with no key press for them.
   fill(element: Handle, value: string): Promise<void>;
@@ -88,7 +73,17 @@ export interface PageInput<Handle> {
   press(element: Handle, key: Key, modifiers: readonly HeldModifierKey[]): Promise<void>;
   // Gives a file input these files, by absolute path, firing its input and change events.
   setFiles(element: Handle, paths: readonly string[]): Promise<void>;
+  // Chooses the option of a select whose visible text, or else whose value, is `option`, firing the
+  // events a person's choice fires.
+  select(element: Handle, option: string): Promise<SelectOutcome>;
+  // Calls a page script's source, one function expression, once in this document's main world
+  // with one argument, the arguments object; awaits it and writes its result as JSON text in the
+  // page (scriptResultText in in-page.ts). It never times out by itself: the session races it.
+  callScript(source: string, scriptArguments: Readonly<Record<string, string | number | boolean>>, maximumResultBytes: number): Promise<ScriptCallOutcome>;
 }
+
+export const SelectOutcome = { Selected: 'selected', NoOption: 'no-option', NotASelect: 'not-a-select' } as const;
+export type SelectOutcome = (typeof SelectOutcome)[keyof typeof SelectOutcome];
 
 // One document with its input, which only hitChecks (HitChecks.ts) is given. It also gives the document
 // of an iframe, input included, so that document's input stays out of a session's reach too.
@@ -96,6 +91,15 @@ export type PageWithInput<Handle> = PageOperations<Handle> & PageInput<Handle> &
   // The document of the iframe element; null when the element is not an iframe whose document this
   // protocol can reach.
   frame(element: Handle): Promise<PageWithInput<Handle> | null>;
+  // Calls `arm` with the element, the name to report by and this press's id, in a script world of the
+  // driver's own, keeps the check it returns for `use` to read, and lets it go as `use` ends. A check
+  // that cannot be let go, because a dialog holds the page, stays for the next call below to take off.
+  withPressCheck<Value>(arm: PageFunction, element: Handle, use: (check: PressCheck) => Promise<Value>): Promise<Value>;
+  // Calls a page function that says whether it took something off, in that script world of this document
+  // and of every document framed in it, skipping any that has gone. The world is the document's, so any
+  // PageOperations of the document reaches what an earlier call left there. Rejects with
+  // PageHeldByDialog while a dialog holds the page, or with why it could not be called.
+  callInEveryFramedDocumentOutOfReach(pageFunction: PageFunction): Promise<void>;
 };
 
 // How one call of a page script ended: with its result as JSON text, with a throw or a rejection,

@@ -5,14 +5,12 @@ import {
   failure, success,
   type DriverError, type Origin, type Result, type StorageArea, type StoragePort,
 } from '@revisum/contracts';
+import { GET_FRAME_TREE, type BrowserCommand } from './BrowserCommand.ts';
+import { GET_STORAGE_ITEMS, REMOVE_STORAGE_ITEM, SET_STORAGE_ITEM } from './DispatchMouseEvent.ts';
 import { PageHeldByDialog } from './PageHeldByDialog.ts';
 
-// Chrome DevTools Protocol answer shapes this port reads.
-type FrameTree = { readonly frameTree: { readonly frame: { readonly url: string; readonly securityOrigin?: string } } };
-type StorageItems = { readonly entries: readonly (readonly string[])[] };
-
 // Sends a command to the page, failing at once when its renderer has died.
-export type PageCommand = <Value>(method: string, parameters?: Record<string, unknown>) => Promise<Value>;
+export type PageCommand = <CommandParameters, Reply>(command: BrowserCommand<CommandParameters, Reply>, parameters: NoInfer<CommandParameters>) => Promise<Reply>;
 
 const errorText = (error: unknown): string => (error instanceof Error ? error.message : String(error)).slice(0, 200);
 
@@ -27,19 +25,19 @@ export class PageStorage implements StoragePort {
 
   async write(area: StorageArea, origin: Origin, key: string, value: string): Promise<Result<void, DriverError>> {
     return this.#onOrigin(area, origin, async (storageId) => {
-      await this.#command('DOMStorage.setDOMStorageItem', { storageId, key, value });
+      await this.#command(SET_STORAGE_ITEM, { storageId, key, value });
     });
   }
 
   async remove(area: StorageArea, origin: Origin, key: string): Promise<Result<void, DriverError>> {
     return this.#onOrigin(area, origin, async (storageId) => {
-      await this.#command('DOMStorage.removeDOMStorageItem', { storageId, key });
+      await this.#command(REMOVE_STORAGE_ITEM, { storageId, key });
     });
   }
 
   async read(area: StorageArea, origin: Origin, key: string): Promise<Result<string | null, DriverError>> {
     return this.#onOrigin(area, origin, async (storageId) => {
-      const items = await this.#command<StorageItems>('DOMStorage.getDOMStorageItems', { storageId });
+      const items = await this.#command(GET_STORAGE_ITEMS, { storageId });
       const entry = items.entries.find((candidate) => candidate[0] === key);
       return entry?.[1] ?? null;
     });
@@ -63,7 +61,7 @@ export class PageStorage implements StoragePort {
 
   // The origin of the page's top document, or null when it has none, such as about:blank.
   async #pageOrigin(): Promise<string | null> {
-    const tree = await this.#command<FrameTree>('Page.getFrameTree');
+    const tree = await this.#command(GET_FRAME_TREE, {});
     const frame = tree.frameTree.frame;
     if (frame.securityOrigin !== undefined && frame.securityOrigin !== '' && frame.securityOrigin !== 'null') return frame.securityOrigin;
     try {

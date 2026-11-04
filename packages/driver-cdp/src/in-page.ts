@@ -361,8 +361,7 @@ export function guardDetails(element: Element): string {
 }
 
 // Chooses the option of a select whose visible text, or else whose value, is `option`, and fires
-// the input and change events a person's choice fires. Returns 'selected', 'no-option' or
-// 'not-a-select'.
+// the input and change events a person's choice fires. Returns what SelectOutcome names.
 export function selectOption(element: Element, option: string): string {
   const normalise = (text: string): string => text.replace(/\s+/g, ' ').trim();
   if (!(element instanceof HTMLSelectElement)) return 'not-a-select';

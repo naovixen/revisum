@@ -4,14 +4,24 @@
 // their channels. Only network schemes are recorded; data:, blob: and the like never leave, and
 // neither does a request a declared stub answered inside the browser, so it is left out.
 import type { BrowserChannel, BrowserRequestRecord } from '@revisum/contracts';
+import { errorText } from './browser-session.ts';
+import { ATTACHED_TO_TARGET, REQUEST_WILL_BE_SENT, WEB_SOCKET_CREATED } from './BrowserEvent.ts';
+import { ENABLE_NETWORK, SET_AUTO_ATTACH } from './BrowserCommand.ts';
+import { RUN_IF_WAITING_FOR_DEBUGGER } from './CallFunctionOn.ts';
 import type { CdpConnection } from './cdp-connection.ts';
+import { holdUnreadableEvent, type SessionFailures } from './page-watch.ts';
 
-// Chrome DevTools Protocol event shapes this recorder reads.
-type RequestWillBeSent = {
-  readonly requestId: string; readonly request: { readonly url: string }; readonly type?: string; readonly redirectResponse?: unknown;
-};
-type WebSocketCreated = { readonly url: string };
-type AttachedToTarget = { readonly sessionId: string; readonly targetInfo: { readonly type: string }; readonly waitingForDebugger: boolean };
+// How a command to a worker fails when the worker has already ended, or the browser or session has gone.
+const WORKER_ALREADY_GONE = /Session with given id not found|No target with given id|connection closed/i;
+
+// What sort of request left the browser, as far as the record says: a redirect, a beacon, or what an
+// ordinary request of the session is.
+function channelOfRequest(hasRedirect: boolean, type: string | undefined, ordinary: BrowserChannel): BrowserChannel {
+  if (hasRedirect) {
+    return 'redirect';
+  }
+  return type === 'Ping' ? 'beacon' : ordinary;
+}
 
 const NETWORK_SCHEMES = new Set(['http:', 'https:', 'ws:', 'wss:']);
 
@@ -24,13 +34,15 @@ function networkOrigin(url: string): string | null {
 
 export class EgressRecorder {
   readonly #connection: CdpConnection;
+  readonly #failures: SessionFailures;
   // Each record with the Network domain's id of its request, when it has one.
   readonly #records: { readonly record: BrowserRequestRecord; readonly requestId: string | null }[] = [];
   // The ids of the requests a stub answered inside the browser.
   readonly #answeredInBrowser = new Set<string>();
 
-  constructor(connection: CdpConnection) {
+  constructor(connection: CdpConnection, failures: SessionFailures) {
     this.#connection = connection;
+    this.#failures = failures;
   }
 
   records(): readonly BrowserRequestRecord[] {
@@ -61,12 +73,11 @@ export class EgressRecorder {
 
   // Watches one session's requests; `channel` is what an ordinary request of that session is.
   #watch(sessionId: string, channel: BrowserChannel): void {
-    this.#connection.on(sessionId, 'Network.requestWillBeSent', (parameters) => {
-      const sent = parameters as RequestWillBeSent;
-      const kind: BrowserChannel = sent.redirectResponse !== undefined ? 'redirect' : sent.type === 'Ping' ? 'beacon' : channel;
-      this.record(sent.request.url, kind, sent.requestId);
-    });
-    this.#connection.on(sessionId, 'Network.webSocketCreated', (parameters) => this.record((parameters as WebSocketCreated).url, 'websocket'));
+    const onMalformed = holdUnreadableEvent(this.#failures);
+    this.#connection.listen(sessionId, REQUEST_WILL_BE_SENT, (sent) => {
+      this.record(sent.request.url, channelOfRequest(sent.redirectResponse !== undefined, sent.type, channel), sent.requestId);
+    }, onMalformed);
+    this.#connection.listen(sessionId, WEB_SOCKET_CREATED, (created) => { this.record(created.url, 'websocket'); }, onMalformed);
   }
 
   // Starts recording the page's requests and its dedicated workers'. A worker is attached paused,
@@ -74,15 +85,30 @@ export class EgressRecorder {
   async start(pageSessionId: string): Promise<void> {
     const connection = this.#connection;
     this.#watch(pageSessionId, 'page');
-    connection.on(pageSessionId, 'Target.attachedToTarget', (parameters) => {
-      const attached = parameters as AttachedToTarget;
-      if (attached.targetInfo.type === 'worker') this.#watch(attached.sessionId, 'worker');
-      const watching = attached.targetInfo.type === 'worker' ? connection.send(attached.sessionId, 'Network.enable') : Promise.resolve();
-      void watching.catch(() => undefined)
-        .then(() => (attached.waitingForDebugger ? connection.send(attached.sessionId, 'Runtime.runIfWaitingForDebugger') : undefined))
-        .catch(() => undefined);
-    });
-    await connection.send(pageSessionId, 'Network.enable');
-    await connection.send(pageSessionId, 'Target.setAutoAttach', { autoAttach: true, waitForDebuggerOnStart: true, flatten: true, filter: [{ type: 'worker' }] });
+    connection.listen(pageSessionId, ATTACHED_TO_TARGET, (attached) => {
+      const isWorker = attached.targetInfo.type === 'worker';
+      if (isWorker) this.#watch(attached.sessionId, 'worker');
+      void this.#letRun(attached.sessionId, isWorker, attached.waitingForDebugger);
+    }, holdUnreadableEvent(this.#failures));
+    await connection.ask(pageSessionId, ENABLE_NETWORK, {});
+    await connection.ask(pageSessionId, SET_AUTO_ATTACH, { autoAttach: true, waitForDebuggerOnStart: true, flatten: true, filter: [{ type: 'worker' }] });
+  }
+
+  // Each step is tried whatever the other did: a worker left paused does nothing at all. Never rejects,
+  // since it runs as an event arrives: a failure is for the session's close to report.
+  async #letRun(sessionId: string, isWorker: boolean, isWaiting: boolean): Promise<void> {
+    if (isWorker) {
+      await this.#connection.ask(sessionId, ENABLE_NETWORK, {}).catch((error: unknown) => { this.#noteWorkerFailure(error); });
+    }
+    if (isWaiting) {
+      await this.#connection.ask(sessionId, RUN_IF_WAITING_FOR_DEBUGGER, {}).catch((error: unknown) => { this.#noteWorkerFailure(error); });
+    }
+  }
+
+  #noteWorkerFailure(error: unknown): void {
+    const text = errorText(error);
+    if (!WORKER_ALREADY_GONE.test(text)) {
+      this.#failures.cleanUp.push(`a worker could not be watched: ${text}`);
+    }
   }
 }

@@ -8,23 +8,25 @@ import { readFileSync, realpathSync } from 'node:fs';
 import { isAbsolute, relative, resolve } from 'node:path';
 import { chromiumBuild } from './browser-build.ts';
 import { buildSession, buildTab, errorText, type SessionDetails } from './browser-session.ts';
-import {
-  CALL_FUNCTION_ON, EVALUATE, GET_FULL_ACCESSIBILITY_TREE, GET_PROPERTIES, NAVIGATE, RESOLVE_NODE,
-  type BrowserCommand, type CallResult, type RemoteObject, type RequestPaused,
-} from './BrowserCommand.ts';
+import { ADD_BINDING, ADD_SCRIPT_ON_NEW_DOCUMENT, ATTACH_TO_TARGET, CAPTURE_SCREENSHOT, CLOSE_TARGET, CREATE_BROWSER_CONTEXT, CREATE_ISOLATED_WORLD, CREATE_TARGET, ENABLE_PAGE, ENABLE_RUNTIME, GET_FRAME_TREE, GET_VERSION, NAVIGATE, SET_DEVICE_METRICS, SET_EMULATED_MEDIA, SET_FOCUS_EMULATION, SET_LOCALE, SET_SCRIPT_EXECUTION_DISABLED, SET_TIME_ZONE, SET_TOUCH_EMULATION, SET_USER_AGENT, type BrowserCommand, type CallArgument, type CallResult, type FrameTree, type RemoteObject } from './BrowserCommand.ts';
+import { BINDING_CALLED, FRAME_STOPPED_LOADING, LOAD_EVENT_FIRED, type RequestAtResponseStage } from './BrowserEvent.ts';
+import { CALL_FUNCTION_ON, DESCRIBE_NODE, EVALUATE, GET_EVENT_LISTENERS, GET_FULL_ACCESSIBILITY_TREE, GET_PARTIAL_ACCESSIBILITY_TREE, GET_PROPERTIES, QUERY_ACCESSIBILITY_TREE, RELEASE_OBJECT, RELEASE_OBJECT_GROUP, RESOLVE_NODE, RUN_IF_WAITING_FOR_DEBUGGER, SET_FILE_INPUT_FILES } from './CallFunctionOn.ts';
+import { CONTINUE_REQUEST, DISPATCH_KEY_EVENT, DISPATCH_MOUSE_EVENT, ENABLE_REQUEST_HOLDING, FAIL_REQUEST, FULFIL_REQUEST, GET_RESPONSE_BODY, INSERT_TEXT } from './DispatchMouseEvent.ts';
 import type { CdpConnection, CdpSessionClient } from './cdp-connection.ts';
 import { DownloadFolder } from './downloads.ts';
 import { EgressRecorder } from './egress-records.ts';
-import { BrowserNetwork, atResponseStage } from './network-stubs.ts';
-import { afterTwoFrames, focusAndSelect, focusElement, frameContentOffset, isConnectedToItsDocument, scriptResultText } from './in-page.ts';
+import { CLICK_WATCH_SCRIPT, PressSent, type CheckRead, type PressCheck } from './HitChecks.ts';
+import { BrowserNetwork } from './network-stubs.ts';
+import { afterTwoFrames, focusAndSelect, focusElement, frameContentOffset, isConnectedToItsDocument, scriptResultText, selectOption } from './in-page.ts';
+import { MalformedBrowserReply } from './MalformedBrowserReply.ts';
 import type { HeldModifierKey } from './modifier-keys.ts';
-import type {
-  DriverSession, ExposedStates, OwnBrowserDriver, PageArgument, PageFunction, PageWithInput, Point, RoleAndName, ScriptCallOutcome,
+import {
+  SelectOutcome,
+  type DriverSession, type ExposedStates, type OwnBrowserDriver, type PageArgument, type PageFunction, type PageWithInput, type Point, type RoleAndName, type ScriptCallOutcome,
 } from './page-operations.ts';
 import { nodesAPressPasses, pressActsByItself } from './NodesAPressPasses.ts';
-import { KeptObjectGone } from './KeptObjectGone.ts';
 import { PageHeldByDialog } from './PageHeldByDialog.ts';
-import { PageWatch, type AttachedPage, type SessionFailures } from './page-watch.ts';
+import { PageWatch, holdUnreadableEvent, type AttachedPage, type SessionFailures } from './page-watch.ts';
 import { RunClipboard, SHARED_BROWSER_CLIPBOARD, allowRunClipboard } from './run-clipboard.ts';
 import { openSessionEgress, type EgressSource, type OpenedSessionEgress } from './SessionEgress.ts';
 import { attachToSharedBrowser, launchOwnBrowser, type AttachedBrowser, type BrowserSource } from './SharedBrowser.ts';
@@ -32,6 +34,7 @@ import { BrowserClock } from './virtual-clock.ts';
 import { PageStorage } from './web-storage.ts';
 
 const CDP_ADAPTER_VERSION = '0.1.0';
+const pause = (milliseconds: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, milliseconds));
 // Schemes the page may load without an allow-list check: they never reach the network.
 const LOCAL_SCHEMES = ['data:', 'about:', 'blob:', 'chrome-error:'];
 const isAllowedUrl = (url: URL, allowedOrigins: readonly string[]): boolean =>
@@ -110,25 +113,6 @@ function heldKeyDefinition(definition: KeyDefinition, held: readonly HeldModifie
 // Chromium-internal roles mapped to ARIA roles, and structural roles left out of snapshots.
 const ROLE_NAMES: Readonly<Record<string, string>> = { RootWebArea: 'document', image: 'img', LabelText: 'label' };
 const TRANSPARENT_ROLES = new Set(['none', 'generic', 'StaticText', 'InlineTextBox', 'LineBreak', 'ignored', 'presentation']);
-
-// Chrome DevTools Protocol shapes this driver reads.
-type CallArgument = { readonly value?: unknown; readonly unserializableValue?: string; readonly objectId?: string };
-type AccessibilityValue = { readonly type: string; readonly value?: unknown };
-type AccessibilityProperty = { readonly name: string; readonly value: AccessibilityValue };
-type AccessibilityNode = {
-  readonly nodeId: string;
-  readonly ignored: boolean;
-  readonly role?: AccessibilityValue;
-  readonly name?: AccessibilityValue;
-  readonly properties?: readonly AccessibilityProperty[];
-  readonly childIds?: readonly string[];
-  readonly parentId?: string;
-  readonly backendDOMNodeId?: number;
-};
-type FrameTree = { readonly frame: { readonly id: string; readonly unreachableUrl?: string }; readonly childFrames?: readonly FrameTree[] };
-type DescribedNode = {
-  readonly node: { readonly backendNodeId: number; readonly frameId?: string; readonly contentDocument?: { readonly backendNodeId: number } };
-};
 
 // The remote objects a page script's call makes, released together once its result is written.
 const SCRIPT_OBJECT_GROUP = 'driver-page-script';
@@ -288,25 +272,27 @@ async function createSession(
   attached: AttachedBrowser, sessionEgress: OpenedSessionEgress, target: Target, environment: SessionEnvironment, fixturesFolder: string | undefined,
 ): Promise<DriverSession> {
   const connection = attached.connection;
-  const version = await connection.send<{ product: string; userAgent: string }>(undefined, 'Browser.getVersion');
-  const { browserContextId } = await connection.send<{ browserContextId: string }>(undefined, 'Target.createBrowserContext', { disposeOnDetach: true, ...sessionEgress.contextProxy });
-  const { targetId } = await connection.send<{ targetId: string }>(undefined, 'Target.createTarget', { url: 'about:blank', browserContextId });
-  const { sessionId } = await connection.send<{ sessionId: string }>(undefined, 'Target.attachToTarget', { targetId, flatten: true });
+  const version = await connection.ask(undefined, GET_VERSION, {});
+  const { browserContextId } = await connection.ask(undefined, CREATE_BROWSER_CONTEXT, { disposeOnDetach: true, ...sessionEgress.contextProxy });
+  const { targetId } = await connection.ask(undefined, CREATE_TARGET, { url: 'about:blank', browserContextId });
+  const { sessionId } = await connection.ask(undefined, ATTACH_TO_TARGET, { targetId, flatten: true });
+  const failures: SessionFailures = { refusedDecisions: [], cleanUp: [] };
   // Every request's origin and channel, for the run's egress events.
-  const recorder = new EgressRecorder(connection);
+  const recorder = new EgressRecorder(connection, failures);
   const browser: SessionBrowser = {
     connection, browserContextId, userAgent: version.userAgent, target, environment, blocked: [], recorder,
     downloads: new DownloadFolder(connection, browserContextId),
     network: new BrowserNetwork(connection, {
       readFixture: (fixture) => readFixture(fixturesFolder, fixture),
-      onAnsweredInBrowser: (requestId) => recorder.answeredInBrowser(requestId),
+      onAnsweredInBrowser: (requestId) => { recorder.answeredInBrowser(requestId); },
+      onMalformedEvent: holdUnreadableEvent(failures),
     }),
     clock: new BrowserClock(environment.virtualTimers === true),
-    failures: { refusedDecisions: [], cleanUp: [] },
+    failures,
   };
   await allowRunClipboard(connection, browserContextId);
 
-  await connection.send(sessionId, 'Page.enable');
+  await connection.ask(sessionId, ENABLE_PAGE, {});
   const watch = new PageWatch(connection, { browserContextId, targetId, sessionId }, {
     failures: browser.failures, onPopupRequest: (url) => { recordPopupRequest(browser, url); }, ownsBrowserContext: true, claimsDownload: (event) => browser.downloads.claims(event), isDownloadStepUnderWay: () => browser.downloads.isArmed(),
   });
@@ -315,9 +301,9 @@ async function createSession(
   await browser.network.watchPage(sessionId);
   browser.downloads.watchResponses(sessionId);
   await preparePage(browser, sessionId, watch);
-  await browser.clock.watchPage((method, parameters) => watch.command(method, parameters), () => watch.crashed());
+  await browser.clock.watchPage((command, parameters) => watch.ask(command, parameters), () => watch.crashed());
 
-  const operations = new CdpPage(connection, sessionId, watch, null, environment.virtualTimers === true);
+  const operations = new CdpPage(connection, sessionId, watch, null);
   const details: SessionDetails = {
     browser: { name: 'chromium', version: /\/(\S+)$/.exec(version.product)?.[1] ?? version.product },
     processId: attached.processId,
@@ -330,18 +316,14 @@ async function createSession(
     // here, and the folder stays for the same reason. The egress goes last, whatever happened, since
     // nothing else ends it. Clean-up failures are read while the session still runs: closing fails
     // whatever was still waiting for an answer, which says nothing about it.
-    close: async () => {
-      try {
-        try {
-          await watch.settleHeldPopupsAndReportCleanUp();
-        } finally {
-          await attached.close();
-          browser.downloads.remove();
-        }
-      } finally {
-        await sessionEgress.egress.close();
-      }
-    },
+    close: () => closeInTurn([
+      () => watch.settleHeldPopupsAndReportCleanUp(),
+      async () => {
+        await attached.close();
+        browser.downloads.remove();
+      },
+      () => sessionEgress.egress.close(),
+    ]),
     events: watch,
     fixturePath: (fixture) => fixtureFilePath(fixturesFolder, fixture),
     downloads: browser.downloads,
@@ -352,38 +334,61 @@ async function createSession(
     clock: browser.clock,
     clipboard: attached.isShared
       ? SHARED_BROWSER_CLIPBOARD
-      : new RunClipboard(connection, browserContextId, (method, parameters) => watch.commandToRunningPage(method, parameters), () => watch.crashed()),
+      : new RunClipboard(connection, browserContextId, (command, parameters) => watch.askRunningPage(command, parameters), () => watch.crashed()),
   };
   return buildSession(operations, environment, details);
 }
 
+// Runs every closer, whatever the others did, and then rejects with all that went wrong.
+async function closeInTurn(closers: readonly (() => Promise<void>)[]): Promise<void> {
+  const failed: unknown[] = [];
+  for (const close of closers) {
+    try {
+      await close();
+    } catch (error) {
+      failed.push(error);
+    }
+  }
+  if (failed.length === 1) {
+    throw failed[0];
+  }
+  if (failed.length > 1) {
+    throw new Error(failed.map(errorText).join('; '));
+  }
+}
+
 // Makes a page of the session hermetic and repeatable before it loads anything: the target's
 // device, locale, time zone, colour scheme and motion, the determinism script, emulated focus (a
-// headless page has none, and the clipboard needs it), and the egress allow-list, whose refusals
-// join the session's blocked origins.
+// headless page has none, and the clipboard needs it), the click checks' world, and the egress
+// allow-list, whose refusals join the session's blocked origins.
 async function preparePage(browser: SessionBrowser, sessionId: string, watch: PageWatch): Promise<void> {
   const { connection, target, environment } = browser;
   const page = connection.session(sessionId);
   const profile = deviceProfile(target);
-  await page.send('Emulation.setDeviceMetricsOverride', { width: profile.width, height: profile.height, deviceScaleFactor: profile.scale, mobile: profile.mobile });
+  await page.ask(SET_DEVICE_METRICS, { width: profile.width, height: profile.height, deviceScaleFactor: profile.scale, mobile: profile.mobile });
   // The quoted key is the protocol's own parameter name.
-  if (profile.touch) await page.send('Emulation.setTouchEmulationEnabled', { enabled: true, 'maxTouchPoints': 5 });
-  await page.send('Emulation.setLocaleOverride', { locale: target.locale });
-  await page.send('Emulation.setTimezoneOverride', { timezoneId: target.timezone });
+  if (profile.touch) await page.ask(SET_TOUCH_EMULATION, { enabled: true, 'maxTouchPoints': 5 });
+  await page.ask(SET_LOCALE, { locale: target.locale });
+  await page.ask(SET_TIME_ZONE, { timezoneId: target.timezone });
   // navigator.language follows Accept-Language, so the locale needs both overrides.
-  await page.send('Emulation.setUserAgentOverride', { userAgent: browser.userAgent, acceptLanguage: target.locale });
-  await page.send('Emulation.setEmulatedMedia', { features: [
+  await page.ask(SET_USER_AGENT, { userAgent: browser.userAgent, acceptLanguage: target.locale });
+  await page.ask(SET_EMULATED_MEDIA, { features: [
     { name: 'prefers-reduced-motion', value: target.reducedMotion },
     { name: 'prefers-color-scheme', value: target.colorScheme },
   ] });
-  await page.send('Emulation.setFocusEmulationEnabled', { enabled: true });
-  await page.send('Page.addScriptToEvaluateOnNewDocument', { source: determinismScript(environment.seed, environment.fixedTimeMilliseconds) });
+  await page.ask(SET_FOCUS_EMULATION, { enabled: true });
+  await page.ask(ADD_SCRIPT_ON_NEW_DOCUMENT, { source: determinismScript(environment.seed, environment.fixedTimeMilliseconds) });
+  // The browser tells the driver of a binding's calls only with this domain on. Only the click checks'
+  // world has the binding, so the page's scripts cannot call it.
+  await page.ask(ENABLE_RUNTIME, {});
+  await page.ask(ADD_BINDING, { name: PRESS_REPORT_BINDING, executionContextName: CLICK_CHECK_WORLD_NAME });
+  await page.ask(ADD_SCRIPT_ON_NEW_DOCUMENT, { source: CLICK_WATCH_SCRIPT, worldName: CLICK_CHECK_WORLD_NAME });
 
   // Every request is paused and either let through (allowed origin) or failed and recorded. An
   // allowed fetch or XHR request an active stub matches is answered by the stub instead. A request
   // whose response fields a plan may read is held again once its response is in, for its body.
   watch.onRequestPaused(sessionId, (paused) => {
-    if (atResponseStage(paused)) { void takeResponseBody(page, browser.network, paused, watch); return; }
+    if (paused.stage === 'response') { void takeResponseBody(page, browser.network, paused, watch); return; }
     const url = URL.parse(paused.request.url);
     // A URL that cannot be parsed is blocked, with no origin to show.
     const allowed = url !== null && isAllowedUrl(url, environment.allowedOrigins);
@@ -391,33 +396,42 @@ async function preparePage(browser: SessionBrowser, sessionId: string, watch: Pa
       browser.blocked.push(url.origin);
     }
     const stubbed = allowed ? browser.network.answer(paused) : null;
-    const sendDecision = (): Promise<unknown> => {
+    const sendDecision = async (): Promise<void> => {
       if (stubbed !== null) {
-        return page.send('Fetch.fulfillRequest', { requestId: paused.requestId, ...stubbed });
+        await page.ask(FULFIL_REQUEST, { requestId: paused.requestId, ...stubbed.response });
+        stubbed.onAccepted();
+        return;
       }
       if (!allowed) {
-        return page.send('Fetch.failRequest', { requestId: paused.requestId, errorReason: 'BlockedByClient' });
+        await page.ask(FAIL_REQUEST, { requestId: paused.requestId, errorReason: 'BlockedByClient' });
+        return;
       }
-      return page.send('Fetch.continueRequest', { requestId: paused.requestId, ...(browser.network.wantsResponseBody(paused) ? { interceptResponse: true } : {}) });
+      await page.ask(CONTINUE_REQUEST, { requestId: paused.requestId, ...(browser.network.wantsResponseBody(paused) ? { interceptResponse: true as const } : {}) });
     };
     sendDecision().catch((error: unknown) => { watch.noteDecisionFailure(error); });
   });
-  await page.send('Fetch.enable', { patterns: [{ urlPattern: '*', requestStage: 'Request' }] });
+  await page.ask(ENABLE_REQUEST_HOLDING, { patterns: [{ urlPattern: '*', requestStage: 'Request' }] });
 }
 
-type FetchedBody = { readonly body: string; readonly base64Encoded: boolean };
+// How the browser says a held response has no body to take: it is a redirect or has none, or nothing
+// is held any more. Any other failure is reported at the session's close.
+const NO_BODY_TO_TAKE = /Can only get response body|No data found|No resource with given|Request content was evicted|Invalid InterceptionId|Session with given id not found|connection closed/;
 
 // Takes the body of a response held at the response stage, for the request check that reads its
 // fields, then lets the page have it unchanged. A body that cannot be taken is left out: the
 // exchange still counts, with no body to read.
-async function takeResponseBody(page: CdpSessionClient, network: BrowserNetwork, held: RequestPaused, watch: PageWatch): Promise<void> {
-  if (held.responseErrorReason === undefined && held.networkId !== undefined) {
+async function takeResponseBody(page: CdpSessionClient, network: BrowserNetwork, held: RequestAtResponseStage, watch: PageWatch): Promise<void> {
+  if (!held.hasFailed && held.networkId !== undefined) {
     try {
-      const fetched = await page.send<FetchedBody>('Fetch.getResponseBody', { requestId: held.requestId });
+      const fetched = await page.ask(GET_RESPONSE_BODY, { requestId: held.requestId });
       network.keepResponseBody(held.networkId, Buffer.from(fetched.body, fetched.base64Encoded ? 'base64' : 'utf8'));
-    } catch { /* the response had no body to take */ }
+    } catch (error) {
+      if (!NO_BODY_TO_TAKE.test(errorText(error))) {
+        watch.noteCleanUpFailure(`a response's body could not be taken: ${errorText(error)}`);
+      }
+    }
   }
-  await page.send('Fetch.continueRequest', { requestId: held.requestId }).catch((error: unknown) => { watch.noteDecisionFailure(error); });
+  await page.ask(CONTINUE_REQUEST, { requestId: held.requestId }).catch((error: unknown) => { watch.noteDecisionFailure(error); });
 }
 
 // Opens a second tab in the session's own browser context, so it shares cookies and storage. The
@@ -428,7 +442,7 @@ async function openTab(browser: SessionBrowser, firstWatch: PageWatch, firstDeta
   const attaching = firstWatch.nextTab(TAB_ATTACH_TIMEOUT_MILLISECONDS);
   let attached: AttachedPage;
   try {
-    await connection.send(undefined, 'Target.createTarget', { url: 'about:blank', browserContextId });
+    await connection.ask(undefined, CREATE_TARGET, { url: 'about:blank', browserContextId });
     attached = await attaching.promise;
   } catch (error) {
     attaching.cancel();
@@ -440,27 +454,29 @@ async function openTab(browser: SessionBrowser, firstWatch: PageWatch, firstDeta
   let stopResponses = (): void => undefined;
   let stopNetwork = (): void => undefined;
   let stopClock = (): void => undefined;
+  // Never rejects: what stops a tab closing is for the session's close to report, and must not take the
+  // place of what a step found.
   const close = async (): Promise<void> => {
     watch.stop();
     stopResponses();
     stopNetwork();
     stopClock();
-    await connection.send(undefined, 'Target.closeTarget', { targetId: attached.targetId }).catch(() => undefined);
+    await connection.ask(undefined, CLOSE_TARGET, { targetId: attached.targetId }).catch((error: unknown) => { watch.noteTargetFailure('a tab could not be closed', error); });
   };
   try {
-    await connection.send(attached.sessionId, 'Page.enable');
+    await connection.ask(attached.sessionId, ENABLE_PAGE, {});
     await watch.start();
     await browser.recorder.start(attached.sessionId);
     stopNetwork = await browser.network.watchPage(attached.sessionId);
     stopResponses = browser.downloads.watchResponses(attached.sessionId);
     await preparePage(browser, attached.sessionId, watch);
-    stopClock = await browser.clock.watchPage((method, parameters) => watch.command(method, parameters), () => watch.crashed());
-    await connection.send(attached.sessionId, 'Runtime.runIfWaitingForDebugger');
+    stopClock = await browser.clock.watchPage((command, parameters) => watch.ask(command, parameters), () => watch.crashed());
+    await connection.ask(attached.sessionId, RUN_IF_WAITING_FOR_DEBUGGER, {});
   } catch (error) {
     await close();
     return failure({ code: 'navigation-failed', detail: `the new tab could not be prepared: ${errorText(error)}` });
   }
-  const operations = new CdpPage(connection, attached.sessionId, watch, null, browser.environment.virtualTimers === true);
+  const operations = new CdpPage(connection, attached.sessionId, watch, null);
   return success(buildTab(operations, browser.environment, {
     fixturePath: firstDetails.fixturePath, downloads: browser.downloads, events: watch, close, secretTypedFields: firstDetails.secretTypedFields,
   }));
@@ -468,20 +484,13 @@ async function openTab(browser: SessionBrowser, firstWatch: PageWatch, firstDeta
 
 // The storage port of one page, whose commands fail at once once its renderer has died.
 const pageStorage = (watch: PageWatch): PageStorage =>
-  new PageStorage((method, parameters) => watch.commandToRunningPage(method, parameters), () => watch.crashed());
+  new PageStorage((command, parameters) => watch.askRunningPage(command, parameters), () => watch.crashed());
 
-// An isolated script world of one frame: the page's own scripts cannot see or change it; it shares
-// only the document. The driver reads an iframe's document through one, and the top document
-// through one while the page's scripts are off, since timers do not run in the page's own world
-// then, and while the page's timers run on virtual time, since they wait for clock advances then.
-type IsolatedWorld = { readonly frameId: string; executionContextId: number };
-
-// Where a CdpPage's document is when it is an iframe's: its element in the parent document, and
-// the isolated world it is read through.
+// Where a CdpPage's document is when it is an iframe's: its element in the parent document, and its frame.
 type FrameScope = {
   readonly parent: CdpPage;
   readonly frameElement: string;
-  readonly world: IsolatedWorld;
+  readonly frameId: string;
 };
 
 // The accessibility properties that hold an element's selected, expanded and pressed states.
@@ -494,17 +503,24 @@ function stateValue(value: unknown): boolean | null {
   return null;
 }
 
-// The name of the isolated script world the driver reads a frame's document through.
-const FRAME_WORLD_NAME = 'driver-frame';
+// The name of the isolated script world the driver reads every document through. The page's own scripts
+// cannot reach it, so what they replace is not what a read calls, and what a read says is not theirs to
+// write. It runs too where the page's own world does not: with the page's scripts turned off, in a
+// document whose own security policy forbids them, and while its timers run on virtual time.
+const READING_WORLD_NAME = 'driver-frame';
 // The name of the isolated script world click checks live in. The browser gives a frame's document one
 // world for each name, so this makes no more of them however many clicks there are.
 const CLICK_CHECK_WORLD_NAME = 'driver-click-check';
-// The group of the objects kept in that world, so that one nobody holds any more can still be let go.
-const OUT_OF_REACH_OBJECT_GROUP = 'driver-kept-out-of-reach';
+// What the click checks' world calls to report a press as it goes, while nothing else can be read.
+const PRESS_REPORT_BINDING = 'driverPressReport';
+// How long what a check reported before a dialog opened, or its document went, is given to arrive. It
+// was on its way before either, by another route to the driver.
+const REPORTS_ARRIVE_MILLISECONDS = 100;
+// A kept check's objects are grouped by frame, so that one nobody holds any more can still be let go,
+// and letting go of one document's cannot touch a check that is live in another.
+const outOfReachObjectGroup = (frameId: string): string => `driver-kept-out-of-reach-${frameId}`;
 // What Page.navigate reports for a response whose HTTP status is an error and whose body is empty.
 const HTTP_ERROR_STATUS = 'net::ERR_HTTP_RESPONSE_CODE_FAILURE';
-// Messages of a command that named an execution context the page has since destroyed.
-const LOST_CONTEXT = /context|Cannot find/i;
 // Messages of a command about an object whose document was replaced, or whose tab has closed.
 const LOST_OBJECT = /Cannot find context|Could not find object|Execution context was destroyed|Inspected target navigated or closed|Session with given id not found/i;
 // How making a script world fails for a frame the page has removed.
@@ -521,6 +537,26 @@ function throwIfThePageThrew(called: CallResult): void {
   if (called.exceptionDetails !== undefined) throw new Error(`page exception: ${called.exceptionDetails.exception?.value ?? called.exceptionDetails.text}`);
 }
 
+function textOfCall(called: CallResult): string {
+  const text = called.result.value;
+  if (typeof text !== 'string') {
+    throw new MalformedBrowserReply(CALL_FUNCTION_ON.method, 'result.result.value');
+  }
+  return text;
+}
+
+const callArgumentsOf = (inputs: readonly PageArgument<string>[]): CallArgument[] =>
+  inputs.map((input) => (typeof input === 'object' && 'element' in input ? { objectId: input.element } : { value: input }));
+
+// The ids of the frame and of every frame inside it, or none when it is no longer in the tree.
+function frameIdsInside(tree: FrameTree, frameId: string): readonly string[] {
+  if (tree.frame.id === frameId) {
+    const everyFrame = (inside: FrameTree): readonly string[] => [inside.frame.id, ...(inside.childFrames ?? []).flatMap(everyFrame)];
+    return everyFrame(tree);
+  }
+  return (tree.childFrames ?? []).flatMap((child) => frameIdsInside(child, frameId));
+}
+
 // PageOperations over one flat CDP session, for its top document or one of its iframes' documents.
 // Element handles are remote object ids.
 class CdpPage implements PageWithInput<string> {
@@ -530,79 +566,50 @@ class CdpPage implements PageWithInput<string> {
   readonly #sessionId: string;
   readonly #watch: PageWatch;
   readonly #frame: FrameScope | null;
-  // For the top document: whether the page's scripts are off, and the world it is read through then.
+  // For the top document: whether the page's scripts are off, and its frame's id once known. A page's
+  // top frame keeps its id for as long as the tab lives.
   #scriptsDisabled = false;
-  #scriptsOffWorld: IsolatedWorld | null = null;
-  // For the top document: whether the page's timers run on virtual time, and the world it is read
-  // through then, made when first needed.
-  readonly #virtualTimers: boolean;
-  #virtualTimersWorld: IsolatedWorld | null = null;
+  #topFrameId: string | null = null;
 
-  constructor(connection: CdpConnection, sessionId: string, watch: PageWatch, frame: FrameScope | null, virtualTimers = false) {
+  constructor(connection: CdpConnection, sessionId: string, watch: PageWatch, frame: FrameScope | null) {
     this.#connection = connection;
     this.#sessionId = sessionId;
     this.#watch = watch;
     this.#frame = frame;
-    this.#virtualTimers = virtualTimers && frame === null;
   }
 
   // Every command goes through the watch, so a crashed page or one a dialog holds fails it at once.
-  #send<Value = Record<string, unknown>>(method: string, parameters: Record<string, unknown> = {}): Promise<Value> {
-    return this.#watch.commandToRunningPage<Value>(method, parameters);
-  }
-
-  #ask<Reply>(command: BrowserCommand<Reply>, parameters: Record<string, unknown> = {}): Promise<Reply> {
+  #ask<CommandParameters, Reply>(command: BrowserCommand<CommandParameters, Reply>, parameters: NoInfer<CommandParameters>): Promise<Reply> {
     return this.#watch.askRunningPage(command, parameters);
   }
 
   // Sends input to a page no dialog holds. A dialog that opens while it waits is the input landing,
   // such as the mouse release whose click opens one: this ends then, since the browser answers the
   // command itself only once the dialog is answered.
-  async #sendInput(method: string, parameters: Record<string, unknown>): Promise<void> {
+  async #sendInput<CommandParameters>(command: BrowserCommand<CommandParameters, void>, parameters: NoInfer<CommandParameters>): Promise<void> {
     if (this.#watch.openDialog() !== null) {
-      throw new PageHeldByDialog(method);
+      throw new PageHeldByDialog(command.method);
     }
     const opened = this.#watch.dialogOpened();
     try {
-      await Promise.race([this.#watch.command(method, parameters), opened.promise]);
+      await Promise.race([this.#watch.ask(command, parameters), opened.promise]);
     } finally {
       opened.cancel();
     }
   }
 
-  // The isolated world this document is read through, or null for the page's own world.
-  #world(): IsolatedWorld | null {
-    return this.#frame?.world ?? this.#scriptsOffWorld ?? this.#virtualTimersWorld;
-  }
-
-  // The world this document is read through, made first for a top document whose page's timers
-  // run on virtual time.
-  async #readingWorld(): Promise<IsolatedWorld | null> {
-    const world = this.#world();
-    if (world !== null || !this.#virtualTimers) return world;
-    const { frameTree } = await this.#send<{ frameTree: FrameTree }>('Page.getFrameTree');
-    this.#virtualTimersWorld = { frameId: frameTree.frame.id, executionContextId: await this.#isolatedWorld(frameTree.frame.id) };
-    return this.#virtualTimersWorld;
-  }
-
   async navigate(url: string, timeoutMilliseconds: number, scripts: 'enabled' | 'disabled'): Promise<void> {
-    const frameId = this.#frame?.world.frameId;
+    const frameId = this.#frame?.frameId;
     // Script execution is a setting of the whole page, so only the top document's navigate changes
     // it; it stays as set until the next one.
     if (frameId === undefined) {
       const disable = scripts === 'disabled';
       if (disable !== this.#scriptsDisabled) {
-        await this.#send('Emulation.setScriptExecutionDisabled', { value: disable });
+        await this.#ask(SET_SCRIPT_EXECUTION_DISABLED, { value: disable });
         this.#scriptsDisabled = disable;
       }
-      this.#scriptsOffWorld = null;
-      this.#virtualTimersWorld = null;
     }
-    // The top document has loaded at its load event; a frame once it stops loading.
-    const loaded = frameId === undefined
-      ? this.#connection.once(this.#sessionId, 'Page.loadEventFired', timeoutMilliseconds)
-      : this.#frameStoppedLoading(frameId, timeoutMilliseconds);
-    loaded.promise.catch(() => undefined);
+    const loaded = this.#whenLoaded(frameId, timeoutMilliseconds);
     try {
       // Sent whatever holds the page: a navigation away ends a dialog, and the browser answers it.
       // The browser answers once the document's own request has gone on, which a refused decision stops.
@@ -613,69 +620,73 @@ class CdpPage implements PageWithInput<string> {
       // its own error page for it, and the plan's checks decide what that means.
       const navigationError = navigated.errorText ?? '';
       if (navigationError !== '' && navigationError !== HTTP_ERROR_STATUS) throw new Error(navigationError);
-      await this.#watch.failingOnRefusedDecision(this.#watch.failingOnCrash('Page.navigate', loaded.promise));
+      const notLoaded = await this.#watch.failingOnRefusedDecision(this.#watch.failingOnCrash(NAVIGATE.method, loaded.promise));
+      if (notLoaded !== null) {
+        throw new Error(notLoaded);
+      }
     } finally {
       loaded.cancel();
     }
-    if (frameId === undefined && this.#scriptsDisabled) {
-      const { frameTree } = await this.#send<{ frameTree: FrameTree }>('Page.getFrameTree');
-      this.#scriptsOffWorld = { frameId: frameTree.frame.id, executionContextId: await this.#isolatedWorld(frameTree.frame.id) };
-    }
   }
 
-  #frameStoppedLoading(frameId: string, timeoutMilliseconds: number): { readonly promise: Promise<unknown>; cancel(): void } {
+  // Resolves as the document has loaded, with null, or with what to say when it has not in time. The
+  // top document has loaded at its load event; a frame once it stops loading.
+  #whenLoaded(frameId: string | undefined, timeoutMilliseconds: number): { readonly promise: Promise<string | null>; cancel(): void } {
+    const onMalformed = (detail: string): void => { this.#watch.noteUnreadableEvent(detail); };
     let stopListening = (): void => undefined;
     let timer: NodeJS.Timeout | undefined;
-    const promise = new Promise<unknown>((resolveLoaded, reject) => {
-      stopListening = this.#connection.on(this.#sessionId, 'Page.frameStoppedLoading', (parameters) => {
-        if ((parameters as { frameId?: string }).frameId !== frameId) return;
+    const promise = new Promise<string | null>((resolveLoaded) => {
+      const loaded = (): void => {
         clearTimeout(timer);
         stopListening();
-        resolveLoaded(parameters);
-      });
-      timer = setTimeout(() => { stopListening(); reject(new Error(`the frame did not load within ${timeoutMilliseconds} ms`)); }, timeoutMilliseconds);
+        resolveLoaded(null);
+      };
+      stopListening = frameId === undefined
+        ? this.#connection.listen(this.#sessionId, LOAD_EVENT_FIRED, loaded, onMalformed)
+        : this.#connection.listen(this.#sessionId, FRAME_STOPPED_LOADING, (stopped) => { if (stopped.frameId === frameId) loaded(); }, onMalformed);
+      const notInTime = frameId === undefined ? `${LOAD_EVENT_FIRED.name}: timeout after ${timeoutMilliseconds} ms` : `the frame did not load within ${timeoutMilliseconds} ms`;
+      timer = setTimeout(() => { stopListening(); resolveLoaded(notInTime); }, timeoutMilliseconds);
     });
     return { promise, cancel: () => { clearTimeout(timer); stopListening(); } };
   }
 
-  // The document object: in the page's main world, or in this document's isolated world when it
-  // has one. A frame that has navigated since has lost its world, so a new one is made.
-  async #documentObject(): Promise<string> {
-    const world = await this.#readingWorld();
-    let evaluated: CallResult;
-    if (world === null) {
-      evaluated = await this.#ask(EVALUATE, { expression: 'document' });
-    } else {
-      try {
-        evaluated = await this.#ask(EVALUATE, { expression: 'document', contextId: world.executionContextId });
-      } catch (error) {
-        if (!LOST_CONTEXT.test(errorText(error)) || this.#watch.crashed()) throw error;
-        world.executionContextId = await this.#isolatedWorld(world.frameId);
-        evaluated = await this.#ask(EVALUATE, { expression: 'document', contextId: world.executionContextId });
-      }
-    }
+  async #isolatedWorld(frameId: string, worldName = READING_WORLD_NAME): Promise<number> {
+    const created = await this.#ask(CREATE_ISOLATED_WORLD, { frameId, worldName });
+    return created.executionContextId;
+  }
+
+  // The world this document is read through. Asked for at each read, since the browser gives a document
+  // one for each name, and a document that has changed since has a new one.
+  async #readingWorld(): Promise<number> {
+    return this.#isolatedWorld(await this.frameId());
+  }
+
+  // The document object, in the world given.
+  async #documentObject(world: number): Promise<string> {
+    const evaluated = await this.#ask(EVALUATE, { expression: 'document', contextId: world });
     if (evaluated.result.objectId === undefined) throw new Error('no document');
     return evaluated.result.objectId;
   }
 
-  async #isolatedWorld(frameId: string, worldName = FRAME_WORLD_NAME): Promise<number> {
-    const created = await this.#send<{ executionContextId: number }>('Page.createIsolatedWorld', { frameId, worldName });
-    return created.executionContextId;
-  }
-
   async #call(pageFunction: PageFunction, inputs: readonly PageArgument<string>[], delivery: CallDelivery): Promise<CallResult> {
-    const objectId = await this.#documentObject();
-    const callArguments: CallArgument[] = inputs.map((input) =>
-      (typeof input === 'object' && 'element' in input ? { objectId: input.element } : { value: input }));
+    const objectId = await this.#documentObject(await this.#readingWorld());
     const called = await this.#ask(CALL_FUNCTION_ON, {
-      functionDeclaration: pageFunction.toString(), objectId, arguments: callArguments, ...delivery,
+      functionDeclaration: pageFunction.toString(), objectId, arguments: callArgumentsOf(inputs), ...delivery,
     });
     throwIfThePageThrew(called);
     return called;
   }
 
   async callForString(pageFunction: PageFunction, inputs: readonly PageArgument<string>[]): Promise<string> {
-    return String((await this.#call(pageFunction, inputs, AWAITED_VALUE)).result.value ?? '');
+    return textOfCall(await this.#call(pageFunction, inputs, AWAITED_VALUE));
+  }
+
+  async callForStringInMainWorld(pageFunction: PageFunction, inputs: readonly PageArgument<string>[]): Promise<string> {
+    const called = await this.#ask(CALL_FUNCTION_ON, {
+      functionDeclaration: pageFunction.toString(), objectId: await this.#mainWorldDocument(), arguments: callArgumentsOf(inputs), ...AWAITED_VALUE,
+    });
+    throwIfThePageThrew(called);
+    return textOfCall(called);
   }
 
   async twoFramesLater(): Promise<void> {
@@ -696,17 +707,54 @@ class CdpPage implements PageWithInput<string> {
     const properties = await this.#ask(GET_PROPERTIES, { objectId: list, ownProperties: true });
     return properties.result
       .filter((property) => /^\d+$/.test(property.name))
-      .flatMap((property) => property.value?.objectId ?? []);
+      .map((property) => {
+        const handle = property.value?.objectId;
+        if (handle === undefined) {
+          throw new MalformedBrowserReply(GET_PROPERTIES.method, `result.${property.name}.value.objectId`);
+        }
+        return handle;
+      });
   }
 
-  async callForObjectOutOfReach(pageFunction: PageFunction, element: string): Promise<string> {
-    const executionContextId = await this.#isolatedWorld(await this.frameId(), CLICK_CHECK_WORLD_NAME);
-    const described = await this.#send<DescribedNode>('DOM.describeNode', { objectId: element });
+  async withPressCheck<Value>(arm: PageFunction, element: string, use: (check: PressCheck) => Promise<Value>): Promise<Value> {
+    const frameId = await this.frameId();
+    const executionContextId = await this.#isolatedWorld(frameId, CLICK_CHECK_WORLD_NAME);
+    const pressId = this.#watch.nextPressId();
+    const reported = new Set<string>();
+    const stopListening = this.#connection.listen(this.#sessionId, BINDING_CALLED, ({ name, payload }) => {
+      const [fromPress, what] = payload.split(' ');
+      if (name === PRESS_REPORT_BINDING && fromPress === pressId && what !== undefined) {
+        reported.add(what);
+      }
+    }, (detail) => { this.#watch.noteUnreadableEvent(detail); });
+    try {
+      const check = await this.#armOutOfReach(arm, element, executionContextId, frameId, pressId);
+      try {
+        return await use({
+          read: (pageFunction) => this.#readCheck(check, pageFunction),
+          reports: async () => {
+            await pause(REPORTS_ARRIVE_MILLISECONDS);
+            return reported;
+          },
+        });
+      } finally {
+        // Not waited for: what the step needs is in, and the browser answers nothing to a page that has
+        // started to navigate, which a click often makes it do.
+        void this.#releaseKept(RELEASE_OBJECT, { objectId: check });
+      }
+    } finally {
+      stopListening();
+    }
+  }
+
+  async #armOutOfReach(arm: PageFunction, element: string, executionContextId: number, frameId: string, pressId: string): Promise<string> {
+    const described = await this.#ask(DESCRIBE_NODE, { objectId: element });
     const resolved = await this.#ask(RESOLVE_NODE, { backendNodeId: described.node.backendNodeId, executionContextId });
     const elementInWorld = resolved.object.objectId;
     try {
       const called = await this.#ask(CALL_FUNCTION_ON, {
-        functionDeclaration: pageFunction.toString(), executionContextId, arguments: [{ objectId: elementInWorld }], returnByValue: false, objectGroup: OUT_OF_REACH_OBJECT_GROUP,
+        functionDeclaration: arm.toString(), executionContextId, arguments: [{ objectId: elementInWorld }, { value: PRESS_REPORT_BINDING }, { value: pressId }],
+        returnByValue: false, objectGroup: outOfReachObjectGroup(frameId),
       });
       throwIfThePageThrew(called);
       const kept = called.result.objectId;
@@ -715,55 +763,57 @@ class CdpPage implements PageWithInput<string> {
       }
       return kept;
     } finally {
-      await this.releaseObject(elementInWorld);
+      await this.#releaseKept(RELEASE_OBJECT, { objectId: elementInWorld });
     }
   }
 
-  async callOutOfReach(pageFunction: PageFunction): Promise<unknown> {
-    let called: CallResult;
+  // A read says what became of the check in every case, since each one means something to a press.
+  async #readCheck(check: string, pageFunction: PageFunction): Promise<CheckRead> {
     try {
-      const executionContextId = await this.#isolatedWorld(await this.frameId(), CLICK_CHECK_WORLD_NAME);
-      called = await this.#ask(CALL_FUNCTION_ON, { functionDeclaration: pageFunction.toString(), executionContextId, returnByValue: true });
+      const called = await this.#ask(CALL_FUNCTION_ON, { functionDeclaration: pageFunction.toString(), objectId: check, returnByValue: true });
+      throwIfThePageThrew(called);
+      return { kind: 'answered', value: called.result.value };
+    } catch (error) {
+      if (error instanceof PageHeldByDialog) {
+        return { kind: 'held-by-dialog' };
+      }
+      return LOST_OBJECT.test(errorText(error)) ? { kind: 'document-gone' } : { kind: 'failed', detail: errorText(error) };
+    }
+  }
+
+  async callInEveryFramedDocumentOutOfReach(pageFunction: PageFunction): Promise<void> {
+    const { frameTree } = await this.#ask(GET_FRAME_TREE, {});
+    for (const frameId of frameIdsInside(frameTree, await this.frameId())) {
+      if (await this.#hasTakenSomethingOff(frameId, pageFunction)) {
+        // Not waited for, as a page that has started to navigate answers nothing, and the browser has it
+        // before anything sent after this. While a dialog held the page it could not be let go.
+        void this.#releaseKept(RELEASE_OBJECT_GROUP, { objectGroup: outOfReachObjectGroup(frameId) });
+      }
+    }
+  }
+
+  // A document that has gone took its check with it, so there are no listeners left to take off.
+  async #hasTakenSomethingOff(frameId: string, pageFunction: PageFunction): Promise<boolean> {
+    try {
+      const executionContextId = await this.#isolatedWorld(frameId, CLICK_CHECK_WORLD_NAME);
+      const called = await this.#ask(CALL_FUNCTION_ON, { functionDeclaration: pageFunction.toString(), executionContextId, returnByValue: true });
+      throwIfThePageThrew(called);
+      return called.result.value === true;
     } catch (error) {
       if (LOST_OBJECT.test(errorText(error)) || FRAME_REMOVED.test(errorText(error))) {
-        throw new KeptObjectGone();
+        return false;
       }
       throw error;
     }
-    throwIfThePageThrew(called);
-    return called.result.value;
   }
 
-  async callOnObject(object: string, pageFunction: PageFunction): Promise<unknown> {
-    let called: CallResult;
+  // Never rejects, since a caller is no better off for it: a failure other than the object having gone is
+  // kept for the session's close to report. An object whose document or page has gone has gone too, and
+  // one a dialog holds goes with its document, so none of these has anything to report.
+  async #releaseKept<CommandParameters>(command: BrowserCommand<CommandParameters, void>, parameters: NoInfer<CommandParameters>): Promise<void> {
     try {
-      called = await this.#ask(CALL_FUNCTION_ON, {
-        functionDeclaration: pageFunction.toString(), objectId: object, returnByValue: true,
-      });
+      await this.#ask(command, parameters);
     } catch (error) {
-      if (LOST_OBJECT.test(errorText(error))) {
-        throw new KeptObjectGone();
-      }
-      throw error;
-    }
-    throwIfThePageThrew(called);
-    return called.result.value;
-  }
-
-  releaseObject(object: string): Promise<void> {
-    return this.#releaseKept('Runtime.releaseObject', { objectId: object });
-  }
-
-  releaseObjectsOutOfReach(): Promise<void> {
-    return this.#releaseKept('Runtime.releaseObjectGroup', { objectGroup: OUT_OF_REACH_OBJECT_GROUP });
-  }
-
-  async #releaseKept(method: string, parameters: Record<string, unknown>): Promise<void> {
-    try {
-      await this.#send(method, parameters);
-    } catch (error) {
-      // An object whose document or page has gone has gone too, and one a dialog holds goes with its
-      // document, so none of these has anything to report.
       const isOutOfReach = error instanceof PageHeldByDialog || this.#watch.crashed() || LOST_OBJECT.test(errorText(error));
       if (!isOutOfReach) {
         this.#watch.noteCleanUpFailure(`a kept object could not be released: ${errorText(error)}`);
@@ -773,46 +823,40 @@ class CdpPage implements PageWithInput<string> {
 
   async byRole(role: string, name: string): Promise<string[]> {
     const world = await this.#readingWorld();
-    // Through a world, the document object comes first: reading it makes the world again if the
-    // document has changed since, before the matches are resolved in it.
-    const root = world === null
-      ? (await this.#send<{ root: { backendNodeId: number } }>('DOM.getDocument', { depth: 0 })).root.backendNodeId
-      : (await this.#send<DescribedNode>('DOM.describeNode', { objectId: await this.#documentObject() })).node.backendNodeId;
-    const queried = await this.#send<{ nodes: AccessibilityNode[] }>('Accessibility.queryAXTree', {
+    const root = (await this.#ask(DESCRIBE_NODE, { objectId: await this.#documentObject(world) })).node.backendNodeId;
+    const queried = await this.#ask(QUERY_ACCESSIBILITY_TREE, {
       backendNodeId: root, role: role === 'img' ? 'image' : role, accessibleName: name,
     });
     const handles: string[] = [];
     for (const node of queried.nodes) {
       if (node.ignored || node.backendDOMNodeId === undefined) continue;
-      const resolved = await this.#ask(RESOLVE_NODE, {
-        backendNodeId: node.backendDOMNodeId, ...(world === null ? {} : { executionContextId: world.executionContextId }),
-      });
+      const resolved = await this.#ask(RESOLVE_NODE, { backendNodeId: node.backendDOMNodeId, executionContextId: world });
       handles.push(resolved.object.objectId);
     }
     return handles;
   }
 
   async roleAndName(element: string): Promise<RoleAndName> {
-    const { nodes } = await this.#send<{ nodes: AccessibilityNode[] }>('Accessibility.getPartialAXTree', { objectId: element, fetchRelatives: false });
+    const { nodes } = await this.#ask(GET_PARTIAL_ACCESSIBILITY_TREE, { objectId: element, fetchRelatives: false });
     const node = nodes[0];
     if (node === undefined || node.ignored) return { role: null, name: null };
-    const role = typeof node.role?.value === 'string' && node.role.value !== '' ? node.role.value : null;
-    const name = typeof node.name?.value === 'string' && node.name.value !== '' ? node.name.value : null;
+    const role = node.role === undefined || node.role === '' ? null : node.role;
+    const name = node.name === undefined || node.name === '' ? null : node.name;
     return { role: role === null ? null : ROLE_NAMES[role] ?? role, name };
   }
 
   async exposedStates(element: string): Promise<ExposedStates> {
-    const { nodes } = await this.#send<{ nodes: AccessibilityNode[] }>('Accessibility.getPartialAXTree', { objectId: element, fetchRelatives: false });
+    const { nodes } = await this.#ask(GET_PARTIAL_ACCESSIBILITY_TREE, { objectId: element, fetchRelatives: false });
     const properties = nodes[0]?.properties ?? [];
     const read = (name: (typeof EXPOSED_STATE_PROPERTIES)[number]): boolean | null => {
       const property = properties.find((candidate) => candidate.name === name);
-      return property === undefined ? null : stateValue(property.value.value);
+      return property === undefined ? null : stateValue(property.value);
     };
     return { selected: read('selected'), expanded: read('expanded'), pressed: read('pressed') };
   }
 
   async accessibilityTree(): Promise<A11yNode> {
-    const frameId = this.#frame?.world.frameId;
+    const frameId = this.#frame?.frameId;
     const { nodes } = await this.#ask(GET_FULL_ACCESSIBILITY_TREE, frameId === undefined ? {} : { frameId });
     const byId = new Map(nodes.map((node) => [node.nodeId, node]));
     const build = (node: (typeof nodes)[number]): A11yNode[] => {
@@ -846,7 +890,11 @@ class CdpPage implements PageWithInput<string> {
       const called = await this.#ask(CALL_FUNCTION_ON, {
         functionDeclaration: isConnectedToItsDocument.toString(), objectId: element, returnByValue: true,
       });
-      return called.exceptionDetails === undefined && called.result.value === false;
+      throwIfThePageThrew(called);
+      if (typeof called.result.value !== 'boolean') {
+        throw new MalformedBrowserReply(CALL_FUNCTION_ON.method, 'result.result.value');
+      }
+      return !called.result.value;
     } catch (error) {
       if (this.#watch.crashed() || LOST_OBJECT.test(errorText(error))) {
         return true;
@@ -856,12 +904,12 @@ class CdpPage implements PageWithInput<string> {
   }
 
   async frameId(): Promise<string> {
-    const framed = this.#frame?.world.frameId;
+    const framed = this.#frame?.frameId;
     if (framed !== undefined) {
       return framed;
     }
-    const { frameTree } = await this.#send<{ frameTree: FrameTree }>('Page.getFrameTree');
-    return frameTree.frame.id;
+    this.#topFrameId ??= (await this.#ask(GET_FRAME_TREE, {})).frameTree.frame.id;
+    return this.#topFrameId;
   }
 
   async canPressStartAnything(element: string, at: Point): Promise<boolean> {
@@ -877,14 +925,14 @@ class CdpPage implements PageWithInput<string> {
       }
       return await this.#hasPressListener(await this.#mainWorldWindow());
     } finally {
-      await this.#releaseScriptObjects();
+      await this.#releaseKept(RELEASE_OBJECT_GROUP, { objectGroup: SCRIPT_OBJECT_GROUP });
     }
   }
 
   // The browser reports only the listeners of the script world the object is read through, and a
   // page's own are in its main world.
   async #inMainWorld(node: string): Promise<string> {
-    const described = await this.#send<DescribedNode>('DOM.describeNode', { objectId: node });
+    const described = await this.#ask(DESCRIBE_NODE, { objectId: node });
     const resolved = await this.#ask(RESOLVE_NODE, { backendNodeId: described.node.backendNodeId, objectGroup: SCRIPT_OBJECT_GROUP });
     return resolved.object.objectId;
   }
@@ -900,29 +948,30 @@ class CdpPage implements PageWithInput<string> {
   }
 
   async #hasPressListener(objectId: string): Promise<boolean> {
-    const { listeners } = await this.#send<{ listeners: readonly { readonly type: string }[] }>('DOMDebugger.getEventListeners', { objectId });
+    const { listeners } = await this.#ask(GET_EVENT_LISTENERS, { objectId });
     return listeners.some((listener) => PRESS_EVENT.test(listener.type));
   }
 
-  async click(_element: string, at: Point): Promise<void> {
+  async click(_element: string, at: Point): Promise<PressSent> {
     const offset = await this.#viewportOffset();
     const point = { x: at.x + offset.x, y: at.y + offset.y };
     const pressed = { ...point, button: 'left' as const, clickCount: 1 };
-    await this.#sendInput('Input.dispatchMouseEvent', { type: 'mouseMoved', ...point });
-    await this.#sendInput('Input.dispatchMouseEvent', { type: 'mousePressed', ...pressed });
-    if (this.#watch.openDialog() !== null) return;
-    await this.#sendInput('Input.dispatchMouseEvent', { type: 'mouseReleased', ...pressed });
+    await this.#sendInput(DISPATCH_MOUSE_EVENT, { type: 'mouseMoved', ...point });
+    await this.#sendInput(DISPATCH_MOUSE_EVENT, { type: 'mousePressed', ...pressed });
+    if (this.#watch.openDialog() !== null) return PressSent.HeldAtThePress;
+    await this.#sendInput(DISPATCH_MOUSE_EVENT, { type: 'mouseReleased', ...pressed });
+    return PressSent.Released;
   }
 
   async hover(at: Point): Promise<void> {
     const offset = await this.#viewportOffset();
-    await this.#sendInput('Input.dispatchMouseEvent', { type: 'mouseMoved', x: at.x + offset.x, y: at.y + offset.y });
+    await this.#sendInput(DISPATCH_MOUSE_EVENT, { type: 'mouseMoved', x: at.x + offset.x, y: at.y + offset.y });
   }
 
   async fill(element: string, value: string): Promise<void> {
     await this.callForString(focusAndSelect, [{ element }]);
     if (value === '') await this.#pressKey(KEY_DEFINITIONS.Backspace);
-    else await this.#sendInput('Input.insertText', { text: value });
+    else await this.#sendInput(INSERT_TEXT, { text: value });
   }
 
   async press(element: string, key: Key, modifiers: readonly HeldModifierKey[]): Promise<void> {
@@ -931,7 +980,7 @@ class CdpPage implements PageWithInput<string> {
     for (const modifier of modifiers) {
       held.push(modifier);
       const definition = MODIFIER_KEY_DEFINITIONS[modifier];
-      await this.#sendInput('Input.dispatchKeyEvent', {
+      await this.#sendInput(DISPATCH_KEY_EVENT, {
         type: 'rawKeyDown', key: definition.key, code: definition.code, windowsVirtualKeyCode: definition.keyCode, location: LEFT_KEY, modifiers: modifierMask(held),
       });
       if (this.#watch.openDialog() !== null) return;
@@ -941,7 +990,7 @@ class CdpPage implements PageWithInput<string> {
       if (this.#watch.openDialog() !== null) return;
       held.splice(held.indexOf(modifier), 1);
       const definition = MODIFIER_KEY_DEFINITIONS[modifier];
-      await this.#sendInput('Input.dispatchKeyEvent', {
+      await this.#sendInput(DISPATCH_KEY_EVENT, {
         type: 'keyUp', key: definition.key, code: definition.code, windowsVirtualKeyCode: definition.keyCode, location: LEFT_KEY, modifiers: modifierMask(held),
       });
     }
@@ -949,35 +998,45 @@ class CdpPage implements PageWithInput<string> {
 
   async #pressKey(definition: KeyDefinition, modifiers = 0): Promise<void> {
     const common = { key: definition.key, code: definition.code, windowsVirtualKeyCode: definition.keyCode, modifiers };
-    await this.#sendInput('Input.dispatchKeyEvent', {
-      type: definition.text === undefined ? 'rawKeyDown' : 'keyDown', ...common, ...(definition.text === undefined ? {} : { text: definition.text }),
-    });
+    if (definition.text === undefined) {
+      await this.#sendInput(DISPATCH_KEY_EVENT, { type: 'rawKeyDown', ...common });
+    } else {
+      await this.#sendInput(DISPATCH_KEY_EVENT, { type: 'keyDown', ...common, text: definition.text });
+    }
     if (this.#watch.openDialog() !== null) return;
-    await this.#sendInput('Input.dispatchKeyEvent', { type: 'keyUp', ...common });
+    await this.#sendInput(DISPATCH_KEY_EVENT, { type: 'keyUp', ...common });
   }
 
   async setFiles(element: string, paths: readonly string[]): Promise<void> {
-    await this.#send('DOM.setFileInputFiles', { files: [...paths], objectId: element });
+    await this.#ask(SET_FILE_INPUT_FILES, { files: [...paths], objectId: element });
+  }
+
+  async select(element: string, option: string): Promise<SelectOutcome> {
+    const chosen = await this.callForString(selectOption, [{ element }, option]);
+    const outcome = Object.values(SelectOutcome).find((known) => known === chosen);
+    if (outcome === undefined) {
+      throw new MalformedBrowserReply(CALL_FUNCTION_ON.method, 'result.result.value');
+    }
+    return outcome;
   }
 
   async frame(element: string): Promise<PageWithInput<string> | null> {
-    const described = await this.#send<DescribedNode>('DOM.describeNode', { objectId: element });
+    const described = await this.#ask(DESCRIBE_NODE, { objectId: element });
     const frameId = described.node.frameId;
     if (frameId === undefined) return null;
-    let executionContextId: number;
     try {
-      executionContextId = await this.#isolatedWorld(frameId);
+      await this.#isolatedWorld(frameId);
     } catch (error) {
       // A frame whose document runs in another renderer process has no world in this session.
       if (this.#watch.crashed()) throw error;
       return null;
     }
-    return new CdpPage(this.#connection, this.#sessionId, this.#watch, { parent: this, frameElement: element, world: { frameId, executionContextId } });
+    return new CdpPage(this.#connection, this.#sessionId, this.#watch, { parent: this, frameElement: element, frameId });
   }
 
   async unreachableUrl(): Promise<string | null> {
-    const { frameTree } = await this.#send<{ frameTree: FrameTree }>('Page.getFrameTree');
-    const frameId = this.#frame?.world.frameId;
+    const { frameTree } = await this.#ask(GET_FRAME_TREE, {});
+    const frameId = this.#frame?.frameId;
     const find = (tree: FrameTree): FrameTree | undefined =>
       (frameId === undefined || tree.frame.id === frameId ? tree : (tree.childFrames ?? []).map(find).find((found) => found !== undefined));
     return find(frameTree)?.frame.unreachableUrl ?? null;
@@ -993,7 +1052,7 @@ class CdpPage implements PageWithInput<string> {
       if (evaluated.result.objectId === undefined) throw new Error('no document');
       return evaluated.result.objectId;
     }
-    const described = await this.#send<DescribedNode>('DOM.describeNode', { objectId: frame.frameElement });
+    const described = await this.#ask(DESCRIBE_NODE, { objectId: frame.frameElement });
     const backendNodeId = described.node.contentDocument?.backendNodeId;
     if (backendNodeId === undefined) throw new Error('the frame has no document');
     const resolved = await this.#ask(RESOLVE_NODE, { backendNodeId, objectGroup: SCRIPT_OBJECT_GROUP });
@@ -1015,18 +1074,12 @@ class CdpPage implements PageWithInput<string> {
       });
       return written.exceptionDetails === undefined ? decodeScriptResult(written.result.value) : { kind: 'not-json' };
     } finally {
-      await this.#releaseScriptObjects();
+      await this.#releaseKept(RELEASE_OBJECT_GROUP, { objectGroup: SCRIPT_OBJECT_GROUP });
     }
   }
 
-  // Lets the browser forget them. A page that cannot answer has nothing left to free, or frees them
-  // with its document, so a failure here must not take the place of what the caller was doing.
-  async #releaseScriptObjects(): Promise<void> {
-    await this.#send('Runtime.releaseObjectGroup', { objectGroup: SCRIPT_OBJECT_GROUP }).catch(() => undefined);
-  }
-
   async screenshotPng(): Promise<Uint8Array> {
-    const captured = await this.#send<{ data: string }>('Page.captureScreenshot', { format: 'png' });
+    const captured = await this.#ask(CAPTURE_SCREENSHOT, { format: 'png' });
     return new Uint8Array(Buffer.from(captured.data, 'base64'));
   }
 }

@@ -11,6 +11,7 @@ import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { platform, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { Readable } from 'node:stream';
+import { CLOSE_BROWSER } from './BrowserCommand.ts';
 import { CdpConnection, type ConnectOptions } from './cdp-connection.ts';
 import { PORT_RANDOMISATION_FEATURE, WEBRTC_UDP_OFF_FLAGS } from './chrome-flags.ts';
 
@@ -133,7 +134,7 @@ export function launchChromium(executablePath: string, options: LaunchOptions = 
 
   const stop = async (connection: CdpConnection | null): Promise<void> => {
     connection?.expectClose();
-    if (connection !== null) await connection.send(undefined, 'Browser.close', {}, 5_000).catch(() => undefined);
+    if (connection !== null) await connection.ask(undefined, CLOSE_BROWSER, {}, 5_000).catch(() => undefined);
     // Wait for a clean exit first; force the process after a grace period.
     const force = setTimeout(() => { try { browserProcess.kill(); } catch { /* already gone */ } }, 3_000);
     let gracePeriod: NodeJS.Timeout | undefined;

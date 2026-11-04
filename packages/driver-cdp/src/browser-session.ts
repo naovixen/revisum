@@ -9,14 +9,15 @@ import {
   UnreadablePage,
 } from '@revisum/contracts';
 import {
-  actionability, documentUrl, fieldValues, fontsReady, guardDetails, inThisDocument, linkAndCurrent, linkTargetList, maskElements, maskGivenElements, pageInfo, probeElement, readDomValue, selectOption,
+  actionability, documentUrl, fieldValues, fontsReady, guardDetails, inThisDocument, linkAndCurrent, linkTargetList, maskElements, maskGivenElements, pageInfo, probeElement, readDomValue,
   structuralSelectorValidity, unmaskElements, whatAClickActivates,
 } from './in-page.ts';
 import { findByLabel, findByTestId, findByText, findStructural, inDocumentOrder } from './FindByLabel.ts';
-import { HitCheckOutcome, hitChecks, type ArmedClick, type CheckedDocument, type HitChecks } from './HitChecks.ts';
+import { HitCheckOutcome, hitChecks, type CheckedDocument, type HitChecks } from './HitChecks.ts';
+import { MalformedBrowserReply } from './MalformedBrowserReply.ts';
 import { heldModifierKeys } from './modifier-keys.ts';
 import { pageAudit, parseAudit, toFindings } from './page-audit.ts';
-import type { Actionability, DownloadCapture, DriverSession, PageEvents, PageFunction, PageOperations, PageWithInput, Point, ScriptCallOutcome } from './page-operations.ts';
+import { SelectOutcome, type Actionability, type DownloadCapture, type DriverSession, type PageEvents, type PageFunction, type PageOperations, type PageWithInput, type Point, type ScriptCallOutcome } from './page-operations.ts';
 import { PageHeldByDialog } from './PageHeldByDialog.ts';
 import type { ConnectionFailure } from './SessionEgress.ts';
 
@@ -48,8 +49,10 @@ async function forAtMost<Value>(milliseconds: number, work: Promise<Value>): Pro
 }
 
 // Lets a catch that reads a failed look at the page as "nothing yet" keep to failures that can pass.
-function rethrowIfHeldByDialog(error: unknown): void {
-  if (error instanceof PageHeldByDialog) {
+// A dialog holds the page until a step answers it, and a reply the browser garbled says nothing of what
+// is on the page, so neither is an element not being there yet.
+function rethrowUnlessPassing(error: unknown): void {
+  if (error instanceof PageHeldByDialog || error instanceof MalformedBrowserReply) {
     throw error;
   }
 }
@@ -124,7 +127,7 @@ async function locate<Handle>(operations: PageOperations<Handle>, locator: Resol
   try {
     return await findElements(operations, locator);
   } catch (error) {
-    rethrowIfHeldByDialog(error);
+    rethrowUnlessPassing(error);
     return [];
   }
 }
@@ -156,7 +159,7 @@ async function rejectsSelector<Handle>(operations: PageOperations<Handle>, locat
   try {
     validity = await operations.callForString(structuralSelectorValidity, [locator.by, text]);
   } catch (error) {
-    rethrowIfHeldByDialog(error);
+    rethrowUnlessPassing(error);
   }
   if (validity === 'invalid') return true;
   return locator.inside !== undefined && rejectsSelector(operations, locator.inside);
@@ -198,9 +201,9 @@ async function lookForActionable<Handle>(operations: PageOperations<Handle>, loc
     return { count: found.length, check: null };
   }
   try {
-    return { count: 1, element, check: JSON.parse(await operations.callForString(actionability, [{ element }])) as Actionability };
+    return { count: 1, element, check: decodeActionability(await operations.callForString(actionability, [{ element }])) };
   } catch (error) {
-    rethrowIfHeldByDialog(error);
+    rethrowUnlessPassing(error);
     return { count: 1, check: null }; // detached during the check: locate again
   }
 }
@@ -267,6 +270,67 @@ async function waitUntilFound<Handle>(
     }
     await pause(POLL_INTERVAL_MILLISECONDS);
   }
+}
+
+// What an in-page function reports as JSON, and where a field of another shape is, for the failure.
+function reportedFields(text: string, source: string): Readonly<Record<string, unknown>> {
+  const parsed: unknown = JSON.parse(text);
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    throw new MalformedBrowserReply(source, 'report');
+  }
+  return parsed as Record<string, unknown>;
+}
+
+function reportedBoolean(fields: Readonly<Record<string, unknown>>, name: string, source: string): boolean {
+  const value = fields[name];
+  if (typeof value !== 'boolean') {
+    throw new MalformedBrowserReply(source, `report.${name}`);
+  }
+  return value;
+}
+
+// Decodes what actionability (in-page.ts) reports.
+function decodeActionability(text: string): Actionability {
+  const source = 'actionability';
+  const fields = reportedFields(text, source);
+  const centre = fields['centre'];
+  const centreFields = typeof centre === 'object' && centre !== null ? centre as Record<string, unknown> : {};
+  const [x, y] = [centreFields['x'], centreFields['y']];
+  return {
+    attached: reportedBoolean(fields, 'attached', source),
+    visible: reportedBoolean(fields, 'visible', source),
+    stable: reportedBoolean(fields, 'stable', source),
+    enabled: reportedBoolean(fields, 'enabled', source),
+    receivesEvents: reportedBoolean(fields, 'receivesEvents', source),
+    centre: typeof x === 'number' && typeof y === 'number' ? { x, y } : null,
+  };
+}
+
+// Decodes what probeElement (in-page.ts) reports, of the one element it was called on.
+function decodeShownElement(text: string): ElementsRead {
+  const source = 'probeElement';
+  const fields = reportedFields(text, source);
+  const [shownText, value, box] = [fields['text'], fields['value'], fields['box']];
+  if (typeof shownText !== 'string') {
+    throw new MalformedBrowserReply(source, 'report.text');
+  }
+  if (typeof value !== 'string' && value !== null) {
+    throw new MalformedBrowserReply(source, 'report.value');
+  }
+  const boxFields = typeof box === 'object' && box !== null ? box as Record<string, unknown> : {};
+  const [x, y, width, height] = [boxFields['x'], boxFields['y'], boxFields['width'], boxFields['height']];
+  if (typeof x !== 'number' || typeof y !== 'number' || typeof width !== 'number' || typeof height !== 'number') {
+    throw new MalformedBrowserReply(source, 'report.box');
+  }
+  return {
+    count: 1,
+    visible: reportedBoolean(fields, 'visible', source),
+    enabled: reportedBoolean(fields, 'enabled', source),
+    text: shownText,
+    value,
+    sensitive: reportedBoolean(fields, 'sensitive', source),
+    box: { x, y, width, height },
+  };
 }
 
 function decodeCurrent(current: unknown): boolean | null {
@@ -473,7 +537,7 @@ function documentPorts<Handle>(
       }
       const element = found[0];
       if (found.length !== 1 || element === undefined) return { ...NOTHING_READ, count: found.length };
-      const shown = JSON.parse(await operations.callForString(probeElement, [{ element }, environment.sensitiveSelectors])) as ElementsRead;
+      const shown = decodeShownElement(await operations.callForString(probeElement, [{ element }, environment.sensitiveSelectors]));
       // The link target and aria-current come from the document, the other states from the
       // browser's accessibility engine, as assistive technology reads them.
       const { href, current } = decodeLinkAndCurrent(await operations.callForString(linkAndCurrent, [{ element }]));
@@ -500,31 +564,12 @@ function documentPorts<Handle>(
     return ended === TIMED_OUT ? failure({ code: 'timeout', detail: `the input was still being handled after ${timeout} ms` }) : success(ended);
   };
 
-  // What a press left in the hit check. A dialog the press opened stops the page until it is answered,
-  // which holds up the read: the press landed. With no check left to read, as after a navigation, or
-  // no answer, the press landed only if the element it was sent to has gone. So too if it landed and
-  // no click followed: a press that takes the element away leaves no click to fire. Otherwise nothing
-  // says where it went, so the step fails.
-  const readHitAfterClick = async (element: Handle, armed: ArmedClick): Promise<HitCheckOutcome> => {
-    let hit: HitCheckOutcome;
-    try {
-      hit = await armed.read();
-    } catch (readFailure) {
-      if (readFailure instanceof PageHeldByDialog || await operations.isElementGone(element)) {
-        return HitCheckOutcome.Hit;
-      }
-      throw readFailure;
-    }
-    const isNoSignOfThePress = hit === HitCheckOutcome.None || hit === HitCheckOutcome.NoClick;
-    return isNoSignOfThePress && await operations.isElementGone(element) ? HitCheckOutcome.Hit : hit;
-  };
-
   // A click is sent once. The wait may find a new element, and the guard is asked about the one it
   // finds, just before the send. A press that lands on another element is swallowed in the page and
   // fails the step at once: sending it again could press whatever the page has put there since. A
-  // press the check never saw was stopped before it reached the page, by a listener of the page's
-  // that came first, so the click did nothing. So did one whose click the page stopped on its way to
-  // the element.
+  // press the element never heard was stopped before it got there, by a listener of the page's that
+  // came first, so the click did nothing. So did one whose click the page stopped on its way to the
+  // element, whatever else the page did then, such as taking the element away or opening a dialog.
   const click = async (locator: ResolvedLocator, guard: ActionGuard, beforePress: BeforePress<Handle>, stepDeadline: number): Promise<Result<void, DriverError>> => {
     const waited = await waitUntilActionable(operations, locator, timeout, timeout, crashed);
     if (!waited.ok) return waited;
@@ -534,12 +579,7 @@ function documentPorts<Handle>(
       return failure(denied);
     }
     await beforePress(element, at);
-    const armed = await clickChecks.arm(element);
-    const clickAndReadHit = async (): Promise<HitCheckOutcome> => {
-      await armed.press(at);
-      return readHitAfterClick(element, armed);
-    };
-    const hit = await inputWithinTimeout(clickAndReadHit(), stepDeadline);
+    const hit = await inputWithinTimeout(clickChecks.around(element, at), stepDeadline);
     if (!hit.ok) {
       return hit;
     }
@@ -589,9 +629,9 @@ function documentPorts<Handle>(
         break;
       }
       case 'select': {
-        const chosen = await operations.callForString(selectOption, [{ element }, action.option]);
-        if (chosen === 'no-option') return failure({ code: 'not-found', detail: 'the select has no option with that text or value' });
-        if (chosen !== 'selected') return failure({ code: 'not-actionable', detail: 'the element is not a select' });
+        const chosen = await clickChecks.input.select(element, action.option);
+        if (chosen === SelectOutcome.NoOption) return failure({ code: 'not-found', detail: 'the select has no option with that text or value' });
+        if (chosen === SelectOutcome.NotASelect) return failure({ code: 'not-actionable', detail: 'the element is not a select' });
         break;
       }
     }
@@ -734,7 +774,7 @@ function documentPorts<Handle>(
     const openingsBefore = events.unsupportedOpenings();
     let ended: ScriptCallOutcome | typeof TIMED_OUT;
     try {
-      ended = await forAtMost(call.timeoutMilliseconds, operations.callScript(call.source, call.arguments, call.maximumResultBytes));
+      ended = await forAtMost(call.timeoutMilliseconds, clickChecks.input.callScript(call.source, call.arguments, call.maximumResultBytes));
     } catch (error) {
       if (error instanceof PageHeldByDialog) {
         return failure(DIALOG_OPEN);
@@ -847,14 +887,14 @@ function documentPorts<Handle>(
     },
     async frame(locator) {
       if (crashed()) return failure(CRASHED);
-      if (await rejectsSelector(operations, locator)) return failure(SELECTOR_INVALID);
-      const found = await waitUntilFound(operations, locator, timeout, crashed);
-      if (!found.ok) return found;
       let inner: CheckedDocument<Handle> | null;
       try {
+        if (await rejectsSelector(operations, locator)) return failure(SELECTOR_INVALID);
+        const found = await waitUntilFound(operations, locator, timeout, crashed);
+        if (!found.ok) return found;
         inner = await clickChecks.frame(found.value);
       } catch (error) {
-        return failure(crashed() ? CRASHED : { code: 'not-actionable', detail: errorText(error) });
+        return failure(failureOfThrow(error));
       }
       // An element that is no iframe, or an iframe whose document runs in another process.
       if (inner === null) return failure({ code: 'unsupported-step', detail: 'the element is not an iframe whose document this driver can reach' });
@@ -874,8 +914,9 @@ async function newTabAt(openTab: () => Promise<Result<SessionTab, DriverError>>,
   const tab = opened.value;
   const navigated = await tab.navigate(url);
   if (navigated.ok) return success(tab);
-  // Why the tab could not load is the step's failure; a tab that also fails to close must not replace it.
-  await tab.close().catch(() => undefined);
+  // Why the tab could not load is the step's failure. A tab that also fails to close is for the
+  // session's close to report: a tab's close never rejects.
+  await tab.close();
   return navigated;
 }
 
@@ -898,6 +939,6 @@ export function buildSession<Handle>(operations: PageWithInput<Handle>, environm
     connectionFailures: details.connectionFailures,
     refusedRequestDecisions: () => details.events.refusedRequestDecisions(),
     egressRecords: details.egressRecords,
-    evaluate: (pageFunction: PageFunction, inputs = []) => operations.callForString(pageFunction, inputs),
+    evaluate: (pageFunction: PageFunction, inputs = []) => operations.callForStringInMainWorld(pageFunction, inputs),
   };
 }

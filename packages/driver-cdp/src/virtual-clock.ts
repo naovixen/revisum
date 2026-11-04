@@ -13,12 +13,10 @@ import {
   CLOCK_CONTROLLER_KEY, failure, success, virtualClockScript,
   type ClockAdvanceMode, type ClockPort, type DriverError, type Result,
 } from '@revisum/contracts';
+import { ADD_SCRIPT_ON_NEW_DOCUMENT, GET_FRAME_TREE, REMOVE_SCRIPT_ON_NEW_DOCUMENT, type FrameTree } from './BrowserCommand.ts';
+import { CALL_FUNCTION_ON, DESCRIBE_NODE, EVALUATE, GET_FRAME_OWNER, RESOLVE_NODE } from './CallFunctionOn.ts';
 import { advanceDocumentClock } from './in-page.ts';
 import type { PageCommand } from './web-storage.ts';
-
-type FrameTree = { readonly frame: { readonly id: string }; readonly childFrames?: readonly FrameTree[] };
-type CallResult = { readonly result: { readonly value?: unknown; readonly objectId?: string }; readonly exceptionDetails?: { readonly text: string } };
-type DescribedNode = { readonly node: { readonly contentDocument?: { readonly backendNodeId: number } } };
 
 // One page of the session, as the clock reaches it.
 type ClockPage = {
@@ -77,7 +75,7 @@ export class BrowserClock implements ClockPort {
       if (page.crashed()) return failure(CRASHED);
       try {
         if (this.#virtualTimers) await this.#startAt(page, target);
-        const { frameTree } = await page.command<{ frameTree: FrameTree }>('Page.getFrameTree');
+        const { frameTree } = await page.command(GET_FRAME_TREE, {});
         for (const frameId of frameIds(frameTree)) {
           const advanced = await this.#advanceFrame(page, frameId, frameId === frameTree.frame.id, target, mode, maximumTimers - fired);
           fired += advanced.fired;
@@ -96,10 +94,10 @@ export class BrowserClock implements ClockPort {
   // Replaces the page's new-document script with one that starts virtual timers at `elapsed`.
   async #startAt(page: ClockPage, elapsed: number): Promise<void> {
     if (page.scriptIdentifier !== null) {
-      await page.command('Page.removeScriptToEvaluateOnNewDocument', { identifier: page.scriptIdentifier });
+      await page.command(REMOVE_SCRIPT_ON_NEW_DOCUMENT, { identifier: page.scriptIdentifier });
       page.scriptIdentifier = null;
     }
-    const added = await page.command<{ identifier: string }>('Page.addScriptToEvaluateOnNewDocument', { source: virtualClockScript(elapsed) });
+    const added = await page.command(ADD_SCRIPT_ON_NEW_DOCUMENT, { source: virtualClockScript(elapsed) });
     page.scriptIdentifier = added.identifier;
   }
 
@@ -111,7 +109,7 @@ export class BrowserClock implements ClockPort {
     try {
       const documentObject = top ? await this.#topDocument(page) : await this.#frameDocument(page, frameId);
       if (documentObject === null) return { fired: 0, runaway: false };
-      const called = await page.command<CallResult>('Runtime.callFunctionOn', {
+      const called = await page.command(CALL_FUNCTION_ON, {
         functionDeclaration: advanceDocumentClock.toString(), objectId: documentObject, awaitPromise: true, returnByValue: true,
         arguments: [{ value: CLOCK_CONTROLLER_KEY }, { value: target }, { value: mode }, { value: maximumCallbacks }],
       });
@@ -125,18 +123,18 @@ export class BrowserClock implements ClockPort {
 
   // The top document, in the page's main world.
   async #topDocument(page: ClockPage): Promise<string | null> {
-    const evaluated = await page.command<CallResult>('Runtime.evaluate', { expression: 'document' });
+    const evaluated = await page.command(EVALUATE, { expression: 'document' });
     return evaluated.result.objectId ?? null;
   }
 
   // An iframe's document, resolved in its own main world, which is where DOM.resolveNode puts a node
   // when no world is named.
   async #frameDocument(page: ClockPage, frameId: string): Promise<string | null> {
-    const owner = await page.command<{ backendNodeId: number }>('DOM.getFrameOwner', { frameId });
-    const described = await page.command<DescribedNode>('DOM.describeNode', { backendNodeId: owner.backendNodeId, depth: 1, pierce: true });
+    const owner = await page.command(GET_FRAME_OWNER, { frameId });
+    const described = await page.command(DESCRIBE_NODE, { backendNodeId: owner.backendNodeId, depth: 1, pierce: true });
     const contentDocument = described.node.contentDocument;
     if (contentDocument === undefined) return null;
-    const resolved = await page.command<{ object: { objectId?: string } }>('DOM.resolveNode', { backendNodeId: contentDocument.backendNodeId });
-    return resolved.object.objectId ?? null;
+    const resolved = await page.command(RESOLVE_NODE, { backendNodeId: contentDocument.backendNodeId });
+    return resolved.object.objectId;
   }
 }

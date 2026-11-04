@@ -6,6 +6,7 @@
 // A key press can still paste what an earlier session copied, so tests that copy or paste keep to a
 // browser of their own. Each session's egress proxy goes on its context, so every browser holds a dead
 // browser-wide one for Chrome's own traffic.
+import { GET_BROWSER_CONTEXTS } from "./BrowserCommand.ts";
 import { CdpConnection } from "./cdp-connection.ts";
 import { sessionEgressChromeFlags } from "./chrome-flags.ts";
 import { launchChromium, type LaunchedChromium } from "./chromium-launcher.ts";
@@ -129,10 +130,7 @@ function whyRefused(shared: SharedBrowser, wanted: LaunchSettings): string | nul
 }
 
 const browserContexts = async (connection: CdpConnection): Promise<readonly string[]> => {
-    const { browserContextIds } = await connection.send<{ browserContextIds: readonly string[] }>(
-        undefined,
-        "Target.getBrowserContexts",
-    );
+    const { browserContextIds } = await connection.ask(undefined, GET_BROWSER_CONTEXTS, {});
     return browserContextIds;
 };
 

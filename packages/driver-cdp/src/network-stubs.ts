@@ -19,32 +19,21 @@ import {
   type DriverError, type NetworkPort, type ObservedExchange, type RequestMatcher, type RequestName, type ResolvedStub, type Result, type StubAnswer,
   type StubName,
 } from '@revisum/contracts';
+import { LOADING_FAILED, REQUEST_WILL_BE_SENT, RESPONSE_RECEIVED, type BrowserEvent, type RequestAtRequestStage } from './BrowserEvent.ts';
+import { SET_BYPASS_SERVICE_WORKER } from './DispatchMouseEvent.ts';
 import type { CdpConnection } from './cdp-connection.ts';
 
-// Chrome DevTools Protocol event shapes this port reads.
-type RequestWillBeSent = {
-  readonly requestId: string;
-  readonly request: { readonly url: string; readonly method: string };
-  readonly redirectResponse?: { readonly status: number; readonly mimeType?: string };
+// What a stub answers a held request with, as Fetch.fulfillRequest takes it, and what to do once the
+// browser has accepted that answer. An answer it refuses was never given.
+type StubbedAnswer = {
+  readonly response: {
+    readonly responseCode: number;
+    readonly responseHeaders: readonly { readonly name: string; readonly value: string }[];
+    readonly body: string;
+  };
+  readonly onAccepted: () => void;
 };
-type ResponseReceived = { readonly requestId: string; readonly response: { readonly status: number; readonly mimeType?: string } };
-type LoadingFailed = { readonly requestId: string };
-// What the Fetch domain says of a request it holds, before it is sent or once its response is in.
-export type HeldRequest = {
-  readonly resourceType?: string | undefined;
-  readonly request: { readonly url: string; readonly method: string };
-  // The Network domain's id for the same request, when that domain sees it.
-  readonly networkId?: string | undefined;
-  // Present only at the response stage.
-  readonly responseStatusCode?: number | undefined;
-  readonly responseErrorReason?: string | undefined;
-};
-// What a stub answers a held request with, as Fetch.fulfillRequest takes it.
-type StubbedResponse = {
-  readonly responseCode: number;
-  readonly responseHeaders: readonly { readonly name: string; readonly value: string }[];
-  readonly body: string;
-};
+type RequestWillBeSent = typeof REQUEST_WILL_BE_SENT extends BrowserEvent<infer Payload> ? Payload : never;
 
 // The only resource types a stub may answer: data a page script asked for.
 const STUBBED_RESOURCE_TYPES = ['Fetch', 'XHR'];
@@ -60,9 +49,6 @@ function matchesRequest(matcher: RequestMatcher, method: string, url: string): b
   if (parsed.origin !== matcher.origin || method.toUpperCase() !== matcher.method) return false;
   return matcher.match === 'exact' ? parsed.pathname === matcher.path : parsed.pathname.startsWith(matcher.path);
 }
-
-// True when the Fetch domain holds the request at its response stage, with the response in.
-export const atResponseStage = (held: HeldRequest): boolean => held.responseStatusCode !== undefined || held.responseErrorReason !== undefined;
 
 type ActiveStub = {
   readonly stub: ResolvedStub;
@@ -97,6 +83,8 @@ type BrowserNetworkOptions = {
   readonly readFixture: (fixture: string) => Result<Uint8Array, DriverError>;
   // Told the Network domain's id of each request a stub answered inside the browser.
   readonly onAnsweredInBrowser: (networkRequestId: string) => void;
+  // Told where an event this port reads is malformed.
+  readonly onMalformedEvent: (detail: string) => void;
 };
 
 export class BrowserNetwork implements NetworkPort {
@@ -124,21 +112,21 @@ export class BrowserNetwork implements NetworkPort {
   // stops watching it, for a tab that closes.
   async watchPage(sessionId: string): Promise<() => void> {
     const connection = this.#connection;
+    const onMalformed = this.#options.onMalformedEvent;
     const stops = [
-      connection.on(sessionId, 'Network.requestWillBeSent', (parameters) => this.#requestSent(sessionId, parameters as RequestWillBeSent)),
-      connection.on(sessionId, 'Network.responseReceived', (parameters) => {
-        const received = parameters as ResponseReceived;
+      connection.listen(sessionId, REQUEST_WILL_BE_SENT, (sent) => { this.#requestSent(sessionId, sent); }, onMalformed),
+      connection.listen(sessionId, RESPONSE_RECEIVED, (received) => {
         const pending = this.#pending.get(pendingKey(sessionId, received.requestId));
         if (pending !== undefined) this.#finish(pending, received.response.status, received.response.mimeType ?? null);
-      }),
-      connection.on(sessionId, 'Network.loadingFailed', (parameters) => {
-        const pending = this.#pending.get(pendingKey(sessionId, (parameters as LoadingFailed).requestId));
+      }, onMalformed),
+      connection.listen(sessionId, LOADING_FAILED, (failed) => {
+        const pending = this.#pending.get(pendingKey(sessionId, failed.requestId));
         if (pending !== undefined) this.#finish(pending, null, null);
-      }),
+      }, onMalformed),
     ];
     const stop = (): void => { for (const stopListening of stops) stopListening(); this.#pages.delete(sessionId); };
     this.#pages.set(sessionId, stop);
-    if (this.#bypassingWorkers) await this.#connection.send(sessionId, 'Network.setBypassServiceWorker', { bypass: true });
+    if (this.#bypassingWorkers) await this.#connection.ask(sessionId, SET_BYPASS_SERVICE_WORKER, { bypass: true });
     return stop;
   }
 
@@ -170,7 +158,7 @@ export class BrowserNetwork implements NetworkPort {
   // The answer for a request the Fetch domain holds, or null when no active stub answers it. The
   // stub started last wins when several match. Called only for requests the allow-list let
   // through: a stub answers, it never lets a request through that was refused.
-  answer(held: HeldRequest): StubbedResponse | null {
+  answer(held: RequestAtRequestStage): StubbedAnswer | null {
     if (held.resourceType === undefined || !STUBBED_RESOURCE_TYPES.includes(held.resourceType)) return null;
     const active = [...this.#stubs.values()].reverse().find((candidate) => matchesRequest(candidate.stub.request, held.request.method, held.request.url));
     if (active === undefined) return null;
@@ -180,19 +168,21 @@ export class BrowserNetwork implements NetworkPort {
     const response = active.stub.responses[index];
     const body = active.bodies[index];
     if (response === undefined || body === undefined) return null;
-    this.#answers.push({ stub: active.stub.name, responseIndex: index + 1 });
     if (held.networkId !== undefined) {
       this.#answered.set(held.networkId, { stub: active.stub.name, body });
       this.#options.onAnsweredInBrowser(held.networkId);
     }
     return {
-      responseCode: response.status,
-      responseHeaders: [
-        { name: 'content-type', value: response.mediaType },
-        { name: 'x-content-type-options', value: 'nosniff' },
-        ...response.headers.map(([name, value]) => ({ name, value })),
-      ],
-      body: Buffer.from(body).toString('base64'),
+      response: {
+        responseCode: response.status,
+        responseHeaders: [
+          { name: 'content-type', value: response.mediaType },
+          { name: 'x-content-type-options', value: 'nosniff' },
+          ...response.headers.map(([name, value]) => ({ name, value })),
+        ],
+        body: Buffer.from(body).toString('base64'),
+      },
+      onAccepted: () => { this.#answers.push({ stub: active.stub.name, responseIndex: index + 1 }); },
     };
   }
 
@@ -231,7 +221,7 @@ export class BrowserNetwork implements NetworkPort {
 
   // True when a request check whose fields a plan may read matches the held request, so its
   // response is held too and its body taken before the page gets it.
-  wantsResponseBody(held: HeldRequest): boolean {
+  wantsResponseBody(held: RequestAtRequestStage): boolean {
     return [...this.#observations.values()].some((observation) =>
       observation.maximumResponseBytes !== null && matchesRequest(observation.matcher, held.request.method, held.request.url));
   }
@@ -291,7 +281,7 @@ export class BrowserNetwork implements NetworkPort {
     if (wanted === this.#bypassingWorkers) return success(undefined);
     this.#bypassingWorkers = wanted;
     try {
-      for (const sessionId of this.#pages.keys()) await this.#connection.send(sessionId, 'Network.setBypassServiceWorker', { bypass: wanted });
+      for (const sessionId of this.#pages.keys()) await this.#connection.ask(sessionId, SET_BYPASS_SERVICE_WORKER, { bypass: wanted });
       return success(undefined);
     } catch (error) {
       return failure({ code: 'not-actionable', detail: `service workers could not be bypassed: ${error instanceof Error ? error.message : String(error)}`.slice(0, 200) });

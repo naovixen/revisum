@@ -18,25 +18,22 @@
 // A request stays held until the browser takes the driver's decision on it, so a decision it refuses
 // is held here too, whenever its answer comes, for whatever reports next.
 import { errorText } from './browser-session.ts';
-import { decodeRequestPaused, type BrowserCommand, type RequestPaused } from './BrowserCommand.ts';
+import { ATTACHED_TO_TARGET, DETACHED_FROM_TARGET, DIALOG_CLOSED, DIALOG_OPENING, FRAME_NAVIGATED, FRAME_REQUESTED_NAVIGATION, FRAME_STOPPED_LOADING, NAVIGATED_WITHIN_DOCUMENT, REQUEST_PAUSED, TARGET_CRASHED, type BrowserEvent, type RequestPaused } from './BrowserEvent.ts';
+import { CLOSE_TARGET, ENABLE_INSPECTOR, HANDLE_DIALOG, SET_AUTO_ATTACH, SET_DOWNLOAD_BEHAVIOUR, type BrowserCommand } from './BrowserCommand.ts';
+import { ENABLE_REQUEST_HOLDING } from './DispatchMouseEvent.ts';
+import { RUN_IF_WAITING_FOR_DEBUGGER } from './CallFunctionOn.ts';
 import { CdpError, type CdpConnection } from './cdp-connection.ts';
 import type { PageEvents } from './page-operations.ts';
 import { PageHeldByDialog } from './PageHeldByDialog.ts';
 
-// Chrome DevTools Protocol event shapes this watch reads.
-type TargetInfo = { readonly targetId: string; readonly type: string; readonly browserContextId?: string; readonly openerId?: string };
-type AttachedToTarget = { readonly sessionId: string; readonly targetInfo: TargetInfo; readonly waitingForDebugger: boolean };
-type TargetCrashed = { readonly targetId: string };
-type DetachedFromTarget = { readonly sessionId: string };
-type DialogOpening = { readonly message: string };
 const DOCUMENT_REQUEST = 'Document';
 
 // How long a popup is given to ask for its first page, so that request can be recorded before the
 // popup is closed. A popup opened with no address asks for nothing and is closed after this wait.
 const POPUP_REQUEST_WAIT_MILLISECONDS = 1_000;
-// How a command fails when a popup closed itself first, or the browser or the session has gone.
-// Nothing is left to hold back then, so there is nothing to report.
-const POPUP_ALREADY_GONE = /Session with given id not found|No target with given id|connection closed/i;
+// How a command fails when a target closed itself first, or the browser or the session has gone.
+// Nothing is left to act on then, so there is nothing to report.
+const TARGET_ALREADY_GONE = /Session with given id not found|No target with given id|connection closed/i;
 // How a decision on a request fails when nothing is held any more: the page gave up on the request or
 // died, its tab or browser context has gone, or the session has closed. Each is the browser's exact
 // answer, so no other refusal can pass for one.
@@ -44,13 +41,9 @@ const REQUEST_NO_LONGER_HELD = /^Fetch\.\w+: (?:Invalid InterceptionId\.|Session
 // A navigation that stays in this page's tab, as the browser says of one it was asked for.
 const THIS_TAB = 'currentTab';
 
-const fieldsOf = (value: unknown): Record<string, unknown> => (typeof value === 'object' && value !== null ? value as Record<string, unknown> : {});
-
 // A link's file, as the top of this file explains: a document asked for with no navigation behind it.
-function isRequestForAFile(paused: unknown): boolean {
-  const fields = fieldsOf(paused);
-  return fields['resourceType'] === DOCUMENT_REQUEST && fields['networkId'] === undefined && fields['responseStatusCode'] === undefined && fields['responseErrorReason'] === undefined;
-}
+const isRequestForAFile = (paused: RequestPaused): boolean =>
+  paused.stage === 'request' && paused.resourceType === DOCUMENT_REQUEST && paused.networkId === undefined;
 
 type WatchedPage = { readonly browserContextId: string; readonly targetId: string; readonly sessionId: string };
 
@@ -58,6 +51,12 @@ type WatchedPage = { readonly browserContextId: string; readonly targetId: strin
 export type SessionFailures = {
   readonly refusedDecisions: string[];
   readonly cleanUp: string[];
+};
+
+// What a held request's decision depends on may be in an event the driver cannot read, and what comes
+// after it says no more than after a refused decision, so it is kept with those.
+export const holdUnreadableEvent = (failures: SessionFailures) => (detail: string): void => {
+  failures.refusedDecisions.push(`the driver could not read what the browser said, so it decided nothing on it: ${detail}`);
 };
 
 // A page the browser attached, still paused before it loads anything.
@@ -95,7 +94,7 @@ export class PageWatch implements PageEvents {
   readonly #isDownloadStepUnderWay: () => boolean;
   // A promise per popup still being given its chance to ask for its first page.
   readonly #popupFirstRequests = new Set<Promise<void>>();
-  readonly #popupFailures: string[] = [];
+  #pressCount = 0;
   // Hands the next page opened without an opener to the newTab step waiting for it.
   #tabClaim: ((page: AttachedPage) => void) | null = null;
   readonly #stopListening: (() => void)[] = [];
@@ -114,26 +113,23 @@ export class PageWatch implements PageEvents {
   async start(): Promise<void> {
     const { browserContextId, targetId, sessionId } = this.#page;
     const connection = this.#connection;
-    const listen = (listenedSession: string | undefined, event: string, handler: (parameters: unknown) => void): void => {
-      this.#stopListening.push(connection.on(listenedSession, event, handler));
-    };
-    this.#stopListening.push(connection.onLost(() => this.#crash()));
-    listen(sessionId, 'Inspector.targetCrashed', () => this.#crash());
-    listen(undefined, 'Target.targetCrashed', (parameters) => {
-      if ((parameters as TargetCrashed).targetId === targetId) this.#crash();
+    this.#stopListening.push(connection.onLost(() => { this.#crash(); }));
+    this.#stopListening.push(connection.on(sessionId, 'Inspector.targetCrashed', () => { this.#crash(); }));
+    this.#listen(undefined, TARGET_CRASHED, (crashed) => {
+      if (crashed.targetId === targetId) this.#crash();
     });
-    listen(undefined, 'Target.detachedFromTarget', (parameters) => {
-      if ((parameters as DetachedFromTarget).sessionId === sessionId) this.#crash();
+    this.#listen(undefined, DETACHED_FROM_TARGET, (detached) => {
+      if (detached.sessionId === sessionId) this.#crash();
     });
-    listen(sessionId, 'Page.javascriptDialogOpening', (parameters) => {
-      this.#dialog = (parameters as DialogOpening).message;
+    this.#listen(sessionId, DIALOG_OPENING, (opening) => {
+      this.#dialog = opening.message;
       for (const notify of [...this.#onDialog]) notify();
       this.#notifyNavigationWaiters();
     });
-    listen(sessionId, 'Page.javascriptDialogClosed', (parameters) => {
+    this.#listen(sessionId, DIALOG_CLOSED, (closed) => {
       this.#dialog = null;
       // Dismissing what a page asks before it unloads cancels the navigation, and nothing else says so.
-      if (fieldsOf(parameters)['result'] === false) {
+      if (!closed.result) {
         this.#endNavigation();
       }
     });
@@ -142,8 +138,7 @@ export class PageWatch implements PageEvents {
     // session's own browser context is a popup or a second page, and is closed, unless it is the
     // tab a newTab step is waiting for. A page of another context is never let run from here: that
     // would start it before its own session has made it hold back its requests.
-    listen(undefined, 'Target.attachedToTarget', (parameters) => {
-      const attached = parameters as AttachedToTarget;
+    this.#listen(undefined, ATTACHED_TO_TARGET, (attached) => {
       const info = attached.targetInfo;
       if (info.type === 'page' && info.browserContextId === browserContextId && info.targetId !== targetId) {
         const claim = this.#tabClaim;
@@ -156,22 +151,30 @@ export class PageWatch implements PageEvents {
         void this.#closePopup(attached.sessionId, info.targetId);
         return;
       }
-      if (attached.waitingForDebugger && info.browserContextId === browserContextId) connection.send(attached.sessionId, 'Runtime.runIfWaitingForDebugger').catch(() => undefined);
-    });
-    listen(undefined, 'Browser.downloadWillBegin', (parameters) => {
-      if (!this.#claimsDownload(parameters)) this.#openings += 1;
-    });
-    listen(sessionId, 'Fetch.requestPaused', (parameters) => {
-      if (isRequestForAFile(parameters) && !this.#isDownloadStepUnderWay()) {
-        this.#openings += 1;
+      if (attached.waitingForDebugger && info.browserContextId === browserContextId) {
+        connection.ask(attached.sessionId, RUN_IF_WAITING_FOR_DEBUGGER, {}).catch((error: unknown) => { this.noteTargetFailure('a new target could not be let run', error); });
       }
     });
-    await connection.send(sessionId, 'Inspector.enable');
+    // Read by the download folder, which treats whatever it cannot read as a download nobody claimed.
+    this.#stopListening.push(connection.on(undefined, 'Browser.downloadWillBegin', (parameters) => {
+      if (!this.#claimsDownload(parameters)) this.#openings += 1;
+    }));
+    await connection.ask(sessionId, ENABLE_INSPECTOR, {});
     if (!this.#ownsBrowserContext) return;
-    await connection.send(undefined, 'Target.setAutoAttach', { autoAttach: true, waitForDebuggerOnStart: true, flatten: true, filter: [{ type: 'page' }] });
+    await connection.ask(undefined, SET_AUTO_ATTACH, { autoAttach: true, waitForDebuggerOnStart: true, flatten: true, filter: [{ type: 'page' }] });
     // Every download is refused, so no file of one is ever written; the events still say it began.
     // A download step lets the browser save the one download it claims, and refuses again after.
-    await connection.send(undefined, 'Browser.setDownloadBehavior', { behavior: 'deny', browserContextId, eventsEnabled: true });
+    await connection.ask(undefined, SET_DOWNLOAD_BEHAVIOUR, { behavior: 'deny', browserContextId, eventsEnabled: true });
+  }
+
+  #listen<Payload>(listenedSession: string | undefined, event: BrowserEvent<Payload>, handler: (payload: Payload) => void): void {
+    this.#stopListening.push(this.#connection.listen(listenedSession, event, handler, (detail) => { this.noteUnreadableEvent(detail); }));
+  }
+
+  // The id of the next press in this page, so what its check reports is told from any other's.
+  nextPressId(): string {
+    this.#pressCount += 1;
+    return `press-${this.#pressCount}`;
   }
 
   // Stops listening, once the page is closed.
@@ -204,7 +207,7 @@ export class PageWatch implements PageEvents {
   }
 
   async answerDialog(accept: boolean): Promise<void> {
-    await this.command('Page.handleJavaScriptDialog', { accept });
+    await this.ask(HANDLE_DIALOG, { accept });
   }
 
   unsupportedOpenings(): number {
@@ -216,21 +219,33 @@ export class PageWatch implements PageEvents {
   }
 
   // Waits until each popup open now has asked for its first page or used up its wait, so the
-  // session's record of them is complete, and rejects with whatever could not be done about one and
-  // with every other clean-up that failed. Popups opened during the wait are not waited for, so a
-  // page that keeps opening them cannot hold the session's close.
+  // session's record of them is complete, and rejects with every clean-up that failed, in any tab.
+  // Popups opened during the wait are not waited for, so a page that keeps opening them cannot hold
+  // the session's close.
   async settleHeldPopupsAndReportCleanUp(): Promise<void> {
     await Promise.all(this.#popupFirstRequests);
-    const popups = this.#popupFailures.length > 0 ? [`a popup could not be held back or closed: ${this.#popupFailures.join('; ')}`] : [];
-    const failures = [...popups, ...this.#failures.cleanUp];
-    if (failures.length > 0) {
-      throw new Error(failures.join('; '));
+    if (this.#failures.cleanUp.length > 0) {
+      throw new Error(this.#failures.cleanUp.join('; '));
     }
   }
 
   // A clean-up that failed can't change what a step found, so it waits for the session's close to say.
   noteCleanUpFailure(failure: string): void {
     this.#failures.cleanUp.push(failure);
+  }
+
+  // Told how something done to a page, a popup or a tab failed. One that has already gone, or a browser
+  // or a session that has, leaves nothing to report.
+  noteTargetFailure(doing: string, error: unknown): void {
+    const text = errorText(error);
+    if (!TARGET_ALREADY_GONE.test(text)) {
+      this.noteCleanUpFailure(`${doing}: ${text}`);
+    }
+  }
+
+  // An event of another shape says nothing the driver can act on, so it counts as a refused decision.
+  noteUnreadableEvent(detail: string): void {
+    this.#holdRefusal(`the driver could not read what the browser said, so it decided nothing on it: ${detail}`);
   }
 
   // Told how a decision on a request failed. Runs as the browser's answer arrives, with no step to
@@ -254,16 +269,12 @@ export class PageWatch implements PageEvents {
   // hand a failure to. A request the driver cannot read stays held with no decision on it, so what
   // comes after it says no more than after a refused decision, and it is kept with those.
   onRequestPaused(pausedSessionId: string, handler: (paused: RequestPaused) => void): () => void {
-    return this.#connection.on(pausedSessionId, 'Fetch.requestPaused', (parameters) => {
-      let paused: RequestPaused;
-      try {
-        paused = decodeRequestPaused(parameters);
-      } catch (error) {
-        this.#holdRefusal(`the driver could not read a request the browser holds, so it decided nothing on it: ${errorText(error)}`);
-        return;
+    return this.#connection.listen(pausedSessionId, REQUEST_PAUSED, (paused) => {
+      if (pausedSessionId === this.#page.sessionId && isRequestForAFile(paused) && !this.#isDownloadStepUnderWay()) {
+        this.#openings += 1;
       }
       handler(paused);
-    });
+    }, (detail) => { this.#holdRefusal(`the driver could not read a request the browser holds, so it decided nothing on it: ${detail}`); });
   }
 
   // Waits for what cannot end while this page's requests stay held, such as its load, for at most
@@ -296,32 +307,22 @@ export class PageWatch implements PageEvents {
     return new Promise((resolve) => { this.#onNavigationEnded.add(resolve); });
   }
 
-  // Sends a command to the page. It fails at once on a crashed page, and as soon as the page
-  // crashes while it waits.
-  command<Value = Record<string, unknown>>(method: string, parameters: Record<string, unknown> = {}): Promise<Value> {
-    if (this.#crashed) return Promise.reject(new CdpError(method, 'the page\'s renderer died'));
-    return this.failingOnCrash(method, this.#connection.send<Value>(this.#page.sessionId, method, parameters));
+  // Sends a command to the page, with its reply parsed before anyone sees it. It fails at once on a
+  // crashed page, and as soon as the page crashes while it waits.
+  ask<CommandParameters, Reply>(command: BrowserCommand<CommandParameters, Reply>, parameters: NoInfer<CommandParameters>): Promise<Reply> {
+    if (this.#crashed) return Promise.reject(new CdpError(command.method, 'the page\'s renderer died'));
+    return this.failingOnCrash(command.method, this.#connection.ask(this.#page.sessionId, command, parameters));
   }
 
-  // Sends a command only the running page can answer. On top of what command() does, it fails at
-  // once with PageHeldByDialog while a dialog is open, and as soon as one opens while it waits.
-  commandToRunningPage<Value = Record<string, unknown>>(method: string, parameters: Record<string, unknown> = {}): Promise<Value> {
+  // Sends a command only the running page can answer. On top of what ask does, it fails at once with
+  // PageHeldByDialog while a dialog is open, and as soon as one opens while it waits.
+  askRunningPage<CommandParameters, Reply>(command: BrowserCommand<CommandParameters, Reply>, parameters: NoInfer<CommandParameters>): Promise<Reply> {
     if (this.#dialog !== null) {
-      return Promise.reject(new PageHeldByDialog(method));
+      return Promise.reject(new PageHeldByDialog(command.method));
     }
     const opened = this.dialogOpened();
-    const held = opened.promise.then((): never => { throw new PageHeldByDialog(method); });
-    return Promise.race([this.command<Value>(method, parameters), held]).finally(() => { opened.cancel(); });
-  }
-
-  // As command, with its reply parsed before anyone sees it.
-  async ask<Reply>(command: BrowserCommand<Reply>, parameters: Record<string, unknown>): Promise<Reply> {
-    return command.decode(await this.command<unknown>(command.method, parameters));
-  }
-
-  // As commandToRunningPage, with its reply parsed before anyone sees it.
-  async askRunningPage<Reply>(command: BrowserCommand<Reply>, parameters: Record<string, unknown>): Promise<Reply> {
-    return command.decode(await this.commandToRunningPage<unknown>(command.method, parameters));
+    const held = opened.promise.then((): never => { throw new PageHeldByDialog(command.method); });
+    return Promise.race([this.ask(command, parameters), held]).finally(() => { opened.cancel(); });
   }
 
   // Waits for what the browser is doing on the page's behalf, for at most as long as the page lives.
@@ -340,24 +341,20 @@ export class PageWatch implements PageEvents {
 
   #watchNavigations(): void {
     const { sessionId, targetId } = this.#page;
-    const connection = this.#connection;
-    const endIfTopDocument = (frameId: unknown): void => {
+    const endIfTopDocument = ({ frameId }: { readonly frameId: string }): void => {
       if (frameId === targetId) {
         this.#endNavigation();
       }
     };
-    this.#stopListening.push(
-      connection.on(sessionId, 'Page.frameRequestedNavigation', (parameters) => {
-        const requested = fieldsOf(parameters);
-        if (requested['frameId'] === targetId && requested['disposition'] === THIS_TAB) {
-          this.#isNavigationUnderWay = true;
-        }
-      }),
-      connection.on(sessionId, 'Page.frameNavigated', (parameters) => { endIfTopDocument(fieldsOf(fieldsOf(parameters)['frame'])['id']); }),
-      connection.on(sessionId, 'Page.navigatedWithinDocument', (parameters) => { endIfTopDocument(fieldsOf(parameters)['frameId']); }),
-      // What ends a navigation that leaves the page where it was: a download, or an empty answer.
-      connection.on(sessionId, 'Page.frameStoppedLoading', (parameters) => { endIfTopDocument(fieldsOf(parameters)['frameId']); }),
-    );
+    this.#listen(sessionId, FRAME_REQUESTED_NAVIGATION, (requested) => {
+      if (requested.frameId === targetId && requested.disposition === THIS_TAB) {
+        this.#isNavigationUnderWay = true;
+      }
+    });
+    this.#listen(sessionId, FRAME_NAVIGATED, endIfTopDocument);
+    this.#listen(sessionId, NAVIGATED_WITHIN_DOCUMENT, endIfTopDocument);
+    // What ends a navigation that leaves the page where it was: a download, or an empty answer.
+    this.#listen(sessionId, FRAME_STOPPED_LOADING, endIfTopDocument);
   }
 
   #endNavigation(): void {
@@ -393,23 +390,16 @@ export class PageWatch implements PageEvents {
     });
     this.#popupFirstRequests.add(firstRequest);
     try {
-      await connection.send(popupSessionId, 'Fetch.enable', { patterns: [{ urlPattern: '*', requestStage: 'Request' }] });
-      await connection.send(popupSessionId, 'Runtime.runIfWaitingForDebugger');
+      await connection.ask(popupSessionId, ENABLE_REQUEST_HOLDING, { patterns: [{ urlPattern: '*', requestStage: 'Request' }] });
+      await connection.ask(popupSessionId, RUN_IF_WAITING_FOR_DEBUGGER, {});
       await firstRequest;
     } catch (error) {
-      this.#notePopupFailure(error);
+      this.noteTargetFailure('a popup could not be held back', error);
     } finally {
       endWait();
       this.#popupFirstRequests.delete(firstRequest);
     }
-    await connection.send(undefined, 'Target.closeTarget', { targetId: popupTargetId }).catch((error: unknown) => { this.#notePopupFailure(error); });
-  }
-
-  #notePopupFailure(error: unknown): void {
-    const text = errorText(error);
-    if (!POPUP_ALREADY_GONE.test(text)) {
-      this.#popupFailures.push(text);
-    }
+    await connection.ask(undefined, CLOSE_TARGET, { targetId: popupTargetId }).catch((error: unknown) => { this.noteTargetFailure('a popup could not be closed', error); });
   }
 
   #crash(): void {

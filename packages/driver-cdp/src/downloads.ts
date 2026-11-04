@@ -14,6 +14,7 @@ import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from 'node:f
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { errorText } from './browser-session.ts';
+import { CANCEL_DOWNLOAD, SET_DOWNLOAD_BEHAVIOUR } from './BrowserCommand.ts';
 import type { CdpConnection } from './cdp-connection.ts';
 import type { ArmedDownload, DownloadCapture, DownloadPress } from './page-operations.ts';
 
@@ -170,8 +171,8 @@ export class DownloadFolder implements DownloadCapture {
     return this.#folder;
   }
 
-  async #behave(behaviour: Record<string, unknown>): Promise<void> {
-    await this.#connection.send(undefined, 'Browser.setDownloadBehavior', { ...behaviour, browserContextId: this.#browserContextId, eventsEnabled: true });
+  async #behave(behaviour: { readonly behavior: 'deny' } | { readonly behavior: 'allowAndName'; readonly downloadPath: string }): Promise<void> {
+    await this.#connection.ask(undefined, SET_DOWNLOAD_BEHAVIOUR, { ...behaviour, browserContextId: this.#browserContextId, eventsEnabled: true });
   }
 
   async #finish(armed: Armed, folder: string, maximumBytes: number, beginTimeoutMilliseconds: number, shouldStopWaiting: () => boolean): Promise<Result<DownloadedFile, DriverError>> {
@@ -229,17 +230,32 @@ export class DownloadFolder implements DownloadCapture {
   async #release(armed: Armed, keep: boolean): Promise<void> {
     if (this.#armed === armed) this.#armed = null;
     const claimed = armed.claimed;
+    const failed: unknown[] = [];
     try {
       if (claimed !== null && !(keep && armed.kept)) {
         await this.#discard(claimed.downloadId);
       }
-      for (const failed of await Promise.all(armed.discardsAside)) {
-        if (failed !== null) {
-          throw failed;
-        }
-      }
-    } finally {
-      await this.#behave({ behavior: 'deny' }).catch(() => undefined);
+      failed.push(...(await Promise.all(armed.discardsAside)).filter((discarded) => discarded !== null));
+    } catch (error) {
+      failed.push(error);
+    }
+    const failedToRefuse = await this.#refuseAgain();
+    if (failedToRefuse !== null) {
+      failed.push(failedToRefuse);
+    }
+    if (failed.length > 0) {
+      throw failed[0];
+    }
+  }
+
+  // What stopped the browser refusing downloads again, or null. A browser or a context that has gone
+  // refuses them all.
+  async #refuseAgain(): Promise<Error | null> {
+    try {
+      await this.#behave({ behavior: 'deny' });
+      return null;
+    } catch (error) {
+      return DOWNLOAD_ALREADY_GONE.test(errorText(error)) ? null : new Error(`downloads could not be refused again: ${errorText(error)}`);
     }
   }
 
@@ -261,7 +277,7 @@ export class DownloadFolder implements DownloadCapture {
   async #isAlreadyGoneWhenCancelled(downloadId: string): Promise<boolean> {
     try {
       // The quoted key is the protocol's own parameter name.
-      await this.#connection.send(undefined, 'Browser.cancelDownload', { 'guid': downloadId, browserContextId: this.#browserContextId });
+      await this.#connection.ask(undefined, CANCEL_DOWNLOAD, { 'guid': downloadId, browserContextId: this.#browserContextId });
       return false;
     } catch (error) {
       if (DOWNLOAD_ALREADY_GONE.test(errorText(error))) {

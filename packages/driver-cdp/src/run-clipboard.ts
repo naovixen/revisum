@@ -9,13 +9,12 @@
 //     straight after, and reads through an isolated world, so the page's scripts can neither see
 //     the read nor change what it returns.
 import { failure, success, type ClipboardPort, type DriverError, type Result } from '@revisum/contracts';
+import { CALL_FUNCTION_ON } from './CallFunctionOn.ts';
+import { CREATE_ISOLATED_WORLD, GET_FRAME_TREE, SET_PERMISSION, type CallResult } from './BrowserCommand.ts';
 import type { CdpConnection } from './cdp-connection.ts';
 import { readClipboardText } from './in-page.ts';
 import { PageHeldByDialog } from './PageHeldByDialog.ts';
 import type { PageCommand } from './web-storage.ts';
-
-type FrameTree = { readonly frameTree: { readonly frame: { readonly id: string; readonly securityOrigin?: string } } };
-type CallResult = { readonly result: { readonly value?: unknown }; readonly exceptionDetails?: { readonly text: string } };
 
 // The isolated script world the driver reads the clipboard through.
 const CLIPBOARD_WORLD_NAME = 'driver-clipboard';
@@ -26,8 +25,8 @@ const errorText = (error: unknown): string => (error instanceof Error ? error.me
 
 // Lets every page of the browser context copy, and none read, the clipboard.
 export async function allowRunClipboard(connection: CdpConnection, browserContextId: string): Promise<void> {
-  await connection.send(undefined, 'Browser.setPermission', { permission: CLIPBOARD_WRITE, setting: 'granted', browserContextId });
-  await connection.send(undefined, 'Browser.setPermission', { permission: CLIPBOARD_READ, setting: 'denied', browserContextId });
+  await connection.ask(undefined, SET_PERMISSION, { permission: CLIPBOARD_WRITE, setting: 'granted', browserContextId });
+  await connection.ask(undefined, SET_PERMISSION, { permission: CLIPBOARD_READ, setting: 'denied', browserContextId });
 }
 
 export const SHARED_BROWSER_CLIPBOARD: ClipboardPort = {
@@ -54,14 +53,14 @@ export class RunClipboard implements ClipboardPort {
   async readText(maximumCharacters: number): Promise<Result<string, DriverError>> {
     if (this.#crashed()) return failure({ code: 'target-crashed', detail: 'the page\'s renderer died' });
     try {
-      const { frameTree } = await this.#command<FrameTree>('Page.getFrameTree');
+      const { frameTree } = await this.#command(GET_FRAME_TREE, {});
       const origin = frameTree.frame.securityOrigin;
       if (!isWebOrigin(origin)) return failure({ code: 'clipboard-unavailable', detail: 'the page has no web origin to read the clipboard for' });
-      const world = await this.#command<{ executionContextId: number }>('Page.createIsolatedWorld', { frameId: frameTree.frame.id, worldName: CLIPBOARD_WORLD_NAME });
+      const world = await this.#command(CREATE_ISOLATED_WORLD, { frameId: frameTree.frame.id, worldName: CLIPBOARD_WORLD_NAME });
       await this.#setRead(origin, 'granted');
       let called: CallResult;
       try {
-        called = await this.#command<CallResult>('Runtime.callFunctionOn', {
+        called = await this.#command(CALL_FUNCTION_ON, {
           functionDeclaration: readClipboardText.toString(), executionContextId: world.executionContextId,
           arguments: [{ value: maximumCharacters }], awaitPromise: true, returnByValue: true,
         });
@@ -83,6 +82,6 @@ export class RunClipboard implements ClipboardPort {
   }
 
   async #setRead(origin: string, setting: 'granted' | 'denied'): Promise<void> {
-    await this.#connection.send(undefined, 'Browser.setPermission', { permission: CLIPBOARD_READ, setting, origin, browserContextId: this.#browserContextId });
+    await this.#connection.ask(undefined, SET_PERMISSION, { permission: CLIPBOARD_READ, setting, origin, browserContextId: this.#browserContextId });
   }
 }
