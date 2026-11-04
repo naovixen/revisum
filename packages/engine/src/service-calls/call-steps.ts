@@ -12,7 +12,7 @@
 // Each request sent is logged by step, outcome, code, response sha256 and duration only: never an
 // argument, a header or the response itself. A body cut short or holding a secret has no sha256.
 import {
-  failure, success,
+  failure, stepFailed, success,
   type BackendAssertion, type CallArguments, type CallDeclaration, type CallName, type CallStep, type CleanupStep, type Clock, type CommandName, type DeclaredService, type HttpMethod, type JsonPointer, type ResponseReadErrorCode, type Result,
   type SafeText,
   type ScriptArguments, type SecretStore, type ServiceCallErrorCode, type ServiceCaller, type ServiceName, type ServiceRequest, type ServiceResponse,
@@ -88,7 +88,7 @@ function declared(call: CallName, project: Project): Declared | undefined {
 }
 
 const failedWith = (code: CallStepCode, serviceCall?: ServiceCallRecord): CallStepOutcome =>
-  ({ outcome: 'failed', code, ...(serviceCall === undefined ? {} : { serviceCall }) });
+  ({ ...stepFailed(code), ...(serviceCall === undefined ? {} : { serviceCall }) });
 
 // What a status says of an answer. `code` is what the step fails with on it: at once when failed, and
 // at the check timeout when pending, the status meaning "not ready yet" and nothing about its body.

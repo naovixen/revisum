@@ -7,11 +7,11 @@
 // through its clock and clipboard ports; page scripts through its script port. Database commands
 // go through the run's DatabaseCommandRunner port, which runs each in a workload container.
 import {
-  failure, isElementCheckNoDriverDecides, needsDriverFeatures, success, UnreadablePage,
+  failure, isElementCheckNoDriverDecides, needsDriverFeatures, stepFailed, StepCode, success, UnreadablePage,
   type A11yFinding, type ActionGuard, type AppliedRewrite, type ApprovalLabel, type ArtifactReference, type ArtifactStore, type Authorised,
   type BrowserDriver, type Clock, type DatabaseCommandRunner, type DocumentSession, type DomRead, type DownloadedFile, type DownloadName, type DriverFeature, type LockEntry, type DialogStep, type ElementProbe,
   type EventSink, type GuaranteeLevel, type GuardVerdict, type PageAssertion, type Plan, type PolicyRuleId, type Redactor,
-  type DownloadStep, type ResolvedElement, type ResolvedLocator, type Result, type SafeText, type SecretStore, type ServiceCaller, type Session, type Step, type Target, type TargetId,
+  type DownloadStep, type StepOutcome, type ResolvedElement, type ResolvedLocator, type Result, type SafeText, type SecretStore, type ServiceCaller, type Session, type Step, type Target, type TargetId,
   type Unavailable, type ValueName, type GuaranteeStatement, type RunMode, type SuiteFinding, type SuiteName, type SuitePass,
   type StubAnswer, type StubName, type SuiteTestId, type SuiteTestResult, type UnsafeFeature,
 } from '@revisum/contracts';
@@ -34,6 +34,7 @@ import {
   type FixtureReference, type HostInfo, type RunManifest, type RunPins,
 } from './manifest.ts';
 import { checkElement, checkPage, domReadFor, normalise, type Verdict } from './oracle.ts';
+import { refusedResult } from './RefusedResult.ts';
 import { runEvaluate, runScriptCheck, type PageScriptContext, type PageScriptRecord } from './page-scripts/page-script-steps.ts';
 import type { SuiteDecodeError } from './evidence/suite-report.ts';
 import type { PlanError } from './plan/plan-decoders.ts';
@@ -118,12 +119,11 @@ export type RunPorts = {
   readonly rewritesApplied?: () => readonly AppliedRewrite[];
 };
 
-export type StepOutcome = 'passed' | 'failed' | 'skipped';
 export type StepResult = {
   readonly index: number;
   readonly type: Step['type'];
   readonly outcome: StepOutcome;
-  readonly code?: string;
+  readonly code?: StepCode;
   // A redacted observation, kept only when a step fails.
   readonly observed?: string;
   readonly artifact?: ArtifactReference;
@@ -360,17 +360,17 @@ export async function run(given: RunInputs, ports: RunPorts): Promise<RunResult>
   const isPlanLogged = logKeepingTheResult({ kind: 'run.state', state: planned.state, targetId: target.id }, logger);
 
   if (!isClearedForStanding(inputs.plan, target.id, inputs.project, standing)) {
-    return refusedResult(planned, { code: 'clearance-standing-mismatch' }, context, startedAt);
+    return refuseRun(planned, { code: 'clearance-standing-mismatch' }, context, startedAt);
   }
 
   // Refused before any driver call if the run would reach a production origin it may not.
   const productionOrigin = productionAllowed(inputs) ? undefined : productionOriginReached(inputs);
   if (productionOrigin !== undefined) {
-    return refusedResult(planned, { code: 'origin-not-allowed', origin: productionOrigin }, context, startedAt, { origin: productionOrigin });
+    return refuseRun(planned, { code: 'origin-not-allowed', origin: productionOrigin }, context, startedAt, { origin: productionOrigin });
   }
 
   if (!resolution.ok) {
-    return refusedResult(planned, { code: 'secret-missing', secretName: resolution.error }, context, startedAt, {
+    return refuseRun(planned, { code: 'secret-missing', secretName: resolution.error }, context, startedAt, {
       detail: `the secret store has no secret named ${resolution.error}`,
     });
   }
@@ -379,12 +379,12 @@ export async function run(given: RunInputs, ports: RunPorts): Promise<RunResult>
   // given: the manifest could not record what would run.
   const unsafe = unsafeFeatureRecord(inputs.plan, inputs.project, inputs.scriptSources ?? {});
   if (!unsafe.ok) {
-    return refusedResult(planned, { code: 'script-source-missing', file: unsafe.error }, context, startedAt);
+    return refuseRun(planned, { code: 'script-source-missing', file: unsafe.error }, context, startedAt);
   }
 
   const beyondThisRun = refusalOfWhatThisRunCannotDo(inputs.plan, context);
   if (beyondThisRun !== undefined) {
-    return refusedResult(planned, beyondThisRun, context, startedAt);
+    return refuseRun(planned, beyondThisRun, context, startedAt);
   }
 
   const opened = await openSession(planned, context);
@@ -480,7 +480,7 @@ export async function run(given: RunInputs, ports: RunPorts): Promise<RunResult>
   if (refusedDecisions.length > 0 && finished.state === 'Passed') {
     const lastStep = steps.pop();
     if (lastStep !== undefined) {
-      steps.push({ ...lastStep, outcome: 'failed', code: ADAPTER_ERROR });
+      steps.push({ ...lastStep, ...stepFailed(ADAPTER_ERROR) });
     }
     finished = lifecycle.finish(running, 'Errored');
   }
@@ -548,7 +548,7 @@ const SETUP_STEP_TYPES: readonly Step['type'][] = ['call', 'evaluate', 'database
 // A step the adapter threw on, or that a refused request decision spoilt: what it saw is unknown,
 // which is not a product failure either. The code stands for the failure and its text stays out of
 // the result, since it could hold page content or a secret.
-const ADAPTER_ERROR = 'adapter-error';
+const ADAPTER_ERROR = StepCode.AdapterError;
 // The codes of a page script or a database command that could not give a result to check, in
 // whatever step it ran, of a service call that got no answer, and of an adapter that threw: the run
 // could not test, which is not a product failure.
@@ -589,16 +589,13 @@ function refusalOfWhatThisRunCannotDo(plan: Plan, context: RunContext): lifecycl
 }
 
 // The run refused, before any driver call. `logged` adds what the event log says beyond the code.
-function refusedResult(
+function refuseRun(
   planned: lifecycle.Planned, refusal: lifecycle.Refusal, context: RunContext, startedAt: number,
   logged: { readonly origin?: string; readonly detail?: string } = {},
 ): RunResult {
   const refused = lifecycle.refuse(planned, refusal);
   logKeepingTheResult({ kind: 'run.state', state: refused.state, targetId: planned.target.id, code: refused.refusal.code, ...logged }, context.logger);
-  return seal({
-    state: refused.state, targetId: planned.target.id, manifest: null, manifestHash: null, steps: [], blockedOrigins: [],
-    unavailable: null, refusal: refused.refusal, timings: { totalMilliseconds: context.ports.clock.now() - startedAt, stepMilliseconds: [] },
-  }, context);
+  return seal(refusedResult(refused.refusal, planned.target.id, context.ports.clock.now() - startedAt), context);
 }
 
 // The origins of the services the plan's calls and database commands reach, its cleanup included.
@@ -684,13 +681,13 @@ async function openSession(planned: lifecycle.Planned, context: RunContext): Pro
 }
 
 // A failed step's result that holds only its code.
-const failedStep = (step: Step, index: number, code: string): StepResult => ({ index, type: step.type, outcome: 'failed', code });
+const failedStep = (step: Step, index: number, code: StepCode): StepResult => ({ index, type: step.type, ...stepFailed(code) });
 
 const isCrashed = (session: DocumentSession): boolean => session.crashed?.() === true;
 const hasARefusedDecision = (context: RunContext): boolean => (context.session?.refusedRequestDecisions?.().length ?? 0) > 0;
 const isHeldByDialog = (session: DocumentSession): boolean => session.isDialogOpen?.() === true;
 
-function adapterFailureCode(session: DocumentSession): string {
+function adapterFailureCode(session: DocumentSession): StepCode {
   if (isCrashed(session)) {
     return TARGET_CRASHED;
   }
@@ -699,7 +696,7 @@ function adapterFailureCode(session: DocumentSession): string {
 
 // The code for something that threw, whose text goes only to the log, which redacts it. A throw from
 // a dead page is the crash, and one from a page a dialog holds is that dialog.
-function codeForThrow(error: unknown, session: DocumentSession, logger: Logger): string {
+function codeForThrow(error: unknown, session: DocumentSession, logger: Logger): StepCode {
   const code = adapterFailureCode(session);
   logger.log({ kind: 'step.end', outcome: 'failed', code, detail: errorText(error) });
   return code;
@@ -708,7 +705,7 @@ function codeForThrow(error: unknown, session: DocumentSession, logger: Logger):
 // The requests the plan checks are observed from its start, so what a page sends as it loads counts
 // too. A driver refused request checks observes nothing: those steps fail on their own. Gives the
 // code for what stopped it, or undefined when nothing did.
-async function failureToObserveRequests(session: Session, context: RunContext): Promise<string | undefined> {
+async function failureToObserveRequests(session: Session, context: RunContext): Promise<StepCode | undefined> {
   if (!context.performs.includes('requestChecks')) {
     return undefined;
   }
@@ -798,7 +795,7 @@ async function runStepOnLivePage(step: Step, index: number, session: DocumentSes
     // A request the browser would not let go on stays held, so neither a pass nor a failure of this
     // step says anything about the app: the run could not test. The reason goes to the log at the end.
     if (hasARefusedDecision(context)) {
-      return { ...done, outcome: 'failed', code: ADAPTER_ERROR };
+      return { ...done, ...stepFailed(ADAPTER_ERROR) };
     }
     if (done.outcome !== 'passed') {
       return done;
@@ -881,27 +878,27 @@ async function executeStep(step: Step, index: number, session: DocumentSession, 
   // a driver, and which of it is optional, is decided in one place, in contracts; the driver declares
   // the optional features it performs. Hover, select and upload go to the driver, which refuses them
   // the same way when it does not perform them; a frame step needs the driver's frame port.
-  if (needsDriverFeatures(step, context.performs)) return { ...base, outcome: 'failed', code: 'unsupported-step' };
+  if (needsDriverFeatures(step, context.performs)) return { ...base, ...stepFailed(StepCode.UnsupportedStep) };
   switch (step.type) {
     case 'navigate': {
       let path = step.url;
       if (typeof path !== 'string') {
         // A path template's values are only known now, so the runtime guard checks the final URL.
         const resolved = resolvePathTemplate(path, context.values, context.inputs.project);
-        if (!resolved.ok) return { ...base, outcome: 'failed', code: resolved.error };
+        if (!resolved.ok) return { ...base, ...stepFailed(resolved.error) };
         path = resolved.value;
         const verdict = context.gate.guardAction({ type: 'navigate', url: path }, index, NO_ELEMENT, null, target.locale);
         if (verdict.kind === 'deny') {
           keepDenial(verdict, context);
-          return { ...base, outcome: 'failed', code: 'policy-denied' };
+          return { ...base, ...stepFailed(StepCode.PolicyDenied) };
         }
       }
       const url = new URL(path, context.inputs.baseUrl);
-      if (!context.inputs.project.origins.some((origin) => origin === url.origin)) return { ...base, outcome: 'failed', code: 'origin-not-allowed' };
+      if (!context.inputs.project.origins.some((origin) => origin === url.origin)) return { ...base, ...stepFailed(StepCode.OriginNotAllowed) };
       // Scripts are named only when they are off, so a driver that never loads a page without them
       // is called exactly as before.
       const navigated = step.scripts === 'disabled' ? await session.navigate(url.href, { scripts: 'disabled' }) : await session.navigate(url.href);
-      return navigated.ok ? { ...base, outcome: 'passed' } : { ...base, outcome: 'failed', code: navigated.error.code };
+      return navigated.ok ? { ...base, outcome: 'passed' } : { ...base, ...stepFailed(navigated.error.code) };
     }
     case 'click':
     case 'hover':
@@ -911,7 +908,7 @@ async function executeStep(step: Step, index: number, session: DocumentSession, 
     case 'press': {
       // Values are substituted first, so the runtime guard and the driver see the final text.
       const action = resolveActionStep(step, context.values, context.inputs.project);
-      if (!action.ok) return { ...base, outcome: 'failed', code: action.error };
+      if (!action.ok) return { ...base, ...stepFailed(action.error) };
       const resolved = action.value;
       // A secret is handed to the driver opaque; it is revealed only as the driver types it.
       const secret = resolved.type === 'fill' && typeof resolved.value !== 'string' && 'secretName' in resolved.value
@@ -922,22 +919,22 @@ async function executeStep(step: Step, index: number, session: DocumentSession, 
         else context.secretFilledFields.set(canonicalJson(resolved.locator), resolved.locator);
       }
       const acted = await session.act(resolved, guardFor(resolved, index, target, context), secret);
-      return acted.ok ? { ...base, outcome: 'passed' } : { ...base, outcome: 'failed', code: acted.error.code };
+      return acted.ok ? { ...base, outcome: 'passed' } : { ...base, ...stepFailed(acted.error.code) };
     }
     case 'dialog': {
       // The driver answers the dialog the page opened, asking the runtime guard first with the
       // dialog's text, so accepting an irreversible one ends the run Denied with nothing sent.
       const answer = resolveDialogStep(step, context);
-      if (!answer.ok) return { ...base, outcome: 'failed', code: answer.error };
+      if (!answer.ok) return { ...base, ...stepFailed(answer.error) };
       const acted = await session.act(answer.value, guardFor(answer.value, index, target, context));
-      return acted.ok ? { ...base, outcome: 'passed' } : { ...base, outcome: 'failed', code: acted.error.code };
+      return acted.ok ? { ...base, outcome: 'passed' } : { ...base, ...stepFailed(acted.error.code) };
     }
     case 'frame': {
-      if (session.frame === undefined) return { ...base, outcome: 'failed', code: 'unsupported-step' };
+      if (session.frame === undefined) return { ...base, ...stepFailed(StepCode.UnsupportedStep) };
       const locator = resolveLocator(step.locator, context.values, context.inputs.project);
-      if (!locator.ok) return { ...base, outcome: 'failed', code: locator.error };
+      if (!locator.ok) return { ...base, ...stepFailed(locator.error) };
       const entered = await session.frame(locator.value);
-      if (!entered.ok) return { ...base, outcome: 'failed', code: entered.error.code };
+      if (!entered.ok) return { ...base, ...stepFailed(entered.error.code) };
       return runInnerSteps(step, index, entered.value, target, context);
     }
     case 'remember':
@@ -966,15 +963,15 @@ async function executeStep(step: Step, index: number, session: DocumentSession, 
     // run that runs them always has a runner: run() refused it before any step otherwise.
     case 'database':
     case 'expectDatabase': {
-      if (context.commands === undefined) return { ...base, outcome: 'failed', code: 'unsupported-step' };
+      if (context.commands === undefined) return { ...base, ...stepFailed(StepCode.UnsupportedStep) };
       const done = step.type === 'database' ? await runDatabaseStep(step, index, context.commands) : await runDatabaseCheck(step, index, context.commands);
       return { ...base, ...done };
     }
     case 'expect': {
       const locator = resolveLocator(step.locator, context.values, context.inputs.project);
-      if (!locator.ok) return { ...base, outcome: 'failed', code: locator.error };
+      if (!locator.ok) return { ...base, ...stepFailed(locator.error) };
       const assertion = resolveElementAssertion(step.assert, context.values, context.inputs.project);
-      if (!assertion.ok) return { ...base, outcome: 'failed', code: assertion.error };
+      if (!assertion.ok) return { ...base, ...stepFailed(assertion.error) };
       // A DOM check asks the probe to read the class, style or attribute it compares.
       const read = domReadFor(assertion.value);
       let last: ElementProbe | null = null;
@@ -982,42 +979,42 @@ async function executeStep(step: Step, index: number, session: DocumentSession, 
         last = read === undefined ? await session.probe(locator.value) : await session.probe(locator.value, read);
         return checkElement(assertion.value, last, context.inputs.baseUrl);
       });
-      if (verdict.code === TARGET_CRASHED) return { ...base, outcome: 'failed', code: TARGET_CRASHED };
+      if (verdict.code === TARGET_CRASHED) return { ...base, ...stepFailed(TARGET_CRASHED) };
       return verdict.pass
         ? { ...base, outcome: 'passed' }
-        : { ...base, outcome: 'failed', code: verdict.code ?? 'assertion-failed', observed: observe(last, context, context.secretFilledFields.has(canonicalJson(locator.value))) };
+        : { ...base, ...stepFailed(verdict.code ?? StepCode.AssertionFailed), observed: observe(last, context, context.secretFilledFields.has(canonicalJson(locator.value))) };
     }
     case 'expectPage': {
       const assertion = resolvePageAssertion(step.assert, context);
-      if (!assertion.ok) return { ...base, outcome: 'failed', code: assertion.error };
+      if (!assertion.ok) return { ...base, ...stepFailed(assertion.error) };
       let title = '';
       const verdict = await poll(context, session, async () => {
         const page = await session.page();
         title = page.title;
         return checkPage(assertion.value, page, context.inputs.baseUrl);
       });
-      if (verdict.code === TARGET_CRASHED) return { ...base, outcome: 'failed', code: TARGET_CRASHED };
+      if (verdict.code === TARGET_CRASHED) return { ...base, ...stepFailed(TARGET_CRASHED) };
       return verdict.pass
         ? { ...base, outcome: 'passed' }
-        : { ...base, outcome: 'failed', code: verdict.code ?? 'assertion-failed', observed: context.isShortSecret(title) ? SECRET_PLACEHOLDER : context.redactor.text(title) };
+        : { ...base, ...stepFailed(verdict.code ?? StepCode.AssertionFailed), observed: context.isShortSecret(title) ? SECRET_PLACEHOLDER : context.redactor.text(title) };
     }
     case 'a11yAudit': {
       const findings = [...(await session.audit())].sort(byRuleId);
       context.logger.log({ kind: 'audit', stepIndex: index, findings: findings.length });
       const gateFails = step.mode === 'gate' && findings.length > 0;
-      return { ...base, outcome: gateFails ? 'failed' : 'passed', findings, ...(gateFails ? { code: 'a11y-violations' } : {}) };
+      return { ...base, outcome: gateFails ? 'failed' : 'passed', findings, ...(gateFails ? { code: StepCode.AccessibilityViolations } : {}) };
     }
     case 'call':
     case 'expectBackend': {
       // A run that calls services always has a caller: run() refused it before any step otherwise.
-      if (context.calls === undefined) return { ...base, outcome: 'failed', code: 'service-unreachable' };
+      if (context.calls === undefined) return { ...base, ...stepFailed(StepCode.ServiceUnreachable) };
       const done = step.type === 'call' ? await runCallStep(step, index, context.calls) : await runBackendCheck(step, index, context.calls);
       return { ...base, ...done };
     }
     case 'capture': {
       const png = await pixelsWithSecretsHidden(session, context);
       if (png === null) {
-        return { ...base, outcome: 'passed', code: 'capture-left-out' };
+        return { ...base, outcome: 'passed', code: StepCode.CaptureLeftOut };
       }
       const reference = await context.ports.artifacts.put(`${target.id}/${step.name}.png`, png, 'image/png');
       context.logger.log({ kind: 'artifact', stepIndex: index, artifact: reference.name, sha256: reference.sha256 });
@@ -1058,13 +1055,13 @@ async function rememberFromPage(step: Extract<Step, { type: 'remember' }>, index
   const base = { index, type: step.type } as const;
   const from = step.from;
   // needsDriverFeatures refused every other source before the step got here.
-  if (!('element' in from)) return { ...base, outcome: 'failed', code: 'unsupported-step' };
+  if (!('element' in from)) return { ...base, ...stepFailed(StepCode.UnsupportedStep) };
   const locator = resolveLocator(from.element, context.values, context.inputs.project);
-  if (!locator.ok) return { ...base, outcome: 'failed', code: locator.error };
+  if (!locator.ok) return { ...base, ...stepFailed(locator.error) };
   // A remembered value is hashed into the result and can be sent on by a later step, and a hash of
   // a short secret is as good as the secret.
   if (context.secretFilledFields.has(canonicalJson(locator.value))) {
-    return { ...base, outcome: 'failed', code: 'value-holds-secret' };
+    return { ...base, ...stepFailed(StepCode.ValueHoldsSecret) };
   }
   const read: DomRead | undefined = from.read === 'attribute' ? { kind: 'attribute', name: from.attribute } : undefined;
   const textOf = (probe: ElementProbe): string => {
@@ -1085,16 +1082,16 @@ async function rememberFromPage(step: Extract<Step, { type: 'remember' }>, index
   });
   if (verdict.code === TARGET_CRASHED || verdict.code === 'not-found' || verdict.code === 'ambiguous' || verdict.code === 'selector-invalid'
     || verdict.code === UnreadablePage.ReadFailed || verdict.code === UnreadablePage.DialogOpen || verdict.code === UnreadablePage.BrowserErrorPage) {
-    return { ...base, outcome: 'failed', code: verdict.code };
+    return { ...base, ...stepFailed(verdict.code) };
   }
   const text = seen.probe === null ? '' : textOf(seen.probe);
-  if (text === '') return { ...base, outcome: 'failed', code: 'value-empty' };
+  if (text === '') return { ...base, ...stepFailed(StepCode.ValueEmpty) };
   const kept = context.remembered.remember(step.name, text, index);
-  return kept.ok ? { ...base, outcome: 'passed', remembered: kept.value } : { ...base, outcome: 'failed', code: kept.error };
+  return kept.ok ? { ...base, outcome: 'passed', remembered: kept.value } : { ...base, ...stepFailed(kept.error) };
 }
 
 // A page check with a meta tag's expected content resolved, when it is a value reference.
-function resolvePageAssertion(assertion: PageAssertion, context: RunContext): Result<PageAssertion, string> {
+function resolvePageAssertion(assertion: PageAssertion, context: RunContext): Result<PageAssertion, StepCode> {
   if (assertion.kind !== 'metaContent') return { ok: true, value: assertion };
   const expected = resolveText(assertion.value, context.values, context.inputs.project.limits.maximumTextLength);
   return expected.ok ? { ok: true, value: { ...assertion, value: expected.value } } : expected;
@@ -1106,12 +1103,12 @@ function resolvePageAssertion(assertion: PageAssertion, context: RunContext): Re
 // media type, size and sha256.
 async function downloadFile(step: DownloadStep, index: number, session: DocumentSession, target: Target, context: RunContext): Promise<StepResult> {
   const base = { index, type: step.type } as const;
-  if (session.download === undefined) return { ...base, outcome: 'failed', code: 'unsupported-step' };
+  if (session.download === undefined) return { ...base, ...stepFailed(StepCode.UnsupportedStep) };
   const locator = resolveLocator(step.locator, context.values, context.inputs.project);
-  if (!locator.ok) return { ...base, outcome: 'failed', code: locator.error };
+  if (!locator.ok) return { ...base, ...stepFailed(locator.error) };
   const resolved: DownloadStep = { ...step, locator: locator.value };
   const saved = await session.download(resolved, context.inputs.project.limits.maximumDownloadBytes, guardFor(resolved, index, target, context));
-  if (!saved.ok) return { ...base, outcome: 'failed', code: saved.error.code };
+  if (!saved.ok) return { ...base, ...stepFailed(saved.error.code) };
   const file = saved.value;
   context.downloads.set(step.name, file);
   const record: DownloadRecord = {
@@ -1145,8 +1142,8 @@ function checkDownload(step: Extract<Step, { type: 'expectDownload' }>, index: n
   // The parser rejects a check of a download no earlier step defined, and a failed download skips
   // every later step, so the file is always there.
   const file = context.downloads.get(step.download);
-  if (file === undefined) return { ...base, outcome: 'failed', code: 'no-download' };
-  const verdict = (pass: boolean): StepResult => (pass ? { ...base, outcome: 'passed' } : { ...base, outcome: 'failed', code: 'assertion-failed' });
+  if (file === undefined) return { ...base, ...stepFailed(StepCode.NoDownload) };
+  const verdict = (pass: boolean): StepResult => (pass ? { ...base, outcome: 'passed' } : { ...base, ...stepFailed(StepCode.AssertionFailed) });
   const assertion = step.assert;
   switch (assertion.kind) {
     case 'sizeAtMost': return verdict(file.bytes.length <= assertion.value);
@@ -1154,10 +1151,10 @@ function checkDownload(step: Extract<Step, { type: 'expectDownload' }>, index: n
     case 'mediaTypeEquals': return verdict(mediaTypeEssence(file.mediaType) === mediaTypeEssence(assertion.value));
     case 'fileNameEquals': case 'contentContains': case 'contentExcludes': {
       const expected = resolveText(assertion.value, context.values, context.inputs.project.limits.maximumTextLength);
-      if (!expected.ok) return { ...base, outcome: 'failed', code: expected.error };
+      if (!expected.ok) return { ...base, ...stepFailed(expected.error) };
       if (assertion.kind === 'fileNameEquals') return verdict(file.fileName === expected.value);
       const text = downloadText(file.bytes);
-      if (text === undefined) return { ...base, outcome: 'failed', code: 'download-not-text' };
+      if (text === undefined) return { ...base, ...stepFailed(StepCode.DownloadNotText) };
       // An empty file proves nothing about what it holds or leaves out, so it fails both.
       if (text === '') return verdict(false);
       return verdict(assertion.kind === 'contentContains' ? text.includes(expected.value) : !text.includes(expected.value));
@@ -1171,23 +1168,23 @@ function checkDownload(step: Extract<Step, { type: 'expectDownload' }>, index: n
 async function runInNewTab(step: Extract<Step, { type: 'newTab' }>, index: number, target: Target, context: RunContext): Promise<StepResult> {
   const base = { index, type: step.type } as const;
   const session = context.session;
-  if (session === null || session.newTab === undefined) return { ...base, outcome: 'failed', code: 'unsupported-step' };
+  if (session === null || session.newTab === undefined) return { ...base, ...stepFailed(StepCode.UnsupportedStep) };
   let path = step.url;
   if (typeof path !== 'string') {
     // As for a navigate: a path template's values are only known now, so the guard checks the final URL.
     const resolved = resolvePathTemplate(path, context.values, context.inputs.project);
-    if (!resolved.ok) return { ...base, outcome: 'failed', code: resolved.error };
+    if (!resolved.ok) return { ...base, ...stepFailed(resolved.error) };
     path = resolved.value;
     const verdict = context.gate.guardAction({ type: 'navigate', url: path }, index, NO_ELEMENT, null, target.locale);
     if (verdict.kind === 'deny') {
       keepDenial(verdict, context);
-      return { ...base, outcome: 'failed', code: 'policy-denied' };
+      return { ...base, ...stepFailed(StepCode.PolicyDenied) };
     }
   }
   const url = new URL(path, context.inputs.baseUrl);
-  if (!context.inputs.project.origins.some((origin) => origin === url.origin)) return { ...base, outcome: 'failed', code: 'origin-not-allowed' };
+  if (!context.inputs.project.origins.some((origin) => origin === url.origin)) return { ...base, ...stepFailed(StepCode.OriginNotAllowed) };
   const opened = await session.newTab(url.href);
-  if (!opened.ok) return { ...base, outcome: 'failed', code: opened.error.code };
+  if (!opened.ok) return { ...base, ...stepFailed(opened.error.code) };
   const tab = opened.value;
   const done = await runInnerSteps(step, index, tab, target, context);
   try {
@@ -1195,12 +1192,12 @@ async function runInNewTab(step: Extract<Step, { type: 'newTab' }>, index: numbe
     return done;
   } catch (error) {
     const code = codeForThrow(error, tab, context.logger);
-    return done.outcome === 'passed' ? { ...done, outcome: 'failed', code } : done;
+    return done.outcome === 'passed' ? { ...done, ...stepFailed(code) } : done;
   }
 }
 
 // A dialog step with its expected text's value references replaced, as a driver must receive it.
-function resolveDialogStep(step: DialogStep, context: RunContext): Result<DialogStep, string> {
+function resolveDialogStep(step: DialogStep, context: RunContext): Result<DialogStep, StepCode> {
   if (step.expectText === undefined) return { ok: true, value: step };
   const expected = resolveText(step.expectText, context.values, context.inputs.project.limits.maximumTextLength);
   return expected.ok ? { ok: true, value: { ...step, expectText: expected.value } } : expected;
@@ -1222,7 +1219,7 @@ function guardFor(step: Step, index: number, target: Target, context: RunContext
   };
 }
 
-const TARGET_CRASHED = 'target-crashed';
+const TARGET_CRASHED = StepCode.TargetCrashed;
 // A check's verdict, or the page's renderer died while the check waited.
 type PollVerdict = Verdict | { readonly pass: false; readonly code: typeof TARGET_CRASHED };
 

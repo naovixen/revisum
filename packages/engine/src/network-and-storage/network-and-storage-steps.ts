@@ -11,8 +11,8 @@
 // Field values, storage values and response bodies never reach the result or the log; a remembered
 // field is logged by its name and sha256 only.
 import {
-  failure, isSecret, success,
-  type CallArguments, type Clock, type FieldName, type JsonPointer, type ObservedExchange, type Plan, type RequestName, type ResolvedStub,
+  failure, isSecret, stepFailed, StorageAssertionKind, success,
+  type StepCode, type CallArguments, type Clock, type FieldName, type JsonPointer, type ObservedExchange, type Plan, type RequestName, type ResolvedStub,
   type ResolvedStubResponse, type ResponseAssertion, type Result, type SafeText, type SecretStore, type Session, type Step, type StubDeclaration,
   type StubName, type StubResponseBody,
 } from '@revisum/contracts';
@@ -43,15 +43,15 @@ export type NetworkStepContext = {
 // What one of these steps gives its step result.
 type NetworkStepOutcome = {
   readonly outcome: 'passed' | 'failed';
-  readonly code?: string;
+  readonly code?: StepCode;
   // Only a count, or "present", "absent" or "differs": never a value read from the page or a response.
   readonly observed?: string;
   readonly remembered?: RememberedRecord;
 };
 
 const passed: NetworkStepOutcome = { outcome: 'passed' };
-const failedWith = (code: string, observed?: string): NetworkStepOutcome =>
-  ({ outcome: 'failed', code, ...(observed === undefined ? {} : { observed }) });
+const failedWith = (code: StepCode, observed?: string): NetworkStepOutcome =>
+  ({ ...stepFailed(code), ...(observed === undefined ? {} : { observed }) });
 const UNSUPPORTED = failedWith('unsupported-step');
 
 // The declaration a name gives in the run's own project. The parser checked the name against the
@@ -61,6 +61,13 @@ const declaredIn = <Declaration>(declarations: Readonly<Record<string, Declarati
 
 // ---- Observed requests ----------------------------------------------------------------------
 
+function requestNamedBy(step: Step): RequestName | undefined {
+  if (step.type === 'resetRequests' || step.type === 'expectRequests' || step.type === 'expectResponse') {
+    return step.request;
+  }
+  return step.type === 'remember' && 'response' in step.from ? step.from.response : undefined;
+}
+
 // The requests a plan names, inside frames and second tabs too, in plan order and each once. Only
 // these are observed, so a plan that names none leaves the page's service workers alone.
 export function observedRequestNames(plan: Plan): readonly RequestName[] {
@@ -68,8 +75,7 @@ export function observedRequestNames(plan: Plan): readonly RequestName[] {
   const visit = (steps: readonly Step[]): void => {
     for (const step of steps) {
       if (step.type === 'frame' || step.type === 'newTab') visit(step.steps);
-      const name = step.type === 'resetRequests' || step.type === 'expectRequests' || step.type === 'expectResponse' ? step.request
-        : step.type === 'remember' && 'response' in step.from ? step.from.response : undefined;
+      const name = requestNamedBy(step);
       if (name !== undefined && !names.includes(name)) names.push(name);
     }
   };
@@ -78,7 +84,7 @@ export function observedRequestNames(plan: Plan): readonly RequestName[] {
 }
 
 // Starts observing one declared request, or starts it again from nothing.
-async function observe(name: RequestName, context: NetworkStepContext): Promise<Result<void, string>> {
+async function observe(name: RequestName, context: NetworkStepContext): Promise<Result<void, StepCode>> {
   const network = context.session?.network;
   const declaration = declaredIn(context.project.observedRequests, name);
   if (network === undefined || declaration === undefined) return failure('unsupported-step');
@@ -90,7 +96,7 @@ async function observe(name: RequestName, context: NetworkStepContext): Promise<
 
 // Before the first step: every request the plan names is observed from the start of the plan, so
 // the requests a page sends while it loads are counted too.
-export async function startObserving(names: readonly RequestName[], context: NetworkStepContext): Promise<Result<void, string>> {
+export async function startObserving(names: readonly RequestName[], context: NetworkStepContext): Promise<Result<void, StepCode>> {
   for (const name of names) {
     const observed = await observe(name, context);
     if (!observed.ok) return observed;
@@ -146,7 +152,7 @@ const pointerOf = (project: Project, request: RequestName, field: FieldName): Js
 };
 
 // One field of an exchange's JSON body: found (with its value), missing, or unreadable.
-type FieldRead = Result<{ readonly value: unknown } | undefined, string>;
+type FieldRead = Result<{ readonly value: unknown } | undefined, StepCode>;
 
 function readField(exchange: ObservedExchange, pointer: JsonPointer | undefined, maximumResponseBytes: number): FieldRead {
   if (pointer === undefined) return failure('field-missing');
@@ -161,7 +167,7 @@ const REQUEST_NOT_SEEN = 'request-not-seen';
 // The latest exchange of a request, once no matching request has been in flight for the quiet
 // window: "latest" means the latest the page asked for, not the latest answered so far, which a
 // newer request in flight is about to replace. request-not-seen when there is none yet.
-async function latestSettledExchange(context: NetworkStepContext, request: RequestName): Promise<Result<ObservedExchange, string>> {
+async function latestSettledExchange(context: NetworkStepContext, request: RequestName): Promise<Result<ObservedExchange, StepCode>> {
   const network = context.session?.network;
   if (network === undefined) {
     return failure('unsupported-step');
@@ -176,9 +182,9 @@ async function latestSettledExchange(context: NetworkStepContext, request: Reque
 }
 
 // Only no exchange yet is worth another look: a wait for quiet that failed has used up the timeout.
-const isWorthAnotherLook = (error: string): boolean => error === REQUEST_NOT_SEEN;
+const isWorthAnotherLook = (error: StepCode): boolean => error === REQUEST_NOT_SEEN;
 
-type Look = { readonly pass: boolean; readonly code: string; readonly final?: boolean };
+type Look = { readonly pass: boolean; readonly code: StepCode; readonly final?: boolean };
 
 // Whether the latest exchange passes the check. Backend data is not rendered text, so a field is
 // compared exactly, spaces and case included.
@@ -218,7 +224,7 @@ export async function checkResponse(step: Extract<Step, { type: 'expectResponse'
 }
 
 // A response field as a run value's text: the field's own text, or the decimal length of an array.
-function rememberedText(found: { readonly value: unknown } | undefined, read: 'text' | 'arrayLength'): Result<string, string> {
+function rememberedText(found: { readonly value: unknown } | undefined, read: 'text' | 'arrayLength'): Result<string, StepCode> {
   if (found === undefined) return failure('field-missing');
   if (read === 'arrayLength') return Array.isArray(found.value) ? success(String(found.value.length)) : failure('field-missing');
   const text = fieldText(found.value);
@@ -323,6 +329,17 @@ export async function writeStorage(step: Extract<Step, { type: 'setStorage' | 'r
 // What a failed storage check may say about the entry: never its value.
 const storageObservation = (value: string | null): string => (value === null ? 'absent' : 'present');
 
+function isStoredValueAsExpected(kind: StorageAssertionKind, value: string | null, expected: SafeText | null): boolean {
+  switch (kind) {
+    case StorageAssertionKind.Present:
+      return value !== null;
+    case StorageAssertionKind.Absent:
+      return value === null;
+    case StorageAssertionKind.Equals:
+      return value === expected;
+  }
+}
+
 export async function checkStorage(step: Extract<Step, { type: 'expectStorage' }>, context: NetworkStepContext): Promise<NetworkStepOutcome> {
   const storage = context.session?.storage;
   const declaration = declaredIn(context.project.storageEntries, step.entry);
@@ -339,7 +356,7 @@ export async function checkStorage(step: Extract<Step, { type: 'expectStorage' }
     // A page on another origin, or one that has died, will not answer a later read either.
     if (!read.ok) return { pass: false, final: true, error: read.error.code, observed: '' };
     const value = read.value;
-    const pass = assertion.kind === 'present' ? value !== null : assertion.kind === 'absent' ? value === null : value === expected;
+    const pass = isStoredValueAsExpected(assertion.kind, value, expected);
     const observed = assertion.kind === 'equals' && value !== null ? 'differs' : storageObservation(value);
     return { pass, error: null, observed };
   });

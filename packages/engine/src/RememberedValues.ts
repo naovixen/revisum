@@ -39,6 +39,18 @@ export type RememberedValuesOptions = {
     readonly logger: Logger;
 };
 
+// How a result holds what a step remembered: one value on its own, several as a list, and none not at all.
+export function recordsOfRemembered(records: readonly RememberedRecord[]): {
+    readonly remembered?: RememberedRecord;
+    readonly rememberedValues?: readonly RememberedRecord[];
+} {
+    const [first, second] = records;
+    if (first === undefined) {
+        return {};
+    }
+    return second === undefined ? { remembered: first } : { rememberedValues: records };
+}
+
 export function rememberedValues(options: RememberedValuesOptions): RememberedValues {
     const { values, rememberedTexts, hasSecret, maximumTextLength, logger } = options;
 

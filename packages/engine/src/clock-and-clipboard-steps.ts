@@ -9,8 +9,9 @@
 //     fails every check, so textExcludes cannot pass on nothing.
 //   - A remember from the clipboard keeps the text as a run value only when it passes the same
 //     rules as plan text; the result and the log keep its name and sha256 only.
-import type {
-  AdvanceClockStep, ClipboardAssertion, Clock, DriverError, ExpectClipboardStep, Result, Session, Step,
+import {
+  stepFailed,
+  type AdvanceClockStep, type ClipboardAssertion, type Clock, type DriverError, type ExpectClipboardStep, type Result, type Session, type Step, type StepCode,
 } from '@revisum/contracts';
 import { clockAdvanceMilliseconds } from './clock-advance.ts';
 import type { Project } from './project/project-parser.ts';
@@ -33,15 +34,15 @@ export type ClockAndClipboardContext = {
 // What one of these steps gives its step result.
 type ClockAndClipboardOutcome = {
   readonly outcome: 'passed' | 'failed';
-  readonly code?: string;
+  readonly code?: StepCode;
   // Only "empty" or "differs": never the clipboard's text.
   readonly observed?: string;
   readonly remembered?: RememberedRecord;
 };
 
 const passed: ClockAndClipboardOutcome = { outcome: 'passed' };
-const failedWith = (code: string, observed?: string): ClockAndClipboardOutcome =>
-  ({ outcome: 'failed', code, ...(observed === undefined ? {} : { observed }) });
+const failedWith = (code: StepCode, observed?: string): ClockAndClipboardOutcome =>
+  ({ ...stepFailed(code), ...(observed === undefined ? {} : { observed }) });
 const UNSUPPORTED = failedWith('unsupported-step');
 
 // ---- Advancing the clock ----------------------------------------------------------------------
@@ -83,7 +84,7 @@ async function readUntil(session: Session, context: ClockAndClipboardContext, ac
 
 // The text a check compares against, with value references replaced. Several lines are joined
 // by "\n", as the clipboard's own line endings are.
-function expectedText(assertion: ClipboardAssertion, values: RunValues, project: Project): Result<string, string> {
+function expectedText(assertion: ClipboardAssertion, values: RunValues, project: Project): Result<string, StepCode> {
   const value = assertion.value;
   if (typeof value === 'object' && 'lines' in value) {
     const lines: string[] = [];

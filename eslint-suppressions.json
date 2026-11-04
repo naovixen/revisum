@@ -685,9 +685,6 @@
     "curly": {
       "count": 27
     },
-    "no-nested-ternary": {
-      "count": 1
-    },
     "revisum/file-name-matches-export": {
       "count": 1
     }
@@ -899,9 +896,6 @@
     "curly": {
       "count": 36
     },
-    "no-nested-ternary": {
-      "count": 2
-    },
     "revisum/file-name-matches-export": {
       "count": 1
     }
@@ -931,9 +925,6 @@
   "packages/engine/src/page-scripts/page-script-steps.ts": {
     "curly": {
       "count": 23
-    },
-    "no-nested-ternary": {
-      "count": 1
     },
     "revisum/file-name-matches-export": {
       "count": 1

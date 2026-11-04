@@ -14,7 +14,7 @@
 // hand under the declaration's limits. Neither the output nor a field's value is kept: the result
 // and the log record the output's sha256, and a remembered value's name and sha256.
 import {
-  failure, success,
+  failure, stepFailed, success,
   type CommandName, type Clock, type DatabaseCommandDeclaration, type DatabaseCommandRequest, type DatabaseCommandRunner, type DatabaseStep,
   type DeclaredService, type ExpectDatabaseStep, type FieldName, type ParameterName, type Result, type ScriptArguments,
   type SecretStore, type ServiceName, type ValueName, type WorkloadErrorCode, type WorkloadOutcome, type WorkloadVariable,
@@ -24,7 +24,7 @@ import { MAXIMUM_SCRIPT_RESULT_DEPTH, nestingDepth } from '../page-scripts/page-
 import { rememberedFieldEntries } from '../plan/plan-values.ts';
 import type { Project } from '../project/project-parser.ts';
 import { declaredCommands } from '../project/unsafe-feature-declarations.ts';
-import type { RememberedRecord, RememberedValues } from '../RememberedValues.ts';
+import { recordsOfRemembered, type RememberedRecord, type RememberedValues } from '../RememberedValues.ts';
 import { resolveText, type RunValues, type StepErrorCode } from '../run-values.ts';
 import { sha256UnlessHoldingASecret } from '../secrets/secret-resolution.ts';
 import { argumentProblem, argumentText, runValueArgument, type ArgumentValue } from '../service-calls/parameter-values.ts';
@@ -97,7 +97,7 @@ function declared(command: CommandName, project: Project): Declared | undefined 
 }
 
 const failedWith = (code: DatabaseStepCode, databaseCommand?: DatabaseCommandRecord): DatabaseStepOutcome =>
-  ({ outcome: 'failed', code, ...(databaseCommand === undefined ? {} : { databaseCommand }) });
+  ({ ...stepFailed(code), ...(databaseCommand === undefined ? {} : { databaseCommand }) });
 
 // One parameter's value, checked against its declared type. A run value's text is only known now,
 // so it is read as the parameter's type and checked as a call's argument is; the parser checked
@@ -270,10 +270,7 @@ export async function runDatabaseStep(step: DatabaseStep, stepIndex: number, con
   if (!texts.ok) return failedWith(texts.error, databaseCommand);
   const remembered = context.remembered.rememberAll(texts.value, stepIndex);
   if (!remembered.ok) return failedWith(remembered.error, databaseCommand);
-  const records = remembered.value;
-  const [only] = records;
-  const kept = records.length === 1 && only !== undefined ? { remembered: only } : records.length > 1 ? { rememberedValues: records } : {};
-  return { outcome: 'passed', databaseCommand, ...kept };
+  return { outcome: 'passed', databaseCommand, ...recordsOfRemembered(remembered.value) };
 }
 
 // A database check: its read command rerun until the field passes or the backend check timeout

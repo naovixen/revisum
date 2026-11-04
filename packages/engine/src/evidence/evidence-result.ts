@@ -15,6 +15,7 @@ import type { Refusal, TerminalState } from '../lifecycle.ts';
 import { manifestHash, type RunManifest } from '../manifest.ts';
 import { runTimeTextOrDigest } from '../plan/plan-decoders.ts';
 import { criterionIdFrom } from '../plan/plan-parser.ts';
+import { refusedResult } from '../RefusedResult.ts';
 import { withRunHashes } from '../WithRunHashes.ts';
 import type { EvidenceOutcomeCode, RunResult, RunReviewItem } from '../run.ts';
 import type { SuiteDecodeError, SuiteReport, SuiteReportTest, SuiteTrace } from './suite-report.ts';
@@ -222,17 +223,15 @@ export function unreadSuiteResult(
 // The result of `run --suite` refused before any suite code ran. Its guarantee statement says
 // egress was not enforced when that is why it was refused.
 export function refusedSuiteResult(suiteName: string, refusal: Refusal): RunResult {
+  // The state stays ahead of the mode and guarantees among the result's keys.
+  const { state, ...nothingRan } = refusedResult(refusal, suiteName, 0);
   return withRunHashes({
-    state: 'Refused',
+    state,
     mode: 'evidence',
     guarantees: guaranteeStatement({
       mode: 'evidence', egressEnforced: refusal.code !== 'egress-unenforceable', unmaskedScreenshotsKept: false, unsafeFeatures: [],
     }),
-    targetId: suiteName,
-    manifest: null, manifestHash: null,
-    steps: [], blockedOrigins: [], unavailable: null,
-    refusal,
-    timings: { totalMilliseconds: 0, stepMilliseconds: [] },
+    ...nothingRan,
   });
 }
 
