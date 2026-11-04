@@ -436,7 +436,7 @@ export async function run(given: RunInputs, ports: RunPorts): Promise<RunResult>
       steps.push(result);
       logger.log({
         kind: 'step.end', stepIndex: index, stepType: step.type, outcome: result.outcome,
-        durationMilliseconds: stepMilliseconds[stepMilliseconds.length - 1] ?? 0, ...(result.code ? { code: result.code } : {}),
+        durationMilliseconds: stepMilliseconds[stepMilliseconds.length - 1] ?? 0, ...(result.code === undefined ? {} : { code: result.code }),
       });
     }
     // In the try: a port that cannot say what it rewrote must not leave a mutated run reading as plain.
@@ -446,11 +446,13 @@ export async function run(given: RunInputs, ports: RunPorts): Promise<RunResult>
     // needs, and a page script that threw, hung or gave no usable result, or a backend check whose
     // call got no answer, could not check it, which is not a product failure.
     const denial = context.denials[0];
-    finished = denial !== undefined && steps.some((done) => done.code === 'policy-denied')
-      ? lifecycle.deny(running, denial)
-      : steps.some((done) => couldNotTest(done, stepContext))
-        ? lifecycle.finish(running, 'Errored')
-        : lifecycle.finish(running, steps.every((done) => done.outcome === 'passed') ? 'Passed' : 'Failed');
+    if (denial !== undefined && steps.some((done) => done.code === 'policy-denied')) {
+      finished = lifecycle.deny(running, denial);
+    } else if (steps.some((done) => couldNotTest(done, stepContext))) {
+      finished = lifecycle.finish(running, 'Errored');
+    } else {
+      finished = lifecycle.finish(running, steps.every((done) => done.outcome === 'passed') ? 'Passed' : 'Failed');
+    }
   } catch {
     // A step's own failures never get here, so only the log or the clock can have failed. The result
     // still accounts for every step.
@@ -467,6 +469,20 @@ export async function run(given: RunInputs, ports: RunPorts): Promise<RunResult>
     // Read before the browser goes, with every answer the stubs gave.
     stubAnswers = readKeepingTheResult(() => session.network?.stubAnswers() ?? [], [], logger);
     await closeKeepingTheResult(session, logger);
+  }
+  // Read once the session has closed, when no decision is left waiting for the browser's answer. With
+  // no later step to report one the browser refused after the last step ended, the last step stands
+  // for it, as it does for a crash it missed.
+  const refusedDecisions: readonly string[] = readKeepingTheResult(() => session.refusedRequestDecisions?.() ?? [], [], logger);
+  for (const refusal of refusedDecisions) {
+    logFailureAfterTheVerdict(ADAPTER_ERROR, refusal, logger);
+  }
+  if (refusedDecisions.length > 0 && finished.state === 'Passed') {
+    const lastStep = steps.pop();
+    if (lastStep !== undefined) {
+      steps.push({ ...lastStep, outcome: 'failed', code: ADAPTER_ERROR });
+    }
+    finished = lifecycle.finish(running, 'Errored');
   }
   // Whatever the outcome. A failing cleanup step never changes the verdict; it raises a review item.
   const cleanup = inputs.plan.cleanup === undefined ? undefined : await runCleanup(inputs.plan.cleanup, inputs.plan.steps.length, calls, commands);
@@ -529,9 +545,9 @@ const productionAllowed = (inputs: RunInputs): boolean =>
 
 // The steps that set up or reach what the test needs: when one fails, the run could not test.
 const SETUP_STEP_TYPES: readonly Step['type'][] = ['call', 'evaluate', 'database'];
-// A step the adapter threw on: what it saw is unknown, which is not a product failure either. The
-// code stands for the failure and its text stays out of the result, since it could hold page
-// content or a secret.
+// A step the adapter threw on, or that a refused request decision spoilt: what it saw is unknown,
+// which is not a product failure either. The code stands for the failure and its text stays out of
+// the result, since it could hold page content or a secret.
 const ADAPTER_ERROR = 'adapter-error';
 // The codes of a page script or a database command that could not give a result to check, in
 // whatever step it ran, of a service call that got no answer, and of an adapter that threw: the run
@@ -671,6 +687,7 @@ async function openSession(planned: lifecycle.Planned, context: RunContext): Pro
 const failedStep = (step: Step, index: number, code: string): StepResult => ({ index, type: step.type, outcome: 'failed', code });
 
 const isCrashed = (session: DocumentSession): boolean => session.crashed?.() === true;
+const hasARefusedDecision = (context: RunContext): boolean => (context.session?.refusedRequestDecisions?.().length ?? 0) > 0;
 const isHeldByDialog = (session: DocumentSession): boolean => session.isDialogOpen?.() === true;
 
 function adapterFailureCode(session: DocumentSession): string {
@@ -778,6 +795,11 @@ async function runStepOnLivePage(step: Step, index: number, session: DocumentSes
   const openingsBefore = session.unsupportedOpenings?.() ?? 0;
   try {
     const done = await executeStep(step, index, session, target, context);
+    // A request the browser would not let go on stays held, so neither a pass nor a failure of this
+    // step says anything about the app: the run could not test. The reason goes to the log at the end.
+    if (hasARefusedDecision(context)) {
+      return { ...done, outcome: 'failed', code: ADAPTER_ERROR };
+    }
     if (done.outcome !== 'passed') {
       return done;
     }
@@ -980,7 +1002,7 @@ async function executeStep(step: Step, index: number, session: DocumentSession, 
         : { ...base, outcome: 'failed', code: verdict.code ?? 'assertion-failed', observed: context.isShortSecret(title) ? SECRET_PLACEHOLDER : context.redactor.text(title) };
     }
     case 'a11yAudit': {
-      const findings = [...(await session.audit())].sort((left, right) => (left.ruleId < right.ruleId ? -1 : left.ruleId > right.ruleId ? 1 : 0));
+      const findings = [...(await session.audit())].sort(byRuleId);
       context.logger.log({ kind: 'audit', stepIndex: index, findings: findings.length });
       const gateFails = step.mode === 'gate' && findings.length > 0;
       return { ...base, outcome: gateFails ? 'failed' : 'passed', findings, ...(gateFails ? { code: 'a11y-violations' } : {}) };
@@ -1002,6 +1024,13 @@ async function executeStep(step: Step, index: number, session: DocumentSession, 
       return { ...base, outcome: 'passed', artifact: reference };
     }
   }
+}
+
+function byRuleId(left: A11yFinding, right: A11yFinding): number {
+  if (left.ruleId === right.ruleId) {
+    return 0;
+  }
+  return left.ruleId < right.ruleId ? -1 : 1;
 }
 
 // The viewport with personal data and every field a secret was typed into masked, or null when one

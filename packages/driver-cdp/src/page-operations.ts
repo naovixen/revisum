@@ -38,7 +38,8 @@ export interface PageOperations<Handle> {
   // Calls a page function on a kept object, as `this`, in the script world that made it, and returns
   // what it returns as the browser reports it. Throws KeptObjectGone when the object no longer exists.
   callOnObject(object: Handle, pageFunction: PageFunction): Promise<unknown>;
-  // Lets the browser forget a kept object. Never throws, since nothing is left to free when this fails.
+  // Lets the browser forget a kept object. Never throws, since a caller is no better off for it: a
+  // failure other than the object having gone is kept for the session's close to report.
   releaseObject(object: Handle): Promise<void>;
   // Elements with this role and exact accessible name, found by the browser's own accessibility engine.
   byRole(role: string, name: string): Promise<Handle[]>;
@@ -125,6 +126,9 @@ export interface PageEvents {
   // Resolves once the top document is not on its way to another, or a dialog or a crash has stopped
   // it from getting there: at once when it is not.
   navigationEnded(): Promise<void>;
+  // What the browser refused of the driver's decisions on the session's requests, in any of its tabs,
+  // each with its reason.
+  refusedRequestDecisions(): readonly string[];
   // Grows with each popup, second page and download the page starts. Each is closed or cancelled as
   // soon as it starts. Only growth means anything: a download counts as its file is asked for, and
   // again as it begins.

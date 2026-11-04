@@ -20,7 +20,7 @@ import type {
 import { nodesAPressPasses, pressActsByItself } from './NodesAPressPasses.ts';
 import { KeptObjectGone } from './KeptObjectGone.ts';
 import { PageHeldByDialog } from './PageHeldByDialog.ts';
-import { PageWatch, type AttachedPage } from './page-watch.ts';
+import { PageWatch, type AttachedPage, type SessionFailures } from './page-watch.ts';
 import { RunClipboard, SHARED_BROWSER_CLIPBOARD, allowRunClipboard } from './run-clipboard.ts';
 import { openSessionEgress, type EgressSource, type OpenedSessionEgress } from './SessionEgress.ts';
 import { attachToSharedBrowser, launchOwnBrowser, type AttachedBrowser, type BrowserSource } from './SharedBrowser.ts';
@@ -254,7 +254,8 @@ async function detailAfterClosing(error: unknown, closers: readonly (() => Promi
 
 // What every page of one session shares: the browser's own context, the target and environment it
 // emulates, the egress allow-list's record of blocked origins, the egress recorder, the download
-// folder, the stubs and request checks, which reach every tab, and the run's virtual clock.
+// folder, the stubs and request checks, which reach every tab, the run's virtual clock, and what has
+// gone wrong outside any one command.
 type SessionBrowser = {
   readonly connection: CdpConnection;
   readonly browserContextId: string;
@@ -266,6 +267,7 @@ type SessionBrowser = {
   readonly downloads: DownloadFolder;
   readonly network: BrowserNetwork;
   readonly clock: BrowserClock;
+  readonly failures: SessionFailures;
 };
 
 // A held-back popup never loads, so it is always recorded as a request that went nowhere. Only an
@@ -301,18 +303,19 @@ async function createSession(
       onAnsweredInBrowser: (requestId) => recorder.answeredInBrowser(requestId),
     }),
     clock: new BrowserClock(environment.virtualTimers === true),
+    failures: { refusedDecisions: [], cleanUp: [] },
   };
   await allowRunClipboard(connection, browserContextId);
 
   await connection.send(sessionId, 'Page.enable');
   const watch = new PageWatch(connection, { browserContextId, targetId, sessionId }, {
-    onPopupRequest: (url) => { recordPopupRequest(browser, url); }, ownsBrowserContext: true, claimsDownload: (event) => browser.downloads.claims(event), isDownloadStepUnderWay: () => browser.downloads.isArmed(),
+    failures: browser.failures, onPopupRequest: (url) => { recordPopupRequest(browser, url); }, ownsBrowserContext: true, claimsDownload: (event) => browser.downloads.claims(event), isDownloadStepUnderWay: () => browser.downloads.isArmed(),
   });
   await watch.start();
   await browser.recorder.start(sessionId);
   await browser.network.watchPage(sessionId);
   browser.downloads.watchResponses(sessionId);
-  await preparePage(browser, sessionId);
+  await preparePage(browser, sessionId, watch);
   await browser.clock.watchPage((method, parameters) => watch.command(method, parameters), () => watch.crashed());
 
   const operations = new CdpPage(connection, sessionId, watch, null, environment.virtualTimers === true);
@@ -326,11 +329,12 @@ async function createSession(
     // every popup of the browser context, whichever tab opened it. The download folder goes once the
     // browser can no longer write into it. A shared browser that keeps the session's context rejects
     // here, and the folder stays for the same reason. The egress goes last, whatever happened, since
-    // nothing else ends it.
+    // nothing else ends it. Clean-up failures are read while the session still runs: closing fails
+    // whatever was still waiting for an answer, which says nothing about it.
     close: async () => {
       try {
         try {
-          await watch.settleHeldPopups();
+          await watch.settleHeldPopupsAndReportCleanUp();
         } finally {
           await attached.close();
           browser.downloads.remove();
@@ -358,7 +362,7 @@ async function createSession(
 // device, locale, time zone, colour scheme and motion, the determinism script, emulated focus (a
 // headless page has none, and the clipboard needs it), and the egress allow-list, whose refusals
 // join the session's blocked origins.
-async function preparePage(browser: SessionBrowser, sessionId: string): Promise<void> {
+async function preparePage(browser: SessionBrowser, sessionId: string, watch: PageWatch): Promise<void> {
   const { connection, target, environment } = browser;
   const page = connection.session(sessionId);
   const profile = deviceProfile(target);
@@ -381,7 +385,7 @@ async function preparePage(browser: SessionBrowser, sessionId: string): Promise<
   // whose response fields a plan may read is held again once its response is in, for its body.
   page.on('Fetch.requestPaused', (parameters) => {
     const paused = parameters as RequestPaused;
-    if (atResponseStage(paused)) { void takeResponseBody(page, browser.network, paused); return; }
+    if (atResponseStage(paused)) { void takeResponseBody(page, browser.network, paused, watch); return; }
     const url = URL.parse(paused.request.url);
     // A URL that cannot be parsed is blocked, with no origin to show.
     const allowed = url !== null && isAllowedUrl(url, environment.allowedOrigins);
@@ -398,7 +402,7 @@ async function preparePage(browser: SessionBrowser, sessionId: string): Promise<
       }
       return page.send('Fetch.continueRequest', { requestId: paused.requestId, ...(browser.network.wantsResponseBody(paused) ? { interceptResponse: true } : {}) });
     };
-    sendDecision().catch(() => undefined);
+    sendDecision().catch((error: unknown) => { watch.noteDecisionFailure(error); });
   });
   await page.send('Fetch.enable', { patterns: [{ urlPattern: '*', requestStage: 'Request' }] });
 }
@@ -408,14 +412,14 @@ type FetchedBody = { readonly body: string; readonly base64Encoded: boolean };
 // Takes the body of a response held at the response stage, for the request check that reads its
 // fields, then lets the page have it unchanged. A body that cannot be taken is left out: the
 // exchange still counts, with no body to read.
-async function takeResponseBody(page: CdpSessionClient, network: BrowserNetwork, held: RequestPaused): Promise<void> {
+async function takeResponseBody(page: CdpSessionClient, network: BrowserNetwork, held: RequestPaused, watch: PageWatch): Promise<void> {
   if (held.responseErrorReason === undefined && held.networkId !== undefined) {
     try {
       const fetched = await page.send<FetchedBody>('Fetch.getResponseBody', { requestId: held.requestId });
       network.keepResponseBody(held.networkId, Buffer.from(fetched.body, fetched.base64Encoded ? 'base64' : 'utf8'));
     } catch { /* the response had no body to take */ }
   }
-  await page.send('Fetch.continueRequest', { requestId: held.requestId }).catch(() => undefined);
+  await page.send('Fetch.continueRequest', { requestId: held.requestId }).catch((error: unknown) => { watch.noteDecisionFailure(error); });
 }
 
 // Opens a second tab in the session's own browser context, so it shares cookies and storage. The
@@ -433,7 +437,7 @@ async function openTab(browser: SessionBrowser, firstWatch: PageWatch, firstDeta
     return failure({ code: 'navigation-failed', detail: `the new tab did not open: ${errorText(error)}` });
   }
   const watch = new PageWatch(connection, { browserContextId, targetId: attached.targetId, sessionId: attached.sessionId }, {
-    onPopupRequest: (url) => { recordPopupRequest(browser, url); }, ownsBrowserContext: false, claimsDownload: (event) => browser.downloads.claims(event), isDownloadStepUnderWay: () => browser.downloads.isArmed(),
+    failures: browser.failures, onPopupRequest: (url) => { recordPopupRequest(browser, url); }, ownsBrowserContext: false, claimsDownload: (event) => browser.downloads.claims(event), isDownloadStepUnderWay: () => browser.downloads.isArmed(),
   });
   let stopResponses = (): void => undefined;
   let stopNetwork = (): void => undefined;
@@ -451,7 +455,7 @@ async function openTab(browser: SessionBrowser, firstWatch: PageWatch, firstDeta
     await browser.recorder.start(attached.sessionId);
     stopNetwork = await browser.network.watchPage(attached.sessionId);
     stopResponses = browser.downloads.watchResponses(attached.sessionId);
-    await preparePage(browser, attached.sessionId);
+    await preparePage(browser, attached.sessionId, watch);
     stopClock = await browser.clock.watchPage((method, parameters) => watch.command(method, parameters), () => watch.crashed());
     await connection.send(attached.sessionId, 'Runtime.runIfWaitingForDebugger');
   } catch (error) {
@@ -602,12 +606,15 @@ class CdpPage implements PageOperations<string> {
     loaded.promise.catch(() => undefined);
     try {
       // Sent whatever holds the page: a navigation away ends a dialog, and the browser answers it.
-      const navigated = await this.#watch.command<{ errorText?: string }>('Page.navigate', { url, ...(frameId === undefined ? {} : { frameId }) });
+      // The browser answers once the document's own request has gone on, which a refused decision stops.
+      const navigated = await this.#watch.failingOnRefusedDecision(
+        this.#watch.command<{ errorText?: string }>('Page.navigate', { url, ...(frameId === undefined ? {} : { frameId }) }),
+      );
       // An HTTP error status with an empty body is a page the server did send: the browser shows
       // its own error page for it, and the plan's checks decide what that means.
       const navigationError = navigated.errorText ?? '';
       if (navigationError !== '' && navigationError !== HTTP_ERROR_STATUS) throw new Error(navigationError);
-      await this.#watch.failingOnCrash('Page.navigate', loaded.promise);
+      await this.#watch.failingOnRefusedDecision(this.#watch.failingOnCrash('Page.navigate', loaded.promise));
     } finally {
       loaded.cancel();
     }
@@ -733,7 +740,16 @@ class CdpPage implements PageOperations<string> {
   }
 
   async releaseObject(object: string): Promise<void> {
-    await this.#send('Runtime.releaseObject', { objectId: object }).catch(() => undefined);
+    try {
+      await this.#send('Runtime.releaseObject', { objectId: object });
+    } catch (error) {
+      // An object whose document or page has gone has gone too, and one a dialog holds goes with its
+      // document, so none of these has anything to report.
+      const isOutOfReach = error instanceof PageHeldByDialog || this.#watch.crashed() || LOST_OBJECT.test(errorText(error));
+      if (!isOutOfReach) {
+        this.#watch.noteCleanUpFailure(`a kept object could not be released: ${errorText(error)}`);
+      }
+    }
   }
 
   async byRole(role: string, name: string): Promise<string[]> {

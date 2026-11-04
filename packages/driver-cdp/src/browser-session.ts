@@ -7,7 +7,7 @@ import {
   DEFAULT_TEST_ID_ATTRIBUTE, DRIVER_FEATURES, failure, literalActionStep, literalText, performableLocator, reveal, success,
   type ActionGuard, type ActionStep, type BrowserRequestRecord, type DialogStep, type DocumentSession, type DomRead, type DomValue, type DownloadedFile,
   type DownloadStep, type DriverError, type DriverFeature, type ElementProbe, type Locator, type PageScriptCall, type PageMetaTag, type PageProbe, type Position, type ResolvedActionStep,
-  type ClipboardPort, type ClockPort, type GuardVerdict, type NetworkPort, type ResolvedElement, type ResolvedLocator, type Result, type Secret, type SessionEnvironment, type StoragePort,
+  type ClipboardPort, type ClockPort, type DriverErrorCode, type GuardVerdict, type NetworkPort, type ResolvedElement, type ResolvedLocator, type Result, type Secret, type SessionEnvironment, type StoragePort,
   UnreadablePage,
 } from '@revisum/contracts';
 import {
@@ -459,6 +459,11 @@ function documentPorts<Handle>(
   const crashed = (): boolean => events.crashed();
   const timeout = environment.timeoutMilliseconds;
   const clickChecks = hitChecks(operations);
+  // A refusal the session holds, from whenever it came, as the failure of what is under way.
+  const failureOfRefusedDecision = (code: DriverErrorCode): DriverError | null => {
+    const [refusal] = events.refusedRequestDecisions();
+    return refusal === undefined ? null : { code, detail: refusal };
+  };
 
   const probeNow = async (planLocator: Locator, read?: DomRead): Promise<ElementProbe> => {
     // A value reference, or a locator this session cannot resolve, says nothing about the page.
@@ -646,6 +651,10 @@ function documentPorts<Handle>(
       return failure(NO_GUARD);
     }
     if (crashed()) return failure(CRASHED);
+    const alreadyRefused = failureOfRefusedDecision('not-actionable');
+    if (alreadyRefused !== null) {
+      return failure(alreadyRefused);
+    }
     if (step.type === 'dialog') {
       try { return await answerDialog(step, guard); } catch (error) { return failure(crashed() ? CRASHED : { code: 'not-actionable', detail: errorText(error) }); }
     }
@@ -682,6 +691,10 @@ function documentPorts<Handle>(
       return acted;
     }
     if (crashed()) return failure(CRASHED);
+    const refused = failureOfRefusedDecision('not-actionable');
+    if (refused !== null) {
+      return failure(refused);
+    }
     if (events.unsupportedOpenings() > openingsBefore) {
       return failure({ code: 'unsupported-step', detail: 'the step opened a popup or a second page, or started a download' });
     }
@@ -800,6 +813,10 @@ function documentPorts<Handle>(
   const ports: DocumentSession = {
     async navigate(url, options) {
       if (crashed()) return failure(CRASHED);
+      const alreadyRefused = failureOfRefusedDecision('navigation-failed');
+      if (alreadyRefused !== null) {
+        return failure(alreadyRefused);
+      }
       const scripts = options?.scripts ?? 'enabled';
       // Scripts are a setting of the whole page, so only the top document's navigate turns them off.
       if (scripts === 'disabled' && !isTopDocument) return failure({ code: 'unsupported-step', detail: 'scripts can be turned off only for the top document' });
@@ -808,7 +825,8 @@ function documentPorts<Handle>(
         // What the page started as it loaded is the navigate's, once it has reached the browser, and
         // a navigation of its own as it loaded may yet turn out to be a download.
         await forAtMost(timeout, inputSettled());
-        return success(undefined);
+        const refused = failureOfRefusedDecision('navigation-failed');
+        return refused === null ? success(undefined) : failure(refused);
       } catch (error) {
         return failure(crashed() ? CRASHED : { code: 'navigation-failed', detail: errorText(error) });
       }
@@ -887,6 +905,7 @@ export function buildSession<Handle>(operations: PageOperations<Handle>, environ
     processId: details.processId,
     blockedOrigins: details.blockedOrigins,
     connectionFailures: details.connectionFailures,
+    refusedRequestDecisions: () => details.events.refusedRequestDecisions(),
     egressRecords: details.egressRecords,
     evaluate: (pageFunction: PageFunction, inputs = []) => operations.callForString(pageFunction, inputs),
     close: details.close,

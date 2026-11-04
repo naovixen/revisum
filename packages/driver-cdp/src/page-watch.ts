@@ -15,6 +15,8 @@
 // that dies or a connection that closes takes the page with it, so both count as a crash.
 // Once a dialog is open, every command that needs the page fails at once in the same way, and one
 // under way fails as the dialog opens, so this is the one place that dialog state is read for them.
+// A request stays held until the browser takes the driver's decision on it, so a decision it refuses
+// is held here too, whenever its answer comes, for whatever reports next.
 import { errorText } from './browser-session.ts';
 import { CdpError, type CdpConnection } from './cdp-connection.ts';
 import type { PageEvents } from './page-operations.ts';
@@ -35,6 +37,10 @@ const POPUP_REQUEST_WAIT_MILLISECONDS = 1_000;
 // How a command fails when a popup closed itself first, or the browser or the session has gone.
 // Nothing is left to hold back then, so there is nothing to report.
 const POPUP_ALREADY_GONE = /Session with given id not found|No target with given id|connection closed/i;
+// How a decision on a request fails when nothing is held any more: the page gave up on the request or
+// died, its tab or browser context has gone, or the session has closed. Each is the browser's exact
+// answer, so no other refusal can pass for one.
+const REQUEST_NO_LONGER_HELD = /^Fetch\.\w+: (?:Invalid InterceptionId\.|Session with given id not found\.|connection closed)$/;
 // A navigation that stays in this page's tab, as the browser says of one it was asked for.
 const THIS_TAB = 'currentTab';
 
@@ -48,10 +54,17 @@ function isRequestForAFile(paused: unknown): boolean {
 
 type WatchedPage = { readonly browserContextId: string; readonly targetId: string; readonly sessionId: string };
 
+// What every page of one session holds together, so a tab that closes takes none of it with it.
+export type SessionFailures = {
+  readonly refusedDecisions: string[];
+  readonly cleanUp: string[];
+};
+
 // A page the browser attached, still paused before it loads anything.
 export type AttachedPage = { readonly targetId: string; readonly sessionId: string };
 
 type PageWatchOptions = {
+  readonly failures: SessionFailures;
   // Told the address each held-back popup asked for.
   readonly onPopupRequest?: (url: string) => void;
   // True for the session's first page, which sets up what the whole browser context shares:
@@ -74,6 +87,8 @@ export class PageWatch implements PageEvents {
   readonly #onCrash = new Set<() => void>();
   readonly #onDialog = new Set<() => void>();
   readonly #onNavigationEnded = new Set<() => void>();
+  readonly #onDecisionRefused = new Set<(refusal: string) => void>();
+  readonly #failures: SessionFailures;
   readonly #onPopupRequest: (url: string) => void;
   readonly #ownsBrowserContext: boolean;
   readonly #claimsDownload: (event: unknown) => boolean;
@@ -88,6 +103,7 @@ export class PageWatch implements PageEvents {
   constructor(connection: CdpConnection, page: WatchedPage, options: PageWatchOptions) {
     this.#connection = connection;
     this.#page = page;
+    this.#failures = options.failures;
     this.#onPopupRequest = options.onPopupRequest ?? (() => undefined);
     this.#ownsBrowserContext = options.ownsBrowserContext;
     this.#claimsDownload = options.claimsDownload ?? (() => false);
@@ -195,15 +211,49 @@ export class PageWatch implements PageEvents {
     return this.#openings;
   }
 
+  refusedRequestDecisions(): readonly string[] {
+    return [...this.#failures.refusedDecisions];
+  }
+
   // Waits until each popup open now has asked for its first page or used up its wait, so the
-  // session's record of them is complete, and rejects with whatever could not be done about one.
-  // Popups opened during the wait are not waited for, so a page that keeps opening them cannot
-  // hold the session's close.
-  async settleHeldPopups(): Promise<void> {
+  // session's record of them is complete, and rejects with whatever could not be done about one and
+  // with every other clean-up that failed. Popups opened during the wait are not waited for, so a
+  // page that keeps opening them cannot hold the session's close.
+  async settleHeldPopupsAndReportCleanUp(): Promise<void> {
     await Promise.all(this.#popupFirstRequests);
-    if (this.#popupFailures.length > 0) {
-      throw new Error(`a popup could not be held back or closed: ${this.#popupFailures.join('; ')}`);
+    const popups = this.#popupFailures.length > 0 ? [`a popup could not be held back or closed: ${this.#popupFailures.join('; ')}`] : [];
+    const failures = [...popups, ...this.#failures.cleanUp];
+    if (failures.length > 0) {
+      throw new Error(failures.join('; '));
     }
+  }
+
+  // A clean-up that failed can't change what a step found, so it waits for the session's close to say.
+  noteCleanUpFailure(failure: string): void {
+    this.#failures.cleanUp.push(failure);
+  }
+
+  // Told how a decision on a request failed. Runs as the browser's answer arrives, with no step to
+  // hand it to, so it only keeps what the next outcome must report.
+  noteDecisionFailure(error: unknown): void {
+    const answer = errorText(error);
+    if (REQUEST_NO_LONGER_HELD.test(answer)) {
+      return;
+    }
+    const refusal = `the browser refused the driver's decision on a request: ${answer}`;
+    this.#failures.refusedDecisions.push(refusal);
+    for (const notify of [...this.#onDecisionRefused]) {
+      notify(refusal);
+    }
+  }
+
+  // Waits for what cannot end while this page's requests stay held, such as its load, for at most
+  // until the browser refuses a decision on one of them.
+  failingOnRefusedDecision<Value>(waited: Promise<Value>): Promise<Value> {
+    const refused = Promise.withResolvers<never>();
+    const fail = (refusal: string): void => { refused.reject(new Error(refusal)); };
+    this.#onDecisionRefused.add(fail);
+    return Promise.race([waited, refused.promise]).finally(() => { this.#onDecisionRefused.delete(fail); });
   }
 
   // Resolves as soon as a dialog is open, at once when one already is.
