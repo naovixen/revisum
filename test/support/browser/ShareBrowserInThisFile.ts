@@ -16,6 +16,7 @@ import {
     type OwnBrowserDriver,
     type SharedBrowser,
 } from "@revisum/driver-cdp";
+import { CLOSE_THE_BROWSER, LIST_CONTEXTS } from "./TestCommand.ts";
 import type { SessionEnvironment, Target } from "@revisum/engine";
 import { startBrowserWatchdog, type BrowserWatchdog } from "./BrowserWatchdog.ts";
 import type { EgressSourceForTest, SessionEgressForTest } from "./SessionEgressForTest.ts";
@@ -80,7 +81,7 @@ async function closeBrowserAndWaitForExit(browser: SharedBrowser): Promise<void>
     try {
         control = await openControlConnection(browser);
         control.expectClose();
-        await control.send(undefined, "Browser.close");
+        await control.ask(undefined, CLOSE_THE_BROWSER, {});
     } catch {
         // A browser that closes may drop the connection before it answers; stop() deals with the rest.
     } finally {
@@ -106,10 +107,7 @@ async function hasNoSessionLeft(browser: SharedBrowser): Promise<boolean> {
     let control: CdpConnection | undefined;
     try {
         control = await openControlConnection(browser);
-        const { browserContextIds } = await control.send<{
-            browserContextIds: readonly string[];
-        }>(undefined, "Target.getBrowserContexts");
-        return browserContextIds.length === 0;
+        return (await control.ask(undefined, LIST_CONTEXTS, {})).length === 0;
     } catch {
         return false;
     } finally {

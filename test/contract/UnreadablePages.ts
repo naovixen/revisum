@@ -1,5 +1,6 @@
 // The pages the negative check tests load: a healthy page of notes, two whose DOM functions throw
-// with the element on screen, and one whose confirm dialog removes one element and hides another.
+// with the element on screen, one whose script never lets go of its thread, so nothing can be read, and
+// one whose confirm dialog removes one element and hides another.
 import type { FixtureRoute } from "#test-support/fixture-server.ts";
 
 const htmlPage =
@@ -14,6 +15,7 @@ const SHOWN_NOTE = '<p data-testid="shown-note">Shown</p>';
 export const NOTES_PATH = "/notes.html";
 export const QUERY_THROWS_PATH = "/query-throws.html";
 export const BOX_READ_THROWS_PATH = "/box-read-throws.html";
+export const THREAD_HELD_PATH = "/thread-held.html";
 export const ANSWERED_DIALOG_PATH = "/answered-dialog.html";
 export const SLOW_LOAD_PATH = "/slow-load.html";
 export const REMOVABLE_FRAME_PATH = "/removable-frame.html";
@@ -36,6 +38,16 @@ export const UNREADABLE_PAGES: ReadonlyMap<string, FixtureRoute> = new Map([
         htmlPage(
             "<script>Element.prototype.getBoundingClientRect = function () { throw new Error('this page broke getBoundingClientRect'); };</script>",
             SHOWN_NOTE,
+        ),
+    ],
+    [
+        THREAD_HELD_PATH,
+        htmlPage(
+            "",
+            `${SHOWN_NOTE}
+             <script>
+               addEventListener('load', () => { setTimeout(() => { for (;;); }, 0); });
+             </script>`,
         ),
     ],
     [

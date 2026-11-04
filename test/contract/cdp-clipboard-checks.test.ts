@@ -14,7 +14,8 @@
 // still saved and put back around this file, in case a copy reaches it.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
-import { launchChromium } from '@revisum/driver-cdp';
+import { ATTACH_TO_TARGET, CREATE_TARGET, ENABLE_PAGE, NAVIGATE, SET_FOCUS_EMULATION, launchChromium } from '@revisum/driver-cdp';
+import { EVALUATE_WITH_A_GESTURE, GRANT_PERMISSIONS, PAGE_LOADED } from '#test-support/browser/TestCommand.ts';
 import { BROWSERS } from '#test-support/browsers.ts';
 import { onTarget } from '#test-support/TestTier.ts';
 import { outcomes, stepMilliseconds, type BrowserRun } from '#test-support/browser/BrowserHarness.ts';
@@ -231,18 +232,21 @@ describe('the page reading the clipboard itself', () => {
   test('counter-example: with clipboard access granted, the same button reads the clipboard', { ...copying }, async () => {
     const launched = await launchChromium(BROWSERS.chrome, { profilePrefix: 'clipboard-grant-test-' });
     try {
-      await launched.connection.send(undefined, 'Browser.grantPermissions', {
+      await launched.connection.ask(undefined, GRANT_PERMISSIONS, {
         origin: harness.origin, permissions: ['clipboardReadWrite', 'clipboardSanitizedWrite'],
       });
-      const { targetId } = await launched.connection.send<{ targetId: string }>(undefined, 'Target.createTarget', { url: 'about:blank' });
-      const { sessionId } = await launched.connection.send<{ sessionId: string }>(undefined, 'Target.attachToTarget', { targetId, flatten: true });
+      const { targetId } = await launched.connection.ask(undefined, CREATE_TARGET, { url: 'about:blank' });
+      const { sessionId } = await launched.connection.ask(undefined, ATTACH_TO_TARGET, { targetId, flatten: true });
       const page = launched.connection.session(sessionId);
-      await page.send('Page.enable');
-      await page.send('Emulation.setFocusEmulationEnabled', { enabled: true });
+      await page.ask(ENABLE_PAGE, {});
+      await page.ask(SET_FOCUS_EMULATION, { enabled: true });
       // Wait for the real page: the blank first document also reads as complete, and has no button.
-      const loaded = launched.connection.once(sessionId, 'Page.loadEventFired', 10_000);
-      await page.send('Page.navigate', { url: harness.url('/clipboard.html') });
+      const loaded = Promise.withResolvers<void>();
+      const stopListening = page.listen(PAGE_LOADED, loaded.resolve, loaded.reject);
+      const navigated = await page.ask(NAVIGATE, { url: harness.url('/clipboard.html') });
+      assert.equal(navigated.errorText, undefined);
       await loaded.promise;
+      stopListening();
       // Click as a person would (with a user gesture), then wait for the page to show what it read.
       const expression = `new Promise((resolve) => {
         document.getElementById('read-clipboard').click();
@@ -252,7 +256,7 @@ describe('the page reading the clipboard itself', () => {
         };
         poll();
       })`;
-      const evaluated = await page.send<{ result: { value?: unknown }; exceptionDetails?: unknown }>('Runtime.evaluate', {
+      const evaluated = await page.ask(EVALUATE_WITH_A_GESTURE, {
         expression, awaitPromise: true, returnByValue: true, userGesture: true,
       });
       assert.equal(evaluated.exceptionDetails, undefined, JSON.stringify(evaluated.exceptionDetails));

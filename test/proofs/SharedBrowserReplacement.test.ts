@@ -6,6 +6,7 @@ import assert from "node:assert/strict";
 import { after, before, describe, test } from "node:test";
 import { setTimeout as pause } from "node:timers/promises";
 import { CdpConnection, type SharedBrowser } from "@revisum/driver-cdp";
+import { CREATE_A_CONTEXT, LIST_CONTEXTS } from "#test-support/browser/TestCommand.ts";
 import { BrowserTarget } from "#test-support/browser/BrowserTarget.ts";
 import { createBrowserDriver } from "#test-support/browser/CreateBrowserDriver.ts";
 import {
@@ -72,10 +73,7 @@ async function waitUntilNoContextIsLeft(browser: SharedBrowser): Promise<void> {
         const giveUpAt = Date.now() + CONTEXT_GONE_WITHIN_MILLISECONDS;
         let left = 1;
         while (left > 0 && Date.now() < giveUpAt) {
-            const { browserContextIds } = await control.send<{
-                browserContextIds: readonly string[];
-            }>(undefined, "Target.getBrowserContexts");
-            left = browserContextIds.length;
+            left = (await control.ask(undefined, LIST_CONTEXTS, {})).length;
             await pause(CONTEXT_POLL_MILLISECONDS);
         }
         assert.equal(left, 0, "the browser still holds a context");
@@ -151,7 +149,7 @@ describe("Using a browser shared by the sessions of a test file", () => {
                     );
                     assert.ok(opened.ok, JSON.stringify(opened));
                     const control = await openControlConnection(usedBefore);
-                    await control.send(undefined, "Target.createBrowserContext", {
+                    await control.ask(undefined, CREATE_A_CONTEXT, {
                         disposeOnDetach: true,
                     });
                     try {

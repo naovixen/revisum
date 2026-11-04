@@ -4,7 +4,7 @@
 // the running browser, take that last flag, and check what it actually disables.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
-import { launchChromium } from '@revisum/driver-cdp';
+import { ATTACH_TO_TARGET, CREATE_TARGET, EVALUATE, launchChromium } from '@revisum/driver-cdp';
 import { createBrowserDriver } from '#test-support/browser/CreateBrowserDriver.ts';
 import { defaultRedactor, type SessionEnvironment, type Target } from '@revisum/engine';
 import { BROWSERS } from '#test-support/browsers.ts';
@@ -58,15 +58,15 @@ describe('Chromium port randomisation is off in every browser a driver starts', 
   test('the shared Chromium launcher, with its default flags, disables port randomisation', async () => {
     const launched = await launchChromium(BROWSERS.chrome, { profilePrefix: 'disabled-features-test-' });
     try {
-      const { targetId } = await launched.connection.send<{ targetId: string }>(undefined, 'Target.createTarget', { url: 'chrome://version' });
-      const { sessionId } = await launched.connection.send<{ sessionId: string }>(undefined, 'Target.attachToTarget', { targetId, flatten: true });
+      const { targetId } = await launched.connection.ask(undefined, CREATE_TARGET, { url: 'chrome://version' });
+      const { sessionId } = await launched.connection.ask(undefined, ATTACH_TO_TARGET, { targetId, flatten: true });
       const page = launched.connection.session(sessionId);
       // Waits for the page to finish loading, then reads the command line element.
       const expression = `new Promise((resolve) => {
         const read = () => resolve(document.getElementById(${JSON.stringify(COMMAND_LINE_ELEMENT_ID)})?.textContent ?? '');
         if (document.readyState === 'complete') read(); else addEventListener('load', read);
       })`;
-      const evaluated = await page.send<{ result: { value?: unknown } }>('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true });
+      const evaluated = await page.ask(EVALUATE, { expression, awaitPromise: true, returnByValue: true });
       const text = evaluated.result.value;
       assert.equal(typeof text, 'string');
       const commandLine = splitCommandLine(String(text));

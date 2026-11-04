@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { after, before, describe, test } from "node:test";
 import { setTimeout as pause } from "node:timers/promises";
 import { launchBrowser, scan, type Browser, type PageDriver } from "@revisum/auditor-act";
-import { launchChromium } from "@revisum/driver-cdp";
+import { CREATE_TARGET, launchChromium } from "@revisum/driver-cdp";
 import { BrowserTarget } from "#test-support/browser/BrowserTarget.ts";
 import { startFixtureServer, type FixtureServer } from "#test-support/fixture-server.ts";
 import { FIXTURES } from "#test-support/repository.ts";
@@ -91,7 +91,7 @@ async function datagramsWithNoPolicy(executablePath: string): Promise<readonly s
         profilePrefix: "webrtc-with-no-policy-",
     });
     try {
-        await launched.connection.send(undefined, "Target.createTarget", {
+        await launched.connection.ask(undefined, CREATE_TARGET, {
             url: `${server.origin}${STUN_PATH}`,
         });
         await pause(WAIT_AFTER_THE_PAGE_MILLISECONDS);
@@ -102,10 +102,14 @@ async function datagramsWithNoPolicy(executablePath: string): Promise<readonly s
 }
 
 async function launchFlagsOfTheAuditBrowser(): Promise<readonly string[]> {
-    const text = await withAuditPage(EXECUTABLE_OF_TARGET[BrowserTarget.Chrome], async (page) => {
-        await page.goto("chrome://version");
-        return page.evaluate<string>(READ_COMMAND_LINE);
-    });
+    const text: unknown = await withAuditPage(
+        EXECUTABLE_OF_TARGET[BrowserTarget.Chrome],
+        async (page) => {
+            await page.goto("chrome://version");
+            return page.evaluate(READ_COMMAND_LINE);
+        },
+    );
+    assert.ok(typeof text === "string", "the page gave its command line as text");
     return text.split(/\s+/).map((flag) => flag.replace(/^"|"$/g, ""));
 }
 
@@ -125,7 +129,7 @@ describe("Using the audit browser", () => {
                                     page: STUN_PATH,
                                 });
                                 await pause(WAIT_AFTER_THE_PAGE_MILLISECONDS);
-                                return page.evaluate<string>(READ_ATTEMPT_STATE);
+                                return String(await page.evaluate(READ_ATTEMPT_STATE));
                             },
                         );
                         datagrams = witness.arrivals().filter(isDatagram);

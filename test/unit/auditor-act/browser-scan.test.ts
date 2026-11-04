@@ -3,7 +3,8 @@
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
 import { launchBrowser, scan, tabWalk, type Browser, type PageDriver } from '@revisum/auditor-act';
-import { launchChromium } from '@revisum/driver-cdp';
+import { ATTACH_TO_TARGET, CREATE_TARGET, EVALUATE, launchChromium } from '@revisum/driver-cdp';
+import { CLOSE_THE_BROWSER, NO_SUCH_COMMAND } from '#test-support/browser/TestCommand.ts';
 import { startAccessibilityServer, type AccessibilityServer } from '../../support/accessibility-server.ts';
 import { BROWSERS } from '../../support/browsers.ts';
 import { createCleanUpScope } from '../../support/CleanUpScope.ts';
@@ -39,11 +40,11 @@ test('the snapshot holds DOM nodes, computed styles, layout boxes and accessibil
 test('CDP commands time out and closing ends the launched browser process', { timeout: 60_000 }, async () => {
   // A command that never answers is rejected by the client's timeout.
   const launched = await launchChromium(BROWSERS.chrome);
-  const { targetId } = await launched.connection.send<{ targetId: string }>(undefined, 'Target.createTarget', { url: 'about:blank' });
-  const { sessionId } = await launched.connection.send<{ sessionId: string }>(undefined, 'Target.attachToTarget', { targetId, flatten: true });
-  await assert.rejects(launched.connection.send(sessionId, 'Runtime.evaluate', { expression: 'new Promise(() => {})', awaitPromise: true }, 500), /timeout after 500 ms/);
-  await assert.rejects(launched.connection.send(sessionId, 'No.suchMethod', {}, 5000), /No.suchMethod/);
-  await launched.connection.send(undefined, 'Browser.close', {}, 5000).catch(() => undefined);
+  const { targetId } = await launched.connection.ask(undefined, CREATE_TARGET, { url: 'about:blank' });
+  const { sessionId } = await launched.connection.ask(undefined, ATTACH_TO_TARGET, { targetId, flatten: true });
+  await assert.rejects(launched.connection.ask(sessionId, EVALUATE, { expression: 'new Promise(() => {})', awaitPromise: true }, 500), /timeout after 500 ms/);
+  await assert.rejects(launched.connection.ask(sessionId, NO_SUCH_COMMAND, {}, 5000), /No.suchMethod/);
+  await launched.connection.ask(undefined, CLOSE_THE_BROWSER, {}, 5000).catch(() => undefined);
   for (let i = 0; i < 200 && launched.browserProcess.exitCode === null; i++) await new Promise((resolve) => setTimeout(resolve, 50));
   assert.notEqual(launched.browserProcess.exitCode, null);
   launched.connection.close();
@@ -56,9 +57,9 @@ test('CDP commands time out and closing ends the launched browser process', { ti
 
 test('the browser cannot reach the network outside 127.0.0.1', { timeout: 60_000 }, async () => {
   await page.goto(`${server.origin}/keyboard-pairs/k10-sequence.clean.html`);
-  const external = await page.evaluate<string>(`fetch('http://example.com/').then(() => 'reached', (e) => 'blocked: ' + e.message)`);
+  const external = String(await page.evaluate(`fetch('http://example.com/').then(() => 'reached', (e) => 'blocked: ' + e.message)`));
   assert.match(external, /^blocked/);
-  const local = await page.evaluate<number>(`fetch(location.href).then((r) => r.status)`);
+  const local: unknown = await page.evaluate(`fetch(location.href).then((r) => r.status)`);
   assert.equal(local, 200);
 });
 

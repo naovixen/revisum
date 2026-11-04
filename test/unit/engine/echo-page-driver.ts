@@ -3,8 +3,9 @@
 // an element found by its test id shows a text the test chooses, such as a careless echo of a
 // secret. The test hands in the values of the secrets it planted, so the driver never needs
 // reveal: it looks the typed value up by the secret's name, as a real page would hold it.
-import { success, type BrowserDriver, type ElementProbe, type Locator } from '@revisum/engine';
+import { performableLocator, success, type BrowserDriver, type ElementProbe, type Locator } from '@revisum/engine';
 import { ORIGIN } from './secret-examples.ts';
+import { performableAction, READ_FAILED } from '#test-support/fakes/FakePage.ts';
 import { fakeSession } from '#test-support/fakes/FakeSession.ts';
 import { fakeDriverOpening } from '#test-support/fakes/FakeDriver.ts';
 
@@ -34,6 +35,13 @@ export function echoPageDriver(page: EchoPage): BrowserDriver & { readonly calls
     page: () => Promise.resolve({ url: `${ORIGIN}/`, title: 'Echo page', meta: [], canonicalUrl: null }),
     act: (step, _guard, secret) => {
       calls.actions++;
+      // What any driver refuses comes before the page: it keeps no value of a step it would not perform.
+      if (step.type !== 'dialog') {
+        const performable = performableAction(step, secret);
+        if (!performable.ok) {
+          return Promise.resolve(performable);
+        }
+      }
       if (step.type === 'fill') {
         const plainText = typeof step.value === 'string' ? step.value : '';
         const typed = secret === undefined ? plainText : page.secretValues?.[secret.name] ?? '';
@@ -43,6 +51,9 @@ export function echoPageDriver(page: EchoPage): BrowserDriver & { readonly calls
     },
     probe: (locator) => {
       calls.probes++;
+      if (performableLocator(locator) === undefined) {
+        return Promise.resolve(READ_FAILED);
+      }
       const key = elementKey(locator);
       const typed = fieldValues.get(key);
       if (typed !== undefined) return Promise.resolve(shown('', typed));

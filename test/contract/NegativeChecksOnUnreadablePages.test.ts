@@ -1,7 +1,8 @@
 // A check that an element is absent or hidden passes when nothing is on screen, so a page the run
 // cannot read must never look like an empty page. These tests run real browsers: the tab's renderer
-// is ended, the browser is ended or its socket is closed, a dialog holds the page, or the page's own
-// DOM functions throw. The counter-examples keep the checks passing on a page that can be read.
+// is ended, the browser is ended or its socket is closed, a dialog holds the page, or the page's script
+// never lets go of its thread. A page's own DOM functions that throw change nothing, since the check does
+// not call them. The counter-examples keep the checks passing on a page that can be read.
 import assert from "node:assert/strict";
 import { setTimeout as pause } from "node:timers/promises";
 import { after, before, describe, test, type TestContext } from "node:test";
@@ -35,6 +36,7 @@ import {
     BOX_READ_THROWS_PATH,
     NOTES_PATH,
     QUERY_THROWS_PATH,
+    THREAD_HELD_PATH,
     UNREADABLE_PAGES,
 } from "./UnreadablePages.ts";
 
@@ -274,27 +276,35 @@ describe("Using a run in a real browser", () => {
                 });
             });
 
-            describe("and the page's querySelectorAll throws, so the element can't be found", () => {
+            describe("and the page's querySelectorAll throws, which the check does not call", () => {
                 describe("when the run ends", () => {
-                    test("then it should fail the check with page-unreadable, at the timeout", async () => {
+                    test("then it should fail the check with assertion-failed, as the element is there", async () => {
                         const result = await runBriefly([
                             navigate(QUERY_THROWS_PATH),
                             negativeCheck(check, testId("shown-note")),
                         ]);
-                        assertStepFailedWith(result, 1, "page-unreadable");
-                        assert.ok(
-                            stepMilliseconds(result, 1) >=
-                                waitingBriefly.stepTimeoutMilliseconds / 2,
-                        );
+                        assertStepFailedWith(result, 1, "assertion-failed");
                     });
                 });
             });
 
-            describe("and the page's getBoundingClientRect throws, so the element can't be read", () => {
+            describe("and the page's getBoundingClientRect throws, which the check does not call", () => {
+                describe("when the run ends", () => {
+                    test("then it should fail the check with assertion-failed, as the element is there", async () => {
+                        const result = await runBriefly([
+                            navigate(BOX_READ_THROWS_PATH),
+                            negativeCheck(check, testId("shown-note")),
+                        ]);
+                        assertStepFailedWith(result, 1, "assertion-failed");
+                    });
+                });
+            });
+
+            describe("and the page's script never lets go of its thread, so nothing can be read", () => {
                 describe("when the run ends", () => {
                     test("then it should fail the check with page-unreadable, at the timeout", async () => {
                         const result = await runBriefly([
-                            navigate(BOX_READ_THROWS_PATH),
+                            navigate(THREAD_HELD_PATH),
                             negativeCheck(check, testId("shown-note")),
                         ]);
                         assertStepFailedWith(result, 1, "page-unreadable");

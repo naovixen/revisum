@@ -17,6 +17,7 @@ import { fakeDriverOpening } from '#test-support/fakes/FakeDriver.ts';
 import { driversOf } from '#test-support/fakes/FakePorts.ts';
 import { fakeRedactor } from '#test-support/fakes/FakeRedactor.ts';
 import { fakeRunEventSink } from '#test-support/fakes/FakeRunEventSink.ts';
+import { performableAction } from '#test-support/fakes/FakePage.ts';
 import { fakeSession } from '#test-support/fakes/FakeSession.ts';
 
 // What the page shows for one step: the element its locator resolves to, or an open dialog's text.
@@ -60,9 +61,16 @@ export function guardedDriver(steps: readonly JsonRecord[], page: PageViews = {}
   const session = fakeSession({
     browser: { name: 'guarded-browser', version: '1.0' },
     page: () => Promise.resolve({ url: `${ORIGIN}/`, title: 'Account', meta: [], canonicalUrl: null }),
-    act: (step, guard) => {
+    act: (step, guard, secret) => {
       const index = actingIndexes[actions] ?? -1;
       actions++;
+      // What any driver refuses comes before the guard and the page.
+      if (step.type !== 'dialog') {
+        const performable = performableAction(step, secret);
+        if (!performable.ok) {
+          return Promise.resolve(performable);
+        }
+      }
       const raw = steps[index] ?? {};
       const seen = page[String(index)];
       const kind: string = step.type;

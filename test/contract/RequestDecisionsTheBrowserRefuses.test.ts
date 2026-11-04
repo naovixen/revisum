@@ -41,6 +41,14 @@ const SCRIPT_FROM_A_BLOCKED_ORIGIN = "http://blocked-origin.example.test/script.
 const PAGE_THAT_WAITS_FOR_A_BLOCKED_SCRIPT = "/waits-for-a-blocked-script.html";
 const ADAPTER_ERROR = "adapter-error";
 const ITEMS_PATH = "/api/items";
+const LOAD_NOTES = click(role("button", "Load notes"));
+const STUB_THEN_TWO_LOADS = [
+    navigate("/resources.html"),
+    startStub("markupNotes"),
+    LOAD_NOTES,
+    LOAD_NOTES,
+    visible(testId("notes-kind"), "stubs.answer-shown"),
+];
 
 const html: (body: string) => FixtureRoute = (body) => () => ({
     headers: { "content-type": "text/html; charset=utf-8" },
@@ -272,6 +280,32 @@ describe("Using the real browser driver", () => {
                 } finally {
                     await relayed.relay.close();
                 }
+            });
+
+            test("then it should record no answer of the stub's", async () => {
+                const relayed = await startRelayedDriver(FIXTURE_FOLDER);
+                relayed.relay.tamperWith({
+                    method: "Fetch.fulfillRequest",
+                    change: { refusal: WHY_THE_BROWSER_REFUSED },
+                });
+                try {
+                    const { result } = await harness.runSteps(TARGET, STUB_THEN_TWO_LOADS, {
+                        drivers: new Map([[ADAPTER_OF_TARGET[TARGET], relayed.driver]]),
+                    });
+                    assert.ok(relayed.relay.timesTampered() > 0, "the answer was refused");
+                    assert.equal(result.stubAnswers, undefined);
+                } finally {
+                    await relayed.relay.close();
+                }
+            });
+
+            test("then it should be the refusal that left the record empty, as the same run without one records the answers", async () => {
+                const { result } = await harness.runSteps(TARGET, STUB_THEN_TWO_LOADS);
+                assert.equal(result.state, "Passed", JSON.stringify(result.steps));
+                assert.deepEqual(result.stubAnswers?.[0], {
+                    stub: "markupNotes",
+                    responseIndex: 1,
+                });
             });
         });
     });

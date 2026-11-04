@@ -12,7 +12,7 @@ import {
 import { BROWSERS } from "../browsers.ts";
 import { startBrowserWatchdog, type BrowserWatchdog } from "./BrowserWatchdog.ts";
 import { startCdpRelay, type CdpRelay } from "./CdpRelay.ts";
-import { realEgressSource } from "./SessionEgressForTest.ts";
+import { realEgressSource, type EgressSourceForTest } from "./SessionEgressForTest.ts";
 import { sharedBrowserFor } from "./ShareBrowserInThisFile.ts";
 
 export type RelayedDriver = {
@@ -20,12 +20,15 @@ export type RelayedDriver = {
     readonly relay: CdpRelay;
 };
 
-export async function startRelayedDriver(fixturesFolder?: string): Promise<RelayedDriver> {
+export async function startRelayedDriver(
+    fixturesFolder?: string,
+    egress: EgressSourceForTest = realEgressSource,
+): Promise<RelayedDriver> {
     const relay = await startCdpRelay();
     const executablePath = BROWSERS.chrome;
     const driver = cdpDriver({
         executablePath,
-        egress: realEgressSource,
+        egress,
         ...(fixturesFolder === undefined ? {} : { fixturesFolder }),
         browserSource: async (locale) => {
             const shared = await sharedBrowserFor({ executablePath, locale });

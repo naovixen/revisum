@@ -3,6 +3,7 @@
 // unsupported popup leaves a Failed run whose audit log holds a denial nobody is told about.
 import assert from "node:assert/strict";
 import { after, before, describe, test } from "node:test";
+import { allowEveryAction } from "#test-support/browser/AllowEveryAction.ts";
 import { outcomes, type BrowserHarness } from "#test-support/browser/BrowserHarness.ts";
 import {
     click,
@@ -11,23 +12,29 @@ import {
     visible,
     type JsonRecord,
 } from "#test-support/browser/RawPlan.ts";
+import { capabilityHarness } from "#test-support/capability-harness.ts";
 import { TARGET, htmlPage, routedPagesHarness } from "./RoutedPagesHarness.ts";
 
-// Once the Start button has been pressed, the page opens one popup the next time anything measures
-// an element, which an action's wait for its element does before the guard is asked. The press is
-// what lets the browser open a popup at all: it blocks one that follows no user action.
-const POPUP_ON_NEXT_MEASURE = `
+// Long enough for the press's own step to have ended, well inside the time a press lets a page open one.
+const POPUP_AFTER_THE_PRESS_MILLISECONDS = 500;
+const BUTTONS_AFTER_THE_POPUP_MILLISECONDS = 300;
+
+// The buttons wait, disabled, for what the Start button sets going, which opens one popup and then
+// enables them. So the popup opens while an action waits for its element, and the driver has heard of it
+// by the time that wait ends and the guard is asked. The press is what lets the browser open a popup at all: it blocks one that
+// follows no user action.
+const POPUP_WHILE_THE_NEXT_STEP_WAITS = `
   <script>
-    const measure = Element.prototype.getBoundingClientRect;
-    let isArmed = false;
-    document.querySelector('[data-testid="start"]').addEventListener('click', () => { isArmed = true; });
-    Element.prototype.getBoundingClientRect = function () {
-      if (isArmed) {
-        isArmed = false;
+    const waiting = document.querySelectorAll('[data-testid="delete"], [data-testid="save"]');
+    for (const button of waiting) { button.disabled = true; }
+    document.querySelector('[data-testid="start"]').addEventListener('click', () => {
+      setTimeout(() => {
         window.open('about:blank', '_blank');
-      }
-      return measure.call(this);
-    };
+        setTimeout(() => {
+          for (const button of waiting) { button.disabled = false; }
+        }, ${BUTTONS_AFTER_THE_POPUP_MILLISECONDS});
+      }, ${POPUP_AFTER_THE_PRESS_MILLISECONDS});
+    });
   </script>`;
 
 const BUTTONS = `
@@ -36,13 +43,15 @@ const BUTTONS = `
   <button type="button" data-testid="save">Save</button>
   <p data-testid="state">Ready</p>`;
 
+const ROUTES = new Map([
+    ["/hostile.html", htmlPage(`${BUTTONS}${POPUP_WHILE_THE_NEXT_STEP_WAITS}`)],
+    ["/plain.html", htmlPage(BUTTONS)],
+]);
+
 let harness: BrowserHarness;
 before(async () => {
     harness = await routedPagesHarness({
-        routes: new Map([
-            ["/hostile.html", htmlPage(`${BUTTONS}${POPUP_ON_NEXT_MEASURE}`)],
-            ["/plain.html", htmlPage(BUTTONS)],
-        ]),
+        routes: ROUTES,
     });
 });
 after(async () => {
@@ -92,6 +101,32 @@ describe("Using a run in a real browser", () => {
                         JSON.stringify(result.steps),
                     );
                 });
+            });
+        });
+    });
+
+    describe("given the same page on the driver alone, with no run to keep the denial", () => {
+        describe("when a guard denies a click once the popup has opened", () => {
+            test("then it should fail the click with policy-denied, not as a popup", async () => {
+                const onItsOwn = await capabilityHarness(undefined, ROUTES);
+                const session = await onItsOwn.openOwn(TARGET);
+                try {
+                    assert.ok((await session.navigate(onItsOwn.url("/hostile.html"))).ok);
+                    const pressed = await session.act(
+                        onItsOwn.actionStep(click(testId("start"))),
+                        allowEveryAction,
+                    );
+                    assert.ok(pressed.ok, JSON.stringify(pressed));
+                    const denied = await session.act(
+                        onItsOwn.actionStep(click(testId("delete"))),
+                        () => ({ kind: "deny", rule: "irreversible-action", stepIndex: 2 }),
+                    );
+                    assert.ok(session.unsupportedOpenings() > 0, "the popup opened");
+                    assert.equal(denied.ok ? "acted" : denied.error.code, "policy-denied");
+                } finally {
+                    await session.close();
+                    await onItsOwn.close();
+                }
             });
         });
     });

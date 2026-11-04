@@ -7,7 +7,12 @@ import { arch, platform } from "node:os";
 import { join } from "node:path";
 import { setTimeout as pause } from "node:timers/promises";
 import type { RunnerHandle } from "@revisum/contracts";
-import { cdpDriver, egressThroughExistingProxy, launchChromium } from "@revisum/driver-cdp";
+import {
+    CREATE_TARGET,
+    cdpDriver,
+    egressThroughExistingProxy,
+    launchChromium,
+} from "@revisum/driver-cdp";
 import { parseProject, planParser, run } from "@revisum/engine";
 import { navigate, rawPlan, testId, textEquals } from "../support/browser/RawPlan.ts";
 import { BROWSERS } from "../support/browsers.ts";
@@ -75,7 +80,7 @@ async function openInBareBrowser(fixture: FixtureServer): Promise<string> {
         profilePrefix: "webrtc-attempt-",
     });
     try {
-        await launched.connection.send(undefined, "Target.createTarget", {
+        await launched.connection.ask(undefined, CREATE_TARGET, {
             url: `${fixture.origin}${PAGE_PATH}`,
         });
         await pause(BARE_BROWSER_WAIT_MILLISECONDS);

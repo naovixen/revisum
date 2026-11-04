@@ -23,7 +23,9 @@ import {
     launchSharedBrowser,
     type LaunchedChromium,
     type SharedBrowser,
+    CREATE_TARGET,
 } from "@revisum/driver-cdp";
+import { LIST_TARGET_URLS } from "#test-support/browser/TestCommand.ts";
 import {
     startBrowserHarness,
     type BrowserHarness,
@@ -231,7 +233,7 @@ async function loadInDefaultContext(
         profilePrefix: "egress-default-context-",
     });
     try {
-        await launched.connection.send(undefined, "Target.createTarget", {
+        await launched.connection.ask(undefined, CREATE_TARGET, {
             url: harness.url(path),
         });
         await pause(DEFAULT_CONTEXT_WAIT_MILLISECONDS);
@@ -261,10 +263,9 @@ async function outOfProcessFramesDuringRun(path: string): Promise<readonly strin
             drivers: new Map([[ADAPTER_OF_TARGET[BrowserTarget.Chrome], driver]]),
             read: [],
             beforePageRead: async () => {
-                const { targetInfos } = await control.send<{
-                    targetInfos: readonly { readonly url: string }[];
-                }>(undefined, "Target.getTargets", { filter: [{ type: "iframe" }] });
-                frameUrls = targetInfos.map((info) => info.url);
+                frameUrls = await control.ask(undefined, LIST_TARGET_URLS, {
+                    filter: [{ type: "iframe" }],
+                });
             },
         });
     } finally {

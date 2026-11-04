@@ -25,6 +25,7 @@ import {
     DIALOG_AT_POINTERDOWN_PAGE,
     FIELD,
     FIRST_RADIO,
+    FOCUS_GOES_TO_THE_BUTTON_PAGE,
     FRAME,
     HOVERED,
     LINK,
@@ -356,6 +357,18 @@ describe("Using the real browser driver", () => {
                     return clickOutcomeIn(await enterFrameOf(top));
                 });
                 assert.deepEqual(outcome, ONE_CLICK);
+            });
+        });
+    });
+
+    describe("given a frame that gives its button focus when it gets focus, and a press in it that opened a dialog, which a plan has answered", () => {
+        describe("when a plan presses Enter on the iframe from the top document", () => {
+            test("then it should pass the step, and the frame's button should have one click", async () => {
+                const tally = await inFrameAfterDialog(async ({ top, entry }) => {
+                    await actIn(top, press(testId(FRAME), "Enter"));
+                    return shownIn(entry, TALLY);
+                }, FOCUS_GOES_TO_THE_BUTTON_PAGE);
+                assert.equal(tally, "1");
             });
         });
     });

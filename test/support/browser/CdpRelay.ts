@@ -19,6 +19,8 @@ const TWO_BYTE_LENGTH = 126;
 const EIGHT_BYTE_LENGTH = 127;
 const LONGEST_TWO_BYTE_LENGTH = 0xffff;
 const BROWSER_ERROR_CODE = -32000;
+// No driver gives a command this id, so it hears the answer as an answer to nothing it asked.
+const RELAY_COMMAND_ID = -1;
 
 export type SentCommand = {
     readonly method: string;
@@ -32,7 +34,10 @@ export type ReplyChange =
     | { readonly refusal: string }
     // The browser gets the command, and the driver hears this in its place. Undefined leaves the
     // reply with no result at all.
-    | { readonly result: unknown };
+    | { readonly result: unknown }
+    // The page runs this first, then the browser gets the command. Its session handles both in that
+    // order, so what the page does lands in the middle of whatever the driver is doing.
+    | { readonly runInThePageFirst: string };
 
 export type ReplyTampering = {
     readonly method: string;
@@ -50,6 +55,10 @@ export type CdpRelay = {
     timesTampered(): number;
     // Tells the driver of an event on its page's session, as if the browser had sent it.
     sendEvent(method: string, parameters: Readonly<Record<string, unknown>>): void;
+    // Tells the driver of an event of the browser itself, on no session.
+    sendBrowserEvent(method: string, parameters: Readonly<Record<string, unknown>>): void;
+    // Sends the driver text as if it had come from the browser, whatever it says.
+    sendText(text: string): void;
     close(): Promise<void>;
 };
 
@@ -190,7 +199,18 @@ function relayConnection(state: RelayState, socket: Duplex, upstream: WebSocket)
                 writeText(socket, JSON.stringify({ id, sessionId, error }));
                 return;
             }
-            replacedResults.set(id, change);
+            if ("runInThePageFirst" in change) {
+                upstream.send(
+                    JSON.stringify({
+                        id: RELAY_COMMAND_ID,
+                        sessionId,
+                        method: "Runtime.evaluate",
+                        params: { expression: change.runInThePageFirst },
+                    }),
+                );
+            } else {
+                replacedResults.set(id, change);
+            }
         }
         upstream.send(text);
     };
@@ -295,6 +315,16 @@ export async function startCdpRelay(): Promise<CdpRelay> {
             const message = { method, params: parameters, sessionId: state.lastSessionId };
             for (const socket of state.sockets) {
                 writeText(socket, JSON.stringify(message));
+            }
+        },
+        sendBrowserEvent(method, parameters) {
+            for (const socket of state.sockets) {
+                writeText(socket, JSON.stringify({ method, params: parameters }));
+            }
+        },
+        sendText(text) {
+            for (const socket of state.sockets) {
+                writeText(socket, text);
             }
         },
         async close() {

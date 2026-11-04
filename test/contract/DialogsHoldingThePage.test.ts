@@ -8,7 +8,9 @@ import {
     stepMilliseconds,
     type BrowserHarness,
     type BrowserRun,
+    type BrowserRunOptions,
 } from "#test-support/browser/BrowserHarness.ts";
+import { ADAPTER_OF_TARGET } from "#test-support/browser/BrowserTarget.ts";
 import {
     click,
     navigate,
@@ -22,6 +24,7 @@ import {
     visible,
     type JsonRecord,
 } from "#test-support/browser/RawPlan.ts";
+import { startRelayedDriver } from "#test-support/browser/RelayedDriver.ts";
 import { shareBrowserInThisFile } from "#test-support/browser/ShareBrowserInThisFile.ts";
 import { assertStepFailedWith } from "./AssertStepFailedWith.ts";
 import { download } from "./page-states-support.ts";
@@ -54,7 +57,8 @@ const SCRIPT_CHECK_OF_THE_TITLE = expectScript(
 );
 
 const TIMER_PAGE = "/dialog-on-a-timer.html";
-const READ_PAGE = "/dialog-during-a-read.html";
+const OWN_SEARCH_PAGE = "/dialog-on-its-own-search.html";
+const PLAIN_PAGE = "/controls.html";
 const START = testId("start");
 const NOTE = testId("note");
 const NEVER_ENABLED = testId("never-enabled");
@@ -77,9 +81,9 @@ const DIALOG_ON_A_TIMER = `${CONTROLS}
     });
   </script>`;
 
-// After the Start button, the next search of the document sets a timer that opens a dialog as soon
-// as that search ends, which lands the dialog between the commands of one read.
-const DIALOG_DURING_A_READ = `${CONTROLS}
+// After the Start button, the next search of the page's own document sets a timer that opens a dialog.
+// A read does not search through the page's own functions, so that timer is never set.
+const DIALOG_ON_THE_PAGES_OWN_SEARCH = `${CONTROLS}
   <script>
     const search = Document.prototype.querySelectorAll;
     let isArmed = false;
@@ -103,7 +107,8 @@ before(async () => {
         },
         routes: new Map([
             [TIMER_PAGE, htmlPage(DIALOG_ON_A_TIMER)],
-            [READ_PAGE, htmlPage(DIALOG_DURING_A_READ)],
+            [OWN_SEARCH_PAGE, htmlPage(DIALOG_ON_THE_PAGES_OWN_SEARCH)],
+            [PLAIN_PAGE, htmlPage(CONTROLS)],
         ]),
     });
 });
@@ -113,7 +118,10 @@ after(async () => {
 
 // A plan must check something, whatever its last step does, and only an approved plan may run a
 // script written in the plan.
-const runApproved = async (steps: readonly JsonRecord[]): Promise<BrowserRun> => {
+const runApproved = async (
+    steps: readonly JsonRecord[],
+    options: BrowserRunOptions = {},
+): Promise<BrowserRun> => {
     const plan = harness.plan(
         rawPlan(
             { featureId: "PAGES-1", specReference: "specs/pages.md#dialogs", title: "Dialogs" },
@@ -121,7 +129,7 @@ const runApproved = async (steps: readonly JsonRecord[]): Promise<BrowserRun> =>
             [...steps, pathStartsWith("/", "page.shown")],
         ),
     );
-    return harness.run(plan, TARGET, { standing: await approvedStanding(plan) });
+    return harness.run(plan, TARGET, { ...options, standing: await approvedStanding(plan) });
 };
 
 const assertFailsAtOnceWithDialogOpen = async (
@@ -217,17 +225,53 @@ describe("Using a run in a real browser", () => {
         });
     });
 
-    describe("given a page timer opens a dialog in the middle of a read", () => {
+    describe("given a page opens a dialog in the middle of a read, with a command of it on its way", () => {
         for (const { name, step } of [
             { name: "a visible check", step: visible(NOTE, "note.shown") },
             { name: "a remember", step: remember("note", NOTE) },
         ]) {
             describe(`when ${name} reads the page`, () => {
                 test("then it should fail the step with dialog-open, at once", async () => {
-                    await assertFailsAtOnceWithDialogOpen(
-                        [navigate(READ_PAGE), click(START)],
+                    const { driver, relay } = await startRelayedDriver();
+                    let isDialogSent = false;
+                    relay.tamperWith({
+                        method: "Accessibility.getPartialAXTree",
+                        applies: () => {
+                            const isFirst = !isDialogSent;
+                            isDialogSent = true;
+                            return isFirst;
+                        },
+                        change: { runInThePageFirst: "alert('Held')" },
+                    });
+                    try {
+                        const { result } = await runApproved([navigate(PLAIN_PAGE), step], {
+                            drivers: new Map([[ADAPTER_OF_TARGET[TARGET], driver]]),
+                        });
+                        assert.equal(relay.timesTampered(), 1, "the dialog opened mid-read");
+                        assertStepFailedWith(result, 1, "dialog-open");
+                        const took = stepMilliseconds(result, 1);
+                        assert.ok(took < AT_ONCE_MILLISECONDS, `took ${took} ms`);
+                    } finally {
+                        await relay.close();
+                    }
+                });
+            });
+        }
+    });
+
+    describe("given a page that would open a dialog when its own search runs, once Start is pressed", () => {
+        for (const { name, step } of [
+            { name: "a visible check", step: visible(NOTE, "note.shown") },
+            { name: "a remember", step: remember("note", NOTE) },
+        ]) {
+            describe(`when ${name} reads the page`, () => {
+                test("then it should pass the run, as the read does not call that search", async () => {
+                    const { result } = await runApproved([
+                        navigate(OWN_SEARCH_PAGE),
+                        click(START),
                         step,
-                    );
+                    ]);
+                    assert.equal(result.state, "Passed", JSON.stringify(result.steps));
                 });
             });
         }
@@ -237,7 +281,7 @@ describe("Using a run in a real browser", () => {
         describe("when a visible check reads the page", () => {
             test("then it should pass the run", async () => {
                 const { result } = await runApproved([
-                    navigate(READ_PAGE),
+                    navigate(OWN_SEARCH_PAGE),
                     visible(NOTE, "note.shown"),
                 ]);
                 assert.equal(result.state, "Passed", JSON.stringify(result.steps));

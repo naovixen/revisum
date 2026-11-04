@@ -1,5 +1,6 @@
 // A check that reads something must not pass, or give up late, when the run cannot read the page:
-// a dialog holds it, its DOM functions throw, its frame is gone, its renderer or browser has died.
+// a dialog holds it, its script holds its thread, its frame is gone, its renderer or browser has died.
+// A page's own DOM functions that throw are no such case, since a read does not call them.
 // These tests run real browsers.
 import assert from "node:assert/strict";
 import { setTimeout as pause } from "node:timers/promises";
@@ -28,6 +29,7 @@ import {
     QUERY_THROWS_PATH,
     REMOVABLE_FRAME_PATH,
     SLOW_LOAD_PATH,
+    THREAD_HELD_PATH,
     UNREADABLE_PAGES,
 } from "./UnreadablePages.ts";
 
@@ -90,23 +92,35 @@ describe("Using a run in a real browser", () => {
             });
         });
 
-        describe("and the page's querySelectorAll throws", () => {
+        describe("and the page's querySelectorAll throws, which the check does not call", () => {
             describe("when the run ends", () => {
-                test("then it should fail the check with page-unreadable", async () => {
+                test("then it should pass the check, as the element is there", async () => {
                     const result = await runBriefly([
                         navigate(QUERY_THROWS_PATH),
                         visible(testId("shown-note"), "note.shown"),
                     ]);
-                    assertStepFailedWith(result, 1, "page-unreadable");
+                    assert.equal(result.state, "Passed", JSON.stringify(result.steps));
                 });
             });
         });
 
-        describe("and the page's getBoundingClientRect throws", () => {
+        describe("and the page's getBoundingClientRect throws, which the check does not call", () => {
+            describe("when the run ends", () => {
+                test("then it should pass the check, as the element is there", async () => {
+                    const result = await runBriefly([
+                        navigate(BOX_READ_THROWS_PATH),
+                        visible(testId("shown-note"), "note.shown"),
+                    ]);
+                    assert.equal(result.state, "Passed", JSON.stringify(result.steps));
+                });
+            });
+        });
+
+        describe("and the page's script never lets go of its thread", () => {
             describe("when the run ends", () => {
                 test("then it should fail the check with page-unreadable", async () => {
                     const result = await runBriefly([
-                        navigate(BOX_READ_THROWS_PATH),
+                        navigate(THREAD_HELD_PATH),
                         visible(testId("shown-note"), "note.shown"),
                     ]);
                     assertStepFailedWith(result, 1, "page-unreadable");

@@ -81,6 +81,7 @@ export const CONTROLS_PAGE = "/controls.html";
 export const DIALOG_AT_POINTERDOWN_PAGE = "/dialog-at-pointerdown.html";
 export const DIALOG_AT_MOUSEDOWN_PAGE = "/dialog-at-mousedown.html";
 export const COVERED_AFTER_DIALOG_PAGE = "/covered-after-dialog.html";
+export const FOCUS_GOES_TO_THE_BUTTON_PAGE = "/focus-goes-to-the-button.html";
 
 export const framing = (framedPage: string): string => `/framing${framedPage}`;
 // The top document has buttons and a tally of its own, under the same test ids as the frame's.
@@ -274,6 +275,15 @@ export const DIALOG_ON_PRESS_PAGES = new Map<string, FixtureRoute>([
         COVERED_AFTER_DIALOG_PAGE,
         pageWith(opensDialogAt("pointerdown"), "", COVER_ARRIVES_WITH_THE_POINTER_OVER_THE_BUTTON),
     ],
+    [
+        FOCUS_GOES_TO_THE_BUTTON_PAGE,
+        pageWith(
+            opensDialogAt("pointerdown"),
+            "",
+            `window.addEventListener('focus', () => { button.focus(); });`,
+        ),
+    ],
+    [framing(FOCUS_GOES_TO_THE_BUTTON_PAGE), framingPage(FOCUS_GOES_TO_THE_BUTTON_PAGE)],
     [framing(DIALOG_AT_POINTERDOWN_PAGE), framingPage(DIALOG_AT_POINTERDOWN_PAGE)],
     [framing(COVERED_AFTER_DIALOG_PAGE), framingPage(COVERED_AFTER_DIALOG_PAGE)],
 ]);
