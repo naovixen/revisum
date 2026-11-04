@@ -39,7 +39,7 @@ const UNNAMED_ELEMENT: ResolvedElement = {
     linkUrl: null,
 };
 const CLICK_EXPORT: JsonRecord = click(NAMED_BUTTON);
-const TOLD_PAGE = { url: "https://app.example/told", title: "Told" };
+const TOLD_PAGE = { url: "https://app.example/told", title: "Told", meta: [], canonicalUrl: null };
 const [ORIGIN = assert.fail("the test project declares an origin")]: readonly Origin[] =
     testProject().origins;
 
@@ -137,12 +137,12 @@ describe("Using a fake session", () => {
         describe("when a download step runs within its byte limit", () => {
             test("then it should save the file, having asked the guard once", async () => {
                 const { guard, asked } = guardAnswering(ALLOW);
-                const saved = await fakeSession().download?.(
+                const saved = await fakeSession().download(
                     downloadStep(),
                     FAKE_DOWNLOAD.length,
                     guard,
                 );
-                assert.ok(saved?.ok === true);
+                assert.ok(saved.ok);
                 assert.deepEqual(saved.value.bytes, FAKE_DOWNLOAD);
                 assert.equal(asked.length, 1);
             });
@@ -150,12 +150,12 @@ describe("Using a fake session", () => {
 
         describe("when a download step's file is past its byte limit", () => {
             test("then it should fail with download-too-large", async () => {
-                const saved = await fakeSession().download?.(
+                const saved = await fakeSession().download(
                     downloadStep(),
                     FAKE_DOWNLOAD.length - 1,
                     guardAnswering(ALLOW).guard,
                 );
-                assert.ok(saved?.ok === false);
+                assert.ok(!saved.ok);
                 assert.equal(saved.error.code, "download-too-large");
             });
         });
@@ -180,21 +180,10 @@ describe("Using a fake session", () => {
         describe("when a download step runs", () => {
             test("then it should answer policy-denied and save nothing", async () => {
                 const { guard, asked } = guardAnswering(DENY);
-                const saved = await fakeSession().download?.(downloadStep(), 1000, guard);
-                assert.ok(saved?.ok === false);
+                const saved = await fakeSession().download(downloadStep(), 1000, guard);
+                assert.ok(!saved.ok);
                 assert.equal(saved.error.code, "policy-denied");
                 assert.equal(asked.length, 1);
-            });
-        });
-    });
-
-    describe("given no guard to ask", () => {
-        describe("when a step is acted on", () => {
-            test("then it should answer policy-denied", async () => {
-                const noGuard = undefined as unknown as ActionGuard;
-                const acted = await fakeSession().act(actionStep(CLICK_EXPORT), noGuard);
-                assert.ok(!acted.ok);
-                assert.equal(acted.error.code, "policy-denied");
             });
         });
     });
@@ -217,8 +206,8 @@ describe("Using a fake session", () => {
                 const session = fakeSession();
                 await session.close();
                 const { guard, asked } = guardAnswering(ALLOW);
-                const saved = await session.download?.(downloadStep(), 1000, guard);
-                assert.ok(saved?.ok === false);
+                const saved = await session.download(downloadStep(), 1000, guard);
+                assert.ok(!saved.ok);
                 assert.equal(saved.error.code, "target-crashed");
                 assert.deepEqual(asked, []);
             });
@@ -227,9 +216,9 @@ describe("Using a fake session", () => {
         describe("when a test asks whether it crashed", () => {
             test("then it should say so, as it did not before it closed", async () => {
                 const session = fakeSession();
-                const wasCrashedBeforeClosing = session.crashed?.();
+                const wasCrashedBeforeClosing = session.crashed();
                 await session.close();
-                assert.deepEqual([wasCrashedBeforeClosing, session.crashed?.()], [false, true]);
+                assert.deepEqual([wasCrashedBeforeClosing, session.crashed()], [false, true]);
             });
         });
     });
@@ -238,8 +227,8 @@ describe("Using a fake session", () => {
         describe("when the tab closes", () => {
             test("then it should go on acting, until the session itself closes", async () => {
                 const session = fakeSession();
-                const tab = await session.newTab?.("https://app.example/other");
-                assert.ok(tab?.ok === true);
+                const tab = await session.newTab("https://app.example/other");
+                assert.ok(tab.ok);
                 await tab.value.close();
                 const step = actionStep(CLICK_EXPORT);
                 const { guard } = guardAnswering(ALLOW);
@@ -252,8 +241,8 @@ describe("Using a fake session", () => {
         describe("when the session was told how to answer", () => {
             test("then it should have the tab answer the same way, with its own calls", async () => {
                 const session = fakeSession({ page: () => Promise.resolve(TOLD_PAGE) });
-                const tab = await session.newTab?.("https://app.example/other");
-                assert.ok(tab?.ok === true);
+                const tab = await session.newTab("https://app.example/other");
+                assert.ok(tab.ok);
                 assert.deepEqual(await tab.value.page(), TOLD_PAGE);
                 assert.equal(session.calls.count("page"), 0);
             });
@@ -262,49 +251,36 @@ describe("Using a fake session", () => {
         describe("when a dialog opens on the tab", () => {
             test("then it should hold the tab and leave the session's page free", async () => {
                 const session = fakeSession();
-                await session.newTab?.("https://app.example/other");
+                await session.newTab("https://app.example/other");
                 const [tab] = session.openedTabs();
                 tab?.openDialog("Keep the draft?");
-                assert.equal(tab?.isDialogOpen?.(), true);
-                assert.equal(session.isDialogOpen?.(), false);
+                assert.equal(tab?.isDialogOpen(), true);
+                assert.equal(session.isDialogOpen(), false);
             });
         });
 
-        describe("when the tab's storage is written", () => {
-            test("then it should reach the session's, until the tab closes", async () => {
+        describe("when the session's storage is written and the tab closes", () => {
+            test("then it should go on reading what was written", async () => {
                 const session = fakeSession();
-                const opened = await session.newTab?.("https://app.example/other");
-                assert.ok(opened?.ok === true);
-                const tab = opened.value;
-                await tab.storage?.write("local", ORIGIN, "key", "value");
+                const opened = await session.newTab("https://app.example/other");
+                assert.ok(opened.ok);
+                await session.storage.write("local", ORIGIN, "key", "value");
+                await opened.value.close();
                 assert.deepEqual(
-                    await session.storage?.read("local", ORIGIN, "key"),
+                    await session.storage.read("local", ORIGIN, "key"),
                     success("value"),
                 );
-                await tab.close();
-                const read = await tab.storage?.read("local", ORIGIN, "key");
-                assert.ok(read?.ok === false);
-                assert.equal(read.error.code, "not-actionable");
-            });
-        });
-    });
-
-    describe("given a session left without a feature", () => {
-        describe("when it has closed", () => {
-            test("then it should still be without it", async () => {
-                const session = fakeSession({}, ["frame", "newTab"]);
-                await session.close();
-                assert.equal("frame" in session, false);
-                assert.equal("newTab" in session, false);
             });
         });
 
-        describe("when it opens a tab", () => {
-            test("then it should leave the tab without it too", async () => {
-                const session = fakeSession({}, ["frame"]);
-                const tab = await session.newTab?.("https://app.example/other");
-                assert.ok(tab?.ok === true);
-                assert.equal("frame" in tab.value, false);
+        describe("when a test asks what the tab offers", () => {
+            test("then it should hold only a document's members", async () => {
+                const session = fakeSession();
+                const opened = await session.newTab("https://app.example/other");
+                assert.ok(opened.ok);
+                for (const member of ["newTab", "storage", "network", "clock", "clipboard"]) {
+                    assert.equal(member in opened.value, false, member);
+                }
             });
         });
     });

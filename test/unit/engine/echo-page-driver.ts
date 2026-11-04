@@ -31,7 +31,7 @@ export function echoPageDriver(page: EchoPage): BrowserDriver & { readonly calls
   const session = fakeSession({
     browser: { name: 'echo-page-browser', version: '1.0' },
     navigate: () => { calls.navigations++; return Promise.resolve(success(undefined)); },
-    page: () => Promise.resolve({ url: `${ORIGIN}/`, title: 'Echo page' }),
+    page: () => Promise.resolve({ url: `${ORIGIN}/`, title: 'Echo page', meta: [], canonicalUrl: null }),
     act: (step, _guard, secret) => {
       calls.actions++;
       if (step.type === 'fill') {

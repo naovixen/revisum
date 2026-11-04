@@ -3,7 +3,6 @@
 // any driver call: no earlier step may act for a check that was always going to fail.
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { DRIVER_FEATURES } from "@revisum/engine";
 import {
     OPEN_ORDERS,
     accepted,
@@ -59,30 +58,26 @@ describe("Using the run", () => {
     for (const kind of ["checked", "unchecked", "focused"]) {
         for (const { name, place } of PLACES) {
             describe(`given a plan with a "${kind}" check ${name}, after steps that act`, () => {
-                describe("and a driver that declares every optional feature", () => {
-                    describe("when the plan is run", () => {
-                        test("then it should refuse the run with element-check-unsupported", async () => {
-                            const { result } = await runPlan(
-                                planOf([OPEN_ORDERS, ACCEPT_TERMS, place(checkOf(kind))]),
-                                { performs: DRIVER_FEATURES },
-                            );
-                            assert.equal(result.state, "Refused", JSON.stringify(result.steps));
-                            assert.deepEqual(result.refusal, {
-                                code: "element-check-unsupported",
-                            });
-                            assert.deepEqual(result.steps, []);
+                describe("when the plan is run", () => {
+                    test("then it should refuse the run with element-check-unsupported", async () => {
+                        const { result } = await runPlan(
+                            planOf([OPEN_ORDERS, ACCEPT_TERMS, place(checkOf(kind))]),
+                        );
+                        assert.equal(result.state, "Refused", JSON.stringify(result.steps));
+                        assert.deepEqual(result.refusal, {
+                            code: "element-check-unsupported",
                         });
+                        assert.deepEqual(result.steps, []);
+                    });
 
-                        test("then it should open no browser and act on no page", async () => {
-                            const { recording } = await runPlan(
-                                planOf([OPEN_ORDERS, ACCEPT_TERMS, place(checkOf(kind))]),
-                                { performs: DRIVER_FEATURES },
-                            );
-                            assert.equal(recording.environments.length, 0, "a session opened");
-                            assert.deepEqual(recording.navigations, []);
-                            assert.deepEqual(recording.actions, []);
-                            assert.equal(recording.probes, 0);
-                        });
+                    test("then it should open no browser and act on no page", async () => {
+                        const { recording } = await runPlan(
+                            planOf([OPEN_ORDERS, ACCEPT_TERMS, place(checkOf(kind))]),
+                        );
+                        assert.equal(recording.environments.length, 0, "a session opened");
+                        assert.deepEqual(recording.navigations, []);
+                        assert.deepEqual(recording.actions, []);
+                        assert.equal(recording.probes, 0);
                     });
                 });
             });
@@ -94,9 +89,6 @@ describe("Using the run", () => {
             test("then it should act, read the page and pass", async () => {
                 const { result, recording } = await runPlan(
                     planOf([OPEN_ORDERS, ACCEPT_TERMS, checkOf("visible")]),
-                    {
-                        performs: DRIVER_FEATURES,
-                    },
                 );
                 assert.equal(result.state, "Passed", JSON.stringify(result.steps));
                 assert.equal(recording.actions.length, 1);

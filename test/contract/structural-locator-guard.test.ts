@@ -14,10 +14,8 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import { outcomes, type BrowserRun } from '#test-support/browser/BrowserHarness.ts';
-import { ADAPTER_OF_TARGET } from '#test-support/browser/BrowserTarget.ts';
-import { listedFeatures } from '#test-support/browser/DriversWithout.ts';
 import { click, navigate, testId, textEquals, type JsonRecord } from '#test-support/browser/RawPlan.ts';
-import { ALLOWED_UNNAMED_SELECTOR, UNSAFE_PAGE_TARGETS, css, unsafePageDrivers, unsafePageHarness, xpath, type UnsafePageHarness } from './unsafe-page-support.ts';
+import { ALLOWED_UNNAMED_SELECTOR, UNSAFE_PAGE_TARGETS, css, unsafePageHarness, xpath, type UnsafePageHarness } from './unsafe-page-support.ts';
 import { shareBrowserInThisFile } from '#test-support/browser/ShareBrowserInThisFile.ts';
 
 shareBrowserInThisFile();
@@ -47,22 +45,17 @@ function assertClickReachedPage(ran: BrowserRun): void {
   assert.notEqual(ran.atClose?.shown['input-events'], '0', 'the click reached the page');
 }
 
-// Every way of finding the "Delete account" button by page structure. `alsoNeeds` names a feature
-// from before this spec the locator needs too, such as positions; on a driver without it
-// the locator is left out.
-const DELETE_ACCOUNT_LOCATORS: readonly { readonly name: string; readonly locator: JsonRecord; readonly alsoNeeds?: string }[] = [
+// Every way of finding the "Delete account" button by page structure.
+const DELETE_ACCOUNT_LOCATORS: readonly { readonly name: string; readonly locator: JsonRecord }[] = [
   { name: 'the CSS selector button.danger', locator: css('button.danger') },
   { name: 'an XPath expression by its place in the page', locator: xpath('//main/section[1]/button[1]') },
   { name: 'a CSS selector with hasText inside another CSS locator', locator: css('button', { hasText: 'Delete account', inside: css('section.account') }) },
-  { name: 'a CSS selector with a position', locator: css('section.account button', { position: 'first' }), alsoNeeds: 'positions' },
+  { name: 'a CSS selector with a position', locator: css('section.account button', { position: 'first' }) },
 ];
 
 for (const targetId of UNSAFE_PAGE_TARGETS) {
-  const declaredBefore = listedFeatures(unsafePageDrivers().get(ADAPTER_OF_TARGET[targetId]));
-  const locators = DELETE_ACCOUNT_LOCATORS.filter((entry) => entry.alsoNeeds === undefined || declaredBefore.includes(entry.alsoNeeds));
-
   describe(`irreversible actions found by structure: ${targetId}`, () => {
-    for (const { name, locator } of locators) {
+    for (const { name, locator } of DELETE_ACCOUNT_LOCATORS) {
       test(`a click on "Delete account" found by ${name} is denied irreversible-action with zero input events`, async () => {
         const ran = await clickOnGuardPage(targetId, locator, accountKept());
         assertDenied(ran, 'irreversible-action');

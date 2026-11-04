@@ -2,7 +2,6 @@
 // a step acts on are the Export button and a field labelled Name, which a real page has to hold.
 import assert from "node:assert/strict";
 import {
-    DRIVER_FEATURES,
     performableLocator,
     type ActionGuard,
     type ActionStep,
@@ -15,6 +14,7 @@ import {
     type Result,
     type SecretName,
     type Session,
+    type SessionTab,
     type Step,
 } from "@revisum/engine";
 import { testProject } from "../../unit/engine/plan-examples.ts";
@@ -89,7 +89,6 @@ export const FILL_THE_SECRET = {
     value: { secretName: SECRET_NAME },
 };
 export const ACCEPT = { type: "dialog", action: "accept" };
-export const NO_GUARD = undefined as unknown as ActionGuard;
 
 export type GuardAndQuestions = {
     readonly guard: ActionGuard;
@@ -125,20 +124,17 @@ export function firstOrigin(): Origin {
 }
 
 export function locatorFindingNothing(): ResolvedLocator {
-    const locator = performableLocator(locatorOf(testId("not-on-the-page")), DRIVER_FEATURES);
+    const locator = performableLocator(locatorOf(testId("not-on-the-page")));
     assert.ok(locator !== undefined, "the locator holds no value reference");
     return locator;
 }
 
 export function assertNothingRead(probe: Awaited<ReturnType<Session["probe"]>>): void {
-    assert.deepEqual(
-        { count: probe.count, visible: probe.visible, enabled: probe.enabled },
-        { count: "page-unreadable", visible: false, enabled: false },
-    );
+    assert.deepEqual(probe, { count: "page-unreadable" });
 }
 
-export async function openTab(subject: SessionUnderTest): Promise<Session> {
-    const opened = await subject.session.newTab?.(subject.pageUrl);
-    assert.ok(opened?.ok === true, `the tab opens: ${JSON.stringify(opened)}`);
+export async function openTab(subject: SessionUnderTest): Promise<SessionTab> {
+    const opened = await subject.session.newTab(subject.pageUrl);
+    assert.ok(opened.ok, `the tab opens: ${JSON.stringify(opened)}`);
     return opened.value;
 }

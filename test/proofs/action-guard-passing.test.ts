@@ -56,7 +56,7 @@ function recordingDriver(): { readonly driver: BrowserDriver; readonly calls: Ac
   const calls: ActCall[] = [];
   const session = fakeSession({
     browser: { name: 'recording-browser', version: '1.0' },
-    page: () => Promise.resolve({ url: `${ORIGIN}/drafts`, title: 'Drafts' }),
+    page: () => Promise.resolve({ url: `${ORIGIN}/drafts`, title: 'Drafts', meta: [], canonicalUrl: null }),
     act: (step, guard) => { calls.push({ type: step.type, guard }); return Promise.resolve(success(undefined)); },
     probe: () => Promise.resolve(SHOWN),
     screenshot: () => Promise.resolve(new Uint8Array()),

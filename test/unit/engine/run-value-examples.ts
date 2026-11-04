@@ -8,7 +8,7 @@
 //   - runPlan() runs a parsed plan through the policy gate and run() on a driver that needs no
 //     browser and records every call, so a test can see what reached the page.
 import assert from 'node:assert/strict';
-import { parseProject, planParser, run, success, type ActionStep, type BrowserDriver, type DriverFeature, type GeneratedValue, type Plan, type PlanError, type Project, type Result, type RunPorts, type RunResult, type SessionEnvironment, type ValueName } from '@revisum/engine';
+import { parseProject, planParser, run, success, type ActionStep, type BrowserDriver, type GeneratedValue, type Plan, type PlanError, type Project, type Result, type RunPorts, type RunResult, type Session, type SessionEnvironment, type ValueName } from '@revisum/engine';
 import { authorise, trustedProjectFrom } from '../../support/policy-clearance.ts';
 import { ORIGIN, TARGET_ID, testProjectInput, type JsonRecord } from './plan-examples.ts';
 import { fakeDriver } from '#test-support/fakes/FakeDriver.ts';
@@ -96,20 +96,21 @@ export type Recording = {
 export const PAGE_TITLE = 'Orders';
 
 // A driver whose page accepts every action, shows one element for every locator and records
-// every call. Its adapter id is the shared test project's. `performs` is what it says it can do.
-export function recordingDriver(performs?: readonly DriverFeature[]): { readonly driver: BrowserDriver; readonly recording: Recording } {
+// every call. Its adapter id is the shared test project's. `changes` replaces what its session does.
+export function recordingDriver(changes: Partial<Session> = {}): { readonly driver: BrowserDriver; readonly recording: Recording } {
   const recording: Recording = { environments: [], navigations: [], actions: [], probes: 0 };
   const page = fakeSession();
   const session = fakeSession({
     browser: { name: 'recording-browser', version: '1.0' },
     navigate: (url) => { recording.navigations.push(url); return Promise.resolve(success(undefined)); },
-    page: () => Promise.resolve({ url: recording.navigations.at(-1) ?? `${ORIGIN}/`, title: PAGE_TITLE }),
+    page: () => Promise.resolve({ url: recording.navigations.at(-1) ?? `${ORIGIN}/`, title: PAGE_TITLE, meta: [], canonicalUrl: null }),
     // Answers as a fake page does, so a step the engine left unresolved is refused here too.
     act: (step, guard, secret) => { recording.actions.push(step); return page.act(step, guard, secret); },
     probe: () => { recording.probes++; return Promise.resolve(FAKE_ELEMENT); },
+    ...changes,
   });
   const driver = fakeDriver({
-    info: { id: 'cdp', version: 'recording', protocol: 'none', ...(performs === undefined ? {} : { performs }) },
+    info: { id: 'cdp', version: 'recording', protocol: 'none' },
     open: (_target, environment) => { recording.environments.push(environment); return Promise.resolve(success(session)); },
   }, ['build']);
   return { driver, recording };
@@ -120,7 +121,7 @@ export type RunOptions = {
   readonly seed?: number;
   readonly clockStartMilliseconds?: number;
   readonly baseUrl?: string;
-  readonly performs?: readonly DriverFeature[];
+  readonly session?: Partial<Session>;
 };
 
 export const DEFAULT_SEED = 7;
@@ -137,7 +138,7 @@ export async function runPlan(raw: unknown, options: RunOptions = {}): Promise<{
   const trusted = await trustedProjectFrom(projectFile);
   const target = project.matrix[0];
   assert.ok(target !== undefined, 'the test project has a target');
-  const { driver, recording } = recordingDriver(options.performs);
+  const { driver, recording } = recordingDriver(options.session);
   const result = await run({
     plan: authorise(plan, trusted), project, targetId: target.id, baseUrl: options.baseUrl ?? ORIGIN,
     seed: options.seed ?? DEFAULT_SEED, fixedTimeMilliseconds: options.clockStartMilliseconds ?? DEFAULT_CLOCK_START,

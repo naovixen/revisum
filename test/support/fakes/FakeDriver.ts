@@ -1,18 +1,11 @@
-import {
-    DRIVER_FEATURES,
-    failure,
-    success,
-    type BrowserDriver,
-    type Session,
-} from "@revisum/engine";
+import { failure, success, type BrowserDriver, type Session } from "@revisum/engine";
 import { fakeSession } from "./FakeSession.ts";
 import { leaveOut, type OptionalMember } from "./LeaveOut.ts";
 import { recordCalls, type Recorded } from "./RecordCalls.ts";
 
 export type FakeDriver = Recorded<BrowserDriver>;
 
-// A driver for every target that performs every plan feature and opens a fresh fake session each
-// time, unless a test overrides it.
+// A driver for every target that opens a fresh fake session each time, unless a test overrides it.
 export function fakeDriver(
     overrides: Partial<BrowserDriver> = {},
     without: readonly OptionalMember<BrowserDriver>[] = [],
@@ -22,7 +15,6 @@ export function fakeDriver(
             id: "cdp",
             version: "fake",
             protocol: "none",
-            performs: DRIVER_FEATURES,
         },
         supports: () => success(true),
         open: () => Promise.resolve(success(fakeSession())),

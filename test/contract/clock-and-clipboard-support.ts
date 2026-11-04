@@ -35,9 +35,6 @@ const SECOND = 1000;
 export const MINUTE = 60 * SECOND;
 export const HOUR = 60 * MINUTE;
 
-// The features this spec adds to the driver capability model.
-export const CLOCK_AND_CLIPBOARD_FEATURES = ["clockControl", "clipboard"] as const;
-export type ClockAndClipboardFeature = (typeof CLOCK_AND_CLIPBOARD_FEATURES)[number];
 
 // The secret the leak page's token field is filled with, and copies.
 export const COPY_SECRET = "CLIPBOARD_ACCESS_TOKEN";

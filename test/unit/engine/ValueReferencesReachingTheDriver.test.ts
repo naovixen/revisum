@@ -3,7 +3,6 @@
 // on a session that refuses as a real driver does.
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { DRIVER_FEATURES } from "@revisum/engine";
 import {
     OPEN_ORDERS,
     label,
@@ -39,7 +38,6 @@ describe("Using a run", () => {
                 test("then it should hand the driver a step holding only text, and pass", async () => {
                     const { result, recording } = await runPlan(
                         planOf([OPEN_ORDERS, step], { values: VALUES }),
-                        { performs: DRIVER_FEATURES },
                     );
                     assert.equal(result.state, "Passed", JSON.stringify(result.steps));
                     const [acted] = recording.actions;

@@ -20,6 +20,7 @@ import { shareBrowserInThisFile } from "#test-support/browser/ShareBrowserInThis
 import type { FixtureRoute } from "#test-support/fixture-server.ts";
 import { decodePng } from "#test-support/png-decoder.ts";
 import { TARGET, htmlPage, routedPagesHarness } from "./RoutedPagesHarness.ts";
+import { readableProbe } from "#test-support/browser/ReadableProbe.ts";
 
 shareBrowserInThisFile();
 
@@ -240,7 +241,7 @@ async function probedHolder(path: string) {
         {
             read: [],
             beforePageRead: async (session) => {
-                const probe = await session.probe(harness.locator(testId(HOLDER)));
+                const probe = readableProbe(await session.probe(harness.locator(testId(HOLDER))));
                 seen.sensitive = probe.sensitive;
                 seen.count = probe.count;
             },

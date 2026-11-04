@@ -1,14 +1,8 @@
 // What the run manifest pins of the driver a run used: its id, version and protocol, and the inputs
-// it cannot pin. The features it performs are not an input of their own: a run's steps show what
-// they needed, so adding a feature to a driver leaves other plans' hashes as they were.
+// it cannot pin.
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import {
-    decodeManifest,
-    type BrowserDriver,
-    type DriverFeature,
-    type RunResult,
-} from "@revisum/engine";
+import { decodeManifest, type BrowserDriver, type RunResult } from "@revisum/engine";
 import { quietDriver, runWithSecrets, secretFillPlan } from "./secret-examples.ts";
 
 const driverWith = (info: Partial<BrowserDriver["info"]>): BrowserDriver => {
@@ -19,29 +13,16 @@ const driverWith = (info: Partial<BrowserDriver["info"]>): BrowserDriver => {
 const resultOn = async (driver: BrowserDriver): Promise<RunResult> =>
     (await runWithSecrets([], secretFillPlan([]), {}, driver)).result;
 
-const FEW_FEATURES: readonly DriverFeature[] = ["positions"];
-const MORE_FEATURES: readonly DriverFeature[] = ["positions", "keyChords", "downloads"];
-
 describe("Using the run manifest", () => {
-    describe("given a driver that declares the features it performs", () => {
+    describe("given a driver", () => {
         describe("when a run records its adapter", () => {
-            test("then it should keep the id, version and protocol and leave the features out", async () => {
-                const result = await resultOn(driverWith({ performs: MORE_FEATURES }));
+            test("then it should keep the id, version and protocol", async () => {
+                const result = await resultOn(driverWith({}));
                 assert.deepEqual(result.manifest?.adapter, {
                     id: "fake",
                     version: "1.0",
                     protocol: "none",
                 });
-            });
-        });
-
-        describe("when another run's driver declares other features the plan does not use", () => {
-            test("then it should give the same manifest hash and result hash", async () => {
-                const few = await resultOn(driverWith({ performs: FEW_FEATURES }));
-                const more = await resultOn(driverWith({ performs: MORE_FEATURES }));
-                assert.equal(few.state, "Passed", JSON.stringify(few.steps));
-                assert.equal(more.manifestHash, few.manifestHash);
-                assert.equal(more.resultHash, few.resultHash);
             });
         });
     });
@@ -68,7 +49,7 @@ describe("Using the run manifest", () => {
     describe("given the manifest a run wrote", () => {
         describe("when it is decoded", () => {
             test("then it should read back exactly as written", async () => {
-                const { manifest } = await resultOn(driverWith({ performs: MORE_FEATURES }));
+                const { manifest } = await resultOn(driverWith({}));
                 assert.deepEqual(decodeManifest(JSON.parse(JSON.stringify(manifest))), {
                     ok: true,
                     value: manifest,
@@ -87,7 +68,7 @@ describe("Using the run manifest", () => {
                         id: "fake",
                         version: "1.0",
                         protocol: "none",
-                        performs: MORE_FEATURES,
+                        performs: ["positions", "keyChords", "downloads"],
                     },
                 };
                 assert.deepEqual(decodeManifest(withFeatures), {

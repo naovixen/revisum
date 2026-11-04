@@ -1,8 +1,7 @@
 // The grammar of positions, declared test-id attributes, key chords, multi-line fills and the
 // URL-prefix check, and the oracle of the URL-prefix check. What a driver does with them on a real
 // page (which of three buttons a position picks, exact attribute matching, the order of key
-// events, the field's value after a multi-line fill) comes with the CDP driver; until then a run
-// reports these steps as unsupported-step (unsupported-features.test.ts).
+// events, the field's value after a multi-line fill) is in the CDP driver's browser tests.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { checkPage, parseProject, type PageAssertion } from '@revisum/engine';
@@ -240,7 +239,7 @@ const PREFIX_CASES = [
 
 for (const prefixCase of PREFIX_CASES) {
   test(`the URL-prefix check "${prefixCase.prefix}" ${prefixCase.pass ? 'passes' : 'fails'} on ${prefixCase.url}`, () => {
-    const verdict = checkPage(prefixAssertion(prefixCase.prefix), { url: prefixCase.url, title: 'Projects' });
+    const verdict = checkPage(prefixAssertion(prefixCase.prefix), { url: prefixCase.url, title: 'Projects', meta: [], canonicalUrl: null });
     assert.equal(verdict.pass, prefixCase.pass);
   });
 }

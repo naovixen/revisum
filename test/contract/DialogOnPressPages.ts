@@ -148,6 +148,64 @@ export const FORM_INPUT_NAMES_HIDING_A_LISTENER_METHOD = [
     "addEventListener",
 ];
 
+// Every name the driver's in-page functions read on an element, which a form's input can take from it.
+export const FORM_INPUT_NAMES_HIDING_WHAT_THE_DRIVER_READS = [
+    "assignedSlot",
+    "classList",
+    "children",
+    "closest",
+    "disabled",
+    "elements",
+    "focus",
+    "form",
+    "getAttribute",
+    "getBoundingClientRect",
+    "getClientRects",
+    "getRootNode",
+    "innerText",
+    "isConnected",
+    "matches",
+    "ownerDocument",
+    "parentElement",
+    "parentNode",
+    "querySelectorAll",
+    "scrollIntoView",
+    "shadowRoot",
+    "tagName",
+    "textContent",
+];
+
+export const BUTTON_IN_THE_FORM = "button-in-the-form";
+export const BUTTON_IN_THE_FORM_NAME = "Inside the form";
+export const FORM_LABEL = "Order form";
+export const FORM_SUBMIT_NAME = "Send order";
+export const BUTTON_IN_THE_FORM_CLICKED = "the button in the form was clicked";
+
+export const formHoldingButtonPage = (inputName: string): string =>
+    `/form-holding-a-button-and-input-${inputName}.html`;
+export const formWithSubmitPage = (inputName: string): string =>
+    `/form-with-a-submit-and-input-${inputName}.html`;
+
+const formHoldingButtonRoute = (inputName: string): [string, FixtureRoute] => [
+    formHoldingButtonPage(inputName),
+    pageWith(
+        "",
+        `<p data-testid="${SHOWN}">${NOTHING_SHOWN}</p>
+         <form data-testid="${CLICKED_FORM}" aria-label="${FORM_LABEL}" style="padding:40px;border:1px solid">
+           <input name="${inputName}" aria-label="Named">
+           <button type="button" data-testid="${BUTTON_IN_THE_FORM}">${BUTTON_IN_THE_FORM_NAME}</button>
+         </form>`,
+        `document.querySelector('[data-testid="${BUTTON_IN_THE_FORM}"]').addEventListener('click', () => { ${show(`'${BUTTON_IN_THE_FORM_CLICKED}'`)} });`,
+    ),
+];
+const formWithSubmitRoute = (inputName: string): [string, FixtureRoute] => [
+    formWithSubmitPage(inputName),
+    pageWith(
+        "",
+        `<form><input name="${inputName}" data-testid="${FIELD}" aria-label="Named"><button type="submit">${FORM_SUBMIT_NAME}</button></form>`,
+    ),
+];
+
 const COVERING_FORM_ID = "covering-form";
 const coveringFormPage = (hiddenInputName: string, onCoverClick: string): FixtureRoute =>
     pageWith(
@@ -173,6 +231,9 @@ export const divIdentifiedAsPage = (id: string): string => `/div-identified-as-$
 export const DIALOG_ON_PRESS_PAGES = new Map<string, FixtureRoute>([
     ...[FORM_INPUT_NAME_HIDING_NOTHING, ...FORM_INPUT_NAMES_HIDING_A_LISTENER_METHOD].flatMap(
         formHoldingInputRoutes,
+    ),
+    ...[FORM_INPUT_NAME_HIDING_NOTHING, ...FORM_INPUT_NAMES_HIDING_WHAT_THE_DRIVER_READS].flatMap(
+        (inputName) => [formHoldingButtonRoute(inputName), formWithSubmitRoute(inputName)],
     ),
     ...FORM_INPUT_NAMES_HIDING_A_LISTENER_METHOD.map((id): [string, FixtureRoute] => [
         divIdentifiedAsPage(id),

@@ -1,7 +1,6 @@
 // One document's page in a fake session: what it does with an action on a page still open, and what
 // a driver refuses before it touches the page, by the same rules the real driver applies.
 import {
-    DRIVER_FEATURES,
     DriverErrorCode,
     failure,
     literalActionStep,
@@ -19,6 +18,7 @@ import {
     type DownloadStep,
     type DriverError,
     type ElementProbe,
+    type ElementsRead,
     type Locator,
     type ResolvedActionStep,
     type ResolvedElement,
@@ -27,7 +27,7 @@ import {
     type Secret,
 } from "@revisum/engine";
 
-export const FAKE_ELEMENT: ElementProbe = {
+export const FAKE_ELEMENT: ElementsRead = {
     count: 1,
     visible: true,
     enabled: true,
@@ -65,10 +65,6 @@ function elementFoundBy(locator: ResolvedLocator): ResolvedElement {
     }
 }
 
-export const NO_GUARD: DriverError = {
-    code: DriverErrorCode.PolicyDenied,
-    detail: "no runtime guard was given, so nothing can allow the action",
-};
 export const TAB_GONE: DriverError = {
     code: DriverErrorCode.NotFound,
     detail: "the tab has closed, so nothing on it can be found",
@@ -82,16 +78,8 @@ const DIALOG_HOLDS_PAGE: DriverError = {
     detail: "a dialog is open: a dialog step must answer it first",
 };
 
-const NOTHING_READ = {
-    visible: false,
-    enabled: false,
-    text: "",
-    value: null,
-    sensitive: false,
-    box: null,
-} as const;
-export const READ_FAILED: ElementProbe = { ...NOTHING_READ, count: UnreadablePage.ReadFailed };
-const DIALOG_HOLDS_PROBE: ElementProbe = { ...NOTHING_READ, count: UnreadablePage.DialogOpen };
+export const READ_FAILED: ElementProbe = { count: UnreadablePage.ReadFailed };
+const DIALOG_HOLDS_PROBE: ElementProbe = { count: UnreadablePage.DialogOpen };
 
 const isSecretMissing = (action: ResolvedActionStep, secret: Secret | undefined): boolean =>
     action.type === "fill" &&
@@ -106,7 +94,7 @@ export function performableAction(
     step: Exclude<ActionStep, DialogStep>,
     secret: Secret | undefined,
 ): Result<ResolvedActionStep, DriverError> {
-    const action = literalActionStep(step, DRIVER_FEATURES);
+    const action = literalActionStep(step);
     if (action === undefined) {
         return failure({
             code: DriverErrorCode.UnsupportedStep,
@@ -123,7 +111,7 @@ export function performableAction(
 }
 
 export function performableDownload(step: DownloadStep): Result<ResolvedLocator, DriverError> {
-    const locator = performableLocator(step.locator, DRIVER_FEATURES);
+    const locator = performableLocator(step.locator);
     return locator === undefined
         ? failure({
               code: DriverErrorCode.UnsupportedStep,
@@ -187,9 +175,6 @@ export function actOnOpenPage(
     guard: ActionGuard,
     secret: Secret | undefined,
 ): Result<void, DriverError> {
-    if (typeof guard !== "function") {
-        return failure(NO_GUARD);
-    }
     if (step.type === "dialog") {
         return answerDialog(page, step, guard);
     }
@@ -210,9 +195,6 @@ export function downloadOnOpenPage(
     maximumBytes: number,
     guard: ActionGuard,
 ): Result<DownloadedFile, DriverError> {
-    if (typeof guard !== "function") {
-        return failure(NO_GUARD);
-    }
     const locator = performableDownload(step);
     if (!locator.ok) {
         return locator;
@@ -239,7 +221,7 @@ export function downloadOnOpenPage(
 }
 
 export function probeOpenPage(page: FakePage, locator: Locator): ElementProbe {
-    if (performableLocator(locator, DRIVER_FEATURES) === undefined) {
+    if (performableLocator(locator) === undefined) {
         return READ_FAILED;
     }
     return page.dialogText === null ? FAKE_ELEMENT : DIALOG_HOLDS_PROBE;

@@ -117,7 +117,6 @@ const refusalAfterTheLastStep = (
         options: {
             read: [],
             beforePageRead: async (session) => {
-                assert.ok(session.runScript !== undefined, "the driver runs scripts");
                 await session.runScript({
                     source: `function () { fetch("${DATA_ASKED_FOR_AFTER_THE_LAST_STEP}").catch(() => undefined); return "asked"; }`,
                     arguments: {},

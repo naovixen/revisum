@@ -1,6 +1,7 @@
 // Proofs that the run's promises are structural or checked, not hoped for: replay, AI containment,
 // the logging manifest, redaction, no target substitution and deterministic release notes.
 import assert from 'node:assert/strict';
+import { readableProbe } from '#test-support/browser/ReadableProbe.ts';
 import { after, before, describe, test } from 'node:test';
 import { LOGGING_MANIFEST, LoggingManifestViolation, SENSITIVE_PLACEHOLDER, defaultRedactor, manifestLogger, planWithAi, releaseNoteDraft, runUntrusted, writeReleaseNotes, type Box, type BrowserDriver, type RunResult, type Step } from '@revisum/engine';
 import { allowEveryAction } from '#test-support/browser/AllowEveryAction.ts';
@@ -159,7 +160,7 @@ describe('(d) redaction by default', () => {
         for (const step of plan.steps.slice(1, 3) as Extract<Step, { type: 'fill' }>[]) {
           assert.ok((await session.act(step, allowEveryAction)).ok);
         }
-        const boxes = await Promise.all(plan.steps.slice(1, 3).map(async (step) => (await session.probe((step as Extract<Step, { type: 'fill' }>).locator)).box));
+        const boxes = await Promise.all(plan.steps.slice(1, 3).map(async (step) => readableProbe(await session.probe((step as Extract<Step, { type: 'fill' }>).locator)).box));
         const masked = await session.screenshot(redactor.selectors);
         const unmasked = await session.screenshot([]);
         for (const box of boxes) {

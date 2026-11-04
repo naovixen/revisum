@@ -7,7 +7,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, describe, test } from "node:test";
-import { leakScanner, sha256, type BrowserDriver } from "@revisum/engine";
+import { leakScanner, sha256 } from "@revisum/engine";
 import { echoPageDriver, holdsSecret } from "./echo-page-driver.ts";
 import {
     FAKE_TARGET,
@@ -157,17 +157,11 @@ async function rememberRun(
     fillValue: unknown,
 ): Promise<RememberRun> {
     const driver = echoPageDriver({ secretValues: { [SECRET]: value } });
-    // The echo page reads as a driver that remembers values does; without this a remember step is
-    // refused as unsupported, whatever it reads.
-    const remembering: BrowserDriver = {
-        ...driver,
-        info: { ...driver.info, performs: ["rememberedValues"] },
-    };
     const run = await runWithSecrets(
         [SECRET],
         planOf(rememberFrom(field, fillValue)),
         { [SECRET]: value },
-        remembering,
+        driver,
     );
     return { run, copiedInto: driver.fieldValues.get(`label:${OTHER_FIELD.label}`) };
 }

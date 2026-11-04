@@ -117,11 +117,11 @@ describe('a WebKit target that no registered adapter supports', () => {
   });
 });
 
-// ---- Device not supported ----------------------------------------------------------------------
+// ---- A device the adapter refuses ---------------------------------------------------------------
 
 const noMobileFirefox = (target: Target) =>
   (target.engine === 'firefox' && (target.device === 'phone-390' || target.device === 'tablet-820')
-    ? { reason: 'device-not-supported' as const, detail: 'this fake cannot emulate a mobile device in Firefox' } : null);
+    ? { reason: 'engine-not-supported' as const, detail: 'this fake cannot emulate a mobile device in Firefox' } : null);
 
 describe('a Firefox target with a phone profile', () => {
   const matrix = [
@@ -129,7 +129,7 @@ describe('a Firefox target with a phone profile', () => {
     targetInput('firefox-desktop', 'fake-firefox', 'firefox', 'desktop-1280'),
   ];
 
-  test('the run ends device-not-supported rather than running on desktop, and no other adapter is tried', async () => {
+  test('the run ends with the adapter\'s refusal rather than running on desktop, and no other adapter is tried', async () => {
     const project = projectWith(matrix);
     const named = targetDriver('fake-firefox', { refuse: noMobileFirefox });
     const substitute = targetDriver('fake-any');
@@ -138,7 +138,7 @@ describe('a Firefox target with a phone profile', () => {
       target: targetOf(project, 'firefox-phone'), drivers: new Map([['fake-firefox', named], ['fake-any', substitute]]),
     });
     assert.equal(ran.result.state, 'TargetUnavailable');
-    assert.equal(ran.result.unavailable?.reason, 'device-not-supported');
+    assert.equal(ran.result.unavailable?.reason, 'engine-not-supported');
     assert.equal(ran.result.targetId, 'firefox-phone');
     assert.equal(named.calls.count('supports'), 1, 'the named adapter was asked once');
     assert.equal(named.calls.count('open'), 0, 'nothing opened, on desktop or any other device');

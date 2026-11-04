@@ -146,10 +146,10 @@ function crashingBeforeFirstCheck(inner: OwnBrowserDriver) {
         }
         seen.endedRenderers = renderers.length;
         const deadline = Date.now() + CRASH_NOTICE_MILLISECONDS;
-        while (session.crashed?.() !== true && Date.now() < deadline) {
+        while (!session.crashed() && Date.now() < deadline) {
             await pause(CRASH_NOTICE_POLL_MILLISECONDS);
         }
-        seen.sawCrash = session.crashed?.() === true;
+        seen.sawCrash = session.crashed();
     };
     const driver = driverWith(inner, {
         open: async (target: Target, environment: SessionEnvironment) => {

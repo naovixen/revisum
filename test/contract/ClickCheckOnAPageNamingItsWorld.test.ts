@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import { after, before, describe, test } from "node:test";
 import { performableLocator, type DocumentSession } from "@revisum/engine";
 import { allowEveryAction } from "#test-support/browser/AllowEveryAction.ts";
+import { readableProbe } from "#test-support/browser/ReadableProbe.ts";
 import { BrowserTarget } from "#test-support/browser/BrowserTarget.ts";
 import { click, fill, press, testId, type JsonRecord } from "#test-support/browser/RawPlan.ts";
 import { shareBrowserInThisFile } from "#test-support/browser/ShareBrowserInThisFile.ts";
@@ -51,7 +52,7 @@ after(async () => {
 });
 
 const tallyIn = async (document: DocumentSession): Promise<string> =>
-    String((await document.probe(harness.locator(testId(TALLY)))).text);
+    readableProbe(await document.probe(harness.locator(testId(TALLY)))).text;
 
 const failureCodeOf = async (
     document: DocumentSession,
@@ -87,7 +88,6 @@ const onPage = async <Value>(
 };
 
 const enterFrameOf = async (document: DocumentSession): Promise<DocumentSession> => {
-    assert.ok(document.frame !== undefined, "the driver reaches frames");
     const located = performableLocator(harness.locator(testId(FRAME)));
     assert.ok(located !== undefined, "the frame's locator is literal");
     const inner = await document.frame(located);

@@ -79,11 +79,10 @@ describe("Using a run in a real browser", () => {
                     const session = opened.value;
                     try {
                         assert.ok((await session.navigate(harness.url(PAGE_READY))).ok);
-                        assert.ok(session.newTab !== undefined, "the driver opens tabs");
                         const tab = await session.newTab(harness.url(PAGE_NEVER_REACHED));
                         assert.ok(!tab.ok, "the tab's page does not load");
                         assert.match(
-                            (session.refusedRequestDecisions?.() ?? []).join(),
+                            session.refusedRequestDecisions().join(),
                             /this decision was refused/,
                         );
                         const next = await session.navigate(harness.url(PAGE_READY));

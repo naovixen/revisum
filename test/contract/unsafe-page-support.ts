@@ -17,10 +17,7 @@
 // every fixture page keeps (counting.js), so a test can show what a refused or denied step did not
 // send.
 //
-// The capability model is settled in the spec's "Page parts" bullet: a driver declares
-// structuralLocators, domChecks and pageScripts in AdapterInfo.performs, and both drivers declare
-// all three. A script's source is one function expression, called once with one object of named
-// JSON arguments.
+// A script's source is one function expression, called once with one object of named JSON arguments.
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { BrowserDriver } from "@revisum/engine";
@@ -43,10 +40,6 @@ const SCRIPT_CHECK_TIMEOUT_MILLISECONDS = 1000;
 const MAXIMUM_CALLS = 200;
 
 export const UNSAFE_PAGE_TARGETS = [BrowserTarget.Chrome] as const;
-
-// The features this spec adds to the driver capability model.
-export const PAGE_PART_FEATURES = ["structuralLocators", "domChecks", "pageScripts"] as const;
-export type PagePartFeature = (typeof PAGE_PART_FEATURES)[number];
 
 // The secret the leak page's token field is filled with.
 export const PAGE_SECRET = "PAGE_ACCESS_TOKEN";

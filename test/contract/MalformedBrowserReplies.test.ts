@@ -324,7 +324,6 @@ describe("Using the real browser driver", () => {
                             applies,
                             change,
                         });
-                        assert.ok(session.runScript !== undefined, "the driver runs scripts");
                         return session.runScript(scriptCall);
                     });
                     assert.ok(relayed.relay.timesTampered() > 0, "the reply was changed");

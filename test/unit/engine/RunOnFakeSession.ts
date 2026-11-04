@@ -1,5 +1,5 @@
 // A run on a session that needs no browser, for tests that decide what the page does at each call:
-// the session is typed to the real port, performs every optional feature and shows one element
+// the session is typed to the real port and shows one element
 // reading "Ready" until a test says otherwise. The plan goes through the real parser, policy gate
 // and run, under a virtual clock, so a check that waits out its timeout costs no real time.
 import assert from "node:assert/strict";
@@ -52,7 +52,13 @@ export const NO_ELEMENT: ElementProbe = { ...SHOWN_ELEMENT, count: 0, text: "", 
 // A session whose frames and tabs are the session itself, unless `changes` says otherwise.
 export const fakeSessionOnOrders = (changes: Partial<Session> = {}): Session =>
     fakeSession({
-        page: () => Promise.resolve({ url: `${ORIGIN}/orders`, title: "Orders" }),
+        page: () =>
+            Promise.resolve({
+                url: `${ORIGIN}/orders`,
+                title: "Orders",
+                meta: [],
+                canonicalUrl: null,
+            }),
         probe: () => Promise.resolve(SHOWN_ELEMENT),
         ...changes,
     });

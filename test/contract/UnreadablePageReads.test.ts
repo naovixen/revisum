@@ -66,7 +66,7 @@ const checkOf = (name: string, locator: JsonRecord, assertion: JsonRecord): Json
 
 async function waitUntilCrashNoticed(session: DriverSession): Promise<void> {
     const deadline = Date.now() + CRASH_NOTICE_MILLISECONDS;
-    while (session.crashed?.() !== true && Date.now() < deadline) {
+    while (!session.crashed() && Date.now() < deadline) {
         await pause(CRASH_NOTICE_POLL_MILLISECONDS);
     }
 }
@@ -126,14 +126,14 @@ describe("Using a run in a real browser", () => {
                         const navigating = session.navigate(waitingLong.url(SLOW_LOAD_PATH));
                         await asked;
                         const deadline = Date.now() + CRASH_NOTICE_MILLISECONDS;
-                        while (session.crashed?.() !== true && Date.now() < deadline) {
+                        while (!session.crashed() && Date.now() < deadline) {
                             for (const renderer of rendererProcesses(session.processId)) {
                                 endAtOnce(renderer.processId);
                             }
                             await pause(CRASH_NOTICE_POLL_MILLISECONDS);
                         }
                         const navigated = await navigating;
-                        assert.ok(session.crashed?.() === true, "the test crashed the page");
+                        assert.ok(session.crashed(), "the test crashed the page");
                         assert.equal(
                             navigated.ok ? "passed" : navigated.error.code,
                             "target-crashed",
@@ -153,10 +153,9 @@ describe("Using a run in a real browser", () => {
                 const session = await waitingLong.openOwn(TARGET);
                 try {
                     assert.ok((await session.navigate(waitingLong.url(NOTES_PATH))).ok);
-                    assert.ok(session.newTab !== undefined, "the session opens tabs");
                     endAtOnce(session.processId);
                     await waitUntilCrashNoticed(session);
-                    assert.ok(session.crashed?.() === true, "the session saw the browser die");
+                    assert.ok(session.crashed(), "the session saw the browser die");
                     const opened = await session.newTab(waitingLong.url(NOTES_PATH));
                     assert.equal(opened.ok ? "opened" : opened.error.code, "target-crashed");
                 } finally {

@@ -155,7 +155,7 @@ export const spyDriver = (): FakeDriver => fakeDriverNeverLaunching({ info: { id
 
 // A driver whose page accepts every action and shows one status element, so a run reaches its manifest.
 export const quietDriver = (): BrowserDriver =>
-  fakeDriverOpening(fakeSession({ page: () => Promise.resolve({ url: `${ORIGIN}/`, title: 'Fake' }) }), { info: { id: 'fake', version: '1.0', protocol: 'none' } });
+  fakeDriverOpening(fakeSession({ page: () => Promise.resolve({ url: `${ORIGIN}/`, title: 'Fake', meta: [], canonicalUrl: null }) }), { info: { id: 'fake', version: '1.0', protocol: 'none' } });
 
 // ---- Running a plan with a secret store ----------------------------------------------------------
 

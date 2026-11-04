@@ -198,7 +198,7 @@ export function spyExploreDriver(site: FakeSite): SpyExploreDriver {
     },
     async page() {
       calls.push({ method: 'page' });
-      return { url: current?.url ?? 'about:blank', title: current?.page.title ?? '' };
+      return { url: current?.url ?? 'about:blank', title: current?.page.title ?? '', meta: [], canonicalUrl: null };
     },
     async accessibilitySnapshot() {
       calls.push({ method: 'accessibilitySnapshot' });

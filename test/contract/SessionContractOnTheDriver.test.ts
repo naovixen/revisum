@@ -29,7 +29,7 @@ const scriptOpeningADialog = (text: string): string =>
 
 async function untilADialogIsOpen(session: Session): Promise<void> {
     const deadline = Date.now() + STEP_TIMEOUT_MILLISECONDS;
-    while (session.isDialogOpen?.() !== true) {
+    while (!session.isDialogOpen()) {
         assert.ok(Date.now() < deadline, "the page opens its dialog");
         await pause(DIALOG_POLL_MILLISECONDS);
     }
@@ -63,13 +63,13 @@ describe("Using the real driver as a session", () => {
             session,
             pageUrl,
             openDialog: async (text) => {
-                const ran = await session.runScript?.({
+                const ran = await session.runScript({
                     source: scriptOpeningADialog(text),
                     arguments: {},
                     timeoutMilliseconds: STEP_TIMEOUT_MILLISECONDS,
                     maximumResultBytes: 16,
                 });
-                assert.ok(ran?.ok === true, JSON.stringify(ran));
+                assert.ok(ran.ok, JSON.stringify(ran));
                 await untilADialogIsOpen(session);
             },
         };

@@ -9,10 +9,8 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import { outcomes } from '#test-support/browser/BrowserHarness.ts';
-import { ADAPTER_OF_TARGET } from '#test-support/browser/BrowserTarget.ts';
-import { listedFeatures } from '#test-support/browser/DriversWithout.ts';
 import { navigate, reference, testId, type JsonRecord } from '#test-support/browser/RawPlan.ts';
-import { UNSAFE_PAGE_TARGETS, check, css, rememberAttribute, unsafePageDrivers, unsafePageHarness, type UnsafePageHarness } from './unsafe-page-support.ts';
+import { UNSAFE_PAGE_TARGETS, check, css, rememberAttribute, unsafePageHarness, type UnsafePageHarness } from './unsafe-page-support.ts';
 import { shareBrowserInThisFile } from '#test-support/browser/ShareBrowserInThisFile.ts';
 
 shareBrowserInThisFile();
@@ -60,9 +58,7 @@ for (const targetId of UNSAFE_PAGE_TARGETS) {
       assert.deepEqual(outcomes(mismatched.result), [[0, 'passed', undefined], [1, 'failed', 'assertion-failed']], JSON.stringify(mismatched.result.steps));
     });
 
-    // A remember from an attribute also needs rememberedValues, which a driver may not declare.
-    const remembers = listedFeatures(unsafePageDrivers().get(ADAPTER_OF_TARGET[targetId])).includes('rememberedValues');
-    test('an attribute remembered from one twin passes attributeEquals on that twin and fails it on the other', { skip: !remembers }, async () => {
+    test('an attribute remembered from one twin passes attributeEquals on that twin and fails it on the other', async () => {
       const ran = await harness.runSteps(targetId, [
         navigate('/dom-checks.html'),
         rememberAttribute('sortOrder', testId('matching-sort'), 'aria-sort'),

@@ -42,7 +42,7 @@ function parsedPageAssertion(
     return step.assert;
 }
 
-const PAGE: PageProbe = { url: `${ORDERS_URL}/7?tab=items#top`, title: "Your  orders" };
+const PAGE: PageProbe = { url: `${ORDERS_URL}/7?tab=items#top`, title: "Your  orders", meta: [], canonicalUrl: null };
 const META_NAME = "og:title";
 const WITH_HEAD: PageProbe = {
     ...PAGE,

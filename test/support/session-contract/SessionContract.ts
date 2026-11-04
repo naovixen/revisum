@@ -3,7 +3,13 @@
 // session and one over the real driver, so the two cannot drift apart.
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { ClockAdvanceMode, success, type Result, type Session } from "@revisum/engine";
+import {
+    ClockAdvanceMode,
+    success,
+    type DocumentSession,
+    type Result,
+    type Session,
+} from "@revisum/engine";
 import { dialogContract } from "./DialogContract.ts";
 import { refusalsContract } from "./RefusalsContract.ts";
 import {
@@ -11,7 +17,6 @@ import {
     CLICK_EXPORT,
     EXPORT_BUTTON,
     HOLDING_A_VALUE,
-    NO_GUARD,
     actionStep,
     allowing,
     assertNothingRead,
@@ -31,67 +36,61 @@ const SCRIPT = {
     maximumResultBytes: 9,
 };
 
-type ResultCall = {
+type CallOn<Port> = {
     readonly name: string;
-    readonly call: (
-        session: Session,
-    ) => Promise<Result<unknown, { readonly code: string }> | undefined> | undefined;
+    readonly call: (port: Port) => Promise<Result<unknown, { readonly code: string }>>;
 };
 
 // Each thing a closed page's tab and session both answer with a result, and how to ask it.
-const PAGE_RESULT_CALLS = {
-    navigate: { name: "navigate", call: (session) => session.navigate("/") },
-    frame: { name: "frame", call: (session) => session.frame?.(locatorFindingNothing()) },
-    runScript: { name: "runScript", call: (session) => session.runScript?.(SCRIPT) },
-    storageRead: {
-        name: "storage.read",
-        call: (session) => session.storage?.read("local", firstOrigin(), "k"),
-    },
-    storageWrite: {
-        name: "storage.write",
-        call: (session) => session.storage?.write("local", firstOrigin(), "k", "v"),
-    },
-    storageRemove: {
-        name: "storage.remove",
-        call: (session) => session.storage?.remove("local", firstOrigin(), "k"),
-    },
-} as const satisfies Readonly<Record<string, ResultCall>>;
+const DOCUMENT_CALLS = {
+    navigate: { name: "navigate", call: (document) => document.navigate("/") },
+    frame: { name: "frame", call: (document) => document.frame(locatorFindingNothing()) },
+    runScript: { name: "runScript", call: (document) => document.runScript(SCRIPT) },
+} as const satisfies Readonly<Record<string, CallOn<DocumentSession>>>;
 
-const CRASH_ONLY_CALLS: readonly ResultCall[] = [
-    { name: "newTab", call: (session) => session.newTab?.("/") },
+// What only the session has, which a closed session answers with a crash.
+const SESSION_CALLS: readonly CallOn<Session>[] = [
+    { name: "storage.read", call: (session) => session.storage.read("local", firstOrigin(), "k") },
+    {
+        name: "storage.write",
+        call: (session) => session.storage.write("local", firstOrigin(), "k", "v"),
+    },
+    {
+        name: "storage.remove",
+        call: (session) => session.storage.remove("local", firstOrigin(), "k"),
+    },
+    { name: "newTab", call: (session) => session.newTab("/") },
     {
         name: "clock.advance",
-        call: (session) => session.clock?.advance(10, ClockAdvanceMode.RunTimers, 10),
+        call: (session) => session.clock.advance(10, ClockAdvanceMode.RunTimers, 10),
     },
-    { name: "clipboard.readText", call: (session) => session.clipboard?.readText(10) },
+    { name: "clipboard.readText", call: (session) => session.clipboard.readText(10) },
 ];
 
 const READS_THAT_THROW: readonly {
     readonly name: string;
-    readonly call: (session: Session) => Promise<unknown> | undefined;
+    readonly call: (document: DocumentSession) => Promise<unknown>;
 }[] = [
     { name: "page", call: (session) => session.page() },
     { name: "screenshot", call: (session) => session.screenshot([]) },
     {
         name: "screenshotHidingFields",
-        call: (session) => session.screenshotHidingFields?.([], [], () => false),
+        call: (session) => session.screenshotHidingFields([], [], () => false),
     },
     { name: "audit", call: (session) => session.audit() },
     { name: "accessibilitySnapshot", call: (session) => session.accessibilitySnapshot() },
-    { name: "linkTargets", call: (session) => session.linkTargets?.() },
+    { name: "linkTargets", call: (session) => session.linkTargets() },
 ];
 
-const CODES_ON_A_CLOSED_TAB: readonly (readonly [ResultCall, string])[] = [
-    [PAGE_RESULT_CALLS.navigate, "navigation-failed"],
-    [PAGE_RESULT_CALLS.frame, "not-found"],
-    [PAGE_RESULT_CALLS.runScript, "script-failed"],
-    [PAGE_RESULT_CALLS.storageRead, "not-actionable"],
-    [PAGE_RESULT_CALLS.storageWrite, "not-actionable"],
-    [PAGE_RESULT_CALLS.storageRemove, "not-actionable"],
+const CODES_ON_A_CLOSED_TAB: readonly (readonly [CallOn<DocumentSession>, string])[] = [
+    [DOCUMENT_CALLS.navigate, "navigation-failed"],
+    [DOCUMENT_CALLS.frame, "not-found"],
+    [DOCUMENT_CALLS.runScript, "script-failed"],
 ];
 
 function membersOfAClosedSession(open: OpenSessionUnderTest): void {
-    for (const { name, call } of [...Object.values(PAGE_RESULT_CALLS), ...CRASH_ONLY_CALLS]) {
+    const calls: readonly CallOn<Session>[] = [...Object.values(DOCUMENT_CALLS), ...SESSION_CALLS];
+    for (const { name, call } of calls) {
         describe(`when ${name} is asked`, () => {
             test("then it should answer target-crashed", async () => {
                 const { session } = await open();
@@ -123,20 +122,9 @@ function closedSessionContract(open: OpenSessionUnderTest): void {
                 const { guard, asked } = allowing();
                 const step = actionStep(CLICK_EXPORT);
                 assert.equal(failureCode(await session.act(step, guard)), "target-crashed");
-                const saved = await session.download?.(downloadStep(EXPORT_BUTTON), 100, guard);
+                const saved = await session.download(downloadStep(EXPORT_BUTTON), 100, guard);
                 assert.equal(failureCode(saved), "target-crashed");
                 assert.deepEqual(asked, []);
-            });
-        });
-
-        describe("when an action or a download is asked of it with no guard", () => {
-            test("then it should answer policy-denied, as ever", async () => {
-                const { session } = await open();
-                await session.close();
-                const step = actionStep(CLICK_EXPORT);
-                assert.equal(failureCode(await session.act(step, NO_GUARD)), "policy-denied");
-                const saved = await session.download?.(downloadStep(EXPORT_BUTTON), 100, NO_GUARD);
-                assert.equal(failureCode(saved), "policy-denied");
             });
         });
 
@@ -153,11 +141,11 @@ function closedSessionContract(open: OpenSessionUnderTest): void {
                 const { session } = await open();
                 await session.close();
                 assert.deepEqual(session.blockedOrigins(), []);
-                assert.deepEqual(session.connectionFailures?.(), []);
-                assert.deepEqual(session.refusedRequestDecisions?.(), []);
-                assert.equal(session.unsupportedOpenings?.(), 0);
-                assert.equal(session.isDialogOpen?.(), false);
-                assert.equal(session.crashed?.(), true);
+                assert.deepEqual(session.connectionFailures(), []);
+                assert.deepEqual(session.refusedRequestDecisions(), []);
+                assert.equal(session.unsupportedOpenings(), 0);
+                assert.equal(session.isDialogOpen(), false);
+                assert.equal(session.crashed(), true);
             });
         });
 
@@ -166,7 +154,7 @@ function closedSessionContract(open: OpenSessionUnderTest): void {
                 const { session } = await open();
                 await session.close();
                 await session.close();
-                assert.equal(session.crashed?.(), true);
+                assert.equal(session.crashed(), true);
             });
         });
     });
@@ -211,7 +199,7 @@ function closedTabContract(open: OpenSessionUnderTest): void {
                 const { guard, asked } = allowing();
                 assert.equal(failureCode(await tab.act(step, guard)), "not-found");
                 assert.deepEqual(asked, []);
-                assert.equal(tab.crashed?.(), false);
+                assert.equal(tab.crashed(), false);
                 assert.deepEqual(await subject.session.act(step, guard), success(undefined));
             });
         });
@@ -221,7 +209,7 @@ function closedTabContract(open: OpenSessionUnderTest): void {
                 const tab = await openTab(await open());
                 await tab.close();
                 const { guard } = allowing();
-                const saved = await tab.download?.(downloadStep(EXPORT_BUTTON), 100, guard);
+                const saved = await tab.download(downloadStep(EXPORT_BUTTON), 100, guard);
                 assert.equal(failureCode(saved), "not-found");
                 assert.equal(failureCode(await tab.act(actionStep(ACCEPT), guard)), "not-found");
             });
@@ -237,14 +225,25 @@ function closedTabContract(open: OpenSessionUnderTest): void {
             });
         });
 
+        describe("when the session's storage is read after it", () => {
+            test("then it should answer as it did before the tab closed", async () => {
+                const subject = await open();
+                const tab = await openTab(subject);
+                const readStorage = () => subject.session.storage.read("local", firstOrigin(), "k");
+                const before = await readStorage();
+                await tab.close();
+                assert.deepEqual(await readStorage(), before);
+            });
+        });
+
         describe("when the session closes after it", () => {
             test("then it should crash the session, and the tab answer as a closed tab still", async () => {
                 const subject = await open();
                 const tab = await openTab(subject);
                 await tab.close();
                 await subject.session.close();
-                assert.equal(subject.session.crashed?.(), true);
-                assert.equal(tab.crashed?.(), false);
+                assert.equal(subject.session.crashed(), true);
+                assert.equal(tab.crashed(), false);
                 const acted = await tab.act(actionStep(CLICK_EXPORT), allowing().guard);
                 assert.equal(failureCode(acted), "not-found");
             });
@@ -270,7 +269,7 @@ function openTabContract(open: OpenSessionUnderTest): void {
                 const acted = await tab.act(actionStep(CLICK_EXPORT), guard);
                 assert.equal(failureCode(acted), "target-crashed");
                 assert.deepEqual(asked, []);
-                assert.equal(tab.crashed?.(), true);
+                assert.equal(tab.crashed(), true);
                 assertNothingRead(await tab.probe(locatorOf(EXPORT_BUTTON)));
                 await assert.rejects(tab.page());
             });

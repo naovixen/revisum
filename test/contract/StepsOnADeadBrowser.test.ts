@@ -105,10 +105,10 @@ const endTheProcesses = (session: DriverSession, death: Death): void => {
 
 const untilTheSessionSeesTheDeath = async (session: DriverSession): Promise<boolean> => {
     const deadline = Date.now() + CRASH_NOTICE_MILLISECONDS;
-    while (session.crashed?.() !== true && Date.now() < deadline) {
+    while (!session.crashed() && Date.now() < deadline) {
         await pause(CRASH_NOTICE_POLL_MILLISECONDS);
     }
-    return session.crashed?.() === true;
+    return session.crashed();
 };
 
 // What a test replaces on the session, given the session and a way to kill it that waits until the
@@ -164,7 +164,7 @@ const dyingAsTheStepBegins: DyingMembers = ({ session, die }) => ({
     },
     download: async (step: DownloadStep, maximumBytes: number, guard: ActionGuard) => {
         await die();
-        return session.download?.(step, maximumBytes, guard);
+        return session.download(step, maximumBytes, guard);
     },
 });
 

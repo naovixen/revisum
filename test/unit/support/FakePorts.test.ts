@@ -54,7 +54,7 @@ import {
     projectWith,
 } from "../engine/run-value-examples.ts";
 
-const OPTIONAL_SESSION_MEMBERS: readonly (keyof Session)[] = [
+const PORT_MEMBERS: readonly (keyof Session)[] = [
     "screenshotHidingFields",
     "frame",
     "crashed",
@@ -93,11 +93,9 @@ const DANGER_ZONE_STEPS = [OPEN_ACCOUNT_PAGE, click(testId("danger-zone-action")
 describe("Using a fake port", () => {
     describe("given a fake session with nothing overridden", () => {
         describe("when a test asks what it offers", () => {
-            test("then it should offer every optional member of the port", () => {
+            test("then it should offer every member of the port", () => {
                 const session = fakeSession();
-                const missing = OPTIONAL_SESSION_MEMBERS.filter(
-                    (member) => !Object.hasOwn(session, member),
-                );
+                const missing = PORT_MEMBERS.filter((member) => !Object.hasOwn(session, member));
                 assert.deepEqual(missing, []);
             });
         });
@@ -113,8 +111,8 @@ describe("Using a fake port", () => {
         describe("when a new tab is opened", () => {
             test("then it should give a fake of its own, that notes the tab's calls apart", async () => {
                 const session = fakeSession();
-                const tab = await session.newTab?.("https://app.example/other");
-                assert.ok(tab?.ok === true);
+                const tab = await session.newTab("https://app.example/other");
+                assert.ok(tab.ok);
                 await tab.value.page();
                 assert.equal(session.calls.count("page"), 0);
                 const [openedTab] = session.openedTabs();
@@ -133,16 +131,6 @@ describe("Using a fake port", () => {
                 const session = fakeSession({ navigate: () => Promise.resolve(refused) });
                 assert.deepEqual(await session.navigate("https://app.example/"), refused);
                 assert.equal(session.calls.count("navigate"), 1);
-            });
-        });
-    });
-
-    describe("given a fake session without a member named by the test", () => {
-        describe("when a test asks what it offers", () => {
-            test("then it should lack that member and keep the others", () => {
-                const session = fakeSession({}, ["frame"]);
-                assert.equal(Object.hasOwn(session, "frame"), false);
-                assert.equal(Object.hasOwn(session, "newTab"), true);
             });
         });
     });

@@ -17,7 +17,7 @@ import {
 const DIALOG_TEXT = "Keep the draft?";
 const NO_ELEMENT = { role: null, name: null, box: null, formSubmitName: null, linkUrl: null };
 
-const isHeldByADialog = (session: Session): boolean | undefined => session.isDialogOpen?.();
+const isHeldByADialog = (session: Session): boolean => session.isDialogOpen();
 
 function answeringContract(open: OpenSessionUnderTest): void {
     describe("when a dialog step is acted on and the guard allows it", () => {

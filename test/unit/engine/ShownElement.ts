@@ -48,15 +48,7 @@ export const NOT_SHOWN: ReadElements = { ...SHOWN_ELEMENT, visible: false };
 export const DISABLED: ReadElements = { ...SHOWN_ELEMENT, enabled: false };
 export const NO_VALUE: ReadElements = { ...SHOWN_ELEMENT, value: null };
 export const REJECTED_SELECTOR: ReadElements = { ...NOTHING, selectorInvalid: true };
-export const unreadable = (count: UnreadablePage): ElementProbe => ({
-    count,
-    visible: false,
-    enabled: false,
-    text: "",
-    value: null,
-    sensitive: false,
-    box: null,
-});
+export const unreadable = (count: UnreadablePage): ElementProbe => ({ count });
 export const twoOf = (probe: ReadElements): ReadElements => ({ ...probe, count: 2 });
 export const statesOf = (states: Partial<AccessibleStates>): ElementProbe => ({
     ...SHOWN_ELEMENT,

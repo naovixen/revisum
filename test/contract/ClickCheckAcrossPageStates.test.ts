@@ -6,6 +6,7 @@ import assert from "node:assert/strict";
 import { after, before, describe, test } from "node:test";
 import { performableLocator, type DocumentSession, type DriverError } from "@revisum/engine";
 import { allowEveryAction } from "#test-support/browser/AllowEveryAction.ts";
+import { readableProbe } from "#test-support/browser/ReadableProbe.ts";
 import { BrowserTarget } from "#test-support/browser/BrowserTarget.ts";
 import { click, testId } from "#test-support/browser/RawPlan.ts";
 import { shareBrowserInThisFile } from "#test-support/browser/ShareBrowserInThisFile.ts";
@@ -178,7 +179,7 @@ const clickOutcomeIn = async (document: DocumentSession): Promise<ClickOutcome> 
     const acted = await document.act(clickOf(BUTTON), allowEveryAction);
     return {
         failureCode: acted.ok ? null : acted.error.code,
-        tally: (await document.probe(harness.locator(testId(TALLY)))).text,
+        tally: readableProbe(await document.probe(harness.locator(testId(TALLY)))).text,
     };
 };
 
@@ -200,7 +201,6 @@ const clickInFrame = async (
     try {
         const page = framing(framedPage);
         assert.ok((await session.navigate(harness.url(page))).ok, `${page} loads`);
-        assert.ok(session.frame !== undefined, "the driver reaches frames");
         const located = performableLocator(harness.locator(testId(FRAME)));
         assert.ok(located !== undefined, "the frame's locator is literal");
         const inner = await session.frame(located);
@@ -397,7 +397,9 @@ describe("Using the real browser driver", () => {
                         detail: "the page stopped the click before it reached the element",
                     };
                     assert.deepEqual(acted, { ok: false, error: expected });
-                    const shown = await session.probe(harness.locator(testId(TALLY)));
+                    const shown = readableProbe(
+                        await session.probe(harness.locator(testId(TALLY))),
+                    );
                     assert.equal(shown.text, "1", "the framework's own click reached the handler");
                 } finally {
                     await session.close();

@@ -76,7 +76,7 @@ function valueReferenceContract(open: OpenSessionUnderTest): void {
         test("then it should answer unsupported-step, having asked no guard", async () => {
             const { session } = await open();
             const { guard, asked } = allowing();
-            const saved = await session.download?.(downloadStep(HOLDING_A_VALUE), 100, guard);
+            const saved = await session.download(downloadStep(HOLDING_A_VALUE), 100, guard);
             assert.equal(failureCode(saved), "unsupported-step");
             assert.deepEqual(asked, []);
         });

@@ -2,8 +2,7 @@
 // checks, the link-target check, head metadata with a server-rendered view, the download and
 // expectDownload steps, and newTab, which only the top level of a plan may hold. What a browser
 // does with them (the state read from the accessibility tree, the head the server sent, the
-// downloaded file, the tab sharing the session) comes with the CDP driver; until then a run
-// reports these steps as unsupported-step (unsupported-page-checks.test.ts).
+// downloaded file, the tab sharing the session) is in the CDP driver's browser tests.
 import assert from 'node:assert/strict';
 import { arch, platform } from 'node:os';
 import { test } from 'node:test';
