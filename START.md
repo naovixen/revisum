@@ -29,7 +29,7 @@ Architecture refactor:
     - [x] Constant objects in `contracts`. Ticked as an exception the founder recorded (2026-11-04, `docs/decisions/decision-assessment.md`), with no `clear` verdict: 194 and 195 are fixed. 193 and 196 go to the phase 4 sweep, and 197 to the phase 5 docs.
     - [x] Foundation helpers. Two reviews, the second `not clear`; its findings are fixed under the founder's rule that reviews don't pause the work (`ada0438`), with no third review. 198 goes to the `RunResult` part, 199 to step tables and 200 to split `plan-parser`.
     - [x] One complete fake per port, and `fakePorts(overrides)` for the whole set. Two reviews, the second `not clear`; its findings are fixed under the founder's rule that reviews don't pause the work, with no third review. The same 54 tests now run over the fake session and the real driver. `npm run proofs` holds 718 tests in two summary blocks, 494 and 224.
-    - [ ] Driver port, with findings 14 and 59
+    - [x] Driver port, with findings 14 and 59. Two reviews, the second `not clear`. Its findings are fixed under the founder's rule that reviews don't pause the work (`7cf4d7f`, `dbb2648`, `f75ca15`), with no third review. One finding, row 236, was rejected as not a bug. Carried forward: 213 goes to the cleared run, 220, 221, 240 and 241 to split `cdp-driver`, and 204 waits for the founder. Browser suite at `f75ca15`: 1384 pass, 0 fail, 46 skip.
     - [ ] Cleared run, with the pipeline and preflight: the gate returns one value holding plan, project, target and standing; `baseUrl` is parsed; `act` and `probe` take resolved types, with the secret carried on the fill; the guarantee level is read at seal through a port
     - [ ] Step tables
     - [ ] Split `run`
