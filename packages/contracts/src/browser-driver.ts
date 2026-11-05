@@ -6,7 +6,7 @@ import type { NetworkPort, StoragePort } from './network-and-storage.ts';
 import { ScriptMode, type ActionStep, type DownloadStep, type Locator, type ResolvedLocator } from './plan.ts';
 import type { GuardVerdict } from './policy.ts';
 import type { Secret } from './secret.ts';
-import type { Result } from './result.ts';
+import { failure, success, type Result } from './result.ts';
 import type { AdapterId, Target } from './target.ts';
 
 // policy-denied: the policy gate's runtime guard refused the action, so no input event was sent.
@@ -30,7 +30,7 @@ import type { AdapterId, Target } from './target.ts';
 // script-failed: a page script threw, its promise rejected, or its source is not one function.
 // script-timeout: a page script did not settle within its timeout.
 // script-result-invalid: a page script's result is not JSON: undefined, a function, or a cyclic value.
-// page-unreadable: every read of the page threw until a check's timeout, so nothing is known of it.
+// page-unreadable: a read of the page threw or got no answer in time, so nothing is known of it.
 // dialog-open: a dialog holds the page, so a step could not act on it or read it. Only a dialog step can free it.
 export const DriverErrorCode = {
   NotFound: 'not-found',
@@ -67,6 +67,15 @@ export const UnreadablePage = {
   BrowserErrorPage: DriverErrorCode.NavigationFailed,
 } as const;
 export type UnreadablePage = (typeof UnreadablePage)[keyof typeof UnreadablePage];
+
+// Why a read of the whole page, its title, tree, links, audit or image, gave nothing.
+export const PageReadFailureCode = {
+  DialogOpen: DriverErrorCode.DialogOpen,
+  TargetCrashed: DriverErrorCode.TargetCrashed,
+  PageUnreadable: DriverErrorCode.PageUnreadable,
+} as const;
+export type PageReadFailureCode = (typeof PageReadFailureCode)[keyof typeof PageReadFailureCode];
+export type PageReadFailure = { readonly code: PageReadFailureCode; readonly detail: string };
 
 // Why a declared target cannot run. A driver explains a "no"; it never substitutes another target.
 // provider-unavailable: the cloud or device provider could not supply the target.
@@ -114,11 +123,14 @@ export type AccessibleStates = {
   readonly current: boolean | null;
 };
 
-// A read-only look at the element a locator matches. A count other than 1 means not found or
-// ambiguous. A count that is no number means the page could not be read: such a probe holds nothing
-// else, so no other field can be read until `typeof probe.count` has ruled that out.
-export type ElementProbe = ElementsRead | UnreadablePageProbe;
+// A read-only look at the element a locator matches. Only a read of exactly one element holds anything
+// of it. A count of 0 or several is not found or ambiguous. A count that is no number means the
+// locator could not be looked for at all, so a check of absence cannot pass on it.
+export type ElementProbe = ElementsRead | RejectedSelectorProbe | UnreadablePageProbe;
 
+// The browser rejects a CSS selector or XPath expression of the locator: nothing it could ever match,
+// so a check fails with selector-invalid rather than waiting.
+type RejectedSelectorProbe = { readonly count: typeof DriverErrorCode.SelectorInvalid };
 type UnreadablePageProbe = { readonly count: UnreadablePage };
 
 // A count of two or more. TypeScript has no type for "a number other than 1", so this brand is what
@@ -128,8 +140,15 @@ export const isSeveralElements = (count: number): count is SeveralElements => Nu
 
 export type ElementsRead = OneElementRead | NoSingleElementRead;
 
-export type OneElementRead = ElementFields & {
+export type OneElementRead = {
   readonly count: 1;
+  readonly visible: boolean;
+  readonly enabled: boolean;
+  readonly text: string;
+  readonly value: string | null;
+  // True when the element, an ancestor or a descendant matches a sensitive (personal data) selector.
+  readonly sensitive: boolean;
+  readonly box: Box | null;
   readonly states: AccessibleStates;
   // The absolute URL of the link the element is, or is in, resolved against the page's URL; null
   // when it is in no link.
@@ -139,23 +158,25 @@ export type OneElementRead = ElementFields & {
   readonly dom?: DomValue;
 };
 
-type NoSingleElementRead = ElementFields & { readonly count: 0 | SeveralElements };
+type NoSingleElementRead = { readonly count: 0 | SeveralElements };
 
 // `count === 1` alone can't narrow a read: the compiler counts a branded number as possibly 1.
 export const isOneElementRead = (read: ElementsRead): read is OneElementRead => read.count === 1;
 
-type ElementFields = {
-  readonly visible: boolean;
-  readonly enabled: boolean;
-  readonly text: string;
-  readonly value: string | null;
-  // True when the element, an ancestor or a descendant matches a sensitive (personal data) selector.
-  readonly sensitive: boolean;
-  readonly box: Box | null;
-  // True when the browser rejects a CSS selector or XPath expression of the locator: nothing it
-  // could ever match, so a check fails with selector-invalid rather than waiting.
-  readonly selectorInvalid?: true;
-};
+// Why a probe is no read of one element, as the code a check of that element fails with.
+export type NoOneElementCode = typeof DriverErrorCode.NotFound | typeof DriverErrorCode.Ambiguous | typeof DriverErrorCode.SelectorInvalid | UnreadablePage;
+
+// The one element a probe read, or why it read none: the one place that tells these apart.
+export function oneElementOf(probe: ElementProbe): Result<OneElementRead, NoOneElementCode> {
+  if (typeof probe.count === 'string') {
+    return failure(probe.count);
+  }
+  if (isOneElementRead(probe)) {
+    return success(probe);
+  }
+  return failure(probe.count === 0 ? DriverErrorCode.NotFound : DriverErrorCode.Ambiguous);
+}
+
 // What a probe reads of the element's DOM besides what it always reads: its class tokens, the
 // computed value of one style property (a lowercase css property name), or one attribute's value
 // (by its lowercase name).
@@ -262,7 +283,7 @@ export type SessionEnvironment = {
 export interface PageNavigator {
   // Without options, scripts run as usual.
   navigate(url: string, options?: NavigateOptions): Promise<Result<void, DriverError>>;
-  page(): Promise<PageProbe>;
+  page(): Promise<Result<PageProbe, PageReadFailure>>;
 }
 export interface ActionRunner {
   // The driver resolves the step's element, asks the guard with it, and acts only on an allow; on
@@ -297,18 +318,18 @@ export type PageScriptCall = {
 export interface Camera {
   // PNG bytes of the viewport, with every element matching `mask` painted solid black, so
   // personal data never reaches an image.
-  screenshot(mask: readonly string[]): Promise<Uint8Array>;
+  screenshot(mask: readonly string[]): Promise<Result<Uint8Array, PageReadFailure>>;
   // The same, with every element each of `fields` finds painted black too: the fields a secret was
   // typed into, which no selector need match. A field that finds nothing, in this document or one
   // it is framed in, gives not-found and no image, since what it holds may still be on screen; unless
   // the element typed into has gone and no field holds what `holdsSecret` says is a secret. A dialog
   // holding the page gives dialog-open, and a page that does not answer gives timeout, since neither is
-  // a field that cannot be hidden: only not-found means that.
+  // a field that cannot be hidden: only not-found means that. It fails too as a read of the page does.
   screenshotHidingFields(mask: readonly string[], fields: readonly ResolvedLocator[], holdsSecret: (text: string) => boolean): Promise<Result<Uint8Array, DriverError>>;
 }
 export interface Auditor {
-  audit(): Promise<readonly A11yFinding[]>;
-  accessibilitySnapshot(): Promise<A11yNode>;
+  audit(): Promise<Result<readonly A11yFinding[], PageReadFailure>>;
+  accessibilitySnapshot(): Promise<Result<A11yNode, PageReadFailure>>;
 }
 
 // The ports one document of a session's page offers: the top document, or an iframe's document
@@ -317,12 +338,12 @@ export interface DocumentSession extends PageNavigator, ActionRunner, Prober, Ca
   // The document of the one iframe the locator finds, waited for as an action waits for its
   // element. Steps given to it act and check inside that frame only.
   frame(locator: ResolvedLocator): Promise<Result<DocumentSession, DriverError>>;
-  // True once the page's renderer or browser has died, or the connection to it has closed. A check
-  // on a crashed page then fails with target-crashed rather than waiting out its timeout, whatever
-  // its last read saw.
+  // True once the page's renderer or browser has died, or the connection to it has closed. A failed
+  // read of the page says target-crashed by itself. This is for what no failure says: a read that
+  // succeeded on a page dying as it answered, a probe (which has no count for a crash), and a throw
+  // from anything else. A check on a crashed page then fails with target-crashed rather than waiting
+  // out its timeout, whatever its last read saw.
   crashed(): boolean;
-  // True while a dialog holds the page, so whatever cannot read the page says dialog-open.
-  isDialogOpen(): boolean;
   // How many popups, second pages and downloads no step asked for the page has started so far. One
   // that starts during a step fails it with unsupported-step, whatever the step was doing.
   unsupportedOpenings(): number;
@@ -339,7 +360,7 @@ export interface DocumentSession extends PageNavigator, ActionRunner, Prober, Ca
   runScript(call: PageScriptCall): Promise<Result<string, DriverError>>;
   // The absolute URLs of this document's links (a and area elements with an href), in document
   // order, as the browser resolves them. A read only: nothing on the page is touched.
-  linkTargets(): Promise<readonly string[]>;
+  linkTargets(): Promise<Result<readonly string[], PageReadFailure>>;
 }
 
 // A second tab of a session. Steps run in its document as in any other; it opens no tab of its own,

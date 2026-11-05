@@ -20,7 +20,7 @@ import {
 import { buildEgressPolicy } from '@revisum/runner';
 
 // Why a crawl stopped, as the command reports it.
-// target-unavailable: the browser did not open, or its sessions cannot list link targets.
+// target-unavailable: the browser did not open.
 // plan-rejected: the --after plan did not pass, so the pages would not be the signed-in ones.
 export type CrawlStop =
   | 'explore-origin-refused' | 'explore-start-unreachable' | 'explore-runner-unavailable' | 'target-unavailable' | 'plan-rejected';

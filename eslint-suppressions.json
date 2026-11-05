@@ -54,7 +54,7 @@
       "count": 4
     },
     "@typescript-eslint/strict-boolean-expressions": {
-      "count": 16
+      "count": 12
     },
     "curly": {
       "count": 32
@@ -135,9 +135,6 @@
     }
   },
   "packages/auditor-act/src/tab-walk.ts": {
-    "@typescript-eslint/strict-boolean-expressions": {
-      "count": 2
-    },
     "curly": {
       "count": 5
     },
@@ -389,7 +386,7 @@
       "count": 2
     },
     "curly": {
-      "count": 45
+      "count": 44
     },
     "max-lines": {
       "count": 1
@@ -414,7 +411,7 @@
   },
   "packages/driver-cdp/src/cdp-driver.ts": {
     "@typescript-eslint/naming-convention": {
-      "count": 3
+      "count": 2
     },
     "@typescript-eslint/no-base-to-string": {
       "count": 1
@@ -693,7 +690,7 @@
   },
   "packages/engine/src/drafting/site-crawl.ts": {
     "@typescript-eslint/naming-convention": {
-      "count": 2
+      "count": 1
     },
     "curly": {
       "count": 5
@@ -866,7 +863,7 @@
       "count": 3
     },
     "curly": {
-      "count": 8
+      "count": 6
     },
     "revisum/file-name-matches-export": {
       "count": 1
@@ -1192,7 +1189,7 @@
       "count": 6
     },
     "curly": {
-      "count": 60
+      "count": 52
     },
     "max-lines": {
       "count": 1

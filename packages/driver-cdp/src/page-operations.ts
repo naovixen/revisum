@@ -8,7 +8,6 @@ import type { PressCheck, PressSent } from './HitChecks.ts';
 import type { HeldModifierKey } from './modifier-keys.ts';
 
 export type Point = { readonly x: number; readonly y: number };
-type ProtocolId = 'cdp' | 'webdriver-bidi' | 'webdriver-classic';
 
 // An element handle wrapped so that it can never be mistaken for a string argument.
 type ElementArgument<Handle> = { readonly element: Handle };
@@ -18,9 +17,6 @@ export type PageFunction = (...inputs: never[]) => unknown;
 
 // What a session needs from one page, in protocol terms. Handle is the protocol's element handle.
 export interface PageOperations<Handle> {
-  readonly protocol: ProtocolId;
-  // Where accessibilityTree() comes from, for notes in the manifest.
-  readonly accessibilityTreeSource: 'browser' | 'in-page-approximation';
   // With scripts 'disabled', the page loads with script execution off until the next navigate.
   // Reads go through a script world of the driver's own either way, which the page's scripts can
   // neither see nor patch, and where the driver's own reads still run.
@@ -71,7 +67,7 @@ export interface PageInput<Handle> {
   // Moves the pointer to the point, in this document's viewport, then presses and releases there unless
   // the aim has gone stale: `centreOfElementNow`, or where this document sits in the top viewport, no longer
   // agrees with the point. Says how far it got before a dialog or a stale aim stopped it.
-  click(element: Handle, at: Point, centreOfElementNow: () => Promise<Point | null>): Promise<PressSent>;
+  click(at: Point, centreOfElementNow: () => Promise<Point | null>): Promise<PressSent>;
   hover(at: Point): Promise<void>;
   // Inserts the text as typed text, line feeds included, with no key press for them.
   fill(element: Handle, value: string): Promise<void>;

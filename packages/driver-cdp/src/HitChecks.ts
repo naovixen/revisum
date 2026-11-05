@@ -370,7 +370,7 @@ export function hitChecks<Handle>(page: PageWithInput<Handle>): HitChecks<Handle
                 if (listening.kind !== "answered") {
                     throw new Error("the press's check could not listen for it");
                 }
-                const sent = await page.click(element, at, () => centreOfElementIn(check));
+                const sent = await page.click(at, () => centreOfElementIn(check));
                 if (sent === PressSent.NotSent) {
                     await disarmUnpressed(check);
                     return HitCheckOutcome.MovedBeforeThePress;

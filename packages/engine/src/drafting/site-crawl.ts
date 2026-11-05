@@ -8,11 +8,14 @@
 // de-duplicated against every path already seen, and queued in sorted order, so the same site gives
 // the same map whatever order its links come in. Pages are opened at origin plus path. A page other
 // than the start page that does not load is left out and not counted; a start page that does not
-// load stops the crawl. `truncated` says whether a page on the start origin was left unvisited
-// because of maximumPages or maximumDepth.
+// load stops the crawl. A page that loaded and then cannot be read, because a dialog holds it, the
+// browser has died or it does not answer, is treated the same, with nothing of it kept, and the map
+// then says it is truncated: unlike a page that never loaded, this one is there and the map lacks
+// it, and its links with it. The next navigate ends any dialog. `truncated` also says whether a page
+// on the start origin was left unvisited because of maximumPages or maximumDepth.
 import {
   failure, success,
-  type CrawlErrorCode, type ExploreDriver, type ExploreOptions, type Origin, type PageMap, type PageMapEntry, type Redactor, type Result,
+  type A11yNode, type CrawlErrorCode, type ExploreDriver, type ExploreOptions, type Origin, type PageMap, type PageMapEntry, type PageReadFailure, type Redactor, type Result,
 } from '@revisum/contracts';
 import { defaultRedactor } from '../redaction.ts';
 import { MAXIMUM_EXPLORE_DEPTH, MAXIMUM_EXPLORE_PAGES, pageMapEntry } from './page-map.ts';
@@ -67,6 +70,28 @@ function sameOriginPath(target: string, origin: Origin): string | undefined {
 }
 
 type Queued = { readonly path: string; readonly depth: number };
+type LoadedPage = { readonly title: string; readonly tree: A11yNode; readonly linkTargets: readonly string[] };
+
+// What a crawl keeps of the page it has loaded, all of it or none; undefined for a redirect off the
+// origin, which counts as a page that did not load and is read no further.
+async function readLoadedPage(driver: ExploreDriver, origin: Origin): Promise<Result<LoadedPage | undefined, PageReadFailure>> {
+  const shown = await driver.page();
+  if (!shown.ok) {
+    return shown;
+  }
+  if (sameOriginPath(shown.value.url, origin) === undefined) {
+    return success(undefined);
+  }
+  const tree = await driver.accessibilitySnapshot();
+  if (!tree.ok) {
+    return tree;
+  }
+  const linkTargets = await driver.linkTargets();
+  if (!linkTargets.ok) {
+    return linkTargets;
+  }
+  return success({ title: shown.value.title, tree: tree.value, linkTargets: linkTargets.value });
+}
 
 export async function crawlSite(
   driver: ExploreDriver, project: CrawlProject, options: ExploreOptions, redactor: Redactor = defaultRedactor(),
@@ -87,17 +112,15 @@ export async function crawlSite(
   for (let next = queue.shift(); next !== undefined; next = queue.shift()) {
     if (pages.length >= maximumPages) { truncated = true; break; }
     const url = `${origin}${next.path}`;
-    const loaded = await loadedInTime(driver, url, pageTimeout);
-    // A redirect off the start origin counts as a page that did not load.
-    const shown = loaded ? await driver.page() : undefined;
-    if (shown === undefined || sameOriginPath(shown.url, origin) === undefined) {
+    const read = await loadedInTime(driver, url, pageTimeout) ? await readLoadedPage(driver, origin) : success(undefined);
+    if (!read.ok || read.value === undefined) {
       if (next.depth === 0) return failure({ code: 'explore-start-unreachable' });
+      truncated ||= !read.ok;
       continue;
     }
-    const tree = await driver.accessibilitySnapshot();
-    pages.push(pageMapEntry(tree, url, shown.title, next.depth, redactor));
+    pages.push(pageMapEntry(read.value.tree, url, read.value.title, next.depth, redactor));
     const found = new Set<string>();
-    for (const target of await driver.linkTargets()) {
+    for (const target of read.value.linkTargets) {
       const path = sameOriginPath(target, origin);
       if (path !== undefined && !seen.has(path)) found.add(path);
     }

@@ -563,8 +563,6 @@ function frameIdsInside(tree: FrameTree, frameId: string): readonly string[] {
 // PageOperations over one flat CDP session, for its top document or one of its iframes' documents.
 // Element handles are remote object ids.
 class CdpPage implements PageWithInput<string> {
-  readonly protocol = 'cdp' as const;
-  readonly accessibilityTreeSource = 'browser' as const;
   readonly #connection: CdpConnection;
   readonly #sessionId: string;
   readonly #watch: PageWatch;
@@ -974,7 +972,7 @@ class CdpPage implements PageWithInput<string> {
     return listeners.some((listener) => PRESS_EVENT.test(listener.type));
   }
 
-  async click(_element: string, at: Point, centreOfElementNow: () => Promise<Point | null>): Promise<PressSent> {
+  async click(at: Point, centreOfElementNow: () => Promise<Point | null>): Promise<PressSent> {
     const offset = await this.#viewportOffset();
     const point = { x: at.x + offset.x, y: at.y + offset.y };
     const pressed = { ...point, button: 'left' as const, clickCount: 1 };

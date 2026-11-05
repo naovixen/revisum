@@ -71,7 +71,7 @@ export async function tabWalk(page: PageDriver, snapshot: PageSnapshot, options:
     await page.pressKey('Tab');
     walk.steps++;
     const active = await page.activeElement();
-    if (!active) { walk.endedAtDocument = true; break; }
+    if (active === null) { walk.endedAtDocument = true; break; }
     let index = indexByBackend.get(active.backendId) ?? seenBackend.get(active.backendId);
     if (index === undefined) {
       index = createdLater--;
@@ -80,7 +80,7 @@ export async function tabWalk(page: PageDriver, snapshot: PageSnapshot, options:
     walk.visits.push(index);
     if (walk.sequence.includes(index)) continue;
     walk.sequence.push(index);
-    if (active.box) walk.boxes.set(index, active.box);
+    if (active.box !== null) walk.boxes.set(index, active.box);
     await page.evaluate(HOLD_FOCUSED_ELEMENT);
     if (options.occlusion) {
       walk.obscured.set(index, decodeOcclusion(await page.evaluate(MEASURE_OCCLUSION)));

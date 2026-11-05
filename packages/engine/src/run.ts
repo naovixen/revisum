@@ -7,9 +7,9 @@
 // through its clock and clipboard ports; page scripts through its script port. Database commands
 // go through the run's DatabaseCommandRunner port, which runs each in a workload container.
 import {
-  failure, isElementCheckNoDriverDecides, isOneElementRead, stepFailed, StepCode, success, UnreadablePage,
+  failure, isElementCheckNoDriverDecides, isOneElementRead, oneElementOf, PageReadFailureCode, stepFailed, StepCode, success, UnreadablePage,
   type A11yFinding, type ActionGuard, type AppliedRewrite, type ApprovalLabel, type ArtifactReference, type ArtifactStore, type Authorised,
-  type BrowserDriver, type Clock, type DatabaseCommandRunner, type DocumentSession, type DomRead, type DownloadedFile, type DownloadName, type DriverError, type ElementsRead, type RememberedElementSource, type LockEntry, type DialogStep, type ElementProbe,
+  type BrowserDriver, type Clock, type DatabaseCommandRunner, type DocumentSession, type DomRead, type DownloadedFile, type DownloadName, type DriverError, type OneElementRead, type PageReadFailure, type RememberedElementSource, type LockEntry, type DialogStep, type ElementProbe,
   type EventSink, type GuaranteeLevel, type GuardVerdict, type PageAssertion, type Plan, type PolicyRuleId, type Redactor,
   type DownloadStep, type StepOutcome, type ResolvedElement, type ResolvedLocator, type Result, type SafeText, type SecretStore, type ServiceCaller, type Session, type Step, type Target, type TargetId,
   type Unavailable, type ValueName, type GuaranteeStatement, type RunMode, type SuiteFinding, type SuiteName, type SuitePass,
@@ -685,19 +685,22 @@ const failedStep = (step: Step, index: number, code: StepCode): StepResult => ({
 
 const hasARefusedDecision = (context: StepContext): boolean => context.session.refusedRequestDecisions().length > 0;
 
-function adapterFailureCode(session: DocumentSession): StepCode {
-  if (session.crashed()) {
-    return TARGET_CRASHED;
-  }
-  return session.isDialogOpen() ? UnreadablePage.DialogOpen : ADAPTER_ERROR;
-}
-
-// The code for something that threw, whose text goes only to the log, which redacts it. A throw from
-// a dead page is the crash, and one from a page a dialog holds is that dialog.
+// The code for something that threw, whose text goes only to the log, which redacts it. A read of the
+// page says what stopped it and never throws, but a throw from anything else cannot say the page died.
 function codeForThrow(error: unknown, session: DocumentSession, logger: Logger): StepCode {
-  const code = adapterFailureCode(session);
+  const code = session.crashed() ? TARGET_CRASHED : ADAPTER_ERROR;
   logger.log({ kind: 'step.end', outcome: 'failed', code, detail: errorText(error) });
   return code;
+}
+
+// A dialog and a crash are the page's to answer for. A read that gave nothing for any other reason is
+// the adapter's: its text goes only to the log, which redacts it.
+function codeOfFailedRead(readFailure: DriverError, logger: Logger): StepCode {
+  if (readFailure.code !== PageReadFailureCode.PageUnreadable) {
+    return readFailure.code;
+  }
+  logger.log({ kind: 'step.end', outcome: 'failed', code: ADAPTER_ERROR, detail: readFailure.detail });
+  return ADAPTER_ERROR;
 }
 
 // The requests the plan checks are observed from its start, so what a page sends as it loads counts
@@ -1002,16 +1005,25 @@ async function executeStep(step: Step, index: number, session: DocumentSession, 
       let title = '';
       const verdict = await poll(context, session, async () => {
         const page = await session.page();
-        title = page.title;
-        return checkPage(assertion.value, page, context.inputs.baseUrl);
+        if (!page.ok) {
+          return verdictOfFailedRead(page.error, context.logger);
+        }
+        title = page.value.title;
+        return checkPage(assertion.value, page.value, context.inputs.baseUrl);
       });
-      if (verdict.code === TARGET_CRASHED) return { ...base, ...stepFailed(TARGET_CRASHED) };
+      if (verdict.code === TARGET_CRASHED || verdict.code === ADAPTER_ERROR) {
+        return { ...base, ...stepFailed(verdict.code) };
+      }
       return verdict.pass
         ? { ...base, outcome: 'passed' }
         : { ...base, ...stepFailed(verdict.code ?? StepCode.AssertionFailed), observed: context.isShortSecret(title) ? SECRET_PLACEHOLDER : context.redactor.text(title) };
     }
     case 'a11yAudit': {
-      const findings = [...(await session.audit())].sort(byRuleId);
+      const audited = await session.audit();
+      if (!audited.ok) {
+        return { ...base, ...stepFailed(codeOfFailedRead(audited.error, context.logger)) };
+      }
+      const findings = [...audited.value].sort(byRuleId);
       context.logger.log({ kind: 'audit', stepIndex: index, findings: findings.length });
       const gateFails = step.mode === 'gate' && findings.length > 0;
       return { ...base, outcome: gateFails ? 'failed' : 'passed', findings, ...(gateFails ? { code: StepCode.AccessibilityViolations } : {}) };
@@ -1028,7 +1040,7 @@ async function executeStep(step: Step, index: number, session: DocumentSession, 
       if (!taken.ok) {
         return taken.error.code === StepCode.NotFound
           ? { ...base, outcome: 'passed', code: StepCode.CaptureLeftOut }
-          : { ...base, ...stepFailed(taken.error.code) };
+          : { ...base, ...stepFailed(codeOfFailedRead(taken.error, context.logger)) };
       }
       const reference = await context.ports.artifacts.put(`${target.id}/${step.name}.png`, taken.value, 'image/png');
       context.logger.log({ kind: 'artifact', stepIndex: index, artifact: reference.name, sha256: reference.sha256 });
@@ -1051,7 +1063,7 @@ async function pixelsWithSecretsHidden(session: DocumentSession, context: RunCon
   const selectors = context.ports.redactor.selectors;
   const fields = [...context.secretFilledFields.values()];
   if (fields.length === 0) {
-    return success(await session.screenshot(selectors));
+    return session.screenshot(selectors);
   }
   return session.screenshotHidingFields(selectors, fields, context.holdsSecret);
 }
@@ -1073,20 +1085,20 @@ async function rememberFromPage(
     return { ...base, ...stepFailed(StepCode.ValueHoldsSecret) };
   }
   const read: DomRead | undefined = from.read === 'attribute' ? { kind: 'attribute', name: from.attribute } : undefined;
-  const textOf = (probe: ElementsRead): string => {
-    if (from.read === 'attribute') return isOneElementRead(probe) && probe.dom?.kind === 'attribute' ? probe.dom.value ?? '' : '';
-    return normalise(from.read === 'value' ? probe.value ?? '' : probe.text);
+  const textOf = (element: OneElementRead): string => {
+    if (from.read === 'attribute') {
+      return element.dom?.kind === 'attribute' ? element.dom.value ?? '' : '';
+    }
+    return normalise(from.read === 'value' ? element.value ?? '' : element.text);
   };
   const seen = { text: '' };
   const verdict = await poll(context, session, async (): Promise<Verdict> => {
     const probe = read === undefined ? await session.probe(locator.value) : await session.probe(locator.value, read);
-    if (typeof probe.count === 'string') {
-      return { pass: false, code: probe.count };
+    const found = oneElementOf(probe);
+    if (!found.ok) {
+      return { pass: false, code: found.error };
     }
-    if (probe.selectorInvalid === true) return { pass: false, code: 'selector-invalid' };
-    if (probe.count === 0) return { pass: false, code: 'not-found' };
-    if (probe.count > 1) return { pass: false, code: 'ambiguous' };
-    seen.text = textOf(probe);
+    seen.text = textOf(found.value);
     return seen.text === '' ? { pass: false, code: null } : { pass: true, code: null };
   });
   if (verdict.code === TARGET_CRASHED || verdict.code === 'not-found' || verdict.code === 'ambiguous' || verdict.code === 'selector-invalid'
@@ -1225,32 +1237,33 @@ function guardFor(step: Step, index: number, target: Target, context: RunContext
 }
 
 const TARGET_CRASHED = StepCode.TargetCrashed;
-// A check's verdict, or the page's renderer died while the check waited.
-type PollVerdict = Verdict | { readonly pass: false; readonly code: typeof TARGET_CRASHED };
+// A check's verdict, or the page's renderer died while the check waited, or a read of the page failed
+// for a reason that is the adapter's.
+type PollVerdict = Verdict | { readonly pass: false; readonly code: typeof TARGET_CRASHED | typeof ADAPTER_ERROR };
+
+function verdictOfFailedRead(readFailure: PageReadFailure, logger: Logger): PollVerdict {
+  switch (readFailure.code) {
+    case PageReadFailureCode.DialogOpen: return { pass: false, code: UnreadablePage.DialogOpen };
+    case PageReadFailureCode.TargetCrashed: return { pass: false, code: TARGET_CRASHED };
+    case PageReadFailureCode.PageUnreadable:
+      logger.log({ kind: 'step.end', outcome: 'failed', code: ADAPTER_ERROR, detail: readFailure.detail });
+      return { pass: false, code: ADAPTER_ERROR };
+  }
+}
 
 // Repeats a check until it passes or the step timeout runs out. A page that crashes stops the
-// wait at once: nothing on it can change any more. A read that threw is tried again, since the page
-// may be between two documents.
-async function poll(context: RunContext, session: DocumentSession, check: () => Promise<Verdict>): Promise<PollVerdict> {
+// wait at once: nothing on it can change any more, and the same goes for a read of the page that failed.
+async function poll(context: RunContext, session: DocumentSession, check: () => Promise<PollVerdict>): Promise<PollVerdict> {
   const deadline = context.ports.clock.now() + context.inputs.project.limits.stepTimeoutMilliseconds;
   for (;;) {
-    let verdict: Verdict;
-    try {
-      verdict = await check();
-    } catch (error) {
-      // A read that failed because the page died is the crash, and one a dialog stopped is that
-      // dialog; any other failure is the adapter's.
-      if (session.crashed()) return { pass: false, code: TARGET_CRASHED };
-      if (session.isDialogOpen()) {
-        return { pass: false, code: UnreadablePage.DialogOpen };
-      }
-      throw error;
-    }
-    // Looked at before a pass is accepted: what a dying page last showed proves nothing.
+    const verdict = await check();
+    // Looked at before a pass is accepted: what a dying page last showed proves nothing. A probe has no
+    // count for a crash either, so one that read nothing on a dead page is told apart here.
     if (session.crashed()) return { pass: false, code: TARGET_CRASHED };
     // Waiting cannot change a selector the browser rejects, a dialog, which only a later step can
-    // answer, or the browser's own error page, which runs no script that could leave it.
-    if (verdict.pass || verdict.code === 'selector-invalid' || verdict.code === UnreadablePage.DialogOpen || verdict.code === 'navigation-failed') return verdict;
+    // answer, the browser's own error page, which runs no script that could leave it, or a read that failed.
+    if (verdict.pass || verdict.code === 'selector-invalid' || verdict.code === UnreadablePage.DialogOpen || verdict.code === 'navigation-failed'
+      || verdict.code === TARGET_CRASHED || verdict.code === ADAPTER_ERROR) return verdict;
     if (context.ports.clock.now() >= deadline) return verdict;
     await context.ports.clock.sleep(POLL_INTERVAL_MILLISECONDS);
   }
@@ -1265,11 +1278,15 @@ const UNREADABLE_PAGE_OBSERVATIONS = {
 // What a failed check saw, redacted: never the text of a sensitive element, nothing read from a
 // field a secret was typed into, and no text that is a whole short secret.
 function observe(probe: ElementProbe | null, context: RunContext, filledFromSecret: boolean): string {
-  if (probe === null || probe.count === 0) return '(no element)';
+  if (probe === null || probe.count === 0 || probe.count === 'selector-invalid') {
+    return '(no element)';
+  }
   if (typeof probe.count === 'string') {
     return UNREADABLE_PAGE_OBSERVATIONS[probe.count];
   }
-  if (probe.count > 1) return `(${probe.count} elements)`;
+  if (!isOneElementRead(probe)) {
+    return `(${probe.count} elements)`;
+  }
   if (probe.sensitive) return SENSITIVE_PLACEHOLDER;
   const asWritten = probe.value ?? probe.text;
   if (filledFromSecret || context.isShortSecret(asWritten)) return SECRET_PLACEHOLDER;

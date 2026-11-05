@@ -4,7 +4,7 @@ import { isDeepStrictEqual } from 'node:util';
 import {
   DEFAULT_TEST_ID_ATTRIBUTE, failure, isSeveralElements, literalActionStep, literalText, performableLocator, reveal, success,
   type ActionGuard, type ActionStep, type BrowserRequestRecord, type DialogStep, type DocumentSession, type DomRead, type DomValue, type DownloadedFile,
-  type DownloadStep, type DriverError, type ElementProbe, type Locator, type OneElementRead, type PageScriptCall, type PageMetaTag, type PageProbe, type Position, type ResolvedActionStep,
+  type DownloadStep, type DriverError, type ElementProbe, type Locator, type OneElementRead, type PageScriptCall, type PageMetaTag, type PageProbe, type PageReadFailure, type Position, type ResolvedActionStep,
   type ClipboardPort, type ClockPort, type DriverErrorCode, type GuardVerdict, type NetworkPort, type ResolvedElement, type ResolvedLocator, type Result, type Secret, type SessionEnvironment, type SessionTab, type StoragePort,
   UnreadablePage,
 } from '@revisum/contracts';
@@ -22,7 +22,8 @@ import { ElementEnabledState, SelectOutcome, type Actionability, type DownloadCa
 import { PageHeldByDialog } from './PageHeldByDialog.ts';
 import type { ConnectionFailure } from './SessionEgress.ts';
 
-const NOTHING_READ = { visible: false, enabled: false, text: '', value: null, sensitive: false, box: null } as const;
+const REJECTED_SELECTOR: ElementProbe = { count: 'selector-invalid' };
+const NOTHING_MATCHES: ElementProbe = { count: 0 };
 const READ_FAILED: ElementProbe = { count: UnreadablePage.ReadFailed };
 const DIALOG_HOLDS_PAGE: ElementProbe = { count: UnreadablePage.DialogOpen };
 const ON_BROWSER_ERROR_PAGE: ElementProbe = { count: UnreadablePage.BrowserErrorPage };
@@ -60,8 +61,8 @@ function rethrowUnlessPassing(error: unknown): void {
 
 const notAnswering = (timeoutMilliseconds: number): DriverError => ({ code: 'timeout', detail: `the page did not answer within ${timeoutMilliseconds} ms` });
 
-// What a page is asked for at most this long, or the failure to answer. Throws, as a read of the page
-// that fails does: the run's step says the page could not be read.
+// What a page is asked for at most this long, or the failure to answer, as a throw for the read's own
+// catch to say what became of it.
 async function answeredWithin<Value>(milliseconds: number, work: Promise<Value>): Promise<Value> {
   const answered = await forAtMost(milliseconds, work);
   if (answered === TIMED_OUT) {
@@ -111,8 +112,8 @@ export type SessionDetails = TabDetails & {
 // The scheme of the page the browser shows in place of one it could not show.
 const BROWSER_ERROR_PAGE = 'chrome-error:';
 
-const CRASHED: DriverError = { code: 'target-crashed', detail: 'the page\'s renderer died' };
-const DIALOG_OPEN: DriverError = { code: 'dialog-open', detail: 'a dialog is open: a dialog step must answer it first' };
+const CRASHED: PageReadFailure = { code: 'target-crashed', detail: 'the page\'s renderer died' };
+const DIALOG_OPEN: PageReadFailure = { code: 'dialog-open', detail: 'a dialog is open: a dialog step must answer it first' };
 const SELECTOR_INVALID: DriverError = { code: 'selector-invalid', detail: 'the browser rejects a CSS selector or XPath expression of the locator' };
 
 // The elements a locator matches. Throws when the page cannot answer, which says nothing about
@@ -556,7 +557,9 @@ function documentPorts<Handle>(
     const locator = performableLocator(planLocator);
     if (locator === undefined || crashed()) return READ_FAILED;
     try {
-      if (await rejectsSelector(operations, locator)) return { ...NOTHING_READ, count: 0, selectorInvalid: true };
+      if (await rejectsSelector(operations, locator)) {
+        return REJECTED_SELECTOR;
+      }
       const found = await findElements(operations, locator);
       // Looked at after the search, so a navigation that fails during it cannot read as a page
       // with nothing on it.
@@ -565,11 +568,11 @@ function documentPorts<Handle>(
       }
       const count = found.length;
       if (isSeveralElements(count)) {
-        return { ...NOTHING_READ, count };
+        return { count };
       }
       const element = found[0];
       if (element === undefined) {
-        return { ...NOTHING_READ, count: 0 };
+        return NOTHING_MATCHES;
       }
       const shown = decodeShownElement(await operations.callForString(probeElement, [{ element }, environment.sensitiveSelectors]));
       // The link target and aria-current come from the document, the other states from the
@@ -721,6 +724,27 @@ function documentPorts<Handle>(
     await operations.twoFramesLater();
     await events.navigationEnded();
     await operations.twoFramesLater();
+  };
+
+  // A dead page says so before a dialog does. The dialog may have opened since the read began, and
+  // what then stopped the read need not be the dialog's own signal, such as a read out of time.
+  const failureOfRead = (error: unknown): PageReadFailure => {
+    if (crashed()) {
+      return CRASHED;
+    }
+    if (error instanceof PageHeldByDialog || events.openDialog() !== null) {
+      return DIALOG_OPEN;
+    }
+    return { code: 'page-unreadable', detail: errorText(error) };
+  };
+
+  // A read of the page never rejects: every signal the page's commands give ends here, as its failure.
+  const readOfPage = async <Value>(read: () => Promise<Value>): Promise<Result<Value, PageReadFailure>> => {
+    try {
+      return success(await read());
+    } catch (error) {
+      return failure(failureOfRead(error));
+    }
   };
 
   const failureOfThrow = (error: unknown): DriverError => {
@@ -909,18 +933,18 @@ function documentPorts<Handle>(
         return failure(crashed() ? CRASHED : { code: 'navigation-failed', detail: errorText(error) });
       }
     },
-    async page(): Promise<PageProbe> {
+    page: () => readOfPage(async (): Promise<PageProbe> => {
       const shown = decodePageInfo(await answeredWithin(timeout, operations.callForString(pageInfo, [])));
       // In place of a page it could not show, the browser shows its own error page at an internal
       // URL. The address bar still shows the URL it wanted, which is not a page that loaded.
       if (!shown.url.startsWith(BROWSER_ERROR_PAGE)) return shown;
       return { ...shown, url: await operations.unreachableUrl() ?? shown.url, browserErrorPage: true };
-    },
+    }),
     act,
     probe,
     download,
     runScript,
-    screenshot: (mask) => answeredWithin(timeout, maskedScreenshot(mask, () => Promise.resolve())),
+    screenshot: (mask) => readOfPage(() => answeredWithin(timeout, maskedScreenshot(mask, () => Promise.resolve()))),
     // Each field is found before anything is painted, so no image exists for a field that cannot be.
     // A field its locator no longer finds holds nothing on screen only if the element typed into has
     // gone and no other field holds what was typed: one still on the page may still show it, and a
@@ -931,19 +955,12 @@ function documentPorts<Handle>(
         const taken = await forAtMost(timeout, screenshotWithFieldsHidden(mask, fields, holdsSecret));
         return taken === TIMED_OUT ? failure(notAnswering(timeout)) : taken;
       } catch (error) {
-        if (error instanceof PageHeldByDialog) {
-          return failure(DIALOG_OPEN);
-        }
-        throw error;
+        return failure(failureOfRead(error));
       }
     },
-    async audit() {
-      return toFindings(parseAudit(await answeredWithin(timeout, operations.callForString(pageAudit, []))));
-    },
-    accessibilitySnapshot: () => operations.accessibilityTree(),
-    async linkTargets() {
-      return decodeLinkTargets(await operations.callForString(linkTargetList, []));
-    },
+    audit: () => readOfPage(async () => toFindings(parseAudit(await answeredWithin(timeout, operations.callForString(pageAudit, []))))),
+    accessibilitySnapshot: () => readOfPage(() => operations.accessibilityTree()),
+    linkTargets: () => readOfPage(async () => decodeLinkTargets(await operations.callForString(linkTargetList, []))),
     async frame(locator) {
       if (crashed()) return failure(CRASHED);
       let inner: CheckedDocument<Handle> | null;
@@ -960,7 +977,6 @@ function documentPorts<Handle>(
       return success(documentPorts(inner.operations, inner.checks, [...masked, inner.operations], environment, details));
     },
     crashed,
-    isDialogOpen: () => events.openDialog() !== null,
     unsupportedOpenings: () => events.unsupportedOpenings(),
   };
   return ports;

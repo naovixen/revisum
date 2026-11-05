@@ -29,7 +29,8 @@ export type PageMap = {
   readonly origin: Origin;
   // In crawl order: breadth first from the start page, each page's new links in sorted order.
   readonly pages: readonly PageMapEntry[];
-  // True when a page on the start origin was left unvisited because of maximumPages or maximumDepth.
+  // True when a page on the start origin was left unvisited because of maximumPages or maximumDepth,
+  // or was left out because it loaded and then could not be read, such as with a dialog holding it.
   readonly truncated: boolean;
   readonly guaranteeLevel: GuaranteeLevel;
 };
@@ -55,9 +56,7 @@ export type ExploreErrorCode = (typeof ExploreErrorCode)[keyof typeof ExploreErr
 export type CrawlErrorCode = Extract<ExploreErrorCode, typeof ExploreErrorCode.ExploreOriginRefused | typeof ExploreErrorCode.ExploreStartUnreachable>;
 
 // What a crawl may ask of a browser session: navigation and reads, nothing that acts on the page.
-export type ExploreDriver = Pick<DocumentSession, 'navigate' | 'page' | 'accessibilitySnapshot'> & {
-  linkTargets(): Promise<readonly string[]>;
-};
+export type ExploreDriver = Pick<DocumentSession, 'navigate' | 'page' | 'accessibilitySnapshot' | 'linkTargets'>;
 
 // A step of an explore draft whose locator does not match its page in the map: no element at all,
 // or more than one. A warning, never an error: the draft is still written and admitted.

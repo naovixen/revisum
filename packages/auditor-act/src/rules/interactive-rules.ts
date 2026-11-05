@@ -248,7 +248,7 @@ export const reflowProbe: InteractiveRule = {
   needsWalk: false,
   async run(page, snapshot) {
     const root = snapshot.nodes.find((node) => node.nodeType === 1 && node.name === 'html' && node.document === 0);
-    if (!root) return [];
+    if (root === undefined) return [];
     await page.setViewport(320, 256);
     try {
       await page.evaluate(`new Promise(r => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(r, 30))))`);
@@ -262,7 +262,7 @@ export const reflowProbe: InteractiveRule = {
       const offenders = narrow.nodes.filter((node) => {
         if (node.nodeType !== 1 || node.name === 'html' || node.name === 'body' || !overflows(node) || node.style?.['position'] === 'fixed') return false;
         const parent = parentElement(narrow, node);
-        return !(parent && overflows(parent) && !['html', 'body'].includes(parent.name));
+        return !(parent !== undefined && overflows(parent) && !['html', 'body'].includes(parent.name));
       });
       if (offenders.length === 0) return [result(root.index, 'cantTell', `Page is ${widths.scrollWidth} px wide at a 320 px viewport`)];
       return offenders.slice(0, 5).map((offender) => {
@@ -272,7 +272,7 @@ export const reflowProbe: InteractiveRule = {
         return result(index, twoDimensional ? 'cantTell' : 'failed', twoDimensional ? message + ' (may be exempt: two-dimensional content)' : message);
       });
     } finally {
-      await page.setViewport(snapshot.viewport.width || 1024, snapshot.viewport.height || 768);
+      await page.setViewport(snapshot.viewport.width > 0 ? snapshot.viewport.width : 1024, snapshot.viewport.height > 0 ? snapshot.viewport.height : 768);
     }
   },
 };

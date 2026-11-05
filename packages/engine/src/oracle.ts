@@ -1,7 +1,7 @@
 // The assertion oracle: pure functions from a probe to a verdict. It lives in the engine so that
 // neither a driver nor an AI can change what "passed" means.
 import {
-  isOneElementRead, literalText, type AccessibleStates, type DomCheckWith, type DomRead, type ElementProbe, type OneElementRead, type PageAssertion, type PageProbe,
+  literalText, oneElementOf, type AccessibleStates, type DomCheckWith, type DomRead, type ElementProbe, type OneElementRead, type PageAssertion, type PageProbe,
   type ResolvedElementAssertion, type SafeText, type UnreadablePage,
 } from '@revisum/contracts';
 
@@ -18,10 +18,7 @@ export type Verdict = {
 
 const PASSED: Verdict = { pass: true, code: null };
 const FAILED: Verdict = { pass: false, code: 'assertion-failed' };
-const NOT_FOUND: Verdict = { pass: false, code: 'not-found' };
-const AMBIGUOUS: Verdict = { pass: false, code: 'ambiguous' };
 const STATE_NOT_EXPOSED: Verdict = { pass: false, code: 'state-not-exposed' };
-const SELECTOR_INVALID: Verdict = { pass: false, code: 'selector-invalid' };
 const NAVIGATION_FAILED: Verdict = { pass: false, code: 'navigation-failed' };
 
 // What a DOM check needs the probe to read of the element; undefined for every other check.
@@ -91,39 +88,41 @@ function sameUrl(expected: string, actual: string | null | undefined, baseUrl: s
 // The assertion's expected text is final: the run replaces value references before checking.
 // `baseUrl` is the run's base URL, which an expected link target given as a path is resolved on.
 export function checkElement(assertion: ResolvedElementAssertion, probe: ElementProbe, baseUrl?: string): Verdict {
+  // A page that cannot be read, and a selector the browser rejects, which matches nothing, say
+  // nothing of how many elements there are: no check passes on them, absent included.
   if (typeof probe.count === 'string') {
     return { pass: false, code: probe.count };
   }
-  // A selector the browser rejects matches nothing, absent included: the plan is wrong, not the page.
-  if (probe.selectorInvalid === true) return SELECTOR_INVALID;
   // Checks on how many elements match come before the single-element rule below.
   if (assertion.kind === 'absent') return probe.count === 0 ? PASSED : FAILED;
   if (assertion.kind === 'countEquals') return probe.count === assertion.value ? PASSED : FAILED;
-  if (assertion.kind === 'hidden') {
-    if (probe.count === 0 || (probe.count === 1 && !probe.visible)) return PASSED;
-    return probe.count > 1 ? AMBIGUOUS : FAILED;
+  if (assertion.kind === 'hidden' && probe.count === 0) {
+    return PASSED;
   }
-  if (!isOneElementRead(probe)) {
-    return probe.count === 0 ? NOT_FOUND : AMBIGUOUS;
+  const found = oneElementOf(probe);
+  if (!found.ok) {
+    return { pass: false, code: found.error };
   }
+  const element = found.value;
   switch (assertion.kind) {
-    case 'visible': return probe.visible ? PASSED : FAILED;
-    case 'enabled': return probe.enabled ? PASSED : FAILED;
-    case 'disabled': return !probe.enabled ? PASSED : FAILED;
-    case 'textEquals': return normalise(probe.text) === normalise(assertion.value) ? PASSED : FAILED;
-    case 'textContains': return normalise(probe.text).includes(normalise(assertion.value)) ? PASSED : FAILED;
-    case 'valueEquals': return probe.value === assertion.value ? PASSED : FAILED;
-    case 'valueContains': return probe.value !== null && probe.value.includes(assertion.value) ? PASSED : FAILED;
+    case 'hidden': return element.visible ? FAILED : PASSED;
+    case 'visible': return element.visible ? PASSED : FAILED;
+    case 'enabled': return element.enabled ? PASSED : FAILED;
+    case 'disabled': return !element.enabled ? PASSED : FAILED;
+    case 'textEquals': return normalise(element.text) === normalise(assertion.value) ? PASSED : FAILED;
+    case 'textContains': return normalise(element.text).includes(normalise(assertion.value)) ? PASSED : FAILED;
+    case 'valueEquals': return element.value === assertion.value ? PASSED : FAILED;
+    case 'valueContains': return element.value !== null && element.value.includes(assertion.value) ? PASSED : FAILED;
     case 'selected': case 'unselected': case 'expanded': case 'collapsed': case 'pressed': case 'unpressed': case 'current':
-      return checkState(assertion.kind, probe);
+      return checkState(assertion.kind, element);
     // The link's resolved href, never followed. An element in no link fails.
-    case 'hrefEquals': return sameUrl(assertion.value, probe.href, baseUrl) ? PASSED : FAILED;
+    case 'hrefEquals': return sameUrl(assertion.value, element.href, baseUrl) ? PASSED : FAILED;
     // The probe does not report checked or focused state yet, so these checks can never pass by
     // accident. The run refuses them before probing; see isElementCheckNoDriverDecides in the contracts package.
     case 'checked': case 'unchecked': case 'focused':
       return FAILED;
     case 'hasClass': case 'lacksClass': case 'computedStyleEquals': case 'attributeEquals': case 'attributeAbsent':
-      return checkDom(assertion, probe);
+      return checkDom(assertion, element);
   }
 }
 
