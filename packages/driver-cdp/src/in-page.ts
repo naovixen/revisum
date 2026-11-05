@@ -8,12 +8,36 @@
 // input named closest has no closest method, and one named parentElement has a parent that leads
 // back into it. So whatever may be a form is read through the prototypes here, never directly.
 
+// What makes an element unusable, for a read and for an action alike, as ElementEnabledState names it:
+// the browser's own :disabled, which knows fieldsets and their first legends, or aria-disabled. A custom
+// element has no platform rule beyond that, so only its own disabled property can say more, and reading
+// that runs the page's code: it is left to the caller, away from this script world and whatever it reads.
+// One that is not upgraded yet has no code of its own to ask.
+export function enabledState(element: Element): string {
+  const isDisabled = Element.prototype.matches.call(element, ':disabled') || Element.prototype.getAttribute.call(element, 'aria-disabled') === 'true';
+  if (isDisabled) {
+    return 'disabled';
+  }
+  const isCustomElement = element instanceof HTMLElement && Reflect.get(Element.prototype, 'localName', element).includes('-') && Element.prototype.matches.call(element, ':defined');
+  return isCustomElement ? 'custom-element' : 'enabled';
+}
+
+// Called on a custom element, as `this`, in the page's own main world, so it calls nothing the page could
+// have replaced. Only this one boolean leaves it. A disabled that is anything but false, or that throws,
+// is not taken to mean enabled; an element with no such property has said nothing against it.
+export function isNotDisabledByItsProperty(this: Element): boolean {
+  try {
+    return !('disabled' in this) || (this as HTMLButtonElement).disabled === false;
+  } catch {
+    return false;
+  }
+}
+
 // A snapshot of one element as JSON, in the shape of ElementProbe.
 export function probeElement(element: Element, selectors: readonly string[]): string {
   const rectangle = Element.prototype.getBoundingClientRect.call(element);
   const style = getComputedStyle(element);
   const visible = rectangle.width > 0 && rectangle.height > 0 && style.visibility !== 'hidden' && style.display !== 'none';
-  const disabled = (element as HTMLInputElement).disabled === true || Element.prototype.getAttribute.call(element, 'aria-disabled') === 'true';
   const isField = element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement || element instanceof HTMLSelectElement;
   const selectorList = selectors.join(',');
   const parentOf = (node: Element): Element | null => {
@@ -57,7 +81,7 @@ export function probeElement(element: Element, selectors: readonly string[]): st
   };
   const sensitive = selectorList !== '' && (isInsideMatch() || hasMatchInside());
   return JSON.stringify({
-    count: 1, visible, enabled: !disabled,
+    count: 1, visible,
     // An SVG element has no innerText.
     text: element instanceof HTMLElement ? Reflect.get(HTMLElement.prototype, 'innerText', element) : Reflect.get(Node.prototype, 'textContent', element),
     value: isField ? (element as HTMLInputElement).value : null,
@@ -66,8 +90,8 @@ export function probeElement(element: Element, selectors: readonly string[]): st
   });
 }
 
-// Actionability: attached, visible, stable over two animation frames, enabled, and the hit test at
-// the centre lands on the element. Scrolls it into view first.
+// Actionability: attached, visible, stable over two animation frames, and the hit test at the centre
+// lands on the element. Scrolls it into view first. Whether it is enabled is enabledState's to say.
 export async function actionability(element: Element): Promise<string> {
   const nextFrame = (): Promise<void> => new Promise((resolve) => {
     let done = false;
@@ -75,7 +99,7 @@ export async function actionability(element: Element): Promise<string> {
     requestAnimationFrame(() => finish());
     setTimeout(finish, 50); // a hidden or throttled page may not paint
   });
-  const none = { attached: false, visible: false, stable: false, enabled: false, receivesEvents: false, centre: null };
+  const none = { attached: false, visible: false, stable: false, receivesEvents: false, centre: null };
   const isConnected = (): boolean => Reflect.get(Node.prototype, 'isConnected', element);
   const boxOf = (): DOMRect => Element.prototype.getBoundingClientRect.call(element);
   const rootOf = (node: Element): ShadowRoot | null => Reflect.get(Element.prototype, 'shadowRoot', node);
@@ -83,9 +107,7 @@ export async function actionability(element: Element): Promise<string> {
   const style = getComputedStyle(element);
   const first = boxOf();
   const visible = first.width > 0 && first.height > 0 && style.visibility !== 'hidden' && style.display !== 'none';
-  const disabled = (element as HTMLButtonElement).disabled === true || Element.prototype.getAttribute.call(element, 'aria-disabled') === 'true'
-    || Element.prototype.closest.call(element, 'fieldset[disabled]') !== null;
-  if (!visible) return JSON.stringify({ ...none, attached: true, enabled: !disabled });
+  if (!visible) return JSON.stringify({ ...none, attached: true });
   const inView = first.top >= 0 && first.left >= 0 && first.bottom <= innerHeight && first.right <= innerWidth;
   if (!inView) Element.prototype.scrollIntoView.call(element, { block: 'center', inline: 'center', behavior: 'instant' });
   await nextFrame();
@@ -123,7 +145,7 @@ export async function actionability(element: Element): Promise<string> {
   const label = hit === null ? null : Element.prototype.closest.call(hit, 'label');
   const viaLabel = label instanceof HTMLLabelElement && label.control === element;
   const receivesEvents = isHit || viaLabel;
-  return JSON.stringify({ attached: isConnected(), visible: true, stable, enabled: !disabled, receivesEvents, centre });
+  return JSON.stringify({ attached: isConnected(), visible: true, stable, receivesEvents, centre });
 }
 
 // What a pointer press at the point would really act on, other than `element`: the element it would

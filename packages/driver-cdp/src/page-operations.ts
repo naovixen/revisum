@@ -51,6 +51,10 @@ export interface PageOperations<Handle> {
   // False when a press at the point can start nothing: neither it nor what holds it has a listener
   // for a pointer's events or does anything by itself when pressed.
   canPressStartAnything(element: Handle, at: Point): Promise<boolean>;
+  // What a custom element's own disabled property says, read by running the page's code in the page's
+  // main world. Nothing else comes back. True only when the property is false or absent. A page that hangs
+  // in its code holds this up, and a dialog its code opens rejects this with PageHeldByDialog.
+  isCustomElementEnabled(element: Handle): Promise<boolean>;
   // A PNG of the viewport.
   screenshotPng(): Promise<Uint8Array>;
   // The URL the browser could not show, while it shows its own error page in its place, such as
@@ -81,6 +85,10 @@ export interface PageInput<Handle> {
   // page (scriptResultText in in-page.ts). It never times out by itself: the session races it.
   callScript(source: string, scriptArguments: Readonly<Record<string, string | number | boolean>>, maximumResultBytes: number): Promise<ScriptCallOutcome>;
 }
+
+// What enabledState (in-page.ts) says of an element.
+export const ElementEnabledState = { Enabled: 'enabled', Disabled: 'disabled', CustomElement: 'custom-element' } as const;
+export type ElementEnabledState = (typeof ElementEnabledState)[keyof typeof ElementEnabledState];
 
 export const SelectOutcome = { Selected: 'selected', NoOption: 'no-option', NotASelect: 'not-a-select' } as const;
 export type SelectOutcome = (typeof SelectOutcome)[keyof typeof SelectOutcome];

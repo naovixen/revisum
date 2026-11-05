@@ -9,15 +9,16 @@ import {
   UnreadablePage,
 } from '@revisum/contracts';
 import {
-  actionability, documentUrl, fieldValues, fontsReady, guardDetails, inThisDocument, linkAndCurrent, linkTargetList, maskElements, maskGivenElements, pageInfo, probeElement, readDomValue,
+  actionability, documentUrl, enabledState, fieldValues, fontsReady, guardDetails, inThisDocument, linkAndCurrent, linkTargetList, maskElements, maskGivenElements, pageInfo, probeElement, readDomValue,
   structuralSelectorValidity, unmaskElements, whatAClickActivates,
 } from './in-page.ts';
+import { DocumentGone } from './DocumentGone.ts';
 import { findByLabel, findByTestId, findByText, findStructural, inDocumentOrder } from './FindByLabel.ts';
 import { HitCheckOutcome, hitChecks, type CheckedDocument, type HitChecks } from './HitChecks.ts';
 import { MalformedBrowserReply } from './MalformedBrowserReply.ts';
 import { heldModifierKeys } from './modifier-keys.ts';
 import { pageAudit, parseAudit, toFindings } from './page-audit.ts';
-import { SelectOutcome, type Actionability, type DownloadCapture, type DriverSession, type PageEvents, type PageFunction, type PageOperations, type PageWithInput, type Point, type ScriptCallOutcome } from './page-operations.ts';
+import { ElementEnabledState, SelectOutcome, type Actionability, type DownloadCapture, type DriverSession, type PageEvents, type PageFunction, type PageOperations, type PageWithInput, type Point, type ScriptCallOutcome } from './page-operations.ts';
 import { PageHeldByDialog } from './PageHeldByDialog.ts';
 import type { ConnectionFailure } from './SessionEgress.ts';
 
@@ -121,6 +122,19 @@ async function findElements<Handle>(operations: PageOperations<Handle>, locator:
   return locator.position === undefined ? found : atPosition(operations, found, locator.position);
 }
 
+// The elements a locator matches, or null when the document it was asked of has gone, which says nothing
+// of what was in it. Any other failure says more than that, so it goes on up.
+async function findElementsUnlessDocumentGone<Handle>(operations: PageOperations<Handle>, locator: ResolvedLocator): Promise<Handle[] | null> {
+  try {
+    return await findElements(operations, locator);
+  } catch (error) {
+    if (error instanceof DocumentGone) {
+      return null;
+    }
+    throw error;
+  }
+}
+
 // For an action, which only waits for an element to act on: an error while the page navigates
 // counts as "nothing found yet". A check reads through findElements, since finding nothing can pass it.
 async function locate<Handle>(operations: PageOperations<Handle>, locator: ResolvedLocator): Promise<Handle[]> {
@@ -189,6 +203,17 @@ async function ownElements<Handle>(operations: PageOperations<Handle>, found: re
   return own;
 }
 
+// The one rule for whether an element can be used, for a read and for an action alike. Anything
+// enabledState does not say is not taken to mean enabled. Called once everything else about the element
+// has been read, since a custom element's own say runs the page's code.
+async function isElementEnabled<Handle>(operations: PageOperations<Handle>, element: Handle): Promise<boolean> {
+  const state = await operations.callForString(enabledState, [{ element }]);
+  if (state === ElementEnabledState.CustomElement) {
+    return operations.isCustomElementEnabled(element);
+  }
+  return state === ElementEnabledState.Enabled;
+}
+
 type Actionable<Handle> = Result<{ readonly element: Handle; readonly at: { x: number; y: number } }, DriverError>;
 type Found<Handle> = Result<Handle, DriverError>;
 
@@ -201,7 +226,8 @@ async function lookForActionable<Handle>(operations: PageOperations<Handle>, loc
     return { count: found.length, check: null };
   }
   try {
-    return { count: 1, element, check: decodeActionability(await operations.callForString(actionability, [{ element }])) };
+    const shown = decodeActionability(await operations.callForString(actionability, [{ element }]));
+    return { count: 1, element, check: { ...shown, enabled: shown.attached && await isElementEnabled(operations, element) } };
   } catch (error) {
     rethrowUnlessPassing(error);
     return { count: 1, check: null }; // detached during the check: locate again
@@ -290,7 +316,7 @@ function reportedBoolean(fields: Readonly<Record<string, unknown>>, name: string
 }
 
 // Decodes what actionability (in-page.ts) reports.
-function decodeActionability(text: string): Actionability {
+function decodeActionability(text: string): Omit<Actionability, 'enabled'> {
   const source = 'actionability';
   const fields = reportedFields(text, source);
   const centre = fields['centre'];
@@ -300,14 +326,13 @@ function decodeActionability(text: string): Actionability {
     attached: reportedBoolean(fields, 'attached', source),
     visible: reportedBoolean(fields, 'visible', source),
     stable: reportedBoolean(fields, 'stable', source),
-    enabled: reportedBoolean(fields, 'enabled', source),
     receivesEvents: reportedBoolean(fields, 'receivesEvents', source),
     centre: typeof x === 'number' && typeof y === 'number' ? { x, y } : null,
   };
 }
 
 // Decodes what probeElement (in-page.ts) reports, of the one element it was called on.
-function decodeShownElement(text: string): Omit<OneElementRead, 'states' | 'href'> {
+function decodeShownElement(text: string): Omit<OneElementRead, 'states' | 'href' | 'enabled'> {
   const source = 'probeElement';
   const fields = reportedFields(text, source);
   const [shownText, value, box] = [fields['text'], fields['value'], fields['box']];
@@ -325,7 +350,6 @@ function decodeShownElement(text: string): Omit<OneElementRead, 'states' | 'href
   return {
     count: 1,
     visible: reportedBoolean(fields, 'visible', source),
-    enabled: reportedBoolean(fields, 'enabled', source),
     text: shownText,
     value,
     sensitive: reportedBoolean(fields, 'sensitive', source),
@@ -459,7 +483,8 @@ async function hasTypedFieldGone(typedFields: readonly SecretTypedField[], locat
   try {
     const gone = await Promise.all(typed.map((field) => field.isGone()));
     return typed.length > 0 && gone.every(Boolean);
-  } catch {
+  } catch (error) {
+    rethrowUnlessPassing(error);
     return false;
   }
 }
@@ -550,7 +575,8 @@ function documentPorts<Handle>(
       const exposed = await operations.exposedStates(element);
       // A DOM check's read: a class list, a computed style or an attribute, read from the document.
       const dom = read === undefined ? undefined : decodeDomValue(await operations.callForString(readDomValue, [{ element }, read.kind, domReadName(read)]), read);
-      return { ...shown, states: { ...exposed, current }, href, ...(dom === undefined ? {} : { dom }) };
+      const isEnabled = await isElementEnabled(operations, element);
+      return { ...shown, enabled: isEnabled, states: { ...exposed, current }, href, ...(dom === undefined ? {} : { dom }) };
     } catch (error) {
       return error instanceof PageHeldByDialog ? DIALOG_HOLDS_PAGE : READ_FAILED;
     }
@@ -573,9 +599,10 @@ function documentPorts<Handle>(
   // A click is sent once. The wait may find a new element, and the guard is asked about the one it
   // finds, just before the send. A press that lands on another element is swallowed in the page and
   // fails the step at once: sending it again could press whatever the page has put there since. A
-  // press the element never heard was stopped before it got there, by a listener of the page's that
-  // came first, so the click did nothing. So did one whose click the page stopped on its way to the
-  // element, whatever else the page did then, such as taking the element away or opening a dialog.
+  // press with an event that never got to the element was stopped, or held by a dialog, by a listener
+  // of the page's that came first, so the click did nothing, whatever else the page did then, such as
+  // taking the element away. The element may yet get it once a dialog is answered, which the step
+  // cannot wait for.
   const click = async (locator: ResolvedLocator, guard: ActionGuard, beforePress: BeforePress<Handle>, stepDeadline: number): Promise<Result<void, DriverError>> => {
     const waited = await waitUntilActionable(operations, locator, timeout, timeout, crashed);
     if (!waited.ok) return waited;
@@ -592,7 +619,7 @@ function documentPorts<Handle>(
     switch (hit.value) {
       case HitCheckOutcome.Hit: return success(undefined);
       case HitCheckOutcome.Miss: return failure({ code: 'not-actionable', detail: 'the click landed on another element' });
-      case HitCheckOutcome.None: return failure({ code: 'not-actionable', detail: 'the press never reached the page' });
+      case HitCheckOutcome.None: return failure({ code: 'not-actionable', detail: 'no part of the press had reached the element when the step ended' });
       case HitCheckOutcome.NoClick: return failure({ code: 'not-actionable', detail: 'the page stopped the click before it reached the element' });
     }
   };
@@ -827,7 +854,7 @@ function documentPorts<Handle>(
       let isFound = false;
       let isEveryDocumentRead = true;
       for (const framed of masked) {
-        const elements = await findElements(framed, field).catch(() => null);
+        const elements = await findElementsUnlessDocumentGone(framed, field);
         isEveryDocumentRead &&= elements !== null;
         isFound ||= elements !== null && elements.length > 0;
         toPaint.push({ framed, elements: elements ?? [] });
@@ -879,10 +906,18 @@ function documentPorts<Handle>(
     // Each field is found before anything is painted, so no image exists for a field that cannot be.
     // A field its locator no longer finds holds nothing on screen only if the element typed into has
     // gone and no other field holds what was typed: one still on the page may still show it, and a
-    // page may have rendered it afresh under another label. A read that throws shows neither.
+    // page may have rendered it afresh under another label. A document that has gone shows neither, and
+    // any other failure to read says nothing of the fields at all, so it is the capture's failure.
     async screenshotHidingFields(mask, fields, holdsSecret) {
-      const taken = await forAtMost(timeout, screenshotWithFieldsHidden(mask, fields, holdsSecret));
-      return taken === TIMED_OUT ? failure(notAnswering(timeout)) : taken;
+      try {
+        const taken = await forAtMost(timeout, screenshotWithFieldsHidden(mask, fields, holdsSecret));
+        return taken === TIMED_OUT ? failure(notAnswering(timeout)) : taken;
+      } catch (error) {
+        if (error instanceof PageHeldByDialog) {
+          return failure(DIALOG_OPEN);
+        }
+        throw error;
+      }
     },
     async audit() {
       return toFindings(parseAudit(await answeredWithin(timeout, operations.callForString(pageAudit, []))));

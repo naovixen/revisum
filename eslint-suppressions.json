@@ -481,7 +481,7 @@
   },
   "packages/driver-cdp/src/in-page.ts": {
     "@typescript-eslint/naming-convention": {
-      "count": 14
+      "count": 12
     },
     "curly": {
       "count": 23

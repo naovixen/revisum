@@ -9,7 +9,7 @@
 import {
   failure, isElementCheckNoDriverDecides, isOneElementRead, stepFailed, StepCode, success, UnreadablePage,
   type A11yFinding, type ActionGuard, type AppliedRewrite, type ApprovalLabel, type ArtifactReference, type ArtifactStore, type Authorised,
-  type BrowserDriver, type Clock, type DatabaseCommandRunner, type DocumentSession, type DomRead, type DownloadedFile, type DownloadName, type ElementsRead, type RememberedElementSource, type LockEntry, type DialogStep, type ElementProbe,
+  type BrowserDriver, type Clock, type DatabaseCommandRunner, type DocumentSession, type DomRead, type DownloadedFile, type DownloadName, type DriverError, type ElementsRead, type RememberedElementSource, type LockEntry, type DialogStep, type ElementProbe,
   type EventSink, type GuaranteeLevel, type GuardVerdict, type PageAssertion, type Plan, type PolicyRuleId, type Redactor,
   type DownloadStep, type StepOutcome, type ResolvedElement, type ResolvedLocator, type Result, type SafeText, type SecretStore, type ServiceCaller, type Session, type Step, type Target, type TargetId,
   type Unavailable, type ValueName, type GuaranteeStatement, type RunMode, type SuiteFinding, type SuiteName, type SuitePass,
@@ -993,11 +993,13 @@ async function executeStep(step: Step, index: number, session: DocumentSession, 
       return { ...base, ...done };
     }
     case 'capture': {
-      const png = await pixelsWithSecretsHidden(session, context);
-      if (png === null) {
-        return { ...base, outcome: 'passed', code: StepCode.CaptureLeftOut };
+      const taken = await pixelsWithSecretsHidden(session, context);
+      if (!taken.ok) {
+        return taken.error.code === StepCode.NotFound
+          ? { ...base, outcome: 'passed', code: StepCode.CaptureLeftOut }
+          : { ...base, ...stepFailed(taken.error.code) };
       }
-      const reference = await context.ports.artifacts.put(`${target.id}/${step.name}.png`, png, 'image/png');
+      const reference = await context.ports.artifacts.put(`${target.id}/${step.name}.png`, taken.value, 'image/png');
       context.logger.log({ kind: 'artifact', stepIndex: index, artifact: reference.name, sha256: reference.sha256 });
       return { ...base, outcome: 'passed', artifact: reference };
     }
@@ -1011,17 +1013,16 @@ function byRuleId(left: A11yFinding, right: A11yFinding): number {
   return left.ruleId < right.ruleId ? -1 : 1;
 }
 
-// The viewport with personal data and every field a secret was typed into masked, or null when one
-// of those fields cannot be masked: text drawn as pixels is out of reach of any later scan, so no
-// image is better than an image that may show the secret.
-async function pixelsWithSecretsHidden(session: DocumentSession, context: RunContext): Promise<Uint8Array | null> {
+// The viewport with personal data and every field a secret was typed into masked. Not-found says one of
+// those fields cannot be masked: text drawn as pixels is out of reach of any later scan, so no image is
+// better than an image that may show the secret. Any other failure says the page could not be captured.
+async function pixelsWithSecretsHidden(session: DocumentSession, context: RunContext): Promise<Result<Uint8Array, DriverError>> {
   const selectors = context.ports.redactor.selectors;
   const fields = [...context.secretFilledFields.values()];
   if (fields.length === 0) {
-    return session.screenshot(selectors);
+    return success(await session.screenshot(selectors));
   }
-  const taken = await session.screenshotHidingFields(selectors, fields, context.holdsSecret);
-  return taken.ok ? taken.value : null;
+  return session.screenshotHidingFields(selectors, fields, context.holdsSecret);
 }
 
 // Reads a remember step's value from the page through the prober, waiting as a check waits until

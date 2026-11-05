@@ -301,7 +301,9 @@ export interface Camera {
   // The same, with every element each of `fields` finds painted black too: the fields a secret was
   // typed into, which no selector need match. A field that finds nothing, in this document or one
   // it is framed in, gives not-found and no image, since what it holds may still be on screen; unless
-  // the element typed into has gone and no field holds what `holdsSecret` says is a secret.
+  // the element typed into has gone and no field holds what `holdsSecret` says is a secret. A dialog
+  // holding the page gives dialog-open, and a page that does not answer gives timeout, since neither is
+  // a field that cannot be hidden: only not-found means that.
   screenshotHidingFields(mask: readonly string[], fields: readonly ResolvedLocator[], holdsSecret: (text: string) => boolean): Promise<Result<Uint8Array, DriverError>>;
 }
 export interface Auditor {

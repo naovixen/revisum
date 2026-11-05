@@ -15,9 +15,10 @@ import { CONTINUE_REQUEST, DISPATCH_KEY_EVENT, DISPATCH_MOUSE_EVENT, ENABLE_REQU
 import type { CdpConnection, CdpSessionClient } from './cdp-connection.ts';
 import { DownloadFolder } from './downloads.ts';
 import { EgressRecorder } from './egress-records.ts';
+import { DocumentGone } from './DocumentGone.ts';
 import { CLICK_WATCH_SCRIPT, PressSent, type CheckRead, type PressCheck } from './HitChecks.ts';
 import { BrowserNetwork } from './network-stubs.ts';
-import { afterTwoFrames, focusAndSelect, focusElement, frameContentOffset, isConnectedToItsDocument, scriptResultText, selectOption } from './in-page.ts';
+import { afterTwoFrames, focusAndSelect, focusElement, frameContentOffset, isConnectedToItsDocument, isNotDisabledByItsProperty, scriptResultText, selectOption } from './in-page.ts';
 import { MalformedBrowserReply } from './MalformedBrowserReply.ts';
 import type { HeldModifierKey } from './modifier-keys.ts';
 import {
@@ -579,8 +580,15 @@ class CdpPage implements PageWithInput<string> {
   }
 
   // Every command goes through the watch, so a crashed page or one a dialog holds fails it at once.
-  #ask<CommandParameters, Reply>(command: BrowserCommand<CommandParameters, Reply>, parameters: NoInfer<CommandParameters>): Promise<Reply> {
-    return this.#watch.askRunningPage(command, parameters);
+  async #ask<CommandParameters, Reply>(command: BrowserCommand<CommandParameters, Reply>, parameters: NoInfer<CommandParameters>): Promise<Reply> {
+    try {
+      return await this.#watch.askRunningPage(command, parameters);
+    } catch (error) {
+      if (error instanceof Error && (LOST_OBJECT.test(error.message) || FRAME_REMOVED.test(error.message))) {
+        throw new DocumentGone(error.message);
+      }
+      throw error;
+    }
   }
 
   // Sends input to a page no dialog holds. A dialog that opens while it waits is the input landing,
@@ -926,6 +934,18 @@ class CdpPage implements PageWithInput<string> {
       return await this.#hasPressListener(await this.#mainWorldWindow());
     } finally {
       await this.#releaseKept(RELEASE_OBJECT_GROUP, { objectGroup: SCRIPT_OBJECT_GROUP });
+    }
+  }
+
+  // The read is all the page's code gets to run in, and a boolean is all that can come out of it. The
+  // release is not waited for, as for a check: a page that has started to navigate answers nothing.
+  async isCustomElementEnabled(element: string): Promise<boolean> {
+    const inMainWorld = await this.#inMainWorld(element);
+    try {
+      const called = await this.#ask(CALL_FUNCTION_ON, { functionDeclaration: isNotDisabledByItsProperty.toString(), objectId: inMainWorld, returnByValue: true });
+      return called.exceptionDetails === undefined && called.result.value === true;
+    } finally {
+      void this.#releaseKept(RELEASE_OBJECT, { objectId: inMainWorld });
     }
   }
 

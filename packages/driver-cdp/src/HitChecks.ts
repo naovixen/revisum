@@ -6,7 +6,8 @@
 // browser made count, since a page can dispatch any other event it likes.
 // A listener added when a press is armed runs after those a page added at load, which can stop an event
 // before it arrives. So a listener put in that world as each document starts, ahead of all the page's,
-// notes the click itself as the browser sends it. What a page cannot stop or forge settles what it does.
+// notes each event of the press as the browser sends it. What a page cannot stop or forge settles what
+// it does: an event that was on its way and never reached the element was stopped, or held by a dialog.
 // While a dialog holds the page nothing in it can be read, and once its document has gone neither can
 // the check. So the check also reports as it goes, ahead of whatever the page does next.
 import type { PageInput, PageOperations, PageWithInput, Point } from "./page-operations.ts";
@@ -14,27 +15,28 @@ import type { PageInput, PageOperations, PageWithInput, Point } from "./page-ope
 export const HitCheckOutcome = {
     Hit: "hit",
     Miss: "miss",
-    // No pointer event of the press reached the element.
+    // No event of the press was on its way to the element, or reached it.
     None: "none",
-    // The press landed on the element, with no click reaching it.
+    // An event of the press was on its way to the element and never reached it, or the press ended with
+    // no click sent to it.
     NoClick: "no-click",
 } as const;
 
 export type HitCheckOutcome = (typeof HitCheckOutcome)[keyof typeof HitCheckOutcome];
 
-// What a check reports as it goes. Press events are reported by their own names.
-const ON_ITS_WAY = "click-on-its-way";
+// What a check reports as it goes: an event arriving at the element by its own name, and one on its way
+// to the element by that name with this after it. The page-side functions spell it out, as they must.
+const ON_ITS_WAY = "-on-its-way";
 const CLICK_ARRIVED = "click";
 
 type ArmedHitCheck = {
     readonly element: Element;
     state: "none" | "hit" | "miss";
-    hasPressReachedElement: boolean;
-    isClickOnItsWay: boolean;
-    hasClickArrived: boolean;
+    readonly eventsOnTheirWay: Set<string>;
+    readonly eventsArrived: Set<string>;
     report: (what: string) => void;
     isOnElement: (event: Event) => boolean;
-    noteClickFromTheStart: (event: Event) => void;
+    noteFromTheStart: (event: Event) => void;
     listen: (target: EventTarget, type: string, listener: (event: Event) => void) => void;
     stopListening: (isIncluded: (target: EventTarget) => boolean) => void;
     disarm: () => void;
@@ -47,16 +49,18 @@ type WindowHoldingAHitCheck = Window & { armedHitCheck?: ArmedHitCheck | undefin
 // world's own property counts, and a page's named element cannot hide the listener method.
 function watchClicksFromTheDocumentStart(): void {
     const world: WindowHoldingAHitCheck = window;
-    EventTarget.prototype.addEventListener.call(
-        window,
-        "click",
-        (event) => {
-            if (event.isTrusted && Object.hasOwn(world, "armedHitCheck")) {
-                world.armedHitCheck?.noteClickFromTheStart(event);
-            }
-        },
-        true,
-    );
+    for (const eventType of ["pointerdown", "mousedown", "pointerup", "mouseup", "click"]) {
+        EventTarget.prototype.addEventListener.call(
+            window,
+            eventType,
+            (event) => {
+                if (event.isTrusted && Object.hasOwn(world, "armedHitCheck")) {
+                    world.armedHitCheck?.noteFromTheStart(event);
+                }
+            },
+            true,
+        );
+    }
 }
 
 export const CLICK_WATCH_SCRIPT = `(${watchClicksFromTheDocumentStart.toString()})();`;
@@ -71,9 +75,8 @@ function armHitCheck(element: Element, bindingName: string, pressId: string): Ar
     const check: ArmedHitCheck = {
         element,
         state: "none",
-        hasPressReachedElement: false,
-        isClickOnItsWay: false,
-        hasClickArrived: false,
+        eventsOnTheirWay: new Set(),
+        eventsArrived: new Set(),
         report: (what) => {
             // A world the browser made before it had the binding has none, and reports nothing.
             const binding: unknown = Object.hasOwn(world, bindingName)
@@ -96,10 +99,10 @@ function armHitCheck(element: Element, bindingName: string, pressId: string): Ar
                     (label instanceof HTMLLabelElement && label.control === element))
             );
         },
-        noteClickFromTheStart: (event) => {
+        noteFromTheStart: (event) => {
             if (check.isOnElement(event)) {
-                check.isClickOnItsWay = true;
-                check.report("click-on-its-way");
+                check.eventsOnTheirWay.add(event.type);
+                check.report(`${event.type}-on-its-way`);
             }
         },
         listen: (target, type, listener) => {
@@ -152,12 +155,13 @@ function listenForThePress(this: ArmedHitCheck): void {
     for (const eventType of [...pressEventTypes, "click"]) {
         this.listen(window, eventType, onPointerEvent);
     }
-    this.listen(this.element, "click", (event) => {
+    const noteArrival = (event: Event): void => {
         if (event.isTrusted) {
-            this.hasClickArrived = true;
-            this.report("click");
+            this.eventsArrived.add(event.type);
+            this.report(event.type);
         }
-    });
+    };
+    this.listen(this.element, "click", noteArrival);
     // A press on a label reaches its control only as the click it forwards. A form's named input can
     // answer to the name, so only labels count.
     const labels: unknown = Reflect.get(this.element, "labels");
@@ -168,30 +172,25 @@ function listenForThePress(this: ArmedHitCheck): void {
     ];
     for (const target of pressTargets) {
         for (const eventType of pressEventTypes) {
-            this.listen(target, eventType, (event) => {
-                if (event.isTrusted) {
-                    this.hasPressReachedElement = true;
-                    this.report(event.type);
-                }
-            });
+            this.listen(target, eventType, noteArrival);
         }
     }
 }
 
 // Called on the check, as `this`. Disarms it, and says what it saw. A press that takes its element away
-// leaves no click to send, so that counts as landing, unless a click was sent and stopped on its way.
+// leaves no click to send, so that counts as landing, unless an event of it was stopped on its way.
 function readHitCheck(this: ArmedHitCheck): string {
     this.disarm();
     if (this.state === "miss") {
         return "miss";
     }
-    if (this.hasClickArrived) {
+    if (this.eventsArrived.has("click")) {
         return "hit";
     }
-    if (this.isClickOnItsWay) {
+    if (Array.from(this.eventsOnTheirWay).some((type) => !this.eventsArrived.has(type))) {
         return "no-click";
     }
-    if (!this.hasPressReachedElement) {
+    if (this.eventsArrived.size === 0) {
         return "none";
     }
     return Reflect.get(Node.prototype, "isConnected", this.element) === true ? "no-click" : "hit";
@@ -231,13 +230,18 @@ const hasAny = (reports: ReadonlySet<string>, events: readonly string[]): boolea
 const EVENTS_OF_THE_PRESS = ["pointerdown", "mousedown"];
 const EVENTS_OF_THE_RELEASE = ["pointerup", "mouseup"];
 
+const wasAnEventStoppedOnItsWay = (reports: ReadonlySet<string>): boolean =>
+    [...EVENTS_OF_THE_PRESS, ...EVENTS_OF_THE_RELEASE, CLICK_ARRIVED].some(
+        (event) => reports.has(`${event}${ON_ITS_WAY}`) && !reports.has(event),
+    );
+
 // With the document still there but held by a dialog, the press landed only if the event the dialog
 // opened during reached the element: a page that stops that event and opens one has only reacted to it.
 function outcomeHeldByDialog(reports: ReadonlySet<string>, sent: PressSent): HitCheckOutcome {
     if (reports.has(CLICK_ARRIVED)) {
         return HitCheckOutcome.Hit;
     }
-    if (reports.has(ON_ITS_WAY)) {
+    if (wasAnEventStoppedOnItsWay(reports)) {
         return HitCheckOutcome.NoClick;
     }
     const wanted = sent === PressSent.Released ? EVENTS_OF_THE_RELEASE : EVENTS_OF_THE_PRESS;
@@ -247,12 +251,13 @@ function outcomeHeldByDialog(reports: ReadonlySet<string>, sent: PressSent): Hit
     return hasAny(reports, EVENTS_OF_THE_PRESS) ? HitCheckOutcome.NoClick : HitCheckOutcome.None;
 }
 
-// With the document gone, the press landed if any of it reached the element and started the navigation.
+// With the document gone, the press landed if it reached the element and started the navigation, with
+// nothing of it stopped on the way.
 function outcomeWithDocumentGone(reports: ReadonlySet<string>): HitCheckOutcome {
     if (reports.has(CLICK_ARRIVED)) {
         return HitCheckOutcome.Hit;
     }
-    if (reports.has(ON_ITS_WAY)) {
+    if (wasAnEventStoppedOnItsWay(reports)) {
         return HitCheckOutcome.NoClick;
     }
     return hasAny(reports, [...EVENTS_OF_THE_PRESS, ...EVENTS_OF_THE_RELEASE])
