@@ -252,6 +252,9 @@ type SessionBrowser = {
   readonly network: BrowserNetwork;
   readonly clock: BrowserClock;
   readonly failures: SessionFailures;
+  // The watch of every page of the session still open, the first page's and each open tab's, which the
+  // session's close ends.
+  readonly openPages: Set<PageWatch>;
 };
 
 // A held-back popup never loads, so it is always recorded as a request that went nowhere. Only an
@@ -290,6 +293,7 @@ async function createSession(
     }),
     clock: new BrowserClock(environment.virtualTimers === true),
     failures,
+    openPages: new Set(),
   };
   await allowRunClipboard(connection, browserContextId);
 
@@ -297,6 +301,7 @@ async function createSession(
   const watch = new PageWatch(connection, { browserContextId, targetId, sessionId }, {
     failures: browser.failures, onPopupRequest: (url) => { recordPopupRequest(browser, url); }, ownsBrowserContext: true, claimsDownload: (event) => browser.downloads.claims(event), isDownloadStepUnderWay: () => browser.downloads.isArmed(),
   });
+  browser.openPages.add(watch);
   await watch.start();
   await browser.recorder.start(sessionId);
   await browser.network.watchPage(sessionId);
@@ -316,7 +321,8 @@ async function createSession(
     // browser can no longer write into it. A shared browser that keeps the session's context rejects
     // here, and the folder stays for the same reason. The egress goes last, whatever happened, since
     // nothing else ends it. Clean-up failures are read while the session still runs: closing fails
-    // whatever was still waiting for an answer, which says nothing about it.
+    // whatever was still waiting for an answer, which says nothing about it. Every page still open ends
+    // with the session, however the browser went.
     close: () => closeInTurn([
       () => watch.settleHeldPopupsAndReportCleanUp(),
       async () => {
@@ -324,6 +330,7 @@ async function createSession(
         browser.downloads.remove();
       },
       () => sessionEgress.egress.close(),
+      () => { endOpenPages(browser.openPages); return Promise.resolve(); },
     ]),
     events: watch,
     fixturePath: (fixture) => fixtureFilePath(fixturesFolder, fixture),
@@ -338,6 +345,13 @@ async function createSession(
       : new RunClipboard(connection, browserContextId, (command, parameters) => watch.askRunningPage(command, parameters), () => watch.crashed()),
   };
   return buildSession(operations, environment, details);
+}
+
+function endOpenPages(openPages: Set<PageWatch>): void {
+  for (const page of openPages) {
+    page.endWithSession();
+  }
+  openPages.clear();
 }
 
 // Runs every closer, whatever the others did, and then rejects with all that went wrong.
@@ -458,12 +472,14 @@ async function openTab(browser: SessionBrowser, firstWatch: PageWatch, firstDeta
   // Never rejects: what stops a tab closing is for the session's close to report, and must not take the
   // place of what a step found.
   const close = async (): Promise<void> => {
+    browser.openPages.delete(watch);
     watch.stop();
     stopResponses();
     stopNetwork();
     stopClock();
     await connection.ask(undefined, CLOSE_TARGET, { targetId: attached.targetId }).catch((error: unknown) => { watch.noteTargetFailure('a tab could not be closed', error); });
   };
+  browser.openPages.add(watch);
   try {
     await connection.ask(attached.sessionId, ENABLE_PAGE, {});
     await watch.start();

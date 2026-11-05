@@ -184,6 +184,14 @@ export class PageWatch implements PageEvents {
     this.#notifyNavigationWaiters();
   }
 
+  // Counts the page as gone once its session has closed, so every later call says so as a crash does.
+  // Nothing from the browser can be relied on to say it: a browser whose process tree was ended sends
+  // no detach first, and a connection closed on purpose tells no listener.
+  endWithSession(): void {
+    this.stop();
+    this.#crash();
+  }
+
   // Resolves with the next page the browser context opens without an opener, still paused, which
   // the caller then prepares and lets run. It is not counted as an opening and not closed.
   nextTab(timeoutMilliseconds: number): { readonly promise: Promise<AttachedPage>; cancel(): void } {

@@ -169,7 +169,7 @@ export async function attachToSharedBrowser(
     };
 }
 
-// The closing connection is deliberate, so the session's pages do not count it as a crash. It makes
+// The closing connection is deliberate, so nothing counts it as lost: the session ends its own pages. It makes
 // the browser dispose of the session's context, without the session being able to see that happen.
 async function closeSharedSession(shared: SharedBrowser, connection: CdpConnection): Promise<void> {
     connection.close();
