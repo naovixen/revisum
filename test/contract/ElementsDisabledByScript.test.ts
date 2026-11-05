@@ -1,7 +1,8 @@
 // A custom element has no platform rule for disabled: its own disabled property is all there is, and a
 // person cannot use a control that says it is disabled. So that property counts, however it is written, and
-// one that cannot be read cannot be taken to mean enabled. Reading it runs the page's code, which must get
-// no say over anything else a read reports. On any other element a disabled property means nothing.
+// one that cannot be read, or that answers neither a boolean nor undefined, cannot be taken to mean enabled.
+// Reading it runs the page's code, which must get no say over anything else a read reports. On any other
+// element a disabled property means nothing.
 import assert from "node:assert/strict";
 import { after, before, describe, test } from "node:test";
 import type { ElementsRead } from "@revisum/engine";
@@ -80,6 +81,26 @@ const DISABLED_CUSTOM_ELEMENTS = [
         path: "/custom-getter-throws.html",
         route: customPage("get disabled() { throw new Error('No'); }"),
     },
+    {
+        name: "has a disabled getter that returns null",
+        path: "/custom-getter-null.html",
+        route: customPage("get disabled() { return null; }"),
+    },
+    {
+        name: "has a disabled getter that returns 0",
+        path: "/custom-getter-zero.html",
+        route: customPage("get disabled() { return 0; }"),
+    },
+    {
+        name: "has a disabled getter that returns an empty string",
+        path: "/custom-getter-empty-string.html",
+        route: customPage("get disabled() { return ''; }"),
+    },
+    {
+        name: "has a disabled getter that returns a string",
+        path: "/custom-getter-string.html",
+        route: customPage("get disabled() { return 'false'; }"),
+    },
 ];
 
 const ENABLED_CUSTOM_ELEMENTS = [
@@ -97,6 +118,17 @@ const ENABLED_CUSTOM_ELEMENTS = [
         name: "has no disabled property",
         path: "/custom-no-property.html",
         route: customPage(""),
+    },
+    // Undefined is what an uninitialised reactive property reads as: the same as having none.
+    {
+        name: "has a disabled getter that returns undefined",
+        path: "/custom-getter-undefined.html",
+        route: customPage("get disabled() { return undefined; }"),
+    },
+    {
+        name: "declares a disabled field with no value",
+        path: "/custom-field-undefined.html",
+        route: customPage("disabled;"),
     },
 ];
 

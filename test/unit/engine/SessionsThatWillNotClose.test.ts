@@ -8,6 +8,8 @@ import { OPEN_CART, unsafePlan, type JsonRecord } from "./unsafe-feature-steps.t
 
 const CLOSE_FAILURE = "the profile folder is still held";
 const SESSION_CLOSE_FAILED = "session-close-failed";
+const LONGEST_CLOSE_MILLISECONDS = 10 * 60 * 1000;
+const TIME_PASSING_AT_A_GO_MILLISECONDS = 100;
 
 const FAILING_CHECK: JsonRecord = {
     type: "expect",
@@ -65,6 +67,42 @@ describe("Using the run", () => {
                         const kept = JSON.stringify(result);
                         assert.equal(kept.includes(CLOSE_FAILURE), false);
                         assert.equal(kept.includes(SESSION_CLOSE_FAILED), false);
+                    });
+                });
+            });
+
+            describe("and a session whose close never settles", () => {
+                describe("when the run ends", () => {
+                    test("then it should finish with the same result, and log session-close-failed once", async (context) => {
+                        const raw = unsafePlan(verdict.steps);
+                        const closing = await runOnFakeSession(raw);
+                        context.mock.timers.enable({ apis: ["setTimeout"] });
+                        const close = context.mock.fn(() => new Promise<void>(() => {}));
+                        const progress = { isFinished: false };
+                        const running = runOnFakeSession(raw, {
+                            session: fakeSessionOnOrders({ close }),
+                        }).finally(() => {
+                            progress.isFinished = true;
+                        });
+                        for (
+                            let waited = 0;
+                            !progress.isFinished && waited < LONGEST_CLOSE_MILLISECONDS;
+                            waited += TIME_PASSING_AT_A_GO_MILLISECONDS
+                        ) {
+                            await new Promise((resolve) => {
+                                setImmediate(resolve);
+                            });
+                            context.mock.timers.tick(TIME_PASSING_AT_A_GO_MILLISECONDS);
+                        }
+                        assert.equal(close.mock.callCount(), 1, "the run reached the close");
+                        assert.ok(progress.isFinished, "the run was still waiting for the close");
+                        const { result, events } = await running;
+                        assert.equal(result.resultHash, closing.result.resultHash);
+                        assert.equal(
+                            events.read().filter((event) => event.code === SESSION_CLOSE_FAILED)
+                                .length,
+                            1,
+                        );
                     });
                 });
             });
