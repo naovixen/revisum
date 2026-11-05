@@ -12,7 +12,13 @@ const [, , leftoverIdFile, ...flags] = process.argv;
 const profileFlag = flags.find((flag) => flag.startsWith('--user-data-dir='));
 
 // Ends itself in the end, so a failed test leaves nothing behind for long.
-const leftover = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 90000)', '--', profileFlag], { stdio: 'ignore', windowsHide: true });
+// Detached, because on Windows a child that is not detached is in a job that ends with its parent.
+const leftover = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 90000)', '--', profileFlag], {
+  detached: true,
+  stdio: 'ignore',
+  windowsHide: true,
+});
+leftover.unref();
 writeFileSync(leftoverIdFile, String(leftover.pid));
 
 const server = createServer();
