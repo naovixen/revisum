@@ -17,6 +17,7 @@ import {
 import { echoForms } from "./secret-examples.ts";
 import { jsonReply, requestLine, shopWith } from "./service-call-examples.ts";
 import { DATABASE_SECRET, OPEN_CART, unsafePlan, type JsonRecord } from "./unsafe-feature-steps.ts";
+import { FAKE_ELEMENT } from "#test-support/fakes/FakePage.ts";
 
 const SHORT_SECRET = "4821";
 const ORDINARY_VALUE = "Ada";
@@ -89,15 +90,7 @@ const ROUTES: readonly {
         },
         holding: (value) => {
             const probe: Session["probe"] = () =>
-                Promise.resolve({
-                    count: 1,
-                    visible: true,
-                    enabled: true,
-                    text: value,
-                    value: null,
-                    sensitive: false,
-                    box: null,
-                });
+                Promise.resolve({ ...FAKE_ELEMENT, text: value });
             return { session: fakeSessionOnOrders({ probe }) };
         },
     },

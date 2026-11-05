@@ -28,6 +28,7 @@ import {
     projectWith,
 } from "./run-value-examples.ts";
 import { fakeDriverOpening } from "#test-support/fakes/FakeDriver.ts";
+import { FAKE_ELEMENT } from "#test-support/fakes/FakePage.ts";
 import { driversOf, fakePorts } from "#test-support/fakes/FakePorts.ts";
 
 const THIS_MACHINE = { platform: "test", arch: "test" };
@@ -39,15 +40,7 @@ const RECORDED_ORIGINS: readonly string[] = [EARLY_ORIGIN, LATE_ORIGIN];
 
 const PLAN = planOf([OPEN_ORDERS]);
 
-const HIDDEN_ELEMENT: ElementProbe = {
-    count: 1,
-    visible: false,
-    enabled: true,
-    text: "Ready",
-    value: "Ready",
-    sensitive: false,
-    box: null,
-};
+const HIDDEN_ELEMENT: ElementProbe = { ...FAKE_ELEMENT, visible: false, value: "Ready" };
 
 type PageState = { readonly probe: ElementProbe; readonly origins: readonly string[] };
 

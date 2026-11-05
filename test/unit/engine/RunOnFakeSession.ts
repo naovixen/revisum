@@ -33,21 +33,22 @@ import { fakeClock } from "#test-support/fakes/FakeClock.ts";
 import { fakeDriver } from "#test-support/fakes/FakeDriver.ts";
 import { fakeEventSink } from "#test-support/fakes/FakeEventSink.ts";
 import { fakeNetworkPort } from "#test-support/fakes/FakeNetworkPort.ts";
+import { FAKE_ELEMENT } from "#test-support/fakes/FakePage.ts";
 import { driversOf, fakePorts } from "#test-support/fakes/FakePorts.ts";
 import { fakeRunEventSink } from "#test-support/fakes/FakeRunEventSink.ts";
 import { fakeSecretStore } from "#test-support/fakes/FakeSecretStore.ts";
 import { fakeSession } from "#test-support/fakes/FakeSession.ts";
 
-export const SHOWN_ELEMENT: ElementProbe = {
-    count: 1,
-    visible: true,
+export const SHOWN_ELEMENT: ElementProbe = { ...FAKE_ELEMENT, value: "Ready" };
+export const NO_ELEMENT: ElementProbe = {
+    count: 0,
+    visible: false,
     enabled: true,
-    text: "Ready",
-    value: "Ready",
+    text: "",
+    value: null,
     sensitive: false,
     box: null,
 };
-export const NO_ELEMENT: ElementProbe = { ...SHOWN_ELEMENT, count: 0, text: "", value: null };
 
 // A session whose frames and tabs are the session itself, unless `changes` says otherwise.
 export const fakeSessionOnOrders = (changes: Partial<Session> = {}): Session =>

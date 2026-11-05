@@ -110,14 +110,6 @@ describe("Using the oracle", () => {
                     });
                 });
             });
-
-            describe("and a driver that reads no states", () => {
-                describe("when the element is judged", () => {
-                    test("then it should fail with state-not-exposed", () => {
-                        assert.deepEqual(checkElement({ kind }, SHOWN_ELEMENT), STATE_NOT_EXPOSED);
-                    });
-                });
-            });
         });
     }
 

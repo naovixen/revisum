@@ -4,11 +4,14 @@ import {
     runTimeText,
     type AccessibleStates,
     type ElementProbe,
+    type ElementsRead,
+    type OneElementRead,
     type ResolvedElementAssertion,
     type SafeText,
     type UnreadablePage,
     type Verdict,
 } from "@revisum/engine";
+import { severalElements } from "#test-support/fakes/SeveralElements.ts";
 
 export const BASE_URL = "https://shop.example.test";
 export const ORDERS_URL = `${BASE_URL}/orders`;
@@ -26,9 +29,7 @@ export function safe(text: string): SafeText {
     return checked;
 }
 
-export type ReadElements = Extract<ElementProbe, { readonly count: number }>;
-
-export const SHOWN_ELEMENT: ReadElements = {
+export const SHOWN_ELEMENT: OneElementRead = {
     count: 1,
     visible: true,
     enabled: true,
@@ -36,20 +37,33 @@ export const SHOWN_ELEMENT: ReadElements = {
     value: "Ada Lovelace",
     sensitive: false,
     box: null,
+    states: { selected: null, expanded: null, pressed: null, current: null },
+    href: null,
 };
-export const NOTHING: ReadElements = {
-    ...SHOWN_ELEMENT,
+export const NOTHING: ElementsRead = {
     count: 0,
     visible: false,
+    enabled: true,
     text: "",
     value: null,
+    sensitive: false,
+    box: null,
 };
-export const NOT_SHOWN: ReadElements = { ...SHOWN_ELEMENT, visible: false };
-export const DISABLED: ReadElements = { ...SHOWN_ELEMENT, enabled: false };
-export const NO_VALUE: ReadElements = { ...SHOWN_ELEMENT, value: null };
-export const REJECTED_SELECTOR: ReadElements = { ...NOTHING, selectorInvalid: true };
+export const NOT_SHOWN: OneElementRead = { ...SHOWN_ELEMENT, visible: false };
+export const DISABLED: OneElementRead = { ...SHOWN_ELEMENT, enabled: false };
+export const NO_VALUE: OneElementRead = { ...SHOWN_ELEMENT, value: null };
+export const REJECTED_SELECTOR: ElementsRead = { ...NOTHING, selectorInvalid: true };
 export const unreadable = (count: UnreadablePage): ElementProbe => ({ count });
-export const twoOf = (probe: ReadElements): ReadElements => ({ ...probe, count: 2 });
+// What a read of several elements holds of them: no states, link or DOM read, since those are of one.
+export const twoOf = (probe: OneElementRead): ElementsRead => ({
+    count: severalElements(2),
+    visible: probe.visible,
+    enabled: probe.enabled,
+    text: probe.text,
+    value: probe.value,
+    sensitive: probe.sensitive,
+    box: probe.box,
+});
 export const statesOf = (states: Partial<AccessibleStates>): ElementProbe => ({
     ...SHOWN_ELEMENT,
     states: { selected: null, expanded: null, pressed: null, current: null, ...states },

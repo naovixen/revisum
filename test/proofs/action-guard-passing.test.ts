@@ -9,6 +9,7 @@ import { test } from 'node:test';
 import { parseProject, planParser, run, success, type ActionGuard, type ActionStep, type BrowserDriver, type ElementProbe, type TargetId } from '@revisum/engine';
 import { authorise, trustedProjectFrom } from '../support/policy-clearance.ts';
 import { fakeDriverOpening } from '#test-support/fakes/FakeDriver.ts';
+import { FAKE_ELEMENT } from '#test-support/fakes/FakePage.ts';
 import { driversOf, fakePorts } from '#test-support/fakes/FakePorts.ts';
 import { fakeSession } from '#test-support/fakes/FakeSession.ts';
 
@@ -49,7 +50,7 @@ const PLAN = {
 
 type ActCall = { readonly type: ActionStep['type']; readonly guard: ActionGuard | undefined };
 
-const SHOWN: ElementProbe = { count: 1, visible: true, enabled: true, text: 'Saved', value: null, sensitive: false, box: { x: 0, y: 0, width: 10, height: 10 } };
+const SHOWN: ElementProbe = { ...FAKE_ELEMENT, text: 'Saved', box: { x: 0, y: 0, width: 10, height: 10 } };
 
 // A driver that needs no browser and records each act() call and the guard it was given.
 function recordingDriver(): { readonly driver: BrowserDriver; readonly calls: ActCall[] } {

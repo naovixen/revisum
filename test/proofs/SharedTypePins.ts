@@ -34,6 +34,7 @@ import type {
     ROLES,
     RunnerError,
     SafeText,
+    SeveralElements,
     SinkError,
     Success,
     success,
@@ -136,7 +137,7 @@ type DriverPorts = [
     Pinned<
         Same<
             ElementProbe["count"],
-            number | "page-unreadable" | "dialog-open" | "navigation-failed"
+            0 | 1 | SeveralElements | "page-unreadable" | "dialog-open" | "navigation-failed"
         >
     >,
     Pinned<Same<DriverError, { readonly code: DriverErrorCode; readonly detail: string }>>,

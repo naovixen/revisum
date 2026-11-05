@@ -188,7 +188,6 @@ const ELEMENT_CASES: readonly {
                 seen: { ...SHOWN_ELEMENT, href: null },
                 verdict: FAILED,
             },
-            { probe: "a driver that reads no link", seen: SHOWN_ELEMENT, verdict: FAILED },
             {
                 probe: "a link that is no URL",
                 seen: { ...SHOWN_ELEMENT, href: "not a url" },

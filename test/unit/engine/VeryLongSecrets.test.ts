@@ -20,6 +20,7 @@ import { REPOSITORY_ROOT } from "../../support/repository.ts";
 import { fakeSessionOnOrders, runOnFakeSession } from "./RunOnFakeSession.ts";
 import { resolvedSecret } from "./secret-examples.ts";
 import { DATABASE_SECRET, OPEN_CART, unsafePlan, type JsonRecord } from "./unsafe-feature-steps.ts";
+import { FAKE_ELEMENT } from "#test-support/fakes/FakePage.ts";
 
 const LENGTHS: readonly number[] = [5_200, 20_000];
 
@@ -102,15 +103,7 @@ const FAILING_CHECK: JsonRecord = {
     criterionId: "status.signed-in",
 };
 
-const showing = (text: string): ElementProbe => ({
-    count: 1,
-    visible: true,
-    enabled: true,
-    text,
-    value: null,
-    sensitive: false,
-    box: null,
-});
+const showing = (text: string): ElementProbe => ({ ...FAKE_ELEMENT, text });
 
 const runShowing = (value: string, shown: string) =>
     runOnFakeSession(unsafePlan([OPEN_CART, FILL_SECRET, FAILING_CHECK]), {

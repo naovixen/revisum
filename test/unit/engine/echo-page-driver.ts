@@ -5,7 +5,7 @@
 // reveal: it looks the typed value up by the secret's name, as a real page would hold it.
 import { performableLocator, success, type BrowserDriver, type ElementProbe, type Locator } from '@revisum/engine';
 import { ORIGIN } from './secret-examples.ts';
-import { performableAction, READ_FAILED } from '#test-support/fakes/FakePage.ts';
+import { FAKE_ELEMENT, performableAction, READ_FAILED } from '#test-support/fakes/FakePage.ts';
 import { fakeSession } from '#test-support/fakes/FakeSession.ts';
 import { fakeDriverOpening } from '#test-support/fakes/FakeDriver.ts';
 
@@ -28,7 +28,7 @@ function elementKey(locator: Locator): string {
 export function echoPageDriver(page: EchoPage): BrowserDriver & { readonly calls: EchoPageCalls; readonly fieldValues: ReadonlyMap<string, string> } {
   const calls: EchoPageCalls = { navigations: 0, actions: 0, probes: 0 };
   const fieldValues = new Map<string, string>();
-  const shown = (text: string, value: string | null): ElementProbe => ({ count: 1, visible: true, enabled: true, text, value, sensitive: false, box: null });
+  const shown = (text: string, value: string | null): ElementProbe => ({ ...FAKE_ELEMENT, text, value });
   const session = fakeSession({
     browser: { name: 'echo-page-browser', version: '1.0' },
     navigate: () => { calls.navigations++; return Promise.resolve(success(undefined)); },

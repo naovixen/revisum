@@ -18,8 +18,8 @@ import {
     type DownloadStep,
     type DriverError,
     type ElementProbe,
-    type ElementsRead,
     type Locator,
+    type OneElementRead,
     type ResolvedActionStep,
     type ResolvedElement,
     type ResolvedLocator,
@@ -27,7 +27,7 @@ import {
     type Secret,
 } from "@revisum/engine";
 
-export const FAKE_ELEMENT: ElementsRead = {
+export const FAKE_ELEMENT: OneElementRead = {
     count: 1,
     visible: true,
     enabled: true,
@@ -35,6 +35,8 @@ export const FAKE_ELEMENT: ElementsRead = {
     value: null,
     sensitive: false,
     box: null,
+    states: { selected: null, expanded: null, pressed: null, current: null },
+    href: null,
 };
 export const FAKE_DOWNLOAD = new TextEncoder().encode("downloaded");
 
