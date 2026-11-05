@@ -30,7 +30,7 @@ const ONE_ELEMENT: ElementsRead = {
     states: { selected: null, expanded: null, pressed: null, current: null },
     href: null,
 };
-const NO_ELEMENT: ElementsRead = { ...FIELDS, count: 0 };
+const NO_ELEMENT: ElementsRead = { count: 0 };
 
 describe("Using the check of several elements", () => {
     for (const { count, isSeveral } of COUNTS) {

@@ -13,7 +13,7 @@ import { after, before, describe, test } from 'node:test';
 import type { ActionGuard, GuardVerdict, ResolvedElement, Session } from '@revisum/engine';
 import { allowEveryAction } from '#test-support/browser/AllowEveryAction.ts';
 import { BrowserTarget } from '#test-support/browser/BrowserTarget.ts';
-import { readableProbe } from '#test-support/browser/ReadableProbe.ts';
+import { expectOneElement } from '#test-support/browser/ExpectOneElement.ts';
 import { click, label, navigate, role, testId, textEquals, type JsonRecord } from '#test-support/browser/RawPlan.ts';
 import { UPLOAD_FIXTURE, capabilityCdpDriver, capabilityDrivers, capabilityHarness, capabilityPlan, shownText, watchedDriver, type CapabilityHarness } from '#test-support/capability-harness.ts';
 import { BROWSERS } from '#test-support/browsers.ts';
@@ -55,7 +55,7 @@ type GuardedAction = {
 };
 
 const shown = (id: string) => (session: Session): Promise<string> => shownText(capability, session, id);
-const noteValue = async (session: Session): Promise<string> => readableProbe(await session.probe(capability.locator(label('Note')))).value ?? '';
+const noteValue = async (session: Session): Promise<string> => expectOneElement(await session.probe(capability.locator(label('Note')))).value ?? '';
 
 const CLICK_FILL_AND_PRESS: readonly GuardedAction[] = [
   { name: 'click', step: click(role('button', 'Save draft')), element: { role: 'button', name: 'Save draft' }, effect: { read: shown('save-clicks'), untouched: '0', done: '1' } },

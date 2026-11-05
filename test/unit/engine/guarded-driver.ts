@@ -60,7 +60,7 @@ export function guardedDriver(steps: readonly JsonRecord[], page: PageViews = {}
   let guardCalls = 0;
   const session = fakeSession({
     browser: { name: 'guarded-browser', version: '1.0' },
-    page: () => Promise.resolve({ url: `${ORIGIN}/`, title: 'Account', meta: [], canonicalUrl: null }),
+    page: () => Promise.resolve(success({ url: `${ORIGIN}/`, title: 'Account', meta: [], canonicalUrl: null })),
     act: (step, guard, secret) => {
       const index = actingIndexes[actions] ?? -1;
       actions++;

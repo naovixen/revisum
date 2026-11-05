@@ -6,7 +6,7 @@ import { after, before, describe, test } from "node:test";
 import type { ActionGuard, DocumentSession, ResolvedElement } from "@revisum/engine";
 import { allowEveryAction } from "#test-support/browser/AllowEveryAction.ts";
 import { BrowserTarget } from "#test-support/browser/BrowserTarget.ts";
-import { readableProbe } from "#test-support/browser/ReadableProbe.ts";
+import { expectOneElement } from "#test-support/browser/ExpectOneElement.ts";
 import { click, label, testId, type JsonRecord } from "#test-support/browser/RawPlan.ts";
 import { shareBrowserInThisFile } from "#test-support/browser/ShareBrowserInThisFile.ts";
 import {
@@ -67,7 +67,7 @@ const failureCodeOf = async (
 };
 
 const shownOn = async (session: DocumentSession): Promise<string> =>
-    readableProbe(await session.probe(harness.locator(testId(SHOWN)))).text;
+    expectOneElement(await session.probe(harness.locator(testId(SHOWN)))).text;
 
 const CLICKS_ON_THE_FORM: readonly { readonly found: string; readonly locator: JsonRecord }[] = [
     { found: "its test id", locator: testId(CLICKED_FORM) },
@@ -96,7 +96,9 @@ describe("Using the real browser driver", () => {
             describe("when a plan reads the form", () => {
                 test("then it should find the one form, shown", async () => {
                     const probe = await onPage(formHoldingButtonPage(inputName), async (session) =>
-                        readableProbe(await session.probe(harness.locator(testId(CLICKED_FORM)))),
+                        expectOneElement(
+                            await session.probe(harness.locator(testId(CLICKED_FORM))),
+                        ),
                     );
                     assert.deepEqual(
                         { count: probe.count, visible: probe.visible, enabled: probe.enabled },

@@ -17,6 +17,7 @@ import type {
     DriverError,
     DriverErrorCode,
     ElementProbe,
+    ElementsRead,
     EventInput,
     EventSink,
     Failure,
@@ -25,7 +26,10 @@ import type {
     Locale,
     Origin,
     PageNavigator,
+    OneElementRead,
     PageProbe,
+    PageReadFailure,
+    PageReadFailureCode,
     PERSON_ACTOR_TYPES,
     Prober,
     RecorderError,
@@ -137,7 +141,35 @@ type DriverPorts = [
     Pinned<
         Same<
             ElementProbe["count"],
-            0 | 1 | SeveralElements | "page-unreadable" | "dialog-open" | "navigation-failed"
+            | 0
+            | 1
+            | SeveralElements
+            | "selector-invalid"
+            | "page-unreadable"
+            | "dialog-open"
+            | "navigation-failed"
+        >
+    >,
+    // A probe of anything but one element holds its count alone, so .text on it does not compile.
+    Pinned<Same<keyof Exclude<ElementsRead, OneElementRead>, "count">>,
+    // A rejected selector can carry no field beside its count.
+    Pinned<
+        Same<
+            Extract<ElementProbe, { readonly count: "selector-invalid" }>,
+            { readonly count: "selector-invalid" }
+        >
+    >,
+    Pinned<Same<PageReadFailureCode, "dialog-open" | "target-crashed" | "page-unreadable">>,
+    Pinned<Same<PageReadFailure, { readonly code: PageReadFailureCode; readonly detail: string }>>,
+    Pinned<Same<Awaited<ReturnType<PageNavigator["page"]>>, Result<PageProbe, PageReadFailure>>>,
+    Pinned<Same<Awaited<ReturnType<Camera["screenshot"]>>, Result<Uint8Array, PageReadFailure>>>,
+    Pinned<
+        Same<Awaited<ReturnType<Auditor["audit"]>>, Result<readonly A11yFinding[], PageReadFailure>>
+    >,
+    Pinned<
+        Same<
+            Awaited<ReturnType<Auditor["accessibilitySnapshot"]>>,
+            Result<A11yNode, PageReadFailure>
         >
     >,
     Pinned<Same<DriverError, { readonly code: DriverErrorCode; readonly detail: string }>>,

@@ -9,6 +9,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, describe, test } from 'node:test';
 import { allowEveryAction } from '#test-support/browser/AllowEveryAction.ts';
+import { expectRead } from '#test-support/ExpectRead.ts';
 import { onTarget } from '#test-support/TestTier.ts';
 import { BrowserTarget } from '#test-support/browser/BrowserTarget.ts';
 import { click, navigate, role, testId, textEquals } from '#test-support/browser/RawPlan.ts';
@@ -78,7 +79,7 @@ for (const targetId of Object.values(BrowserTarget)) {
           if (popupState !== 'closed') await new Promise((resolve) => setTimeout(resolve, 50));
         }
         assert.equal(popupState, 'closed');
-        assert.equal(new URL((await session.page()).url).pathname, '/pages.html');
+        assert.equal(new URL(expectRead(await session.page()).url).pathname, '/pages.html');
       } finally {
         await session.close();
       }

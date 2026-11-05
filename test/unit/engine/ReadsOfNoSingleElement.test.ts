@@ -19,9 +19,10 @@ import {
     NOTHING,
     NOT_FOUND,
     PASSED,
+    REJECTED_SELECTOR,
     SHOWN_ELEMENT,
     safe,
-    twoOf,
+    TWO_ELEMENTS,
 } from "./ShownElement.ts";
 import { OPEN_CART, REMEMBER_ATTRIBUTE, unsafePlan } from "./unsafe-feature-steps.ts";
 import { FAKE_ELEMENT } from "#test-support/fakes/FakePage.ts";
@@ -110,7 +111,7 @@ describe("Using the oracle", () => {
             describe("and a read of two elements that carries a satisfying DOM read", () => {
                 describe("when the element is judged", () => {
                     test("then it should fail with ambiguous", () => {
-                        const read = carryingDom(twoOf(SHOWN_ELEMENT), passingRead);
+                        const read = carryingDom(TWO_ELEMENTS, passingRead);
                         assert.deepEqual(checkElement(assertion, read), AMBIGUOUS);
                     });
                 });
@@ -122,7 +123,7 @@ describe("Using the oracle", () => {
 describe("Using a run that remembers an attribute of an element", () => {
     const noSingleMatch = [
         { name: "no element", read: NOTHING, code: "not-found" },
-        { name: "two elements", read: twoOf(SHOWN_ELEMENT), code: "ambiguous" },
+        { name: "two elements", read: TWO_ELEMENTS, code: "ambiguous" },
     ];
     for (const { name, read, code } of noSingleMatch) {
         describe(`given a page where the locator finds ${name}`, () => {
@@ -201,4 +202,39 @@ describe("Using a run that remembers an attribute of an element", () => {
             });
         });
     }
+
+    describe("given a selector the browser rejects", () => {
+        describe("when the step runs", () => {
+            test("then it should fail with selector-invalid, taking no value", async () => {
+                const { step } = await rememberAttributeFrom(REJECTED_SELECTOR);
+                assert.equal(step?.outcome, "failed");
+                assert.equal(step.code, "selector-invalid");
+                assert.equal(hasRememberedAnything(step), false);
+            });
+        });
+    });
+});
+
+describe("Using a run of a check", () => {
+    describe("given a selector the browser rejects", () => {
+        describe("when the check runs", () => {
+            test("then it should fail with selector-invalid, having observed no element", async () => {
+                const check = {
+                    type: "expect",
+                    locator: { by: "testId", testId: "status" },
+                    assert: { kind: "textEquals", value: "Ready" },
+                    criterionId: "status.text-shown",
+                };
+                const { result } = await runOnFakeSession(unsafePlan([OPEN_CART, check]), {
+                    session: fakeSessionOnOrders({
+                        probe: () => Promise.resolve(REJECTED_SELECTOR),
+                    }),
+                });
+                const step = result.steps[1];
+                assert.ok(step !== undefined, "the check has a result");
+                assert.equal(step.code, "selector-invalid");
+                assert.equal(step.observed, "(no element)");
+            });
+        });
+    });
 });

@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { after, before, describe, test } from "node:test";
 import { performableLocator, type DocumentSession } from "@revisum/engine";
 import { allowEveryAction } from "#test-support/browser/AllowEveryAction.ts";
-import { readableProbe } from "#test-support/browser/ReadableProbe.ts";
+import { expectOneElement } from "#test-support/browser/ExpectOneElement.ts";
 import { BrowserTarget } from "#test-support/browser/BrowserTarget.ts";
 import { click, fill, press, testId, type JsonRecord } from "#test-support/browser/RawPlan.ts";
 import { shareBrowserInThisFile } from "#test-support/browser/ShareBrowserInThisFile.ts";
@@ -52,7 +52,7 @@ after(async () => {
 });
 
 const tallyIn = async (document: DocumentSession): Promise<string> =>
-    readableProbe(await document.probe(harness.locator(testId(TALLY)))).text;
+    expectOneElement(await document.probe(harness.locator(testId(TALLY)))).text;
 
 const failureCodeOf = async (
     document: DocumentSession,

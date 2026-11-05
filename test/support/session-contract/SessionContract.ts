@@ -10,6 +10,7 @@ import {
     type Result,
     type Session,
 } from "@revisum/engine";
+import { isHeldByADialog } from "../IsHeldByADialog.ts";
 import { dialogContract } from "./DialogContract.ts";
 import { refusalsContract } from "./RefusalsContract.ts";
 import {
@@ -67,10 +68,7 @@ const SESSION_CALLS: readonly CallOn<Session>[] = [
     { name: "clipboard.readText", call: (session) => session.clipboard.readText(10) },
 ];
 
-const READS_THAT_THROW: readonly {
-    readonly name: string;
-    readonly call: (document: DocumentSession) => Promise<unknown>;
-}[] = [
+const PAGE_READS: readonly CallOn<DocumentSession>[] = [
     { name: "page", call: (session) => session.page() },
     { name: "screenshot", call: (session) => session.screenshot([]) },
     {
@@ -100,12 +98,12 @@ function membersOfAClosedSession(open: OpenSessionUnderTest): void {
         });
     }
 
-    for (const { name, call } of READS_THAT_THROW) {
+    for (const { name, call } of PAGE_READS) {
         describe(`when ${name} is asked`, () => {
-            test("then it should throw", async () => {
+            test("then it should answer target-crashed", async () => {
                 const { session } = await open();
                 await session.close();
-                await assert.rejects(async () => call(session));
+                assert.equal(failureCode(await call(session)), "target-crashed");
             });
         });
     }
@@ -144,7 +142,7 @@ function closedSessionContract(open: OpenSessionUnderTest): void {
                 assert.deepEqual(session.connectionFailures(), []);
                 assert.deepEqual(session.refusedRequestDecisions(), []);
                 assert.equal(session.unsupportedOpenings(), 0);
-                assert.equal(session.isDialogOpen(), false);
+                assert.equal(await isHeldByADialog(session), false);
                 assert.equal(session.crashed(), true);
             });
         });
@@ -170,11 +168,11 @@ function pageOfAClosedTab(open: OpenSessionUnderTest): void {
             });
         }
 
-        for (const { name, call } of READS_THAT_THROW) {
-            test(`then it should throw from ${name}`, async () => {
+        for (const { name, call } of PAGE_READS) {
+            test(`then it should answer ${name} with page-unreadable`, async () => {
                 const tab = await openTab(await open());
                 await tab.close();
-                await assert.rejects(async () => call(tab));
+                assert.equal(failureCode(await call(tab)), "page-unreadable");
             });
         }
 
@@ -271,7 +269,7 @@ function openTabContract(open: OpenSessionUnderTest): void {
                 assert.deepEqual(asked, []);
                 assert.equal(tab.crashed(), true);
                 assertNothingRead(await tab.probe(locatorOf(EXPORT_BUTTON)));
-                await assert.rejects(tab.page());
+                assert.equal(failureCode(await tab.page()), "target-crashed");
             });
         });
     });

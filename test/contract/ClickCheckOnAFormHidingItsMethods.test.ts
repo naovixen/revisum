@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { after, before, describe, test } from "node:test";
 import type { DocumentSession } from "@revisum/engine";
 import { allowEveryAction } from "#test-support/browser/AllowEveryAction.ts";
-import { readableProbe } from "#test-support/browser/ReadableProbe.ts";
+import { expectOneElement } from "#test-support/browser/ExpectOneElement.ts";
 import { BrowserTarget } from "#test-support/browser/BrowserTarget.ts";
 import { click, fill, press, testId, type JsonRecord } from "#test-support/browser/RawPlan.ts";
 import { shareBrowserInThisFile } from "#test-support/browser/ShareBrowserInThisFile.ts";
@@ -53,7 +53,7 @@ after(async () => {
 });
 
 const shownIn = async (document: DocumentSession, id: string): Promise<string | null> =>
-    readableProbe(await document.probe(harness.locator(testId(id)))).text;
+    expectOneElement(await document.probe(harness.locator(testId(id)))).text;
 
 const failureOf = async (document: DocumentSession, step: JsonRecord): Promise<Failure> => {
     const acted = await document.act(harness.actionStep(step), allowEveryAction);

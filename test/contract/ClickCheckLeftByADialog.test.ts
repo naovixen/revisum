@@ -6,7 +6,8 @@ import assert from "node:assert/strict";
 import { after, before, describe, test } from "node:test";
 import { performableLocator, type DocumentSession } from "@revisum/engine";
 import { allowEveryAction } from "#test-support/browser/AllowEveryAction.ts";
-import { readableProbe } from "#test-support/browser/ReadableProbe.ts";
+import { expectRead } from "#test-support/ExpectRead.ts";
+import { expectOneElement } from "#test-support/browser/ExpectOneElement.ts";
 import { BrowserTarget } from "#test-support/browser/BrowserTarget.ts";
 import { click, fill, press, testId, type JsonRecord } from "#test-support/browser/RawPlan.ts";
 import { shareBrowserInThisFile } from "#test-support/browser/ShareBrowserInThisFile.ts";
@@ -62,7 +63,7 @@ after(async () => {
 });
 
 const shownIn = async (document: DocumentSession, id: string): Promise<string | null> =>
-    readableProbe(await document.probe(harness.locator(testId(id)))).text;
+    expectOneElement(await document.probe(harness.locator(testId(id)))).text;
 
 const clickOutcomeIn = async (document: DocumentSession): Promise<ClickOutcome> => {
     const acted = await document.act(harness.actionStep(click(testId(BUTTON))), allowEveryAction);
@@ -235,7 +236,7 @@ describe("Using the real browser driver", () => {
                     const url = await onPage(CONTROLS_PAGE, async (session) => {
                         await earlier(session);
                         await actIn(session, press(testId(LINK), "Enter"));
-                        return (await session.page()).url;
+                        return expectRead(await session.page()).url;
                     });
                     assert.ok(url.endsWith("#followed"), url);
                 });

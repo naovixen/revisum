@@ -13,7 +13,7 @@ import { allowEveryAction } from "#test-support/browser/AllowEveryAction.ts";
 import { outcomes, type BrowserHarness } from "#test-support/browser/BrowserHarness.ts";
 import { BrowserTarget } from "#test-support/browser/BrowserTarget.ts";
 import { click, navigate, testId } from "#test-support/browser/RawPlan.ts";
-import { readableProbe } from "#test-support/browser/ReadableProbe.ts";
+import { expectOneElement } from "#test-support/browser/ExpectOneElement.ts";
 import { shareBrowserInThisFile } from "#test-support/browser/ShareBrowserInThisFile.ts";
 import { capabilityHarness, type CapabilityHarness } from "#test-support/capability-harness.ts";
 import type { FixtureRoute } from "#test-support/fixture-server.ts";
@@ -122,7 +122,7 @@ const clickOutcomeIn = async (document: DocumentSession): Promise<ClickOutcome> 
     return {
         failureCode: acted.ok ? null : acted.error.code,
         elapsedMilliseconds,
-        ...parsedTally(readableProbe(await document.probe(harness.locator(testId(TALLY)))).text),
+        ...parsedTally(expectOneElement(await document.probe(harness.locator(testId(TALLY)))).text),
     };
 };
 

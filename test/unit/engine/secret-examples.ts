@@ -14,7 +14,7 @@
 //     the secret's value is the storage-state JSON.
 import { randomBytes } from 'node:crypto';
 import type { Secret, SecretStore } from '@revisum/contracts';
-import { environmentSecretStore, parseProject, planParser, run, type BrowserDriver, type Plan, type RunPorts, type Project, type RunResult, type SecretName, type TargetId } from '@revisum/engine';
+import { environmentSecretStore, parseProject, planParser, run, success, type BrowserDriver, type Plan, type RunPorts, type Project, type RunResult, type SecretName, type TargetId } from '@revisum/engine';
 import { authorise, trustedProjectFrom } from '../../support/policy-clearance.ts';
 import { fakeArtifactStore } from '#test-support/fakes/FakeArtifactStore.ts';
 import { fakeDriverNeverLaunching, fakeDriverOpening, type FakeDriver } from '#test-support/fakes/FakeDriver.ts';
@@ -155,7 +155,7 @@ export const spyDriver = (): FakeDriver => fakeDriverNeverLaunching({ info: { id
 
 // A driver whose page accepts every action and shows one status element, so a run reaches its manifest.
 export const quietDriver = (): BrowserDriver =>
-  fakeDriverOpening(fakeSession({ page: () => Promise.resolve({ url: `${ORIGIN}/`, title: 'Fake', meta: [], canonicalUrl: null }) }), { info: { id: 'fake', version: '1.0', protocol: 'none' } });
+  fakeDriverOpening(fakeSession({ page: () => Promise.resolve(success({ url: `${ORIGIN}/`, title: 'Fake', meta: [], canonicalUrl: null })) }), { info: { id: 'fake', version: '1.0', protocol: 'none' } });
 
 // ---- Running a plan with a secret store ----------------------------------------------------------
 

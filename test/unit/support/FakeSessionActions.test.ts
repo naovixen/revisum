@@ -14,6 +14,8 @@ import {
     type ResolvedElement,
 } from "@revisum/engine";
 import { FAKE_DOWNLOAD, fakeSession } from "#test-support/fakes/FakeSession.ts";
+import { isHeldByADialog } from "#test-support/IsHeldByADialog.ts";
+import { failureCode as failureCodeOf } from "#test-support/session-contract/SessionUnderTest.ts";
 import { testProject } from "../engine/plan-examples.ts";
 import {
     OPEN_ACCOUNT_PAGE,
@@ -240,10 +242,10 @@ describe("Using a fake session", () => {
 
         describe("when the session was told how to answer", () => {
             test("then it should have the tab answer the same way, with its own calls", async () => {
-                const session = fakeSession({ page: () => Promise.resolve(TOLD_PAGE) });
+                const session = fakeSession({ page: () => Promise.resolve(success(TOLD_PAGE)) });
                 const tab = await session.newTab("https://app.example/other");
                 assert.ok(tab.ok);
-                assert.deepEqual(await tab.value.page(), TOLD_PAGE);
+                assert.deepEqual(await tab.value.page(), success(TOLD_PAGE));
                 assert.equal(session.calls.count("page"), 0);
             });
         });
@@ -254,8 +256,9 @@ describe("Using a fake session", () => {
                 await session.newTab("https://app.example/other");
                 const [tab] = session.openedTabs();
                 tab?.openDialog("Keep the draft?");
-                assert.equal(tab?.isDialogOpen(), true);
-                assert.equal(session.isDialogOpen(), false);
+                assert.ok(tab !== undefined, "the tab opened");
+                assert.equal(await isHeldByADialog(tab), true);
+                assert.equal(await isHeldByADialog(session), false);
             });
         });
 
@@ -288,9 +291,9 @@ describe("Using a fake session", () => {
     describe("given a test's own answer", () => {
         describe("when it is asked for after the session has closed", () => {
             test("then it should give way to the closed session's", async () => {
-                const session = fakeSession({ page: () => Promise.resolve(TOLD_PAGE) });
+                const session = fakeSession({ page: () => Promise.resolve(success(TOLD_PAGE)) });
                 await session.close();
-                await assert.rejects(session.page());
+                assert.equal(failureCodeOf(await session.page()), "target-crashed");
             });
         });
     });

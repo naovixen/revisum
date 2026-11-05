@@ -7,6 +7,7 @@
 import assert from "node:assert/strict";
 import { after, before, describe, test } from "node:test";
 import { allowEveryAction } from "#test-support/browser/AllowEveryAction.ts";
+import { isHeldByADialog } from "#test-support/IsHeldByADialog.ts";
 import { BrowserTarget } from "#test-support/browser/BrowserTarget.ts";
 import { click, testId } from "#test-support/browser/RawPlan.ts";
 import { shareBrowserInThisFile } from "#test-support/browser/ShareBrowserInThisFile.ts";
@@ -175,7 +176,7 @@ const clickOn = async (page: string): Promise<ClickOutcome> => {
             harness.actionStep(click(testId(BUTTON))),
             allowEveryAction,
         );
-        const isDialogOpen = session.isDialogOpen();
+        const isDialogOpen = await isHeldByADialog(session);
         if (isDialogOpen) {
             const answered = await session.act(harness.actionStep(ANSWER), allowEveryAction);
             assert.ok(answered.ok, JSON.stringify(answered));

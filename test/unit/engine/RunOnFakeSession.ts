@@ -40,26 +40,20 @@ import { fakeSecretStore } from "#test-support/fakes/FakeSecretStore.ts";
 import { fakeSession } from "#test-support/fakes/FakeSession.ts";
 
 export const SHOWN_ELEMENT: ElementProbe = { ...FAKE_ELEMENT, value: "Ready" };
-export const NO_ELEMENT: ElementProbe = {
-    count: 0,
-    visible: false,
-    enabled: true,
-    text: "",
-    value: null,
-    sensitive: false,
-    box: null,
-};
+export const NO_ELEMENT: ElementProbe = { count: 0 };
 
 // A session whose frames and tabs are the session itself, unless `changes` says otherwise.
 export const fakeSessionOnOrders = (changes: Partial<Session> = {}): Session =>
     fakeSession({
         page: () =>
-            Promise.resolve({
-                url: `${ORIGIN}/orders`,
-                title: "Orders",
-                meta: [],
-                canonicalUrl: null,
-            }),
+            Promise.resolve(
+                success({
+                    url: `${ORIGIN}/orders`,
+                    title: "Orders",
+                    meta: [],
+                    canonicalUrl: null,
+                }),
+            ),
         probe: () => Promise.resolve(SHOWN_ELEMENT),
         ...changes,
     });

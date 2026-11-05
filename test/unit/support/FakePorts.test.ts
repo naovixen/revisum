@@ -58,7 +58,6 @@ const PORT_MEMBERS: readonly (keyof Session)[] = [
     "screenshotHidingFields",
     "frame",
     "crashed",
-    "isDialogOpen",
     "unsupportedOpenings",
     "download",
     "runScript",
@@ -103,7 +102,7 @@ describe("Using a fake port", () => {
         describe("when a step reads the page", () => {
             test("then it should show the fake page and note the call", async () => {
                 const session = fakeSession();
-                assert.deepEqual(await session.page(), FAKE_PAGE);
+                assert.deepEqual(await session.page(), success(FAKE_PAGE));
                 assert.deepEqual(session.calls.all(), [{ method: "page", arguments: [] }]);
             });
         });

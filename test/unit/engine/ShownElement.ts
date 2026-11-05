@@ -40,30 +40,13 @@ export const SHOWN_ELEMENT: OneElementRead = {
     states: { selected: null, expanded: null, pressed: null, current: null },
     href: null,
 };
-export const NOTHING: ElementsRead = {
-    count: 0,
-    visible: false,
-    enabled: true,
-    text: "",
-    value: null,
-    sensitive: false,
-    box: null,
-};
+export const NOTHING: ElementsRead = { count: 0 };
 export const NOT_SHOWN: OneElementRead = { ...SHOWN_ELEMENT, visible: false };
 export const DISABLED: OneElementRead = { ...SHOWN_ELEMENT, enabled: false };
 export const NO_VALUE: OneElementRead = { ...SHOWN_ELEMENT, value: null };
-export const REJECTED_SELECTOR: ElementsRead = { ...NOTHING, selectorInvalid: true };
+export const REJECTED_SELECTOR: ElementProbe = { count: "selector-invalid" };
 export const unreadable = (count: UnreadablePage): ElementProbe => ({ count });
-// What a read of several elements holds of them: no states, link or DOM read, since those are of one.
-export const twoOf = (probe: OneElementRead): ElementsRead => ({
-    count: severalElements(2),
-    visible: probe.visible,
-    enabled: probe.enabled,
-    text: probe.text,
-    value: probe.value,
-    sensitive: probe.sensitive,
-    box: probe.box,
-});
+export const TWO_ELEMENTS: ElementsRead = { count: severalElements(2) };
 export const statesOf = (states: Partial<AccessibleStates>): ElementProbe => ({
     ...SHOWN_ELEMENT,
     states: { selected: null, expanded: null, pressed: null, current: null, ...states },

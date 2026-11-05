@@ -5,6 +5,7 @@
 import assert from "node:assert/strict";
 import { arch, platform } from "node:os";
 import {
+    oneElementOf,
     parseProject,
     planParser,
     run,
@@ -35,6 +36,7 @@ import { authorise, trustedProjectFrom } from "../policy-clearance.ts";
 import { BrowserTarget } from "./BrowserTarget.ts";
 import { navigate, testId, visible, type JsonRecord } from "./RawPlan.ts";
 import { runningAtClose } from "./WrappingSessions.ts";
+import { expectRead } from "../ExpectRead.ts";
 import { realRunPorts } from "../RealRunPorts.ts";
 
 export type BrowserHarnessDefinition = {
@@ -216,7 +218,7 @@ function driversForRun(
         for (const id of testIds) {
             shown[id] = await context.shownOn(session, id);
         }
-        pages.push({ url: (await session.page()).url, shown });
+        pages.push({ url: expectRead(await session.page()).url, shown });
         await options.afterPageRead?.(session);
     };
     return new Map(
@@ -306,7 +308,8 @@ export async function startBrowserHarness(
     });
     const shownOn = async (session: Session, id: string): Promise<string | null> => {
         const probed = await session.probe(locator(testId(id)));
-        return probed.count === 1 ? probed.text : null;
+        const found = oneElementOf(probed);
+        return found.ok ? found.value.text : null;
     };
     const context: RunContext = { definition, watch, trusted, target, runInputs, shownOn };
     return {

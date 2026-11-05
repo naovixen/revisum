@@ -216,38 +216,34 @@ describe("Using the real browser driver", () => {
 
     describe("given the browser answers a page's reads with no remote object", () => {
         describe("when a plan reads the page", () => {
-            test("then it should reject with no language error", async () => {
+            test("then it should fail as unreadable, with no language error", async () => {
                 const read = await onOpenSession(PAGE, async (session) => {
                     relayed.relay.tamperWith({
                         method: "Runtime.callFunctionOn",
                         change: NO_REMOTE_OBJECT,
                     });
-                    return session.page().then(
-                        () => "resolved",
-                        (error: unknown) => String(error),
-                    );
+                    return session.page();
                 });
-                assert.notEqual(read, "resolved");
-                assert.doesNotMatch(read, WHAT_A_LANGUAGE_ERROR_SAYS);
+                assert.ok(!read.ok, "the read gave nothing");
+                assert.equal(read.error.code, "page-unreadable");
+                assert.doesNotMatch(read.error.detail, WHAT_A_LANGUAGE_ERROR_SAYS);
             });
         });
     });
 
     describe("given the browser answers the accessibility tree with no nodes", () => {
         describe("when a run reads the snapshot", () => {
-            test("then it should reject with no language error", async () => {
+            test("then it should fail as unreadable, with no language error", async () => {
                 const read = await onOpenSession(PAGE, async (session) => {
                     relayed.relay.tamperWith({
                         method: "Accessibility.getFullAXTree",
                         change: { result: {} },
                     });
-                    return session.accessibilitySnapshot().then(
-                        () => "resolved",
-                        (error: unknown) => String(error),
-                    );
+                    return session.accessibilitySnapshot();
                 });
-                assert.notEqual(read, "resolved");
-                assert.doesNotMatch(read, WHAT_A_LANGUAGE_ERROR_SAYS);
+                assert.ok(!read.ok, "the read gave nothing");
+                assert.equal(read.error.code, "page-unreadable");
+                assert.doesNotMatch(read.error.detail, WHAT_A_LANGUAGE_ERROR_SAYS);
             });
         });
     });

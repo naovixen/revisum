@@ -5,6 +5,7 @@ import { setTimeout as pause } from "node:timers/promises";
 import { after, afterEach, before, describe } from "node:test";
 import type { Session } from "@revisum/engine";
 import { BrowserTarget } from "#test-support/browser/BrowserTarget.ts";
+import { isHeldByADialog } from "#test-support/IsHeldByADialog.ts";
 import { capabilityHarness, type CapabilityHarness } from "#test-support/capability-harness.ts";
 import type { FixtureRoute } from "#test-support/fixture-server.ts";
 import { sessionContract } from "#test-support/session-contract/SessionContract.ts";
@@ -29,7 +30,7 @@ const scriptOpeningADialog = (text: string): string =>
 
 async function untilADialogIsOpen(session: Session): Promise<void> {
     const deadline = Date.now() + STEP_TIMEOUT_MILLISECONDS;
-    while (!session.isDialogOpen()) {
+    while (!(await isHeldByADialog(session))) {
         assert.ok(Date.now() < deadline, "the page opens its dialog");
         await pause(DIALOG_POLL_MILLISECONDS);
     }

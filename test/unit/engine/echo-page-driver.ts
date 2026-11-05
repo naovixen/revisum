@@ -32,7 +32,7 @@ export function echoPageDriver(page: EchoPage): BrowserDriver & { readonly calls
   const session = fakeSession({
     browser: { name: 'echo-page-browser', version: '1.0' },
     navigate: () => { calls.navigations++; return Promise.resolve(success(undefined)); },
-    page: () => Promise.resolve({ url: `${ORIGIN}/`, title: 'Echo page', meta: [], canonicalUrl: null }),
+    page: () => Promise.resolve(success({ url: `${ORIGIN}/`, title: 'Echo page', meta: [], canonicalUrl: null })),
     act: (step, _guard, secret) => {
       calls.actions++;
       // What any driver refuses comes before the page: it keeps no value of a step it would not perform.
@@ -58,7 +58,7 @@ export function echoPageDriver(page: EchoPage): BrowserDriver & { readonly calls
       const typed = fieldValues.get(key);
       if (typed !== undefined) return Promise.resolve(shown('', typed));
       const text = locator.by === 'testId' && typeof locator.testId === 'string' ? page.texts?.[locator.testId] : undefined;
-      return Promise.resolve(text === undefined ? { count: 0, visible: false, enabled: false, text: '', value: null, sensitive: false, box: null } : shown(text, null));
+      return Promise.resolve(text === undefined ? { count: 0 } : shown(text, null));
     },
   });
   return {

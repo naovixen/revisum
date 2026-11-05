@@ -5,10 +5,10 @@
 // element a disabled property means nothing.
 import assert from "node:assert/strict";
 import { after, before, describe, test } from "node:test";
-import type { ElementsRead } from "@revisum/engine";
+import type { OneElementRead } from "@revisum/engine";
 import { allowEveryAction } from "#test-support/browser/AllowEveryAction.ts";
 import { BrowserTarget } from "#test-support/browser/BrowserTarget.ts";
-import { readableProbe } from "#test-support/browser/ReadableProbe.ts";
+import { expectOneElement } from "#test-support/browser/ExpectOneElement.ts";
 import { click, testId } from "#test-support/browser/RawPlan.ts";
 import { shareBrowserInThisFile } from "#test-support/browser/ShareBrowserInThisFile.ts";
 import {
@@ -238,8 +238,8 @@ const readOf = async (path: string) => {
     const session = await harness.openOwn(TARGET);
     try {
         assert.ok((await session.navigate(harness.url(path))).ok, `${path} loads`);
-        const first = readableProbe(await session.probe(harness.locator(testId(CONTROL))));
-        const second = readableProbe(await session.probe(harness.locator(testId(CONTROL))));
+        const first = expectOneElement(await session.probe(harness.locator(testId(CONTROL))));
+        const second = expectOneElement(await session.probe(harness.locator(testId(CONTROL))));
         return { first, second };
     } finally {
         await session.close();
@@ -263,7 +263,7 @@ const clickOn = async (path: string) => {
     }
 };
 
-const everythingButEnabled = (read: ElementsRead) => ({
+const everythingButEnabled = (read: OneElementRead) => ({
     count: read.count,
     visible: read.visible,
     text: read.text,

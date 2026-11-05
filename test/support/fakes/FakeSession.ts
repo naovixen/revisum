@@ -8,6 +8,7 @@ import {
     type DocumentSession,
     type DriverError,
     type PageProbe,
+    type PageReadFailure,
     type Result,
     type Session,
     type SessionTab,
@@ -18,6 +19,7 @@ import { fakeClockPort } from "./FakeClockPort.ts";
 import { fakeNetworkPort } from "./FakeNetworkPort.ts";
 import {
     actOnOpenPage,
+    DIALOG_HOLDS_PAGE,
     downloadOnOpenPage,
     NO_DIALOG,
     performableAction,
@@ -63,14 +65,17 @@ export type FakeSession = Recorded<Session> &
 
 // The real driver loses its connection on close, and reports that as a crash on anything it is
 // then asked to do.
-const CLOSED: DriverError = {
+const CLOSED: PageReadFailure = {
     code: DriverErrorCode.TargetCrashed,
     detail: "the session has closed",
 };
-const unreachable = <Value>(what: string): Promise<Value> =>
-    Promise.reject(new Error(`${what} cannot be read from a page that has gone`));
-const refusing = <Value>(error: DriverError): Promise<Result<Value, DriverError>> =>
-    Promise.resolve(failure(error));
+const TAB_UNREADABLE: PageReadFailure = {
+    code: DriverErrorCode.PageUnreadable,
+    detail: "the tab has closed",
+};
+const refusing = <Value, Reason extends DriverError>(
+    error: Reason,
+): Promise<Result<Value, Reason>> => Promise.resolve(failure(error));
 
 // The port as given, until `hasEnded` says it has gone: from then on the `ended` port answers every
 // member. It decides at each call, so a copy of the port made earlier ends with it.
@@ -99,25 +104,24 @@ const STORAGE_ONCE_CLOSED: StoragePort = {
 const CLOCK_ONCE_CLOSED: ClockPort = { advance: () => refusing(CLOSED) };
 const CLIPBOARD_ONCE_CLOSED: ClipboardPort = { readText: () => refusing(CLOSED) };
 
-// Nothing reaches the page once the session has closed: what can fail says the target crashed, a read
-// that cannot say so throws, and a probe reads nothing.
+// Nothing reaches the page once the session has closed: what can fail says the target crashed, and a
+// probe reads nothing.
 function documentOnceClosed(open: DocumentSession): DocumentSession {
     return {
         navigate: () => refusing(CLOSED),
-        page: () => unreachable("the page"),
+        page: () => refusing(CLOSED),
         act: () => refusing(CLOSED),
         probe: () => Promise.resolve(READ_FAILED),
-        screenshot: () => unreachable("a screenshot"),
-        screenshotHidingFields: () => unreachable("a screenshot"),
-        audit: () => unreachable("an audit"),
-        accessibilitySnapshot: () => unreachable("the accessibility tree"),
+        screenshot: () => refusing(CLOSED),
+        screenshotHidingFields: () => refusing(CLOSED),
+        audit: () => refusing(CLOSED),
+        accessibilitySnapshot: () => refusing(CLOSED),
         frame: () => refusing(CLOSED),
         crashed: () => true,
-        isDialogOpen: () => false,
         unsupportedOpenings: () => open.unsupportedOpenings(),
         download: () => refusing(CLOSED),
         runScript: () => refusing(CLOSED),
-        linkTargets: () => unreachable("the links"),
+        linkTargets: () => refusing(CLOSED),
     };
 }
 
@@ -140,14 +144,21 @@ function sessionOnceClosed(open: Session): Session {
 }
 
 // A tab closed in a session that goes on: its target has gone but the connection has not, so no crash
-// is reported. A wait finds nothing and every other command fails as it does on a target that has
-// gone. What a driver refuses before it touches the page comes first, as on an open tab.
+// is reported, so a read of it can say only that nothing answered. A wait finds nothing and every other
+// command fails as it does on a target that has gone. What a driver refuses before it touches the page
+// comes first, as on an open tab.
 function tabOnceClosed(open: DocumentSession): SessionTab {
     return {
         ...documentOnceClosed(open),
         close: () => Promise.resolve(),
         navigate: () =>
             refusing({ code: DriverErrorCode.NavigationFailed, detail: "the tab has closed" }),
+        page: () => refusing(TAB_UNREADABLE),
+        screenshot: () => refusing(TAB_UNREADABLE),
+        screenshotHidingFields: () => refusing(TAB_UNREADABLE),
+        audit: () => refusing(TAB_UNREADABLE),
+        accessibilitySnapshot: () => refusing(TAB_UNREADABLE),
+        linkTargets: () => refusing(TAB_UNREADABLE),
         act(...[step, , secret]) {
             if (step.type === "dialog") {
                 return refusing(NO_DIALOG);
@@ -166,25 +177,28 @@ function tabOnceClosed(open: DocumentSession): SessionTab {
     };
 }
 
+// A read of the page gives what it shows, unless a dialog holds it, as on the real driver.
+const readOf = <Value>(page: FakePage, shown: Value): Promise<Result<Value, PageReadFailure>> =>
+    Promise.resolve(page.dialogText === null ? success(shown) : failure(DIALOG_HOLDS_PAGE));
+
 // What a document's page does unless a test says otherwise. Its frames are the document itself.
 function pageAnswers(page: FakePage, thisDocument: () => DocumentSession): DocumentSession {
     return {
         navigate: () => Promise.resolve(success(undefined)),
-        page: () => Promise.resolve(FAKE_PAGE),
+        page: () => readOf(page, FAKE_PAGE),
         act: (step, guard, secret) => Promise.resolve(actOnOpenPage(page, step, guard, secret)),
         probe: (locator) => Promise.resolve(probeOpenPage(page, locator)),
-        screenshot: () => Promise.resolve(FAKE_PNG),
-        screenshotHidingFields: () => Promise.resolve(success(FAKE_PNG)),
-        audit: () => Promise.resolve([]),
-        accessibilitySnapshot: () => Promise.resolve(FAKE_SNAPSHOT),
+        screenshot: () => readOf(page, FAKE_PNG),
+        screenshotHidingFields: () => readOf(page, FAKE_PNG),
+        audit: () => readOf(page, []),
+        accessibilitySnapshot: () => readOf(page, FAKE_SNAPSHOT),
         frame: () => Promise.resolve(success(thisDocument())),
         crashed: () => false,
-        isDialogOpen: () => page.dialogText !== null,
         unsupportedOpenings: () => 0,
         download: (step, maximumBytes, guard) =>
             Promise.resolve(downloadOnOpenPage(page, step, maximumBytes, guard)),
         runScript: () => Promise.resolve(success("null")),
-        linkTargets: () => Promise.resolve([]),
+        linkTargets: () => readOf(page, []),
     };
 }
 

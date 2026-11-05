@@ -25,7 +25,7 @@
 import assert from 'node:assert/strict';
 import {
   defaultRedactor, failure, success,
-  type A11yNode, type DriverError, type PageProbe, type Plan, type Redactor, type Result, type TextReading, type TrustedProject,
+  type A11yNode, type DriverError, type PageProbe, type PageReadFailure, type PageReadFailureCode, type Plan, type Redactor, type Result, type TextReading, type TrustedProject,
 } from '@revisum/engine';
 import { fakeExploreDriver } from '#test-support/fakes/FakeExploreDriver.ts';
 
@@ -49,9 +49,9 @@ export type ExploreOptions = {
 // The driver port the crawl is given (contracts' ExploreDriver in the build notes).
 export type ExploreDriver = {
   navigate(url: string, options?: { readonly scripts: 'enabled' | 'disabled' }): Promise<Result<void, DriverError>>;
-  page(): Promise<PageProbe>;
-  accessibilitySnapshot(): Promise<A11yNode>;
-  linkTargets(): Promise<readonly string[]>;
+  page(): Promise<Result<PageProbe, PageReadFailure>>;
+  accessibilitySnapshot(): Promise<Result<A11yNode, PageReadFailure>>;
+  linkTargets(): Promise<Result<readonly string[], PageReadFailure>>;
 };
 export type CrawlOutcome = { readonly ok: true; readonly map: PageMap } | { readonly ok: false; readonly code: string };
 export type LineWarning = { readonly code: string; readonly line: number };
@@ -162,7 +162,10 @@ export type FakePage = {
   readonly tree?: A11yNode;
   // A page that does not load: navigate answers navigation-failed.
   readonly fails?: true;
+  // A page that loads and that one of a crawl's reads then gets nothing from.
+  readonly failingRead?: { readonly read: PageRead; readonly code: PageReadFailureCode };
 };
+export type PageRead = 'page' | 'accessibilitySnapshot' | 'linkTargets';
 export type FakeSite = ReadonlyMap<string, FakePage>;
 
 // A site from pages keyed by absolute URL without query or fragment.
@@ -177,6 +180,12 @@ const pageAt = (site: FakeSite, url: string): FakePage | undefined => {
   const parsed = new URL(url);
   return site.get(`${parsed.origin}${parsed.pathname}`);
 };
+
+// What a read of the current page gives: what it shows, unless that read is the page's failing one.
+const readOfPage = <Value>(read: PageRead, page: FakePage | undefined, shown: Value): Result<Value, PageReadFailure> =>
+  page?.failingRead?.read === read
+    ? failure({ code: page.failingRead.code, detail: `the fake site's ${read} failed` })
+    : success(shown);
 
 // One call made on the spy driver: the method's name and, for navigate, the URL.
 export type DriverCall = { readonly method: string; readonly url?: string };
@@ -198,15 +207,15 @@ export function spyExploreDriver(site: FakeSite): SpyExploreDriver {
     },
     async page() {
       calls.push({ method: 'page' });
-      return { url: current?.url ?? 'about:blank', title: current?.page.title ?? '', meta: [], canonicalUrl: null };
+      return readOfPage('page', current?.page, { url: current?.url ?? 'about:blank', title: current?.page.title ?? '', meta: [], canonicalUrl: null });
     },
     async accessibilitySnapshot() {
       calls.push({ method: 'accessibilitySnapshot' });
-      return current === undefined ? { role: 'document', name: '', children: [] } : current.page.tree ?? headingTree(current.page.title);
+      return readOfPage('accessibilitySnapshot', current?.page, current === undefined ? { role: 'document', name: '', children: [] } : current.page.tree ?? headingTree(current.page.title));
     },
     async linkTargets() {
       calls.push({ method: 'linkTargets' });
-      return current?.page.links ?? [];
+      return readOfPage('linkTargets', current?.page, current?.page.links ?? []);
     },
   });
   const spy = new Proxy(driver, {
@@ -240,7 +249,8 @@ export async function followEveryLink(driver: ExploreDriver, start: string, maxi
     if (!navigated.ok) continue;
     const act: unknown = Reflect.get(driver, 'act');
     if (typeof act === 'function') await Reflect.apply(act, driver, [{ type: 'click', locator: { by: 'role', role: 'button', name: 'Send' } }]);
-    for (const link of await driver.linkTargets()) {
+    const links = await driver.linkTargets();
+    for (const link of links.ok ? links.value : []) {
       if (!seen.has(link)) { seen.add(link); queue.push(link); }
     }
   }

@@ -26,7 +26,7 @@ import { driverWith, sessionWith } from "./browser/WrappingSessions.ts";
 import type { FixtureRoute } from "./fixture-server.ts";
 import { processTree, stillRunning, type RunningProcess } from "./process-tree.ts";
 import { FIXTURES } from "./repository.ts";
-import { readableProbe } from "./browser/ReadableProbe.ts";
+import { expectOneElement } from "./browser/ExpectOneElement.ts";
 
 export const SEED = 11;
 export const FIXED_TIME_MILLISECONDS = Date.UTC(2026, 9, 29, 9, 0, 0);
@@ -212,5 +212,5 @@ export async function shownText(
     session: Session,
     id: string,
 ): Promise<string> {
-    return readableProbe(await session.probe(harness.locator(testId(id)))).text;
+    return expectOneElement(await session.probe(harness.locator(testId(id)))).text;
 }

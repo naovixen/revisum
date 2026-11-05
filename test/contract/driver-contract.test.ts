@@ -6,6 +6,8 @@ import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import { defaultRedactor, seededRandom, type A11yNode, type Session, type SessionEnvironment, type Step } from '@revisum/engine';
 import { allowEveryAction } from '#test-support/browser/AllowEveryAction.ts';
+import { expectOneElement } from '#test-support/browser/ExpectOneElement.ts';
+import { expectRead } from '#test-support/ExpectRead.ts';
 import { onTarget } from '#test-support/TestTier.ts';
 import type { BrowserHarness } from '#test-support/browser/BrowserHarness.ts';
 import { CONTRACT_TARGETS, EMAIL, FIXED_TIME_MILLISECONDS, LOCALE, SEED, TIMEZONE, environmentPlan, signupHarness, makeDrivers, signupPlan, stepsPlan } from '#test-support/signup-harness.ts';
@@ -97,7 +99,7 @@ for (const targetId of CONTRACT_TARGETS) {
     test('accessibility snapshot exposes the heading and named form controls', onTarget(targetId), async () => {
       const nodes = await withSession(targetId, async (session) => {
         assert.ok((await session.navigate(`${testHarness.server.origin}/`)).ok);
-        return flatten(await session.accessibilitySnapshot());
+        return flatten(expectRead(await session.accessibilitySnapshot()));
       });
       const has = (role: string, name: string): boolean => nodes.some((node) => node.role === role && node.name === name);
       assert.ok(has('heading', 'Create your account'));
@@ -113,10 +115,10 @@ for (const targetId of CONTRACT_TARGETS) {
         assert.ok(filled.ok);
         return session.probe(fill.locator);
       });
-      assert.equal(probe.count, 1);
-      assert.equal(probe.value, EMAIL);
-      assert.equal(probe.sensitive, true);
-      assert.ok(probe.box !== null && probe.box.width > 0 && probe.box.height > 0);
+      const element = expectOneElement(probe);
+      assert.equal(element.value, EMAIL);
+      assert.equal(element.sensitive, true);
+      assert.ok(element.box !== null && element.box.width > 0 && element.box.height > 0);
     });
   });
 }

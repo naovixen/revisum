@@ -6,7 +6,8 @@ import assert from "node:assert/strict";
 import { after, before, describe, test } from "node:test";
 import { performableLocator, type DocumentSession, type DriverError } from "@revisum/engine";
 import { allowEveryAction } from "#test-support/browser/AllowEveryAction.ts";
-import { readableProbe } from "#test-support/browser/ReadableProbe.ts";
+import { expectRead } from "#test-support/ExpectRead.ts";
+import { expectOneElement } from "#test-support/browser/ExpectOneElement.ts";
 import { BrowserTarget } from "#test-support/browser/BrowserTarget.ts";
 import { click, testId } from "#test-support/browser/RawPlan.ts";
 import { shareBrowserInThisFile } from "#test-support/browser/ShareBrowserInThisFile.ts";
@@ -179,7 +180,7 @@ const clickOutcomeIn = async (document: DocumentSession): Promise<ClickOutcome> 
     const acted = await document.act(clickOf(BUTTON), allowEveryAction);
     return {
         failureCode: acted.ok ? null : acted.error.code,
-        tally: readableProbe(await document.probe(harness.locator(testId(TALLY)))).text,
+        tally: expectOneElement(await document.probe(harness.locator(testId(TALLY)))).text,
     };
 };
 
@@ -268,7 +269,7 @@ describe("Using the real browser driver", () => {
                         const page = harness.url(TIMER_PAGE);
                         assert.ok((await session.navigate(page)).ok, "the page loads");
                         assert.deepEqual(await clickOutcomeIn(session), ONE_CLICK);
-                        assert.equal((await session.page()).title, title);
+                        assert.equal(expectRead(await session.page()).title, title);
                     } finally {
                         await session.close();
                     }
@@ -318,7 +319,7 @@ describe("Using the real browser driver", () => {
                 const loaded = await session.navigate(harness.url(page), { scripts: "disabled" });
                 assert.ok(loaded.ok, `${page} loads`);
                 const acted = await session.act(clickOf(LINK), allowEveryAction);
-                const { url, title } = await session.page();
+                const { url, title } = expectRead(await session.page());
                 return { acted, url, title };
             } finally {
                 await session.close();
@@ -376,7 +377,7 @@ describe("Using the real browser driver", () => {
                     assert.ok((await session.navigate(page)).ok, "the page loads");
                     const acted = await session.act(clickOf(BUTTON), allowEveryAction);
                     assert.deepEqual(acted, { ok: true, value: undefined });
-                    assert.equal((await session.page()).url, harness.url(ARRIVED_PAGE));
+                    assert.equal(expectRead(await session.page()).url, harness.url(ARRIVED_PAGE));
                 } finally {
                     await session.close();
                 }
@@ -397,7 +398,7 @@ describe("Using the real browser driver", () => {
                         detail: "the page stopped the click before it reached the element",
                     };
                     assert.deepEqual(acted, { ok: false, error: expected });
-                    const shown = readableProbe(
+                    const shown = expectOneElement(
                         await session.probe(harness.locator(testId(TALLY))),
                     );
                     assert.equal(shown.text, "1", "the framework's own click reached the handler");

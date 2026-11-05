@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { after, before, describe, test } from "node:test";
 import { allowEveryAction } from "#test-support/browser/AllowEveryAction.ts";
 import { BrowserTarget } from "#test-support/browser/BrowserTarget.ts";
-import { readableProbe } from "#test-support/browser/ReadableProbe.ts";
+import { expectOneElement } from "#test-support/browser/ExpectOneElement.ts";
 import { click, testId } from "#test-support/browser/RawPlan.ts";
 import { shareBrowserInThisFile } from "#test-support/browser/ShareBrowserInThisFile.ts";
 import { capabilityHarness, type CapabilityHarness } from "#test-support/capability-harness.ts";
@@ -150,7 +150,7 @@ const readAndClick = async (path: string) => {
     const session = await harness.openOwn(TARGET);
     try {
         assert.ok((await session.navigate(harness.url(path))).ok, `${path} loads`);
-        const read = readableProbe(await session.probe(harness.locator(testId(CONTROL))));
+        const read = expectOneElement(await session.probe(harness.locator(testId(CONTROL))));
         const acted = await session.act(
             harness.actionStep(click(testId(CONTROL))),
             allowEveryAction,

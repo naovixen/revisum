@@ -6,9 +6,9 @@ import { recordCalls, type Recorded } from "./RecordCalls.ts";
 export function fakeExploreDriver(overrides: Partial<ExploreDriver> = {}): Recorded<ExploreDriver> {
     const defaults: Required<ExploreDriver> = {
         navigate: () => Promise.resolve(success(undefined)),
-        page: () => Promise.resolve(FAKE_PAGE),
-        accessibilitySnapshot: () => Promise.resolve(FAKE_SNAPSHOT),
-        linkTargets: () => Promise.resolve([]),
+        page: () => Promise.resolve(success(FAKE_PAGE)),
+        accessibilitySnapshot: () => Promise.resolve(success(FAKE_SNAPSHOT)),
+        linkTargets: () => Promise.resolve(success([])),
     };
     return recordCalls({ ...defaults, ...overrides });
 }

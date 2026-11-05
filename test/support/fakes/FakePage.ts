@@ -20,6 +20,7 @@ import {
     type ElementProbe,
     type Locator,
     type OneElementRead,
+    type PageReadFailure,
     type ResolvedActionStep,
     type ResolvedElement,
     type ResolvedLocator,
@@ -75,7 +76,7 @@ export const NO_DIALOG: DriverError = {
     code: DriverErrorCode.NotFound,
     detail: "no dialog is open",
 };
-const DIALOG_HOLDS_PAGE: DriverError = {
+export const DIALOG_HOLDS_PAGE: PageReadFailure = {
     code: DriverErrorCode.DialogOpen,
     detail: "a dialog is open: a dialog step must answer it first",
 };

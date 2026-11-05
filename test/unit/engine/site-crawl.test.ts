@@ -2,9 +2,10 @@
 // depth 0. A page's link targets are kept when they are on the start origin; each is reduced to its
 // path (no query or fragment), de-duplicated against every path already seen, and queued in sorted
 // order. Pages are opened at origin plus path. At most maximumPages pages, none deeper than maximumDepth;
-// truncated is true exactly when a same-origin path was left unvisited because of a bound. A page
-// other than the start page that fails to load is left out and not counted; a start page that
-// fails gives explore-start-unreachable. The crawl only navigates and reads: it never clicks,
+// truncated is true exactly when a same-origin path was left unvisited because of a bound, or was left
+// out because it loaded and then could not be read. A page other than the start page that fails to
+// load is left out and not counted, and truncates nothing; a start page that fails gives
+// explore-start-unreachable. The crawl only navigates and reads: it never clicks,
 // types, selects, submits or runs page scripts.
 //
 // The site is held in memory (explore-examples.ts) and the driver is a spy that records every call

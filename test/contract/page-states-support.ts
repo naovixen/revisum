@@ -15,7 +15,7 @@ import { randomBytes } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { Session } from "@revisum/engine";
+import { oneElementOf, type Session } from "@revisum/engine";
 import { startBrowserHarness, type BrowserHarness } from "#test-support/browser/BrowserHarness.ts";
 import { BrowserTarget, englishMatrix } from "#test-support/browser/BrowserTarget.ts";
 import { driversForTargets } from "#test-support/browser/CreateBrowserDriver.ts";
@@ -321,7 +321,8 @@ export async function settledText(
     let shown = pending;
     while (Date.now() < deadline) {
         const probed = await session.probe(harness.locator(testId(id)));
-        shown = probed.count === 1 ? probed.text : "(not one element)";
+        const found = oneElementOf(probed);
+        shown = found.ok ? found.value.text : "(not one element)";
         if (shown !== pending) {
             return shown;
         }

@@ -103,7 +103,7 @@ export function recordingDriver(changes: Partial<Session> = {}): { readonly driv
   const session = fakeSession({
     browser: { name: 'recording-browser', version: '1.0' },
     navigate: (url) => { recording.navigations.push(url); return Promise.resolve(success(undefined)); },
-    page: () => Promise.resolve({ url: recording.navigations.at(-1) ?? `${ORIGIN}/`, title: PAGE_TITLE, meta: [], canonicalUrl: null }),
+    page: () => Promise.resolve(success({ url: recording.navigations.at(-1) ?? `${ORIGIN}/`, title: PAGE_TITLE, meta: [], canonicalUrl: null })),
     // Answers as a fake page does, so a step the engine left unresolved is refused here too.
     act: (step, guard, secret) => { recording.actions.push(step); return page.act(step, guard, secret); },
     probe: () => { recording.probes++; return Promise.resolve(FAKE_ELEMENT); },

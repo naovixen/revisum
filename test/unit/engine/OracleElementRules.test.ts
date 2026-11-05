@@ -21,7 +21,7 @@ import {
     VISIBLE,
     safe,
     statesOf,
-    twoOf,
+    TWO_ELEMENTS,
     unreadable,
 } from "./ShownElement.ts";
 
@@ -161,7 +161,7 @@ describe("Using the oracle", () => {
                 describe("when the element is judged", () => {
                     test("then it should fail with ambiguous", () => {
                         assert.deepEqual(
-                            checkElement(assertion, twoOf(SHOWN_ELEMENT), BASE_URL),
+                            checkElement(assertion, TWO_ELEMENTS, BASE_URL),
                             AMBIGUOUS,
                         );
                     });

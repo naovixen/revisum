@@ -18,7 +18,7 @@ const FILE_BYTES = new TextEncoder().encode("Report");
 
 const sessionOfOneRun = () =>
     fakeSessionOnOrders({
-        audit: () => Promise.resolve([FINDING]),
+        audit: () => Promise.resolve(success([FINDING])),
         download: () =>
             Promise.resolve(
                 success({

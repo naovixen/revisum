@@ -5,6 +5,8 @@
 import assert from "node:assert/strict";
 import { after, before, describe, test } from "node:test";
 import { allowEveryAction } from "#test-support/browser/AllowEveryAction.ts";
+import { expectOneElement } from "#test-support/browser/ExpectOneElement.ts";
+import { isHeldByADialog } from "#test-support/IsHeldByADialog.ts";
 import { BrowserTarget } from "#test-support/browser/BrowserTarget.ts";
 import { click, testId } from "#test-support/browser/RawPlan.ts";
 import { shareBrowserInThisFile } from "#test-support/browser/ShareBrowserInThisFile.ts";
@@ -150,7 +152,7 @@ const clickOn = async (page: string): Promise<ClickOutcome> => {
             harness.actionStep(click(testId(BUTTON))),
             allowEveryAction,
         );
-        const isDialogOpen = session.isDialogOpen();
+        const isDialogOpen = await isHeldByADialog(session);
         if (isDialogOpen) {
             const answered = await session.act(harness.actionStep(ANSWER), allowEveryAction);
             assert.ok(answered.ok, JSON.stringify(answered));
@@ -236,8 +238,9 @@ describe("Using the real browser driver", () => {
                 try {
                     const page = harness.url(ELEMENT_DISABLED_ONLY_IN_SCRIPT);
                     assert.ok((await session.navigate(page)).ok);
-                    const read = await session.probe(harness.locator(testId(CUSTOM_CONTROL)));
-                    assert.ok(read.count === 1, JSON.stringify(read));
+                    const read = expectOneElement(
+                        await session.probe(harness.locator(testId(CUSTOM_CONTROL))),
+                    );
                     assert.equal(read.enabled, false);
                 } finally {
                     await session.close();
