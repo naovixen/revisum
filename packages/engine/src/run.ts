@@ -303,6 +303,8 @@ type RunContext = {
 type StepContext = RunContext & { readonly session: Session };
 
 const POLL_INTERVAL_MILLISECONDS = 50;
+// Longer than a driver's stop takes to give up by itself, so this deadline is only for what has wedged.
+const LONGEST_SESSION_CLOSE_MILLISECONDS = 60_000;
 
 export async function run(given: RunInputs, ports: RunPorts): Promise<RunResult> {
   // First, before any side effect: a plan the parser did not make is refused, whatever its type says.
@@ -466,7 +468,7 @@ export async function run(given: RunInputs, ports: RunPorts): Promise<RunResult>
   } finally {
     // Read before the browser goes, with every answer the stubs gave.
     stubAnswers = readKeepingTheResult(() => session.network.stubAnswers(), [], logger);
-    await closeKeepingTheResult(session, logger);
+    await closeKeepingTheResult(session, ports.clock, logger);
   }
   // Read once the session has closed, when no decision is left waiting for the browser's answer. With
   // no later step to report one the browser refused after the last step ended, the last step stands
@@ -756,11 +758,40 @@ function logKeepingTheResult(event: Parameters<Logger['log']>[0], logger: Logger
 
 // A session that will not close, such as a browser profile Windows still holds, says nothing about
 // what the steps found. It stays out of the result, whose hash a replay on a calmer machine must match.
-async function closeKeepingTheResult(session: Session, logger: Logger): Promise<void> {
+// Nor does one that never answers hold the result back. Whatever comes of it after that goes unlogged, so
+// the failure is logged once.
+async function closeKeepingTheResult(session: Session, clock: Clock, logger: Logger): Promise<void> {
+  const closeFailed = 'session-close-failed';
+  const progress = { hasEnded: false, hasStoppedWaiting: false };
+  const closing = (async () => {
+    try {
+      await session.close();
+    } catch (error) {
+      if (!progress.hasStoppedWaiting) {
+        logFailureAfterTheVerdict(closeFailed, error, logger);
+      }
+    } finally {
+      progress.hasEnded = true;
+    }
+  })();
   try {
-    await session.close();
+    // A close with nothing to wait for has ended after one turn, which takes nothing from the clock.
+    await Promise.race([closing, clock.sleep(0)]);
+    const deadline = clock.now() + LONGEST_SESSION_CLOSE_MILLISECONDS;
+    while (!progress.hasEnded) {
+      if (clock.now() >= deadline) {
+        progress.hasStoppedWaiting = true;
+        logFailureAfterTheVerdict(closeFailed, `the session did not close within ${LONGEST_SESSION_CLOSE_MILLISECONDS} ms`, logger);
+        return;
+      }
+      await Promise.race([closing, clock.sleep(POLL_INTERVAL_MILLISECONDS)]);
+    }
   } catch (error) {
-    logFailureAfterTheVerdict('session-close-failed', error, logger);
+    // Only the clock can have failed, and with no clock there is no deadline to wait for the close by.
+    if (!progress.hasEnded) {
+      progress.hasStoppedWaiting = true;
+      logFailureAfterTheVerdict(closeFailed, error, logger);
+    }
   }
 }
 

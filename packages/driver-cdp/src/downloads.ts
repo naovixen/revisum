@@ -146,11 +146,19 @@ export class DownloadFolder implements DownloadCapture {
     const armed: Armed = { press: null, claimed: null, kept: false, discardsAside: [] };
     this.#mediaTypes.clear();
     this.#armed = armed;
+    let isBrowserSaving = false;
     return {
       expectFromPress: async (press) => {
+        // A press aimed anew was not sent, so a file claimed since the last aim is none of its doing.
+        const claimedTooEarly = armed.claimed;
+        if (claimedTooEarly !== null) {
+          armed.claimed = null;
+          armed.discardsAside.push(this.#discard(claimedTooEarly.downloadId).then(() => null, (error: unknown) => new Error(`a download could not be cancelled: ${errorText(error)}`)));
+        }
         armed.press = press;
-        if (press.canStartFile) {
-          await this.#behave({ behavior: 'allowAndName', downloadPath: folder });
+        if (press.canStartFile !== isBrowserSaving) {
+          isBrowserSaving = press.canStartFile;
+          await this.#behave(press.canStartFile ? { behavior: 'allowAndName', downloadPath: folder } : { behavior: 'deny' });
         }
       },
       finish: (maximumBytes, beginTimeoutMilliseconds, shouldStopWaiting) => this.#finish(armed, folder, maximumBytes, beginTimeoutMilliseconds, shouldStopWaiting),

@@ -248,18 +248,21 @@ function whyNotActionable<Handle>(look: ActionabilityLook<Handle>, timeoutMillis
   return { code: 'not-actionable', detail: `not ${missing} after ${timeoutMilliseconds} ms` };
 }
 
+// How long one wait for an element has. A look gets the whole of its limit, however little of the wait is
+// left, so only a page that has stopped answering fails with timeout. Failures name the step's timeout.
+type ActionableWait = { readonly waitMilliseconds: number; readonly lookLimitMilliseconds: number; readonly stepTimeoutMilliseconds: number };
+
 // Auto-wait: exactly one match that is attached, visible, stable, enabled and hit by a pointer at
 // its centre. Never the first of several matches; a typed failure at the deadline, or at once when
-// `crashed` says the page has died. One look gets the whole of `lookLimitMilliseconds`, however
-// little of the wait is left, so only a page that has stopped answering fails with timeout.
+// `crashed` says the page has died.
 async function waitUntilActionable<Handle>(
-  operations: PageOperations<Handle>, locator: ResolvedLocator, timeoutMilliseconds: number, lookLimitMilliseconds: number, crashed: () => boolean,
+  operations: PageOperations<Handle>, locator: ResolvedLocator, wait: ActionableWait, crashed: () => boolean,
 ): Promise<Actionable<Handle>> {
-  const deadline = Date.now() + timeoutMilliseconds;
+  const deadline = Date.now() + wait.waitMilliseconds;
   for (;;) {
-    const look = await forAtMost(lookLimitMilliseconds, lookForActionable(operations, locator));
+    const look = await forAtMost(wait.lookLimitMilliseconds, lookForActionable(operations, locator));
     if (look === TIMED_OUT) {
-      return failure(notAnswering(lookLimitMilliseconds));
+      return failure(notAnswering(wait.stepTimeoutMilliseconds));
     }
     const centre = look.check?.centre ?? null;
     if (look.element !== undefined && centre !== null && REQUIRED_STATES.every((state) => look.check?.[state] === true)) {
@@ -269,7 +272,7 @@ async function waitUntilActionable<Handle>(
       return failure(CRASHED);
     }
     if (Date.now() >= deadline) {
-      return failure(whyNotActionable(look, timeoutMilliseconds));
+      return failure(whyNotActionable(look, wait.stepTimeoutMilliseconds));
     }
     await pause(POLL_INTERVAL_MILLISECONDS);
   }
@@ -596,31 +599,46 @@ function documentPorts<Handle>(
     return ended === TIMED_OUT ? failure({ code: 'timeout', detail: `the input was still being handled after ${timeout} ms` }) : success(ended);
   };
 
+  // What is left of a step's one timeout, for a wait inside it. A look at a page still gets long enough to
+  // be answered, as input does, or a page that only has its hands full would read as one that has stopped.
+  const waitWithin = (stepDeadline: number): ActionableWait => {
+    const left = Math.max(stepDeadline - Date.now(), 0);
+    return { waitMilliseconds: left, lookLimitMilliseconds: Math.max(left, Math.min(SHORTEST_INPUT_MILLISECONDS, timeout)), stepTimeoutMilliseconds: timeout };
+  };
+
   // A click is sent once. The wait may find a new element, and the guard is asked about the one it
-  // finds, just before the send. A press that lands on another element is swallowed in the page and
+  // finds, just before the send. A pointer's arrival can move the element, and then no press goes: the
+  // wait, the guard and what comes before the press all go round again for wherever, and whichever, the
+  // element now is, under the step's one deadline. A press that lands on another element is swallowed in the page and
   // fails the step at once: sending it again could press whatever the page has put there since. A
   // press with an event that never got to the element was stopped, or held by a dialog, by a listener
   // of the page's that came first, so the click did nothing, whatever else the page did then, such as
   // taking the element away. The element may yet get it once a dialog is answered, which the step
   // cannot wait for.
   const click = async (locator: ResolvedLocator, guard: ActionGuard, beforePress: BeforePress<Handle>, stepDeadline: number): Promise<Result<void, DriverError>> => {
-    const waited = await waitUntilActionable(operations, locator, timeout, timeout, crashed);
-    if (!waited.ok) return waited;
-    const { element, at } = waited.value;
-    const denied = await clickDenial(operations, element, at, guard);
-    if (denied !== null) {
-      return failure(denied);
-    }
-    await beforePress(element, at);
-    const hit = await inputWithinTimeout(clickChecks.around(element, at), stepDeadline);
-    if (!hit.ok) {
-      return hit;
-    }
-    switch (hit.value) {
-      case HitCheckOutcome.Hit: return success(undefined);
-      case HitCheckOutcome.Miss: return failure({ code: 'not-actionable', detail: 'the click landed on another element' });
-      case HitCheckOutcome.None: return failure({ code: 'not-actionable', detail: 'no part of the press had reached the element when the step ended' });
-      case HitCheckOutcome.NoClick: return failure({ code: 'not-actionable', detail: 'the page stopped the click before it reached the element' });
+    for (;;) {
+      const waited = await waitUntilActionable(operations, locator, waitWithin(stepDeadline), crashed);
+      if (!waited.ok) return waited;
+      const { element, at } = waited.value;
+      const denied = await clickDenial(operations, element, at, guard);
+      if (denied !== null) {
+        return failure(denied);
+      }
+      await beforePress(element, at);
+      const hit = await inputWithinTimeout(clickChecks.around(element, at), stepDeadline);
+      if (!hit.ok) {
+        return hit;
+      }
+      switch (hit.value) {
+        case HitCheckOutcome.Hit: return success(undefined);
+        case HitCheckOutcome.Miss: return failure({ code: 'not-actionable', detail: 'the click landed on another element' });
+        case HitCheckOutcome.None: return failure({ code: 'not-actionable', detail: 'no part of the press had reached the element when the step ended' });
+        case HitCheckOutcome.NoClick: return failure({ code: 'not-actionable', detail: 'the page stopped the click before it reached the element' });
+        case HitCheckOutcome.MovedBeforeThePress:
+          if (Date.now() >= stepDeadline) {
+            return failure({ code: 'not-actionable', detail: `the element was still moving as the pointer reached it after ${timeout} ms, so no press was sent` });
+          }
+      }
     }
   };
 
@@ -637,7 +655,7 @@ function documentPorts<Handle>(
       await clickChecks.input.setFiles(found.value, [path.value]);
       return success(undefined);
     }
-    const waited = await waitUntilActionable(operations, action.locator, timeout, timeout, crashed);
+    const waited = await waitUntilActionable(operations, action.locator, { waitMilliseconds: timeout, lookLimitMilliseconds: timeout, stepTimeoutMilliseconds: timeout }, crashed);
     if (!waited.ok) return waited;
     const { element, at } = waited.value;
     const denied = await denial(operations, element, guard);

@@ -515,7 +515,9 @@ const CLICK_CHECK_WORLD_NAME = 'driver-click-check';
 // What the click checks' world calls to report a press as it goes, while nothing else can be read.
 const PRESS_REPORT_BINDING = 'driverPressReport';
 // How long what a check reported before a dialog opened, or its document went, is given to arrive. It
-// was on its way before either, by another route to the driver.
+// was on its way before either, by another route to the driver. A fixed wait, as no sync point exists
+// while a dialog holds the renderer: a command that could come back after the reports needs the renderer
+// to answer it, and that is what the dialog stops.
 const REPORTS_ARRIVE_MILLISECONDS = 100;
 // A kept check's objects are grouped by frame, so that one nobody holds any more can still be let go,
 // and letting go of one document's cannot touch a check that is live in another.
@@ -972,11 +974,18 @@ class CdpPage implements PageWithInput<string> {
     return listeners.some((listener) => PRESS_EVENT.test(listener.type));
   }
 
-  async click(_element: string, at: Point): Promise<PressSent> {
+  async click(_element: string, at: Point, centreOfElementNow: () => Promise<Point | null>): Promise<PressSent> {
     const offset = await this.#viewportOffset();
     const point = { x: at.x + offset.x, y: at.y + offset.y };
     const pressed = { ...point, button: 'left' as const, clickCount: 1 };
     await this.#sendInput(DISPATCH_MOUSE_EVENT, { type: 'mouseMoved', ...point });
+    // A parent page can move this document's frame, which a read inside the frame cannot see, so the aim
+    // is only good if both still agree. The element's own read comes last, closest to the press.
+    const offsetNow = await this.#viewportOffset();
+    const centre = await centreOfElementNow();
+    if (centre === null || !isSamePoint(centre, at) || !isSamePoint(offsetNow, offset)) {
+      return PressSent.NotSent;
+    }
     await this.#sendInput(DISPATCH_MOUSE_EVENT, { type: 'mousePressed', ...pressed });
     if (this.#watch.openDialog() !== null) return PressSent.HeldAtThePress;
     await this.#sendInput(DISPATCH_MOUSE_EVENT, { type: 'mouseReleased', ...pressed });
@@ -1105,6 +1114,8 @@ class CdpPage implements PageWithInput<string> {
 }
 
 // Decodes the {x, y} JSON frameContentOffset (in-page.ts) reports.
+const isSamePoint = (first: Point, second: Point): boolean => first.x === second.x && first.y === second.y;
+
 function decodePoint(text: string): Point {
   const parsed: unknown = JSON.parse(text);
   const fields = typeof parsed === 'object' && parsed !== null ? parsed as Record<string, unknown> : {};

@@ -11,6 +11,7 @@
 // While a dialog holds the page nothing in it can be read, and once its document has gone neither can
 // the check. So the check also reports as it goes, ahead of whatever the page does next.
 import type { PageInput, PageOperations, PageWithInput, Point } from "./page-operations.ts";
+import { PageHeldByDialog } from "./PageHeldByDialog.ts";
 
 export const HitCheckOutcome = {
     Hit: "hit",
@@ -20,6 +21,8 @@ export const HitCheckOutcome = {
     // An event of the press was on its way to the element and never reached it, or the press ended with
     // no click sent to it.
     NoClick: "no-click",
+    // The pointer's arrival left the element somewhere else, or nowhere, so no press was sent.
+    MovedBeforeThePress: "moved-before-the-press",
 } as const;
 
 export type HitCheckOutcome = (typeof HitCheckOutcome)[keyof typeof HitCheckOutcome];
@@ -196,6 +199,22 @@ function readHitCheck(this: ArmedHitCheck): string {
     return Reflect.get(Node.prototype, "isConnected", this.element) === true ? "no-click" : "hit";
 }
 
+// Called on the check, as `this`, once the pointer has arrived and before the press. The centre of the
+// element's first box, as the wait for it measures it, or null when it has no box. Where the element is
+// and nothing else: what the page has put over it is for the press to find out.
+function centreOfTheFirstBox(this: ArmedHitCheck): Point | null {
+    const boxes = Array.from(Element.prototype.getClientRects.call(this.element));
+    const firstBox = boxes.find((box) => box.width > 0 && box.height > 0);
+    return firstBox === undefined
+        ? null
+        : { x: firstBox.x + firstBox.width / 2, y: firstBox.y + firstBox.height / 2 };
+}
+
+// Called on the check, as `this`, when no press is going to follow.
+function disarmUnpressedHitCheck(this: ArmedHitCheck): void {
+    this.disarm();
+}
+
 // Called in a check's world. Says whether a check was still armed there.
 function disarmArmedHitCheck(): boolean {
     const world: WindowHoldingAHitCheck = window;
@@ -206,7 +225,11 @@ function disarmArmedHitCheck(): boolean {
 }
 
 // How far a press was sent before anything stopped it. A dialog holds the release back.
-export const PressSent = { HeldAtThePress: "held-at-the-press", Released: "released" } as const;
+export const PressSent = {
+    NotSent: "not-sent",
+    HeldAtThePress: "held-at-the-press",
+    Released: "released",
+} as const;
 export type PressSent = (typeof PressSent)[keyof typeof PressSent];
 
 // What a read of a press's check gave.
@@ -273,9 +296,48 @@ function decodedOutcome(reported: unknown): HitCheckOutcome {
     return outcome;
 }
 
+function decodedCentre(reported: unknown): Point | null {
+    if (reported === null) {
+        return null;
+    }
+    const fields: object = typeof reported === "object" ? reported : {};
+    const x: unknown = Reflect.get(fields, "x");
+    const y: unknown = Reflect.get(fields, "y");
+    if (typeof x !== "number" || typeof y !== "number") {
+        throw new Error("the browser did not say where the element is");
+    }
+    return { x, y };
+}
+
+// Where the element is once the pointer has arrived, or null when that cannot be anywhere the point is: a
+// document that has gone holds no element to press. A dialog stops the press as it would any input.
+async function centreOfElementIn(check: PressCheck): Promise<Point | null> {
+    const read = await check.read(centreOfTheFirstBox);
+    switch (read.kind) {
+        case "answered":
+            return decodedCentre(read.value);
+        case "document-gone":
+            return null;
+        case "held-by-dialog":
+            throw new PageHeldByDialog("reading where the element is");
+        case "failed":
+            throw new Error(read.detail);
+    }
+}
+
+// A check nothing will press against. One that a dialog holds stays for the next input to take off, and
+// one whose document has gone has gone with it.
+async function disarmUnpressed(check: PressCheck): Promise<void> {
+    const read = await check.read(disarmUnpressedHitCheck);
+    if (read.kind === "failed") {
+        throw new Error(read.detail);
+    }
+}
+
 export type HitChecks<Handle> = {
-    // Sends one press at the point, around a check armed for it, and says what became of it. Any check
-    // an earlier press left armed goes first. Throws when the page cannot say: whatever is thrown says
+    // Sends at most one press at the point, around a check armed for it, and says what became of it: none,
+    // when the pointer's arrival moved the element, as a person would look and aim again. Any check an
+    // earlier press left armed goes first. Throws when the page cannot say: whatever is thrown says
     // nothing of where the press went, so the step fails.
     around(element: Handle, at: Point): Promise<HitCheckOutcome>;
     // All other input to the page, each sent only once any check an earlier press left armed is off, in
@@ -308,7 +370,11 @@ export function hitChecks<Handle>(page: PageWithInput<Handle>): HitChecks<Handle
                 if (listening.kind !== "answered") {
                     throw new Error("the press's check could not listen for it");
                 }
-                const sent = await page.click(element, at);
+                const sent = await page.click(element, at, () => centreOfElementIn(check));
+                if (sent === PressSent.NotSent) {
+                    await disarmUnpressed(check);
+                    return HitCheckOutcome.MovedBeforeThePress;
+                }
                 const read = await check.read(readHitCheck);
                 switch (read.kind) {
                     case "answered":

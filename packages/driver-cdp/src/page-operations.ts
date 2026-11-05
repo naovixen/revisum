@@ -52,7 +52,7 @@ export interface PageOperations<Handle> {
   // for a pointer's events or does anything by itself when pressed.
   canPressStartAnything(element: Handle, at: Point): Promise<boolean>;
   // What a custom element's own disabled property says, read by running the page's code in the page's
-  // main world. Nothing else comes back. True only when the property is false or absent. A page that hangs
+  // main world. Nothing else comes back. True only when the property is false, undefined or absent. A page that hangs
   // in its code holds this up, and a dialog its code opens rejects this with PageHeldByDialog.
   isCustomElementEnabled(element: Handle): Promise<boolean>;
   // A PNG of the viewport.
@@ -68,8 +68,10 @@ export interface PageOperations<Handle> {
 // The input a session sends a document. It is apart from PageOperations so that a session can reach it
 // only through hitChecks (HitChecks.ts), and a new kind of input does not compile until it goes there.
 export interface PageInput<Handle> {
-  // Points are in this document's viewport. Says how far it got before a dialog stopped it.
-  click(element: Handle, at: Point): Promise<PressSent>;
+  // Moves the pointer to the point, in this document's viewport, then presses and releases there unless
+  // the aim has gone stale: `centreOfElementNow`, or where this document sits in the top viewport, no longer
+  // agrees with the point. Says how far it got before a dialog or a stale aim stopped it.
+  click(element: Handle, at: Point, centreOfElementNow: () => Promise<Point | null>): Promise<PressSent>;
   hover(at: Point): Promise<void>;
   // Inserts the text as typed text, line feeds included, with no key press for them.
   fill(element: Handle, value: string): Promise<void>;
@@ -132,7 +134,8 @@ export type DownloadPress = {
 };
 export interface ArmedDownload {
   // Called just before the press: lets the browser save the next download of the press's frame,
-  // and claims it for the caller. A download that began earlier is no download of the press.
+  // and claims it for the caller. A download that began earlier is no download of the press. Called
+  // again when the press was aimed anew and not sent, and then only this latest aim counts.
   expectFromPress(press: DownloadPress): Promise<void>;
   // Waits up to `beginTimeoutMilliseconds` for the claimed download to start (no-download), then
   // for its last byte. A file over `maximumBytes` is cancelled and its bytes deleted

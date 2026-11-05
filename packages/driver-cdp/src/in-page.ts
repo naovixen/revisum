@@ -24,10 +24,12 @@ export function enabledState(element: Element): string {
 
 // Called on a custom element, as `this`, in the page's own main world, so it calls nothing the page could
 // have replaced. Only this one boolean leaves it. A disabled that is anything but false, or that throws,
-// is not taken to mean enabled; an element with no such property has said nothing against it.
+// is not taken to mean enabled. One that reads undefined has said nothing against it, as one that is not
+// there has not: an uninitialised reactive property of a component library reads so, and behaves as enabled.
 export function isNotDisabledByItsProperty(this: Element): boolean {
   try {
-    return !('disabled' in this) || (this as HTMLButtonElement).disabled === false;
+    const disabled: unknown = (this as HTMLButtonElement).disabled;
+    return disabled === false || disabled === undefined;
   } catch {
     return false;
   }
