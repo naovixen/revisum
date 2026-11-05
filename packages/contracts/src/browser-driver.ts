@@ -281,8 +281,7 @@ export type SessionEnvironment = {
 };
 
 export interface PageNavigator {
-  // Without options, scripts run as usual.
-  navigate(url: string, options?: NavigateOptions): Promise<Result<void, DriverError>>;
+  navigate(url: string, options: NavigateOptions): Promise<Result<void, DriverError>>;
   page(): Promise<Result<PageProbe, PageReadFailure>>;
 }
 export interface ActionRunner {
@@ -297,8 +296,8 @@ export interface ActionRunner {
 }
 export interface Prober {
   // The engine replaces a locator's value references with their text before it probes. Given a
-  // DOM read, the driver reads that too, into the probe's `dom`.
-  probe(locator: Locator, read?: DomRead): Promise<ElementProbe>;
+  // DOM read, the driver reads that too, into the probe's `dom`; given null, it reads no DOM value.
+  probe(locator: Locator, read: DomRead | null): Promise<ElementProbe>;
 }
 
 // One run of a page script, as the engine hands it to a driver. The source is one function

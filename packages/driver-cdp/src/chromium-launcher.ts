@@ -5,10 +5,12 @@
 // utility and renderer processes join. Those may outlive the browser process by a moment, so
 // stopping waits until the whole group has exited, and ends what is left of it after a grace
 // period. Only that group is ever signalled: it holds nothing the driver did not start. On
-// Windows there are no such groups, so stopping ends the browser's process tree instead.
+// Windows there are no such groups, so stopping ends the browser's process tree instead, and then waits
+// for every process that names the profile folder to end, which is when Windows has let go of its files.
+// The folder is removed once, after that wait: on Windows a folder that something still holds cannot be.
 import { spawn, type ChildProcess } from "node:child_process";
 import { mkdtempSync, readdirSync, readFileSync } from "node:fs";
-import { rename, rm } from "node:fs/promises";
+import { rm } from "node:fs/promises";
 import { platform, tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Readable } from "node:stream";
@@ -61,7 +63,7 @@ export type LaunchedChromium = {
     readonly exited: Promise<void>;
     // Ends the browser's process tree on Windows, or elsewhere asks it to close and ends its process group.
     // Where the tree could not be ended it asks the browser to close there too, and forces it after a grace
-    // period. Then it removes the profile folder. Always ends inside 30 seconds. Rejects naming
+    // period. Then it waits for what holds the profile folder to end, and removes the folder once. Always ends inside 30 seconds. Rejects naming
     // what it left, a process or a folder, and resolves when it left nothing, however it got there. Stopping
     // again gives the same answer.
     stop(): Promise<void>;
@@ -77,14 +79,14 @@ const CLOSE_LIMIT_MILLISECONDS = 4_000;
 const FORCE_AFTER_MILLISECONDS = 3_000;
 const EXIT_GRACE_MILLISECONDS = 4_000;
 const EXIT_WHEN_FORCED_MILLISECONDS = 1_000;
-const FOLDER_RELEASE_MILLISECONDS = 4_000;
+// How long the browser's other processes on Windows are given to end, and so let go of the profile folder,
+// once the browser has: ending a process tree only asks Windows to end each process, and one being torn down
+// under load can take seconds to.
+const WINDOWS_RELEASE_MILLISECONDS = 4_000;
 const FOLDER_REMOVAL_MILLISECONDS = 3_000;
-const FOLDER_RELEASE_CHECK_MILLISECONDS = 50;
 
 const messageOf = (error: unknown): string =>
     error instanceof Error ? error.message : String(error);
-const codeOf = (error: unknown): unknown =>
-    error instanceof Error && "code" in error ? error.code : undefined;
 
 const pause = (milliseconds: number): Promise<void> =>
     new Promise((resolve) => {
@@ -106,44 +108,14 @@ async function settledWithin(work: Promise<unknown>, milliseconds: number): Prom
     }
 }
 
-// How a folder fails to move while Windows still holds something inside it.
-const HELD_FOLDER = ["EPERM", "EBUSY", "EACCES", "ENOTEMPTY"];
-
-// Takes the folder out of the way once nothing holds it, and gives where it now is, or null when it was not
-// there. A process's handles go a moment after the process does, and nothing reports it, so this waits for
-// that, by moving the folder, under one deadline: moving a folder that is held does nothing at all, so what
-// repeats is a question, and what removes the folder is sent once, by the caller. Rejects with what holds it
-// up at the deadline.
-async function movedOnceReleased(folder: string): Promise<string | null> {
-    const moved = `${folder}-being-removed`;
-    const giveUpAt = Date.now() + FOLDER_RELEASE_MILLISECONDS;
-    for (;;) {
-        try {
-            await rename(folder, moved);
-            return moved;
-        } catch (error) {
-            if (codeOf(error) === "ENOENT") {
-                return null;
-            }
-            if (!HELD_FOLDER.includes(String(codeOf(error))) || Date.now() >= giveUpAt) {
-                throw error;
-            }
-        }
-        await pause(FOLDER_RELEASE_CHECK_MILLISECONDS);
-    }
-}
-
-// Removes a profile folder. What it could not remove, or null.
+// Removes a profile folder, once, after stop has waited for what held it. What it could not remove, or null.
+// Whatever holds it then is not the browser's, or outlived the wait, and is reported, not waited for.
 async function folderLeftBehind(folder: string): Promise<string | null> {
     try {
-        const moved = await movedOnceReleased(folder);
-        if (moved === null) {
-            return null;
-        }
-        const removing = rm(moved, { recursive: true, force: true });
+        const removing = rm(folder, { recursive: true, force: true });
         return (await settledWithin(removing, FOLDER_REMOVAL_MILLISECONDS))
             ? null
-            : `the folder ${moved}, still being removed after ${FOLDER_REMOVAL_MILLISECONDS} ms`;
+            : `the folder ${folder}, still being removed after ${FOLDER_REMOVAL_MILLISECONDS} ms`;
     } catch (error) {
         return `the folder ${folder} (${messageOf(error)})`;
     }
@@ -275,19 +247,19 @@ async function hasBrowserExitedInTime(
     return settledWithin(exited, EXIT_WHEN_FORCED_MILLISECONDS);
 }
 
-// Which of the browser's other processes run on, on Windows, where what ended the browser did not end them
-// too. What stop has waited for on every platform is a grace period past the browser's exit, so what still
-// runs after one is what counts as left.
+// Which of the browser's other processes run on, on Windows, waiting for them to end first, as they hold the
+// profile folder until they have. Ending the tree only asks Windows to end them, so this waits even when that
+// worked. What stop waits for on every platform is a grace period past the browser's exit, so what still runs
+// after one is what counts as left.
 async function windowsProcessesLeftBehind(
     folder: string,
     browserProcess: ChildProcess,
-    ending: TreeEnding,
 ): Promise<readonly string[]> {
-    if (OWN_PROCESS_GROUP || ending.hasEnded || browserProcess.pid === undefined) {
+    if (OWN_PROCESS_GROUP || browserProcess.pid === undefined) {
         return [];
     }
     try {
-        return (await windowsProcessesLeft(folder, GROUP_GRACE_MILLISECONDS)).map(
+        return (await windowsProcessesLeft(folder, WINDOWS_RELEASE_MILLISECONDS)).map(
             (processId) => `the process ${processId}`,
         );
     } catch (error) {
@@ -319,7 +291,7 @@ async function stopBrowser(
             ? []
             : [`the browser process ${String(processId)}`]),
         ...((await endProcessGroup(processId)) ? [] : [`the process group ${String(processId)}`]),
-        ...(await windowsProcessesLeftBehind(userDataFolder, browserProcess, ending)),
+        ...(await windowsProcessesLeftBehind(userDataFolder, browserProcess)),
     ];
     connection?.close();
     const folderLeft = await folderLeftBehind(userDataFolder);

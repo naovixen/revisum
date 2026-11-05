@@ -21,13 +21,13 @@ const FAILED: Verdict = { pass: false, code: 'assertion-failed' };
 const STATE_NOT_EXPOSED: Verdict = { pass: false, code: 'state-not-exposed' };
 const NAVIGATION_FAILED: Verdict = { pass: false, code: 'navigation-failed' };
 
-// What a DOM check needs the probe to read of the element; undefined for every other check.
-export function domReadFor(assertion: ResolvedElementAssertion): DomRead | undefined {
+// What a DOM check needs the probe to read of the element; null for every other check.
+export function domReadFor(assertion: ResolvedElementAssertion): DomRead | null {
   switch (assertion.kind) {
     case 'hasClass': case 'lacksClass': return { kind: 'classes' };
     case 'computedStyleEquals': return { kind: 'computedStyle', property: assertion.property };
     case 'attributeEquals': case 'attributeAbsent': return { kind: 'attribute', name: assertion.name };
-    default: return undefined;
+    default: return null;
   }
 }
 

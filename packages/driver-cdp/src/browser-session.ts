@@ -2,7 +2,7 @@
 // masking and auditing live here once, so every protocol behaves the same way.
 import { isDeepStrictEqual } from 'node:util';
 import {
-  DEFAULT_TEST_ID_ATTRIBUTE, failure, isSeveralElements, literalActionStep, literalText, performableLocator, reveal, success,
+  DEFAULT_TEST_ID_ATTRIBUTE, failure, isSeveralElements, literalActionStep, NavigateScripts, literalText, performableLocator, reveal, success,
   type ActionGuard, type ActionStep, type BrowserRequestRecord, type DialogStep, type DocumentSession, type DomRead, type DomValue, type DownloadedFile,
   type DownloadStep, type DriverError, type ElementProbe, type Locator, type OneElementRead, type PageScriptCall, type PageMetaTag, type PageProbe, type PageReadFailure, type Position, type ResolvedActionStep,
   type ClipboardPort, type ClockPort, type DriverErrorCode, type GuardVerdict, type NetworkPort, type ResolvedElement, type ResolvedLocator, type Result, type Secret, type SessionEnvironment, type SessionTab, type StoragePort,
@@ -552,7 +552,7 @@ function documentPorts<Handle>(
     return refusal === undefined ? null : { code, detail: refusal };
   };
 
-  const probeNow = async (planLocator: Locator, read?: DomRead): Promise<ElementProbe> => {
+  const probeNow = async (planLocator: Locator, read: DomRead | null): Promise<ElementProbe> => {
     // A value reference says nothing about the page.
     const locator = performableLocator(planLocator);
     if (locator === undefined || crashed()) return READ_FAILED;
@@ -580,7 +580,7 @@ function documentPorts<Handle>(
       const { href, current } = decodeLinkAndCurrent(await operations.callForString(linkAndCurrent, [{ element }]));
       const exposed = await operations.exposedStates(element);
       // A DOM check's read: a class list, a computed style or an attribute, read from the document.
-      const dom = read === undefined ? undefined : decodeDomValue(await operations.callForString(readDomValue, [{ element }, read.kind, domReadName(read)]), read);
+      const dom = read === null ? undefined : decodeDomValue(await operations.callForString(readDomValue, [{ element }, read.kind, domReadName(read)]), read);
       const isEnabled = await isElementEnabled(operations, element);
       return { ...shown, enabled: isEnabled, states: { ...exposed, current }, href, ...(dom === undefined ? {} : { dom }) };
     } catch (error) {
@@ -589,17 +589,30 @@ function documentPorts<Handle>(
   };
 
   // A read the page does not answer in time is one that says nothing about what is on it.
-  const probe = async (planLocator: Locator, read?: DomRead): Promise<ElementProbe> => {
+  const probe = async (planLocator: Locator, read: DomRead | null): Promise<ElementProbe> => {
     const probed = await forAtMost(timeout, probeNow(planLocator, read));
     return probed === TIMED_OUT ? READ_FAILED : probed;
   };
 
   // A step has one timeout, whatever it spent the time on, so input gets what the wait for the element
-  // left of it.
-  const inputWithinTimeout = async <Value>(input: Promise<Value>, stepDeadline: number): Promise<Result<Value, DriverError>> => {
+  // left of it. The step ends when that runs out, whatever the input is still doing, and the input is told
+  // so: what it has yet to send would otherwise reach the page during the failure's capture or a later step.
+  const inputWithinTimeout = async <Value>(send: (hasStepEnded: () => boolean) => Promise<Value>, stepDeadline: number): Promise<Result<Value, DriverError>> => {
     const left = Math.max(stepDeadline - Date.now(), Math.min(SHORTEST_INPUT_MILLISECONDS, timeout));
-    const ended = await forAtMost(left, input);
-    return ended === TIMED_OUT ? failure({ code: 'timeout', detail: `the input was still being handled after ${timeout} ms` }) : success(ended);
+    let hasStepEnded = false;
+    let timer: NodeJS.Timeout | undefined;
+    const timedOut = new Promise<typeof TIMED_OUT>((resolveTimedOut) => {
+      timer = setTimeout(() => {
+        hasStepEnded = true;
+        resolveTimedOut(TIMED_OUT);
+      }, left);
+    });
+    try {
+      const ended = await Promise.race([send(() => hasStepEnded), timedOut]);
+      return ended === TIMED_OUT ? failure({ code: 'timeout', detail: `the input was still being handled after ${timeout} ms` }) : success(ended);
+    } finally {
+      clearTimeout(timer);
+    }
   };
 
   // What is left of a step's one timeout, for a wait inside it. A look at a page still gets long enough to
@@ -628,7 +641,7 @@ function documentPorts<Handle>(
         return failure(denied);
       }
       await beforePress(element, at);
-      const hit = await inputWithinTimeout(clickChecks.around(element, at), stepDeadline);
+      const hit = await inputWithinTimeout((hasStepEnded) => clickChecks.around(element, at, hasStepEnded), stepDeadline);
       if (!hit.ok) {
         return hit;
       }
@@ -676,7 +689,7 @@ function documentPorts<Handle>(
         break;
       case 'press': {
         // Enter on a form or a link starts a navigation as a click does.
-        const pressed = await inputWithinTimeout(clickChecks.input.press(element, action.key, heldModifierKeys(action.modifiers ?? [], process.platform)), stepDeadline);
+        const pressed = await inputWithinTimeout(() => clickChecks.input.press(element, action.key, heldModifierKeys(action.modifiers ?? [], process.platform)), stepDeadline);
         if (!pressed.ok) {
           return pressed;
         }
@@ -784,7 +797,7 @@ function documentPorts<Handle>(
       }
       acted = await perform(action, guard, typedSecret, beforePress, stepDeadline);
       if (acted.ok) {
-        const settled = await inputWithinTimeout(inputSettled(), stepDeadline);
+        const settled = await inputWithinTimeout(() => inputSettled(), stepDeadline);
         if (!settled.ok) {
           acted = settled;
         }
@@ -919,11 +932,10 @@ function documentPorts<Handle>(
       if (alreadyRefused !== null) {
         return failure(alreadyRefused);
       }
-      const scripts = options?.scripts ?? 'enabled';
       // Scripts are a setting of the whole page, so only the top document's navigate turns them off.
-      if (scripts === 'disabled' && !isTopDocument) return failure({ code: 'unsupported-step', detail: 'scripts can be turned off only for the top document' });
+      if (options.scripts === 'disabled' && !isTopDocument) return failure({ code: 'unsupported-step', detail: 'scripts can be turned off only for the top document' });
       try {
-        await operations.navigate(url, Math.max(timeout, 10_000), scripts);
+        await operations.navigate(url, Math.max(timeout, 10_000), options.scripts);
         // What the page started as it loaded is the navigate's, once it has reached the browser, and
         // a navigation of its own as it loaded may yet turn out to be a download.
         await forAtMost(timeout, inputSettled());
@@ -987,7 +999,7 @@ async function newTabAt(openTab: () => Promise<Result<SessionTab, DriverError>>,
   const opened = await openTab();
   if (!opened.ok) return crashed() ? failure(CRASHED) : opened;
   const tab = opened.value;
-  const navigated = await tab.navigate(url);
+  const navigated = await tab.navigate(url, { scripts: NavigateScripts.Enabled });
   if (navigated.ok) return success(tab);
   // Why the tab could not load is the step's failure. A tab that also fails to close is for the
   // session's close to report: a tab's close never rejects.

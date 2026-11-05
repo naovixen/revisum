@@ -166,12 +166,17 @@ export class DownloadFolder implements DownloadCapture {
     };
   }
 
-  // Removes the folder and every file in it. Called once the browser has stopped.
+  // Removes the folder and every file in it, once. Called once the browser has stopped, so nothing
+  // still writes into it. Throws naming the folder when it could not be removed.
   remove(): void {
     const folder = this.#folder;
     this.#folder = null;
-    // 'maxRetries' is Node's own option name.
-    if (folder !== null) rmSync(folder, { recursive: true, force: true, 'maxRetries': 5, retryDelay: 200 });
+    if (folder === null) return;
+    try {
+      rmSync(folder, { recursive: true, force: true });
+    } catch (error) {
+      throw new Error(`the download folder ${folder} could not be removed: ${errorText(error)}`, { cause: error });
+    }
   }
 
   #ensureFolder(): string {

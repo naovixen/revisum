@@ -66,8 +66,9 @@ export interface PageOperations<Handle> {
 export interface PageInput<Handle> {
   // Moves the pointer to the point, in this document's viewport, then presses and releases there unless
   // the aim has gone stale: `centreOfElementNow`, or where this document sits in the top viewport, no longer
-  // agrees with the point. Says how far it got before a dialog or a stale aim stopped it.
-  click(at: Point, centreOfElementNow: () => Promise<Point | null>): Promise<PressSent>;
+  // agrees with the point. Says how far it got before a dialog or a stale aim stopped it. Sends neither the
+  // move nor the press once `hasStepEnded` says the step has ended, so a late click acts on no later step.
+  click(at: Point, centreOfElementNow: () => Promise<Point | null>, hasStepEnded: () => boolean): Promise<PressSent>;
   hover(at: Point): Promise<void>;
   // Inserts the text as typed text, line feeds included, with no key press for them.
   fill(element: Handle, value: string): Promise<void>;

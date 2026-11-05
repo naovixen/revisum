@@ -988,16 +988,20 @@ class CdpPage implements PageWithInput<string> {
     return listeners.some((listener) => PRESS_EVENT.test(listener.type));
   }
 
-  async click(at: Point, centreOfElementNow: () => Promise<Point | null>): Promise<PressSent> {
+  async click(at: Point, centreOfElementNow: () => Promise<Point | null>, hasStepEnded: () => boolean): Promise<PressSent> {
     const offset = await this.#viewportOffset();
     const point = { x: at.x + offset.x, y: at.y + offset.y };
     const pressed = { ...point, button: 'left' as const, clickCount: 1 };
+    if (hasStepEnded()) {
+      return PressSent.NotSent;
+    }
     await this.#sendInput(DISPATCH_MOUSE_EVENT, { type: 'mouseMoved', ...point });
     // A parent page can move this document's frame, which a read inside the frame cannot see, so the aim
     // is only good if both still agree. The element's own read comes last, closest to the press.
     const offsetNow = await this.#viewportOffset();
     const centre = await centreOfElementNow();
-    if (centre === null || !isSamePoint(centre, at) || !isSamePoint(offsetNow, offset)) {
+    // Looked at in the same turn as the send, so nothing can end the step between the two.
+    if (centre === null || !isSamePoint(centre, at) || !isSamePoint(offsetNow, offset) || hasStepEnded()) {
       return PressSent.NotSent;
     }
     await this.#sendInput(DISPATCH_MOUSE_EVENT, { type: 'mousePressed', ...pressed });

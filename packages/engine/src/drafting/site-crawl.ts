@@ -14,7 +14,7 @@
 // it, and its links with it. The next navigate ends any dialog. `truncated` also says whether a page
 // on the start origin was left unvisited because of maximumPages or maximumDepth.
 import {
-  failure, success,
+  failure, NavigateScripts, success,
   type A11yNode, type CrawlErrorCode, type ExploreDriver, type ExploreOptions, type Origin, type PageMap, type PageMapEntry, type PageReadFailure, type Redactor, type Result,
 } from '@revisum/contracts';
 import { defaultRedactor } from '../redaction.ts';
@@ -52,7 +52,7 @@ async function loadedInTime(driver: ExploreDriver, url: string, timeoutMilliseco
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timedOut = new Promise<false>((resolve) => { timer = setTimeout(() => resolve(false), timeoutMilliseconds); });
   try {
-    const navigated = driver.navigate(url).then((outcome) => outcome.ok, () => false);
+    const navigated = driver.navigate(url, { scripts: NavigateScripts.Enabled }).then((outcome) => outcome.ok, () => false);
     return await Promise.race([navigated, timedOut]);
   } finally {
     clearTimeout(timer);

@@ -7,9 +7,9 @@
 // through its clock and clipboard ports; page scripts through its script port. Database commands
 // go through the run's DatabaseCommandRunner port, which runs each in a workload container.
 import {
-  failure, isElementCheckNoDriverDecides, isOneElementRead, oneElementOf, PageReadFailureCode, stepFailed, StepCode, success, UnreadablePage,
+  failure, isElementCheckNoDriverDecides, isOneElementRead, NavigateScripts, oneElementOf, PageReadFailureCode, stepFailed, StepCode, success, UnreadablePage,
   type A11yFinding, type ActionGuard, type AppliedRewrite, type ApprovalLabel, type ArtifactReference, type ArtifactStore, type Authorised,
-  type BrowserDriver, type Clock, type DatabaseCommandRunner, type DocumentSession, type DomRead, type DownloadedFile, type DownloadName, type DriverError, type OneElementRead, type PageReadFailure, type RememberedElementSource, type LockEntry, type DialogStep, type ElementProbe,
+  type BrowserDriver, type Clock, type DatabaseCommandRunner, type DocumentSession, type DomRead, type DownloadedFile, type DownloadName, type DriverError, type DriverErrorCode, type OneElementRead, type PageReadFailure, type RememberedElementSource, type LockEntry, type DialogStep, type ElementProbe,
   type EventSink, type GuaranteeLevel, type GuardVerdict, type PageAssertion, type Plan, type PolicyRuleId, type Redactor,
   type DownloadStep, type StepOutcome, type ResolvedElement, type ResolvedLocator, type Result, type SafeText, type SecretStore, type ServiceCaller, type Session, type Step, type Target, type TargetId,
   type Unavailable, type ValueName, type GuaranteeStatement, type RunMode, type SuiteFinding, type SuiteName, type SuitePass,
@@ -693,15 +693,31 @@ function codeForThrow(error: unknown, session: DocumentSession, logger: Logger):
   return code;
 }
 
-// A dialog and a crash are the page's to answer for. A read that gave nothing for any other reason is
-// the adapter's: its text goes only to the log, which redacts it.
-function codeOfFailedRead(readFailure: DriverError, logger: Logger): StepCode {
-  if (readFailure.code !== PageReadFailureCode.PageUnreadable) {
-    return readFailure.code;
+// What a step fails with when a read of the page gave nothing. A dialog and a crash are the page's to
+// answer for. A read that gave nothing for any other reason is the adapter's.
+const STEP_CODE_OF_FAILED_READ = {
+  [PageReadFailureCode.DialogOpen]: StepCode.DialogOpen,
+  [PageReadFailureCode.TargetCrashed]: StepCode.TargetCrashed,
+  [PageReadFailureCode.PageUnreadable]: StepCode.AdapterError,
+} as const satisfies Record<PageReadFailureCode, StepCode>;
+type FailedReadCode = (typeof STEP_CODE_OF_FAILED_READ)[PageReadFailureCode];
+
+// The adapter's own failure keeps its text, which goes only to the log, which redacts it.
+function codeOfFailedRead(readFailure: PageReadFailure, logger: Logger): FailedReadCode {
+  const code = STEP_CODE_OF_FAILED_READ[readFailure.code];
+  if (code === ADAPTER_ERROR) {
+    logger.log({ kind: 'step.end', outcome: 'failed', code, detail: readFailure.detail });
   }
-  logger.log({ kind: 'step.end', outcome: 'failed', code: ADAPTER_ERROR, detail: readFailure.detail });
-  return ADAPTER_ERROR;
+  return code;
 }
+
+const PAGE_READ_FAILURE_CODES: readonly DriverErrorCode[] = Object.values(PageReadFailureCode);
+const isPageReadFailure = (error: DriverError): error is PageReadFailure => PAGE_READ_FAILURE_CODES.includes(error.code);
+
+// A capture fails as a read of the page does, or with the code the driver gave for anything else,
+// such as a field a secret was typed into that it could not find to hide.
+const codeOfFailedCapture = (error: DriverError, logger: Logger): StepCode =>
+  isPageReadFailure(error) ? codeOfFailedRead(error, logger) : error.code;
 
 // The requests the plan checks are observed from its start, so what a page sends as it loads counts
 // too. Gives the code for what stopped it, or undefined when nothing did.
@@ -914,8 +930,7 @@ async function executeStep(step: Step, index: number, session: DocumentSession, 
       }
       const url = new URL(path, context.inputs.baseUrl);
       if (!context.inputs.project.origins.some((origin) => origin === url.origin)) return { ...base, ...stepFailed(StepCode.OriginNotAllowed) };
-      // Scripts are named only when they are off: without options, they run as usual.
-      const navigated = step.scripts === 'disabled' ? await session.navigate(url.href, { scripts: 'disabled' }) : await session.navigate(url.href);
+      const navigated = await session.navigate(url.href, { scripts: step.scripts ?? NavigateScripts.Enabled });
       return navigated.ok ? { ...base, outcome: 'passed' } : { ...base, ...stepFailed(navigated.error.code) };
     }
     case 'click':
@@ -991,10 +1006,10 @@ async function executeStep(step: Step, index: number, session: DocumentSession, 
       const read = domReadFor(assertion.value);
       let last: ElementProbe | null = null;
       const verdict = await poll(context, session, async () => {
-        last = read === undefined ? await session.probe(locator.value) : await session.probe(locator.value, read);
+        last = await session.probe(locator.value, read);
         return checkElement(assertion.value, last, context.inputs.baseUrl);
       });
-      if (verdict.code === TARGET_CRASHED) return { ...base, ...stepFailed(TARGET_CRASHED) };
+      if (isCheckStopped(verdict)) return { ...base, ...stepFailed(verdict.code) };
       return verdict.pass
         ? { ...base, outcome: 'passed' }
         : { ...base, ...stepFailed(verdict.code ?? StepCode.AssertionFailed), observed: observe(last, context, context.secretFilledFields.has(canonicalJson(locator.value))) };
@@ -1011,7 +1026,7 @@ async function executeStep(step: Step, index: number, session: DocumentSession, 
         title = page.value.title;
         return checkPage(assertion.value, page.value, context.inputs.baseUrl);
       });
-      if (verdict.code === TARGET_CRASHED || verdict.code === ADAPTER_ERROR) {
+      if (isCheckStopped(verdict)) {
         return { ...base, ...stepFailed(verdict.code) };
       }
       return verdict.pass
@@ -1040,7 +1055,7 @@ async function executeStep(step: Step, index: number, session: DocumentSession, 
       if (!taken.ok) {
         return taken.error.code === StepCode.NotFound
           ? { ...base, outcome: 'passed', code: StepCode.CaptureLeftOut }
-          : { ...base, ...stepFailed(codeOfFailedRead(taken.error, context.logger)) };
+          : { ...base, ...stepFailed(codeOfFailedCapture(taken.error, context.logger)) };
       }
       const reference = await context.ports.artifacts.put(`${target.id}/${step.name}.png`, taken.value, 'image/png');
       context.logger.log({ kind: 'artifact', stepIndex: index, artifact: reference.name, sha256: reference.sha256 });
@@ -1084,7 +1099,7 @@ async function rememberFromPage(
   if (context.secretFilledFields.has(canonicalJson(locator.value))) {
     return { ...base, ...stepFailed(StepCode.ValueHoldsSecret) };
   }
-  const read: DomRead | undefined = from.read === 'attribute' ? { kind: 'attribute', name: from.attribute } : undefined;
+  const read: DomRead | null = from.read === 'attribute' ? { kind: 'attribute', name: from.attribute } : null;
   const textOf = (element: OneElementRead): string => {
     if (from.read === 'attribute') {
       return element.dom?.kind === 'attribute' ? element.dom.value ?? '' : '';
@@ -1093,7 +1108,7 @@ async function rememberFromPage(
   };
   const seen = { text: '' };
   const verdict = await poll(context, session, async (): Promise<Verdict> => {
-    const probe = read === undefined ? await session.probe(locator.value) : await session.probe(locator.value, read);
+    const probe = await session.probe(locator.value, read);
     const found = oneElementOf(probe);
     if (!found.ok) {
       return { pass: false, code: found.error };
@@ -1101,11 +1116,8 @@ async function rememberFromPage(
     seen.text = textOf(found.value);
     return seen.text === '' ? { pass: false, code: null } : { pass: true, code: null };
   });
-  if (verdict.code === TARGET_CRASHED || verdict.code === 'not-found' || verdict.code === 'ambiguous' || verdict.code === 'selector-invalid'
-    || verdict.code === UnreadablePage.ReadFailed || verdict.code === UnreadablePage.DialogOpen || verdict.code === UnreadablePage.BrowserErrorPage) {
-    return { ...base, ...stepFailed(verdict.code) };
-  }
-  if (seen.text === '') return { ...base, ...stepFailed(StepCode.ValueEmpty) };
+  // A remember step keeps no observation, so a stopped check and the check's own answer fail it alike.
+  if (!verdict.pass) return { ...base, ...stepFailed(verdict.code ?? StepCode.ValueEmpty) };
   const kept = context.remembered.remember(step.name, seen.text, index);
   return kept.ok ? { ...base, outcome: 'passed', remembered: kept.value } : { ...base, ...stepFailed(kept.error) };
 }
@@ -1237,19 +1249,15 @@ function guardFor(step: Step, index: number, target: Target, context: RunContext
 }
 
 const TARGET_CRASHED = StepCode.TargetCrashed;
-// A check's verdict, or the page's renderer died while the check waited, or a read of the page failed
-// for a reason that is the adapter's.
-type PollVerdict = Verdict | { readonly pass: false; readonly code: typeof TARGET_CRASHED | typeof ADAPTER_ERROR };
+// A check the page stopped rather than answered: its renderer died while the check waited, or a read
+// of it failed for a reason that is the adapter's. What the check last saw then says nothing about the
+// page, so the step fails with this code and keeps no observation. Every other failed verdict is the
+// check's own answer, which the step fails with, keeping what it saw where the step has an observation.
+type CheckStopped = { readonly pass: false; readonly code: typeof TARGET_CRASHED | typeof ADAPTER_ERROR };
+type PollVerdict = Verdict | CheckStopped;
+const isCheckStopped = (verdict: PollVerdict): verdict is CheckStopped => verdict.code === TARGET_CRASHED || verdict.code === ADAPTER_ERROR;
 
-function verdictOfFailedRead(readFailure: PageReadFailure, logger: Logger): PollVerdict {
-  switch (readFailure.code) {
-    case PageReadFailureCode.DialogOpen: return { pass: false, code: UnreadablePage.DialogOpen };
-    case PageReadFailureCode.TargetCrashed: return { pass: false, code: TARGET_CRASHED };
-    case PageReadFailureCode.PageUnreadable:
-      logger.log({ kind: 'step.end', outcome: 'failed', code: ADAPTER_ERROR, detail: readFailure.detail });
-      return { pass: false, code: ADAPTER_ERROR };
-  }
-}
+const verdictOfFailedRead = (readFailure: PageReadFailure, logger: Logger): PollVerdict => ({ pass: false, code: codeOfFailedRead(readFailure, logger) });
 
 // Repeats a check until it passes or the step timeout runs out. A page that crashes stops the
 // wait at once: nothing on it can change any more, and the same goes for a read of the page that failed.
@@ -1262,8 +1270,8 @@ async function poll(context: RunContext, session: DocumentSession, check: () => 
     if (session.crashed()) return { pass: false, code: TARGET_CRASHED };
     // Waiting cannot change a selector the browser rejects, a dialog, which only a later step can
     // answer, the browser's own error page, which runs no script that could leave it, or a read that failed.
-    if (verdict.pass || verdict.code === 'selector-invalid' || verdict.code === UnreadablePage.DialogOpen || verdict.code === 'navigation-failed'
-      || verdict.code === TARGET_CRASHED || verdict.code === ADAPTER_ERROR) return verdict;
+    if (verdict.pass || isCheckStopped(verdict) || verdict.code === 'selector-invalid' || verdict.code === UnreadablePage.DialogOpen
+      || verdict.code === 'navigation-failed') return verdict;
     if (context.ports.clock.now() >= deadline) return verdict;
     await context.ports.clock.sleep(POLL_INTERVAL_MILLISECONDS);
   }

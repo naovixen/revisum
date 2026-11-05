@@ -90,7 +90,7 @@ export async function crawlInBrowser(browser: BrowserDriver, crawl: BrowserCrawl
     }
     // Navigation and reads only: nothing else of the session is in reach of the crawl.
     const explorer: ExploreDriver = {
-      navigate: (url) => session.navigate(url),
+      navigate: (url, navigation) => session.navigate(url, navigation),
       page: () => session.page(),
       accessibilitySnapshot: () => session.accessibilitySnapshot(),
       linkTargets: () => session.linkTargets(),

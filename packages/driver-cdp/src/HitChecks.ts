@@ -338,8 +338,9 @@ export type HitChecks<Handle> = {
     // Sends at most one press at the point, around a check armed for it, and says what became of it: none,
     // when the pointer's arrival moved the element, as a person would look and aim again. Any check an
     // earlier press left armed goes first. Throws when the page cannot say: whatever is thrown says
-    // nothing of where the press went, so the step fails.
-    around(element: Handle, at: Point): Promise<HitCheckOutcome>;
+    // nothing of where the press went, so the step fails. Once `hasStepEnded` says the step has ended, no
+    // press goes: what is left of it then is only taking the check off.
+    around(element: Handle, at: Point, hasStepEnded: () => boolean): Promise<HitCheckOutcome>;
     // All other input to the page, each sent only once any check an earlier press left armed is off, in
     // this document and every one it frames, where the input may land. Such a check would cancel a click
     // the input makes, and the input would still seem to have worked. A disarm that fails stops the
@@ -363,14 +364,14 @@ export function hitChecks<Handle>(page: PageWithInput<Handle>): HitChecks<Handle
     const disarmLeftOvers = (): Promise<void> =>
         page.callInEveryFramedDocumentOutOfReach(disarmArmedHitCheck);
     return {
-        async around(element, at) {
+        async around(element, at, hasStepEnded) {
             await disarmLeftOvers();
             return page.withPressCheck(armHitCheck, element, async (check) => {
                 const listening = await check.read(listenForThePress);
                 if (listening.kind !== "answered") {
                     throw new Error("the press's check could not listen for it");
                 }
-                const sent = await page.click(at, () => centreOfElementIn(check));
+                const sent = await page.click(at, () => centreOfElementIn(check), hasStepEnded);
                 if (sent === PressSent.NotSent) {
                     await disarmUnpressed(check);
                     return HitCheckOutcome.MovedBeforeThePress;
