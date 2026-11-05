@@ -18,6 +18,7 @@ import { shareBrowserInThisFile } from "#test-support/browser/ShareBrowserInThis
 import { capabilityHarness, type CapabilityHarness } from "#test-support/capability-harness.ts";
 import type { FixtureRoute } from "#test-support/fixture-server.ts";
 import type { ActionStep, GuardVerdict, Session } from "@revisum/engine";
+import { scriptsEnabled } from "#test-support/browser/ScriptsEnabled.ts";
 
 shareBrowserInThisFile();
 
@@ -176,7 +177,7 @@ const actWithoutGuard = (session: Session, step: ActionStep): ReturnType<Session
 async function withPlainPage<Value>(use: (session: Session) => Promise<Value>): Promise<Value> {
     const session = await harness.open(TARGET);
     try {
-        assert.ok((await session.navigate(harness.url("/plain.html"))).ok);
+        assert.ok((await session.navigate(harness.url("/plain.html"), scriptsEnabled)).ok);
         return await use(session);
     } finally {
         await session.close();

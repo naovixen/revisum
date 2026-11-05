@@ -32,6 +32,7 @@ import {
     TYPED_TEXT,
     framing,
 } from "./DialogOnPressPages.ts";
+import { scriptsEnabled } from "#test-support/browser/ScriptsEnabled.ts";
 
 shareBrowserInThisFile();
 
@@ -52,7 +53,7 @@ after(async () => {
 });
 
 const tallyIn = async (document: DocumentSession): Promise<string> =>
-    expectOneElement(await document.probe(harness.locator(testId(TALLY)))).text;
+    expectOneElement(await document.probe(harness.locator(testId(TALLY)), null)).text;
 
 const failureCodeOf = async (
     document: DocumentSession,
@@ -80,7 +81,7 @@ const onPage = async <Value>(
     assert.ok(opened.ok, `the session opens: ${JSON.stringify(opened)}`);
     const session = opened.value;
     try {
-        assert.ok((await session.navigate(harness.url(page))).ok, `${page} loads`);
+        assert.ok((await session.navigate(harness.url(page), scriptsEnabled)).ok, `${page} loads`);
         return await use(session);
     } finally {
         await session.close();

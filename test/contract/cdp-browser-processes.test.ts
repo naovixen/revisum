@@ -16,6 +16,7 @@ import { click, navigate, role, testId, textEquals } from '#test-support/browser
 import { capabilityDrivers, capabilityHarness, capabilityPlan, ownDriverFor, watchedDriver, type CapabilityHarness } from '#test-support/capability-harness.ts';
 import { endAtOnce, listProcesses, processTree, rendererProcesses, stillRunning } from '#test-support/process-tree.ts';
 import { CRASH_READY_PATH, crashWhenRequested } from '#test-support/tab-crash.ts';
+import { scriptsEnabled } from "#test-support/browser/ScriptsEnabled.ts";
 
 // Long enough for the test to find and end the renderer while the step waits.
 const CRASH_STEP_TIMEOUT_MILLISECONDS = 8000;
@@ -96,7 +97,7 @@ for (const targetId of Object.values(BrowserTarget)) {
       const session = await capability.openOwn(targetId);
       let tree: ReturnType<typeof processTree> = [];
       try {
-        assert.ok((await session.navigate(capability.url('/dialog.html'))).ok);
+        assert.ok((await session.navigate(capability.url('/dialog.html'), scriptsEnabled)).ok);
         tree = processTree(session.processId);
         const renderers = rendererProcesses(session.processId);
         assert.ok(renderers.length > 0, 'the page has a renderer');
@@ -130,7 +131,7 @@ for (const targetId of Object.values(BrowserTarget)) {
       const session = await capability.openOwn(targetId);
       let tree: ReturnType<typeof processTree> = [];
       try {
-        assert.ok((await session.navigate(capability.url('/dialog.html'))).ok);
+        assert.ok((await session.navigate(capability.url('/dialog.html'), scriptsEnabled)).ok);
         tree = processTree(session.processId);
         assert.ok(tree.some((member) => member.processId === session.processId), 'the browser process is in the tree');
         assert.ok(tree.length >= 2, 'the browser started at least one other process');
@@ -161,7 +162,7 @@ for (const targetId of Object.values(BrowserTarget)) {
       const session = await capability.openOwn(targetId);
       let tree: ReturnType<typeof processTree> = [];
       try {
-        assert.ok((await session.navigate(capability.url('/dialog.html'))).ok);
+        assert.ok((await session.navigate(capability.url('/dialog.html'), scriptsEnabled)).ok);
         // The click opens a confirm dialog that nothing answers.
         assert.ok((await session.act(capability.actionStep(click(role('button', 'Ask a question'))), allowEveryAction)).ok);
         tree = processTree(session.processId);

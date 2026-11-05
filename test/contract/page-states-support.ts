@@ -320,7 +320,7 @@ export async function settledText(
     const deadline = Date.now() + limit;
     let shown = pending;
     while (Date.now() < deadline) {
-        const probed = await session.probe(harness.locator(testId(id)));
+        const probed = await session.probe(harness.locator(testId(id)), null);
         const found = oneElementOf(probed);
         shown = found.ok ? found.value.text : "(not one element)";
         if (shown !== pending) {

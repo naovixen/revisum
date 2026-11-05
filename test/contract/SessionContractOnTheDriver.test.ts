@@ -9,6 +9,7 @@ import { isHeldByADialog } from "#test-support/IsHeldByADialog.ts";
 import { capabilityHarness, type CapabilityHarness } from "#test-support/capability-harness.ts";
 import type { FixtureRoute } from "#test-support/fixture-server.ts";
 import { sessionContract } from "#test-support/session-contract/SessionContract.ts";
+import { scriptsEnabled } from "#test-support/browser/ScriptsEnabled.ts";
 
 const STEP_TIMEOUT_MILLISECONDS = 1000;
 const DIALOG_POLL_MILLISECONDS = 10;
@@ -58,7 +59,7 @@ describe("Using the real driver as a session", () => {
         const session = await harness.open(BrowserTarget.Chrome);
         opened.push(session);
         const pageUrl = `${harness.origin}${PAGE_PATH}`;
-        const loaded = await session.navigate(pageUrl);
+        const loaded = await session.navigate(pageUrl, scriptsEnabled);
         assert.ok(loaded.ok, JSON.stringify(loaded));
         return {
             session,

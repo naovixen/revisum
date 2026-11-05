@@ -12,6 +12,7 @@ import { BrowserTarget } from '#test-support/browser/BrowserTarget.ts';
 import { navigate, testId, textEquals } from '#test-support/browser/RawPlan.ts';
 import { expectStorage, networkHarness, removeStorage, setStorage, type NetworkHarness, type NetworkRun } from './network-stubs-support.ts';
 import { shareBrowserInThisFile } from '#test-support/browser/ShareBrowserInThisFile.ts';
+import { scriptsEnabled } from "#test-support/browser/ScriptsEnabled.ts";
 
 shareBrowserInThisFile();
 
@@ -99,7 +100,7 @@ describe('a write while the page is on another origin', () => {
   test('setStorage for an entry on another origin fails with storage-origin-mismatch and writes nothing on either origin', async () => {
     const seen: { otherOrigin: string | null } = { otherOrigin: null };
     const readOtherOrigin = async (session: Session): Promise<void> => {
-      const opened = await session.navigate(harness.otherUrl('/storage.html'));
+      const opened = await session.navigate(harness.otherUrl('/storage.html'), scriptsEnabled);
       assert.ok(opened.ok, JSON.stringify(opened));
       seen.otherOrigin = await harness.shownOn(session, 'stored-docked');
     };

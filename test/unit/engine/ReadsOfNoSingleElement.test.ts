@@ -71,8 +71,8 @@ const DOM_CHECKS: readonly {
 
 // A run whose one element gives this read, and every DOM read the run asked of the element.
 async function rememberAttributeFrom(read: ElementProbe) {
-    const asked: (DomRead | undefined)[] = [];
-    const probe = (locator: Locator, domRead?: DomRead): Promise<ElementProbe> => {
+    const asked: (DomRead | null)[] = [];
+    const probe = (locator: Locator, domRead: DomRead | null): Promise<ElementProbe> => {
         if (locator.by === "testId" && locator.testId === "order-row") {
             asked.push(domRead);
         }

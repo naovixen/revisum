@@ -15,6 +15,7 @@ import {
 } from "#test-support/browser/ShareBrowserInThisFile.ts";
 import { BROWSERS } from "#test-support/browsers.ts";
 import { capabilityHarness, type CapabilityHarness } from "#test-support/capability-harness.ts";
+import { scriptsEnabled } from "#test-support/browser/ScriptsEnabled.ts";
 
 shareBrowserInThisFile();
 
@@ -55,7 +56,7 @@ async function openAndCloseASession(): Promise<number> {
     );
     assert.ok(opened.ok, JSON.stringify(opened));
     const { processId } = opened.value;
-    const navigated = await opened.value.navigate(harness.url("/"));
+    const navigated = await opened.value.navigate(harness.url("/"), scriptsEnabled);
     assert.ok(navigated.ok, JSON.stringify(navigated));
     await opened.value.close();
     return processId;

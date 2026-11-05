@@ -29,6 +29,7 @@ import {
     openTab,
     type OpenSessionUnderTest,
 } from "./SessionUnderTest.ts";
+import { scriptsEnabled } from "#test-support/browser/ScriptsEnabled.ts";
 
 const SCRIPT = {
     source: "() => 1",
@@ -44,7 +45,7 @@ type CallOn<Port> = {
 
 // Each thing a closed page's tab and session both answer with a result, and how to ask it.
 const DOCUMENT_CALLS = {
-    navigate: { name: "navigate", call: (document) => document.navigate("/") },
+    navigate: { name: "navigate", call: (document) => document.navigate("/", scriptsEnabled) },
     frame: { name: "frame", call: (document) => document.frame(locatorFindingNothing()) },
     runScript: { name: "runScript", call: (document) => document.runScript(SCRIPT) },
 } as const satisfies Readonly<Record<string, CallOn<DocumentSession>>>;
@@ -130,7 +131,7 @@ function closedSessionContract(open: OpenSessionUnderTest): void {
             test("then it should read nothing", async () => {
                 const { session } = await open();
                 await session.close();
-                assertNothingRead(await session.probe(locatorOf(EXPORT_BUTTON)));
+                assertNothingRead(await session.probe(locatorOf(EXPORT_BUTTON), null));
             });
         });
 
@@ -179,7 +180,7 @@ function pageOfAClosedTab(open: OpenSessionUnderTest): void {
         test("then it should read nothing on a probe", async () => {
             const tab = await openTab(await open());
             await tab.close();
-            assertNothingRead(await tab.probe(locatorOf(EXPORT_BUTTON)));
+            assertNothingRead(await tab.probe(locatorOf(EXPORT_BUTTON), null));
         });
     });
 }
@@ -268,7 +269,7 @@ function openTabContract(open: OpenSessionUnderTest): void {
                 assert.equal(failureCode(acted), "target-crashed");
                 assert.deepEqual(asked, []);
                 assert.equal(tab.crashed(), true);
-                assertNothingRead(await tab.probe(locatorOf(EXPORT_BUTTON)));
+                assertNothingRead(await tab.probe(locatorOf(EXPORT_BUTTON), null));
                 assert.equal(failureCode(await tab.page()), "target-crashed");
             });
         });

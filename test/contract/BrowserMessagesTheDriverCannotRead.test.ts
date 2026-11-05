@@ -13,6 +13,7 @@ import { realEgressSource } from "#test-support/browser/SessionEgressForTest.ts"
 import { shareBrowserInThisFile } from "#test-support/browser/ShareBrowserInThisFile.ts";
 import { capabilityHarness, type CapabilityHarness } from "#test-support/capability-harness.ts";
 import type { FixtureRoute } from "#test-support/fixture-server.ts";
+import { scriptsEnabled } from "#test-support/browser/ScriptsEnabled.ts";
 
 shareBrowserInThisFile();
 
@@ -75,7 +76,10 @@ describe("Using the real browser driver", () => {
         assert.ok(opened.ok, `the session opens: ${JSON.stringify(opened)}`);
         const session = opened.value;
         try {
-            assert.ok((await session.navigate(harness.url(PAGE))).ok, `${PAGE} loads`);
+            assert.ok(
+                (await session.navigate(harness.url(PAGE), scriptsEnabled)).ok,
+                `${PAGE} loads`,
+            );
             return await use(session);
         } finally {
             await session.close().catch(() => undefined);
@@ -93,7 +97,7 @@ describe("Using the real browser driver", () => {
                     const { acted, refusals } = await onOpenSession(async (session) => {
                         relayed.relay.sendEvent(method, { unexpected: true });
                         // Answered after the event, on the same socket, so the driver has heard it.
-                        await session.probe(harness.locator(testId(BUTTON)));
+                        await session.probe(harness.locator(testId(BUTTON)), null);
                         return {
                             acted: await clickTheButton(session),
                             refusals: session.refusedRequestDecisions(),
@@ -114,7 +118,7 @@ describe("Using the real browser driver", () => {
             test("then it should fail the step saying the driver could not read it", async () => {
                 const acted = await onOpenSession(async (session) => {
                     relayed.relay.sendBrowserEvent("Target.targetCrashed", { unexpected: true });
-                    await session.probe(harness.locator(testId(BUTTON)));
+                    await session.probe(harness.locator(testId(BUTTON)), null);
                     return clickTheButton(session);
                 });
                 assert.ok(!acted.ok, "the step fails");
@@ -167,6 +171,7 @@ describe("Using the real browser driver", () => {
                         relayed.relay.sendText(text);
                         const { count: read } = await session.probe(
                             harness.locator(testId(BUTTON)),
+                            null,
                         );
                         return {
                             count: read,
@@ -213,7 +218,7 @@ describe("Using the real browser driver", () => {
                     change: { refusal: WHY_THE_RELEASE_WAS_REFUSED },
                 });
                 try {
-                    assert.ok((await session.navigate(harness.url(PAGE))).ok);
+                    assert.ok((await session.navigate(harness.url(PAGE), scriptsEnabled)).ok);
                     assert.ok((await clickTheButton(session)).ok);
                     const closing = await session.close().then(
                         () => "closed",

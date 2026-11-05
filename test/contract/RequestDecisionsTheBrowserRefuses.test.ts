@@ -26,6 +26,7 @@ import {
     startStub,
     type NetworkHarness,
 } from "./network-stubs-support.ts";
+import { scriptsEnabled } from "#test-support/browser/ScriptsEnabled.ts";
 
 shareBrowserInThisFile();
 
@@ -127,7 +128,7 @@ describe("Using the real browser driver", () => {
             const opened = await relayed.driver.open(harness.target(TARGET), harness.environment());
             assert.ok(opened.ok, `the session opens: ${JSON.stringify(opened)}`);
             try {
-                return await opened.value.navigate(harness.url(page));
+                return await opened.value.navigate(harness.url(page), scriptsEnabled);
             } finally {
                 await opened.value.close();
                 await relayed.relay.close();
@@ -330,6 +331,7 @@ describe("Using the real browser driver", () => {
                 try {
                     const navigated = await opened.value.navigate(
                         harness.url(PAGE_THAT_GIVES_UP_ON_DATA),
+                        scriptsEnabled,
                     );
                     assert.equal(relayed.relay.timesTampered(), 1);
                     assert.deepEqual(navigated, { ok: true, value: undefined });

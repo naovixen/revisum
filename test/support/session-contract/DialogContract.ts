@@ -129,7 +129,7 @@ export function dialogContract(open: OpenSessionUnderTest): void {
                 const clicked = await subject.session.act(actionStep(CLICK_EXPORT), guard);
                 assert.equal(failureCode(clicked), "dialog-open");
                 assert.deepEqual(asked, []);
-                const probe = await subject.session.probe(locatorOf(EXPORT_BUTTON));
+                const probe = await subject.session.probe(locatorOf(EXPORT_BUTTON), null);
                 assert.equal(probe.count, "dialog-open");
             });
         });

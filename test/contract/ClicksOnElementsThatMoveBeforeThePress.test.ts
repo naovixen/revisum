@@ -19,6 +19,7 @@ import { capabilityHarness, type CapabilityHarness } from "#test-support/capabil
 import type { FixtureRoute } from "#test-support/fixture-server.ts";
 import { download, expectDownload } from "./page-states-support.ts";
 import { routedPagesHarness } from "./RoutedPagesHarness.ts";
+import { scriptsEnabled } from "#test-support/browser/ScriptsEnabled.ts";
 
 shareBrowserInThisFile();
 
@@ -122,7 +123,9 @@ const clickOutcomeIn = async (document: DocumentSession): Promise<ClickOutcome> 
     return {
         failureCode: acted.ok ? null : acted.error.code,
         elapsedMilliseconds,
-        ...parsedTally(expectOneElement(await document.probe(harness.locator(testId(TALLY)))).text),
+        ...parsedTally(
+            expectOneElement(await document.probe(harness.locator(testId(TALLY)), null)).text,
+        ),
     };
 };
 
@@ -132,7 +135,7 @@ const withOpenPage = async <Answer>(
 ): Promise<Answer> => {
     const session = await harness.openOwn(TARGET);
     try {
-        assert.ok((await session.navigate(harness.url(page))).ok, `${page} loads`);
+        assert.ok((await session.navigate(harness.url(page), scriptsEnabled)).ok, `${page} loads`);
         return await action(session);
     } finally {
         await session.close();

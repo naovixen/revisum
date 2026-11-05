@@ -11,6 +11,7 @@ import { click, testId } from "#test-support/browser/RawPlan.ts";
 import { shareBrowserInThisFile } from "#test-support/browser/ShareBrowserInThisFile.ts";
 import { capabilityHarness, type CapabilityHarness } from "#test-support/capability-harness.ts";
 import type { FixtureRoute } from "#test-support/fixture-server.ts";
+import { scriptsEnabled } from "#test-support/browser/ScriptsEnabled.ts";
 
 shareBrowserInThisFile();
 
@@ -149,8 +150,8 @@ const NOT_ENABLED = /not enabled/;
 const readAndClick = async (path: string) => {
     const session = await harness.openOwn(TARGET);
     try {
-        assert.ok((await session.navigate(harness.url(path))).ok, `${path} loads`);
-        const read = expectOneElement(await session.probe(harness.locator(testId(CONTROL))));
+        assert.ok((await session.navigate(harness.url(path), scriptsEnabled)).ok, `${path} loads`);
+        const read = expectOneElement(await session.probe(harness.locator(testId(CONTROL)), null));
         const acted = await session.act(
             harness.actionStep(click(testId(CONTROL))),
             allowEveryAction,

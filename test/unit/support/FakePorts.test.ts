@@ -53,6 +53,7 @@ import {
     projectFileWith,
     projectWith,
 } from "../engine/run-value-examples.ts";
+import { scriptsEnabled } from "#test-support/browser/ScriptsEnabled.ts";
 
 const PORT_MEMBERS: readonly (keyof Session)[] = [
     "screenshotHidingFields",
@@ -128,7 +129,10 @@ describe("Using a fake port", () => {
             test("then it should answer as the override says and note the call", async () => {
                 const refused = failure({ code: "timeout" as const, detail: "slow" });
                 const session = fakeSession({ navigate: () => Promise.resolve(refused) });
-                assert.deepEqual(await session.navigate("https://app.example/"), refused);
+                assert.deepEqual(
+                    await session.navigate("https://app.example/", scriptsEnabled),
+                    refused,
+                );
                 assert.equal(session.calls.count("navigate"), 1);
             });
         });

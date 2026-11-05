@@ -32,6 +32,7 @@ import {
     THREAD_HELD_PATH,
     UNREADABLE_PAGES,
 } from "./UnreadablePages.ts";
+import { scriptsEnabled } from "#test-support/browser/ScriptsEnabled.ts";
 
 const LONG_STEP_TIMEOUT_MILLISECONDS = 8000;
 const CRASH_NOTICE_MILLISECONDS = 5000;
@@ -137,7 +138,10 @@ describe("Using a run in a real browser", () => {
                     try {
                         const asked = waitingLong.requested(SLOW_LOAD_PATH);
                         const startedAt = Date.now();
-                        const navigating = session.navigate(waitingLong.url(SLOW_LOAD_PATH));
+                        const navigating = session.navigate(
+                            waitingLong.url(SLOW_LOAD_PATH),
+                            scriptsEnabled,
+                        );
                         await asked;
                         const deadline = Date.now() + CRASH_NOTICE_MILLISECONDS;
                         while (!session.crashed() && Date.now() < deadline) {
@@ -166,7 +170,9 @@ describe("Using a run in a real browser", () => {
             test("then it should fail with target-crashed", async () => {
                 const session = await waitingLong.openOwn(TARGET);
                 try {
-                    assert.ok((await session.navigate(waitingLong.url(NOTES_PATH))).ok);
+                    assert.ok(
+                        (await session.navigate(waitingLong.url(NOTES_PATH), scriptsEnabled)).ok,
+                    );
                     endAtOnce(session.processId);
                     await waitUntilCrashNoticed(session);
                     assert.ok(session.crashed(), "the session saw the browser die");

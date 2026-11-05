@@ -25,6 +25,7 @@ import { onTarget } from "#test-support/TestTier.ts";
 import { ATTEMPT_SETTLED, ATTEMPT_STATE, attemptPage } from "./EgressChannels.ts";
 import { EXECUTABLE_OF_TARGET, driverWithEgress } from "./HostBrowserDrivers.ts";
 import { startRecordingProxy, type RecordingProxy } from "./StartRecordingProxy.ts";
+import { scriptsEnabled } from "#test-support/browser/ScriptsEnabled.ts";
 
 const BACKGROUND_HOSTS = [
     "accounts.google.com",
@@ -138,7 +139,7 @@ async function launchFlags(target: BrowserTarget): Promise<readonly string[]> {
     );
     assert.ok(opened.ok, JSON.stringify(opened));
     try {
-        const navigated = await opened.value.navigate("chrome://version");
+        const navigated = await opened.value.navigate("chrome://version", scriptsEnabled);
         assert.ok(navigated.ok, JSON.stringify(navigated));
         const text = await opened.value.evaluate(readCommandLineText);
         return text

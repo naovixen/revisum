@@ -13,6 +13,7 @@ import { startRelayedDriver, type RelayedDriver } from "#test-support/browser/Re
 import { shareBrowserInThisFile } from "#test-support/browser/ShareBrowserInThisFile.ts";
 import { capabilityHarness, type CapabilityHarness } from "#test-support/capability-harness.ts";
 import type { FixtureRoute } from "#test-support/fixture-server.ts";
+import { scriptsEnabled } from "#test-support/browser/ScriptsEnabled.ts";
 
 shareBrowserInThisFile();
 
@@ -162,7 +163,10 @@ describe("Using the real browser driver", () => {
         assert.ok(opened.ok, `the session opens: ${JSON.stringify(opened)}`);
         const session = opened.value;
         try {
-            assert.ok((await session.navigate(harness.url(path))).ok, `${path} loads`);
+            assert.ok(
+                (await session.navigate(harness.url(path), scriptsEnabled)).ok,
+                `${path} loads`,
+            );
             return await act(session);
         } finally {
             await session.close();
@@ -182,7 +186,7 @@ describe("Using the real browser driver", () => {
                 test("then it should fail as navigation-failed, with no language error", async () => {
                     const navigated = await onOpenSession(PAGE, async (session) => {
                         relayed.relay.tamperWith({ method: "Page.navigate", change });
-                        return session.navigate(harness.url(PAGE));
+                        return session.navigate(harness.url(PAGE), scriptsEnabled);
                     });
                     assert.equal(relayed.relay.timesTampered(), 1);
                     assert.ok(!navigated.ok, "the navigation fails");
@@ -201,7 +205,7 @@ describe("Using the real browser driver", () => {
                 beforeEach(async () => {
                     count = await onOpenSession(PAGE, async (session) => {
                         relayed.relay.tamperWith({ method, change });
-                        return (await session.probe(harness.locator(locator))).count;
+                        return (await session.probe(harness.locator(locator), null)).count;
                     });
                     madeUp = madeUpHandlesSent();
                 });
@@ -336,7 +340,7 @@ describe("Using the real browser driver", () => {
             test("then it should go on reading, with nothing thrown out of the driver", async () => {
                 const count = await onOpenSession(PAGE, async (session) => {
                     relayed.relay.sendEvent("Fetch.requestPaused", { requestId: "made-up" });
-                    return (await session.probe(harness.locator(testId(BUTTON)))).count;
+                    return (await session.probe(harness.locator(testId(BUTTON)), null)).count;
                 });
                 assert.equal(count, 1);
             });

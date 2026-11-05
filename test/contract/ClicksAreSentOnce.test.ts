@@ -16,6 +16,7 @@ import {
     type CapabilityHarness,
 } from "#test-support/capability-harness.ts";
 import type { FixtureRoute } from "#test-support/fixture-server.ts";
+import { scriptsEnabled } from "#test-support/browser/ScriptsEnabled.ts";
 
 shareBrowserInThisFile();
 
@@ -130,7 +131,7 @@ const clickTheButtonOn = async (
     };
     const session = await harness.openOwn(TARGET);
     try {
-        assert.ok((await session.navigate(harness.url(page))).ok, `${page} loads`);
+        assert.ok((await session.navigate(harness.url(page), scriptsEnabled)).ok, `${page} loads`);
         await beforeTheClick(session);
         const started = Date.now();
         const acted = await session.act(harness.actionStep(click(testId(BUTTON))), allowAndNote);

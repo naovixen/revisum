@@ -13,6 +13,7 @@ import {
 } from "#test-support/browser/RelayedDriver.ts";
 import { capabilityHarness, type CapabilityHarness } from "#test-support/capability-harness.ts";
 import type { FixtureRoute } from "#test-support/fixture-server.ts";
+import { scriptsEnabled } from "#test-support/browser/ScriptsEnabled.ts";
 
 const TARGET = BrowserTarget.Chrome;
 const STEP_TIMEOUT_MILLISECONDS = 2000;
@@ -78,14 +79,19 @@ describe("Using a run in a real browser", () => {
                     assert.ok(opened.ok, `the session opens: ${JSON.stringify(opened)}`);
                     const session = opened.value;
                     try {
-                        assert.ok((await session.navigate(harness.url(PAGE_READY))).ok);
+                        assert.ok(
+                            (await session.navigate(harness.url(PAGE_READY), scriptsEnabled)).ok,
+                        );
                         const tab = await session.newTab(harness.url(PAGE_NEVER_REACHED));
                         assert.ok(!tab.ok, "the tab's page does not load");
                         assert.match(
                             session.refusedRequestDecisions().join(),
                             /this decision was refused/,
                         );
-                        const next = await session.navigate(harness.url(PAGE_READY));
+                        const next = await session.navigate(
+                            harness.url(PAGE_READY),
+                            scriptsEnabled,
+                        );
                         assert.ok(!next.ok, "the first tab's next step fails");
                         assert.equal(next.error.code, "navigation-failed");
                         assert.match(next.error.detail, /this decision was refused/);

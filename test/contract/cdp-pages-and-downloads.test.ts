@@ -14,6 +14,7 @@ import { onTarget } from '#test-support/TestTier.ts';
 import { BrowserTarget } from '#test-support/browser/BrowserTarget.ts';
 import { click, navigate, role, testId, textEquals } from '#test-support/browser/RawPlan.ts';
 import { capabilityHarness, capabilityPlan, shownText, type CapabilityHarness } from '#test-support/capability-harness.ts';
+import { scriptsEnabled } from "#test-support/browser/ScriptsEnabled.ts";
 
 let capability: CapabilityHarness;
 before(async () => { capability = await capabilityHarness(2000); });
@@ -69,7 +70,7 @@ for (const targetId of Object.values(BrowserTarget)) {
     test('the popup is closed and the session stays on the page that opened it', onTarget(targetId), async () => {
       const session = await capability.openOwn(targetId);
       try {
-        assert.ok((await session.navigate(capability.url('/pages.html'))).ok);
+        assert.ok((await session.navigate(capability.url('/pages.html'), scriptsEnabled)).ok);
         const acted = await session.act(capability.actionStep(click(role('button', 'Open help'))), allowEveryAction);
         assert.equal(acted.ok ? 'passed' : acted.error.code, 'unsupported-step');
         // The page checks its own handle on the popup every 50 ms.

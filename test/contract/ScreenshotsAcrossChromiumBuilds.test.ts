@@ -16,6 +16,7 @@ import {
     signupPlan,
 } from "#test-support/signup-harness.ts";
 import { fullTierOnly } from "#test-support/TestTier.ts";
+import { scriptsEnabled } from "#test-support/browser/ScriptsEnabled.ts";
 
 const SOFTWARE_RASTER_FLAG = "--disable-gpu";
 const HEADLESS_FLAG = "--headless";
@@ -55,7 +56,7 @@ async function commandLineOfAChromeSession(): Promise<readonly string[]> {
     );
     assert.ok(opened.ok, "the session opens");
     try {
-        const navigated = await opened.value.navigate("chrome://version");
+        const navigated = await opened.value.navigate("chrome://version", scriptsEnabled);
         assert.ok(navigated.ok, JSON.stringify(navigated));
         return splitCommandLine(await opened.value.evaluate(readCommandLineText));
     } finally {

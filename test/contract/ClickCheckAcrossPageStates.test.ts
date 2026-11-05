@@ -17,6 +17,7 @@ import {
     type CapabilityHarness,
 } from "#test-support/capability-harness.ts";
 import type { FixtureRoute } from "#test-support/fixture-server.ts";
+import { scriptsEnabled } from "#test-support/browser/ScriptsEnabled.ts";
 
 shareBrowserInThisFile();
 
@@ -180,14 +181,14 @@ const clickOutcomeIn = async (document: DocumentSession): Promise<ClickOutcome> 
     const acted = await document.act(clickOf(BUTTON), allowEveryAction);
     return {
         failureCode: acted.ok ? null : acted.error.code,
-        tally: expectOneElement(await document.probe(harness.locator(testId(TALLY)))).text,
+        tally: expectOneElement(await document.probe(harness.locator(testId(TALLY)), null)).text,
     };
 };
 
 const clickOnPage = async (page: string, hasVirtualTimers: boolean): Promise<ClickOutcome> => {
     const session = await openSession(hasVirtualTimers);
     try {
-        assert.ok((await session.navigate(harness.url(page))).ok, `${page} loads`);
+        assert.ok((await session.navigate(harness.url(page), scriptsEnabled)).ok, `${page} loads`);
         return await clickOutcomeIn(session);
     } finally {
         await session.close();
@@ -201,7 +202,7 @@ const clickInFrame = async (
     const session = await openSession(hasVirtualTimers);
     try {
         const page = framing(framedPage);
-        assert.ok((await session.navigate(harness.url(page))).ok, `${page} loads`);
+        assert.ok((await session.navigate(harness.url(page), scriptsEnabled)).ok, `${page} loads`);
         const located = performableLocator(harness.locator(testId(FRAME)));
         assert.ok(located !== undefined, "the frame's locator is literal");
         const inner = await session.frame(located);
@@ -267,7 +268,10 @@ describe("Using the real browser driver", () => {
                     const session = await openSession(hasVirtualTimers);
                     try {
                         const page = harness.url(TIMER_PAGE);
-                        assert.ok((await session.navigate(page)).ok, "the page loads");
+                        assert.ok(
+                            (await session.navigate(page, scriptsEnabled)).ok,
+                            "the page loads",
+                        );
                         assert.deepEqual(await clickOutcomeIn(session), ONE_CLICK);
                         assert.equal(expectRead(await session.page()).title, title);
                     } finally {
@@ -353,7 +357,7 @@ describe("Using the real browser driver", () => {
                 const session = await openSession(false);
                 try {
                     const page = harness.url(DIALOG_ON_PRESS_PAGE);
-                    assert.ok((await session.navigate(page)).ok, "the page loads");
+                    assert.ok((await session.navigate(page, scriptsEnabled)).ok, "the page loads");
                     await session.act(clickOf(ASK), allowEveryAction);
                     const answered = await session.act(
                         harness.actionStep({ type: "dialog", action: "accept" }),
@@ -374,7 +378,7 @@ describe("Using the real browser driver", () => {
                 const session = await openSession(false);
                 try {
                     const page = harness.url(NAVIGATES_DURING_PRESS_PAGE);
-                    assert.ok((await session.navigate(page)).ok, "the page loads");
+                    assert.ok((await session.navigate(page, scriptsEnabled)).ok, "the page loads");
                     const acted = await session.act(clickOf(BUTTON), allowEveryAction);
                     assert.deepEqual(acted, { ok: true, value: undefined });
                     assert.equal(expectRead(await session.page()).url, harness.url(ARRIVED_PAGE));
@@ -391,7 +395,7 @@ describe("Using the real browser driver", () => {
                 const session = await openSession(false);
                 try {
                     const page = harness.url(FRAMEWORK_PAGE);
-                    assert.ok((await session.navigate(page)).ok, "the page loads");
+                    assert.ok((await session.navigate(page, scriptsEnabled)).ok, "the page loads");
                     const acted = await session.act(clickOf(BUTTON), allowEveryAction);
                     const expected: DriverError = {
                         code: NOT_ACTIONABLE,
@@ -399,7 +403,7 @@ describe("Using the real browser driver", () => {
                     };
                     assert.deepEqual(acted, { ok: false, error: expected });
                     const shown = expectOneElement(
-                        await session.probe(harness.locator(testId(TALLY))),
+                        await session.probe(harness.locator(testId(TALLY)), null),
                     );
                     assert.equal(shown.text, "1", "the framework's own click reached the handler");
                 } finally {

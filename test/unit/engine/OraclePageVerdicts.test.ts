@@ -215,7 +215,7 @@ describe("Using the oracle", () => {
                     kind: "attribute",
                     name: "title",
                 });
-                assert.equal(domReadFor(VISIBLE), undefined);
+                assert.equal(domReadFor(VISIBLE), null);
             });
         });
     });

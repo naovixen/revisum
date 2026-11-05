@@ -19,6 +19,7 @@ import {
 } from "#test-support/capability-harness.ts";
 import type { FixtureRoute } from "#test-support/fixture-server.ts";
 import { endAtOnce, isRunning } from "#test-support/process-tree.ts";
+import { scriptsEnabled } from "#test-support/browser/ScriptsEnabled.ts";
 
 shareBrowserInThisFile();
 
@@ -222,7 +223,9 @@ describe("Using a browser that a test file shares", () => {
                 try {
                     assert.notEqual(next.processId, left.processId);
                     assert.equal(isRunning(left.processId), false);
-                    assert.ok((await next.navigate(harness.url(READ_TRACES_PATH))).ok);
+                    assert.ok(
+                        (await next.navigate(harness.url(READ_TRACES_PATH), scriptsEnabled)).ok,
+                    );
                 } finally {
                     await next.close();
                 }
@@ -244,7 +247,9 @@ describe("Using a browser that a test file shares", () => {
                 const next = await openSession(driver);
                 try {
                     assert.notEqual(next.processId, first.processId);
-                    assert.ok((await next.navigate(harness.url(READ_TRACES_PATH))).ok);
+                    assert.ok(
+                        (await next.navigate(harness.url(READ_TRACES_PATH), scriptsEnabled)).ok,
+                    );
                 } finally {
                     await next.close();
                 }

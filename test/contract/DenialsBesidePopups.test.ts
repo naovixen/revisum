@@ -14,6 +14,7 @@ import {
 } from "#test-support/browser/RawPlan.ts";
 import { capabilityHarness } from "#test-support/capability-harness.ts";
 import { TARGET, htmlPage, routedPagesHarness } from "./RoutedPagesHarness.ts";
+import { scriptsEnabled } from "#test-support/browser/ScriptsEnabled.ts";
 
 // Long enough for the press's own step to have ended, well inside the time a press lets a page open one.
 const POPUP_AFTER_THE_PRESS_MILLISECONDS = 500;
@@ -111,7 +112,9 @@ describe("Using a run in a real browser", () => {
                 const onItsOwn = await capabilityHarness(undefined, ROUTES);
                 const session = await onItsOwn.openOwn(TARGET);
                 try {
-                    assert.ok((await session.navigate(onItsOwn.url("/hostile.html"))).ok);
+                    assert.ok(
+                        (await session.navigate(onItsOwn.url("/hostile.html"), scriptsEnabled)).ok,
+                    );
                     const pressed = await session.act(
                         onItsOwn.actionStep(click(testId("start"))),
                         allowEveryAction,

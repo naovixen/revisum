@@ -8,6 +8,7 @@ import { BrowserTarget } from "#test-support/browser/BrowserTarget.ts";
 import { click, testId } from "#test-support/browser/RawPlan.ts";
 import { capabilityHarness, type CapabilityHarness } from "#test-support/capability-harness.ts";
 import type { FixtureRoute } from "#test-support/fixture-server.ts";
+import { scriptsEnabled } from "#test-support/browser/ScriptsEnabled.ts";
 
 const TARGET = BrowserTarget.Chrome;
 const STEP_TIMEOUT_MILLISECONDS = 5000;
@@ -45,7 +46,10 @@ const clicksInTurn = async (): Promise<readonly (string | null)[]> => {
     for (let turn = 0; turn < CLICKS_ON_EACH; turn += 1) {
         const session = await harness.openOwn(TARGET);
         try {
-            assert.ok((await session.navigate(harness.url(PAGE))).ok, `${PAGE} loads`);
+            assert.ok(
+                (await session.navigate(harness.url(PAGE), scriptsEnabled)).ok,
+                `${PAGE} loads`,
+            );
             const acted = await session.act(
                 harness.actionStep(click(testId(BUTTON))),
                 allowEveryAction,

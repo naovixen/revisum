@@ -27,6 +27,7 @@ import {
   defaultRedactor, failure, success,
   type A11yNode, type DriverError, type PageProbe, type PageReadFailure, type PageReadFailureCode, type Plan, type Redactor, type Result, type TextReading, type TrustedProject,
 } from '@revisum/engine';
+import { scriptsEnabled } from '#test-support/browser/ScriptsEnabled.ts';
 import { fakeExploreDriver } from '#test-support/fakes/FakeExploreDriver.ts';
 
 // ---- The types the spec names, as these tests read them --------------------------------------------
@@ -48,7 +49,7 @@ export type ExploreOptions = {
 };
 // The driver port the crawl is given (contracts' ExploreDriver in the build notes).
 export type ExploreDriver = {
-  navigate(url: string, options?: { readonly scripts: 'enabled' | 'disabled' }): Promise<Result<void, DriverError>>;
+  navigate(url: string, options: { readonly scripts: 'enabled' | 'disabled' }): Promise<Result<void, DriverError>>;
   page(): Promise<Result<PageProbe, PageReadFailure>>;
   accessibilitySnapshot(): Promise<Result<A11yNode, PageReadFailure>>;
   linkTargets(): Promise<Result<readonly string[], PageReadFailure>>;
@@ -245,7 +246,7 @@ export async function followEveryLink(driver: ExploreDriver, start: string, maxi
   for (let visited = 0; visited < maximumPages && queue.length > 0; visited++) {
     const url = queue.shift();
     if (url === undefined) break;
-    const navigated = await driver.navigate(url);
+    const navigated = await driver.navigate(url, scriptsEnabled);
     if (!navigated.ok) continue;
     const act: unknown = Reflect.get(driver, 'act');
     if (typeof act === 'function') await Reflect.apply(act, driver, [{ type: 'click', locator: { by: 'role', role: 'button', name: 'Send' } }]);

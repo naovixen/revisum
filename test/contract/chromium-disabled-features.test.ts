@@ -10,6 +10,7 @@ import { defaultRedactor, type SessionEnvironment, type Target } from '@revisum/
 import { BROWSERS } from '#test-support/browsers.ts';
 import type { BrowserHarness } from '#test-support/browser/BrowserHarness.ts';
 import { FIXED_TIME_MILLISECONDS, SEED, signupHarness } from '#test-support/signup-harness.ts';
+import { scriptsEnabled } from "#test-support/browser/ScriptsEnabled.ts";
 
 const PORT_RANDOMISATION_FEATURE = 'TcpPortRandomizationWin';
 const DISABLE_FEATURES = '--disable-features=';
@@ -83,7 +84,7 @@ describe('Chromium port randomisation is off in every browser a driver starts', 
     assert.ok(opened.ok, 'session opens');
     const session = opened.value;
     try {
-      const navigated = await session.navigate('chrome://version');
+      const navigated = await session.navigate('chrome://version', scriptsEnabled);
       assert.ok(navigated.ok, JSON.stringify(navigated));
       const text = await session.evaluate(readCommandLineText);
       const commandLine = splitCommandLine(text);

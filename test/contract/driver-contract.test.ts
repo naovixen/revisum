@@ -11,6 +11,7 @@ import { expectRead } from '#test-support/ExpectRead.ts';
 import { onTarget } from '#test-support/TestTier.ts';
 import type { BrowserHarness } from '#test-support/browser/BrowserHarness.ts';
 import { CONTRACT_TARGETS, EMAIL, FIXED_TIME_MILLISECONDS, LOCALE, SEED, TIMEZONE, environmentPlan, signupHarness, makeDrivers, signupPlan, stepsPlan } from '#test-support/signup-harness.ts';
+import { scriptsEnabled } from "#test-support/browser/ScriptsEnabled.ts";
 
 const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47];
 
@@ -98,7 +99,7 @@ for (const targetId of CONTRACT_TARGETS) {
 
     test('accessibility snapshot exposes the heading and named form controls', onTarget(targetId), async () => {
       const nodes = await withSession(targetId, async (session) => {
-        assert.ok((await session.navigate(`${testHarness.server.origin}/`)).ok);
+        assert.ok((await session.navigate(`${testHarness.server.origin}/`, scriptsEnabled)).ok);
         return flatten(expectRead(await session.accessibilitySnapshot()));
       });
       const has = (role: string, name: string): boolean => nodes.some((node) => node.role === role && node.name === name);
@@ -109,11 +110,11 @@ for (const targetId of CONTRACT_TARGETS) {
 
     test('probes report value, box and PII sensitivity consistently', onTarget(targetId), async () => {
       const probe = await withSession(targetId, async (session) => {
-        assert.ok((await session.navigate(`${testHarness.server.origin}/`)).ok);
+        assert.ok((await session.navigate(`${testHarness.server.origin}/`, scriptsEnabled)).ok);
         const fill = parsedStep({ type: 'fill', locator: { by: 'label', label: 'Email' }, value: EMAIL }, 'fill');
         const filled = await session.act(fill, allowEveryAction);
         assert.ok(filled.ok);
-        return session.probe(fill.locator);
+        return session.probe(fill.locator, null);
       });
       const element = expectOneElement(probe);
       assert.equal(element.value, EMAIL);

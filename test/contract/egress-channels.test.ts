@@ -27,6 +27,7 @@ import {
   CHANNEL_HOSTS, CHANNEL_NAMES, CHANNEL_PAGES, UNDECLARED_CHANNEL_ORIGINS, declaredService, egressPolicy, fakeResolver, hostOf,
   type ChannelName, type FakeResolver,
 } from '../unit/runner/runner-examples.ts';
+import { scriptsEnabled } from "#test-support/browser/ScriptsEnabled.ts";
 
 const WAIT_MILLISECONDS = 10_000;
 const POLL_MILLISECONDS = 50;
@@ -79,7 +80,7 @@ async function waitFor(condition: () => boolean): Promise<void> {
 async function sendThrough(channel: ChannelName): Promise<{ readonly events: readonly EgressEvent[]; readonly session: DriverSession }> {
   const session = await openThroughProxy();
   const host = CHANNEL_HOSTS[channel];
-  const navigated = await session.navigate(fixture.url(CHANNEL_PAGES[channel]));
+  const navigated = await session.navigate(fixture.url(CHANNEL_PAGES[channel]), scriptsEnabled);
   assert.ok(navigated.ok, JSON.stringify(navigated));
   if (channel === 'popup') await session.act(capability.actionStep(click(role('button', 'Open the partner site'))), allowEveryAction);
   await waitFor(() => eventsOf(session).some((event) => event.channel === channel && hostOf(String(event.origin)) === host));
@@ -127,7 +128,7 @@ describe('every channel to an undeclared origin is stopped and recorded as an eg
 test('counter-example: the fixture origin\'s own requests go through the proxy and are allowed', async () => {
   const session = await openThroughProxy();
   try {
-    const navigated = await session.navigate(fixture.url('/index.html'));
+    const navigated = await session.navigate(fixture.url('/index.html'), scriptsEnabled);
     assert.ok(navigated.ok, JSON.stringify(navigated));
     const allowed = proxy.decisions().filter((entry) => String(entry.origin) === fixture.origin && entry.decision === 'allowed');
     assert.ok(allowed.length >= 1, `the proxy recorded the fixture origin as allowed: ${JSON.stringify(proxy.decisions())}`);

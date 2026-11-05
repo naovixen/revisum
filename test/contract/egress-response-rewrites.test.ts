@@ -19,6 +19,7 @@ import { FIXED_TIME_MILLISECONDS, SEED, capabilityHarness, type CapabilityHarnes
 import { defaultParser, signupPlan } from '../unit/engine/plan-examples.ts';
 import { startEgressFixtureServer, type EgressFixtureServer } from '../unit/runner/egress-fixture-server.ts';
 import { declaredService, egressPolicy, fakeResolver, origin } from '../unit/runner/runner-examples.ts';
+import { scriptsEnabled } from "#test-support/browser/ScriptsEnabled.ts";
 
 const HEADING_CHANGED: ResponseRewrite = { name: 'heading-changed', find: 'Original heading', replace: 'Mutated heading' };
 const readHeading = (): string => document.querySelector('[data-testid="heading"]')?.textContent ?? '';
@@ -60,21 +61,21 @@ before(async () => {
 after(() => cleanUps.runAll());
 
 test('counter-example: the same page on a declared origin that is not a fixture origin is not rewritten', async () => {
-  const navigated = await session.navigate(secondApp.url('/mutant.html'));
+  const navigated = await session.navigate(secondApp.url('/mutant.html'), scriptsEnabled);
   assert.ok(navigated.ok, JSON.stringify(navigated));
   assert.equal(await session.evaluate(readHeading), 'Original heading');
   assert.deepEqual(proxy.rewritesApplied(), [], 'no rewrite has been applied yet');
 });
 
 test('the page on the fixture origin is rewritten by its browser mutant', async () => {
-  const navigated = await session.navigate(fixtureApp.url('/mutant.html'));
+  const navigated = await session.navigate(fixtureApp.url('/mutant.html'), scriptsEnabled);
   assert.ok(navigated.ok, JSON.stringify(navigated));
   assert.equal(await session.evaluate(readHeading), 'Mutated heading');
 });
 
 test('the proxy reports the rewrite it applied, by origin and name, once', async () => {
   // Loading the fixture page again applies the same rewrite again; it is still one rewrite.
-  assert.ok((await session.navigate(fixtureApp.url('/mutant.html'))).ok);
+  assert.ok((await session.navigate(fixtureApp.url('/mutant.html'), scriptsEnabled)).ok);
   assert.deepEqual(proxy.rewritesApplied(), [{ origin: origin(fixtureApp.origin), name: 'heading-changed' }]);
 });
 

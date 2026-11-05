@@ -212,5 +212,5 @@ export async function shownText(
     session: Session,
     id: string,
 ): Promise<string> {
-    return expectOneElement(await session.probe(harness.locator(testId(id)))).text;
+    return expectOneElement(await session.probe(harness.locator(testId(id)), null)).text;
 }

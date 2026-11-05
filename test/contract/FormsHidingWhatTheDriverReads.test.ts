@@ -29,6 +29,7 @@ import {
     formHoldingButtonPage,
     formWithSubmitPage,
 } from "./DialogOnPressPages.ts";
+import { scriptsEnabled } from "#test-support/browser/ScriptsEnabled.ts";
 
 shareBrowserInThisFile();
 
@@ -51,7 +52,7 @@ const onPage = async <Value>(
     assert.ok(opened.ok, `the session opens: ${JSON.stringify(opened)}`);
     const session = opened.value;
     try {
-        assert.ok((await session.navigate(harness.url(page))).ok, `${page} loads`);
+        assert.ok((await session.navigate(harness.url(page), scriptsEnabled)).ok, `${page} loads`);
         return await use(session);
     } finally {
         await session.close();
@@ -67,7 +68,7 @@ const failureCodeOf = async (
 };
 
 const shownOn = async (session: DocumentSession): Promise<string> =>
-    expectOneElement(await session.probe(harness.locator(testId(SHOWN)))).text;
+    expectOneElement(await session.probe(harness.locator(testId(SHOWN)), null)).text;
 
 const CLICKS_ON_THE_FORM: readonly { readonly found: string; readonly locator: JsonRecord }[] = [
     { found: "its test id", locator: testId(CLICKED_FORM) },
@@ -97,7 +98,7 @@ describe("Using the real browser driver", () => {
                 test("then it should find the one form, shown", async () => {
                     const probe = await onPage(formHoldingButtonPage(inputName), async (session) =>
                         expectOneElement(
-                            await session.probe(harness.locator(testId(CLICKED_FORM))),
+                            await session.probe(harness.locator(testId(CLICKED_FORM)), null),
                         ),
                     );
                     assert.deepEqual(

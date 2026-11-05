@@ -17,6 +17,7 @@ import { fakeAiWriter } from '#test-support/fakes/FakeAiWriter.ts';
 import { fakeArtifactStore } from '#test-support/fakes/FakeArtifactStore.ts';
 import { fakeDriverNeverLaunching } from '#test-support/fakes/FakeDriver.ts';
 import { fakePorts } from '#test-support/fakes/FakePorts.ts';
+import { scriptsEnabled } from "#test-support/browser/ScriptsEnabled.ts";
 
 let testHarness: BrowserHarness;
 before(async () => { testHarness = await signupHarness(); });
@@ -156,12 +157,12 @@ describe('(d) redaction by default', () => {
           { type: 'fill', locator: { by: 'label', label: 'Full name' }, value: NAME },
           { type: 'fill', locator: { by: 'label', label: 'Email' }, value: EMAIL },
         ]));
-        assert.ok((await session.navigate(`${testHarness.server.origin}/`)).ok);
+        assert.ok((await session.navigate(`${testHarness.server.origin}/`, scriptsEnabled)).ok);
         // Steps 1 and 2 are the two fills; the probe plan adds a final check after them.
         for (const step of plan.steps.slice(1, 3) as Extract<Step, { type: 'fill' }>[]) {
           assert.ok((await session.act(step, allowEveryAction)).ok);
         }
-        const boxes = await Promise.all(plan.steps.slice(1, 3).map(async (step) => expectOneElement(await session.probe((step as Extract<Step, { type: 'fill' }>).locator)).box));
+        const boxes = await Promise.all(plan.steps.slice(1, 3).map(async (step) => expectOneElement(await session.probe((step as Extract<Step, { type: 'fill' }>).locator, null)).box));
         const masked = expectRead(await session.screenshot(redactor.selectors));
         const unmasked = expectRead(await session.screenshot([]));
         for (const box of boxes) {

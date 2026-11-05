@@ -14,6 +14,7 @@ import {
     type CapabilityHarness,
 } from "#test-support/capability-harness.ts";
 import type { FixtureRoute } from "#test-support/fixture-server.ts";
+import { scriptsEnabled } from "#test-support/browser/ScriptsEnabled.ts";
 
 shareBrowserInThisFile();
 
@@ -104,7 +105,7 @@ const onPage = async <Value>(
 ): Promise<Value> => {
     const session = await harness.openOwn(TARGET);
     try {
-        assert.ok((await session.navigate(harness.url(path))).ok, `${path} loads`);
+        assert.ok((await session.navigate(harness.url(path), scriptsEnabled)).ok, `${path} loads`);
         return await use(session);
     } finally {
         await session.close();
@@ -113,8 +114,8 @@ const onPage = async <Value>(
 
 const readsOf = async (path: string) =>
     onPage(path, async (session) => ({
-        shown: await session.probe(harness.locator(testId(SHOWN))),
-        nowhere: await session.probe(harness.locator(testId(NOWHERE))),
+        shown: await session.probe(harness.locator(testId(SHOWN)), null),
+        nowhere: await session.probe(harness.locator(testId(NOWHERE)), null),
     }));
 
 // The page's own world, where the patches are, so a read's answer there is the patch's.

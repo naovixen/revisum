@@ -307,7 +307,7 @@ export async function startBrowserHarness(
         host: { platform: platform(), arch: arch() },
     });
     const shownOn = async (session: Session, id: string): Promise<string | null> => {
-        const probed = await session.probe(locator(testId(id)));
+        const probed = await session.probe(locator(testId(id)), null);
         const found = oneElementOf(probed);
         return found.ok ? found.value.text : null;
     };

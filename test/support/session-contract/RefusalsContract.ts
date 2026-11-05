@@ -85,7 +85,7 @@ function valueReferenceContract(open: OpenSessionUnderTest): void {
     describe("when a locator holding a value reference is probed", () => {
         test("then it should read nothing, not an empty page", async () => {
             const { session } = await open();
-            assertNothingRead(await session.probe(locatorOf(HOLDING_A_VALUE)));
+            assertNothingRead(await session.probe(locatorOf(HOLDING_A_VALUE), null));
         });
     });
 
@@ -98,7 +98,7 @@ function valueReferenceContract(open: OpenSessionUnderTest): void {
                 await session.act(actionStep(CLICK_EXPORT), guard),
                 success(undefined),
             );
-            assert.equal((await session.probe(locatorOf(EXPORT_BUTTON))).count, 1);
+            assert.equal((await session.probe(locatorOf(EXPORT_BUTTON), null)).count, 1);
         });
     });
 }

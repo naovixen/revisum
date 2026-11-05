@@ -13,6 +13,7 @@ import { BrowserTarget } from '#test-support/browser/BrowserTarget.ts';
 import { click, role } from '#test-support/browser/RawPlan.ts';
 import { capabilityHarness, shownText, type CapabilityHarness } from '#test-support/capability-harness.ts';
 import { shareBrowserInThisFile } from '#test-support/browser/ShareBrowserInThisFile.ts';
+import { scriptsEnabled } from "#test-support/browser/ScriptsEnabled.ts";
 
 shareBrowserInThisFile();
 
@@ -47,7 +48,7 @@ for (const targetId of Object.values(BrowserTarget)) {
     });
 
     const clickContinue = async (scenario: string) => {
-      assert.ok((await session.navigate(capability.url(`/auto-wait-${scenario}.html`))).ok, `the ${scenario} page loads`);
+      assert.ok((await session.navigate(capability.url(`/auto-wait-${scenario}.html`), scriptsEnabled)).ok, `the ${scenario} page loads`);
       const started = Date.now();
       const acted = await session.act(capability.actionStep(click(role('button', 'Continue'))), allowEveryAction);
       return { acted, elapsed: Date.now() - started, shown: await shownText(capability, session, 'result') };
@@ -73,7 +74,7 @@ for (const targetId of Object.values(BrowserTarget)) {
     // Counter-example: the result line does count a click that lands too early, so the checks
     // above can fail. A page script clicks the button while it is still moving.
     test('counter-example: a click while the button still moves is counted as early', onTarget(targetId), async () => {
-      assert.ok((await session.navigate(capability.url('/auto-wait-moving.html'))).ok);
+      assert.ok((await session.navigate(capability.url('/auto-wait-moving.html'), scriptsEnabled)).ok);
       const early = await session.evaluate(() => {
         const button = [...document.querySelectorAll('button')].find((candidate) => candidate.textContent === 'Continue');
         button?.click();

@@ -34,6 +34,7 @@ import {
     divIdentifiedAsPage,
     formHoldingInputPage,
 } from "./DialogOnPressPages.ts";
+import { scriptsEnabled } from "#test-support/browser/ScriptsEnabled.ts";
 
 shareBrowserInThisFile();
 
@@ -53,7 +54,7 @@ after(async () => {
 });
 
 const shownIn = async (document: DocumentSession, id: string): Promise<string | null> =>
-    expectOneElement(await document.probe(harness.locator(testId(id)))).text;
+    expectOneElement(await document.probe(harness.locator(testId(id)), null)).text;
 
 const failureOf = async (document: DocumentSession, step: JsonRecord): Promise<Failure> => {
     const acted = await document.act(harness.actionStep(step), allowEveryAction);
@@ -73,7 +74,7 @@ const onPage = async <Value>(
     assert.ok(opened.ok, `the session opens: ${JSON.stringify(opened)}`);
     const session = opened.value;
     try {
-        assert.ok((await session.navigate(harness.url(page))).ok, `${page} loads`);
+        assert.ok((await session.navigate(harness.url(page), scriptsEnabled)).ok, `${page} loads`);
         return await use(session);
     } finally {
         await session.close();

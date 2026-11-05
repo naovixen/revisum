@@ -19,6 +19,7 @@ import { capabilityHarness, type CapabilityHarness } from "#test-support/capabil
 import { recordedReport } from "../unit/engine/evidence-examples.ts";
 import { runDeclaredSuite } from "../unit/cli/suite-run-examples.ts";
 import { declaredService, egressPolicy, fakeResolver } from "../unit/runner/runner-examples.ts";
+import { scriptsEnabled } from "#test-support/browser/ScriptsEnabled.ts";
 
 const OPEN_BUTTON = "Open the partner site";
 const UNDECLARED_ORIGIN = "http://undeclared.invalid";
@@ -111,7 +112,7 @@ async function openPopupFrom(page: string): Promise<HeldPopup> {
     const session = opened.value;
     let records: readonly BrowserRequestRecord[];
     try {
-        const navigated = await session.navigate(`${opener.origin}${page}`);
+        const navigated = await session.navigate(`${opener.origin}${page}`, scriptsEnabled);
         assert.ok(navigated.ok, JSON.stringify(navigated));
         await session.act(
             capability.actionStep(click(role("button", OPEN_BUTTON))),

@@ -38,6 +38,25 @@ const THROWING_STEPS: readonly {
     readonly session: () => ReturnType<typeof fakeSessionOnOrders>;
 }[] = [
     {
+        name: "a capture whose screenshot",
+        step: { type: "capture", name: "cart" },
+        session: () => fakeSessionOnOrders({ screenshot: breaks }),
+    },
+    {
+        name: "an a11yAudit whose audit",
+        step: { type: "a11yAudit", mode: "report" },
+        session: () => fakeSessionOnOrders({ audit: breaks }),
+    },
+    {
+        name: "an expectPage whose page read",
+        step: {
+            type: "expectPage",
+            assert: { kind: "title", value: "Orders" },
+            criterionId: "cart.title-shown",
+        },
+        session: () => fakeSessionOnOrders({ page: breaks }),
+    },
+    {
         name: "an expect whose probe",
         step: PASSING_CHECK,
         session: () => fakeSessionOnOrders({ probe: breaks }),
@@ -125,31 +144,36 @@ describe("Using the run", () => {
         });
     }
 
-    describe("given a step inside a frame cannot read the page", () => {
-        describe("when the run ends", () => {
-            test("then it should record the frame step with adapter-error and end Errored", async () => {
-                const frame: JsonRecord = {
-                    type: "frame",
-                    locator: { by: "testId", testId: "cart-frame" },
-                    steps: [{ type: "capture", name: "cart" }],
-                };
-                const { result } = await runOnFakeSession(unsafePlan([OPEN_CART, frame]), {
-                    session: fakeSessionOnOrders({ screenshot: cannotRead }),
+    for (const { name, screenshot } of [
+        { name: "cannot read the page", screenshot: cannotRead },
+        { name: "throws", screenshot: breaks },
+    ]) {
+        describe(`given a step inside a frame ${name}`, () => {
+            describe("when the run ends", () => {
+                test("then it should record the frame step with adapter-error and end Errored", async () => {
+                    const frame: JsonRecord = {
+                        type: "frame",
+                        locator: { by: "testId", testId: "cart-frame" },
+                        steps: [{ type: "capture", name: "cart" }],
+                    };
+                    const { result } = await runOnFakeSession(unsafePlan([OPEN_CART, frame]), {
+                        session: fakeSessionOnOrders({ screenshot }),
+                    });
+                    assert.deepEqual(
+                        { state: result.state, steps: stepSummaries(result) },
+                        {
+                            state: "Errored",
+                            steps: [
+                                ["passed", undefined],
+                                ["failed", "adapter-error"],
+                                ["skipped", undefined],
+                            ],
+                        },
+                    );
                 });
-                assert.deepEqual(
-                    { state: result.state, steps: stepSummaries(result) },
-                    {
-                        state: "Errored",
-                        steps: [
-                            ["passed", undefined],
-                            ["failed", "adapter-error"],
-                            ["skipped", undefined],
-                        ],
-                    },
-                );
             });
         });
-    });
+    }
 
     describe("given a new tab whose check fails", () => {
         describe("and the tab fails to close", () => {

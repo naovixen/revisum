@@ -18,6 +18,7 @@ import { click, label, navigate, role, testId, textEquals, type JsonRecord } fro
 import { UPLOAD_FIXTURE, capabilityCdpDriver, capabilityDrivers, capabilityHarness, capabilityPlan, shownText, watchedDriver, type CapabilityHarness } from '#test-support/capability-harness.ts';
 import { BROWSERS } from '#test-support/browsers.ts';
 import { shareBrowserInThisFile } from '#test-support/browser/ShareBrowserInThisFile.ts';
+import { scriptsEnabled } from "#test-support/browser/ScriptsEnabled.ts";
 
 shareBrowserInThisFile();
 
@@ -38,7 +39,7 @@ function spyGuard(verdict: GuardVerdict): { readonly guard: ActionGuard; readonl
 const withGuardPage = async <Value>(targetId: string, use: (session: Session) => Promise<Value>): Promise<Value> => {
   const session = await capability.open(targetId);
   try {
-    assert.ok((await session.navigate(capability.url('/guard.html'))).ok, 'the guard page loads');
+    assert.ok((await session.navigate(capability.url('/guard.html'), scriptsEnabled)).ok, 'the guard page loads');
     return await use(session);
   } finally {
     await session.close();
@@ -55,7 +56,7 @@ type GuardedAction = {
 };
 
 const shown = (id: string) => (session: Session): Promise<string> => shownText(capability, session, id);
-const noteValue = async (session: Session): Promise<string> => expectOneElement(await session.probe(capability.locator(label('Note')))).value ?? '';
+const noteValue = async (session: Session): Promise<string> => expectOneElement(await session.probe(capability.locator(label('Note')), null)).value ?? '';
 
 const CLICK_FILL_AND_PRESS: readonly GuardedAction[] = [
   { name: 'click', step: click(role('button', 'Save draft')), element: { role: 'button', name: 'Save draft' }, effect: { read: shown('save-clicks'), untouched: '0', done: '1' } },

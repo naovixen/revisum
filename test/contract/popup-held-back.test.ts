@@ -21,6 +21,7 @@ import { BrowserTarget } from '#test-support/browser/BrowserTarget.ts';
 import { click, role } from '#test-support/browser/RawPlan.ts';
 import { FIXED_TIME_MILLISECONDS, SEED, capabilityHarness, type CapabilityHarness } from '#test-support/capability-harness.ts';
 import { declaredService, egressPolicy, fakeResolver } from '../unit/runner/runner-examples.ts';
+import { scriptsEnabled } from "#test-support/browser/ScriptsEnabled.ts";
 
 const WAIT_MILLISECONDS = 10_000;
 const POLL_MILLISECONDS = 50;
@@ -84,7 +85,7 @@ async function openSession(): Promise<DriverSession> {
 // Clicks the button that opens the popup, and waits until the browser has reported it and any load
 // it was let make has had time to arrive.
 async function openPopup(session: DriverSession): Promise<void> {
-  const navigated = await session.navigate(`${opener.origin}/`);
+  const navigated = await session.navigate(`${opener.origin}/`, scriptsEnabled);
   assert.ok(navigated.ok, JSON.stringify(navigated));
   await session.act(capability.actionStep(click(role('button', OPEN_BUTTON))), allowEveryAction);
   const deadline = Date.now() + WAIT_MILLISECONDS;
@@ -111,7 +112,7 @@ test('counter-example: the same server gets a direct request, and the popup that
   const session = await openSession();
   try {
     await openPopup(session);
-    const navigated = await session.navigate(`${reachable.origin}/welcome`);
+    const navigated = await session.navigate(`${reachable.origin}/welcome`, scriptsEnabled);
     assert.ok(navigated.ok, JSON.stringify(navigated));
     assert.ok(reachable.requested.includes('/welcome'), JSON.stringify(reachable.requested));
     assert.ok(proxy.decisions().some((entry) => entry.origin === reachable.origin && entry.decision === 'allowed'), JSON.stringify(proxy.decisions()));

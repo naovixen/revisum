@@ -17,6 +17,7 @@ import {
     type CapabilityHarness,
 } from "#test-support/capability-harness.ts";
 import type { FixtureRoute } from "#test-support/fixture-server.ts";
+import { scriptsEnabled } from "#test-support/browser/ScriptsEnabled.ts";
 
 shareBrowserInThisFile();
 
@@ -237,9 +238,11 @@ after(async () => {
 const readOf = async (path: string) => {
     const session = await harness.openOwn(TARGET);
     try {
-        assert.ok((await session.navigate(harness.url(path))).ok, `${path} loads`);
-        const first = expectOneElement(await session.probe(harness.locator(testId(CONTROL))));
-        const second = expectOneElement(await session.probe(harness.locator(testId(CONTROL))));
+        assert.ok((await session.navigate(harness.url(path), scriptsEnabled)).ok, `${path} loads`);
+        const first = expectOneElement(await session.probe(harness.locator(testId(CONTROL)), null));
+        const second = expectOneElement(
+            await session.probe(harness.locator(testId(CONTROL)), null),
+        );
         return { first, second };
     } finally {
         await session.close();
@@ -249,7 +252,7 @@ const readOf = async (path: string) => {
 const clickOn = async (path: string) => {
     const session = await harness.openOwn(TARGET);
     try {
-        assert.ok((await session.navigate(harness.url(path))).ok, `${path} loads`);
+        assert.ok((await session.navigate(harness.url(path), scriptsEnabled)).ok, `${path} loads`);
         const acted = await session.act(
             harness.actionStep(click(testId(CONTROL))),
             allowEveryAction,

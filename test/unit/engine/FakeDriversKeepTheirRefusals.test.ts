@@ -127,7 +127,7 @@ describe("Using a fake driver that shapes the page", () => {
             test("then it should read nothing of the page", async () => {
                 const driver = echoPageDriver({});
                 const session = await opened(driver);
-                const probed = await session.probe(locatorOf(HOLDING_A_VALUE));
+                const probed = await session.probe(locatorOf(HOLDING_A_VALUE), null);
                 assert.equal(probed.count, "page-unreadable");
                 assert.equal(driver.calls.probes, 1);
             });

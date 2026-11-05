@@ -242,7 +242,7 @@ async function probedHolder(path: string) {
             read: [],
             beforePageRead: async (session) => {
                 const probe = expectOneElement(
-                    await session.probe(harness.locator(testId(HOLDER))),
+                    await session.probe(harness.locator(testId(HOLDER)), null),
                 );
                 seen.sensitive = probe.sensitive;
                 seen.count = probe.count;
