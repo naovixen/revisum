@@ -1,7 +1,7 @@
 // A press must not pass because something got in its way: a page can stop every event of it and take the
 // button away, open a dialog that holds the read, or navigate, and none of that is the button having been
 // clicked. A page that does the same from the button's own listeners has had its press, and the step
-// passes. The two costs of telling them apart on ordinary pages are pinned here by name.
+// passes. The cost of telling them apart on ordinary pages is pinned here by name.
 import assert from "node:assert/strict";
 import { after, before, describe, test } from "node:test";
 import { allowEveryAction } from "#test-support/browser/AllowEveryAction.ts";
@@ -227,21 +227,21 @@ describe("Using the real browser driver", () => {
                 });
             });
         });
+    });
 
-        describe("and a custom element whose disabled exists only as a JavaScript property", () => {
-            describe("when a plan reads it", () => {
-                test("then it should read as enabled, as the driver's own world cannot see the property", async () => {
-                    const session = await harness.openOwn(TARGET);
-                    try {
-                        const page = harness.url(ELEMENT_DISABLED_ONLY_IN_SCRIPT);
-                        assert.ok((await session.navigate(page)).ok);
-                        const read = await session.probe(harness.locator(testId(CUSTOM_CONTROL)));
-                        assert.ok(read.count === 1, JSON.stringify(read));
-                        assert.equal(read.enabled, true);
-                    } finally {
-                        await session.close();
-                    }
-                });
+    describe("given a custom element whose disabled exists only as a JavaScript property", () => {
+        describe("when a plan reads it", () => {
+            test("then it should read as not enabled", async () => {
+                const session = await harness.openOwn(TARGET);
+                try {
+                    const page = harness.url(ELEMENT_DISABLED_ONLY_IN_SCRIPT);
+                    assert.ok((await session.navigate(page)).ok);
+                    const read = await session.probe(harness.locator(testId(CUSTOM_CONTROL)));
+                    assert.ok(read.count === 1, JSON.stringify(read));
+                    assert.equal(read.enabled, false);
+                } finally {
+                    await session.close();
+                }
             });
         });
     });
