@@ -254,14 +254,19 @@ async function hasBrowserExitedInTime(
 async function windowsProcessesLeftBehind(
     folder: string,
     browserProcess: ChildProcess,
+    stopStartedAt: number,
 ): Promise<readonly string[]> {
     if (OWN_PROCESS_GROUP || browserProcess.pid === undefined) {
         return [];
     }
     try {
-        return (await windowsProcessesLeft(folder, WINDOWS_RELEASE_MILLISECONDS)).map(
-            (processId) => `the process ${processId}`,
-        );
+        return (
+            await windowsProcessesLeft(
+                folder,
+                { processId: browserProcess.pid, stopStartedAt },
+                WINDOWS_RELEASE_MILLISECONDS,
+            )
+        ).map((processId) => `the process ${processId}`);
     } catch (error) {
         return [`whatever still runs, as it could not be told (${messageOf(error)})`];
     }
@@ -275,6 +280,7 @@ async function stopBrowser(
     connection: CdpConnection | null,
 ): Promise<void> {
     connection?.expectClose();
+    const stopStartedAt = Date.now();
     const ending = await endWindowsProcessTree(browserProcess);
     // A failed ask is expected of a browser that has gone or stopped answering. It says nothing by itself,
     // as the wait below finds out whether the browser went, and is only part of why if it did not.
@@ -291,7 +297,7 @@ async function stopBrowser(
             ? []
             : [`the browser process ${String(processId)}`]),
         ...((await endProcessGroup(processId)) ? [] : [`the process group ${String(processId)}`]),
-        ...(await windowsProcessesLeftBehind(userDataFolder, browserProcess)),
+        ...(await windowsProcessesLeftBehind(userDataFolder, browserProcess, stopStartedAt)),
     ];
     connection?.close();
     const folderLeft = await folderLeftBehind(userDataFolder);

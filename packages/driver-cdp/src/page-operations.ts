@@ -63,27 +63,32 @@ export interface PageOperations<Handle> {
 
 // The input a session sends a document. It is apart from PageOperations so that a session can reach it
 // only through hitChecks (HitChecks.ts), and a new kind of input does not compile until it goes there.
+// Every input is given `hasStepEnded`, and asks it just before each command it sends the page, in the
+// same turn as the send: once it says the step has ended, the input sends nothing more and rejects with
+// StepHasEnded, so no part of a step that has failed with its timeout reaches the page afterwards.
 export interface PageInput<Handle> {
   // Moves the pointer to the point, in this document's viewport, then presses and releases there unless
   // the aim has gone stale: `centreOfElementNow`, or where this document sits in the top viewport, no longer
-  // agrees with the point. Says how far it got before a dialog or a stale aim stopped it. Sends neither the
-  // move nor the press once `hasStepEnded` says the step has ended, so a late click acts on no later step.
-  click(at: Point, centreOfElementNow: () => Promise<Point | null>, hasStepEnded: () => boolean): Promise<PressSent>;
-  hover(at: Point): Promise<void>;
+  // agrees with the point. Says how far it got before a dialog or a stale aim stopped it.
+  click(at: Point, centreOfElementNow: () => Promise<Point | null>, hasStepEnded: HasStepEnded): Promise<PressSent>;
+  hover(at: Point, hasStepEnded: HasStepEnded): Promise<void>;
   // Inserts the text as typed text, line feeds included, with no key press for them.
-  fill(element: Handle, value: string): Promise<void>;
+  fill(element: Handle, value: string, hasStepEnded: HasStepEnded): Promise<void>;
   // Holds the modifier keys down in order, presses the key, then releases them in reverse.
-  press(element: Handle, key: Key, modifiers: readonly HeldModifierKey[]): Promise<void>;
+  press(element: Handle, key: Key, modifiers: readonly HeldModifierKey[], hasStepEnded: HasStepEnded): Promise<void>;
   // Gives a file input these files, by absolute path, firing its input and change events.
-  setFiles(element: Handle, paths: readonly string[]): Promise<void>;
+  setFiles(element: Handle, paths: readonly string[], hasStepEnded: HasStepEnded): Promise<void>;
   // Chooses the option of a select whose visible text, or else whose value, is `option`, firing the
   // events a person's choice fires.
-  select(element: Handle, option: string): Promise<SelectOutcome>;
+  select(element: Handle, option: string, hasStepEnded: HasStepEnded): Promise<SelectOutcome>;
   // Calls a page script's source, one function expression, once in this document's main world
   // with one argument, the arguments object; awaits it and writes its result as JSON text in the
   // page (scriptResultText in in-page.ts). It never times out by itself: the session races it.
-  callScript(source: string, scriptArguments: Readonly<Record<string, string | number | boolean>>, maximumResultBytes: number): Promise<ScriptCallOutcome>;
+  callScript(source: string, scriptArguments: Readonly<Record<string, string | number | boolean>>, maximumResultBytes: number, hasStepEnded: HasStepEnded): Promise<ScriptCallOutcome>;
 }
+
+// Says whether the step an input belongs to has ended, which its timer decides.
+export type HasStepEnded = () => boolean;
 
 // What enabledState (in-page.ts) says of an element.
 export const ElementEnabledState = { Enabled: 'enabled', Disabled: 'disabled', CustomElement: 'custom-element' } as const;

@@ -18,7 +18,7 @@ import { HitCheckOutcome, hitChecks, type CheckedDocument, type HitChecks } from
 import { MalformedBrowserReply } from './MalformedBrowserReply.ts';
 import { heldModifierKeys } from './modifier-keys.ts';
 import { pageAudit, parseAudit, toFindings } from './page-audit.ts';
-import { ElementEnabledState, SelectOutcome, type Actionability, type DownloadCapture, type DriverSession, type PageEvents, type PageFunction, type PageOperations, type PageWithInput, type Point, type ScriptCallOutcome } from './page-operations.ts';
+import { ElementEnabledState, SelectOutcome, type Actionability, type DownloadCapture, type DriverSession, type HasStepEnded, type PageEvents, type PageFunction, type PageOperations, type PageWithInput, type Point, type ScriptCallOutcome } from './page-operations.ts';
 import { PageHeldByDialog } from './PageHeldByDialog.ts';
 import type { ConnectionFailure } from './SessionEgress.ts';
 
@@ -45,6 +45,25 @@ async function forAtMost<Value>(milliseconds: number, work: Promise<Value>): Pro
   const timedOut = new Promise<typeof TIMED_OUT>((resolveTimedOut) => { timer = setTimeout(() => resolveTimedOut(TIMED_OUT), milliseconds); });
   try {
     return await Promise.race([work, timedOut]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// Sends input for at most this long. The input is told the time has run out as the timer fires, and then
+// sends nothing more: what it had yet to send would reach the page during the failure's capture or a later
+// step, as input the plan never asked for there.
+async function inputForAtMost<Value>(milliseconds: number, send: (hasStepEnded: HasStepEnded) => Promise<Value>): Promise<Value | typeof TIMED_OUT> {
+  let hasStepEnded = false;
+  let timer: NodeJS.Timeout | undefined;
+  const timedOut = new Promise<typeof TIMED_OUT>((resolveTimedOut) => {
+    timer = setTimeout(() => {
+      hasStepEnded = true;
+      resolveTimedOut(TIMED_OUT);
+    }, milliseconds);
+  });
+  try {
+    return await Promise.race([send(() => hasStepEnded), timedOut]);
   } finally {
     clearTimeout(timer);
   }
@@ -595,24 +614,12 @@ function documentPorts<Handle>(
   };
 
   // A step has one timeout, whatever it spent the time on, so input gets what the wait for the element
-  // left of it. The step ends when that runs out, whatever the input is still doing, and the input is told
-  // so: what it has yet to send would otherwise reach the page during the failure's capture or a later step.
-  const inputWithinTimeout = async <Value>(send: (hasStepEnded: () => boolean) => Promise<Value>, stepDeadline: number): Promise<Result<Value, DriverError>> => {
+  // left of it. The step ends when that runs out, whatever the input is still doing. Every input of a
+  // step goes through here, so none is sent once its step has ended.
+  const inputWithinTimeout = async <Value>(send: (hasStepEnded: HasStepEnded) => Promise<Value>, stepDeadline: number): Promise<Result<Value, DriverError>> => {
     const left = Math.max(stepDeadline - Date.now(), Math.min(SHORTEST_INPUT_MILLISECONDS, timeout));
-    let hasStepEnded = false;
-    let timer: NodeJS.Timeout | undefined;
-    const timedOut = new Promise<typeof TIMED_OUT>((resolveTimedOut) => {
-      timer = setTimeout(() => {
-        hasStepEnded = true;
-        resolveTimedOut(TIMED_OUT);
-      }, left);
-    });
-    try {
-      const ended = await Promise.race([send(() => hasStepEnded), timedOut]);
-      return ended === TIMED_OUT ? failure({ code: 'timeout', detail: `the input was still being handled after ${timeout} ms` }) : success(ended);
-    } finally {
-      clearTimeout(timer);
-    }
+    const ended = await inputForAtMost(left, send);
+    return ended === TIMED_OUT ? failure({ code: 'timeout', detail: `the input was still being handled after ${timeout} ms` }) : success(ended);
   };
 
   // What is left of a step's one timeout, for a wait inside it. A look at a page still gets long enough to
@@ -668,41 +675,39 @@ function documentPorts<Handle>(
       if (!found.ok) return found;
       const denied = await denial(operations, found.value, guard);
       if (denied !== null) return failure(denied);
-      await clickChecks.input.setFiles(found.value, [path.value]);
-      return success(undefined);
+      return inputWithinTimeout((hasStepEnded) => clickChecks.input.setFiles(found.value, [path.value], hasStepEnded), stepDeadline);
     }
     const waited = await waitUntilActionable(operations, action.locator, { waitMilliseconds: timeout, lookLimitMilliseconds: timeout, stepTimeoutMilliseconds: timeout }, crashed);
     if (!waited.ok) return waited;
     const { element, at } = waited.value;
     const denied = await denial(operations, element, guard);
     if (denied !== null) return failure(denied);
-    switch (action.type) {
-      case 'hover': await clickChecks.input.hover(at); break;
-      // The secret is revealed here, as it is typed, and nowhere else in this driver. Lines are
-      // joined by line feeds and inserted as text, so no Enter key press can send a form early.
-      // Noted before typing: a fill that fails part way may still have typed some of it.
-      case 'fill':
-        if (typedSecret !== null) {
-          details.secretTypedFields.push({ locator: action.locator, isGone: () => operations.isElementGone(element) });
-        }
-        await clickChecks.input.fill(element, typedSecret === null ? textToFill(action.value) : reveal(typedSecret));
-        break;
-      case 'press': {
-        // Enter on a form or a link starts a navigation as a click does.
-        const pressed = await inputWithinTimeout(() => clickChecks.input.press(element, action.key, heldModifierKeys(action.modifiers ?? [], process.platform)), stepDeadline);
-        if (!pressed.ok) {
-          return pressed;
-        }
-        break;
-      }
-      case 'select': {
-        const chosen = await clickChecks.input.select(element, action.option);
-        if (chosen === SelectOutcome.NoOption) return failure({ code: 'not-found', detail: 'the select has no option with that text or value' });
-        if (chosen === SelectOutcome.NotASelect) return failure({ code: 'not-actionable', detail: 'the element is not a select' });
-        break;
-      }
+    // Noted before typing: a fill that fails part way may still have typed some of it.
+    if (action.type === 'fill' && typedSecret !== null) {
+      details.secretTypedFields.push({ locator: action.locator, isGone: () => operations.isElementGone(element) });
     }
-    return success(undefined);
+    const sent = await inputWithinTimeout(async (hasStepEnded): Promise<Result<void, DriverError>> => {
+      switch (action.type) {
+        case 'hover': await clickChecks.input.hover(at, hasStepEnded); break;
+        // The secret is revealed here, as it is typed, and nowhere else in this driver. Lines are
+        // joined by line feeds and inserted as text, so no Enter key press can send a form early.
+        case 'fill':
+          await clickChecks.input.fill(element, typedSecret === null ? textToFill(action.value) : reveal(typedSecret), hasStepEnded);
+          break;
+        // Enter on a form or a link starts a navigation as a click does.
+        case 'press':
+          await clickChecks.input.press(element, action.key, heldModifierKeys(action.modifiers ?? [], process.platform), hasStepEnded);
+          break;
+        case 'select': {
+          const chosen = await clickChecks.input.select(element, action.option, hasStepEnded);
+          if (chosen === SelectOutcome.NoOption) return failure({ code: 'not-found', detail: 'the select has no option with that text or value' });
+          if (chosen === SelectOutcome.NotASelect) return failure({ code: 'not-actionable', detail: 'the element is not a select' });
+          break;
+        }
+      }
+      return success(undefined);
+    }, stepDeadline);
+    return sent.ok ? sent.value : sent;
   };
 
   // Answers the dialog the page has open, or opens within the timeout: its text is checked first,
@@ -856,13 +861,14 @@ function documentPorts<Handle>(
   };
 
   // A page script, raced against its timeout in real time. A script that never settles is left to
-  // the page: the run ends without it, and closing the session ends the page.
+  // the page: the run ends without it, and closing the session ends the page. One not yet called when
+  // the time runs out, such as behind a page that holds the driver's own calls, is never called.
   const runScript = async (call: PageScriptCall): Promise<Result<string, DriverError>> => {
     if (crashed()) return failure(CRASHED);
     const openingsBefore = events.unsupportedOpenings();
     let ended: ScriptCallOutcome | typeof TIMED_OUT;
     try {
-      ended = await forAtMost(call.timeoutMilliseconds, clickChecks.input.callScript(call.source, call.arguments, call.maximumResultBytes));
+      ended = await inputForAtMost(call.timeoutMilliseconds, (hasStepEnded) => clickChecks.input.callScript(call.source, call.arguments, call.maximumResultBytes, hasStepEnded));
     } catch (error) {
       if (error instanceof PageHeldByDialog) {
         return failure(DIALOG_OPEN);

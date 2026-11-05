@@ -10,7 +10,13 @@
 // it does: an event that was on its way and never reached the element was stopped, or held by a dialog.
 // While a dialog holds the page nothing in it can be read, and once its document has gone neither can
 // the check. So the check also reports as it goes, ahead of whatever the page does next.
-import type { PageInput, PageOperations, PageWithInput, Point } from "./page-operations.ts";
+import type {
+    HasStepEnded,
+    PageInput,
+    PageOperations,
+    PageWithInput,
+    Point,
+} from "./page-operations.ts";
 import { PageHeldByDialog } from "./PageHeldByDialog.ts";
 
 export const HitCheckOutcome = {
@@ -340,7 +346,7 @@ export type HitChecks<Handle> = {
     // earlier press left armed goes first. Throws when the page cannot say: whatever is thrown says
     // nothing of where the press went, so the step fails. Once `hasStepEnded` says the step has ended, no
     // press goes: what is left of it then is only taking the check off.
-    around(element: Handle, at: Point, hasStepEnded: () => boolean): Promise<HitCheckOutcome>;
+    around(element: Handle, at: Point, hasStepEnded: HasStepEnded): Promise<HitCheckOutcome>;
     // All other input to the page, each sent only once any check an earlier press left armed is off, in
     // this document and every one it frames, where the input may land. Such a check would cancel a click
     // the input makes, and the input would still seem to have worked. A disarm that fails stops the
@@ -390,29 +396,29 @@ export function hitChecks<Handle>(page: PageWithInput<Handle>): HitChecks<Handle
             });
         },
         input: {
-            async hover(at) {
+            async hover(at, hasStepEnded) {
                 await disarmLeftOvers();
-                await page.hover(at);
+                await page.hover(at, hasStepEnded);
             },
-            async fill(element, value) {
+            async fill(element, value, hasStepEnded) {
                 await disarmLeftOvers();
-                await page.fill(element, value);
+                await page.fill(element, value, hasStepEnded);
             },
-            async press(element, key, modifiers) {
+            async press(element, key, modifiers, hasStepEnded) {
                 await disarmLeftOvers();
-                await page.press(element, key, modifiers);
+                await page.press(element, key, modifiers, hasStepEnded);
             },
-            async setFiles(element, paths) {
+            async setFiles(element, paths, hasStepEnded) {
                 await disarmLeftOvers();
-                await page.setFiles(element, paths);
+                await page.setFiles(element, paths, hasStepEnded);
             },
-            async select(element, option) {
+            async select(element, option, hasStepEnded) {
                 await disarmLeftOvers();
-                return page.select(element, option);
+                return page.select(element, option, hasStepEnded);
             },
-            async callScript(source, scriptArguments, maximumResultBytes) {
+            async callScript(source, scriptArguments, maximumResultBytes, hasStepEnded) {
                 await disarmLeftOvers();
-                return page.callScript(source, scriptArguments, maximumResultBytes);
+                return page.callScript(source, scriptArguments, maximumResultBytes, hasStepEnded);
             },
         },
         async frame(element) {

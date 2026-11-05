@@ -23,7 +23,7 @@ import { MalformedBrowserReply } from './MalformedBrowserReply.ts';
 import type { HeldModifierKey } from './modifier-keys.ts';
 import {
   SelectOutcome,
-  type DriverSession, type ExposedStates, type OwnBrowserDriver, type PageArgument, type PageFunction, type PageWithInput, type Point, type RoleAndName, type ScriptCallOutcome,
+  type DriverSession, type ExposedStates, type HasStepEnded, type OwnBrowserDriver, type PageArgument, type PageFunction, type PageWithInput, type Point, type RoleAndName, type ScriptCallOutcome,
 } from './page-operations.ts';
 import { nodesAPressPasses, pressActsByItself } from './NodesAPressPasses.ts';
 import { PageHeldByDialog } from './PageHeldByDialog.ts';
@@ -31,6 +31,7 @@ import { PageWatch, holdUnreadableEvent, type AttachedPage, type SessionFailures
 import { RunClipboard, SHARED_BROWSER_CLIPBOARD, allowRunClipboard } from './run-clipboard.ts';
 import { openSessionEgress, type EgressSource, type OpenedSessionEgress } from './SessionEgress.ts';
 import { attachToSharedBrowser, launchOwnBrowser, type AttachedBrowser, type BrowserSource } from './SharedBrowser.ts';
+import { StepHasEnded } from './StepHasEnded.ts';
 import { BrowserClock } from './virtual-clock.ts';
 import { PageStorage } from './web-storage.ts';
 
@@ -576,6 +577,9 @@ function frameIdsInside(tree: FrameTree, frameId: string): readonly string[] {
   return (tree.childFrames ?? []).flatMap((child) => frameIdsInside(child, frameId));
 }
 
+// For the release of a key or button input has already sent down, which goes even once its step has ended.
+const SENT_EVEN_ONCE_THE_STEP_HAS_ENDED: HasStepEnded = () => false;
+
 // PageOperations over one flat CDP session, for its top document or one of its iframes' documents.
 // Element handles are remote object ids.
 class CdpPage implements PageWithInput<string> {
@@ -607,12 +611,24 @@ class CdpPage implements PageWithInput<string> {
     }
   }
 
-  // Sends input to a page no dialog holds. A dialog that opens while it waits is the input landing,
-  // such as the mouse release whose click opens one: this ends then, since the browser answers the
-  // command itself only once the dialog is answered.
-  async #sendInput<CommandParameters>(command: BrowserCommand<CommandParameters, void>, parameters: NoInfer<CommandParameters>): Promise<void> {
+  // A command an input sends that is answered as any other, such as a focus or a choice made in the page.
+  // Whether its step has ended is asked in the same turn as the send, so nothing can end the step between.
+  #askAsInput<CommandParameters, Reply>(command: BrowserCommand<CommandParameters, Reply>, parameters: NoInfer<CommandParameters>, hasStepEnded: HasStepEnded): Promise<Reply> {
+    if (hasStepEnded()) {
+      return Promise.reject(new StepHasEnded(command.method));
+    }
+    return this.#ask(command, parameters);
+  }
+
+  // Sends input to a page no dialog holds, while its step lasts, asked in the same turn as the send. A
+  // dialog that opens while it waits is the input landing, such as the mouse release whose click opens
+  // one: this ends then, since the browser answers the command itself only once the dialog is answered.
+  async #sendInput<CommandParameters>(command: BrowserCommand<CommandParameters, void>, parameters: NoInfer<CommandParameters>, hasStepEnded: HasStepEnded): Promise<void> {
     if (this.#watch.openDialog() !== null) {
       throw new PageHeldByDialog(command.method);
+    }
+    if (hasStepEnded()) {
+      throw new StepHasEnded(command.method);
     }
     const opened = this.#watch.dialogOpened();
     try {
@@ -692,13 +708,17 @@ class CdpPage implements PageWithInput<string> {
     return evaluated.result.objectId;
   }
 
-  async #call(pageFunction: PageFunction, inputs: readonly PageArgument<string>[], delivery: CallDelivery): Promise<CallResult> {
+  // With `hasStepEnded`, the call is part of an input and goes only while its step lasts.
+  async #call(pageFunction: PageFunction, inputs: readonly PageArgument<string>[], delivery: CallDelivery, hasStepEnded: HasStepEnded | null = null): Promise<CallResult> {
     const objectId = await this.#documentObject(await this.#readingWorld());
-    const called = await this.#ask(CALL_FUNCTION_ON, {
-      functionDeclaration: pageFunction.toString(), objectId, arguments: callArgumentsOf(inputs), ...delivery,
-    });
+    const parameters = { functionDeclaration: pageFunction.toString(), objectId, arguments: callArgumentsOf(inputs), ...delivery };
+    const called = await (hasStepEnded === null ? this.#ask(CALL_FUNCTION_ON, parameters) : this.#askAsInput(CALL_FUNCTION_ON, parameters, hasStepEnded));
     throwIfThePageThrew(called);
     return called;
+  }
+
+  async #callForStringAsInput(pageFunction: PageFunction, inputs: readonly PageArgument<string>[], hasStepEnded: HasStepEnded): Promise<string> {
+    return textOfCall(await this.#call(pageFunction, inputs, AWAITED_VALUE, hasStepEnded));
   }
 
   async callForString(pageFunction: PageFunction, inputs: readonly PageArgument<string>[]): Promise<string> {
@@ -988,78 +1008,90 @@ class CdpPage implements PageWithInput<string> {
     return listeners.some((listener) => PRESS_EVENT.test(listener.type));
   }
 
-  async click(at: Point, centreOfElementNow: () => Promise<Point | null>, hasStepEnded: () => boolean): Promise<PressSent> {
+  async click(at: Point, centreOfElementNow: () => Promise<Point | null>, hasStepEnded: HasStepEnded): Promise<PressSent> {
     const offset = await this.#viewportOffset();
     const point = { x: at.x + offset.x, y: at.y + offset.y };
     const pressed = { ...point, button: 'left' as const, clickCount: 1 };
-    if (hasStepEnded()) {
-      return PressSent.NotSent;
-    }
-    await this.#sendInput(DISPATCH_MOUSE_EVENT, { type: 'mouseMoved', ...point });
+    await this.#sendInput(DISPATCH_MOUSE_EVENT, { type: 'mouseMoved', ...point }, hasStepEnded);
     // A parent page can move this document's frame, which a read inside the frame cannot see, so the aim
     // is only good if both still agree. The element's own read comes last, closest to the press.
     const offsetNow = await this.#viewportOffset();
     const centre = await centreOfElementNow();
-    // Looked at in the same turn as the send, so nothing can end the step between the two.
-    if (centre === null || !isSamePoint(centre, at) || !isSamePoint(offsetNow, offset) || hasStepEnded()) {
+    if (centre === null || !isSamePoint(centre, at) || !isSamePoint(offsetNow, offset)) {
       return PressSent.NotSent;
     }
-    await this.#sendInput(DISPATCH_MOUSE_EVENT, { type: 'mousePressed', ...pressed });
+    await this.#sendInput(DISPATCH_MOUSE_EVENT, { type: 'mousePressed', ...pressed }, hasStepEnded);
     if (this.#watch.openDialog() !== null) return PressSent.HeldAtThePress;
-    await this.#sendInput(DISPATCH_MOUSE_EVENT, { type: 'mouseReleased', ...pressed });
+    // A press sent is released even once the step has ended, so no button is left held down.
+    await this.#sendInput(DISPATCH_MOUSE_EVENT, { type: 'mouseReleased', ...pressed }, SENT_EVEN_ONCE_THE_STEP_HAS_ENDED);
     return PressSent.Released;
   }
 
-  async hover(at: Point): Promise<void> {
+  async hover(at: Point, hasStepEnded: HasStepEnded): Promise<void> {
     const offset = await this.#viewportOffset();
-    await this.#sendInput(DISPATCH_MOUSE_EVENT, { type: 'mouseMoved', x: at.x + offset.x, y: at.y + offset.y });
+    await this.#sendInput(DISPATCH_MOUSE_EVENT, { type: 'mouseMoved', x: at.x + offset.x, y: at.y + offset.y }, hasStepEnded);
   }
 
-  async fill(element: string, value: string): Promise<void> {
-    await this.callForString(focusAndSelect, [{ element }]);
-    if (value === '') await this.#pressKey(KEY_DEFINITIONS.Backspace);
-    else await this.#sendInput(INSERT_TEXT, { text: value });
+  async fill(element: string, value: string, hasStepEnded: HasStepEnded): Promise<void> {
+    await this.#callForStringAsInput(focusAndSelect, [{ element }], hasStepEnded);
+    if (value === '') await this.#pressKey(KEY_DEFINITIONS.Backspace, 0, hasStepEnded);
+    else await this.#sendInput(INSERT_TEXT, { text: value }, hasStepEnded);
   }
 
-  async press(element: string, key: Key, modifiers: readonly HeldModifierKey[]): Promise<void> {
-    await this.callForString(focusElement, [{ element }]);
+  async press(element: string, key: Key, modifiers: readonly HeldModifierKey[], hasStepEnded: HasStepEnded): Promise<void> {
+    await this.#callForStringAsInput(focusElement, [{ element }], hasStepEnded);
     const held: HeldModifierKey[] = [];
-    for (const modifier of modifiers) {
-      held.push(modifier);
-      const definition = MODIFIER_KEY_DEFINITIONS[modifier];
-      await this.#sendInput(DISPATCH_KEY_EVENT, {
-        type: 'rawKeyDown', key: definition.key, code: definition.code, windowsVirtualKeyCode: definition.keyCode, location: LEFT_KEY, modifiers: modifierMask(held),
-      });
-      if (this.#watch.openDialog() !== null) return;
+    try {
+      for (const modifier of modifiers) {
+        const definition = MODIFIER_KEY_DEFINITIONS[modifier];
+        await this.#sendInput(DISPATCH_KEY_EVENT, {
+          type: 'rawKeyDown', key: definition.key, code: definition.code, windowsVirtualKeyCode: definition.keyCode, location: LEFT_KEY, modifiers: modifierMask([...held, modifier]),
+        }, hasStepEnded);
+        held.push(modifier);
+        if (this.#watch.openDialog() !== null) return;
+      }
+      await this.#pressKey(heldKeyDefinition(KEY_DEFINITIONS[key], held), modifierMask(held), hasStepEnded);
+    } catch (error) {
+      if (error instanceof StepHasEnded) {
+        await this.#releaseModifierKeys(held);
+      }
+      throw error;
     }
-    await this.#pressKey(heldKeyDefinition(KEY_DEFINITIONS[key], held), modifierMask(held));
-    for (const modifier of [...modifiers].reverse()) {
+    await this.#releaseModifierKeys(held);
+  }
+
+  // Lets go of the modifier keys held down, in reverse, unless a dialog holds the page. They go even once
+  // the step has ended, as no new key is pressed by them and a key left down would change later input.
+  async #releaseModifierKeys(held: readonly HeldModifierKey[]): Promise<void> {
+    const stillHeld = [...held];
+    for (const modifier of [...held].reverse()) {
       if (this.#watch.openDialog() !== null) return;
-      held.splice(held.indexOf(modifier), 1);
+      stillHeld.splice(stillHeld.indexOf(modifier), 1);
       const definition = MODIFIER_KEY_DEFINITIONS[modifier];
       await this.#sendInput(DISPATCH_KEY_EVENT, {
-        type: 'keyUp', key: definition.key, code: definition.code, windowsVirtualKeyCode: definition.keyCode, location: LEFT_KEY, modifiers: modifierMask(held),
-      });
+        type: 'keyUp', key: definition.key, code: definition.code, windowsVirtualKeyCode: definition.keyCode, location: LEFT_KEY, modifiers: modifierMask(stillHeld),
+      }, SENT_EVEN_ONCE_THE_STEP_HAS_ENDED);
     }
   }
 
-  async #pressKey(definition: KeyDefinition, modifiers = 0): Promise<void> {
+  // A key sent down is let go even once the step has ended, as a mouse press is released.
+  async #pressKey(definition: KeyDefinition, modifiers: number, hasStepEnded: HasStepEnded): Promise<void> {
     const common = { key: definition.key, code: definition.code, windowsVirtualKeyCode: definition.keyCode, modifiers };
     if (definition.text === undefined) {
-      await this.#sendInput(DISPATCH_KEY_EVENT, { type: 'rawKeyDown', ...common });
+      await this.#sendInput(DISPATCH_KEY_EVENT, { type: 'rawKeyDown', ...common }, hasStepEnded);
     } else {
-      await this.#sendInput(DISPATCH_KEY_EVENT, { type: 'keyDown', ...common, text: definition.text });
+      await this.#sendInput(DISPATCH_KEY_EVENT, { type: 'keyDown', ...common, text: definition.text }, hasStepEnded);
     }
     if (this.#watch.openDialog() !== null) return;
-    await this.#sendInput(DISPATCH_KEY_EVENT, { type: 'keyUp', ...common });
+    await this.#sendInput(DISPATCH_KEY_EVENT, { type: 'keyUp', ...common }, SENT_EVEN_ONCE_THE_STEP_HAS_ENDED);
   }
 
-  async setFiles(element: string, paths: readonly string[]): Promise<void> {
-    await this.#ask(SET_FILE_INPUT_FILES, { files: [...paths], objectId: element });
+  async setFiles(element: string, paths: readonly string[], hasStepEnded: HasStepEnded): Promise<void> {
+    await this.#askAsInput(SET_FILE_INPUT_FILES, { files: [...paths], objectId: element }, hasStepEnded);
   }
 
-  async select(element: string, option: string): Promise<SelectOutcome> {
-    const chosen = await this.callForString(selectOption, [{ element }, option]);
+  async select(element: string, option: string, hasStepEnded: HasStepEnded): Promise<SelectOutcome> {
+    const chosen = await this.#callForStringAsInput(selectOption, [{ element }, option], hasStepEnded);
     const outcome = Object.values(SelectOutcome).find((known) => known === chosen);
     if (outcome === undefined) {
       throw new MalformedBrowserReply(CALL_FUNCTION_ON.method, 'result.result.value');
@@ -1108,17 +1140,19 @@ class CdpPage implements PageWithInput<string> {
 
   // The source is compiled by the browser as the function it declares and called once with the
   // arguments object, never spliced into other text; then its result is written as JSON in the page.
-  async callScript(source: string, scriptArguments: Readonly<Record<string, string | number | boolean>>, maximumResultBytes: number): Promise<ScriptCallOutcome> {
+  // Writing the result runs in the page's main world too, where a result's own toJSON is the page's code,
+  // so it also goes only while the step lasts.
+  async callScript(source: string, scriptArguments: Readonly<Record<string, string | number | boolean>>, maximumResultBytes: number, hasStepEnded: HasStepEnded): Promise<ScriptCallOutcome> {
     try {
       const objectId = await this.#mainWorldDocument();
-      const called = await this.#ask(CALL_FUNCTION_ON, {
+      const called = await this.#askAsInput(CALL_FUNCTION_ON, {
         functionDeclaration: source, objectId, arguments: [{ value: scriptArguments }], awaitPromise: true, returnByValue: false, objectGroup: SCRIPT_OBJECT_GROUP,
-      });
+      }, hasStepEnded);
       if (called.exceptionDetails !== undefined) return { kind: 'threw' };
-      const written = await this.#ask(CALL_FUNCTION_ON, {
+      const written = await this.#askAsInput(CALL_FUNCTION_ON, {
         functionDeclaration: scriptResultText.toString(), objectId, arguments: [callArgumentOf(called.result), { value: maximumResultBytes }],
         returnByValue: true, objectGroup: SCRIPT_OBJECT_GROUP,
-      });
+      }, hasStepEnded);
       return written.exceptionDetails === undefined ? decodeScriptResult(written.result.value) : { kind: 'not-json' };
     } finally {
       await this.#releaseKept(RELEASE_OBJECT_GROUP, { objectGroup: SCRIPT_OBJECT_GROUP });
