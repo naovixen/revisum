@@ -1943,9 +1943,6 @@
     }
   },
   "test/contract/chromium-disabled-features.test.ts": {
-    "@typescript-eslint/strict-boolean-expressions": {
-      "count": 1
-    },
     "curly": {
       "count": 1
     },
@@ -1995,9 +1992,6 @@
     }
   },
   "test/contract/driver-contract.test.ts": {
-    "@typescript-eslint/strict-boolean-expressions": {
-      "count": 2
-    },
     "curly": {
       "count": 1
     },
@@ -2295,9 +2289,6 @@
     }
   },
   "test/proofs/compile-time-guarantees.ts": {
-    "@typescript-eslint/no-floating-promises": {
-      "count": 1
-    },
     "no-restricted-syntax": {
       "count": 1
     },
@@ -2878,9 +2869,6 @@
     }
   },
   "test/support/capability-harness.ts": {
-    "@typescript-eslint/strict-boolean-expressions": {
-      "count": 1
-    },
     "revisum/file-name-matches-export": {
       "count": 1
     }
@@ -3413,15 +3401,6 @@
     }
   },
   "test/unit/engine/explore-draft-admission.test.ts": {
-    "@typescript-eslint/no-unsafe-assignment": {
-      "count": 1
-    },
-    "@typescript-eslint/no-unsafe-member-access": {
-      "count": 6
-    },
-    "@typescript-eslint/no-unsafe-return": {
-      "count": 1
-    },
     "curly": {
       "count": 4
     },
@@ -3677,12 +3656,6 @@
     }
   },
   "test/unit/engine/policy-denial-events.test.ts": {
-    "@typescript-eslint/no-unsafe-member-access": {
-      "count": 2
-    },
-    "@typescript-eslint/no-unsafe-return": {
-      "count": 2
-    },
     "curly": {
       "count": 2
     },

@@ -282,6 +282,7 @@ Status is one of: `suspected`, `fixed`, `deferred`, `not a bug`.
 | 259 | Whether a database command's secrets are resolved, and so whether a plan is refused secret-missing or database-commands-unavailable, was decided in the run's logging set-up, apart from the preflight order it changes | `engine/src/run.ts` (`runLogging`), `engine/src/CheckPreflight.ts` | fixed | Second review of the cleared run. Preflight resolves the secrets itself, with that rule beside its order, and hands the run the secrets to redact with |
 | 260 | The switch over a cleared target's clearances had no exhaustive default, so a new kind of clearance would be dropped without a result | `engine/src/run.ts` (`runUntrusted`) | fixed | Second review of the cleared run. The default assigns the clearance to `never` |
 | 261 | `NothingRanContext.cleared` held a subject that may be a target no run was cleared for | `engine/src/run.ts` | fixed | Second review of the cleared run. Renamed `subject` |
+| 262 | The crawl's shared driver refuses a run for another target, but no caller can reach that branch: the run opens only its cleared target, and the crawl passes the login's. Defensive code no test can drive | `cli/src/explore-crawl.ts:60-71` | deferred | Tests for the second review of the cleared run. With the composition root, which owns how the crawl gets its driver: make the branch unrepresentable or remove it |
 
 ## Risks
 
