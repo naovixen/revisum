@@ -16,7 +16,7 @@ import { severalElements } from "#test-support/fakes/SeveralElements.ts";
 export const BASE_URL = "https://shop.example.test";
 export const ORDERS_URL = `${BASE_URL}/orders`;
 
-export const PASSED: Verdict = { pass: true, code: null };
+export const PASSED: Verdict = { pass: true };
 export const FAILED: Verdict = { pass: false, code: "assertion-failed" };
 export const NOT_FOUND: Verdict = { pass: false, code: "not-found" };
 export const AMBIGUOUS: Verdict = { pass: false, code: "ambiguous" };

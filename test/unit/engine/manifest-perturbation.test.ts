@@ -257,9 +257,12 @@ test('the project hash leaves out the evidence-mode and planner sections, which 
 });
 
 test('counter-example: changing an input the manifest leaves out on purpose, the base URL\'s port, changes neither', async () => {
-  const before = await populatedManifest();
+  // The project declares both addresses, so each run may start on its own; the project hash is the same for both.
+  const otherPort = 'http://127.0.0.1:4999';
+  const onBothPorts: Scenario = { ...POPULATED, projectFile: populatedProjectFile({ origins: [ORIGIN, otherPort] }) };
+  const before = (await runScenario(onBothPorts)).manifest;
   // The manifest keeps the fixtures' content hashes, never the address they were served from.
-  const after = (await runScenario({ ...POPULATED, baseUrl: 'http://127.0.0.1:4999' })).manifest;
+  const after = (await runScenario({ ...onBothPorts, baseUrl: otherPort })).manifest;
   assert.equal(manifestHash(after), manifestHash(before));
   assert.deepEqual(after.nonHermeticInputs, before.nonHermeticInputs);
 });
