@@ -69,7 +69,9 @@ export default async function* testResultsReporter(source: AsyncIterable<Reporte
     const fields = readEvent(event.data);
     if (fields === undefined) continue;
     if (event.type === 'test:start') {
-      if (fields.nesting === 0) testFile = fields.file;
+      if (fields.nesting === 0) {
+        testFile = fields.file;
+      }
       openNames.length = fields.nesting;
       openNames.push(fields.name);
     } else if ((event.type === 'test:pass' || event.type === 'test:fail') && !fields.isSuite) {
