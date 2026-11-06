@@ -278,17 +278,15 @@ const needsUnsetValue = (stepArguments: CallArguments | ScriptArguments, values:
   Object.values(stepArguments).some((argument) => typeof argument === 'object' && 'valueName' in argument && !values.has(argument.valueName));
 
 // The cleanup steps, in order, each recorded. They are numbered after the plan's steps in the log.
-// A run that calls services always has a call context, and one that runs database commands a
-// command context: run() refused it before any step otherwise. Without one, a cleanup step is
-// recorded as failed, raising a review item, since its test data may be left behind.
+// Preflight refused a run whose cleanup needs a service caller or command runner it was not given,
+// so both contexts are the run's own whenever its cleanup uses them.
 export async function runCleanup(
-  cleanup: readonly CleanupStep[], firstIndex: number, context: CallStepContext | undefined, commands?: DatabaseCommandContext,
+  cleanup: readonly CleanupStep[], firstIndex: number, context: CallStepContext, commands: DatabaseCommandContext,
 ): Promise<readonly CleanupResult[]> {
   const results: CleanupResult[] = [];
   for (const [index, step] of cleanup.entries()) {
     if (step.type === 'database') {
       const base = { index, command: step.command } as const;
-      if (commands === undefined) { results.push({ ...base, outcome: 'failed', code: 'cleanup-failed', cause: 'unsupported-step' }); continue; }
       if (needsUnsetValue(step.arguments, commands.values)) { results.push({ ...base, outcome: 'skipped' }); continue; }
       let done: Awaited<ReturnType<typeof runDatabaseStep>>;
       try {
@@ -302,7 +300,6 @@ export async function runCleanup(
       continue;
     }
     const base = { index, call: step.call } as const;
-    if (context === undefined) { results.push({ ...base, outcome: 'failed', code: 'cleanup-failed', cause: 'service-unreachable' }); continue; }
     if (needsUnsetValue(step.arguments, context.values)) { results.push({ ...base, outcome: 'skipped' }); continue; }
     let outcome: CallStepOutcome;
     try {

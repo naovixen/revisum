@@ -154,6 +154,9 @@ export async function benchmarkRuns(options: BenchmarkRunsOptions): Promise<Benc
     if (!baseUrl.ok) throw new Error(`the fixture server's origin is not a base URL: ${baseUrl.error}`);
     const decision = policyGate({ project, events: discardingAudit }).clear(parsed.value, target.id);
     if (decision.kind === 'deny') throw new Error(`the policy gate denied the benchmark plan: ${decision.rule}`);
+    if (decision.kind === 'not-declared') {
+      throw new Error(`the benchmark plan does not declare the target ${target.id}`);
+    }
     const drivers = new Map([['cdp', buildAdapters.hostBrowserDriver({ executablePath: options.executablePath })]]);
     const samples: BenchmarkSample[] = [];
     for (let index = 0; index < options.runs; index++) {

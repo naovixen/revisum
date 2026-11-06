@@ -4,13 +4,13 @@ import type { Brand } from './brand.ts';
 import type { ClipboardPort, ClockPort } from './clock-and-clipboard.ts';
 import type { NetworkPort, StoragePort } from './network-and-storage.ts';
 import {
-  ScriptMode, type ResolvedActionStep, type ResolvedDialogStep, type ResolvedDownloadStep, type ResolvedLocator, type ResolvedMultiLineText, type SafeText,
+  ScriptMode, type ResolvedActionStep, type ResolvedDialogStep, type ResolvedDownloadStep, type ResolvedLocator, type SafeText,
   type StepType,
 } from './plan.ts';
 import type { GuardVerdict } from './policy.ts';
 import type { Secret } from './secret.ts';
 import { failure, success, type Result } from './result.ts';
-import type { AdapterId, Target } from './target.ts';
+import type { AdapterId, BaseUrl, Target } from './target.ts';
 
 // policy-denied: the policy gate's runtime guard refused the action, so no input event was sent.
 // no-download: a download step's click started no download within the step timeout.
@@ -270,7 +270,7 @@ export type A11yNode = { readonly role: string; readonly name: string; readonly 
 
 // Everything a driver needs to make a session hermetic and repeatable.
 export type SessionEnvironment = {
-  readonly baseUrl: string;
+  readonly baseUrl: BaseUrl;
   readonly allowedOrigins: readonly string[];
   readonly seed: number;
   readonly fixedTimeMilliseconds: number;
@@ -286,12 +286,23 @@ export interface PageNavigator {
   navigate(url: string, options: NavigateOptions): Promise<Result<void, DriverError>>;
   page(): Promise<Result<PageProbe, PageReadFailure>>;
 }
+// What a fill types: literal text, literal lines, or a secret.
+export const FillValueKind = {
+  Text: 'text',
+  Lines: 'lines',
+  Secret: 'secret',
+} as const;
+export type FillValueKind = (typeof FillValueKind)[keyof typeof FillValueKind];
 // The secret a fill types. The driver reveals it only at the moment it types it, and never reports
 // it back.
-export type SecretFill = { readonly secret: Secret };
-// A fill as a driver performs it: literal text, literal lines, or a secret.
+export type SecretFill = { readonly kind: typeof FillValueKind.Secret; readonly secret: Secret };
+export type FillValue =
+  | { readonly kind: typeof FillValueKind.Text; readonly text: SafeText }
+  | { readonly kind: typeof FillValueKind.Lines; readonly lines: readonly SafeText[] }
+  | SecretFill;
+// A fill as a driver performs it.
 export type PerformableFill = {
-  readonly type: typeof StepType.Fill; readonly locator: ResolvedLocator; readonly value: SafeText | ResolvedMultiLineText | SecretFill;
+  readonly type: typeof StepType.Fill; readonly locator: ResolvedLocator; readonly value: FillValue;
 };
 // An action as a driver performs it: every value reference replaced by its text, and a fill of a
 // secret holding the secret itself. A download goes through its own port.

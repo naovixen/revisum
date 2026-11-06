@@ -293,9 +293,8 @@ function clearedLogin(path: string, project: Project, target: Target, ports: Dra
   if (!parsed.ok) return stop('plan-rejected', '--after');
   const standing = planStanding(parsed.value, ports.approvals ?? NO_APPROVALS);
   if (standing.mode !== 'approved') return stop('after-plan-unapproved', '--after');
-  if (!parsed.value.targets.includes(target.id)) return stop('plan-rejected', '--after');
   const decision = policyGate({ project, events: ports.events }).clear(parsed.value, target.id, standing);
-  if (decision.kind === 'deny') return stop('plan-rejected', '--after');
+  if (decision.kind !== 'allow') return stop('plan-rejected', '--after');
   return { cleared: decision.run, text };
 }
 

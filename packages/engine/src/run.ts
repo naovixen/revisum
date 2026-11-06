@@ -7,12 +7,12 @@
 // through its clock and clipboard ports; page scripts through its script port. Database commands
 // go through the run's DatabaseCommandRunner port, which runs each in a workload container.
 import {
-  failure, isOneElementRead, NavigateScripts, oneElementOf, PageReadFailureCode, stepFailed, StepCode, success, UnreadablePage,
+  failure, FillValueKind, isOneElementRead, NavigateScripts, UnavailableReason, oneElementOf, PageReadFailureCode, stepFailed, StepCode, success, UnreadablePage,
   type A11yFinding, type ActionGuard, type AppliedRewrite, type ApprovalLabel, type ArtifactReference, type ArtifactStore, type BaseUrl,
   type BrowserDriver, type Clock, type DatabaseCommandRunner, type DocumentSession, type DomRead, type DownloadedFile, type DownloadName, type DriverError, type DriverErrorCode, type OneElementRead, type PageReadFailure, type RememberedElementSource, type LockEntry, type DialogStep, type ElementProbe,
-  type EventSink, type GuardVerdict, type PageAssertion, type PerformableAction, type PerformableFill, type Plan, type PolicyRuleId, type Redactor, type ResolvedActionStep,
+  type EventSink, type FillValue, type GuardVerdict, type PageAssertion, type PerformableAction, type PerformableFill, type Plan, type PolicyRuleId, type Redactor, type ResolvedActionStep,
   type ResolvedDialogStep, type ResolvedDownloadStep,
-  type DownloadStep, type StepOutcome, type ResolvedElement, type ResolvedLocator, type Result, type RunIsolation, type SafeText, type SecretStore, type ServiceCaller, type Session, type Step, type Target,
+  type DownloadStep, type StepOutcome, type ResolvedElement, type ResolvedLocator, type Result, type RunIsolation, type SafeText, type SecretStore, type SecretName, type ServiceCaller, type Session, type Step, type Target,
   type Unavailable, type ValueName, type GuaranteeStatement, type RunMode, type SuiteFinding, type SuiteName, type SuitePass,
   type StubAnswer, type StubName, type SuiteTestId, type SuiteTestResult, type UnsafeFeature,
 } from '@revisum/contracts';
@@ -42,9 +42,10 @@ import type { PlanError } from './plan/plan-decoders.ts';
 import { ASSERTION_STEP_TYPES } from './plan/plan-grammar.ts';
 import { assertBranded } from './plan/plan-parser.ts';
 import { unsafeFeaturesOf } from './plan/unsafe-features.ts';
-import { assertCleared, type ClearedRun } from './policy/ClearedRun.ts';
+import { assertCleared, ClearedRunKind, type ClearedRun } from './policy/ClearedRun.ts';
+import type { TargetNotDeclared } from './policy/TargetNotDeclared.ts';
 import { policyGate, type PolicyGate } from './policy/policy-gate.ts';
-import { findPreflightRefusal } from './FindPreflightRefusal.ts';
+import { checkPreflight, type PreflightPassed } from './CheckPreflight.ts';
 import { callsServices, runsDatabaseCommands } from './plan/CallsServices.ts';
 import { reachableOrigins } from './ReachableOrigins.ts';
 import type { Project } from './project/project-parser.ts';
@@ -56,7 +57,7 @@ import {
   generateRunValues, resolveActionStep, resolveElementAssertion, resolveLocator, resolvePathTemplate, resolvePlanClock, resolveText, type RunValues,
 } from './run-values.ts';
 import {
-  NO_SECRETS, commandSecretStore, resolvePlanSecrets, resolvedSecretStore, secretEchoRemoval, secretRecords, shortSecretObservation, stubAndStorageSecretStore, withSecretRedaction,
+  NO_SECRETS, commandSecretStore, fillSecretOf, resolvePlanSecrets, resolvedSecretStore, secretEchoRemoval, secretRecords, shortSecretObservation, stubAndStorageSecretStore, withSecretRedaction,
   type ResolvedSecrets,
 } from './secrets/secret-resolution.ts';
 import { SECRET_PLACEHOLDER } from './secrets/secret-values.ts';
@@ -253,6 +254,9 @@ export type Rejected = { readonly state: 'Rejected'; readonly errors: readonly P
 // when the audit sink failed to record the denial.
 export type DeniedPlan = { readonly state: 'Denied'; readonly rule: PolicyRuleId; readonly stepIndex: number | null; readonly unrecorded?: true };
 
+// What a result is for, whether or not a run was cleared for its target.
+type RunSubject = Pick<TargetNotDeclared, 'plan' | 'project' | 'targetId' | 'standing'>;
+
 type RunContext = {
   readonly cleared: ClearedRun;
   readonly inputs: RunInputs;
@@ -284,10 +288,10 @@ type RunContext = {
   // The files download steps saved, by the name the plan gives each, for later checks. The bytes
   // stay in memory for the run only.
   readonly downloads: Map<DownloadName, DownloadedFile>;
-  // What the call steps use, when the run has a service caller.
-  readonly calls: CallStepContext | undefined;
-  // What the database steps use, when the run has a database-command port.
-  readonly commands: DatabaseCommandContext | undefined;
+  // What the call steps use: the run's service caller whenever the plan calls a service.
+  readonly calls: CallStepContext;
+  // What the database steps use: the run's command runner whenever the plan runs a command.
+  readonly commands: DatabaseCommandContext;
   // The stubs started and not yet stopped.
   readonly activeStubs: Set<StubName>;
   // True when the target's adapter cannot pin the clock, the time zone or randomness, so the run
@@ -310,58 +314,23 @@ export async function run(cleared: ClearedRun, inputs: RunInputs, ports: RunPort
   // is refused, whatever its type says.
   assertCleared(cleared);
   assertBranded(cleared.plan);
-  const { plan, project } = cleared;
+  const { plan, project, target } = cleared;
   const startedAt = ports.clock.now();
-  const target = project.matrix.find((candidate) => candidate.id === cleared.targetId);
-  const declared = target !== undefined && plan.targets.includes(cleared.targetId);
-  const runId = sha256(`${sha256(canonicalJson(plan))}:${cleared.targetId}:${inputs.seed}`).slice(0, 16);
-  // Resolving reads only the store, so it can come first: the run's redactor needs the secrets
-  // before anything is logged. A missing secret refuses the run below, before any driver call.
-  // A command's secrets are needed only by a run that can run commands.
-  const commandDeclarations = ports.databaseCommands === undefined ? {} : declaredCommands(project.unsafeFeatures);
-  const resolution = resolvePlanSecrets(plan, ports.secrets, project.calls, commandDeclarations);
-  const secrets = resolution.ok ? resolution.value : NO_SECRETS;
-  const redactor = withSecretRedaction(ports.redactor, secrets);
-  const logger = manifestLogger(ports.events, redactor, runId);
-  const gate = policyGate({ project, events: ports.audit });
-  // Generation is pure, so values exist before anything runs; a run with no target has none.
-  const values = new Map<ValueName, SafeText>(target === undefined
-    ? [] : generateRunValues(plan, inputs.seed, inputs.fixedTimeMilliseconds, target, project));
-  const isShortSecret = shortSecretObservation(secrets);
-  const withoutSecrets = secretEchoRemoval(secrets);
-  const rememberedTexts = new Set<string>();
-  const holdsSecret = (text: string): boolean => isShortSecret(text) || withoutSecrets(text) !== text;
-  const remembered = rememberedValues({
-    values, rememberedTexts, hasSecret: holdsSecret,
-    maximumTextLength: project.limits.maximumTextLength, logger,
-  });
-  const calls: CallStepContext | undefined = ports.services === undefined ? undefined : {
-    caller: ports.services, project, values, remembered, secrets: resolvedSecretStore(secrets), clock: ports.clock, logger, holdsSecret,
-  };
-  const commands: DatabaseCommandContext | undefined = ports.databaseCommands === undefined ? undefined : {
-    runner: ports.databaseCommands, project, values, remembered, secrets: commandSecretStore(secrets), clock: ports.clock, logger, holdsSecret,
-  };
-  const context: RunContext = {
-    cleared, inputs, ports, logger, gate, denials: [], redactor, secrets, isShortSecret, withoutSecrets, holdsSecret, secretFilledFields: new Map(), values, remembered, calls,
-    commands, rememberedTexts, downloads: new Map(), activeStubs: new Set(), setupFailedInside: new Set(),
-    determinismUnpinned: target !== undefined && cannotPinDeterminism(ports.drivers, target),
-  };
-
-  if (target === undefined || !declared) {
-    return unavailableResult(cleared.targetId, { reason: 'not-declared', detail: 'target is not in both the plan and the matrix' }, context, startedAt);
-  }
+  const { resolution, redactor, logger } = runLogging(cleared, inputs.seed, ports);
+  const nothingRan: NothingRanContext = { cleared, ports, logger, determinismUnpinned: cannotPinDeterminism(ports.drivers, target) };
   const planned = lifecycle.plan(plan, target);
   // A log that fails this early ends the run Errored like one that fails later, once there are steps
   // to account for. It must not reject the run, and a refusal below still stands.
   const isPlanLogged = logKeepingTheResult({ kind: 'run.state', state: planned.state, targetId: target.id }, logger);
 
   const scriptSources = inputs.scriptSources ?? {};
-  const refusal = findPreflightRefusal({
-    cleared, baseUrl: inputs.baseUrl, secrets: resolution, scriptSources, hasServiceCaller: calls !== undefined, hasCommandRunner: commands !== undefined,
+  const preflight = checkPreflight({
+    cleared, baseUrl: inputs.baseUrl, secrets: resolution, scriptSources, services: ports.services, databaseCommands: ports.databaseCommands,
   });
-  if (refusal !== undefined) {
-    return refuseRun(planned, refusal, context, startedAt);
+  if (!preflight.ok) {
+    return refuseRun(planned, preflight.error, nothingRan, startedAt);
   }
+  const context = runContext(cleared, inputs, preflight.value, { ...nothingRan, redactor });
   const unsafe = unsafeFeatureRecord(plan, project, scriptSources);
 
   const opened = await openSession(planned, context);
@@ -376,7 +345,7 @@ export async function run(cleared: ClearedRun, inputs: RunInputs, ports: RunPort
   const manifestInputs: Parameters<typeof buildManifest>[0] = {
     plan, target, adapter: driver.info, browser: session.browser,
     seed: inputs.seed, fixedTimeMilliseconds: inputs.fixedTimeMilliseconds, fixtures: inputs.fixtures, host: inputs.host,
-    ...secretRecords(secrets), callsServices: callsServices(plan),
+    ...secretRecords(context.secrets), callsServices: callsServices(plan),
     ...(unsafe === undefined ? {} : { unsafe }),
     ...(unpinned.length === 0 ? {} : { unpinned }),
     ...(executableSha256 === undefined ? {} : { executableSha256 }),
@@ -461,7 +430,7 @@ export async function run(cleared: ClearedRun, inputs: RunInputs, ports: RunPort
     finished = lifecycle.finish(running, 'Errored');
   }
   // Whatever the outcome. A failing cleanup step never changes the verdict; it raises a review item.
-  const cleanup = plan.cleanup === undefined ? undefined : await runCleanup(plan.cleanup, plan.steps.length, calls, commands);
+  const cleanup = plan.cleanup === undefined ? undefined : await runCleanup(plan.cleanup, plan.steps.length, context.calls, context.commands);
   const cleanupItems = (cleanup ?? []).flatMap((done): RunReviewItem[] => (done.outcome === 'failed' ? [{ code: 'cleanup-failed', cleanupIndex: done.index }] : []));
   const blockedRead = readBlockedOrigins(session);
   if (!blockedRead.ok) {
@@ -492,6 +461,65 @@ export async function run(cleared: ClearedRun, inputs: RunInputs, ports: RunPort
   }, context);
 }
 
+// What the run logs and redacts with. Resolving reads only the store, so it comes first: the run's
+// redactor needs the secrets before anything is logged. A missing secret refuses the run at
+// preflight, before any driver call. A command's secrets are needed only by a run that can run
+// commands.
+function runLogging(subject: RunSubject, seed: number, ports: RunPorts): {
+  readonly resolution: Result<ResolvedSecrets, SecretName>; readonly redactor: Redactor; readonly logger: Logger;
+} {
+  const { plan, project } = subject;
+  const runId = sha256(`${sha256(canonicalJson(plan))}:${subject.targetId}:${seed}`).slice(0, 16);
+  const commandDeclarations = ports.databaseCommands === undefined ? {} : declaredCommands(project.unsafeFeatures);
+  const resolution = resolvePlanSecrets(plan, ports.secrets, project.calls, commandDeclarations);
+  const redactor = withSecretRedaction(ports.redactor, resolution.ok ? resolution.value : NO_SECRETS);
+  return { resolution, redactor, logger: manifestLogger(ports.events, redactor, runId) };
+}
+
+// The context of a run that passed preflight: what its steps run with.
+function runContext(
+  cleared: ClearedRun, inputs: RunInputs, passed: PreflightPassed, logging: NothingRanContext & { readonly redactor: Redactor },
+): RunContext {
+  const { plan, project, target } = cleared;
+  const { ports, logger, redactor } = logging;
+  const { secrets } = passed;
+  // Generation is pure, so values exist before anything runs.
+  const values = new Map<ValueName, SafeText>(generateRunValues(plan, inputs.seed, inputs.fixedTimeMilliseconds, target, project));
+  const isShortSecret = shortSecretObservation(secrets);
+  const withoutSecrets = secretEchoRemoval(secrets);
+  const rememberedTexts = new Set<string>();
+  const holdsSecret = (text: string): boolean => isShortSecret(text) || withoutSecrets(text) !== text;
+  const remembered = rememberedValues({
+    values, rememberedTexts, hasSecret: holdsSecret,
+    maximumTextLength: project.limits.maximumTextLength, logger,
+  });
+  const calls: CallStepContext = {
+    caller: passed.services, project, values, remembered, secrets: resolvedSecretStore(secrets), clock: ports.clock, logger, holdsSecret,
+  };
+  const commands: DatabaseCommandContext = {
+    runner: passed.databaseCommands, project, values, remembered, secrets: commandSecretStore(secrets), clock: ports.clock, logger, holdsSecret,
+  };
+  return {
+    cleared, inputs, ports, logger, gate: policyGate({ project, events: ports.audit }), denials: [], redactor, secrets, isShortSecret, withoutSecrets,
+    holdsSecret, secretFilledFields: new Map(), values, remembered, calls, commands, rememberedTexts, downloads: new Map(), activeStubs: new Set(),
+    setupFailedInside: new Set(), determinismUnpinned: logging.determinismUnpinned,
+  };
+}
+
+// The result of a target the gate gave no cleared run, since the plan or the project's matrix does
+// not declare it: TargetUnavailable with not-declared, before any driver is asked. It is logged and
+// sealed as any run that never opened its target is.
+function targetNotDeclaredResult(notDeclared: TargetNotDeclared, seed: number, ports: RunPorts): RunResult {
+  const startedAt = ports.clock.now();
+  const { logger } = runLogging(notDeclared, seed, ports);
+  const target = notDeclared.project.matrix.find((candidate) => candidate.id === notDeclared.targetId);
+  const nothingRan: NothingRanContext = {
+    cleared: notDeclared, ports, logger, determinismUnpinned: target !== undefined && cannotPinDeterminism(ports.drivers, target),
+  };
+  const unavailable = { reason: UnavailableReason.NotDeclared, detail: 'target is not in both the plan and the matrix' };
+  return unavailableResult(notDeclared.targetId, unavailable, nothingRan, startedAt);
+}
+
 // The only entry point for untrusted input, such as a plan an AI proposed. Parsing happens first,
 // then the policy gate's static check against the project, for the plan's declared targets and
 // standing; on any error or denial no driver method is called. A missing standing, or one whose
@@ -507,14 +535,19 @@ export async function runUntrusted(
   if (!parsed.ok) return { state: 'Rejected', errors: parsed.error };
   const { project, standing, ...inputs } = base;
   const gate = policyGate({ project, events: ports.audit });
-  // One run per target the plan names, in its order: one the matrix does not declare ends
+  // One result per target the plan names, in its order: one the matrix does not declare ends
   // TargetUnavailable with not-declared.
   const decision = gate.decide(parsed.value, parsed.value.targets, standing);
   if (decision.kind === 'deny') {
     return { state: 'Denied', rule: decision.rule, stepIndex: decision.stepIndex, ...(decision.unrecorded ? { unrecorded: true } : {}) };
   }
   const results: RunResult[] = [];
-  for (const cleared of decision.runs) results.push(await run(cleared, inputs, ports));
+  for (const clearance of decision.runs) {
+    switch (clearance.kind) {
+      case ClearedRunKind: results.push(await run(clearance, inputs, ports)); break;
+      case UnavailableReason.NotDeclared: results.push(targetNotDeclaredResult(clearance, inputs.seed, ports)); break;
+    }
+  }
   return results;
 }
 
@@ -545,7 +578,7 @@ function loggedWithRefusal(refusal: lifecycle.Refusal): { readonly origin?: stri
 }
 
 // The run refused, before any driver call.
-function refuseRun(planned: lifecycle.Planned, refusal: lifecycle.Refusal, context: RunContext, startedAt: number): RunResult {
+function refuseRun(planned: lifecycle.Planned, refusal: lifecycle.Refusal, context: NothingRanContext, startedAt: number): RunResult {
   const refused = lifecycle.refuse(planned, refusal);
   logKeepingTheResult({ kind: 'run.state', state: refused.state, targetId: planned.target.id, code: refused.refusal.code, ...loggedWithRefusal(refusal) }, context.logger);
   return seal(refusedResult(refused.refusal, planned.target.id, context.ports.clock.now() - startedAt), context);
@@ -858,10 +891,9 @@ async function executeStep(step: Step, index: number, session: DocumentSession, 
       if (!action.ok) return { ...base, ...stepFailed(action.error) };
       const resolved = action.value;
       const performable = withFillSecret(resolved, context.secrets);
-      if (!performable.ok) return { ...base, ...stepFailed(performable.error) };
       // Marked before acting: a fill that fails part way may still have typed some of the secret.
-      if (performable.value.type === 'fill') markFilledField(performable.value, context.secretFilledFields);
-      const acted = await session.act(performable.value, guardFor(resolved, index, target, context));
+      if (performable.type === 'fill') markFilledField(performable, context.secretFilledFields);
+      const acted = await session.act(performable, guardFor(resolved, index, target, context));
       return acted.ok ? { ...base, outcome: 'passed' } : { ...base, ...stepFailed(acted.error.code) };
     }
     case 'dialog': {
@@ -903,7 +935,6 @@ async function executeStep(step: Step, index: number, session: DocumentSession, 
     // run that runs them always has a runner: run() refused it before any step otherwise.
     case 'database':
     case 'expectDatabase': {
-      if (context.commands === undefined) return { ...base, ...stepFailed(StepCode.UnsupportedStep) };
       const done = step.type === 'database' ? await runDatabaseStep(step, index, context.commands) : await runDatabaseCheck(step, index, context.commands);
       return { ...base, ...done };
     }
@@ -956,7 +987,6 @@ async function executeStep(step: Step, index: number, session: DocumentSession, 
     case 'call':
     case 'expectBackend': {
       // A run that calls services always has a caller: run() refused it before any step otherwise.
-      if (context.calls === undefined) return { ...base, ...stepFailed(StepCode.ServiceUnreachable) };
       const done = step.type === 'call' ? await runCallStep(step, index, context.calls) : await runBackendCheck(step, index, context.calls);
       return { ...base, ...done };
     }
@@ -1144,21 +1174,25 @@ function resolveDialogStep(step: DialogStep, context: RunContext): Result<Resolv
 
 // The action as the driver performs it: a fill of a secret reference carries the secret the run
 // resolved for it, opaque, so the driver reveals it only as it types.
-function withFillSecret(action: ResolvedActionStep, secrets: ResolvedSecrets): Result<PerformableAction, StepCode> {
-  if (action.type !== 'fill') return success(action);
+function withFillSecret(action: ResolvedActionStep, secrets: ResolvedSecrets): PerformableAction {
+  if (action.type !== 'fill') return action;
   const { type, locator, value } = action;
-  if (typeof value === 'string' || 'lines' in value) return success({ type, locator, value });
-  const secret = secrets.fills.get(value.secretName);
-  return secret === undefined ? failure(StepCode.SecretMissing) : success({ type, locator, value: { secret } });
+  return { type, locator, value: fillValueOf(value, secrets) };
+}
+
+function fillValueOf(value: Extract<ResolvedActionStep, { type: 'fill' }>['value'], secrets: ResolvedSecrets): FillValue {
+  if (typeof value === 'string') return { kind: FillValueKind.Text, text: value };
+  return 'lines' in value
+    ? { kind: FillValueKind.Lines, lines: value.lines }
+    : { kind: FillValueKind.Secret, secret: fillSecretOf(secrets, value.secretName) };
 }
 
 // Keeps the fields whose last fill typed a secret, by their locator.
 function markFilledField(fill: PerformableFill, secretFilledFields: Map<string, ResolvedLocator>): void {
   const key = canonicalJson(fill.locator);
-  if (typeof fill.value === 'object' && 'secret' in fill.value) {
-    secretFilledFields.set(key, fill.locator);
-  } else {
-    secretFilledFields.delete(key);
+  switch (fill.value.kind) {
+    case FillValueKind.Secret: secretFilledFields.set(key, fill.locator); break;
+    case FillValueKind.Text: case FillValueKind.Lines: secretFilledFields.delete(key); break;
   }
 }
 
@@ -1252,7 +1286,7 @@ function withoutRememberedTexts(observed: string, remembered: ReadonlySet<string
 
 const errorText = (error: unknown): string => (error instanceof Error ? error.message : String(error)).slice(0, 200);
 
-function unavailableResult(targetId: string, unavailable: Unavailable, context: RunContext, startedAt: number): RunResult {
+function unavailableResult(targetId: string, unavailable: Unavailable, context: NothingRanContext, startedAt: number): RunResult {
   logKeepingTheResult({ kind: 'run.state', state: 'TargetUnavailable', targetId, code: unavailable.reason }, context.logger);
   return seal(targetUnavailableResult(unavailable, targetId, context.ports.clock.now() - startedAt), context);
 }
@@ -1273,7 +1307,11 @@ const planRunGuarantees = (context: SealContext, unsafeFeatures: readonly Unsafe
   });
 };
 
-type SealContext = Pick<RunContext, 'cleared' | 'ports' | 'determinismUnpinned'>;
+// What a result is sealed with: the plan, project and standing it was judged as, which a target that
+// is not declared has too.
+type SealContext = { readonly cleared: RunSubject; readonly ports: RunPorts; readonly determinismUnpinned: boolean };
+// What a run that ended before any step needs: the seal, and the log it ends on.
+type NothingRanContext = SealContext & { readonly logger: Logger };
 
 // Adds the run mode, the guarantee statement, the unsafe label (for a plan using unsafe features),
 // the approval label (for an approved plan) and the result's two hashes.

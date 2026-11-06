@@ -15,10 +15,15 @@ import { entriesInKeyOrder, sha256 } from './hashing.ts';
 import { normalise } from './oracle.ts';
 import { runTimeText } from './plan/plan-decoders.ts';
 import { generatedValueEntries } from './plan/plan-values.ts';
-import type { Project } from './project/project-parser.ts';
+import type { Limits, Project } from './project/project-parser.ts';
 
 // Each run value's text, by name.
 export type RunValues = ReadonlyMap<ValueName, SafeText>;
+
+// The part of a project that resolving a step reads.
+type LimitsOf = Pick<Project, 'limits'>;
+
+const NO_VALUES: RunValues = new Map();
 
 // Run-time step failures the engine decides, as opposed to driver errors:
 //   value-empty        a value is blank where text is needed, or has no text yet;
@@ -130,7 +135,7 @@ export function resolveText(text: TextOrValue, values: RunValues, maximumLength:
 
 // The locator a driver matches, with its value references replaced. A css or XPath locator's
 // selector is always literal; only its hasText, and the locators it is inside, may hold a reference.
-export function resolveLocator(locator: Locator, values: RunValues, project: Project): Result<ResolvedLocator, StepErrorCode> {
+export function resolveLocator(locator: Locator, values: RunValues, project: LimitsOf): Result<ResolvedLocator, StepErrorCode> {
   switch (locator.by) {
     case 'role': {
       const name = resolveText(locator.name, values, project.limits.maximumTextLength);
@@ -188,7 +193,7 @@ export function resolveElementAssertion(
 // The lines of a multi-line fill with every value replaced. Each line is held to the project's
 // maximumTextLength, and the lines with the line feeds between them to maximumFillCharacters:
 // the parser checked the literal lines, but a value's text is only known now.
-function resolveLines(lines: readonly TextOrValue[], values: RunValues, project: Project): Resolved<ResolvedMultiLineText> {
+function resolveLines(lines: readonly TextOrValue[], values: RunValues, project: LimitsOf): Resolved<ResolvedMultiLineText> {
   const resolved: SafeText[] = [];
   for (const line of lines) {
     const text = resolveText(line, values, project.limits.maximumTextLength);
@@ -201,7 +206,7 @@ function resolveLines(lines: readonly TextOrValue[], values: RunValues, project:
 
 // The action a driver performs, with every value replaced.
 export function resolveActionStep(
-  step: Extract<Step, { type: ResolvedActionStep['type'] }>, values: RunValues, project: Project,
+  step: Extract<Step, { type: ResolvedActionStep['type'] }>, values: RunValues, project: LimitsOf,
 ): Result<ResolvedActionStep, StepErrorCode> {
   const locator = resolveLocator(step.locator, values, project);
   if (!locator.ok) return locator;
@@ -224,6 +229,16 @@ export function resolveActionStep(
     }
   }
 }
+
+// A locator or action step holding only literal text, as a driver takes it: what a caller that hands
+// a driver a step itself, with no run around it, gets from the engine. A value reference in it has no
+// text outside a run, so it is value-empty.
+export const resolveLiteralLocator = (locator: Locator, limits: Limits): Result<ResolvedLocator, StepErrorCode> =>
+  resolveLocator(locator, NO_VALUES, { limits });
+
+export const resolveLiteralActionStep = (
+  step: Extract<Step, { type: ResolvedActionStep['type'] }>, limits: Limits,
+): Result<ResolvedActionStep, StepErrorCode> => resolveActionStep(step, NO_VALUES, { limits });
 
 // One path segment or query value, percent-encoded as a whole, so "/", "?", "#" and "%" inside a
 // value stay inside it. An empty value, "." or ".." would drop or climb a segment.

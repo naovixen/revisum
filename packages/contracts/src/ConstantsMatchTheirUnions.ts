@@ -2,7 +2,7 @@
 // added to one alone would compile, and the constant's list would hold a kind no variant has. Every
 // row fails to compile when its two sides stop holding the same values. Only types exist here.
 import type { ApprovalProof, ApprovalProofKind } from './approval.ts';
-import type { DomRead, DomReadKind, DomValue } from './browser-driver.ts';
+import type { DomRead, DomReadKind, DomValue, FillValue, FillValueKind } from './browser-driver.ts';
 import type { ClipboardAssertion, ClipboardAssertionKind } from './clock-and-clipboard.ts';
 import type {
   RequestCount, RequestCountKind, ResponseAssertion, ResponseAssertionKind, StorageAssertion, StorageAssertionKind,
@@ -42,4 +42,5 @@ export type ConstantsMatchTheirUnions = [
   MustHold<HoldSameValues<PolicyVerdictKind, GuardVerdict['kind']>>,
   MustHold<HoldSameValues<ParameterKind, ParameterType['kind']>>,
   MustHold<HoldSameValues<BackendAssertionKind, BackendAssertion['kind']>>,
+  MustHold<HoldSameValues<FillValueKind, FillValue['kind']>>,
 ];

@@ -2,10 +2,8 @@
 // run unless the plan is approved and the project's policy allows production for approved plans.
 import type { BaseUrl, Step } from "@revisum/contracts";
 import type { ClearedRun } from "./policy/ClearedRun.ts";
+import { isProductionAllowed } from "./policy/IsProductionAllowed.ts";
 import { declaredCommands } from "./project/unsafe-feature-declarations.ts";
-
-export const isProductionAllowed = (cleared: ClearedRun): boolean =>
-    cleared.standing.mode === "approved" && cleared.project.policy.allowProductionForApprovedPlans;
 
 // The origins of the services the plan's calls and database commands reach, its cleanup included.
 function serviceOrigins({ plan, project }: ClearedRun): string[] {
@@ -55,7 +53,7 @@ export function productionOriginReached(cleared: ClearedRun, baseUrl: BaseUrl): 
 // The origins the browser may reach. A run that may not reach production has the production origins
 // left out of its allow-list as well, so any request the page makes to one is blocked.
 export function reachableOrigins(cleared: ClearedRun): readonly string[] {
-    if (isProductionAllowed(cleared)) {
+    if (isProductionAllowed(cleared.standing, cleared.project.policy)) {
         return cleared.project.origins;
     }
     const production = new Set<string>(cleared.project.productionOrigins);

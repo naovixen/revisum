@@ -100,6 +100,17 @@ export function resolvePlanSecrets(
 
 // The store a declared call's request is built from: only the secrets the run resolved before it
 // started, so a call never reaches past them.
+// The secret a fill of the plan these secrets were resolved for types. resolvePlanSecrets resolves
+// every name that plan's fills use, inside frames and second tabs too, or fails, so a fill of that
+// plan always finds its own; only a fill from another plan could miss, and that is a broken caller.
+export function fillSecretOf(secrets: ResolvedSecrets, name: SecretName): Secret {
+  const secret = secrets.fills.get(name);
+  if (secret === undefined) {
+    throw new TypeError(`no secret was resolved for a fill of ${name}: the secrets are another plan's`);
+  }
+  return secret;
+}
+
 export const resolvedSecretStore = (secrets: ResolvedSecrets): SecretStore => ({ resolve: (name) => secrets.services.get(name) ?? null });
 // The store stub bodies and storage values are filled from, in the same way.
 export const stubAndStorageSecretStore = (secrets: ResolvedSecrets): SecretStore => ({ resolve: (name) => secrets.stubsAndStorage.get(name) ?? null });

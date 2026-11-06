@@ -2,7 +2,7 @@
 // masking and auditing live here once, so every protocol behaves the same way.
 import { isDeepStrictEqual } from 'node:util';
 import {
-  DEFAULT_TEST_ID_ATTRIBUTE, failure, isSeveralElements, NavigateScripts, reveal, success,
+  DEFAULT_TEST_ID_ATTRIBUTE, failure, FillValueKind, isSeveralElements, NavigateScripts, reveal, success,
   type ActionGuard, type BrowserRequestRecord, type DocumentSession, type DomRead, type DomValue, type DownloadedFile,
   type DriverError, type ElementProbe, type OneElementRead, type PageScriptCall, type PageMetaTag, type PageProbe, type PageReadFailure, type PerformableAction,
   type PerformableFill, type Position, type ResolvedDialogStep, type ResolvedDownloadStep,
@@ -535,15 +535,21 @@ async function hasFieldHoldingASecret<Handle>(documents: readonly PageOperations
 }
 
 // True when a fill types a secret, which is revealed only as it is typed.
-const isSecretFill = (fill: PerformableFill): boolean => typeof fill.value === 'object' && 'secret' in fill.value;
+function isSecretFill(fill: PerformableFill): boolean {
+  switch (fill.value.kind) {
+    case FillValueKind.Secret: return true;
+    case FillValueKind.Text: case FillValueKind.Lines: return false;
+  }
+}
 
 // The text a fill types. The secret is revealed here, as it is typed, and nowhere else in this driver.
 // Lines are joined by line feeds and inserted as text, so no Enter key press can send a form early.
 function textToFill(value: PerformableFill['value']): string {
-  if (typeof value === 'string') {
-    return value;
+  switch (value.kind) {
+    case FillValueKind.Text: return value.text;
+    case FillValueKind.Lines: return value.lines.join('\n');
+    case FillValueKind.Secret: return reveal(value.secret);
   }
-  return 'lines' in value ? value.lines.join('\n') : reveal(value.secret);
 }
 
 // An action on an element: every action but answering a dialog.

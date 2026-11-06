@@ -176,7 +176,7 @@
       "count": 3
     },
     "curly": {
-      "count": 51
+      "count": 50
     },
     "revisum/file-name-matches-export": {
       "count": 1
@@ -826,10 +826,7 @@
   },
   "packages/engine/src/manifest.ts": {
     "@typescript-eslint/naming-convention": {
-      "count": 5
-    },
-    "@typescript-eslint/no-unused-vars": {
-      "count": 2
+      "count": 3
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 1
@@ -1180,10 +1177,10 @@
   },
   "packages/engine/src/run.ts": {
     "@typescript-eslint/naming-convention": {
-      "count": 5
+      "count": 4
     },
     "curly": {
-      "count": 48
+      "count": 44
     },
     "max-lines": {
       "count": 1

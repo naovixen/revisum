@@ -8,6 +8,7 @@ import {
 import { canonicalJson, sha256 } from './hashing.ts';
 import { declarationsNamedBy, unsafeFeaturesOf } from './plan/unsafe-features.ts';
 import type { Project } from './project/project-parser.ts';
+import type { Provenance } from './project/trusted-project.ts';
 import { declaredCommands, declaredScripts } from './project/unsafe-feature-declarations.ts';
 import { ENGINE_VERSION, schemaId } from './version.ts';
 
@@ -246,10 +247,15 @@ function nonHermeticInputs(callsServices: boolean, others: readonly string[]): r
 // The project as its hash covers it: everything but the evidence-mode and planner sections, which a
 // plan run never reads, so turning either on leaves a plan run's manifest unchanged; and where a
 // trusted project was read from, so the same file has the same hash, parsed or loaded as trusted.
-export function projectHash(project: Project): string {
-  const { evidenceMode: _evidenceRunsOnly, planner: _draftingOnly, ...read } = project;
-  const allowances = Object.fromEntries(Object.entries(read).filter(([key]) => key !== 'provenance'));
-  return sha256(canonicalJson(allowances));
+type HashedProject = Project & { readonly provenance?: Provenance };
+// Each section the hash leaves out, as nothing, which canonical JSON leaves out. A key the project
+// does not have fails to compile.
+const LEFT_OUT_OF_THE_HASH = {
+  evidenceMode: undefined, planner: undefined, provenance: undefined,
+} satisfies Partial<Record<keyof HashedProject, undefined>>;
+
+export function projectHash(project: HashedProject): string {
+  return sha256(canonicalJson({ ...project, ...LEFT_OUT_OF_THE_HASH }));
 }
 
 // The manifest fields a run's pins give, with the project's hash and limits.

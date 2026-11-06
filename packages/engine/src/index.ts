@@ -12,7 +12,8 @@ export * from './approval/plan-standing.ts';
 // Read by tools/check-deny-rules.ts, which checks this repository's own agent lock-down.
 export { deniesRequiredActions, parseDenyRules } from './approval/approvers-file.ts';
 export type { ClearedRun } from './policy/ClearedRun.ts';
-export { policyGate, type PlanClearance, type PolicyGate, type RunClearance } from './policy/policy-gate.ts';
+export { policyGate, type PlanClearance, type PolicyGate, type RunClearance, type TargetClearance } from './policy/policy-gate.ts';
+export type { TargetNotDeclared } from './policy/TargetNotDeclared.ts';
 export { BaseUrlRefusal, baseUrlOfOrigin, parseBaseUrl } from './ParseBaseUrl.ts';
 export { assertBranded, planParser } from './plan/plan-parser.ts';
 export { unsafeFeaturesOf } from './plan/unsafe-features.ts';
@@ -62,7 +63,9 @@ export { testedOn } from './target/tested-on.ts';
 export { unavailableTargetOutcome } from './target/unavailable-target-outcome.ts';
 export { hashExecutable, lock, lockToFile, readLockfile } from './target/target-lock.ts';
 export { buildServiceRequest } from './service-calls/service-request.ts';
-export { generateValue, resolvePlanClock, type RunValues, type StepErrorCode } from './run-values.ts';
+export {
+  generateValue, resolveLiteralActionStep, resolveLiteralLocator, resolvePlanClock, type RunValues, type StepErrorCode,
+} from './run-values.ts';
 export * from './ai-planning.ts';
 export * from './release-notes.ts';
 export { HOST_ISOLATION, guaranteeStatement } from './guarantees.ts';

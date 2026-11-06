@@ -42,7 +42,7 @@ function clearedLogin(text: string, project: Project, target: BrowserCrawl['targ
   const read = readPlanText(text, project.limits);
   if (!read.ok) return undefined;
   const parsed = planParser(project)(read.value.json);
-  if (!parsed.ok || !parsed.value.targets.includes(target.id)) return undefined;
+  if (!parsed.ok) return undefined;
   // The host checked the approval; here the plan runs as the proposal it is to the container.
   const decision = policyGate({ project, events: discardingAudit }).clear(parsed.value, target.id);
   return decision.kind === 'allow' ? decision.run : undefined;

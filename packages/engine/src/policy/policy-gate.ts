@@ -9,8 +9,10 @@
 //     or command its declaration keeps out of proposals, and any database command whose service is
 //     on a production origin. Whatever its standing, a plan is held to the features, scripts and
 //     secrets this project declares, not those of the project it was parsed under. Only an allow
-//     decision carries a ClearedRun, one per target, the only kind run() accepts: it holds the plan
-//     with this project, the target and the standing it was judged as, so none can be swapped.
+//     decision carries a ClearedRun, the only kind run() accepts, and only for a target both the
+//     plan and this project's matrix declare: it holds the plan with this project, that matrix entry
+//     and the standing it was judged as, so none can be swapped. Any other target id gets a
+//     TargetNotDeclared, on which nothing runs.
 //   - guardAction() is the runtime guard. The driver calls it just before every action, with the
 //     element the locator resolved to and any open dialog's text, so it sees what the plan alone
 //     cannot: the name behind a test id, the form a key press would submit, where a link leads.
@@ -29,20 +31,25 @@ import { planHash } from '../manifest.ts';
 import { unsafeFeaturesOf } from '../plan/unsafe-features.ts';
 import type { Limits, Project, ProjectPolicy } from '../project/project-parser.ts';
 import { declaredCommands, declaredScripts, enabledUnsafeFeatures } from '../project/unsafe-feature-declarations.ts';
-import { ClearedRun } from './ClearedRun.ts';
+import { ClearedRun, ClearedRunKind } from './ClearedRun.ts';
+import { isProductionAllowed } from './IsProductionAllowed.ts';
+import { targetNotDeclared, type TargetNotDeclared } from './TargetNotDeclared.ts';
 import { everyIrreversiblePattern, isAllowedName, isBlankName, matchesIrreversiblePattern, patternsForLocale } from './irreversible-patterns.ts';
 
-// What the gate decided about a plan for the targets it will run on: on an allow, one cleared run
-// per target id, in the order given, a target the project's matrix does not declare included, so
-// its run says so with TargetUnavailable rather than having no result at all.
-export type PlanClearance = { readonly kind: typeof PolicyVerdictKind.Allow; readonly runs: readonly ClearedRun[] } | PlanDenial;
+// What the gate gives a plan it allows for one target id: a cleared run when both the plan and the
+// project's matrix declare the target, and otherwise a TargetNotDeclared, on which nothing may run.
+export type TargetClearance = ClearedRun | TargetNotDeclared;
+// What the gate decided about a plan for the targets it will run on: on an allow, one clearance per
+// target id, in the order given, so a target that is not declared still has an outcome of its own.
+export type PlanClearance = { readonly kind: typeof PolicyVerdictKind.Allow; readonly runs: readonly TargetClearance[] } | PlanDenial;
 // The same, for one target.
-export type RunClearance = { readonly kind: typeof PolicyVerdictKind.Allow; readonly run: ClearedRun } | PlanDenial;
+export type RunClearance = { readonly kind: typeof PolicyVerdictKind.Allow; readonly run: ClearedRun } | TargetNotDeclared | PlanDenial;
 
 export interface PolicyGate {
   // The static check of a whole plan for the targets it will run on. A missing standing, or one
   // whose approval is for another plan's hash, is a proposal.
-  // Each target is judged as the project's matrix declares it, by its id.
+  // Each target is judged as the project's matrix declares it, by its id. A denial is for the whole
+  // plan, whichever targets are declared.
   decide(plan: Plan, targetIds: readonly TargetId[], standing?: PlanStanding): PlanClearance;
   // decide() for a plan that runs on one target.
   clear(plan: Plan, targetId: TargetId, standing?: PlanStanding): RunClearance;
@@ -359,9 +366,8 @@ function staticDenial(plan: Plan, targets: readonly Target[], standing: PlanStan
     if (set === null) return { rule: 'no-locale-patterns', stepIndex: null };
     patterns.push(...set);
   }
-  // Production is closed to every plan unless the project opens it, and then only to approved plans.
   // The standing is already the plan's own (ownStanding), never another plan's.
-  const productionAllowed = standing.mode === 'approved' && project.policy.allowProductionForApprovedPlans;
+  const productionAllowed = isProductionAllowed(standing, project.policy);
   const context: StaticContext = { project, patterns, productionAllowed, approved: standing.mode === 'approved' };
   for (const { step, index } of everyStep(plan.steps)) {
     const rule = staticRule(step, context);
@@ -460,15 +466,24 @@ export function policyGate(options: PolicyGateOptions): PolicyGate {
     const recorded = record(denial.rule, plan);
     return { kind: PolicyVerdictKind.Deny, rule: denial.rule, stepIndex: denial.stepIndex, ...(recorded ? {} : UNRECORDED) };
   };
-  const runOn = (judged: Judged, targetId: TargetId): ClearedRun => new ClearedRun({ plan: judged.plan, project, targetId, standing: judged.standing });
+  const clearanceFor = (judged: Judged, targetId: TargetId): TargetClearance => {
+    const target = judged.plan.targets.includes(targetId) ? project.matrix.find((candidate) => candidate.id === targetId) : undefined;
+    return target === undefined
+      ? targetNotDeclared({ plan: judged.plan, project, targetId, standing: judged.standing })
+      : new ClearedRun({ plan: judged.plan, project, target, standing: judged.standing });
+  };
   return {
     decide(plan, targetIds, standing) {
       const judged = judge(plan, targetIds, standing);
-      return judged.kind === PolicyVerdictKind.Deny ? judged : { kind: PolicyVerdictKind.Allow, runs: targetIds.map((targetId) => runOn(judged, targetId)) };
+      return judged.kind === PolicyVerdictKind.Deny ? judged : { kind: PolicyVerdictKind.Allow, runs: targetIds.map((targetId) => clearanceFor(judged, targetId)) };
     },
     clear(plan, targetId, standing) {
       const judged = judge(plan, [targetId], standing);
-      return judged.kind === PolicyVerdictKind.Deny ? judged : { kind: PolicyVerdictKind.Allow, run: runOn(judged, targetId) };
+      if (judged.kind === PolicyVerdictKind.Deny) {
+        return judged;
+      }
+      const clearance = clearanceFor(judged, targetId);
+      return clearance.kind === ClearedRunKind ? { kind: PolicyVerdictKind.Allow, run: clearance } : clearance;
     },
     guardAction(step, stepIndex, element, dialogText, locale) {
       const patterns = patternsForLocale(locale, project.policy.irreversiblePatterns);

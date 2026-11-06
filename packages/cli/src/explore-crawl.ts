@@ -71,8 +71,9 @@ export async function crawlInBrowser(browser: BrowserDriver, crawl: BrowserCrawl
   if (!browser.supports(target).ok) return failure('target-unavailable');
   const fixedTimeMilliseconds = Date.now();
   // The session may reach the start origin and nothing else.
+  const baseUrl = baseUrlOfOrigin(origin);
   const opened = await browser.open(target, {
-    baseUrl: origin, allowedOrigins: [origin], seed: CRAWL_SEED, fixedTimeMilliseconds,
+    baseUrl, allowedOrigins: [origin], seed: CRAWL_SEED, fixedTimeMilliseconds,
     sensitiveSelectors: crawl.redactor.selectors, timeoutMilliseconds: project.limits.stepTimeoutMilliseconds,
   });
   if (!opened.ok) return failure('target-unavailable');
@@ -80,7 +81,7 @@ export async function crawlInBrowser(browser: BrowserDriver, crawl: BrowserCrawl
   try {
     if (crawl.login !== undefined) {
       const loggedIn = await run(crawl.login, {
-        baseUrl: baseUrlOfOrigin(origin), seed: CRAWL_SEED, fixedTimeMilliseconds, fixtures: [], host: { platform: platform(), arch: arch() },
+        baseUrl, seed: CRAWL_SEED, fixedTimeMilliseconds, fixtures: [], host: { platform: platform(), arch: arch() },
       }, {
         drivers: new Map([[target.adapter, sharingDriver(browser, session)]]), clock: systemClock, artifacts: discardingArtifacts,
         redactor: crawl.redactor, events: discardingRunEvents, audit: crawl.audit, secrets: crawl.secrets, isolation: HOST_ISOLATION,
