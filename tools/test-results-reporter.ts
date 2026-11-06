@@ -58,22 +58,26 @@ function readEvent(data: unknown): EventFields | undefined {
 }
 
 export default async function* testResultsReporter(source: AsyncIterable<ReporterEvent>): AsyncGenerator<string> {
-  // The names of the suites a test runs in, per file, by nesting depth. Node reports a test's
-  // start, then its result, in order within a file, so the stack is right when a result arrives.
-  const openNames = new Map<string, string[]>();
+  // Node names as a test's file the module that called test(), which for a shared contract is a
+  // module under test/support, not the test file that runs it. The test file is the one its
+  // top-level suite was declared in. Node reports each file's events as one unbroken block, a
+  // test's start before its result, so the latest top-level start names the file a result
+  // belongs to, and one stack holds the names of the suites it runs in, by nesting depth.
+  const openNames: string[] = [];
+  let testFile = '';
   for await (const event of source) {
     const fields = readEvent(event.data);
     if (fields === undefined) continue;
-    const names = openNames.get(fields.file) ?? [];
-    openNames.set(fields.file, names);
     if (event.type === 'test:start') {
-      names.length = fields.nesting;
-      names.push(fields.name);
+      if (fields.nesting === 0) testFile = fields.file;
+      openNames.length = fields.nesting;
+      openNames.push(fields.name);
     } else if ((event.type === 'test:pass' || event.type === 'test:fail') && !fields.isSuite) {
       const line: TestResultLine = {
         kind: 'test',
-        file: fields.file,
-        name: [...names.slice(0, fields.nesting), fields.name].join(' > '),
+        // A top-level result is its own file's, which also covers a file that failed to load.
+        file: fields.nesting === 0 ? fields.file : testFile,
+        name: [...openNames.slice(0, fields.nesting), fields.name].join(' > '),
         line: fields.line,
         passed: event.type === 'test:pass' && !fields.skipped,
         skipped: fields.skipped,
