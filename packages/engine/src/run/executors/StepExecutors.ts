@@ -1,7 +1,7 @@
 // How the run carries out each step type: one executor per type, grouped as the plan language's
 // sections are.
 import type { StepType } from "@revisum/contracts";
-import type { RunStepByType } from "../../RunStep.ts";
+import type { RunStep, RunStepByType } from "../../RunStep.ts";
 import { actOnElement } from "./actions/ActOnElement.ts";
 import { answerDialog } from "./actions/AnswerDialog.ts";
 import { fillField } from "./actions/FillField.ts";
@@ -47,9 +47,12 @@ export const STEP_EXECUTORS: StepExecutorTable = {
     ...DATABASE_COMMAND_EXECUTORS,
 };
 
-// Runs one step with its type's executor.
-export const executeStep = async <Type extends StepType>(
+const executeTyped = async <Type extends StepType>(
     type: Type,
     step: RunStepByType[Type],
     context: StepContext,
 ): Promise<StepRecord> => await STEP_EXECUTORS[type](step, context);
+
+// Runs one step with its own type's executor.
+export const executeStep = async (step: RunStep, context: StepContext): Promise<StepRecord> =>
+    await executeTyped(step.type, step, context);

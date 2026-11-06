@@ -7,7 +7,7 @@
 // through its clock and clipboard ports; page scripts through its script port. Database commands
 // go through the run's DatabaseCommandRunner port, which runs each in a workload container.
 import {
-  failure, UnavailableReason, stepFailed, StepCode, StepOutcome, StepType, success,
+  failure, UnavailableReason, stepFailed, StepCode, StepOutcome, success,
   type A11yFinding, type AppliedRewrite, type ApprovalLabel, type BrowserDriver, type Clock, type DocumentSession, type Plan, type PolicyRuleId,
   type Redactor, type Result, type SafeText, type Session, type Step, type Target, type Unavailable, type ValueName, type GuaranteeStatement,
   type RunMode, type SuiteFinding, type SuiteName, type SuitePass, type StubAnswer, type StubName, type SuiteTestId, type SuiteTestResult,
@@ -27,7 +27,7 @@ import {
 import { refusedResult, targetUnavailableResult } from './NothingRanResult.ts';
 import type { SuiteDecodeError } from './evidence/suite-report.ts';
 import type { PlanError } from './plan/plan-decoders.ts';
-import { isAssertionStepType } from './plan/StepFacts.ts';
+import { isAssertionStepType, isSetupStepType } from './plan/StepFacts.ts';
 import { assertBranded } from './plan/plan-parser.ts';
 import { unsafeFeaturesOf } from './plan/unsafe-features.ts';
 import { assertCleared, ClearedRunKind, type ClearedRun } from './policy/ClearedRun.ts';
@@ -471,8 +471,6 @@ export async function runUntrusted(
   return results;
 }
 
-// The steps that set up or reach what the test needs: when one fails, the run could not test.
-const SETUP_STEP_TYPES: readonly StepType[] = [StepType.Call, StepType.Evaluate, StepType.Database];
 // A step the adapter threw on, or that a refused request decision spoilt: what it saw is unknown,
 // which is not a product failure either. The code stands for the failure and its text stays out of
 // the result, since it could hold page content or a secret.
@@ -488,7 +486,8 @@ const UNUSABLE_RESULT_CODES: readonly string[] = [
 
 // True when a failed step means the run could not test, wherever in the plan the step stands.
 const couldNotTest = (done: StepResult, context: RunContext): boolean =>
-  done.outcome === 'failed' && (SETUP_STEP_TYPES.includes(done.type) || UNUSABLE_RESULT_CODES.includes(done.code ?? '') || context.setupFailedInside.has(done.index));
+  done.outcome === 'failed'
+  && (isSetupStepType(done.type) || UNUSABLE_RESULT_CODES.some((code) => code === done.code) || context.setupFailedInside.has(done.index));
 
 // What the event log says of a refusal beyond its code.
 function loggedWithRefusal(refusal: lifecycle.Refusal): { readonly origin?: string; readonly detail?: string } {
@@ -667,9 +666,10 @@ async function runStepOnLivePage(step: RunStep, index: number, document: Documen
     return failedStep(step, index, TARGET_CRASHED);
   }
   const openingsBefore = document.unsupportedOpenings();
-  const runInnerSteps: RunInnerSteps = (container, containerIndex, inner) => runStepsInside(container, containerIndex, inner, context);
+  // The steps inside a container report under the container's own index.
+  const runInnerSteps: RunInnerSteps = (container, inner) => runStepsInside(container, index, inner, context);
   try {
-    const done: StepResult = { index, type: step.type, ...(await executeStep(step.type, step, { ...context, index, document, runInnerSteps })) };
+    const done: StepResult = { index, type: step.type, ...(await executeStep(step, { ...context, index, document, runInnerSteps })) };
     // A request the browser would not let go on stays held, so neither a pass nor a failure of this
     // step says anything about the app: the run could not test. The reason goes to the log at the end.
     if (hasARefusedDecision(context)) {
@@ -702,7 +702,7 @@ async function runStepsInside(container: ContainerRunStep, index: number, docume
   for (const inner of container.steps) {
     const done = await runStep(inner, index, document, context);
     if (done.outcome !== StepOutcome.Passed) {
-      if (SETUP_STEP_TYPES.includes(inner.type)) {
+      if (isSetupStepType(inner.type)) {
         context.setupFailedInside.add(index);
       }
       return withKept({ ...done, type: container.type }, done.innerSteps);

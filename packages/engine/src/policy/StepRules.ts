@@ -1,9 +1,11 @@
-// What the policy gate checks of each step type, before the run and as it acts, in one table. Every
+// What the policy gate checks of each step type, before the run, in its pass over what the plan calls,
+// and as it acts, in one table. Every
 // step type has an entry, so a new type does not compile until someone decides what may deny it:
 // nothing is allowed by default for want of a case.
 import { literalText } from "@revisum/contracts";
 import type {
     AllowedUrl,
+    DatabaseCommandStep,
     Locator,
     PageScriptStep,
     PathTemplate,
@@ -11,6 +13,7 @@ import type {
     RemoveStorageStep,
     ResolvedElement,
     SafeText,
+    ServiceCallStep,
     SetStorageStep,
     Step,
     StepByType,
@@ -18,8 +21,8 @@ import type {
     StubStep,
 } from "@revisum/contracts";
 import type { Project, ProjectPolicy } from "../project/project-parser.ts";
-import { declaredScripts } from "../project/unsafe-feature-declarations.ts";
-import { isDestructivePath, readUrl } from "./IsDestructivePath.ts";
+import { declaredCommands, declaredScripts } from "../project/unsafe-feature-declarations.ts";
+import { isDestructivePath, readUrl, type ReadUrl } from "./IsDestructivePath.ts";
 import { isAllowedName, isBlankName, matchesIrreversiblePattern } from "./irreversible-patterns.ts";
 
 // What the static check judges a step with, made once for the whole plan.
@@ -40,9 +43,18 @@ export type GuardedAction = {
     readonly project: Project;
 };
 
+type StaticRule<TypedStep extends Step> = (
+    step: TypedStep,
+    context: StaticContext,
+) => PolicyRuleId | null;
+
 type StepRule<TypedStep extends Step> = {
-    // The static check, before the run starts.
-    readonly beforeRun: (step: TypedStep, context: StaticContext) => PolicyRuleId | null;
+    // The static check, before the run starts, over every step, those in frames and second tabs
+    // included.
+    readonly beforeRun: StaticRule<TypedStep>;
+    // The static check's pass over what the plan calls, after every step's own rule: the plan's own
+    // steps, then its cleanup. Calls and database commands stand only there.
+    readonly beforeRunCalls: StaticRule<TypedStep>;
     // The runtime guard, just before the driver acts.
     readonly duringRun: (step: TypedStep, action: GuardedAction) => PolicyRuleId | null;
 };
@@ -101,9 +113,12 @@ function literalPathOf(template: PathTemplate): string {
     return `/${literal.join("/")}`;
 }
 
-// The URL a navigate step names, as far as the plan alone says it.
-const navigationUrl = (url: AllowedUrl | PathTemplate): string =>
-    typeof url === "string" ? url : literalPathOf(url);
+// The URL a navigate step names, as far as the plan alone says it. A URL the parser accepted always
+// reads. A path template's text may not: an http URL reads a backslash as a "/", so a segment that
+// is one names a host with no name, and a URL with no host cannot be read. It reaches no declared
+// origin.
+const readNavigation = (url: AllowedUrl | PathTemplate): ReadUrl | null =>
+    typeof url === "string" ? readUrl(url) : readUrl(literalPathOf(url));
 
 // True when the name marks an irreversible action the project has not allowed by name.
 const isIrreversibleName = (
@@ -122,8 +137,7 @@ function navigationRule(
     url: AllowedUrl | PathTemplate,
     context: StaticContext,
 ): PolicyRuleId | null {
-    const read = readUrl(navigationUrl(url));
-    // The parser has already accepted the URL, so this cannot happen; deny rather than guess.
+    const read = readNavigation(url);
     if (read === null) {
         return "undeclared-origin";
     }
@@ -152,28 +166,39 @@ function irreversibleClickRule(
         : null;
 }
 
-// What a stub start or a storage write may not do: in a proposal, fake a response or change the
-// page's storage unless its declaration allows it in proposals. Removing an entry is a write too.
-// Stopping a stub undoes a side effect, so it is never one. A name the project does not declare
-// reaches something nobody declared.
-function sideEffectRule(
-    step: StubStep | SetStorageStep | RemoveStorageStep,
+// A side effect a proposal may hold only when the declaration it names allows it in proposals. A
+// name the project does not declare reaches something nobody declared.
+function proposalSideEffectRule(
+    declaration: { readonly allowInProposals: boolean } | undefined,
+    isSideEffect: boolean,
     context: StaticContext,
 ): PolicyRuleId | null {
-    const declaration =
-        step.type === "stub"
-            ? Object.entries(context.project.stubs).find(([name]) => name === step.stub)?.[1]
-            : Object.entries(context.project.storageEntries).find(
-                  ([name]) => name === step.entry,
-              )?.[1];
     if (declaration === undefined) {
         return "undeclared-origin";
     }
-    const isSideEffect = step.type !== "stub" || step.action === "start";
     return isSideEffect && !context.approved && !declaration.allowInProposals
         ? "side-effect-in-proposal"
         : null;
 }
+
+// Starting a stub fakes a response. Stopping one undoes that side effect, so it is never one.
+const stubRule = (step: StubStep, context: StaticContext): PolicyRuleId | null =>
+    proposalSideEffectRule(
+        Object.entries(context.project.stubs).find(([name]) => name === step.stub)?.[1],
+        step.action === "start",
+        context,
+    );
+
+// Writing an entry changes the page's storage, and removing one is a write too.
+const storageRule = (
+    step: SetStorageStep | RemoveStorageStep,
+    context: StaticContext,
+): PolicyRuleId | null =>
+    proposalSideEffectRule(
+        Object.entries(context.project.storageEntries).find(([name]) => name === step.entry)?.[1],
+        true,
+        context,
+    );
 
 // What a page script may not do: run undeclared, whatever the plan's standing, since a script the
 // project does not declare is no one's. And in a proposal: be written into the plan, since its source
@@ -195,6 +220,53 @@ function scriptRule(step: PageScriptStep, context: StaticContext): PolicyRuleId 
         : null;
 }
 
+// ---- What the plan calls ------------------------------------------------------------------------------
+
+// What a call may not do: reach a production service the plan's standing does not open, or, in a
+// proposal, change something unless its declaration allows it in proposals. A call the project
+// does not declare, or whose service it does not declare, reaches somewhere nobody declared.
+function callRule(step: ServiceCallStep, context: StaticContext): PolicyRuleId | null {
+    const declaration = Object.entries(context.project.calls).find(
+        ([name]) => name === step.call,
+    )?.[1];
+    const service = context.project.services.find(
+        (candidate) => candidate.name === declaration?.service,
+    );
+    if (declaration === undefined || service === undefined) {
+        return "undeclared-origin";
+    }
+    if (
+        !context.productionAllowed &&
+        context.project.productionOrigins.some((origin) => origin === service.origin)
+    ) {
+        return "production-origin";
+    }
+    return !context.approved && declaration.effect === "write" && !declaration.allowInProposals
+        ? "side-effect-in-proposal"
+        : null;
+}
+
+// What a database command may not do: reach a service on a production origin, whatever the plan's
+// standing, since the gate cannot judge what the team's program does there; or, in a proposal,
+// change something unless its declaration allows it in proposals.
+function commandRule(step: DatabaseCommandStep, context: StaticContext): PolicyRuleId | null {
+    const declaration = Object.entries(declaredCommands(context.project.unsafeFeatures)).find(
+        ([name]) => name === step.command,
+    )?.[1];
+    const service = context.project.services.find(
+        (candidate) => candidate.name === declaration?.service,
+    );
+    if (declaration === undefined || service === undefined) {
+        return "undeclared-origin";
+    }
+    if (context.project.productionOrigins.some((origin) => origin === service.origin)) {
+        return "production-origin";
+    }
+    return !context.approved && declaration.effect === "write" && !declaration.allowInProposals
+        ? "side-effect-in-proposal"
+        : null;
+}
+
 // ---- As the run acts ------------------------------------------------------------------------------
 
 const noRuleDuringRun = (): null => null;
@@ -205,7 +277,7 @@ function navigationGuard(
     url: AllowedUrl | PathTemplate,
     action: GuardedAction,
 ): PolicyRuleId | null {
-    const read = readUrl(navigationUrl(url));
+    const read = readNavigation(url);
     if (
         read === null ||
         (read.origin !== null && !action.project.origins.some((origin) => origin === read.origin))
@@ -285,38 +357,63 @@ function pressGuard(step: StepByType["press"], action: GuardedAction): PolicyRul
 // A second tab opens its URL as a navigate step would.
 const navigationRules: StepRule<StepByType["navigate" | "newTab"]> = {
     beforeRun: (step, context) => navigationRule(step.url, context),
+    beforeRunCalls: noRuleBeforeRun,
     duringRun: (step, action) => navigationGuard(step.url, action),
 };
 
 // A download is a click that must start a download, so it is judged as the click it is.
 const clickRules: StepRule<StepByType["click" | "download"]> = {
     beforeRun: irreversibleClickRule,
+    beforeRunCalls: noRuleBeforeRun,
     duringRun: clickGuard,
 };
 
 const elementActionRules: StepRule<StepByType["hover" | "fill" | "select" | "upload"]> = {
     beforeRun: noRuleBeforeRun,
+    beforeRunCalls: noRuleBeforeRun,
     duringRun: unnamedControlRule,
 };
 
-// Neither sends input to the page, so the runtime guard has nothing to judge.
-const sideEffectRules: StepRule<StubStep | SetStorageStep | RemoveStorageStep> = {
-    beforeRun: sideEffectRule,
+// None of the next three sends input to the page, so the runtime guard has nothing to judge.
+const stubRules: StepRule<StubStep> = {
+    beforeRun: stubRule,
+    beforeRunCalls: noRuleBeforeRun,
     duringRun: noRuleDuringRun,
 };
 
-const scriptRules: StepRule<PageScriptStep> = { beforeRun: scriptRule, duringRun: noRuleDuringRun };
+const storageRules: StepRule<SetStorageStep | RemoveStorageStep> = {
+    beforeRun: storageRule,
+    beforeRunCalls: noRuleBeforeRun,
+    duringRun: noRuleDuringRun,
+};
 
-// Calls and database commands are judged by the static check's own pass over what the plan calls,
-// cleanup included, after every step's own rules.
-const externalCallRules: StepRule<Step> = {
+const scriptRules: StepRule<PageScriptStep> = {
+    beforeRun: scriptRule,
+    beforeRunCalls: noRuleBeforeRun,
+    duringRun: noRuleDuringRun,
+};
+
+// A call or a database command reaches outside the browser, so it is judged by what it calls,
+// cleanup included, after every step's own rule. It sends no input to the page.
+const callRules: StepRule<ServiceCallStep> = {
     beforeRun: noRuleBeforeRun,
+    beforeRunCalls: callRule,
+    duringRun: noRuleDuringRun,
+};
+
+const commandRules: StepRule<DatabaseCommandStep> = {
+    beforeRun: noRuleBeforeRun,
+    beforeRunCalls: commandRule,
     duringRun: noRuleDuringRun,
 };
 
 // Checks, evidence and remembering only read, and a clock advance moves the page's own clock: none
 // sends input, so none is a side effect, and a proposal may hold each.
-const readOnlyRules: StepRule<Step> = { beforeRun: noRuleBeforeRun, duringRun: noRuleDuringRun };
+const readOnlyRules: StepRule<Step> = {
+    beforeRun: noRuleBeforeRun,
+    beforeRunCalls: noRuleBeforeRun,
+    duringRun: noRuleDuringRun,
+};
 
 export const STEP_RULES: { readonly [Type in StepType]: StepRule<StepByType[Type]> } = {
     navigate: navigationRules,
@@ -327,10 +424,11 @@ export const STEP_RULES: { readonly [Type in StepType]: StepRule<StepByType[Type
     fill: elementActionRules,
     select: elementActionRules,
     upload: elementActionRules,
-    press: { beforeRun: noRuleBeforeRun, duringRun: pressGuard },
+    press: { beforeRun: noRuleBeforeRun, beforeRunCalls: noRuleBeforeRun, duringRun: pressGuard },
     // The driver answers the dialog the page opened, so only the runtime guard can read its text.
     dialog: {
         beforeRun: noRuleBeforeRun,
+        beforeRunCalls: noRuleBeforeRun,
         duringRun: (step, action) =>
             step.action === "accept" && isIrreversibleText(action.dialogText, action)
                 ? "irreversible-dialog"
@@ -344,11 +442,11 @@ export const STEP_RULES: { readonly [Type in StepType]: StepRule<StepByType[Type
     a11yAudit: readOnlyRules,
     capture: readOnlyRules,
     remember: readOnlyRules,
-    call: externalCallRules,
-    expectBackend: externalCallRules,
-    stub: sideEffectRules,
-    setStorage: sideEffectRules,
-    removeStorage: sideEffectRules,
+    call: callRules,
+    expectBackend: callRules,
+    stub: stubRules,
+    setStorage: storageRules,
+    removeStorage: storageRules,
     resetRequests: readOnlyRules,
     expectRequests: readOnlyRules,
     expectResponse: readOnlyRules,
@@ -358,20 +456,33 @@ export const STEP_RULES: { readonly [Type in StepType]: StepRule<StepByType[Type
     // A page script acts on no element the guard could see: the static check judged its declaration.
     evaluate: scriptRules,
     expectScript: scriptRules,
-    database: externalCallRules,
-    expectDatabase: externalCallRules,
+    database: commandRules,
+    expectDatabase: commandRules,
 };
 
-// The static check's rule for one step: what denies it, or null.
-export const ruleBeforeRun = <Type extends StepType>(
+// A column's rule for the step's own type. Callers hand only the step, so its type and the step it
+// types cannot come apart.
+const staticRuleFor = <Type extends StepType>(
+    column: "beforeRun" | "beforeRunCalls",
     type: Type,
     step: StepByType[Type],
     context: StaticContext,
-): PolicyRuleId | null => STEP_RULES[type].beforeRun(step, context);
+): PolicyRuleId | null => STEP_RULES[type][column](step, context);
 
-// The runtime guard's rule for one action: what denies it, or null.
-export const ruleDuringRun = <Type extends StepType>(
+const guardFor = <Type extends StepType>(
     type: Type,
     step: StepByType[Type],
     action: GuardedAction,
 ): PolicyRuleId | null => STEP_RULES[type].duringRun(step, action);
+
+// The static check's rule for one step: what denies it, or null.
+export const ruleBeforeRun = (step: Step, context: StaticContext): PolicyRuleId | null =>
+    staticRuleFor("beforeRun", step.type, step, context);
+
+// The static check's rule for what one step calls: what denies it, or null.
+export const callRuleBeforeRun = (step: Step, context: StaticContext): PolicyRuleId | null =>
+    staticRuleFor("beforeRunCalls", step.type, step, context);
+
+// The runtime guard's rule for one action: what denies it, or null.
+export const ruleDuringRun = (step: Step, action: GuardedAction): PolicyRuleId | null =>
+    guardFor(step.type, step, action);

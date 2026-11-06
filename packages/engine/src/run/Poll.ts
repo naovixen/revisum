@@ -23,8 +23,14 @@ type CheckStopped = {
 };
 export type PollVerdict = Verdict | CheckStopped;
 
-export const isCheckStopped = (verdict: PollVerdict): verdict is CheckStopped =>
-    verdict.code === StepCode.TargetCrashed || verdict.code === StepCode.AdapterError;
+// What a check answers each time it looks: a pass, or a failure that says why.
+type CheckAnswer = { readonly pass: true } | { readonly pass: false; readonly code: string };
+
+export const isCheckStopped = <Answer extends CheckAnswer>(
+    verdict: Answer | CheckStopped,
+): verdict is CheckStopped =>
+    !verdict.pass &&
+    (verdict.code === StepCode.TargetCrashed || verdict.code === StepCode.AdapterError);
 
 export const verdictOfFailedRead = (readFailure: PageReadFailure, logger: Logger): PollVerdict => ({
     pass: false,
@@ -34,7 +40,7 @@ export const verdictOfFailedRead = (readFailure: PageReadFailure, logger: Logger
 // True when waiting cannot change the verdict: a selector the browser rejects, a dialog, which only a
 // later step can answer, the browser's own error page, which runs no script that could leave it, or a
 // read that failed.
-const isFinal = (verdict: PollVerdict): boolean =>
+const isFinal = (verdict: CheckAnswer): boolean =>
     verdict.pass ||
     isCheckStopped(verdict) ||
     verdict.code === StepCode.SelectorInvalid ||
@@ -43,11 +49,11 @@ const isFinal = (verdict: PollVerdict): boolean =>
 
 // Repeats a check until it passes or the step timeout runs out. A page that crashes stops the
 // wait at once: nothing on it can change any more, and the same goes for a read of the page that failed.
-export async function poll(
+export async function poll<Answer extends CheckAnswer>(
     context: RunContext,
     document: DocumentSession,
-    check: () => Promise<PollVerdict>,
-): Promise<PollVerdict> {
+    check: () => Promise<Answer | CheckStopped>,
+): Promise<Answer | CheckStopped> {
     const deadline =
         context.ports.clock.now() + context.cleared.project.limits.stepTimeoutMilliseconds;
     for (;;) {

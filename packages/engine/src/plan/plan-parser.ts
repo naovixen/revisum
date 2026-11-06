@@ -50,7 +50,7 @@ import {
   SELECTOR_FORBIDDEN_CHARACTERS, STYLE_PROPERTY, WRITTEN_URL,
 } from './plan-grammar.ts';
 import {
-  STEP_FACTS, STEP_TYPES, canStandInCleanup, canStandInside, isAssertionStepType, isDatabaseCommandStepType, isPageScriptStepType,
+  STEP_FACTS, STEP_TYPES, StepSection, canStandInCleanup, canStandInside, isAssertionStepType, isStepTypeIn,
 } from './StepFacts.ts';
 import { stepsWithin } from './VisitSteps.ts';
 import { readGeneratedValues, readPlanClock, readValueName, type ValueContext } from './plan-values.ts';
@@ -778,8 +778,8 @@ function readExpectBackend(head: Readonly<Record<string, unknown>>, path: string
 // inline one needs inline-page-script, refused at its `inline`, and a project can enable that only
 // together with page-script, so one check covers both.
 function unsafeStepEnabled(type: StepType, head: Readonly<Record<string, unknown>>, path: string, context: ParseContext): boolean {
-  if (isDatabaseCommandStepType(type)) return featureEnabled(DATABASE_COMMAND_FEATURE, `${path}.type`, context);
-  if (!isPageScriptStepType(type)) return true;
+  if (isStepTypeIn(type, StepSection.DatabaseCommands)) return featureEnabled(DATABASE_COMMAND_FEATURE, `${path}.type`, context);
+  if (!isStepTypeIn(type, StepSection.PageScripts)) return true;
   const script = head['script'];
   if (isNonArrayObject(script) && Object.hasOwn(script, 'inline')) return featureEnabled(INLINE_SCRIPT_FEATURE, `${path}.script.inline`, context);
   return featureEnabled(NAMED_SCRIPT_FEATURE, `${path}.type`, context);
@@ -1319,9 +1319,6 @@ function readStorageState(input: unknown, context: ParseContext): Parsed<SecretR
   const secretName = readDeclared(reference['secretName'], `${path}.secretName`, context, context.rules.secretNames);
   return secretName === INVALID ? INVALID : { secretName };
 }
-
-// Everything the plan may do: every step, those inside frames and second tabs included, and its cleanup.
-export const everyPlanStep = (plan: Plan): readonly Step[] => [...stepsWithin(plan.steps), ...(plan.cleanup ?? [])];
 
 // Checks across the whole plan once every step has been read: capture names are unique, and the
 // plan checks at least one thing.

@@ -959,9 +959,6 @@
     "curly": {
       "count": 20
     },
-    "no-nested-ternary": {
-      "count": 2
-    },
     "revisum/file-name-matches-export": {
       "count": 1
     }
@@ -1018,7 +1015,7 @@
       "count": 3
     },
     "curly": {
-      "count": 12
+      "count": 6
     },
     "revisum/file-name-matches-export": {
       "count": 1

@@ -64,8 +64,9 @@ function checkText(
 // Checks a file an earlier download step saved. None of its text is ever kept: a failed check
 // keeps only its code.
 export const checkDownload: StepExecutor<StepByType["expectDownload"]> = (step, context) => {
-    // The parser rejects a check of a download no earlier step defined, and a failed download skips
-    // every later step, so the file is always there.
+    // A run has the file: the parser rejects a check of a download no earlier step defined, and a
+    // failed download skips every later step. A context without it, as a caller may build, fails the
+    // check as no download.
     const file = context.downloads.get(step.download);
     if (file === undefined) {
         return stepFailed(StepCode.NoDownload);

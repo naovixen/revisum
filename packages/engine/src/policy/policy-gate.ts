@@ -22,21 +22,22 @@
 // nothing ran; a denial the audit sink failed to record is marked unrecorded.
 import { PolicyVerdictKind } from '@revisum/contracts';
 import type {
-  Authorised, CallArgument, DatabaseCommandStep, EventSink, GuardVerdict, Locale, Plan, PlanDenial,
-  PolicyRuleId, ResolvedElement, SecretName, ServiceCallStep, Step, Target, TargetId,
+  Authorised, EventSink, GuardVerdict, Locale, Plan, PlanDenial, PolicyRuleId, ResolvedElement, SecretName, Step, Target, TargetId,
 } from '@revisum/contracts';
 import { deriveActor, sourceActorId } from '../actor.ts';
 import { ownStanding, type PlanStanding } from '../approval/plan-standing.ts';
 import { planHash } from '../manifest.ts';
 import { unsafeFeaturesOf } from '../plan/unsafe-features.ts';
 import type { Limits, Project } from '../project/project-parser.ts';
-import { declaredCommands, enabledUnsafeFeatures } from '../project/unsafe-feature-declarations.ts';
+import { enabledUnsafeFeatures } from '../project/unsafe-feature-declarations.ts';
 import { ClearedRun, ClearedRunKind } from './ClearedRun.ts';
 import { isProductionAllowed } from './IsProductionAllowed.ts';
 import { targetNotDeclared, type TargetNotDeclared } from './TargetNotDeclared.ts';
 import { everyIrreversiblePattern, patternsForLocale } from './irreversible-patterns.ts';
-import { ruleBeforeRun, ruleDuringRun, type StaticContext } from './StepRules.ts';
-import { visitSteps } from '../plan/VisitSteps.ts';
+import { callRuleBeforeRun, ruleBeforeRun, ruleDuringRun, type StaticContext } from './StepRules.ts';
+import { everyPlanStep, visitSteps } from '../plan/VisitSteps.ts';
+import { isStepIn, StepSection } from '../plan/StepFacts.ts';
+import { secretsNamedBy } from '../plan/SecretsNamedBy.ts';
 
 // What the gate gives a plan it allows for one target id: a cleared run when both the plan and the
 // project's matrix declare the target, and otherwise a TargetNotDeclared, on which nothing may run.
@@ -95,64 +96,23 @@ function isOverLimit(plan: Plan, limits: Limits): boolean {
     || steps.some((step) => (step.type === 'frame' && (depth + 1 > limits.maximumFrameDepth || listTooLong(step.steps, depth + 1)))
       || (step.type === 'newTab' && listTooLong(step.steps, depth)));
   const bytes = new TextEncoder().encode(JSON.stringify(plan)).length;
-  const scripts = everyStep(plan.steps).filter(({ step }) => step.type === 'evaluate' || step.type === 'expectScript');
-  return bytes > limits.maximumPlanBytes || listTooLong(plan.steps, 0) || externalCallSteps(plan).length + scripts.length > limits.maximumCalls;
+  const scripts = everyStep(plan.steps).filter(({ step }) => isStepIn(step, StepSection.PageScripts));
+  const calls = callingSteps(plan).filter(({ step }) => isStepIn(step, StepSection.ServiceCalls, StepSection.DatabaseCommands));
+  return bytes > limits.maximumPlanBytes || listTooLong(plan.steps, 0) || calls.length + scripts.length > limits.maximumCalls;
 }
 
-// Every step that calls a service or runs a database command, the plan's steps first and its
+// The steps that may call a service or run a database command, the plan's steps first and its
 // cleanup after, each with its step index, or null for a cleanup step, which no step index names.
 // Both stand only at the top level, so frames and second tabs hold none. A check counts once,
 // however often it polls.
-function externalCallSteps(plan: Plan): { readonly step: ServiceCallStep | DatabaseCommandStep; readonly index: number | null }[] {
-  const isExternal = (step: Step): step is ServiceCallStep | DatabaseCommandStep =>
-    step.type === 'call' || step.type === 'expectBackend' || step.type === 'database' || step.type === 'expectDatabase';
-  const steps = plan.steps.flatMap((step, index) => (isExternal(step) ? [{ step, index }] : []));
-  return [...steps, ...(plan.cleanup ?? []).map((step) => ({ step, index: null }))];
-}
+const callingSteps = (plan: Plan): { readonly step: Step; readonly index: number | null }[] => [
+  ...plan.steps.map((step, index) => ({ step, index })),
+  ...(plan.cleanup ?? []).map((step) => ({ step, index: null })),
+];
 
-// What a call may not do: reach a production service the plan's standing does not open, or, in a
-// proposal, change something unless its declaration allows it in proposals. A call the project
-// does not declare, or whose service it does not declare, reaches somewhere nobody declared.
-function callRule(step: ServiceCallStep, context: StaticContext): PolicyRuleId | null {
-  const declaration = Object.entries(context.project.calls).find(([name]) => name === step.call)?.[1];
-  const service = context.project.services.find((candidate) => candidate.name === declaration?.service);
-  if (declaration === undefined || service === undefined) return 'undeclared-origin';
-  if (!context.productionAllowed && context.project.productionOrigins.some((origin) => origin === service.origin)) return 'production-origin';
-  if (!context.approved && declaration.effect === 'write' && !declaration.allowInProposals) return 'side-effect-in-proposal';
-  return null;
-}
-
-// What a database command may not do: reach a service on a production origin, whatever the plan's
-// standing, since the gate cannot judge what the team's program does there; or, in a proposal,
-// change something unless its declaration allows it in proposals.
-function commandRule(step: DatabaseCommandStep, context: StaticContext): PolicyRuleId | null {
-  const declaration = Object.entries(declaredCommands(context.project.unsafeFeatures)).find(([name]) => name === step.command)?.[1];
-  const service = context.project.services.find((candidate) => candidate.name === declaration?.service);
-  if (declaration === undefined || service === undefined) return 'undeclared-origin';
-  if (context.project.productionOrigins.some((origin) => origin === service.origin)) return 'production-origin';
-  if (!context.approved && declaration.effect === 'write' && !declaration.allowInProposals) return 'side-effect-in-proposal';
-  return null;
-}
-
-const externalCallRule = (step: ServiceCallStep | DatabaseCommandStep, context: StaticContext): PolicyRuleId | null =>
-  (step.type === 'call' || step.type === 'expectBackend' ? callRule(step, context) : commandRule(step, context));
-
-const secretNamesIn = (values: readonly (CallArgument | Extract<Step, { type: 'fill' }>['value'])[]): SecretName[] =>
-  values.flatMap((value) => (typeof value === 'object' && 'secretName' in value ? [value.secretName] : []));
-
-// The secrets the plan itself names, frames, second tabs and cleanup included. Those inside a
-// declaration were held to the project when it was parsed.
+// The secrets the plan itself names, frames, second tabs and cleanup included.
 function secretNamesOf(plan: Plan): readonly SecretName[] {
-  const steps = [...everyStep(plan.steps).map(({ step }) => step), ...(plan.cleanup ?? [])];
-  const named = steps.flatMap((step) => {
-    if (step.type === 'fill') {
-      return secretNamesIn([step.value]);
-    }
-    if (step.type === 'call' || step.type === 'expectBackend' || step.type === 'setStorage' || step.type === 'stub') {
-      return secretNamesIn(Object.values(step.arguments ?? {}));
-    }
-    return [];
-  });
+  const named = everyPlanStep(plan).flatMap(secretsNamedBy);
   return plan.storageState === undefined ? named : [...named, plan.storageState.secretName];
 }
 
@@ -183,11 +143,11 @@ function staticDenial(plan: Plan, targets: readonly Target[], standing: PlanStan
   const productionAllowed = isProductionAllowed(standing, project.policy);
   const context: StaticContext = { project, patterns, productionAllowed, approved: standing.mode === 'approved' };
   for (const { step, index } of everyStep(plan.steps)) {
-    const rule = ruleBeforeRun(step.type, step, context);
+    const rule = ruleBeforeRun(step, context);
     if (rule !== null) return { rule, stepIndex: index };
   }
-  for (const { step, index } of externalCallSteps(plan)) {
-    const rule = externalCallRule(step, context);
+  for (const { step, index } of callingSteps(plan)) {
+    const rule = callRuleBeforeRun(step, context);
     if (rule !== null) return { rule, stepIndex: index };
   }
   return null;
@@ -241,7 +201,7 @@ export function policyGate(options: PolicyGateOptions): PolicyGate {
     },
     guardAction(step, stepIndex, element, dialogText, locale) {
       const patterns = patternsForLocale(locale, project.policy.irreversiblePatterns);
-      const rule = patterns === null ? 'no-locale-patterns' : ruleDuringRun(step.type, step, { element, dialogText, patterns, project });
+      const rule = patterns === null ? 'no-locale-patterns' : ruleDuringRun(step, { element, dialogText, patterns, project });
       if (rule === null) return { kind: 'allow' };
       const recorded = record(rule);
       return { kind: 'deny', rule, stepIndex, ...(recorded ? {} : UNRECORDED) };

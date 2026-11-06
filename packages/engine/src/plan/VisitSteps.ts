@@ -1,16 +1,12 @@
 // The one walk over a plan's steps. Frames and second tabs hold steps of their own, and anything
 // that reads every step, such as the secrets or the origins a plan names, walks them here.
-import { StepType, type Step } from "@revisum/contracts";
+import type { Plan, Step } from "@revisum/contracts";
+import { holdsSteps } from "./StepFacts.ts";
 
 // Where a visited step stands: the index of the step in the list the walk started from that holds
 // it (itself, or the frame or second tab it is inside), and its JSON path, such as
 // "$.steps[2].steps[0]".
 export type StepPlace = { readonly topIndex: number; readonly path: string };
-
-type ContainerStep = Extract<Step, { readonly steps: readonly Step[] }>;
-
-const holdsSteps = (step: Step): step is ContainerStep =>
-    step.type === StepType.Frame || step.type === StepType.NewTab;
 
 function visitList(
     steps: readonly Step[],
@@ -45,3 +41,10 @@ export function stepsWithin(steps: readonly Step[]): readonly Step[] {
     });
     return found;
 }
+
+// Everything the plan may do: every step, those inside frames and second tabs included, then its
+// cleanup.
+export const everyPlanStep = (plan: Plan): readonly Step[] => [
+    ...stepsWithin(plan.steps),
+    ...(plan.cleanup ?? []),
+];

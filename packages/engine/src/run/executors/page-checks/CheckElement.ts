@@ -1,10 +1,4 @@
-import {
-    StepCode,
-    stepFailed,
-    StepOutcome,
-    type ElementProbe,
-    type StepByType,
-} from "@revisum/contracts";
+import { stepFailed, StepOutcome, type ElementProbe, type StepByType } from "@revisum/contracts";
 import { canonicalJson } from "../../../hashing.ts";
 import { checkElement as judgeElement, domReadFor } from "../../../oracle.ts";
 import { resolveElementAssertion, resolveLocator } from "../../../run-values.ts";
@@ -38,7 +32,7 @@ export const checkElement: StepExecutor<StepByType["expect"]> = async (step, con
     }
     const isFilledFromSecret = context.secretFilledFields.has(canonicalJson(locator.value));
     return {
-        ...stepFailed(verdict.code ?? StepCode.AssertionFailed),
+        ...stepFailed(verdict.code),
         observed: observe(seen.last, context, isFilledFromSecret),
     };
 };

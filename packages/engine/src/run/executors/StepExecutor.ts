@@ -13,11 +13,10 @@ export type SessionContext = RunContext & { readonly session: Session };
 export type StepRecord = Omit<StepResult, "index" | "type">;
 
 // Runs the steps a frame or a second tab holds, in the document they stand in, and gives the
-// container's result. Handed to the executors in their context, so a recursive step never imports
-// the run that runs it.
+// container's result, under the container's own index. Handed to the executors in their context, so
+// a recursive step never imports the run that runs it.
 export type RunInnerSteps = (
     container: ContainerRunStep,
-    index: number,
     document: DocumentSession,
 ) => Promise<StepResult>;
 

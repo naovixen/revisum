@@ -1,6 +1,6 @@
 // What a plan reaches beyond the browser, anywhere in it, its cleanup included.
 import type { Plan } from "@revisum/contracts";
-import { everyPlanStep } from "./plan-parser.ts";
+import { everyPlanStep } from "./VisitSteps.ts";
 import { STEP_FACTS, StepSection } from "./StepFacts.ts";
 
 const holdsStepOf = (plan: Plan, section: StepSection): boolean =>

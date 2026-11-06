@@ -55,5 +55,5 @@ export const checkPage: StepExecutor<StepByType["expectPage"]> = async (step, co
     const observed = context.isShortSecret(seen.title)
         ? SECRET_PLACEHOLDER
         : context.redactor.text(seen.title);
-    return { ...stepFailed(verdict.code ?? StepCode.AssertionFailed), observed };
+    return { ...stepFailed(verdict.code), observed };
 };

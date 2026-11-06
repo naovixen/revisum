@@ -22,6 +22,12 @@ import type { StepContext, StepExecutor, StepRecord } from "../StepExecutor.ts";
 
 type RememberStep = StepByType["remember"];
 
+// What one look at the page gives: an element's check, or text that is empty, which a later look
+// may fill.
+type RememberVerdict =
+    Verdict | { readonly pass: false; readonly code: typeof StepCode.ValueEmpty };
+const EMPTY: RememberVerdict = { pass: false, code: StepCode.ValueEmpty };
+
 // The text one element gives: its normalised text or input value, or one attribute exactly as the
 // page holds it.
 function textOf(element: OneElementRead, from: RememberedElementSource): string {
@@ -57,17 +63,17 @@ async function rememberFromPage(
             ? { kind: DomReadKind.Attribute, name: from.attribute }
             : null;
     const seen = { text: "" };
-    const verdict = await poll(context, context.document, async (): Promise<Verdict> => {
+    const verdict = await poll(context, context.document, async (): Promise<RememberVerdict> => {
         const found = oneElementOf(await context.document.probe(locator.value, read));
         if (!found.ok) {
             return { pass: false, code: found.error };
         }
         seen.text = textOf(found.value, from);
-        return { pass: seen.text !== "", code: null };
+        return seen.text === "" ? EMPTY : { pass: true };
     });
     // A remember step keeps no observation, so a stopped check and the check's own answer fail it alike.
     if (!verdict.pass) {
-        return stepFailed(verdict.code ?? StepCode.ValueEmpty);
+        return stepFailed(verdict.code);
     }
     const kept = context.remembered.remember(step.name, seen.text, context.index);
     return kept.ok

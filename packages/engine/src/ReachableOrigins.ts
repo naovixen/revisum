@@ -1,24 +1,31 @@
 // Which of the project's production origins a cleared run may reach. Production is closed to every
 // run unless the plan is approved and the project's policy allows production for approved plans.
-import type { BaseUrl } from "@revisum/contracts";
+import type { BaseUrl, Step } from "@revisum/contracts";
+import { isStepIn, StepSection } from "./plan/StepFacts.ts";
 import { visitSteps } from "./plan/VisitSteps.ts";
 import type { ClearedRun } from "./policy/ClearedRun.ts";
 import { isProductionAllowed } from "./policy/IsProductionAllowed.ts";
+import type { Project } from "./project/project-parser.ts";
 import { declaredCommands } from "./project/unsafe-feature-declarations.ts";
+
+// The service a call or a database command names in its declaration; undefined for any other step.
+function declaredServiceOf(step: Step, project: Project): string | undefined {
+    if (isStepIn(step, StepSection.ServiceCalls)) {
+        return Object.entries(project.calls).find(([name]) => name === step.call)?.[1].service;
+    }
+    if (isStepIn(step, StepSection.DatabaseCommands)) {
+        return Object.entries(declaredCommands(project.unsafeFeatures)).find(
+            ([name]) => name === step.command,
+        )?.[1].service;
+    }
+    return undefined;
+}
 
 // The origins of the services the plan's calls and database commands reach, its cleanup included.
 function serviceOrigins({ plan, project }: ClearedRun): string[] {
     const steps = [...plan.steps, ...(plan.cleanup ?? [])];
-    const commands = declaredCommands(project.unsafeFeatures);
     return steps.flatMap((step) => {
-        let serviceName: string | undefined;
-        if (step.type === "call" || step.type === "expectBackend") {
-            serviceName = Object.entries(project.calls).find(([name]) => name === step.call)?.[1]
-                .service;
-        } else if (step.type === "database" || step.type === "expectDatabase") {
-            serviceName = Object.entries(commands).find(([name]) => name === step.command)?.[1]
-                .service;
-        }
+        const serviceName = declaredServiceOf(step, project);
         const service = project.services.find((candidate) => candidate.name === serviceName);
         return service === undefined ? [] : [service.origin];
     });

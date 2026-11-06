@@ -1,5 +1,6 @@
 // How the policy gate reads a URL's path: the way servers commonly read it, so no spelling of a
 // destructive path slips past.
+import type { AllowedUrl } from "@revisum/contracts";
 import type { ProjectPolicy } from "../project/project-parser.ts";
 
 // Only used to read the path of a URL that is relative to the app under test.
@@ -90,10 +91,14 @@ export function isDestructivePath(path: string, policy: ProjectPolicy): boolean 
     });
 }
 
-// The URL a plan or a link names, read once. Relative URLs have no origin of their own.
-export function readUrl(
-    url: string,
-): { readonly origin: string | null; readonly path: string } | null {
+// A URL as the policy gate reads it. A relative URL has no origin of its own.
+export type ReadUrl = { readonly origin: string | null; readonly path: string };
+
+// The URL a plan or a link names, read once. One the plan parser accepted always reads; other text
+// may not, and is then null.
+export function readUrl(url: AllowedUrl): ReadUrl;
+export function readUrl(url: string): ReadUrl | null;
+export function readUrl(url: string): ReadUrl | null {
     try {
         const parsed = new URL(url, RELATIVE_BASE);
         return {

@@ -12,7 +12,8 @@ import { isOneOf } from './plan-decoders.ts';
 import {
   DATABASE_COMMAND_FEATURE, DOM_CHECKS_FEATURE, INLINE_SCRIPT_FEATURE, LOCATOR_FEATURES, NAMED_SCRIPT_FEATURE,
 } from './plan-grammar.ts';
-import { stepsWithin, visitSteps } from './VisitSteps.ts';
+import { isStepIn, StepSection } from './StepFacts.ts';
+import { everyPlanStep, visitSteps } from './VisitSteps.ts';
 
 // One use of an unsafe feature, at the JSON path of the field that names it.
 export type UnsafeConstruct = { readonly feature: UnsafeFeature; readonly path: string };
@@ -81,9 +82,9 @@ export function unsafeFeaturesOf(plan: Plan): readonly UnsafeFeature[] {
 export function declarationsNamedBy(plan: Plan): { readonly scripts: readonly ScriptName[]; readonly commands: readonly CommandName[] } {
   const scripts = new Set<ScriptName>();
   const commands = new Set<CommandName>();
-  for (const step of [...stepsWithin(plan.steps), ...(plan.cleanup ?? [])]) {
-    if ((step.type === 'evaluate' || step.type === 'expectScript') && typeof step.script === 'string') scripts.add(step.script);
-    if (step.type === 'database' || step.type === 'expectDatabase') commands.add(step.command);
+  for (const step of everyPlanStep(plan)) {
+    if (isStepIn(step, StepSection.PageScripts) && typeof step.script === 'string') scripts.add(step.script);
+    if (isStepIn(step, StepSection.DatabaseCommands)) commands.add(step.command);
   }
   return { scripts: [...scripts], commands: [...commands] };
 }

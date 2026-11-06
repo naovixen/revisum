@@ -170,6 +170,14 @@ const SHIFTED_DAY = record([
   field('days', DIGITS), countedWord('days', 'day', 'days'), field('direction', oneOf(['after', 'before'])), field('anchor', ANCHOR),
 ]);
 
+// Days after the anchor count forward and days before it back. No day either way is 0, never -0.
+function signedDays(days: number, direction: unknown): number {
+  if (days === 0 || direction === 'after') {
+    return days;
+  }
+  return -days;
+}
+
 // A day relative to an anchor. The writer writes addDays 0 as the anchor alone, 1 as "1 day after"
 // and others as "<n> days after" or "<n> days before".
 const DAY: Syntax = {
@@ -180,7 +188,7 @@ const DAY: Syntax = {
     if (!shifted.ok) return { ok: false, failure: better(anchorAlone.failure, shifted.failure) ?? shifted.failure };
     const parts = isRecord(shifted.value) ? shifted.value : {};
     const days = typeof parts['days'] === 'number' ? parts['days'] : 0;
-    const addDays = days === 0 ? 0 : parts['direction'] === 'after' ? days : -days;
+    const addDays = signedDays(days, parts['direction']);
     return { ...shifted, value: { [FROM_FIELD]: parts['anchor'], addDays } };
   },
   write(value) {
@@ -351,7 +359,8 @@ const sourceBlock = (...parts: readonly RecordPart[]): SourceBlockForm => ({ sou
 // criterionId comes from the Criterion: line before it, a frame's or tab's steps from the indented
 // block after it, and an inline script's source from its source block. Every check starts with
 // "Expect", and only checks do.
-const STEP_FORMS: { readonly [Type in StepType]: readonly (readonly RecordPart[] | SourceBlockForm)[] } = {
+type StepForm = readonly RecordPart[] | SourceBlockForm;
+const STEP_FORMS: { readonly [Type in StepType]: readonly StepForm[] } = {
   navigate: [[words('Go to'), field('url', NAVIGATION), optional(field('scripts', wordsFor(SCRIPT_MODE_WORDS)))]],
   click: [[words('Click'), field('locator', LOCATOR)]],
   download: [[words('Download'), field('name', TEXT), words('by clicking'), field('locator', LOCATOR)]],
@@ -406,12 +415,18 @@ export type StatementBlock = 'steps' | 'source';
 // inline page script.
 type StepStatement = { readonly type: StepType; readonly syntax: Syntax; readonly opens: StatementBlock | undefined };
 
-const opensSteps = (type: StepType): boolean => STEP_FACTS[type].fields.required.includes('steps');
+// A source block's statement opens its source lines; any other opens its type's own steps, if it
+// holds any.
+function blockOpenedBy(type: StepType, form: StepForm): StatementBlock | undefined {
+  if ('sourceBlock' in form) {
+    return 'source';
+  }
+  return STEP_FACTS[type].holdsSteps ? 'steps' : undefined;
+}
 
 export const STEP_STATEMENTS: readonly StepStatement[] = STEP_TYPES.flatMap((type) => STEP_FORMS[type].map((form): StepStatement => {
   const parts = 'sourceBlock' in form ? form.sourceBlock : form;
-  const opens = 'sourceBlock' in form ? 'source' : opensSteps(type) ? 'steps' : undefined;
-  return { type, syntax: record([constant('type', type), ...parts, END]), opens };
+  return { type, syntax: record([constant('type', type), ...parts, END]), opens: blockOpenedBy(type, form) };
 }));
 
 // ---- The unsafe mark --------------------------------------------------------------------------------

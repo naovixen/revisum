@@ -13,5 +13,5 @@ export const enterFrame: StepExecutor<RunStepByType["frame"]> = async (step, con
     if (!entered.ok) {
         return stepFailed(entered.error.code);
     }
-    return context.runInnerSteps(step, context.index, entered.value);
+    return context.runInnerSteps(step, entered.value);
 };

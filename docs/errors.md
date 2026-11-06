@@ -659,7 +659,12 @@ Policy error. A plan with no approval holds an inline page script: its source an
 
 ## origin-not-allowed
 
-Run refusal. The run would reach one of the project's production origins, which only an approved plan may reach, and only when the project allows production for approved plans. The refusal names the origin. No browser was opened. Not the plan error `origin_not_allowed`.
+Run refusal, for either of two reasons, checked in this order before anything else:
+
+- The run's base URL is on an origin the project does not declare. Every relative path in the plan resolves against the base URL, and the browser may reach only the project's origins, so each relative navigate would fail part way through the run. Run against a base URL on a declared origin, or add the origin to the trusted project configuration.
+- The run would reach one of the project's production origins, which only an approved plan may reach, and only when the project allows production for approved plans.
+
+The refusal names the origin. No browser was opened. Not the plan error `origin_not_allowed`.
 
 Step error, too. A `navigate` or `newTab` step's final URL is on an origin the project does not allow, so nothing was loaded and every later step is skipped. Use a path on an allowed origin, or add the origin to the trusted project configuration.
 

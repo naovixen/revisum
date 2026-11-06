@@ -11,12 +11,11 @@ import {
 // element can ever match and waiting is pointless.
 // page-unreadable and dialog-open: the probe could not read the page, so nothing is known of it.
 // navigation-failed: the browser shows its own error page, so the page never loaded.
-export type Verdict = {
-  readonly pass: boolean;
-  readonly code: 'not-found' | 'ambiguous' | 'assertion-failed' | 'state-not-exposed' | 'selector-invalid' | 'navigation-failed' | UnreadablePage | null;
-};
+type CheckFailure = 'not-found' | 'ambiguous' | 'assertion-failed' | 'state-not-exposed' | 'selector-invalid' | 'navigation-failed' | UnreadablePage;
+// A check that passed, or one that failed and says why.
+export type Verdict = { readonly pass: true } | { readonly pass: false; readonly code: CheckFailure };
 
-const PASSED: Verdict = { pass: true, code: null };
+const PASSED: Verdict = { pass: true };
 const FAILED: Verdict = { pass: false, code: 'assertion-failed' };
 const STATE_NOT_EXPOSED: Verdict = { pass: false, code: 'state-not-exposed' };
 const NAVIGATION_FAILED: Verdict = { pass: false, code: 'navigation-failed' };

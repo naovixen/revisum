@@ -1,5 +1,5 @@
 // Preflight: the checks that refuse a cleared run before any side effect, in one fixed order: a
-// production origin the run may not reach, a missing secret, a page script whose source is missing,
+// base URL on an origin the project does not declare, a production origin the run may not reach, a missing secret, a page script whose source is missing,
 // services or database commands the plan needs with nothing to run them, a saved storage state, and
 // an element check no driver decides. Each reads only the cleared run and what the run was handed,
 // so a refusal leaves nothing behind: no browser opened, no call sent, no command run. A run that
@@ -27,7 +27,7 @@ import {
 import type { Refusal } from "./lifecycle.ts";
 import { namedScriptSources, type NamedScripts } from "./page-scripts/NamedScriptSources.ts";
 import { callsServices, runsDatabaseCommands } from "./plan/CallsServices.ts";
-import { everyPlanStep } from "./plan/plan-parser.ts";
+import { everyPlanStep } from "./plan/VisitSteps.ts";
 import type { ClearedRun } from "./policy/ClearedRun.ts";
 import { isProductionAllowed } from "./policy/IsProductionAllowed.ts";
 import type { Project } from "./project/project-parser.ts";
@@ -80,6 +80,15 @@ const NO_COMMAND_RUNNER: DatabaseCommandRunner = {
 
 type PreflightCheck = (facts: PreflightFacts) => Refusal | undefined;
 
+// A plan's relative paths resolve against the base URL, and the browser may reach only the project's
+// origins, so on any other origin every relative navigate would fail part way through the run.
+const refuseBaseUrlOffProject: PreflightCheck = (facts) => {
+    const origin = new URL(facts.baseUrl).origin;
+    return facts.cleared.project.origins.some((declared) => declared === origin)
+        ? undefined
+        : { code: "origin-not-allowed", origin };
+};
+
 const refuseProductionOrigin: PreflightCheck = (facts) => {
     const origin = isProductionAllowed(facts.cleared.standing, facts.cleared.project.policy)
         ? undefined
@@ -112,8 +121,8 @@ const refuseUnwiredDatabaseCommands: PreflightCheck = (facts) =>
         ? { code: "database-commands-unavailable" }
         : undefined;
 
-// A result reports the first refusal, so this order is part of the behaviour: a production origin
-// first, then a missing secret, then a page script's missing source, then the rest in this order.
+// A result reports the first refusal, so this order is part of the behaviour: a base URL off the
+// project's origins first, then a production origin, then a missing secret, then a page script's missing source, then the rest in this order.
 const CHECKS_AFTER_SCRIPTS: readonly PreflightCheck[] = [
     refuseUnwiredServices,
     refuseStorageState,
@@ -148,7 +157,7 @@ function passedOrRefused(
     facts: PreflightFacts,
     secrets: Result<PlanSecrets, SecretName>,
 ): Result<PreflightPassed, Refusal> {
-    const origin = refuseProductionOrigin(facts);
+    const origin = firstRefusal([refuseBaseUrlOffProject, refuseProductionOrigin], facts);
     if (origin !== undefined) {
         return failure(origin);
     }
