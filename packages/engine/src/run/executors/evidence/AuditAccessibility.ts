@@ -25,10 +25,10 @@ export const auditAccessibility: StepExecutor<StepByType["a11yAudit"]> = async (
     }
     const findings = [...audited.value].sort(byRuleId);
     context.logger.log({ kind: "audit", stepIndex: context.index, findings: findings.length });
-    const isGateFailed = step.mode === AuditMode.Gate && findings.length > 0;
-    return {
-        outcome: isGateFailed ? StepOutcome.Failed : StepOutcome.Passed,
-        findings,
-        ...(isGateFailed ? { code: StepCode.AccessibilityViolations } : {}),
-    };
+    if (step.mode === AuditMode.Report || findings.length === 0) {
+        return { outcome: StepOutcome.Passed, findings };
+    }
+    // Findings stand before the code, as results have always recorded them.
+    const { outcome, code } = stepFailed(StepCode.AccessibilityViolations);
+    return { outcome, findings, code };
 };

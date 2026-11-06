@@ -36,7 +36,7 @@ import { targetNotDeclared, type TargetNotDeclared } from './TargetNotDeclared.t
 import { everyIrreversiblePattern, patternsForLocale } from './irreversible-patterns.ts';
 import { callRuleBeforeRun, ruleBeforeRun, ruleDuringRun, type StaticContext } from './StepRules.ts';
 import { everyPlanStep, visitSteps } from '../plan/VisitSteps.ts';
-import { isStepIn, StepSection } from '../plan/StepFacts.ts';
+import { frameDepthAddedBy, holdsSteps, isStepIn, StepSection } from '../plan/StepFacts.ts';
 import { secretsNamedBy } from '../plan/SecretsNamedBy.ts';
 
 // What the gate gives a plan it allows for one target id: a cleared run when both the plan and the
@@ -90,11 +90,11 @@ function everyStep(steps: readonly Step[]): { readonly step: Step; readonly inde
 // The same limits the plan parser applies, checked again against the trusted project, so a plan
 // parsed under looser settings is still held to the trusted ones.
 function isOverLimit(plan: Plan, limits: Limits): boolean {
-  // Frame depth counts from the tab, so a second tab's steps start at the depth of its own list.
   const listTooLong = (steps: readonly Step[], depth: number): boolean =>
     steps.length > limits.maximumSteps
-    || steps.some((step) => (step.type === 'frame' && (depth + 1 > limits.maximumFrameDepth || listTooLong(step.steps, depth + 1)))
-      || (step.type === 'newTab' && listTooLong(step.steps, depth)));
+    || steps.some((step) => holdsSteps(step) && innerTooDeepOrLong(step.steps, depth + frameDepthAddedBy(step)));
+  const innerTooDeepOrLong = (steps: readonly Step[], depth: number): boolean =>
+    depth > limits.maximumFrameDepth || listTooLong(steps, depth);
   const bytes = new TextEncoder().encode(JSON.stringify(plan)).length;
   const scripts = everyStep(plan.steps).filter(({ step }) => isStepIn(step, StepSection.PageScripts));
   const calls = callingSteps(plan).filter(({ step }) => isStepIn(step, StepSection.ServiceCalls, StepSection.DatabaseCommands));

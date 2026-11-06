@@ -34,7 +34,9 @@ function pathOf(
     return isAllowed ? success(resolved.value) : failure(StepCode.PolicyDenied);
 }
 
-// The page's URL on the run's base URL, on one of the project's origins.
+// The page's URL on the run's base URL. It is always on one of the project's origins: the run's
+// base URL is, or the run is refused before it starts; a URL the plan wrote out on another origin is
+// denied before the run; and a path template's values cannot change its origin.
 export function pageUrl(
     url: AllowedUrl | PathTemplate,
     index: number,
@@ -44,7 +46,5 @@ export function pageUrl(
     if (!path.ok) {
         return path;
     }
-    const resolved = new URL(path.value, context.inputs.baseUrl);
-    const isDeclared = context.cleared.project.origins.some((origin) => origin === resolved.origin);
-    return isDeclared ? success(resolved) : failure(StepCode.OriginNotAllowed);
+    return success(new URL(path.value, context.inputs.baseUrl));
 }

@@ -60,23 +60,31 @@ export type StepFact<Field extends string = string> = {
     readonly isSetup: boolean;
     // A frame or a second tab: its `steps` field holds steps of its own.
     readonly holdsSteps: boolean;
+    // How many frames deeper than the step itself its own steps stand, counted against the
+    // project's frame depth limit: 1 for a frame, 0 for any other step.
+    readonly frameDepthAdded: number;
+    // A navigate step or a second tab: its `url` field names a page the browser opens.
+    readonly opensUrl: boolean;
 };
 
 // One fact per step type, each naming only fields its steps have.
 type StepFactTable = { readonly [Type in StepType]: StepFact<FieldOf<Type>> };
 
-// A fact as the builders below make it, with its section and whether it holds steps kept exact, so
-// the step types of a section, and those that hold steps, are typed from the table itself.
+// A fact as the builders below make it, with its section, whether it holds steps and whether it
+// opens a URL kept exact, so the step types of a section, those that hold steps and those that open
+// a URL are typed from the table itself.
 type BuiltFact<
     Section extends StepSection,
     Field extends string,
     HoldsSteps extends boolean,
-> = Omit<StepFact, "section" | "fields" | "holdsSteps"> & {
+    OpensUrl extends boolean = false,
+> = Omit<StepFact, "section" | "fields" | "holdsSteps" | "opensUrl"> & {
     readonly section: Section;
     readonly fields: StepFields<Field>;
     readonly holdsSteps: HoldsSteps;
+    readonly opensUrl: OpensUrl;
 };
-type AnyBuiltFact = BuiltFact<StepSection, string, boolean>;
+type AnyBuiltFact = BuiltFact<StepSection, string, boolean, boolean>;
 
 const anywhere = <Section extends StepSection, Field extends string>(
     section: Section,
@@ -89,6 +97,8 @@ const anywhere = <Section extends StepSection, Field extends string>(
     placement: StepPlacement.Anywhere,
     isSetup: false,
     holdsSteps: false,
+    frameDepthAdded: 0,
+    opensUrl: false,
 });
 
 // Every assertion carries the criterion it checks.
@@ -103,16 +113,24 @@ const assertion = <Section extends StepSection, Field extends string>(
     placement,
     isSetup: false,
     holdsSteps: false,
+    frameDepthAdded: 0,
+    opensUrl: false,
 });
 
-// Its `steps` field comes after its others.
+// Its `steps` field comes after its others, and they stand `frameDepthAdded` frames deeper than it.
 const holdingSteps = <Section extends StepSection, Field extends string>(
     section: Section,
     required: readonly Field[],
+    frameDepthAdded: number,
 ): BuiltFact<Section, "type" | Field | "steps", true> => ({
     ...anywhere(section, [...required, "steps"]),
     holdsSteps: true,
+    frameDepthAdded,
 });
+
+const openingUrl = <Fact extends AnyBuiltFact>(
+    fact: Fact,
+): Omit<Fact, "opensUrl"> & { readonly opensUrl: true } => ({ ...fact, opensUrl: true });
 
 const placedAt = <Fact extends AnyBuiltFact>(placement: StepPlacement, fact: Fact): Fact => ({
     ...fact,
@@ -123,14 +141,14 @@ const settingUp = <Fact extends AnyBuiltFact>(fact: Fact): Fact => ({ ...fact, i
 
 // In the order the published JSON Schema and the readable forms list the step types.
 const FACTS = {
-    navigate: anywhere(StepSection.Navigation, ["url"], ["scripts"]),
+    navigate: openingUrl(anywhere(StepSection.Navigation, ["url"], ["scripts"])),
     click: anywhere(StepSection.Actions, ["locator"]),
     hover: anywhere(StepSection.Actions, ["locator"]),
     fill: anywhere(StepSection.Actions, ["locator", "value"]),
     select: anywhere(StepSection.Actions, ["locator", "option"]),
     upload: anywhere(StepSection.Actions, ["locator", "fixture"]),
     press: anywhere(StepSection.Actions, ["locator", "key"], ["modifiers"]),
-    frame: holdingSteps(StepSection.FramesAndTabs, ["locator"]),
+    frame: holdingSteps(StepSection.FramesAndTabs, ["locator"], 1),
     dialog: anywhere(StepSection.Actions, ["action"], ["expectText"]),
     expect: assertion(StepSection.PageChecks, ["locator", "assert"]),
     expectPage: assertion(StepSection.PageChecks, ["assert"]),
@@ -139,7 +157,11 @@ const FACTS = {
     remember: anywhere(StepSection.PageChecks, ["name", FROM_FIELD]),
     download: anywhere(StepSection.Downloads, ["name", "locator"]),
     expectDownload: assertion(StepSection.Downloads, ["download", "assert"]),
-    newTab: placedAt(StepPlacement.TopLevel, holdingSteps(StepSection.FramesAndTabs, ["url"])),
+    // A second tab's steps count frames from the depth of the list it stands in.
+    newTab: placedAt(
+        StepPlacement.TopLevel,
+        openingUrl(holdingSteps(StepSection.FramesAndTabs, ["url"], 0)),
+    ),
     call: placedAt(
         StepPlacement.TopLevelOrCleanup,
         settingUp(anywhere(StepSection.ServiceCalls, ["call", "arguments"], ["remember"])),
@@ -183,6 +205,11 @@ export type StepTypeIn<Section extends StepSection> = {
 // The step types that hold steps of their own, read from the table.
 export type ContainerStepType = {
     [Type in StepType]: (typeof FACTS)[Type]["holdsSteps"] extends true ? Type : never;
+}[StepType];
+
+// The step types that open a URL, read from the table.
+export type UrlOpeningStepType = {
+    [Type in StepType]: (typeof FACTS)[Type]["opensUrl"] extends true ? Type : never;
 }[StepType];
 
 const stepTypesWhere = (isWanted: (fact: StepFact) => boolean): readonly StepType[] =>
@@ -229,6 +256,13 @@ export const isStepIn = <Section extends StepSection>(
 // True for a frame or a second tab.
 export const holdsSteps = (step: Step): step is StepByType[ContainerStepType] =>
     STEP_FACTS[step.type].holdsSteps;
+
+// True for a navigate step or a second tab.
+export const opensUrl = (step: Step): step is StepByType[UrlOpeningStepType] =>
+    STEP_FACTS[step.type].opensUrl;
+
+// How many frames deeper than the step its own steps stand.
+export const frameDepthAddedBy = (step: Step): number => STEP_FACTS[step.type].frameDepthAdded;
 
 // True when a failed step of this type means the run could not test.
 export const isSetupStepType = (type: StepType): boolean => STEP_FACTS[type].isSetup;
