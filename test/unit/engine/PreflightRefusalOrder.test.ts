@@ -1,6 +1,12 @@
 // Every "can this run at all" check is made before any side effect, in one fixed order, and a run
 // that fails several reports the first. Each pair here is two neighbouring checks a run fails at
 // once: the refusal is always the earlier one's, and no driver is asked anything.
+//
+// The policy gate keeps a production origin out of every step and call, so only a base URL brings
+// one to preflight, and a base URL fails both origin checks at once only when it is a production
+// origin the project does not list, where both name that one origin. The base URL check is paired
+// with the first check after the production origin instead, and a run failing several conditions
+// takes the base URL of the earliest.
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import { planParser, run, type RunPorts, type RunResult } from "@revisum/engine";
@@ -26,6 +32,7 @@ import {
 } from "./unsafe-feature-steps.ts";
 
 const PRODUCTION_ORIGIN = "https://shop.example.com";
+const UNDECLARED_ORIGIN = "https://elsewhere.example.org";
 const TOKEN = "SHOP_API_TOKEN";
 const SAVED_SESSION = "SAVED_SESSION";
 
@@ -43,7 +50,10 @@ const EVERY_SECRET: Readonly<Record<string, string>> = {
 
 // One reason a run cannot go ahead: what the plan holds and what the run is handed to fail it.
 type Condition = {
+    readonly check: string;
     readonly code: string;
+    // The origin a refusal of this check names, so two checks refusing with one code tell apart.
+    readonly origin?: string;
     readonly steps?: readonly JsonRecord[];
     readonly planFields?: JsonRecord;
     readonly baseUrl?: string;
@@ -55,8 +65,20 @@ type Condition = {
 
 // In the order the run checks them.
 const CONDITIONS: readonly Condition[] = [
-    { code: "origin-not-allowed", baseUrl: PRODUCTION_ORIGIN },
     {
+        check: "base URL off the project's origins",
+        code: "origin-not-allowed",
+        origin: UNDECLARED_ORIGIN,
+        baseUrl: `${UNDECLARED_ORIGIN}/app/`,
+    },
+    {
+        check: "production origin",
+        code: "origin-not-allowed",
+        origin: PRODUCTION_ORIGIN,
+        baseUrl: PRODUCTION_ORIGIN,
+    },
+    {
+        check: "secret",
         code: "secret-missing",
         steps: [
             {
@@ -67,17 +89,25 @@ const CONDITIONS: readonly Condition[] = [
         ],
         missingSecret: TOKEN,
     },
-    { code: "script-source-missing", steps: [SEED_EDITOR], withoutScriptSources: true },
     {
+        check: "page script source",
+        code: "script-source-missing",
+        steps: [SEED_EDITOR],
+        withoutScriptSources: true,
+    },
+    {
+        check: "services",
         code: "services-unavailable",
         steps: [{ type: "call", call: "resetShop", arguments: {} }],
         withoutServices: true,
     },
     {
+        check: "storage state",
         code: "storage-state-unsupported",
         planFields: { storageState: { secretName: SAVED_SESSION } },
     },
     {
+        check: "element check",
         code: "element-check-unsupported",
         steps: [
             {
@@ -88,10 +118,24 @@ const CONDITIONS: readonly Condition[] = [
             },
         ],
     },
-    { code: "database-commands-unavailable", steps: [SEED_ORDERS], withoutDatabaseCommands: true },
+    {
+        check: "database commands",
+        code: "database-commands-unavailable",
+        steps: [SEED_ORDERS],
+        withoutDatabaseCommands: true,
+    },
 ];
 
-const ALL_CODES = CONDITIONS.map((condition) => condition.code);
+const [FIRST_CHECK = assert.fail("there is a first check")] = CONDITIONS;
+
+// Refused by this condition's check: its code, and the origin it names when it names one.
+const assertRefusedBy = (result: RunResult, condition: Condition): void => {
+    assert.equal(result.state, "Refused", JSON.stringify(result));
+    assert.equal(result.refusal?.code, condition.code, JSON.stringify(result.refusal));
+    if (condition.origin !== undefined) {
+        assert.deepEqual(result.refusal, { code: condition.code, origin: condition.origin });
+    }
+};
 
 function portsFor(
     conditions: readonly Condition[],
@@ -130,7 +174,9 @@ async function runFailing(
     const cleared = clearRun(plan, await trustedProjectFrom(PROJECT_FILE), targetId);
     const driver = fakeDriverNeverLaunching();
     const baseUrl =
-        conditions.find((condition) => condition.baseUrl !== undefined)?.baseUrl ?? ORIGIN;
+        CONDITIONS.find(
+            (condition) => conditions.includes(condition) && condition.baseUrl !== undefined,
+        )?.baseUrl ?? ORIGIN;
     const result = await run(
         cleared,
         {
@@ -150,12 +196,11 @@ async function runFailing(
 
 describe("Using the run", () => {
     for (const condition of CONDITIONS) {
-        describe(`given a plan that fails only the ${condition.code} check`, () => {
+        describe(`given a plan that fails only the ${condition.check} check`, () => {
             describe("when the run starts", () => {
                 test(`then it should refuse it with ${condition.code}, asking no driver anything`, async () => {
                     const { result, driverCalls } = await runFailing([condition]);
-                    assert.equal(result.state, "Refused", JSON.stringify(result));
-                    assert.equal(result.refusal?.code, condition.code);
+                    assertRefusedBy(result, condition);
                     assert.equal(driverCalls, 0);
                 });
             });
@@ -163,15 +208,18 @@ describe("Using the run", () => {
     }
 
     for (const [index, earlier] of CONDITIONS.entries()) {
-        const later = CONDITIONS[index + 1];
+        // One run has one base URL, so two conditions that each set it never pair.
+        const later = CONDITIONS.slice(index + 1).find(
+            (condition) => earlier.baseUrl === undefined || condition.baseUrl === undefined,
+        );
         if (later === undefined) {
             continue;
         }
-        describe(`given a plan that fails the ${earlier.code} and ${later.code} checks`, () => {
+        describe(`given a plan that fails the ${earlier.check} and ${later.check} checks`, () => {
             describe("when the run starts", () => {
-                test(`then it should refuse it with ${earlier.code}, the check made first`, async () => {
+                test(`then it should refuse it with ${earlier.code}, the ${earlier.check} check made first`, async () => {
                     const { result, driverCalls } = await runFailing([later, earlier]);
-                    assert.equal(result.refusal?.code, earlier.code, JSON.stringify(result));
+                    assertRefusedBy(result, earlier);
                     assert.equal(driverCalls, 0);
                 });
             });
@@ -180,9 +228,9 @@ describe("Using the run", () => {
 
     describe("given a plan that fails every check", () => {
         describe("when the run starts", () => {
-            test(`then it should refuse it with ${ALL_CODES[0] ?? "the first check"}`, async () => {
+            test(`then it should refuse it with ${FIRST_CHECK.code}, the ${FIRST_CHECK.check} check`, async () => {
                 const { result } = await runFailing(CONDITIONS.toReversed());
-                assert.equal(result.refusal?.code, ALL_CODES[0]);
+                assertRefusedBy(result, FIRST_CHECK);
             });
         });
     });
