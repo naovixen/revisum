@@ -1,6 +1,7 @@
 // Which of the project's production origins a cleared run may reach. Production is closed to every
 // run unless the plan is approved and the project's policy allows production for approved plans.
-import type { BaseUrl, Step } from "@revisum/contracts";
+import type { BaseUrl } from "@revisum/contracts";
+import { visitSteps } from "./plan/VisitSteps.ts";
 import type { ClearedRun } from "./policy/ClearedRun.ts";
 import { isProductionAllowed } from "./policy/IsProductionAllowed.ts";
 import { declaredCommands } from "./project/unsafe-feature-declarations.ts";
@@ -31,21 +32,12 @@ export function productionOriginReached(cleared: ClearedRun, baseUrl: BaseUrl): 
         return undefined;
     }
     const origins = [new URL(baseUrl).origin];
-    const visit = (steps: readonly Step[]): void => {
-        for (const step of steps) {
-            // A path template always stays on the base URL's origin, already in the list.
-            if (
-                (step.type === "navigate" || step.type === "newTab") &&
-                typeof step.url === "string"
-            ) {
-                origins.push(new URL(step.url, baseUrl).origin);
-            }
-            if (step.type === "frame" || step.type === "newTab") {
-                visit(step.steps);
-            }
+    visitSteps(cleared.plan.steps, (step) => {
+        // A path template always stays on the base URL's origin, already in the list.
+        if ((step.type === "navigate" || step.type === "newTab") && typeof step.url === "string") {
+            origins.push(new URL(step.url, baseUrl).origin);
         }
-    };
-    visit(cleared.plan.steps);
+    });
     origins.push(...serviceOrigins(cleared));
     return origins.find((origin) => production.has(origin));
 }

@@ -44,7 +44,8 @@ export type ServiceCallRecord = {
 
 // Why a call or backend-check step failed: a service call error, a run value with no text or
 // unsafe text, a secret the run never resolved, or a check that did not pass.
-export type CallStepCode = ServiceCallErrorCode | StepErrorCode | 'secret-missing' | 'assertion-failed' | 'unsupported-step';
+export type CallStepCode =
+  | ServiceCallErrorCode | StepErrorCode | typeof StepCode.SecretMissing | typeof StepCode.AssertionFailed | typeof StepCode.UnsupportedStep;
 type CallStepOutcome = {
   readonly outcome: 'passed' | 'failed';
   readonly code?: CallStepCode;
@@ -53,7 +54,7 @@ type CallStepOutcome = {
 
 // The codes of a call that got no answer from the service, not even through a gateway. A check then
 // learned nothing about the product, so the run could not test, in whatever step the call stood.
-export const NO_ANSWER_CODES: readonly string[] = ['service-unreachable', 'call-timeout'] satisfies readonly ServiceCallErrorCode[];
+export const NO_ANSWER_CODES: readonly string[] = [StepCode.ServiceUnreachable, StepCode.CallTimeout] satisfies readonly ServiceCallErrorCode[];
 
 // A cleanup step's record, naming its call or its database command. A failed one is always
 // cleanup-failed; `cause` says what failed.

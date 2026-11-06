@@ -14,7 +14,7 @@
 // hand under the declaration's limits. Neither the output nor a field's value is kept: the result
 // and the log record the output's sha256, and a remembered value's name and sha256.
 import {
-  failure, stepFailed, success,
+  failure, StepCode, stepFailed, success,
   type CommandName, type Clock, type DatabaseCommandDeclaration, type DatabaseCommandRequest, type DatabaseCommandRunner, type DatabaseStep,
   type DeclaredService, type ExpectDatabaseStep, type FieldName, type ParameterName, type Result, type ScriptArguments,
   type SecretStore, type ServiceName, type ValueName, type WorkloadErrorCode, type WorkloadOutcome, type WorkloadVariable,
@@ -41,8 +41,8 @@ const END_OF_OPTIONS = '--';
 // The codes a command's run may end with besides a check that did not pass. A workload error says
 // the command never started, such as image-missing.
 export const COMMAND_ERROR_CODES: readonly string[] = [
-  'command-failed', 'command-timeout', 'command-output-invalid',
-  'image-missing', 'image-digest-mismatch', 'egress-unenforceable', 'workload-start-failed',
+  StepCode.CommandFailed, StepCode.CommandTimeout, StepCode.CommandOutputInvalid,
+  StepCode.ImageMissing, StepCode.ImageDigestMismatch, StepCode.EgressUnenforceable, StepCode.WorkloadStartFailed,
 ] satisfies readonly (StepErrorCode | WorkloadErrorCode)[];
 
 // What a run keeps of a database step: the command, its service, how many times it ran, and of
@@ -60,7 +60,8 @@ export type DatabaseCommandRecord = {
 // an argument that does not fit, a field the output lacks, a secret the run never resolved, a
 // command the run's project does not declare, or a check that did not pass.
 export type DatabaseStepCode = StepErrorCode | WorkloadErrorCode
-  | 'parameter-invalid' | 'field-missing' | 'secret-missing' | 'egress-blocked' | 'assertion-failed';
+  | typeof StepCode.ParameterInvalid | typeof StepCode.FieldMissing | typeof StepCode.SecretMissing | typeof StepCode.EgressBlocked
+  | typeof StepCode.AssertionFailed;
 
 // What one of these steps gives its step result. A step that remembers one value records it as
 // `remembered`; one that remembers several records them all in `rememberedValues`.

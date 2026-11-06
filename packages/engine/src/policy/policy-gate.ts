@@ -20,21 +20,23 @@
 // Both are deterministic and read nothing but their arguments and the project. Each denial appends
 // one plan.denied audit event whose code is the rule, so a denial leaves a record even when
 // nothing ran; a denial the audit sink failed to record is marked unrecorded.
-import { literalText, PolicyVerdictKind } from '@revisum/contracts';
+import { PolicyVerdictKind } from '@revisum/contracts';
 import type {
-  AllowedUrl, Authorised, CallArgument, DatabaseCommandStep, EventSink, GuardVerdict, Locale, Locator, PageScriptStep, PathTemplate, Plan, PlanDenial,
-  PolicyRuleId, RemoveStorageStep, ResolvedElement, SafeText, SecretName, ServiceCallStep, SetStorageStep, Step, StubStep, Target, TargetId,
+  Authorised, CallArgument, DatabaseCommandStep, EventSink, GuardVerdict, Locale, Plan, PlanDenial,
+  PolicyRuleId, ResolvedElement, SecretName, ServiceCallStep, Step, Target, TargetId,
 } from '@revisum/contracts';
 import { deriveActor, sourceActorId } from '../actor.ts';
 import { ownStanding, type PlanStanding } from '../approval/plan-standing.ts';
 import { planHash } from '../manifest.ts';
 import { unsafeFeaturesOf } from '../plan/unsafe-features.ts';
-import type { Limits, Project, ProjectPolicy } from '../project/project-parser.ts';
-import { declaredCommands, declaredScripts, enabledUnsafeFeatures } from '../project/unsafe-feature-declarations.ts';
+import type { Limits, Project } from '../project/project-parser.ts';
+import { declaredCommands, enabledUnsafeFeatures } from '../project/unsafe-feature-declarations.ts';
 import { ClearedRun, ClearedRunKind } from './ClearedRun.ts';
 import { isProductionAllowed } from './IsProductionAllowed.ts';
 import { targetNotDeclared, type TargetNotDeclared } from './TargetNotDeclared.ts';
-import { everyIrreversiblePattern, isAllowedName, isBlankName, matchesIrreversiblePattern, patternsForLocale } from './irreversible-patterns.ts';
+import { everyIrreversiblePattern, patternsForLocale } from './irreversible-patterns.ts';
+import { ruleBeforeRun, ruleDuringRun, type StaticContext } from './StepRules.ts';
+import { visitSteps } from '../plan/VisitSteps.ts';
 
 // What the gate gives a plan it allows for one target id: a cleared run when both the plan and the
 // project's matrix declare the target, and otherwise a TargetNotDeclared, on which nothing may run.
@@ -69,143 +71,17 @@ type Denial = { readonly rule: PolicyRuleId; readonly stepIndex: number | null }
 // The gate does not know who wrote the plan it denies, so its events carry no person.
 const POLICY_GATE_ACTOR = deriveActor(sourceActorId('policy gate'), 'unverified');
 
-// Keys that press a focused control or submit the form around a focused field. Held modifiers
-// do not change that: Control+Enter and Shift+Enter submit many forms, so a chord is judged by
-// its key alone.
-const ACTIVATING_KEYS: readonly string[] = ['Enter', 'Space'];
-
-// Only used to read the path of a URL that is relative to the app under test.
-const RELATIVE_BASE = new URL('https://relative.invalid');
-
-// How many times a path is decoded before the gate stops trusting what it can read of it. Each
-// layer of encoding takes one round, and the last round only confirms nothing changed.
-const MAXIMUM_DECODING_ROUNDS = 5;
-const RUN_OF_ESCAPES = /(?:%[0-9a-f]{2})+/giu;
-const UTF8 = new TextDecoder();
-
 // A plan is Authorised only here, as decide() clears it into its runs.
 const authorised = (plan: Plan): Authorised => plan as Authorised;
 
-// ---- Shared rules -------------------------------------------------------------------------------
-
-// Each run of valid escapes decoded on its own, so a malformed escape stays as written and stops
-// nothing. Bytes that are not UTF-8 become U+FFFD.
-const withEscapesDecoded = (path: string): string =>
-  path.replace(RUN_OF_ESCAPES, (run) => UTF8.decode(Uint8Array.from(run.split('%').slice(1), (escape) => Number.parseInt(escape, 16))));
-
-const comparableForm = (decoded: string): string =>
-  decoded.toLowerCase().replace(/;[^/]*/gu, '').replace(/\/+/gu, '/').replace(/\/$/u, '');
-
-// The path with its "." and ".." segments resolved, a path parameter on one included, as Tomcat reads
-// "..;x=1". Servers differ on whether "//" holds an empty segment that ".." climbs out of.
-function withoutDotSegments(path: string, isMergingSlashes: boolean): string {
-  const kept: string[] = [];
-  for (const segment of path.split('/').slice(1)) {
-    const name = segment.replace(/;.*$/u, '');
-    if (name === '..') {
-      kept.pop();
-    } else if (name !== '.' && (segment !== '' || !isMergingSlashes)) {
-      kept.push(segment);
-    }
-  }
-  return `/${kept.join('/')}`;
-}
-
-// A path compared the way servers commonly read it: percent-decoded through every layer,
-// case-insensitive, with path parameters and repeated and trailing slashes removed, so
-// "/Account//%2564elete;x=1/" still reads as /account/delete. A server may decode a path more than
-// once and only then resolve what is left, so `resolved` reads it with its dot segments resolved after
-// each round. `decoded` reads it without, as a server that decodes once does: resolving alone would
-// allow "/account/delete/%252e%252e/settings", which that server reads as under /account/delete.
-type ComparablePath = { readonly decoded: string; readonly resolved: readonly string[] };
-
-// Null when the path holds more layers than the gate will read.
-function comparablePath(path: string): ComparablePath | null {
-  let decoded = path;
-  let keepingSlashes = withoutDotSegments(path, false);
-  let mergingSlashes = withoutDotSegments(path, true);
-  for (let round = 0; round < MAXIMUM_DECODING_ROUNDS; round++) {
-    const next = withEscapesDecoded(decoded);
-    if (next === decoded) {
-      return { decoded: comparableForm(decoded), resolved: [comparableForm(keepingSlashes), comparableForm(mergingSlashes)] };
-    }
-    decoded = next;
-    keepingSlashes = withoutDotSegments(withEscapesDecoded(keepingSlashes), false);
-    mergingSlashes = withoutDotSegments(withEscapesDecoded(mergingSlashes), true);
-  }
-  return null;
-}
-
-// True when any reading of `path` is a destructive path or continues one after a "/". A path or
-// pattern too deeply encoded to read might be one, so it counts as one. A pattern names one route as
-// a person wrote it, so only its decoded form counts.
-function isDestructivePath(path: string, policy: ProjectPolicy): boolean {
-  const visited = comparablePath(path);
-  if (visited === null) {
-    return true;
-  }
-  const readings = [visited.decoded, ...visited.resolved];
-  return policy.destructiveUrlPatterns.some((pattern) => {
-    const destructive = comparablePath(pattern)?.decoded;
-    return destructive === undefined || readings.some((reading) => reading === destructive || reading.startsWith(`${destructive}/`));
-  });
-}
-
-// The URL a plan or a link names, read once. Relative URLs have no origin of their own.
-function readUrl(url: string): { readonly origin: string | null; readonly path: string } | null {
-  try {
-    const parsed = new URL(url, RELATIVE_BASE);
-    return { origin: parsed.origin === RELATIVE_BASE.origin ? null : parsed.origin, path: parsed.pathname };
-  } catch {
-    return null;
-  }
-}
-
-const isBlank = (text: string | null): boolean => text === null || isBlankName(text);
-
-// The accessible name a locator asks for, when the plan itself says it. A test id names no text,
-// and a value reference has none until the run; the runtime guard then sees the element's name.
-function locatorName(locator: Locator): string | null {
-  switch (locator.by) {
-    case 'role': return literalText(locator.name) ?? null;
-    case 'label': return literalText(locator.label) ?? null;
-    case 'text': return literalText(locator.text) ?? null;
-    case 'testId': case 'css': case 'xpath': return null;
-  }
-}
-
-// The selector or expression of a css or XPath locator; undefined for any other.
-function structuralQuery(locator: Locator): SafeText | undefined {
-  switch (locator.by) {
-    case 'css': return locator.selector;
-    case 'xpath': return locator.expression;
-    case 'role': case 'label': case 'text': case 'testId': return undefined;
-  }
-}
-
-// The part of a path template the plan fixes: its literal segments up to the first value. A
-// destructive path there is destructive whatever the values are; the runtime guard checks the
-// whole URL once the values are known.
-function literalPathOf(template: PathTemplate): string {
-  const literal: string[] = [];
-  for (const segment of template.segments) {
-    const text = literalText(segment);
-    if (text === undefined) break;
-    literal.push(text);
-  }
-  return `/${literal.join('/')}`;
-}
-
-// The URL a navigate step names, as far as the plan alone says it.
-const navigationUrl = (url: AllowedUrl | PathTemplate): string => (typeof url === 'string' ? url : literalPathOf(url));
-
 // The steps a plan holds, including those inside frames and second tabs, each with the index of
 // its top-level step. A second tab's steps are judged exactly as the first tab's would be.
-function everyStep(steps: readonly Step[], topIndex?: number): { readonly step: Step; readonly index: number }[] {
-  return steps.flatMap((step, index) => {
-    const own = { step, index: topIndex ?? index };
-    return step.type === 'frame' || step.type === 'newTab' ? [own, ...everyStep(step.steps, own.index)] : [own];
+function everyStep(steps: readonly Step[]): { readonly step: Step; readonly index: number }[] {
+  const found: { readonly step: Step; readonly index: number }[] = [];
+  visitSteps(steps, (step, place) => {
+    found.push({ step, index: place.topIndex });
   });
+  return found;
 }
 
 // ---- The static check ---------------------------------------------------------------------------
@@ -261,69 +137,6 @@ function commandRule(step: DatabaseCommandStep, context: StaticContext): PolicyR
 const externalCallRule = (step: ServiceCallStep | DatabaseCommandStep, context: StaticContext): PolicyRuleId | null =>
   (step.type === 'call' || step.type === 'expectBackend' ? callRule(step, context) : commandRule(step, context));
 
-// What a page script may not do: run undeclared, whatever the plan's standing, since a script the
-// project does not declare is no one's. And in a proposal: be written into the plan, since its source
-// and its claimed effect are the plan's own and no person declared them; or change something unless
-// its declaration allows it in proposals.
-function scriptRule(step: PageScriptStep, context: StaticContext): PolicyRuleId | null {
-  if (typeof step.script !== 'string') {
-    return context.approved ? null : 'inline-script-in-proposal';
-  }
-  const name = step.script;
-  const declaration = Object.entries(declaredScripts(context.project.unsafeFeatures)).find(([declared]) => declared === name)?.[1];
-  if (declaration === undefined) return 'undeclared-origin';
-  return !context.approved && declaration.effect === 'write' && !declaration.allowInProposals ? 'side-effect-in-proposal' : null;
-}
-
-type StaticContext = {
-  readonly project: Project;
-  readonly patterns: readonly string[];
-  readonly productionAllowed: boolean;
-  // False for a proposal: a plan with no approval.
-  readonly approved: boolean;
-};
-
-// What a stub start or a storage write may not do: in a proposal, fake a response or change the
-// page's storage unless its declaration allows it in proposals. Removing an entry is a write too.
-// Stopping a stub undoes a side effect, so it is never one. A name the project does not declare
-// reaches something nobody declared.
-function sideEffectRule(step: StubStep | SetStorageStep | RemoveStorageStep, context: StaticContext): PolicyRuleId | null {
-  const declaration = step.type === 'stub'
-    ? Object.entries(context.project.stubs).find(([name]) => name === step.stub)?.[1]
-    : Object.entries(context.project.storageEntries).find(([name]) => name === step.entry)?.[1];
-  if (declaration === undefined) return 'undeclared-origin';
-  const sideEffect = step.type !== 'stub' || step.action === 'start';
-  return sideEffect && !context.approved && !declaration.allowInProposals ? 'side-effect-in-proposal' : null;
-}
-
-function navigationRule(url: string, context: StaticContext): PolicyRuleId | null {
-  const read = readUrl(url);
-  // The parser has already accepted the URL, so this cannot happen; deny rather than guess.
-  if (read === null) return 'undeclared-origin';
-  if (read.origin !== null) {
-    if (!context.project.origins.some((origin) => origin === read.origin)) return 'undeclared-origin';
-    if (!context.productionAllowed && context.project.productionOrigins.some((origin) => origin === read.origin)) return 'production-origin';
-  }
-  return isDestructivePath(read.path, context.project.policy) ? 'destructive-navigation' : null;
-}
-
-// True when the name marks an irreversible action the project has not allowed by name.
-const isIrreversibleName = (name: string, patterns: readonly string[], policy: ProjectPolicy): boolean =>
-  matchesIrreversiblePattern(name, patterns) && !isAllowedName(name, policy.allowedIrreversibleNames);
-
-function staticRule(step: Step, context: StaticContext): PolicyRuleId | null {
-  // A second tab opens its URL as a navigate step would.
-  if (step.type === 'navigate' || step.type === 'newTab') return navigationRule(navigationUrl(step.url), context);
-  // A download is a click that must start a download, so it is judged as the click it is.
-  if (step.type === 'click' || step.type === 'download') {
-    const name = locatorName(step.locator);
-    if (name !== null && isIrreversibleName(name, context.patterns, context.project.policy)) return 'irreversible-action';
-  }
-  if (step.type === 'stub' || step.type === 'setStorage' || step.type === 'removeStorage') return sideEffectRule(step, context);
-  if (step.type === 'evaluate' || step.type === 'expectScript') return scriptRule(step, context);
-  return null;
-}
-
 const secretNamesIn = (values: readonly (CallArgument | Extract<Step, { type: 'fill' }>['value'])[]): SecretName[] =>
   values.flatMap((value) => (typeof value === 'object' && 'secretName' in value ? [value.secretName] : []));
 
@@ -370,7 +183,7 @@ function staticDenial(plan: Plan, targets: readonly Target[], standing: PlanStan
   const productionAllowed = isProductionAllowed(standing, project.policy);
   const context: StaticContext = { project, patterns, productionAllowed, approved: standing.mode === 'approved' };
   for (const { step, index } of everyStep(plan.steps)) {
-    const rule = staticRule(step, context);
+    const rule = ruleBeforeRun(step.type, step, context);
     if (rule !== null) return { rule, stepIndex: index };
   }
   for (const { step, index } of externalCallSteps(plan)) {
@@ -378,68 +191,6 @@ function staticDenial(plan: Plan, targets: readonly Target[], standing: PlanStan
     if (rule !== null) return { rule, stepIndex: index };
   }
   return null;
-}
-
-// ---- The runtime guard --------------------------------------------------------------------------
-
-// A control with no accessible name could be anything, so it is acted on only when the project
-// allows it by test id, either the one the locator used or the element's own, or, for a css or
-// XPath locator, by that exact selector or expression in its unsafe features' list.
-function isAllowedUnnamed(locator: Locator, element: ResolvedElement, project: Project): boolean {
-  const allowed = project.policy.unnamedControlsAllowedByTestId;
-  const testId = locator.by === 'testId' ? literalText(locator.testId) : undefined;
-  const structural = structuralQuery(locator);
-  return (testId !== undefined && allowed.includes(testId))
-    || (element.testId !== undefined && allowed.some((testId) => testId === element.testId))
-    || (structural !== undefined && (project.unsafeFeatures?.unnamedControlsAllowed ?? []).includes(structural));
-}
-
-function linkRule(element: ResolvedElement, policy: ProjectPolicy): PolicyRuleId | null {
-  if (element.linkUrl === null) return null;
-  const read = readUrl(element.linkUrl);
-  return read !== null && isDestructivePath(read.path, policy) ? 'destructive-navigation' : null;
-}
-
-function runtimeRule(
-  step: Step, element: ResolvedElement, dialogText: string | null, patterns: readonly string[], project: Project,
-): PolicyRuleId | null {
-  const policy = project.policy;
-  const irreversible = (text: string | null): boolean => text !== null && isIrreversibleName(text, patterns, policy);
-  switch (step.type) {
-    case 'dialog':
-      return step.action === 'accept' && irreversible(dialogText) ? 'irreversible-dialog' : null;
-    case 'navigate': case 'newTab': {
-      // Production depends on the plan's standing, which only the static check has. The run
-      // passes a path template here with its values already in place. A second tab opens its URL
-      // as a navigate step would.
-      const read = readUrl(navigationUrl(step.url));
-      if (read === null || (read.origin !== null && !project.origins.some((origin) => origin === read.origin))) return 'undeclared-origin';
-      return isDestructivePath(read.path, policy) ? 'destructive-navigation' : null;
-    }
-    case 'click': case 'download': case 'hover': case 'fill': case 'select': case 'upload': case 'press': {
-      if (isBlank(element.name) && !isAllowedUnnamed(step.locator, element, project)) return 'unnamed-control';
-      // A download is the click that starts it, so it is guarded exactly as a click.
-      if (step.type === 'click' || step.type === 'download') return irreversible(element.name) ? 'irreversible-action' : linkRule(element, policy);
-      if (step.type !== 'press' || !ACTIVATING_KEYS.includes(step.key)) return null;
-      // Enter or Space presses a focused button or link as a click would, and submits the form
-      // around a focused field.
-      if (irreversible(element.name)) return 'irreversible-action';
-      return linkRule(element, policy) ?? (irreversible(element.formSubmitName) ? 'irreversible-submit' : null);
-    }
-    case 'frame': case 'expect': case 'expectPage': case 'expectDownload': case 'a11yAudit': case 'capture': case 'remember':
-    // Calls act on no page, and stubs, request checks and storage steps on no element: the static
-    // check judged them, before the run started.
-    case 'call': case 'expectBackend':
-    case 'stub': case 'resetRequests': case 'expectRequests': case 'expectResponse':
-    case 'setStorage': case 'removeStorage': case 'expectStorage':
-    // A clock advance moves the page's own clock and a clipboard check only reads: neither sends
-    // input, so neither is a side effect, and a proposal may hold both.
-    case 'advanceClock': case 'expectClipboard':
-    // A page script or a database command acts on no element the guard could see: the static check
-    // judged its declaration before the run started.
-    case 'evaluate': case 'expectScript': case 'database': case 'expectDatabase':
-      return null;
-  }
 }
 
 // ---- The gate -----------------------------------------------------------------------------------
@@ -490,7 +241,7 @@ export function policyGate(options: PolicyGateOptions): PolicyGate {
     },
     guardAction(step, stepIndex, element, dialogText, locale) {
       const patterns = patternsForLocale(locale, project.policy.irreversiblePatterns);
-      const rule = patterns === null ? 'no-locale-patterns' : runtimeRule(step, element, dialogText, patterns, project);
+      const rule = patterns === null ? 'no-locale-patterns' : ruleDuringRun(step.type, step, { element, dialogText, patterns, project });
       if (rule === null) return { kind: 'allow' };
       const recorded = record(rule);
       return { kind: 'deny', rule, stepIndex, ...(recorded ? {} : UNRECORDED) };

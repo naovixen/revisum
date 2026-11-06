@@ -14,7 +14,8 @@ import {
   type DownloadAssertion, type ElementAssertion, type GeneratedValue, type Locator, type PageAssertion, type REQUEST_COUNT_KINDS,
   type ResponseAssertion, type ResponseRead, type SCRIPT_MODES, type StepType, type StorageAssertion,
 } from '@revisum/contracts';
-import { FROM_FIELD, STEP_FIELDS, STEP_TYPES, UNSAFE_STEP_TYPES } from '../plan-grammar.ts';
+import { FROM_FIELD } from '../plan-grammar.ts';
+import { STEP_FACTS, STEP_TYPES, UNSAFE_STEP_TYPES } from '../StepFacts.ts';
 import {
   BARE, DIGITS, END, NUMBER, QUOTED, REFERENCE, URL_WORD,
   better, choice, constant, countedWord, either, entry, field, group, isRecord, list, map, notThisStatement, oneOf, optional, orElse,
@@ -405,7 +406,7 @@ export type StatementBlock = 'steps' | 'source';
 // inline page script.
 type StepStatement = { readonly type: StepType; readonly syntax: Syntax; readonly opens: StatementBlock | undefined };
 
-const opensSteps = (type: StepType): boolean => STEP_FIELDS[type].required.includes('steps');
+const opensSteps = (type: StepType): boolean => STEP_FACTS[type].fields.required.includes('steps');
 
 export const STEP_STATEMENTS: readonly StepStatement[] = STEP_TYPES.flatMap((type) => STEP_FORMS[type].map((form): StepStatement => {
   const parts = 'sourceBlock' in form ? form.sourceBlock : form;

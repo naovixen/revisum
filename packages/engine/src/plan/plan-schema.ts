@@ -23,9 +23,10 @@ import {
   LARGEST_DOWNLOAD_BYTES, LOCATOR_FIELDS, LOWERCASE_ID, MAXIMUM_DAY_OFFSET, MAXIMUM_EXPECTED_COUNT, MAXIMUM_INLINE_SCRIPT_LENGTH,
   MAXIMUM_META_NAME_LENGTH, MAXIMUM_MODIFIERS, MAXIMUM_PATH_SEGMENTS, MAXIMUM_POSITION, MAXIMUM_SELECTOR_LENGTH,
   MAXIMUM_SPEC_REFERENCE_LENGTH, MAXIMUM_STYLE_VALUE_LENGTH, MAXIMUM_TEST_ID_LENGTH, MAXIMUM_TITLE_LENGTH, MAXIMUM_URL_LENGTH, MAXIMUM_VALUE_PREFIX_LENGTH,
-  META_FIELDS, OPTIONAL_LOCATOR_FIELDS, PLAN_FIELDS, QUERY_KEY, RESPONSE_STATUS, STEP_FIELDS, STEP_TYPES, STYLE_PROPERTY,
+  META_FIELDS, OPTIONAL_LOCATOR_FIELDS, PLAN_FIELDS, QUERY_KEY, RESPONSE_STATUS, STYLE_PROPERTY,
   UNIQUE_NUMBER_DIGITS, UNSAFE_TEXT_CHARACTERS, VALUE_NAME, WRITTEN_URL_PATTERN, type LocatorKind,
 } from './plan-grammar.ts';
+import { STEP_FACTS, STEP_TYPES } from './StepFacts.ts';
 
 // A JSON Schema document or part of one. Plain JSON values only, so it serialises exactly.
 export type JsonSchema = { readonly [keyword: string]: JsonValue };
@@ -146,7 +147,7 @@ const STEP_TYPE_FIELD_SCHEMAS: { readonly [Type in StepType]?: Readonly<Record<s
 };
 
 function stepSchema(type: StepType): JsonSchema {
-  const fields = STEP_FIELDS[type];
+  const fields = STEP_FACTS[type].fields;
   const properties: Record<string, JsonSchema> = { type: { const: type } };
   for (const field of [...fields.required, ...fields.optional]) {
     const schema = STEP_TYPE_FIELD_SCHEMAS[type]?.[field] ?? STEP_FIELD_SCHEMAS[field];

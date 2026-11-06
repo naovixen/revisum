@@ -437,6 +437,9 @@ export type Step =
   // what one returns: unsafe features. See unsafe-plan-features.ts.
   | PageScriptStep
   | DatabaseCommandStep;
+// Each step type's own step, so a table keyed by StepType can type each entry by its step:
+// `{ [Type in StepType]: Handler<StepByType[Type]> }` needs no cast and no case can be left out.
+export type StepByType = { readonly [TypedStep in Step as TypedStep['type']]: TypedStep };
 // The steps that send input to the page; the driver's ActionRunner port performs them, asking the
 // policy gate's runtime guard first. All but a dialog act on an element; answering a dialog acts
 // on the dialog the page opened, so the guard reads its text. The policy gate judges a download as

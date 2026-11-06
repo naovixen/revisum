@@ -16,6 +16,7 @@ import {
   type ResolvedStubResponse, type ResponseAssertion, type Result, type SafeText, type SecretStore, type RememberedResponseSource, type Session, type Step, type StubDeclaration,
   type StubName, type StubResponseBody,
 } from '@revisum/contracts';
+import { visitSteps } from '../plan/VisitSteps.ts';
 import type { Project } from '../project/project-parser.ts';
 import type { RememberedRecord, RememberedValues } from '../RememberedValues.ts';
 import { resolveText, type RunValues } from '../run-values.ts';
@@ -72,14 +73,12 @@ function requestNamedBy(step: Step): RequestName | undefined {
 // these are observed, so a plan that names none leaves the page's service workers alone.
 export function observedRequestNames(plan: Plan): readonly RequestName[] {
   const names: RequestName[] = [];
-  const visit = (steps: readonly Step[]): void => {
-    for (const step of steps) {
-      if (step.type === 'frame' || step.type === 'newTab') visit(step.steps);
-      const name = requestNamedBy(step);
-      if (name !== undefined && !names.includes(name)) names.push(name);
+  visitSteps(plan.steps, (step) => {
+    const name = requestNamedBy(step);
+    if (name !== undefined && !names.includes(name)) {
+      names.push(name);
     }
-  };
-  visit(plan.steps);
+  });
   return names;
 }
 

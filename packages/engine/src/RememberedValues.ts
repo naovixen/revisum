@@ -3,12 +3,15 @@
 // judged here. A remembered value is hashed into the result and a later step can send it on, and a
 // hash of a short secret is as good as the secret, so a value holding one is refused before anything
 // about it is kept.
-import { failure, success, type Result, type SafeText, type ValueName } from "@revisum/contracts";
+import { failure, success, type Result, type SafeText, type StepCode, type ValueName } from "@revisum/contracts";
 import { sha256 } from "./hashing.ts";
 import type { Logger } from "./logging.ts";
 import { runTimeText } from "./plan/plan-decoders.ts";
 
-export type RememberRefusal = "value-holds-secret" | "value-too-long" | "value-unsafe";
+export type RememberRefusal =
+    | typeof StepCode.ValueHoldsSecret
+    | typeof StepCode.ValueTooLong
+    | typeof StepCode.ValueUnsafe;
 export type RememberedRecord = { readonly valueName: ValueName; readonly sha256: string };
 type TextToRemember = readonly [ValueName, string];
 

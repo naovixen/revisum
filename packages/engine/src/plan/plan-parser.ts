@@ -41,15 +41,18 @@ import {
   type Issues, type Parsed, type PlanError,
 } from './plan-decoders.ts';
 import {
-  ALL_LOCATOR_KINDS, ASSERTION_STEP_TYPES, ATTRIBUTE_NAME, CAPTURE_NAME, CLASS_TOKEN, CLEANUP_STEP_TYPES, CRITERION_FIELD, CRITERION_ID, CURRENT_PLAN_VERSION,
+  ALL_LOCATOR_KINDS, ATTRIBUTE_NAME, CAPTURE_NAME, CLASS_TOKEN, CRITERION_FIELD, CRITERION_ID, CURRENT_PLAN_VERSION,
   DATABASE_COMMAND_FEATURE, DOM_CHECKS_FEATURE, DOWNLOAD_KINDS, DOWNLOAD_NAME, ELEMENT_KINDS, FEATURE_ID,
   FROM_FIELD, INLINE_SCRIPT_FEATURE, LARGEST_DOWNLOAD_BYTES, LOCATOR_FEATURES, LOCATOR_FIELDS, MAXIMUM_EXPECTED_COUNT, MAXIMUM_INLINE_SCRIPT_LENGTH,
   MAXIMUM_INSIDE_DEPTH, MAXIMUM_LITERAL_NAME_LENGTH, MAXIMUM_META_NAME_LENGTH, MAXIMUM_MODIFIERS, MAXIMUM_PATH_SEGMENTS, MAXIMUM_POSITION, MAXIMUM_QUERY_VALUES,
   MAXIMUM_SELECTOR_LENGTH, MAXIMUM_SPEC_REFERENCE_LENGTH, MAXIMUM_STYLE_VALUE_LENGTH, MAXIMUM_TEST_ID_LENGTH, MAXIMUM_TITLE_LENGTH, MAXIMUM_URL_LENGTH,
   META_FIELDS, NAMED_SCRIPT_FEATURE, OPTIONAL_LOCATOR_FIELDS, OPTIONAL_PLAN_FIELDS, PAGE_KINDS, PLAN_FIELDS, QUERY_KEY, RESPONSE_STATUS,
-  SELECTOR_FORBIDDEN_CHARACTERS, STEP_FIELDS, STEP_TYPES, STYLE_PROPERTY, TOP_LEVEL_STEP_TYPES, WRITTEN_URL,
-  isDatabaseCommandStepType, isPageScriptStepType,
+  SELECTOR_FORBIDDEN_CHARACTERS, STYLE_PROPERTY, WRITTEN_URL,
 } from './plan-grammar.ts';
+import {
+  STEP_FACTS, STEP_TYPES, canStandInCleanup, canStandInside, isAssertionStepType, isDatabaseCommandStepType, isPageScriptStepType,
+} from './StepFacts.ts';
+import { stepsWithin } from './VisitSteps.ts';
 import { readGeneratedValues, readPlanClock, readValueName, type ValueContext } from './plan-values.ts';
 import { looksLikeCredential, namesSensitiveField } from './literal-secrets.ts';
 import { argumentProblem } from '../service-calls/parameter-values.ts';
@@ -1118,7 +1121,7 @@ function readCleanup(input: unknown, context: ParseContext): Parsed<readonly Cle
     const type = readOneOf(head['type'], `${path}.type`, context.issues, STEP_TYPES, 'unknown_step');
     if (type === INVALID) return INVALID;
     // Nothing inside a misplaced step is read.
-    if (!CLEANUP_STEP_TYPES.includes(type)) { context.issues.push({ code: 'misplaced_step', path }); return INVALID; }
+    if (!canStandInCleanup(type)) { context.issues.push({ code: 'misplaced_step', path }); return INVALID; }
     const step = readStep(entry, path, context);
     return step !== INVALID && (step.type === 'call' || step.type === 'database') ? step : INVALID;
   });
@@ -1130,14 +1133,11 @@ function readStep(input: unknown, path: string, context: ParseContext): Parsed<S
   if (head === INVALID) return INVALID;
   const type = readOneOf(head['type'], `${path}.type`, context.issues, STEP_TYPES, 'unknown_step');
   if (type === INVALID) return INVALID;
-  // A second tab opens only from the plan's own list of steps, so a tab never holds another tab
-  // and a frame never opens one. Nothing inside a misplaced tab is read.
-  if (type === 'newTab' && !context.topLevel) { context.issues.push({ code: 'misplaced_step', path }); return INVALID; }
-  // A call or a database command is setup or a check for the whole test, not an action in a page,
-  // so neither a frame nor a second tab may hold one.
-  if (TOP_LEVEL_STEP_TYPES.includes(type) && !context.topLevel) { context.issues.push({ code: 'misplaced_step', path }); return INVALID; }
+  // A second tab, a call or a database command stands only in the plan's own list of steps.
+  // Nothing inside a misplaced step is read.
+  if (!canStandInside(type) && !context.topLevel) { context.issues.push({ code: 'misplaced_step', path }); return INVALID; }
   if (!unsafeStepEnabled(type, head, path, context)) return INVALID;
-  const fields = STEP_FIELDS[type];
+  const fields = STEP_FACTS[type].fields;
   // The criterion id is checked on its own below, so that a missing one is reported as vacuous.
   const required = fields.required.filter((field) => field !== CRITERION_FIELD);
   if (readRecord(input, path, context.issues, [...fields.required, ...fields.optional], required) === INVALID) return INVALID;
@@ -1320,21 +1320,16 @@ function readStorageState(input: unknown, context: ParseContext): Parsed<SecretR
   return secretName === INVALID ? INVALID : { secretName };
 }
 
-// Every step, including the steps inside frames and second tabs, depth first.
-function everyStep(steps: readonly Step[]): Step[] {
-  return steps.flatMap((step) => (step.type === 'frame' || step.type === 'newTab' ? [step, ...everyStep(step.steps)] : [step]));
-}
-
-// Everything the plan may do: every step, as above, and its cleanup.
-export const everyPlanStep = (plan: Plan): readonly Step[] => [...everyStep(plan.steps), ...(plan.cleanup ?? [])];
+// Everything the plan may do: every step, those inside frames and second tabs included, and its cleanup.
+export const everyPlanStep = (plan: Plan): readonly Step[] => [...stepsWithin(plan.steps), ...(plan.cleanup ?? [])];
 
 // Checks across the whole plan once every step has been read: capture names are unique, and the
 // plan checks at least one thing.
 function checkWholePlan(steps: readonly Step[], context: ParseContext): void {
-  const all = everyStep(steps);
+  const all = stepsWithin(steps);
   const captureNames = all.flatMap((step) => (step.type === 'capture' ? [step.name] : []));
   if (new Set(captureNames).size !== captureNames.length) context.issues.push({ code: 'duplicate', path: '$.steps' });
-  if (!all.some((step) => ASSERTION_STEP_TYPES.includes(step.type))) context.issues.push({ code: 'vacuous', path: '$.steps' });
+  if (!all.some((step) => isAssertionStepType(step.type))) context.issues.push({ code: 'vacuous', path: '$.steps' });
 }
 
 // Whatever its type says, JSON.stringify gives undefined for undefined, a function or a symbol.

@@ -7,160 +7,57 @@
 // through its clock and clipboard ports; page scripts through its script port. Database commands
 // go through the run's DatabaseCommandRunner port, which runs each in a workload container.
 import {
-  failure, FillValueKind, isOneElementRead, NavigateScripts, UnavailableReason, oneElementOf, PageReadFailureCode, stepFailed, StepCode, success, UnreadablePage,
-  type A11yFinding, type ActionGuard, type AppliedRewrite, type ApprovalLabel, type ArtifactReference, type ArtifactStore, type BaseUrl,
-  type BrowserDriver, type Clock, type DatabaseCommandRunner, type DocumentSession, type DomRead, type DownloadedFile, type DownloadName, type DriverError, type DriverErrorCode, type OneElementRead, type PageReadFailure, type RememberedElementSource, type LockEntry, type DialogStep, type ElementProbe,
-  type EventSink, type FillValue, type GuardVerdict, type PageAssertion, type PerformableFill, type Plan, type PolicyRuleId, type Redactor, type ResolvedActionStep,
-  type ResolvedDialogStep, type ResolvedDownloadStep,
-  type DownloadStep, type StepOutcome, type ResolvedElement, type ResolvedLocator, type Result, type RunIsolation, type SafeText, type SecretStore, type ServiceCaller, type Session, type Step, type Target,
-  type Unavailable, type ValueName, type GuaranteeStatement, type RunMode, type SuiteFinding, type SuiteName, type SuitePass,
-  type StubAnswer, type StubName, type SuiteTestId, type SuiteTestResult, type UnsafeFeature,
+  failure, UnavailableReason, stepFailed, StepCode, StepOutcome, StepType, success,
+  type A11yFinding, type AppliedRewrite, type ApprovalLabel, type BrowserDriver, type Clock, type DocumentSession, type Plan, type PolicyRuleId,
+  type Redactor, type Result, type SafeText, type Session, type Step, type Target, type Unavailable, type ValueName, type GuaranteeStatement,
+  type RunMode, type SuiteFinding, type SuiteName, type SuitePass, type StubAnswer, type StubName, type SuiteTestId, type SuiteTestResult,
+  type UnsafeFeature,
 } from '@revisum/contracts';
 import { approvalLabel, type PlanStanding } from './approval/plan-standing.ts';
 import { totalClockAdvanceMilliseconds } from './clock-advance.ts';
-import {
-  COMMAND_ERROR_CODES, runDatabaseCheck, runDatabaseStep, type DatabaseCommandContext, type DatabaseCommandRecord,
-} from './database-commands/database-command-steps.ts';
-import { advanceClock, checkClipboard, rememberFromClipboard, type ClockAndClipboardContext } from './clock-and-clipboard-steps.ts';
+import { COMMAND_ERROR_CODES, type DatabaseCommandContext } from './database-commands/database-command-steps.ts';
 import { guaranteeStatement } from './guarantees.ts';
 import { canonicalJson, sha256 } from './hashing.ts';
 import * as lifecycle from './lifecycle.ts';
-import { manifestLogger, type Logger, type RunEventSink } from './logging.ts';
+import { manifestLogger, type Logger } from './logging.ts';
+import { observedRequestNames, startObserving } from './network-and-storage/network-and-storage-steps.ts';
 import {
-  checkRequests, checkResponse, checkStorage, observedRequestNames, rememberFromResponse, resetRequests, runStubStep, startObserving, writeStorage,
-  type NetworkStepContext,
-} from './network-and-storage/network-and-storage-steps.ts';
-import {
-  DATABASE_COMMANDS_INPUT, DETERMINISM_INPUTS, buildManifest, manifestHash, unsafeFeatureRecord,
-  type FixtureReference, type HostInfo, type RunManifest, type RunPins,
+  DATABASE_COMMANDS_INPUT, DETERMINISM_INPUTS, buildManifest, manifestHash, unsafeFeatureRecord, type RunManifest,
 } from './manifest.ts';
-import { checkElement, checkPage, domReadFor, normalise, type Verdict } from './oracle.ts';
 import { refusedResult, targetUnavailableResult } from './NothingRanResult.ts';
-import type { NamedScripts } from './page-scripts/NamedScriptSources.ts';
-import { runEvaluate, runScriptCheck, type PageScriptContext, type PageScriptRecord } from './page-scripts/page-script-steps.ts';
 import type { SuiteDecodeError } from './evidence/suite-report.ts';
 import type { PlanError } from './plan/plan-decoders.ts';
-import { ASSERTION_STEP_TYPES } from './plan/plan-grammar.ts';
+import { isAssertionStepType } from './plan/StepFacts.ts';
 import { assertBranded } from './plan/plan-parser.ts';
 import { unsafeFeaturesOf } from './plan/unsafe-features.ts';
 import { assertCleared, ClearedRunKind, type ClearedRun } from './policy/ClearedRun.ts';
 import type { TargetNotDeclared } from './policy/TargetNotDeclared.ts';
-import { policyGate, type PolicyGate } from './policy/policy-gate.ts';
+import { policyGate } from './policy/policy-gate.ts';
 import { checkPreflight, secretsToRedact, type PreflightPassed } from './CheckPreflight.ts';
 import { callsServices, runsDatabaseCommands } from './plan/CallsServices.ts';
 import { reachableOrigins } from './ReachableOrigins.ts';
 import type { Project } from './project/project-parser.ts';
-import { SENSITIVE_PLACEHOLDER } from './redaction.ts';
-import { rememberedValues, type RememberedValues } from './RememberedValues.ts';
-import type { RunFillStep, RunStep } from './RunStep.ts';
+import { rememberedValues } from './RememberedValues.ts';
+import type { ContainerRunStep, RunStep } from './RunStep.ts';
+import { codeForThrow, errorText } from './run/CodeForThrow.ts';
+import { networkContext } from './run/executors/network-and-storage/NetworkAndStorageExecutors.ts';
+import type { RunInnerSteps, SessionContext } from './run/executors/StepExecutor.ts';
+import { executeStep } from './run/executors/StepExecutors.ts';
+import { POLL_INTERVAL_MILLISECONDS } from './run/Poll.ts';
+import type { RunContext, RunInputs, RunPorts } from './run/RunContext.ts';
+import type { StepResult } from './run/StepResult.ts';
 import { withRunHashes } from './WithRunHashes.ts';
+import { generateRunValues, resolvePlanClock } from './run-values.ts';
 import {
-  generateRunValues, resolveElementAssertion, resolveFillText, resolveInputStep, resolveLocator, resolvePathTemplate, resolvePlanClock, resolveText, type RunValues,
-} from './run-values.ts';
-import {
-  commandSecretStore, resolvedSecretStore, secretEchoRemoval, secretRecords, shortSecretObservation, stubAndStorageSecretStore, withSecretRedaction,
+  commandSecretStore, resolvedSecretStore, secretEchoRemoval, secretRecords, shortSecretObservation, withSecretRedaction,
   type ResolvedSecrets,
 } from './secrets/secret-resolution.ts';
-import { SECRET_PLACEHOLDER } from './secrets/secret-values.ts';
 import { adapterRegistry } from './target/adapter-registry.ts';
 import { BROWSER_BUILD_INPUT, checkPinnedBuild } from './target/target-lock.ts';
-import {
-  NO_ANSWER_CODES, runBackendCheck, runCallStep, runCleanup, type CallStepContext, type CleanupResult, type ServiceCallRecord,
-} from './service-calls/call-steps.ts';
+import { NO_ANSWER_CODES, runCleanup, type CallStepContext, type CleanupResult } from './service-calls/call-steps.ts';
 
-// How a cleared run is to be run. What it runs, under which project, on which target and as which
-// standing are the ClearedRun's alone.
-export type RunInputs = {
-  readonly baseUrl: BaseUrl;
-  readonly seed: number;
-  readonly fixedTimeMilliseconds: number;
-  readonly fixtures: readonly FixtureReference[];
-  readonly host: HostInfo;
-  // The sources of the page scripts the project declares, keyed by each declared file path, as the
-  // protected branch holds them. The manifest records the sha256 of each one the plan names, so a
-  // plan that names a script whose source is not here is refused before any side effect.
-  readonly scriptSources?: Readonly<Record<string, Uint8Array>>;
-  // The lockfile's entries (readLockfile). Given, the target's browser build is hashed before any
-  // browser opens, and a build other than the pinned one ends the run TargetUnavailable with
-  // build-mismatch. Absent, no build is checked and nothing is recorded about pinning.
-  readonly lockEntries?: readonly LockEntry[];
-  // What cli's runPins() gathered about the machine and repository the run starts on: versions,
-  // hashes of the redactor, rule set, baselines and fonts, the run image and the commit. Given, the
-  // manifest records each, with the project's hash and limits; absent, it records none of them.
-  readonly pins?: RunPins;
-};
-
-export type RunPorts = {
-  readonly drivers: ReadonlyMap<string, BrowserDriver>;
-  readonly clock: Clock;
-  readonly artifacts: ArtifactStore;
-  readonly redactor: Redactor;
-  readonly events: RunEventSink;
-  // The audit sink that policy denials are appended to. Required, so no run can deny a plan
-  // without a record; a denial the sink fails to record is marked unrecorded in the outcome.
-  readonly audit: EventSink;
-  // How strongly the run is isolated, read as the result is sealed: an isolated runner's handle, or
-  // one that always says host. Only 'isolated' makes the result state that egress was enforced. The
-  // manifest does not record it, so a replay of an isolated run must be given an isolated one too,
-  // or its result hash differs and the replay is a mismatch.
-  readonly isolation: RunIsolation;
-  // Where the secrets the plan names are resolved, such as environmentSecretStore(process.env).
-  // Without one, every secret reference is missing and such a plan is refused.
-  readonly secrets?: SecretStore;
-  // Sends the requests of the plan's declared calls: runner's caller, through the egress proxy.
-  // Without one, a plan that calls a service is refused before any side effect.
-  readonly services?: ServiceCaller;
-  // Runs the plan's database commands, each in a workload container: cli's wiring of runner's
-  // workload runner. Without one, a plan with a database command, cleanup included, is refused
-  // before any side effect.
-  readonly databaseCommands?: DatabaseCommandRunner;
-  // The browser mutants' rewrites the egress proxy applied (EgressProxy.rewritesApplied). Only the
-  // proxy knows, and only once the steps have run, so the run reads it after them.
-  readonly rewritesApplied?: () => readonly AppliedRewrite[];
-};
-
-export type StepResult = {
-  readonly index: number;
-  readonly type: Step['type'];
-  readonly outcome: StepOutcome;
-  readonly code?: StepCode;
-  // A redacted observation, kept only when a step fails.
-  readonly observed?: string;
-  readonly artifact?: ArtifactReference;
-  readonly findings?: readonly A11yFinding[];
-  // A call or backend check's record: status and response sha256, never a header or the body.
-  readonly serviceCall?: ServiceCallRecord;
-  // A remember step's record: the value's name and the sha256 of its text, never the text. An
-  // evaluate that remembers one value records it here too; one that remembers several records
-  // them in rememberedValues.
-  readonly remembered?: RememberedValueRecord;
-  readonly rememberedValues?: readonly RememberedValueRecord[];
-  // A page-script step's record: the script, how often it ran and its result's sha256, never the result.
-  readonly pageScript?: PageScriptRecord;
-  // A database step's record: the command, its service, exit code and output sha256, never the output.
-  readonly databaseCommand?: DatabaseCommandRecord;
-  // A download step's record: the file's name, media type, size and sha256, never its content.
-  readonly download?: DownloadRecord;
-  // An assertion's record of the stubs active while it ran, sorted by name, so a report can say it
-  // checked a faked answer and not the real backend. Absent when no stub was active.
-  readonly activeStubs?: readonly StubName[];
-  // A frame or newTab step's record of the passed steps inside it that left a record of their own,
-  // in order, each under the frame or newTab step's index. Absent when none did, so a frame of
-  // plain actions and checks keeps its result, and its hash, exactly as they were. The step that
-  // failed a frame or newTab step is not here: its code and records are the frame or newTab step's.
-  readonly innerSteps?: readonly StepResult[];
-};
-
-export type RememberedValueRecord = { readonly valueName: ValueName; readonly sha256: string };
-// What a run keeps of a downloaded file. The server's name and media type are kept redacted; the
-// content is never kept (until privacy masking, whatever evidence.keepDownloads says).
-export type DownloadRecord = {
-  readonly downloadName: DownloadName;
-  readonly fileName: string;
-  readonly mediaType: string;
-  readonly size: number;
-  readonly sha256: string;
-};
+export type { RunInputs, RunPorts } from './run/RunContext.ts';
+export type { DownloadRecord, RememberedValueRecord, StepResult } from './run/StepResult.ts';
 
 // Something a run found that a person should look at, whatever the verdict: a cleanup call that
 // failed, so test data may be left behind; or a suite test's criterion annotation whose
@@ -258,59 +155,6 @@ export type DeniedPlan = { readonly state: 'Denied'; readonly rule: PolicyRuleId
 // What a result is for, whether or not a run was cleared for its target.
 type RunSubject = Pick<TargetNotDeclared, 'plan' | 'project' | 'targetId' | 'standing'>;
 
-type RunContext = {
-  readonly cleared: ClearedRun;
-  readonly inputs: RunInputs;
-  readonly ports: RunPorts;
-  readonly logger: Logger;
-  readonly gate: PolicyGate;
-  // The runtime guard's denial, once it has stopped an action.
-  readonly denials: lifecycle.Denial[];
-  // The caller's redactor with the plan's secrets added: every kept text goes through it.
-  readonly redactor: Redactor;
-  readonly secrets: ResolvedSecrets;
-  // The plan's steps as the run runs them, each fill of a secret carrying its own.
-  readonly planSteps: readonly RunStep[];
-  // Every page script the plan names, with its source.
-  readonly scripts: NamedScripts;
-  // Whether a whole observed text is a secret too short to search for by value.
-  readonly isShortSecret: (observed: string) => boolean;
-  // Removes every echo of the plan's secrets, and nothing else, from text as the page wrote it.
-  readonly withoutSecrets: (text: string) => string;
-  // True when text holds one of the plan's secrets, in any form.
-  readonly holdsSecret: (text: string) => boolean;
-  // The fields, by their resolved locator as canonical JSON, whose last fill typed a secret. What a
-  // check reads back from one is the secret, whatever its length, so it is never kept; a remember
-  // step may not read one; and a capture masks each.
-  readonly secretFilledFields: Map<string, ResolvedLocator>;
-  // The run's values by name: the plan's generated values, the response fields calls remember and
-  // the page texts remember steps read.
-  readonly values: RunValues;
-  // The only way a step adds to the run's values.
-  readonly remembered: RememberedValues;
-  // The texts remember steps read from the page, which a failed check's observation never keeps.
-  readonly rememberedTexts: Set<string>;
-  // The files download steps saved, by the name the plan gives each, for later checks. The bytes
-  // stay in memory for the run only.
-  readonly downloads: Map<DownloadName, DownloadedFile>;
-  // What the call steps use: the run's service caller whenever the plan calls a service.
-  readonly calls: CallStepContext;
-  // What the database steps use: the run's command runner whenever the plan runs a command.
-  readonly commands: DatabaseCommandContext;
-  // The stubs started and not yet stopped.
-  readonly activeStubs: Set<StubName>;
-  // True when the target's adapter cannot pin the clock, the time zone or randomness, so the run
-  // loses replay-identical. Known from the target alone, before anything runs.
-  readonly determinismUnpinned: boolean;
-  // The plan steps whose frame or second tab holds a setup step that failed. A frame or newTab step
-  // reports under its own type, so its type alone cannot say the run could not test.
-  readonly setupFailedInside: Set<number>;
-};
-
-// What a step runs with: the run's context, and the open session whose ports its steps use.
-type StepContext = RunContext & { readonly session: Session };
-
-const POLL_INTERVAL_MILLISECONDS = 50;
 // Longer than a driver's stop takes to give up by itself, so this deadline is only for what has wedged.
 const LONGEST_SESSION_CLOSE_MILLISECONDS = 60_000;
 
@@ -343,7 +187,7 @@ export async function run(cleared: ClearedRun, inputs: RunInputs, ports: RunPort
     return unavailableResult(target.id, unavailable.unavailable, nothingRan, startedAt);
   }
   const { session, driver } = opened.value;
-  const stepContext: StepContext = { ...context, session };
+  const stepContext: SessionContext = { ...context, session };
   const manifestInputs = manifestInputsOf(context, passed, opened.value);
   const manifestBeforeTheSteps = buildManifest(manifestInputs);
   const resolved = lifecycle.resolve(planned, session, manifestBeforeTheSteps, manifestHash(manifestBeforeTheSteps));
@@ -394,7 +238,7 @@ type StepsRun = {
 };
 
 // Runs the steps in order and gives them a verdict, then closes the session, whatever happened.
-async function runTheSteps(context: StepContext, resolved: lifecycle.Resolved, adapter: string, isPlanLogged: boolean): Promise<StepsRun> {
+async function runTheSteps(context: SessionContext, resolved: lifecycle.Resolved, adapter: string, isPlanLogged: boolean): Promise<StepsRun> {
   const { session, logger, ports } = context;
   const targetId = context.cleared.target.id;
   const running = lifecycle.start(resolved);
@@ -430,16 +274,15 @@ async function runTheSteps(context: StepContext, resolved: lifecycle.Resolved, a
 
 // Each step in order, with its result and duration pushed as it ends. After a failed step, every
 // later one is skipped.
-async function runEachStep(context: StepContext, steps: StepResult[], stepMilliseconds: number[]): Promise<void> {
+async function runEachStep(context: SessionContext, steps: StepResult[], stepMilliseconds: number[]): Promise<void> {
   const { session, logger, ports, planSteps } = context;
-  const target = context.cleared.target;
   const notObserved = await failureToObserveRequests(session, context);
   for (const [index, step] of planSteps.entries()) {
     if (steps.some((done) => done.outcome === 'failed')) { steps.push({ index, type: step.type, outcome: 'skipped' }); continue; }
     const stepStartedAt = ports.clock.now();
     logger.log({ kind: 'step.start', stepIndex: index, stepType: step.type });
     // The first step stands for what could not be started, so the result says why nothing ran.
-    const done = index === 0 && notObserved !== undefined ? failedStep(step, index, notObserved) : await runStep(step, index, session, target, context);
+    const done = index === 0 && notObserved !== undefined ? failedStep(step, index, notObserved) : await runStep(step, index, session, context);
     // With no later step to notice, a crash the last step did not report would go unseen.
     const isLastStep = index === planSteps.length - 1;
     const result = isLastStep && done.outcome === 'passed' && session.crashed() ? failedStep(step, index, TARGET_CRASHED) : done;
@@ -506,7 +349,7 @@ type AfterTheVerdict = {
 
 // The plan's cleanup, whatever the outcome, then what the egress refused, which the result claims,
 // and the run's last log entries.
-async function afterTheVerdict(context: StepContext, verdict: StepsVerdict): Promise<AfterTheVerdict> {
+async function afterTheVerdict(context: SessionContext, verdict: StepsVerdict): Promise<AfterTheVerdict> {
   const { plan } = context.cleared;
   // A failing cleanup step never changes the verdict; it raises a review item.
   const cleanup = plan.cleanup === undefined ? undefined : await runCleanup(plan.cleanup, plan.steps.length, context.calls, context.commands);
@@ -523,7 +366,7 @@ async function afterTheVerdict(context: StepContext, verdict: StepsVerdict): Pro
 }
 
 // The connections that failed, the origins the egress refused and the state the run ended in.
-function logTheEnd(context: StepContext, blocked: readonly string[], endState: FinishedRun): void {
+function logTheEnd(context: SessionContext, blocked: readonly string[], endState: FinishedRun): void {
   const { session, logger } = context;
   readKeepingTheResult(() => {
     for (const { origin, message } of session.connectionFailures()) {
@@ -629,16 +472,18 @@ export async function runUntrusted(
 }
 
 // The steps that set up or reach what the test needs: when one fails, the run could not test.
-const SETUP_STEP_TYPES: readonly Step['type'][] = ['call', 'evaluate', 'database'];
+const SETUP_STEP_TYPES: readonly StepType[] = [StepType.Call, StepType.Evaluate, StepType.Database];
 // A step the adapter threw on, or that a refused request decision spoilt: what it saw is unknown,
 // which is not a product failure either. The code stands for the failure and its text stays out of
 // the result, since it could hold page content or a secret.
 const ADAPTER_ERROR = StepCode.AdapterError;
+const TARGET_CRASHED = StepCode.TargetCrashed;
 // The codes of a page script or a database command that could not give a result to check, in
 // whatever step it ran, of a service call that got no answer, and of an adapter that threw: the run
 // could not test, which is not a product failure.
 const UNUSABLE_RESULT_CODES: readonly string[] = [
-  'script-failed', 'script-timeout', 'script-result-invalid', 'script-result-too-large', ADAPTER_ERROR, ...COMMAND_ERROR_CODES, ...NO_ANSWER_CODES,
+  StepCode.ScriptFailed, StepCode.ScriptTimeout, StepCode.ScriptResultInvalid, StepCode.ScriptResultTooLarge, ADAPTER_ERROR,
+  ...COMMAND_ERROR_CODES, ...NO_ANSWER_CODES,
 ];
 
 // True when a failed step means the run could not test, wherever in the plan the step stands.
@@ -707,45 +552,11 @@ async function openSession(planned: lifecycle.Planned, context: RunContext): Pro
 // A failed step's result that holds only its code.
 const failedStep = (step: Step, index: number, code: StepCode): StepResult => ({ index, type: step.type, ...stepFailed(code) });
 
-const hasARefusedDecision = (context: StepContext): boolean => context.session.refusedRequestDecisions().length > 0;
-
-// The code for something that threw, whose text goes only to the log, which redacts it. A read of the
-// page says what stopped it and never throws, but a throw from anything else cannot say the page died.
-function codeForThrow(error: unknown, session: DocumentSession, logger: Logger): StepCode {
-  const code = session.crashed() ? TARGET_CRASHED : ADAPTER_ERROR;
-  logger.log({ kind: 'step.end', outcome: 'failed', code, detail: errorText(error) });
-  return code;
-}
-
-// What a step fails with when a read of the page gave nothing. A dialog and a crash are the page's to
-// answer for. A read that gave nothing for any other reason is the adapter's.
-const STEP_CODE_OF_FAILED_READ = {
-  [PageReadFailureCode.DialogOpen]: StepCode.DialogOpen,
-  [PageReadFailureCode.TargetCrashed]: StepCode.TargetCrashed,
-  [PageReadFailureCode.PageUnreadable]: StepCode.AdapterError,
-} as const satisfies Record<PageReadFailureCode, StepCode>;
-type FailedReadCode = (typeof STEP_CODE_OF_FAILED_READ)[PageReadFailureCode];
-
-// The adapter's own failure keeps its text, which goes only to the log, which redacts it.
-function codeOfFailedRead(readFailure: PageReadFailure, logger: Logger): FailedReadCode {
-  const code = STEP_CODE_OF_FAILED_READ[readFailure.code];
-  if (code === ADAPTER_ERROR) {
-    logger.log({ kind: 'step.end', outcome: 'failed', code, detail: readFailure.detail });
-  }
-  return code;
-}
-
-const PAGE_READ_FAILURE_CODES: readonly DriverErrorCode[] = Object.values(PageReadFailureCode);
-const isPageReadFailure = (error: DriverError): error is PageReadFailure => PAGE_READ_FAILURE_CODES.includes(error.code);
-
-// A capture fails as a read of the page does, or with the code the driver gave for anything else,
-// such as a field a secret was typed into that it could not find to hide.
-const codeOfFailedCapture = (error: DriverError, logger: Logger): StepCode =>
-  isPageReadFailure(error) ? codeOfFailedRead(error, logger) : error.code;
+const hasARefusedDecision = (context: SessionContext): boolean => context.session.refusedRequestDecisions().length > 0;
 
 // The requests the plan checks are observed from its start, so what a page sends as it loads counts
 // too. Gives the code for what stopped it, or undefined when nothing did.
-async function failureToObserveRequests(session: Session, context: StepContext): Promise<StepCode | undefined> {
+async function failureToObserveRequests(session: Session, context: SessionContext): Promise<StepCode | undefined> {
   try {
     const observing = await startObserving(observedRequestNames(context.cleared.plan), networkContext(context));
     if (observing.ok) {
@@ -840,40 +651,41 @@ async function closeKeepingTheResult(session: Session, clock: Clock, logger: Log
 
 // One step, wherever in the plan it stands, with what its driver alone cannot be trusted to report:
 // a browser already dead, a check that passed from memory while it died, a throw, and a denial.
-async function runStep(step: RunStep, index: number, session: DocumentSession, target: Target, context: StepContext): Promise<StepResult> {
+async function runStep(step: RunStep, index: number, document: DocumentSession, context: SessionContext): Promise<StepResult> {
   const denialsBefore = context.denials.length;
-  const result = await runStepOnLivePage(step, index, session, target, context);
+  const result = await runStepOnLivePage(step, index, document, context);
   // The audit log holds this denial, so whatever the driver reported from the same moment must not
   // turn the verdict into an ordinary failure.
   if (context.denials.length > denialsBefore) {
-    return failedStep(step, index, 'policy-denied');
+    return failedStep(step, index, StepCode.PolicyDenied);
   }
   return withActiveStubs(step, result, context.activeStubs);
 }
 
-async function runStepOnLivePage(step: RunStep, index: number, session: DocumentSession, target: Target, context: StepContext): Promise<StepResult> {
-  if (session.crashed()) {
+async function runStepOnLivePage(step: RunStep, index: number, document: DocumentSession, context: SessionContext): Promise<StepResult> {
+  if (document.crashed()) {
     return failedStep(step, index, TARGET_CRASHED);
   }
-  const openingsBefore = session.unsupportedOpenings();
+  const openingsBefore = document.unsupportedOpenings();
+  const runInnerSteps: RunInnerSteps = (container, containerIndex, inner) => runStepsInside(container, containerIndex, inner, context);
   try {
-    const done = await executeStep(step, index, session, target, context);
+    const done: StepResult = { index, type: step.type, ...(await executeStep(step.type, step, { ...context, index, document, runInnerSteps })) };
     // A request the browser would not let go on stays held, so neither a pass nor a failure of this
     // step says anything about the app: the run could not test. The reason goes to the log at the end.
     if (hasARefusedDecision(context)) {
       return { ...done, ...stepFailed(ADAPTER_ERROR) };
     }
-    if (done.outcome !== 'passed') {
+    if (done.outcome !== StepOutcome.Passed) {
       return done;
     }
-    if (ASSERTION_STEP_TYPES.includes(step.type) && session.crashed()) {
+    if (isAssertionStepType(step.type) && document.crashed()) {
       return failedStep(step, index, TARGET_CRASHED);
     }
     // A popup or a download that no step asked for fails the step under way, so a run cannot pass as
     // if nothing had opened.
-    return session.unsupportedOpenings() > openingsBefore ? failedStep(step, index, 'unsupported-step') : done;
+    return document.unsupportedOpenings() > openingsBefore ? failedStep(step, index, StepCode.UnsupportedStep) : done;
   } catch (error) {
-    return failedStep(step, index, codeForThrow(error, session, context.logger));
+    return failedStep(step, index, codeForThrow(error, document, context.logger));
   }
 }
 
@@ -883,15 +695,13 @@ const holdsARecord = (done: StepResult): boolean => Object.keys(done).some((key)
 // The steps of a frame or newTab step, in order, in the document they stand in. They have no results
 // of their own in the plan's list: the first that fails fails the frame or newTab step, with its code,
 // observation and records, and the records of those before it are kept beside them.
-async function runInnerSteps(
-  container: Extract<RunStep, { type: 'frame' | 'newTab' }>, index: number, session: DocumentSession, target: Target, context: StepContext,
-): Promise<StepResult> {
+async function runStepsInside(container: ContainerRunStep, index: number, document: DocumentSession, context: SessionContext): Promise<StepResult> {
   const kept: StepResult[] = [];
   const withKept = (result: StepResult, nested: readonly StepResult[] = []): StepResult =>
     (kept.length + nested.length === 0 ? result : { ...result, innerSteps: [...kept, ...nested] });
   for (const inner of container.steps) {
-    const done = await runStep(inner, index, session, target, context);
-    if (done.outcome !== 'passed') {
+    const done = await runStep(inner, index, document, context);
+    if (done.outcome !== StepOutcome.Passed) {
       if (SETUP_STEP_TYPES.includes(inner.type)) {
         context.setupFailedInside.add(index);
       }
@@ -901,477 +711,16 @@ async function runInnerSteps(
       kept.push(done);
     }
   }
-  return withKept({ index, type: container.type, outcome: 'passed' });
+  return withKept({ index, type: container.type, outcome: StepOutcome.Passed });
 }
 
 // An assertion's result with the stubs active while it ran, so a report can tell a check of a faked
 // answer from a check of the real backend. A stub step never checks anything, so the stubs active
 // as the step ends are the ones active while it ran.
 function withActiveStubs(step: Step, result: StepResult, activeStubs: ReadonlySet<StubName>): StepResult {
-  if (activeStubs.size === 0 || !ASSERTION_STEP_TYPES.includes(step.type)) return result;
+  if (activeStubs.size === 0 || !isAssertionStepType(step.type)) return result;
   return { ...result, activeStubs: [...activeStubs].sort() };
 }
-
-// What the stub, request-check and storage steps use: the run's session, values and the secrets
-// resolved for stub starts and storage writes.
-const networkContext = (context: StepContext): NetworkStepContext => ({
-  project: context.cleared.project, session: context.session, values: context.values, remembered: context.remembered,
-  secrets: stubAndStorageSecretStore(context.secrets), clock: context.ports.clock, activeStubs: context.activeStubs,
-});
-
-// What the clock and clipboard steps use: the run's session and values.
-const clockAndClipboardContext = (context: StepContext): ClockAndClipboardContext => ({
-  project: context.cleared.project, session: context.session, values: context.values, remembered: context.remembered,
-  clock: context.ports.clock,
-});
-
-// What the page-script steps use: the run's values and the scripts the plan names, with their sources.
-const pageScriptContext = (context: RunContext): PageScriptContext => ({
-  project: context.cleared.project, scripts: context.scripts, values: context.values,
-  remembered: context.remembered, clock: context.ports.clock, logger: context.logger, holdsSecret: context.holdsSecret,
-});
-
-// What the runtime guard is given for a step that acts on no element.
-const NO_ELEMENT: ResolvedElement = { role: null, name: null, box: null, formSubmitName: null, linkUrl: null };
-
-// Runs one step on a document of the page: the top document, or an iframe's for the steps inside a
-// frame step, which report under the frame step's own index.
-async function executeStep(step: RunStep, index: number, session: DocumentSession, target: Target, context: StepContext): Promise<StepResult> {
-  const base = { index, type: step.type } as const;
-  switch (step.type) {
-    case 'navigate': {
-      let path = step.url;
-      if (typeof path !== 'string') {
-        // A path template's values are only known now, so the runtime guard checks the final URL.
-        const resolved = resolvePathTemplate(path, context.values, context.cleared.project);
-        if (!resolved.ok) return { ...base, ...stepFailed(resolved.error) };
-        path = resolved.value;
-        const verdict = context.gate.guardAction({ type: 'navigate', url: path }, index, NO_ELEMENT, null, target.locale);
-        if (verdict.kind === 'deny') {
-          keepDenial(verdict, context);
-          return { ...base, ...stepFailed(StepCode.PolicyDenied) };
-        }
-      }
-      const url = new URL(path, context.inputs.baseUrl);
-      if (!context.cleared.project.origins.some((origin) => origin === url.origin)) return { ...base, ...stepFailed(StepCode.OriginNotAllowed) };
-      const navigated = await session.navigate(url.href, { scripts: step.scripts ?? NavigateScripts.Enabled });
-      return navigated.ok ? { ...base, outcome: 'passed' } : { ...base, ...stepFailed(navigated.error.code) };
-    }
-    case 'click':
-    case 'hover':
-    case 'select':
-    case 'upload':
-    case 'press': {
-      // Values are substituted first, so the runtime guard and the driver see the final text.
-      const action = resolveInputStep(step, context.values, context.cleared.project);
-      if (!action.ok) return { ...base, ...stepFailed(action.error) };
-      const acted = await session.act(action.value, guardFor(action.value, index, target, context));
-      return acted.ok ? { ...base, outcome: 'passed' } : { ...base, ...stepFailed(acted.error.code) };
-    }
-    case 'fill': return fillField(step, index, session, target, context);
-    case 'dialog': {
-      // The driver answers the dialog the page opened, asking the runtime guard first with the
-      // dialog's text, so accepting an irreversible one ends the run Denied with nothing sent.
-      const answer = resolveDialogStep(step, context);
-      if (!answer.ok) return { ...base, ...stepFailed(answer.error) };
-      const acted = await session.act(answer.value, guardFor(answer.value, index, target, context));
-      return acted.ok ? { ...base, outcome: 'passed' } : { ...base, ...stepFailed(acted.error.code) };
-    }
-    case 'frame': {
-      const locator = resolveLocator(step.locator, context.values, context.cleared.project);
-      if (!locator.ok) return { ...base, ...stepFailed(locator.error) };
-      const entered = await session.frame(locator.value);
-      if (!entered.ok) return { ...base, ...stepFailed(entered.error.code) };
-      return runInnerSteps(step, index, entered.value, target, context);
-    }
-    case 'remember':
-      if ('response' in step.from) return { ...base, ...(await rememberFromResponse(step, step.from, index, networkContext(context))) };
-      if ('clipboard' in step.from) return { ...base, ...(await rememberFromClipboard(step, index, clockAndClipboardContext(context))) };
-      return rememberFromPage(step, step.from, index, session, context);
-    case 'download': return downloadFile(step, index, session, target, context);
-    case 'expectDownload': return checkDownload(step, index, context);
-    case 'newTab': return runInNewTab(step, index, target, context);
-    // The session's network and storage ports carry these out.
-    case 'stub': return { ...base, ...(await runStubStep(step, networkContext(context))) };
-    case 'resetRequests': return { ...base, ...(await resetRequests(step, networkContext(context))) };
-    case 'expectRequests': return { ...base, ...(await checkRequests(step, networkContext(context))) };
-    case 'expectResponse': return { ...base, ...(await checkResponse(step, networkContext(context))) };
-    case 'setStorage': case 'removeStorage': return { ...base, ...(await writeStorage(step, networkContext(context))) };
-    case 'expectStorage': return { ...base, ...(await checkStorage(step, networkContext(context))) };
-    // The session's clock and clipboard ports carry these out.
-    case 'advanceClock': return { ...base, ...(await advanceClock(step, clockAndClipboardContext(context))) };
-    case 'expectClipboard': return { ...base, ...(await checkClipboard(step, clockAndClipboardContext(context))) };
-    // Page scripts run through the script port of the document the step stands in.
-    case 'evaluate': return { ...base, ...(await runEvaluate(step, index, session, pageScriptContext(context))) };
-    case 'expectScript': return { ...base, ...(await runScriptCheck(step, index, session, pageScriptContext(context))) };
-    // Database commands run in a workload container through the run's port, not in the browser. A
-    // run that runs them always has a runner: run() refused it before any step otherwise.
-    case 'database':
-    case 'expectDatabase': {
-      const done = step.type === 'database' ? await runDatabaseStep(step, index, context.commands) : await runDatabaseCheck(step, index, context.commands);
-      return { ...base, ...done };
-    }
-    case 'expect': {
-      const locator = resolveLocator(step.locator, context.values, context.cleared.project);
-      if (!locator.ok) return { ...base, ...stepFailed(locator.error) };
-      const assertion = resolveElementAssertion(step.assert, context.values, context.cleared.project);
-      if (!assertion.ok) return { ...base, ...stepFailed(assertion.error) };
-      // A DOM check asks the probe to read the class, style or attribute it compares.
-      const read = domReadFor(assertion.value);
-      let last: ElementProbe | null = null;
-      const verdict = await poll(context, session, async () => {
-        last = await session.probe(locator.value, read);
-        return checkElement(assertion.value, last, context.inputs.baseUrl);
-      });
-      if (isCheckStopped(verdict)) return { ...base, ...stepFailed(verdict.code) };
-      return verdict.pass
-        ? { ...base, outcome: 'passed' }
-        : { ...base, ...stepFailed(verdict.code ?? StepCode.AssertionFailed), observed: observe(last, context, context.secretFilledFields.has(canonicalJson(locator.value))) };
-    }
-    case 'expectPage': {
-      const assertion = resolvePageAssertion(step.assert, context);
-      if (!assertion.ok) return { ...base, ...stepFailed(assertion.error) };
-      let title = '';
-      const verdict = await poll(context, session, async () => {
-        const page = await session.page();
-        if (!page.ok) {
-          return verdictOfFailedRead(page.error, context.logger);
-        }
-        title = page.value.title;
-        return checkPage(assertion.value, page.value, context.inputs.baseUrl);
-      });
-      if (isCheckStopped(verdict)) {
-        return { ...base, ...stepFailed(verdict.code) };
-      }
-      return verdict.pass
-        ? { ...base, outcome: 'passed' }
-        : { ...base, ...stepFailed(verdict.code ?? StepCode.AssertionFailed), observed: context.isShortSecret(title) ? SECRET_PLACEHOLDER : context.redactor.text(title) };
-    }
-    case 'a11yAudit': {
-      const audited = await session.audit();
-      if (!audited.ok) {
-        return { ...base, ...stepFailed(codeOfFailedRead(audited.error, context.logger)) };
-      }
-      const findings = [...audited.value].sort(byRuleId);
-      context.logger.log({ kind: 'audit', stepIndex: index, findings: findings.length });
-      const gateFails = step.mode === 'gate' && findings.length > 0;
-      return { ...base, outcome: gateFails ? 'failed' : 'passed', findings, ...(gateFails ? { code: StepCode.AccessibilityViolations } : {}) };
-    }
-    case 'call':
-    case 'expectBackend': {
-      // A run that calls services always has a caller: run() refused it before any step otherwise.
-      const done = step.type === 'call' ? await runCallStep(step, index, context.calls) : await runBackendCheck(step, index, context.calls);
-      return { ...base, ...done };
-    }
-    case 'capture': {
-      const taken = await pixelsWithSecretsHidden(session, context);
-      if (!taken.ok) {
-        return taken.error.code === StepCode.NotFound
-          ? { ...base, outcome: 'passed', code: StepCode.CaptureLeftOut }
-          : { ...base, ...stepFailed(codeOfFailedCapture(taken.error, context.logger)) };
-      }
-      const reference = await context.ports.artifacts.put(`${target.id}/${step.name}.png`, taken.value, 'image/png');
-      context.logger.log({ kind: 'artifact', stepIndex: index, artifact: reference.name, sha256: reference.sha256 });
-      return { ...base, outcome: 'passed', artifact: reference };
-    }
-  }
-}
-
-function byRuleId(left: A11yFinding, right: A11yFinding): number {
-  if (left.ruleId === right.ruleId) {
-    return 0;
-  }
-  return left.ruleId < right.ruleId ? -1 : 1;
-}
-
-// The viewport with personal data and every field a secret was typed into masked. Not-found says one of
-// those fields cannot be masked: text drawn as pixels is out of reach of any later scan, so no image is
-// better than an image that may show the secret. Any other failure says the page could not be captured.
-async function pixelsWithSecretsHidden(session: DocumentSession, context: RunContext): Promise<Result<Uint8Array, DriverError>> {
-  const selectors = context.ports.redactor.selectors;
-  const fields = [...context.secretFilledFields.values()];
-  if (fields.length === 0) {
-    return session.screenshot(selectors);
-  }
-  return session.screenshotHidingFields(selectors, fields, context.holdsSecret);
-}
-
-// Reads a remember step's value from the page through the prober, waiting as a check waits until
-// the locator matches one element with non-empty text (or input value), whitespace normalised, or
-// with a non-empty attribute, taken exactly as the page holds it.
-// The text must be safe text no longer than the project's maximumTextLength. Only the value's name
-// and sha256 are kept in the result and the events, never the text.
-async function rememberFromPage(
-  step: Extract<Step, { type: 'remember' }>, from: RememberedElementSource, index: number, session: DocumentSession, context: RunContext,
-): Promise<StepResult> {
-  const base = { index, type: step.type } as const;
-  const locator = resolveLocator(from.element, context.values, context.cleared.project);
-  if (!locator.ok) return { ...base, ...stepFailed(locator.error) };
-  // A remembered value is hashed into the result and can be sent on by a later step, and a hash of
-  // a short secret is as good as the secret.
-  if (context.secretFilledFields.has(canonicalJson(locator.value))) {
-    return { ...base, ...stepFailed(StepCode.ValueHoldsSecret) };
-  }
-  const read: DomRead | null = from.read === 'attribute' ? { kind: 'attribute', name: from.attribute } : null;
-  const textOf = (element: OneElementRead): string => {
-    if (from.read === 'attribute') {
-      return element.dom?.kind === 'attribute' ? element.dom.value ?? '' : '';
-    }
-    return normalise(from.read === 'value' ? element.value ?? '' : element.text);
-  };
-  const seen = { text: '' };
-  const verdict = await poll(context, session, async (): Promise<Verdict> => {
-    const probe = await session.probe(locator.value, read);
-    const found = oneElementOf(probe);
-    if (!found.ok) {
-      return { pass: false, code: found.error };
-    }
-    seen.text = textOf(found.value);
-    return seen.text === '' ? { pass: false, code: null } : { pass: true, code: null };
-  });
-  // A remember step keeps no observation, so a stopped check and the check's own answer fail it alike.
-  if (!verdict.pass) return { ...base, ...stepFailed(verdict.code ?? StepCode.ValueEmpty) };
-  const kept = context.remembered.remember(step.name, seen.text, index);
-  return kept.ok ? { ...base, outcome: 'passed', remembered: kept.value } : { ...base, ...stepFailed(kept.error) };
-}
-
-// A page check with a meta tag's expected content resolved, when it is a value reference.
-function resolvePageAssertion(assertion: PageAssertion, context: RunContext): Result<PageAssertion, StepCode> {
-  if (assertion.kind !== 'metaContent') return { ok: true, value: assertion };
-  const expected = resolveText(assertion.value, context.values, context.cleared.project.limits.maximumTextLength);
-  return expected.ok ? { ok: true, value: { ...assertion, value: expected.value } } : expected;
-}
-
-// A download step: the driver clicks the element, asking the runtime guard first as for any click,
-// and saves the one file the click starts, within the project's maximumDownloadBytes. The file is
-// kept in memory under the plan's name for the checks after it; the result keeps only its name,
-// media type, size and sha256.
-async function downloadFile(step: DownloadStep, index: number, session: DocumentSession, target: Target, context: RunContext): Promise<StepResult> {
-  const base = { index, type: step.type } as const;
-  const locator = resolveLocator(step.locator, context.values, context.cleared.project);
-  if (!locator.ok) return { ...base, ...stepFailed(locator.error) };
-  const resolved: ResolvedDownloadStep = { type: step.type, name: step.name, locator: locator.value };
-  const saved = await session.download(resolved, context.cleared.project.limits.maximumDownloadBytes, guardFor(resolved, index, target, context));
-  if (!saved.ok) return { ...base, ...stepFailed(saved.error.code) };
-  const file = saved.value;
-  context.downloads.set(step.name, file);
-  const record: DownloadRecord = {
-    downloadName: step.name, fileName: keptText(file.fileName, context), mediaType: keptText(file.mediaType, context),
-    size: file.bytes.length, sha256: file.sha256,
-  };
-  return { ...base, outcome: 'passed', download: record };
-}
-
-// Text the server chose that a result keeps, such as a file name: redacted and capped.
-const keptText = (text: string, context: RunContext): string => (context.isShortSecret(text) ? SECRET_PLACEHOLDER : context.redactor.text(text).slice(0, 200));
-
-// A media type's essence, such as "text/csv" for "text/csv; charset=utf-8", in lower case.
-const mediaTypeEssence = (mediaType: string): string => (mediaType.split(';')[0] ?? '').trim().toLowerCase();
-
-// The file's bytes as text, or undefined when they are not UTF-8 text: invalid UTF-8, or a NUL
-// byte, which no text file holds.
-function downloadText(bytes: Uint8Array): string | undefined {
-  try {
-    const text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
-    return text.includes('\u0000') ? undefined : text;
-  } catch {
-    return undefined;
-  }
-}
-
-// Checks a file an earlier download step saved. None of its text is ever kept: a failed check
-// keeps only its code.
-function checkDownload(step: Extract<Step, { type: 'expectDownload' }>, index: number, context: RunContext): StepResult {
-  const base = { index, type: step.type } as const;
-  // The parser rejects a check of a download no earlier step defined, and a failed download skips
-  // every later step, so the file is always there.
-  const file = context.downloads.get(step.download);
-  if (file === undefined) return { ...base, ...stepFailed(StepCode.NoDownload) };
-  const verdict = (pass: boolean): StepResult => (pass ? { ...base, outcome: 'passed' } : { ...base, ...stepFailed(StepCode.AssertionFailed) });
-  const assertion = step.assert;
-  switch (assertion.kind) {
-    case 'sizeAtMost': return verdict(file.bytes.length <= assertion.value);
-    case 'sizeAtLeast': return verdict(file.bytes.length >= assertion.value);
-    case 'mediaTypeEquals': return verdict(mediaTypeEssence(file.mediaType) === mediaTypeEssence(assertion.value));
-    case 'fileNameEquals': case 'contentContains': case 'contentExcludes': {
-      const expected = resolveText(assertion.value, context.values, context.cleared.project.limits.maximumTextLength);
-      if (!expected.ok) return { ...base, ...stepFailed(expected.error) };
-      if (assertion.kind === 'fileNameEquals') return verdict(file.fileName === expected.value);
-      const text = downloadText(file.bytes);
-      if (text === undefined) return { ...base, ...stepFailed(StepCode.DownloadNotText) };
-      // An empty file proves nothing about what it holds or leaves out, so it fails both.
-      if (text === '') return verdict(false);
-      return verdict(assertion.kind === 'contentContains' ? text.includes(expected.value) : !text.includes(expected.value));
-    }
-  }
-}
-
-// A newTab step: opens its URL in a second tab of the session's browser context, runs its steps
-// there in order and closes the tab, whatever they did. A tab that will not close fails a step that
-// had passed, and never takes the place of a real failure.
-async function runInNewTab(step: Extract<RunStep, { type: 'newTab' }>, index: number, target: Target, context: StepContext): Promise<StepResult> {
-  const base = { index, type: step.type } as const;
-  let path = step.url;
-  if (typeof path !== 'string') {
-    // As for a navigate: a path template's values are only known now, so the guard checks the final URL.
-    const resolved = resolvePathTemplate(path, context.values, context.cleared.project);
-    if (!resolved.ok) return { ...base, ...stepFailed(resolved.error) };
-    path = resolved.value;
-    const verdict = context.gate.guardAction({ type: 'navigate', url: path }, index, NO_ELEMENT, null, target.locale);
-    if (verdict.kind === 'deny') {
-      keepDenial(verdict, context);
-      return { ...base, ...stepFailed(StepCode.PolicyDenied) };
-    }
-  }
-  const url = new URL(path, context.inputs.baseUrl);
-  if (!context.cleared.project.origins.some((origin) => origin === url.origin)) return { ...base, ...stepFailed(StepCode.OriginNotAllowed) };
-  const opened = await context.session.newTab(url.href);
-  if (!opened.ok) return { ...base, ...stepFailed(opened.error.code) };
-  const tab = opened.value;
-  const done = await runInnerSteps(step, index, tab, target, context);
-  try {
-    await tab.close();
-    return done;
-  } catch (error) {
-    const code = codeForThrow(error, tab, context.logger);
-    return done.outcome === 'passed' ? { ...done, ...stepFailed(code) } : done;
-  }
-}
-
-// A dialog step with its expected text's value references replaced, as a driver must receive it.
-function resolveDialogStep(step: DialogStep, context: RunContext): Result<ResolvedDialogStep, StepCode> {
-  if (step.expectText === undefined) return success({ type: step.type, action: step.action });
-  const expected = resolveText(step.expectText, context.values, context.cleared.project.limits.maximumTextLength);
-  return expected.ok ? success({ type: step.type, action: step.action, expectText: expected.value }) : expected;
-}
-
-// A fill as the runtime guard reads it, with the plan's secret reference, and as the driver performs
-// it, with the secret preflight resolved for it, opaque, so the driver reveals it only as it types.
-type ResolvedFill = { readonly guarded: ResolvedActionStep; readonly performable: PerformableFill };
-
-// Values are substituted first, so the runtime guard and the driver see the final text.
-function resolveFill(step: RunFillStep, context: RunContext): Result<ResolvedFill, StepCode> {
-  const locator = resolveLocator(step.locator, context.values, context.cleared.project);
-  if (!locator.ok) return locator;
-  const { type } = step;
-  if ('secret' in step) {
-    const performable: PerformableFill = { type, locator: locator.value, value: { kind: FillValueKind.Secret, secret: step.secret } };
-    return success({ guarded: { type, locator: locator.value, value: step.value }, performable });
-  }
-  const text = resolveFillText(step.value, context.values, context.cleared.project);
-  if (!text.ok) return text;
-  const value: FillValue = typeof text.value === 'string' ? { kind: FillValueKind.Text, text: text.value } : { kind: FillValueKind.Lines, lines: text.value.lines };
-  return success({ guarded: { type, locator: locator.value, value: text.value }, performable: { type, locator: locator.value, value } });
-}
-
-async function fillField(step: RunFillStep, index: number, session: DocumentSession, target: Target, context: RunContext): Promise<StepResult> {
-  const base = { index, type: step.type } as const;
-  const fill = resolveFill(step, context);
-  if (!fill.ok) return { ...base, ...stepFailed(fill.error) };
-  // Marked before acting: a fill that fails part way may still have typed some of the secret.
-  markFilledField(fill.value.performable, context.secretFilledFields);
-  const acted = await session.act(fill.value.performable, guardFor(fill.value.guarded, index, target, context));
-  return acted.ok ? { ...base, outcome: 'passed' } : { ...base, ...stepFailed(acted.error.code) };
-}
-
-// Keeps the fields whose last fill typed a secret, by their locator.
-function markFilledField(fill: PerformableFill, secretFilledFields: Map<string, ResolvedLocator>): void {
-  const key = canonicalJson(fill.locator);
-  switch (fill.value.kind) {
-    case FillValueKind.Secret: secretFilledFields.set(key, fill.locator); break;
-    case FillValueKind.Text: case FillValueKind.Lines: secretFilledFields.delete(key); break;
-  }
-}
-
-// Keeps the runtime guard's denial, so the run can end Denied naming the rule, and marked
-// unrecorded when the audit sink did not record it.
-function keepDenial(verdict: Extract<GuardVerdict, { kind: 'deny' }>, context: RunContext): void {
-  context.denials.push({ rule: verdict.rule, stepIndex: verdict.stepIndex, ...(verdict.unrecorded ? { unrecorded: true } : {}) });
-}
-
-// The runtime guard the driver asks before the step's input event, with the element it resolved
-// and, for a dialog step, the open dialog's text.
-function guardFor(step: Step, index: number, target: Target, context: RunContext): ActionGuard {
-  return (element, dialogText) => {
-    const verdict = context.gate.guardAction(step, index, element, dialogText, target.locale);
-    if (verdict.kind === 'deny') keepDenial(verdict, context);
-    return verdict;
-  };
-}
-
-const TARGET_CRASHED = StepCode.TargetCrashed;
-// A check the page stopped rather than answered: its renderer died while the check waited, or a read
-// of it failed for a reason that is the adapter's. What the check last saw then says nothing about the
-// page, so the step fails with this code and keeps no observation. Every other failed verdict is the
-// check's own answer, which the step fails with, keeping what it saw where the step has an observation.
-type CheckStopped = { readonly pass: false; readonly code: typeof TARGET_CRASHED | typeof ADAPTER_ERROR };
-type PollVerdict = Verdict | CheckStopped;
-const isCheckStopped = (verdict: PollVerdict): verdict is CheckStopped => verdict.code === TARGET_CRASHED || verdict.code === ADAPTER_ERROR;
-
-const verdictOfFailedRead = (readFailure: PageReadFailure, logger: Logger): PollVerdict => ({ pass: false, code: codeOfFailedRead(readFailure, logger) });
-
-// Repeats a check until it passes or the step timeout runs out. A page that crashes stops the
-// wait at once: nothing on it can change any more, and the same goes for a read of the page that failed.
-async function poll(context: RunContext, session: DocumentSession, check: () => Promise<PollVerdict>): Promise<PollVerdict> {
-  const deadline = context.ports.clock.now() + context.cleared.project.limits.stepTimeoutMilliseconds;
-  for (;;) {
-    const verdict = await check();
-    // Looked at before a pass is accepted: what a dying page last showed proves nothing. A probe has no
-    // count for a crash either, so one that read nothing on a dead page is told apart here.
-    if (session.crashed()) return { pass: false, code: TARGET_CRASHED };
-    // Waiting cannot change a selector the browser rejects, a dialog, which only a later step can
-    // answer, the browser's own error page, which runs no script that could leave it, or a read that failed.
-    if (verdict.pass || isCheckStopped(verdict) || verdict.code === 'selector-invalid' || verdict.code === UnreadablePage.DialogOpen
-      || verdict.code === 'navigation-failed') return verdict;
-    if (context.ports.clock.now() >= deadline) return verdict;
-    await context.ports.clock.sleep(POLL_INTERVAL_MILLISECONDS);
-  }
-}
-
-const UNREADABLE_PAGE_OBSERVATIONS = {
-  [UnreadablePage.ReadFailed]: '(page unreadable)',
-  [UnreadablePage.DialogOpen]: '(a dialog is open)',
-  [UnreadablePage.BrowserErrorPage]: '(the browser shows its own error page)',
-} as const satisfies Record<UnreadablePage, string>;
-
-// What a failed check saw, redacted: never the text of a sensitive element, nothing read from a
-// field a secret was typed into, and no text that is a whole short secret.
-function observe(probe: ElementProbe | null, context: RunContext, filledFromSecret: boolean): string {
-  if (probe === null || probe.count === 0 || probe.count === 'selector-invalid') {
-    return '(no element)';
-  }
-  if (typeof probe.count === 'string') {
-    return UNREADABLE_PAGE_OBSERVATIONS[probe.count];
-  }
-  if (!isOneElementRead(probe)) {
-    return `(${probe.count} elements)`;
-  }
-  if (probe.sensitive) return SENSITIVE_PLACEHOLDER;
-  const asWritten = probe.value ?? probe.text;
-  if (filledFromSecret || context.isShortSecret(asWritten)) return SECRET_PLACEHOLDER;
-  // Secrets go while the text is as the page wrote it. Collapsing first could join what a secret
-  // holds apart; personal-data patterns come after, as they read collapsed text.
-  const seen = normalise(context.withoutSecrets(asWritten));
-  return context.redactor.text(withoutRememberedTexts(seen, context.rememberedTexts)).slice(0, 200);
-}
-
-// Shown instead of a remembered value's text in what a failed check observed.
-const REMEMBERED_PLACEHOLDER = '[redacted:remembered-value]';
-// Shorter remembered texts, such as "3", are replaced only when they are the whole observation:
-// searched for inside longer text they would blank out unrelated characters.
-const SHORTEST_REMEMBERED_SEARCH = 8;
-
-// An observation with every text a remember step read replaced, so a remembered value never
-// reaches the result through a failed check.
-function withoutRememberedTexts(observed: string, remembered: ReadonlySet<string>): string {
-  if (remembered.has(observed)) return REMEMBERED_PLACEHOLDER;
-  let kept = observed;
-  const longestFirst = [...remembered].filter((text) => text.length >= SHORTEST_REMEMBERED_SEARCH).sort((left, right) => right.length - left.length);
-  for (const text of longestFirst) kept = kept.split(text).join(REMEMBERED_PLACEHOLDER);
-  return kept;
-}
-
-const errorText = (error: unknown): string => (error instanceof Error ? error.message : String(error)).slice(0, 200);
 
 function unavailableResult(targetId: string, unavailable: Unavailable, context: NothingRanContext, startedAt: number): RunResult {
   logKeepingTheResult({ kind: 'run.state', state: 'TargetUnavailable', targetId, code: unavailable.reason }, context.logger);

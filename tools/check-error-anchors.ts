@@ -15,6 +15,8 @@ export const ERRORS_PAGE = 'docs/errors.md';
 export const ERROR_CODE_UNIONS: readonly { readonly file: string; readonly name: string }[] = [
   { file: 'packages/engine/src/plan/plan-decoders.ts', name: 'PLAN_ERROR_CODES' },
   { file: 'packages/engine/src/plan/readable/text-syntax.ts', name: 'TextErrorCode' },
+  // StepErrorCode takes its codes from StepCode, every code a step's result can hold.
+  { file: 'packages/contracts/src/foundation/StepCode.ts', name: 'StepCode' },
   { file: 'packages/engine/src/run-values.ts', name: 'StepErrorCode' },
   { file: 'packages/engine/src/evidence/suite-report.ts', name: 'SuiteDecodeErrorCode' },
   { file: 'packages/contracts/src/browser-driver.ts', name: 'DriverErrorCode' },
@@ -75,7 +77,8 @@ export function readDeclaredCodes(tokens: readonly Token[], name: string): Decla
     else if (isPunctuator(token, '}') || isPunctuator(token, ']') || isPunctuator(token, ')')) depth -= 1;
     else if (isPunctuator(token, ';') && depth === 0) break;
     else if (token.kind === 'string') codes.push(token.text);
-    else if (token.kind === 'identifier' && namesBorrowedSet(tokens, index)) {
+    // `typeof Set.Member` names the set, not `typeof`.
+    else if (token.kind === 'identifier' && token.text !== 'typeof' && namesBorrowedSet(tokens, index)) {
       borrowedSets.add(token.text);
     }
   }

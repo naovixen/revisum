@@ -12,6 +12,7 @@ import { isOneOf } from './plan-decoders.ts';
 import {
   DATABASE_COMMAND_FEATURE, DOM_CHECKS_FEATURE, INLINE_SCRIPT_FEATURE, LOCATOR_FEATURES, NAMED_SCRIPT_FEATURE,
 } from './plan-grammar.ts';
+import { stepsWithin, visitSteps } from './VisitSteps.ts';
 
 // One use of an unsafe feature, at the JSON path of the field that names it.
 export type UnsafeConstruct = { readonly feature: UnsafeFeature; readonly path: string };
@@ -27,10 +28,9 @@ function stepConstructs(step: Step, path: string): UnsafeConstruct[] {
   switch (step.type) {
     case 'click': case 'download': case 'hover': case 'fill': case 'select': case 'upload': case 'press':
       return locatorConstructs(step.locator, `${path}.locator`);
+    // The steps inside a frame or a second tab are visited on their own.
     case 'frame':
-      return [...locatorConstructs(step.locator, `${path}.locator`), ...listConstructs(step.steps, `${path}.steps`)];
-    case 'newTab':
-      return listConstructs(step.steps, `${path}.steps`);
+      return locatorConstructs(step.locator, `${path}.locator`);
     case 'expect': {
       const check = isOneOf(DOM_CHECK_KINDS, step.assert.kind) ? [{ feature: DOM_CHECKS_FEATURE, path: `${path}.assert.kind` }] : [];
       return [...locatorConstructs(step.locator, `${path}.locator`), ...check];
@@ -46,7 +46,7 @@ function stepConstructs(step: Step, path: string): UnsafeConstruct[] {
         : { feature: INLINE_SCRIPT_FEATURE, path: `${path}.script.inline` }];
     case 'database': case 'expectDatabase':
       return [{ feature: DATABASE_COMMAND_FEATURE, path: `${path}.type` }];
-    case 'navigate': case 'dialog': case 'expectPage': case 'expectDownload': case 'a11yAudit': case 'capture':
+    case 'navigate': case 'newTab': case 'dialog': case 'expectPage': case 'expectDownload': case 'a11yAudit': case 'capture':
     case 'call': case 'expectBackend':
     case 'stub': case 'resetRequests': case 'expectRequests': case 'expectResponse':
     case 'setStorage': case 'removeStorage': case 'expectStorage':
@@ -55,8 +55,13 @@ function stepConstructs(step: Step, path: string): UnsafeConstruct[] {
   }
 }
 
-const listConstructs = (steps: readonly Step[], path: string): UnsafeConstruct[] =>
-  steps.flatMap((step, index) => stepConstructs(step, `${path}[${index}]`));
+function listConstructs(steps: readonly Step[], path: string): UnsafeConstruct[] {
+  const constructs: UnsafeConstruct[] = [];
+  visitSteps(steps, (step, place) => {
+    constructs.push(...stepConstructs(step, place.path));
+  }, path);
+  return constructs;
+}
 
 // Every use of an unsafe feature in the plan, in document order: its steps, frames and second tabs
 // included, then its cleanup. Empty for a closed plan.
@@ -76,14 +81,9 @@ export function unsafeFeaturesOf(plan: Plan): readonly UnsafeFeature[] {
 export function declarationsNamedBy(plan: Plan): { readonly scripts: readonly ScriptName[]; readonly commands: readonly CommandName[] } {
   const scripts = new Set<ScriptName>();
   const commands = new Set<CommandName>();
-  const visit = (steps: readonly Step[]): void => {
-    for (const step of steps) {
-      if (step.type === 'frame' || step.type === 'newTab') visit(step.steps);
-      if ((step.type === 'evaluate' || step.type === 'expectScript') && typeof step.script === 'string') scripts.add(step.script);
-      if (step.type === 'database' || step.type === 'expectDatabase') commands.add(step.command);
-    }
-  };
-  visit(plan.steps);
-  visit(plan.cleanup ?? []);
+  for (const step of [...stepsWithin(plan.steps), ...(plan.cleanup ?? [])]) {
+    if ((step.type === 'evaluate' || step.type === 'expectScript') && typeof step.script === 'string') scripts.add(step.script);
+    if (step.type === 'database' || step.type === 'expectDatabase') commands.add(step.command);
+  }
   return { scripts: [...scripts], commands: [...commands] };
 }

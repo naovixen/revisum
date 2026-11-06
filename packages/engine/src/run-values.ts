@@ -4,7 +4,7 @@
 // seed or clock start) gives new unique ones. Substitution happens before the policy gate's
 // runtime guard, so the guard sees the final text and URL.
 import {
-  failure, literalText, referencedValueName, success,
+  failure, literalText, referencedValueName, StepCode, success,
   type AllowedUrl, type ElementAssertion, type GeneratedValue, type Locator, type PathTemplate, type Plan,
   type PlanClock, type ResolvedActionStep, type ResolvedMultiLineText, type ResolvedElementAssertion, type ResolvedLocator, type Result, type SafeText, type SecretReference, type Step,
   type Target,
@@ -47,9 +47,10 @@ const NO_VALUES: RunValues = new Map();
 //   capture-left-out   a capture took no image, since a field a secret was typed into is still on
 //                      the page but cannot be found to mask it.
 export type StepErrorCode =
-  | 'value-empty' | 'value-unsafe' | 'value-too-long' | 'state-not-exposed' | 'download-not-text' | 'request-not-seen'
-  | 'script-result-too-large' | 'script-result-invalid' | 'command-failed' | 'command-timeout' | 'command-output-invalid'
-  | 'value-holds-secret' | 'capture-left-out';
+  | typeof StepCode.ValueEmpty | typeof StepCode.ValueUnsafe | typeof StepCode.ValueTooLong | typeof StepCode.StateNotExposed
+  | typeof StepCode.DownloadNotText | typeof StepCode.RequestNotSeen | typeof StepCode.ScriptResultTooLarge
+  | typeof StepCode.ScriptResultInvalid | typeof StepCode.CommandFailed | typeof StepCode.CommandTimeout
+  | typeof StepCode.CommandOutputInvalid | typeof StepCode.ValueHoldsSecret | typeof StepCode.CaptureLeftOut;
 
 const UNIQUE_PART_LENGTH = 10;
 const BASE_36 = 36;

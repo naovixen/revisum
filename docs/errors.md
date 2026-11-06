@@ -221,6 +221,14 @@ Step error, on a step that passes. A `capture` took no image, because a field a 
 
 A field that has gone does not cause this: when the page has removed it, or its document was replaced, as after most sign-ins, there is nothing left to mask and the capture is taken as usual. The exception is a page that has rendered the field afresh under another label, still holding what was typed or part of it: no locator finds that one, so no image is kept. If you do see this code, make the field's locator still find it when the capture runs, capture before typing the secret, or type plain text into that field first.
 
+## a11y-violations
+
+Step error. An `a11yAudit` step in `gate` mode found accessibility findings, so the step fails and every later step is skipped. The findings are kept in the step's result, sorted by rule. In `report` mode the same findings are kept and the step passes. Fix what the findings name, or audit in `report` mode while you do.
+
+## adapter-error
+
+Step error. The browser adapter threw, a read of the page failed for a reason that is the adapter's own, or the browser refused to let a request the step made go on. What the step saw is unknown, so the run ends `Errored`, not `Failed`: it could not test, which says nothing about the product. The adapter's message goes only to the redacted event log, never into the result. Run the plan again on a working browser; if it recurs on one page, look at the event log for that step.
+
 ## state-not-exposed
 
 Step error. A state check (`selected`, `unselected`, `expanded`, `collapsed`, `pressed`, `unpressed` or `current`) targets an element that does not expose that state in the accessibility tree, for example a tab whose selection is shown only by a CSS class. The check fails rather than passes. Give the element the matching ARIA attribute (`aria-selected`, `aria-expanded`, `aria-pressed` or `aria-current`) or its native equivalent, or check another state.

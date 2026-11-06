@@ -15,7 +15,8 @@ import { failure, success, type Plan, type Result, type SinkError, type StepType
 import { entriesInKeyOrder } from '../../hashing.ts';
 import type { PlanLimits } from '../../project/project-parser.ts';
 import type { PlanError, PlanErrorCode } from '../plan-decoders.ts';
-import { CRITERION_FIELD, STEP_FIELDS } from '../plan-grammar.ts';
+import { CRITERION_FIELD } from '../plan-grammar.ts';
+import { isAssertionStepType } from '../StepFacts.ts';
 import {
   CLEANUP_LINE, CRITERION_LINE, HEADERS, STEP_STATEMENTS, UNSAFE_MARK, VALUES_LINE, VALUE_DEFINITION, needsUnsafeMark,
   type StatementBlock,
@@ -55,7 +56,6 @@ const STEPS_FIELD = 'steps';
 const SCRIPT_FIELD = 'script';
 const INLINE_FIELD = 'inline';
 const SOURCE_FIELD = 'source';
-const isCheck = (type: StepType): boolean => STEP_FIELDS[type].required.includes(CRITERION_FIELD);
 const INDENT = '  ';
 const LINE_START: TextPosition = { line: 1, column: 1 };
 // Script lines are joined with LF, and a source is split at LF to write them: one line each.
@@ -164,7 +164,7 @@ export function readPlanText(text: string, limits: PlanLimits): Result<TextReadi
       // With an Origin: header, a path in Go to or In new tab at is resolved against it.
       const url = step['url'];
       if (origin !== undefined && typeof url === 'string' && url.startsWith('/')) step['url'] = `${origin.replace(/\/+$/, '')}${url}`;
-      if (isCheck(type)) {
+      if (isAssertionStepType(type)) {
         if (criterion === undefined) refuse('no-criterion', number, 1);
         else { step[CRITERION_FIELD] = criterion.id; positions.set(`${stepPath}.${CRITERION_FIELD}`, criterion.position); }
       }
@@ -356,7 +356,7 @@ export function writePlanText(plan: Plan): string {
         if (text !== undefined) { written = { text, opens: candidate.opens, source }; break; }
       }
       if (type === undefined || written === undefined) { put(depth, undefined); return; }
-      if (isCheck(type) && id !== criterion) {
+      if (isAssertionStepType(type) && id !== criterion) {
         put(depth, CRITERION_LINE.write({ criterion: id }));
         criterion = id;
       }

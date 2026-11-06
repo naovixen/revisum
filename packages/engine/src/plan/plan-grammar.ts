@@ -1,10 +1,11 @@
-// The plan language's grammar as data: which fields each step and locator has, and the patterns
-// its ids follow. The plan parser reads these tables to decode a plan, and planJsonSchema() reads
-// the same tables to build the published JSON Schema, so the two cannot drift apart.
+// The plan language's grammar as data: which fields each locator has, and the patterns its ids
+// follow; each step type's fields are in StepFacts.ts. The plan parser reads these tables to decode
+// a plan, and planJsonSchema() reads the same tables to build the published JSON Schema, so the two
+// cannot drift apart.
 import {
   DOM_CHECK_KINDS, DOWNLOAD_SIZE_KINDS, DOWNLOAD_TEXT_KINDS, ELEMENT_STATE_KINDS, ELEMENT_TEXT_KINDS, SEMANTIC_LOCATOR_KINDS, PAGE_TEXT_KINDS,
   PLAN_VERSION, STRUCTURAL_LOCATOR_KINDS,
-  type DatabaseCommandStep, type PageScriptStep, type StepType, type StructuralLocatorKind, type UnsafeFeature,
+  type StructuralLocatorKind, type UnsafeFeature,
 } from '@revisum/contracts';
 
 // The one version text a plan may declare. Anything else is refused, so no plan partly runs.
@@ -19,73 +20,6 @@ export const CRITERION_FIELD = 'criterionId';
 // quotation mark for an import.
 export const FROM_FIELD = `from`;
 
-type StepFields = { readonly required: readonly string[]; readonly optional: readonly string[] };
-
-// Every step's fields. `type` is always required; no other field is allowed.
-export const STEP_FIELDS: { readonly [Type in StepType]: StepFields } = {
-  navigate: { required: ['type', 'url'], optional: ['scripts'] },
-  click: { required: ['type', 'locator'], optional: [] },
-  download: { required: ['type', 'name', 'locator'], optional: [] },
-  hover: { required: ['type', 'locator'], optional: [] },
-  fill: { required: ['type', 'locator', 'value'], optional: [] },
-  select: { required: ['type', 'locator', 'option'], optional: [] },
-  upload: { required: ['type', 'locator', 'fixture'], optional: [] },
-  press: { required: ['type', 'locator', 'key'], optional: ['modifiers'] },
-  frame: { required: ['type', 'locator', 'steps'], optional: [] },
-  dialog: { required: ['type', 'action'], optional: ['expectText'] },
-  expect: { required: ['type', 'locator', 'assert', CRITERION_FIELD], optional: [] },
-  expectPage: { required: ['type', 'assert', CRITERION_FIELD], optional: [] },
-  expectDownload: { required: ['type', 'download', 'assert', CRITERION_FIELD], optional: [] },
-  newTab: { required: ['type', 'url', 'steps'], optional: [] },
-  a11yAudit: { required: ['type', 'mode'], optional: [] },
-  capture: { required: ['type', 'name'], optional: [] },
-  remember: { required: ['type', 'name', FROM_FIELD], optional: [] },
-  call: { required: ['type', 'call', 'arguments'], optional: ['remember'] },
-  expectBackend: { required: ['type', 'call', 'arguments', 'field', 'assert', CRITERION_FIELD], optional: [] },
-  // Arguments only with a start; the parser refuses them on a stop.
-  stub: { required: ['type', 'stub', 'action'], optional: ['arguments'] },
-  resetRequests: { required: ['type', 'request'], optional: [] },
-  expectRequests: { required: ['type', 'request', 'count', CRITERION_FIELD], optional: [] },
-  expectResponse: { required: ['type', 'request', 'assert', CRITERION_FIELD], optional: [] },
-  setStorage: { required: ['type', 'entry'], optional: ['arguments'] },
-  removeStorage: { required: ['type', 'entry'], optional: [] },
-  expectStorage: { required: ['type', 'entry', 'assert', CRITERION_FIELD], optional: [] },
-  // An advance without a mode runs timers.
-  advanceClock: { required: ['type', 'by'], optional: ['mode'] },
-  expectClipboard: { required: ['type', 'assert', CRITERION_FIELD], optional: [] },
-  // The unsafe features' steps: a page script or a database command the project declares.
-  evaluate: { required: ['type', 'script', 'arguments'], optional: ['remember'] },
-  expectScript: { required: ['type', 'script', 'arguments', 'field', 'assert', CRITERION_FIELD], optional: [] },
-  database: { required: ['type', 'command', 'arguments'], optional: ['remember'] },
-  expectDatabase: { required: ['type', 'command', 'arguments', 'field', 'assert', CRITERION_FIELD], optional: [] },
-};
-// Stubs, request checks and web storage, which name what the trusted project declares.
-const NETWORK_AND_STORAGE_STEP_TYPES: readonly StepType[] = [
-  'stub', 'resetRequests', 'expectRequests', 'expectResponse', 'setStorage', 'removeStorage', 'expectStorage',
-];
-// Advancing the run's virtual clock and checking the clipboard, which need no declaration.
-const CLOCK_AND_CLIPBOARD_STEP_TYPES: readonly StepType[] = ['advanceClock', 'expectClipboard'];
-// The unsafe features' steps, which a plan may hold only once its project enables their feature.
-export const UNSAFE_STEP_TYPES: readonly StepType[] = ['evaluate', 'expectScript', 'database', 'expectDatabase'];
-export const STEP_TYPES: readonly StepType[] = [
-  'navigate', 'click', 'hover', 'fill', 'select', 'upload', 'press', 'frame', 'dialog', 'expect', 'expectPage', 'a11yAudit', 'capture',
-  'remember', 'download', 'expectDownload', 'newTab', 'call', 'expectBackend', ...NETWORK_AND_STORAGE_STEP_TYPES, ...CLOCK_AND_CLIPBOARD_STEP_TYPES,
-  ...UNSAFE_STEP_TYPES,
-];
-// The steps that check something. A plan needs at least one, or it would pass without proving
-// anything. A clock advance checks nothing.
-export const ASSERTION_STEP_TYPES: readonly StepType[] = [
-  'expect', 'expectPage', 'expectDownload', 'expectBackend', 'expectRequests', 'expectResponse', 'expectStorage', 'expectClipboard',
-  'expectScript', 'expectDatabase',
-];
-// The steps that call a declared service.
-const SERVICE_CALL_STEP_TYPES: readonly StepType[] = ['call', 'expectBackend'];
-// Steps that set up or check the whole test, not act in a page: only the plan's own list of steps
-// may hold them, never a frame or a second tab.
-export const TOP_LEVEL_STEP_TYPES: readonly StepType[] = [...SERVICE_CALL_STEP_TYPES, 'database', 'expectDatabase'];
-// What a plan's cleanup may hold: calls, and database commands.
-export const CLEANUP_STEP_TYPES: readonly StepType[] = ['call', 'database'];
-
 // ---- Which unsafe feature each construct needs --------------------------------------------------
 // The one table of what needs which feature: the parser refuses a construct whose feature the
 // project leaves off, and unsafeFeaturesOf names a plan's features, both from these.
@@ -98,8 +32,6 @@ export const DOM_CHECKS_FEATURE: UnsafeFeature = 'dom-checks';
 export const NAMED_SCRIPT_FEATURE: UnsafeFeature = 'page-script';
 export const INLINE_SCRIPT_FEATURE: UnsafeFeature = 'inline-page-script';
 export const DATABASE_COMMAND_FEATURE: UnsafeFeature = 'database-command';
-export const isPageScriptStepType = (type: StepType): type is PageScriptStep['type'] => type === 'evaluate' || type === 'expectScript';
-export const isDatabaseCommandStepType = (type: StepType): type is DatabaseCommandStep['type'] => type === 'database' || type === 'expectDatabase';
 
 // The fields of each locator kind, in the order they are written. All are required.
 export const LOCATOR_FIELDS = {

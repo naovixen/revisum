@@ -627,9 +627,6 @@
     }
   },
   "packages/engine/src/clock-advance.ts": {
-    "curly": {
-      "count": 2
-    },
     "revisum/file-name-matches-export": {
       "count": 1
     }
@@ -846,7 +843,7 @@
       "count": 1
     },
     "curly": {
-      "count": 33
+      "count": 31
     },
     "revisum/file-name-matches-export": {
       "count": 1
@@ -1005,7 +1002,7 @@
   },
   "packages/engine/src/plan/unsafe-features.ts": {
     "curly": {
-      "count": 5
+      "count": 4
     },
     "revisum/file-name-matches-export": {
       "count": 1
@@ -1018,13 +1015,10 @@
   },
   "packages/engine/src/policy/policy-gate.ts": {
     "@typescript-eslint/naming-convention": {
-      "count": 4
+      "count": 3
     },
     "curly": {
-      "count": 28
-    },
-    "no-fallthrough": {
-      "count": 3
+      "count": 12
     },
     "revisum/file-name-matches-export": {
       "count": 1
@@ -1177,15 +1171,12 @@
   },
   "packages/engine/src/run.ts": {
     "@typescript-eslint/naming-convention": {
-      "count": 4
-    },
-    "curly": {
-      "count": 44
-    },
-    "max-lines": {
       "count": 1
     },
-    "max-lines-per-function": {
+    "curly": {
+      "count": 7
+    },
+    "max-lines": {
       "count": 1
     },
     "no-restricted-syntax": {
@@ -1205,7 +1196,7 @@
   },
   "packages/engine/src/secrets/secret-resolution.ts": {
     "curly": {
-      "count": 12
+      "count": 11
     },
     "revisum/file-name-matches-export": {
       "count": 1

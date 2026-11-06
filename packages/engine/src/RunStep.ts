@@ -27,3 +27,9 @@ export type RunStep =
     | RunFillStep
     | (Omit<FrameStep, "steps"> & { readonly steps: readonly RunStep[] })
     | (Omit<NewTabStep, "steps"> & { readonly steps: readonly RunStep[] });
+
+// Each step type's step as a run runs it, for tables keyed by StepType. A fill is either kind.
+export type RunStepByType = { readonly [TypedStep in RunStep as TypedStep["type"]]: TypedStep };
+
+// A step that holds steps of its own: a frame, or a second tab.
+export type ContainerRunStep = Extract<RunStep, { readonly steps: readonly RunStep[] }>;

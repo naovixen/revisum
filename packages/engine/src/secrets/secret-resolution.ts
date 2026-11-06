@@ -11,6 +11,7 @@ import {
 } from '@revisum/contracts';
 import { sha256 } from '../hashing.ts';
 import type { SecretRecord, StorageStateRecord } from '../manifest.ts';
+import { stepsWithin } from '../plan/VisitSteps.ts';
 import type { RunStep } from '../RunStep.ts';
 import { redactionModeOf, secretRedaction, secretSha256, shortSecretMatch, storageStateSecrets } from './secret-values.ts';
 
@@ -84,8 +85,7 @@ function withFillSecret(step: Step, resolveName: ResolveName): Result<RunStep, S
 // The secret names stub starts and storage writes pass as arguments, inside frames and second tabs
 // too, in plan order.
 function stubAndStorageSecretNames(steps: readonly Step[]): SecretName[] {
-  return steps.flatMap((step) => {
-    if (step.type === 'frame' || step.type === 'newTab') return stubAndStorageSecretNames(step.steps);
+  return stepsWithin(steps).flatMap((step) => {
     if (step.type !== 'stub' && step.type !== 'setStorage') return [];
     return Object.values(step.arguments ?? {}).flatMap((argument) => (typeof argument === 'object' && 'secretName' in argument ? [argument.secretName] : []));
   });
