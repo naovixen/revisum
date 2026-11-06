@@ -11,6 +11,7 @@ import { BROWSERS } from '#test-support/browsers.ts';
 import type { BrowserHarness } from '#test-support/browser/BrowserHarness.ts';
 import { FIXED_TIME_MILLISECONDS, SEED, signupHarness } from '#test-support/signup-harness.ts';
 import { scriptsEnabled } from "#test-support/browser/ScriptsEnabled.ts";
+import { baseUrlOf } from "#test-support/policy-clearance.ts";
 
 const PORT_RANDOMISATION_FEATURE = 'TcpPortRandomizationWin';
 const DISABLE_FEATURES = '--disable-features=';
@@ -50,7 +51,7 @@ function contractTarget(targetId: string): Target {
 
 function sessionEnvironment(): SessionEnvironment {
   return {
-    baseUrl: testHarness.server.origin, allowedOrigins: testHarness.project.origins, seed: SEED,
+    baseUrl: baseUrlOf(testHarness.server.origin), allowedOrigins: testHarness.project.origins, seed: SEED,
     fixedTimeMilliseconds: FIXED_TIME_MILLISECONDS, sensitiveSelectors: defaultRedactor().selectors, timeoutMilliseconds: 5000,
   };
 }

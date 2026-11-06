@@ -27,6 +27,7 @@ import type { FixtureRoute } from "./fixture-server.ts";
 import { processTree, stillRunning, type RunningProcess } from "./process-tree.ts";
 import { FIXTURES } from "./repository.ts";
 import { expectOneElement } from "./browser/ExpectOneElement.ts";
+import { baseUrlOf } from "./policy-clearance.ts";
 
 export const SEED = 11;
 export const FIXED_TIME_MILLISECONDS = Date.UTC(2026, 9, 29, 9, 0, 0);
@@ -170,7 +171,7 @@ export async function capabilityHarness(
         planFor: capabilityPlan,
     });
     const environment = (): SessionEnvironment => ({
-        baseUrl: harness.origin,
+        baseUrl: baseUrlOf(harness.origin),
         allowedOrigins: harness.project.origins,
         seed: SEED,
         fixedTimeMilliseconds: FIXED_TIME_MILLISECONDS,

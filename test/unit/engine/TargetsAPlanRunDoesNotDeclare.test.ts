@@ -1,15 +1,16 @@
-// A run is cleared for one target id, which the run looks up in the trusted project's matrix and
-// the plan's own targets. A target missing from either ends the run TargetUnavailable with
-// not-declared, before any driver is asked, rather than leaving the target with no result at all.
+// A plan is cleared only for a target both its own targets and the trusted project's matrix
+// declare. The policy gate gives any other target a not-declared clearance in place of a cleared
+// run, and an untrusted plan's run gives such a target a result ending TargetUnavailable with
+// not-declared, before any driver is asked, rather than leaving it with no result at all.
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { planParser, runUntrusted, type RunResult } from "@revisum/engine";
-import { fakePorts } from "#test-support/fakes/FakePorts.ts";
-import { baseUrlOf } from "#test-support/policy-clearance.ts";
-import { ORIGIN, signupPlan, withValue } from "./plan-examples.ts";
+import { policyGate } from "@revisum/engine";
+import { fakeEventSink } from "#test-support/fakes/FakeEventSink.ts";
 import {
+    clearanceOn,
     projectWith,
-    runOnTarget,
+    runUntrustedOn,
+    signupPlanOn,
     targetDriver,
     targetInput,
     targetOf,
@@ -20,49 +21,72 @@ const DESKTOP = targetInput("chromium-desktop", "fake-any", "chromium", "desktop
 const TABLET = targetInput("chromium-tablet", "fake-any", "chromium", "tablet-820");
 const SMALL_MATRIX = [DESKTOP];
 const LARGE_MATRIX = [DESKTOP, TABLET];
+const DESKTOP_ID = targetOf(projectWith(LARGE_MATRIX), "chromium-desktop").id;
+const TABLET_ID = targetOf(projectWith(LARGE_MATRIX), "chromium-tablet").id;
 
-describe("Using the run", () => {
+describe("Using the policy gate", () => {
     describe("given a target the matrix declares but the plan does not name", () => {
-        describe("when the run cleared for it runs", () => {
-            test("then it should end TargetUnavailable with not-declared, asking no driver anything", async () => {
-                const project = projectWith(LARGE_MATRIX);
-                const driver = targetDriver("fake-any");
-                const ran = await runOnTarget({
-                    planProject: project,
+        describe("when the plan is cleared for it", () => {
+            test("then it should give a not-declared clearance for that target, not a cleared run", async () => {
+                const clearance = clearanceOn({
+                    planProject: projectWith(LARGE_MATRIX),
                     trusted: await trustedProjectWith(LARGE_MATRIX),
                     planTargets: ["chromium-desktop"],
-                    target: targetOf(project, "chromium-tablet"),
-                    drivers: new Map([["fake-any", driver]]),
+                    targetId: TABLET_ID,
                 });
-                assert.equal(ran.result.state, "TargetUnavailable");
-                assert.equal(ran.result.unavailable?.reason, "not-declared");
-                assert.equal(ran.result.targetId, "chromium-tablet");
-                assert.equal(driver.calls.count(), 0);
+                assert.equal(clearance.kind, "not-declared");
+                assert.equal(clearance.targetId, TABLET_ID);
+            });
+        });
+
+        describe("when the plan is decided for that target beside one it names", () => {
+            test("then it should clear the named target and give the other a not-declared clearance, in order", async () => {
+                const trusted = await trustedProjectWith(LARGE_MATRIX);
+                const plan = signupPlanOn(projectWith(LARGE_MATRIX), ["chromium-desktop"]);
+                const decision = policyGate({ project: trusted, events: fakeEventSink() }).decide(
+                    plan,
+                    [DESKTOP_ID, TABLET_ID],
+                );
+                assert.equal(decision.kind, "allow");
+                assert.deepEqual(
+                    decision.runs.map((clearance) => [clearance.kind, clearance.targetId]),
+                    [
+                        ["cleared", DESKTOP_ID],
+                        ["not-declared", TABLET_ID],
+                    ],
+                );
             });
         });
     });
 
-    describe("given an untrusted plan naming a target the trusted project's matrix does not declare", () => {
+    describe("given a target the plan names but the trusted project's matrix does not declare", () => {
+        describe("when the plan is cleared for it", () => {
+            test("then it should give a not-declared clearance for that target, not a cleared run", async () => {
+                const clearance = clearanceOn({
+                    planProject: projectWith(LARGE_MATRIX),
+                    trusted: await trustedProjectWith(SMALL_MATRIX),
+                    planTargets: ["chromium-desktop", "chromium-tablet"],
+                    targetId: TABLET_ID,
+                });
+                assert.equal(clearance.kind, "not-declared");
+            });
+        });
+    });
+});
+
+describe("Using the untrusted run", () => {
+    describe("given a plan naming a target the trusted project's matrix does not declare", () => {
         describe("when it is run", () => {
             test("then it should give that target a run ending TargetUnavailable with not-declared, beside the declared target's", async () => {
                 const driver = targetDriver("fake-any");
-                const outcome = await runUntrusted(
-                    withValue(signupPlan(), ["targets"], ["chromium-desktop", "chromium-tablet"]),
-                    planParser(projectWith(LARGE_MATRIX)),
-                    {
-                        project: projectWith(SMALL_MATRIX),
-                        baseUrl: baseUrlOf(ORIGIN),
-                        seed: 42,
-                        fixedTimeMilliseconds: 0,
-                        fixtures: [],
-                        host: { platform: "test", arch: "test" },
-                    },
-                    fakePorts({ drivers: new Map([["fake-any", driver]]) }),
-                );
-                assert.ok(Array.isArray(outcome), JSON.stringify(outcome));
-                const runs: readonly RunResult[] = outcome;
+                const ran = await runUntrustedOn({
+                    planProject: projectWith(LARGE_MATRIX),
+                    trusted: await trustedProjectWith(SMALL_MATRIX),
+                    planTargets: ["chromium-desktop", "chromium-tablet"],
+                    drivers: new Map([["fake-any", driver]]),
+                });
                 assert.deepEqual(
-                    runs.map((result) => [
+                    ran.results.map((result) => [
                         result.targetId,
                         result.state,
                         result.unavailable?.reason,
@@ -73,6 +97,29 @@ describe("Using the run", () => {
                     ],
                 );
                 assert.equal(driver.calls.count("open"), 1);
+            });
+        });
+
+        describe("and the plan names only that target", () => {
+            describe("when it is run", () => {
+                test("then it should end TargetUnavailable with not-declared, asking no driver anything", async () => {
+                    const driver = targetDriver("fake-any");
+                    const ran = await runUntrustedOn({
+                        planProject: projectWith(LARGE_MATRIX),
+                        trusted: await trustedProjectWith(SMALL_MATRIX),
+                        planTargets: ["chromium-tablet"],
+                        drivers: new Map([["fake-any", driver]]),
+                    });
+                    assert.deepEqual(
+                        ran.results.map((result) => [
+                            result.targetId,
+                            result.state,
+                            result.unavailable?.reason,
+                        ]),
+                        [["chromium-tablet", "TargetUnavailable", "not-declared"]],
+                    );
+                    assert.equal(driver.calls.count(), 0);
+                });
             });
         });
     });

@@ -20,6 +20,7 @@ import { defaultParser, signupPlan } from '../unit/engine/plan-examples.ts';
 import { startEgressFixtureServer, type EgressFixtureServer } from '../unit/runner/egress-fixture-server.ts';
 import { declaredService, egressPolicy, fakeResolver, origin } from '../unit/runner/runner-examples.ts';
 import { scriptsEnabled } from "#test-support/browser/ScriptsEnabled.ts";
+import { baseUrlOf } from "#test-support/policy-clearance.ts";
 
 const HEADING_CHANGED: ResponseRewrite = { name: 'heading-changed', find: 'Original heading', replace: 'Mutated heading' };
 const readHeading = (): string => document.querySelector('[data-testid="heading"]')?.textContent ?? '';
@@ -49,7 +50,7 @@ before(async () => {
   });
   cleanUps.add(() => proxy.close());
   const environment: SessionEnvironment = {
-    baseUrl: fixtureApp.origin, allowedOrigins: [fixtureApp.origin, secondApp.origin], seed: SEED,
+    baseUrl: baseUrlOf(fixtureApp.origin), allowedOrigins: [fixtureApp.origin, secondApp.origin], seed: SEED,
     fixedTimeMilliseconds: FIXED_TIME_MILLISECONDS, sensitiveSelectors: defaultRedactor().selectors, timeoutMilliseconds: 5000,
   };
   const driver = createBrowserDriver({ executablePath: BROWSERS.chrome, egress: egressThrough(proxy) });

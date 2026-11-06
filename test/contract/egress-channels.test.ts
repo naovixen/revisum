@@ -28,6 +28,7 @@ import {
   type ChannelName, type FakeResolver,
 } from '../unit/runner/runner-examples.ts';
 import { scriptsEnabled } from "#test-support/browser/ScriptsEnabled.ts";
+import { baseUrlOf } from "#test-support/policy-clearance.ts";
 
 const WAIT_MILLISECONDS = 10_000;
 const POLL_MILLISECONDS = 50;
@@ -57,7 +58,7 @@ after(() => cleanUps.runAll());
 
 // A browser allow-list that lets every channel's undeclared origin through, so only the proxy blocks.
 const widenedEnvironment = (): SessionEnvironment => ({
-  baseUrl: fixture.origin, allowedOrigins: [fixture.origin, ...UNDECLARED_CHANNEL_ORIGINS], seed: SEED,
+  baseUrl: baseUrlOf(fixture.origin), allowedOrigins: [fixture.origin, ...UNDECLARED_CHANNEL_ORIGINS], seed: SEED,
   fixedTimeMilliseconds: FIXED_TIME_MILLISECONDS, sensitiveSelectors: defaultRedactor().selectors, timeoutMilliseconds: 5000,
 });
 

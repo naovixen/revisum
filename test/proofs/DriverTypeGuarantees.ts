@@ -25,7 +25,7 @@ declare const secretName: SecretName;
 // What a driver is handed, each of which type-checks.
 export const driverTypeGuarantees = {
   performableActs: session.act(performable, guard),
-  secretFillActs: session.act({ type: 'fill', locator: resolvedLocator, value: { secret } }, guard),
+  secretFillActs: session.act({ type: 'fill', locator: resolvedLocator, value: { kind: 'secret', secret } }, guard),
   resolvedDownloadRuns: session.download(resolvedDownload, 100, guard),
   resolvedLocatorIsProbed: session.probe(resolvedLocator, null),
 };
@@ -37,7 +37,7 @@ export const planStepActs = session.act(planStep, guard);
 export const planDialogActs = session.act(planDialog, guard);
 
 // @ts-expect-error a fill naming a secret it does not carry cannot reach a driver
-export const secretReferenceFillActs = session.act({ type: 'fill', locator: resolvedLocator, value: { secretName } }, guard);
+export const secretReferenceFillActs = session.act({ type: 'fill', locator: resolvedLocator, value: { kind: 'secret', secretName } }, guard);
 
 // @ts-expect-error a secret is carried on its fill, never handed beside the action
 export const secretBesideTheAction = session.act(performable, guard, secret);

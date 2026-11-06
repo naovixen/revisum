@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { expectOneElement } from '#test-support/browser/ExpectOneElement.ts';
 import { after, before, describe, test } from 'node:test';
-import { LOGGING_MANIFEST, LoggingManifestViolation, SENSITIVE_PLACEHOLDER, defaultRedactor, manifestLogger, planWithAi, releaseNoteDraft, runUntrusted, writeReleaseNotes, type Box, type BrowserDriver, type RunResult, type Step } from '@revisum/engine';
+import { LOGGING_MANIFEST, LoggingManifestViolation, SENSITIVE_PLACEHOLDER, defaultRedactor, manifestLogger, planWithAi, policyGate, releaseNoteDraft, runUntrusted, writeReleaseNotes, type Box, type BrowserDriver, type RunResult, type Step } from '@revisum/engine';
 import { allowEveryAction } from '#test-support/browser/AllowEveryAction.ts';
 import { expectRead } from '#test-support/ExpectRead.ts';
 import { hostilePlans } from '#test-support/hostile-plans.ts';
@@ -16,9 +16,11 @@ import { fakeAiPlanner } from '#test-support/fakes/FakeAiPlanner.ts';
 import { fakeAiWriter } from '#test-support/fakes/FakeAiWriter.ts';
 import { fakeArtifactStore } from '#test-support/fakes/FakeArtifactStore.ts';
 import { fakeDriverNeverLaunching } from '#test-support/fakes/FakeDriver.ts';
+import { fakeEventSink } from '#test-support/fakes/FakeEventSink.ts';
 import { fakePorts } from '#test-support/fakes/FakePorts.ts';
 import { scriptsEnabled } from "#test-support/browser/ScriptsEnabled.ts";
 import { performableActionOf, resolvedLocatorOf } from '#test-support/PerformableActionOf.ts';
+import { baseUrlOf } from "#test-support/policy-clearance.ts";
 
 let testHarness: BrowserHarness;
 before(async () => { testHarness = await signupHarness(); });
@@ -148,7 +150,7 @@ describe('(d) redaction by default', () => {
       assert.ok(driver !== undefined);
       const redactor = defaultRedactor();
       const opened = await driver.open(target, {
-        baseUrl: testHarness.server.origin, allowedOrigins: testHarness.project.origins, seed: SEED,
+        baseUrl: baseUrlOf(testHarness.server.origin), allowedOrigins: testHarness.project.origins, seed: SEED,
         fixedTimeMilliseconds: FIXED_TIME_MILLISECONDS, sensitiveSelectors: redactor.selectors, timeoutMilliseconds: 2000,
       });
       assert.ok(opened.ok);
@@ -211,11 +213,12 @@ describe('(e) targets are never substituted', () => {
     assert.equal(appium.store.references().length, 0);
   });
 
-  test('a target missing from the plan is refused even if it is in the matrix', async () => {
+  test('a target missing from the plan is refused even if it is in the matrix', () => {
     const plan = testHarness.plan(stepsPlan(['cdp-chromium'], []));
-    const ran = await testHarness.run(plan, 'cdp-chromium-headless-shell');
-    assert.equal(ran.result.state, 'TargetUnavailable');
-    assert.equal(ran.result.unavailable?.reason, 'not-declared');
+    const clearance = policyGate({ project: testHarness.project, events: fakeEventSink() })
+      .clear(plan, testHarness.target('cdp-chromium-headless-shell').id);
+    assert.equal(clearance.kind, 'not-declared');
+    assert.equal(clearance.targetId, 'cdp-chromium-headless-shell');
   });
 });
 

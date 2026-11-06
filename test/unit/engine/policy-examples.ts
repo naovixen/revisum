@@ -145,8 +145,13 @@ export const denied = (rule: PolicyRuleId, stepIndex: number | null) => ({ kind:
 export const ALLOWED = { kind: 'allow' } as const;
 
 // The decision with its cleared runs reduced to its kind, so decisions compare by value.
-export const comparable = (decision: PlanClearance | RunClearance): JsonRecord =>
-  decision.kind === 'allow' ? { kind: 'allow' } : { kind: decision.kind, rule: decision.rule, stepIndex: decision.stepIndex };
+export function comparable(decision: PlanClearance | RunClearance): JsonRecord {
+  switch (decision.kind) {
+    case 'allow': return { kind: 'allow' };
+    case 'deny': return { kind: decision.kind, rule: decision.rule, stepIndex: decision.stepIndex };
+    case 'not-declared': return { kind: decision.kind, targetId: decision.targetId };
+  }
+}
 
 // The plan.denied events the gate appended.
 export const eventsDenied = (events: MemoryEventSink): readonly RecordedEvent[] => eventsOfKind(events, 'plan.denied');

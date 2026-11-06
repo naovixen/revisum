@@ -22,6 +22,7 @@ import { click, role } from '#test-support/browser/RawPlan.ts';
 import { FIXED_TIME_MILLISECONDS, SEED, capabilityHarness, type CapabilityHarness } from '#test-support/capability-harness.ts';
 import { declaredService, egressPolicy, fakeResolver } from '../unit/runner/runner-examples.ts';
 import { scriptsEnabled } from "#test-support/browser/ScriptsEnabled.ts";
+import { baseUrlOf } from "#test-support/policy-clearance.ts";
 
 const WAIT_MILLISECONDS = 10_000;
 const POLL_MILLISECONDS = 50;
@@ -73,7 +74,7 @@ after(() => cleanUps.runAll());
 
 async function openSession(): Promise<DriverSession> {
   const environment: SessionEnvironment = {
-    baseUrl: opener.origin, allowedOrigins: [opener.origin, reachable.origin], seed: SEED, fixedTimeMilliseconds: FIXED_TIME_MILLISECONDS,
+    baseUrl: baseUrlOf(opener.origin), allowedOrigins: [opener.origin, reachable.origin], seed: SEED, fixedTimeMilliseconds: FIXED_TIME_MILLISECONDS,
     sensitiveSelectors: defaultRedactor().selectors, timeoutMilliseconds: 5000,
   };
   const driver = createBrowserDriver({ executablePath: BROWSERS.chrome, egress: egressThrough(proxy) });

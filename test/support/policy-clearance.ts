@@ -32,7 +32,8 @@ export async function trustedProjectFrom(projectFile: unknown): Promise<TrustedP
 }
 
 // The run the gate clears for the plan on one target, under the project. A missing standing is a
-// proposal. A test plan the gate denies is a broken test, so it throws.
+// proposal. A test plan the gate denies, or one on a target it and the project do not both declare,
+// is a broken test, so it throws.
 export function clearRun(
     plan: Plan,
     project: Project,
@@ -44,12 +45,18 @@ export function clearRun(
         targetId,
         standing,
     );
-    if (decision.kind === "deny") {
-        throw new Error(
-            `the policy gate denied the test plan: ${decision.rule} at step ${String(decision.stepIndex)}`,
-        );
+    switch (decision.kind) {
+        case "deny":
+            throw new Error(
+                `the policy gate denied the test plan: ${decision.rule} at step ${String(decision.stepIndex)}`,
+            );
+        case "not-declared":
+            throw new Error(
+                `the test plan or project does not declare the target ${decision.targetId}`,
+            );
+        case "allow":
+            return decision.run;
     }
-    return decision.run;
 }
 
 // A test's base URL, parsed as run() takes it. A test base URL the parser refuses is a broken test.

@@ -6,7 +6,7 @@
 // replays in the pinned Linux image, come with the CDP driver and replay.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { planHash } from '@revisum/engine';
+import { FillValueKind, planHash, type PerformableAction } from '@revisum/engine';
 import { DEFAULT_CLOCK_START, OPEN_ORDERS, runPlan, type JsonRecord } from './run-value-examples.ts';
 import { COPY_LINK, accepted, advanceClock, expectClipboard, parserFor, planOf } from './clock-and-clipboard-examples.ts';
 
@@ -23,8 +23,9 @@ const withoutAdvances = (): JsonRecord => planOf([OPEN_ORDERS, ...FILLS], { valu
 const withAdvances = (): JsonRecord =>
   planOf([OPEN_ORDERS, ...FILLS, advanceClock(1, 'hours'), advanceClock(30, 'minutes', 'skipAhead')], { values: VALUES, clock: PLAN_CLOCK });
 
-const filledValues = (actions: readonly { readonly type: string }[]): unknown[] =>
-  actions.filter((action) => action.type === 'fill').map((action) => ('value' in action ? action.value : undefined));
+// The text each fill typed; a fill of anything but text is kept whole, so it fails the check.
+const filledValues = (actions: readonly PerformableAction[]): unknown[] =>
+  actions.flatMap((action) => (action.type === 'fill' ? [action.value.kind === FillValueKind.Text ? action.value.text : action.value] : []));
 
 // ---- Date values and the clocks (metamorphic) -----------------------------------------------------------
 

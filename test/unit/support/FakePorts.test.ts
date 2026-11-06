@@ -80,7 +80,7 @@ const firstOf = <Item>(items: readonly Item[]): Item => {
 const ORIGIN: Origin = firstOf(testProject().origins);
 const TARGET: Target = firstOf(testProject().matrix);
 const ENVIRONMENT: SessionEnvironment = {
-    baseUrl: "https://app.example",
+    baseUrl: baseUrlOf("https://app.example"),
     allowedOrigins: [],
     seed: 7,
     fixedTimeMilliseconds: 0,

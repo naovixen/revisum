@@ -3,7 +3,7 @@
 // an element found by its test id shows a text the test chooses, such as a careless echo of a
 // secret. The test hands in the values of the secrets it planted, so the driver never needs
 // reveal: it looks the typed value up by the secret's name, as a real page would hold it.
-import { success, type BrowserDriver, type ElementProbe, type ResolvedLocator } from '@revisum/engine';
+import { FillValueKind, success, type BrowserDriver, type ElementProbe, type FillValue, type ResolvedLocator } from '@revisum/engine';
 import { ORIGIN } from './secret-examples.ts';
 import { FAKE_ELEMENT } from '#test-support/fakes/FakePage.ts';
 import { fakeSession } from '#test-support/fakes/FakeSession.ts';
@@ -25,6 +25,16 @@ function elementKey(locator: ResolvedLocator): string {
   return JSON.stringify(locator);
 }
 
+// What a field holds after a fill: the text, the lines with a line feed between them, or the value
+// of the planted secret.
+function typedText(value: FillValue, page: EchoPage): string {
+  switch (value.kind) {
+    case FillValueKind.Text: return value.text;
+    case FillValueKind.Lines: return value.lines.join('\n');
+    case FillValueKind.Secret: return page.secretValues?.[value.secret.name] ?? '';
+  }
+}
+
 export function echoPageDriver(page: EchoPage): BrowserDriver & { readonly calls: EchoPageCalls; readonly fieldValues: ReadonlyMap<string, string> } {
   const calls: EchoPageCalls = { navigations: 0, actions: 0, probes: 0 };
   const fieldValues = new Map<string, string>();
@@ -36,10 +46,7 @@ export function echoPageDriver(page: EchoPage): BrowserDriver & { readonly calls
     act: (action) => {
       calls.actions++;
       if (action.type === 'fill') {
-        const value = action.value;
-        const plainText = typeof value === 'string' ? value : '';
-        const typed = typeof value === 'object' && 'secret' in value ? page.secretValues?.[value.secret.name] ?? '' : plainText;
-        fieldValues.set(elementKey(action.locator), typed);
+        fieldValues.set(elementKey(action.locator), typedText(action.value, page));
       }
       return Promise.resolve(success(undefined));
     },

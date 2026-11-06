@@ -20,6 +20,7 @@ import { recordedReport } from "../unit/engine/evidence-examples.ts";
 import { runDeclaredSuite } from "../unit/cli/suite-run-examples.ts";
 import { declaredService, egressPolicy, fakeResolver } from "../unit/runner/runner-examples.ts";
 import { scriptsEnabled } from "#test-support/browser/ScriptsEnabled.ts";
+import { baseUrlOf } from "#test-support/policy-clearance.ts";
 
 const OPEN_BUTTON = "Open the partner site";
 const UNDECLARED_ORIGIN = "http://undeclared.invalid";
@@ -105,7 +106,7 @@ async function openPopupFrom(page: string): Promise<HeldPopup> {
     });
     const opened = await driver.open(capability.target(BrowserTarget.Chrome), {
         ...capability.environment(),
-        baseUrl: opener.origin,
+        baseUrl: baseUrlOf(opener.origin),
         allowedOrigins: [opener.origin, partner.origin],
     });
     assert.ok(opened.ok, JSON.stringify(opened));

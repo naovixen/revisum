@@ -26,6 +26,7 @@ import { ATTEMPT_SETTLED, ATTEMPT_STATE, attemptPage } from "./EgressChannels.ts
 import { EXECUTABLE_OF_TARGET, driverWithEgress } from "./HostBrowserDrivers.ts";
 import { startRecordingProxy, type RecordingProxy } from "./StartRecordingProxy.ts";
 import { scriptsEnabled } from "#test-support/browser/ScriptsEnabled.ts";
+import { baseUrlOf } from "#test-support/policy-clearance.ts";
 
 const BACKGROUND_HOSTS = [
     "accounts.google.com",
@@ -120,7 +121,7 @@ async function runPage(targetId: BrowserTarget, path: string): Promise<void> {
 }
 
 const sessionEnvironment = (): SessionEnvironment => ({
-    baseUrl: harness.origin,
+    baseUrl: baseUrlOf(harness.origin),
     allowedOrigins: harness.project.origins,
     seed: SEED,
     fixedTimeMilliseconds: FIXED_TIME_MILLISECONDS,

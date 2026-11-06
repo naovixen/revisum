@@ -4,11 +4,12 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { arch, platform, tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { failure, parseProject, planParser, run, sha256, success, type BrowserBuild, type BrowserDriver, type BuildFailure, type Project, type Result, type RunInputs, type RunResult, type Target, type TrustedProject, type Unavailable } from '@revisum/engine';
+import { failure, parseProject, planParser, policyGate, run, runUntrusted, sha256, success, type BrowserBuild, type BrowserDriver, type BuildFailure, type Plan, type Project, type Result, type RunClearance, type RunInputs, type RunResult, type Target, type TargetId, type TrustedProject, type Unavailable } from '@revisum/engine';
 import { type MemoryArtifactStore } from '../../support/memory-ports.ts';
 import { baseUrlOf, clearRun, trustedProjectFrom } from '../../support/policy-clearance.ts';
 import { ORIGIN, signupPlan, testProjectInput, withValue, type JsonRecord } from './plan-examples.ts';
 import { fakeArtifactStore } from '#test-support/fakes/FakeArtifactStore.ts';
+import { fakeEventSink } from '#test-support/fakes/FakeEventSink.ts';
 import { fakeDriverNeverLaunching, type FakeDriver } from '#test-support/fakes/FakeDriver.ts';
 import { fakePorts } from '#test-support/fakes/FakePorts.ts';
 
@@ -100,12 +101,51 @@ export async function runOnTarget(options: {
   readonly drivers: ReadonlyMap<string, BrowserDriver>;
   readonly lockEntries?: NonNullable<RunInputs['lockEntries']>;
 }): Promise<TargetRun> {
-  const parsed = planParser(options.planProject)(withValue(signupPlan(), ['targets'], [...options.planTargets]));
-  if (!parsed.ok) throw new Error(`bad test plan: ${JSON.stringify(parsed.error)}`);
   const store = fakeArtifactStore();
-  const result = await run(clearRun(parsed.value, options.trusted, options.target.id), {
+  const result = await run(clearRun(signupPlanOn(options.planProject, options.planTargets), options.trusted, options.target.id), {
     baseUrl: baseUrlOf(ORIGIN), seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() },
     ...(options.lockEntries === undefined ? {} : pinnedTo(options.lockEntries)),
   }, fakePorts({ drivers: options.drivers, artifacts: store }));
   return { result, store };
+}
+
+// The sign-up plan, declaring `planTargets`, parsed under `planProject`.
+export function signupPlanOn(planProject: Project, planTargets: readonly string[]): Plan {
+  const parsed = planParser(planProject)(withValue(signupPlan(), ['targets'], [...planTargets]));
+  if (!parsed.ok) throw new Error(`bad test plan: ${JSON.stringify(parsed.error)}`);
+  return parsed.value;
+}
+
+// What the trusted project's policy gate gives the sign-up plan, declaring `planTargets` and parsed
+// under `planProject`, for one target id.
+export const clearanceOn = (options: {
+  readonly planProject: Project;
+  readonly trusted: TrustedProject;
+  readonly planTargets: readonly string[];
+  readonly targetId: TargetId;
+}): RunClearance =>
+  policyGate({ project: options.trusted, events: fakeEventSink() }).clear(signupPlanOn(options.planProject, options.planTargets), options.targetId);
+
+export type UntrustedRuns = { readonly results: readonly RunResult[]; readonly store: MemoryArtifactStore };
+
+// Runs the sign-up plan, declaring `planTargets`, as an untrusted plan from outside: parsed under
+// `planProject`, then cleared and run under the trusted project on every target it names.
+export async function runUntrustedOn(options: {
+  readonly planProject: Project;
+  readonly trusted: TrustedProject;
+  readonly planTargets: readonly string[];
+  readonly drivers: ReadonlyMap<string, BrowserDriver>;
+}): Promise<UntrustedRuns> {
+  const store = fakeArtifactStore();
+  const outcome = await runUntrusted(
+    withValue(signupPlan(), ['targets'], [...options.planTargets]),
+    planParser(options.planProject),
+    { project: options.trusted, baseUrl: baseUrlOf(ORIGIN), seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() } },
+    fakePorts({ drivers: options.drivers, artifacts: store }),
+  );
+  if (!Array.isArray(outcome)) {
+    throw new Error(`the test plan did not run: ${JSON.stringify(outcome)}`);
+  }
+  const results: readonly RunResult[] = outcome;
+  return { results, store };
 }

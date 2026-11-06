@@ -37,6 +37,7 @@ import { FIXTURES } from "#test-support/repository.ts";
 import { ATTEMPT_SETTLED, ATTEMPT_STATE, attemptPage } from "./EgressChannels.ts";
 import { driverWithEgress, hostBrowserDrivers } from "./HostBrowserDrivers.ts";
 import { startRecordingProxy, type RecordingProxy } from "./StartRecordingProxy.ts";
+import { baseUrlOf } from "#test-support/policy-clearance.ts";
 
 const TARGET = BrowserTarget.Chrome;
 const ADAPTER = ADAPTER_OF_TARGET[TARGET];
@@ -125,7 +126,7 @@ after(async () => {
 });
 
 const sessionEnvironment = (): SessionEnvironment => ({
-    baseUrl: harness.origin,
+    baseUrl: baseUrlOf(harness.origin),
     allowedOrigins: harness.project.origins,
     seed: SEED,
     fixedTimeMilliseconds: FIXED_TIME_MILLISECONDS,

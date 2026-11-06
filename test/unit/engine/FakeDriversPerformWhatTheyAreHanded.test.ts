@@ -21,13 +21,14 @@ import {
 import { echoPageDriver } from "./echo-page-driver.ts";
 import { guardedDriver } from "./guarded-driver.ts";
 import { testProject } from "./plan-examples.ts";
+import { baseUrlOf } from "#test-support/policy-clearance.ts";
 
 const ALLOW: GuardVerdict = { kind: "allow" };
 const SECRET_VALUE = "test-only-value";
 const FILL_ADA = { type: "fill", locator: NAME_FIELD, value: "Ada" };
 
 const ENVIRONMENT: SessionEnvironment = {
-    baseUrl: "https://app.example",
+    baseUrl: baseUrlOf("https://app.example"),
     allowedOrigins: [],
     seed: 7,
     fixedTimeMilliseconds: 0,

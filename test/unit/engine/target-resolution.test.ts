@@ -5,7 +5,7 @@ import { after, describe, test } from 'node:test';
 import { adapterRegistry, planParser, type Target } from '@revisum/engine';
 import { signupPlan, withValue } from './plan-examples.ts';
 import {
-  builtAt, fakeBrowserBuild, targetDriver, projectWith, runOnTarget, targetInput, targetOf, trustedProjectWith,
+  builtAt, clearanceOn, fakeBrowserBuild, targetDriver, projectWith, runOnTarget, runUntrustedOn, targetInput, targetOf, trustedProjectWith,
 } from './target-examples.ts';
 
 // ---- Not in the matrix -------------------------------------------------------------------------
@@ -18,16 +18,18 @@ describe('a target that is not in the matrix', () => {
     // The plan was parsed under a project with the larger matrix; the trusted project clearing and
     // running it declares only the smaller one.
     const planProject = projectWith(largeMatrix);
+    const trusted = await trustedProjectWith(smallMatrix);
+    const planTargets = ['chromium-tablet'];
     const driver = targetDriver('fake-any');
-    const ran = await runOnTarget({
-      planProject, trusted: await trustedProjectWith(smallMatrix),
-      planTargets: ['chromium-desktop', 'chromium-tablet'], target: targetOf(planProject, 'chromium-tablet'),
-      drivers: new Map([['fake-any', driver]]),
-    });
-    assert.equal(ran.result.state, 'TargetUnavailable');
-    assert.equal(ran.result.unavailable?.reason, 'not-declared');
-    assert.equal(ran.result.targetId, 'chromium-tablet');
-    assert.equal(ran.result.manifest, null);
+    const clearance = clearanceOn({ planProject, trusted, planTargets, targetId: targetOf(planProject, 'chromium-tablet').id });
+    assert.equal(clearance.kind, 'not-declared');
+    const ran = await runUntrustedOn({ planProject, trusted, planTargets, drivers: new Map([['fake-any', driver]]) });
+    assert.equal(ran.results.length, 1);
+    const [result] = ran.results;
+    assert.equal(result?.state, 'TargetUnavailable');
+    assert.equal(result.unavailable?.reason, 'not-declared');
+    assert.equal(result.targetId, 'chromium-tablet');
+    assert.equal(result.manifest, null);
     assert.equal(driver.calls.count(), 0, 'no driver method was called');
     assert.equal(ran.store.references().length, 0, 'nothing was stored');
   });

@@ -17,6 +17,7 @@ import {
 } from "#test-support/signup-harness.ts";
 import { fullTierOnly } from "#test-support/TestTier.ts";
 import { scriptsEnabled } from "#test-support/browser/ScriptsEnabled.ts";
+import { baseUrlOf } from "#test-support/policy-clearance.ts";
 
 const SOFTWARE_RASTER_FLAG = "--disable-gpu";
 const HEADLESS_FLAG = "--headless";
@@ -43,7 +44,7 @@ const splitCommandLine = (text: string): readonly string[] =>
 
 async function commandLineOfAChromeSession(): Promise<readonly string[]> {
     const environment: SessionEnvironment = {
-        baseUrl: harness.server.origin,
+        baseUrl: baseUrlOf(harness.server.origin),
         allowedOrigins: harness.project.origins,
         seed: SEED,
         fixedTimeMilliseconds: FIXED_TIME_MILLISECONDS,

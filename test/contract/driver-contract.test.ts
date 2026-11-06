@@ -13,6 +13,7 @@ import type { BrowserHarness } from '#test-support/browser/BrowserHarness.ts';
 import { CONTRACT_TARGETS, EMAIL, FIXED_TIME_MILLISECONDS, LOCALE, SEED, TIMEZONE, environmentPlan, signupHarness, makeDrivers, signupPlan, stepsPlan } from '#test-support/signup-harness.ts';
 import { scriptsEnabled } from "#test-support/browser/ScriptsEnabled.ts";
 import { performableActionOf, resolvedLocatorOf } from '#test-support/PerformableActionOf.ts';
+import { baseUrlOf } from "#test-support/policy-clearance.ts";
 
 const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47];
 
@@ -26,7 +27,7 @@ async function withSession<Value>(targetId: string, use: (session: Session) => P
   const driver = makeDrivers().get(target.adapter);
   assert.ok(driver);
   const environment: SessionEnvironment = {
-    baseUrl: testHarness.server.origin, allowedOrigins: testHarness.project.origins, seed: SEED,
+    baseUrl: baseUrlOf(testHarness.server.origin), allowedOrigins: testHarness.project.origins, seed: SEED,
     fixedTimeMilliseconds: FIXED_TIME_MILLISECONDS, sensitiveSelectors: defaultRedactor().selectors, timeoutMilliseconds: 5000,
   };
   const opened = await driver.open(target, environment);
