@@ -3343,9 +3343,6 @@
     }
   },
   "test/unit/engine/echo-page-driver.ts": {
-    "@typescript-eslint/naming-convention": {
-      "count": 1
-    },
     "curly": {
       "count": 3
     },
