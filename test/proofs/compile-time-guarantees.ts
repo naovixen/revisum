@@ -4,12 +4,13 @@
 import { cdpDriver, type EgressSource } from '@revisum/driver-cdp';
 import {
   lifecycle, run,
-  type AiPlanner, type Logger, type Plan, type RunInputs, type RunPorts,
+  type AiPlanner, type ClearedRun, type Logger, type Plan, type RunInputs, type RunPorts,
 } from '@revisum/engine';
 
 declare const logger: Logger;
 declare const inputs: RunInputs;
 declare const ports: RunPorts;
+declare const cleared: ClearedRun;
 declare const planner: AiPlanner;
 declare const planned: lifecycle.Planned;
 declare const resolved: lifecycle.Resolved;
@@ -32,8 +33,10 @@ logger.log({ kind: 'debug' });
 const proposal = await planner.propose({ specReference: 'specs/x.md', text: 'x' });
 // @ts-expect-error AI output is unknown and cannot be used as a Plan
 const asPlan: Plan = proposal;
+// A run takes the run the policy gate cleared, which holds the plan the parser made.
+export const clearedRunRuns = run(cleared, inputs, ports);
 // @ts-expect-error a hand-built object is not a Plan; only the plan parser can brand one
-run({ ...inputs, plan: { version: 1, meta: inputs.plan.meta, targets: [], steps: [] } }, ports);
+run({ ...cleared, plan: { version: 1, meta: cleared.plan.meta, targets: [], steps: [] } }, inputs, ports);
 
 // ---- Lifecycle state machine --------------------------------------------------------------------
 lifecycle.start(resolved); // allowed: Resolved -> Running

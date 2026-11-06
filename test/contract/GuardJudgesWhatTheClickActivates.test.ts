@@ -17,7 +17,7 @@ import {
 import { shareBrowserInThisFile } from "#test-support/browser/ShareBrowserInThisFile.ts";
 import { capabilityHarness, type CapabilityHarness } from "#test-support/capability-harness.ts";
 import type { FixtureRoute } from "#test-support/fixture-server.ts";
-import type { ActionStep, GuardVerdict, Session } from "@revisum/engine";
+import type { GuardVerdict, PerformableAction, Session } from "@revisum/engine";
 import { scriptsEnabled } from "#test-support/browser/ScriptsEnabled.ts";
 
 shareBrowserInThisFile();
@@ -171,7 +171,7 @@ const DENIED_UNTOUCHED = {
 const WENT_THROUGH = { state: "Passed", shown: CLICKED };
 
 // Stands for a caller the type system cannot stop, so it still compiles once the guard is required.
-const actWithoutGuard = (session: Session, step: ActionStep): ReturnType<Session["act"]> =>
+const actWithoutGuard = (session: Session, step: PerformableAction): ReturnType<Session["act"]> =>
     Reflect.apply(session.act.bind(session), undefined, [step]) as ReturnType<Session["act"]>;
 
 async function withPlainPage<Value>(use: (session: Session) => Promise<Value>): Promise<Value> {

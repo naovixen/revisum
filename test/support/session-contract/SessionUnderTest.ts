@@ -2,24 +2,28 @@
 // a step acts on are the Export button and a field labelled Name, which a real page has to hold.
 import assert from "node:assert/strict";
 import {
-    performableLocator,
     type ActionGuard,
-    type ActionStep,
-    type DownloadStep,
     type GuardVerdict,
-    type Locator,
     type Origin,
+    type PerformableAction,
+    type ResolvedDownloadStep,
     type ResolvedElement,
     type ResolvedLocator,
     type Result,
+    type Secret,
     type SecretName,
     type Session,
     type SessionTab,
     type Step,
 } from "@revisum/engine";
 import { testProject } from "../../unit/engine/plan-examples.ts";
-import { accepted, parserFor, planOf, reference } from "../../unit/engine/run-value-examples.ts";
+import { accepted, parserFor, planOf } from "../../unit/engine/run-value-examples.ts";
 import { label, navigate, role, testId, type JsonRecord } from "../browser/RawPlan.ts";
+import {
+    performableActionOf,
+    resolvedDownloadOf,
+    resolvedLocatorOf,
+} from "../PerformableActionOf.ts";
 
 export type SessionUnderTest = {
     readonly session: Session;
@@ -31,42 +35,36 @@ export type SessionUnderTest = {
 export type OpenSessionUnderTest = () => Promise<SessionUnderTest>;
 
 export const SECRET_NAME = "ACCESS_CODE";
-export const ANOTHER_SECRET_NAME = "ANOTHER_CODE";
-const VALUE_NAME = "orderCode";
-const parsePlan = parserFor({ secretNames: [SECRET_NAME, ANOTHER_SECRET_NAME] });
+const parsePlan = parserFor({ secretNames: [SECRET_NAME] });
 
-// A step as the parser gives it, so it is one the engine could hand a driver.
+// A step as the parser gives it, so it is one the engine could resolve and hand a driver.
 function parsedStep(raw: JsonRecord): Step {
-    const plan = accepted(
-        parsePlan,
-        planOf([navigate("/"), raw], {
-            values: { [VALUE_NAME]: { kind: "uniqueText", prefix: "order" } },
-        }),
-    );
+    const plan = accepted(parsePlan, planOf([navigate("/"), raw]));
     const step = plan.steps[1];
     assert.ok(step !== undefined, "the plan keeps its second step");
     return step;
 }
 
-export function actionStep(raw: JsonRecord): ActionStep {
+// The step as the engine hands it to a driver: a fill of a secret carries the secret given.
+export function actionStep(raw: JsonRecord, secret?: Secret): PerformableAction {
     const step = parsedStep(raw);
     assert.ok(
         step.type === "click" || step.type === "fill" || step.type === "dialog",
         JSON.stringify(step),
     );
-    return step;
+    return performableActionOf(step, secret);
 }
 
-export function downloadStep(locator: JsonRecord): DownloadStep {
+export function downloadStep(locator: JsonRecord): ResolvedDownloadStep {
     const step = parsedStep({ type: "download", name: "report", locator });
     assert.ok(step.type === "download", JSON.stringify(step));
-    return step;
+    return resolvedDownloadOf(step);
 }
 
-export function locatorOf(raw: JsonRecord): Locator {
+export function locatorOf(raw: JsonRecord): ResolvedLocator {
     const step = parsedStep({ type: "click", locator: raw });
     assert.ok(step.type === "click", JSON.stringify(step));
-    return step.locator;
+    return resolvedLocatorOf(step.locator);
 }
 
 export function parsedSecretName(name: string): SecretName {
@@ -80,8 +78,6 @@ export function parsedSecretName(name: string): SecretName {
 
 export const EXPORT_BUTTON = role("button", "Export");
 export const NAME_FIELD = label("Name");
-export const HOLDING_A_VALUE = testId(reference(VALUE_NAME));
-export const A_LEFT_REFERENCE = reference(VALUE_NAME);
 export const CLICK_EXPORT = { type: "click", locator: EXPORT_BUTTON };
 export const FILL_THE_SECRET = {
     type: "fill",
@@ -123,11 +119,7 @@ export function firstOrigin(): Origin {
     return origin;
 }
 
-export function locatorFindingNothing(): ResolvedLocator {
-    const locator = performableLocator(locatorOf(testId("not-on-the-page")));
-    assert.ok(locator !== undefined, "the locator holds no value reference");
-    return locator;
-}
+export const locatorFindingNothing = (): ResolvedLocator => locatorOf(testId("not-on-the-page"));
 
 export function assertNothingRead(probe: Awaited<ReturnType<Session["probe"]>>): void {
     assert.deepEqual(probe, { count: "page-unreadable" });

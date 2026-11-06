@@ -12,7 +12,7 @@ import {
     type RunPorts,
     type RunResult,
 } from "@revisum/engine";
-import { authorise, trustedProjectFrom } from "../../support/policy-clearance.ts";
+import { baseUrlOf, clearRun, trustedProjectFrom } from "../../support/policy-clearance.ts";
 import { fakeSessionOnOrders } from "./RunOnFakeSession.ts";
 import {
     DEFAULT_CLOCK_START,
@@ -54,11 +54,9 @@ const runWithRewrites = async (
     const ports =
         applied === undefined ? leaveOut<RunPorts>(everyPort, ["rewritesApplied"]) : everyPort;
     return run(
+        clearRun(plan, trusted, project.matrix[0]?.id ?? assert.fail("no target")),
         {
-            plan: authorise(plan, trusted),
-            project,
-            targetId: project.matrix[0]?.id ?? assert.fail("no target"),
-            baseUrl: ORIGIN,
+            baseUrl: baseUrlOf(ORIGIN),
             seed: DEFAULT_SEED,
             fixedTimeMilliseconds: DEFAULT_CLOCK_START,
             fixtures: [],

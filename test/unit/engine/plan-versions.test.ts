@@ -12,6 +12,7 @@ import {
 import { fakeDriverNeverLaunching } from '#test-support/fakes/FakeDriver.ts';
 import { driversOf, fakePorts } from '#test-support/fakes/FakePorts.ts';
 import { futureVersions } from '../../support/plan-changelog.ts';
+import { baseUrlOf } from '#test-support/policy-clearance.ts';
 
 const parsePlan = defaultParser();
 
@@ -79,7 +80,7 @@ test('a run of a plan with a newer step is refused before any driver is touched'
   const project = testProject();
   const ports = fakePorts({ drivers: driversOf(spy) });
   const base = {
-    project, baseUrl: ORIGIN, seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() },
+    project, baseUrl: baseUrlOf(ORIGIN), seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() },
   };
   const parse = defaultParser();
   const refused = await runUntrusted(insertAt(signupPlan(), 8, NEWER_STEPS[1] ?? {}), parse, base, ports);

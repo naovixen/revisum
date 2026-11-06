@@ -6,12 +6,12 @@
 //   - an audit sink that failed to record a denial let the denial pass silently.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { failure, policyGate, run, runUntrusted, type EventSink, type RunResult } from '@revisum/engine';
+import { failure, policyGate, run, runUntrusted, type ClearedRun, type EventSink, type RunResult } from '@revisum/engine';
 import { memoryEventSink } from './approval-repositories.ts';
-import { finalState, guardedDriver, onlyRun, parserFor, runBase } from './guarded-driver.ts';
+import { finalState, guardedDriver, onlyRun, parserFor, runBase, runInputs } from './guarded-driver.ts';
 import {
   CLOSING_CHECK, ENGLISH, OPEN_ACCOUNT_PAGE, ORIGIN, PRODUCTION_ORIGIN,
-  click, decideOn, element, localeOf, navigate, parsedPlan, planOf, policyProjectInput, role, stepAt, targetsOf, testGate, testId,
+  click, decideOn, element, localeOf, navigate, parsedPlan, parserProject, planOf, policyProjectInput, role, stepAt, testGate, testId,
   trustedProject, withPolicy,
 } from './policy-examples.ts';
 import { fakeEventSink } from '#test-support/fakes/FakeEventSink.ts';
@@ -65,33 +65,35 @@ test('with no targets, a click on Save changes is not denied as irreversible-act
 // Project A allows the irreversible name "Delete account"; project B, the default, does not.
 const ALLOWS_DELETE = withPolicy({ allowedIrreversibleNames: ['Delete account'] });
 
-async function runClearedUnderA(runProjectInput: Record<string, unknown>) {
+// The run cleared under project A, run as the gate cleared it, or copied under another project.
+async function runClearedUnderA(copiedUnder?: Record<string, unknown>) {
   const projectA = await trustedProject(ALLOWS_DELETE);
   const plan = parsedPlan(planOf(DELETE_STEPS), ALLOWS_DELETE);
-  const decision = policyGate({ project: projectA, events: memoryEventSink() }).decide(plan, targetsOf(projectA, plan));
-  assert.equal(decision.kind, 'allow', JSON.stringify(decision));
   const targetId = plan.targets[0];
   if (targetId === undefined) throw new Error('the test plan has no target');
+  const decision = policyGate({ project: projectA, events: memoryEventSink() }).clear(plan, targetId);
+  assert.equal(decision.kind, 'allow', JSON.stringify(decision));
+  const cleared = copiedUnder === undefined ? decision.run : ({ ...decision.run, project: parserProject(copiedUnder) } as ClearedRun);
   const driven = guardedDriver([...DELETE_STEPS, CLOSING_CHECK]);
   let result: RunResult | undefined;
   let thrown: unknown;
   try {
-    result = await run({ ...runBase(runProjectInput), plan: decision.plan, targetId },
-      fakePorts({ drivers: driversOf(driven.driver) }));
+    result = await run(cleared, runInputs(), fakePorts({ drivers: driversOf(driven.driver) }));
   } catch (error) {
     thrown = error;
   }
   return { result, thrown, driven };
 }
 
-test('a plan cleared under one project\'s allowed names is refused before any browser opens when run under a project that does not allow them', async () => {
+test('a run cleared under one project\'s allowed names, copied under a project that does not allow them, is refused before any browser opens', async () => {
   const { result, thrown, driven } = await runClearedUnderA(policyProjectInput());
   assert.equal(driven.opens(), 0, `the run opened a browser and ended ${result?.state ?? 'nowhere'}`);
-  assert.ok(thrown !== undefined || (result !== undefined && result.state !== 'Passed'), JSON.stringify(result));
+  assert.equal(result, undefined);
+  assert.ok(thrown instanceof TypeError && thrown.message === 'refused a run that the policy gate did not clear', String(thrown));
 });
 
 test('the same plan runs to the end under the project that cleared it', async () => {
-  const { result, thrown, driven } = await runClearedUnderA(ALLOWS_DELETE);
+  const { result, thrown, driven } = await runClearedUnderA();
   assert.equal(thrown, undefined);
   assert.equal(result?.state, 'Passed', JSON.stringify(result?.steps));
   assert.equal(driven.inputEvents[1], 1);

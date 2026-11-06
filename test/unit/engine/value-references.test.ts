@@ -14,6 +14,7 @@ import {
 import { fakeDriverNeverLaunching } from '#test-support/fakes/FakeDriver.ts';
 import { driversOf, fakePorts } from '#test-support/fakes/FakePorts.ts';
 import { fakeRunEventSink } from '#test-support/fakes/FakeRunEventSink.ts';
+import { baseUrlOf } from '#test-support/policy-clearance.ts';
 
 // The project declares one secret and one fixture, so that their names are real declarations.
 const PROJECT_FIELDS: JsonRecord = { secretNames: ['ORDER_PIN'], fixtures: ['invoice.pdf'], testIdAttributes: ['data-testid', 'data-qa'] };
@@ -89,7 +90,7 @@ test('a plan with an undefined or duplicate value is refused before any driver i
   const events = fakeRunEventSink();
   const ports = fakePorts({ drivers: driversOf(spy), events });
   const base = {
-    project: projectWith(PROJECT_FIELDS), baseUrl: ORIGIN, seed: 42, fixedTimeMilliseconds: 0, fixtures: [],
+    project: projectWith(PROJECT_FIELDS), baseUrl: baseUrlOf(ORIGIN), seed: 42, fixedTimeMilliseconds: 0, fixtures: [],
     host: { platform: platform(), arch: arch() },
   };
   for (const plan of [withValues([OPEN_ORDERS, fill(reference('missingValue'))]), withValues([OPEN_ORDERS, remember(MARKED)])]) {

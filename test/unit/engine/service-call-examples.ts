@@ -18,7 +18,7 @@
 //   - a review item a run raises is in RunResult.reviewItems, each with a `code`.
 import assert from 'node:assert/strict';
 import { failure, parseProject, planParser, run, success, type LoggedEvent, type PlanStanding, type Project, type Result, type RunPorts, type RunResult, type ServiceCallErrorCode, type ServiceCaller, type ServiceRequest, type ServiceResponse } from '@revisum/engine';
-import { authorise, trustedProjectFrom } from '../../support/policy-clearance.ts';
+import { baseUrlOf, clearRun, trustedProjectFrom } from '../../support/policy-clearance.ts';
 import {
   DEFAULT_CLOCK_START, DEFAULT_SEED, CURRENT_VERSION, ORIGIN, TARGET_ID, accepted, projectFileWith, recordingDriver,
   type JsonRecord, type ParsePlan, type Recording,
@@ -290,10 +290,8 @@ export async function runWithCalls(raw: unknown, options: CallRunOptions = {}): 
   const { caller, requests } = routedServiceCaller(options.route);
   const clock = virtualClock();
   const events = fakeRunEventSink();
-  const result = await run({
-    plan: authorise(plan, trusted, options.standing), project, targetId: project.matrix[0]?.id ?? assert.fail('no target'),
-    baseUrl: ORIGIN, seed: DEFAULT_SEED, fixedTimeMilliseconds: DEFAULT_CLOCK_START, fixtures: [], host: { platform: 'test', arch: 'test' },
-    ...(options.standing === undefined ? {} : { standing: options.standing }),
+  const result = await run(clearRun(plan, trusted, project.matrix[0]?.id ?? assert.fail('no target'), options.standing), {
+    baseUrl: baseUrlOf(ORIGIN), seed: DEFAULT_SEED, fixedTimeMilliseconds: DEFAULT_CLOCK_START, fixtures: [], host: { platform: 'test', arch: 'test' },
   }, serviceCallPorts(fakePorts({
     drivers: driversOf(driver), clock, events, secrets: fakeSecretStore(options.environment ?? SECRET_VALUES), services: options.caller ?? caller,
   }), options.withCaller !== false));

@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { setTimeout as pause } from "node:timers/promises";
 import { after, before, describe, test } from "node:test";
 import type { DriverSession } from "@revisum/driver-cdp";
-import type { ActionGuard, ActionStep, Secret, SessionEnvironment, Target } from "@revisum/engine";
+import type { ActionGuard, PerformableAction, SessionEnvironment, Target } from "@revisum/engine";
 import { outcomes, type BrowserHarness } from "#test-support/browser/BrowserHarness.ts";
 import { DriverAdapter } from "#test-support/browser/BrowserTarget.ts";
 import { driverForTarget } from "#test-support/browser/CreateBrowserDriver.ts";
@@ -89,9 +89,9 @@ function driverThatDiesAfterTheHover(death: Death | null) {
                 return opened;
             }
             const session = opened.value;
-            const act = async (step: ActionStep, guard: ActionGuard, secret?: Secret) => {
-                const acted = await session.act(step, guard, secret);
-                if (step.type === "hover" && death !== null) {
+            const act = async (action: PerformableAction, guard: ActionGuard) => {
+                const acted = await session.act(action, guard);
+                if (action.type === "hover" && death !== null) {
                     await dieIn(session, death);
                 }
                 return acted;

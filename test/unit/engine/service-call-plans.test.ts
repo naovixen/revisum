@@ -17,6 +17,7 @@ import {
 import { fakeDriverNeverLaunching } from '#test-support/fakes/FakeDriver.ts';
 import { driversOf, fakePorts } from '#test-support/fakes/FakePorts.ts';
 import { fakeRunEventSink } from '#test-support/fakes/FakeRunEventSink.ts';
+import { baseUrlOf } from '#test-support/policy-clearance.ts';
 
 const parsePlan = callParser();
 
@@ -264,7 +265,7 @@ test('a refused plan reaches neither the service caller nor the driver, and noth
   const { caller, requests } = routedServiceCaller();
   const events = fakeRunEventSink();
   const ports = fakePorts({ drivers: driversOf(spy), events, services: caller });
-  const base = { project: callProject(), baseUrl: ORIGIN, seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() } };
+  const base = { project: callProject(), baseUrl: baseUrlOf(ORIGIN), seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() } };
   for (const refused of REFUSED) {
     const outcome = await runUntrusted(refused.plan, parsePlan, base, ports);
     assert.ok('errors' in outcome, `${refused.name}: ${JSON.stringify(outcome)}`);

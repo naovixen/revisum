@@ -1,31 +1,25 @@
-// One document's page in a fake session: what it does with an action on a page still open, and what
-// a driver refuses before it touches the page, by the same rules the real driver applies.
+// One document's page in a fake session: what it does with an action on a page still open, by the
+// same rules the real driver applies.
 import {
     DriverErrorCode,
     failure,
-    literalActionStep,
-    literalText,
-    performableLocator,
     SemanticLocatorKind,
     sha256,
     StructuralLocatorKind,
     success,
     UnreadablePage,
     type ActionGuard,
-    type ActionStep,
-    type DialogStep,
     type DownloadedFile,
-    type DownloadStep,
     type DriverError,
     type ElementProbe,
-    type Locator,
     type OneElementRead,
     type PageReadFailure,
-    type ResolvedActionStep,
+    type PerformableAction,
+    type ResolvedDialogStep,
+    type ResolvedDownloadStep,
     type ResolvedElement,
     type ResolvedLocator,
     type Result,
-    type Secret,
 } from "@revisum/engine";
 
 export const FAKE_ELEMENT: OneElementRead = {
@@ -84,45 +78,6 @@ export const DIALOG_HOLDS_PAGE: PageReadFailure = {
 export const READ_FAILED: ElementProbe = { count: UnreadablePage.ReadFailed };
 const DIALOG_HOLDS_PROBE: ElementProbe = { count: UnreadablePage.DialogOpen };
 
-const isSecretMissing = (action: ResolvedActionStep, secret: Secret | undefined): boolean =>
-    action.type === "fill" &&
-    typeof action.value === "object" &&
-    "secretName" in action.value &&
-    secret?.name !== action.value.secretName;
-
-// The step as a driver performs it, or why it refuses before it touches the page. A value reference
-// left in the step means the engine did not replace it, and a secret reference without its secret
-// leaves nothing to type, and typing nothing could pass a step that should fail.
-export function performableAction(
-    step: Exclude<ActionStep, DialogStep>,
-    secret: Secret | undefined,
-): Result<ResolvedActionStep, DriverError> {
-    const action = literalActionStep(step);
-    if (action === undefined) {
-        return failure({
-            code: DriverErrorCode.UnsupportedStep,
-            detail: `this driver does not perform this ${step.type} step`,
-        });
-    }
-    if (isSecretMissing(action, secret)) {
-        return failure({
-            code: DriverErrorCode.NotActionable,
-            detail: "a secret reference reached the driver without its secret",
-        });
-    }
-    return success(action);
-}
-
-export function performableDownload(step: DownloadStep): Result<ResolvedLocator, DriverError> {
-    const locator = performableLocator(step.locator);
-    return locator === undefined
-        ? failure({
-              code: DriverErrorCode.UnsupportedStep,
-              detail: "this driver does not perform this download step",
-          })
-        : success(locator);
-}
-
 function guardDenial(
     element: ResolvedElement,
     dialogText: string | null,
@@ -142,7 +97,7 @@ const withWhitespaceCollapsed = (text: string): string => text.replace(/\s+/g, "
 // Answers the page's dialog: its text is checked first, then shown to the guard.
 function answerDialog(
     page: FakePage,
-    step: DialogStep,
+    step: ResolvedDialogStep,
     guard: ActionGuard,
 ): Result<void, DriverError> {
     const text = page.dialogText;
@@ -150,14 +105,7 @@ function answerDialog(
         return failure(NO_DIALOG);
     }
     if (step.expectText !== undefined) {
-        const expected = literalText(step.expectText);
-        if (expected === undefined) {
-            return failure({
-                code: DriverErrorCode.UnsupportedStep,
-                detail: "a value reference reached the driver",
-            });
-        }
-        if (withWhitespaceCollapsed(expected) !== withWhitespaceCollapsed(text)) {
+        if (withWhitespaceCollapsed(step.expectText) !== withWhitespaceCollapsed(text)) {
             return failure({
                 code: DriverErrorCode.AssertionFailed,
                 detail: "the open dialog does not say the expected text",
@@ -174,38 +122,29 @@ function answerDialog(
 
 export function actOnOpenPage(
     page: FakePage,
-    step: ActionStep,
+    action: PerformableAction,
     guard: ActionGuard,
-    secret: Secret | undefined,
 ): Result<void, DriverError> {
-    if (step.type === "dialog") {
-        return answerDialog(page, step, guard);
-    }
-    const action = performableAction(step, secret);
-    if (!action.ok) {
-        return action;
+    if (action.type === "dialog") {
+        return answerDialog(page, action, guard);
     }
     if (page.dialogText !== null) {
         return failure(DIALOG_HOLDS_PAGE);
     }
-    const denied = guardDenial(elementFoundBy(action.value.locator), null, guard);
+    const denied = guardDenial(elementFoundBy(action.locator), null, guard);
     return denied === null ? success(undefined) : failure(denied);
 }
 
 export function downloadOnOpenPage(
     page: FakePage,
-    step: DownloadStep,
+    step: ResolvedDownloadStep,
     maximumBytes: number,
     guard: ActionGuard,
 ): Result<DownloadedFile, DriverError> {
-    const locator = performableDownload(step);
-    if (!locator.ok) {
-        return locator;
-    }
     if (page.dialogText !== null) {
         return failure(DIALOG_HOLDS_PAGE);
     }
-    const denied = guardDenial(elementFoundBy(locator.value), null, guard);
+    const denied = guardDenial(elementFoundBy(step.locator), null, guard);
     if (denied !== null) {
         return failure(denied);
     }
@@ -223,9 +162,6 @@ export function downloadOnOpenPage(
     });
 }
 
-export function probeOpenPage(page: FakePage, locator: Locator): ElementProbe {
-    if (performableLocator(locator) === undefined) {
-        return READ_FAILED;
-    }
+export function probeOpenPage(page: FakePage): ElementProbe {
     return page.dialogText === null ? FAKE_ELEMENT : DIALOG_HOLDS_PROBE;
 }

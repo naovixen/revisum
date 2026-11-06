@@ -15,11 +15,12 @@ describe('a target that is not in the matrix', () => {
   const largeMatrix = [...smallMatrix, targetInput('chromium-tablet', 'fake-any', 'chromium', 'tablet-820')];
 
   test('a run on a target the matrix does not declare ends TargetUnavailable with not-declared, touching no driver', async () => {
-    const runProject = projectWith(smallMatrix);
+    // The plan was parsed under a project with the larger matrix; the trusted project clearing and
+    // running it declares only the smaller one.
     const planProject = projectWith(largeMatrix);
     const driver = targetDriver('fake-any');
     const ran = await runOnTarget({
-      runProject, planProject, trusted: await trustedProjectWith(largeMatrix),
+      planProject, trusted: await trustedProjectWith(smallMatrix),
       planTargets: ['chromium-desktop', 'chromium-tablet'], target: targetOf(planProject, 'chromium-tablet'),
       drivers: new Map([['fake-any', driver]]),
     });
@@ -35,7 +36,7 @@ describe('a target that is not in the matrix', () => {
     const project = projectWith(largeMatrix);
     const driver = targetDriver('fake-any');
     const ran = await runOnTarget({
-      runProject: project, trusted: await trustedProjectWith(largeMatrix),
+      planProject: project, trusted: await trustedProjectWith(largeMatrix),
       planTargets: ['chromium-desktop', 'chromium-tablet'], target: targetOf(project, 'chromium-tablet'),
       drivers: new Map([['fake-any', driver]]),
     });
@@ -83,7 +84,7 @@ describe('a WebKit target that no registered adapter supports', () => {
     // A registered adapter that would accept anything: a substitute, if core ever looked for one.
     const substitute = targetDriver('fake-any');
     const ran = await runOnTarget({
-      runProject: project, trusted: await trustedProjectWith(matrix), planTargets: ['webkit-desktop'],
+      planProject: project, trusted: await trustedProjectWith(matrix), planTargets: ['webkit-desktop'],
       target: targetOf(project, 'webkit-desktop'), drivers: new Map([['fake-chromium', named], ['fake-any', substitute]]),
     });
     assert.equal(ran.result.state, 'TargetUnavailable');
@@ -98,7 +99,7 @@ describe('a WebKit target that no registered adapter supports', () => {
     const project = projectWith(matrix);
     const named = targetDriver('fake-chromium', { refuse: chromiumOnly });
     const ran = await runOnTarget({
-      runProject: project, trusted: await trustedProjectWith(matrix), planTargets: ['chromium-desktop'],
+      planProject: project, trusted: await trustedProjectWith(matrix), planTargets: ['chromium-desktop'],
       target: targetOf(project, 'chromium-desktop'), drivers: new Map([['fake-chromium', named]]),
     });
     assert.equal(ran.result.unavailable?.reason, 'launch-failed');
@@ -134,7 +135,7 @@ describe('a Firefox target with a phone profile', () => {
     const named = targetDriver('fake-firefox', { refuse: noMobileFirefox });
     const substitute = targetDriver('fake-any');
     const ran = await runOnTarget({
-      runProject: project, trusted: await trustedProjectWith(matrix), planTargets: ['firefox-phone'],
+      planProject: project, trusted: await trustedProjectWith(matrix), planTargets: ['firefox-phone'],
       target: targetOf(project, 'firefox-phone'), drivers: new Map([['fake-firefox', named], ['fake-any', substitute]]),
     });
     assert.equal(ran.result.state, 'TargetUnavailable');
@@ -152,7 +153,7 @@ describe('a Firefox target with a phone profile', () => {
     const project = projectWith(matrix);
     const named = targetDriver('fake-firefox', { refuse: noMobileFirefox });
     const ran = await runOnTarget({
-      runProject: project, trusted: await trustedProjectWith(matrix), planTargets: ['firefox-desktop'],
+      planProject: project, trusted: await trustedProjectWith(matrix), planTargets: ['firefox-desktop'],
       target: targetOf(project, 'firefox-desktop'), drivers: new Map([['fake-firefox', named]]),
     });
     assert.equal(ran.result.unavailable?.reason, 'launch-failed');
@@ -172,7 +173,7 @@ describe('a browser build that differs from the lockfile at run time', () => {
     const target = targetOf(project, 'pinned-chromium');
     const driver = targetDriver('fake-chromium', { build: () => builtAt('156.0.7258.5', build) });
     const ran = await runOnTarget({
-      runProject: project, trusted: await trustedProjectWith(matrix), planTargets: ['pinned-chromium'], target,
+      planProject: project, trusted: await trustedProjectWith(matrix), planTargets: ['pinned-chromium'], target,
       drivers: new Map([['fake-chromium', driver]]),
       ...(executableSha256 === null ? {} : { lockEntries: [{ targetId: target.id, version: '156.0.7258.5', executableSha256 }] }),
     });
@@ -209,7 +210,7 @@ describe('a browser build that differs from the lockfile at run time', () => {
       const target = targetOf(project, 'pinned-chromium');
       const driver = targetDriver('fake-chromium', { build: () => builtAt('156.0.7258.5', changing) });
       const ran = await runOnTarget({
-        runProject: project, trusted: await trustedProjectWith(matrix), planTargets: ['pinned-chromium'], target,
+        planProject: project, trusted: await trustedProjectWith(matrix), planTargets: ['pinned-chromium'], target,
         drivers: new Map([['fake-chromium', driver]]),
         lockEntries: [{ targetId: target.id, version: '156.0.7258.5', executableSha256: pinnedHash }],
       });

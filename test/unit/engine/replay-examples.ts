@@ -29,13 +29,14 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { GuaranteeLevel } from '@revisum/contracts';
-import { parseProject, planParser, run, sha256, success, type BrowserDriver, type FixtureReference, type Plan, type Project, type RunManifest, type RunResult, type ServiceRequest } from '@revisum/engine';
-import { authorise, trustedProjectFrom } from '../../support/policy-clearance.ts';
+import type { GuaranteeLevel, RunIsolation } from '@revisum/contracts';
+import { HOST_ISOLATION, parseProject, planParser, run, sha256, success, type BrowserDriver, type ClearedRun, type FixtureReference, type Plan, type Project, type RunManifest, type RunResult, type ServiceRequest } from '@revisum/engine';
+import { baseUrlOf, clearRun, trustedProjectFrom } from '../../support/policy-clearance.ts';
 import { DEFAULT_ROUTE, fakeCommandRunner, type CommandRoute, type SeenCommand } from './database-command-examples.ts';
 import { DEFAULT_CLOCK_START, DEFAULT_SEED, ORIGIN, accepted, recordingDriver, type JsonRecord } from './run-value-examples.ts';
 import { SHOP_ROUTE, routedServiceCaller, type Route } from './service-call-examples.ts';
 import { driversOf, fakePorts } from '#test-support/fakes/FakePorts.ts';
+import { fakeRunIsolation } from '#test-support/fakes/FakeRunIsolation.ts';
 import { fakeSecretStore } from '#test-support/fakes/FakeSecretStore.ts';
 
 export { DEFAULT_CLOCK_START, DEFAULT_SEED, ORIGIN, type JsonRecord };
@@ -201,7 +202,7 @@ export type Scenario = {
   readonly pins: RunPins | null;
   readonly serviceRoute: Route;
   readonly commandRoute: CommandRoute;
-  // The level whoever started the run says the runner gave it; no level at all when absent.
+  // The level the run's isolation port says the runner gave it; the host's own isolation when absent.
   readonly guaranteeLevel?: GuaranteeLevel;
 };
 
@@ -288,18 +289,23 @@ export function parsedProject(projectFile: JsonRecord): Project {
 
 // The run's inputs a replay is given: everything but the seed, the clock start and the fixtures,
 // which come from the manifest.
-async function replayInputs(scenario: Scenario): Promise<{ readonly project: Project; readonly plan: Plan; readonly inputs: Readonly<Record<string, unknown>> }> {
+async function replayInputs(scenario: Scenario): Promise<{
+  readonly project: Project; readonly plan: Plan; readonly cleared: ClearedRun; readonly inputs: Readonly<Record<string, unknown>>;
+}> {
   const project = parsedProject(scenario.projectFile);
   const plan = accepted(planParser(project), scenario.plan);
   const trusted = await trustedProjectFrom(scenario.projectFile);
+  const cleared = clearRun(plan, trusted, project.matrix[0]?.id ?? assert.fail('no target'));
   const inputs = {
-    plan: authorise(plan, trusted), project, targetId: project.matrix[0]?.id ?? assert.fail('no target'),
-    baseUrl: scenario.baseUrl, host: scenario.host, scriptSources: scriptBytes(scenario.scriptSources),
+    baseUrl: baseUrlOf(scenario.baseUrl), host: scenario.host, scriptSources: scriptBytes(scenario.scriptSources),
     ...(scenario.pins === null ? {} : { pins: scenario.pins }),
-    ...(scenario.guaranteeLevel === undefined ? {} : { guaranteeLevel: scenario.guaranteeLevel }),
   };
-  return { project, plan, inputs };
+  return { project, plan, cleared, inputs };
 }
+
+// The isolation port the scenario's run is handed.
+const isolationOf = (scenario: Scenario): RunIsolation =>
+  scenario.guaranteeLevel === undefined ? HOST_ISOLATION : fakeRunIsolation(scenario.guaranteeLevel);
 
 // The wrapped ports and the recording maker recordingPorts gives; see the assumptions at the top.
 async function recordedPorts(ports: Readonly<Record<string, unknown>>): Promise<{
@@ -318,14 +324,14 @@ async function recordedPorts(ports: Readonly<Record<string, unknown>>): Promise<
 // Runs the scenario. With `record`, its service and command ports are wrapped by recordingPorts, as
 // cli wraps them for a project that sets replay.recordReplies, and the recording is kept.
 export async function runScenario(scenario: Scenario, options: { readonly record?: boolean } = {}): Promise<ScenarioRun> {
-  const { project, plan, inputs } = await replayInputs(scenario);
+  const { project, plan, cleared, inputs } = await replayInputs(scenario);
   const { driver, calls } = scenarioDriver(scenario);
   const { caller, requests } = routedServiceCaller(scenario.serviceRoute);
   const { port, commands } = fakeCommandRunner(scenario.commandRoute);
   const live = { services: caller, databaseCommands: port };
   const recorder = options.record === true ? await recordedPorts(live) : null;
   const ports = {
-    ...fakePorts({ drivers: driversOf(driver), secrets: fakeSecretStore(scenario.environment) }),
+    ...fakePorts({ drivers: driversOf(driver), secrets: fakeSecretStore(scenario.environment), isolation: isolationOf(scenario) }),
     ...(recorder === null ? live : recorder.ports),
   };
   const runInputs = {
@@ -333,7 +339,7 @@ export async function runScenario(scenario: Scenario, options: { readonly record
   };
   // Built as values, not literals: until the code exists, pins and the wrapped ports are outside
   // the run's types, and an excess field is simply ignored.
-  const result = await (Reflect.apply(run, undefined, [runInputs, ports]) as Promise<RunResult>);
+  const result = await (Reflect.apply(run, undefined, [cleared, runInputs, ports]) as Promise<RunResult>);
   const manifest: ManifestUnderTest | null = result.manifest;
   assert.ok(manifest !== null, `the run made no manifest: ${JSON.stringify(result)}`);
   return {
@@ -367,13 +373,13 @@ export type Replay = {
 
 export async function replayRun(ran: ScenarioRun, options: ReplayOptions = {}): Promise<Replay> {
   const scenario = options.scenario ?? ran.scenario;
-  const { inputs } = await replayInputs(scenario);
+  const { cleared, inputs } = await replayInputs(scenario);
   const { driver, calls } = scenarioDriver(scenario);
   const spyCaller = routedServiceCaller(scenario.serviceRoute);
   const spyRunner = fakeCommandRunner(scenario.commandRoute);
   const fixtureFiles = new Map(scenario.fixtures.map((fixture) => [fixture.path, new TextEncoder().encode(fixture.text)]));
   const ports = {
-    ...fakePorts({ drivers: driversOf(driver), secrets: fakeSecretStore(scenario.environment) }),
+    ...fakePorts({ drivers: driversOf(driver), secrets: fakeSecretStore(scenario.environment), isolation: isolationOf(scenario) }),
     fixtures: { read: async (path: string) => (options.readFixture === undefined ? fixtureFiles.get(path) ?? null : options.readFixture(path)) },
     // Not part of ReplayPorts: a replay that used either would send a call or run a command.
     services: spyCaller.caller, databaseCommands: spyRunner.port,
@@ -384,6 +390,7 @@ export async function replayRun(ran: ScenarioRun, options: ReplayOptions = {}): 
     recording: options.recording === undefined ? ran.recording : options.recording,
     recordedResultHash: options.recordedResultHash ?? ran.result.resultHash,
     recordedState: ran.result.state,
+    cleared,
     inputs: options.host === undefined ? inputs : { ...inputs, host: options.host },
   };
   const replay = await engineFunction('replay');

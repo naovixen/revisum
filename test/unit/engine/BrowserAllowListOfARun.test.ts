@@ -4,7 +4,7 @@
 import assert from "node:assert/strict";
 import { describe, test, type TestContext } from "node:test";
 import { run, success, type BrowserDriver, type PlanStanding } from "@revisum/engine";
-import { authorise, trustedProjectFrom } from "../../support/policy-clearance.ts";
+import { baseUrlOf, clearRun, trustedProjectFrom } from "../../support/policy-clearance.ts";
 import { parsedSignupPlan, withRepository } from "./approval-repositories.ts";
 import {
     ORIGIN,
@@ -53,25 +53,23 @@ async function allowedOriginsOfRun(
     );
     const driver = fakeDriver({ info: { id: "cdp", version: "fake", protocol: "none" }, open });
     const plan = parsedSignupPlan();
-    const authorised = authorise(
-        plan,
-        await trustedProjectFrom(testProjectInput({}, projectFields(policy))),
-        standing,
-    );
     const project = testProject({}, projectFields(policy));
     const target = project.matrix.find((candidate) => String(candidate.id) === TARGET_ID);
     assert.ok(target !== undefined, "the project has the plan's target");
+    const cleared = clearRun(
+        plan,
+        await trustedProjectFrom(testProjectInput({}, projectFields(policy))),
+        target.id,
+        standing,
+    );
     await run(
+        cleared,
         {
-            plan: authorised,
-            project,
-            targetId: target.id,
-            baseUrl: ORIGIN,
+            baseUrl: baseUrlOf(ORIGIN),
             seed: 7,
             fixedTimeMilliseconds: 0,
             fixtures: [],
             host: { platform: "test", arch: "test" },
-            standing,
         },
         fakePorts({ drivers: driversOf(driver) }),
     );

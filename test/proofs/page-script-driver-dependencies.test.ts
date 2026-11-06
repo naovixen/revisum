@@ -81,7 +81,11 @@ for (const driver of DRIVERS) {
       revealCallLines(readFileSync(file, 'utf8')).map((line) => ({ file: relative(REPOSITORY_ROOT, file).split('\\').join('/'), line: line.trim() })));
     assert.equal(calls.length, 1, JSON.stringify(calls));
     assert.equal(calls[0]?.file, driver.inputModule);
-    assert.match(calls[0].line, /\binput\.fill\(/, 'the one call is in the fill');
+    // The one call reveals the secret the fill carries, in the text the fill types and nowhere else.
+    assert.match(calls[0].line, /\breveal\(value\.secret\)/, 'the one call reveals the secret its fill carries');
+    const source = readFileSync(join(REPOSITORY_ROOT, driver.inputModule), 'utf8');
+    assert.match(source, /\binput\.fill\(\s*element,\s*textToFill\(/, 'the text holding the secret is typed by the fill');
+    assert.equal(source.match(/\btextToFill\(/g)?.length, 2, 'the text holding the secret is made for the fill alone');
   });
 }
 

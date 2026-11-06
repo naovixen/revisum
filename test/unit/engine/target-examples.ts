@@ -6,7 +6,7 @@ import { arch, platform, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { failure, parseProject, planParser, run, sha256, success, type BrowserBuild, type BrowserDriver, type BuildFailure, type Project, type Result, type RunInputs, type RunResult, type Target, type TrustedProject, type Unavailable } from '@revisum/engine';
 import { type MemoryArtifactStore } from '../../support/memory-ports.ts';
-import { authorise, trustedProjectFrom } from '../../support/policy-clearance.ts';
+import { baseUrlOf, clearRun, trustedProjectFrom } from '../../support/policy-clearance.ts';
 import { ORIGIN, signupPlan, testProjectInput, withValue, type JsonRecord } from './plan-examples.ts';
 import { fakeArtifactStore } from '#test-support/fakes/FakeArtifactStore.ts';
 import { fakeDriverNeverLaunching, type FakeDriver } from '#test-support/fakes/FakeDriver.ts';
@@ -89,23 +89,22 @@ const pinnedTo = (lockEntries: NonNullable<RunInputs['lockEntries']>): Pick<RunI
 
 export type TargetRun = { readonly result: RunResult; readonly store: MemoryArtifactStore };
 
-// Runs the sign-up plan, declaring `planTargets`, on one target: the plan is parsed and authorised
-// under `planProject` and run under `runProject` (the same project unless a test needs them apart).
+// Runs the sign-up plan, declaring `planTargets`, on one target: the plan is parsed under
+// `planProject`, and cleared and run under the trusted project (the same file unless a test needs
+// them apart).
 export async function runOnTarget(options: {
-  readonly runProject: Project;
-  readonly planProject?: Project;
+  readonly planProject: Project;
   readonly trusted: TrustedProject;
   readonly planTargets: readonly string[];
   readonly target: Target;
   readonly drivers: ReadonlyMap<string, BrowserDriver>;
   readonly lockEntries?: NonNullable<RunInputs['lockEntries']>;
 }): Promise<TargetRun> {
-  const parsed = planParser(options.planProject ?? options.runProject)(withValue(signupPlan(), ['targets'], [...options.planTargets]));
+  const parsed = planParser(options.planProject)(withValue(signupPlan(), ['targets'], [...options.planTargets]));
   if (!parsed.ok) throw new Error(`bad test plan: ${JSON.stringify(parsed.error)}`);
   const store = fakeArtifactStore();
-  const result = await run({
-    plan: authorise(parsed.value, options.trusted), project: options.runProject, targetId: options.target.id,
-    baseUrl: ORIGIN, seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() },
+  const result = await run(clearRun(parsed.value, options.trusted, options.target.id), {
+    baseUrl: baseUrlOf(ORIGIN), seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() },
     ...(options.lockEntries === undefined ? {} : pinnedTo(options.lockEntries)),
   }, fakePorts({ drivers: options.drivers, artifacts: store }));
   return { result, store };

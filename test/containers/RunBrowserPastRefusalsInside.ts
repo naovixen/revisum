@@ -16,7 +16,7 @@ import {
     type FixtureServer,
 } from "../support/fixture-server.ts";
 import { systemClock } from "../support/memory-ports.ts";
-import { authorise, trustedProjectFrom } from "../support/policy-clearance.ts";
+import { baseUrlOf, clearRun, trustedProjectFrom } from "../support/policy-clearance.ts";
 import { FIXTURES } from "../support/repository.ts";
 import { buildAdapters } from "../../packages/cli/src/BuildAdapters.ts";
 import { realRunPorts } from "../support/RealRunPorts.ts";
@@ -115,15 +115,13 @@ async function runPlanAgainst(fixture: FixtureServer, proxyServer: string): Prom
     const target = project.value.matrix[0];
     assert.ok(target !== undefined, "the project has a target");
     return run(
+        clearRun(parsedPlan.value, await trustedProjectFrom(projectFile), target.id),
         {
-            project: project.value,
-            baseUrl: fixture.origin,
+            baseUrl: baseUrlOf(fixture.origin),
             seed: SEED,
             fixedTimeMilliseconds: FIXED_TIME_MILLISECONDS,
             fixtures: fixture.fixtures,
             host: { platform: platform(), arch: arch() },
-            plan: authorise(parsedPlan.value, await trustedProjectFrom(projectFile)),
-            targetId: target.id,
         },
         realRunPorts({
             drivers: new Map([

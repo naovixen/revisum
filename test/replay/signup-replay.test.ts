@@ -18,7 +18,7 @@ import {
 } from '@revisum/engine';
 import { BROWSERS } from '#test-support/browsers.ts';
 import { systemClock } from '#test-support/memory-ports.ts';
-import { authorise, trustedProjectFrom } from '#test-support/policy-clearance.ts';
+import { clearRun, trustedProjectFrom } from '#test-support/policy-clearance.ts';
 import { FIXTURES, GOLDEN } from '#test-support/repository.ts';
 import { determinismRuns } from '#test-support/TestTier.ts';
 import type { BrowserHarness } from '#test-support/browser/BrowserHarness.ts';
@@ -55,7 +55,7 @@ async function replaySignup(rawPlan: unknown, targetId: string, manifest: unknow
   const { seed: _seed, fixedTimeMilliseconds: _clock, fixtures: _fixtures, ...inputs } = testHarness.runInputs();
   const request = {
     manifest, recording: null, recordedResultHash, recordedState: 'Passed',
-    inputs: { ...inputs, plan: authorise(testHarness.plan(rawPlan), trusted), targetId: targetOf(targetId) },
+    cleared: clearRun(testHarness.plan(rawPlan), trusted, targetOf(targetId)), inputs,
   };
   const ports = { ...realRunPorts({ drivers: makeDrivers(), clock: systemClock }), fixtures: fixtureReader };
   const replay = await engineFunction('replay');

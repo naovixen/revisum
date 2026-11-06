@@ -59,7 +59,7 @@ const ERROR_CODES: Readonly<Record<string, readonly string[]>> = {
   replay: ['replay-not-claimed', 'replay-mismatch', 'version-unsupported'],
   refusal: [
     'origin-not-allowed', 'secret-missing', 'services-unavailable', 'storage-state-unsupported', 'database-commands-unavailable',
-    'evidence-mode-disabled', 'suite-not-declared', 'egress-unenforceable', 'clearance-standing-mismatch', 'element-check-unsupported',
+    'evidence-mode-disabled', 'suite-not-declared', 'egress-unenforceable', 'element-check-unsupported',
   ],
   policy: [
     'irreversible-action', 'irreversible-submit', 'destructive-navigation', 'irreversible-dialog', 'unnamed-control',

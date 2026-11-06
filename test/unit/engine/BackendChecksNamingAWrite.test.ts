@@ -10,7 +10,7 @@ import {
     type RunResult,
     type ServiceRequest,
 } from "@revisum/engine";
-import { authorise, trustedProjectFrom } from "../../support/policy-clearance.ts";
+import { baseUrlOf, clearRun, trustedProjectFrom } from "../../support/policy-clearance.ts";
 import {
     DEFAULT_CLOCK_START,
     DEFAULT_SEED,
@@ -79,11 +79,9 @@ const runUnder = async (
     const { caller, requests } = routedServiceCaller(route);
     const clock = fakeClock();
     const result = await run(
+        clearRun(plan, trusted, project.matrix[0]?.id ?? assert.fail("no target")),
         {
-            plan: authorise(plan, trusted),
-            project,
-            targetId: project.matrix[0]?.id ?? assert.fail("no target"),
-            baseUrl: ORIGIN,
+            baseUrl: baseUrlOf(ORIGIN),
             seed: DEFAULT_SEED,
             fixedTimeMilliseconds: DEFAULT_CLOCK_START,
             fixtures: [],

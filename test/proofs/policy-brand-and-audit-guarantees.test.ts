@@ -25,12 +25,12 @@ const FORGERY_SETUP = [
 
 test('control: the plan the policy gate returns compiles as Authorised', { timeout: TIMEOUT }, () => {
   const compiled = compile('gate-output.ts', [
-    "import type { Authorised, Plan, PolicyGate, Target } from '@revisum/engine';",
+    "import type { Authorised, Plan, PolicyGate, TargetId } from '@revisum/engine';",
     'declare const gate: PolicyGate;',
     'declare const parsed: Plan;',
-    'declare const targets: readonly Target[];',
-    'const decision = gate.decide(parsed, targets);',
-    'export const cleared: Authorised | null = decision.kind === \'allow\' ? decision.plan : null;',
+    'declare const targetId: TargetId;',
+    'const decision = gate.clear(parsed, targetId);',
+    'export const cleared: Authorised | null = decision.kind === \'allow\' ? decision.run.plan : null;',
   ]);
   assert.equal(compiled.passed, true, compiled.output);
 });
@@ -56,17 +56,18 @@ test('a parsed plan given the brand\'s field by Object.assign does not compile a
 // ---- A run without an audit sink -----------------------------------------------------------------
 
 const PORTS_SETUP = [
-  "import type { ArtifactStore, BrowserDriver, Clock, EventSink, Redactor, RunEventSink, RunPorts } from '@revisum/engine';",
+  "import type { ArtifactStore, BrowserDriver, Clock, EventSink, Redactor, RunEventSink, RunIsolation, RunPorts } from '@revisum/engine';",
   'declare const drivers: ReadonlyMap<string, BrowserDriver>;',
   'declare const clock: Clock;',
   'declare const artifacts: ArtifactStore;',
   'declare const redactor: Redactor;',
   'declare const events: RunEventSink;',
   'declare const audit: EventSink;',
+  'declare const isolation: RunIsolation;',
 ];
 
 test('control: run ports with an audit sink compile', { timeout: TIMEOUT }, () => {
-  const compiled = compile('ports-with-audit.ts', [...PORTS_SETUP, 'export const ports: RunPorts = { drivers, clock, artifacts, redactor, events, audit };']);
+  const compiled = compile('ports-with-audit.ts', [...PORTS_SETUP, 'export const ports: RunPorts = { drivers, clock, artifacts, redactor, events, audit, isolation };']);
   assert.equal(compiled.passed, true, compiled.output);
 });
 
@@ -74,7 +75,7 @@ const DELETE_STEPS = [OPEN_ACCOUNT_PAGE, click(role('button', 'Delete account'))
 const SAVE_STEPS = [OPEN_ACCOUNT_PAGE, click(role('button', 'Save changes'))];
 
 test('a run cannot deny a plan without recording it: the audit port is required, or a run without one refuses to start', { timeout: TIMEOUT }, async () => {
-  const compiled = compile('ports-without-audit.ts', [...PORTS_SETUP, 'export const ports: RunPorts = { drivers, clock, artifacts, redactor, events };']);
+  const compiled = compile('ports-without-audit.ts', [...PORTS_SETUP, 'export const ports: RunPorts = { drivers, clock, artifacts, redactor, events, isolation };']);
   if (!compiled.passed) {
     // The port is required: leaving it out is the one error, and it names the audit sink.
     assert.equal(compiled.errors.length, 1, compiled.output);

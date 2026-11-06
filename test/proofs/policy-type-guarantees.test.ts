@@ -1,10 +1,10 @@
-// run() accepts only a plan the policy gate authorised. This is a compile-time guarantee: the
-// guarantee file must compile, and each line marked as an expected error must be one, so a parsed
-// but unauthorised plan, or a hand-made copy, can never reach a run.
+// run() accepts only a run the policy gate cleared. This is a compile-time guarantee: the guarantee
+// file must compile, and each line marked as an expected error must be one, so a parsed plan, a
+// hand-made cleared run or a copy of one under another project or standing can never reach a run.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { test } from 'node:test';
+import { describe, test } from 'node:test';
 import { REPOSITORY_ROOT } from '../support/repository.ts';
 import { compileFiles } from './scratch-compiler.ts';
 
@@ -28,13 +28,13 @@ const assertMutantFails = (marker: string): void => {
   assert.equal(compiled.errors.length, 1, compiled.output);
 };
 
-test('the policy guarantee file compiles: an authorised plan is a real type, is a Plan, and runs', { timeout: TIMEOUT }, () => {
+test('the policy guarantee file compiles: a cleared run is a real type, holds a Plan, and runs', { timeout: TIMEOUT }, () => {
   const compiled = compileFiles([GUARANTEE_FILE]);
   assert.equal(compiled.passed, true, compiled.output);
 });
 
-test('run() called with a parsed plan that has not been authorised does not type-check', { timeout: TIMEOUT }, () => {
-  assertMutantFails('unauthorisedPlanRuns');
+test('run() called with a parsed plan the gate has not cleared does not type-check', { timeout: TIMEOUT }, () => {
+  assertMutantFails('unclearedPlanRuns');
 });
 
 test('a copy of a parsed plan cannot pass as Authorised', { timeout: TIMEOUT }, () => {
@@ -43,5 +43,24 @@ test('a copy of a parsed plan cannot pass as Authorised', { timeout: TIMEOUT }, 
 
 test('every expected-error marker in the policy guarantee file is checked by a test above', () => {
   const markers = readFileSync(GUARANTEE_FILE, 'utf8').split(/\r?\n/).filter((line) => EXPECTED_ERROR_LINE.test(line)).length;
-  assert.equal(markers, 2);
+  assert.equal(markers, 6);
+});
+
+const CLEARED_RUN_MUTANTS: readonly (readonly [string, string])[] = [
+  ['an authorised plan alone', 'authorisedPlanRuns'],
+  ['a cleared run written by hand', 'handMadeClearedRunRuns'],
+  ['a cleared run copied under another project', 'clearedRunUnderAnotherProject'],
+  ['a cleared run copied under another standing', 'clearedRunUnderAnotherStanding'],
+];
+
+describe('Using the policy guarantee file', () => {
+  for (const [handed, marker] of CLEARED_RUN_MUTANTS) {
+    describe(`given the line running ${handed} without its expected-error marker`, () => {
+      describe('when it is type-checked', () => {
+        test('then it should fail on that line alone', { timeout: TIMEOUT }, () => {
+          assertMutantFails(marker);
+        });
+      });
+    });
+  }
 });

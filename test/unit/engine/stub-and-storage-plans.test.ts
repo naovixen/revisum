@@ -17,6 +17,7 @@ import {
 import { fakeDriverNeverLaunching } from '#test-support/fakes/FakeDriver.ts';
 import { driversOf, fakePorts } from '#test-support/fakes/FakePorts.ts';
 import { fakeRunEventSink } from '#test-support/fakes/FakeRunEventSink.ts';
+import { baseUrlOf } from '#test-support/policy-clearance.ts';
 
 // Built on first use, so each test reports its own failure while the project parser lacks a section.
 let parser: ParsePlan | undefined;
@@ -247,7 +248,7 @@ test('a refused plan reaches no driver method, and nothing is logged', async () 
   const spy = fakeDriverNeverLaunching();
   const events = fakeRunEventSink();
   const ports = fakePorts({ drivers: driversOf(spy), events });
-  const base = { project: stubProject(), baseUrl: ORIGIN, seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() } };
+  const base = { project: stubProject(), baseUrl: baseUrlOf(ORIGIN), seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() } };
   for (const refused of REFUSED) {
     const outcome = await runUntrusted(refused.plan, parsePlan, base, ports);
     assert.ok('errors' in outcome, `${refused.name}: ${JSON.stringify(outcome)}`);
@@ -261,7 +262,7 @@ test('counter-example: an accepted plan with a stub step does reach the driver',
 
   const spy = fakeDriverNeverLaunching();
   const ports = fakePorts({ drivers: driversOf(spy) });
-  const base = { project: stubProject(), baseUrl: ORIGIN, seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() } };
+  const base = { project: stubProject(), baseUrl: baseUrlOf(ORIGIN), seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() } };
   await runUntrusted(planOf([OPEN_LOGIN, startStub('cartEmpty')]), parsePlan, base, ports);
   assert.equal(spy.calls.count('open'), 1);
 });

@@ -7,12 +7,13 @@ import {
     failure,
     success,
     type ActionGuard,
-    type ActionStep,
-    type DownloadStep,
     type GuardVerdict,
     type Origin,
+    type PerformableAction,
+    type ResolvedDownloadStep,
     type ResolvedElement,
 } from "@revisum/engine";
+import { performableActionOf, resolvedDownloadOf } from "#test-support/PerformableActionOf.ts";
 import { FAKE_DOWNLOAD, fakeSession } from "#test-support/fakes/FakeSession.ts";
 import { isHeldByADialog } from "#test-support/IsHeldByADialog.ts";
 import { failureCode as failureCodeOf } from "#test-support/session-contract/SessionUnderTest.ts";
@@ -62,16 +63,16 @@ function guardAnswering(verdict: GuardVerdict): {
 
 const secondStepOf = (raw: JsonRecord) => stepAt(parsedPlan(planOf([OPEN_ACCOUNT_PAGE, raw])), 1);
 
-function actionStep(raw: JsonRecord): ActionStep {
+function actionStep(raw: JsonRecord): PerformableAction {
     const step = secondStepOf(raw);
     assert.ok(step.type === "click" || step.type === "dialog", JSON.stringify(step));
-    return step;
+    return performableActionOf(step);
 }
 
-function downloadStep(): DownloadStep {
+function downloadStep(): ResolvedDownloadStep {
     const step = secondStepOf({ type: "download", name: "report", locator: NAMED_BUTTON });
     assert.ok(step.type === "download", JSON.stringify(step));
-    return step;
+    return resolvedDownloadOf(step);
 }
 
 describe("Using a fake session", () => {
@@ -130,7 +131,7 @@ describe("Using a fake session", () => {
                     1,
                 );
                 assert.ok(step.type === "click", JSON.stringify(step));
-                const acted = await fakeSession().act(step, guard);
+                const acted = await fakeSession().act(performableActionOf(step), guard);
                 assert.deepEqual(acted, success(undefined));
                 assert.deepEqual(asked, [[UNNAMED_ELEMENT, null]]);
             });

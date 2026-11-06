@@ -6,6 +6,7 @@ import { fakeDriver } from "./FakeDriver.ts";
 import { fakeEventSink } from "./FakeEventSink.ts";
 import { fakeRedactor } from "./FakeRedactor.ts";
 import { fakeRunEventSink } from "./FakeRunEventSink.ts";
+import { fakeRunIsolation } from "./FakeRunIsolation.ts";
 import { fakeSecretStore } from "./FakeSecretStore.ts";
 import { fakeServiceCaller } from "./FakeServiceCaller.ts";
 
@@ -24,6 +25,7 @@ export function fakePorts(overrides: Partial<RunPorts> = {}): RunPorts {
         redactor: fakeRedactor(),
         events: fakeRunEventSink(),
         audit: fakeEventSink(),
+        isolation: fakeRunIsolation(),
         secrets: fakeSecretStore(),
         services: fakeServiceCaller(),
         databaseCommands: fakeDatabaseCommandRunner(),

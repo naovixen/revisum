@@ -7,9 +7,8 @@ import { after, before, describe, test } from "node:test";
 import type { DriverSession } from "@revisum/driver-cdp";
 import type {
     ActionGuard,
-    ActionStep,
-    DownloadStep,
-    Secret,
+    PerformableAction,
+    ResolvedDownloadStep,
     SessionEnvironment,
     Target,
 } from "@revisum/engine";
@@ -142,9 +141,9 @@ function driversThatDie(death: Death | null, members: DyingMembers) {
 
 // The death comes as a hover finishes, so the next step starts on a page already known to be dead.
 const dyingAfterTheHover: DyingMembers = ({ session, die }) => ({
-    act: async (step: ActionStep, guard: ActionGuard, secret?: Secret) => {
-        const acted = await session.act(step, guard, secret);
-        if (step.type === "hover") {
+    act: async (action: PerformableAction, guard: ActionGuard) => {
+        const acted = await session.act(action, guard);
+        if (action.type === "hover") {
             await die();
         }
         return acted;
@@ -162,7 +161,7 @@ const dyingAsTheStepBegins: DyingMembers = ({ session, die }) => ({
         await die();
         return session.screenshot(mask);
     },
-    download: async (step: DownloadStep, maximumBytes: number, guard: ActionGuard) => {
+    download: async (step: ResolvedDownloadStep, maximumBytes: number, guard: ActionGuard) => {
         await die();
         return session.download(step, maximumBytes, guard);
     },

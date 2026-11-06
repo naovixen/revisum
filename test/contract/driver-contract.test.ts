@@ -12,6 +12,7 @@ import { onTarget } from '#test-support/TestTier.ts';
 import type { BrowserHarness } from '#test-support/browser/BrowserHarness.ts';
 import { CONTRACT_TARGETS, EMAIL, FIXED_TIME_MILLISECONDS, LOCALE, SEED, TIMEZONE, environmentPlan, signupHarness, makeDrivers, signupPlan, stepsPlan } from '#test-support/signup-harness.ts';
 import { scriptsEnabled } from "#test-support/browser/ScriptsEnabled.ts";
+import { performableActionOf, resolvedLocatorOf } from '#test-support/PerformableActionOf.ts';
 
 const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47];
 
@@ -112,9 +113,9 @@ for (const targetId of CONTRACT_TARGETS) {
       const probe = await withSession(targetId, async (session) => {
         assert.ok((await session.navigate(`${testHarness.server.origin}/`, scriptsEnabled)).ok);
         const fill = parsedStep({ type: 'fill', locator: { by: 'label', label: 'Email' }, value: EMAIL }, 'fill');
-        const filled = await session.act(fill, allowEveryAction);
+        const filled = await session.act(performableActionOf(fill), allowEveryAction);
         assert.ok(filled.ok);
-        return session.probe(fill.locator, null);
+        return session.probe(resolvedLocatorOf(fill.locator), null);
       });
       const element = expectOneElement(probe);
       assert.equal(element.value, EMAIL);

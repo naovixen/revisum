@@ -10,7 +10,7 @@ import {
 } from '@revisum/engine';
 import { buildAdapters } from '../../packages/cli/src/BuildAdapters.ts';
 import { memoryArtifactStore, systemClock } from '../support/memory-ports.ts';
-import { authorise, trustedProjectFrom } from '../support/policy-clearance.ts';
+import { baseUrlOf, clearRun, trustedProjectFrom } from '../support/policy-clearance.ts';
 import { fakePorts } from '../support/fakes/FakePorts.ts';
 
 const ORIGIN = 'http://127.0.0.1:4173';
@@ -61,9 +61,8 @@ async function runOn(targetId: string, drivers: ReadonlyMap<string, BrowserDrive
   const parsed = planParser(project)(headingPlan(targetId));
   if (!parsed.ok) throw new Error(`bad test plan: ${JSON.stringify(parsed.error)}`);
   const store = memoryArtifactStore();
-  const result = await run({
-    plan: authorise(parsed.value, await trustedProjectFrom(projectFile)), project, targetId: target(targetId).id,
-    baseUrl: ORIGIN, seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() },
+  const result = await run(clearRun(parsed.value, await trustedProjectFrom(projectFile), target(targetId).id), {
+    baseUrl: baseUrlOf(ORIGIN), seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() },
   }, fakePorts({ drivers, clock: systemClock, artifacts: store }));
   return { result, store };
 }

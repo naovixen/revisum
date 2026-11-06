@@ -8,7 +8,7 @@
 //
 // A dialog step acts on no element: the driver asks the guard with an element whose fields are all
 // null, and passes the open dialog's text as the guard's second argument.
-import { failure, planParser, runUntrusted, success, type BrowserDriver, type GuardVerdict, type Plan, type PlanError, type ResolvedElement, type Result, type RunInputs, type RunPorts, type RunResult } from '@revisum/engine';
+import { failure, planParser, runUntrusted, success, type BrowserDriver, type GuardVerdict, type Plan, type PlanError, type Project, type ResolvedElement, type Result, type RunInputs, type RunPorts, type RunResult } from '@revisum/engine';
 import { arch, platform } from 'node:os';
 import { ORIGIN, element, parserProject, policyProjectInput, type JsonRecord } from './policy-examples.ts';
 import { fakeArtifactStore } from '#test-support/fakes/FakeArtifactStore.ts';
@@ -17,8 +17,9 @@ import { fakeDriverOpening } from '#test-support/fakes/FakeDriver.ts';
 import { driversOf } from '#test-support/fakes/FakePorts.ts';
 import { fakeRedactor } from '#test-support/fakes/FakeRedactor.ts';
 import { fakeRunEventSink } from '#test-support/fakes/FakeRunEventSink.ts';
-import { performableAction } from '#test-support/fakes/FakePage.ts';
+import { fakeRunIsolation } from '#test-support/fakes/FakeRunIsolation.ts';
 import { fakeSession } from '#test-support/fakes/FakeSession.ts';
+import { baseUrlOf } from '#test-support/policy-clearance.ts';
 
 // What the page shows for one step: the element its locator resolves to, or an open dialog's text.
 export type PageView = { readonly element?: Partial<ResolvedElement>; readonly dialogText?: string };
@@ -61,16 +62,9 @@ export function guardedDriver(steps: readonly JsonRecord[], page: PageViews = {}
   const session = fakeSession({
     browser: { name: 'guarded-browser', version: '1.0' },
     page: () => Promise.resolve(success({ url: `${ORIGIN}/`, title: 'Account', meta: [], canonicalUrl: null })),
-    act: (step, guard, secret) => {
+    act: (step, guard) => {
       const index = actingIndexes[actions] ?? -1;
       actions++;
-      // What any driver refuses comes before the guard and the page.
-      if (step.type !== 'dialog') {
-        const performable = performableAction(step, secret);
-        if (!performable.ok) {
-          return Promise.resolve(performable);
-        }
-      }
       const raw = steps[index] ?? {};
       const seen = page[String(index)];
       const kind: string = step.type;
@@ -87,16 +81,20 @@ export function guardedDriver(steps: readonly JsonRecord[], page: PageViews = {}
   return { driver, opens: () => driver.calls.count('open'), inputEvents, guardCalls: () => guardCalls };
 }
 
-// What a run needs besides the plan and target, for the policy test project.
-export const runBase = (projectInput: JsonRecord = policyProjectInput()): Omit<RunInputs, 'plan' | 'targetId'> => ({
-  project: parserProject(projectInput), baseUrl: ORIGIN, seed: 7, fixedTimeMilliseconds: Date.UTC(2026, 9, 28, 12, 0, 0),
-  fixtures: [], host: { platform: platform(), arch: arch() },
+// What a run needs besides its cleared run.
+export const runInputs = (): RunInputs => ({
+  baseUrl: baseUrlOf(ORIGIN), seed: 7, fixedTimeMilliseconds: Date.UTC(2026, 9, 28, 12, 0, 0), fixtures: [], host: { platform: platform(), arch: arch() },
+});
+
+// The same, with the policy test project runUntrusted clears the plan under.
+export const runBase = (projectInput: JsonRecord = policyProjectInput()): RunInputs & { readonly project: Project } => ({
+  ...runInputs(), project: parserProject(projectInput),
 });
 
 // The ports of a run on `driver`, without an audit sink; tests add one where they need it.
 export const portsWithoutAudit = (driver: BrowserDriver): Omit<RunPorts, 'audit'> => ({
   drivers: driversOf(driver), clock: fakeClock(), artifacts: fakeArtifactStore(),
-  redactor: fakeRedactor(), events: fakeRunEventSink(),
+  redactor: fakeRedactor(), events: fakeRunEventSink(), isolation: fakeRunIsolation(),
 });
 
 export const parserFor = (projectInput: JsonRecord = policyProjectInput()) =>

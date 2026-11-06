@@ -1,18 +1,19 @@
-// A run's result claims egress control only when whoever started the run says the runner enforced
-// it. RunInputs.guaranteeLevel is set from Runner.guaranteeLevel(); only 'isolated' makes the result
-// state that egress was enforced. Without it, or at 'host', the result is what every committed
-// hash already holds. Each test reads the real result of a real run, on a recording driver.
+// A run's result claims egress control only when its isolation port says the runner enforced it.
+// Only 'isolated' makes the result state that egress was enforced. At 'host', and with the host's
+// own isolation, the result is what every committed hash already holds. Each test reads the real
+// result of a real run, on a recording driver.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import type { GuaranteeLevel } from '@revisum/contracts';
-import { guaranteeStatement, parseProject, planParser, run, type RunResult } from '@revisum/engine';
-import { authorise, trustedProjectFrom } from '../../support/policy-clearance.ts';
+import type { RunIsolation } from '@revisum/contracts';
+import { HOST_ISOLATION, guaranteeStatement, parseProject, planParser, run, type RunResult } from '@revisum/engine';
+import { baseUrlOf, clearRun, trustedProjectFrom } from '../../support/policy-clearance.ts';
 import { ORIGIN } from './plan-examples.ts';
 import { DEFAULT_CLOCK_START, DEFAULT_SEED, OPEN_ORDERS, accepted, planOf, projectFileWith, recordingDriver } from './run-value-examples.ts';
 import { driversOf, fakePorts } from '#test-support/fakes/FakePorts.ts';
+import { fakeRunIsolation } from '#test-support/fakes/FakeRunIsolation.ts';
 
-// Runs one plan on the shared test project, at the level given, or with no level at all.
-async function runAt(level?: GuaranteeLevel): Promise<RunResult> {
+// Runs one plan on the shared test project, isolated as the port given says.
+async function runWith(isolation: RunIsolation): Promise<RunResult> {
   const projectFile = projectFileWith();
   const parsed = parseProject(projectFile);
   assert.ok(parsed.ok, JSON.stringify(parsed));
@@ -22,16 +23,15 @@ async function runAt(level?: GuaranteeLevel): Promise<RunResult> {
   const target = project.matrix[0];
   assert.ok(target !== undefined, 'the test project has a target');
   const { driver } = recordingDriver();
-  return run({
-    plan: authorise(plan, trusted), project, targetId: target.id, baseUrl: ORIGIN, seed: DEFAULT_SEED, fixedTimeMilliseconds: DEFAULT_CLOCK_START,
-    fixtures: [], host: { platform: 'test', arch: 'test' }, ...(level === undefined ? {} : { guaranteeLevel: level }),
-  }, fakePorts({ drivers: driversOf(driver) }));
+  return run(clearRun(plan, trusted, target.id), { baseUrl: baseUrlOf(ORIGIN), seed: DEFAULT_SEED, fixedTimeMilliseconds: DEFAULT_CLOCK_START,
+    fixtures: [], host: { platform: 'test', arch: 'test' },
+  }, fakePorts({ drivers: driversOf(driver), isolation }));
 }
 
 const statementWith = (egressEnforced: boolean) => guaranteeStatement({ mode: 'plan', egressEnforced, unmaskedScreenshotsKept: false, unsafeFeatures: [] });
 
 test('a run started at the isolated level states that egress was enforced', async () => {
-  const { guarantees, state } = await runAt('isolated');
+  const { guarantees, state } = await runWith(fakeRunIsolation('isolated'));
   assert.equal(state, 'Passed');
   assert.deepEqual(guarantees, statementWith(true));
   assert.equal(guarantees.level, 'isolated');
@@ -41,7 +41,7 @@ test('a run started at the isolated level states that egress was enforced', asyn
 });
 
 test('counter-example: a run started at the host level loses egress to egress-unenforceable and claims no isolation', async () => {
-  const { guarantees, state } = await runAt('host');
+  const { guarantees, state } = await runWith(fakeRunIsolation('host'));
   assert.equal(state, 'Passed');
   assert.deepEqual(guarantees, statementWith(false));
   assert.equal(guarantees.level, 'host');
@@ -49,20 +49,20 @@ test('counter-example: a run started at the host level loses egress to egress-un
   assert.ok(guarantees.lost.some((loss) => loss.guarantee === 'egress-enforced' && loss.because === 'egress-unenforceable'), JSON.stringify(guarantees.lost));
 });
 
-test('a run given no level claims what a host run claims, so no one has to say host for the claim to be safe', async () => {
-  const { guarantees } = await runAt();
+test('a run handed the host isolation claims what a host-level run claims', async () => {
+  const { guarantees } = await runWith(HOST_ISOLATION);
   assert.deepEqual(guarantees, statementWith(false));
 });
 
-test('a run given no level has the very hashes of a host run, so committed hashes stay valid', async () => {
-  const unset = await runAt();
-  const host = await runAt('host');
-  assert.equal(unset.resultHash, host.resultHash);
-  assert.equal(unset.manifestHash, host.manifestHash);
+test('a run handed the host isolation has the very hashes of a host-level run, so committed hashes stay valid', async () => {
+  const hostIsolation = await runWith(HOST_ISOLATION);
+  const host = await runWith(fakeRunIsolation('host'));
+  assert.equal(hostIsolation.resultHash, host.resultHash);
+  assert.equal(hostIsolation.manifestHash, host.manifestHash);
 });
 
 test('the level a run claims is part of its result hash, so the claim cannot be changed unnoticed', async () => {
-  const isolated = await runAt('isolated');
-  const host = await runAt('host');
+  const isolated = await runWith(fakeRunIsolation('isolated'));
+  const host = await runWith(fakeRunIsolation('host'));
   assert.notEqual(isolated.resultHash, host.resultHash);
 });

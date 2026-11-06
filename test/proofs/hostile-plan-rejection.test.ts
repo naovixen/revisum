@@ -16,6 +16,7 @@ import { hostilePlans, type HostilePlan } from '#test-support/hostile-plans.ts';
 import { makeProject, signupPlan } from '#test-support/signup-harness.ts';
 import { fakeDriverNeverLaunching } from '#test-support/fakes/FakeDriver.ts';
 import { driversOf, fakePorts } from '#test-support/fakes/FakePorts.ts';
+import { baseUrlOf } from '#test-support/policy-clearance.ts';
 
 const ORIGIN = 'http://127.0.0.1:4173';
 const project = makeProject(ORIGIN);
@@ -36,7 +37,7 @@ afterEach(() => { globalThis.fetch = realFetch; });
 
 const ports = () => fakePorts({ drivers: driversOf(spy) });
 const base = {
-  project, baseUrl: ORIGIN, seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() },
+  project, baseUrl: baseUrlOf(ORIGIN), seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() },
 };
 
 async function rejectedErrors(input: unknown): Promise<readonly PlanError[]> {

@@ -23,7 +23,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { admitDraft, assertBranded, failure, planHash, planStanding, policyGate, readPlanText, run, success, unverified, writePlanText, type BrowserDriver, type DerivedActor, type DraftError, type Plan, type PlanDraft, type PlanError, type PlanFormat, type PlanParse, type PlanProvenance, type PlanSource, type ProvenanceBasis } from '@revisum/engine';
-import { authorise, trustedProjectFrom } from '../../support/policy-clearance.ts';
+import { baseUrlOf, clearRun, trustedProjectFrom } from '../../support/policy-clearance.ts';
 import { memoryApprovalStore, memoryEventSink, parsedSignupPlan, withRepository } from './approval-repositories.ts';
 import { ORIGIN, accountClosurePlan, defaultParser, signupPlan, testProject, testProjectInput, withValue, type JsonRecord } from './plan-examples.ts';
 import { fakeDriver } from '#test-support/fakes/FakeDriver.ts';
@@ -120,11 +120,11 @@ function loggingDriver(log: CallLog): BrowserDriver {
 async function runAdmitted(plan: Plan, log: CallLog): Promise<void> {
   const trusted = await trustedProjectFrom(testProjectInput());
   log.push('gate');
-  const authorised = authorise(plan, trusted);
   const targetId = plan.targets[0];
   assert.ok(targetId !== undefined, 'the plan has no target');
-  await run({
-    plan: authorised, project: testProject(), targetId, baseUrl: ORIGIN, seed: 7, fixedTimeMilliseconds: 0,
+  const cleared = clearRun(plan, trusted, targetId);
+  await run(cleared, {
+    baseUrl: baseUrlOf(ORIGIN), seed: 7, fixedTimeMilliseconds: 0,
     fixtures: [], host: { platform: 'test', arch: 'test' },
   }, fakePorts({ drivers: driversOf(loggingDriver(log)) }));
 }
@@ -278,7 +278,7 @@ async function treatmentOf(draft: PlanDraft): Promise<string> {
   const admitted = admitDraft(draft, defaultParser(), memoryEventSink(), someActor());
   if (!admitted.ok) assert.fail(shown(admitted.error));
   const project = testProject();
-  const decision = policyGate({ project, events: memoryEventSink() }).decide(admitted.value, project.matrix);
+  const decision = policyGate({ project, events: memoryEventSink() }).decide(admitted.value, project.matrix.map((target) => target.id));
   let approvedStanding = '';
   await withRepository('solo', async (repository) => {
     const verified = await repository.verify(repository.subject('plan'), repository.lockdownProof());

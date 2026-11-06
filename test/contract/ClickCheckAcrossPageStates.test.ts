@@ -4,7 +4,7 @@
 // sends one of its own has had no click from the browser.
 import assert from "node:assert/strict";
 import { after, before, describe, test } from "node:test";
-import { performableLocator, type DocumentSession, type DriverError } from "@revisum/engine";
+import { type DocumentSession, type DriverError } from "@revisum/engine";
 import { allowEveryAction } from "#test-support/browser/AllowEveryAction.ts";
 import { expectRead } from "#test-support/ExpectRead.ts";
 import { expectOneElement } from "#test-support/browser/ExpectOneElement.ts";
@@ -203,8 +203,7 @@ const clickInFrame = async (
     try {
         const page = framing(framedPage);
         assert.ok((await session.navigate(harness.url(page), scriptsEnabled)).ok, `${page} loads`);
-        const located = performableLocator(harness.locator(testId(FRAME)));
-        assert.ok(located !== undefined, "the frame's locator is literal");
+        const located = harness.locator(testId(FRAME));
         const inner = await session.frame(located);
         assert.ok(inner.ok, `the frame is found: ${JSON.stringify(inner)}`);
         return await clickOutcomeIn(inner.value);

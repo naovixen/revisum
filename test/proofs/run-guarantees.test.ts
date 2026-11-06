@@ -18,6 +18,7 @@ import { fakeArtifactStore } from '#test-support/fakes/FakeArtifactStore.ts';
 import { fakeDriverNeverLaunching } from '#test-support/fakes/FakeDriver.ts';
 import { fakePorts } from '#test-support/fakes/FakePorts.ts';
 import { scriptsEnabled } from "#test-support/browser/ScriptsEnabled.ts";
+import { performableActionOf, resolvedLocatorOf } from '#test-support/PerformableActionOf.ts';
 
 let testHarness: BrowserHarness;
 before(async () => { testHarness = await signupHarness(); });
@@ -70,7 +71,7 @@ describe('(b) AI containment: hostile plans are rejected before any side effect'
     const ports = spyPorts(new Map(spies.map((spy) => [spy.info.id, spy])));
     const hostile = hostilePlans(testHarness.server.origin);
     for (const plan of hostile) {
-      const outcome = await runUntrusted(plan.input, testHarness.parse, testHarness.runInputs(), ports);
+      const outcome = await runUntrusted(plan.input, testHarness.parse, { ...testHarness.runInputs(), project: testHarness.project }, ports);
       assert.ok(!Array.isArray(outcome) && 'errors' in outcome, `${plan.name}: rejected`);
       assert.ok(outcome.errors.some((error) => error.code === plan.code), `${plan.name}: expected ${plan.code}, got ${JSON.stringify(outcome.errors)}`);
     }
@@ -81,7 +82,7 @@ describe('(b) AI containment: hostile plans are rejected before any side effect'
 
   test('positive control: a valid plan does reach the (spy) driver', async () => {
     const spy = spyDriver('cdp');
-    const outcome = await runUntrusted(signupPlan(['cdp-chromium']), testHarness.parse, testHarness.runInputs(), spyPorts(new Map([['cdp', spy]])));
+    const outcome = await runUntrusted(signupPlan(['cdp-chromium']), testHarness.parse, { ...testHarness.runInputs(), project: testHarness.project }, spyPorts(new Map([['cdp', spy]])));
     assert.ok(!('state' in outcome), JSON.stringify(outcome));
     assert.equal(outcome[0]?.state, 'TargetUnavailable');
     assert.equal(spy.calls.count(), 2);
@@ -159,10 +160,11 @@ describe('(d) redaction by default', () => {
         ]));
         assert.ok((await session.navigate(`${testHarness.server.origin}/`, scriptsEnabled)).ok);
         // Steps 1 and 2 are the two fills; the probe plan adds a final check after them.
-        for (const step of plan.steps.slice(1, 3) as Extract<Step, { type: 'fill' }>[]) {
-          assert.ok((await session.act(step, allowEveryAction)).ok);
+        const fills = plan.steps.slice(1, 3) as Extract<Step, { type: 'fill' }>[];
+        for (const step of fills) {
+          assert.ok((await session.act(performableActionOf(step), allowEveryAction)).ok);
         }
-        const boxes = await Promise.all(plan.steps.slice(1, 3).map(async (step) => expectOneElement(await session.probe((step as Extract<Step, { type: 'fill' }>).locator, null)).box));
+        const boxes = await Promise.all(fills.map(async (step) => expectOneElement(await session.probe(resolvedLocatorOf(step.locator), null)).box));
         const masked = expectRead(await session.screenshot(redactor.selectors));
         const unmasked = expectRead(await session.screenshot([]));
         for (const box of boxes) {

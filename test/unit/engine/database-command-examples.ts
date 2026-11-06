@@ -24,7 +24,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { success, type EgressEvent, type WorkloadErrorCode, type WorkloadOutcome } from '@revisum/contracts';
 import { parseProject, planParser, run, runUntrusted, type LoggedEvent, type PlanStanding, type Project, type Result, type RunPorts, type RunResult } from '@revisum/engine';
-import { authorise, trustedProjectFrom } from '../../support/policy-clearance.ts';
+import { baseUrlOf, clearRun, trustedProjectFrom } from '../../support/policy-clearance.ts';
 import { TEST_SERVICE, testProjectInput , TEST_SERVICE_SECRET_NAMES } from './plan-examples.ts';
 import { DEFAULT_CLOCK_START, DEFAULT_SEED, accepted, recordingDriver, type Recording } from './run-value-examples.ts';
 import { fakeSecretValue } from './secret-examples.ts';
@@ -262,10 +262,8 @@ export async function runWithCommands(raw: unknown, options: CommandRunOptions =
 
   const clock = virtualClock();
   const events = fakeRunEventSink();
-  const result = await run({
-    plan: authorise(plan, trusted, options.standing), project, targetId: project.matrix[0]?.id ?? assert.fail('no target'),
-    baseUrl: ORIGIN, seed: DEFAULT_SEED, fixedTimeMilliseconds: DEFAULT_CLOCK_START, fixtures: [], host: { platform: 'test', arch: 'test' },
-    ...(options.standing === undefined ? {} : { standing: options.standing }),
+  const result = await run(clearRun(plan, trusted, project.matrix[0]?.id ?? assert.fail('no target'), options.standing), {
+    baseUrl: baseUrlOf(ORIGIN), seed: DEFAULT_SEED, fixedTimeMilliseconds: DEFAULT_CLOCK_START, fixtures: [], host: { platform: 'test', arch: 'test' },
   }, withPortIf(options.withPort !== false, fakePorts({
     drivers: driversOf(driver), clock, events, secrets: fakeSecretStore({ [DATABASE_SECRET]: DATABASE_PASSWORD }), databaseCommands: port,
   })));
@@ -284,7 +282,7 @@ export async function runUntrustedWithCommands(raw: unknown, projectFile: JsonRe
   const { port, commands } = fakeCommandRunner();
 
   const outcome = await runUntrusted(raw, planParser(project), {
-    project, baseUrl: ORIGIN, seed: DEFAULT_SEED, fixedTimeMilliseconds: DEFAULT_CLOCK_START, fixtures: [], host: { platform: 'test', arch: 'test' },
+    project, baseUrl: baseUrlOf(ORIGIN), seed: DEFAULT_SEED, fixedTimeMilliseconds: DEFAULT_CLOCK_START, fixtures: [], host: { platform: 'test', arch: 'test' },
   }, fakePorts({ drivers: driversOf(driver), secrets: fakeSecretStore({ [DATABASE_SECRET]: DATABASE_PASSWORD }), databaseCommands: port }));
   return { outcome, commands, opens: recording.environments.length };
 }

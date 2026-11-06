@@ -8,7 +8,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { planHash, planParser, planStanding, policyGate, run, runUntrusted, type Approval, type ApprovalErrorCode, type ApprovalSubject, type BrowserDriver, type DerivedActor, type Plan, type PlanStanding, type Project, type Result, type TargetId } from '@revisum/engine';
-import { authorise, trustedProjectFrom } from '../../support/policy-clearance.ts';
+import { baseUrlOf, clearRun, trustedProjectFrom } from '../../support/policy-clearance.ts';
 import {
   PLAN_PATH, eventsOfKind, memoryApprovalStore, memoryEventSink, parsedSignupPlan, withRepository, type TestRepository,
 } from './approval-repositories.ts';
@@ -98,10 +98,11 @@ async function standingOf(plan: Plan): Promise<PlanStanding> {
 
 const runPorts = (driver: BrowserDriver) => fakePorts({ drivers: driversOf(driver) });
 
-const runBase = (standing: PlanStanding) => ({
-  project: productionProject(), baseUrl: PRODUCTION_ORIGIN, seed: 7, fixedTimeMilliseconds: 0, fixtures: [],
-  host: { platform: 'test', arch: 'test' }, standing,
+const runInputs = () => ({
+  baseUrl: baseUrlOf(PRODUCTION_ORIGIN), seed: 7, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: 'test', arch: 'test' },
 });
+
+const runBase = (standing: PlanStanding) => ({ ...runInputs(), project: productionProject(), standing });
 
 test("an AI plan given another plan's approved standing does not reach the production origin", async () => {
   const standingOfPlanA = await standingOf(parsedForProduction(signupPlan()));
@@ -120,12 +121,12 @@ test('the same run with the plan whose approval the standing holds does reach th
   assert.ok(JSON.stringify(outcome).includes('declared, not verified'), JSON.stringify(outcome));
 });
 
-test("a cleared plan run with another plan's standing is refused the production origin before any driver call", async () => {
+test("a plan cleared with another plan's standing is refused the production origin before any driver call", async () => {
   const standingOfPlanA = await standingOf(parsedForProduction(signupPlan()));
   const planB = parsedForProduction(retitledSignupInput());
   const trusted = await trustedProjectFrom(testProjectInput({}, productionPolicy));
   const driver = fakeDriverNeverLaunching();
-  const result = await run({ ...runBase(standingOfPlanA), plan: authorise(planB, trusted), targetId: TARGET_ID as TargetId }, runPorts(driver));
+  const result = await run(clearRun(planB, trusted, TARGET_ID as TargetId, standingOfPlanA), runInputs(), runPorts(driver));
   assert.equal(driver.calls.count(), 0, `plan B reached a driver on the production origin: ${JSON.stringify(result)}`);
   assert.equal(result.refusal?.code, 'origin-not-allowed', JSON.stringify(result));
   assert.equal(result.approvalLabel, undefined, "plan B's result carries plan A's approval label");
@@ -137,7 +138,7 @@ test("the policy gate denies another plan's standing the production origin a nav
   const planB = parsedForProduction(toProduction(retitledSignupInput()));
   const standingOfPlanA = await standingOf(planA);
   const gate = policyGate({ project: productionProject(), events: memoryEventSink() });
-  const targets = productionProject().matrix;
+  const targets = productionProject().matrix.map((target) => target.id);
   const forPlanB = gate.decide(planB, targets, standingOfPlanA);
   assert.deepEqual(forPlanB.kind === 'deny' ? { rule: forPlanB.rule, stepIndex: forPlanB.stepIndex } : forPlanB.kind,
     { rule: 'production-origin', stepIndex: 0 });

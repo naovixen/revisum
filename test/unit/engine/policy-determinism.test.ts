@@ -7,7 +7,7 @@ import { canonicalJson } from '@revisum/engine';
 import {
   DESTRUCTIVE_PATH, ENGLISH, FRENCH, JAPANESE, NO_ELEMENT, OPEN_ACCOUNT_PAGE, PRODUCTION_ORIGIN,
   acceptDialog, click, comparable, decideOn, element, label, localeOf, navigate, parsedPlan, planOf, press, role, stepAt,
-  targetsOf, testGate, testId,
+  testGate, testId,
 } from './policy-examples.ts';
 
 // One plan per outcome the static check can reach, so every branch is decided twice.
@@ -27,7 +27,7 @@ for (const [what, steps, targets] of PLANS) {
     const first = decideOn(tested, plan);
     const second = decideOn(tested, plan);
     assert.deepEqual(comparable(second), comparable(first));
-    if (first.kind === 'allow' && second.kind === 'allow') assert.equal(canonicalJson(second.plan), canonicalJson(first.plan));
+    if (first.kind === 'allow' && second.kind === 'allow') assert.deepEqual(second.runs.map((cleared) => canonicalJson(cleared.plan)), first.runs.map((cleared) => canonicalJson(cleared.plan)));
   });
 
   test(`two gates built from the same project file decide ${what} alike`, async () => {
@@ -43,7 +43,7 @@ for (const [what, steps, targets] of PLANS) {
   test(`deciding ${what} leaves the plan, project and targets as they were`, async () => {
     const { gate, project } = await testGate();
     const plan = parsedPlan(planOf(steps, targets));
-    const chosen = targetsOf(project, plan);
+    const chosen = plan.targets;
     const before = canonicalJson({ plan, project, chosen });
     gate.decide(plan, chosen);
     assert.equal(canonicalJson({ plan, project, chosen }), before);

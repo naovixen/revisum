@@ -11,10 +11,12 @@ import {
     run,
     type ActionStep,
     type BrowserDriver,
-    type Locator,
+    type DownloadStep,
+    type PerformableAction,
     type Plan,
     type PlanStanding,
     type Project,
+    type ResolvedLocator,
     type RunEventSink,
     type RunInputs,
     type RunResult,
@@ -32,11 +34,12 @@ import {
     type MemoryArtifactStore,
     type MemoryEventSink,
 } from "../memory-ports.ts";
-import { authorise, trustedProjectFrom } from "../policy-clearance.ts";
+import { baseUrlOf, clearRun, trustedProjectFrom } from "../policy-clearance.ts";
 import { BrowserTarget } from "./BrowserTarget.ts";
 import { navigate, testId, visible, type JsonRecord } from "./RawPlan.ts";
 import { runningAtClose } from "./WrappingSessions.ts";
 import { expectRead } from "../ExpectRead.ts";
+import { performableActionOf, resolvedLocatorOf } from "../PerformableActionOf.ts";
 import { realRunPorts } from "../RealRunPorts.ts";
 
 export type BrowserHarnessDefinition = {
@@ -104,12 +107,13 @@ export type BrowserHarness = {
     readonly drivers: ReadonlyMap<string, BrowserDriver>;
     readonly parse: ReturnType<typeof planParser>;
     plan(raw: unknown): Plan;
-    // One locator or action step, parsed by the real parser so a direct session call gets branded values.
-    locator(raw: JsonRecord): Locator;
-    actionStep(raw: JsonRecord): ActionStep;
+    // One locator or action step, parsed by the real parser and resolved as the engine resolves it,
+    // so a direct session call gets what a driver is handed.
+    locator(raw: JsonRecord): ResolvedLocator;
+    actionStep(raw: JsonRecord): PerformableAction;
     target(targetId: string): Target;
-    // Everything a run takes except its plan and target.
-    runInputs(): Omit<RunInputs, "plan" | "targetId">;
+    // Everything a run takes besides its cleared run.
+    runInputs(): RunInputs;
     run(plan: Plan, targetId: string, options?: BrowserRunOptions): Promise<BrowserRun>;
     // The definition's plan, parsed and run on the target.
     runSteps(
@@ -132,10 +136,10 @@ const ACTION_STEP_TYPES: readonly string[] = [
     "select",
     "upload",
     "press",
-    "download",
     "dialog",
 ];
-const isActionStep = (step: Step): step is ActionStep => ACTION_STEP_TYPES.includes(step.type);
+const isActionStep = (step: Step): step is Exclude<ActionStep, DownloadStep> =>
+    ACTION_STEP_TYPES.includes(step.type);
 
 function parsedProjectOf(projectFile: unknown): Project {
     const parsed = parseProject(projectFile);
@@ -181,12 +185,12 @@ function stepParsers(
         locator(raw) {
             const step = singleStep(visible(raw, "probe.located"));
             assert.ok(step.type === "expect");
-            return step.locator;
+            return resolvedLocatorOf(step.locator);
         },
         actionStep(raw) {
             const step = singleStep(raw);
             assert.ok(isActionStep(step), `${step.type} is not an action step`);
-            return step;
+            return performableActionOf(step);
         },
     };
 }
@@ -240,15 +244,13 @@ async function runPlan(
     const firstRequest = context.watch.paths.length;
     const scriptSources = options.scriptSources ?? context.definition.scriptSources;
     const result = await run(
+        clearRun(plan, context.trusted, context.target(targetId).id, options.standing),
         {
             ...context.runInputs(),
             ...(options.clockStartMilliseconds === undefined
                 ? {}
                 : { fixedTimeMilliseconds: options.clockStartMilliseconds }),
-            plan: authorise(plan, context.trusted, options.standing),
-            targetId: context.target(targetId).id,
             ...(scriptSources === undefined ? {} : { scriptSources }),
-            ...(options.standing === undefined ? {} : { standing: options.standing }),
         },
         realRunPorts({
             drivers: driversForRun(context, options, startedAt, pages),
@@ -298,9 +300,8 @@ export async function startBrowserHarness(
         assert.ok(found !== undefined, `no target ${targetId}`);
         return found;
     };
-    const runInputs = (): Omit<RunInputs, "plan" | "targetId"> => ({
-        project,
-        baseUrl: server.origin,
+    const runInputs = (): RunInputs => ({
+        baseUrl: baseUrlOf(server.origin),
         seed: definition.seed,
         fixedTimeMilliseconds: definition.fixedTimeMilliseconds,
         fixtures: server.fixtures,

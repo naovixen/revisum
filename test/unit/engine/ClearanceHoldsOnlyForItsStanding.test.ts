@@ -1,17 +1,20 @@
-// A clearance is good only for what was judged. A plan the gate cleared because it was approved must
-// not act as approved in a run that has no standing, or one lent from another plan.
+// A clearance is good only for what was judged. The gate's cleared run holds the standing it judged
+// the plan as, so a plan cleared as approved cannot be run as anything else: cleared with no standing,
+// or one lent from another plan, its barred actions are denied before any run, and a cleared run
+// copied under another standing is refused before it acts.
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import {
     policyGate,
     run,
     success,
-    type Authorised,
+    type ClearedRun,
     type Plan,
     type PlanStanding,
+    type RunClearance,
 } from "@revisum/engine";
 import { memoryEventSink } from "../../support/memory-ports.ts";
-import { trustedProjectFrom } from "../../support/policy-clearance.ts";
+import { baseUrlOf, trustedProjectFrom } from "../../support/policy-clearance.ts";
 import { DATABASE_PASSWORD, fakeCommandRunner } from "./database-command-examples.ts";
 import { TEST_SERVICE } from "./plan-examples.ts";
 import { PROPOSAL, approvedStanding, parsedPlan } from "./policy-examples.ts";
@@ -101,11 +104,11 @@ const countOf = (effects: Effects, name: EffectName): number => {
     return name === "serviceCalls" ? effects.serviceCalls() : effects[name];
 };
 
-// The run's whole page, where each thing the plan may do is counted as it happens.
+// The run's whole page, where each thing the plan may do is counted as it happens. `refused` is the
+// error the run threw, or null when it ran.
 async function runOnCountingSession(
-    authorised: Authorised,
-    standing: PlanStanding | undefined,
-): Promise<Effects> {
+    cleared: ClearedRun,
+): Promise<{ readonly effects: Effects; readonly refused: unknown }> {
     const commandRunner = fakeCommandRunner();
     const services = routedServiceCaller();
     const effects: Effects = {
@@ -141,42 +144,47 @@ async function runOnCountingSession(
         services: services.caller,
         databaseCommands: commandRunner.port,
     });
-    const project = parsedProject(BARRED_PROJECT);
-    const target = project.matrix[0];
-    assert.ok(target !== undefined, "the test project has a target");
+    let refused: unknown = null;
     try {
         await run(
+            cleared,
             {
-                plan: authorised,
-                project,
-                targetId: target.id,
-                baseUrl: ORIGIN,
+                baseUrl: baseUrlOf(ORIGIN),
                 seed: DEFAULT_SEED,
                 fixedTimeMilliseconds: DEFAULT_CLOCK_START,
                 fixtures: [],
                 host: { platform: "test", arch: "test" },
                 scriptSources: sourceBytes(),
-                ...(standing === undefined ? {} : { standing }),
             },
             ports,
         );
-    } catch {
-        // Refusing by throwing is one way of not acting; only what reached the page is judged here.
+    } catch (error) {
+        refused = error;
     }
-    return effects;
+    return { effects, refused };
 }
 
-async function clearedWith(plan: Plan, standing: PlanStanding): Promise<Authorised> {
+async function clearanceOf(plan: Plan, standing: PlanStanding | undefined): Promise<RunClearance> {
     const trusted = await trustedProjectFrom(BARRED_PROJECT);
-    const targets = trusted.matrix.filter((target) => plan.targets.includes(target.id));
-    const decision = policyGate({ project: trusted, events: memoryEventSink() }).decide(
+    const [target] = parsedProject(BARRED_PROJECT).matrix;
+    assert.ok(target !== undefined, "the test project has a target");
+    return policyGate({ project: trusted, events: memoryEventSink() }).clear(
         plan,
-        targets,
+        target.id,
         standing,
     );
-    assert.equal(decision.kind, "allow", JSON.stringify(decision));
-    return decision.plan;
 }
+
+async function clearedWith(plan: Plan, standing: PlanStanding | undefined): Promise<ClearedRun> {
+    const decision = await clearanceOf(plan, standing);
+    assert.equal(decision.kind, "allow", JSON.stringify(decision));
+    return decision.run;
+}
+
+const REFUSED_AS_NOT_CLEARED = {
+    name: "TypeError",
+    message: "refused a run that the policy gate did not clear",
+};
 
 const BARRED_ACTIONS: readonly {
     readonly name: string;
@@ -203,47 +211,49 @@ describe("Using the policy gate and the run", () => {
     for (const { name, step, effect } of BARRED_ACTIONS) {
         const plan = (): Plan => parsedPlan(unsafePlan([OPEN_CART, step]), BARRED_PROJECT);
 
-        describe(`given a plan with ${name}, cleared as approved`, () => {
-            describe("and the run is given no standing", () => {
-                describe("when it runs", () => {
-                    test(`then it should not execute it`, async () => {
-                        const parsed = plan();
-                        const authorised = await clearedWith(
-                            parsed,
-                            await approvedStanding(parsed),
-                        );
-                        const effects = await runOnCountingSession(authorised, undefined);
-                        assert.equal(countOf(effects, effect), 0);
+        describe(`given a plan with ${name}`, () => {
+            describe("and no standing", () => {
+                describe("when the gate clears it", () => {
+                    test("then it should deny it, so no run of it exists", async () => {
+                        const decision = await clearanceOf(plan(), undefined);
+                        assert.equal(decision.kind, "deny", JSON.stringify(decision));
                     });
                 });
             });
 
-            describe("and the run is given a standing lent from another plan", () => {
-                describe("when it runs", () => {
-                    test(`then it should not execute it`, async () => {
-                        const parsed = plan();
-                        const authorised = await clearedWith(
-                            parsed,
-                            await approvedStanding(parsed),
-                        );
+            describe("and an approval lent from another plan", () => {
+                describe("when the gate clears it", () => {
+                    test("then it should deny it as the proposal it is", async () => {
                         const another = parsedPlan(
                             unsafePlan([{ type: "navigate", url: "/other" }]),
                             BARRED_PROJECT,
                         );
-                        const lent = await approvedStanding(another);
-                        const effects = await runOnCountingSession(authorised, lent);
-                        assert.equal(countOf(effects, effect), 0);
+                        const decision = await clearanceOf(plan(), await approvedStanding(another));
+                        assert.equal(decision.kind, "deny", JSON.stringify(decision));
                     });
                 });
             });
 
-            describe("and the run is given the plan's own approval", () => {
-                describe("when it runs", () => {
-                    test(`then it should execute it`, async () => {
+            describe("and its own approval", () => {
+                describe("when the run cleared as approved is copied with no standing", () => {
+                    test("then it should refuse the copy and not execute it", async () => {
                         const parsed = plan();
-                        const standing = await approvedStanding(parsed);
-                        const authorised = await clearedWith(parsed, standing);
-                        const effects = await runOnCountingSession(authorised, standing);
+                        const cleared = await clearedWith(parsed, await approvedStanding(parsed));
+                        const copied = { ...cleared, standing: PROPOSAL } as ClearedRun;
+                        const { effects, refused } = await runOnCountingSession(copied);
+                        assert.throws(() => {
+                            throw refused;
+                        }, REFUSED_AS_NOT_CLEARED);
+                        assert.equal(countOf(effects, effect), 0);
+                    });
+                });
+
+                describe("when the run cleared as approved runs", () => {
+                    test("then it should execute it", async () => {
+                        const parsed = plan();
+                        const cleared = await clearedWith(parsed, await approvedStanding(parsed));
+                        const { effects, refused } = await runOnCountingSession(cleared);
+                        assert.equal(refused, null);
                         assert.equal(countOf(effects, effect), 1);
                     });
                 });
@@ -251,15 +261,15 @@ describe("Using the policy gate and the run", () => {
         });
     }
 
-    describe("given a write script its declaration allows in proposals, cleared as a proposal", () => {
-        describe("and the run is given no standing", () => {
-            describe("when it runs", () => {
-                test("then it should execute it", async () => {
-                    const parsed = parsedPlan(unsafePlan([OPEN_CART, SEED_EDITOR]), BARRED_PROJECT);
-                    const authorised = await clearedWith(parsed, PROPOSAL);
-                    const effects = await runOnCountingSession(authorised, undefined);
-                    assert.equal(effects.scripts, 1);
-                });
+    describe("given a write script its declaration allows in proposals", () => {
+        describe("when the run cleared as a proposal runs", () => {
+            test("then it should execute it", async () => {
+                const parsed = parsedPlan(unsafePlan([OPEN_CART, SEED_EDITOR]), BARRED_PROJECT);
+                const { effects, refused } = await runOnCountingSession(
+                    await clearedWith(parsed, undefined),
+                );
+                assert.equal(refused, null);
+                assert.equal(effects.scripts, 1);
             });
         });
     });

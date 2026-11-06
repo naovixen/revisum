@@ -8,8 +8,8 @@
 //   - runPlan() runs a parsed plan through the policy gate and run() on a driver that needs no
 //     browser and records every call, so a test can see what reached the page.
 import assert from 'node:assert/strict';
-import { parseProject, planParser, run, success, type ActionStep, type BrowserDriver, type GeneratedValue, type Plan, type PlanError, type Project, type Result, type RunPorts, type RunResult, type Session, type SessionEnvironment, type ValueName } from '@revisum/engine';
-import { authorise, trustedProjectFrom } from '../../support/policy-clearance.ts';
+import { parseProject, planParser, run, success, type PerformableAction, type BrowserDriver, type GeneratedValue, type Plan, type PlanError, type Project, type Result, type RunPorts, type RunResult, type Session, type SessionEnvironment, type ValueName } from '@revisum/engine';
+import { baseUrlOf, clearRun, trustedProjectFrom } from '../../support/policy-clearance.ts';
 import { ORIGIN, TARGET_ID, testProjectInput, type JsonRecord } from './plan-examples.ts';
 import { fakeDriver } from '#test-support/fakes/FakeDriver.ts';
 import { driversOf, fakePorts } from '#test-support/fakes/FakePorts.ts';
@@ -88,7 +88,7 @@ export function declaredValue(plan: Plan, name: string): GeneratedValue {
 export type Recording = {
   readonly environments: SessionEnvironment[];
   readonly navigations: string[];
-  readonly actions: ActionStep[];
+  readonly actions: PerformableAction[];
   probes: number;
 };
 
@@ -104,8 +104,8 @@ export function recordingDriver(changes: Partial<Session> = {}): { readonly driv
     browser: { name: 'recording-browser', version: '1.0' },
     navigate: (url) => { recording.navigations.push(url); return Promise.resolve(success(undefined)); },
     page: () => Promise.resolve(success({ url: recording.navigations.at(-1) ?? `${ORIGIN}/`, title: PAGE_TITLE, meta: [], canonicalUrl: null })),
-    // Answers as a fake page does, so a step the engine left unresolved is refused here too.
-    act: (step, guard, secret) => { recording.actions.push(step); return page.act(step, guard, secret); },
+    // Answers as a fake page does, so a guard's denial or an open dialog is answered here too.
+    act: (action, guard) => { recording.actions.push(action); return page.act(action, guard); },
     probe: () => { recording.probes++; return Promise.resolve(FAKE_ELEMENT); },
     ...changes,
   });
@@ -139,8 +139,8 @@ export async function runPlan(raw: unknown, options: RunOptions = {}): Promise<{
   const target = project.matrix[0];
   assert.ok(target !== undefined, 'the test project has a target');
   const { driver, recording } = recordingDriver(options.session);
-  const result = await run({
-    plan: authorise(plan, trusted), project, targetId: target.id, baseUrl: options.baseUrl ?? ORIGIN,
+  const result = await run(clearRun(plan, trusted, target.id), {
+    baseUrl: baseUrlOf(options.baseUrl ?? ORIGIN),
     seed: options.seed ?? DEFAULT_SEED, fixedTimeMilliseconds: options.clockStartMilliseconds ?? DEFAULT_CLOCK_START,
     fixtures: [], host: { platform: 'test', arch: 'test' },
   }, leaveOut<RunPorts>(fakePorts({ drivers: driversOf(driver) }), ['secrets', 'services', 'databaseCommands', 'rewritesApplied']));

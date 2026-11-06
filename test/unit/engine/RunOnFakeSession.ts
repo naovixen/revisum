@@ -19,7 +19,7 @@ import {
     type StepResult,
 } from "@revisum/engine";
 import { type MemoryEventSink } from "../../support/memory-ports.ts";
-import { authorise, trustedProjectFrom } from "../../support/policy-clearance.ts";
+import { baseUrlOf, clearRun, trustedProjectFrom } from "../../support/policy-clearance.ts";
 import {
     DATABASE_PASSWORD,
     fakeCommandRunner,
@@ -109,11 +109,9 @@ export async function runOnFakeSession(
     const audit = fakeEventSink();
     const events = options.events ?? fakeRunEventSink();
     const result = await run(
+        clearRun(parsed.value, trusted, target.id),
         {
-            plan: authorise(parsed.value, trusted),
-            project,
-            targetId: target.id,
-            baseUrl: ORIGIN,
+            baseUrl: baseUrlOf(ORIGIN),
             seed: DEFAULT_SEED,
             fixedTimeMilliseconds: DEFAULT_CLOCK_START,
             fixtures: [],

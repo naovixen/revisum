@@ -10,6 +10,7 @@ import { runUntrusted } from '@revisum/engine';
 import { OPEN_ACCOUNT_PAGE, ORIGIN, approvedStanding, comparable, decideOn, deniedCodes, parsedPlan, parserProject, policyProjectInput, testGate, type JsonRecord , planOf } from './policy-examples.ts';
 import { spyDriver } from './secret-examples.ts';
 import { fakePorts } from '#test-support/fakes/FakePorts.ts';
+import { baseUrlOf } from '#test-support/policy-clearance.ts';
 
 const request = (method: string, path: string): JsonRecord => ({ origin: ORIGIN, method, path, match: 'exact' });
 const unavailable = { status: 503, mediaType: 'application/json', body: { json: { error: 'unavailable' } } };
@@ -110,7 +111,7 @@ test('a plan the gate denies for a stub or a storage write opens no browser', as
   const input = projectInput();
   const spy = spyDriver();
   const ports = fakePorts({ drivers: new Map([['cdp', spy]]) });
-  const base = { project: parserProject(input), baseUrl: ORIGIN, seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() } };
+  const base = { project: parserProject(input), baseUrl: baseUrlOf(ORIGIN), seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() } };
   const parse = (raw: unknown) => ({ ok: true as const, value: parsedPlan(raw as JsonRecord, input) });
   const rules: string[] = [];
   for (const raw of [newerPlan([OPEN_ACCOUNT_PAGE, startStub('accountUnavailable')]), newerPlan([OPEN_ACCOUNT_PAGE, setStorage('chosenLanguage')])]) {
@@ -127,7 +128,7 @@ test('counter-example: a proposal with a stub allowed in proposals opens the bro
   const input = projectInput();
   const spy = spyDriver();
   const ports = fakePorts({ drivers: new Map([['cdp', spy]]) });
-  const base = { project: parserProject(input), baseUrl: ORIGIN, seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() } };
+  const base = { project: parserProject(input), baseUrl: baseUrlOf(ORIGIN), seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() } };
   const parse = (raw: unknown) => ({ ok: true as const, value: parsedPlan(raw as JsonRecord, input) });
   await runUntrusted(newerPlan([OPEN_ACCOUNT_PAGE, startStub('noNotifications')]), parse, base, ports);
   assert.ok(spy.calls.count('open') > 0, 'the browser was opened');

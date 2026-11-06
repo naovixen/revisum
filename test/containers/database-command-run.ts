@@ -23,7 +23,7 @@ import { PRODUCT, type DeclaredService, type Result, type WorkloadErrorCode, typ
 import { environmentSecretStore, parseProject, planParser, run, type Project, type RunResult } from '@revisum/engine';
 import { RUN_IMAGE_TAG, dockerCliEngine, runDocker } from '@revisum/runner';
 import { systemClock } from '../support/memory-ports.ts';
-import { authorise, trustedProjectFrom } from '../support/policy-clearance.ts';
+import { baseUrlOf, clearRun, trustedProjectFrom } from '../support/policy-clearance.ts';
 import { FIXTURES } from '../support/repository.ts';
 import { TEST_SERVICE, TEST_SERVICE_SECRET_NAMES, testProjectInput, type JsonRecord } from '../unit/engine/plan-examples.ts';
 import { DEFAULT_CLOCK_START, DEFAULT_SEED, accepted, recordingDriver } from '../unit/engine/run-value-examples.ts';
@@ -178,9 +178,8 @@ export async function runCommandSteps(projectFile: JsonRecord, steps: readonly J
       return reply;
     },
   };
-  const result = await withSeededHost(() => run({
-    plan: authorise(plan, trusted), project, targetId: project.matrix[0]?.id ?? assert.fail('no target'),
-    baseUrl: ORIGIN, seed: DEFAULT_SEED, fixedTimeMilliseconds: DEFAULT_CLOCK_START, fixtures: [], host: { platform: 'test', arch: 'test' },
+  const result = await withSeededHost(() => run(clearRun(plan, trusted, project.matrix[0]?.id ?? assert.fail('no target')), {
+    baseUrl: baseUrlOf(ORIGIN), seed: DEFAULT_SEED, fixedTimeMilliseconds: DEFAULT_CLOCK_START, fixtures: [], host: { platform: 'test', arch: 'test' },
   }, fakePorts({
     drivers: driversOf(driver), clock: systemClock, secrets: environmentSecretStore({ [DATABASE_SECRET]: secretValue }), databaseCommands: spy,
   })));

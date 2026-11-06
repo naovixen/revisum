@@ -1,11 +1,13 @@
 // The type system stops a forged Plan at compile time, but a cast defeats it. So run() checks the
 // brand again at run time, first: an object that looks like a plan but was not made by the plan
-// parser is refused before any driver call, log entry or stored artefact.
+// parser is refused before any driver call, log entry or stored artefact. run() takes only a run the
+// gate cleared, so each forgery is cast past the gate's own types and cleared by it, which is the one
+// way a cast can put one inside a cleared run.
 import assert from 'node:assert/strict';
 import { arch, platform } from 'node:os';
 import { test } from 'node:test';
-import { assertBranded, planParser, run, type Authorised, type Plan, type TargetId } from '@revisum/engine';
-import { authorise, trustedProjectFrom } from '../support/policy-clearance.ts';
+import { assertBranded, planParser, run, type ClearedRun, type Plan, type TargetId } from '@revisum/engine';
+import { baseUrlOf, clearRun, trustedProjectFrom } from '../support/policy-clearance.ts';
 import { ORIGIN, TARGET_ID, signupPlan, testProject, testProjectInput } from '../unit/engine/plan-examples.ts';
 import { fakeArtifactStore } from '#test-support/fakes/FakeArtifactStore.ts';
 import { fakeDriverNeverLaunching } from '#test-support/fakes/FakeDriver.ts';
@@ -36,7 +38,7 @@ const FORGERIES: readonly (readonly [string, () => Plan])[] = [
 // that this one stopped them first.
 const REFUSED_AS_NOT_PARSED = { name: 'TypeError', message: 'refused a plan that the plan parser did not make' };
 
-type Watched = { readonly ports: Parameters<typeof run>[1]; readonly driverCalls: () => number; readonly storeWrites: () => number };
+type Watched = { readonly ports: Parameters<typeof run>[2]; readonly driverCalls: () => number; readonly storeWrites: () => number };
 
 function watchedPorts(): Watched {
   const spy = fakeDriverNeverLaunching();
@@ -48,19 +50,19 @@ function watchedPorts(): Watched {
   };
 }
 
-// The parser's own output, cleared through the policy gate as every run requires.
-const authorisedPlan = async (): Promise<Authorised> => authorise(genuinePlan(), await trustedProjectFrom(testProjectInput()));
+// The plan cleared through the policy gate as every run requires.
+const clearedRunOf = async (plan: Plan): Promise<ClearedRun> => clearRun(plan, await trustedProjectFrom(testProjectInput()), TARGET_ID as TargetId);
+const clearedRun = (): Promise<ClearedRun> => clearedRunOf(genuinePlan());
 
-const inputs = (plan: Authorised) => ({
-  plan, project, targetId: TARGET_ID as TargetId, baseUrl: ORIGIN, seed: 42, fixedTimeMilliseconds: 0,
-  fixtures: [], host: { platform: platform(), arch: arch() },
-});
+const INPUTS = {
+  baseUrl: baseUrlOf(ORIGIN), seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() },
+};
 
 for (const [name, forge] of FORGERIES) {
   test(`run() refuses ${name} before any side effect`, async () => {
     const watched = watchedPorts();
-    // The forgery is cast past the gate too: the run-time check must catch it all the same.
-    await assert.rejects(run(inputs(forge() as Authorised), watched.ports), REFUSED_AS_NOT_PARSED);
+    const cleared = await clearedRunOf(forge());
+    await assert.rejects(run(cleared, INPUTS, watched.ports), REFUSED_AS_NOT_PARSED);
     assert.equal(watched.driverCalls(), 0, 'no driver method was called');
     assert.equal(watched.ports.events.read().length, 0, 'nothing was logged');
     assert.equal(watched.storeWrites(), 0, 'nothing was stored');
@@ -83,17 +85,17 @@ test('assertBranded accepts a plan made by the parser', () => {
 
 test('run() accepts a plan made by the parser and reaches the driver', async () => {
   const watched = watchedPorts();
-  const result = await run(inputs(await authorisedPlan()), watched.ports);
+  const result = await run(await clearedRun(), INPUTS, watched.ports);
   assert.equal(result.state, 'TargetUnavailable', 'the spy driver cannot launch, so the target is unavailable');
   assert.ok(watched.driverCalls() > 0, 'the driver was asked to open a session');
   assert.ok(watched.ports.events.read().length > 0, 'the run was logged');
 });
 
 test('a parser-made plan passes the check each time it is run', async () => {
-  const plan = await authorisedPlan();
+  const cleared = await clearedRun();
   for (let attempt = 0; attempt < 2; attempt++) {
     const watched = watchedPorts();
-    await run(inputs(plan), watched.ports);
+    await run(cleared, INPUTS, watched.ports);
     assert.ok(watched.driverCalls() > 0, `run ${attempt + 1} reached the driver`);
   }
 });

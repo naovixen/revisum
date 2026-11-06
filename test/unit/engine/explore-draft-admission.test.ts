@@ -61,7 +61,7 @@ test('a draft that declares itself an explore draft is refused with untrusted-so
 // without an approval and with the sign-up plan's approval.
 async function treatmentOf(plan: Plan): Promise<string> {
   const project = testProject();
-  const decision = policyGate({ project, events: memoryEventSink() }).decide(plan, project.matrix);
+  const decision = policyGate({ project, events: memoryEventSink() }).decide(plan, project.matrix.map((target) => target.id));
   let approvedStanding = '';
   await withRepository('solo', async (repository) => {
     const verified = await repository.verify(repository.subject('plan'), repository.lockdownProof());

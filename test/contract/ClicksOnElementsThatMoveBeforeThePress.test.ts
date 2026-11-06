@@ -8,7 +8,7 @@
 import assert from "node:assert/strict";
 import { after, before, beforeEach, describe, test } from "node:test";
 import type { DriverSession } from "@revisum/driver-cdp";
-import { performableLocator, type DocumentSession } from "@revisum/engine";
+import { type DocumentSession } from "@revisum/engine";
 import { allowEveryAction } from "#test-support/browser/AllowEveryAction.ts";
 import { outcomes, type BrowserHarness } from "#test-support/browser/BrowserHarness.ts";
 import { BrowserTarget } from "#test-support/browser/BrowserTarget.ts";
@@ -146,8 +146,7 @@ const clickOn = (page: string): Promise<ClickOutcome> => withOpenPage(page, clic
 
 const clickInFrameOn = (page: string): Promise<ClickOutcome> =>
     withOpenPage(page, async (session) => {
-        const located = performableLocator(harness.locator(testId(FRAME)));
-        assert.ok(located !== undefined, "the frame's locator is literal");
+        const located = harness.locator(testId(FRAME));
         const inner = await session.frame(located);
         assert.ok(inner.ok, `the frame is found: ${JSON.stringify(inner)}`);
         return clickOutcomeIn(inner.value);

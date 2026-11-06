@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
 import { planParser, run, sha256, type RunResult } from '@revisum/engine';
-import { authorise, trustedProjectFrom } from '../../support/policy-clearance.ts';
+import { baseUrlOf, clearRun, trustedProjectFrom } from '../../support/policy-clearance.ts';
 import { fixtureReferences, parsedProject, removeFakeExecutables, runScenario, scenarioDriver, type Scenario , closedScenario } from './replay-examples.ts';
 import { OPEN_ORDERS, accepted, planOf, projectFileWith } from './run-value-examples.ts';
 import { driversOf, fakePorts } from '#test-support/fakes/FakePorts.ts';
@@ -67,9 +67,8 @@ async function runKeepingAnyOutcome(scenario: Scenario): Promise<{ readonly resu
   const { driver, calls } = scenarioDriver(scenario);
   const project = parsedProject(scenario.projectFile);
   const plan = accepted(planParser(project), scenario.plan);
-  const result = await run({
-    plan: authorise(plan, await trustedProjectFrom(scenario.projectFile)), project, targetId: project.matrix[0]?.id ?? assert.fail('no target'),
-    baseUrl: scenario.baseUrl, seed: scenario.seed, fixedTimeMilliseconds: scenario.clockStartMilliseconds,
+  const result = await run(clearRun(plan, await trustedProjectFrom(scenario.projectFile), project.matrix[0]?.id ?? assert.fail('no target')), {
+    baseUrl: baseUrlOf(scenario.baseUrl), seed: scenario.seed, fixedTimeMilliseconds: scenario.clockStartMilliseconds,
     fixtures: fixtureReferences(scenario.fixtures), host: scenario.host,
   }, fakePorts({ drivers: driversOf(driver) }));
   return { result, calls: calls.order };

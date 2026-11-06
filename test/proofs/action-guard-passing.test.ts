@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { arch, platform } from 'node:os';
 import { test } from 'node:test';
 import { parseProject, planParser, run, success, type ActionGuard, type ActionStep, type BrowserDriver, type ElementProbe, type TargetId } from '@revisum/engine';
-import { authorise, trustedProjectFrom } from '../support/policy-clearance.ts';
+import { baseUrlOf, clearRun, trustedProjectFrom } from '../support/policy-clearance.ts';
 import { fakeDriverOpening } from '#test-support/fakes/FakeDriver.ts';
 import { FAKE_ELEMENT } from '#test-support/fakes/FakePage.ts';
 import { driversOf, fakePorts } from '#test-support/fakes/FakePorts.ts';
@@ -76,8 +76,7 @@ test('every act() call of a run carries the runtime guard, for every kind of act
   assert.ok(parsedPlan.ok, JSON.stringify(parsedPlan.ok ? null : parsedPlan.error));
   const trusted = await trustedProjectFrom(PROJECT_FILE);
   const { driver, calls } = recordingDriver();
-  const result = await run({
-    project: parsedProject.value, plan: authorise(parsedPlan.value, trusted), targetId: TARGET_ID as TargetId, baseUrl: ORIGIN,
+  const result = await run(clearRun(parsedPlan.value, trusted, TARGET_ID as TargetId), { baseUrl: baseUrlOf(ORIGIN),
     seed: 7, fixedTimeMilliseconds: Date.UTC(2026, 9, 29, 9, 0, 0), fixtures: [], host: { platform: platform(), arch: arch() },
   }, fakePorts({ drivers: driversOf(driver) }));
   assert.equal(result.state, 'Passed', JSON.stringify(result.steps.filter((step) => step.outcome !== 'passed')));

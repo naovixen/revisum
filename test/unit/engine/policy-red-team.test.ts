@@ -14,7 +14,7 @@ import { literalLocator } from '@revisum/contracts';
 import { FIXTURES } from '../../support/repository.ts';
 import {
   OPEN_ACCOUNT_PAGE, NO_ELEMENT, ORIGIN, PRODUCTION_ORIGIN, UNLISTED_ORIGIN,
-  click, element, localeOf, navigate, parsedPlan, planOf, policyProjectInput, role, targetsOf, testGate, trustedProject,
+  click, element, localeOf, navigate, parsedPlan, planOf, policyProjectInput, role, testGate, trustedProject,
   type JsonRecord,
 } from './policy-examples.ts';
 import { memoryEventSink } from './approval-repositories.ts';
@@ -65,10 +65,10 @@ function resolvedElement(step: Step, seen: PageView | undefined): ResolvedElemen
 // acting step. An input event is dispatched only for a step the guard allowed.
 function runThroughGate(gate: PolicyGate, project: TrustedProject, plan: Plan, targetId: string, page: Variant['page']): Outcome {
   const inputEvents = plan.steps.map(() => 0);
-  const decision = gate.decide(plan, targetsOf(project, plan));
+  const decision = gate.decide(plan, plan.targets);
   if (decision.kind === 'deny') return { state: 'Denied', stage: 'static', rule: decision.rule, stepIndex: decision.stepIndex, inputEvents };
   const locale = localeOf(project, targetId);
-  for (const [index, step] of decision.plan.steps.entries()) {
+  for (const [index, step] of plan.steps.entries()) {
     if (!ACTING_STEPS.includes(step.type)) continue;
     const seen = page?.[String(index)];
     const verdict = gate.guardAction(step, index, resolvedElement(step, seen), seen?.dialogText ?? null, locale);
@@ -120,7 +120,7 @@ for (const redTeamCase of RED_TEAM) {
 async function decideAgainstTrusted(plan: Plan, trustedInput: JsonRecord) {
   const project = await trustedProject(trustedInput);
   const gate = policyGate({ project, events: memoryEventSink() });
-  return gate.decide(plan, targetsOf(project, plan));
+  return gate.decide(plan, plan.targets);
 }
 
 const LOOSE_ORIGINS = policyProjectInput({ origins: [ORIGIN, PRODUCTION_ORIGIN, UNLISTED_ORIGIN] });

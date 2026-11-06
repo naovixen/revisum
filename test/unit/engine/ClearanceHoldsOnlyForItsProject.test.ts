@@ -1,10 +1,11 @@
 // A clearance is good only under the project that gave it. The gate must hold a plan to the project
 // it clears it under, not the one it was parsed under: unsafe features, named scripts and secret
-// names the clearing project does not declare are denied.
+// names the clearing project does not declare are denied. And the run the gate clears holds that
+// project: a copy of it under another project is refused before any browser opens.
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { runUntrusted } from "@revisum/engine";
-import { finalState, guardedDriver, parserFor, runBase } from "./guarded-driver.ts";
+import { run, runUntrusted, type ClearedRun } from "@revisum/engine";
+import { finalState, guardedDriver, parserFor, runBase, runInputs } from "./guarded-driver.ts";
 import {
     ALLOWED,
     PROPOSAL,
@@ -14,7 +15,6 @@ import {
     parsedPlan,
     testGate,
 } from "./policy-examples.ts";
-import { sourceBytes } from "./unsafe-feature-examples.ts";
 import {
     CLASS_CHECK,
     CSS_CHECK,
@@ -34,6 +34,8 @@ import {
 } from "./unsafe-feature-steps.ts";
 import { driversOf, fakePorts } from "#test-support/fakes/FakePorts.ts";
 import { TEST_SERVICE_SECRET_NAMES } from "./plan-examples.ts";
+import { baseUrlOf, clearRun, trustedProjectFrom } from "#test-support/policy-clearance.ts";
+import { parsedProject, sourceBytes } from "./unsafe-feature-examples.ts";
 
 const ENGLISH_TARGET: JsonRecord = {
     id: TARGET_ID,
@@ -189,7 +191,7 @@ describe("Using the policy gate", () => {
                 parserFor(LOOSER),
                 {
                     ...runBase(runProject),
-                    baseUrl: ORIGIN,
+                    baseUrl: baseUrlOf(ORIGIN),
                     standing: await approvedStanding(plan),
                     scriptSources: sourceBytes(),
                 },
@@ -214,6 +216,48 @@ describe("Using the policy gate", () => {
                 const raw = unsafePlan([OPEN_CART, READ_CART]);
                 const decision = await decidedUnderStricter(raw, LOOSER, LOOSER, "approved");
                 assert.deepEqual(decision, ALLOWED);
+            });
+        });
+    });
+
+    describe("given an approved plan with a css locator, cleared under a looser project", () => {
+        const clearedUnderLooser = async (): Promise<ClearedRun> => {
+            const plan = parsedPlan(unsafePlan([OPEN_CART, CSS_CHECK]), LOOSER);
+            return clearRun(
+                plan,
+                await trustedProjectFrom(LOOSER),
+                parsedProject(LOOSER).matrix[0]?.id ?? assert.fail("the project has a target"),
+                await approvedStanding(plan),
+            );
+        };
+        const runOn = (cleared: ClearedRun) => {
+            const guarded = guardedDriver([OPEN_CART, CSS_CHECK]);
+            const ran = run(
+                cleared,
+                runInputs(),
+                fakePorts({ drivers: driversOf(guarded.driver) }),
+            );
+            return { ran, opens: guarded.opens };
+        };
+
+        describe("when the cleared run is copied under the stricter project", () => {
+            test("then it should refuse the copy before any browser opens", async () => {
+                const cleared = await clearedUnderLooser();
+                const copied = { ...cleared, project: parsedProject(STRICTER) } as ClearedRun;
+                const { ran, opens } = runOn(copied);
+                await assert.rejects(ran, {
+                    name: "TypeError",
+                    message: "refused a run that the policy gate did not clear",
+                });
+                assert.equal(opens(), 0);
+            });
+        });
+
+        describe("when the cleared run itself runs", () => {
+            test("then it should open the browser", async () => {
+                const { ran, opens } = runOn(await clearedUnderLooser());
+                await ran;
+                assert.equal(opens(), 1);
             });
         });
     });

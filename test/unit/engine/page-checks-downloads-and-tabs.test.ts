@@ -14,6 +14,7 @@ import {
 import { fakeDriverNeverLaunching } from '#test-support/fakes/FakeDriver.ts';
 import { driversOf, fakePorts } from '#test-support/fakes/FakePorts.ts';
 import { fakeRunEventSink } from '#test-support/fakes/FakeRunEventSink.ts';
+import { baseUrlOf } from '#test-support/policy-clearance.ts';
 
 const parsePlan = parserFor();
 
@@ -317,7 +318,7 @@ test('a plan with a misplaced or off-list newTab is refused before any driver is
   const spy = fakeDriverNeverLaunching();
   const events = fakeRunEventSink();
   const ports = fakePorts({ drivers: driversOf(spy), events });
-  const base = { project: projectWith(), baseUrl: ORIGIN, seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() } };
+  const base = { project: projectWith(), baseUrl: baseUrlOf(ORIGIN), seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() } };
   for (const plan of [planOf([OPEN_ORDERS, frame([newTab('/account'), CLOSING_CHECK])]), planOf([OPEN_ORDERS, newTab('https://evil.example/collect')])]) {
     const outcome = await runUntrusted(plan, parsePlan, base, ports);
     assert.ok(!Array.isArray(outcome) && 'errors' in outcome, JSON.stringify(outcome));

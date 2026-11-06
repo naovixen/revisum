@@ -18,6 +18,7 @@ import {
 import { spyDriver } from './secret-examples.ts';
 import { ALLOWED_UNNAMED_SELECTOR, CART_COUNT_CHECK, CLEAR_EDITOR, DATABASE_COMMANDS, DATABASE_SERVICE, FEATURES, INLINE_READ, OPEN_CART, ORDER_COUNT_CHECK, ORIGIN, READ_CART, SEED_EDITOR, SEED_ORDERS, TARGET_ID, WIPE_ORDERS, css, unsafePlan, unsafeProjectFile, xpath, type JsonRecord , unsafeSection } from './unsafe-feature-steps.ts';
 import { fakePorts } from '#test-support/fakes/FakePorts.ts';
+import { baseUrlOf } from '#test-support/policy-clearance.ts';
 
 // The shared unsafe project, every feature on, with its one target in British English so the
 // engine's English irreversible patterns apply.
@@ -104,7 +105,7 @@ test('a plan the gate denies for any of these rules opens no browser, so no scri
   const project = parserProject(PROJECT);
   const spy = spyDriver();
   const ports = fakePorts({ drivers: new Map([['cdp', spy]]) });
-  const base = { project, baseUrl: ORIGIN, seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() } };
+  const base = { project, baseUrl: baseUrlOf(ORIGIN), seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() } };
   const parse = (raw: unknown) => ({ ok: true as const, value: parsedPlan(raw as JsonRecord, PROJECT) });
   const rules: string[] = [];
   for (const raw of [unsafePlan([OPEN_CART, INLINE_READ]), unsafePlan([OPEN_CART, CLEAR_EDITOR]), unsafePlan([OPEN_CART], { cleanup: [WIPE_ORDERS] })]) {
@@ -147,7 +148,7 @@ test('a production command is denied before anything starts: no browser is opene
   const spy = spyDriver();
   const ports = fakePorts({ drivers: new Map([['cdp', spy]]) });
   const base = {
-    project: parserProject(PRODUCTION_PROJECT), baseUrl: ORIGIN, seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() },
+    project: parserProject(PRODUCTION_PROJECT), baseUrl: baseUrlOf(ORIGIN), seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() },
   };
   const parse = (raw: unknown) => ({ ok: true as const, value: parsedPlan(raw as JsonRecord, PRODUCTION_PROJECT) });
   const outcome = await runUntrusted(unsafePlan([OPEN_CART, LIVE_COUNT_CHECK]), parse, base, ports);

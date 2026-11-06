@@ -1,6 +1,6 @@
-// A driver refuses any step that still holds a value reference, so the engine has to replace every
-// one before it acts. Each plan here uses a generated value in one place a step can hold it, and runs
-// on a session that refuses as a real driver does.
+// A driver's ports take only resolved steps, so the engine has to replace every value reference
+// before it acts. Each plan here uses a generated value in one place a step can hold it, and the
+// recording driver shows what reached it.
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import {

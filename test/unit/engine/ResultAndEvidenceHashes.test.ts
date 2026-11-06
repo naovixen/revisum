@@ -13,7 +13,7 @@ import {
     type RunManifest,
     type RunResult,
 } from "@revisum/engine";
-import { authorise, trustedProjectFrom } from "../../support/policy-clearance.ts";
+import { baseUrlOf, clearRun, trustedProjectFrom } from "../../support/policy-clearance.ts";
 import {
     evidenceHashOf,
     expectedEvidenceHash,
@@ -147,13 +147,11 @@ const unavailableDriver = fakeDriver({
 const planRunOnAnUnavailableTarget = async (): Promise<RunResult> => {
     const project = projectWith();
     const trusted = await trustedProjectFrom(projectFileWith());
-    const plan = authorise(accepted(planParser(project), planOf([OPEN_ORDERS])), trusted);
+    const plan = accepted(planParser(project), planOf([OPEN_ORDERS]));
     return run(
+        clearRun(plan, trusted, project.matrix[0]?.id ?? assert.fail("no target")),
         {
-            plan,
-            project,
-            targetId: project.matrix[0]?.id ?? assert.fail("no target"),
-            baseUrl: ORIGIN,
+            baseUrl: baseUrlOf(ORIGIN),
             seed: DEFAULT_SEED,
             fixedTimeMilliseconds: DEFAULT_CLOCK_START,
             fixtures: [],

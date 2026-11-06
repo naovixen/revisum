@@ -18,7 +18,7 @@ import {
 } from '@revisum/engine';
 import { startFixtureServer, type FixtureServer } from '#test-support/fixture-server.ts';
 import { memoryArtifactStore, memoryRunEventSink, systemClock } from '#test-support/memory-ports.ts';
-import { authorise, trustedProjectFrom } from '#test-support/policy-clearance.ts';
+import { baseUrlOf, clearRun, trustedProjectFrom } from '#test-support/policy-clearance.ts';
 import { FIXTURES } from '#test-support/repository.ts';
 import { FIXED_TIME_MILLISECONDS, SEED, makeDrivers, makeProjectFile } from '#test-support/signup-harness.ts';
 import { echoesIn, fakeEnvironmentStore, fakeSecretValue, resolvedSecret } from '../unit/engine/secret-examples.ts';
@@ -77,9 +77,8 @@ function parsed(raw: unknown): Plan {
 async function runEcho(targetId: string, echo: string, value: unknown, secretValue: string, field?: string): Promise<Ran> {
   const events = memoryRunEventSink();
   const artifacts = memoryArtifactStore();
-  const result = await run({
-    plan: authorise(parsed(echoPlan(targetId, echo, value, field)), trusted), project, targetId: targetId as TargetId,
-    baseUrl: server.origin, seed: SEED, fixedTimeMilliseconds: FIXED_TIME_MILLISECONDS, fixtures: server.fixtures,
+  const result = await run(clearRun(parsed(echoPlan(targetId, echo, value, field)), trusted, targetId as TargetId), {
+    baseUrl: baseUrlOf(server.origin), seed: SEED, fixedTimeMilliseconds: FIXED_TIME_MILLISECONDS, fixtures: server.fixtures,
     host: { platform: platform(), arch: arch() },
   }, fakePorts({
     drivers: makeDrivers(), clock: systemClock, artifacts, events,

@@ -12,7 +12,7 @@ import { jsonLinesEventSink, mergeGateOpen, planHash, planStanding, policyGate, 
 import { memoryApprovalStore, parsedSignupPlan, withRepository } from './approval-repositories.ts';
 import {
   ENGLISH, JAPANESE, OPEN_ACCOUNT_PAGE, POLICY, acceptDialog, click, decideOn, deniedCodes, element, label, localeOf, navigate,
-  parsedPlan, planOf, policyProjectInput, press, role, stepAt, targetsOf, testGate, testId, trustedProject, NO_ELEMENT,
+  parsedPlan, planOf, policyProjectInput, press, role, stepAt, testGate, testId, trustedProject, NO_ELEMENT,
 } from './policy-examples.ts';
 import { TARGET_ID, signupPlan, withValue } from './plan-examples.ts';
 
@@ -80,7 +80,7 @@ test('a denial reaches the JSON Lines sink as a plan.denied entry carrying the r
     const project = await trustedProject();
     const gate = policyGate({ project, events: jsonLinesEventSink(path) });
     const plan = parsedPlan(DELETE_PLAN);
-    assert.equal(gate.decide(plan, targetsOf(project, plan)).kind, 'deny');
+    assert.equal(gate.decide(plan, plan.targets).kind, 'deny');
     const entries = readFileSync(path, 'utf8').split('\n').filter((line) => line.trim() !== '').map((line) => JSON.parse(line));
     assert.deepEqual(entries.map((entry) => [entry.kind, entry.code]), [['plan.denied', 'irreversible-action']]);
   } finally {

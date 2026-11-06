@@ -11,6 +11,7 @@ import { OPEN_ACCOUNT_PAGE, ORIGIN, PRODUCTION_ORIGIN, approvedStanding, compara
 import { routedServiceCaller } from './service-call-examples.ts';
 import { spyDriver } from './secret-examples.ts';
 import { fakePorts } from '#test-support/fakes/FakePorts.ts';
+import { baseUrlOf } from '#test-support/policy-clearance.ts';
 
 const SHOP_ORIGIN = 'http://127.0.0.1:4180';
 const SERVICES = [
@@ -156,7 +157,7 @@ test('a plan the gate denies for any of these rules makes zero calls and opens n
   const { caller, requests } = routedServiceCaller();
   const spy = spyDriver();
   const ports = fakePorts({ drivers: new Map([['cdp', spy]]), services: caller });
-  const base = { project, baseUrl: ORIGIN, seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() } };
+  const base = { project, baseUrl: baseUrlOf(ORIGIN), seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() } };
   const planParserFor = (raw: unknown) => ({ ok: true as const, value: parsedPlan(raw as JsonRecord, input) });
   const denied = [
     newerPlan([OPEN_ACCOUNT_PAGE, call('createOrder')]),

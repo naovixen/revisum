@@ -9,10 +9,10 @@
 // `standing` in its inputs.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { PERSON_ACTOR_TYPES, approvalFor, mergeGateOpen, planHash, planStanding, run, unverified, type Approval, type Plan, type Project, type TargetId } from '@revisum/engine';
-import { authorise, trustedProjectFrom } from '../../support/policy-clearance.ts';
+import { PERSON_ACTOR_TYPES, approvalFor, mergeGateOpen, planHash, planStanding, run, unverified, type Approval, type Plan, type TargetId } from '@revisum/engine';
+import { baseUrlOf, clearRun, trustedProjectFrom } from '../../support/policy-clearance.ts';
 import { memoryApprovalStore, parsedSignupPlan, withRepository, type TestRepository } from './approval-repositories.ts';
-import { ORIGIN, TARGET_ID, signupPlan, testProject, testProjectInput, withValue, type JsonRecord } from './plan-examples.ts';
+import { ORIGIN, TARGET_ID, signupPlan, testProjectInput, withValue, type JsonRecord } from './plan-examples.ts';
 import { fakeDriverNeverLaunching } from '#test-support/fakes/FakeDriver.ts';
 import { driversOf, fakePorts } from '#test-support/fakes/FakePorts.ts';
 
@@ -55,15 +55,13 @@ const stringAt = (plan: JsonRecord, path: readonly (string | number)[]): string 
 // `policy` optionally adds the project's policy, such as the allowance for approved plans on production.
 const productionFields = (policy?: JsonRecord): JsonRecord =>
   ({ origins: [ORIGIN, PRODUCTION_ORIGIN], productionOrigins: [PRODUCTION_ORIGIN], ...(policy === undefined ? {} : { policy }) });
-const projectWithProduction = (policy?: JsonRecord): Project => testProject({}, productionFields(policy));
 
 async function runPlan(plan: Plan, standing: ReturnType<typeof planStanding>, baseUrl: string, policy?: JsonRecord) {
   const driver = fakeDriverNeverLaunching();
-  // Every run takes a plan the policy gate authorised, under the plan's standing.
-  const authorised = authorise(plan, await trustedProjectFrom(testProjectInput({}, productionFields(policy))), standing);
-  const result = await run({
-    plan: authorised, project: projectWithProduction(policy), targetId: TARGET_ID as TargetId, baseUrl, seed: 7, fixedTimeMilliseconds: 0,
-    fixtures: [], host: { platform: 'test', arch: 'test' }, standing,
+  // Every run is one the policy gate cleared, under the plan's standing.
+  const cleared = clearRun(plan, await trustedProjectFrom(testProjectInput({}, productionFields(policy))), TARGET_ID as TargetId, standing);
+  const result = await run(cleared, {
+    baseUrl: baseUrlOf(baseUrl), seed: 7, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: 'test', arch: 'test' },
   }, fakePorts({ drivers: driversOf(driver) }));
   return { result, driverCalls: driver.calls.count() };
 }

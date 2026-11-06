@@ -16,7 +16,7 @@
 //     reports those steps as unsupported-step. Its database commands go to a fake runner.
 import assert from 'node:assert/strict';
 import { guaranteeStatement, parseProject, planParser, run, unsafeFeaturesOf, type GuaranteeId, type GuaranteeStatement, type Plan, type PlanError, type PlanStanding, type Project, type Result, type RunResult, type UnsafeFeature } from '@revisum/engine';
-import { authorise, trustedProjectFrom } from '../../support/policy-clearance.ts';
+import { baseUrlOf, clearRun, trustedProjectFrom } from '../../support/policy-clearance.ts';
 import { DATABASE_PASSWORD, fakeCommandRunner } from './database-command-examples.ts';
 import { DEFAULT_CLOCK_START, DEFAULT_SEED, recordingDriver, type Recording } from './run-value-examples.ts';
 import { DATABASE_SECRET, FEATURES, ORIGIN, SCRIPT_SOURCES, unsafeProjectFile, type FeatureName, type JsonRecord } from './unsafe-feature-steps.ts';
@@ -115,11 +115,9 @@ export async function runUnsafePlan(raw: unknown, options: UnsafeRunOptions = {}
   const target = project.matrix[0];
   assert.ok(target !== undefined, 'the test project has a target');
   const { driver, recording } = recordingDriver();
-  const result = await run({
-    plan: authorise(plan, trusted, options.standing), project, targetId: target.id, baseUrl: ORIGIN,
+  const result = await run(clearRun(plan, trusted, target.id, options.standing), { baseUrl: baseUrlOf(ORIGIN),
     seed: options.seed ?? DEFAULT_SEED, fixedTimeMilliseconds: DEFAULT_CLOCK_START, fixtures: [], host: { platform: 'test', arch: 'test' },
     scriptSources: sourceBytes(options.scriptSources),
-    ...(options.standing === undefined ? {} : { standing: options.standing }),
   }, fakePorts({ drivers: driversOf(driver), secrets: fakeSecretStore({ [DATABASE_SECRET]: DATABASE_PASSWORD }), databaseCommands: fakeCommandRunner().port }));
   return { result, recording };
 }

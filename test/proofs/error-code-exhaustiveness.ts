@@ -284,7 +284,7 @@ export function describeRefusal(code: lifecycle.RefusalCode): string {
   switch (code) {
     case 'element-check-unsupported': case 'origin-not-allowed': case 'secret-missing': case 'services-unavailable': case 'storage-state-unsupported':
     case 'database-commands-unavailable': case 'evidence-mode-disabled': case 'suite-not-declared': case 'egress-unenforceable':
-    case 'script-source-missing': case 'image-missing': case 'image-digest-mismatch': case 'workload-start-failed': case 'clearance-standing-mismatch':
+    case 'script-source-missing': case 'image-missing': case 'image-digest-mismatch': case 'workload-start-failed':
       return 'run refused';
     default:
       return unreachable(code);
@@ -294,7 +294,7 @@ export function describeRefusalForgettingOne(code: lifecycle.RefusalCode): strin
   switch (code) {
     case 'element-check-unsupported': case 'origin-not-allowed': case 'secret-missing': case 'services-unavailable': case 'storage-state-unsupported':
     case 'evidence-mode-disabled': case 'suite-not-declared': case 'egress-unenforceable':
-    case 'script-source-missing': case 'image-missing': case 'image-digest-mismatch': case 'workload-start-failed': case 'clearance-standing-mismatch':
+    case 'script-source-missing': case 'image-missing': case 'image-digest-mismatch': case 'workload-start-failed':
       return 'run refused';
     default:
       // @ts-expect-error 'database-commands-unavailable' is not handled, so the code does not narrow to never

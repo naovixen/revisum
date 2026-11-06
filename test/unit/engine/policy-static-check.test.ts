@@ -83,11 +83,14 @@ test('with the allowed name removed from the project, the same click is denied',
   assert.deepEqual(decision, denied('irreversible-action', 1));
 });
 
-test('the plan an allow decision carries is the parsed plan, unchanged, and still passes run()\'s brand check', async () => {
+test('the plan each cleared run of an allow decision carries is the parsed plan, unchanged, and still passes run()\'s brand check', async () => {
   const { decision, plan } = await decide(clickOn('Save changes'));
   assert.equal(decision.kind, 'allow', JSON.stringify(decision));
-  assert.equal(canonicalJson(decision.plan), canonicalJson(plan));
-  assert.doesNotThrow(() => assertBranded(decision.plan));
+  assert.equal(decision.runs.length, 1);
+  for (const cleared of decision.runs) {
+    assert.equal(canonicalJson(cleared.plan), canonicalJson(plan));
+    assert.doesNotThrow(() => assertBranded(cleared.plan));
+  }
 });
 
 // ---- Production origins -------------------------------------------------------------------------

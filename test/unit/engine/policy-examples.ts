@@ -9,7 +9,7 @@
 //     unnamed control by its test id. It allows no irreversible name.
 // The gate is built by policyGate({ project, events }); each denial appends one plan.denied event
 // whose code is the rule. A dialog step acts on no element, so the guard receives NO_ELEMENT for it.
-import { loadTrustedProject, parseProject, planHash, planParser, policyGate, type EventSink, type Locale, type Plan, type PlanStanding, type PolicyDecision, type PolicyGate, type PolicyRuleId, type Project, type ResolvedElement, type Step, type Target, type TrustedProject } from '@revisum/engine';
+import { loadTrustedProject, parseProject, planHash, planParser, policyGate, type EventSink, type Locale, type Plan, type PlanStanding, type PlanClearance, type RunClearance, type PolicyGate, type PolicyRuleId, type Project, type ResolvedElement, type Step, type TrustedProject } from '@revisum/engine';
 import {
   PLAN_PATH, eventsOfKind, memoryEventSink, withRepository, type MemoryEventSink, type RecordedEvent,
 } from './approval-repositories.ts';
@@ -118,13 +118,9 @@ export async function testGate(projectInput: JsonRecord = policyProjectInput()):
   return { gate: policyGate({ project, events: sink }), events, project };
 }
 
-// The plan's declared targets, as the trusted project's matrix describes them.
-export const targetsOf = (project: TrustedProject, plan: Plan): readonly Target[] =>
-  project.matrix.filter((candidate) => plan.targets.includes(candidate.id));
-
 // The gate's decision on `plan` for its declared targets. No standing means a proposal.
-export const decideOn = (tested: TestGate, plan: Plan, standing?: PlanStanding): PolicyDecision =>
-  tested.gate.decide(plan, targetsOf(tested.project, plan), standing);
+export const decideOn = (tested: TestGate, plan: Plan, standing?: PlanStanding): PlanClearance =>
+  tested.gate.decide(plan, plan.targets, standing);
 
 export function localeOf(project: TrustedProject, targetId: string): Locale {
   const found = project.matrix.find((candidate) => candidate.id === targetId);
@@ -148,8 +144,8 @@ export const NO_ELEMENT: ResolvedElement = element();
 export const denied = (rule: PolicyRuleId, stepIndex: number | null) => ({ kind: 'deny', rule, stepIndex }) as const;
 export const ALLOWED = { kind: 'allow' } as const;
 
-// The decision with an allowed plan reduced to its kind, so decisions compare by value.
-export const comparable = (decision: PolicyDecision): JsonRecord =>
+// The decision with its cleared runs reduced to its kind, so decisions compare by value.
+export const comparable = (decision: PlanClearance | RunClearance): JsonRecord =>
   decision.kind === 'allow' ? { kind: 'allow' } : { kind: decision.kind, rule: decision.rule, stepIndex: decision.stepIndex };
 
 // The plan.denied events the gate appended.

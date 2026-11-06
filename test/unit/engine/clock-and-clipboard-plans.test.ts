@@ -19,6 +19,7 @@ import {
 import { fakeDriverNeverLaunching } from '#test-support/fakes/FakeDriver.ts';
 import { driversOf, fakePorts } from '#test-support/fakes/FakePorts.ts';
 import { fakeRunEventSink } from '#test-support/fakes/FakeRunEventSink.ts';
+import { baseUrlOf } from '#test-support/policy-clearance.ts';
 
 const parsePlan = parserFor();
 
@@ -276,7 +277,7 @@ function countingPorts() {
   return { ports, spy, requests, events };
 }
 
-const base = () => ({ project: projectWith(), baseUrl: ORIGIN, seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() } });
+const base = () => ({ project: projectWith(), baseUrl: baseUrlOf(ORIGIN), seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() } });
 
 async function assertNothingReached(plans: readonly JsonRecord[]): Promise<void> {
   const { ports, spy, requests, events } = countingPorts();

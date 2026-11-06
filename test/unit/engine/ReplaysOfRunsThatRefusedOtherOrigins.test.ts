@@ -14,7 +14,7 @@ import {
     type RunResult,
     type Session,
 } from "@revisum/engine";
-import { authorise, trustedProjectFrom } from "../../support/policy-clearance.ts";
+import { baseUrlOf, clearRun, trustedProjectFrom } from "../../support/policy-clearance.ts";
 import { evidenceHashOf } from "../../support/ExpectedEvidenceHash.ts";
 import { NO_ELEMENT, SHOWN_ELEMENT, fakeSessionOnOrders } from "./RunOnFakeSession.ts";
 import {
@@ -59,13 +59,11 @@ type Recorded = {
 const record = async (page: PageState): Promise<Recorded> => {
     const project = projectWith();
     const trusted = await trustedProjectFrom(projectFileWith());
-    const plan = authorise(accepted(planParser(project), PLAN), trusted);
+    const plan = accepted(planParser(project), PLAN);
     const result = await run(
+        clearRun(plan, trusted, project.matrix[0]?.id ?? assert.fail("no target")),
         {
-            plan,
-            project,
-            targetId: project.matrix[0]?.id ?? assert.fail("no target"),
-            baseUrl: ORIGIN,
+            baseUrl: baseUrlOf(ORIGIN),
             seed: DEFAULT_SEED,
             fixedTimeMilliseconds: DEFAULT_CLOCK_START,
             fixtures: [],
@@ -89,11 +87,13 @@ const replayOn = async (
             recording: null,
             recordedResultHash,
             recordedState: recorded.result.state,
+            cleared: clearRun(
+                recorded.plan,
+                trusted,
+                recorded.project.matrix[0]?.id ?? assert.fail("no target"),
+            ),
             inputs: {
-                plan: authorise(recorded.plan, trusted),
-                project: recorded.project,
-                targetId: recorded.project.matrix[0]?.id ?? assert.fail("no target"),
-                baseUrl: ORIGIN,
+                baseUrl: baseUrlOf(ORIGIN),
                 host: THIS_MACHINE,
             },
         },

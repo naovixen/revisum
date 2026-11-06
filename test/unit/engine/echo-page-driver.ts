@@ -3,9 +3,9 @@
 // an element found by its test id shows a text the test chooses, such as a careless echo of a
 // secret. The test hands in the values of the secrets it planted, so the driver never needs
 // reveal: it looks the typed value up by the secret's name, as a real page would hold it.
-import { performableLocator, success, type BrowserDriver, type ElementProbe, type Locator } from '@revisum/engine';
+import { success, type BrowserDriver, type ElementProbe, type ResolvedLocator } from '@revisum/engine';
 import { ORIGIN } from './secret-examples.ts';
-import { FAKE_ELEMENT, performableAction, READ_FAILED } from '#test-support/fakes/FakePage.ts';
+import { FAKE_ELEMENT } from '#test-support/fakes/FakePage.ts';
 import { fakeSession } from '#test-support/fakes/FakeSession.ts';
 import { fakeDriverOpening } from '#test-support/fakes/FakeDriver.ts';
 
@@ -19,9 +19,9 @@ export type EchoPage = {
 export type EchoPageCalls = { navigations: number; actions: number; probes: number };
 
 // Fields are found by their label, shown texts by their test id; anything else is a key of its own.
-function elementKey(locator: Locator): string {
-  if (locator.by === 'label' && typeof locator.label === 'string') return `label:${locator.label}`;
-  if (locator.by === 'testId' && typeof locator.testId === 'string') return `testId:${locator.testId}`;
+function elementKey(locator: ResolvedLocator): string {
+  if (locator.by === 'label') return `label:${locator.label}`;
+  if (locator.by === 'testId') return `testId:${locator.testId}`;
   return JSON.stringify(locator);
 }
 
@@ -33,31 +33,22 @@ export function echoPageDriver(page: EchoPage): BrowserDriver & { readonly calls
     browser: { name: 'echo-page-browser', version: '1.0' },
     navigate: () => { calls.navigations++; return Promise.resolve(success(undefined)); },
     page: () => Promise.resolve(success({ url: `${ORIGIN}/`, title: 'Echo page', meta: [], canonicalUrl: null })),
-    act: (step, _guard, secret) => {
+    act: (action) => {
       calls.actions++;
-      // What any driver refuses comes before the page: it keeps no value of a step it would not perform.
-      if (step.type !== 'dialog') {
-        const performable = performableAction(step, secret);
-        if (!performable.ok) {
-          return Promise.resolve(performable);
-        }
-      }
-      if (step.type === 'fill') {
-        const plainText = typeof step.value === 'string' ? step.value : '';
-        const typed = secret === undefined ? plainText : page.secretValues?.[secret.name] ?? '';
-        fieldValues.set(elementKey(step.locator), typed);
+      if (action.type === 'fill') {
+        const value = action.value;
+        const plainText = typeof value === 'string' ? value : '';
+        const typed = typeof value === 'object' && 'secret' in value ? page.secretValues?.[value.secret.name] ?? '' : plainText;
+        fieldValues.set(elementKey(action.locator), typed);
       }
       return Promise.resolve(success(undefined));
     },
     probe: (locator) => {
       calls.probes++;
-      if (performableLocator(locator) === undefined) {
-        return Promise.resolve(READ_FAILED);
-      }
       const key = elementKey(locator);
       const typed = fieldValues.get(key);
       if (typed !== undefined) return Promise.resolve(shown('', typed));
-      const text = locator.by === 'testId' && typeof locator.testId === 'string' ? page.texts?.[locator.testId] : undefined;
+      const text = locator.by === 'testId' ? page.texts?.[locator.testId] : undefined;
       return Promise.resolve(text === undefined ? { count: 0 } : shown(text, null));
     },
   });

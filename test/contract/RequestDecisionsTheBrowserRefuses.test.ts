@@ -6,7 +6,7 @@ import { after, before, beforeEach, describe, test } from "node:test";
 import type { OwnBrowserDriver } from "@revisum/driver-cdp";
 import type {
     ActionGuard,
-    ActionStep,
+    PerformableAction,
     DriverError,
     Result,
     SessionEnvironment,
@@ -89,7 +89,7 @@ const notingActions = (
             }
             const session = opened.value;
             const act = async (
-                step: ActionStep,
+                step: PerformableAction,
                 guard: ActionGuard,
             ): Promise<Result<void, DriverError>> => {
                 const acted = await session.act(step, guard);

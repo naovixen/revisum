@@ -18,7 +18,7 @@ import { navigate, rawPlan, testId, textEquals } from "../support/browser/RawPla
 import { BROWSERS } from "../support/browsers.ts";
 import { startFixtureServer, type FixtureServer } from "../support/fixture-server.ts";
 import { systemClock } from "../support/memory-ports.ts";
-import { authorise, trustedProjectFrom } from "../support/policy-clearance.ts";
+import { baseUrlOf, clearRun, trustedProjectFrom } from "../support/policy-clearance.ts";
 import { FIXTURES } from "../support/repository.ts";
 import {
     ATTEMPT_SETTLED,
@@ -129,15 +129,13 @@ async function openInRun(fixture: FixtureServer): Promise<string> {
     const target = project.value.matrix[0];
     assert.ok(target !== undefined, "the project has a target");
     const result = await run(
+        clearRun(parsedPlan.value, await trustedProjectFrom(projectFile), target.id),
         {
-            project: project.value,
-            baseUrl: fixture.origin,
+            baseUrl: baseUrlOf(fixture.origin),
             seed: SEED,
             fixedTimeMilliseconds: FIXED_TIME_MILLISECONDS,
             fixtures: fixture.fixtures,
             host: { platform: platform(), arch: arch() },
-            plan: authorise(parsedPlan.value, await trustedProjectFrom(projectFile)),
-            targetId: target.id,
         },
         realRunPorts({
             // The page is on the container's own loopback, which the proxy, in another container,

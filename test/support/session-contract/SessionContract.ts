@@ -17,7 +17,6 @@ import {
     ACCEPT,
     CLICK_EXPORT,
     EXPORT_BUTTON,
-    HOLDING_A_VALUE,
     actionStep,
     allowing,
     assertNothingRead,
@@ -211,16 +210,6 @@ function closedTabContract(open: OpenSessionUnderTest): void {
                 const saved = await tab.download(downloadStep(EXPORT_BUTTON), 100, guard);
                 assert.equal(failureCode(saved), "not-found");
                 assert.equal(failureCode(await tab.act(actionStep(ACCEPT), guard)), "not-found");
-            });
-        });
-
-        describe("when a step holding a value reference reaches the tab", () => {
-            test("then it should still refuse it as unsupported-step", async () => {
-                const tab = await openTab(await open());
-                await tab.close();
-                const step = actionStep({ type: "click", locator: HOLDING_A_VALUE });
-                const acted = await tab.act(step, allowing().guard);
-                assert.equal(failureCode(acted), "unsupported-step");
             });
         });
 

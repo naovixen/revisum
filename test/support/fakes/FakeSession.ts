@@ -22,8 +22,6 @@ import {
     DIALOG_HOLDS_PAGE,
     downloadOnOpenPage,
     NO_DIALOG,
-    performableAction,
-    performableDownload,
     probeOpenPage,
     READ_FAILED,
     TAB_GONE,
@@ -145,8 +143,7 @@ function sessionOnceClosed(open: Session): Session {
 
 // A tab closed in a session that goes on: its target has gone but the connection has not, so no crash
 // is reported, so a read of it can say only that nothing answered. A wait finds nothing and every other
-// command fails as it does on a target that has gone. What a driver refuses before it touches the page
-// comes first, as on an open tab.
+// command fails as it does on a target that has gone.
 function tabOnceClosed(open: DocumentSession): SessionTab {
     return {
         ...documentOnceClosed(open),
@@ -159,19 +156,10 @@ function tabOnceClosed(open: DocumentSession): SessionTab {
         audit: () => refusing(TAB_UNREADABLE),
         accessibilitySnapshot: () => refusing(TAB_UNREADABLE),
         linkTargets: () => refusing(TAB_UNREADABLE),
-        act(...[step, , secret]) {
-            if (step.type === "dialog") {
-                return refusing(NO_DIALOG);
-            }
-            const action = performableAction(step, secret);
-            return Promise.resolve(action.ok ? failure(TAB_GONE) : action);
-        },
+        act: (action) => refusing(action.type === "dialog" ? NO_DIALOG : TAB_GONE),
         frame: () => refusing(TAB_GONE),
         crashed: () => false,
-        download(step) {
-            const locator = performableDownload(step);
-            return Promise.resolve(locator.ok ? failure(TAB_GONE) : locator);
-        },
+        download: () => refusing(TAB_GONE),
         runScript: () =>
             refusing({ code: DriverErrorCode.ScriptFailed, detail: "the tab has closed" }),
     };
@@ -186,8 +174,8 @@ function pageAnswers(page: FakePage, thisDocument: () => DocumentSession): Docum
     return {
         navigate: () => Promise.resolve(success(undefined)),
         page: () => readOf(page, FAKE_PAGE),
-        act: (step, guard, secret) => Promise.resolve(actOnOpenPage(page, step, guard, secret)),
-        probe: (locator) => Promise.resolve(probeOpenPage(page, locator)),
+        act: (action, guard) => Promise.resolve(actOnOpenPage(page, action, guard)),
+        probe: () => Promise.resolve(probeOpenPage(page)),
         screenshot: () => readOf(page, FAKE_PNG),
         screenshotHidingFields: () => readOf(page, FAKE_PNG),
         audit: () => readOf(page, []),

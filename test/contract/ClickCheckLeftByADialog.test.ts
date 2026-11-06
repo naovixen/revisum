@@ -4,7 +4,7 @@
 // frame. What the press itself is judged to have done is not what these tests are about.
 import assert from "node:assert/strict";
 import { after, before, describe, test } from "node:test";
-import { performableLocator, type DocumentSession } from "@revisum/engine";
+import { type DocumentSession } from "@revisum/engine";
 import { allowEveryAction } from "#test-support/browser/AllowEveryAction.ts";
 import { expectRead } from "#test-support/ExpectRead.ts";
 import { expectOneElement } from "#test-support/browser/ExpectOneElement.ts";
@@ -115,8 +115,7 @@ const onPage = async <Value>(
 };
 
 const enterFrameOf = async (document: DocumentSession): Promise<DocumentSession> => {
-    const located = performableLocator(harness.locator(testId(FRAME)));
-    assert.ok(located !== undefined, "the frame's locator is literal");
+    const located = harness.locator(testId(FRAME));
     const inner = await document.frame(located);
     assert.ok(inner.ok, `the frame is found: ${JSON.stringify(inner)}`);
     return inner.value;

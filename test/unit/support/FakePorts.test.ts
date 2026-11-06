@@ -26,7 +26,7 @@ import { fakeRandom } from "#test-support/fakes/FakeRandom.ts";
 import { FAKE_PAGE, fakeSession } from "#test-support/fakes/FakeSession.ts";
 import { fakeStoragePort } from "#test-support/fakes/FakeStoragePort.ts";
 import { leaveOut } from "#test-support/fakes/LeaveOut.ts";
-import { authorise, trustedProjectFrom } from "#test-support/policy-clearance.ts";
+import { baseUrlOf, clearRun, trustedProjectFrom } from "#test-support/policy-clearance.ts";
 import {
     finalState,
     guardedDriver,
@@ -186,14 +186,13 @@ describe("Using a fake port", () => {
                 const project = projectWith();
                 const driver = fakeDriver();
                 const result = await run(
+                    clearRun(
+                        accepted(planParser(project), planOf([OPEN_ORDERS])),
+                        await trustedProjectFrom(projectFileWith()),
+                        firstOf(project.matrix).id,
+                    ),
                     {
-                        plan: authorise(
-                            accepted(planParser(project), planOf([OPEN_ORDERS])),
-                            await trustedProjectFrom(projectFileWith()),
-                        ),
-                        project,
-                        targetId: firstOf(project.matrix).id,
-                        baseUrl: RUN_ORIGIN,
+                        baseUrl: baseUrlOf(RUN_ORIGIN),
                         seed: DEFAULT_SEED,
                         fixedTimeMilliseconds: DEFAULT_CLOCK_START,
                         fixtures: [],

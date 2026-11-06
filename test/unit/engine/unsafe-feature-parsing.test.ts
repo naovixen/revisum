@@ -16,6 +16,7 @@ import {
 } from './unsafe-feature-examples.ts';
 import { ALL_FEATURES_PLAN, CSS_CHECK, FEATURES, FEATURE_EXAMPLES, INLINE_READ, OPEN_CART, ORIGIN, XPATH_CHECK, css, unsafePlan, unsafeProjectFile, xpath, type FeatureName, type JsonRecord , ALL_FEATURES_PATHS } from './unsafe-feature-steps.ts';
 import { fakePorts } from '#test-support/fakes/FakePorts.ts';
+import { baseUrlOf } from '#test-support/policy-clearance.ts';
 
 const NOTHING_ENABLED: readonly FeatureName[] = [];
 
@@ -99,7 +100,7 @@ test('a plan refused for a disabled feature opens no browser, makes no call and 
   const spy = spyDriver();
   const { caller, requests } = routedServiceCaller();
   const ports = fakePorts({ drivers: new Map([['cdp', spy]]), services: caller });
-  const base = { project, baseUrl: ORIGIN, seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() } };
+  const base = { project, baseUrl: baseUrlOf(ORIGIN), seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() } };
   const plans: readonly JsonRecord[] = [...FEATURE_EXAMPLES.map((example) => unsafePlan(example.steps)), ALL_FEATURES_PLAN()];
   for (const plan of plans) {
     const outcome = await runUntrusted(plan, parse, base, ports);

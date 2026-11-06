@@ -15,7 +15,7 @@
 import { randomBytes } from 'node:crypto';
 import type { Secret, SecretStore } from '@revisum/contracts';
 import { environmentSecretStore, parseProject, planParser, run, success, type BrowserDriver, type Plan, type RunPorts, type Project, type RunResult, type SecretName, type TargetId } from '@revisum/engine';
-import { authorise, trustedProjectFrom } from '../../support/policy-clearance.ts';
+import { baseUrlOf, clearRun, trustedProjectFrom } from '../../support/policy-clearance.ts';
 import { fakeArtifactStore } from '#test-support/fakes/FakeArtifactStore.ts';
 import { fakeDriverNeverLaunching, fakeDriverOpening, type FakeDriver } from '#test-support/fakes/FakeDriver.ts';
 import { fakePorts } from '#test-support/fakes/FakePorts.ts';
@@ -177,8 +177,7 @@ export async function runWithSecrets(
   const events = fakeRunEventSink();
   const artifacts = fakeArtifactStore();
   const ports = fakePorts({ drivers: new Map([['fake', driver]]), artifacts, events });
-  const result = await run({
-    plan: authorise(parsedPlan(project, plan), trusted), project, targetId: FAKE_TARGET as TargetId, baseUrl: ORIGIN,
+  const result = await run(clearRun(parsedPlan(project, plan), trusted, FAKE_TARGET as TargetId), { baseUrl: baseUrlOf(ORIGIN),
     seed: 7, fixedTimeMilliseconds: Date.UTC(2026, 0, 1), fixtures: [], host: { platform: 'test', arch: 'test' },
   }, environment === null ? leaveOut<RunPorts>(ports, ['secrets']) : { ...ports, secrets: fakeEnvironmentStore(environment) });
   const eventLines = events.read().map((event) => JSON.stringify(event)).join('\n');
