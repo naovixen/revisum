@@ -4,7 +4,7 @@
 // and every process it started (Chromium), sampled from /proc every 100 ms. tools/benchmark.ts
 // calls this and compares the medians with the stored Linux baseline; it is never a gate.
 import {
-  defaultRedactor, failure, loadTrustedProject, parseProject, planParser, policyGate, run, sha256, success,
+  defaultRedactor, failure, HOST_ISOLATION, loadTrustedProject, parseBaseUrl, planParser, policyGate, run, sha256, success,
   type ArtifactReference, type ArtifactStore, type Clock, type EventSink, type FixtureReference, type LoggedEvent, type RunEventSink,
   type VersionControlPort,
 } from '@revisum/engine';
@@ -142,18 +142,17 @@ export async function benchmarkRuns(options: BenchmarkRunsOptions): Promise<Benc
   const { server, origin, fixtures } = await serveFixtures(join(options.repositoryRoot, 'fixtures', 'signup-app'));
   try {
     const projectFile = projectFileFor(origin);
-    // The gate clears the plan under the trusted project; the run reads the same file, parsed.
+    // The gate clears the plan under the trusted project, and the run runs under the project it cleared.
     const loaded = await loadTrustedProject('project.json', protectedBranchWith(projectFile), { files: [], events: discardingAudit });
     if (!loaded.ok) throw new Error(`the benchmark project was refused: ${JSON.stringify(loaded.error)}`);
-    const trusted = loaded.value.project;
-    const parsedProject = parseProject(projectFile);
-    if (!parsedProject.ok) throw new Error(`the benchmark project was refused: ${JSON.stringify(parsedProject.error)}`);
-    const project = parsedProject.value;
+    const project = loaded.value.project;
     const parsed = planParser(project)(SIGNUP_PLAN);
     if (!parsed.ok) throw new Error(`the benchmark plan was rejected: ${JSON.stringify(parsed.error)}`);
-    const target = trusted.matrix.find((candidate) => candidate.id === TARGET_ID);
+    const target = project.matrix.find((candidate) => candidate.id === TARGET_ID);
     if (target === undefined) throw new Error('the benchmark project has no headless-shell target');
-    const decision = policyGate({ project: trusted, events: discardingAudit }).decide(parsed.value, [target]);
+    const baseUrl = parseBaseUrl(origin);
+    if (!baseUrl.ok) throw new Error(`the fixture server's origin is not a base URL: ${baseUrl.error}`);
+    const decision = policyGate({ project, events: discardingAudit }).clear(parsed.value, target.id);
     if (decision.kind === 'deny') throw new Error(`the policy gate denied the benchmark plan: ${decision.rule}`);
     const drivers = new Map([['cdp', buildAdapters.hostBrowserDriver({ executablePath: options.executablePath })]]);
     const samples: BenchmarkSample[] = [];
@@ -172,10 +171,9 @@ export async function benchmarkRuns(options: BenchmarkRunsOptions): Promise<Benc
       const sampler = setInterval(() => { peak = Math.max(peak, treeResidentBytes()); }, SAMPLE_INTERVAL_MILLISECONDS);
       const started = performance.now();
       try {
-        const result = await run({
-          plan: decision.plan, project, targetId: target.id, baseUrl: origin, seed: 42, fixedTimeMilliseconds: Date.UTC(2026, 0, 15, 10, 30),
-          fixtures, host: { platform: platform(), arch: arch() },
-        }, { drivers, clock: systemClock, artifacts: memoryArtifacts(), redactor: defaultRedactor(), audit: discardingAudit, events: sink });
+        const result = await run(decision.run, {
+          baseUrl: baseUrl.value, seed: 42, fixedTimeMilliseconds: Date.UTC(2026, 0, 15, 10, 30), fixtures, host: { platform: platform(), arch: arch() },
+        }, { drivers, clock: systemClock, artifacts: memoryArtifacts(), redactor: defaultRedactor(), audit: discardingAudit, events: sink, isolation: HOST_ISOLATION });
         if (result.state !== 'Passed') throw new Error(`benchmark run ${index + 1} ended ${result.state}`);
       } finally {
         clearInterval(sampler);

@@ -2,10 +2,11 @@
 // masking and auditing live here once, so every protocol behaves the same way.
 import { isDeepStrictEqual } from 'node:util';
 import {
-  DEFAULT_TEST_ID_ATTRIBUTE, failure, isSeveralElements, literalActionStep, NavigateScripts, literalText, performableLocator, reveal, success,
-  type ActionGuard, type ActionStep, type BrowserRequestRecord, type DialogStep, type DocumentSession, type DomRead, type DomValue, type DownloadedFile,
-  type DownloadStep, type DriverError, type ElementProbe, type Locator, type OneElementRead, type PageScriptCall, type PageMetaTag, type PageProbe, type PageReadFailure, type Position, type ResolvedActionStep,
-  type ClipboardPort, type ClockPort, type DriverErrorCode, type GuardVerdict, type NetworkPort, type ResolvedElement, type ResolvedLocator, type Result, type Secret, type SessionEnvironment, type SessionTab, type StoragePort,
+  DEFAULT_TEST_ID_ATTRIBUTE, failure, isSeveralElements, NavigateScripts, reveal, success,
+  type ActionGuard, type BrowserRequestRecord, type DocumentSession, type DomRead, type DomValue, type DownloadedFile,
+  type DriverError, type ElementProbe, type OneElementRead, type PageScriptCall, type PageMetaTag, type PageProbe, type PageReadFailure, type PerformableAction,
+  type PerformableFill, type Position, type ResolvedDialogStep, type ResolvedDownloadStep,
+  type ClipboardPort, type ClockPort, type DriverErrorCode, type GuardVerdict, type NetworkPort, type ResolvedElement, type ResolvedLocator, type Result, type SessionEnvironment, type SessionTab, type StoragePort,
   UnreadablePage,
 } from '@revisum/contracts';
 import {
@@ -533,23 +534,20 @@ async function hasFieldHoldingASecret<Handle>(documents: readonly PageOperations
   return false;
 }
 
-// The text a fill of literal text or of lines types; a secret reference is revealed elsewhere.
-const textToFill = (value: Extract<ResolvedActionStep, { type: 'fill' }>['value']): string => {
+// True when a fill types a secret, which is revealed only as it is typed.
+const isSecretFill = (fill: PerformableFill): boolean => typeof fill.value === 'object' && 'secret' in fill.value;
+
+// The text a fill types. The secret is revealed here, as it is typed, and nowhere else in this driver.
+// Lines are joined by line feeds and inserted as text, so no Enter key press can send a form early.
+function textToFill(value: PerformableFill['value']): string {
   if (typeof value === 'string') {
     return value;
   }
-  return 'lines' in value ? value.lines.join('\n') : '';
-};
-
-// The secret an action types: null when it types none, and undefined when it should type one the
-// engine did not resolve for it.
-function secretToType(action: ResolvedActionStep, secret: Secret | undefined): Secret | null | undefined {
-  const typed = action.type === 'fill' ? action.value : '';
-  if (typeof typed === 'string' || 'lines' in typed) {
-    return null;
-  }
-  return secret?.name === typed.secretName ? secret : undefined;
+  return 'lines' in value ? value.lines.join('\n') : reveal(value.secret);
 }
+
+// An action on an element: every action but answering a dialog.
+type ElementAction = Exclude<PerformableAction, ResolvedDialogStep>;
 
 // What a click does with the element it found and where it will press, just before the press.
 type BeforePress<Handle> = (element: Handle, at: Point) => Promise<void>;
@@ -571,10 +569,8 @@ function documentPorts<Handle>(
     return refusal === undefined ? null : { code, detail: refusal };
   };
 
-  const probeNow = async (planLocator: Locator, read: DomRead | null): Promise<ElementProbe> => {
-    // A value reference says nothing about the page.
-    const locator = performableLocator(planLocator);
-    if (locator === undefined || crashed()) return READ_FAILED;
+  const probeNow = async (locator: ResolvedLocator, read: DomRead | null): Promise<ElementProbe> => {
+    if (crashed()) return READ_FAILED;
     try {
       if (await rejectsSelector(operations, locator)) {
         return REJECTED_SELECTOR;
@@ -608,8 +604,8 @@ function documentPorts<Handle>(
   };
 
   // A read the page does not answer in time is one that says nothing about what is on it.
-  const probe = async (planLocator: Locator, read: DomRead | null): Promise<ElementProbe> => {
-    const probed = await forAtMost(timeout, probeNow(planLocator, read));
+  const probe = async (locator: ResolvedLocator, read: DomRead | null): Promise<ElementProbe> => {
+    const probed = await forAtMost(timeout, probeNow(locator, read));
     return probed === TIMED_OUT ? READ_FAILED : probed;
   };
 
@@ -666,7 +662,7 @@ function documentPorts<Handle>(
   };
 
   // The action itself, once the step is known to be performable.
-  const perform = async (action: ResolvedActionStep, guard: ActionGuard, typedSecret: Secret | null, beforePress: BeforePress<Handle>, stepDeadline: number): Promise<Result<void, DriverError>> => {
+  const perform = async (action: ElementAction, guard: ActionGuard, beforePress: BeforePress<Handle>, stepDeadline: number): Promise<Result<void, DriverError>> => {
     if (action.type === 'click') return click(action.locator, guard, beforePress, stepDeadline);
     if (action.type === 'upload') {
       const path = details.fixturePath(action.fixture);
@@ -683,16 +679,14 @@ function documentPorts<Handle>(
     const denied = await denial(operations, element, guard);
     if (denied !== null) return failure(denied);
     // Noted before typing: a fill that fails part way may still have typed some of it.
-    if (action.type === 'fill' && typedSecret !== null) {
+    if (action.type === 'fill' && isSecretFill(action)) {
       details.secretTypedFields.push({ locator: action.locator, isGone: () => operations.isElementGone(element) });
     }
     const sent = await inputWithinTimeout(async (hasStepEnded): Promise<Result<void, DriverError>> => {
       switch (action.type) {
         case 'hover': await clickChecks.input.hover(at, hasStepEnded); break;
-        // The secret is revealed here, as it is typed, and nowhere else in this driver. Lines are
-        // joined by line feeds and inserted as text, so no Enter key press can send a form early.
         case 'fill':
-          await clickChecks.input.fill(element, typedSecret === null ? textToFill(action.value) : reveal(typedSecret), hasStepEnded);
+          await clickChecks.input.fill(element, textToFill(action.value), hasStepEnded);
           break;
         // Enter on a form or a link starts a navigation as a click does.
         case 'press':
@@ -712,7 +706,7 @@ function documentPorts<Handle>(
 
   // Answers the dialog the page has open, or opens within the timeout: its text is checked first,
   // then the guard is asked with it.
-  const answerDialog = async (step: DialogStep, guard: ActionGuard): Promise<Result<void, DriverError>> => {
+  const answerDialog = async (step: ResolvedDialogStep, guard: ActionGuard): Promise<Result<void, DriverError>> => {
     const deadline = Date.now() + timeout;
     let text = events.openDialog();
     while (text === null) {
@@ -721,11 +715,9 @@ function documentPorts<Handle>(
       await pause(POLL_INTERVAL_MILLISECONDS);
       text = events.openDialog();
     }
+    // The dialog's text is never echoed: it may hold personal data.
     if (step.expectText !== undefined) {
-      const expected = literalText(step.expectText);
-      if (expected === undefined) return failure({ code: 'unsupported-step', detail: 'a value reference reached the driver' });
-      // The dialog's text is never echoed: it may hold personal data.
-      if (normalise(expected) !== normalise(text)) return failure({ code: 'assertion-failed', detail: 'the open dialog does not say the expected text' });
+      if (normalise(step.expectText) !== normalise(text)) return failure({ code: 'assertion-failed', detail: 'the open dialog does not say the expected text' });
     }
     const denied = denialOf(guard(NO_RESOLVED_ELEMENT, text));
     if (denied !== null) {
@@ -772,23 +764,15 @@ function documentPorts<Handle>(
     return crashed() ? CRASHED : { code: 'not-actionable', detail: errorText(error) };
   };
 
-  const actBeforePress = async (step: ActionStep, guard: ActionGuard, secret: Secret | undefined, beforePress: BeforePress<Handle>): Promise<Result<void, DriverError>> => {
+  const actBeforePress = async (action: PerformableAction, guard: ActionGuard, beforePress: BeforePress<Handle>): Promise<Result<void, DriverError>> => {
     if (crashed()) return failure(CRASHED);
     const alreadyRefused = failureOfRefusedDecision('not-actionable');
     if (alreadyRefused !== null) {
       return failure(alreadyRefused);
     }
-    if (step.type === 'dialog') {
-      try { return await answerDialog(step, guard); } catch (error) { return failure(crashed() ? CRASHED : { code: 'not-actionable', detail: errorText(error) }); }
+    if (action.type === 'dialog') {
+      try { return await answerDialog(action, guard); } catch (error) { return failure(crashed() ? CRASHED : { code: 'not-actionable', detail: errorText(error) }); }
     }
-    // A step left holding a value reference, and a download, which has a port of its own, are refused
-    // before they touch the page.
-    const action = literalActionStep(step);
-    if (action === undefined) return failure({ code: 'unsupported-step', detail: `this ${step.type} step cannot be performed as it stands` });
-    // A secret reference arrives with the secret the engine resolved for it. Without that secret
-    // there is nothing to type, and typing nothing could pass a step that should fail.
-    const typedSecret = secretToType(action, secret);
-    if (typedSecret === undefined) return failure({ code: 'not-actionable', detail: 'a secret reference reached the driver without its secret' });
     const openingsBefore = events.unsupportedOpenings();
     const stepDeadline = Date.now() + timeout;
     let acted: Result<void, DriverError>;
@@ -800,7 +784,7 @@ function documentPorts<Handle>(
       if (rejected) {
         return failure(SELECTOR_INVALID);
       }
-      acted = await perform(action, guard, typedSecret, beforePress, stepDeadline);
+      acted = await perform(action, guard, beforePress, stepDeadline);
       if (acted.ok) {
         const settled = await inputWithinTimeout(() => inputSettled(), stepDeadline);
         if (!settled.ok) {
@@ -825,15 +809,14 @@ function documentPorts<Handle>(
     return acted;
   };
 
-  const act = (step: ActionStep, guard: ActionGuard, secret?: Secret): Promise<Result<void, DriverError>> => actBeforePress(step, guard, secret, NOTHING_BEFORE_PRESS);
+  const act = (action: PerformableAction, guard: ActionGuard): Promise<Result<void, DriverError>> => actBeforePress(action, guard, NOTHING_BEFORE_PRESS);
 
   // A download step: the click, guarded as any click, with the browser armed, just before the press,
   // to save the one download it starts. A popup the click opens, or a download that is not its own,
   // fails the step with unsupported-step and nothing of it is kept.
-  const download = async (step: DownloadStep, maximumBytes: number, guard: ActionGuard): Promise<Result<DownloadedFile, DriverError>> => {
+  const download = async (step: ResolvedDownloadStep, maximumBytes: number, guard: ActionGuard): Promise<Result<DownloadedFile, DriverError>> => {
     if (crashed()) return failure(CRASHED);
-    const locator = performableLocator(step.locator);
-    if (locator === undefined) return failure({ code: 'unsupported-step', detail: 'a value reference reached the driver' });
+    const locator = step.locator;
     try {
       if (await rejectsSelector(operations, locator)) return failure(SELECTOR_INVALID);
     } catch (error) {
@@ -844,7 +827,7 @@ function documentPorts<Handle>(
     const armed = details.downloads.arm();
     let kept = false;
     try {
-      const clicked = await actBeforePress({ type: 'click', locator }, guard, undefined, async (element, at) => {
+      const clicked = await actBeforePress({ type: 'click', locator }, guard, async (element, at) => {
         await armed.expectFromPress({ frameId: await operations.frameId(), canStartFile: await operations.canPressStartAnything(element, at) });
       });
       if (!clicked.ok) return clicked;

@@ -3,7 +3,10 @@
 import type { Brand } from './brand.ts';
 import type { ClipboardPort, ClockPort } from './clock-and-clipboard.ts';
 import type { NetworkPort, StoragePort } from './network-and-storage.ts';
-import { ScriptMode, type ActionStep, type DownloadStep, type Locator, type ResolvedLocator } from './plan.ts';
+import {
+  ScriptMode, type ResolvedActionStep, type ResolvedDialogStep, type ResolvedDownloadStep, type ResolvedLocator, type ResolvedMultiLineText, type SafeText,
+  type StepType,
+} from './plan.ts';
 import type { GuardVerdict } from './policy.ts';
 import type { Secret } from './secret.ts';
 import { failure, success, type Result } from './result.ts';
@@ -20,9 +23,8 @@ import type { AdapterId, Target } from './target.ts';
 // still ends every process.
 // unsupported-step: the step made the page open a popup or a second page, or start a download no
 // download step claimed: the popup is closed and the download cancelled, with nothing of it kept, so
-// the step never passes with a partial result. Or the step reached the driver holding a value
-// reference, or asks what a document cannot do: an iframe whose document runs in another process, or
-// scripts turned off inside a frame.
+// the step never passes with a partial result. Or the step asks what a document cannot do: an iframe
+// whose document runs in another process, or scripts turned off inside a frame.
 // assertion-failed: a dialog step's expected text is not the open dialog's text, so nothing
 // answered the dialog.
 // selector-invalid: the browser rejects a CSS selector or XPath expression the step's locator
@@ -284,20 +286,26 @@ export interface PageNavigator {
   navigate(url: string, options: NavigateOptions): Promise<Result<void, DriverError>>;
   page(): Promise<Result<PageProbe, PageReadFailure>>;
 }
+// The secret a fill types. The driver reveals it only at the moment it types it, and never reports
+// it back.
+export type SecretFill = { readonly secret: Secret };
+// A fill as a driver performs it: literal text, literal lines, or a secret.
+export type PerformableFill = {
+  readonly type: typeof StepType.Fill; readonly locator: ResolvedLocator; readonly value: SafeText | ResolvedMultiLineText | SecretFill;
+};
+// An action as a driver performs it: every value reference replaced by its text, and a fill of a
+// secret holding the secret itself. A download goes through its own port.
+export type PerformableAction = Exclude<ResolvedActionStep, { readonly type: typeof StepType.Fill }> | PerformableFill | ResolvedDialogStep;
+
 export interface ActionRunner {
-  // The driver resolves the step's element, asks the guard with it, and acts only on an allow; on
+  // The driver resolves the action's element, asks the guard with it, and acts only on an allow; on
   // a deny it sends no input event and returns policy-denied. A dialog step asks the guard with the
   // open dialog's text.
-  // For a fill whose value is a secret reference, the engine passes the resolved secret; the driver
-  // reveals it only at the moment it types, and never reports it back. The engine replaces value
-  // references before it acts; a driver refuses any step that still holds one with unsupported-step,
-  // with nothing sent, and a download step likewise, which goes through its own port.
-  act(step: ActionStep, guard: ActionGuard, secret?: Secret): Promise<Result<void, DriverError>>;
+  act(action: PerformableAction, guard: ActionGuard): Promise<Result<void, DriverError>>;
 }
 export interface Prober {
-  // The engine replaces a locator's value references with their text before it probes. Given a
-  // DOM read, the driver reads that too, into the probe's `dom`; given null, it reads no DOM value.
-  probe(locator: Locator, read: DomRead | null): Promise<ElementProbe>;
+  // Given a DOM read, the driver reads that too, into the probe's `dom`; given null, it reads no DOM value.
+  probe(locator: ResolvedLocator, read: DomRead | null): Promise<ElementProbe>;
 }
 
 // One run of a page script, as the engine hands it to a driver. The source is one function
@@ -350,7 +358,7 @@ export interface DocumentSession extends PageNavigator, ActionRunner, Prober, Ca
   // download to start within the step timeout and to finish. A click that starts none fails with
   // no-download; a file over maximumBytes is cancelled, its partial bytes deleted, and fails with
   // download-too-large; a popup the click opens fails with unsupported-step.
-  download(step: DownloadStep, maximumBytes: number, guard: ActionGuard): Promise<Result<DownloadedFile, DriverError>>;
+  download(step: ResolvedDownloadStep, maximumBytes: number, guard: ActionGuard): Promise<Result<DownloadedFile, DriverError>>;
   // Runs a page script in this document and gives its result written as JSON text in the page.
   // The text is outside data: the engine decodes it under its own size and depth limits and reads
   // only the declared fields. A throw or a rejection is script-failed, a value JSON cannot write

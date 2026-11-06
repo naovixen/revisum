@@ -12,9 +12,9 @@
 // page map it prints is outside data: the host decodes it with the engine's decodePageMap.
 import { arch, platform } from 'node:os';
 import {
-  crawlSite, decodePageMap, exploreStartOrigin, failure, redactPageMap, run, sha256, success,
-  type ArtifactStore, type Authorised, type BrowserDriver, type Clock, type EventSink, type ExploreDriver, type ExploreOptions,
-  type ImageDigest, type Origin, type PageMap, type PlanStanding, type Project, type Redactor, type Result, type RunEventSink,
+  baseUrlOfOrigin, crawlSite, decodePageMap, exploreStartOrigin, failure, HOST_ISOLATION, redactPageMap, run, sha256, success,
+  type ArtifactStore, type BrowserDriver, type ClearedRun, type Clock, type EventSink, type ExploreDriver, type ExploreOptions,
+  type ImageDigest, type Origin, type PageMap, type Project, type Redactor, type Result, type RunEventSink,
   type Runner, type SecretName, type SecretStore, type Session, type Target,
 } from '@revisum/engine';
 import { buildEgressPolicy } from '@revisum/runner';
@@ -26,12 +26,12 @@ export type CrawlStop =
   | 'explore-origin-refused' | 'explore-start-unreachable' | 'explore-runner-unavailable' | 'target-unavailable' | 'plan-rejected';
 
 // One crawl in a browser session: the project it may go to, the target the session opens, the
-// bounds, the gate-cleared --after plan and its standing, and how text read from pages is redacted.
+// bounds, the gate-cleared --after run, and how text read from pages is redacted.
 export type BrowserCrawl = {
   readonly project: Project;
   readonly target: Target;
   readonly options: ExploreOptions;
-  readonly login?: { readonly plan: Authorised; readonly standing: PlanStanding };
+  readonly login?: ClearedRun;
   readonly redactor: Redactor;
   readonly secrets: SecretStore;
   // Where the --after run's policy denials are recorded.
@@ -79,12 +79,11 @@ export async function crawlInBrowser(browser: BrowserDriver, crawl: BrowserCrawl
   const session = opened.value;
   try {
     if (crawl.login !== undefined) {
-      const loggedIn = await run({
-        plan: crawl.login.plan, project, targetId: target.id, baseUrl: origin, seed: CRAWL_SEED, fixedTimeMilliseconds,
-        fixtures: [], host: { platform: platform(), arch: arch() }, standing: crawl.login.standing,
+      const loggedIn = await run(crawl.login, {
+        baseUrl: baseUrlOfOrigin(origin), seed: CRAWL_SEED, fixedTimeMilliseconds, fixtures: [], host: { platform: platform(), arch: arch() },
       }, {
         drivers: new Map([[target.adapter, sharingDriver(browser, session)]]), clock: systemClock, artifacts: discardingArtifacts,
-        redactor: crawl.redactor, events: discardingRunEvents, audit: crawl.audit, secrets: crawl.secrets,
+        redactor: crawl.redactor, events: discardingRunEvents, audit: crawl.audit, secrets: crawl.secrets, isolation: HOST_ISOLATION,
       });
       if (loggedIn.state !== 'Passed') return failure('plan-rejected');
     }

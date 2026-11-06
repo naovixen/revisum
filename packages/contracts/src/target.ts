@@ -43,6 +43,9 @@ export type Locale = Brand<string, 'Locale'>;
 export type TimeZone = Brand<string, 'TimeZone'>;
 // scheme://host[:port], with no path.
 export type Origin = Brand<string, 'Origin'>;
+// The absolute http or https URL a run's relative paths resolve against, with no user name or
+// password in it. Only the engine's base URL decoder makes one.
+export type BaseUrl = Brand<string, 'BaseUrl'>;
 
 // How close the target is to what a user holds. engine: the browser engine itself;
 // engine-emulated: the engine with a device's viewport and input emulated; emulator and simulator:

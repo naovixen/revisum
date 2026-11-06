@@ -273,7 +273,7 @@ async function runnableProject(ports: DraftCommandPorts): Promise<{ readonly wri
   return project.ok ? { written, project: project.value } : stop('config-invalid', PROJECT_FILE);
 }
 
-type Login = NonNullable<BrowserCrawl['login']> & { readonly text: string };
+type Login = { readonly cleared: NonNullable<BrowserCrawl['login']>; readonly text: string };
 
 // The --after plan, read from the working tree, approved for its exact hash on the protected
 // branch, and cleared by the policy gate for the crawl's target, all before any browser starts.
@@ -294,9 +294,9 @@ function clearedLogin(path: string, project: Project, target: Target, ports: Dra
   const standing = planStanding(parsed.value, ports.approvals ?? NO_APPROVALS);
   if (standing.mode !== 'approved') return stop('after-plan-unapproved', '--after');
   if (!parsed.value.targets.includes(target.id)) return stop('plan-rejected', '--after');
-  const decision = policyGate({ project, events: ports.events }).decide(parsed.value, [target], standing);
+  const decision = policyGate({ project, events: ports.events }).clear(parsed.value, target.id, standing);
   if (decision.kind === 'deny') return stop('plan-rejected', '--after');
-  return { plan: decision.plan, standing, text };
+  return { cleared: decision.run, text };
 }
 
 const crawlStop = (code: CrawlStop): Stop => stop(code, code === 'plan-rejected' ? '--after' : '--explore');
@@ -319,7 +319,7 @@ async function exploreSite(explore: ExploreArguments, prepared: Prepared, ports:
     if (ports.browser === undefined) return stop('internal', '--host');
     const crawled = await crawlInBrowser(ports.browser, {
       project, target, redactor, secrets: ports.secrets, audit: ports.events, options: { ...bounds, placement: 'host' },
-      ...(login === undefined ? {} : { login: { plan: login.plan, standing: login.standing } }),
+      ...(login === undefined ? {} : { login: login.cleared }),
     });
     return crawled.ok ? { map: crawled.value, text: pageMapText(crawled.value), egressEnforced: false } : crawlStop(crawled.error);
   }

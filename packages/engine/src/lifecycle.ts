@@ -49,8 +49,6 @@ type TargetUnavailableRun = Omit<Planned, 'state'> & { readonly state: 'TargetUn
 //     the run was given no command runner.
 //   script-source-missing: the plan names a page script whose source the run was not given, so the
 //     manifest could not record what would run.
-//   clearance-standing-mismatch: the policy gate cleared the plan as a standing other than the one
-//     this run has, so what the plan may do was judged for a different run.
 // And why an evidence run (`run --suite`) was refused before any container started:
 //   evidence-mode-disabled: the trusted project has no evidenceMode section.
 //   suite-not-declared: the evidenceMode section declares no suite of that name.
@@ -61,11 +59,11 @@ type TargetUnavailableRun = Omit<Planned, 'state'> & { readonly state: 'TargetUn
 export type RefusalCode =
   | 'origin-not-allowed' | 'secret-missing' | 'services-unavailable' | 'storage-state-unsupported' | 'database-commands-unavailable'
   | 'evidence-mode-disabled' | 'suite-not-declared' | 'egress-unenforceable' | 'script-source-missing' | 'image-missing' | 'image-digest-mismatch'
-  | 'workload-start-failed' | 'clearance-standing-mismatch' | 'element-check-unsupported';
+  | 'workload-start-failed' | 'element-check-unsupported';
 export type Refusal =
   | { readonly code: Extract<RefusalCode, 'origin-not-allowed'>; readonly origin: string }
   | { readonly code: Extract<RefusalCode, 'secret-missing'>; readonly secretName: SecretName }
-  | { readonly code: Extract<RefusalCode, 'services-unavailable' | 'storage-state-unsupported' | 'database-commands-unavailable' | 'clearance-standing-mismatch' | 'element-check-unsupported'> }
+  | { readonly code: Extract<RefusalCode, 'services-unavailable' | 'storage-state-unsupported' | 'database-commands-unavailable' | 'element-check-unsupported'> }
   // The plan names a page script whose source file the run was not given, by its declared path.
   | { readonly code: Extract<RefusalCode, 'script-source-missing'>; readonly file: string }
   | EvidenceRefusal;

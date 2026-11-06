@@ -9,34 +9,43 @@
 //     or command its declaration keeps out of proposals, and any database command whose service is
 //     on a production origin. Whatever its standing, a plan is held to the features, scripts and
 //     secrets this project declares, not those of the project it was parsed under. Only an allow
-//     decision carries an Authorised plan, the only kind run() accepts.
+//     decision carries a ClearedRun, one per target, the only kind run() accepts: it holds the plan
+//     with this project, the target and the standing it was judged as, so none can be swapped.
 //   - guardAction() is the runtime guard. The driver calls it just before every action, with the
 //     element the locator resolved to and any open dialog's text, so it sees what the plan alone
 //     cannot: the name behind a test id, the form a key press would submit, where a link leads.
 //
 // Both are deterministic and read nothing but their arguments and the project. Each denial appends
 // one plan.denied audit event whose code is the rule, so a denial leaves a record even when
-// nothing ran; a denial the audit sink failed to record is marked unrecorded. An authorisation
-// holds only for the project and the standing it was cleared under: run() refuses it under any other.
-import { literalText } from '@revisum/contracts';
+// nothing ran; a denial the audit sink failed to record is marked unrecorded.
+import { literalText, PolicyVerdictKind } from '@revisum/contracts';
 import type {
-  AllowedUrl, Authorised, CallArgument, DatabaseCommandStep, EventSink, GuardVerdict, Locale, Locator, PageScriptStep, PathTemplate, Plan, PolicyDecision,
-  PolicyRuleId, RemoveStorageStep, ResolvedElement, SecretName, ServiceCallStep, SetStorageStep, Step, StubStep, Target, TargetId,
+  AllowedUrl, Authorised, CallArgument, DatabaseCommandStep, EventSink, GuardVerdict, Locale, Locator, PageScriptStep, PathTemplate, Plan, PlanDenial,
+  PolicyRuleId, RemoveStorageStep, ResolvedElement, SafeText, SecretName, ServiceCallStep, SetStorageStep, Step, StubStep, Target, TargetId,
 } from '@revisum/contracts';
 import { deriveActor, sourceActorId } from '../actor.ts';
 import { ownStanding, type PlanStanding } from '../approval/plan-standing.ts';
-import { canonicalJson, sha256 } from '../hashing.ts';
 import { planHash } from '../manifest.ts';
 import { unsafeFeaturesOf } from '../plan/unsafe-features.ts';
 import type { Limits, Project, ProjectPolicy } from '../project/project-parser.ts';
-import type { TrustedProject } from '../project/trusted-project.ts';
 import { declaredCommands, declaredScripts, enabledUnsafeFeatures } from '../project/unsafe-feature-declarations.ts';
+import { ClearedRun } from './ClearedRun.ts';
 import { everyIrreversiblePattern, isAllowedName, isBlankName, matchesIrreversiblePattern, patternsForLocale } from './irreversible-patterns.ts';
+
+// What the gate decided about a plan for the targets it will run on: on an allow, one cleared run
+// per target id, in the order given, a target the project's matrix does not declare included, so
+// its run says so with TargetUnavailable rather than having no result at all.
+export type PlanClearance = { readonly kind: typeof PolicyVerdictKind.Allow; readonly runs: readonly ClearedRun[] } | PlanDenial;
+// The same, for one target.
+export type RunClearance = { readonly kind: typeof PolicyVerdictKind.Allow; readonly run: ClearedRun } | PlanDenial;
 
 export interface PolicyGate {
   // The static check of a whole plan for the targets it will run on. A missing standing, or one
   // whose approval is for another plan's hash, is a proposal.
-  decide(plan: Plan, targets: readonly Target[], standing?: PlanStanding): PolicyDecision;
+  // Each target is judged as the project's matrix declares it, by its id.
+  decide(plan: Plan, targetIds: readonly TargetId[], standing?: PlanStanding): PlanClearance;
+  // decide() for a plan that runs on one target.
+  clear(plan: Plan, targetId: TargetId, standing?: PlanStanding): RunClearance;
   // The runtime check of one action. A step that acts on no element, such as a dialog step,
   // passes an element with every field null.
   guardAction(step: Step, stepIndex: number, element: ResolvedElement, dialogText: string | null, locale: Locale): GuardVerdict;
@@ -44,7 +53,7 @@ export interface PolicyGate {
 
 export type PolicyGateOptions = {
   // The person-written project whose origins, limits and policy the gate applies.
-  readonly project: Project | TrustedProject;
+  readonly project: Project;
   readonly events: EventSink;
 };
 
@@ -67,46 +76,8 @@ const MAXIMUM_DECODING_ROUNDS = 5;
 const RUN_OF_ESCAPES = /(?:%[0-9a-f]{2})+/giu;
 const UTF8 = new TextDecoder();
 
-// Every plan the gate authorised, with each project, target and standing it authorised it for, so
-// run() can refuse a plan that was only cast to Authorised, or that was cleared under another
-// project's allowances or as a standing it no longer has. A WeakMap holds no plan alive and cannot
-// be listed.
-const AUTHORISED_CLEARANCES = new WeakMap<object, Set<string>>();
-
-// What a project allows, as one hash over everything the gate reads from it. Where the project was
-// read from (its provenance) allows nothing, so it is left out, and the same project file gives
-// the same hash whether it was parsed or loaded from the protected branch.
-function projectFingerprint(project: Project | TrustedProject): string {
-  const allowances = Object.fromEntries(Object.entries(project).filter(([key]) => key !== 'provenance'));
-  return sha256(canonicalJson(allowances));
-}
-
-const clearance = (projectHash: string, targetId: string, mode: PlanStanding['mode']): string => `${projectHash}:${targetId}:${mode}`;
-
-// The one place a plan becomes Authorised: after decide() found nothing to deny.
-function authorised(plan: Plan, targets: readonly Target[], projectHash: string, mode: PlanStanding['mode']): Authorised {
-  const known = AUTHORISED_CLEARANCES.get(plan) ?? new Set<string>();
-  for (const target of targets) known.add(clearance(projectHash, target.id, mode));
-  AUTHORISED_CLEARANCES.set(plan, known);
-  return plan as Authorised;
-}
-
-// The run-time half of the Authorised brand: run() calls this before acting on a plan for a
-// target, so a plan the gate never cleared for that target, under exactly this project, is
-// refused, whatever its type says. A plan cleared where "Delete account" is allowed cannot then
-// run under a project that does not allow it.
-export function assertAuthorised(plan: unknown, targetId: TargetId, project: Project | TrustedProject): asserts plan is Authorised {
-  const known = typeof plan === 'object' && plan !== null ? AUTHORISED_CLEARANCES.get(plan) : undefined;
-  const projectHash = projectFingerprint(project);
-  if (known === undefined || !(known.has(clearance(projectHash, targetId, 'approved')) || known.has(clearance(projectHash, targetId, 'proposal')))) {
-    throw new TypeError('refused a plan that the policy gate did not authorise for this target under this project');
-  }
-}
-
-// True when the gate cleared this plan as this standing. A clearance as approved judged the plan's
-// writes, inline scripts and barred stubs as allowed, which holds for no other standing.
-export const isClearedForStanding = (plan: Authorised, targetId: TargetId, project: Project | TrustedProject, standing: PlanStanding): boolean =>
-  AUTHORISED_CLEARANCES.get(plan)?.has(clearance(projectFingerprint(project), targetId, standing.mode)) === true;
+// A plan is Authorised only here, as decide() clears it into its runs.
+const authorised = (plan: Plan): Authorised => plan as Authorised;
 
 // ---- Shared rules -------------------------------------------------------------------------------
 
@@ -188,8 +159,21 @@ const isBlank = (text: string | null): boolean => text === null || isBlankName(t
 // The accessible name a locator asks for, when the plan itself says it. A test id names no text,
 // and a value reference has none until the run; the runtime guard then sees the element's name.
 function locatorName(locator: Locator): string | null {
-  const name = locator.by === 'role' ? locator.name : locator.by === 'label' ? locator.label : locator.by === 'text' ? locator.text : null;
-  return name === null ? null : literalText(name) ?? null;
+  switch (locator.by) {
+    case 'role': return literalText(locator.name) ?? null;
+    case 'label': return literalText(locator.label) ?? null;
+    case 'text': return literalText(locator.text) ?? null;
+    case 'testId': case 'css': case 'xpath': return null;
+  }
+}
+
+// The selector or expression of a css or XPath locator; undefined for any other.
+function structuralQuery(locator: Locator): SafeText | undefined {
+  switch (locator.by) {
+    case 'css': return locator.selector;
+    case 'xpath': return locator.expression;
+    case 'role': case 'label': case 'text': case 'testId': return undefined;
+  }
 }
 
 // The part of a path template the plan fixes: its literal segments up to the first value. A
@@ -285,7 +269,7 @@ function scriptRule(step: PageScriptStep, context: StaticContext): PolicyRuleId 
 }
 
 type StaticContext = {
-  readonly project: Project | TrustedProject;
+  readonly project: Project;
   readonly patterns: readonly string[];
   readonly productionAllowed: boolean;
   // False for a proposal: a plan with no approval.
@@ -354,7 +338,7 @@ function secretNamesOf(plan: Plan): readonly SecretName[] {
 
 // The parser judged these against the project it was given, which may not be the one clearing the
 // plan. Plan-wide, before any step, so no standing can skip them.
-function undeclaredUseRule(plan: Plan, project: Project | TrustedProject): PolicyRuleId | null {
+function undeclaredUseRule(plan: Plan, project: Project): PolicyRuleId | null {
   const enabled = enabledUnsafeFeatures(project.unsafeFeatures);
   if (unsafeFeaturesOf(plan).some((feature) => !enabled.includes(feature))) {
     return 'unsafe-feature-disabled';
@@ -362,7 +346,7 @@ function undeclaredUseRule(plan: Plan, project: Project | TrustedProject): Polic
   return secretNamesOf(plan).some((name) => !project.secretNames.includes(name)) ? 'undeclared-secret' : null;
 }
 
-function staticDenial(plan: Plan, targets: readonly Target[], standing: PlanStanding, project: Project | TrustedProject): Denial | null {
+function staticDenial(plan: Plan, targets: readonly Target[], standing: PlanStanding, project: Project): Denial | null {
   if (isOverLimit(plan, project.limits)) return { rule: 'over-limit', stepIndex: null };
   const undeclaredUse = undeclaredUseRule(plan, project);
   if (undeclaredUse !== null) {
@@ -395,10 +379,10 @@ function staticDenial(plan: Plan, targets: readonly Target[], standing: PlanStan
 // A control with no accessible name could be anything, so it is acted on only when the project
 // allows it by test id, either the one the locator used or the element's own, or, for a css or
 // XPath locator, by that exact selector or expression in its unsafe features' list.
-function isAllowedUnnamed(locator: Locator, element: ResolvedElement, project: Project | TrustedProject): boolean {
+function isAllowedUnnamed(locator: Locator, element: ResolvedElement, project: Project): boolean {
   const allowed = project.policy.unnamedControlsAllowedByTestId;
   const testId = locator.by === 'testId' ? literalText(locator.testId) : undefined;
-  const structural = locator.by === 'css' ? locator.selector : locator.by === 'xpath' ? locator.expression : undefined;
+  const structural = structuralQuery(locator);
   return (testId !== undefined && allowed.includes(testId))
     || (element.testId !== undefined && allowed.some((testId) => testId === element.testId))
     || (structural !== undefined && (project.unsafeFeatures?.unnamedControlsAllowed ?? []).includes(structural));
@@ -411,7 +395,7 @@ function linkRule(element: ResolvedElement, policy: ProjectPolicy): PolicyRuleId
 }
 
 function runtimeRule(
-  step: Step, element: ResolvedElement, dialogText: string | null, patterns: readonly string[], project: Project | TrustedProject,
+  step: Step, element: ResolvedElement, dialogText: string | null, patterns: readonly string[], project: Project,
 ): PolicyRuleId | null {
   const policy = project.policy;
   const irreversible = (text: string | null): boolean => text !== null && isIrreversibleName(text, patterns, policy);
@@ -458,20 +442,33 @@ function runtimeRule(
 // the lost record show in the outcome instead of passing silently.
 const UNRECORDED = { unrecorded: true } as const;
 
+// A plan the static check found nothing to deny in, with the standing it was judged as.
+type Judged = { readonly kind: typeof PolicyVerdictKind.Allow; readonly plan: Authorised; readonly standing: PlanStanding };
+
 export function policyGate(options: PolicyGateOptions): PolicyGate {
   const { project, events } = options;
-  const projectHash = projectFingerprint(project);
   // True when the audit sink accepted the denial's event.
   const record = (rule: PolicyRuleId, plan?: Plan): boolean =>
     events.append({ kind: 'plan.denied', code: rule, ...(plan === undefined ? {} : { subjectHash: planHash(plan) }) }, POLICY_GATE_ACTOR).ok;
+  // The plan as cleared with the standing it was judged as, or the gate's denial, recorded.
+  const judge = (plan: Plan, targetIds: readonly TargetId[], standing: PlanStanding | undefined): Judged | PlanDenial => {
+    const targets = targetIds.flatMap((id) => project.matrix.filter((target) => target.id === id));
+    // A standing made for another plan is no standing: the plan is judged as a proposal.
+    const judged = ownStanding(plan, standing);
+    const denial = staticDenial(plan, targets, judged, project);
+    if (denial === null) return { kind: PolicyVerdictKind.Allow, plan: authorised(plan), standing: judged };
+    const recorded = record(denial.rule, plan);
+    return { kind: PolicyVerdictKind.Deny, rule: denial.rule, stepIndex: denial.stepIndex, ...(recorded ? {} : UNRECORDED) };
+  };
+  const runOn = (judged: Judged, targetId: TargetId): ClearedRun => new ClearedRun({ plan: judged.plan, project, targetId, standing: judged.standing });
   return {
-    decide(plan, targets, standing) {
-      // A standing made for another plan is no standing: the plan is judged as a proposal.
-      const judged = ownStanding(plan, standing);
-      const denial = staticDenial(plan, targets, judged, project);
-      if (denial === null) return { kind: 'allow', plan: authorised(plan, targets, projectHash, judged.mode) };
-      const recorded = record(denial.rule, plan);
-      return { kind: 'deny', rule: denial.rule, stepIndex: denial.stepIndex, ...(recorded ? {} : UNRECORDED) };
+    decide(plan, targetIds, standing) {
+      const judged = judge(plan, targetIds, standing);
+      return judged.kind === PolicyVerdictKind.Deny ? judged : { kind: PolicyVerdictKind.Allow, runs: targetIds.map((targetId) => runOn(judged, targetId)) };
+    },
+    clear(plan, targetId, standing) {
+      const judged = judge(plan, [targetId], standing);
+      return judged.kind === PolicyVerdictKind.Deny ? judged : { kind: PolicyVerdictKind.Allow, run: runOn(judged, targetId) };
     },
     guardAction(step, stepIndex, element, dialogText, locale) {
       const patterns = patternsForLocale(locale, project.policy.irreversiblePatterns);

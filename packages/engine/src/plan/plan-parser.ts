@@ -35,7 +35,6 @@ import { clockAdvanceMilliseconds } from '../clock-advance.ts';
 import { normalise } from '../oracle.ts';
 import { readFieldPointers } from '../project/call-declarations.ts';
 import { readId, type Limits, type Project } from '../project/project-parser.ts';
-import type { TrustedProject } from '../project/trusted-project.ts';
 import { declaredCommands, declaredScripts, enabledUnsafeFeatures } from '../project/unsafe-feature-declarations.ts';
 import {
   INVALID, allValid, isOneOf, isUnsafeSource, peekRecord, readInteger, readList, readOneOf, readRecord, readText,
@@ -99,7 +98,7 @@ type ParseContext = {
   readonly clockAdvance: { milliseconds: number; limitPassed: boolean };
 };
 
-const rulesOf = (project: Project | TrustedProject): PlanRules => ({
+const rulesOf = (project: Project): PlanRules => ({
   origins: project.origins, targetIds: project.matrix.map((target) => target.id),
   secretNames: project.secretNames, fixtures: project.fixtures, limits: project.limits,
   testIdAttributes: project.testIdAttributes, emailDomains: project.generatedEmailDomains, calls: project.calls,
@@ -1427,7 +1426,7 @@ function deepFreeze<Value>(value: Value): Value {
 
 // Builds the parser for one trusted project.
 // A project read by the project parser, or the trusted project read from the protected branch.
-export function planParser(project: Project | TrustedProject): (input: unknown) => Result<Plan, readonly PlanError[]> {
+export function planParser(project: Project): (input: unknown) => Result<Plan, readonly PlanError[]> {
   const rules = rulesOf(project);
   return function parsePlan(input) {
     const read = readPlanData(input, rules);

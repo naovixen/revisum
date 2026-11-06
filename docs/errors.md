@@ -679,10 +679,6 @@ Run refusal. The plan has a `database` or `expectDatabase` step, or a `database`
 
 Run refusal. The plan names a page script whose source file the run was not given, so the manifest could not record the sha256 of what would run. The run ends `Refused` before any browser opens. The refusal names the declared file, never its content. Run it where the protected branch's `plans/scripts/` files are supplied.
 
-## clearance-standing-mismatch
-
-Run refusal. The policy gate cleared the plan as approved and the run has no approval of it, or the other way round. What a plan may do depends on its standing, so a clearance holds only for the standing it was decided under; a standing lent from another plan counts as none. The run ends `Refused` before any browser opens. Decide and run with the same standing.
-
 ## evidence-mode-disabled
 
 Run refusal. `run --suite` was asked for, but the trusted project file has no `evidenceMode` section, so no suite may run and no container starts. Evidence mode is turned on only in `project.json` on the protected branch: a change that adds the section runs without it until the change is approved and merged.

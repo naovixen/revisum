@@ -7,15 +7,16 @@
 // through its clock and clipboard ports; page scripts through its script port. Database commands
 // go through the run's DatabaseCommandRunner port, which runs each in a workload container.
 import {
-  failure, isElementCheckNoDriverDecides, isOneElementRead, NavigateScripts, oneElementOf, PageReadFailureCode, stepFailed, StepCode, success, UnreadablePage,
-  type A11yFinding, type ActionGuard, type AppliedRewrite, type ApprovalLabel, type ArtifactReference, type ArtifactStore, type Authorised,
+  failure, isOneElementRead, NavigateScripts, oneElementOf, PageReadFailureCode, stepFailed, StepCode, success, UnreadablePage,
+  type A11yFinding, type ActionGuard, type AppliedRewrite, type ApprovalLabel, type ArtifactReference, type ArtifactStore, type BaseUrl,
   type BrowserDriver, type Clock, type DatabaseCommandRunner, type DocumentSession, type DomRead, type DownloadedFile, type DownloadName, type DriverError, type DriverErrorCode, type OneElementRead, type PageReadFailure, type RememberedElementSource, type LockEntry, type DialogStep, type ElementProbe,
-  type EventSink, type GuaranteeLevel, type GuardVerdict, type PageAssertion, type Plan, type PolicyRuleId, type Redactor,
-  type DownloadStep, type StepOutcome, type ResolvedElement, type ResolvedLocator, type Result, type SafeText, type SecretStore, type ServiceCaller, type Session, type Step, type Target, type TargetId,
+  type EventSink, type GuardVerdict, type PageAssertion, type PerformableAction, type PerformableFill, type Plan, type PolicyRuleId, type Redactor, type ResolvedActionStep,
+  type ResolvedDialogStep, type ResolvedDownloadStep,
+  type DownloadStep, type StepOutcome, type ResolvedElement, type ResolvedLocator, type Result, type RunIsolation, type SafeText, type SecretStore, type ServiceCaller, type Session, type Step, type Target,
   type Unavailable, type ValueName, type GuaranteeStatement, type RunMode, type SuiteFinding, type SuiteName, type SuitePass,
   type StubAnswer, type StubName, type SuiteTestId, type SuiteTestResult, type UnsafeFeature,
 } from '@revisum/contracts';
-import { approvalLabel, ownStanding, type PlanStanding } from './approval/plan-standing.ts';
+import { approvalLabel, type PlanStanding } from './approval/plan-standing.ts';
 import { totalClockAdvanceMilliseconds } from './clock-advance.ts';
 import {
   COMMAND_ERROR_CODES, runDatabaseCheck, runDatabaseStep, type DatabaseCommandContext, type DatabaseCommandRecord,
@@ -39,9 +40,13 @@ import { runEvaluate, runScriptCheck, type PageScriptContext, type PageScriptRec
 import type { SuiteDecodeError } from './evidence/suite-report.ts';
 import type { PlanError } from './plan/plan-decoders.ts';
 import { ASSERTION_STEP_TYPES } from './plan/plan-grammar.ts';
-import { assertBranded, everyPlanStep } from './plan/plan-parser.ts';
+import { assertBranded } from './plan/plan-parser.ts';
 import { unsafeFeaturesOf } from './plan/unsafe-features.ts';
-import { assertAuthorised, isClearedForStanding, policyGate, type PolicyGate } from './policy/policy-gate.ts';
+import { assertCleared, type ClearedRun } from './policy/ClearedRun.ts';
+import { policyGate, type PolicyGate } from './policy/policy-gate.ts';
+import { findPreflightRefusal } from './FindPreflightRefusal.ts';
+import { callsServices, runsDatabaseCommands } from './plan/CallsServices.ts';
+import { reachableOrigins } from './ReachableOrigins.ts';
 import type { Project } from './project/project-parser.ts';
 import { declaredCommands } from './project/unsafe-feature-declarations.ts';
 import { SENSITIVE_PLACEHOLDER } from './redaction.ts';
@@ -61,21 +66,14 @@ import {
   NO_ANSWER_CODES, runBackendCheck, runCallStep, runCleanup, type CallStepContext, type CleanupResult, type ServiceCallRecord,
 } from './service-calls/call-steps.ts';
 
+// How a cleared run is to be run. What it runs, under which project, on which target and as which
+// standing are the ClearedRun's alone.
 export type RunInputs = {
-  // Only the policy gate makes an Authorised plan, so a plan it has not cleared does not type-check.
-  readonly plan: Authorised;
-  readonly project: Project;
-  readonly targetId: TargetId;
-  readonly baseUrl: string;
+  readonly baseUrl: BaseUrl;
   readonly seed: number;
   readonly fixedTimeMilliseconds: number;
   readonly fixtures: readonly FixtureReference[];
   readonly host: HostInfo;
-  // The plan's standing (planStanding). Absent means no approval was supplied, so the run is a
-  // proposal: it never reaches the project's production origins. An approved plan reaches them
-  // only when the project's policy allows production for approved plans. A standing whose
-  // approval is for another plan's hash is ignored: the run is a proposal.
-  readonly standing?: PlanStanding;
   // The sources of the page scripts the project declares, keyed by each declared file path, as the
   // protected branch holds them. The manifest records the sha256 of each one the plan names, so a
   // plan that names a script whose source is not here is refused before any side effect.
@@ -88,11 +86,6 @@ export type RunInputs = {
   // hashes of the redactor, rule set, baselines and fonts, the run image and the commit. Given, the
   // manifest records each, with the project's hash and limits; absent, it records none of them.
   readonly pins?: RunPins;
-  // How strongly the run is isolated, set by whoever started it from Runner.guaranteeLevel(). Only
-  // 'isolated' makes the result state that egress was enforced; absent means 'host', so no run can
-  // claim isolation by leaving it out. The manifest does not record it, so a replay of an isolated
-  // run must be given it too, or its result hash differs and the replay is a mismatch.
-  readonly guaranteeLevel?: GuaranteeLevel;
 };
 
 export type RunPorts = {
@@ -104,6 +97,11 @@ export type RunPorts = {
   // The audit sink that policy denials are appended to. Required, so no run can deny a plan
   // without a record; a denial the sink fails to record is marked unrecorded in the outcome.
   readonly audit: EventSink;
+  // How strongly the run is isolated, read as the result is sealed: an isolated runner's handle, or
+  // one that always says host. Only 'isolated' makes the result state that egress was enforced. The
+  // manifest does not record it, so a replay of an isolated run must be given an isolated one too,
+  // or its result hash differs and the replay is a mismatch.
+  readonly isolation: RunIsolation;
   // Where the secrets the plan names are resolved, such as environmentSecretStore(process.env).
   // Without one, every secret reference is missing and such a plan is refused.
   readonly secrets?: SecretStore;
@@ -256,6 +254,7 @@ export type Rejected = { readonly state: 'Rejected'; readonly errors: readonly P
 export type DeniedPlan = { readonly state: 'Denied'; readonly rule: PolicyRuleId; readonly stepIndex: number | null; readonly unrecorded?: true };
 
 type RunContext = {
+  readonly cleared: ClearedRun;
   readonly inputs: RunInputs;
   readonly ports: RunPorts;
   readonly logger: Logger;
@@ -306,87 +305,64 @@ const POLL_INTERVAL_MILLISECONDS = 50;
 // Longer than a driver's stop takes to give up by itself, so this deadline is only for what has wedged.
 const LONGEST_SESSION_CLOSE_MILLISECONDS = 60_000;
 
-export async function run(given: RunInputs, ports: RunPorts): Promise<RunResult> {
-  // First, before any side effect: a plan the parser did not make is refused, whatever its type says.
-  assertBranded(given.plan);
-  // A standing lent from another plan is dropped here, so production, the origin allow-list and
-  // the approval label all see the plan as the proposal it is.
-  const standing = ownStanding(given.plan, given.standing);
-  const inputs: RunInputs = { ...given, standing };
+export async function run(cleared: ClearedRun, inputs: RunInputs, ports: RunPorts): Promise<RunResult> {
+  // First, before any side effect: a run the gate did not clear, or a plan the parser did not make,
+  // is refused, whatever its type says.
+  assertCleared(cleared);
+  assertBranded(cleared.plan);
+  const { plan, project } = cleared;
   const startedAt = ports.clock.now();
-  const target = inputs.project.matrix.find((candidate) => candidate.id === inputs.targetId);
-  const declared = target !== undefined && inputs.plan.targets.includes(inputs.targetId);
-  const runId = sha256(`${sha256(canonicalJson(inputs.plan))}:${inputs.targetId}:${inputs.seed}`).slice(0, 16);
+  const target = project.matrix.find((candidate) => candidate.id === cleared.targetId);
+  const declared = target !== undefined && plan.targets.includes(cleared.targetId);
+  const runId = sha256(`${sha256(canonicalJson(plan))}:${cleared.targetId}:${inputs.seed}`).slice(0, 16);
   // Resolving reads only the store, so it can come first: the run's redactor needs the secrets
   // before anything is logged. A missing secret refuses the run below, before any driver call.
   // A command's secrets are needed only by a run that can run commands.
-  const commandDeclarations = ports.databaseCommands === undefined ? {} : declaredCommands(inputs.project.unsafeFeatures);
-  const resolution = resolvePlanSecrets(inputs.plan, ports.secrets, inputs.project.calls, commandDeclarations);
+  const commandDeclarations = ports.databaseCommands === undefined ? {} : declaredCommands(project.unsafeFeatures);
+  const resolution = resolvePlanSecrets(plan, ports.secrets, project.calls, commandDeclarations);
   const secrets = resolution.ok ? resolution.value : NO_SECRETS;
   const redactor = withSecretRedaction(ports.redactor, secrets);
   const logger = manifestLogger(ports.events, redactor, runId);
-  const gate = policyGate({ project: inputs.project, events: ports.audit });
+  const gate = policyGate({ project, events: ports.audit });
   // Generation is pure, so values exist before anything runs; a run with no target has none.
   const values = new Map<ValueName, SafeText>(target === undefined
-    ? [] : generateRunValues(inputs.plan, inputs.seed, inputs.fixedTimeMilliseconds, target, inputs.project));
+    ? [] : generateRunValues(plan, inputs.seed, inputs.fixedTimeMilliseconds, target, project));
   const isShortSecret = shortSecretObservation(secrets);
   const withoutSecrets = secretEchoRemoval(secrets);
   const rememberedTexts = new Set<string>();
   const holdsSecret = (text: string): boolean => isShortSecret(text) || withoutSecrets(text) !== text;
   const remembered = rememberedValues({
     values, rememberedTexts, hasSecret: holdsSecret,
-    maximumTextLength: inputs.project.limits.maximumTextLength, logger,
+    maximumTextLength: project.limits.maximumTextLength, logger,
   });
   const calls: CallStepContext | undefined = ports.services === undefined ? undefined : {
-    caller: ports.services, project: inputs.project, values, remembered, secrets: resolvedSecretStore(secrets), clock: ports.clock, logger, holdsSecret,
+    caller: ports.services, project, values, remembered, secrets: resolvedSecretStore(secrets), clock: ports.clock, logger, holdsSecret,
   };
   const commands: DatabaseCommandContext | undefined = ports.databaseCommands === undefined ? undefined : {
-    runner: ports.databaseCommands, project: inputs.project, values, remembered, secrets: commandSecretStore(secrets), clock: ports.clock, logger, holdsSecret,
+    runner: ports.databaseCommands, project, values, remembered, secrets: commandSecretStore(secrets), clock: ports.clock, logger, holdsSecret,
   };
   const context: RunContext = {
-    inputs, ports, logger, gate, denials: [], redactor, secrets, isShortSecret, withoutSecrets, holdsSecret, secretFilledFields: new Map(), values, remembered, calls,
+    cleared, inputs, ports, logger, gate, denials: [], redactor, secrets, isShortSecret, withoutSecrets, holdsSecret, secretFilledFields: new Map(), values, remembered, calls,
     commands, rememberedTexts, downloads: new Map(), activeStubs: new Set(), setupFailedInside: new Set(),
     determinismUnpinned: target !== undefined && cannotPinDeterminism(ports.drivers, target),
   };
 
   if (target === undefined || !declared) {
-    return unavailableResult(inputs.targetId, { reason: 'not-declared', detail: 'target is not in both the plan and the matrix' }, context, startedAt);
+    return unavailableResult(cleared.targetId, { reason: 'not-declared', detail: 'target is not in both the plan and the matrix' }, context, startedAt);
   }
-  // Before any side effect on the target: a plan the gate did not clear for it, under this very
-  // project, is refused.
-  assertAuthorised(inputs.plan, target.id, inputs.project);
-  const planned = lifecycle.plan(inputs.plan, target);
+  const planned = lifecycle.plan(plan, target);
   // A log that fails this early ends the run Errored like one that fails later, once there are steps
   // to account for. It must not reject the run, and a refusal below still stands.
   const isPlanLogged = logKeepingTheResult({ kind: 'run.state', state: planned.state, targetId: target.id }, logger);
 
-  if (!isClearedForStanding(inputs.plan, target.id, inputs.project, standing)) {
-    return refuseRun(planned, { code: 'clearance-standing-mismatch' }, context, startedAt);
+  const scriptSources = inputs.scriptSources ?? {};
+  const refusal = findPreflightRefusal({
+    cleared, baseUrl: inputs.baseUrl, secrets: resolution, scriptSources, hasServiceCaller: calls !== undefined, hasCommandRunner: commands !== undefined,
+  });
+  if (refusal !== undefined) {
+    return refuseRun(planned, refusal, context, startedAt);
   }
-
-  // Refused before any driver call if the run would reach a production origin it may not.
-  const productionOrigin = productionAllowed(inputs) ? undefined : productionOriginReached(inputs);
-  if (productionOrigin !== undefined) {
-    return refuseRun(planned, { code: 'origin-not-allowed', origin: productionOrigin }, context, startedAt, { origin: productionOrigin });
-  }
-
-  if (!resolution.ok) {
-    return refuseRun(planned, { code: 'secret-missing', secretName: resolution.error }, context, startedAt, {
-      detail: `the secret store has no secret named ${resolution.error}`,
-    });
-  }
-
-  // Refused before any side effect when the plan names a page script whose source the run was not
-  // given: the manifest could not record what would run.
-  const unsafe = unsafeFeatureRecord(inputs.plan, inputs.project, inputs.scriptSources ?? {});
-  if (!unsafe.ok) {
-    return refuseRun(planned, { code: 'script-source-missing', file: unsafe.error }, context, startedAt);
-  }
-
-  const beyondThisRun = refusalOfWhatThisRunCannotDo(inputs.plan, context);
-  if (beyondThisRun !== undefined) {
-    return refuseRun(planned, beyondThisRun, context, startedAt);
-  }
+  const unsafe = unsafeFeatureRecord(plan, project, scriptSources);
 
   const opened = await openSession(planned, context);
   if (!opened.ok) {
@@ -395,17 +371,17 @@ export async function run(given: RunInputs, ports: RunPorts): Promise<RunResult>
   }
   const { session, driver, executableSha256 } = opened.value;
   // A database command's output, and the database it ran against, cannot be pinned.
-  const unpinned = [...opened.value.unpinned, ...(runsDatabaseCommands(inputs.plan) ? [DATABASE_COMMANDS_INPUT] : [])];
+  const unpinned = [...opened.value.unpinned, ...(runsDatabaseCommands(plan) ? [DATABASE_COMMANDS_INPUT] : [])];
   const stepContext: StepContext = { ...context, session };
   const manifestInputs: Parameters<typeof buildManifest>[0] = {
-    plan: inputs.plan, target, adapter: driver.info, browser: session.browser,
+    plan, target, adapter: driver.info, browser: session.browser,
     seed: inputs.seed, fixedTimeMilliseconds: inputs.fixedTimeMilliseconds, fixtures: inputs.fixtures, host: inputs.host,
-    ...secretRecords(secrets), callsServices: callsServices(inputs.plan),
-    ...(unsafe.value === undefined ? {} : { unsafe: unsafe.value }),
+    ...secretRecords(secrets), callsServices: callsServices(plan),
+    ...(unsafe === undefined ? {} : { unsafe }),
     ...(unpinned.length === 0 ? {} : { unpinned }),
     ...(executableSha256 === undefined ? {} : { executableSha256 }),
-    ...(inputs.pins === undefined ? {} : { pins: { pins: inputs.pins, project: inputs.project } }),
-    recordsReplies: inputs.project.replay?.recordReplies === true,
+    ...(inputs.pins === undefined ? {} : { pins: { pins: inputs.pins, project } }),
+    recordsReplies: project.replay?.recordReplies === true,
   };
   const manifestBeforeTheSteps = buildManifest(manifestInputs);
   const resolved = lifecycle.resolve(planned, session, manifestBeforeTheSteps, manifestHash(manifestBeforeTheSteps));
@@ -423,14 +399,14 @@ export async function run(given: RunInputs, ports: RunPorts): Promise<RunResult>
     logger.log({ kind: 'run.state', state: resolved.state, targetId: target.id, adapter: driver.info.id, sha256: resolved.manifestHash });
     logger.log({ kind: 'run.state', state: running.state, targetId: target.id });
     const notObserved = await failureToObserveRequests(session, stepContext);
-    for (const [index, step] of inputs.plan.steps.entries()) {
+    for (const [index, step] of plan.steps.entries()) {
       if (steps.some((done) => done.outcome === 'failed')) { steps.push({ index, type: step.type, outcome: 'skipped' }); continue; }
       const stepStartedAt = ports.clock.now();
       logger.log({ kind: 'step.start', stepIndex: index, stepType: step.type });
       // The first step stands for what could not be started, so the result says why nothing ran.
       const done = index === 0 && notObserved !== undefined ? failedStep(step, index, notObserved) : await runStep(step, index, session, target, stepContext);
       // With no later step to notice, a crash the last step did not report would go unseen.
-      const isLastStep = index === inputs.plan.steps.length - 1;
+      const isLastStep = index === plan.steps.length - 1;
       const result = isLastStep && done.outcome === 'passed' && session.crashed() ? failedStep(step, index, TARGET_CRASHED) : done;
       stepMilliseconds.push(ports.clock.now() - stepStartedAt);
       steps.push(result);
@@ -456,7 +432,7 @@ export async function run(given: RunInputs, ports: RunPorts): Promise<RunResult>
   } catch {
     // A step's own failures never get here, so only the log or the clock can have failed. The result
     // still accounts for every step.
-    const [unfinished, ...unreached] = inputs.plan.steps.slice(steps.length);
+    const [unfinished, ...unreached] = plan.steps.slice(steps.length);
     if (unfinished !== undefined) {
       steps.push(failedStep(unfinished, steps.length, ADAPTER_ERROR));
     }
@@ -485,7 +461,7 @@ export async function run(given: RunInputs, ports: RunPorts): Promise<RunResult>
     finished = lifecycle.finish(running, 'Errored');
   }
   // Whatever the outcome. A failing cleanup step never changes the verdict; it raises a review item.
-  const cleanup = inputs.plan.cleanup === undefined ? undefined : await runCleanup(inputs.plan.cleanup, inputs.plan.steps.length, calls, commands);
+  const cleanup = plan.cleanup === undefined ? undefined : await runCleanup(plan.cleanup, plan.steps.length, calls, commands);
   const cleanupItems = (cleanup ?? []).flatMap((done): RunReviewItem[] => (done.outcome === 'failed' ? [{ code: 'cleanup-failed', cleanupIndex: done.index }] : []));
   const blockedRead = readBlockedOrigins(session);
   if (!blockedRead.ok) {
@@ -518,30 +494,29 @@ export async function run(given: RunInputs, ports: RunPorts): Promise<RunResult>
 
 // The only entry point for untrusted input, such as a plan an AI proposed. Parsing happens first,
 // then the policy gate's static check against the project, for the plan's declared targets and
-// standing; on any error or denial no driver method is called.
+// standing; on any error or denial no driver method is called. A missing standing, or one whose
+// approval is for another plan's hash, is a proposal: it never reaches the project's production
+// origins.
 export async function runUntrusted(
   input: unknown,
   parsePlan: (input: unknown) => Result<Plan, readonly PlanError[]>,
-  base: Omit<RunInputs, 'plan' | 'targetId'>,
+  base: RunInputs & { readonly project: Project; readonly standing?: PlanStanding },
   ports: RunPorts,
 ): Promise<Rejected | DeniedPlan | readonly RunResult[]> {
   const parsed = parsePlan(input);
   if (!parsed.ok) return { state: 'Rejected', errors: parsed.error };
-  const gate = policyGate({ project: base.project, events: ports.audit });
-  const targets = base.project.matrix.filter((target) => parsed.value.targets.includes(target.id));
-  const decision = gate.decide(parsed.value, targets, base.standing);
+  const { project, standing, ...inputs } = base;
+  const gate = policyGate({ project, events: ports.audit });
+  // One run per target the plan names, in its order: one the matrix does not declare ends
+  // TargetUnavailable with not-declared.
+  const decision = gate.decide(parsed.value, parsed.value.targets, standing);
   if (decision.kind === 'deny') {
     return { state: 'Denied', rule: decision.rule, stepIndex: decision.stepIndex, ...(decision.unrecorded ? { unrecorded: true } : {}) };
   }
   const results: RunResult[] = [];
-  for (const targetId of decision.plan.targets) results.push(await run({ ...base, plan: decision.plan, targetId }, ports));
+  for (const cleared of decision.runs) results.push(await run(cleared, inputs, ports));
   return results;
 }
-
-// Production is closed to every run unless the plan is approved and the project's policy allows
-// production for approved plans.
-const productionAllowed = (inputs: RunInputs): boolean =>
-  inputs.standing?.mode === 'approved' && inputs.project.policy.allowProductionForApprovedPlans;
 
 // The steps that set up or reach what the test needs: when one fails, the run could not test.
 const SETUP_STEP_TYPES: readonly Step['type'][] = ['call', 'evaluate', 'database'];
@@ -560,81 +535,20 @@ const UNUSABLE_RESULT_CODES: readonly string[] = [
 const couldNotTest = (done: StepResult, context: RunContext): boolean =>
   done.outcome === 'failed' && (SETUP_STEP_TYPES.includes(done.type) || UNUSABLE_RESULT_CODES.includes(done.code ?? '') || context.setupFailedInside.has(done.index));
 
-// True when the plan calls a declared service, anywhere in it.
-const callsServices = (plan: Plan): boolean => everyPlanStep(plan).some((step) => step.type === 'call' || step.type === 'expectBackend');
-
-// True when the plan runs a database command, anywhere in it.
-const runsDatabaseCommands = (plan: Plan): boolean => everyPlanStep(plan).some((step) => step.type === 'database' || step.type === 'expectDatabase');
-
-// Why this run could not do all the plan asks, known from the plan and the run's ports alone, so
-// nothing has acted yet. A plan that needs one of these relies on it to mean anything: stopping
-// part way would leave test data behind or report on a run that never had what it declared.
-function refusalOfWhatThisRunCannotDo(plan: Plan, context: RunContext): lifecycle.Refusal | undefined {
-  if (callsServices(plan) && context.calls === undefined) {
-    return { code: 'services-unavailable' };
+// What the event log says of a refusal beyond its code.
+function loggedWithRefusal(refusal: lifecycle.Refusal): { readonly origin?: string; readonly detail?: string } {
+  switch (refusal.code) {
+    case 'origin-not-allowed': return { origin: refusal.origin };
+    case 'secret-missing': return { detail: `the secret store has no secret named ${refusal.secretName}` };
+    default: return {};
   }
-  // A plan that names it relies on being signed in. Loading it comes with the driver's session
-  // environment; until then no run can honour it, so the plan parses and every run of it is refused.
-  if (plan.storageState !== undefined) {
-    return { code: 'storage-state-unsupported' };
-  }
-  if (everyPlanStep(plan).some(isElementCheckNoDriverDecides)) {
-    return { code: 'element-check-unsupported' };
-  }
-  // Cleanup counts too: with no way to run it, the steps would leave their test data behind.
-  if (runsDatabaseCommands(plan) && context.commands === undefined) {
-    return { code: 'database-commands-unavailable' };
-  }
-  return undefined;
 }
 
-// The run refused, before any driver call. `logged` adds what the event log says beyond the code.
-function refuseRun(
-  planned: lifecycle.Planned, refusal: lifecycle.Refusal, context: RunContext, startedAt: number,
-  logged: { readonly origin?: string; readonly detail?: string } = {},
-): RunResult {
+// The run refused, before any driver call.
+function refuseRun(planned: lifecycle.Planned, refusal: lifecycle.Refusal, context: RunContext, startedAt: number): RunResult {
   const refused = lifecycle.refuse(planned, refusal);
-  logKeepingTheResult({ kind: 'run.state', state: refused.state, targetId: planned.target.id, code: refused.refusal.code, ...logged }, context.logger);
+  logKeepingTheResult({ kind: 'run.state', state: refused.state, targetId: planned.target.id, code: refused.refusal.code, ...loggedWithRefusal(refusal) }, context.logger);
   return seal(refusedResult(refused.refusal, planned.target.id, context.ports.clock.now() - startedAt), context);
-}
-
-// The origins of the services the plan's calls and database commands reach, its cleanup included.
-function serviceOrigins(inputs: RunInputs): string[] {
-  const steps = [...inputs.plan.steps, ...(inputs.plan.cleanup ?? [])];
-  const commands = declaredCommands(inputs.project.unsafeFeatures);
-  return steps.flatMap((step) => {
-    let serviceName: string | undefined;
-    if (step.type === 'call' || step.type === 'expectBackend') serviceName = Object.entries(inputs.project.calls).find(([name]) => name === step.call)?.[1].service;
-    else if (step.type === 'database' || step.type === 'expectDatabase') serviceName = Object.entries(commands).find(([name]) => name === step.command)?.[1].service;
-    const service = inputs.project.services.find((candidate) => candidate.name === serviceName);
-    return service === undefined ? [] : [service.origin];
-  });
-}
-
-// The first production origin the run would reach: its base URL, a navigate step or a second tab's
-// URL, inside frames and second tabs too, or a declared call's service.
-function productionOriginReached(inputs: RunInputs): string | undefined {
-  const production = new Set<string>(inputs.project.productionOrigins);
-  if (production.size === 0) return undefined;
-  const origins = [new URL(inputs.baseUrl).origin];
-  const visit = (steps: readonly Step[]): void => {
-    for (const step of steps) {
-      // A path template always stays on the base URL's origin, already in the list.
-      if ((step.type === 'navigate' || step.type === 'newTab') && typeof step.url === 'string') origins.push(new URL(step.url, inputs.baseUrl).origin);
-      if (step.type === 'frame' || step.type === 'newTab') visit(step.steps);
-    }
-  };
-  visit(inputs.plan.steps);
-  origins.push(...serviceOrigins(inputs));
-  return origins.find((origin) => production.has(origin));
-}
-
-// The origins the browser may reach. A run that may not reach production has the production origins
-// left out of its allow-list as well, so any request the page makes to one is blocked.
-function reachableOrigins(inputs: RunInputs): readonly string[] {
-  if (productionAllowed(inputs)) return inputs.project.origins;
-  const production = new Set<string>(inputs.project.productionOrigins);
-  return inputs.project.origins.filter((origin) => !production.has(origin));
 }
 
 type OpenedSession = {
@@ -666,15 +580,15 @@ async function openSession(planned: lifecycle.Planned, context: RunContext): Pro
   const executableSha256 = checked.value.executableSha256;
   const opened = await driver.open(planned.target, {
     baseUrl: context.inputs.baseUrl,
-    allowedOrigins: reachableOrigins(context.inputs),
+    allowedOrigins: reachableOrigins(context.cleared),
     seed: context.inputs.seed,
     // The page sees the plan clock's time; the manifest keeps the run's own clock start.
-    fixedTimeMilliseconds: resolvePlanClock(context.inputs.plan.clock, context.inputs.fixedTimeMilliseconds, planned.target.timezone),
+    fixedTimeMilliseconds: resolvePlanClock(context.cleared.plan.clock, context.inputs.fixedTimeMilliseconds, planned.target.timezone),
     sensitiveSelectors: context.ports.redactor.selectors,
-    timeoutMilliseconds: context.inputs.project.limits.stepTimeoutMilliseconds,
+    timeoutMilliseconds: context.cleared.project.limits.stepTimeoutMilliseconds,
     // Only a plan that advances the clock puts the page's timers on virtual time; every other plan
     // keeps real-time timers, as pages that wait on their own timers need.
-    ...(totalClockAdvanceMilliseconds(context.inputs.plan) > 0 ? { virtualTimers: true } : {}),
+    ...(totalClockAdvanceMilliseconds(context.cleared.plan) > 0 ? { virtualTimers: true } : {}),
   });
   if (!opened.ok) return opened;
   return { ok: true, value: { session: opened.value, driver, unpinned, ...(executableSha256 === undefined ? {} : { executableSha256 }) } };
@@ -723,7 +637,7 @@ const codeOfFailedCapture = (error: DriverError, logger: Logger): StepCode =>
 // too. Gives the code for what stopped it, or undefined when nothing did.
 async function failureToObserveRequests(session: Session, context: StepContext): Promise<StepCode | undefined> {
   try {
-    const observing = await startObserving(observedRequestNames(context.inputs.plan), networkContext(context));
+    const observing = await startObserving(observedRequestNames(context.cleared.plan), networkContext(context));
     if (observing.ok) {
       return undefined;
     }
@@ -891,19 +805,19 @@ function withActiveStubs(step: Step, result: StepResult, activeStubs: ReadonlySe
 // What the stub, request-check and storage steps use: the run's session, values and the secrets
 // resolved for stub starts and storage writes.
 const networkContext = (context: StepContext): NetworkStepContext => ({
-  project: context.inputs.project, session: context.session, values: context.values, remembered: context.remembered,
+  project: context.cleared.project, session: context.session, values: context.values, remembered: context.remembered,
   secrets: stubAndStorageSecretStore(context.secrets), clock: context.ports.clock, activeStubs: context.activeStubs,
 });
 
 // What the clock and clipboard steps use: the run's session and values.
 const clockAndClipboardContext = (context: StepContext): ClockAndClipboardContext => ({
-  project: context.inputs.project, session: context.session, values: context.values, remembered: context.remembered,
+  project: context.cleared.project, session: context.session, values: context.values, remembered: context.remembered,
   clock: context.ports.clock,
 });
 
 // What the page-script steps use: the run's values and the declared scripts' sources.
 const pageScriptContext = (context: RunContext): PageScriptContext => ({
-  project: context.inputs.project, scriptSources: context.inputs.scriptSources ?? {}, values: context.values,
+  project: context.cleared.project, scriptSources: context.inputs.scriptSources ?? {}, values: context.values,
   remembered: context.remembered, clock: context.ports.clock, logger: context.logger, holdsSecret: context.holdsSecret,
 });
 
@@ -919,7 +833,7 @@ async function executeStep(step: Step, index: number, session: DocumentSession, 
       let path = step.url;
       if (typeof path !== 'string') {
         // A path template's values are only known now, so the runtime guard checks the final URL.
-        const resolved = resolvePathTemplate(path, context.values, context.inputs.project);
+        const resolved = resolvePathTemplate(path, context.values, context.cleared.project);
         if (!resolved.ok) return { ...base, ...stepFailed(resolved.error) };
         path = resolved.value;
         const verdict = context.gate.guardAction({ type: 'navigate', url: path }, index, NO_ELEMENT, null, target.locale);
@@ -929,7 +843,7 @@ async function executeStep(step: Step, index: number, session: DocumentSession, 
         }
       }
       const url = new URL(path, context.inputs.baseUrl);
-      if (!context.inputs.project.origins.some((origin) => origin === url.origin)) return { ...base, ...stepFailed(StepCode.OriginNotAllowed) };
+      if (!context.cleared.project.origins.some((origin) => origin === url.origin)) return { ...base, ...stepFailed(StepCode.OriginNotAllowed) };
       const navigated = await session.navigate(url.href, { scripts: step.scripts ?? NavigateScripts.Enabled });
       return navigated.ok ? { ...base, outcome: 'passed' } : { ...base, ...stepFailed(navigated.error.code) };
     }
@@ -940,18 +854,14 @@ async function executeStep(step: Step, index: number, session: DocumentSession, 
     case 'upload':
     case 'press': {
       // Values are substituted first, so the runtime guard and the driver see the final text.
-      const action = resolveActionStep(step, context.values, context.inputs.project);
+      const action = resolveActionStep(step, context.values, context.cleared.project);
       if (!action.ok) return { ...base, ...stepFailed(action.error) };
       const resolved = action.value;
-      // A secret is handed to the driver opaque; it is revealed only as the driver types it.
-      const secret = resolved.type === 'fill' && typeof resolved.value !== 'string' && 'secretName' in resolved.value
-        ? context.secrets.fills.get(resolved.value.secretName) : undefined;
+      const performable = withFillSecret(resolved, context.secrets);
+      if (!performable.ok) return { ...base, ...stepFailed(performable.error) };
       // Marked before acting: a fill that fails part way may still have typed some of the secret.
-      if (resolved.type === 'fill') {
-        if (secret === undefined) context.secretFilledFields.delete(canonicalJson(resolved.locator));
-        else context.secretFilledFields.set(canonicalJson(resolved.locator), resolved.locator);
-      }
-      const acted = await session.act(resolved, guardFor(resolved, index, target, context), secret);
+      if (performable.value.type === 'fill') markFilledField(performable.value, context.secretFilledFields);
+      const acted = await session.act(performable.value, guardFor(resolved, index, target, context));
       return acted.ok ? { ...base, outcome: 'passed' } : { ...base, ...stepFailed(acted.error.code) };
     }
     case 'dialog': {
@@ -963,7 +873,7 @@ async function executeStep(step: Step, index: number, session: DocumentSession, 
       return acted.ok ? { ...base, outcome: 'passed' } : { ...base, ...stepFailed(acted.error.code) };
     }
     case 'frame': {
-      const locator = resolveLocator(step.locator, context.values, context.inputs.project);
+      const locator = resolveLocator(step.locator, context.values, context.cleared.project);
       if (!locator.ok) return { ...base, ...stepFailed(locator.error) };
       const entered = await session.frame(locator.value);
       if (!entered.ok) return { ...base, ...stepFailed(entered.error.code) };
@@ -998,9 +908,9 @@ async function executeStep(step: Step, index: number, session: DocumentSession, 
       return { ...base, ...done };
     }
     case 'expect': {
-      const locator = resolveLocator(step.locator, context.values, context.inputs.project);
+      const locator = resolveLocator(step.locator, context.values, context.cleared.project);
       if (!locator.ok) return { ...base, ...stepFailed(locator.error) };
-      const assertion = resolveElementAssertion(step.assert, context.values, context.inputs.project);
+      const assertion = resolveElementAssertion(step.assert, context.values, context.cleared.project);
       if (!assertion.ok) return { ...base, ...stepFailed(assertion.error) };
       // A DOM check asks the probe to read the class, style or attribute it compares.
       const read = domReadFor(assertion.value);
@@ -1092,7 +1002,7 @@ async function rememberFromPage(
   step: Extract<Step, { type: 'remember' }>, from: RememberedElementSource, index: number, session: DocumentSession, context: RunContext,
 ): Promise<StepResult> {
   const base = { index, type: step.type } as const;
-  const locator = resolveLocator(from.element, context.values, context.inputs.project);
+  const locator = resolveLocator(from.element, context.values, context.cleared.project);
   if (!locator.ok) return { ...base, ...stepFailed(locator.error) };
   // A remembered value is hashed into the result and can be sent on by a later step, and a hash of
   // a short secret is as good as the secret.
@@ -1125,7 +1035,7 @@ async function rememberFromPage(
 // A page check with a meta tag's expected content resolved, when it is a value reference.
 function resolvePageAssertion(assertion: PageAssertion, context: RunContext): Result<PageAssertion, StepCode> {
   if (assertion.kind !== 'metaContent') return { ok: true, value: assertion };
-  const expected = resolveText(assertion.value, context.values, context.inputs.project.limits.maximumTextLength);
+  const expected = resolveText(assertion.value, context.values, context.cleared.project.limits.maximumTextLength);
   return expected.ok ? { ok: true, value: { ...assertion, value: expected.value } } : expected;
 }
 
@@ -1135,10 +1045,10 @@ function resolvePageAssertion(assertion: PageAssertion, context: RunContext): Re
 // media type, size and sha256.
 async function downloadFile(step: DownloadStep, index: number, session: DocumentSession, target: Target, context: RunContext): Promise<StepResult> {
   const base = { index, type: step.type } as const;
-  const locator = resolveLocator(step.locator, context.values, context.inputs.project);
+  const locator = resolveLocator(step.locator, context.values, context.cleared.project);
   if (!locator.ok) return { ...base, ...stepFailed(locator.error) };
-  const resolved: DownloadStep = { ...step, locator: locator.value };
-  const saved = await session.download(resolved, context.inputs.project.limits.maximumDownloadBytes, guardFor(resolved, index, target, context));
+  const resolved: ResolvedDownloadStep = { type: step.type, name: step.name, locator: locator.value };
+  const saved = await session.download(resolved, context.cleared.project.limits.maximumDownloadBytes, guardFor(resolved, index, target, context));
   if (!saved.ok) return { ...base, ...stepFailed(saved.error.code) };
   const file = saved.value;
   context.downloads.set(step.name, file);
@@ -1181,7 +1091,7 @@ function checkDownload(step: Extract<Step, { type: 'expectDownload' }>, index: n
     case 'sizeAtLeast': return verdict(file.bytes.length >= assertion.value);
     case 'mediaTypeEquals': return verdict(mediaTypeEssence(file.mediaType) === mediaTypeEssence(assertion.value));
     case 'fileNameEquals': case 'contentContains': case 'contentExcludes': {
-      const expected = resolveText(assertion.value, context.values, context.inputs.project.limits.maximumTextLength);
+      const expected = resolveText(assertion.value, context.values, context.cleared.project.limits.maximumTextLength);
       if (!expected.ok) return { ...base, ...stepFailed(expected.error) };
       if (assertion.kind === 'fileNameEquals') return verdict(file.fileName === expected.value);
       const text = downloadText(file.bytes);
@@ -1201,7 +1111,7 @@ async function runInNewTab(step: Extract<Step, { type: 'newTab' }>, index: numbe
   let path = step.url;
   if (typeof path !== 'string') {
     // As for a navigate: a path template's values are only known now, so the guard checks the final URL.
-    const resolved = resolvePathTemplate(path, context.values, context.inputs.project);
+    const resolved = resolvePathTemplate(path, context.values, context.cleared.project);
     if (!resolved.ok) return { ...base, ...stepFailed(resolved.error) };
     path = resolved.value;
     const verdict = context.gate.guardAction({ type: 'navigate', url: path }, index, NO_ELEMENT, null, target.locale);
@@ -1211,7 +1121,7 @@ async function runInNewTab(step: Extract<Step, { type: 'newTab' }>, index: numbe
     }
   }
   const url = new URL(path, context.inputs.baseUrl);
-  if (!context.inputs.project.origins.some((origin) => origin === url.origin)) return { ...base, ...stepFailed(StepCode.OriginNotAllowed) };
+  if (!context.cleared.project.origins.some((origin) => origin === url.origin)) return { ...base, ...stepFailed(StepCode.OriginNotAllowed) };
   const opened = await context.session.newTab(url.href);
   if (!opened.ok) return { ...base, ...stepFailed(opened.error.code) };
   const tab = opened.value;
@@ -1226,10 +1136,30 @@ async function runInNewTab(step: Extract<Step, { type: 'newTab' }>, index: numbe
 }
 
 // A dialog step with its expected text's value references replaced, as a driver must receive it.
-function resolveDialogStep(step: DialogStep, context: RunContext): Result<DialogStep, StepCode> {
-  if (step.expectText === undefined) return { ok: true, value: step };
-  const expected = resolveText(step.expectText, context.values, context.inputs.project.limits.maximumTextLength);
-  return expected.ok ? { ok: true, value: { ...step, expectText: expected.value } } : expected;
+function resolveDialogStep(step: DialogStep, context: RunContext): Result<ResolvedDialogStep, StepCode> {
+  if (step.expectText === undefined) return success({ type: step.type, action: step.action });
+  const expected = resolveText(step.expectText, context.values, context.cleared.project.limits.maximumTextLength);
+  return expected.ok ? success({ type: step.type, action: step.action, expectText: expected.value }) : expected;
+}
+
+// The action as the driver performs it: a fill of a secret reference carries the secret the run
+// resolved for it, opaque, so the driver reveals it only as it types.
+function withFillSecret(action: ResolvedActionStep, secrets: ResolvedSecrets): Result<PerformableAction, StepCode> {
+  if (action.type !== 'fill') return success(action);
+  const { type, locator, value } = action;
+  if (typeof value === 'string' || 'lines' in value) return success({ type, locator, value });
+  const secret = secrets.fills.get(value.secretName);
+  return secret === undefined ? failure(StepCode.SecretMissing) : success({ type, locator, value: { secret } });
+}
+
+// Keeps the fields whose last fill typed a secret, by their locator.
+function markFilledField(fill: PerformableFill, secretFilledFields: Map<string, ResolvedLocator>): void {
+  const key = canonicalJson(fill.locator);
+  if (typeof fill.value === 'object' && 'secret' in fill.value) {
+    secretFilledFields.set(key, fill.locator);
+  } else {
+    secretFilledFields.delete(key);
+  }
 }
 
 // Keeps the runtime guard's denial, so the run can end Denied naming the rule, and marked
@@ -1262,7 +1192,7 @@ const verdictOfFailedRead = (readFailure: PageReadFailure, logger: Logger): Poll
 // Repeats a check until it passes or the step timeout runs out. A page that crashes stops the
 // wait at once: nothing on it can change any more, and the same goes for a read of the page that failed.
 async function poll(context: RunContext, session: DocumentSession, check: () => Promise<PollVerdict>): Promise<PollVerdict> {
-  const deadline = context.ports.clock.now() + context.inputs.project.limits.stepTimeoutMilliseconds;
+  const deadline = context.ports.clock.now() + context.cleared.project.limits.stepTimeoutMilliseconds;
   for (;;) {
     const verdict = await check();
     // Looked at before a pass is accepted: what a dying page last showed proves nothing. A probe has no
@@ -1330,29 +1260,30 @@ function unavailableResult(targetId: string, unavailable: Unavailable, context: 
 // What a plan run vouches for: decided by the plan, its project's recording setting, the run's
 // isolation and the target's adapter alone, so two runs of one plan say the same, unless one leaves its
 // egress unread, which loses the claim as it does for an evidence run. Egress, credentials and replay
-// are claimed only for a run whose starter says the isolated runner enforced egress
-// (RunInputs.guaranteeLevel); any other run counts as running on the host.
-const planRunGuarantees = (inputs: RunInputs, unsafeFeatures: readonly UnsafeFeature[], determinismUnpinned: boolean, isEgressUnread: boolean): GuaranteeStatement => {
-  const repliesNotRecorded = callsServices(inputs.plan) && inputs.project.replay?.recordReplies !== true;
+// are claimed only for a run whose isolation port says the isolated runner enforced egress; any other
+// run counts as running on the host.
+const planRunGuarantees = (context: SealContext, unsafeFeatures: readonly UnsafeFeature[], isEgressUnread: boolean): GuaranteeStatement => {
+  const { plan, project } = context.cleared;
+  const repliesNotRecorded = callsServices(plan) && project.replay?.recordReplies !== true;
+  const isIsolated = context.ports.isolation.guaranteeLevel() === 'isolated';
   return guaranteeStatement({
-    mode: 'plan', egressEnforced: inputs.guaranteeLevel === 'isolated' && !isEgressUnread, unmaskedScreenshotsKept: false, unsafeFeatures,
-    ...(determinismUnpinned ? { determinismUnpinned } : {}),
+    mode: 'plan', egressEnforced: isIsolated && !isEgressUnread, unmaskedScreenshotsKept: false, unsafeFeatures,
+    ...(context.determinismUnpinned ? { determinismUnpinned: true } : {}),
     ...(repliesNotRecorded ? { repliesNotRecorded } : {}),
   });
 };
 
+type SealContext = Pick<RunContext, 'cleared' | 'ports' | 'determinismUnpinned'>;
+
 // Adds the run mode, the guarantee statement, the unsafe label (for a plan using unsafe features),
 // the approval label (for an approved plan) and the result's two hashes.
-function seal(
-  outcome: Omit<RunResult, 'resultHash' | 'evidenceHash' | 'approvalLabel' | 'mode' | 'guarantees' | 'unsafeFeatures'>,
-  context: Pick<RunContext, 'inputs' | 'determinismUnpinned'>,
-): RunResult {
-  const standing = context.inputs.standing;
-  const unsafeFeatures = unsafeFeaturesOf(context.inputs.plan);
+function seal(outcome: Omit<RunResult, 'resultHash' | 'evidenceHash' | 'approvalLabel' | 'mode' | 'guarantees' | 'unsafeFeatures'>, context: SealContext): RunResult {
+  const standing = context.cleared.standing;
+  const unsafeFeatures = unsafeFeaturesOf(context.cleared.plan);
   const isEgressUnread = (outcome.reviewItems ?? []).some((item) => item.code === EGRESS_UNREAD);
   const labelled = {
-    ...outcome, mode: 'plan' as const, guarantees: planRunGuarantees(context.inputs, unsafeFeatures, context.determinismUnpinned, isEgressUnread),
+    ...outcome, mode: 'plan' as const, guarantees: planRunGuarantees(context, unsafeFeatures, isEgressUnread),
     ...(unsafeFeatures.length === 0 ? {} : { unsafeFeatures }),
   };
-  return withRunHashes(standing?.mode === 'approved' ? { ...labelled, approvalLabel: approvalLabel(standing.approval) } : labelled);
+  return withRunHashes(standing.mode === 'approved' ? { ...labelled, approvalLabel: approvalLabel(standing.approval) } : labelled);
 }

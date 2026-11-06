@@ -18,6 +18,7 @@ import type { TerminalState } from '../lifecycle.ts';
 import {
   DATABASE_COMMANDS_INPUT, SERVICE_CALLS_INPUT, manifestHash, planHash, replayManifest, type RunManifest,
 } from '../manifest.ts';
+import type { ClearedRun } from '../policy/ClearedRun.ts';
 import { run, type RunInputs, type RunPorts } from '../run.ts';
 import { decodeManifest } from './manifest-decoder.ts';
 import {
@@ -27,13 +28,14 @@ import {
 
 // What a replay is given: the recorded manifest and, for a run that recorded replies, its
 // recording (null when none was kept), both as read from disk; the recorded result hash and the
-// state the recorded run ended in; and the run's inputs apart from the seed, clock start and
-// fixtures, which come from the manifest.
+// state the recorded run ended in; the run the policy gate cleared; and the run's inputs apart from
+// the seed, clock start and fixtures, which come from the manifest.
 export type ReplayRequest = {
   readonly manifest: unknown;
   readonly recording: unknown;
   readonly recordedResultHash: string;
   readonly recordedState: TerminalState;
+  readonly cleared: ClearedRun;
   readonly inputs: Omit<RunInputs, 'seed' | 'fixedTimeMilliseconds' | 'fixtures'>;
 };
 
@@ -125,8 +127,8 @@ export async function replay(request: ReplayRequest, ports: ReplayPorts): Promis
   if (!claimed.ok) return claimed;
   const replies = repliesFor(manifest, request.recording, ports);
   if (!replies.ok) return replies;
-  if (planHash(request.inputs.plan) !== manifest.planHash) return failure({ code: 'replay-mismatch', path: '$.planHash' });
-  if (manifest.target?.id !== request.inputs.targetId) return failure({ code: 'replay-mismatch', path: '$.target.id' });
+  if (planHash(request.cleared.plan) !== manifest.planHash) return failure({ code: 'replay-mismatch', path: '$.planHash' });
+  if (manifest.target?.id !== request.cleared.targetId) return failure({ code: 'replay-mismatch', path: '$.target.id' });
   const fixture = await fixtureMismatch(manifest, ports.fixtures);
   if (fixture !== null) return failure({ code: 'replay-mismatch', fixture });
 
@@ -135,12 +137,13 @@ export async function replay(request: ReplayRequest, ports: ReplayPorts): Promis
   const { services, databaseCommands } = replies.value;
   const runPorts: RunPorts = {
     drivers: ports.drivers, clock: ports.clock, artifacts: ports.artifacts, redactor: ports.redactor, events: ports.events, audit: ports.audit,
+    isolation: ports.isolation,
     ...(ports.secrets === undefined ? {} : { secrets: ports.secrets }),
     ...(ports.rewritesApplied === undefined ? {} : { rewritesApplied: ports.rewritesApplied }),
     ...(services === undefined ? {} : { services: services.port }),
     ...(databaseCommands === undefined ? {} : { databaseCommands: databaseCommands.port }),
   };
-  const result = await run({
+  const result = await run(request.cleared, {
     ...request.inputs, seed: manifest.seeds.random, fixedTimeMilliseconds: manifest.clock.fixedTimeMilliseconds, fixtures: manifest.fixtures,
   }, runPorts);
 

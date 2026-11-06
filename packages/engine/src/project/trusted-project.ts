@@ -3,21 +3,26 @@
 // refused, and a trusted file the change edits is ignored in favour of the protected version and
 // raised for review.
 import {
-  failure, success, type Approval, type Brand, type EventSink, type Result, type TrustError, type VersionControlPort,
+  failure, success, type Approval, type EventSink, type Result, type TrustError, type VersionControlPort,
 } from '@revisum/contracts';
 import { deriveActor, sourceActorId } from '../actor.ts';
-import { brand } from '../brand.ts';
 import { isAnySuiteFile } from '../evidence/suite-choice.ts';
 import type { PlanError } from '../plan/plan-decoders.ts';
 import { repositoryPath } from '../relative-paths.ts';
-import { parseProject, type ProjectData } from './project-parser.ts';
+import { parseProject, type Project } from './project-parser.ts';
 
 // Where a trusted project came from: the protected branch at a commit, or an approval of it.
 export type Provenance =
   | { readonly kind: 'protected-branch'; readonly branch: string; readonly commit: string }
   | { readonly kind: 'approval'; readonly approval: Approval };
 
-export type TrustedProject = Brand<ProjectData & { readonly provenance: Provenance }, 'TrustedProject'>;
+// The key of the TrustedProject mark: declared here and never exported, so only this module can
+// make one. Only a type exists: nothing is emitted.
+declare const trustedMark: unique symbol;
+
+// A parsed project read from the protected branch. It is a Project too, so whatever takes a
+// project takes a trusted one, and its provenance allows nothing more.
+export type TrustedProject = Project & { readonly provenance: Provenance; readonly [trustedMark]: true };
 
 // A trusted file that the change under test edited: core ignored the edit and someone should look.
 export type TrustedFileReviewItem = { readonly code: 'changed-with-code'; readonly path: string };
@@ -65,10 +70,11 @@ export async function loadTrustedProject(
   const parsed = parseProject(parseJson(protectedFile.value.bytes));
   if (!parsed.ok) return failure({ code: 'config-invalid', path: projectPath, errors: parsed.error });
 
-  const project = brand<ProjectData & { readonly provenance: Provenance }, 'TrustedProject'>({
+  // The one place a TrustedProject is made, from the project the parser gave.
+  const project = {
     ...parsed.value,
     provenance: { kind: 'protected-branch', branch: versionControl.protectedBranch, commit: protectedFile.value.commit },
-  });
+  } as TrustedProject;
   // The protected project's suites decide which suite files are trusted, so a change cannot widen
   // or narrow them by editing its own project.json.
   const edited = [...new Set(change.files.map(repositoryPath))]

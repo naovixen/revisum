@@ -457,6 +457,10 @@ export type ResolvedActionStep =
   | { readonly type: typeof StepType.Select; readonly locator: ResolvedLocator; readonly option: SafeText }
   | { readonly type: typeof StepType.Upload; readonly locator: ResolvedLocator; readonly fixture: FixtureName }
   | { readonly type: typeof StepType.Press; readonly locator: ResolvedLocator; readonly key: Key; readonly modifiers?: readonly Modifier[] };
+// A dialog step with its expected text's value reference replaced by its text.
+export type ResolvedDialogStep = { readonly type: typeof StepType.Dialog; readonly action: DialogAction; readonly expectText?: SafeText };
+// A download step with its locator's value references replaced by their text.
+export type ResolvedDownloadStep = { readonly type: typeof StepType.Download; readonly name: DownloadName; readonly locator: ResolvedLocator };
 // A step that calls a declared service.
 export type CallStep = Extract<Step, { type: typeof StepType.Call }>;
 // What a plan's cleanup list holds: calls and database commands.

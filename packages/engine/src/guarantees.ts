@@ -2,9 +2,13 @@
 // lost one is lost, so a plan run and an evidence run can never describe themselves differently
 // for the same conditions. The level is the summary: 'isolated' only when every guarantee holds.
 import {
-  GUARANTEE_IDS,
-  type GuaranteeId, type GuaranteeLossReason, type GuaranteeStatement, type RunMode, type UnsafeFeature,
+  GUARANTEE_IDS, GuaranteeLevel,
+  type GuaranteeId, type GuaranteeLossReason, type GuaranteeStatement, type RunIsolation, type RunMode, type UnsafeFeature,
 } from '@revisum/contracts';
+
+// The isolation of a run on the host, with no egress enforcement: what a run is handed when no
+// isolated runner started it.
+export const HOST_ISOLATION: RunIsolation = { guaranteeLevel: () => GuaranteeLevel.Host };
 
 export type GuaranteeConditions = {
   readonly mode: RunMode;

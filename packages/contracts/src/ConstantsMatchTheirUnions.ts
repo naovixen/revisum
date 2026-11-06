@@ -13,7 +13,7 @@ import type {
   PageAssertion, PageAssertionKind, RememberElementRead, RememberSource, SafeText, SemanticLocatorKind, SemanticLocatorWith, Step, StepType,
   StructuralLocatorKind, StructuralLocatorWith,
 } from './plan.ts';
-import type { GuardVerdict, PolicyDecision, PolicyVerdictKind } from './policy.ts';
+import type { GuardVerdict, PolicyVerdictKind } from './policy.ts';
 import type { BackendAssertion, BackendAssertionKind, ParameterKind, ParameterType } from './service-calls.ts';
 
 type HoldSameValues<Constant, Union> = [Constant] extends [Union] ? ([Union] extends [Constant] ? true : false) : false;
@@ -39,7 +39,6 @@ export type ConstantsMatchTheirUnions = [
   MustHold<HoldSameValues<ResponseAssertionKind, ResponseAssertion['kind']>>,
   MustHold<HoldSameValues<StorageAssertionKind, StorageAssertion['kind']>>,
   MustHold<HoldSameValues<PlannerEndpointKind, PlannerEndpoint['kind']>>,
-  MustHold<HoldSameValues<PolicyVerdictKind, PolicyDecision['kind']>>,
   MustHold<HoldSameValues<PolicyVerdictKind, GuardVerdict['kind']>>,
   MustHold<HoldSameValues<ParameterKind, ParameterType['kind']>>,
   MustHold<HoldSameValues<BackendAssertionKind, BackendAssertion['kind']>>,

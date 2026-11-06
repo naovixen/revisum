@@ -28,8 +28,8 @@ export type PolicyRuleId = (typeof PolicyRuleId)[keyof typeof PolicyRuleId];
 // plan or by Object.assign, never has it. Only a type exists: nothing is emitted.
 declare const authorisedMark: unique symbol;
 
-// A plan the policy gate cleared for its targets. Only the gate makes one, and run() takes nothing
-// else. It is marked with a key of its own, not with Brand, so it stays a narrower Plan: a second
+// A plan the policy gate cleared for its targets. Only the gate makes one, inside the run it
+// clears. It is marked with a key of its own, not with Brand, so it stays a narrower Plan: a second
 // `__brand` would conflict with the Plan brand and reduce the type to never.
 export type Authorised = Plan & { readonly [authorisedMark]: 'policy-gate' };
 
@@ -39,13 +39,12 @@ export const PolicyVerdictKind = {
 } as const;
 export type PolicyVerdictKind = (typeof PolicyVerdictKind)[keyof typeof PolicyVerdictKind];
 
-// What the gate decided about a whole plan. The step index is the first offending step (a step
-// inside a frame counts as the frame's step), or null when the rule concerns the whole plan. A
-// denial the audit sink failed to record says so with `unrecorded`, so a lost audit record changes
-// the outcome instead of passing silently.
-export type PolicyDecision =
-  | { readonly kind: typeof PolicyVerdictKind.Allow; readonly plan: Authorised }
-  | { readonly kind: typeof PolicyVerdictKind.Deny; readonly rule: PolicyRuleId; readonly stepIndex: number | null; readonly unrecorded?: true };
+// The gate's denial of a whole plan. The step index is the first offending step (a step inside a
+// frame counts as the frame's step), or null when the rule concerns the whole plan. A denial the
+// audit sink failed to record says so with `unrecorded`, so a lost audit record changes the outcome
+// instead of passing silently. What the gate gives for a plan it allows is the engine's: the run it
+// cleared, with the project and standing it was judged under.
+export type PlanDenial = { readonly kind: typeof PolicyVerdictKind.Deny; readonly rule: PolicyRuleId; readonly stepIndex: number | null; readonly unrecorded?: true };
 
 // What the gate's runtime guard decided about one action, just before it is performed. As above,
 // `unrecorded` marks a denial the audit sink failed to record.

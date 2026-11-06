@@ -47,3 +47,10 @@ export const GuaranteeLevel = {
   Host: 'host',
 } as const;
 export type GuaranteeLevel = (typeof GuaranteeLevel)[keyof typeof GuaranteeLevel];
+
+// Says how strongly a run is isolated. A run reads it as it seals its result, once its steps have
+// ended, since a runner's level can fall to 'host' only when the proxy's record proves incomplete.
+// A run on the host is handed one that always says 'host'; an isolated runner's handle is one.
+export interface RunIsolation {
+  guaranteeLevel(): GuaranteeLevel;
+}

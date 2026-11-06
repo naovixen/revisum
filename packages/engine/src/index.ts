@@ -11,7 +11,9 @@ export { approvalVerifier, unverified, type ApprovalVerifier } from './approval/
 export * from './approval/plan-standing.ts';
 // Read by tools/check-deny-rules.ts, which checks this repository's own agent lock-down.
 export { deniesRequiredActions, parseDenyRules } from './approval/approvers-file.ts';
-export { policyGate, type PolicyGate } from './policy/policy-gate.ts';
+export type { ClearedRun } from './policy/ClearedRun.ts';
+export { policyGate, type PlanClearance, type PolicyGate, type RunClearance } from './policy/policy-gate.ts';
+export { BaseUrlRefusal, baseUrlOfOrigin, parseBaseUrl } from './ParseBaseUrl.ts';
 export { assertBranded, planParser } from './plan/plan-parser.ts';
 export { unsafeFeaturesOf } from './plan/unsafe-features.ts';
 export { clockAdvanceMilliseconds, totalClockAdvanceMilliseconds } from './clock-advance.ts';
@@ -63,7 +65,7 @@ export { buildServiceRequest } from './service-calls/service-request.ts';
 export { generateValue, resolvePlanClock, type RunValues, type StepErrorCode } from './run-values.ts';
 export * from './ai-planning.ts';
 export * from './release-notes.ts';
-export { guaranteeStatement } from './guarantees.ts';
+export { HOST_ISOLATION, guaranteeStatement } from './guarantees.ts';
 export { declaredSuite, isSuiteFile, suitePasses } from './evidence/suite-choice.ts';
 export { parseSuiteReport, type SuiteDecodeError, type SuiteDecodeErrorCode, type SuiteReport, type SuiteTrace } from './evidence/suite-report.ts';
 export { parseSuiteTrace } from './evidence/suite-trace.ts';
