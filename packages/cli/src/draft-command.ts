@@ -26,13 +26,13 @@ import {
   READABLE_GRAMMAR_VERSION, admitCoreDraft, checkDraftLocators, defaultRedactor, exploreStartOrigin, extractCriteria, loadTrustedProject,
   pageMapReference, pageMapText, parseAiText, parseProject, planParser, planStanding, plannerOrigin, plannerReplyText, policyGate,
   readPlanText, withDeclaredSecretRedaction,
-  type ApprovalStore, type BrowserDriver, type CliErrorCode, type CriterionText, type DraftError, type DraftRequest,
+  type ApprovalStore, type BrowserDriver, type ClearedRun, type CliErrorCode, type CriterionText, type DraftError, type DraftRequest,
   type DraftWarning, type EventSink, type Origin, type PageMap, type PlanDraft, type PlannerEndpoint, type PlanProvenance, type PlanSource, type Project,
   type Redactor, type SecretStore, type Target, type TrustedProject, type VersionControlPort,
 } from '@revisum/engine';
 import { serviceCaller, startProxyServer, type AddressConnector, type AddressResolver } from '@revisum/runner';
 import { CLI_OUTPUT_SCHEMA, cliError, exitCodeFor, type CliError, type CliOutput, type CommandOutcome } from './cli-output.ts';
-import { crawlInBrowser, crawlInRunner, crawlTarget, type BrowserCrawl, type CrawlStop, type IsolatedRunner } from './explore-crawl.ts';
+import { crawlInBrowser, crawlInRunner, crawlTarget, type CrawlStop, type IsolatedRunner } from './explore-crawl.ts';
 import { isLoopbackEndpoint, plannerAdapter } from './planner-adapters.ts';
 
 export type DraftCommandPorts = {
@@ -273,7 +273,7 @@ async function runnableProject(ports: DraftCommandPorts): Promise<{ readonly wri
   return project.ok ? { written, project: project.value } : stop('config-invalid', PROJECT_FILE);
 }
 
-type Login = { readonly cleared: NonNullable<BrowserCrawl['login']>; readonly text: string };
+type Login = { readonly cleared: ClearedRun; readonly text: string };
 
 // The --after plan, read from the working tree, approved for its exact hash on the protected
 // branch, and cleared by the policy gate for the crawl's target, all before any browser starts.
@@ -317,8 +317,8 @@ async function exploreSite(explore: ExploreArguments, prepared: Prepared, ports:
   if (explore.host) {
     if (ports.browser === undefined) return stop('internal', '--host');
     const crawled = await crawlInBrowser(ports.browser, {
-      project, target, redactor, secrets: ports.secrets, audit: ports.events, options: { ...bounds, placement: 'host' },
-      ...(login === undefined ? {} : { login: login.cleared }),
+      redactor, secrets: ports.secrets, audit: ports.events, options: { ...bounds, placement: 'host' },
+      ...(login === undefined ? { project, target } : { login: login.cleared }),
     });
     return crawled.ok ? { map: crawled.value, text: pageMapText(crawled.value), egressEnforced: false } : crawlStop(crawled.error);
   }

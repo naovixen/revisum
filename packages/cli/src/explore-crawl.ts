@@ -12,7 +12,7 @@
 // page map it prints is outside data: the host decodes it with the engine's decodePageMap.
 import { arch, platform } from 'node:os';
 import {
-  baseUrlOfOrigin, crawlSite, decodePageMap, exploreStartOrigin, failure, HOST_ISOLATION, redactPageMap, run, sha256, success,
+  baseUrlOfOrigin, crawlSite, decodePageMap, exploreStartOrigin, failure, HOST_ISOLATION, redactPageMap, run, sha256, success, UnavailableReason,
   type ArtifactStore, type BrowserDriver, type ClearedRun, type Clock, type EventSink, type ExploreDriver, type ExploreOptions,
   type ImageDigest, type Origin, type PageMap, type Project, type Redactor, type Result, type RunEventSink,
   type Runner, type SecretName, type SecretStore, type Session, type Target,
@@ -25,18 +25,17 @@ import { buildEgressPolicy } from '@revisum/runner';
 export type CrawlStop =
   | 'explore-origin-refused' | 'explore-start-unreachable' | 'explore-runner-unavailable' | 'target-unavailable' | 'plan-rejected';
 
-// One crawl in a browser session: the project it may go to, the target the session opens, the
-// bounds, the gate-cleared --after run, and how text read from pages is redacted.
+// One crawl in a browser session: the bounds, how text read from pages is redacted, and either the
+// gate-cleared --after run, whose project and target the crawl's session is, or, with no --after
+// run, the project the crawl may go to and the target its session opens. A login cleared for one
+// project or target cannot be handed a session opened for another.
 export type BrowserCrawl = {
-  readonly project: Project;
-  readonly target: Target;
   readonly options: ExploreOptions;
-  readonly login?: ClearedRun;
   readonly redactor: Redactor;
   readonly secrets: SecretStore;
   // Where the --after run's policy denials are recorded.
   readonly audit: EventSink;
-};
+} & ({ readonly login: ClearedRun } | { readonly project: Project; readonly target: Target });
 
 // The page's random numbers are seeded, so a page that uses them shows the same each time.
 const CRAWL_SEED = 0;
@@ -56,16 +55,28 @@ const discardingArtifacts: ArtifactStore = {
 const discardingRunEvents: RunEventSink = { append: () => undefined, read: () => [] };
 
 // A driver that hands the run the crawl's own session instead of opening another, and keeps it
-// open when the run ends, so the crawl reads the pages the run signed in to.
-function sharingDriver(browser: BrowserDriver, session: Session): BrowserDriver {
+// open when the run ends, so the crawl reads the pages the run signed in to. The session was opened
+// for one target, so a run asking for any other is given none.
+function sharingDriver(browser: BrowserDriver, session: Session, sessionTarget: Target): BrowserDriver {
   const shared = new Proxy(session, {
     get: (target, property): unknown => (property === 'close' ? async (): Promise<void> => undefined : Reflect.get(target, property)),
   });
-  return { info: browser.info, supports: (target) => browser.supports(target), open: async () => success(shared) };
+  return {
+    info: browser.info,
+    supports: (target) => browser.supports(target),
+    open: async (target) => (target.id === sessionTarget.id
+      ? success(shared)
+      : failure({ reason: UnavailableReason.LaunchFailed, detail: `the crawl's session is for the target ${sessionTarget.id}, not ${target.id}` })),
+  };
 }
 
+// The project and target the crawl's session is for: the --after run's own when there is one.
+const sessionFor = (crawl: BrowserCrawl): { readonly project: Project; readonly target: Target } =>
+  ('login' in crawl ? crawl.login : crawl);
+
 export async function crawlInBrowser(browser: BrowserDriver, crawl: BrowserCrawl): Promise<Result<PageMap, CrawlStop>> {
-  const { project, target, options } = crawl;
+  const { project, target } = sessionFor(crawl);
+  const { options } = crawl;
   const origin = exploreStartOrigin(project, options.start);
   if (origin === undefined) return failure('explore-origin-refused');
   if (!browser.supports(target).ok) return failure('target-unavailable');
@@ -79,11 +90,11 @@ export async function crawlInBrowser(browser: BrowserDriver, crawl: BrowserCrawl
   if (!opened.ok) return failure('target-unavailable');
   const session = opened.value;
   try {
-    if (crawl.login !== undefined) {
+    if ('login' in crawl) {
       const loggedIn = await run(crawl.login, {
         baseUrl, seed: CRAWL_SEED, fixedTimeMilliseconds, fixtures: [], host: { platform: platform(), arch: arch() },
       }, {
-        drivers: new Map([[target.adapter, sharingDriver(browser, session)]]), clock: systemClock, artifacts: discardingArtifacts,
+        drivers: new Map([[target.adapter, sharingDriver(browser, session, target)]]), clock: systemClock, artifacts: discardingArtifacts,
         redactor: crawl.redactor, events: discardingRunEvents, audit: crawl.audit, secrets: crawl.secrets, isolation: HOST_ISOLATION,
       });
       if (loggedIn.state !== 'Passed') return failure('plan-rejected');

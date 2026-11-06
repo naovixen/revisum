@@ -1,14 +1,17 @@
 // Resolves the secrets a plan names, once, before a run opens any browser: every fill's
 // { secretName }, the plan's saved storage state, the secrets its declared calls use, in their
 // headers or as arguments, the secrets its stub starts and storage writes pass as arguments, and the
-// secrets in the environments of the database commands it runs. The first name the store cannot resolve stops the run as secret-missing. The resolved secrets give the run its redaction and its manifest
-// records; their values stay inside the opaque Secret objects.
+// secrets in the environments of the database commands it runs. The first name the store cannot
+// resolve stops the run as secret-missing. The resolved secrets give the run its redaction and its
+// manifest records, and each fill of a secret its secret; their values stay inside the opaque Secret
+// objects.
 import {
   failure, success,
   type CallDeclaration, type CallName, type CommandName, type DatabaseCommandDeclaration, type Plan, type Redactor, type Result, type Secret, type SecretName, type SecretStore, type Step,
 } from '@revisum/contracts';
 import { sha256 } from '../hashing.ts';
 import type { SecretRecord, StorageStateRecord } from '../manifest.ts';
+import type { RunStep } from '../RunStep.ts';
 import { redactionModeOf, secretRedaction, secretSha256, shortSecretMatch, storageStateSecrets } from './secret-values.ts';
 
 export type ResolvedSecrets = {
@@ -25,6 +28,12 @@ export type ResolvedSecrets = {
 
 export const NO_SECRETS: ResolvedSecrets = { fills: new Map(), storageState: null, services: new Map(), stubsAndStorage: new Map(), commands: new Map() };
 
+// A plan's secrets, resolved: every one it names, and its steps as the run runs them, each fill of
+// a secret carrying its own.
+export type PlanSecrets = { readonly secrets: ResolvedSecrets; readonly steps: readonly RunStep[] };
+
+type ResolveName = (name: SecretName) => Result<Secret, SecretName>;
+
 // The secret names the plan's calls use, its cleanup included, in plan order: each declaration's
 // header secrets, then the secrets passed as arguments.
 function callSecretNames(plan: Plan, calls: Readonly<Record<CallName, CallDeclaration>>): SecretName[] {
@@ -38,12 +47,38 @@ function callSecretNames(plan: Plan, calls: Readonly<Record<CallName, CallDeclar
   });
 }
 
-// The secret names fill steps use, inside frames and second tabs too, in plan order.
-function fillSecretNames(steps: readonly Step[]): SecretName[] {
-  return steps.flatMap((step) => {
-    if (step.type === 'frame' || step.type === 'newTab') return fillSecretNames(step.steps);
-    return step.type === 'fill' && typeof step.value !== 'string' && 'secretName' in step.value ? [step.value.secretName] : [];
-  });
+// The steps as the run runs them, inside frames and second tabs too, in plan order: each fill of a
+// secret carries the secret, or the first name the store cannot resolve stops them.
+function withFillSecrets(steps: readonly Step[], resolveName: ResolveName): Result<RunStep[], SecretName> {
+  const runSteps: RunStep[] = [];
+  for (const step of steps) {
+    const runStep = withFillSecret(step, resolveName);
+    if (!runStep.ok) {
+      return runStep;
+    }
+    runSteps.push(runStep.value);
+  }
+  return success(runSteps);
+}
+
+function withFillSecret(step: Step, resolveName: ResolveName): Result<RunStep, SecretName> {
+  switch (step.type) {
+    case 'frame':
+    case 'newTab': {
+      const inner = withFillSecrets(step.steps, resolveName);
+      return inner.ok ? success({ ...step, steps: inner.value }) : inner;
+    }
+    case 'fill': {
+      const value = step.value;
+      if (typeof value === 'string' || !('secretName' in value)) {
+        return success({ ...step, value });
+      }
+      const secret = resolveName(value.secretName);
+      return secret.ok ? success({ ...step, value, secret: secret.value }) : secret;
+    }
+    default:
+      return success(step);
+  }
 }
 
 // The secret names stub starts and storage writes pass as arguments, inside frames and second tabs
@@ -72,7 +107,7 @@ function commandSecretNames(plan: Plan, commands: Readonly<Record<CommandName, D
 export function resolvePlanSecrets(
   plan: Plan, store: SecretStore | undefined, calls: Readonly<Record<CallName, CallDeclaration>>,
   commands: Readonly<Record<CommandName, DatabaseCommandDeclaration>> = {},
-): Result<ResolvedSecrets, SecretName> {
+): Result<PlanSecrets, SecretName> {
   const resolveAll = (names: readonly SecretName[]): Result<Map<SecretName, Secret>, SecretName> => {
     const resolved = new Map<SecretName, Secret>();
     for (const name of names) {
@@ -83,8 +118,19 @@ export function resolvePlanSecrets(
     }
     return success(resolved);
   };
-  const fills = resolveAll(fillSecretNames(plan.steps));
-  if (!fills.ok) return fills;
+  const fills = new Map<SecretName, Secret>();
+  const resolveFill: ResolveName = (name) => {
+    const secret = fills.get(name) ?? store?.resolve(name) ?? null;
+    if (secret === null) {
+      return failure(name);
+    }
+    fills.set(name, secret);
+    return success(secret);
+  };
+  const steps = withFillSecrets(plan.steps, resolveFill);
+  if (!steps.ok) {
+    return steps;
+  }
   const storageState = plan.storageState === undefined ? null : store?.resolve(plan.storageState.secretName) ?? null;
   if (plan.storageState !== undefined && storageState === null) return failure(plan.storageState.secretName);
   const services = resolveAll(callSecretNames(plan, calls));
@@ -94,23 +140,13 @@ export function resolvePlanSecrets(
   const commandSecrets = resolveAll(commandSecretNames(plan, commands));
   if (!commandSecrets.ok) return commandSecrets;
   return success({
-    fills: fills.value, storageState, services: services.value, stubsAndStorage: stubsAndStorage.value, commands: commandSecrets.value,
+    secrets: { fills, storageState, services: services.value, stubsAndStorage: stubsAndStorage.value, commands: commandSecrets.value },
+    steps: steps.value,
   });
 }
 
 // The store a declared call's request is built from: only the secrets the run resolved before it
 // started, so a call never reaches past them.
-// The secret a fill of the plan these secrets were resolved for types. resolvePlanSecrets resolves
-// every name that plan's fills use, inside frames and second tabs too, or fails, so a fill of that
-// plan always finds its own; only a fill from another plan could miss, and that is a broken caller.
-export function fillSecretOf(secrets: ResolvedSecrets, name: SecretName): Secret {
-  const secret = secrets.fills.get(name);
-  if (secret === undefined) {
-    throw new TypeError(`no secret was resolved for a fill of ${name}: the secrets are another plan's`);
-  }
-  return secret;
-}
-
 export const resolvedSecretStore = (secrets: ResolvedSecrets): SecretStore => ({ resolve: (name) => secrets.services.get(name) ?? null });
 // The store stub bodies and storage values are filled from, in the same way.
 export const stubAndStorageSecretStore = (secrets: ResolvedSecrets): SecretStore => ({ resolve: (name) => secrets.stubsAndStorage.get(name) ?? null });

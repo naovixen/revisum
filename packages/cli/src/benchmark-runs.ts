@@ -148,14 +148,15 @@ export async function benchmarkRuns(options: BenchmarkRunsOptions): Promise<Benc
     const project = loaded.value.project;
     const parsed = planParser(project)(SIGNUP_PLAN);
     if (!parsed.ok) throw new Error(`the benchmark plan was rejected: ${JSON.stringify(parsed.error)}`);
-    const target = project.matrix.find((candidate) => candidate.id === TARGET_ID);
-    if (target === undefined) throw new Error('the benchmark project has no headless-shell target');
     const baseUrl = parseBaseUrl(origin);
     if (!baseUrl.ok) throw new Error(`the fixture server's origin is not a base URL: ${baseUrl.error}`);
-    const decision = policyGate({ project, events: discardingAudit }).clear(parsed.value, target.id);
+    // The plan names the one target it runs on, typed as the parser read it.
+    const [targetId] = parsed.value.targets;
+    if (targetId === undefined) throw new Error('the benchmark plan names no target');
+    const decision = policyGate({ project, events: discardingAudit }).clear(parsed.value, targetId);
     if (decision.kind === 'deny') throw new Error(`the policy gate denied the benchmark plan: ${decision.rule}`);
     if (decision.kind === 'not-declared') {
-      throw new Error(`the benchmark plan does not declare the target ${target.id}`);
+      throw new Error(`the benchmark project does not declare the target ${decision.targetId}`);
     }
     const drivers = new Map([['cdp', buildAdapters.hostBrowserDriver({ executablePath: options.executablePath })]]);
     const samples: BenchmarkSample[] = [];

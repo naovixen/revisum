@@ -10,9 +10,9 @@ import {
   failure, FillValueKind, isOneElementRead, NavigateScripts, UnavailableReason, oneElementOf, PageReadFailureCode, stepFailed, StepCode, success, UnreadablePage,
   type A11yFinding, type ActionGuard, type AppliedRewrite, type ApprovalLabel, type ArtifactReference, type ArtifactStore, type BaseUrl,
   type BrowserDriver, type Clock, type DatabaseCommandRunner, type DocumentSession, type DomRead, type DownloadedFile, type DownloadName, type DriverError, type DriverErrorCode, type OneElementRead, type PageReadFailure, type RememberedElementSource, type LockEntry, type DialogStep, type ElementProbe,
-  type EventSink, type FillValue, type GuardVerdict, type PageAssertion, type PerformableAction, type PerformableFill, type Plan, type PolicyRuleId, type Redactor, type ResolvedActionStep,
+  type EventSink, type FillValue, type GuardVerdict, type PageAssertion, type PerformableFill, type Plan, type PolicyRuleId, type Redactor, type ResolvedActionStep,
   type ResolvedDialogStep, type ResolvedDownloadStep,
-  type DownloadStep, type StepOutcome, type ResolvedElement, type ResolvedLocator, type Result, type RunIsolation, type SafeText, type SecretStore, type SecretName, type ServiceCaller, type Session, type Step, type Target,
+  type DownloadStep, type StepOutcome, type ResolvedElement, type ResolvedLocator, type Result, type RunIsolation, type SafeText, type SecretStore, type ServiceCaller, type Session, type Step, type Target,
   type Unavailable, type ValueName, type GuaranteeStatement, type RunMode, type SuiteFinding, type SuiteName, type SuitePass,
   type StubAnswer, type StubName, type SuiteTestId, type SuiteTestResult, type UnsafeFeature,
 } from '@revisum/contracts';
@@ -36,6 +36,7 @@ import {
 } from './manifest.ts';
 import { checkElement, checkPage, domReadFor, normalise, type Verdict } from './oracle.ts';
 import { refusedResult, targetUnavailableResult } from './NothingRanResult.ts';
+import type { NamedScripts } from './page-scripts/NamedScriptSources.ts';
 import { runEvaluate, runScriptCheck, type PageScriptContext, type PageScriptRecord } from './page-scripts/page-script-steps.ts';
 import type { SuiteDecodeError } from './evidence/suite-report.ts';
 import type { PlanError } from './plan/plan-decoders.ts';
@@ -45,19 +46,19 @@ import { unsafeFeaturesOf } from './plan/unsafe-features.ts';
 import { assertCleared, ClearedRunKind, type ClearedRun } from './policy/ClearedRun.ts';
 import type { TargetNotDeclared } from './policy/TargetNotDeclared.ts';
 import { policyGate, type PolicyGate } from './policy/policy-gate.ts';
-import { checkPreflight, type PreflightPassed } from './CheckPreflight.ts';
+import { checkPreflight, secretsToRedact, type PreflightPassed } from './CheckPreflight.ts';
 import { callsServices, runsDatabaseCommands } from './plan/CallsServices.ts';
 import { reachableOrigins } from './ReachableOrigins.ts';
 import type { Project } from './project/project-parser.ts';
-import { declaredCommands } from './project/unsafe-feature-declarations.ts';
 import { SENSITIVE_PLACEHOLDER } from './redaction.ts';
 import { rememberedValues, type RememberedValues } from './RememberedValues.ts';
+import type { RunFillStep, RunStep } from './RunStep.ts';
 import { withRunHashes } from './WithRunHashes.ts';
 import {
-  generateRunValues, resolveActionStep, resolveElementAssertion, resolveLocator, resolvePathTemplate, resolvePlanClock, resolveText, type RunValues,
+  generateRunValues, resolveElementAssertion, resolveFillText, resolveInputStep, resolveLocator, resolvePathTemplate, resolvePlanClock, resolveText, type RunValues,
 } from './run-values.ts';
 import {
-  NO_SECRETS, commandSecretStore, fillSecretOf, resolvePlanSecrets, resolvedSecretStore, secretEchoRemoval, secretRecords, shortSecretObservation, stubAndStorageSecretStore, withSecretRedaction,
+  commandSecretStore, resolvedSecretStore, secretEchoRemoval, secretRecords, shortSecretObservation, stubAndStorageSecretStore, withSecretRedaction,
   type ResolvedSecrets,
 } from './secrets/secret-resolution.ts';
 import { SECRET_PLACEHOLDER } from './secrets/secret-values.ts';
@@ -268,6 +269,10 @@ type RunContext = {
   // The caller's redactor with the plan's secrets added: every kept text goes through it.
   readonly redactor: Redactor;
   readonly secrets: ResolvedSecrets;
+  // The plan's steps as the run runs them, each fill of a secret carrying its own.
+  readonly planSteps: readonly RunStep[];
+  // Every page script the plan names, with its source.
+  readonly scripts: NamedScripts;
   // Whether a whole observed text is a secret too short to search for by value.
   readonly isShortSecret: (observed: string) => boolean;
   // Removes every echo of the plan's secrets, and nothing else, from text as the page wrote it.
@@ -314,100 +319,105 @@ export async function run(cleared: ClearedRun, inputs: RunInputs, ports: RunPort
   // is refused, whatever its type says.
   assertCleared(cleared);
   assertBranded(cleared.plan);
-  const { plan, project, target } = cleared;
+  const { plan, target } = cleared;
   const startedAt = ports.clock.now();
-  const { resolution, redactor, logger } = runLogging(cleared, inputs.seed, ports);
-  const nothingRan: NothingRanContext = { cleared, ports, logger, determinismUnpinned: cannotPinDeterminism(ports.drivers, target) };
+  const preflight = checkPreflight({
+    cleared, baseUrl: inputs.baseUrl, secretStore: ports.secrets, scriptSources: inputs.scriptSources ?? {},
+    services: ports.services, databaseCommands: ports.databaseCommands,
+  });
+  const { redactor, logger } = runLogging(cleared, inputs.seed, ports, preflight.redaction);
+  const nothingRan: NothingRanContext = { subject: cleared, ports, logger, determinismUnpinned: cannotPinDeterminism(ports.drivers, target) };
   const planned = lifecycle.plan(plan, target);
   // A log that fails this early ends the run Errored like one that fails later, once there are steps
   // to account for. It must not reject the run, and a refusal below still stands.
   const isPlanLogged = logKeepingTheResult({ kind: 'run.state', state: planned.state, targetId: target.id }, logger);
-
-  const scriptSources = inputs.scriptSources ?? {};
-  const preflight = checkPreflight({
-    cleared, baseUrl: inputs.baseUrl, secrets: resolution, scriptSources, services: ports.services, databaseCommands: ports.databaseCommands,
-  });
-  if (!preflight.ok) {
-    return refuseRun(planned, preflight.error, nothingRan, startedAt);
+  if (!preflight.outcome.ok) {
+    return refuseRun(planned, preflight.outcome.error, nothingRan, startedAt);
   }
-  const context = runContext(cleared, inputs, preflight.value, { ...nothingRan, redactor });
-  const unsafe = unsafeFeatureRecord(plan, project, scriptSources);
+  const passed = preflight.outcome.value;
+  const context = runContext(cleared, inputs, passed, { ...nothingRan, redactor });
 
   const opened = await openSession(planned, context);
   if (!opened.ok) {
     const unavailable = lifecycle.targetUnavailable(planned, opened.error);
-    return unavailableResult(target.id, unavailable.unavailable, context, startedAt);
+    return unavailableResult(target.id, unavailable.unavailable, nothingRan, startedAt);
   }
-  const { session, driver, executableSha256 } = opened.value;
-  // A database command's output, and the database it ran against, cannot be pinned.
-  const unpinned = [...opened.value.unpinned, ...(runsDatabaseCommands(plan) ? [DATABASE_COMMANDS_INPUT] : [])];
+  const { session, driver } = opened.value;
   const stepContext: StepContext = { ...context, session };
-  const manifestInputs: Parameters<typeof buildManifest>[0] = {
-    plan, target, adapter: driver.info, browser: session.browser,
+  const manifestInputs = manifestInputsOf(context, passed, opened.value);
+  const manifestBeforeTheSteps = buildManifest(manifestInputs);
+  const resolved = lifecycle.resolve(planned, session, manifestBeforeTheSteps, manifestHash(manifestBeforeTheSteps));
+  const ran = await runTheSteps(stepContext, resolved, driver.info.id, isPlanLogged);
+  const verdict = withRefusedDecisions(ran, session, logger);
+  const after = await afterTheVerdict(stepContext, verdict);
+  const manifest = ran.rewrites.length === 0 ? verdict.finished.manifest : buildManifest({ ...manifestInputs, responseRewrites: ran.rewrites });
+  return seal({
+    state: after.endState.state, targetId: target.id, manifest, manifestHash: manifestHash(manifest),
+    steps: verdict.steps, blockedOrigins: after.blocked, unavailable: null, ...(verdict.finished.state === 'Denied' ? { denial: verdict.finished.denial } : {}),
+    ...(after.cleanup === undefined ? {} : { cleanup: after.cleanup }), ...(after.reviewItems.length === 0 ? {} : { reviewItems: after.reviewItems }),
+    ...(ran.stubAnswers.length === 0 ? {} : { stubAnswers: [...ran.stubAnswers] }),
+    timings: { totalMilliseconds: readKeepingTheResult(() => ports.clock.now() - startedAt, 0, logger), stepMilliseconds: ran.stepMilliseconds },
+  }, nothingRan);
+}
+
+type ManifestInputs = Parameters<typeof buildManifest>[0];
+
+// What the manifest records of a run whose session opened, before any step runs.
+function manifestInputsOf(context: RunContext, passed: PreflightPassed, opened: OpenedSession): ManifestInputs {
+  const { plan, project, target } = context.cleared;
+  const { inputs } = context;
+  const unsafe = unsafeFeatureRecord(plan, project, passed.scripts);
+  // A database command's output, and the database it ran against, cannot be pinned.
+  const unpinned = [...opened.unpinned, ...(runsDatabaseCommands(plan) ? [DATABASE_COMMANDS_INPUT] : [])];
+  return {
+    plan, target, adapter: opened.driver.info, browser: opened.session.browser,
     seed: inputs.seed, fixedTimeMilliseconds: inputs.fixedTimeMilliseconds, fixtures: inputs.fixtures, host: inputs.host,
     ...secretRecords(context.secrets), callsServices: callsServices(plan),
     ...(unsafe === undefined ? {} : { unsafe }),
     ...(unpinned.length === 0 ? {} : { unpinned }),
-    ...(executableSha256 === undefined ? {} : { executableSha256 }),
+    ...(opened.executableSha256 === undefined ? {} : { executableSha256: opened.executableSha256 }),
     ...(inputs.pins === undefined ? {} : { pins: { pins: inputs.pins, project } }),
     recordsReplies: project.replay?.recordReplies === true,
   };
-  const manifestBeforeTheSteps = buildManifest(manifestInputs);
-  const resolved = lifecycle.resolve(planned, session, manifestBeforeTheSteps, manifestHash(manifestBeforeTheSteps));
+}
+
+type FinishedRun = lifecycle.Finished<'Passed' | 'Failed' | 'Errored'> | lifecycle.DeniedRun;
+
+// The steps' results and verdict, and what was read from the session before it closed.
+type StepsRun = {
+  readonly running: lifecycle.Running;
+  readonly steps: readonly StepResult[];
+  readonly stepMilliseconds: readonly number[];
+  readonly stubAnswers: readonly StubAnswer[];
+  readonly rewrites: readonly AppliedRewrite[];
+  readonly finished: FinishedRun;
+};
+
+// Runs the steps in order and gives them a verdict, then closes the session, whatever happened.
+async function runTheSteps(context: StepContext, resolved: lifecycle.Resolved, adapter: string, isPlanLogged: boolean): Promise<StepsRun> {
+  const { session, logger, ports } = context;
+  const targetId = context.cleared.target.id;
   const running = lifecycle.start(resolved);
   const steps: StepResult[] = [];
   const stepMilliseconds: number[] = [];
-  let stubAnswers: readonly StubAnswer[] = [];
+  let stubAnswers: readonly StubAnswer[];
   let rewrites: readonly AppliedRewrite[];
-  let finished: lifecycle.Finished<'Passed' | 'Failed' | 'Errored'> | lifecycle.DeniedRun;
+  let finished: FinishedRun;
   try {
     if (!isPlanLogged) {
       throw new Error('the log could not be written');
     }
     // The hash as it stands before the steps: a run whose proxy then rewrites a response ends with another.
-    logger.log({ kind: 'run.state', state: resolved.state, targetId: target.id, adapter: driver.info.id, sha256: resolved.manifestHash });
-    logger.log({ kind: 'run.state', state: running.state, targetId: target.id });
-    const notObserved = await failureToObserveRequests(session, stepContext);
-    for (const [index, step] of plan.steps.entries()) {
-      if (steps.some((done) => done.outcome === 'failed')) { steps.push({ index, type: step.type, outcome: 'skipped' }); continue; }
-      const stepStartedAt = ports.clock.now();
-      logger.log({ kind: 'step.start', stepIndex: index, stepType: step.type });
-      // The first step stands for what could not be started, so the result says why nothing ran.
-      const done = index === 0 && notObserved !== undefined ? failedStep(step, index, notObserved) : await runStep(step, index, session, target, stepContext);
-      // With no later step to notice, a crash the last step did not report would go unseen.
-      const isLastStep = index === plan.steps.length - 1;
-      const result = isLastStep && done.outcome === 'passed' && session.crashed() ? failedStep(step, index, TARGET_CRASHED) : done;
-      stepMilliseconds.push(ports.clock.now() - stepStartedAt);
-      steps.push(result);
-      logger.log({
-        kind: 'step.end', stepIndex: index, stepType: step.type, outcome: result.outcome,
-        durationMilliseconds: stepMilliseconds[stepMilliseconds.length - 1] ?? 0, ...(result.code === undefined ? {} : { code: result.code }),
-      });
-    }
+    logger.log({ kind: 'run.state', state: resolved.state, targetId, adapter, sha256: resolved.manifestHash });
+    logger.log({ kind: 'run.state', state: running.state, targetId });
+    await runEachStep(context, steps, stepMilliseconds);
     // In the try: a port that cannot say what it rewrote must not leave a mutated run reading as plain.
     rewrites = ports.rewritesApplied?.() ?? [];
-    // A denied action failed its step, so every later step was skipped and nothing ran after it.
-    // A failed call, page script or database command could not set up or reach what the test
-    // needs, and a page script that threw, hung or gave no usable result, or a backend check whose
-    // call got no answer, could not check it, which is not a product failure.
-    const denial = context.denials[0];
-    if (denial !== undefined && steps.some((done) => done.code === 'policy-denied')) {
-      finished = lifecycle.deny(running, denial);
-    } else if (steps.some((done) => couldNotTest(done, stepContext))) {
-      finished = lifecycle.finish(running, 'Errored');
-    } else {
-      finished = lifecycle.finish(running, steps.every((done) => done.outcome === 'passed') ? 'Passed' : 'Failed');
-    }
+    finished = verdictOf(steps, running, context);
   } catch {
     // A step's own failures never get here, so only the log or the clock can have failed. The result
     // still accounts for every step.
-    const [unfinished, ...unreached] = plan.steps.slice(steps.length);
-    if (unfinished !== undefined) {
-      steps.push(failedStep(unfinished, steps.length, ADAPTER_ERROR));
-    }
-    for (const step of unreached) {
-      steps.push({ index: steps.length, type: step.type, outcome: 'skipped' });
-    }
+    pushUnfinishedSteps(context.planSteps, steps);
     finished = lifecycle.finish(running, 'Errored');
     rewrites = readKeepingTheResult(() => ports.rewritesApplied?.() ?? [], [], logger);
   } finally {
@@ -415,30 +425,106 @@ export async function run(cleared: ClearedRun, inputs: RunInputs, ports: RunPort
     stubAnswers = readKeepingTheResult(() => session.network.stubAnswers(), [], logger);
     await closeKeepingTheResult(session, ports.clock, logger);
   }
-  // Read once the session has closed, when no decision is left waiting for the browser's answer. With
-  // no later step to report one the browser refused after the last step ended, the last step stands
-  // for it, as it does for a crash it missed.
+  return { running, steps, stepMilliseconds, stubAnswers, rewrites, finished };
+}
+
+// Each step in order, with its result and duration pushed as it ends. After a failed step, every
+// later one is skipped.
+async function runEachStep(context: StepContext, steps: StepResult[], stepMilliseconds: number[]): Promise<void> {
+  const { session, logger, ports, planSteps } = context;
+  const target = context.cleared.target;
+  const notObserved = await failureToObserveRequests(session, context);
+  for (const [index, step] of planSteps.entries()) {
+    if (steps.some((done) => done.outcome === 'failed')) { steps.push({ index, type: step.type, outcome: 'skipped' }); continue; }
+    const stepStartedAt = ports.clock.now();
+    logger.log({ kind: 'step.start', stepIndex: index, stepType: step.type });
+    // The first step stands for what could not be started, so the result says why nothing ran.
+    const done = index === 0 && notObserved !== undefined ? failedStep(step, index, notObserved) : await runStep(step, index, session, target, context);
+    // With no later step to notice, a crash the last step did not report would go unseen.
+    const isLastStep = index === planSteps.length - 1;
+    const result = isLastStep && done.outcome === 'passed' && session.crashed() ? failedStep(step, index, TARGET_CRASHED) : done;
+    stepMilliseconds.push(ports.clock.now() - stepStartedAt);
+    steps.push(result);
+    logger.log({
+      kind: 'step.end', stepIndex: index, stepType: step.type, outcome: result.outcome,
+      durationMilliseconds: stepMilliseconds[stepMilliseconds.length - 1] ?? 0, ...(result.code === undefined ? {} : { code: result.code }),
+    });
+  }
+}
+
+// A denied action failed its step, so every later step was skipped and nothing ran after it. A
+// failed call, page script or database command could not set up or reach what the test needs, and
+// a page script that threw, hung or gave no usable result, or a backend check whose call got no
+// answer, could not check it, which is not a product failure.
+function verdictOf(steps: readonly StepResult[], running: lifecycle.Running, context: RunContext): FinishedRun {
+  const denial = context.denials[0];
+  if (denial !== undefined && steps.some((done) => done.code === 'policy-denied')) {
+    return lifecycle.deny(running, denial);
+  }
+  if (steps.some((done) => couldNotTest(done, context))) {
+    return lifecycle.finish(running, 'Errored');
+  }
+  return lifecycle.finish(running, steps.every((done) => done.outcome === 'passed') ? 'Passed' : 'Failed');
+}
+
+// Adds to the steps the one that was running when the log or the clock failed, as failed, and every
+// one after it, as skipped.
+function pushUnfinishedSteps(planSteps: readonly RunStep[], steps: StepResult[]): void {
+  const [unfinished, ...unreached] = planSteps.slice(steps.length);
+  if (unfinished !== undefined) {
+    steps.push(failedStep(unfinished, steps.length, ADAPTER_ERROR));
+  }
+  for (const step of unreached) {
+    steps.push({ index: steps.length, type: step.type, outcome: 'skipped' });
+  }
+}
+
+type StepsVerdict = Pick<StepsRun, 'running' | 'steps' | 'finished'>;
+
+// Read once the session has closed, when no decision is left waiting for the browser's answer. With
+// no later step to report one the browser refused after the last step ended, the last step stands
+// for it, as it does for a crash it missed.
+function withRefusedDecisions(ran: StepsRun, session: Session, logger: Logger): StepsVerdict {
   const refusedDecisions: readonly string[] = readKeepingTheResult(() => session.refusedRequestDecisions(), [], logger);
   for (const refusal of refusedDecisions) {
     logFailureAfterTheVerdict(ADAPTER_ERROR, refusal, logger);
   }
-  if (refusedDecisions.length > 0 && finished.state === 'Passed') {
-    const lastStep = steps.pop();
-    if (lastStep !== undefined) {
-      steps.push({ ...lastStep, ...stepFailed(ADAPTER_ERROR) });
-    }
-    finished = lifecycle.finish(running, 'Errored');
+  if (refusedDecisions.length === 0 || ran.finished.state !== 'Passed') {
+    return ran;
   }
-  // Whatever the outcome. A failing cleanup step never changes the verdict; it raises a review item.
+  const lastIndex = ran.steps.length - 1;
+  const steps = ran.steps.map((done, index) => (index === lastIndex ? { ...done, ...stepFailed(ADAPTER_ERROR) } : done));
+  return { running: ran.running, steps, finished: lifecycle.finish(ran.running, 'Errored') };
+}
+
+type AfterTheVerdict = {
+  readonly cleanup: readonly CleanupResult[] | undefined;
+  readonly reviewItems: readonly RunReviewItem[];
+  readonly blocked: readonly string[];
+  readonly endState: FinishedRun;
+};
+
+// The plan's cleanup, whatever the outcome, then what the egress refused, which the result claims,
+// and the run's last log entries.
+async function afterTheVerdict(context: StepContext, verdict: StepsVerdict): Promise<AfterTheVerdict> {
+  const { plan } = context.cleared;
+  // A failing cleanup step never changes the verdict; it raises a review item.
   const cleanup = plan.cleanup === undefined ? undefined : await runCleanup(plan.cleanup, plan.steps.length, context.calls, context.commands);
   const cleanupItems = (cleanup ?? []).flatMap((done): RunReviewItem[] => (done.outcome === 'failed' ? [{ code: 'cleanup-failed', cleanupIndex: done.index }] : []));
-  const blockedRead = readBlockedOrigins(session);
+  const blockedRead = readBlockedOrigins(context.session);
   if (!blockedRead.ok) {
-    logFailureAfterTheVerdict(EGRESS_UNREAD, blockedRead.error, logger);
+    logFailureAfterTheVerdict(EGRESS_UNREAD, blockedRead.error, context.logger);
   }
   const blocked = blockedRead.ok ? blockedRead.value : [];
   const reviewItems: readonly RunReviewItem[] = blockedRead.ok ? cleanupItems : [...cleanupItems, { code: EGRESS_UNREAD }];
-  const endState = blockedRead.ok ? finished : lifecycle.finish(running, 'Errored');
+  const endState = blockedRead.ok ? verdict.finished : lifecycle.finish(verdict.running, 'Errored');
+  logTheEnd(context, blocked, endState);
+  return { cleanup, reviewItems, blocked, endState };
+}
+
+// The connections that failed, the origins the egress refused and the state the run ended in.
+function logTheEnd(context: StepContext, blocked: readonly string[], endState: FinishedRun): void {
+  const { session, logger } = context;
   readKeepingTheResult(() => {
     for (const { origin, message } of session.connectionFailures()) {
       logger.log({ kind: 'session.connection-failed', origin, detail: message });
@@ -447,33 +533,19 @@ export async function run(cleared: ClearedRun, inputs: RunInputs, ports: RunPort
   readKeepingTheResult(() => {
     for (const origin of blocked) logger.log({ kind: 'network.blocked', origin });
     logger.log({
-      kind: 'run.state', state: endState.state, targetId: target.id,
+      kind: 'run.state', state: endState.state, targetId: context.cleared.target.id,
       ...(endState.state === 'Denied' ? { code: endState.denial.rule, stepIndex: endState.denial.stepIndex } : {}),
     });
   }, undefined, logger);
-  const manifest = rewrites.length === 0 ? finished.manifest : buildManifest({ ...manifestInputs, responseRewrites: rewrites });
-  return seal({
-    state: endState.state, targetId: target.id, manifest, manifestHash: manifestHash(manifest),
-    steps, blockedOrigins: blocked, unavailable: null, ...(finished.state === 'Denied' ? { denial: finished.denial } : {}),
-    ...(cleanup === undefined ? {} : { cleanup }), ...(reviewItems.length === 0 ? {} : { reviewItems }),
-    ...(stubAnswers.length === 0 ? {} : { stubAnswers: [...stubAnswers] }),
-    timings: { totalMilliseconds: readKeepingTheResult(() => ports.clock.now() - startedAt, 0, logger), stepMilliseconds },
-  }, context);
 }
 
-// What the run logs and redacts with. Resolving reads only the store, so it comes first: the run's
-// redactor needs the secrets before anything is logged. A missing secret refuses the run at
-// preflight, before any driver call. A command's secrets are needed only by a run that can run
-// commands.
-function runLogging(subject: RunSubject, seed: number, ports: RunPorts): {
-  readonly resolution: Result<ResolvedSecrets, SecretName>; readonly redactor: Redactor; readonly logger: Logger;
+// What the run logs and redacts with: the caller's redactor with the plan's secrets added.
+function runLogging(subject: RunSubject, seed: number, ports: RunPorts, secrets: ResolvedSecrets): {
+  readonly redactor: Redactor; readonly logger: Logger;
 } {
-  const { plan, project } = subject;
-  const runId = sha256(`${sha256(canonicalJson(plan))}:${subject.targetId}:${seed}`).slice(0, 16);
-  const commandDeclarations = ports.databaseCommands === undefined ? {} : declaredCommands(project.unsafeFeatures);
-  const resolution = resolvePlanSecrets(plan, ports.secrets, project.calls, commandDeclarations);
-  const redactor = withSecretRedaction(ports.redactor, resolution.ok ? resolution.value : NO_SECRETS);
-  return { resolution, redactor, logger: manifestLogger(ports.events, redactor, runId) };
+  const runId = sha256(`${sha256(canonicalJson(subject.plan))}:${subject.targetId}:${seed}`).slice(0, 16);
+  const redactor = withSecretRedaction(ports.redactor, secrets);
+  return { redactor, logger: manifestLogger(ports.events, redactor, runId) };
 }
 
 // The context of a run that passed preflight: what its steps run with.
@@ -500,9 +572,9 @@ function runContext(
     runner: passed.databaseCommands, project, values, remembered, secrets: commandSecretStore(secrets), clock: ports.clock, logger, holdsSecret,
   };
   return {
-    cleared, inputs, ports, logger, gate: policyGate({ project, events: ports.audit }), denials: [], redactor, secrets, isShortSecret, withoutSecrets,
-    holdsSecret, secretFilledFields: new Map(), values, remembered, calls, commands, rememberedTexts, downloads: new Map(), activeStubs: new Set(),
-    setupFailedInside: new Set(), determinismUnpinned: logging.determinismUnpinned,
+    cleared, inputs, ports, logger, gate: policyGate({ project, events: ports.audit }), denials: [], redactor, secrets, planSteps: passed.steps,
+    scripts: passed.scripts, isShortSecret, withoutSecrets, holdsSecret, secretFilledFields: new Map(), values, remembered, calls, commands,
+    rememberedTexts, downloads: new Map(), activeStubs: new Set(), setupFailedInside: new Set(), determinismUnpinned: logging.determinismUnpinned,
   };
 }
 
@@ -511,10 +583,10 @@ function runContext(
 // sealed as any run that never opened its target is.
 function targetNotDeclaredResult(notDeclared: TargetNotDeclared, seed: number, ports: RunPorts): RunResult {
   const startedAt = ports.clock.now();
-  const { logger } = runLogging(notDeclared, seed, ports);
+  const { logger } = runLogging(notDeclared, seed, ports, secretsToRedact(notDeclared, ports.secrets, ports.databaseCommands));
   const target = notDeclared.project.matrix.find((candidate) => candidate.id === notDeclared.targetId);
   const nothingRan: NothingRanContext = {
-    cleared: notDeclared, ports, logger, determinismUnpinned: target !== undefined && cannotPinDeterminism(ports.drivers, target),
+    subject: notDeclared, ports, logger, determinismUnpinned: target !== undefined && cannotPinDeterminism(ports.drivers, target),
   };
   const unavailable = { reason: UnavailableReason.NotDeclared, detail: 'target is not in both the plan and the matrix' };
   return unavailableResult(notDeclared.targetId, unavailable, nothingRan, startedAt);
@@ -546,6 +618,11 @@ export async function runUntrusted(
     switch (clearance.kind) {
       case ClearedRunKind: results.push(await run(clearance, inputs, ports)); break;
       case UnavailableReason.NotDeclared: results.push(targetNotDeclaredResult(clearance, inputs.seed, ports)); break;
+      // A new kind of clearance fails to compile here until it is handled.
+      default: {
+        const unhandled: never = clearance;
+        return unhandled;
+      }
     }
   }
   return results;
@@ -763,7 +840,7 @@ async function closeKeepingTheResult(session: Session, clock: Clock, logger: Log
 
 // One step, wherever in the plan it stands, with what its driver alone cannot be trusted to report:
 // a browser already dead, a check that passed from memory while it died, a throw, and a denial.
-async function runStep(step: Step, index: number, session: DocumentSession, target: Target, context: StepContext): Promise<StepResult> {
+async function runStep(step: RunStep, index: number, session: DocumentSession, target: Target, context: StepContext): Promise<StepResult> {
   const denialsBefore = context.denials.length;
   const result = await runStepOnLivePage(step, index, session, target, context);
   // The audit log holds this denial, so whatever the driver reported from the same moment must not
@@ -774,7 +851,7 @@ async function runStep(step: Step, index: number, session: DocumentSession, targ
   return withActiveStubs(step, result, context.activeStubs);
 }
 
-async function runStepOnLivePage(step: Step, index: number, session: DocumentSession, target: Target, context: StepContext): Promise<StepResult> {
+async function runStepOnLivePage(step: RunStep, index: number, session: DocumentSession, target: Target, context: StepContext): Promise<StepResult> {
   if (session.crashed()) {
     return failedStep(step, index, TARGET_CRASHED);
   }
@@ -807,7 +884,7 @@ const holdsARecord = (done: StepResult): boolean => Object.keys(done).some((key)
 // of their own in the plan's list: the first that fails fails the frame or newTab step, with its code,
 // observation and records, and the records of those before it are kept beside them.
 async function runInnerSteps(
-  container: Extract<Step, { type: 'frame' | 'newTab' }>, index: number, session: DocumentSession, target: Target, context: StepContext,
+  container: Extract<RunStep, { type: 'frame' | 'newTab' }>, index: number, session: DocumentSession, target: Target, context: StepContext,
 ): Promise<StepResult> {
   const kept: StepResult[] = [];
   const withKept = (result: StepResult, nested: readonly StepResult[] = []): StepResult =>
@@ -848,9 +925,9 @@ const clockAndClipboardContext = (context: StepContext): ClockAndClipboardContex
   clock: context.ports.clock,
 });
 
-// What the page-script steps use: the run's values and the declared scripts' sources.
+// What the page-script steps use: the run's values and the scripts the plan names, with their sources.
 const pageScriptContext = (context: RunContext): PageScriptContext => ({
-  project: context.cleared.project, scriptSources: context.inputs.scriptSources ?? {}, values: context.values,
+  project: context.cleared.project, scripts: context.scripts, values: context.values,
   remembered: context.remembered, clock: context.ports.clock, logger: context.logger, holdsSecret: context.holdsSecret,
 });
 
@@ -859,7 +936,7 @@ const NO_ELEMENT: ResolvedElement = { role: null, name: null, box: null, formSub
 
 // Runs one step on a document of the page: the top document, or an iframe's for the steps inside a
 // frame step, which report under the frame step's own index.
-async function executeStep(step: Step, index: number, session: DocumentSession, target: Target, context: StepContext): Promise<StepResult> {
+async function executeStep(step: RunStep, index: number, session: DocumentSession, target: Target, context: StepContext): Promise<StepResult> {
   const base = { index, type: step.type } as const;
   switch (step.type) {
     case 'navigate': {
@@ -882,20 +959,16 @@ async function executeStep(step: Step, index: number, session: DocumentSession, 
     }
     case 'click':
     case 'hover':
-    case 'fill':
     case 'select':
     case 'upload':
     case 'press': {
       // Values are substituted first, so the runtime guard and the driver see the final text.
-      const action = resolveActionStep(step, context.values, context.cleared.project);
+      const action = resolveInputStep(step, context.values, context.cleared.project);
       if (!action.ok) return { ...base, ...stepFailed(action.error) };
-      const resolved = action.value;
-      const performable = withFillSecret(resolved, context.secrets);
-      // Marked before acting: a fill that fails part way may still have typed some of the secret.
-      if (performable.type === 'fill') markFilledField(performable, context.secretFilledFields);
-      const acted = await session.act(performable, guardFor(resolved, index, target, context));
+      const acted = await session.act(action.value, guardFor(action.value, index, target, context));
       return acted.ok ? { ...base, outcome: 'passed' } : { ...base, ...stepFailed(acted.error.code) };
     }
+    case 'fill': return fillField(step, index, session, target, context);
     case 'dialog': {
       // The driver answers the dialog the page opened, asking the runtime guard first with the
       // dialog's text, so accepting an irreversible one ends the run Denied with nothing sent.
@@ -1136,7 +1209,7 @@ function checkDownload(step: Extract<Step, { type: 'expectDownload' }>, index: n
 // A newTab step: opens its URL in a second tab of the session's browser context, runs its steps
 // there in order and closes the tab, whatever they did. A tab that will not close fails a step that
 // had passed, and never takes the place of a real failure.
-async function runInNewTab(step: Extract<Step, { type: 'newTab' }>, index: number, target: Target, context: StepContext): Promise<StepResult> {
+async function runInNewTab(step: Extract<RunStep, { type: 'newTab' }>, index: number, target: Target, context: StepContext): Promise<StepResult> {
   const base = { index, type: step.type } as const;
   let path = step.url;
   if (typeof path !== 'string') {
@@ -1172,19 +1245,33 @@ function resolveDialogStep(step: DialogStep, context: RunContext): Result<Resolv
   return expected.ok ? success({ type: step.type, action: step.action, expectText: expected.value }) : expected;
 }
 
-// The action as the driver performs it: a fill of a secret reference carries the secret the run
-// resolved for it, opaque, so the driver reveals it only as it types.
-function withFillSecret(action: ResolvedActionStep, secrets: ResolvedSecrets): PerformableAction {
-  if (action.type !== 'fill') return action;
-  const { type, locator, value } = action;
-  return { type, locator, value: fillValueOf(value, secrets) };
+// A fill as the runtime guard reads it, with the plan's secret reference, and as the driver performs
+// it, with the secret preflight resolved for it, opaque, so the driver reveals it only as it types.
+type ResolvedFill = { readonly guarded: ResolvedActionStep; readonly performable: PerformableFill };
+
+// Values are substituted first, so the runtime guard and the driver see the final text.
+function resolveFill(step: RunFillStep, context: RunContext): Result<ResolvedFill, StepCode> {
+  const locator = resolveLocator(step.locator, context.values, context.cleared.project);
+  if (!locator.ok) return locator;
+  const { type } = step;
+  if ('secret' in step) {
+    const performable: PerformableFill = { type, locator: locator.value, value: { kind: FillValueKind.Secret, secret: step.secret } };
+    return success({ guarded: { type, locator: locator.value, value: step.value }, performable });
+  }
+  const text = resolveFillText(step.value, context.values, context.cleared.project);
+  if (!text.ok) return text;
+  const value: FillValue = typeof text.value === 'string' ? { kind: FillValueKind.Text, text: text.value } : { kind: FillValueKind.Lines, lines: text.value.lines };
+  return success({ guarded: { type, locator: locator.value, value: text.value }, performable: { type, locator: locator.value, value } });
 }
 
-function fillValueOf(value: Extract<ResolvedActionStep, { type: 'fill' }>['value'], secrets: ResolvedSecrets): FillValue {
-  if (typeof value === 'string') return { kind: FillValueKind.Text, text: value };
-  return 'lines' in value
-    ? { kind: FillValueKind.Lines, lines: value.lines }
-    : { kind: FillValueKind.Secret, secret: fillSecretOf(secrets, value.secretName) };
+async function fillField(step: RunFillStep, index: number, session: DocumentSession, target: Target, context: RunContext): Promise<StepResult> {
+  const base = { index, type: step.type } as const;
+  const fill = resolveFill(step, context);
+  if (!fill.ok) return { ...base, ...stepFailed(fill.error) };
+  // Marked before acting: a fill that fails part way may still have typed some of the secret.
+  markFilledField(fill.value.performable, context.secretFilledFields);
+  const acted = await session.act(fill.value.performable, guardFor(fill.value.guarded, index, target, context));
+  return acted.ok ? { ...base, outcome: 'passed' } : { ...base, ...stepFailed(acted.error.code) };
 }
 
 // Keeps the fields whose last fill typed a secret, by their locator.
@@ -1297,7 +1384,7 @@ function unavailableResult(targetId: string, unavailable: Unavailable, context: 
 // are claimed only for a run whose isolation port says the isolated runner enforced egress; any other
 // run counts as running on the host.
 const planRunGuarantees = (context: SealContext, unsafeFeatures: readonly UnsafeFeature[], isEgressUnread: boolean): GuaranteeStatement => {
-  const { plan, project } = context.cleared;
+  const { plan, project } = context.subject;
   const repliesNotRecorded = callsServices(plan) && project.replay?.recordReplies !== true;
   const isIsolated = context.ports.isolation.guaranteeLevel() === 'isolated';
   return guaranteeStatement({
@@ -1309,15 +1396,15 @@ const planRunGuarantees = (context: SealContext, unsafeFeatures: readonly Unsafe
 
 // What a result is sealed with: the plan, project and standing it was judged as, which a target that
 // is not declared has too.
-type SealContext = { readonly cleared: RunSubject; readonly ports: RunPorts; readonly determinismUnpinned: boolean };
+type SealContext = { readonly subject: RunSubject; readonly ports: RunPorts; readonly determinismUnpinned: boolean };
 // What a run that ended before any step needs: the seal, and the log it ends on.
 type NothingRanContext = SealContext & { readonly logger: Logger };
 
 // Adds the run mode, the guarantee statement, the unsafe label (for a plan using unsafe features),
 // the approval label (for an approved plan) and the result's two hashes.
 function seal(outcome: Omit<RunResult, 'resultHash' | 'evidenceHash' | 'approvalLabel' | 'mode' | 'guarantees' | 'unsafeFeatures'>, context: SealContext): RunResult {
-  const standing = context.cleared.standing;
-  const unsafeFeatures = unsafeFeaturesOf(context.cleared.plan);
+  const standing = context.subject.standing;
+  const unsafeFeatures = unsafeFeaturesOf(context.subject.plan);
   const isEgressUnread = (outcome.reviewItems ?? []).some((item) => item.code === EGRESS_UNREAD);
   const labelled = {
     ...outcome, mode: 'plan' as const, guarantees: planRunGuarantees(context, unsafeFeatures, isEgressUnread),

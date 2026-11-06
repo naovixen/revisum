@@ -5,8 +5,8 @@
 //   - expectScript runs its read script and checks one field of the result, repeating until the
 //     check passes or the project's scriptCheckTimeoutMilliseconds runs out. A script that throws,
 //     times out or gives a result that cannot be decoded stops the check at once.
-// The script's source comes from the run's script sources (the protected branch's files) or from
-// the plan, and reaches the driver unchanged; arguments go as JSON values, never into the source.
+// The script's source comes from the named scripts preflight proved the run holds (the protected
+// branch's files) or from the plan, and reaches the driver unchanged; arguments go as JSON values, never into the source.
 // The result text is decoded by the engine, under its own limits, and only the declared fields
 // are read. Neither the text nor a field's value is kept: the result and the log record the
 // text's sha256, and a remembered value's name and sha256.
@@ -19,12 +19,12 @@ import {
 import type { Logger } from '../logging.ts';
 import { rememberedFieldEntries } from '../plan/plan-values.ts';
 import type { Project } from '../project/project-parser.ts';
-import { declaredScripts } from '../project/unsafe-feature-declarations.ts';
 import { recordsOfRemembered, type RememberedRecord, type RememberedValues } from '../RememberedValues.ts';
 import { resolveText, type RunValues } from '../run-values.ts';
 import { sha256UnlessHoldingASecret } from '../secrets/secret-resolution.ts';
 import { argumentProblem, runValueArgument, type ArgumentValue } from '../service-calls/parameter-values.ts';
 import { checkBackendField, fieldAt, fieldText } from '../service-calls/service-response.ts';
+import type { NamedScripts } from './NamedScriptSources.ts';
 import { decodeScriptResult } from './page-script-result.ts';
 
 // A declared script's limits when its declaration sets none: 5 seconds and 256 KiB.
@@ -36,8 +36,8 @@ const SCRIPT_CHECK_INTERVAL_MILLISECONDS = 100;
 // What the run hands these steps. `remembered` is how an evaluate adds to the run's values.
 export type PageScriptContext = {
   readonly project: Project;
-  // The declared script files' bytes, keyed by declared file path.
-  readonly scriptSources: Readonly<Record<string, Uint8Array>>;
+  // Every page script the plan names, as the project declares it, with its source.
+  readonly scripts: NamedScripts;
   readonly values: RunValues;
   readonly remembered: RememberedValues;
   readonly clock: Clock;
@@ -76,9 +76,8 @@ type ScriptToRun = {
   readonly maximumResultBytes: number;
 };
 
-// The script a step names. A named script the run's project does not declare, or whose source the
-// run was not given, cannot run here; run() refuses a plan missing a declared script's source
-// before any side effect, so that is only a plan parsed under another project.
+// The script a step names. The named scripts hold every one the run's plan names, with its source,
+// so a name not among them is a step from a plan the run was not cleared for, which cannot run here.
 function scriptToRun(choice: ScriptChoice, context: PageScriptContext): Result<ScriptToRun, StepCode> {
   if (typeof choice !== 'string') {
     const inline = choice.inline;
@@ -88,14 +87,12 @@ function scriptToRun(choice: ScriptChoice, context: PageScriptContext): Result<S
       timeoutMilliseconds: DEFAULT_SCRIPT_TIMEOUT_MILLISECONDS, maximumResultBytes: DEFAULT_MAXIMUM_SCRIPT_RESULT_BYTES,
     });
   }
-  const declared = Object.entries(declaredScripts(context.project.unsafeFeatures)).find(([name]) => name === choice);
-  if (declared === undefined) return failure('unsupported-step');
-  const declaration = declared[1];
-  const bytes = Object.hasOwn(context.scriptSources, declaration.file) ? context.scriptSources[declaration.file] : undefined;
-  if (bytes === undefined) return failure('unsupported-step');
+  const named = context.scripts.get(choice);
+  if (named === undefined) return failure('unsupported-step');
+  const declaration = named.declaration;
   let source: string;
   try {
-    source = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+    source = new TextDecoder('utf-8', { fatal: true }).decode(named.source);
   } catch {
     // A file that is not UTF-8 text is no script the page could run.
     return failure('script-failed');

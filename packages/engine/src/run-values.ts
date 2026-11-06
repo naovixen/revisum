@@ -6,7 +6,8 @@
 import {
   failure, literalText, referencedValueName, success,
   type AllowedUrl, type ElementAssertion, type GeneratedValue, type Locator, type PathTemplate, type Plan,
-  type PlanClock, type ResolvedActionStep, type ResolvedMultiLineText, type ResolvedElementAssertion, type ResolvedLocator, type Result, type SafeText, type Step, type Target,
+  type PlanClock, type ResolvedActionStep, type ResolvedMultiLineText, type ResolvedElementAssertion, type ResolvedLocator, type Result, type SafeText, type SecretReference, type Step,
+  type Target,
   type TextOrValue, type TimeZone, type ValueName,
 } from '@revisum/contracts';
 import { brand } from './brand.ts';
@@ -204,12 +205,27 @@ function resolveLines(lines: readonly TextOrValue[], values: RunValues, project:
   return characters > project.limits.maximumFillCharacters ? failure('value-too-long') : success({ lines: resolved });
 }
 
-// The action a driver performs, with every value replaced.
-export function resolveActionStep(
-  step: Extract<Step, { type: ResolvedActionStep['type'] }>, values: RunValues, project: LimitsOf,
-): Result<ResolvedActionStep, StepErrorCode> {
+type FillStep = Extract<Step, { type: 'fill' }>;
+// What a fill types when it is not a secret: text, a value reference or several lines.
+export type FillText = Exclude<FillStep['value'], SecretReference>;
+// An action step other than a fill.
+export type InputStep = Extract<Step, { type: Exclude<ResolvedActionStep['type'], 'fill'> }>;
+export type ResolvedInputStep = Exclude<ResolvedActionStep, { type: 'fill' }>;
+
+// The text a fill types, with every value replaced.
+export function resolveFillText(value: FillText, values: RunValues, project: LimitsOf): Resolved<SafeText | ResolvedMultiLineText> {
+  if (typeof value === 'object' && 'lines' in value) {
+    return resolveLines(value.lines, values, project);
+  }
+  return resolveText(value, values, project.limits.maximumTextLength);
+}
+
+// An action other than a fill as a driver performs it, with every value replaced.
+export function resolveInputStep(step: InputStep, values: RunValues, project: LimitsOf): Result<ResolvedInputStep, StepErrorCode> {
   const locator = resolveLocator(step.locator, values, project);
-  if (!locator.ok) return locator;
+  if (!locator.ok) {
+    return locator;
+  }
   switch (step.type) {
     case 'click': case 'hover': return success({ type: step.type, locator: locator.value });
     case 'upload': return success({ type: step.type, locator: locator.value, fixture: step.fixture });
@@ -218,16 +234,26 @@ export function resolveActionStep(
       const option = resolveText(step.option, values, project.limits.maximumTextLength);
       return option.ok ? success({ type: step.type, locator: locator.value, option: option.value }) : option;
     }
-    case 'fill': {
-      if (typeof step.value === 'object' && 'lines' in step.value) {
-        const lines = resolveLines(step.value.lines, values, project);
-        return lines.ok ? success({ type: step.type, locator: locator.value, value: lines.value }) : lines;
-      }
-      if (typeof step.value === 'object' && 'secretName' in step.value) return success({ type: step.type, locator: locator.value, value: step.value });
-      const value = resolveText(step.value, values, project.limits.maximumTextLength);
-      return value.ok ? success({ type: step.type, locator: locator.value, value: value.value }) : value;
-    }
   }
+}
+
+// The action a driver performs, with every value replaced.
+export function resolveActionStep(
+  step: Extract<Step, { type: ResolvedActionStep['type'] }>, values: RunValues, project: LimitsOf,
+): Result<ResolvedActionStep, StepErrorCode> {
+  if (step.type !== 'fill') {
+    return resolveInputStep(step, values, project);
+  }
+  const locator = resolveLocator(step.locator, values, project);
+  if (!locator.ok) {
+    return locator;
+  }
+  const value = step.value;
+  if (typeof value === 'object' && 'secretName' in value) {
+    return success({ type: step.type, locator: locator.value, value });
+  }
+  const text = resolveFillText(value, values, project);
+  return text.ok ? success({ type: step.type, locator: locator.value, value: text.value }) : text;
 }
 
 // A locator or action step holding only literal text, as a driver takes it: what a caller that hands

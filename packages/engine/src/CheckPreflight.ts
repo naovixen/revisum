@@ -3,7 +3,8 @@
 // services or database commands the plan needs with nothing to run them, a saved storage state, and
 // an element check no driver decides. Each reads only the cleared run and what the run was handed,
 // so a refusal leaves nothing behind: no browser opened, no call sent, no command run. A run that
-// passes gets what those checks proved, so nothing after them checks again.
+// passes gets what those checks proved, so nothing after them checks again: its steps with each
+// fill's secret, and the page scripts it names with their sources.
 //
 // What the target itself allows is not here, and ends a run TargetUnavailable rather than Refused:
 // a target the plan or the matrix does not declare never becomes a cleared run (the policy gate
@@ -17,36 +18,57 @@ import {
     WorkloadErrorCode,
     type BaseUrl,
     type DatabaseCommandRunner,
+    type Plan,
     type Result,
     type SecretName,
+    type SecretStore,
     type ServiceCaller,
 } from "@revisum/contracts";
 import type { Refusal } from "./lifecycle.ts";
-import { missingScriptSource } from "./manifest.ts";
+import { namedScriptSources, type NamedScripts } from "./page-scripts/NamedScriptSources.ts";
 import { callsServices, runsDatabaseCommands } from "./plan/CallsServices.ts";
 import { everyPlanStep } from "./plan/plan-parser.ts";
 import type { ClearedRun } from "./policy/ClearedRun.ts";
 import { isProductionAllowed } from "./policy/IsProductionAllowed.ts";
+import type { Project } from "./project/project-parser.ts";
+import { declaredCommands } from "./project/unsafe-feature-declarations.ts";
 import { productionOriginReached } from "./ReachableOrigins.ts";
-import type { ResolvedSecrets } from "./secrets/secret-resolution.ts";
+import type { RunStep } from "./RunStep.ts";
+import {
+    NO_SECRETS,
+    resolvePlanSecrets,
+    type PlanSecrets,
+    type ResolvedSecrets,
+} from "./secrets/secret-resolution.ts";
 
 export type PreflightFacts = {
     readonly cleared: ClearedRun;
     readonly baseUrl: BaseUrl;
-    // The plan's secrets as the store resolved them, or the first name it could not.
-    readonly secrets: Result<ResolvedSecrets, SecretName>;
+    // Where the plan's secrets are resolved. Without one, every secret the plan names is missing.
+    readonly secretStore: SecretStore | undefined;
     readonly scriptSources: Readonly<Record<string, Uint8Array>>;
     readonly services: ServiceCaller | undefined;
     readonly databaseCommands: DatabaseCommandRunner | undefined;
 };
 
-// What a run that passed preflight runs with. The secrets are every one the plan names, resolved.
-// The service caller and command runner are the run's own when the plan needs them; a plan that
-// needs neither gets one that is never called, and fails as unreachable if it were.
+// What a run that passed preflight runs with. The secrets are every one the plan names, resolved,
+// and the steps are the plan's, each fill of a secret carrying its own. The scripts are every page
+// script the plan names, with its source. The service caller and command runner are the run's own
+// when the plan needs them; a plan that needs neither gets one that is never called, and fails as
+// unreachable if it were.
 export type PreflightPassed = {
     readonly secrets: ResolvedSecrets;
+    readonly steps: readonly RunStep[];
+    readonly scripts: NamedScripts;
     readonly services: ServiceCaller;
     readonly databaseCommands: DatabaseCommandRunner;
+};
+
+// What preflight decided, and the secrets the run redacts with whatever it decided: every one the
+// plan names, or none when one is missing.
+export type Preflight = {
+    readonly redaction: ResolvedSecrets;
+    readonly outcome: Result<PreflightPassed, Refusal>;
 };
 
 const NO_SERVICE_CALLER: ServiceCaller = {
@@ -63,16 +85,6 @@ const refuseProductionOrigin: PreflightCheck = (facts) => {
         ? undefined
         : productionOriginReached(facts.cleared, facts.baseUrl);
     return origin === undefined ? undefined : { code: "origin-not-allowed", origin };
-};
-
-// The manifest could not record what would run.
-const refuseMissingScriptSource: PreflightCheck = (facts) => {
-    const file = missingScriptSource(
-        facts.cleared.plan,
-        facts.cleared.project,
-        facts.scriptSources,
-    );
-    return file === undefined ? undefined : { code: "script-source-missing", file };
 };
 
 // A plan that needs one of the next four relies on it to mean anything: stopping part way would leave
@@ -101,10 +113,8 @@ const refuseUnwiredDatabaseCommands: PreflightCheck = (facts) =>
         : undefined;
 
 // A result reports the first refusal, so this order is part of the behaviour: a production origin
-// first, then a missing secret, then the rest in this order.
-const CHECKS_BEFORE_SECRETS: readonly PreflightCheck[] = [refuseProductionOrigin];
-const CHECKS_AFTER_SECRETS: readonly PreflightCheck[] = [
-    refuseMissingScriptSource,
+// first, then a missing secret, then a page script's missing source, then the rest in this order.
+const CHECKS_AFTER_SCRIPTS: readonly PreflightCheck[] = [
     refuseUnwiredServices,
     refuseStorageState,
     refuseElementCheckNoDriverDecides,
@@ -117,22 +127,74 @@ const firstRefusal = (
 ): Refusal | undefined =>
     checks.map((check) => check(facts)).find((refusal) => refusal !== undefined);
 
+// The secrets a plan names, resolved. A database command's secrets are resolved only for a run that
+// can run commands: without a runner, a plan with a command is refused
+// database-commands-unavailable, after every check before it, rather than secret-missing for a
+// secret no command of the run would use.
+const resolvePreflightSecrets = (
+    subject: { readonly plan: Plan; readonly project: Project },
+    secretStore: SecretStore | undefined,
+    databaseCommands: DatabaseCommandRunner | undefined,
+): Result<PlanSecrets, SecretName> =>
+    resolvePlanSecrets(
+        subject.plan,
+        secretStore,
+        subject.project.calls,
+        databaseCommands === undefined ? {} : declaredCommands(subject.project.unsafeFeatures),
+    );
+
 // The first reason the run cannot go ahead, or what it runs with when nothing stops it.
-export function checkPreflight(facts: PreflightFacts): Result<PreflightPassed, Refusal> {
-    const beforeSecrets = firstRefusal(CHECKS_BEFORE_SECRETS, facts);
-    if (beforeSecrets !== undefined) {
-        return failure(beforeSecrets);
+function passedOrRefused(
+    facts: PreflightFacts,
+    secrets: Result<PlanSecrets, SecretName>,
+): Result<PreflightPassed, Refusal> {
+    const origin = refuseProductionOrigin(facts);
+    if (origin !== undefined) {
+        return failure(origin);
     }
-    if (!facts.secrets.ok) {
-        return failure({ code: "secret-missing", secretName: facts.secrets.error });
+    if (!secrets.ok) {
+        return failure({ code: "secret-missing", secretName: secrets.error });
     }
-    const afterSecrets = firstRefusal(CHECKS_AFTER_SECRETS, facts);
-    if (afterSecrets !== undefined) {
-        return failure(afterSecrets);
+    // Without every source, the manifest could not record what would run.
+    const scripts = namedScriptSources(
+        facts.cleared.plan,
+        facts.cleared.project,
+        facts.scriptSources,
+    );
+    if (!scripts.ok) {
+        return failure({ code: "script-source-missing", file: scripts.error });
+    }
+    const afterScripts = firstRefusal(CHECKS_AFTER_SCRIPTS, facts);
+    if (afterScripts !== undefined) {
+        return failure(afterScripts);
     }
     return success({
-        secrets: facts.secrets.value,
+        secrets: secrets.value.secrets,
+        steps: secrets.value.steps,
+        scripts: scripts.value,
         services: facts.services ?? NO_SERVICE_CALLER,
         databaseCommands: facts.databaseCommands ?? NO_COMMAND_RUNNER,
     });
 }
+
+const redactionOf = (secrets: Result<PlanSecrets, SecretName>): ResolvedSecrets =>
+    secrets.ok ? secrets.value.secrets : NO_SECRETS;
+
+// Resolving reads only the store, so it is done once, before anything is logged: the run redacts
+// with the secrets even when preflight refuses it.
+export function checkPreflight(facts: PreflightFacts): Preflight {
+    const secrets = resolvePreflightSecrets(
+        facts.cleared,
+        facts.secretStore,
+        facts.databaseCommands,
+    );
+    return { redaction: redactionOf(secrets), outcome: passedOrRefused(facts, secrets) };
+}
+
+// What a result for a target no run was cleared for redacts with: the same secrets a cleared run of
+// its plan would.
+export const secretsToRedact = (
+    subject: { readonly plan: Plan; readonly project: Project },
+    secretStore: SecretStore | undefined,
+    databaseCommands: DatabaseCommandRunner | undefined,
+): ResolvedSecrets => redactionOf(resolvePreflightSecrets(subject, secretStore, databaseCommands));

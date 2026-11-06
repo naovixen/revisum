@@ -2,14 +2,15 @@
 // compared.
 import {
   failure, success,
-  type AdapterInfo, type AppliedRewrite, type EvidenceSuiteDeclaration, type ImageDigest, type Plan, type RedactionMode, type Result, type SecretName,
-  type SuiteName, type Target, type UnsafeFeature,
+  type AdapterInfo, type AppliedRewrite, type EvidenceSuiteDeclaration, type ImageDigest, type Plan, type RedactionMode, type Result,
+  type SecretName, type SuiteName, type Target, type UnsafeFeature,
 } from '@revisum/contracts';
 import { canonicalJson, sha256 } from './hashing.ts';
+import type { NamedScripts } from './page-scripts/NamedScriptSources.ts';
 import { declarationsNamedBy, unsafeFeaturesOf } from './plan/unsafe-features.ts';
 import type { Project } from './project/project-parser.ts';
 import type { Provenance } from './project/trusted-project.ts';
-import { declaredCommands, declaredScripts } from './project/unsafe-feature-declarations.ts';
+import { declaredCommands } from './project/unsafe-feature-declarations.ts';
 import { ENGINE_VERSION, schemaId } from './version.ts';
 
 // A file of the app under test, by content hash.
@@ -205,33 +206,14 @@ export const SERVICE_CALLS_INPUT = 'service-calls';
 // database they ran against, which no manifest can pin.
 export const DATABASE_COMMANDS_INPUT = 'database-commands';
 
-// A page script the plan names, with its declared file and, when the run was given it, its source.
-type NamedScript = { readonly name: string; readonly file: string; readonly source: Uint8Array | undefined };
-
-function namedScripts(plan: Plan, project: Project, scriptSources: Readonly<Record<string, Uint8Array>>): NamedScript[] {
-  const named = declarationsNamedBy(plan);
-  return Object.entries(declaredScripts(project.unsafeFeatures))
-    .filter(([name]) => named.scripts.some((used) => used === name))
-    .map(([name, declaration]) => ({ name, file: declaration.file, source: Object.hasOwn(scriptSources, declaration.file) ? scriptSources[declaration.file] : undefined }));
-}
-
-// The file of the first page script the plan names whose source the run was not given: the manifest
-// could not record what would run, so the run is refused before any side effect.
-export const missingScriptSource = (plan: Plan, project: Project, scriptSources: Readonly<Record<string, Uint8Array>>): string | undefined =>
-  namedScripts(plan, project, scriptSources).find((script) => script.source === undefined)?.file;
-
 // What the manifest records about the plan's unsafe features: the features, and each declaration
-// the plan names, with its sha256. Undefined for a closed plan. Only a script whose source the run
-// was given has a record, which every script has once missingScriptSource found none missing.
-export function unsafeFeatureRecord(
-  plan: Plan, project: Project, scriptSources: Readonly<Record<string, Uint8Array>>,
-): UnsafeFeatureRecord | undefined {
+// the plan names, with its sha256. Undefined for a closed plan.
+export function unsafeFeatureRecord(plan: Plan, project: Project, scripts: NamedScripts): UnsafeFeatureRecord | undefined {
   const unsafeFeatures = unsafeFeaturesOf(plan);
   if (unsafeFeatures.length === 0) return undefined;
   const named = declarationsNamedBy(plan);
   const commands = Object.entries(declaredCommands(project.unsafeFeatures)).filter(([name]) => named.commands.some((used) => used === name));
-  const records: UnsafeDeclarationRecord[] = namedScripts(plan, project, scriptSources)
-    .flatMap(({ name, source }): UnsafeDeclarationRecord[] => (source === undefined ? [] : [{ kind: 'script', name, sha256: sha256(source) }]));
+  const records = [...scripts.values()].map(({ name, source }): UnsafeDeclarationRecord => ({ kind: 'script', name, sha256: sha256(source) }));
   for (const [name, declaration] of commands) records.push({ kind: 'command', name, sha256: sha256(canonicalJson(declaration)) });
   const order = (record: UnsafeDeclarationRecord): string => `${record.kind}:${record.name}`;
   return { unsafeFeatures, unsafeDeclarations: records.sort((left, right) => (order(left) < order(right) ? -1 : 1)) };

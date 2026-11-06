@@ -8,10 +8,10 @@ import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   defaultRedactor, environmentSecretStore, exploreStartOrigin, pageMapText, parseProject, planParser, policyGate, readPlanText, success,
-  withDeclaredSecretRedaction, type EventSink, type Project,
+  withDeclaredSecretRedaction, type ClearedRun, type EventSink, type Project, type Target,
 } from '@revisum/engine';
 import { buildAdapters } from './BuildAdapters.ts';
-import { CONTAINER_EXIT, crawlInBrowser, crawlTarget, decodeContainerCrawlInput, type BrowserCrawl } from './explore-crawl.ts';
+import { CONTAINER_EXIT, crawlInBrowser, crawlTarget, decodeContainerCrawlInput } from './explore-crawl.ts';
 
 // Where the run image keeps the pinned Chrome for Testing builds, relative to the working folder.
 const BROWSER_CACHE = join('.browsers', 'chrome');
@@ -38,7 +38,7 @@ function stop(code: number, reason: string): number {
 }
 
 // The --after plan, cleared by the policy gate for the crawl's target, or undefined when it is refused.
-function clearedLogin(text: string, project: Project, target: BrowserCrawl['target']): BrowserCrawl['login'] | undefined {
+function clearedLogin(text: string, project: Project, target: Target): ClearedRun | undefined {
   const read = readPlanText(text, project.limits);
   if (!read.ok) return undefined;
   const parsed = planParser(project)(read.value.json);
@@ -72,7 +72,7 @@ async function main(): Promise<number> {
   const variables = Object.fromEntries(project.value.secretNames.map((name) => [name, process.env[name]]));
   const secrets = environmentSecretStore(variables);
   const redactor = withDeclaredSecretRedaction(defaultRedactor(), project.value.secretNames, secrets);
-  let login: BrowserCrawl['login'];
+  let login: ClearedRun | undefined;
   if (input.afterPlan !== undefined) {
     login = clearedLogin(input.afterPlan, project.value, target);
     if (login === undefined) return stop(CONTAINER_EXIT.loginRefused, 'the --after plan was refused');
@@ -80,12 +80,12 @@ async function main(): Promise<number> {
 
   const browser = buildAdapters.containerBrowserDriver({ executablePath: browserPath, proxyServer });
   const crawled = await crawlInBrowser(browser, {
-    project: project.value, target, redactor, secrets, audit: discardingAudit,
+    redactor, secrets, audit: discardingAudit,
     options: {
       start: input.start, maximumPages: input.maximumPages, maximumDepth: input.maximumDepth,
       pageTimeoutMilliseconds: input.pageTimeoutMilliseconds, placement: 'isolated',
     },
-    ...(login === undefined ? {} : { login }),
+    ...(login === undefined ? { project: project.value, target } : { login }),
   });
   if (!crawled.ok) {
     if (crawled.error === 'explore-start-unreachable') return stop(CONTAINER_EXIT.startUnreachable, crawled.error);

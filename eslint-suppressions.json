@@ -876,7 +876,7 @@
   },
   "packages/engine/src/page-scripts/page-script-steps.ts": {
     "curly": {
-      "count": 20
+      "count": 19
     },
     "revisum/file-name-matches-export": {
       "count": 1
@@ -1169,7 +1169,7 @@
   },
   "packages/engine/src/run-values.ts": {
     "curly": {
-      "count": 15
+      "count": 13
     },
     "revisum/file-name-matches-export": {
       "count": 1
@@ -1186,12 +1186,9 @@
       "count": 1
     },
     "max-lines-per-function": {
-      "count": 2
-    },
-    "no-restricted-syntax": {
       "count": 1
     },
-    "no-useless-assignment": {
+    "no-restricted-syntax": {
       "count": 1
     },
     "revisum/file-name-matches-export": {
@@ -1208,7 +1205,7 @@
   },
   "packages/engine/src/secrets/secret-resolution.ts": {
     "curly": {
-      "count": 14
+      "count": 12
     },
     "revisum/file-name-matches-export": {
       "count": 1

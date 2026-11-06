@@ -458,7 +458,10 @@ export function policyGate(options: PolicyGateOptions): PolicyGate {
     events.append({ kind: 'plan.denied', code: rule, ...(plan === undefined ? {} : { subjectHash: planHash(plan) }) }, POLICY_GATE_ACTOR).ok;
   // The plan as cleared with the standing it was judged as, or the gate's denial, recorded.
   const judge = (plan: Plan, targetIds: readonly TargetId[], standing: PlanStanding | undefined): Judged | PlanDenial => {
-    const targets = targetIds.flatMap((id) => project.matrix.filter((target) => target.id === id));
+    // Only the targets the plan declares: one it does not gets no run, so its locale must not decide
+    // the plan's patterns either, and the gate answers it not-declared rather than denying the plan.
+    const declared = targetIds.filter((id) => plan.targets.includes(id));
+    const targets = declared.flatMap((id) => project.matrix.filter((target) => target.id === id));
     // A standing made for another plan is no standing: the plan is judged as a proposal.
     const judged = ownStanding(plan, standing);
     const denial = staticDenial(plan, targets, judged, project);
