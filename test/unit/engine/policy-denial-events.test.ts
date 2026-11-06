@@ -73,6 +73,15 @@ test('when the runtime guard allows an action, no plan.denied event is appended'
   assert.deepEqual(deniedCodes(events), [], JSON.stringify(events.recorded));
 });
 
+// The kind and code of one JSON Lines entry, read as the outside data a written file is.
+const kindAndCodeOf = (line: string): readonly unknown[] => {
+  const entry: unknown = JSON.parse(line);
+  if (typeof entry !== 'object' || entry === null) {
+    return [entry];
+  }
+  return ['kind' in entry ? entry.kind : undefined, 'code' in entry ? entry.code : undefined];
+};
+
 test('a denial reaches the JSON Lines sink as a plan.denied entry carrying the rule', async () => {
   const folder = mkdtempSync(join(tmpdir(), 'policy-events-'));
   try {
@@ -81,8 +90,8 @@ test('a denial reaches the JSON Lines sink as a plan.denied entry carrying the r
     const gate = policyGate({ project, events: jsonLinesEventSink(path) });
     const plan = parsedPlan(DELETE_PLAN);
     assert.equal(gate.decide(plan, plan.targets).kind, 'deny');
-    const entries = readFileSync(path, 'utf8').split('\n').filter((line) => line.trim() !== '').map((line) => JSON.parse(line));
-    assert.deepEqual(entries.map((entry) => [entry.kind, entry.code]), [['plan.denied', 'irreversible-action']]);
+    const entries = readFileSync(path, 'utf8').split('\n').filter((line) => line.trim() !== '').map(kindAndCodeOf);
+    assert.deepEqual(entries, [['plan.denied', 'irreversible-action']]);
   } finally {
     rmSync(folder, { recursive: true, force: true });
   }

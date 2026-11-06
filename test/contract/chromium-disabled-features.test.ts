@@ -45,7 +45,7 @@ after(async () => { await testHarness.close(); });
 
 function contractTarget(targetId: string): Target {
   const target = testHarness.project.matrix.find((candidate) => candidate.id === targetId);
-  assert.ok(target, `the test project has the target ${targetId}`);
+  assert.ok(target !== undefined, `the test project has the target ${targetId}`);
   return target;
 }
 

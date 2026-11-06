@@ -185,7 +185,7 @@ export async function capabilityHarness(
         async open(targetId) {
             const target = harness.target(targetId);
             const driver = drivers.get(target.adapter);
-            assert.ok(driver, `no driver for ${target.adapter}`);
+            assert.ok(driver !== undefined, `no driver for ${target.adapter}`);
             const opened = await driver.open(target, environment());
             assert.ok(
                 opened.ok,

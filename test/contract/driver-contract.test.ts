@@ -23,9 +23,9 @@ after(async () => { await testHarness.close(); });
 
 async function withSession<Value>(targetId: string, use: (session: Session) => Promise<Value>): Promise<Value> {
   const target = testHarness.project.matrix.find((candidate) => candidate.id === targetId);
-  assert.ok(target);
+  assert.ok(target !== undefined);
   const driver = makeDrivers().get(target.adapter);
-  assert.ok(driver);
+  assert.ok(driver !== undefined);
   const environment: SessionEnvironment = {
     baseUrl: baseUrlOf(testHarness.server.origin), allowedOrigins: testHarness.project.origins, seed: SEED,
     fixedTimeMilliseconds: FIXED_TIME_MILLISECONDS, sensitiveSelectors: defaultRedactor().selectors, timeoutMilliseconds: 5000,

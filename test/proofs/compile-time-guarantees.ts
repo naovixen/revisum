@@ -3,8 +3,9 @@
 // '@ts-expect-error' directive and the check fails.
 import { cdpDriver, type EgressSource } from '@revisum/driver-cdp';
 import {
-  lifecycle, run,
-  type AiPlanner, type ClearedRun, type Logger, type Plan, type RunInputs, type RunPorts,
+  lifecycle, policyGate, run,
+  type AiPlanner, type ClearedRun, type EventSink, type Logger, type Plan, type PlanData, type RunInputs, type RunPorts, type TargetId,
+  type TrustedProject,
 } from '@revisum/engine';
 
 declare const logger: Logger;
@@ -16,6 +17,9 @@ declare const planned: lifecycle.Planned;
 declare const resolved: lifecycle.Resolved;
 declare const running: lifecycle.Running;
 declare const egress: EgressSource;
+declare const trusted: TrustedProject;
+declare const events: EventSink;
+declare const targetId: TargetId;
 
 // ---- Logging manifest ---------------------------------------------------------------------------
 logger.log({ kind: 'step.end', stepIndex: 1, outcome: 'passed' }); // allowed
@@ -35,8 +39,14 @@ const proposal = await planner.propose({ specReference: 'specs/x.md', text: 'x' 
 const asPlan: Plan = proposal;
 // A run takes the run the policy gate cleared, which holds the plan the parser made.
 export const clearedRunRuns = run(cleared, inputs, ports);
-// @ts-expect-error a hand-built object is not a Plan; only the plan parser can brand one
-run({ ...cleared, plan: { version: 1, meta: cleared.plan.meta, targets: [], steps: [] } }, inputs, ports);
+// Typed as the plan's data, so every field is well typed and only the parser's brand is missing.
+const handBuiltPlan: PlanData = { version: '1.3', meta: cleared.plan.meta, targets: [targetId], steps: cleared.plan.steps };
+const gate = policyGate({ project: trusted, events });
+gate.clear(cleared.plan, targetId); // allowed
+// @ts-expect-error a hand-built object is not a Plan, so it cannot enter the gate; only the plan parser can brand one
+gate.clear(handBuiltPlan, targetId);
+// @ts-expect-error the same holds for a plan decided for several targets
+gate.decide(handBuiltPlan, [targetId]);
 
 // ---- Lifecycle state machine --------------------------------------------------------------------
 lifecycle.start(resolved); // allowed: Resolved -> Running

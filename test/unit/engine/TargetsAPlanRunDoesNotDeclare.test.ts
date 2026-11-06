@@ -1,11 +1,23 @@
 // A plan is cleared only for a target both its own targets and the trusted project's matrix
 // declare. The policy gate gives any other target a not-declared clearance in place of a cleared
 // run, and an untrusted plan's run gives such a target a result ending TargetUnavailable with
-// not-declared, before any driver is asked, rather than leaving it with no result at all.
+// not-declared, before any driver is asked, rather than leaving it with no result at all. A target
+// the plan does not declare plays no part in judging it, so its locale can never deny the plan.
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { policyGate } from "@revisum/engine";
+import { policyGate, type Plan } from "@revisum/engine";
 import { fakeEventSink } from "#test-support/fakes/FakeEventSink.ts";
+import {
+    ENGLISH,
+    JAPANESE,
+    OPEN_ACCOUNT_PAGE,
+    click,
+    deniedCodes,
+    parsedPlan,
+    planOf,
+    role,
+    testGate,
+} from "./policy-examples.ts";
 import {
     clearanceOn,
     projectWith,
@@ -120,6 +132,60 @@ describe("Using the untrusted run", () => {
                     );
                     assert.equal(driver.calls.count(), 0);
                 });
+            });
+        });
+    });
+});
+
+// A plan saving the account page's changes on the English target, which a target in a locale with
+// no pattern set would deny.
+const englishSavePlan = (): Plan =>
+    parsedPlan(planOf([OPEN_ACCOUNT_PAGE, click(role("button", "Save changes"))], [ENGLISH]));
+
+describe("Using the policy gate", () => {
+    describe("given a plan declaring only the English target", () => {
+        describe("and a target the plan does not declare, in a locale with no pattern set", () => {
+            describe("when the plan is cleared for that target", () => {
+                test("then it should give a not-declared clearance and record no plan.denied event", async () => {
+                    const tested = await testGate();
+                    const japaneseId = targetOf(tested.project, JAPANESE).id;
+                    const clearance = tested.gate.clear(englishSavePlan(), japaneseId);
+                    assert.equal(clearance.kind, "not-declared");
+                    assert.equal(clearance.targetId, japaneseId);
+                    assert.deepEqual(deniedCodes(tested.events), []);
+                });
+            });
+
+            describe("when the plan is decided for that target beside the English one", () => {
+                test("then it should clear the English target, give the other a not-declared clearance, and record no plan.denied event", async () => {
+                    const tested = await testGate();
+                    const englishId = targetOf(tested.project, ENGLISH).id;
+                    const japaneseId = targetOf(tested.project, JAPANESE).id;
+                    const decision = tested.gate.decide(englishSavePlan(), [englishId, japaneseId]);
+                    assert.equal(decision.kind, "allow");
+                    assert.deepEqual(
+                        decision.runs.map((clearance) => [clearance.kind, clearance.targetId]),
+                        [
+                            ["cleared", englishId],
+                            ["not-declared", japaneseId],
+                        ],
+                    );
+                    assert.deepEqual(deniedCodes(tested.events), []);
+                });
+            });
+        });
+    });
+
+    describe("given the same plan declaring the target in a locale with no pattern set", () => {
+        describe("when the plan is cleared for that target", () => {
+            test("then it should deny it no-locale-patterns and record the denial", async () => {
+                const tested = await testGate();
+                const plan = parsedPlan(
+                    planOf([OPEN_ACCOUNT_PAGE, click(role("button", "Save changes"))], [JAPANESE]),
+                );
+                const clearance = tested.gate.clear(plan, targetOf(tested.project, JAPANESE).id);
+                assert.equal(clearance.kind, "deny");
+                assert.deepEqual(deniedCodes(tested.events), ["no-locale-patterns"]);
             });
         });
     });
