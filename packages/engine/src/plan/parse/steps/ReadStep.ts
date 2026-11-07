@@ -2,7 +2,6 @@
 // of an unsafe feature the project does not enable, is refused with nothing inside it read. Its
 // fields are then checked against its type's fact, and its type's reader reads them.
 import {
-    isNonArrayObject,
     PlanErrorCode,
     StepType,
     type CleanupStep,
@@ -34,6 +33,7 @@ import {
     StepSection,
     type StepTypeIn,
 } from "../../StepFacts.ts";
+import { isInlineScript } from "../../IsInlineScript.ts";
 import { isFeatureEnabledElseRefused, nestedContext, type ParseContext } from "../ParseContext.ts";
 import { refuse } from "../Refuse.ts";
 import { readNavigation } from "../text/ReadNavigation.ts";
@@ -105,8 +105,7 @@ function isUnsafeStepEnabledElseRefused(
     if (!isStepTypeIn(type, StepSection.PageScripts)) {
         return true;
     }
-    const script = step.script;
-    if (isNonArrayObject(script) && Object.hasOwn(script, "inline")) {
+    if (isInlineScript(step.script)) {
         return isFeatureEnabledElseRefused(INLINE_SCRIPT_FEATURE, `${path}.script.inline`, context);
     }
     return isFeatureEnabledElseRefused(NAMED_SCRIPT_FEATURE, `${path}.type`, context);

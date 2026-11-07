@@ -8,6 +8,7 @@ import {
   DOM_CHECK_KINDS, UNSAFE_FEATURES,
   type CommandName, type Locator, type Plan, type ScriptName, type Step, type UnsafeFeature,
 } from '@revisum/contracts';
+import { isInlineScript } from './IsInlineScript.ts';
 import { isOneOf } from './plan-decoders.ts';
 import {
   DATABASE_COMMAND_FEATURE, DOM_CHECKS_FEATURE, INLINE_SCRIPT_FEATURE, LOCATOR_FEATURES, NAMED_SCRIPT_FEATURE,
@@ -42,9 +43,9 @@ function stepConstructs(step: Step, path: string): UnsafeConstruct[] {
       return [...read, ...locatorConstructs(step.from.element, `${path}.from.element`)];
     }
     case 'evaluate': case 'expectScript':
-      return [typeof step.script === 'string'
-        ? { feature: NAMED_SCRIPT_FEATURE, path: `${path}.type` }
-        : { feature: INLINE_SCRIPT_FEATURE, path: `${path}.script.inline` }];
+      return [isInlineScript(step.script)
+        ? { feature: INLINE_SCRIPT_FEATURE, path: `${path}.script.inline` }
+        : { feature: NAMED_SCRIPT_FEATURE, path: `${path}.type` }];
     case 'database': case 'expectDatabase':
       return [{ feature: DATABASE_COMMAND_FEATURE, path: `${path}.type` }];
     case 'navigate': case 'newTab': case 'dialog': case 'expectPage': case 'expectDownload': case 'a11yAudit': case 'capture':
@@ -83,7 +84,7 @@ export function declarationsNamedBy(plan: Plan): { readonly scripts: readonly Sc
   const scripts = new Set<ScriptName>();
   const commands = new Set<CommandName>();
   for (const step of everyPlanStep(plan)) {
-    if (isStepIn(step, StepSection.PageScripts) && typeof step.script === 'string') scripts.add(step.script);
+    if (isStepIn(step, StepSection.PageScripts) && !isInlineScript(step.script)) scripts.add(step.script);
     if (isStepIn(step, StepSection.DatabaseCommands)) commands.add(step.command);
   }
   return { scripts: [...scripts], commands: [...commands] };

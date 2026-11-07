@@ -1,7 +1,6 @@
 // The script a page-script step runs: a name the project declares, or a script written inline.
 import {
     CALL_EFFECTS,
-    isNonArrayObject,
     PlanErrorCode,
     type CallEffect,
     type FieldName,
@@ -14,6 +13,7 @@ import {
 } from "@revisum/contracts";
 import { brand } from "../../../brand.ts";
 import { readFieldPointers } from "../../../project/call-declarations.ts";
+import { isInlineScript } from "../../IsInlineScript.ts";
 import { looksLikeCredential } from "../../literal-secrets.ts";
 import {
     allValid,
@@ -107,7 +107,7 @@ export function readScriptChoice(
     path: string,
     context: ParseContext,
 ): Parsed<ScriptUse> {
-    if (isNonArrayObject(input)) {
+    if (isInlineScript(input)) {
         const choice = readFields(input, path, context.issues, {
             inline: (inline: unknown, inlinePath: string) =>
                 readInlineScript(inline, inlinePath, context),

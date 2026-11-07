@@ -21,6 +21,7 @@ import type {
     StubStep,
 } from "@revisum/contracts";
 import type { Project, ProjectPolicy } from "../project/project-parser.ts";
+import { isInlineScript } from "../plan/IsInlineScript.ts";
 import { declaredCommands, declaredScripts } from "../project/unsafe-feature-declarations.ts";
 import { isDestructivePath, readUrl, type ReadUrl } from "./IsDestructivePath.ts";
 import { isAllowedName, isBlankName, matchesIrreversiblePattern } from "./irreversible-patterns.ts";
@@ -205,7 +206,7 @@ const storageRule = (
 // and its claimed effect are the plan's own and no person declared them; or change something unless
 // its declaration allows it in proposals.
 function scriptRule(step: PageScriptStep, context: StaticContext): PolicyRuleId | null {
-    if (typeof step.script !== "string") {
+    if (isInlineScript(step.script)) {
         return context.approved ? null : "inline-script-in-proposal";
     }
     const name = step.script;
