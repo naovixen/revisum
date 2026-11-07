@@ -56,6 +56,13 @@ const proxyThatThrows = (target: object): unknown =>
         setPrototypeOf: throwOnRead,
     });
 
+// A proxy over `target` that has been revoked, so any operation on it throws, even Array.isArray.
+const revokedProxy = (target: object): unknown => {
+    const { proxy, revoke } = Proxy.revocable(target, {});
+    revoke();
+    return proxy;
+};
+
 const issuesOf = (parsed: {
     readonly ok: boolean;
     readonly error?: readonly CodeAndPath[];
@@ -154,6 +161,11 @@ const PARSERS: readonly ParserCases[] = [
                 expected: [{ code: "not_object", path: "$" }],
             },
             {
+                name: "a revoked proxy as the plan",
+                hostile: () => revokedProxy(plainPlan()),
+                expected: [{ code: "not_object", path: "$" }],
+            },
+            {
                 name: "the steps in a list with no prototype",
                 hostile: () =>
                     withValue(plainPlan(), ["steps"], listWithoutPrototype(stepsOfPlainPlan())),
@@ -163,6 +175,12 @@ const PARSERS: readonly ParserCases[] = [
                 name: "the steps in a proxy over a list that throws on every read",
                 hostile: () =>
                     withValue(plainPlan(), ["steps"], proxyThatThrows([...stepsOfPlainPlan()])),
+                expected: [{ code: "wrong_type", path: "$.steps" }],
+            },
+            {
+                name: "the steps in a revoked proxy over a list",
+                hostile: () =>
+                    withValue(plainPlan(), ["steps"], revokedProxy([...stepsOfPlainPlan()])),
                 expected: [{ code: "wrong_type", path: "$.steps" }],
             },
             {
@@ -184,6 +202,11 @@ const PARSERS: readonly ParserCases[] = [
             {
                 name: "a first step that is a proxy throwing on every read",
                 hostile: () => withValue(plainPlan(), ["steps", 0], proxyThatThrows(firstStep())),
+                expected: [{ code: "not_object", path: "$.steps[0]" }],
+            },
+            {
+                name: "a first step that is a revoked proxy",
+                hostile: () => withValue(plainPlan(), ["steps", 0], revokedProxy(firstStep())),
                 expected: [{ code: "not_object", path: "$.steps[0]" }],
             },
         ],
@@ -210,6 +233,11 @@ const PARSERS: readonly ParserCases[] = [
                 expected: [{ code: "not_object", path: "$" }],
             },
             {
+                name: "a revoked proxy as the project",
+                hostile: () => revokedProxy(testProjectInput()),
+                expected: [{ code: "not_object", path: "$" }],
+            },
+            {
                 name: "the origins in a list with no prototype",
                 hostile: () =>
                     withValue(
@@ -232,6 +260,13 @@ const PARSERS: readonly ParserCases[] = [
                 refusal: ORIGINS_OF_THE_WRONG_FORM,
             },
             {
+                name: "the origins in a revoked proxy over a list",
+                hostile: () =>
+                    withValue(testProjectInput(), ["origins"], revokedProxy([...projectOrigins()])),
+                expected: originsOfTheWrongFormIssues(),
+                refusal: ORIGINS_OF_THE_WRONG_FORM,
+            },
+            {
                 name: "a first target whose engine has a getter that throws",
                 hostile: () =>
                     withValue(
@@ -249,6 +284,12 @@ const PARSERS: readonly ParserCases[] = [
                         ["matrix", 0],
                         proxyThatThrows(firstMatrixEntry()),
                     ),
+                expected: [{ code: "not_object", path: "$.matrix[0]" }],
+            },
+            {
+                name: "a first target that is a revoked proxy",
+                hostile: () =>
+                    withValue(testProjectInput(), ["matrix", 0], revokedProxy(firstMatrixEntry())),
                 expected: [{ code: "not_object", path: "$.matrix[0]" }],
             },
         ],
@@ -274,6 +315,11 @@ const PARSERS: readonly ParserCases[] = [
                 hostile: () => proxyThatThrows({ ...PERSON_INPUT }),
                 expected: [{ code: "not_object", path: "$" }],
             },
+            {
+                name: "a revoked proxy as the record",
+                hostile: () => revokedProxy({ ...PERSON_INPUT }),
+                expected: [{ code: "not_object", path: "$" }],
+            },
         ],
     },
 ];
@@ -290,6 +336,7 @@ const MANIFEST_CASES: readonly { readonly name: string; readonly hostile: () => 
         hostile: () => withThrowingGetter({}, "schema"),
     },
     { name: "a proxy that throws on every read", hostile: () => proxyThatThrows({}) },
+    { name: "a revoked proxy", hostile: () => revokedProxy({}) },
 ];
 
 for (const { parserName, inputName, parse, plain, cases } of PARSERS) {

@@ -6,7 +6,7 @@
 // most 3 deep, so what a locator can match is fixed when the plan is approved.
 import assert from 'node:assert/strict';
 import { arch, platform } from 'node:os';
-import { test } from 'node:test';
+import { describe, test } from 'node:test';
 import { UntrustedRunOutcomeKind, createRunService } from '@revisum/engine';
 import { PRIVATE_MARKER, defaultParser } from './plan-examples.ts';
 import { spyDriver } from './secret-examples.ts';
@@ -48,6 +48,48 @@ test('an inline script is refused at .script.inline when page scripts are on but
 test('an inline script is refused at .script.inline, and only there, when page scripts are off too', () => {
   const errors = errorsOf(parserEnabling(allBut('page-script')), unsafePlan([OPEN_CART, INLINE_READ]));
   assert.deepEqual(disabledPaths(errors), ['$.steps[1].script.inline']);
+});
+
+// Any object as a script is the inline form, even one without its own inline field, so the
+// feature check and the reader agree on which form a script is.
+const EMPTY_INLINE_READ: JsonRecord = { ...INLINE_READ, script: {} };
+
+describe('Using the plan parser', () => {
+  describe('given a step whose script is an empty object', () => {
+    describe('and a project with inline scripts off', () => {
+      describe('when the plan is parsed', () => {
+        test('then it should refuse the script as an inline script, exactly as one written in full', () => {
+          const parse = parserEnabling(allBut('inline-page-script'));
+          assert.deepEqual(
+            rejection(parse, unsafePlan([OPEN_CART, EMPTY_INLINE_READ])),
+            rejection(parse, unsafePlan([OPEN_CART, INLINE_READ])),
+          );
+        });
+      });
+    });
+
+    describe('and a project with inline scripts on', () => {
+      describe('when the plan is parsed', () => {
+        test('then it should refuse the script as missing_field at .script.inline', () => {
+          assert.deepEqual(rejection(parserEnabling(FEATURES), unsafePlan([OPEN_CART, EMPTY_INLINE_READ])), [
+            'missing_field $.steps[1].script.inline',
+          ]);
+        });
+      });
+    });
+  });
+
+  describe('given a step with an inline script written in full', () => {
+    describe('and a project with inline scripts off', () => {
+      describe('when the plan is parsed', () => {
+        test('then it should refuse it with unsafe_feature_disabled at .script.inline alone', () => {
+          assert.deepEqual(rejection(parserEnabling(allBut('inline-page-script')), unsafePlan([OPEN_CART, INLINE_READ])), [
+            'unsafe_feature_disabled $.steps[1].script.inline',
+          ]);
+        });
+      });
+    });
+  });
 });
 
 // ---- Every use, in one plan ----------------------------------------------------------------------

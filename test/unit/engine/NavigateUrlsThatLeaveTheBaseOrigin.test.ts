@@ -25,8 +25,8 @@ const URLS_THAT_STAY_ON_THE_BASE_ORIGIN: readonly {
 ];
 
 const navigatedUrlOf = (written: string): unknown => {
-    const firstStep = accepted(parsePlan, planOf([navigate(written)])).steps.at(0);
-    assert.ok(firstStep?.type === "navigate", "the first step is the navigate step");
+    const firstStep = accepted(parsePlan, planOf([navigate(written)])).steps[0];
+    assert.ok(firstStep.type === "navigate", "the first step is the navigate step");
     return firstStep.url;
 };
 

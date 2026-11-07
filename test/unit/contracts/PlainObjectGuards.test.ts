@@ -76,3 +76,19 @@ describe("Using the plain object guards", () => {
         });
     }
 });
+
+describe("Using the plain object guard", () => {
+    describe("given a revoked proxy, on which even Array.isArray throws", () => {
+        describe("when isPlainObject reads it", () => {
+            test("then it should answer false without throwing", () => {
+                const { proxy, revoke } = Proxy.revocable({}, {});
+                revoke();
+                let isPlain: boolean | undefined;
+                assert.doesNotThrow(() => {
+                    isPlain = isPlainObject(proxy);
+                });
+                assert.equal(isPlain, false);
+            });
+        });
+    });
+});
