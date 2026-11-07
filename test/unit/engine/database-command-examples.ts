@@ -23,7 +23,7 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { success, type EgressEvent, type WorkloadErrorCode, type WorkloadOutcome } from '@revisum/contracts';
-import { createRunService, type RunService, parseProject, planParser, type LoggedEvent, type PlanStanding, type Project, type Result, type RunPorts, type RunResult } from '@revisum/engine';
+import { createRunService, noDatabaseCommandRunner, type RunService, parseProject, planParser, type LoggedEvent, type PlanStanding, type Project, type Result, type RunPorts, type RunResult } from '@revisum/engine';
 import { baseUrlOf, clearRun, trustedProjectFrom } from '../../support/policy-clearance.ts';
 import { TEST_SERVICE, testProjectInput , TEST_SERVICE_SECRET_NAMES } from './plan-examples.ts';
 import { DEFAULT_CLOCK_START, DEFAULT_SEED, accepted, recordingDriver, type Recording } from './run-value-examples.ts';
@@ -33,7 +33,6 @@ import { COMMAND_IMAGE, DATABASE_SECRET, DATABASE_SERVICE, ORIGIN, OPEN_CART, un
 import { driversOf, fakePorts } from '#test-support/fakes/FakePorts.ts';
 import { fakeRunEventSink } from '#test-support/fakes/FakeRunEventSink.ts';
 import { fakeSecretStore } from '#test-support/fakes/FakeSecretStore.ts';
-import { leaveOut } from '#test-support/fakes/LeaveOut.ts';
 
 export { OPEN_CART, ORIGIN, type JsonRecord };
 export { cleanupRecords, stepLines } from './service-call-examples.ts';
@@ -250,7 +249,7 @@ export type CommandRun = {
   readonly everything: string;
 };
 
-const withPortIf = (isWired: boolean, ports: RunPorts): RunPorts => (isWired ? ports : leaveOut<RunPorts>(ports, ['databaseCommands']));
+const withPortIf = (isWired: boolean, ports: RunPorts): RunPorts => (isWired ? ports : { ...ports, databaseCommands: noDatabaseCommandRunner });
 
 export async function runWithCommands(raw: unknown, options: CommandRunOptions = {}): Promise<CommandRun> {
   const projectFile = options.projectFile ?? commandProjectFile();

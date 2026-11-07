@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { expectOneElement } from '#test-support/browser/ExpectOneElement.ts';
 import { after, before, describe, test } from 'node:test';
-import { createRunService, LOGGING_MANIFEST, LoggingManifestViolation, SENSITIVE_PLACEHOLDER, defaultRedactor, manifestLogger, planWithAi, policyGate, releaseNoteDraft, writeReleaseNotes, type Box, type BrowserDriver, type RunResult, type Step } from '@revisum/engine';
+import { createRunService, UntrustedRunOutcomeKind, LOGGING_MANIFEST, LoggingManifestViolation, SENSITIVE_PLACEHOLDER, defaultRedactor, manifestLogger, planWithAi, policyGate, releaseNoteDraft, writeReleaseNotes, type Box, type BrowserDriver, type RunResult, type Step } from '@revisum/engine';
 import { allowEveryAction } from '#test-support/browser/AllowEveryAction.ts';
 import { expectRead } from '#test-support/ExpectRead.ts';
 import { hostilePlans } from '#test-support/hostile-plans.ts';
@@ -74,7 +74,7 @@ describe('(b) AI containment: hostile plans are rejected before any side effect'
     const hostile = hostilePlans(testHarness.server.origin);
     for (const plan of hostile) {
       const outcome = await createRunService(ports).runUntrusted(plan.input, testHarness.parse, { ...testHarness.runInputs(), project: testHarness.project });
-      assert.ok(!Array.isArray(outcome) && 'errors' in outcome, `${plan.name}: rejected`);
+      assert.ok(outcome.kind === UntrustedRunOutcomeKind.Rejected, `${plan.name}: rejected`);
       assert.ok(outcome.errors.some((error) => error.code === plan.code), `${plan.name}: expected ${plan.code}, got ${JSON.stringify(outcome.errors)}`);
     }
     const driverCalls = spies.reduce((total, spy) => total + spy.calls.count(), 0);
@@ -85,8 +85,8 @@ describe('(b) AI containment: hostile plans are rejected before any side effect'
   test('positive control: a valid plan does reach the (spy) driver', async () => {
     const spy = spyDriver('cdp');
     const outcome = await createRunService(spyPorts(new Map([['cdp', spy]]))).runUntrusted(signupPlan(['cdp-chromium']), testHarness.parse, { ...testHarness.runInputs(), project: testHarness.project });
-    assert.ok(!('state' in outcome), JSON.stringify(outcome));
-    assert.equal(outcome[0]?.state, 'TargetUnavailable');
+    assert.ok(outcome.kind === UntrustedRunOutcomeKind.Ran, JSON.stringify(outcome));
+    assert.equal(outcome.results[0]?.state, 'TargetUnavailable');
     assert.equal(spy.calls.count(), 2);
   });
 

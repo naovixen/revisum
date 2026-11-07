@@ -7,9 +7,9 @@ import { describe, test } from "node:test";
 import {
     createRunService,
     manifestHash,
+    noRewrites,
     planParser,
     success,
-    type RunPorts,
     type RunResult,
 } from "@revisum/engine";
 import { baseUrlOf, clearRun, trustedProjectFrom } from "../../support/policy-clearance.ts";
@@ -26,7 +26,6 @@ import {
 } from "./run-value-examples.ts";
 import { fakeDriverOpening } from "#test-support/fakes/FakeDriver.ts";
 import { driversOf, fakePorts } from "#test-support/fakes/FakePorts.ts";
-import { leaveOut } from "#test-support/fakes/LeaveOut.ts";
 
 const HEADING_CHANGED = { origin: ORIGIN, name: "heading-changed" };
 const STATUS_FLIPPED = { origin: ORIGIN, name: "status-flipped" };
@@ -49,10 +48,9 @@ const runWithRewrites = async (
         },
     });
     const driver = fakeDriverOpening(session);
-    const rewritesApplied: RewritesApplied = () => (isPageOpened ? (applied ?? []) : []);
-    const everyPort = fakePorts({ drivers: driversOf(driver), rewritesApplied });
-    const ports =
-        applied === undefined ? leaveOut<RunPorts>(everyPort, ["rewritesApplied"]) : everyPort;
+    const rewritesApplied: RewritesApplied =
+        applied === undefined ? noRewrites : () => (isPageOpened ? applied : []);
+    const ports = fakePorts({ drivers: driversOf(driver), rewritesApplied });
     return createRunService(ports).run(
         clearRun(plan, trusted, project.matrix[0]?.id ?? assert.fail("no target")),
         {

@@ -7,7 +7,7 @@
 import assert from 'node:assert/strict';
 import { arch, platform } from 'node:os';
 import { test } from 'node:test';
-import { createRunService } from '@revisum/engine';
+import { UntrustedRunOutcomeKind, createRunService } from '@revisum/engine';
 import { PRIVATE_MARKER, defaultParser } from './plan-examples.ts';
 import { spyDriver } from './secret-examples.ts';
 import { routedServiceCaller } from './service-call-examples.ts';
@@ -104,8 +104,8 @@ test('a plan refused for a disabled feature opens no browser, makes no call and 
   const plans: readonly JsonRecord[] = [...FEATURE_EXAMPLES.map((example) => unsafePlan(example.steps)), ALL_FEATURES_PLAN()];
   for (const plan of plans) {
     const outcome = await createRunService(ports).runUntrusted(plan, parse, base);
-    assert.ok('state' in outcome && outcome.state === 'Rejected', JSON.stringify(outcome));
-    if ('errors' in outcome) assert.ok(outcome.errors.some((error) => error.code === 'unsafe_feature_disabled'), JSON.stringify(outcome.errors));
+    assert.ok(outcome.kind === UntrustedRunOutcomeKind.Rejected, JSON.stringify(outcome));
+    assert.ok(outcome.errors.some((error) => error.code === 'unsafe_feature_disabled'), JSON.stringify(outcome.errors));
   }
   assert.equal(spy.calls.count('open'), 0, 'a browser was opened, so a script could have run in it');
   assert.equal(requests.length, 0, 'a call was made');

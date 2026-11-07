@@ -2,11 +2,14 @@ import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import {
     createRunService,
+    emptySecretStore,
     failure,
+    noDatabaseCommandRunner,
+    noRewrites,
+    noServiceCaller,
     planParser,
     success,
     type Origin,
-    type RunPorts,
     type Session,
     type SessionEnvironment,
     type Target,
@@ -24,7 +27,6 @@ import { fakeLeakScanner } from "#test-support/fakes/FakeLeakScanner.ts";
 import { fakeRandom } from "#test-support/fakes/FakeRandom.ts";
 import { FAKE_PAGE, fakeSession } from "#test-support/fakes/FakeSession.ts";
 import { fakeStoragePort } from "#test-support/fakes/FakeStoragePort.ts";
-import { leaveOut } from "#test-support/fakes/LeaveOut.ts";
 import { baseUrlOf, clearRun, trustedProjectFrom } from "#test-support/policy-clearance.ts";
 import {
     finalState,
@@ -216,11 +218,13 @@ describe("Using a fake port", () => {
             });
         });
 
-        describe("when a test leaves out an optional port", () => {
-            test("then it should be absent from the ports", () => {
-                const ports = leaveOut<RunPorts>(fakePorts(), ["services"]);
-                assert.equal(Object.hasOwn(ports, "services"), false);
-                assert.equal(Object.hasOwn(ports, "secrets"), true);
+        describe("when a test gives no secrets, services, database commands or rewrites", () => {
+            test("then it should use the engine's unwired ports for them", () => {
+                const ports = fakePorts();
+                assert.equal(ports.secrets, emptySecretStore);
+                assert.equal(ports.services, noServiceCaller);
+                assert.equal(ports.databaseCommands, noDatabaseCommandRunner);
+                assert.equal(ports.rewritesApplied, noRewrites);
             });
         });
     });

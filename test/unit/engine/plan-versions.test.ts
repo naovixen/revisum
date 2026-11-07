@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { arch, platform } from 'node:os';
-import { createRunService } from '@revisum/engine';
+import { UntrustedRunOutcomeKind, createRunService } from '@revisum/engine';
 import {
   CURRENT_VERSION, ORIGIN, accountClosurePlan, defaultParser, signupPlan, stepsOf, testProject, withValue,
   type JsonRecord,
@@ -84,12 +84,12 @@ test('a run of a plan with a newer step is refused before any driver is touched'
   };
   const parse = defaultParser();
   const refused = await createRunService(ports).runUntrusted(insertAt(signupPlan(), 8, NEWER_STEPS[1] ?? {}), parse, base);
-  assert.ok(!Array.isArray(refused) && 'errors' in refused, 'the run was refused');
+  assert.ok(refused.kind === UntrustedRunOutcomeKind.Rejected, 'the run was refused');
   assert.equal(spy.calls.count(), 0, 'no driver method was called');
   assert.equal(ports.events.read().length, 0, 'nothing was logged');
 
   // Positive control: the plan without the newer step does reach the driver.
   const accepted = await createRunService(ports).runUntrusted(signupPlan(), parse, base);
-  assert.ok(Array.isArray(accepted), JSON.stringify(accepted));
+  assert.ok(accepted.kind === UntrustedRunOutcomeKind.Ran, JSON.stringify(accepted));
   assert.ok(spy.calls.count() > 0, 'a valid plan reaches the driver, so the zero above is meaningful');
 });

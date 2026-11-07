@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import { arch, platform } from 'node:os';
 import { test } from 'node:test';
-import { createRunService } from '@revisum/engine';
+import { UntrustedRunOutcomeKind, createRunService } from '@revisum/engine';
 import { OPEN_ACCOUNT_PAGE, ORIGIN, approvedStanding, comparable, decideOn, deniedCodes, parsedPlan, parserProject, policyProjectInput, testGate, type JsonRecord , planOf } from './policy-examples.ts';
 import { spyDriver } from './secret-examples.ts';
 import { fakePorts } from '#test-support/fakes/FakePorts.ts';
@@ -116,8 +116,8 @@ test('a plan the gate denies for a stub or a storage write opens no browser', as
   const rules: string[] = [];
   for (const raw of [newerPlan([OPEN_ACCOUNT_PAGE, startStub('accountUnavailable')]), newerPlan([OPEN_ACCOUNT_PAGE, setStorage('chosenLanguage')])]) {
     const outcome = await createRunService(ports).runUntrusted(raw, parse, base);
-    assert.ok('rule' in outcome, JSON.stringify(outcome));
-    if ('rule' in outcome) rules.push(outcome.rule);
+    assert.ok(outcome.kind === UntrustedRunOutcomeKind.Denied, JSON.stringify(outcome));
+    rules.push(outcome.rule);
   }
   assert.deepEqual(rules, ['side-effect-in-proposal', 'side-effect-in-proposal']);
   assert.equal(spy.calls.count('open'), 0, 'no browser was opened');

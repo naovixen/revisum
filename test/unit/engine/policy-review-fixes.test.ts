@@ -6,7 +6,7 @@
 //   - an audit sink that failed to record a denial let the denial pass silently.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { createRunService, failure, policyGate, type ClearedRun, type EventSink, type RunResult } from '@revisum/engine';
+import { createRunService, failure, policyGate, UntrustedRunOutcomeKind, type ClearedRun, type EventSink, type RunResult, type UntrustedRunOutcome } from '@revisum/engine';
 import { memoryEventSink } from './approval-repositories.ts';
 import { finalState, guardedDriver, onlyRun, parserFor, runBase, runInputs } from './guarded-driver.ts';
 import {
@@ -142,6 +142,9 @@ for (const name of LOOK_ALIKE_NAMES) {
 const failingSink = () => fakeEventSink({ append: () => failure({ code: 'write-failed' as const }) });
 
 const DELETE_PLAN = planOf(DELETE_STEPS);
+// What a run that threw leaves to read: no result.
+const NOTHING_RAN: UntrustedRunOutcome = { kind: UntrustedRunOutcomeKind.Ran, results: [] };
+const RECORDED_STATIC_DENIAL: UntrustedRunOutcome = { kind: UntrustedRunOutcomeKind.Denied, state: 'Denied', rule: 'irreversible-action', stepIndex: 1 };
 // The red-team's runtime click: a test id that turns out to be the Delete account button.
 const RUNTIME_DELETE_STEPS = [OPEN_ACCOUNT_PAGE, click(testId('danger-zone-action'))];
 const RUNTIME_DELETE_PAGE = { 1: { element: { role: 'button', name: 'Delete account' } } };
@@ -161,7 +164,7 @@ test('when the audit sink fails to record a static denial, the outcome says so r
   assert.ok(sink.calls.count('append') > 0, 'the denial was never offered to the sink');
   assert.equal(driven.opens(), 0, 'a denied plan opened a browser');
   if (settled.thrown !== undefined) return;
-  assert.notDeepEqual(settled.value, { state: 'Denied', rule: 'irreversible-action', stepIndex: 1 },
+  assert.notDeepEqual(settled.value, RECORDED_STATIC_DENIAL,
     'the denial went unrecorded, yet the outcome looks exactly like a recorded one');
 });
 
@@ -169,7 +172,7 @@ test('when the audit sink records a static denial, the outcome is a plain Denied
   const driven = guardedDriver([...DELETE_STEPS, CLOSING_CHECK]);
   const sink = memoryEventSink();
   const outcome = await createRunService(fakePorts({ drivers: driversOf(driven.driver), audit: sink })).runUntrusted(DELETE_PLAN, parserFor(), runBase());
-  assert.deepEqual(outcome, { state: 'Denied', rule: 'irreversible-action', stepIndex: 1 });
+  assert.deepEqual(outcome, RECORDED_STATIC_DENIAL);
   assert.equal(sink.recorded.length, 1);
 });
 
@@ -186,15 +189,15 @@ test('when the audit sink fails to record a runtime denial, the run result diffe
   assert.ok(sink.calls.count('append') > 0, 'the denial was never offered to the sink');
   assert.equal(unrecorded.driven.inputEvents[1], 0, 'the denied click sent an input event');
   if (unrecorded.settled.thrown !== undefined) return;
-  const failed = onlyRun(unrecorded.settled.value ?? []);
+  const failed = onlyRun(unrecorded.settled.value ?? NOTHING_RAN);
   assert.ok(failed !== undefined && failed.state !== 'Passed', JSON.stringify(failed?.steps));
-  assert.notEqual(failed.resultHash, onlyRun(recorded.settled.value ?? [])?.resultHash,
+  assert.notEqual(failed.resultHash, onlyRun(recorded.settled.value ?? NOTHING_RAN)?.resultHash,
     'the denial went unrecorded, yet the result is identical to a recorded one');
 });
 
 test('two runs whose runtime denial was recorded give the same result', async () => {
   const first = await runtimeDenial(memoryEventSink());
   const second = await runtimeDenial(memoryEventSink());
-  assert.equal(finalState(first.settled.value ?? []), 'Denied');
-  assert.equal(onlyRun(first.settled.value ?? [])?.resultHash, onlyRun(second.settled.value ?? [])?.resultHash);
+  assert.equal(finalState(first.settled.value ?? NOTHING_RAN), 'Denied');
+  assert.equal(onlyRun(first.settled.value ?? NOTHING_RAN)?.resultHash, onlyRun(second.settled.value ?? NOTHING_RAN)?.resultHash);
 });

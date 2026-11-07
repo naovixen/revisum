@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import { arch, platform } from 'node:os';
 import { test } from 'node:test';
-import { createRunService } from '@revisum/engine';
+import { UntrustedRunOutcomeKind, createRunService } from '@revisum/engine';
 import { OPEN_ACCOUNT_PAGE, ORIGIN, PRODUCTION_ORIGIN, approvedStanding, comparable, decideOn, deniedCodes, parsedPlan, parserProject, policyProjectInput, testGate, type JsonRecord , POLICY , planOf } from './policy-examples.ts';
 import { routedServiceCaller } from './service-call-examples.ts';
 import { spyDriver } from './secret-examples.ts';
@@ -167,8 +167,8 @@ test('a plan the gate denies for any of these rules makes zero calls and opens n
   const rules: string[] = [];
   for (const raw of denied) {
     const outcome = await createRunService(ports).runUntrusted(raw, planParserFor, base);
-    assert.ok('rule' in outcome, JSON.stringify(outcome));
-    if ('rule' in outcome) rules.push(outcome.rule);
+    assert.ok(outcome.kind === UntrustedRunOutcomeKind.Denied, JSON.stringify(outcome));
+    rules.push(outcome.rule);
   }
   assert.deepEqual(rules, ['side-effect-in-proposal', 'over-limit', 'production-origin']);
   assert.equal(requests.length, 0, 'no call was made');

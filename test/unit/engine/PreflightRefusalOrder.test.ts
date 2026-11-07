@@ -9,12 +9,20 @@
 // takes the base URL of the earliest.
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { createRunService, planParser, type RunPorts, type RunResult } from "@revisum/engine";
+import {
+    createRunService,
+    noDatabaseCommandRunner,
+    noServiceCaller,
+    planParser,
+    type RunPorts,
+    type RunResult,
+} from "@revisum/engine";
 import { baseUrlOf, clearRun, trustedProjectFrom } from "#test-support/policy-clearance.ts";
 import { fakeDriverNeverLaunching } from "#test-support/fakes/FakeDriver.ts";
 import { driversOf, fakePorts } from "#test-support/fakes/FakePorts.ts";
 import { fakeSecretStore } from "#test-support/fakes/FakeSecretStore.ts";
-import { leaveOut } from "#test-support/fakes/LeaveOut.ts";
+import { fakeServiceCaller } from "#test-support/fakes/FakeServiceCaller.ts";
+import { fakeDatabaseCommandRunner } from "#test-support/fakes/FakeDatabaseCommandRunner.ts";
 import { TEST_SERVICE_SECRET_NAMES } from "./plan-examples.ts";
 import { DEFAULT_CLOCK_START, DEFAULT_SEED, accepted } from "./run-value-examples.ts";
 import { fakeStorageState } from "./secret-examples.ts";
@@ -145,15 +153,16 @@ function portsFor(
     const secrets = Object.fromEntries(
         Object.entries(EVERY_SECRET).filter(([name]) => !missing.has(name)),
     );
-    const ports = fakePorts({ ...driverPorts, secrets: fakeSecretStore(secrets) });
-    return leaveOut<RunPorts>(ports, [
-        ...(conditions.some((condition) => condition.withoutServices)
-            ? (["services"] as const)
-            : []),
-        ...(conditions.some((condition) => condition.withoutDatabaseCommands)
-            ? (["databaseCommands"] as const)
-            : []),
-    ]);
+    return fakePorts({
+        ...driverPorts,
+        secrets: fakeSecretStore(secrets),
+        services: conditions.some((condition) => condition.withoutServices)
+            ? noServiceCaller
+            : fakeServiceCaller(),
+        databaseCommands: conditions.some((condition) => condition.withoutDatabaseCommands)
+            ? noDatabaseCommandRunner
+            : fakeDatabaseCommandRunner(),
+    });
 }
 
 // Runs one plan failing every condition given, on a driver that records whether it was asked.

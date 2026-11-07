@@ -14,14 +14,13 @@
 //     the secret's value is the storage-state JSON.
 import { randomBytes } from 'node:crypto';
 import type { Secret, SecretStore } from '@revisum/contracts';
-import { createRunService, environmentSecretStore, parseProject, planParser, success, type BrowserDriver, type Plan, type RunPorts, type Project, type RunResult, type SecretName, type TargetId } from '@revisum/engine';
+import { createRunService, emptySecretStore, environmentSecretStore, parseProject, planParser, success, type BrowserDriver, type Plan, type Project, type RunResult, type SecretName, type TargetId } from '@revisum/engine';
 import { baseUrlOf, clearRun, trustedProjectFrom } from '../../support/policy-clearance.ts';
 import { fakeArtifactStore } from '#test-support/fakes/FakeArtifactStore.ts';
 import { fakeDriverNeverLaunching, fakeDriverOpening, type FakeDriver } from '#test-support/fakes/FakeDriver.ts';
 import { fakePorts } from '#test-support/fakes/FakePorts.ts';
 import { fakeRunEventSink } from '#test-support/fakes/FakeRunEventSink.ts';
 import { fakeSession } from '#test-support/fakes/FakeSession.ts';
-import { leaveOut } from '#test-support/fakes/LeaveOut.ts';
 
 // The forms a leak scan looks for, as the Leak type names them.
 export const LEAK_FORMS = ['raw', 'uri', 'base64', 'base64url', 'prefix', 'case'] as const;
@@ -177,7 +176,7 @@ export async function runWithSecrets(
   const events = fakeRunEventSink();
   const artifacts = fakeArtifactStore();
   const ports = fakePorts({ drivers: new Map([['fake', driver]]), artifacts, events });
-  const result = await createRunService(environment === null ? leaveOut<RunPorts>(ports, ['secrets']) : { ...ports, secrets: fakeEnvironmentStore(environment) }).run(clearRun(parsedPlan(project, plan), trusted, FAKE_TARGET as TargetId), { baseUrl: baseUrlOf(ORIGIN),
+  const result = await createRunService(environment === null ? { ...ports, secrets: emptySecretStore } : { ...ports, secrets: fakeEnvironmentStore(environment) }).run(clearRun(parsedPlan(project, plan), trusted, FAKE_TARGET as TargetId), { baseUrl: baseUrlOf(ORIGIN),
     seed: 7, fixedTimeMilliseconds: Date.UTC(2026, 0, 1), fixtures: [], host: { platform: 'test', arch: 'test' },
   });
   const eventLines = events.read().map((event) => JSON.stringify(event)).join('\n');

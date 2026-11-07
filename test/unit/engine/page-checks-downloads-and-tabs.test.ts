@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import { arch, platform } from 'node:os';
 import { test } from 'node:test';
-import { createRunService, type Plan } from '@revisum/engine';
+import { UntrustedRunOutcomeKind, createRunService, type Plan } from '@revisum/engine';
 import {
   CLOSING_CHECK, OPEN_ORDERS, ORIGIN, accepted, label, navigate, parserFor, planOf, projectWith, reference, rejection,
   type JsonRecord,
@@ -321,7 +321,7 @@ test('a plan with a misplaced or off-list newTab is refused before any driver is
   const base = { project: projectWith(), baseUrl: baseUrlOf(ORIGIN), seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() } };
   for (const plan of [planOf([OPEN_ORDERS, frame([newTab('/account'), CLOSING_CHECK])]), planOf([OPEN_ORDERS, newTab('https://evil.example/collect')])]) {
     const outcome = await createRunService(ports).runUntrusted(plan, parsePlan, base);
-    assert.ok(!Array.isArray(outcome) && 'errors' in outcome, JSON.stringify(outcome));
+    assert.ok(outcome.kind === UntrustedRunOutcomeKind.Rejected, JSON.stringify(outcome));
   }
   assert.equal(spy.calls.count(), 0, 'no driver method was called');
   assert.equal(events.read().length, 0, 'nothing was logged');

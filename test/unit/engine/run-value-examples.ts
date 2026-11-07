@@ -8,13 +8,12 @@
 //   - runPlan() runs a parsed plan through the policy gate and run() on a driver that needs no
 //     browser and records every call, so a test can see what reached the page.
 import assert from 'node:assert/strict';
-import { createRunService, parseProject, planParser, success, type PerformableAction, type BrowserDriver, type GeneratedValue, type Plan, type PlanError, type Project, type Result, type RunPorts, type RunResult, type Session, type SessionEnvironment, type ValueName } from '@revisum/engine';
+import { createRunService, parseProject, planParser, success, unwiredPorts, type PerformableAction, type BrowserDriver, type GeneratedValue, type Plan, type PlanError, type Project, type Result, type RunResult, type Session, type SessionEnvironment, type ValueName } from '@revisum/engine';
 import { baseUrlOf, clearRun, trustedProjectFrom } from '../../support/policy-clearance.ts';
 import { ORIGIN, TARGET_ID, testProjectInput, type JsonRecord } from './plan-examples.ts';
 import { fakeDriver } from '#test-support/fakes/FakeDriver.ts';
 import { driversOf, fakePorts } from '#test-support/fakes/FakePorts.ts';
 import { FAKE_ELEMENT, fakeSession } from '#test-support/fakes/FakeSession.ts';
-import { leaveOut } from '#test-support/fakes/LeaveOut.ts';
 
 export { ORIGIN, TARGET_ID, type JsonRecord };
 
@@ -139,7 +138,7 @@ export async function runPlan(raw: unknown, options: RunOptions = {}): Promise<{
   const target = project.matrix[0];
   assert.ok(target !== undefined, 'the test project has a target');
   const { driver, recording } = recordingDriver(options.session);
-  const result = await createRunService(leaveOut<RunPorts>(fakePorts({ drivers: driversOf(driver) }), ['secrets', 'services', 'databaseCommands', 'rewritesApplied'])).run(clearRun(plan, trusted, target.id), {
+  const result = await createRunService(fakePorts({ drivers: driversOf(driver), ...unwiredPorts })).run(clearRun(plan, trusted, target.id), {
     baseUrl: baseUrlOf(options.baseUrl ?? ORIGIN),
     seed: options.seed ?? DEFAULT_SEED, fixedTimeMilliseconds: options.clockStartMilliseconds ?? DEFAULT_CLOCK_START,
     fixtures: [], host: { platform: 'test', arch: 'test' },

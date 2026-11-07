@@ -56,7 +56,7 @@ test('a parsed plan given the brand\'s field by Object.assign does not compile a
 // ---- A run without an audit sink -----------------------------------------------------------------
 
 const PORTS_SETUP = [
-  "import type { ArtifactStore, BrowserDriver, Clock, EventSink, Redactor, RunEventSink, RunIsolation, RunPorts } from '@revisum/engine';",
+  "import { unwiredPorts, type ArtifactStore, type BrowserDriver, type Clock, type EventSink, type Redactor, type RunEventSink, type RunIsolation, type RunPorts } from '@revisum/engine';",
   'declare const drivers: ReadonlyMap<string, BrowserDriver>;',
   'declare const clock: Clock;',
   'declare const artifacts: ArtifactStore;',
@@ -67,7 +67,7 @@ const PORTS_SETUP = [
 ];
 
 test('control: run ports with an audit sink compile', { timeout: TIMEOUT }, () => {
-  const compiled = compile('ports-with-audit.ts', [...PORTS_SETUP, 'export const ports: RunPorts = { drivers, clock, artifacts, redactor, events, audit, isolation };']);
+  const compiled = compile('ports-with-audit.ts', [...PORTS_SETUP, 'export const ports: RunPorts = { drivers, clock, artifacts, redactor, events, audit, isolation, ...unwiredPorts };']);
   assert.equal(compiled.passed, true, compiled.output);
 });
 
@@ -75,7 +75,7 @@ const DELETE_STEPS = [OPEN_ACCOUNT_PAGE, click(role('button', 'Delete account'))
 const SAVE_STEPS = [OPEN_ACCOUNT_PAGE, click(role('button', 'Save changes'))];
 
 test('a run cannot deny a plan without recording it: the audit port is required, or a run without one refuses to start', { timeout: TIMEOUT }, async () => {
-  const compiled = compile('ports-without-audit.ts', [...PORTS_SETUP, 'export const ports: RunPorts = { drivers, clock, artifacts, redactor, events, isolation };']);
+  const compiled = compile('ports-without-audit.ts', [...PORTS_SETUP, 'export const ports: RunPorts = { drivers, clock, artifacts, redactor, events, isolation, ...unwiredPorts };']);
   if (!compiled.passed) {
     // The port is required: leaving it out is the one error, and it names the audit sink.
     assert.equal(compiled.errors.length, 1, compiled.output);

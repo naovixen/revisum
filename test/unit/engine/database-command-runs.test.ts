@@ -14,6 +14,7 @@
 //     output or an environment value.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { UntrustedRunOutcomeKind } from '@revisum/engine';
 import { TEST_SERVICE } from './plan-examples.ts';
 import {
   COUNT_ORDERS, COUNT_OUTPUT_LIMIT, DATABASE_NAME, DATABASE_PASSWORD, DATABASE_SERVICE_NAME, DECLARED_VARIABLES, OPEN_CART, ORIGIN,
@@ -218,13 +219,13 @@ const PRODUCTION_PROJECT = commandProjectFile({
 
 test('a command whose service is on a production origin is denied production-origin before it starts: the port is never called', async () => {
   const { outcome, commands, opens } = await runUntrustedWithCommands(commandPlan([OPEN_CART, { type: 'database', command: 'seedLiveOrders', arguments: { count: 3 } }]), PRODUCTION_PROJECT);
-  assert.ok('rule' in outcome && outcome.rule === 'production-origin', JSON.stringify(outcome));
+  assert.ok(outcome.kind === UntrustedRunOutcomeKind.Denied && outcome.rule === 'production-origin', JSON.stringify(outcome));
   assert.deepEqual(commands, [], 'the command was handed to the port');
   assert.equal(opens, 0, 'a browser was opened');
 });
 
 test('counter-example: the same command on the test database, in the same project, reaches the port once', async () => {
   const { outcome, commands } = await runUntrustedWithCommands(commandPlan([OPEN_CART, SEED_ORDERS]), PRODUCTION_PROJECT);
-  assert.ok(Array.isArray(outcome), JSON.stringify(outcome));
+  assert.ok(outcome.kind === UntrustedRunOutcomeKind.Ran, JSON.stringify(outcome));
   assert.deepEqual(modesOf(commands), ['seed']);
 });

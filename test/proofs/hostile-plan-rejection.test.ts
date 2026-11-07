@@ -11,7 +11,7 @@
 import assert from 'node:assert/strict';
 import { arch, platform } from 'node:os';
 import { afterEach, beforeEach, test } from 'node:test';
-import { createRunService, planParser, type Plan, type PlanError, type Result } from '@revisum/engine';
+import { UntrustedRunOutcomeKind, createRunService, planParser, type Plan, type PlanError, type Result } from '@revisum/engine';
 import { hostilePlans, type HostilePlan } from '#test-support/hostile-plans.ts';
 import { makeProject, signupPlan } from '#test-support/signup-harness.ts';
 import { fakeDriverNeverLaunching } from '#test-support/fakes/FakeDriver.ts';
@@ -42,7 +42,7 @@ const base = {
 
 async function rejectedErrors(input: unknown): Promise<readonly PlanError[]> {
   const outcome = await createRunService(ports()).runUntrusted(input, parsePlan, base);
-  assert.ok(!Array.isArray(outcome) && 'errors' in outcome, 'the plan was run, not rejected');
+  assert.ok(outcome.kind === UntrustedRunOutcomeKind.Rejected, 'the plan was run, not rejected');
   return outcome.errors;
 }
 
@@ -138,6 +138,6 @@ test('every API-step plan is rejected with no driver call or network request', a
 // Positive control: the same counters do move for a valid plan, so the zeros above can fail.
 test('positive control: a valid plan does reach the spy driver', async () => {
   const outcome = await createRunService(ports()).runUntrusted(valid(), parsePlan, base);
-  assert.ok(Array.isArray(outcome), JSON.stringify(outcome));
+  assert.ok(outcome.kind === UntrustedRunOutcomeKind.Ran, JSON.stringify(outcome));
   assert.ok(spy.calls.count() > 0, 'the driver was asked to open a session');
 });

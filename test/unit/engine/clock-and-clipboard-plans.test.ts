@@ -8,7 +8,7 @@
 import assert from 'node:assert/strict';
 import { arch, platform } from 'node:os';
 import { afterEach, beforeEach, test } from 'node:test';
-import { createRunService, type PlanErrorCode } from '@revisum/engine';
+import { UntrustedRunOutcomeKind, createRunService, type PlanErrorCode } from '@revisum/engine';
 import { PRIVATE_MARKER } from './plan-examples.ts';
 import { projectWith } from './run-value-examples.ts';
 import { routedServiceCaller } from './service-call-examples.ts';
@@ -284,7 +284,7 @@ async function assertNothingReached(plans: readonly JsonRecord[]): Promise<void>
   assert.ok(plans.length >= 15, 'enough hostile plans');
   for (const plan of plans) {
     const outcome = await createRunService(ports).runUntrusted(plan, parsePlan, base());
-    assert.ok('errors' in outcome, JSON.stringify(outcome));
+    assert.ok(outcome.kind === UntrustedRunOutcomeKind.Rejected, JSON.stringify(outcome));
   }
   assert.equal(spy.calls.count(), 0, 'no driver method was called');
   assert.equal(networkRequests, 0, 'no network request was made');

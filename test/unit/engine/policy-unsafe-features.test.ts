@@ -9,7 +9,7 @@
 import assert from 'node:assert/strict';
 import { arch, platform } from 'node:os';
 import { test } from 'node:test';
-import { createRunService, type Plan } from '@revisum/engine';
+import { UntrustedRunOutcomeKind, createRunService, type Plan } from '@revisum/engine';
 import { TEST_SERVICE } from './plan-examples.ts';
 import {
   ALLOWED, PROPOSAL, approvedStanding, comparable, decideOn, deniedCodes, denied, element, localeOf, parsedPlan, parserProject, stepAt,
@@ -110,8 +110,8 @@ test('a plan the gate denies for any of these rules opens no browser, so no scri
   const rules: string[] = [];
   for (const raw of [unsafePlan([OPEN_CART, INLINE_READ]), unsafePlan([OPEN_CART, CLEAR_EDITOR]), unsafePlan([OPEN_CART], { cleanup: [WIPE_ORDERS] })]) {
     const outcome = await createRunService(ports).runUntrusted(raw, parse, base);
-    assert.ok('rule' in outcome, JSON.stringify(outcome));
-    if ('rule' in outcome) rules.push(outcome.rule);
+    assert.ok(outcome.kind === UntrustedRunOutcomeKind.Denied, JSON.stringify(outcome));
+    rules.push(outcome.rule);
   }
   assert.deepEqual(rules, ['inline-script-in-proposal', 'side-effect-in-proposal', 'side-effect-in-proposal']);
   assert.equal(spy.calls.count('open'), 0, 'a browser was opened');
@@ -152,7 +152,7 @@ test('a production command is denied before anything starts: no browser is opene
   };
   const parse = (raw: unknown) => ({ ok: true as const, value: parsedPlan(raw as JsonRecord, PRODUCTION_PROJECT) });
   const outcome = await createRunService(ports).runUntrusted(unsafePlan([OPEN_CART, LIVE_COUNT_CHECK]), parse, base);
-  assert.ok('rule' in outcome && outcome.rule === 'production-origin', JSON.stringify(outcome));
+  assert.ok(outcome.kind === UntrustedRunOutcomeKind.Denied && outcome.rule === 'production-origin', JSON.stringify(outcome));
   assert.equal(spy.calls.count('open'), 0);
 });
 

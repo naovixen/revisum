@@ -4,7 +4,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { arch, platform, tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createRunService, failure, parseProject, planParser, policyGate, sha256, success, type BrowserBuild, type BrowserDriver, type BuildFailure, type Plan, type Project, type Result, type RunClearance, type RunInputs, type RunResult, type Target, type TargetId, type TrustedProject, type Unavailable } from '@revisum/engine';
+import { UntrustedRunOutcomeKind, createRunService, failure, parseProject, planParser, policyGate, sha256, success, type BrowserBuild, type BrowserDriver, type BuildFailure, type Plan, type Project, type Result, type RunClearance, type RunInputs, type RunResult, type Target, type TargetId, type TrustedProject, type Unavailable } from '@revisum/engine';
 import { type MemoryArtifactStore } from '../../support/memory-ports.ts';
 import { baseUrlOf, clearRun, trustedProjectFrom } from '../../support/policy-clearance.ts';
 import { ORIGIN, signupPlan, testProjectInput, withValue, type JsonRecord } from './plan-examples.ts';
@@ -138,9 +138,8 @@ export async function runUntrustedOn(options: {
 }): Promise<UntrustedRuns> {
   const store = fakeArtifactStore();
   const outcome = await createRunService(fakePorts({ drivers: options.drivers, artifacts: store })).runUntrusted(withValue(signupPlan(), ['targets'], [...options.planTargets]), planParser(options.planProject), { project: options.trusted, baseUrl: baseUrlOf(ORIGIN), seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() } });
-  if (!Array.isArray(outcome)) {
+  if (outcome.kind !== UntrustedRunOutcomeKind.Ran) {
     throw new Error(`the test plan did not run: ${JSON.stringify(outcome)}`);
   }
-  const results: readonly RunResult[] = outcome;
-  return { results, store };
+  return { results: outcome.results, store };
 }

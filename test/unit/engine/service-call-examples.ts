@@ -17,7 +17,7 @@
 //     order, each with an `outcome` (passed, failed or skipped) and, on failure, a `code`;
 //   - a review item a run raises is in RunResult.reviewItems, each with a `code`.
 import assert from 'node:assert/strict';
-import { createRunService, failure, parseProject, planParser, success, type LoggedEvent, type PlanStanding, type Project, type Result, type RunPorts, type RunResult, type ServiceCallErrorCode, type ServiceCaller, type ServiceRequest, type ServiceResponse } from '@revisum/engine';
+import { createRunService, failure, noServiceCaller, parseProject, planParser, success, type LoggedEvent, type PlanStanding, type Project, type Result, type RunPorts, type RunResult, type ServiceCallErrorCode, type ServiceCaller, type ServiceRequest, type ServiceResponse } from '@revisum/engine';
 import { baseUrlOf, clearRun, trustedProjectFrom } from '../../support/policy-clearance.ts';
 import {
   DEFAULT_CLOCK_START, DEFAULT_SEED, CURRENT_VERSION, ORIGIN, TARGET_ID, accepted, projectFileWith, recordingDriver,
@@ -29,7 +29,6 @@ import { driversOf, fakePorts } from '#test-support/fakes/FakePorts.ts';
 import { fakeRunEventSink } from '#test-support/fakes/FakeRunEventSink.ts';
 import { fakeSecretStore } from '#test-support/fakes/FakeSecretStore.ts';
 import { fakeServiceCaller } from '#test-support/fakes/FakeServiceCaller.ts';
-import { leaveOut } from '#test-support/fakes/LeaveOut.ts';
 
 export { CURRENT_VERSION, ORIGIN, TARGET_ID, type JsonRecord };
 
@@ -277,7 +276,7 @@ export type CallRun = {
   readonly everything: string;
 };
 
-const serviceCallPorts = (ports: RunPorts, hasCaller: boolean): RunPorts => (hasCaller ? ports : leaveOut<RunPorts>(ports, ['services']));
+const serviceCallPorts = (ports: RunPorts, hasCaller: boolean): RunPorts => (hasCaller ? ports : { ...ports, services: noServiceCaller });
 
 export async function runWithCalls(raw: unknown, options: CallRunOptions = {}): Promise<CallRun> {
   const projectFile = options.projectFile ?? callProjectFile();

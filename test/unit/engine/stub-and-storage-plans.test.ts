@@ -7,7 +7,7 @@
 import assert from 'node:assert/strict';
 import { arch, platform } from 'node:os';
 import { test } from 'node:test';
-import { createRunService, type PlanErrorCode } from '@revisum/engine';
+import { UntrustedRunOutcomeKind, createRunService, type PlanErrorCode } from '@revisum/engine';
 import { PRIVATE_MARKER } from './plan-examples.ts';
 import { accepted, rejection, type ParsePlan } from './run-value-examples.ts';
 import {
@@ -251,7 +251,7 @@ test('a refused plan reaches no driver method, and nothing is logged', async () 
   const base = { project: stubProject(), baseUrl: baseUrlOf(ORIGIN), seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() } };
   for (const refused of REFUSED) {
     const outcome = await createRunService(ports).runUntrusted(refused.plan, parsePlan, base);
-    assert.ok('errors' in outcome, `${refused.name}: ${JSON.stringify(outcome)}`);
+    assert.ok(outcome.kind === UntrustedRunOutcomeKind.Rejected, `${refused.name}: ${JSON.stringify(outcome)}`);
   }
   assert.equal(spy.calls.count(), 0, 'no driver method was called');
   assert.equal(events.read().length, 0, 'nothing was logged');

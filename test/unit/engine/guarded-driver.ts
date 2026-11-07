@@ -8,7 +8,7 @@
 //
 // A dialog step acts on no element: the driver asks the guard with an element whose fields are all
 // null, and passes the open dialog's text as the guard's second argument.
-import { type RunService, failure, planParser, success, type BrowserDriver, type GuardVerdict, type Plan, type PlanError, type Project, type ResolvedElement, type Result, type RunInputs, type RunPorts, type RunResult } from '@revisum/engine';
+import { type RunService, failure, planParser, success, unwiredPorts, UntrustedRunOutcomeKind, type BrowserDriver, type GuardVerdict, type Plan, type PlanError, type Project, type ResolvedElement, type Result, type RunInputs, type RunPorts, type RunResult } from '@revisum/engine';
 import { arch, platform } from 'node:os';
 import { ORIGIN, element, parserProject, policyProjectInput, type JsonRecord } from './policy-examples.ts';
 import { fakeArtifactStore } from '#test-support/fakes/FakeArtifactStore.ts';
@@ -94,7 +94,7 @@ export const runBase = (projectInput: JsonRecord = policyProjectInput()): RunInp
 // The ports of a run on `driver`, without an audit sink; tests add one where they need it.
 export const portsWithoutAudit = (driver: BrowserDriver): Omit<RunPorts, 'audit'> => ({
   drivers: driversOf(driver), clock: fakeClock(), artifacts: fakeArtifactStore(),
-  redactor: fakeRedactor(), events: fakeRunEventSink(), isolation: fakeRunIsolation(),
+  redactor: fakeRedactor(), events: fakeRunEventSink(), isolation: fakeRunIsolation(), ...unwiredPorts,
 });
 
 export const parserFor = (projectInput: JsonRecord = policyProjectInput()) =>
@@ -104,11 +104,11 @@ export type UntrustedOutcome = Awaited<ReturnType<RunService["runUntrusted"]>>;
 
 // The state a runUntrusted outcome ended in: Rejected or Denied before any run, or the one run's state.
 export function finalState(outcome: UntrustedOutcome): string {
-  if (!Array.isArray(outcome)) return (outcome as { readonly state: string }).state;
-  const runs: readonly RunResult[] = outcome;
+  if (outcome.kind !== UntrustedRunOutcomeKind.Ran) return outcome.state;
+  const runs = outcome.results;
   if (runs.length !== 1) throw new Error(`expected one run, got ${runs.length}`);
   return runs[0]?.state ?? 'none';
 }
 
 // The one run's result, when the plan ran at all.
-export const onlyRun = (outcome: UntrustedOutcome): RunResult | undefined => (Array.isArray(outcome) ? (outcome as readonly RunResult[])[0] : undefined);
+export const onlyRun = (outcome: UntrustedOutcome): RunResult | undefined => (outcome.kind === UntrustedRunOutcomeKind.Ran ? outcome.results[0] : undefined);
