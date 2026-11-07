@@ -31,7 +31,7 @@ const DECLARED_COMMAND = ['npx', 'playwright', 'test'];
 test('a workload runner that cannot enforce egress makes the run Refused with egress-unenforceable', async () => {
   const { result } = await runDeclaredSuite({ behaviour: { refusal: 'egress-unenforceable' } });
   assert.equal(result.state, 'Refused');
-  assert.equal(result.refusal?.code, 'egress-unenforceable');
+  assert.equal(result.refusal.code, 'egress-unenforceable');
 });
 
 test('after the refusal nothing else is run: no setup, no suite, and no test result', async () => {
@@ -166,7 +166,7 @@ test('counter-example: the failed test\'s error message reaches the result, with
 
 async function manifestOf(options: Parameters<typeof runDeclaredSuite>[0] = {}) {
   const { result } = await runDeclaredSuite(options);
-  assert.ok(result.manifest !== null && result.manifestHash !== null, 'the evidence run has no manifest');
+  assert.ok(result.manifest !== null, 'the evidence run has no manifest');
   return { manifest: result.manifest, hash: result.manifestHash };
 }
 

@@ -30,7 +30,7 @@ test('a plan naming a secret the store cannot resolve ends with secret-missing b
   assert.equal(spy.calls.count('open'), 0, 'no browser session was opened');
   assert.equal(ran.artifactsStored, 0, 'no artefact was stored');
   assert.equal(ran.result.state, 'Refused');
-  assert.equal(ran.result.refusal?.code, 'secret-missing');
+  assert.equal(ran.result.refusal.code, 'secret-missing');
   assert.deepEqual(ran.result.steps, [], 'no step ran');
   assert.ok(JSON.stringify(ran.result.refusal).includes('MISSING_TOKEN'), `the refusal names the secret: ${JSON.stringify(ran.result.refusal)}`);
   assert.deepEqual(echoesIn(ran.everything, resolvableValue), [], 'no form of the resolvable secret appears in the result or the log');
@@ -59,7 +59,7 @@ test('a run with no secret store refuses every secret reference with secret-miss
   const ran = await runWithSecrets(['ACCOUNT_TOKEN'], secretFillPlan(['ACCOUNT_TOKEN']), null, spy);
   assert.equal(spy.calls.count('open'), 0, 'no browser session was opened');
   assert.equal(ran.result.state, 'Refused');
-  assert.equal(ran.result.refusal?.code, 'secret-missing');
+  assert.equal(ran.result.refusal.code, 'secret-missing');
   assert.ok(JSON.stringify(ran.result.refusal).includes('ACCOUNT_TOKEN'));
 });
 

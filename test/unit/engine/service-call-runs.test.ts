@@ -253,7 +253,7 @@ test('a header secret the store cannot resolve ends the run before any call or p
   const environment = { [ADMIN_LOGIN_SECRET]: SECRET_VALUES[ADMIN_LOGIN_SECRET] ?? '', [ADMIN_PASSWORD_SECRET]: SECRET_VALUES[ADMIN_PASSWORD_SECRET] ?? '' };
   const ran = await runWithCalls(withCleanup(callPlanOf([NAVIGATE, CREATE_ORDER]), [RESET_SHOP]), { environment });
   assert.equal(ran.result.state, 'Refused');
-  assert.equal(ran.result.refusal?.code, 'secret-missing');
+  assert.equal(ran.result.refusal.code, 'secret-missing');
   assert.ok(JSON.stringify(ran.result.refusal).includes(TOKEN_SECRET), `the refusal names the secret: ${JSON.stringify(ran.result.refusal)}`);
   assert.deepEqual(lines(ran.requests), [], 'no call was made, cleanup included');
   assert.equal(ran.recording.environments.length, 0, 'no browser session was opened');
@@ -389,7 +389,7 @@ test('a plan that calls a service, run with no services port, is refused with se
   for (const plan of [callPlanOf([NAVIGATE, CREATE_ORDER]), withCleanup(callPlanOf([NAVIGATE]), [RESET_SHOP]), callPlanOf([NAVIGATE, expectBackend('getOrder', { orderId: 'ord_1' }, 'status', { kind: 'present' })])]) {
     const ran = await runWithCalls(plan, { withCaller: false });
     assert.equal(ran.result.state, 'Refused', JSON.stringify(ran.result));
-    assert.equal(ran.result.refusal?.code, 'services-unavailable');
+    assert.equal(ran.result.refusal.code, 'services-unavailable');
     assert.deepEqual(ran.result.steps, [], 'no step ran');
     assert.equal(ran.recording.environments.length, 0, 'no browser session was opened');
     assert.equal(ran.recording.navigations.length, 0, 'nothing reached the page');

@@ -139,7 +139,7 @@ const [FIRST_CHECK = assert.fail("there is a first check")] = CONDITIONS;
 // Refused by this condition's check: its code, and the origin it names when it names one.
 const assertRefusedBy = (result: RunResult, condition: Condition): void => {
     assert.equal(result.state, "Refused", JSON.stringify(result));
-    assert.equal(result.refusal?.code, condition.code, JSON.stringify(result.refusal));
+    assert.equal(result.refusal.code, condition.code, JSON.stringify(result.refusal));
     if (condition.origin !== undefined) {
         assert.deepEqual(result.refusal, { code: condition.code, origin: condition.origin });
     }

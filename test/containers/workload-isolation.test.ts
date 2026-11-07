@@ -158,7 +158,7 @@ for (const change of ['no-internal-network', 'probe-reaches'] as const) {
     const engine = engineWhere(change);
     const { result, outputDirectory } = await runFixtureSuite(image, fakeSecretValue(), engine);
     assert.equal(result.state, 'Refused');
-    assert.equal(result.refusal?.code, 'egress-unenforceable');
+    assert.equal(result.refusal.code, 'egress-unenforceable');
     assert.ok(!engine.images.includes(image), 'a container of the team\'s image was started');
     assert.deepEqual(filesIn(outputDirectory), [], 'the suite wrote output');
     assert.deepEqual(newIds(containersBefore, dockerIds('containers')), []);

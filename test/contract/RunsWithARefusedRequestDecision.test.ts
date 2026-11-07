@@ -213,7 +213,7 @@ describe("Using a run in a real browser", () => {
                         READY_IS_SHOWN,
                     ]);
                     assert.equal(result.state, "Denied", JSON.stringify(result.steps));
-                    assert.equal(result.denial?.rule, "irreversible-action");
+                    assert.equal(result.denial.rule, "irreversible-action");
                     assert.deepEqual(outcomes(result), [
                         [0, "passed", undefined],
                         [1, "failed", "policy-denied"],

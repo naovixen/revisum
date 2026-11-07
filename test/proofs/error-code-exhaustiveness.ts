@@ -5,8 +5,8 @@
 //   - one that handles exactly the codes the spec lists. It compiles only if the union holds those
 //     codes and no others: an unknown case label, or a code left over at `unreachable`, is an error;
 //   - one that leaves a code out. Its @ts-expect-error line must stay an error.
-import type { CliErrorCode, DriverErrorCode, RecorderError, RunnerError, ServiceCallErrorCode, SinkError } from '@revisum/contracts';
-import type { PlanErrorCode, ReplayErrorCode, StepErrorCode, SuiteDecodeErrorCode, TextErrorCode, lifecycle } from '@revisum/engine';
+import type { CliErrorCode, DriverErrorCode, RecorderError, RefusalCode, RunnerError, ServiceCallErrorCode, SinkError } from '@revisum/contracts';
+import type { PlanErrorCode, ReplayErrorCode, StepErrorCode, SuiteDecodeErrorCode, TextErrorCode } from '@revisum/engine';
 import type { EgressPolicyError } from '@revisum/runner';
 
 // Only a value of type never may reach this, so every code must have been handled before it.
@@ -279,8 +279,8 @@ export function describeReplayErrorForgettingOne(code: ReplayErrorCode): string 
   }
 }
 
-// ---- Run refusals (declared in engine beside the lifecycle): all hyphens, as every run-time code is -
-export function describeRefusal(code: lifecycle.RefusalCode): string {
+// ---- Run refusals (declared in contracts beside the run result): all hyphens, as every run-time code is -
+export function describeRefusal(code: RefusalCode): string {
   switch (code) {
     case 'element-check-unsupported': case 'origin-not-allowed': case 'secret-missing': case 'services-unavailable': case 'storage-state-unsupported':
     case 'database-commands-unavailable': case 'evidence-mode-disabled': case 'suite-not-declared': case 'egress-unenforceable':
@@ -290,7 +290,7 @@ export function describeRefusal(code: lifecycle.RefusalCode): string {
       return unreachable(code);
   }
 }
-export function describeRefusalForgettingOne(code: lifecycle.RefusalCode): string {
+export function describeRefusalForgettingOne(code: RefusalCode): string {
   switch (code) {
     case 'element-check-unsupported': case 'origin-not-allowed': case 'secret-missing': case 'services-unavailable': case 'storage-state-unsupported':
     case 'evidence-mode-disabled': case 'suite-not-declared': case 'egress-unenforceable':

@@ -87,7 +87,7 @@ describe("Using the run", () => {
                 test("then it should give that refusal rather than reject", async () => {
                     const { result } = await runRefused(logFailingOnStates(states));
                     assert.equal(result.state, "Refused");
-                    assert.equal(result.refusal?.code, "secret-missing");
+                    assert.equal(result.refusal.code, "secret-missing");
                 });
             });
         });

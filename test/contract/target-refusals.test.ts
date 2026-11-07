@@ -86,7 +86,7 @@ test('a WebKit run on CDP ends engine-not-supported; another registered adapter 
   const bystander = watched(buildAdapters.hostBrowserDriver({ executablePath: 'never-launched' }));
   const { result, store } = await runOn('cdp-webkit', new Map<string, BrowserDriver>([['cdp', cdp], ['other', bystander]]));
   assert.equal(result.state, 'TargetUnavailable');
-  assert.equal(result.unavailable?.reason, 'engine-not-supported');
+  assert.equal(result.unavailable.reason, 'engine-not-supported');
   assert.equal(cdp.opened + bystander.opened, 0, 'no browser was started');
   assert.equal(store.references().length, 0);
 });
@@ -95,7 +95,7 @@ test('a run on an adapter nobody registered ends adapter-not-registered, and the
   const cdp = watched(buildAdapters.hostBrowserDriver({ executablePath: 'never-launched' }));
   const { result, store } = await runOn('appium-android', new Map<string, BrowserDriver>([['cdp', cdp]]));
   assert.equal(result.state, 'TargetUnavailable');
-  assert.equal(result.unavailable?.reason, 'adapter-not-registered');
+  assert.equal(result.unavailable.reason, 'adapter-not-registered');
   assert.equal(cdp.opened, 0, 'no browser was started');
   assert.equal(result.manifest, null);
   assert.equal(store.references().length, 0);

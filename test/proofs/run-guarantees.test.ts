@@ -209,7 +209,7 @@ describe('(e) targets are never substituted', () => {
     const plan = testHarness.plan(stepsPlan(['appium-android'], []));
     const appium = await testHarness.run(plan, 'appium-android');
     assert.equal(appium.result.state, 'TargetUnavailable');
-    assert.equal(appium.result.unavailable?.reason, 'adapter-not-registered');
+    assert.equal(appium.result.unavailable.reason, 'adapter-not-registered');
     assert.equal(appium.store.references().length, 0);
   });
 

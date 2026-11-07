@@ -74,7 +74,7 @@ describe("Using the run", () => {
                             },
                         );
                         assert.equal(result.state, "Denied", JSON.stringify(result.steps));
-                        assert.equal(result.denial?.rule, "irreversible-action");
+                        assert.equal(result.denial.rule, "irreversible-action");
                         assert.equal(
                             result.steps[1]?.code,
                             "policy-denied",

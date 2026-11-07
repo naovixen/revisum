@@ -78,7 +78,7 @@ describe("Using a run in a real browser", () => {
                     );
                     assert.ok(audit.recorded.length > 0, "the audit log holds the denial");
                     assert.equal(result.state, "Denied", JSON.stringify(result.steps));
-                    assert.equal(result.denial?.rule, "irreversible-action");
+                    assert.equal(result.denial.rule, "irreversible-action");
                     assert.deepEqual(
                         outcomes(result)[2],
                         [2, "failed", "policy-denied"],

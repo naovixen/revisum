@@ -27,7 +27,7 @@ describe('a target that is not in the matrix', () => {
     assert.equal(ran.results.length, 1);
     const [result] = ran.results;
     assert.equal(result?.state, 'TargetUnavailable');
-    assert.equal(result.unavailable?.reason, 'not-declared');
+    assert.equal(result.unavailable.reason, 'not-declared');
     assert.equal(result.targetId, 'chromium-tablet');
     assert.equal(result.manifest, null);
     assert.equal(driver.calls.count(), 0, 'no driver method was called');
@@ -90,7 +90,7 @@ describe('a WebKit target that no registered adapter supports', () => {
       target: targetOf(project, 'webkit-desktop'), drivers: new Map([['fake-chromium', named], ['fake-any', substitute]]),
     });
     assert.equal(ran.result.state, 'TargetUnavailable');
-    assert.equal(ran.result.unavailable?.reason, 'engine-not-supported');
+    assert.equal(ran.result.unavailable.reason, 'engine-not-supported');
     assert.equal(named.calls.count('open'), 0, 'the named adapter opened nothing');
     assert.equal(substitute.calls.count(), 0, 'no other adapter was asked');
     assert.equal(ran.result.manifest, null);
@@ -141,7 +141,7 @@ describe('a Firefox target with a phone profile', () => {
       target: targetOf(project, 'firefox-phone'), drivers: new Map([['fake-firefox', named], ['fake-any', substitute]]),
     });
     assert.equal(ran.result.state, 'TargetUnavailable');
-    assert.equal(ran.result.unavailable?.reason, 'engine-not-supported');
+    assert.equal(ran.result.unavailable.reason, 'engine-not-supported');
     assert.equal(ran.result.targetId, 'firefox-phone');
     assert.equal(named.calls.count('supports'), 1, 'the named adapter was asked once');
     assert.equal(named.calls.count('open'), 0, 'nothing opened, on desktop or any other device');
@@ -185,7 +185,7 @@ describe('a browser build that differs from the lockfile at run time', () => {
   test('the target is unavailable with build-mismatch and no browser opens', async () => {
     const ran = await runPinned('0'.repeat(64));
     assert.equal(ran.result.state, 'TargetUnavailable');
-    assert.equal(ran.result.unavailable?.reason, 'build-mismatch');
+    assert.equal(ran.result.unavailable.reason, 'build-mismatch');
     assert.equal(ran.driver.calls.count('open'), 0, 'the build was hashed before open, and open was never called');
     assert.equal(ran.result.manifest, null);
     assert.equal(ran.store.references().length, 0);
