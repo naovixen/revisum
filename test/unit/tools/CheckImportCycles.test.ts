@@ -142,14 +142,32 @@ describe("Using the import cycle check", () => {
         });
     });
 
+    // Under verbatimModuleSyntax and Node's type stripping, `import { type A }` keeps the import
+    // statement, so the module still loads at run time.
     describe("given a cycle closed by an import whose every name is marked type", () => {
         describe("when the check runs", () => {
-            test("then it should report it as a type-only cycle", () => {
+            test("then it should report a value cycle, since the module still loads", () => {
                 const cycles = cyclesIn({
                     "tools/first.ts":
                         'import { second } from "./second.ts";\nexport type First = string;\nexport type Other = number;\nexport const first = second;\n',
                     "tools/second.ts":
                         'import { type First, type Other } from "./first.ts";\nexport const second: First | Other = "";\n',
+                });
+                assert.deepEqual(cycles.map(readReport), [
+                    { isTypeOnly: false, chain: chainFrom(cycles[0], ["first", "second"]) },
+                ]);
+            });
+        });
+    });
+
+    describe("given a cycle closed by an export type from", () => {
+        describe("when the check runs", () => {
+            test("then it should report it as a type-only cycle", () => {
+                const cycles = cyclesIn({
+                    "tools/first.ts":
+                        'import { second } from "./second.ts";\nexport type First = string;\nexport const first = second;\n',
+                    "tools/second.ts":
+                        'export type { First } from "./first.ts";\nexport const second = "";\n',
                 });
                 assert.deepEqual(cycles.map(readReport), [
                     { isTypeOnly: true, chain: chainFrom(cycles[0], ["first", "second"]) },

@@ -10,8 +10,8 @@ const OPTIONS = [{ inPageFiles: [IN_PAGE_FILE] }];
 const SUPPORTING_FILES = {
     "src/page-function.ts": "export type PageFunction = (...inputs: never[]) => unknown;\n",
     "src/page-runner.ts":
-        'import type { PageFunction } from "./page-function.ts";\nexport const evaluate = (pageFunction: PageFunction): string => String(pageFunction);\n',
-    "src/helpers.ts": "export function helper(): number {\n    return 1;\n}\n",
+        'import type { PageFunction } from "./page-function.ts";\nexport const evaluate = (pageFunction: PageFunction): string => String(pageFunction);\nexport const evaluateIfGiven = (pageFunction: PageFunction | undefined): string => String(pageFunction);\n',
+    "src/helpers.ts": "export function helper(): number {\n    return process.pid;\n}\n",
     "src/page-methods.ts":
         'export const page = {\n    read(): string | undefined {\n        return process.env["X"];\n    },\n};\n',
 };
@@ -146,6 +146,57 @@ describe("Using the in-page functions rule", () => {
                 const source =
                     'import type { PageFunction } from "./page-function.ts";\nimport { evaluate } from "./page-runner.ts";\nexport const send = (pageFunction: PageFunction): string => evaluate(pageFunction) + pageFunction.toString();\n';
                 assert.deepEqual(findingsOutside(source), []);
+            });
+        });
+
+        describe("when it sends a field typed as a page function", () => {
+            test("then it should pass, by toString and as a page function", () => {
+                const source =
+                    'import type { PageFunction } from "./page-function.ts";\nimport { evaluate } from "./page-runner.ts";\ntype Holder = { readonly read: PageFunction };\nexport const send = (holder: Holder): string => evaluate(holder.read) + holder.read.toString();\n';
+                assert.deepEqual(findingsOutside(source), []);
+            });
+        });
+
+        describe("when it passes a page function along to another that sends it", () => {
+            test("then it should pass", () => {
+                const source =
+                    'import type { PageFunction } from "./page-function.ts";\nimport { evaluate } from "./page-runner.ts";\nconst forward = (pageFunction: PageFunction): string => evaluate(pageFunction);\nexport const send = (pageFunction: PageFunction): string => forward(pageFunction);\n';
+                assert.deepEqual(findingsOutside(source), []);
+            });
+        });
+
+        describe("when it sends a local alias of a function imported from a file that is not in-page", () => {
+            test("then it should report it by toString", () => {
+                const source =
+                    'import { helper } from "./helpers.ts";\nconst alias = helper;\nexport const text = alias.toString();\n';
+                assert.deepEqual(findingsOutside(source), ["sentFromElsewhere"]);
+            });
+
+            test("then it should report it as a page function", () => {
+                const source =
+                    'import { helper } from "./helpers.ts";\nimport { evaluate } from "./page-runner.ts";\nconst alias = helper;\nexport const result = evaluate(alias);\n';
+                assert.deepEqual(findingsOutside(source), ["sentFromElsewhere"]);
+            });
+        });
+
+        describe("when it passes such a function to its own function that sends its parameter by toString", () => {
+            test("then it should report it", () => {
+                const source =
+                    'import { helper } from "./helpers.ts";\nconst send = (sent: () => number): string => sent.toString();\nexport const text = send(helper);\n';
+                const findings = findingsOutside(source);
+                assert.notDeepEqual(findings, []);
+                assert.deepEqual(
+                    findings.filter((messageId) => messageId !== "sentFromElsewhere"),
+                    [],
+                );
+            });
+        });
+
+        describe("when it passes such a function where a page function or undefined is taken", () => {
+            test("then it should report it as sent from elsewhere", () => {
+                const source =
+                    'import { helper } from "./helpers.ts";\nimport { evaluateIfGiven } from "./page-runner.ts";\nexport const result = evaluateIfGiven(helper);\n';
+                assert.deepEqual(findingsOutside(source), ["sentFromElsewhere"]);
             });
         });
 
