@@ -78,5 +78,6 @@ export { parseSuiteTrace } from './evidence/suite-trace.ts';
 export { SUITE_EVIDENCE_PATHS, SUITE_REPORT_FILE, suiteArguments } from './evidence/suite-arguments.ts';
 export { suiteEnvironment, suiteRedactor } from './evidence/suite-environment.ts';
 export {
-  evidenceMergeGateOpen, evidenceResult, refusedSuiteResult, unreadSuiteResult, type EvidenceContext,
+  evidenceMergeGateOpen, evidenceResult, refusedSuiteResult, unreadSuiteResult, type EvidenceContext, type UnreadReportCode,
 } from './evidence/evidence-result.ts';
+export { RECORD_UNREAD, RecordReadKind, readValueOr, recordRead, type RecordRead } from './run/after-the-verdict/RecordRead.ts';

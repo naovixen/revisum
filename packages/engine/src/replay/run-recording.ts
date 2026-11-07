@@ -17,6 +17,7 @@ import {
   type ServiceCaller, type ServiceRequest, type ServiceResponse, type WorkloadErrorCode, type WorkloadOutcome,
 } from '@revisum/contracts';
 import { canonicalJson, sha256 } from '../hashing.ts';
+import { ReplayErrorCode } from '../manifest.ts';
 import { INVALID, allValid, readInteger, readList, readOneOf, readRecord, type Issues, type Parsed } from '../plan/plan-decoders.ts';
 import { readSecretName } from '../project/project-parser.ts';
 import { cutSecretEchoes, restoreSecretEchoes, type SecretEcho } from '../secrets/secret-values.ts';
@@ -360,8 +361,8 @@ function readReplies<Reply>(
 // version does not know, is version-unsupported; a known field of the wrong shape, a mismatch at
 // its JSON path.
 export function decodeRecording(input: unknown): Result<RunRecording, DecodeError> {
-  if (!isPlainObject(input)) return failure({ code: 'version-unsupported', path: '$' });
-  if (input['schema'] !== RECORDING_SCHEMA) return failure({ code: 'version-unsupported', path: '$.schema' });
+  if (!isPlainObject(input)) return failure({ code: ReplayErrorCode.VersionUnsupported, path: '$' });
+  if (input['schema'] !== RECORDING_SCHEMA) return failure({ code: ReplayErrorCode.VersionUnsupported, path: '$.schema' });
   const issues: Issues = [];
   const fields = readRecord(input, '$', issues, ['schema', 'manifestHash', 'serviceCalls', 'databaseCommands'], ['schema', 'manifestHash']);
   if (fields === INVALID) return failure(decodeErrorOf(issues));

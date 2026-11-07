@@ -15,13 +15,15 @@ import { canonicalJson, sha256 } from '../hashing.ts';
 import { manifestHash } from '../manifest.ts';
 import { runTimeTextOrDigest } from '../plan/plan-decoders.ts';
 import { criterionIdFrom } from '../plan/plan-parser.ts';
+import { RECORD_UNREAD, RecordReadKind, readValueOr, type RecordRead } from '../run/after-the-verdict/RecordRead.ts';
 import { refusedResult } from '../run/seal/RefusedResult.ts';
 import { withRunHashes } from '../run/seal/WithRunHashes.ts';
 import type { SuiteReport, SuiteReportTest, SuiteTrace } from './suite-report.ts';
 
 // What the result builder needs besides the decoded outputs: the declared suite, which pass this
-// is, the suite command's exit code, and the redactor every kept text goes through. A suite run
-// adds whether the runner stopped it at its timeout, and the manifest that pins its inputs.
+// is, the suite command's exit code, the redactor every kept text goes through, the manifest that
+// pins its inputs and what its egress proxy refused. A suite run adds whether the runner stopped it
+// at its timeout.
 export type EvidenceContext = {
   readonly suite: EvidenceSuiteDeclaration;
   readonly pass: SuitePass;
@@ -29,10 +31,9 @@ export type EvidenceContext = {
   readonly redactor: Redactor;
   readonly timedOut?: boolean;
   readonly manifest: EvidenceRunManifest;
-  // What the egress proxy blocked, as seen on the wire. Kept redacted: a name can carry a secret.
-  readonly blockedOrigins?: readonly string[];
-  // True when what the proxy decided could not be read back whole.
-  readonly egressRecordUnread?: boolean;
+  // The origins the egress proxy blocked, as seen on the wire, or unread when what the proxy decided
+  // could not be read back whole. Kept redacted: a name can carry a secret.
+  readonly egress: RecordRead<readonly string[]>;
   // Why a trace the report attaches could not be read.
   readonly traceDecodeErrors?: readonly SuiteDecodeError[];
 };
@@ -122,12 +123,12 @@ function evidenceState(
 // The guarantee statement every evidence result carries. A suite runs only inside the isolated
 // runner, behind its egress proxy; without it the run is refused before any suite code runs.
 const evidenceGuarantees = (context: EvidenceContext) => guaranteeStatement({
-  mode: 'evidence', egressEnforced: context.egressRecordUnread !== true, unmaskedScreenshotsKept: context.suite.keepSuiteScreenshots, unsafeFeatures: [],
+  mode: 'evidence', egressEnforced: context.egress.kind === RecordReadKind.Read, unmaskedScreenshotsKept: context.suite.keepSuiteScreenshots, unsafeFeatures: [],
 });
 
 // Each blocked origin once, redacted, in a stable order.
 const keptOrigins = (context: EvidenceContext): readonly string[] =>
-  [...new Set((context.blockedOrigins ?? []).map((origin) => keptText(origin, context.redactor)))].sort();
+  [...new Set(readValueOr(context.egress, []).map((origin) => keptText(origin, context.redactor)))].sort();
 
 // A stopped suite's exit code is the stop's, and a suite that ran no test is vacuous whatever its
 // exit code says, so the caller compares neither with the outcomes.
@@ -135,10 +136,17 @@ function outcomeCodeOf(context: EvidenceContext, outcomes: readonly SuiteTestOut
   if (context.timedOut === true) {
     return EvidenceOutcomeCode.SuiteTimeout;
   }
-  if (context.egressRecordUnread === true) {
+  if (context.egress.kind === RecordReadKind.Unread) {
     return EvidenceOutcomeCode.EgressUnread;
   }
   return outcomes.every((outcome) => outcome === 'skipped') ? EvidenceOutcomeCode.Vacuous : undefined;
+}
+
+function unreadOutcomeCode(context: EvidenceContext, reportCode: UnreadReportCode | undefined): EvidenceOutcomeCode {
+  if (context.timedOut === true) {
+    return EvidenceOutcomeCode.SuiteTimeout;
+  }
+  return reportCode ?? EvidenceOutcomeCode.EgressUnread;
 }
 
 export function evidenceResult(
@@ -196,14 +204,26 @@ export function evidenceResult(
   });
 }
 
+// Why a suite run's report went unread that its context cannot say: its setup command failed, or
+// the report is missing or was refused.
+export type UnreadReportCode = typeof EvidenceOutcomeCode.SetupFailed | typeof EvidenceOutcomeCode.SuiteReportUnread;
+
+// The context of a run whose setup command left no egress record, which is all that went wrong.
+type EgressUnreadContext = EvidenceContext & { readonly egress: typeof RECORD_UNREAD };
+
 // The result of a suite run whose report could not be read: it wrote none, or the decoder refused
 // it, or its setup command failed first or left no egress record. It could not test, so it is
-// Errored, with no tests.
+// Errored, with no tests. A run the runner stopped at its timeout says so, whatever else went wrong;
+// otherwise the report's code, if any, stands before an unread egress record.
+export function unreadSuiteResult(context: EgressUnreadContext): SuiteRanResult;
 export function unreadSuiteResult(
-  context: EvidenceContext, outcomeCode: Exclude<EvidenceOutcomeCode, typeof EvidenceOutcomeCode.Vacuous>,
-  decodeErrors: readonly SuiteDecodeError[] = [],
+  context: EvidenceContext, reportCode: UnreadReportCode, decodeErrors?: readonly SuiteDecodeError[],
+): SuiteRanResult;
+export function unreadSuiteResult(
+  context: EvidenceContext, reportCode?: UnreadReportCode, decodeErrors: readonly SuiteDecodeError[] = [],
 ): SuiteRanResult {
   const { suite, pass, exitCode } = context;
+  const outcomeCode = unreadOutcomeCode(context, reportCode);
   return withRunHashes({
     state: TerminalState.Errored,
     mode: RunMode.Evidence,

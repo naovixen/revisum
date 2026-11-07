@@ -1,5 +1,6 @@
 // The only entry point for untrusted input, such as a plan an AI proposed.
 import {
+    RejectedState,
     TerminalState,
     UnavailableReason,
     type Plan,
@@ -56,7 +57,11 @@ export async function runUntrusted(
 ): Promise<UntrustedRunOutcome> {
     const parsed = parsePlan(input);
     if (!parsed.ok) {
-        return { kind: UntrustedRunOutcomeKind.Rejected, state: "Rejected", errors: parsed.error };
+        return {
+            kind: UntrustedRunOutcomeKind.Rejected,
+            state: RejectedState.Rejected,
+            errors: parsed.error,
+        };
     }
     const { project, standing, ...inputs } = base;
     const gate = policyGate({ project, events: ports.audit });

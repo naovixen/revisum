@@ -113,3 +113,6 @@ export type EvidenceRunManifest = ManifestBasis & {
 };
 
 export type RunManifest = PlanRunManifest | EvidenceRunManifest;
+
+export const isEvidenceManifest = (manifest: RunManifest): manifest is EvidenceRunManifest =>
+    manifest.evidence !== undefined;

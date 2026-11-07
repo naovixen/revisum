@@ -56,7 +56,8 @@ export type EndOfTheRun =
           readonly denial: Denial;
       };
 
-function endOfTheRun(finished: FinishedRun, hasVerdict: boolean): EndOfTheRun {
+function endOfTheRun(finished: FinishedRun, records: RecordsAfterTheSteps): EndOfTheRun {
+    const hasVerdict = !isVerdictLostToTheRecords(finished, records);
     if (finished.state === TerminalState.Denied) {
         return {
             kind: EndOfTheRunKind.WithDenial,
@@ -103,10 +104,7 @@ export async function afterTheVerdict(
     }
     const egress = blockedRead.ok ? recordRead(blockedRead.value) : RECORD_UNREAD;
     const records = { ...readBeforeTheEgress, egress };
-    const end = endOfTheRun(
-        verdict.finished,
-        !isVerdictLostToTheRecords(verdict.finished, records),
-    );
+    const end = endOfTheRun(verdict.finished, records);
     logTheEnd(context, readValueOr(egress, []), end);
     return { cleanup, cleanupReviewItems, records, end };
 }

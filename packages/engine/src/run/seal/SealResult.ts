@@ -6,7 +6,9 @@ import {
     type PlanDeniedResult,
     type PlanDeniedThenErroredResult,
     type PlanRanResult,
+    type PlanRefusedResult,
     type PlanRunResult,
+    type TargetUnavailableResult,
     type UnsafeFeature,
 } from "@revisum/contracts";
 import { approvalLabel } from "../../approval/plan-standing.ts";
@@ -16,7 +18,12 @@ import { callsServices } from "../../plan/CallsServices.ts";
 import { unsafeFeaturesOf } from "../../plan/unsafe-features.ts";
 import type { TargetNotDeclared } from "../../policy/TargetNotDeclared.ts";
 import type { RunPorts } from "../RunContext.ts";
-import { RecordReadKind, readValueOr } from "../after-the-verdict/RecordRead.ts";
+import {
+    RecordReadKind,
+    readValueOr,
+    recordRead,
+    type RecordRead,
+} from "../after-the-verdict/RecordRead.ts";
 import {
     unreadRecordItems,
     type RecordsAfterTheSteps,
@@ -49,7 +56,10 @@ type Unsealed<Result, Others extends PropertyKey = never> = Result extends unkno
     : never;
 
 // What a result holds before it is sealed.
-export type UnsealedResult = Unsealed<PlanRunResult>;
+type UnsealedResult = Unsealed<PlanRunResult>;
+
+// What the result of a run that ended before any step holds before it is sealed.
+export type UnsealedNothingRanResult = Unsealed<PlanRefusedResult | TargetUnavailableResult>;
 
 // What a plan run vouches for: decided by the plan, its project's recording setting, the run's
 // isolation and the target's adapter alone, so two runs of one plan say the same, unless one leaves its
@@ -59,14 +69,14 @@ export type UnsealedResult = Unsealed<PlanRunResult>;
 const planRunGuarantees = (
     context: SealContext,
     unsafeFeatures: readonly UnsafeFeature[],
-    canClaimEgress: boolean,
+    egress: RecordRead<readonly string[]>,
 ): GuaranteeStatement => {
     const { plan, project } = context.subject;
     const hasUnrecordedReplies = callsServices(plan) && project.replay?.recordReplies !== true;
     const isIsolated = context.ports.isolation.guaranteeLevel() === "isolated";
     return guaranteeStatement({
         mode: "plan",
-        egressEnforced: isIsolated && canClaimEgress,
+        egressEnforced: isIsolated && egress.kind === RecordReadKind.Read,
         unmaskedScreenshotsKept: false,
         unsafeFeatures,
         ...(context.determinismUnpinned ? { determinismUnpinned: true } : {}),
@@ -74,9 +84,10 @@ const planRunGuarantees = (
     });
 };
 
-// Seals the result of a run that ended before its session closed, so read no egress record.
-export function sealResult(outcome: UnsealedResult, context: SealContext): PlanRunResult {
-    return seal(outcome, context, true);
+// Seals the result of a run that ended before any step. It reads no egress record: the empty list of
+// blocked origins its result holds stands for one.
+export function sealResult(outcome: UnsealedNothingRanResult, context: SealContext): PlanRunResult {
+    return seal(outcome, context, recordRead(outcome.blockedOrigins));
 }
 
 // What a result holds before it is sealed, less what the records read after the steps decide.
@@ -103,21 +114,21 @@ export function sealRanResult(
             ...(stubAnswers.length === 0 ? {} : { stubAnswers: [...stubAnswers] }),
         },
         context,
-        records.egress.kind === RecordReadKind.Read,
+        records.egress,
     );
 }
 
 function seal(
     outcome: UnsealedResult,
     context: SealContext,
-    canClaimEgress: boolean,
+    egress: RecordRead<readonly string[]>,
 ): PlanRunResult {
     const standing = context.subject.standing;
     const unsafeFeatures = unsafeFeaturesOf(context.subject.plan);
     const labelled = {
         ...outcome,
         mode: RunMode.Plan,
-        guarantees: planRunGuarantees(context, unsafeFeatures, canClaimEgress),
+        guarantees: planRunGuarantees(context, unsafeFeatures, egress),
         ...(unsafeFeatures.length === 0 ? {} : { unsafeFeatures }),
     };
     return withRunHashes(

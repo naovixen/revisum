@@ -1,7 +1,7 @@
 // The run manifest: every input that decides a run's result, hashed, so a run can be replayed and
 // compared.
 import {
-  failure, success,
+  failure, isEvidenceManifest, success,
   type AdapterInfo, type AppliedRewrite, type EvidenceSuiteDeclaration, type Plan, type Result,
   type FixtureReference, type HostInfo, type EvidenceRunManifest, type PlanRunManifest, type RunManifest, type RunVersions, type SecretRecord, type StorageStateRecord, type Target,
   type UnsafeDeclarationRecord, type UnsafeFeature,
@@ -89,7 +89,13 @@ export function evidenceManifest(inputs: EvidenceManifestInputs): EvidenceRunMan
 //     the target, a field of the wrong shape or a recorded reply), so it never ran as a pass.
 //   version-unsupported: the manifest or recording is of a schema version, or holds a key, this
 //     engine does not read.
-export type ReplayErrorCode = 'replay-not-claimed' | 'replay-mismatch' | 'version-unsupported';
+export const ReplayErrorCode = {
+  ReplayNotClaimed: 'replay-not-claimed',
+  ReplayMismatch: 'replay-mismatch',
+  VersionUnsupported: 'version-unsupported',
+} as const;
+
+export type ReplayErrorCode = (typeof ReplayErrorCode)[keyof typeof ReplayErrorCode];
 
 // The inputs an adapter may be unable to pin (AdapterInfo.cannotPin). A run whose adapter cannot
 // pin any of them is never replay-claimed.
@@ -105,12 +111,12 @@ const RECORDED_REPLIES_INPUT = 'recorded-replies';
 
 // The manifest a replay may run, or why none may: a replay of it could never be claimed identical.
 // The replay itself, which runs the manifest again and compares result hashes, is replay().
-export function replayManifest(manifest: RunManifest): Result<PlanRunManifest, { readonly code: 'replay-not-claimed' }> {
-  if (manifest.evidence !== undefined) return failure({ code: 'replay-not-claimed' });
+export function replayManifest(manifest: RunManifest): Result<PlanRunManifest, { readonly code: typeof ReplayErrorCode.ReplayNotClaimed }> {
+  if (isEvidenceManifest(manifest)) return failure({ code: ReplayErrorCode.ReplayNotClaimed });
   const unpinned = manifest.nonHermeticInputs;
-  if (unpinned.some((input) => DETERMINISM_INPUTS.includes(input))) return failure({ code: 'replay-not-claimed' });
+  if (unpinned.some((input) => DETERMINISM_INPUTS.includes(input))) return failure({ code: ReplayErrorCode.ReplayNotClaimed });
   const needsReplies = unpinned.includes(SERVICE_CALLS_INPUT) || unpinned.includes(DATABASE_COMMANDS_INPUT);
-  if (needsReplies && !unpinned.includes(RECORDED_REPLIES_INPUT)) return failure({ code: 'replay-not-claimed' });
+  if (needsReplies && !unpinned.includes(RECORDED_REPLIES_INPUT)) return failure({ code: ReplayErrorCode.ReplayNotClaimed });
   return success(manifest);
 }
 

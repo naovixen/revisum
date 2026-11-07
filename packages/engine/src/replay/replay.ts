@@ -15,7 +15,7 @@
 import { failure, success, type DatabaseCommandRunner, type Result, type ServiceCaller, type TerminalState, type PlanRunManifest } from '@revisum/contracts';
 import { canonicalJson, sha256 } from '../hashing.ts';
 import {
-  DATABASE_COMMANDS_INPUT, SERVICE_CALLS_INPUT, manifestHash, planHash, replayManifest,
+  DATABASE_COMMANDS_INPUT, ReplayErrorCode, SERVICE_CALLS_INPUT, manifestHash, planHash, replayManifest,
 } from '../manifest.ts';
 import type { ClearedRun } from '../policy/ClearedRun.ts';
 import type { RunInputs, RunPorts } from '../run/RunContext.ts';
@@ -65,11 +65,11 @@ export type ReplayOutcome = {
 // its path; the manifest's plan hash, target, or a field of the wrong shape by JSON path; or the
 // recorded reply of a call or command by its position, counted from 0.
 export type ReplayError =
-  | { readonly code: 'replay-not-claimed' }
-  | { readonly code: 'version-unsupported'; readonly path: string }
-  | { readonly code: 'replay-mismatch'; readonly path: string }
-  | { readonly code: 'replay-mismatch'; readonly fixture: string }
-  | { readonly code: 'replay-mismatch'; readonly kind: RecordedReplyKind; readonly position: number };
+  | { readonly code: typeof ReplayErrorCode.ReplayNotClaimed }
+  | { readonly code: typeof ReplayErrorCode.VersionUnsupported; readonly path: string }
+  | { readonly code: typeof ReplayErrorCode.ReplayMismatch; readonly path: string }
+  | { readonly code: typeof ReplayErrorCode.ReplayMismatch; readonly fixture: string }
+  | { readonly code: typeof ReplayErrorCode.ReplayMismatch; readonly kind: RecordedReplyKind; readonly position: number };
 
 // The manifest fields that describe the machine a run ran on rather than what it tested: a replay
 // that differs only in these is a per-environment baseline.
@@ -88,13 +88,13 @@ function repliesFor(manifest: PlanRunManifest, input: unknown, ports: ReplayPort
   const runsCommands = manifest.nonHermeticInputs.includes(DATABASE_COMMANDS_INPUT);
   if (!callsServices && !runsCommands) return success({});
   const firstKind: RecordedReplyKind = callsServices ? 'service-call' : 'database-command';
-  if (input === null || input === undefined) return failure({ code: 'replay-mismatch', kind: firstKind, position: 0 });
+  if (input === null || input === undefined) return failure({ code: ReplayErrorCode.ReplayMismatch, kind: firstKind, position: 0 });
   const decoded = decodeRecording(input);
   if (!decoded.ok) return decoded;
   const recording: RunRecording = decoded.value;
-  if (recording.manifestHash !== manifestHash(manifest)) return failure({ code: 'replay-mismatch', path: '$.manifestHash' });
-  if (callsServices && recording.serviceCalls === undefined) return failure({ code: 'replay-mismatch', kind: 'service-call', position: 0 });
-  if (runsCommands && recording.databaseCommands === undefined) return failure({ code: 'replay-mismatch', kind: 'database-command', position: 0 });
+  if (recording.manifestHash !== manifestHash(manifest)) return failure({ code: ReplayErrorCode.ReplayMismatch, path: '$.manifestHash' });
+  if (callsServices && recording.serviceCalls === undefined) return failure({ code: ReplayErrorCode.ReplayMismatch, kind: 'service-call', position: 0 });
+  if (runsCommands && recording.databaseCommands === undefined) return failure({ code: ReplayErrorCode.ReplayMismatch, kind: 'database-command', position: 0 });
   return success({
     ...(recording.serviceCalls === undefined ? {} : { services: replayedServices(recording.serviceCalls, ports.secrets) }),
     ...(recording.databaseCommands === undefined ? {} : { databaseCommands: replayedDatabaseCommands(recording.databaseCommands, ports.secrets) }),
@@ -128,10 +128,10 @@ export async function replay(request: ReplayRequest, ports: ReplayPorts): Promis
   const manifest = claimed.value;
   const replies = repliesFor(manifest, request.recording, ports);
   if (!replies.ok) return replies;
-  if (planHash(request.cleared.plan) !== manifest.planHash) return failure({ code: 'replay-mismatch', path: '$.planHash' });
-  if (manifest.target.id !== request.cleared.targetId) return failure({ code: 'replay-mismatch', path: '$.target.id' });
+  if (planHash(request.cleared.plan) !== manifest.planHash) return failure({ code: ReplayErrorCode.ReplayMismatch, path: '$.planHash' });
+  if (manifest.target.id !== request.cleared.targetId) return failure({ code: ReplayErrorCode.ReplayMismatch, path: '$.target.id' });
   const fixture = await fixtureMismatch(manifest, ports.fixtures);
-  if (fixture !== null) return failure({ code: 'replay-mismatch', fixture });
+  if (fixture !== null) return failure({ code: ReplayErrorCode.ReplayMismatch, fixture });
 
   // Only the ports a run takes are passed on: whatever else the caller's object holds, such as a
   // live caller, never reaches the run.
@@ -147,9 +147,9 @@ export async function replay(request: ReplayRequest, ports: ReplayPorts): Promis
   });
 
   const callMismatch = services?.mismatchAt() ?? null;
-  if (callMismatch !== null) return failure({ code: 'replay-mismatch', kind: 'service-call', position: callMismatch });
+  if (callMismatch !== null) return failure({ code: ReplayErrorCode.ReplayMismatch, kind: 'service-call', position: callMismatch });
   const commandMismatch = databaseCommands?.mismatchAt() ?? null;
-  if (commandMismatch !== null) return failure({ code: 'replay-mismatch', kind: 'database-command', position: commandMismatch });
+  if (commandMismatch !== null) return failure({ code: ReplayErrorCode.ReplayMismatch, kind: 'database-command', position: commandMismatch });
 
   // The result hash covers the manifest's hash, so a recorded result hash can only stand for the
   // manifest given when the replay's own manifest is that manifest too.

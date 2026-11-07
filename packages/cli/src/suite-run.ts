@@ -9,11 +9,11 @@
 import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync } from 'node:fs';
 import { isAbsolute, join, posix, relative, sep } from 'node:path';
 import {
-  SUITE_EVIDENCE_PATHS, SUITE_REPORT_FILE, WORKLOAD_OUTPUT_PATH,
+  EvidenceOutcomeCode, RECORD_UNREAD, SUITE_EVIDENCE_PATHS, SUITE_REPORT_FILE, WORKLOAD_OUTPUT_PATH,
   declaredSuite, defaultRedactor, evidenceManifest, evidenceResult, failure, isSuiteFile, mergeRefusedOrigins, parseSuiteReport, parseSuiteTrace, refusedSuiteResult,
-  success, suiteArguments, suiteEnvironment, suiteRedactor, unreadSuiteResult,
+  recordRead, success, suiteArguments, suiteEnvironment, suiteRedactor, unreadSuiteResult,
   type EgressEvent, type EgressPolicy, type EvidenceContext, type EvidenceLimits, type EvidenceRunManifest, type EvidenceSuiteDeclaration, type HostInfo, type Project, type Redactor,
-  type Result, type RunResult, type SecretStore, type SuiteDecodeError, type SuiteFile, type SuitePass, type SuiteReport, type SuiteTrace,
+  type RecordRead, type Result, type RunResult, type SecretStore, type SuiteDecodeError, type SuiteFile, type SuitePass, type SuiteReport, type SuiteTrace,
   type WorkloadErrorCode, type WorkloadRequest, type WorkloadRunner, type WorkloadVariable,
 } from '@revisum/engine';
 import { buildEgressPolicy } from '@revisum/runner';
@@ -236,9 +236,14 @@ export async function runSuite(project: Project, suiteName: string, ports: Suite
     timeoutMilliseconds: suite.timeoutMilliseconds, outputDirectory: ports.outputDirectory,
   });
   const redactor = suiteRedactor(ports.redactor ?? defaultRedactor(), environment.value.secrets);
-  const context = (
-    exitCode: number, timedOut: boolean, manifest: EvidenceRunManifest, extra: Partial<Omit<EvidenceContext, 'manifest'>> = {},
-  ): EvidenceContext => ({ suite, pass: ports.pass, exitCode, redactor, timedOut, manifest, ...extra });
+  const context = <Egress extends RecordRead<readonly string[]>>(
+    exitCode: number, timedOut: boolean, manifest: EvidenceRunManifest, egress: Egress, traceDecodeErrors?: readonly SuiteDecodeError[],
+  ): EvidenceContext & { readonly egress: Egress } => ({
+    suite, pass: ports.pass, exitCode, redactor, timedOut, manifest, egress, ...(traceDecodeErrors === undefined ? {} : { traceDecodeErrors }),
+  });
+  // A setup command that failed is judged by its exit code alone: the suite never ran, so its egress
+  // record is not read.
+  const noEgressRead = recordRead<readonly string[]>([]);
   const manifestFor = (report: SuiteReport | null, traces: readonly SuiteTrace[]) => evidenceManifest({
     suite, suiteFiles: files, host: host(),
     playwrightVersion: report?.playwrightVersion ?? traces.find((trace) => trace.playwrightVersion !== undefined)?.playwrightVersion,
@@ -254,11 +259,10 @@ export async function runSuite(project: Project, suiteName: string, ports: Suite
     const setup = await ports.workload.run(request(suite.setupCommand, environment.value.variables));
     if (!setup.ok) return refusedSuiteResult(suiteName, refusalFor(setup.error));
     if (setup.value.timedOut || setup.value.exitCode !== 0) {
-      return unreadSuiteResult(context(setup.value.exitCode, setup.value.timedOut, manifestFor(null, [])),
-        setup.value.timedOut ? 'suite-timeout' : 'setup-failed');
+      return unreadSuiteResult(context(setup.value.exitCode, setup.value.timedOut, manifestFor(null, []), noEgressRead), EvidenceOutcomeCode.SetupFailed);
     }
     if (setup.value.egressRecordUnread === true) {
-      return unreadSuiteResult(context(setup.value.exitCode, false, manifestFor(null, []), { egressRecordUnread: true }), 'egress-unread');
+      return unreadSuiteResult(context(setup.value.exitCode, false, manifestFor(null, []), RECORD_UNREAD));
     }
   }
 
@@ -276,13 +280,12 @@ export async function runSuite(project: Project, suiteName: string, ports: Suite
   const ran = await ports.workload.run(request(built.argv, variables));
   if (!ran.ok) return refusedSuiteResult(suiteName, refusalFor(ran.error));
   const { exitCode, timedOut, egressEvents } = ran.value;
-  const egress = { blockedOrigins: blockedOriginsOf(egressEvents), egressRecordUnread: ran.value.egressRecordUnread === true };
+  const egress = ran.value.egressRecordUnread === true ? RECORD_UNREAD : recordRead(blockedOriginsOf(egressEvents));
 
   const read = readReport(ports.outputDirectory, limits);
   if (!read.ok) {
-    return unreadSuiteResult(context(exitCode, timedOut, manifestFor(null, []), egress),
-      timedOut ? 'suite-timeout' : 'suite-report-unread', read.errors);
+    return unreadSuiteResult(context(exitCode, timedOut, manifestFor(null, []), egress), EvidenceOutcomeCode.SuiteReportUnread, read.errors);
   }
   const { traces, decodeErrors } = readTraces(ports.outputDirectory, read.report, limits);
-  return evidenceResult(read.report, traces, [], context(exitCode, timedOut, manifestFor(read.report, traces), { ...egress, traceDecodeErrors: decodeErrors }));
+  return evidenceResult(read.report, traces, [], context(exitCode, timedOut, manifestFor(read.report, traces), egress, decodeErrors));
 }

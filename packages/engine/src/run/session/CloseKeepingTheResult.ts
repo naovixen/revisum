@@ -1,7 +1,10 @@
 // Closing the session once the steps have a verdict, without letting the close change it.
 import type { Clock, Session } from "@revisum/contracts";
 import type { Logger } from "../../logging.ts";
-import { logFailureAfterTheVerdict } from "../after-the-verdict/ReadKeepingTheResult.ts";
+import {
+    FailureAfterTheVerdictCode,
+    logFailureAfterTheVerdict,
+} from "../after-the-verdict/ReadKeepingTheResult.ts";
 import { POLL_INTERVAL_MILLISECONDS } from "../Poll.ts";
 
 // Longer than a driver's stop takes to give up by itself, so this deadline is only for what has wedged.
@@ -16,14 +19,17 @@ export async function closeKeepingTheResult(
     clock: Clock,
     logger: Logger,
 ): Promise<void> {
-    const closeFailed = "session-close-failed";
     const progress = { hasEnded: false, hasStoppedWaiting: false };
     const closing = (async () => {
         try {
             await session.close();
         } catch (error) {
             if (!progress.hasStoppedWaiting) {
-                logFailureAfterTheVerdict(closeFailed, error, logger);
+                logFailureAfterTheVerdict(
+                    FailureAfterTheVerdictCode.SessionCloseFailed,
+                    error,
+                    logger,
+                );
             }
         } finally {
             progress.hasEnded = true;
@@ -37,7 +43,7 @@ export async function closeKeepingTheResult(
             if (clock.now() >= deadline) {
                 progress.hasStoppedWaiting = true;
                 logFailureAfterTheVerdict(
-                    closeFailed,
+                    FailureAfterTheVerdictCode.SessionCloseFailed,
                     `the session did not close within ${LONGEST_SESSION_CLOSE_MILLISECONDS} ms`,
                     logger,
                 );
@@ -49,7 +55,7 @@ export async function closeKeepingTheResult(
         // Only the clock can have failed, and with no clock there is no deadline to wait for the close by.
         if (!progress.hasEnded) {
             progress.hasStoppedWaiting = true;
-            logFailureAfterTheVerdict(closeFailed, error, logger);
+            logFailureAfterTheVerdict(FailureAfterTheVerdictCode.SessionCloseFailed, error, logger);
         }
     }
 }

@@ -167,3 +167,9 @@ export type RunResult = WithOthersFieldsAbsent<EachShape>;
 export type PlanRunResult = Extract<RunResult, { readonly mode: typeof RunMode.Plan }>;
 
 export type EvidenceRunResult = Extract<RunResult, { readonly mode: typeof RunMode.Evidence }>;
+
+// True for a plan run the policy gate's runtime guard stopped: a Denied one, or one a record read
+// after its steps then left Errored, which an ordinary Errored run is not.
+export const isDeniedRun = (
+    result: PlanRunResult,
+): result is Extract<PlanRunResult, { readonly denial: Denial }> => result.denial !== undefined;

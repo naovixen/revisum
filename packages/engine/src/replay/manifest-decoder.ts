@@ -7,6 +7,7 @@ import {
   type EvidenceManifestRecord, type FixtureReference, type HostInfo, type PlanRunManifest, type Result, type RunManifest, type RunVersions, type SecretRecord,
   type StorageStateRecord, type UnsafeDeclarationRecord,
 } from '@revisum/contracts';
+import { ReplayErrorCode } from '../manifest.ts';
 import { INVALID, allValid, readInteger, readList, readOneOf, readRecord, type Issues, type Parsed } from '../plan/plan-decoders.ts';
 import { readImageDigest, readSuiteName } from '../project/evidence-declarations.ts';
 import { MAXIMUM_DAY_OFFSET } from '../plan/plan-grammar.ts';
@@ -18,8 +19,8 @@ export const MANIFEST_SCHEMA = schemaId('run-manifest', 1);
 // Why a manifest or recording could not be read: of a version, or with a key, this engine does not
 // read; or a known field of the wrong shape, at its JSON path.
 export type DecodeError =
-  | { readonly code: 'version-unsupported'; readonly path: string }
-  | { readonly code: 'replay-mismatch'; readonly path: string };
+  | { readonly code: typeof ReplayErrorCode.VersionUnsupported; readonly path: string }
+  | { readonly code: typeof ReplayErrorCode.ReplayMismatch; readonly path: string };
 
 const REQUIRED_KEYS = ['schema', 'engineVersion', 'planHash', 'seeds', 'clock', 'fixtures', 'host', 'nonHermeticInputs'] as const;
 const OPTIONAL_KEYS = [
@@ -39,8 +40,8 @@ const MAXIMUM_LIST_LENGTH = 100_000;
 // field of the wrong shape.
 export function decodeErrorOf(issues: Issues): DecodeError {
   const unknown = issues.find((issue) => issue.code === 'unknown_field');
-  if (unknown !== undefined) return { code: 'version-unsupported', path: unknown.path };
-  return { code: 'replay-mismatch', path: issues[0]?.path ?? '$' };
+  if (unknown !== undefined) return { code: ReplayErrorCode.VersionUnsupported, path: unknown.path };
+  return { code: ReplayErrorCode.ReplayMismatch, path: issues[0]?.path ?? '$' };
 }
 
 export function readString(input: unknown, path: string, issues: Issues, maximumLength = MAXIMUM_TEXT_LENGTH): Parsed<string> {
@@ -199,9 +200,9 @@ function optional<Value>(
 }
 
 export function decodeManifest(input: unknown): Result<RunManifest, DecodeError> {
-  if (!isPlainObject(input)) return failure({ code: 'version-unsupported', path: '$' });
+  if (!isPlainObject(input)) return failure({ code: ReplayErrorCode.VersionUnsupported, path: '$' });
   // The schema first: a manifest of another version is refused whole, before any field is read.
-  if (input['schema'] !== MANIFEST_SCHEMA) return failure({ code: 'version-unsupported', path: '$.schema' });
+  if (input['schema'] !== MANIFEST_SCHEMA) return failure({ code: ReplayErrorCode.VersionUnsupported, path: '$.schema' });
   const issues: Issues = [];
   const fields = readRecord(input, '$', issues, [...REQUIRED_KEYS, ...OPTIONAL_KEYS], REQUIRED_KEYS);
   if (fields === INVALID) return failure(decodeErrorOf(issues));
@@ -259,16 +260,16 @@ export function decodeManifest(input: unknown): Result<RunManifest, DecodeError>
   // run's holds all three and no evidence record. Either is read back in the key order it was written.
   if (evidence !== undefined) {
     const stray = PLAN_RUN_ONLY_KEYS.find((key) => Object.hasOwn(fields, key));
-    return stray === undefined ? success({ ...head, ...middle, evidence, ...tail }) : failure({ code: 'replay-mismatch', path: `$.${stray}` });
+    return stray === undefined ? success({ ...head, ...middle, evidence, ...tail }) : failure({ code: ReplayErrorCode.ReplayMismatch, path: `$.${stray}` });
   }
   if (target === undefined) {
-    return failure({ code: 'replay-mismatch', path: '$.target' });
+    return failure({ code: ReplayErrorCode.ReplayMismatch, path: '$.target' });
   }
   if (adapter === undefined) {
-    return failure({ code: 'replay-mismatch', path: '$.adapter' });
+    return failure({ code: ReplayErrorCode.ReplayMismatch, path: '$.adapter' });
   }
   if (browser === undefined) {
-    return failure({ code: 'replay-mismatch', path: '$.browser' });
+    return failure({ code: ReplayErrorCode.ReplayMismatch, path: '$.browser' });
   }
   return success({ ...head, target, adapter, browser, ...middle, ...tail });
 }
