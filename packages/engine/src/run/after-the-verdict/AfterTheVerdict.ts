@@ -6,13 +6,14 @@ import { runCleanup, type CleanupResult } from "../../service-calls/call-steps.t
 import type { SessionContext } from "../executors/StepExecutor.ts";
 import { EGRESS_UNREAD, type RunReviewItem } from "../RunResult.ts";
 import type { FinishedRun, StepsVerdict } from "../steps/VerdictOfSteps.ts";
-import { EgressRecordKind, type EgressRecord } from "./EgressRecord.ts";
+import { RECORD_UNREAD, readValueOr, recordRead, type RecordRead } from "./RecordRead.ts";
 import { logFailureAfterTheVerdict, readKeepingTheResult } from "./ReadKeepingTheResult.ts";
 
 export type AfterTheVerdict = {
     readonly cleanup: readonly CleanupResult[] | undefined;
     readonly cleanupReviewItems: readonly RunReviewItem[];
-    readonly egress: EgressRecord;
+    // The origins the egress refused.
+    readonly egress: RecordRead<readonly string[]>;
     readonly endState: FinishedRun;
 };
 
@@ -40,11 +41,9 @@ export async function afterTheVerdict(
     if (!blockedRead.ok) {
         logFailureAfterTheVerdict(EGRESS_UNREAD, blockedRead.error, context.logger);
     }
-    const egress: EgressRecord = blockedRead.ok
-        ? { kind: EgressRecordKind.Read, blocked: blockedRead.value }
-        : { kind: EgressRecordKind.Unread };
+    const egress = blockedRead.ok ? recordRead(blockedRead.value) : RECORD_UNREAD;
     const endState = blockedRead.ok ? verdict.finished : finish(verdict.running, "Errored");
-    logTheEnd(context, blockedRead.ok ? blockedRead.value : [], endState);
+    logTheEnd(context, readValueOr(egress, []), endState);
     return { cleanup, cleanupReviewItems, egress, endState };
 }
 

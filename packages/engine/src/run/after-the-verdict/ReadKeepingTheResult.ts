@@ -3,6 +3,7 @@
 // or log has left to say.
 import type { Logger } from "../../logging.ts";
 import { errorText } from "../CodeForThrow.ts";
+import { RECORD_UNREAD, recordRead, type RecordRead } from "./RecordRead.ts";
 
 // What cannot be read goes to the log, if the log still works, and takes `otherwise`.
 export function readKeepingTheResult<Value>(
@@ -15,6 +16,16 @@ export function readKeepingTheResult<Value>(
     } catch (error) {
         logFailureAfterTheVerdict("session-records-unread", error, logger);
         return otherwise;
+    }
+}
+
+// A record read from the session, or, when the read throws, unread, with the failure logged.
+export function readRecord<Value>(read: () => Value, logger: Logger): RecordRead<Value> {
+    try {
+        return recordRead(read());
+    } catch (error) {
+        logFailureAfterTheVerdict("session-records-unread", error, logger);
+        return RECORD_UNREAD;
     }
 }
 

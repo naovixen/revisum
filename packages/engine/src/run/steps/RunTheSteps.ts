@@ -1,5 +1,5 @@
 // Runs the plan's steps in order and gives them a verdict, reading what the session must give before it closes.
-import { StepCode, type AppliedRewrite, type Session } from "@revisum/contracts";
+import { StepCode, type Session } from "@revisum/contracts";
 import { finish, start, type Denial, type Resolved, type Running } from "../../lifecycle.ts";
 import {
     observedRequestNames,
@@ -8,7 +8,7 @@ import {
 import type { RunStep } from "../../RunStep.ts";
 import {
     logFailureAfterTheVerdict,
-    readKeepingTheResult,
+    readRecord,
 } from "../after-the-verdict/ReadKeepingTheResult.ts";
 import { codeForThrow } from "../CodeForThrow.ts";
 import { networkContext } from "../executors/network-and-storage/NetworkAndStorageExecutors.ts";
@@ -83,7 +83,7 @@ function endUnfinished(
     return endOfTheSteps(context, running, soFar, finish(running, "Errored"));
 }
 
-// What the session must give before it closes, and the verdict it may change.
+// What the session must give before it closes.
 function endOfTheSteps(
     context: SessionContext,
     running: Running,
@@ -92,20 +92,10 @@ function endOfTheSteps(
 ): StepsRun {
     const { session, logger, ports } = context;
     // Asked once: a port that cannot say what it rewrote must not leave a mutated run reading as plain.
-    const rewritesRead = readKeepingTheResult<readonly AppliedRewrite[] | undefined>(
-        () => ports.rewritesApplied?.() ?? [],
-        undefined,
-        logger,
-    );
+    const rewrites = readRecord(() => ports.rewritesApplied?.() ?? [], logger);
     // Read before the browser goes, with every answer the stubs gave.
-    const stubAnswers = readKeepingTheResult(() => session.network.stubAnswers(), [], logger);
-    return {
-        running,
-        steps: soFar.steps,
-        stubAnswers,
-        rewrites: rewritesRead ?? [],
-        finished: rewritesRead === undefined ? finish(running, "Errored") : verdict,
-    };
+    const stubAnswers = readRecord(() => session.network.stubAnswers(), logger);
+    return { running, steps: soFar.steps, stubAnswers, rewrites, finished: verdict };
 }
 
 // Keeps what only a top-level step's outcome says, and gives the result it stands as in the plan's list.

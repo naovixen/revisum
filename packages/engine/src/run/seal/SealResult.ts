@@ -8,8 +8,12 @@ import { callsServices } from "../../plan/CallsServices.ts";
 import { unsafeFeaturesOf } from "../../plan/unsafe-features.ts";
 import type { TargetNotDeclared } from "../../policy/TargetNotDeclared.ts";
 import type { RunPorts } from "../RunContext.ts";
-import { EgressRecordKind, type EgressRecord } from "../after-the-verdict/EgressRecord.ts";
-import { EGRESS_UNREAD, type RunResult } from "../RunResult.ts";
+import { RecordReadKind, readValueOr } from "../after-the-verdict/RecordRead.ts";
+import {
+    unreadRecordItems,
+    type RecordsAfterTheSteps,
+} from "../after-the-verdict/RecordsAfterTheSteps.ts";
+import type { RunResult } from "../RunResult.ts";
 import { withRunHashes } from "./WithRunHashes.ts";
 
 // What a result is for, whether or not a run was cleared for its target.
@@ -62,31 +66,29 @@ export function sealResult(outcome: UnsealedResult, context: SealContext): RunRe
     return seal(outcome, context, true);
 }
 
-// What a result holds before it is sealed, less what the egress record decides.
-export type UnsealedRanResult = Omit<UnsealedResult, "blockedOrigins">;
+// What a result holds before it is sealed, less what the records read after the steps decide.
+export type UnsealedRanResult = Omit<UnsealedResult, "blockedOrigins" | "stubAnswers">;
 
-// Seals the result of a run whose session closed. The one place its egress record goes into the
-// result: the origins the egress refused, or, when it could not say, an empty list, a review item and
-// no claim that egress was enforced.
+// Seals the result of a run whose session closed. The one place the records read after its steps go
+// into the result: the origins the egress refused and the stubs that answered, a review item for each
+// record left unread, and no claim that egress was enforced when the egress could not say.
 export function sealRanResult(
     outcome: UnsealedRanResult,
     context: SealContext,
-    egress: EgressRecord,
+    records: RecordsAfterTheSteps,
 ): RunResult {
-    switch (egress.kind) {
-        case EgressRecordKind.Read:
-            return seal({ ...outcome, blockedOrigins: egress.blocked }, context, true);
-        case EgressRecordKind.Unread:
-            return seal(
-                {
-                    ...outcome,
-                    blockedOrigins: [],
-                    reviewItems: [...(outcome.reviewItems ?? []), { code: EGRESS_UNREAD }],
-                },
-                context,
-                false,
-            );
-    }
+    const reviewItems = [...(outcome.reviewItems ?? []), ...unreadRecordItems(records)];
+    const stubAnswers = readValueOr(records.stubAnswers, []);
+    return seal(
+        {
+            ...outcome,
+            blockedOrigins: readValueOr(records.egress, []),
+            ...(reviewItems.length === 0 ? {} : { reviewItems }),
+            ...(stubAnswers.length === 0 ? {} : { stubAnswers: [...stubAnswers] }),
+        },
+        context,
+        records.egress.kind === RecordReadKind.Read,
+    );
 }
 
 function seal(outcome: UnsealedResult, context: SealContext, canClaimEgress: boolean): RunResult {

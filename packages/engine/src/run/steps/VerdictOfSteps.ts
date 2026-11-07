@@ -12,16 +12,18 @@ import {
 import { isSetupStepType } from "../../plan/StepFacts.ts";
 import { NO_ANSWER_CODES } from "../../service-calls/call-steps.ts";
 import type { StepResult } from "../StepResult.ts";
+import type { RecordRead } from "../after-the-verdict/RecordRead.ts";
 import type { TimedStep } from "./TimedStep.ts";
 
 export type FinishedRun = Finished<"Passed" | "Failed" | "Errored"> | DeniedRun;
 
-// The steps' results and verdict, and what was read from the session before it closed.
+// The steps' results and their own verdict, and what was read from the session before it closed.
+// What a record left unread does to the verdict comes after.
 export type StepsRun = {
     readonly running: Running;
     readonly steps: readonly TimedStep[];
-    readonly stubAnswers: readonly StubAnswer[];
-    readonly rewrites: readonly AppliedRewrite[];
+    readonly stubAnswers: RecordRead<readonly StubAnswer[]>;
+    readonly rewrites: RecordRead<readonly AppliedRewrite[]>;
     readonly finished: FinishedRun;
 };
 

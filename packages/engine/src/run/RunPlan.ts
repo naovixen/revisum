@@ -17,7 +17,10 @@ import {
     logFailureAfterTheVerdict,
     logKeepingTheResult,
     readKeepingTheResult,
+    readRecord,
 } from "./after-the-verdict/ReadKeepingTheResult.ts";
+import { readValueOr, type RecordRead } from "./after-the-verdict/RecordRead.ts";
+import { verdictGivenTheRecords } from "./after-the-verdict/RecordsAfterTheSteps.ts";
 import { withRefusalsAfterTheVerdict } from "./after-the-verdict/WithRefusalsAfterTheVerdict.ts";
 import type { SessionContext } from "./executors/StepExecutor.ts";
 import type { StepsRun, StepsVerdict } from "./steps/VerdictOfSteps.ts";
@@ -129,12 +132,23 @@ async function finishAfterTheSteps(
 ): Promise<RunResult> {
     const { session, manifestInputs, ran } = inSession;
     const { logger, ports } = context;
-    const verdict = verdictAfterRefusals(ran, session, logger);
+    const refusals = refusalsAfterTheVerdict(session, logger);
+    const readBeforeTheEgress = {
+        refusals,
+        rewrites: ran.rewrites,
+        stubAnswers: ran.stubAnswers,
+    };
+    const verdict = verdictAfterRefusals(
+        verdictGivenTheRecords(ran, readBeforeTheEgress),
+        readValueOr(refusals, []),
+        logger,
+    );
     const after = await afterTheVerdict({ ...context, session }, verdict);
+    const rewrites = readValueOr(ran.rewrites, []);
     const manifest =
-        ran.rewrites.length === 0
+        rewrites.length === 0
             ? verdict.finished.manifest
-            : buildManifest({ ...manifestInputs, responseRewrites: ran.rewrites });
+            : buildManifest({ ...manifestInputs, responseRewrites: rewrites });
     return sealRanResult(
         {
             state: after.endState.state,
@@ -148,7 +162,6 @@ async function finishAfterTheSteps(
             ...(after.cleanupReviewItems.length === 0
                 ? {}
                 : { reviewItems: after.cleanupReviewItems }),
-            ...(ran.stubAnswers.length === 0 ? {} : { stubAnswers: [...ran.stubAnswers] }),
             timings: {
                 totalMilliseconds: readKeepingTheResult(
                     () => ports.clock.now() - startedAt,
@@ -159,18 +172,14 @@ async function finishAfterTheSteps(
             },
         },
         nothingRan,
-        after.egress,
+        { ...readBeforeTheEgress, egress: after.egress },
     );
 }
 
 // The request decisions the browser refused, read once the session has closed, each logged.
-function refusalsAfterTheVerdict(session: Session, logger: Logger): readonly string[] {
-    const refusals: readonly string[] = readKeepingTheResult(
-        () => session.refusedRequestDecisions(),
-        [],
-        logger,
-    );
-    for (const refusal of refusals) {
+function refusalsAfterTheVerdict(session: Session, logger: Logger): RecordRead<readonly string[]> {
+    const refusals = readRecord(() => session.refusedRequestDecisions(), logger);
+    for (const refusal of readValueOr(refusals, [])) {
         logFailureAfterTheVerdict(StepCode.AdapterError, refusal, logger);
     }
     return refusals;
@@ -179,8 +188,12 @@ function refusalsAfterTheVerdict(session: Session, logger: Logger): readonly str
 // The verdict with the refusals read after it counted. A step they spoilt ends again in the log, as it
 // now does in the result, so the log alone never shows a pass where the result says the run could
 // not test.
-function verdictAfterRefusals(ran: StepsRun, session: Session, logger: Logger): StepsVerdict {
-    const counted = withRefusalsAfterTheVerdict(ran, refusalsAfterTheVerdict(session, logger));
+function verdictAfterRefusals(
+    verdict: StepsVerdict,
+    refusals: readonly string[],
+    logger: Logger,
+): StepsVerdict {
+    const counted = withRefusalsAfterTheVerdict(verdict, refusals);
     if (counted.isSpoilt) {
         const { spoiltStep, spoiltStepMilliseconds } = counted;
         logKeepingTheResult(

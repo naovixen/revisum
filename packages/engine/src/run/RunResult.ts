@@ -24,6 +24,16 @@ import type { StepResult } from "./StepResult.ts";
 
 export const EGRESS_UNREAD = "egress-unread";
 
+// A record a plan run reads from the session once its steps have run, left unread: the request
+// decisions the browser refused, what the egress proxy rewrote, or which stubs answered.
+export const UnreadRecordCode = {
+    Refusals: "refusals-unread",
+    Rewrites: "rewrites-unread",
+    StubAnswers: "stub-answers-unread",
+} as const;
+
+export type UnreadRecordCode = (typeof UnreadRecordCode)[keyof typeof UnreadRecordCode];
+
 // Something a run found that a person should look at, whatever the verdict: a cleanup call that
 // failed, so test data may be left behind; or a suite test's criterion annotation whose
 // description is not a valid criterion id, so it was dropped (never echoed).
@@ -44,7 +54,10 @@ export type RunReviewItem =
     | { readonly code: "suite-output-unread"; readonly decodeErrorIndex: number }
     // A plan run's egress could not say what it refused, so its empty blockedOrigins claims nothing and
     // the run ended Errored.
-    | { readonly code: typeof EGRESS_UNREAD };
+    | { readonly code: typeof EGRESS_UNREAD }
+    // A plan run could not read one of the session's records after its steps, so the result does not
+    // claim what it would have said. Without the refusals or the rewrites, the run ended Errored.
+    | { readonly code: UnreadRecordCode };
 
 // Why an evidence run ended as it did, beyond its tests' outcomes.
 //   vacuous: the report holds no test that ran, so the run checked nothing and ends Failed.
