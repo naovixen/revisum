@@ -10,7 +10,8 @@
 //     the read nor change what it returns.
 import { failure, success, type ClipboardPort, type DriverError, type Result } from '@revisum/contracts';
 import { CALL_FUNCTION_ON } from './CallFunctionOn.ts';
-import { CREATE_ISOLATED_WORLD, GET_FRAME_TREE, SET_PERMISSION, type CallResult } from './BrowserCommand.ts';
+import { CREATE_ISOLATED_WORLD, GET_FRAME_TREE, SET_PERMISSION } from './BrowserCommand.ts';
+import type { CallResult } from './RemoteObject.ts';
 import type { CdpConnection } from './cdp-connection.ts';
 import { readClipboardText } from './in-page.ts';
 import { PageHeldByDialog } from './PageHeldByDialog.ts';

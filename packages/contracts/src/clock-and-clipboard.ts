@@ -8,9 +8,11 @@
 //     step may read that text into a run value. The text is page content: compared, never recorded.
 //
 // An advance never falls back to a real wait.
-import type { DriverError } from './browser-driver.ts';
-import type { CriterionId, MultiLineText, StepType, TextOrValue } from './plan.ts';
 import type { Result } from './result.ts';
+import type { DriverError } from './DriverError.ts';
+import type { CriterionId } from './CriterionId.ts';
+import type { MultiLineText, TextOrValue } from './TextOrValue.ts';
+import type { StepType } from './StepType.ts';
 
 // The units an advance may be written in. A day is 86,400,000 ms of elapsed time; wall-clock
 // dates follow from the new instant, so a daylight-saving change needs no special case. There is

@@ -15,7 +15,7 @@ import {
   INVALID, allValid, peekRecord, readInteger, readList, readOneOf, readRecord, readText, type Issues, type Parsed,
 } from '../plan/plan-decoders.ts';
 import { HEADER_NAME, readDeclarationSection, readFieldPointers, readJsonTemplate, readParameters } from './call-declarations.ts';
-import { readOrigin } from './project-parser.ts';
+import { readOrigin } from './ReadOrigin.ts';
 
 // What a declaration may refer to: the origins a matcher may name, and the fixture files a stub may serve.
 type NetworkDeclarationContext = {

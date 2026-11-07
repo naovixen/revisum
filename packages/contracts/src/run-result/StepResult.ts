@@ -5,13 +5,13 @@ import type { A11yFinding } from "../browser-driver.ts";
 import type { StepCode } from "../foundation/StepCode.ts";
 import type { StepOutcome } from "../foundation/StepOutcome.ts";
 import type { StubName } from "../network-and-storage.ts";
-import type { StepType } from "../plan.ts";
-import type { ArtifactReference } from "../run-ports.ts";
 import type { DatabaseCommandRecord } from "./DatabaseCommandRecord.ts";
 import type { DownloadRecord } from "./DownloadRecord.ts";
 import type { PageScriptRecord } from "./PageScriptRecord.ts";
 import type { RememberedValueRecord } from "./RememberedValueRecord.ts";
 import type { ServiceCallRecord } from "./ServiceCallRecord.ts";
+import type { StepType } from "../StepType.ts";
+import type { ArtifactReference } from "../ArtifactReference.ts";
 
 // What a step that ran may leave beside its outcome, whether it passed or failed.
 export type StepRecords = {

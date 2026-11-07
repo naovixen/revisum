@@ -1,4 +1,4 @@
-import type { SecretName } from "../plan.ts";
+import type { SecretName } from "../SecretName.ts";
 
 // Why a run was refused before any driver call.
 //   origin-not-allowed: the run would reach one of the project's production origins, which only an

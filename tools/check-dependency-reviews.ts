@@ -10,33 +10,10 @@
 // are in tools/dependency-reviews.ts.
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { DEPENDENCY_REVIEWS } from './dependency-reviews.ts';
+import { DEPENDENCY_REVIEWS, type DependencyReview } from './dependency-reviews.ts';
 import type { Token } from './lint-names.ts';
 import { closingParenthesis, CODE_FILE, codeTokens, isPunctuator } from './source-files.ts';
 import { readWorkspacePackages, reportProblems } from './workspace-packages.ts';
-
-// The checks every third-party component on the trust path must pass to stay on the default path.
-export type DependencyCheck =
-  | 'licenceAllowsUse'     // its licence permits commercial use and distribution
-  | 'reachesAllTargets'    // it can drive or run on every target the product must support
-  | 'versionPinned'        // an exact version can be pinned and run hermetically
-  | 'stockBrowsersOnly'    // it needs no patched or vendor-only browser build
-  | 'gapsClosable'         // any accessibility coverage gap can be closed around it
-  | 'roadmapFits';         // its roadmap can't break the product's guarantees
-
-export type DependencyCheckResult = 'pass' | 'fail' | 'partial';
-
-// One review per third-party component on the trust path.
-export type DependencyReview = {
-  readonly component: string;
-  // Exact and pinned.
-  readonly version: string;
-  readonly results: Readonly<Record<DependencyCheck, DependencyCheckResult>>;
-  readonly decision: 'default' | 'optional-adapter' | 'dropped';
-  // Test ids (<file>#<name>, the name as test results give it: titles joined by " > "), licence
-  // files, repository docs or vendor URLs behind the results.
-  readonly evidence: readonly string[];
-};
 
 const SUITE_CALLS = new Set(['describe', 'suite']);
 const TEST_CALLS = new Set([...SUITE_CALLS, 'test', 'it']);

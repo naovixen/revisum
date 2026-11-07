@@ -1,5 +1,5 @@
 import { failure, success, type Brand, type Result } from "@revisum/contracts";
-import { errorText } from "./browser-session.ts";
+import { errorText } from "./ErrorText.ts";
 import { LOOPBACK_THROUGH_PROXY, type ProxySettings } from "./chrome-flags.ts";
 
 // A declared origin the egress could not connect to, with what to tell whoever is running.

@@ -13,11 +13,14 @@
 // The engine resolves templates and arguments; a driver receives finished bytes, or the name of a
 // fixture it reads from its own fixtures folder.
 import type { Brand } from './brand.ts';
-import type { DriverError } from './browser-driver.ts';
-import type { CriterionId, FixtureName, SafeText, StepType, TextOrValue } from './plan.ts';
 import type { Result } from './result.ts';
 import type { CallArguments, FieldName, HttpMethod, JsonPointer, JsonTemplate, ParameterName, ParameterType } from './service-calls.ts';
 import type { Origin } from './target.ts';
+import type { DriverError } from './DriverError.ts';
+import type { CriterionId } from './CriterionId.ts';
+import type { FixtureName } from './FixtureName.ts';
+import type { SafeText, TextOrValue } from './TextOrValue.ts';
+import type { StepType } from './StepType.ts';
 
 // ---- Declarations ---------------------------------------------------------------------------
 

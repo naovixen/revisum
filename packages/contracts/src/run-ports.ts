@@ -1,6 +1,8 @@
 // The other ports a run needs from outside: time, randomness, artefact storage, redaction and
 // the optional AI helpers. AI output is typed `unknown`, so it is usable only after parsing.
 import type { DraftRequest } from './plan-drafts.ts';
+import type { ArtifactReference } from './ArtifactReference.ts';
+import type { GuaranteeLevel } from './GuaranteeLevel.ts';
 
 export interface Clock {
   now(): number;
@@ -11,7 +13,6 @@ export interface Random {
   next(): number;
 }
 
-export type ArtifactReference = { readonly name: string; readonly mediaType: string; readonly sha256: string; readonly bytes: number };
 export interface ArtifactStore {
   put(name: string, bytes: Uint8Array, mediaType: string): Promise<ArtifactReference>;
 }
@@ -39,14 +40,6 @@ export interface DraftPlanner {
 export interface AiWriter {
   suggest(draft: string): Promise<unknown>;
 }
-
-// How strongly a run is isolated. isolated: the run's network egress is enforced and it can be
-// replayed. host: it ran on the host, with no egress enforcement and no replay claim.
-export const GuaranteeLevel = {
-  Isolated: 'isolated',
-  Host: 'host',
-} as const;
-export type GuaranteeLevel = (typeof GuaranteeLevel)[keyof typeof GuaranteeLevel];
 
 // Says how strongly a run is isolated. A run reads it as it seals its result, once its steps have
 // ended, since a runner's level can fall to 'host' only when the proxy's record proves incomplete.

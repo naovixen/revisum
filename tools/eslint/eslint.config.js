@@ -5,13 +5,25 @@ import js from "@eslint/js";
 import { defineConfig, globalIgnores } from "eslint/config";
 import tseslint from "typescript-eslint";
 import { fileNameMatchesExport } from "./FileNameMatchesExport.ts";
+import { inPageFunctionsAreSelfContained } from "./InPageFunctionsAreSelfContained.ts";
 import { testTitleFormat } from "./TestTitleFormat.ts";
 
 const GENERIC_NAME_ENDINGS = "(Manager|Helper|Util|Utils)$";
 
+// The files whose top-level functions run inside the page. The in-page rule checks that each uses
+// nothing from its module, and that no other file sends a function to the page.
+const IN_PAGE_FILES = [
+    "packages/driver-cdp/src/in-page.ts",
+    "packages/driver-cdp/src/FindByLabel.ts",
+    "packages/driver-cdp/src/NodesAPressPasses.ts",
+    "packages/driver-cdp/src/ArmHitCheck.ts",
+    "packages/driver-cdp/src/page-audit.ts",
+];
+
 const everywhereSyntax = [
     {
-        selector: "PropertyDefinition[accessibility='private'], MethodDefinition[accessibility='private']",
+        selector:
+            "PropertyDefinition[accessibility='private'], MethodDefinition[accessibility='private']",
         message: "Use #private, which is enforced at run time, not TypeScript's private.",
     },
     {
@@ -31,7 +43,8 @@ const everywhereSyntax = [
     },
     {
         selector: "TSEnumDeclaration",
-        message: "Use a union of string literals: Node runs this code without a build step and rejects enums.",
+        message:
+            "Use a union of string literals: Node runs this code without a build step and rejects enums.",
     },
     {
         selector: "Program > :not(ImportDeclaration) ~ ImportDeclaration",
@@ -64,6 +77,7 @@ export default defineConfig([
             revisum: {
                 rules: {
                     "file-name-matches-export": fileNameMatchesExport,
+                    "in-page-functions-are-self-contained": inPageFunctionsAreSelfContained,
                     "test-title-format": testTitleFormat,
                 },
             },
@@ -108,7 +122,10 @@ export default defineConfig([
             "no-object-constructor": "error",
 
             "max-lines": ["error", { max: 400, skipBlankLines: true, skipComments: true }],
-            "max-lines-per-function": ["error", { max: 75, skipBlankLines: true, skipComments: true }],
+            "max-lines-per-function": [
+                "error",
+                { max: 75, skipBlankLines: true, skipComments: true },
+            ],
             "no-duplicate-imports": ["error", { allowSeparateTypeImports: true }],
 
             "no-restricted-syntax": ["error", ...everywhereSyntax, noExportStar],
@@ -118,7 +135,10 @@ export default defineConfig([
             "@typescript-eslint/default-param-last": "error",
             "dot-notation": "off",
             // Brackets stay allowed on records: decoders read unverified keys that way on purpose.
-            "@typescript-eslint/dot-notation": ["error", { allowIndexSignaturePropertyAccess: true }],
+            "@typescript-eslint/dot-notation": [
+                "error",
+                { allowIndexSignaturePropertyAccess: true },
+            ],
             "no-useless-constructor": "off",
             "@typescript-eslint/no-useless-constructor": "error",
 
@@ -132,7 +152,11 @@ export default defineConfig([
                 "error",
                 {
                     allowForKnownSafeCalls: [
-                        { from: "package", name: ["describe", "it", "test", "suite"], package: "node:test" },
+                        {
+                            from: "package",
+                            name: ["describe", "it", "test", "suite"],
+                            package: "node:test",
+                        },
                     ],
                 },
             ],
@@ -156,7 +180,11 @@ export default defineConfig([
                     prefix: ["is", "has", "can", "should", "was", "did"],
                 },
                 { selector: "classMethod", format: ["camelCase"] },
-                { selector: ["classProperty", "accessor"], format: null, leadingUnderscore: "forbid" },
+                {
+                    selector: ["classProperty", "accessor"],
+                    format: null,
+                    leadingUnderscore: "forbid",
+                },
                 {
                     selector: "interface",
                     format: ["PascalCase"],
@@ -167,6 +195,15 @@ export default defineConfig([
                     format: ["PascalCase"],
                     custom: { regex: GENERIC_NAME_ENDINGS, match: false },
                 },
+            ],
+        },
+    },
+    {
+        files: ["packages/**/*.ts"],
+        rules: {
+            "revisum/in-page-functions-are-self-contained": [
+                "error",
+                { inPageFiles: IN_PAGE_FILES },
             ],
         },
     },

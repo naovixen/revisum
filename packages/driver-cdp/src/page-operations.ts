@@ -4,16 +4,15 @@
 import type {
   A11yNode, BrowserDriver, BrowserRequestRecord, DownloadedFile, DriverError, Key, Result, Session, SessionEnvironment, Target, Unavailable,
 } from '@revisum/contracts';
-import type { PressCheck, PressSent } from './HitChecks.ts';
 import type { HeldModifierKey } from './modifier-keys.ts';
+import type { PageFunction } from './PageFunction.ts';
+import type { PressCheck, PressSent } from './PressCheck.ts';
 
 export type Point = { readonly x: number; readonly y: number };
 
 // An element handle wrapped so that it can never be mistaken for a string argument.
 type ElementArgument<Handle> = { readonly element: Handle };
 export type PageArgument<Handle> = string | number | boolean | readonly string[] | ElementArgument<Handle>;
-// A self-contained page function, sent with toString().
-export type PageFunction = (...inputs: never[]) => unknown;
 
 // What a session needs from one page, in protocol terms. Handle is the protocol's element handle.
 export interface PageOperations<Handle> {

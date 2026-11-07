@@ -15,7 +15,7 @@ import {
 } from '../plan/plan-decoders.ts';
 import { DECLARED_NAME, QUERY_KEY } from '../plan/plan-grammar.ts';
 import { isInterpolationSafe } from '../service-calls/parameter-values.ts';
-import { readOrigin } from './project-parser.ts';
+import { readOrigin } from './ReadOrigin.ts';
 
 // A service's name: a lowercase letter, then up to 39 lowercase letters, digits or hyphens.
 const SERVICE_NAME = /^[a-z][a-z0-9-]{0,39}$/;

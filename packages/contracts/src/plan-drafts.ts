@@ -6,8 +6,9 @@
 // A draft's provenance says where it came from. It is recorded on the audit event and shown, but
 // never trusted: it changes no gate, approval or metric.
 import type { PageMapEntry } from './explore-mode.ts';
-import type { CriterionId, SecretName } from './plan.ts';
 import type { Origin, TargetId } from './target.ts';
+import type { CriterionId } from './CriterionId.ts';
+import type { SecretName } from './SecretName.ts';
 
 // Every route a draft may come by.
 // explore-draft is the draft command's explore mode, which drafts from a crawl of the running app.

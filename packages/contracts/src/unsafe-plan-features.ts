@@ -12,19 +12,10 @@ import type { EgressPolicy } from './isolated-runner.ts';
 import type { Result } from './result.ts';
 import type { WorkloadErrorCode, WorkloadOutcome, WorkloadVariable } from './workload.ts';
 import type { EnvironmentValue, ImageDigest } from './evidence-mode.ts';
-import type { CriterionId, SafeText, StepType, TextOrValue, ValueName } from './plan.ts';
 import type { BackendAssertion, CallEffect, FieldName, JsonPointer, ParameterKind, ParameterName, ParameterType, ServiceName } from './service-calls.ts';
-
-export const UnsafeFeature = {
-  CssLocator: 'css-locator',
-  XpathLocator: 'xpath-locator',
-  DomChecks: 'dom-checks',
-  PageScript: 'page-script',
-  InlinePageScript: 'inline-page-script',
-  DatabaseCommand: 'database-command',
-} as const;
-export type UnsafeFeature = (typeof UnsafeFeature)[keyof typeof UnsafeFeature];
-export const UNSAFE_FEATURES: readonly UnsafeFeature[] = Object.values(UnsafeFeature);
+import type { CriterionId } from './CriterionId.ts';
+import type { SafeText, TextOrValue, ValueName } from './TextOrValue.ts';
+import type { StepType } from './StepType.ts';
 
 // ---- Declarations in the trusted project ------------------------------------------------------
 

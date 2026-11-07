@@ -3,10 +3,10 @@
 import type { AdapterInfo } from "../browser-driver.ts";
 import type { ImageDigest, SuiteName } from "../evidence-mode.ts";
 import type { AppliedRewrite } from "../isolated-runner.ts";
-import type { SecretName } from "../plan.ts";
 import type { RedactionMode } from "../secret.ts";
 import type { Target } from "../target.ts";
-import type { UnsafeFeature } from "../unsafe-plan-features.ts";
+import type { SecretName } from "../SecretName.ts";
+import type { UnsafeFeature } from "../UnsafeFeature.ts";
 
 // A file of the app under test, by content hash.
 export type FixtureReference = { readonly path: string; readonly sha256: string };

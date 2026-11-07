@@ -7,8 +7,10 @@ import {
 import { readFileSync, realpathSync } from 'node:fs';
 import { isAbsolute, relative, resolve } from 'node:path';
 import { chromiumBuild } from './browser-build.ts';
-import { buildSession, buildTab, errorText, type SessionDetails } from './browser-session.ts';
-import { ADD_BINDING, ADD_SCRIPT_ON_NEW_DOCUMENT, ATTACH_TO_TARGET, CAPTURE_SCREENSHOT, CLOSE_TARGET, CREATE_BROWSER_CONTEXT, CREATE_ISOLATED_WORLD, CREATE_TARGET, ENABLE_PAGE, ENABLE_RUNTIME, GET_FRAME_TREE, GET_VERSION, NAVIGATE, SET_DEVICE_METRICS, SET_EMULATED_MEDIA, SET_FOCUS_EMULATION, SET_LOCALE, SET_SCRIPT_EXECUTION_DISABLED, SET_TIME_ZONE, SET_TOUCH_EMULATION, SET_USER_AGENT, type BrowserCommand, type CallArgument, type CallResult, type FrameTree, type RemoteObject } from './BrowserCommand.ts';
+import { buildSession, buildTab, type SessionDetails } from './browser-session.ts';
+import { errorText } from './ErrorText.ts';
+import { ADD_BINDING, ADD_SCRIPT_ON_NEW_DOCUMENT, ATTACH_TO_TARGET, CAPTURE_SCREENSHOT, CLOSE_TARGET, CREATE_BROWSER_CONTEXT, CREATE_ISOLATED_WORLD, CREATE_TARGET, ENABLE_PAGE, ENABLE_RUNTIME, GET_FRAME_TREE, GET_VERSION, NAVIGATE, SET_DEVICE_METRICS, SET_EMULATED_MEDIA, SET_FOCUS_EMULATION, SET_LOCALE, SET_SCRIPT_EXECUTION_DISABLED, SET_TIME_ZONE, SET_TOUCH_EMULATION, SET_USER_AGENT, type BrowserCommand, type CallArgument } from './BrowserCommand.ts';
+import type { CallResult, FrameTree, RemoteObject } from './RemoteObject.ts';
 import { BINDING_CALLED, FRAME_STOPPED_LOADING, LOAD_EVENT_FIRED, type RequestAtResponseStage } from './BrowserEvent.ts';
 import { CALL_FUNCTION_ON, DESCRIBE_NODE, EVALUATE, GET_EVENT_LISTENERS, GET_FULL_ACCESSIBILITY_TREE, GET_PARTIAL_ACCESSIBILITY_TREE, GET_PROPERTIES, QUERY_ACCESSIBILITY_TREE, RELEASE_OBJECT, RELEASE_OBJECT_GROUP, RESOLVE_NODE, RUN_IF_WAITING_FOR_DEBUGGER, SET_FILE_INPUT_FILES } from './CallFunctionOn.ts';
 import { CONTINUE_REQUEST, DISPATCH_KEY_EVENT, DISPATCH_MOUSE_EVENT, ENABLE_REQUEST_HOLDING, FAIL_REQUEST, FULFIL_REQUEST, GET_RESPONSE_BODY, INSERT_TEXT } from './DispatchMouseEvent.ts';
@@ -16,16 +18,18 @@ import type { CdpConnection, CdpSessionClient } from './cdp-connection.ts';
 import { DownloadFolder } from './downloads.ts';
 import { EgressRecorder } from './egress-records.ts';
 import { DocumentGone } from './DocumentGone.ts';
-import { CLICK_WATCH_SCRIPT, PressSent, type CheckRead, type PressCheck } from './HitChecks.ts';
+import { CLICK_WATCH_SCRIPT } from './HitChecks.ts';
+import { PressSent, type CheckRead, type PressCheck } from './PressCheck.ts';
 import { BrowserNetwork } from './network-stubs.ts';
 import { afterTwoFrames, focusAndSelect, focusElement, frameContentOffset, isConnectedToItsDocument, isNotDisabledByItsProperty, scriptResultText, selectOption } from './in-page.ts';
 import { MalformedBrowserReply } from './MalformedBrowserReply.ts';
 import type { HeldModifierKey } from './modifier-keys.ts';
 import {
   SelectOutcome,
-  type DriverSession, type ExposedStates, type HasStepEnded, type OwnBrowserDriver, type PageArgument, type PageFunction, type PageWithInput, type Point, type RoleAndName, type ScriptCallOutcome,
+  type DriverSession, type ExposedStates, type HasStepEnded, type OwnBrowserDriver, type PageArgument, type PageWithInput, type Point, type RoleAndName, type ScriptCallOutcome,
 } from './page-operations.ts';
 import { nodesAPressPasses, pressActsByItself } from './NodesAPressPasses.ts';
+import type { PageFunction } from './PageFunction.ts';
 import { PageHeldByDialog } from './PageHeldByDialog.ts';
 import { PageWatch, holdUnreadableEvent, type AttachedPage, type SessionFailures } from './page-watch.ts';
 import { RunClipboard, SHARED_BROWSER_CLIPBOARD, allowRunClipboard } from './run-clipboard.ts';

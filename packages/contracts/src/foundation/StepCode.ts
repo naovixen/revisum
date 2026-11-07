@@ -1,6 +1,6 @@
-import { DriverErrorCode } from "../browser-driver.ts";
 import { ServiceCallErrorCode } from "../service-calls.ts";
 import { WorkloadErrorCode } from "../workload.ts";
+import { DriverErrorCode } from "../DriverError.ts";
 
 // Every code a step's result can hold. A step that passed holds one only to say what it left out.
 export const StepCode = {

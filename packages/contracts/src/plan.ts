@@ -3,10 +3,15 @@
 // The types live here because drivers act on steps and locators; the parser lives in the engine.
 import type { Brand } from './brand.ts';
 import type { ClipboardRead, ClockAndClipboardStep } from './clock-and-clipboard.ts';
+import type { CriterionId } from './CriterionId.ts';
+import type { FixtureName } from './FixtureName.ts';
 import type { Key } from './Key.ts';
 import type { NetworkAndStorageStep, RequestName, ResponseRead } from './network-and-storage.ts';
 import type { Role } from './Role.ts';
+import type { SecretReference } from './SecretName.ts';
 import type { BackendAssertion, CallArguments, CallName, FieldName } from './service-calls.ts';
+import { StepType } from './StepType.ts';
+import type { TextOrValue, MultiLineText, SafeText, ValueName } from './TextOrValue.ts';
 import type { TargetId } from './target.ts';
 import type { DatabaseCommandStep, DatabaseStep, PageScriptStep } from './unsafe-plan-features.ts';
 
@@ -15,20 +20,10 @@ import type { DatabaseCommandStep, DatabaseStep, PageScriptStep } from './unsafe
 // (unsafe-plan-features.ts).
 export const PLAN_VERSION = { major: 1, minor: 3 } as const;
 
-// Text that passed the engine's safety rules: no control or bidirectional-override characters
-// and nothing that looks like script.
-export type SafeText = Brand<string, 'SafeText'>;
-
 // ---- Run values -----------------------------------------------------------------------------
 // A plan may name values and use them where it would write literal text for the page. A
 // generated value derives from the run's seed and clock start; a remembered value is read from
 // the page by a remember step. Plans stay straight-line: there is no arithmetic or branching.
-
-// A run value's name, such as "orderCode": a lowercase letter, then letters and digits.
-export type ValueName = Brand<string, 'ValueName'>;
-export type ValueReference = { readonly valueName: ValueName };
-// Literal text, or a reference to a run value that the run replaces with its text.
-export type TextOrValue = SafeText | ValueReference;
 
 // Days a date value counts from, in the target's time zone. Weeks start on Monday.
 export const DateAnchor = {
@@ -288,17 +283,7 @@ export type DownloadAssertion =
 export type AllowedUrl = Brand<string, 'AllowedUrl'>;
 export type CaptureName = Brand<string, 'CaptureName'>;
 export type FeatureId = Brand<string, 'FeatureId'>;
-// The id of the acceptance criterion an assertion checks, from the user's own spec, such as "AC-3".
-export type CriterionId = Brand<string, 'CriterionId'>;
-// A file the trusted project declares in its fixtures list, which an upload step may send.
-export type FixtureName = Brand<string, 'FixtureName'>;
-// The name of a secret the trusted project declares. A plan names a secret; it never holds one.
-export type SecretName = Brand<string, 'SecretName'>;
-export type SecretReference = { readonly secretName: SecretName };
 
-// Text of several lines for a fill, joined with line feeds and inserted as text, with no Enter
-// key press, so a chat box does not send early.
-export type MultiLineText = { readonly lines: readonly TextOrValue[] };
 // A path on the run's base URL, built from literal and value segments plus query values. Each
 // value is percent-encoded as one whole segment or query value, so no value can change the
 // origin or the number of segments. Literal segments hold no "/", "?" or "#", and are never "."
@@ -353,42 +338,6 @@ export const AuditMode = {
 } as const;
 export type AuditMode = (typeof AuditMode)[keyof typeof AuditMode];
 export const AUDIT_MODES: readonly AuditMode[] = Object.values(AuditMode);
-
-export const StepType = {
-  Navigate: 'navigate',
-  Click: 'click',
-  Download: 'download',
-  Hover: 'hover',
-  Fill: 'fill',
-  Select: 'select',
-  Upload: 'upload',
-  Press: 'press',
-  Frame: 'frame',
-  Dialog: 'dialog',
-  Expect: 'expect',
-  ExpectPage: 'expectPage',
-  ExpectDownload: 'expectDownload',
-  NewTab: 'newTab',
-  A11yAudit: 'a11yAudit',
-  Capture: 'capture',
-  Remember: 'remember',
-  Call: 'call',
-  ExpectBackend: 'expectBackend',
-  Stub: 'stub',
-  ResetRequests: 'resetRequests',
-  ExpectRequests: 'expectRequests',
-  ExpectResponse: 'expectResponse',
-  SetStorage: 'setStorage',
-  RemoveStorage: 'removeStorage',
-  ExpectStorage: 'expectStorage',
-  AdvanceClock: 'advanceClock',
-  ExpectClipboard: 'expectClipboard',
-  Evaluate: 'evaluate',
-  ExpectScript: 'expectScript',
-  Database: 'database',
-  ExpectDatabase: 'expectDatabase',
-} as const;
-export type StepType = (typeof StepType)[keyof typeof StepType];
 
 export type Step =
   // A URL, or a path template on the run's base URL.

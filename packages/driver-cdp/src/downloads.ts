@@ -13,7 +13,7 @@ import { createHash } from 'node:crypto';
 import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { errorText } from './browser-session.ts';
+import { errorText } from './ErrorText.ts';
 import { CANCEL_DOWNLOAD, SET_DOWNLOAD_BEHAVIOUR } from './BrowserCommand.ts';
 import type { CdpConnection } from './cdp-connection.ts';
 import type { ArmedDownload, DownloadCapture, DownloadPress } from './page-operations.ts';

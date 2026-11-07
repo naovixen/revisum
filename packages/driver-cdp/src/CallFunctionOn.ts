@@ -1,5 +1,5 @@
 // The commands that run scripts in a page and read its document and its accessibility tree.
-import type { AccessibilityTreeNode } from "./BrowserCommand.ts";
+import type { AccessibilityTreeNode } from "./RemoteObject.ts";
 import {
     browserCommand,
     NOTHING_TO_READ,

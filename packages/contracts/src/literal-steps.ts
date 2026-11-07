@@ -1,7 +1,9 @@
 // The one place that tells literal text from a value reference. The engine replaces every value
 // reference before a step reaches a driver, whose ports take only resolved types.
-import { ElementStateKind, SemanticLocatorKind, StepType, StructuralLocatorKind, type ElementAssertionKind } from './plan.ts';
-import type { Locator, SafeText, SemanticLocatorWith, Step, TextOrValue, ValueName } from './plan.ts';
+import { ElementStateKind, SemanticLocatorKind, StructuralLocatorKind, type ElementAssertionKind } from './plan.ts';
+import type { Locator, SemanticLocatorWith, Step } from './plan.ts';
+import { StepType } from './StepType.ts';
+import type { SafeText, TextOrValue, ValueName } from './TextOrValue.ts';
 
 // The test-id attribute a testId locator without `attribute` matches, and the project's default list.
 export const DEFAULT_TEST_ID_ATTRIBUTE = 'data-testid';

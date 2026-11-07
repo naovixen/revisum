@@ -3,8 +3,8 @@
 // The crawl only navigates and reads: it never clicks, types, selects, submits or runs a script of
 // its own. These are the types the engine, the CDP driver and the command agree on.
 import type { DocumentSession } from './browser-driver.ts';
-import type { GuaranteeLevel } from './run-ports.ts';
 import type { Origin } from './target.ts';
+import type { GuaranteeLevel } from './GuaranteeLevel.ts';
 
 // How far one crawl may go. `start` is an absolute URL on a declared, non-production origin.
 export type ExploreOptions = {

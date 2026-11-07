@@ -9,7 +9,7 @@ import type {
     CallResult,
     FrameTree,
     RemoteObject,
-} from "./BrowserCommand.ts";
+} from "./RemoteObject.ts";
 
 // One value of what the browser sent, and where in the message it is.
 export type MessagePart = {

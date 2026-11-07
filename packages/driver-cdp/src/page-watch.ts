@@ -17,7 +17,7 @@
 // under way fails as the dialog opens, so this is the one place that dialog state is read for them.
 // A request stays held until the browser takes the driver's decision on it, so a decision it refuses
 // is held here too, whenever its answer comes, for whatever reports next.
-import { errorText } from './browser-session.ts';
+import { errorText } from './ErrorText.ts';
 import { ATTACHED_TO_TARGET, DETACHED_FROM_TARGET, DIALOG_CLOSED, DIALOG_OPENING, FRAME_NAVIGATED, FRAME_REQUESTED_NAVIGATION, FRAME_STOPPED_LOADING, NAVIGATED_WITHIN_DOCUMENT, REQUEST_PAUSED, TARGET_CRASHED, type BrowserEvent, type RequestPaused } from './BrowserEvent.ts';
 import { CLOSE_TARGET, ENABLE_INSPECTOR, HANDLE_DIALOG, SET_AUTO_ATTACH, SET_DOWNLOAD_BEHAVIOUR, type BrowserCommand } from './BrowserCommand.ts';
 import { ENABLE_REQUEST_HOLDING } from './DispatchMouseEvent.ts';

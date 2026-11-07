@@ -23,6 +23,8 @@
 | Field names | Object and type properties aren't name-checked | Results, plan schemas, events and CDP calls have published or external names |
 | Quoted keys | `quoteProps: preserve` | Some quoted keys are deliberate (the JSON Schema keywords in `packages/engine/src/plan/plan-schema.ts`) |
 | Mixed operators | Left to Prettier, which adds the parentheses | `no-mixed-operators` is deprecated in ESLint |
+| Import cycles | No cycle between source files, through value or type-only imports: `tools/CheckImportCycles.ts`, a repository rule | A value cycle can crash at load, which `tsc` can't see. A type-only one is erased and can't, but it still ties the two modules together, so the fix is the same: move the shared piece below both |
+| In-page functions | Live at the top level of the in-page files listed in `tools/eslint/eslint.config.js`, and use only their own parameters and locals and the globals TypeScript's libraries declare: `revisum/in-page-functions-are-self-contained` | A borrowed name type-checks and throws only in the browser. The rule needs type information to tell a browser global from Node's, so it's in ESLint. Every other file may send only a function from an in-page file |
 
 **Rules that stay as Revisum already had them:** `unknown` at boundaries until a decoder parses it, generics such as `<Value>` not `<T>`, the abbreviation list in `CLAUDE.md`, and tests in `test/` rather than beside the code. The `{ criterion }` test tag and spec citations in comments were dropped on 2026-11-02: tests read standalone, and traceability lives in `Criteria:` commit trailers.
 
@@ -43,7 +45,7 @@ Hazards for the refactor:
 
 - **Test titles:** `tools/guarantee-map.ts`, `tools/dependency-reviews.ts` and `docs/guarantees.md` reference tests as `file#title`. Retitling or moving a test means updating them.
 - **File paths:** named in `package.json` scripts, CI workflows, `CODEOWNERS`, `docs/specs/`, `docs/system-design.md` and `docs/glossary.md`.
-- **Page functions:** the `in-page` functions are sent with `.toString()` (`packages/driver-cdp/src/cdp-driver.ts:578`). They must stay self-contained when long functions are broken up.
+- **Page functions:** in-page functions are sent with `.toString()`, so they can't be broken up into module-level helpers. The in-page rule fails on any name they borrow from their module.
 - **Source-reading tests:** some tests read source text. After the double-quote reformat, `/from 'node:os'/` in `test/unit/report/report-generator.test.ts` would keep passing while proving nothing, so it must match both quote styles. `test/proofs/page-script-driver-dependencies.test.ts` and `test/proofs/service-call-isolation.test.ts` have the same quote assumption but fail loudly.
 - **Naming lint:** check that `tools/lint-names.ts` accepts PascalCase file names before renaming.
 - **Suppressions are keyed by path:** a renamed file loses its baseline, so it must be clean or re-suppressed in the same commit. Wrapping lines can also push a function over a size limit, so regenerate the size rules' entries with the reformat.

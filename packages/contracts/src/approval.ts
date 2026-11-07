@@ -3,9 +3,9 @@
 // against GitHub and the protected branch. Every gate, metric and level takes an Approval, never
 // a VerifiedApproval: a verified and a declared approval both pass, and strength only selects the
 // label shown beside a result. Agent, MCP and token sources never get an Approval at all.
-import type { ActorId } from './audit-events.ts';
 import type { Brand } from './brand.ts';
 import type { Result } from './result.ts';
+import type { ActorId } from './ActorId.ts';
 
 // What is approved, keyed by its hash. `path` is where the subject lives in the repository.
 export const ApprovalSubjectKind = {

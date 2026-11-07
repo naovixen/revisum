@@ -7,7 +7,6 @@ import type { ApprovalLabel } from "../approval.ts";
 import type { Unavailable } from "../browser-driver.ts";
 import type { GuaranteeStatement, RunMode } from "../evidence-mode.ts";
 import type { StubAnswer } from "../network-and-storage.ts";
-import type { UnsafeFeature } from "../unsafe-plan-features.ts";
 import type { CleanupResult } from "./CleanupResult.ts";
 import type { Denial } from "./Denial.ts";
 import type { EvidenceRunRecord } from "./EvidenceRunRecord.ts";
@@ -17,6 +16,7 @@ import type { RunReviewItem } from "./RunReviewItem.ts";
 import type { StepResult } from "./StepResult.ts";
 import type { SuiteRunRecord } from "./SuiteRunRecord.ts";
 import type { TerminalState } from "./TerminalState.ts";
+import type { UnsafeFeature } from "../UnsafeFeature.ts";
 
 export type RunTimings = {
     readonly totalMilliseconds: number;

@@ -18,6 +18,7 @@ import { readCallDeclarations, readServices } from './call-declarations.ts';
 import { readObservedRequestDeclarations, readStorageEntryDeclarations, readStubDeclarations } from './network-and-storage-declarations.ts';
 import { readEvidenceMode } from './evidence-declarations.ts';
 import { readUnsafeFeatures } from './unsafe-feature-declarations.ts';
+import { readOrigin } from './ReadOrigin.ts';
 import { LARGEST_DOWNLOAD_BYTES, LOWERCASE_ID, MAXIMUM_TEST_ID_LENGTH, MAXIMUM_URL_LENGTH } from '../plan/plan-grammar.ts';
 import { readableCopy } from '../decoding/ReadableCopy.ts';
 
@@ -162,16 +163,6 @@ export function readId<Name extends string>(input: unknown, path: string, issues
   if (typeof input !== 'string') { issues.push({ code: 'wrong_type', path }); return INVALID; }
   if (!LOWERCASE_ID.test(input)) { issues.push({ code: 'unknown_value', path }); return INVALID; }
   return brand<string, Name>(input);
-}
-
-// An http or https origin with no path, written exactly as the URL standard serialises it.
-export function readOrigin(input: unknown, path: string, issues: Issues): Parsed<Origin> {
-  if (typeof input !== 'string') { issues.push({ code: 'wrong_type', path }); return INVALID; }
-  let url: URL;
-  try { url = new URL(input); } catch { issues.push({ code: 'invalid_url', path }); return INVALID; }
-  if (url.protocol !== 'http:' && url.protocol !== 'https:') { issues.push({ code: 'scheme_not_allowed', path }); return INVALID; }
-  if (url.origin !== input) { issues.push({ code: 'invalid_url', path }); return INVALID; }
-  return brand<string, 'Origin'>(input);
 }
 
 function readLocale(input: unknown, path: string, issues: Issues): Parsed<Locale> {
@@ -516,16 +507,6 @@ function readPlannerKey(input: unknown, path: string, issues: Issues, secretName
   const found = secretNames.find((name) => name === fields['secretName']);
   if (found === undefined) { issues.push({ code: 'unknown_value', path: at }); return INVALID; }
   return { secretName: found };
-}
-
-// The origin a planner endpoint's requests go to, which the egress proxy allows and nothing else.
-// Undefined for an address that is not a URL, which the project parser never lets through.
-export function plannerOrigin(endpoint: PlannerEndpoint): Origin | undefined {
-  try {
-    return brand<string, 'Origin'>(new URL(endpoint.url).origin);
-  } catch {
-    return undefined;
-  }
 }
 
 export function parseProject(input: unknown): Result<Project, readonly PlanError[]> {

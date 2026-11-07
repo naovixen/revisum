@@ -4,7 +4,7 @@
 // their channels. Only network schemes are recorded; data:, blob: and the like never leave, and
 // neither does a request a declared stub answered inside the browser, so it is left out.
 import type { BrowserChannel, BrowserRequestRecord } from '@revisum/contracts';
-import { errorText } from './browser-session.ts';
+import { errorText } from './ErrorText.ts';
 import { ATTACHED_TO_TARGET, REQUEST_WILL_BE_SENT, WEB_SOCKET_CREATED } from './BrowserEvent.ts';
 import { ENABLE_NETWORK, SET_AUTO_ATTACH } from './BrowserCommand.ts';
 import { RUN_IF_WAITING_FOR_DEBUGGER } from './CallFunctionOn.ts';

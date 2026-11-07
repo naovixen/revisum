@@ -14,12 +14,15 @@ import {
   structuralSelectorValidity, unmaskElements, whatAClickActivates,
 } from './in-page.ts';
 import { DocumentGone } from './DocumentGone.ts';
+import { errorText } from './ErrorText.ts';
 import { findByLabel, findByTestId, findByText, findStructural, inDocumentOrder } from './FindByLabel.ts';
 import { HitCheckOutcome, hitChecks, type CheckedDocument, type HitChecks } from './HitChecks.ts';
 import { MalformedBrowserReply } from './MalformedBrowserReply.ts';
 import { heldModifierKeys } from './modifier-keys.ts';
-import { pageAudit, parseAudit, toFindings } from './page-audit.ts';
-import { ElementEnabledState, SelectOutcome, type Actionability, type DownloadCapture, type DriverSession, type HasStepEnded, type PageEvents, type PageFunction, type PageOperations, type PageWithInput, type Point, type ScriptCallOutcome } from './page-operations.ts';
+import { pageAudit } from './page-audit.ts';
+import { parseAudit, toFindings } from './ParseAudit.ts';
+import { ElementEnabledState, SelectOutcome, type Actionability, type DownloadCapture, type DriverSession, type HasStepEnded, type PageEvents, type PageOperations, type PageWithInput, type Point, type ScriptCallOutcome } from './page-operations.ts';
+import type { PageFunction } from './PageFunction.ts';
 import { PageHeldByDialog } from './PageHeldByDialog.ts';
 import type { ConnectionFailure } from './SessionEgress.ts';
 
@@ -33,7 +36,6 @@ const TIMED_OUT = Symbol('timed out');
 // What the runtime guard is told for a dialog step, which acts on no element.
 const NO_RESOLVED_ELEMENT: ResolvedElement = { role: null, name: null, box: null, formSubmitName: null, linkUrl: null };
 
-export const errorText = (error: unknown): string => (error instanceof Error ? error.message : String(error)).slice(0, 200);
 const normalise = (text: string): string => text.replace(/\s+/g, ' ').trim();
 const pause = (milliseconds: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, milliseconds));
 

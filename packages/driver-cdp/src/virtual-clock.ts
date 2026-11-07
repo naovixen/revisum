@@ -13,7 +13,8 @@ import {
   CLOCK_CONTROLLER_KEY, failure, success, virtualClockScript,
   type ClockAdvanceMode, type ClockPort, type DriverError, type Result,
 } from '@revisum/contracts';
-import { ADD_SCRIPT_ON_NEW_DOCUMENT, GET_FRAME_TREE, REMOVE_SCRIPT_ON_NEW_DOCUMENT, type FrameTree } from './BrowserCommand.ts';
+import { ADD_SCRIPT_ON_NEW_DOCUMENT, GET_FRAME_TREE, REMOVE_SCRIPT_ON_NEW_DOCUMENT } from './BrowserCommand.ts';
+import type { FrameTree } from './RemoteObject.ts';
 import { CALL_FUNCTION_ON, DESCRIBE_NODE, EVALUATE, GET_FRAME_OWNER, RESOLVE_NODE } from './CallFunctionOn.ts';
 import { advanceDocumentClock } from './in-page.ts';
 import type { PageCommand } from './web-storage.ts';

@@ -37,6 +37,12 @@ Prettier owns layout and ESLint owns code rules. Run `npm run lint:code` before 
 - Prefer non-mutating forms: spread, `toSorted`, `structuredClone`. Mark shared data `readonly`.
 - Prefer composition to inheritance. Type a singleton as its interface.
 
+## In-page functions
+
+- A function that runs in the page is sent as its source text, so it can't use anything from its module: no imports, constants, helpers or other in-page functions. Pass values in as arguments.
+- Declare it at the top level of an in-page file: one listed in `IN_PAGE_FILES` in `tools/eslint/eslint.config.js`. Keep Node code out of those files; add a new in-page file to the list.
+- Send it only by `name.toString()` or as a `PageFunction` argument, which is how the in-page rule recognises it.
+
 ## Fixed sets of values
 
 No magic strings. Real `enum`s can't run under Node's type stripping, so a fixed set of values is a constant object with a type of the same name:

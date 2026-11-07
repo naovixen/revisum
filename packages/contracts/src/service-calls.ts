@@ -8,9 +8,10 @@
 // protocol pack can reuse them without core importing the pack.
 import type { Brand } from './brand.ts';
 import type { Result } from './result.ts';
-import type { SafeText, SecretName, SecretReference, TextOrValue } from './plan.ts';
 import type { Secret } from './secret.ts';
 import type { Origin } from './target.ts';
+import type { SafeText, TextOrValue } from './TextOrValue.ts';
+import type { SecretName, SecretReference } from './SecretName.ts';
 
 // ---- The declared services ------------------------------------------------------------------
 

@@ -19,9 +19,9 @@ export const ERROR_CODE_UNIONS: readonly { readonly file: string; readonly name:
   { file: 'packages/contracts/src/foundation/StepCode.ts', name: 'StepCode' },
   { file: 'packages/engine/src/run-values.ts', name: 'StepErrorCode' },
   { file: 'packages/contracts/src/run-result/SuiteDecodeError.ts', name: 'SuiteDecodeErrorCode' },
-  { file: 'packages/contracts/src/browser-driver.ts', name: 'DriverErrorCode' },
+  { file: 'packages/contracts/src/DriverError.ts', name: 'DriverErrorCode' },
   // RunnerErrorCode and WorkloadErrorCode share these, and CliErrorCode these build-fetch codes.
-  { file: 'packages/contracts/src/isolated-runner.ts', name: 'ContainerRefusalCode' },
+  { file: 'packages/contracts/src/ContainerRefusalCode.ts', name: 'ContainerRefusalCode' },
   { file: 'packages/contracts/src/browser-driver.ts', name: 'BuildFetchFailureCode' },
   { file: 'packages/contracts/src/error-codes.ts', name: 'RunnerErrorCode' },
   { file: 'packages/runner/src/egress-policy.ts', name: 'EgressPolicyError' },
@@ -30,7 +30,7 @@ export const ERROR_CODE_UNIONS: readonly { readonly file: string; readonly name:
   { file: 'packages/contracts/src/audit-events.ts', name: 'SinkErrorCode' },
   // CliErrorCode adds its own codes to ExploreErrorCode's, so both are read.
   { file: 'packages/contracts/src/explore-mode.ts', name: 'ExploreErrorCode' },
-  { file: 'packages/contracts/src/error-codes.ts', name: 'CliErrorCode' },
+  { file: 'packages/contracts/src/CliErrorCode.ts', name: 'CliErrorCode' },
   { file: 'packages/contracts/src/approval.ts', name: 'ApprovalErrorCode' },
   { file: 'packages/contracts/src/approval.ts', name: 'TrustErrorCode' },
   { file: 'packages/contracts/src/policy.ts', name: 'PolicyRuleId' },

@@ -1,3 +1,4 @@
+import type { SecretName } from './SecretName.ts';
 // Secrets: a plan names a secret; it never holds one. The value is resolved from the secret store
 // when a run starts, travels inside an opaque Secret, and is read back only through reveal().
 // Printing, serialising or inspecting a Secret gives "[secret]", so a value cannot slip into a
@@ -6,7 +7,6 @@
 // reveal() is exported here so the drivers can type a secret without importing the engine, but
 // only the modules on the reveal allow-list may import it: REVEAL_ALLOWED_MODULES in
 // tools/check-secret-reveal.ts, which `npm run lint` runs.
-import type { SecretName } from './plan.ts';
 
 // Below this length a value is too short to search for in outputs without matching ordinary text,
 // so it is redacted by key (the field that holds it is never kept) rather than by value.

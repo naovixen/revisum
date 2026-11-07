@@ -3,30 +3,6 @@
 // works without a third-party engine. It serves the driver's audit step and gives the report the
 // boxes of failing elements; the full rules engine lives in the auditor-act package. Rule ids use
 // the common short names, so findings line up across engines.
-import { IMPACTS, type A11yFinding, type Box, type Impact } from '@revisum/contracts';
-
-export type AuditNode = {
-  readonly selector: string;
-  // Page css pixels at scroll position 0; null when the element has no box.
-  readonly box: Box | null;
-  // True when the box lies wholly outside the viewport, so it is not in the screenshot.
-  readonly offscreen: boolean;
-  readonly snippet: string;
-};
-export type AuditRuleResult = {
-  readonly ruleId: string;
-  // The W3C ACT rule the check follows, where one exists.
-  readonly actRule: string | null;
-  readonly wcag: readonly string[];
-  readonly impact: Impact;
-  readonly nodes: readonly AuditNode[];
-};
-
-// The rule ids pageAudit implements; keep in step with it.
-export const PAGE_AUDIT_RULE_IDS: readonly string[] = [
-  'image-alt', 'button-name', 'link-name', 'label', 'document-title', 'html-has-lang', 'html-lang-valid', 'valid-lang',
-  'list', 'autocomplete-valid', 'color-contrast', 'meta-viewport', 'meta-refresh', 'marquee', 'aria-roles',
-];
 
 // Runs in the page and returns the failing rules as JSON. Self-contained: sent with toString().
 export function pageAudit(): string {
@@ -228,11 +204,3 @@ export function pageAudit(): string {
 
   return JSON.stringify(rules);
 }
-
-export function parseAudit(json: string): readonly AuditRuleResult[] {
-  const raw = JSON.parse(json) as AuditRuleResult[];
-  return raw.map((rule) => ({ ...rule, impact: IMPACTS.find((impact) => impact === rule.impact) ?? 'unknown' }));
-}
-
-export const toFindings = (rules: readonly AuditRuleResult[]): readonly A11yFinding[] =>
-  rules.map((rule) => ({ ruleId: rule.ruleId, impact: rule.impact, elementCount: rule.nodes.length }));

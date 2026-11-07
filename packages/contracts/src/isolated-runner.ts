@@ -5,9 +5,9 @@
 import type { RunnerError } from './error-codes.ts';
 import type { ImageDigest } from './evidence-mode.ts';
 import type { Result } from './result.ts';
-import type { GuaranteeLevel } from './run-ports.ts';
 import type { ServiceName } from './service-calls.ts';
 import type { Origin } from './target.ts';
+import type { GuaranteeLevel } from './GuaranteeLevel.ts';
 
 // How a page sent a request, as the browser reports it: an ordinary request of the page, a
 // WebSocket, a request of a worker, the first load of a popup, a redirect it followed, or a beacon.
@@ -78,14 +78,6 @@ export type EgressPolicy = {
   // Present only when a browser mutant is configured.
   readonly responseRewrites?: readonly FixtureRewrite[];
 };
-
-// Why a runner will not start a container, whichever container it is: the isolated run's, or a workload's.
-export const ContainerRefusalCode = {
-  ImageMissing: 'image-missing',
-  ImageDigestMismatch: 'image-digest-mismatch',
-  EgressUnenforceable: 'egress-unenforceable',
-} as const;
-export type ContainerRefusalCode = (typeof ContainerRefusalCode)[keyof typeof ContainerRefusalCode];
 
 // What a command run inside the run container printed, and how it ended.
 export type ExecOutcome = { readonly exitCode: number; readonly stdout: string; readonly stderr: string };

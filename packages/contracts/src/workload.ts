@@ -3,7 +3,8 @@
 // Playwright suite through it. The types live here so cli can join engine and runner without
 // either importing the other.
 import type { ImageDigest } from './evidence-mode.ts';
-import { ContainerRefusalCode, type EgressEvent, type EgressPolicy } from './isolated-runner.ts';
+import { ContainerRefusalCode } from './ContainerRefusalCode.ts';
+import type { EgressEvent, EgressPolicy } from './isolated-runner.ts';
 import type { Result } from './result.ts';
 import type { Secret } from './secret.ts';
 import type { DeclaredService } from './service-calls.ts';

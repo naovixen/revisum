@@ -8,17 +8,15 @@ import type {
   RequestCount, RequestCountKind, ResponseAssertion, ResponseAssertionKind, StorageAssertion, StorageAssertionKind,
 } from './network-and-storage.ts';
 import type { PlannerEndpoint, PlannerEndpointKind } from './plan-drafts.ts';
-import type {
-  DomCheckKind, DomCheckWith, DownloadAssertion, DownloadAssertionKind, ElementAssertion, ElementAssertionKind, GeneratedValue, GeneratedValueKind,
-  PageAssertion, PageAssertionKind, RememberElementRead, RememberSource, SafeText, SemanticLocatorKind, SemanticLocatorWith, Step, StepType,
-  StructuralLocatorKind, StructuralLocatorWith,
-} from './plan.ts';
+import type { DomCheckKind, DomCheckWith, DownloadAssertion, DownloadAssertionKind, ElementAssertion, ElementAssertionKind, GeneratedValue, GeneratedValueKind, PageAssertion, PageAssertionKind, RememberElementRead, RememberSource, SemanticLocatorKind, SemanticLocatorWith, Step, StructuralLocatorKind, StructuralLocatorWith } from './plan.ts';
 import type { GuardVerdict, PolicyVerdictKind } from './policy.ts';
 import type { Refusal, RefusalCode } from './run-result/Refusal.ts';
 import type { RunResult } from './run-result/RunResult.ts';
 import type { RunReviewItem, RunReviewItemCode } from './run-result/RunReviewItem.ts';
 import type { TerminalState } from './run-result/TerminalState.ts';
 import type { BackendAssertion, BackendAssertionKind, ParameterKind, ParameterType } from './service-calls.ts';
+import type { SafeText } from './TextOrValue.ts';
+import type { StepType } from './StepType.ts';
 
 type HoldSameValues<Constant, Union> = [Constant] extends [Union] ? ([Union] extends [Constant] ? true : false) : false;
 type MustHold<Check extends true> = Check;

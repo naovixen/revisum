@@ -2,13 +2,11 @@
 // derived by core from the approval proof, never declared by the caller, so an agent cannot
 // label its own work as a person's.
 import type { ApprovalErrorCode, ApprovalProof } from './approval.ts';
+import type { ActorId } from './ActorId.ts';
 import type { Brand } from './brand.ts';
 import type { PlanProvenance } from './plan-drafts.ts';
 import type { PolicyRuleId } from './policy.ts';
 import type { Result } from './result.ts';
-
-// A keyed hash (HMAC) of the identity under the customer's key: pseudonymous, never the raw identity.
-export type ActorId = Brand<string, 'ActorId'>;
 
 // Set by core from the approval proof, never by the caller. A declared person rests on the
 // founder's own push or merge (the agent lock-down route); a verified person on a checked account.

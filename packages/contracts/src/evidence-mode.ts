@@ -3,9 +3,12 @@
 // checks, so every evidence result carries the `host` guarantee level and a statement of which
 // guarantees hold and which are lost.
 import type { Brand } from './brand.ts';
-import type { CriterionId, SafeText, SecretName } from './plan.ts';
-import type { ArtifactReference, GuaranteeLevel } from './run-ports.ts';
-import { UnsafeFeature } from './unsafe-plan-features.ts';
+import type { CriterionId } from './CriterionId.ts';
+import type { SafeText } from './TextOrValue.ts';
+import type { SecretName } from './SecretName.ts';
+import type { ArtifactReference } from './ArtifactReference.ts';
+import type { GuaranteeLevel } from './GuaranteeLevel.ts';
+import { UnsafeFeature } from './UnsafeFeature.ts';
 
 // A declared suite's name, as `run --suite <name>` gives it: a lowercase letter, then up to 39
 // lowercase letters, digits or hyphens.
