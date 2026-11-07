@@ -4,7 +4,7 @@
 // and every process it started (Chromium), sampled from /proc every 100 ms. tools/benchmark.ts
 // calls this and compares the medians with the stored Linux baseline; it is never a gate.
 import {
-  defaultRedactor, failure, HOST_ISOLATION, loadTrustedProject, parseBaseUrl, planParser, policyGate, run, sha256, success,
+  defaultRedactor, failure, HOST_ISOLATION, loadTrustedProject, parseBaseUrl, planParser, policyGate, createRunService, sha256, success,
   type ArtifactReference, type ArtifactStore, type Clock, type EventSink, type FixtureReference, type LoggedEvent, type RunEventSink,
   type VersionControlPort,
 } from '@revisum/engine';
@@ -175,9 +175,10 @@ export async function benchmarkRuns(options: BenchmarkRunsOptions): Promise<Benc
       const sampler = setInterval(() => { peak = Math.max(peak, treeResidentBytes()); }, SAMPLE_INTERVAL_MILLISECONDS);
       const started = performance.now();
       try {
-        const result = await run(decision.run, {
+        const runService = createRunService({ drivers, clock: systemClock, artifacts: memoryArtifacts(), redactor: defaultRedactor(), audit: discardingAudit, events: sink, isolation: HOST_ISOLATION });
+        const result = await runService.run(decision.run, {
           baseUrl: baseUrl.value, seed: 42, fixedTimeMilliseconds: Date.UTC(2026, 0, 15, 10, 30), fixtures, host: { platform: platform(), arch: arch() },
-        }, { drivers, clock: systemClock, artifacts: memoryArtifacts(), redactor: defaultRedactor(), audit: discardingAudit, events: sink, isolation: HOST_ISOLATION });
+        });
         if (result.state !== 'Passed') throw new Error(`benchmark run ${index + 1} ended ${result.state}`);
       } finally {
         clearInterval(sampler);

@@ -57,8 +57,6 @@ export { recordingPorts } from './replay/run-recording.ts';
 export { replay, type ReplayError, type ReplayOutcome, type ReplayPorts, type ReplayRequest } from './replay/replay.ts';
 export * from './oracle.ts';
 export * as lifecycle from './lifecycle.ts';
-export { runPlan as run } from './run/RunPlan.ts';
-export { runUntrusted } from './run/RunUntrusted.ts';
 export { createRunService, type RunService } from './run/RunService.ts';
 export type { RunInputs, RunPorts } from './run/RunContext.ts';
 export type { DownloadRecord, RememberedValueRecord, StepResult } from './run/StepResult.ts';

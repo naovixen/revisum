@@ -1,6 +1,6 @@
 // Runs the plan's steps in order and gives them a verdict, reading what the session must give before it closes.
 import { StepCode, type AppliedRewrite, type Session } from "@revisum/contracts";
-import { finish, start, type Denial, type Resolved } from "../../lifecycle.ts";
+import { finish, start, type Denial, type Resolved, type Running } from "../../lifecycle.ts";
 import {
     observedRequestNames,
     startObserving,
@@ -15,37 +15,33 @@ import { networkContext } from "../executors/network-and-storage/NetworkAndStora
 import { ExecutorOutcome, type RanStep, type SessionContext } from "../executors/StepExecutor.ts";
 import { failedStep, type StepResult } from "../StepResult.ts";
 import { runPlanStep } from "./RunPlanStep.ts";
-import { verdictOfSteps, type StepsRun } from "./VerdictOfSteps.ts";
+import { resultsOf, type TimedStep } from "./TimedStep.ts";
+import { verdictOfSteps, type FinishedRun, type StepsRun } from "./VerdictOfSteps.ts";
 
 // What the steps have given so far, kept as each ends, so a log or clock that fails part way still
 // leaves every step accounted for.
 type StepsSoFar = {
-    readonly steps: StepResult[];
-    readonly stepMilliseconds: number[];
-    readonly denials: Denial[];
+    readonly steps: TimedStep[];
+    denial: Denial | undefined;
     readonly setupFailedInside: Set<number>;
 };
+
+const nothingSoFar = (): StepsSoFar => ({
+    steps: [],
+    denial: undefined,
+    setupFailedInside: new Set(),
+});
 
 export async function runTheSteps(
     context: SessionContext,
     resolved: Resolved,
     adapter: string,
-    isPlanLogged: boolean,
 ): Promise<StepsRun> {
-    const { session, logger, ports } = context;
+    const { logger } = context;
     const targetId = context.cleared.target.id;
     const running = start(resolved);
-    const soFar: StepsSoFar = {
-        steps: [],
-        stepMilliseconds: [],
-        denials: [],
-        setupFailedInside: new Set(),
-    };
-    let hasFailedPartWay = false;
+    const soFar = nothingSoFar();
     try {
-        if (!isPlanLogged) {
-            throw new Error("the log could not be written");
-        }
         // The hash as it stands before the steps: a run whose proxy then rewrites a response ends with another.
         logger.log({
             kind: "run.state",
@@ -59,29 +55,56 @@ export async function runTheSteps(
     } catch (error) {
         // Only what the steps do not catch themselves gets here, such as a log or a clock that failed part
         // way. The result still accounts for every step.
-        logFailureAfterTheVerdict(StepCode.AdapterError, error, logger);
-        pushUnfinishedSteps(context.planSteps, soFar.steps);
-        hasFailedPartWay = true;
+        return endUnfinished(context, running, soFar, error);
     }
+    return endOfTheSteps(
+        context,
+        running,
+        soFar,
+        verdictOfSteps(resultsOf(soFar.steps), running, soFar),
+    );
+}
+
+// The steps of a run whose log failed before they began: none runs, and the run ends Errored, as one
+// whose log fails part way does.
+export function stepsNotRunForTheLog(context: SessionContext, resolved: Resolved): StepsRun {
+    return endUnfinished(context, start(resolved), nothingSoFar(), "the log could not be written");
+}
+
+// Ends a run cut short: the step that was running fails and every later one is skipped.
+function endUnfinished(
+    context: SessionContext,
+    running: Running,
+    soFar: StepsSoFar,
+    error: unknown,
+): StepsRun {
+    logFailureAfterTheVerdict(StepCode.AdapterError, error, context.logger);
+    pushUnfinishedSteps(context.planSteps, soFar.steps);
+    return endOfTheSteps(context, running, soFar, finish(running, "Errored"));
+}
+
+// What the session must give before it closes, and the verdict it may change.
+function endOfTheSteps(
+    context: SessionContext,
+    running: Running,
+    soFar: StepsSoFar,
+    verdict: FinishedRun,
+): StepsRun {
+    const { session, logger, ports } = context;
     // Asked once: a port that cannot say what it rewrote must not leave a mutated run reading as plain.
     const rewritesRead = readKeepingTheResult<readonly AppliedRewrite[] | undefined>(
         () => ports.rewritesApplied?.() ?? [],
         undefined,
         logger,
     );
-    const finished =
-        hasFailedPartWay || rewritesRead === undefined
-            ? finish(running, "Errored")
-            : verdictOfSteps(soFar.steps, running, soFar);
     // Read before the browser goes, with every answer the stubs gave.
     const stubAnswers = readKeepingTheResult(() => session.network.stubAnswers(), [], logger);
     return {
         running,
         steps: soFar.steps,
-        stepMilliseconds: soFar.stepMilliseconds,
         stubAnswers,
         rewrites: rewritesRead ?? [],
-        finished,
+        finished: rewritesRead === undefined ? finish(running, "Errored") : verdict,
     };
 }
 
@@ -89,7 +112,7 @@ export async function runTheSteps(
 function keepOutcome(step: RunStep, index: number, ran: RanStep, soFar: StepsSoFar): StepResult {
     switch (ran.outcome) {
         case ExecutorOutcome.Denied:
-            soFar.denials.push(ran.denial);
+            soFar.denial = ran.denial;
             return failedStep(step, index, StepCode.PolicyDenied);
         case ExecutorOutcome.SetupFailedInside:
             soFar.setupFailedInside.add(index);
@@ -103,11 +126,14 @@ function keepOutcome(step: RunStep, index: number, ran: RanStep, soFar: StepsSoF
 // later one is skipped.
 async function runEachStep(context: SessionContext, soFar: StepsSoFar): Promise<void> {
     const { session, logger, ports, planSteps } = context;
-    const { steps, stepMilliseconds } = soFar;
+    const { steps } = soFar;
     const notObserved = await failureToObserveRequests(session, context);
     for (const [index, step] of planSteps.entries()) {
-        if (steps.some((done) => done.outcome === "failed")) {
-            steps.push({ index, type: step.type, outcome: "skipped" });
+        if (steps.some((done) => done.result.outcome === "failed")) {
+            steps.push({
+                result: { index, type: step.type, outcome: "skipped" },
+                milliseconds: undefined,
+            });
             continue;
         }
         const stepStartedAt = ports.clock.now();
@@ -124,14 +150,14 @@ async function runEachStep(context: SessionContext, soFar: StepsSoFar): Promise<
             isLastStep && done.outcome === "passed" && session.crashed()
                 ? failedStep(step, index, StepCode.TargetCrashed)
                 : done;
-        stepMilliseconds.push(ports.clock.now() - stepStartedAt);
-        steps.push(result);
+        const milliseconds = ports.clock.now() - stepStartedAt;
+        steps.push({ result, milliseconds });
         logger.log({
             kind: "step.end",
             stepIndex: index,
             stepType: step.type,
             outcome: result.outcome,
-            durationMilliseconds: stepMilliseconds[stepMilliseconds.length - 1] ?? 0,
+            durationMilliseconds: milliseconds,
             ...(result.code === undefined ? {} : { code: result.code }),
         });
     }
@@ -139,13 +165,19 @@ async function runEachStep(context: SessionContext, soFar: StepsSoFar): Promise<
 
 // Adds to the steps the one that was running when the log or the clock failed, as failed, and every
 // one after it, as skipped.
-function pushUnfinishedSteps(planSteps: readonly RunStep[], steps: StepResult[]): void {
+function pushUnfinishedSteps(planSteps: readonly RunStep[], steps: TimedStep[]): void {
     const [unfinished, ...unreached] = planSteps.slice(steps.length);
     if (unfinished !== undefined) {
-        steps.push(failedStep(unfinished, steps.length, StepCode.AdapterError));
+        steps.push({
+            result: failedStep(unfinished, steps.length, StepCode.AdapterError),
+            milliseconds: undefined,
+        });
     }
     for (const step of unreached) {
-        steps.push({ index: steps.length, type: step.type, outcome: "skipped" });
+        steps.push({
+            result: { index: steps.length, type: step.type, outcome: "skipped" },
+            milliseconds: undefined,
+        });
     }
 }
 

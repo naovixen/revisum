@@ -20,7 +20,7 @@ import {
 } from '../manifest.ts';
 import type { ClearedRun } from '../policy/ClearedRun.ts';
 import type { RunInputs, RunPorts } from '../run/RunContext.ts';
-import { runPlan } from '../run/RunPlan.ts';
+import { createRunService } from '../run/RunService.ts';
 import { decodeManifest } from './manifest-decoder.ts';
 import {
   decodeRecording, replayedDatabaseCommands, replayedServices,
@@ -144,9 +144,9 @@ export async function replay(request: ReplayRequest, ports: ReplayPorts): Promis
     ...(services === undefined ? {} : { services: services.port }),
     ...(databaseCommands === undefined ? {} : { databaseCommands: databaseCommands.port }),
   };
-  const result = await runPlan(request.cleared, {
+  const result = await createRunService(runPorts).run(request.cleared, {
     ...request.inputs, seed: manifest.seeds.random, fixedTimeMilliseconds: manifest.clock.fixedTimeMilliseconds, fixtures: manifest.fixtures,
-  }, runPorts);
+  });
 
   const callMismatch = services?.mismatchAt() ?? null;
   if (callMismatch !== null) return failure({ code: 'replay-mismatch', kind: 'service-call', position: callMismatch });

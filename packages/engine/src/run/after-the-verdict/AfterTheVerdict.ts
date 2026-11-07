@@ -12,6 +12,8 @@ export type AfterTheVerdict = {
     readonly cleanup: readonly CleanupResult[] | undefined;
     readonly reviewItems: readonly RunReviewItem[];
     readonly blocked: readonly string[];
+    // The egress could not say what it refused, so the run cannot claim it was enforced.
+    readonly isEgressUnread: boolean;
     readonly endState: FinishedRun;
 };
 
@@ -45,7 +47,7 @@ export async function afterTheVerdict(
         : [...cleanupItems, { code: EGRESS_UNREAD }];
     const endState = blockedRead.ok ? verdict.finished : finish(verdict.running, "Errored");
     logTheEnd(context, blocked, endState);
-    return { cleanup, reviewItems, blocked, endState };
+    return { cleanup, reviewItems, blocked, isEgressUnread: !blockedRead.ok, endState };
 }
 
 // The result claims what the egress refused and is hashed with that claim in it. So this is the one

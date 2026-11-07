@@ -8,7 +8,7 @@ import { callsServices } from "../../plan/CallsServices.ts";
 import { unsafeFeaturesOf } from "../../plan/unsafe-features.ts";
 import type { TargetNotDeclared } from "../../policy/TargetNotDeclared.ts";
 import type { RunPorts } from "../RunContext.ts";
-import { EGRESS_UNREAD, type RunResult } from "../RunResult.ts";
+import type { RunResult } from "../RunResult.ts";
 import { withRunHashes } from "./WithRunHashes.ts";
 
 // What a result is for, whether or not a run was cleared for its target.
@@ -56,10 +56,13 @@ const planRunGuarantees = (
     });
 };
 
-export function sealResult(outcome: UnsealedResult, context: SealContext): RunResult {
+export function sealResult(
+    outcome: UnsealedResult,
+    context: SealContext,
+    isEgressUnread: boolean,
+): RunResult {
     const standing = context.subject.standing;
     const unsafeFeatures = unsafeFeaturesOf(context.subject.plan);
-    const isEgressUnread = (outcome.reviewItems ?? []).some((item) => item.code === EGRESS_UNREAD);
     const labelled = {
         ...outcome,
         mode: "plan" as const,

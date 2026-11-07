@@ -4,7 +4,7 @@
 // and (for `engine`) `contracts`, and neither may declare a runtime dependency.
 //
 // It also keeps route code to drafts. A plan-authoring route, such as the draft command, hands on
-// a PlanDraft and nothing more, so it may not import the engine's run function (under any name)
+// a PlanDraft and nothing more, so it may not import the engine's run service (under any name)
 // or the brand constructor, nor import the engine whole, where either could hide. (A Plan made by
 // a cast is refused by tools/check-branded-casts.ts.)
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
@@ -21,8 +21,9 @@ const TRUSTED_PACKAGES: Readonly<Record<string, readonly string[]>> = {
 
 // The modules that are route code, by repository-relative path.
 export const ROUTE_MODULES: readonly string[] = ['packages/cli/src/draft-command.ts'];
-// What route code may not take from a workspace package: the run function and the brand constructor.
-const NAMES_ROUTE_CODE_MAY_NOT_IMPORT = new Set(['run', 'brand']);
+// What route code may not take from a workspace package: the run service that is the way into the
+// run, the name the run function was once exported under, and the brand constructor.
+const NAMES_ROUTE_CODE_MAY_NOT_IMPORT = new Set(['createRunService', 'run', 'brand']);
 const WORKSPACE_SCOPE = '@revisum/';
 // Each of these reaches a package's users when it is installed. Dev dependencies never run.
 const RUNTIME_DEPENDENCY_SECTIONS = ['dependencies', 'optionalDependencies', 'peerDependencies'] as const;
@@ -89,11 +90,11 @@ export function checkRouteImports(root: string): string[] {
     for (const loaded of workspaceImports) {
       for (const imported of importedNames(loaded.clause ?? [])) {
         if (NAMES_ROUTE_CODE_MAY_NOT_IMPORT.has(imported)) {
-          problems.push(`${module} imports "${imported}" from ${loaded.specifier}; route code hands on drafts, so it may not import the run function or the brand constructor`);
+          problems.push(`${module} imports "${imported}" from ${loaded.specifier}; route code hands on drafts, so it may not import the run service or the brand constructor`);
         }
       }
       if (takesModuleWhole(loaded)) {
-        problems.push(`${module} imports ${loaded.specifier} whole; route code imports only the names it needs, so the run function cannot hide in it`);
+        problems.push(`${module} imports ${loaded.specifier} whole; route code imports only the names it needs, so the run service cannot hide in it`);
       }
     }
   }

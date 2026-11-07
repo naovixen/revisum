@@ -19,6 +19,7 @@ import {
     readKeepingTheResult,
 } from "./after-the-verdict/ReadKeepingTheResult.ts";
 import { withRefusalsAfterTheVerdict } from "./after-the-verdict/WithRefusalsAfterTheVerdict.ts";
+import type { SessionContext } from "./executors/StepExecutor.ts";
 import type { StepsRun, StepsVerdict } from "./steps/VerdictOfSteps.ts";
 import { checkPreflight, type PreflightPassed } from "./preflight/CheckPreflight.ts";
 import { refuseRun } from "./preflight/RefuseRun.ts";
@@ -31,7 +32,8 @@ import { createRunContext } from "./session/CreateRunContext.ts";
 import { manifestInputsOf, type ManifestInputs } from "./session/ManifestInputsOf.ts";
 import { cannotPinDeterminism, type OpenedSession } from "./session/OpenSession.ts";
 import { withOpenSession } from "./session/WithOpenSession.ts";
-import { runTheSteps } from "./steps/RunTheSteps.ts";
+import { runTheSteps, stepsNotRunForTheLog } from "./steps/RunTheSteps.ts";
+import { durationsOf, resultsOf } from "./steps/TimedStep.ts";
 
 export async function runPlan(
     cleared: ClearedRun,
@@ -111,7 +113,10 @@ async function runTheStepsInTheSession(
         manifestBeforeTheSteps,
         manifestHash(manifestBeforeTheSteps),
     );
-    const ran = await runTheSteps({ ...context, session }, resolved, driver.info.id, isPlanLogged);
+    const stepContext: SessionContext = { ...context, session };
+    const ran = isPlanLogged
+        ? await runTheSteps(stepContext, resolved, driver.info.id)
+        : stepsNotRunForTheLog(stepContext, resolved);
     return { session, manifestInputs, ran };
 }
 
@@ -136,7 +141,7 @@ async function finishAfterTheSteps(
             targetId: context.cleared.target.id,
             manifest,
             manifestHash: manifestHash(manifest),
-            steps: verdict.steps,
+            steps: resultsOf(verdict.steps),
             blockedOrigins: after.blocked,
             unavailable: null,
             ...(verdict.finished.state === "Denied" ? { denial: verdict.finished.denial } : {}),
@@ -149,10 +154,11 @@ async function finishAfterTheSteps(
                     0,
                     logger,
                 ),
-                stepMilliseconds: ran.stepMilliseconds,
+                stepMilliseconds: durationsOf(verdict.steps),
             },
         },
         nothingRan,
+        after.isEgressUnread,
     );
 }
 
@@ -175,14 +181,14 @@ function refusalsAfterTheVerdict(session: Session, logger: Logger): readonly str
 function verdictAfterRefusals(ran: StepsRun, session: Session, logger: Logger): StepsVerdict {
     const counted = withRefusalsAfterTheVerdict(ran, refusalsAfterTheVerdict(session, logger));
     if (counted.isSpoilt) {
-        const { spoiltStep } = counted;
+        const { spoiltStep, spoiltStepMilliseconds } = counted;
         logKeepingTheResult(
             {
                 kind: "step.end",
                 stepIndex: spoiltStep.index,
                 stepType: spoiltStep.type,
                 outcome: spoiltStep.outcome,
-                durationMilliseconds: ran.stepMilliseconds.at(-1) ?? 0,
+                durationMilliseconds: spoiltStepMilliseconds,
                 ...(spoiltStep.code === undefined ? {} : { code: spoiltStep.code }),
             },
             logger,

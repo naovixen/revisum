@@ -8,7 +8,12 @@ import type { StepsVerdict } from "../steps/VerdictOfSteps.ts";
 // then tell again, as the result now does.
 export type VerdictAfterRefusals =
     | { readonly isSpoilt: false; readonly verdict: StepsVerdict }
-    | { readonly isSpoilt: true; readonly verdict: StepsVerdict; readonly spoiltStep: StepResult };
+    | {
+          readonly isSpoilt: true;
+          readonly verdict: StepsVerdict;
+          readonly spoiltStep: StepResult;
+          readonly spoiltStepMilliseconds: number;
+      };
 
 // Read once the session has closed, when no decision is left waiting for the browser's answer. With
 // no later step to report one the browser refused after the last step ended, the last step stands
@@ -23,10 +28,19 @@ export function withRefusalsAfterTheVerdict(
     }
     const finished = finish(verdict.running, "Errored");
     const lastStep = verdict.steps.at(-1);
-    if (lastStep === undefined) {
+    // Every step of a passed run ran to an end, so only a plan with no steps has none to spoil.
+    if (lastStep?.milliseconds === undefined) {
         return { isSpoilt: false, verdict: { ...verdict, finished } };
     }
-    const spoiltStep: StepResult = { ...lastStep, ...stepFailed(StepCode.AdapterError) };
-    const steps = [...verdict.steps.slice(0, -1), spoiltStep];
-    return { isSpoilt: true, verdict: { running: verdict.running, steps, finished }, spoiltStep };
+    const spoiltStep: StepResult = { ...lastStep.result, ...stepFailed(StepCode.AdapterError) };
+    const steps = [
+        ...verdict.steps.slice(0, -1),
+        { result: spoiltStep, milliseconds: lastStep.milliseconds },
+    ];
+    return {
+        isSpoilt: true,
+        verdict: { running: verdict.running, steps, finished },
+        spoiltStep,
+        spoiltStepMilliseconds: lastStep.milliseconds,
+    };
 }

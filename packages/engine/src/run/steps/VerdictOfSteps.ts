@@ -12,14 +12,14 @@ import {
 import { isSetupStepType } from "../../plan/StepFacts.ts";
 import { NO_ANSWER_CODES } from "../../service-calls/call-steps.ts";
 import type { StepResult } from "../StepResult.ts";
+import type { TimedStep } from "./TimedStep.ts";
 
 export type FinishedRun = Finished<"Passed" | "Failed" | "Errored"> | DeniedRun;
 
 // The steps' results and verdict, and what was read from the session before it closed.
 export type StepsRun = {
     readonly running: Running;
-    readonly steps: readonly StepResult[];
-    readonly stepMilliseconds: readonly number[];
+    readonly steps: readonly TimedStep[];
     readonly stubAnswers: readonly StubAnswer[];
     readonly rewrites: readonly AppliedRewrite[];
     readonly finished: FinishedRun;
@@ -27,10 +27,11 @@ export type StepsRun = {
 
 export type StepsVerdict = Pick<StepsRun, "running" | "steps" | "finished">;
 
-// What the steps gave beyond their results: the runtime guard's denials, in order, and the steps
-// whose frame or second tab failed on a setup step inside it.
+// What the steps gave beyond their results: the runtime guard's denial, if it denied a step, and the
+// steps whose frame or second tab failed on a setup step inside it. At most one step is denied, since
+// the step it fails skips every later one.
 export type StepsFound = {
-    readonly denials: readonly Denial[];
+    readonly denial: Denial | undefined;
     readonly setupFailedInside: ReadonlySet<number>;
 };
 
@@ -63,9 +64,8 @@ export function verdictOfSteps(
     running: Running,
     found: StepsFound,
 ): FinishedRun {
-    const denial = found.denials[0];
-    if (denial !== undefined && steps.some((done) => done.code === "policy-denied")) {
-        return deny(running, denial);
+    if (found.denial !== undefined) {
+        return deny(running, found.denial);
     }
     if (steps.some((done) => couldNotTest(done, found))) {
         return finish(running, "Errored");
