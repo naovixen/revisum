@@ -1,6 +1,6 @@
 import type { Unavailable } from "@revisum/contracts";
-import type { Refusal } from "./lifecycle.ts";
-import type { RunResult } from "./run.ts";
+import type { Refusal } from "../../lifecycle.ts";
+import type { RunResult } from "../RunResult.ts";
 
 export type NothingRanResult = Pick<
     RunResult,

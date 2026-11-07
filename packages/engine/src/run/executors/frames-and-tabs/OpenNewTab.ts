@@ -10,7 +10,7 @@ import { withTab } from "./WithTab.ts";
 export const openNewTab: StepExecutor<RunStepByType["newTab"]> = async (step, context) => {
     const url = pageUrl(step.url, context.index, context);
     if (!url.ok) {
-        return stepFailed(url.error);
+        return url.error;
     }
     const ran = await withTab(context.session, url.value.href, context.logger, (tab) =>
         context.runInnerSteps(step, tab),

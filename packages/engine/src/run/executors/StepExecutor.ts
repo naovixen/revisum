@@ -1,7 +1,8 @@
 // What every step executor is: a function from one step and its context to what the step's result
 // records. The run adds the index and type, and judges what no executor can see alone: a crash, a
-// denial, a popup no step asked for.
+// popup no step asked for.
 import type { DocumentSession, Session, StepType } from "@revisum/contracts";
+import type { Denial } from "../../lifecycle.ts";
 import type { ContainerRunStep, RunStep, RunStepByType } from "../../RunStep.ts";
 import type { RunContext } from "../RunContext.ts";
 import type { StepResult } from "../StepResult.ts";
@@ -12,13 +13,48 @@ export type SessionContext = RunContext & { readonly session: Session };
 // What a step's result holds beyond its index and type.
 export type StepRecord = Omit<StepResult, "index" | "type">;
 
+// The two outcomes of a step that its record alone cannot say.
+export const ExecutorOutcome = {
+    // The runtime guard denied the step's action. The audit log holds the denial, so whatever the
+    // driver reported or threw from the same moment never turns it into an ordinary failure.
+    Denied: "denied",
+    // A frame or second tab failed on a setup step inside it. The frame or newTab step reports under
+    // its own type, so its type alone cannot say the run could not test.
+    SetupFailedInside: "setup-failed-inside",
+} as const;
+
+export type DeniedStep = {
+    readonly outcome: typeof ExecutorOutcome.Denied;
+    readonly denial: Denial;
+};
+
+export type SetupFailedInside<Failed extends StepRecord> = {
+    readonly outcome: typeof ExecutorOutcome.SetupFailedInside;
+    readonly failed: Failed;
+};
+
+// What an executor gives back: the step's record, or one of the outcomes a record cannot say.
+export type ExecutedStep = StepRecord | DeniedStep | SetupFailedInside<StepRecord>;
+
+// What the run made of one step, wherever in the plan it stands.
+export type RanStep = StepResult | DeniedStep | SetupFailedInside<StepResult>;
+
+export const deniedStep = (denial: Denial): DeniedStep => ({
+    outcome: ExecutorOutcome.Denied,
+    denial,
+});
+
+export const setupFailedInside = <Failed extends StepRecord>(
+    failed: Failed,
+): SetupFailedInside<Failed> => ({ outcome: ExecutorOutcome.SetupFailedInside, failed });
+
 // Runs the steps a frame or a second tab holds, in the document they stand in, and gives the
-// container's result, under the container's own index. Handed to the executors in their context, so
+// container's outcome, under the container's own index. Handed to the executors in their context, so
 // a recursive step never imports the run that runs it.
 export type RunInnerSteps = (
     container: ContainerRunStep,
     document: DocumentSession,
-) => Promise<StepResult>;
+) => Promise<RanStep>;
 
 // What a step runs with: the run's context, the index the step reports under, the document it acts
 // on (the top document, or an iframe's for the steps inside a frame step, which report under the
@@ -33,7 +69,7 @@ export type StepContext = SessionContext & {
 export type StepExecutor<TypedStep extends RunStep> = (
     step: TypedStep,
     context: StepContext,
-) => Promise<StepRecord> | StepRecord;
+) => Promise<ExecutedStep> | ExecutedStep;
 
 // One executor per step type: a new type does not compile until it has one.
 export type StepExecutorTable = { readonly [Type in StepType]: StepExecutor<RunStepByType[Type]> };

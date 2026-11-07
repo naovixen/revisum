@@ -24,22 +24,22 @@ import {
     type SecretStore,
     type ServiceCaller,
 } from "@revisum/contracts";
-import type { Refusal } from "./lifecycle.ts";
-import { namedScriptSources, type NamedScripts } from "./page-scripts/NamedScriptSources.ts";
-import { callsServices, runsDatabaseCommands } from "./plan/CallsServices.ts";
-import { everyPlanStep } from "./plan/VisitSteps.ts";
-import type { ClearedRun } from "./policy/ClearedRun.ts";
-import { isProductionAllowed } from "./policy/IsProductionAllowed.ts";
-import type { Project } from "./project/project-parser.ts";
-import { declaredCommands } from "./project/unsafe-feature-declarations.ts";
-import { productionOriginReached } from "./ReachableOrigins.ts";
-import type { RunStep } from "./RunStep.ts";
+import type { Refusal } from "../../lifecycle.ts";
+import { namedScriptSources, type NamedScripts } from "../../page-scripts/NamedScriptSources.ts";
+import { callsServices, runsDatabaseCommands } from "../../plan/CallsServices.ts";
+import { everyPlanStep } from "../../plan/VisitSteps.ts";
+import type { ClearedRun } from "../../policy/ClearedRun.ts";
+import { isProductionAllowed } from "../../policy/IsProductionAllowed.ts";
+import type { Project } from "../../project/project-parser.ts";
+import { declaredCommands } from "../../project/unsafe-feature-declarations.ts";
+import { productionOriginReached } from "../../ReachableOrigins.ts";
+import type { RunStep } from "../../RunStep.ts";
 import {
     NO_SECRETS,
     resolvePlanSecrets,
     type PlanSecrets,
     type ResolvedSecrets,
-} from "./secrets/secret-resolution.ts";
+} from "../../secrets/secret-resolution.ts";
 
 export type PreflightFacts = {
     readonly cleared: ClearedRun;

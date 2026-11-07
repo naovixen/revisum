@@ -8,7 +8,7 @@ import {
     type StepCode,
 } from "@revisum/contracts";
 import { resolveText } from "../../../run-values.ts";
-import { guardFor } from "../../GuardFor.ts";
+import { actGuarded } from "../../ActGuarded.ts";
 import type { RunContext } from "../../RunContext.ts";
 import type { StepExecutor } from "../StepExecutor.ts";
 
@@ -37,9 +37,11 @@ export const answerDialog: StepExecutor<DialogStep> = async (step, context) => {
     if (!answer.ok) {
         return stepFailed(answer.error);
     }
-    const acted = await context.document.act(
-        answer.value,
-        guardFor(answer.value, context.index, context),
+    const acted = await actGuarded(answer.value, context.index, context, (guard) =>
+        context.document.act(answer.value, guard),
     );
-    return acted.ok ? { outcome: StepOutcome.Passed } : stepFailed(acted.error.code);
+    if (!acted.ok) {
+        return acted.error;
+    }
+    return acted.value.ok ? { outcome: StepOutcome.Passed } : stepFailed(acted.value.error.code);
 };

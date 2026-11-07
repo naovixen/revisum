@@ -13,7 +13,7 @@ import {
 import { canonicalJson } from "../../../hashing.ts";
 import type { RunFillStep } from "../../../RunStep.ts";
 import { resolveFillText, resolveLocator } from "../../../run-values.ts";
-import { guardFor } from "../../GuardFor.ts";
+import { actGuarded } from "../../ActGuarded.ts";
 import type { RunContext } from "../../RunContext.ts";
 import type { StepExecutor } from "../StepExecutor.ts";
 
@@ -77,9 +77,11 @@ export const fillField: StepExecutor<RunFillStep> = async (step, context) => {
     }
     // Marked before acting: a fill that fails part way may still have typed some of the secret.
     markFilledField(fill.value.performable, context.secretFilledFields);
-    const acted = await context.document.act(
-        fill.value.performable,
-        guardFor(fill.value.guarded, context.index, context),
+    const acted = await actGuarded(fill.value.guarded, context.index, context, (guard) =>
+        context.document.act(fill.value.performable, guard),
     );
-    return acted.ok ? { outcome: StepOutcome.Passed } : stepFailed(acted.error.code);
+    if (!acted.ok) {
+        return acted.error;
+    }
+    return acted.value.ok ? { outcome: StepOutcome.Passed } : stepFailed(acted.value.error.code);
 };

@@ -18,7 +18,6 @@ import type {
     StubName,
 } from "@revisum/contracts";
 import type { DatabaseCommandContext } from "../database-commands/database-command-steps.ts";
-import type { Denial } from "../lifecycle.ts";
 import type { Logger, RunEventSink } from "../logging.ts";
 import type { FixtureReference, HostInfo, RunPins } from "../manifest.ts";
 import type { NamedScripts } from "../page-scripts/NamedScriptSources.ts";
@@ -87,8 +86,6 @@ export type RunContext = {
     readonly ports: RunPorts;
     readonly logger: Logger;
     readonly gate: PolicyGate;
-    // The runtime guard's denial, once it has stopped an action.
-    readonly denials: Denial[];
     // The caller's redactor with the plan's secrets added: every kept text goes through it.
     readonly redactor: Redactor;
     readonly secrets: ResolvedSecrets;
@@ -125,7 +122,4 @@ export type RunContext = {
     // True when the target's adapter cannot pin the clock, the time zone or randomness, so the run
     // loses replay-identical. Known from the target alone, before anything runs.
     readonly determinismUnpinned: boolean;
-    // The plan steps whose frame or second tab holds a setup step that failed. A frame or newTab step
-    // reports under its own type, so its type alone cannot say the run could not test.
-    readonly setupFailedInside: Set<number>;
 };

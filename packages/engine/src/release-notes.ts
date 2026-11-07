@@ -9,7 +9,7 @@ import {
 } from '@revisum/contracts';
 import { parseAiText } from './ai-text.ts';
 import type { PlanErrorCode } from './plan/plan-decoders.ts';
-import type { RunResult } from './run.ts';
+import type { RunResult } from './run/RunResult.ts';
 
 const MARKDOWN_SPECIAL = /[\\`*_[\]<>#|!()]/g;
 // Markdown-safe text: every character with a Markdown meaning gets a backslash.

@@ -633,7 +633,7 @@
   },
   "packages/engine/src/clock-and-clipboard-steps.ts": {
     "curly": {
-      "count": 8
+      "count": 7
     },
     "revisum/file-name-matches-export": {
       "count": 1
@@ -644,7 +644,7 @@
       "count": 1
     },
     "curly": {
-      "count": 27
+      "count": 26
     },
     "revisum/file-name-matches-export": {
       "count": 1
@@ -843,7 +843,7 @@
       "count": 1
     },
     "curly": {
-      "count": 31
+      "count": 30
     },
     "revisum/file-name-matches-export": {
       "count": 1
@@ -873,7 +873,7 @@
   },
   "packages/engine/src/page-scripts/page-script-steps.ts": {
     "curly": {
-      "count": 19
+      "count": 18
     },
     "revisum/file-name-matches-export": {
       "count": 1
@@ -1161,23 +1161,6 @@
   "packages/engine/src/run-values.ts": {
     "curly": {
       "count": 13
-    },
-    "revisum/file-name-matches-export": {
-      "count": 1
-    }
-  },
-  "packages/engine/src/run.ts": {
-    "@typescript-eslint/naming-convention": {
-      "count": 1
-    },
-    "curly": {
-      "count": 7
-    },
-    "max-lines": {
-      "count": 1
-    },
-    "no-restricted-syntax": {
-      "count": 1
     },
     "revisum/file-name-matches-export": {
       "count": 1

@@ -8,6 +8,7 @@ import {
 import type { Logger } from "../logging.ts";
 import type { Verdict } from "../oracle.ts";
 import { codeOfFailedRead } from "./CodeForThrow.ts";
+import { pollUntil } from "./PollUntil.ts";
 import type { RunContext } from "./RunContext.ts";
 
 // How long a check waits between two looks at the page.
@@ -49,23 +50,24 @@ const isFinal = (verdict: CheckAnswer): boolean =>
 
 // Repeats a check until it passes or the step timeout runs out. A page that crashes stops the
 // wait at once: nothing on it can change any more, and the same goes for a read of the page that failed.
-export async function poll<Answer extends CheckAnswer>(
+export function poll<Answer extends CheckAnswer>(
     context: RunContext,
     document: DocumentSession,
     check: () => Promise<Answer | CheckStopped>,
 ): Promise<Answer | CheckStopped> {
-    const deadline =
-        context.ports.clock.now() + context.cleared.project.limits.stepTimeoutMilliseconds;
-    for (;;) {
-        const verdict = await check();
-        // Looked at before a pass is accepted: what a dying page last showed proves nothing. A probe has no
-        // count for a crash either, so one that read nothing on a dead page is told apart here.
-        if (document.crashed()) {
-            return { pass: false, code: StepCode.TargetCrashed };
-        }
-        if (isFinal(verdict) || context.ports.clock.now() >= deadline) {
-            return verdict;
-        }
-        await context.ports.clock.sleep(POLL_INTERVAL_MILLISECONDS);
-    }
+    return pollUntil<Answer | CheckStopped>(
+        context.ports.clock,
+        {
+            timeoutMilliseconds: context.cleared.project.limits.stepTimeoutMilliseconds,
+            intervalMilliseconds: POLL_INTERVAL_MILLISECONDS,
+            isDone: isFinal,
+        },
+        async () => {
+            const verdict = await check();
+            // Looked at before a pass is accepted: what a dying page last showed proves nothing. A
+            // probe has no count for a crash either, so one that read nothing on a dead page is told
+            // apart here.
+            return document.crashed() ? { pass: false, code: StepCode.TargetCrashed } : verdict;
+        },
+    );
 }

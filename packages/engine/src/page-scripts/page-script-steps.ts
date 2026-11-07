@@ -26,6 +26,7 @@ import { argumentProblem, runValueArgument, type ArgumentValue } from '../servic
 import { checkBackendField, fieldAt, fieldText } from '../service-calls/service-response.ts';
 import type { NamedScripts } from './NamedScriptSources.ts';
 import { decodeScriptResult } from './page-script-result.ts';
+import { isJudgedLookDone, pollUntil, type JudgedLook } from '../run/PollUntil.ts';
 
 // A declared script's limits when its declaration sets none: 5 seconds and 256 KiB.
 const DEFAULT_SCRIPT_TIMEOUT_MILLISECONDS = 5000;
@@ -198,17 +199,21 @@ export async function runScriptCheck(step: ExpectScriptStep, stepIndex: number, 
   if (!callArguments.ok) return failedWith(callArguments.error);
   const expected = expectedText(step.assert, context);
   if (!expected.ok) return failedWith(expected.error);
-  const deadline = context.clock.now() + context.project.limits.scriptCheckTimeoutMilliseconds;
-  for (let attempts = 1; ; attempts++) {
+  const rule = {
+    timeoutMilliseconds: context.project.limits.scriptCheckTimeoutMilliseconds,
+    intervalMilliseconds: SCRIPT_CHECK_INTERVAL_MILLISECONDS,
+    isDone: isJudgedLookDone,
+  };
+  const last = await pollUntil(context.clock, rule, async (attempts): Promise<JudgedLook<PageScriptOutcome>> => {
     const once = await runOnce(session, script.value, callArguments.value, stepIndex, step.type, context);
     const pageScript: PageScriptRecord = { script: script.value.name, attempts, resultSha256: once.resultSha256 };
     // A script that throws, hangs or gives no usable result would do the same again: it stops here.
-    if (!once.result.ok) return failedWith(once.result.error, pageScript);
+    if (!once.result.ok) return { outcome: failedWith(once.result.error, pageScript), isDone: true };
     const field = resultField(once.result.value, script.value, step.field);
-    if (checkBackendField(step.assert, field.ok ? { value: field.value } : undefined, expected.value)) return { outcome: 'passed', pageScript };
+    if (checkBackendField(step.assert, field.ok ? { value: field.value } : undefined, expected.value)) return { outcome: { outcome: 'passed', pageScript }, isDone: true };
     const code = !field.ok && step.assert.kind !== 'present' && step.assert.kind !== 'absent' ? 'field-missing' : 'assertion-failed';
     // The parser lets only a read script stand in a check; a write one is never run twice all the same.
-    if (script.value.effect === 'write' || context.clock.now() >= deadline) return failedWith(code, pageScript);
-    await context.clock.sleep(SCRIPT_CHECK_INTERVAL_MILLISECONDS);
-  }
+    return { outcome: failedWith(code, pageScript), isDone: script.value.effect === 'write' };
+  });
+  return last.outcome;
 }

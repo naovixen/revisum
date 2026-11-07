@@ -20,7 +20,7 @@ import { checkElement } from "./page-checks/CheckElement.ts";
 import { checkPage } from "./page-checks/CheckPage.ts";
 import { remember } from "./page-checks/Remember.ts";
 import { SERVICE_CALL_EXECUTORS } from "./service-calls/ServiceCallExecutors.ts";
-import type { StepContext, StepExecutorTable, StepRecord } from "./StepExecutor.ts";
+import type { ExecutedStep, StepContext, StepExecutorTable } from "./StepExecutor.ts";
 
 export const STEP_EXECUTORS: StepExecutorTable = {
     navigate,
@@ -51,8 +51,8 @@ const executeTyped = async <Type extends StepType>(
     type: Type,
     step: RunStepByType[Type],
     context: StepContext,
-): Promise<StepRecord> => await STEP_EXECUTORS[type](step, context);
+): Promise<ExecutedStep> => await STEP_EXECUTORS[type](step, context);
 
 // Runs one step with its own type's executor.
-export const executeStep = async (step: RunStep, context: StepContext): Promise<StepRecord> =>
+export const executeStep = async (step: RunStep, context: StepContext): Promise<ExecutedStep> =>
     await executeTyped(step.type, step, context);

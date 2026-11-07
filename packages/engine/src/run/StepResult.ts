@@ -1,4 +1,5 @@
 // What a run keeps of each step it ran.
+import { stepFailed } from "@revisum/contracts";
 import type {
     A11yFinding,
     ArtifactReference,
@@ -58,3 +59,10 @@ export type DownloadRecord = {
 
 // Something a run found that a person should look at, whatever the verdict: a cleanup call that
 // failed, so test data may be left behind; or a suite test's criterion annotation whose
+
+// A failed step's result that holds only its code.
+export const failedStep = (step: Step, index: number, code: StepCode): StepResult => ({
+    index,
+    type: step.type,
+    ...stepFailed(code),
+});

@@ -17,6 +17,7 @@ import { clockAdvanceMilliseconds } from './clock-advance.ts';
 import type { Project } from './project/project-parser.ts';
 import type { RememberedRecord, RememberedValues } from './RememberedValues.ts';
 import { resolveText, type RunValues } from './run-values.ts';
+import { pollUntil } from './run/PollUntil.ts';
 
 // How long a clipboard check or remember waits between two reads of the clipboard.
 const POLL_INTERVAL_MILLISECONDS = 50;
@@ -68,13 +69,12 @@ async function readClipboard(context: ClockAndClipboardContext): Promise<Clipboa
 
 // Reads the clipboard until `accept` takes what it holds, a read fails, or the step timeout runs
 // out, and gives the last read.
-async function readUntil(context: ClockAndClipboardContext, accept: (read: ClipboardRead) => boolean): Promise<ClipboardRead> {
-  const deadline = context.clock.now() + context.project.limits.stepTimeoutMilliseconds;
-  for (;;) {
-    const read = await readClipboard(context);
-    if (read.kind === 'error' || accept(read) || context.clock.now() >= deadline) return read;
-    await context.clock.sleep(POLL_INTERVAL_MILLISECONDS);
-  }
+function readUntil(context: ClockAndClipboardContext, accept: (read: ClipboardRead) => boolean): Promise<ClipboardRead> {
+  return pollUntil(context.clock, {
+    timeoutMilliseconds: context.project.limits.stepTimeoutMilliseconds,
+    intervalMilliseconds: POLL_INTERVAL_MILLISECONDS,
+    isDone: (read) => read.kind === 'error' || accept(read),
+  }, () => readClipboard(context));
 }
 
 // The text a check compares against, with value references replaced. Several lines are joined

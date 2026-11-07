@@ -15,9 +15,9 @@ import type { Refusal, TerminalState } from '../lifecycle.ts';
 import { manifestHash, type RunManifest } from '../manifest.ts';
 import { runTimeTextOrDigest } from '../plan/plan-decoders.ts';
 import { criterionIdFrom } from '../plan/plan-parser.ts';
-import { refusedResult } from '../NothingRanResult.ts';
-import { withRunHashes } from '../WithRunHashes.ts';
-import type { EvidenceOutcomeCode, RunResult, RunReviewItem } from '../run.ts';
+import { refusedResult } from '../run/seal/NothingRanResult.ts';
+import { withRunHashes } from '../run/seal/WithRunHashes.ts';
+import type { EvidenceOutcomeCode, RunResult, RunReviewItem } from '../run/RunResult.ts';
 import type { SuiteDecodeError, SuiteReport, SuiteReportTest, SuiteTrace } from './suite-report.ts';
 
 // What the result builder needs besides the decoded outputs: the declared suite, which pass this

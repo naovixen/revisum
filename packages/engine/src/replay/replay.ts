@@ -19,7 +19,8 @@ import {
   DATABASE_COMMANDS_INPUT, SERVICE_CALLS_INPUT, manifestHash, planHash, replayManifest, type RunManifest,
 } from '../manifest.ts';
 import type { ClearedRun } from '../policy/ClearedRun.ts';
-import { run, type RunInputs, type RunPorts } from '../run.ts';
+import type { RunInputs, RunPorts } from '../run/RunContext.ts';
+import { runPlan } from '../run/RunPlan.ts';
 import { decodeManifest } from './manifest-decoder.ts';
 import {
   decodeRecording, replayedDatabaseCommands, replayedServices,
@@ -143,7 +144,7 @@ export async function replay(request: ReplayRequest, ports: ReplayPorts): Promis
     ...(services === undefined ? {} : { services: services.port }),
     ...(databaseCommands === undefined ? {} : { databaseCommands: databaseCommands.port }),
   };
-  const result = await run(request.cleared, {
+  const result = await runPlan(request.cleared, {
     ...request.inputs, seed: manifest.seeds.random, fixedTimeMilliseconds: manifest.clock.fixedTimeMilliseconds, fixtures: manifest.fixtures,
   }, runPorts);
 

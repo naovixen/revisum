@@ -1,7 +1,7 @@
 // The URL a navigate step or a second tab opens, once its values are known.
 import {
     failure,
-    StepCode,
+    stepFailed,
     StepType,
     success,
     type AllowedUrl,
@@ -9,8 +9,12 @@ import {
     type Result,
 } from "@revisum/contracts";
 import { resolvePathTemplate } from "../../../run-values.ts";
-import { isAllowedNow } from "../../GuardFor.ts";
+import { denialNow } from "../../ActGuarded.ts";
 import type { RunContext } from "../../RunContext.ts";
+import { deniedStep, type DeniedStep, type StepRecord } from "../StepExecutor.ts";
+
+// Why a page's URL cannot be opened: the step's failure, or the runtime guard's denial.
+type UrlRefused = StepRecord | DeniedStep;
 
 // A path template's values are only known now, so the runtime guard checks the final URL. A URL the
 // plan wrote out was judged before the run.
@@ -18,20 +22,16 @@ function pathOf(
     url: AllowedUrl | PathTemplate,
     index: number,
     context: RunContext,
-): Result<string, StepCode> {
+): Result<string, UrlRefused> {
     if (typeof url === "string") {
         return success(url);
     }
     const resolved = resolvePathTemplate(url, context.values, context.cleared.project);
     if (!resolved.ok) {
-        return resolved;
+        return failure(stepFailed(resolved.error));
     }
-    const isAllowed = isAllowedNow(
-        { type: StepType.Navigate, url: resolved.value },
-        index,
-        context,
-    );
-    return isAllowed ? success(resolved.value) : failure(StepCode.PolicyDenied);
+    const denial = denialNow({ type: StepType.Navigate, url: resolved.value }, index, context);
+    return denial === undefined ? success(resolved.value) : failure(deniedStep(denial));
 }
 
 // The page's URL on the run's base URL. It is always on one of the project's origins: the run's
@@ -41,7 +41,7 @@ export function pageUrl(
     url: AllowedUrl | PathTemplate,
     index: number,
     context: RunContext,
-): Result<URL, StepCode> {
+): Result<URL, UrlRefused> {
     const path = pathOf(url, index, context);
     if (!path.ok) {
         return path;

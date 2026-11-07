@@ -29,6 +29,7 @@ import { resolveText, type RunValues, type StepErrorCode } from '../run-values.t
 import { sha256UnlessHoldingASecret } from '../secrets/secret-resolution.ts';
 import { argumentProblem, argumentText, runValueArgument, type ArgumentValue } from '../service-calls/parameter-values.ts';
 import { checkBackendField, fieldAt, fieldText } from '../service-calls/service-response.ts';
+import { isJudgedLookDone, pollUntil, type JudgedLook } from '../run/PollUntil.ts';
 
 // A declared command's limits when its declaration sets none: 60 seconds and 1 MiB.
 export const DEFAULT_COMMAND_TIMEOUT_MILLISECONDS = 60_000;
@@ -284,17 +285,21 @@ export async function runDatabaseCheck(step: ExpectDatabaseStep, stepIndex: numb
   if (!expected.ok) return failedWith(expected.error);
   const request = commandRequest(found, step.arguments, context);
   if (!request.ok) return failedWith(request.error, record(found, null, 0));
-  const deadline = context.clock.now() + context.project.limits.backendCheckTimeoutMilliseconds;
-  for (let attempts = 1; ; attempts++) {
+  const rule = {
+    timeoutMilliseconds: context.project.limits.backendCheckTimeoutMilliseconds,
+    intervalMilliseconds: COMMAND_CHECK_INTERVAL_MILLISECONDS,
+    isDone: isJudgedLookDone,
+  };
+  const last = await pollUntil(context.clock, rule, async (attempts): Promise<JudgedLook<DatabaseStepOutcome>> => {
     const once = await runOnce(request.value, found.declaration, stepIndex, step.type, context);
     const databaseCommand = record(found, once, attempts);
     // A command that failed, timed out or printed nothing readable would do the same again.
-    if (!once.result.ok) return failedWith(once.result.error, databaseCommand);
+    if (!once.result.ok) return { outcome: failedWith(once.result.error, databaseCommand), isDone: true };
     const field = outputField(once.result.value, found.declaration, step.field);
-    if (checkBackendField(step.assert, field.ok ? { value: field.value } : undefined, expected.value)) return { outcome: 'passed', databaseCommand };
+    if (checkBackendField(step.assert, field.ok ? { value: field.value } : undefined, expected.value)) return { outcome: { outcome: 'passed', databaseCommand }, isDone: true };
     const code = !field.ok && step.assert.kind !== 'present' && step.assert.kind !== 'absent' ? 'field-missing' : 'assertion-failed';
     // The parser lets only a read command stand in a check; a write one is never run twice all the same.
-    if (found.declaration.effect === 'write' || context.clock.now() >= deadline) return failedWith(code, databaseCommand);
-    await context.clock.sleep(COMMAND_CHECK_INTERVAL_MILLISECONDS);
-  }
+    return { outcome: failedWith(code, databaseCommand), isDone: found.declaration.effect === 'write' };
+  });
+  return last.outcome;
 }

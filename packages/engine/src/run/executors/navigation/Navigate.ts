@@ -5,7 +5,7 @@ import { pageUrl } from "./PageUrl.ts";
 export const navigate: StepExecutor<StepByType["navigate"]> = async (step, context) => {
     const url = pageUrl(step.url, context.index, context);
     if (!url.ok) {
-        return stepFailed(url.error);
+        return url.error;
     }
     const navigated = await context.document.navigate(url.value.href, {
         scripts: step.scripts ?? NavigateScripts.Enabled,

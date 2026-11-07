@@ -57,7 +57,14 @@ export { recordingPorts } from './replay/run-recording.ts';
 export { replay, type ReplayError, type ReplayOutcome, type ReplayPorts, type ReplayRequest } from './replay/replay.ts';
 export * from './oracle.ts';
 export * as lifecycle from './lifecycle.ts';
-export * from './run.ts';
+export { runPlan as run } from './run/RunPlan.ts';
+export { runUntrusted } from './run/RunUntrusted.ts';
+export { createRunService, type RunService } from './run/RunService.ts';
+export type { RunInputs, RunPorts } from './run/RunContext.ts';
+export type { DownloadRecord, RememberedValueRecord, StepResult } from './run/StepResult.ts';
+export type {
+  DeniedPlan, EvidenceOutcomeCode, EvidenceRunRecord, Rejected, RunResult, RunReviewItem, SuiteRunRecord,
+} from './run/RunResult.ts';
 export { adapterRegistry } from './target/adapter-registry.ts';
 export { testedOn } from './target/tested-on.ts';
 export { unavailableTargetOutcome } from './target/unavailable-target-outcome.ts';

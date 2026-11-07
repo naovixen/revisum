@@ -36,7 +36,7 @@ export const ERROR_CODE_UNIONS: readonly { readonly file: string; readonly name:
   { file: 'packages/contracts/src/policy.ts', name: 'PolicyRuleId' },
   { file: 'packages/engine/src/lifecycle.ts', name: 'RefusalCode' },
   { file: 'packages/contracts/src/workload.ts', name: 'WorkloadErrorCode' },
-  { file: 'packages/engine/src/run.ts', name: 'EvidenceOutcomeCode' },
+  { file: 'packages/engine/src/run/RunResult.ts', name: 'EvidenceOutcomeCode' },
   { file: 'packages/engine/src/manifest.ts', name: 'ReplayErrorCode' },
   // ServiceCallErrorCode adds its own codes to ResponseReadErrorCode's, so both are read.
   { file: 'packages/contracts/src/service-calls.ts', name: 'ResponseReadErrorCode' },

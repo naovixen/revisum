@@ -5,7 +5,7 @@ import {
     type ResolvedDownloadStep,
 } from "@revisum/contracts";
 import { resolveLocator } from "../../../run-values.ts";
-import { guardFor } from "../../GuardFor.ts";
+import { actGuarded } from "../../ActGuarded.ts";
 import { keptText } from "../../Observe.ts";
 import type { DownloadRecord } from "../../StepResult.ts";
 import type { StepExecutor } from "../StepExecutor.ts";
@@ -23,15 +23,20 @@ export const downloadFile: StepExecutor<DownloadStep> = async (step, context) =>
         name: step.name,
         locator: locator.value,
     };
-    const saved = await context.document.download(
-        resolved,
-        context.cleared.project.limits.maximumDownloadBytes,
-        guardFor(resolved, context.index, context),
+    const saved = await actGuarded(resolved, context.index, context, (guard) =>
+        context.document.download(
+            resolved,
+            context.cleared.project.limits.maximumDownloadBytes,
+            guard,
+        ),
     );
     if (!saved.ok) {
-        return stepFailed(saved.error.code);
+        return saved.error;
     }
-    const file = saved.value;
+    if (!saved.value.ok) {
+        return stepFailed(saved.value.error.code);
+    }
+    const file = saved.value.value;
     context.downloads.set(step.name, file);
     const record: DownloadRecord = {
         downloadName: step.name,

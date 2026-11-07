@@ -24,6 +24,7 @@ import { rememberedFieldEntries } from '../plan/plan-values.ts';
 import type { Project } from '../project/project-parser.ts';
 import type { RememberedValues } from '../RememberedValues.ts';
 import { resolveText, type RunValues, type StepErrorCode } from '../run-values.ts';
+import { isJudgedLookDone, pollUntil, type JudgedLook } from '../run/PollUntil.ts';
 import { sha256UnlessHoldingASecret } from '../secrets/secret-resolution.ts';
 import { buildServiceRequest } from './service-request.ts';
 import { checkBackendField, fieldAt, fieldText, isGatewayStatus, isPendingStatus, isSuccessStatus, responseJson } from './service-response.ts';
@@ -251,26 +252,27 @@ export async function runBackendCheck(step: Extract<Step, { type: 'expectBackend
   if (!request.ok) return failedWith(request.error, record(step, found, NO_ANSWER, 0));
   const pointer = pointerOf(found.declaration, step.field);
   if (pointer === undefined) return failedWith('field-missing', record(step, found, NO_ANSWER, 0));
-  const deadline = context.clock.now() + context.project.limits.backendCheckTimeoutMilliseconds;
-  for (let attempts = 1; ; attempts++) {
+  const rule = {
+    timeoutMilliseconds: context.project.limits.backendCheckTimeoutMilliseconds,
+    intervalMilliseconds: BACKEND_POLL_INTERVAL_MILLISECONDS,
+    isDone: isJudgedLookDone,
+  };
+  const last = await pollUntil(context.clock, rule, async (attempts): Promise<JudgedLook<CallStepOutcome>> => {
     const sent = await send(request.value, found, judgeForBackendCheck, stepIndex, step.type, context);
     const serviceCall = record(step, found, sent.kept, attempts);
     // A call that failed is not sent again, so an outage is reported at once, not waited out or
     // hidden by a later answer.
     if (sent.outcome === 'failed') {
-      return failedWith(sent.code, serviceCall);
+      return { outcome: failedWith(sent.code, serviceCall), isDone: true };
     }
     const checked = sent.outcome === 'pending'
       ? failure(sent.code)
       : checkAnswer(step.assert, sent.received, pointer, expected.value, request.value.maximumResponseBytes);
-    if (checked.ok) {
-      return { outcome: 'passed', serviceCall };
-    }
-    if (context.clock.now() >= deadline) {
-      return failedWith(checked.error, serviceCall);
-    }
-    await context.clock.sleep(BACKEND_POLL_INTERVAL_MILLISECONDS);
-  }
+    return checked.ok
+      ? { outcome: { outcome: 'passed', serviceCall }, isDone: true }
+      : { outcome: failedWith(checked.error, serviceCall), isDone: false };
+  });
+  return last.outcome;
 }
 
 // True when the step names a run value that has no text, because the step that would have

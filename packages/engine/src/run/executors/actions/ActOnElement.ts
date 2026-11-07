@@ -1,6 +1,6 @@
 import { stepFailed, StepOutcome } from "@revisum/contracts";
 import { resolveInputStep, type InputStep } from "../../../run-values.ts";
-import { guardFor } from "../../GuardFor.ts";
+import { actGuarded } from "../../ActGuarded.ts";
 import type { StepExecutor } from "../StepExecutor.ts";
 
 // A click, hover, select, upload or key press. Values are substituted first, so the runtime guard
@@ -10,9 +10,11 @@ export const actOnElement: StepExecutor<InputStep> = async (step, context) => {
     if (!action.ok) {
         return stepFailed(action.error);
     }
-    const acted = await context.document.act(
-        action.value,
-        guardFor(action.value, context.index, context),
+    const acted = await actGuarded(action.value, context.index, context, (guard) =>
+        context.document.act(action.value, guard),
     );
-    return acted.ok ? { outcome: StepOutcome.Passed } : stepFailed(acted.error.code);
+    if (!acted.ok) {
+        return acted.error;
+    }
+    return acted.value.ok ? { outcome: StepOutcome.Passed } : stepFailed(acted.value.error.code);
 };

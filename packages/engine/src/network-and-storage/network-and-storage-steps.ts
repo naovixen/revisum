@@ -23,6 +23,7 @@ import { resolveText, type RunValues } from '../run-values.ts';
 import { jsonTextWithSecrets, storedTextWithSecrets } from '../secrets/secret-values.ts';
 import { bodyOf, filledTemplate, type JsonWithSecrets, type RequestBuildError } from '../service-calls/service-request.ts';
 import { fieldAt, fieldText, responseJson } from '../service-calls/service-response.ts';
+import { pollUntil } from '../run/PollUntil.ts';
 
 // How long a check waits between two looks at the exchanges or the storage.
 const POLL_INTERVAL_MILLISECONDS = 50;
@@ -109,13 +110,12 @@ export async function resetRequests(step: Extract<Step, { type: 'resetRequests' 
 
 // Repeats a look until it passes, says no later look can change the answer, or the project's step
 // timeout runs out, and gives the last look.
-async function poll<Seen extends { readonly pass: boolean; readonly final?: boolean }>(context: NetworkStepContext, look: () => Promise<Seen>): Promise<Seen> {
-  const deadline = context.clock.now() + context.project.limits.stepTimeoutMilliseconds;
-  for (;;) {
-    const seen = await look();
-    if (seen.pass || seen.final === true || context.clock.now() >= deadline) return seen;
-    await context.clock.sleep(POLL_INTERVAL_MILLISECONDS);
-  }
+function poll<Seen extends { readonly pass: boolean; readonly final?: boolean }>(context: NetworkStepContext, look: () => Promise<Seen>): Promise<Seen> {
+  return pollUntil(context.clock, {
+    timeoutMilliseconds: context.project.limits.stepTimeoutMilliseconds,
+    intervalMilliseconds: POLL_INTERVAL_MILLISECONDS,
+    isDone: (seen) => seen.pass || seen.final === true,
+  }, look);
 }
 
 // What a failed count check saw, in words a person can follow when the two counts differ.
