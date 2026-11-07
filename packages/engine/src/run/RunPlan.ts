@@ -12,7 +12,7 @@ import type { Logger } from "../logging.ts";
 import { buildManifest, manifestHash } from "../manifest.ts";
 import { assertBranded } from "../plan/plan-parser.ts";
 import { assertCleared, type ClearedRun } from "../policy/ClearedRun.ts";
-import { afterTheVerdict } from "./after-the-verdict/AfterTheVerdict.ts";
+import { afterTheVerdict, EndOfTheRunKind } from "./after-the-verdict/AfterTheVerdict.ts";
 import {
     logFailureAfterTheVerdict,
     logKeepingTheResult,
@@ -20,7 +20,10 @@ import {
     readRecord,
 } from "./after-the-verdict/ReadKeepingTheResult.ts";
 import { readValueOr, type RecordRead } from "./after-the-verdict/RecordRead.ts";
-import { isVerdictLostToTheRecords } from "./after-the-verdict/RecordsAfterTheSteps.ts";
+import {
+    isVerdictLostToTheRecords,
+    type RecordsBeforeTheEgress,
+} from "./after-the-verdict/RecordsAfterTheSteps.ts";
 import { withRefusalsAfterTheVerdict } from "./after-the-verdict/WithRefusalsAfterTheVerdict.ts";
 import type { SessionContext } from "./executors/StepExecutor.ts";
 import type { StepsRun, StepsVerdict } from "./steps/VerdictOfSteps.ts";
@@ -132,17 +135,16 @@ async function finishAfterTheSteps(
     const { session, manifestInputs, ran } = inSession;
     const { logger, ports } = context;
     const refusals = refusalsAfterTheVerdict(session, logger);
-    const readBeforeTheEgress = {
+    const readBeforeTheEgress: RecordsBeforeTheEgress = {
         refusals,
         rewrites: ran.rewrites,
         stubAnswers: ran.stubAnswers,
     };
-    const isVerdictLost = isVerdictLostToTheRecords(ran.finished, readBeforeTheEgress);
     // Refusals can only spoil a verdict there is to give; without one the run ends Errored anyway.
-    const verdict = isVerdictLost
+    const verdict = isVerdictLostToTheRecords(ran.finished, readBeforeTheEgress)
         ? ran
         : verdictAfterRefusals(ran, readValueOr(refusals, []), logger);
-    const after = await afterTheVerdict({ ...context, session }, verdict, isVerdictLost);
+    const after = await afterTheVerdict({ ...context, session }, verdict, readBeforeTheEgress);
     const rewrites = readValueOr(ran.rewrites, []);
     const manifest =
         rewrites.length === 0
@@ -166,10 +168,10 @@ async function finishAfterTheSteps(
     const { end } = after;
     // A result's key order is published: the denial stands between the steps and the cleanup.
     const outcome =
-        "denial" in end
+        end.kind === EndOfTheRunKind.WithDenial
             ? { state: end.state, ...beforeTheDenial, denial: end.denial, ...afterTheDenial }
             : { state: end.state, ...beforeTheDenial, ...afterTheDenial };
-    return sealRanResult(outcome, nothingRan, { ...readBeforeTheEgress, egress: after.egress });
+    return sealRanResult(outcome, nothingRan, after.records);
 }
 
 // The request decisions the browser refused, read once the session has closed, each logged.

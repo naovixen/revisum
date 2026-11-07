@@ -3,7 +3,7 @@
 import {
   failure, success,
   type AdapterInfo, type AppliedRewrite, type EvidenceSuiteDeclaration, type Plan, type Result,
-  type FixtureReference, type HostInfo, type RunManifest, type RunVersions, type SecretRecord, type StorageStateRecord, type Target,
+  type FixtureReference, type HostInfo, type EvidenceRunManifest, type PlanRunManifest, type RunManifest, type RunVersions, type SecretRecord, type StorageStateRecord, type Target,
   type UnsafeDeclarationRecord, type UnsafeFeature,
 } from '@revisum/contracts';
 import { canonicalJson, sha256 } from './hashing.ts';
@@ -57,7 +57,7 @@ const compareText = (left: string, right: string): number => {
   return left < right ? -1 : 1;
 };
 
-export function evidenceManifest(inputs: EvidenceManifestInputs): RunManifest {
+export function evidenceManifest(inputs: EvidenceManifestInputs): EvidenceRunManifest {
   const files = inputs.suiteFiles.map((file) => ({ path: file.path, sha256: sha256(file.bytes) }))
     .sort((left, right) => compareText(left.path, right.path));
   const { suite } = inputs;
@@ -105,7 +105,7 @@ const RECORDED_REPLIES_INPUT = 'recorded-replies';
 
 // The manifest a replay may run, or why none may: a replay of it could never be claimed identical.
 // The replay itself, which runs the manifest again and compares result hashes, is replay().
-export function replayManifest(manifest: RunManifest): Result<RunManifest, { readonly code: 'replay-not-claimed' }> {
+export function replayManifest(manifest: RunManifest): Result<PlanRunManifest, { readonly code: 'replay-not-claimed' }> {
   if (manifest.evidence !== undefined) return failure({ code: 'replay-not-claimed' });
   const unpinned = manifest.nonHermeticInputs;
   if (unpinned.some((input) => DETERMINISM_INPUTS.includes(input))) return failure({ code: 'replay-not-claimed' });
@@ -157,7 +157,7 @@ export function projectHash(project: HashedProject): string {
 }
 
 // The manifest fields a run's pins give, with the project's hash and limits.
-function pinnedFields(pins: RunPins, project: Project): Partial<RunManifest> {
+function pinnedFields(pins: RunPins, project: Project): Partial<PlanRunManifest> {
   return {
     projectHash: projectHash(project),
     versions: { ...pins.versions, packs: [...pins.versions.packs].sort() },
@@ -191,7 +191,7 @@ export function buildManifest(inputs: {
   readonly pins?: { readonly pins: RunPins; readonly project: Project };
   // True when the project records the replies of the run's calls and commands.
   readonly recordsReplies?: boolean;
-}): RunManifest {
+}): PlanRunManifest {
   const pinned = inputs.pins === undefined ? undefined : pinnedFields(inputs.pins.pins, inputs.pins.project);
   const { id, version, protocol, cannotPin } = inputs.adapter;
   const unpinned = [

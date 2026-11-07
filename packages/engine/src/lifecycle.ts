@@ -9,7 +9,7 @@
 // A plan reaches Planned only once the policy gate has authorised it. Denied is the run the gate's
 // runtime guard stopped before an action; the denied action sent no input event.
 import type {
-  Denial, Plan, PlanRefusal, RunManifest, Session, Target, TerminalState as EndState, Unavailable,
+  Denial, Plan, PlanRefusal, PlanRunManifest, Session, Target, TerminalState as EndState, Unavailable,
 } from '@revisum/contracts';
 
 type Transitions = {
@@ -34,7 +34,7 @@ export const transition = <From extends RunState, To extends Transitions[From]>(
 
 export type Planned = { readonly state: 'Planned'; readonly plan: Plan; readonly target: Target };
 export type Resolved = Omit<Planned, 'state'> & {
-  readonly state: 'Resolved'; readonly session: Session; readonly manifest: RunManifest; readonly manifestHash: string;
+  readonly state: 'Resolved'; readonly session: Session; readonly manifest: PlanRunManifest; readonly manifestHash: string;
 };
 export type Running = Omit<Resolved, 'state'> & { readonly state: 'Running' };
 export type Finished<State extends 'Passed' | 'Failed' | 'Errored'> = Omit<Running, 'state' | 'session'> & { readonly state: State };
@@ -46,7 +46,7 @@ export type DeniedRun = Omit<Running, 'state' | 'session'> & { readonly state: '
 
 export const plan = (approved: Plan, target: Target): Planned => ({ state: 'Planned', plan: approved, target });
 
-export const resolve = (run: Planned, session: Session, manifest: RunManifest, manifestHash: string): Resolved =>
+export const resolve = (run: Planned, session: Session, manifest: PlanRunManifest, manifestHash: string): Resolved =>
   ({ ...run, state: 'Resolved', session, manifest, manifestHash });
 
 export const targetUnavailable = (run: Planned, unavailable: Unavailable): TargetUnavailableRun =>

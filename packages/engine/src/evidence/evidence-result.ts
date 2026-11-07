@@ -5,7 +5,7 @@
 // sha256. A result built here is never verified evidence: it says what the suite reported.
 import {
   EvidenceOutcomeCode, RefusalCode, RunMode, RunReviewItemCode, SUITE_CRITERION_LINK, SuitePass, SuiteDecodeErrorCode, TerminalState,
-  type A11yFinding, type CriterionId, type EvidenceSuiteDeclaration, type ManifestOfTheRun, type Redactor, type RunManifest, type RunResult,
+  type A11yFinding, type CriterionId, type EvidenceRunManifest, type EvidenceSuiteDeclaration, type Redactor, type RunResult,
   type RunReviewItem, type SafeText, type SuiteDecodeError, type SuiteFinding, type SuiteLocation, type SuiteRanResult, type SuiteRefusal,
   type SuiteRefusedResult, type SuiteTestId, type SuiteTestOutcome, type SuiteTestResult,
 } from '@revisum/contracts';
@@ -28,7 +28,7 @@ export type EvidenceContext = {
   readonly exitCode: number;
   readonly redactor: Redactor;
   readonly timedOut?: boolean;
-  readonly manifest?: RunManifest;
+  readonly manifest: EvidenceRunManifest;
   // What the egress proxy blocked, as seen on the wire. Kept redacted: a name can carry a secret.
   readonly blockedOrigins?: readonly string[];
   // True when what the proxy decided could not be read back whole.
@@ -125,9 +125,6 @@ const evidenceGuarantees = (context: EvidenceContext) => guaranteeStatement({
   mode: 'evidence', egressEnforced: context.egressRecordUnread !== true, unmaskedScreenshotsKept: context.suite.keepSuiteScreenshots, unsafeFeatures: [],
 });
 
-const manifestFields = (context: EvidenceContext): ManifestOfTheRun =>
-  context.manifest === undefined ? { manifest: null, manifestHash: null } : { manifest: context.manifest, manifestHash: manifestHash(context.manifest) };
-
 // Each blocked origin once, redacted, in a stable order.
 const keptOrigins = (context: EvidenceContext): readonly string[] =>
   [...new Set((context.blockedOrigins ?? []).map((origin) => keptText(origin, context.redactor)))].sort();
@@ -190,7 +187,7 @@ export function evidenceResult(
     mode: RunMode.Evidence,
     guarantees: evidenceGuarantees(context),
     targetId: suite.name,
-    ...manifestFields(context),
+    manifest: context.manifest, manifestHash: manifestHash(context.manifest),
     steps: [], blockedOrigins: keptOrigins(context), unavailable: null,
     suite: { name: suite.name, tests, findings, ...(audits.length === 0 ? {} : { accessibilityFindings: audits }) },
     evidence: { pass, exitCode, exitCodeMismatch, ...(outcomeCode === undefined ? {} : { outcomeCode }), ...(decodeErrors.length === 0 ? {} : { decodeErrors }) },
@@ -212,7 +209,7 @@ export function unreadSuiteResult(
     mode: RunMode.Evidence,
     guarantees: evidenceGuarantees(context),
     targetId: suite.name,
-    ...manifestFields(context),
+    manifest: context.manifest, manifestHash: manifestHash(context.manifest),
     steps: [], blockedOrigins: keptOrigins(context), unavailable: null,
     suite: { name: suite.name, tests: [], findings: [] },
     evidence: { pass, exitCode, exitCodeMismatch: false, outcomeCode, ...(decodeErrors.length === 0 ? {} : { decodeErrors }) },

@@ -2,6 +2,7 @@
 import {
     StepCode,
     StepOutcome,
+    TerminalState,
     type AppliedRewrite,
     type Denial,
     type StepResult,
@@ -14,7 +15,11 @@ import { NO_ANSWER_CODES } from "../../service-calls/call-steps.ts";
 import type { RecordRead } from "../after-the-verdict/RecordRead.ts";
 import type { TimedStep } from "./TimedStep.ts";
 
-export type FinishedRun = Finished<"Passed" | "Failed" | "Errored"> | DeniedRun;
+export type FinishedRun =
+    | Finished<
+          typeof TerminalState.Passed | typeof TerminalState.Failed | typeof TerminalState.Errored
+      >
+    | DeniedRun;
 
 // The steps' results and their own verdict, and what was read from the session before it closed.
 // What a record left unread does to the verdict comes after.
@@ -39,7 +44,7 @@ export type StepsFound = {
 // The codes of a page script or a database command that could not give a result to check, in
 // whatever step it ran, of a service call that got no answer, and of an adapter that threw: the run
 // could not test, which is not a product failure.
-const UNUSABLE_RESULT_CODES: readonly string[] = [
+const UNUSABLE_RESULT_CODES: readonly StepCode[] = [
     StepCode.ScriptFailed,
     StepCode.ScriptTimeout,
     StepCode.ScriptResultInvalid,
@@ -69,10 +74,12 @@ export function verdictOfSteps(
         return deny(running, found.denial);
     }
     if (steps.some((done) => couldNotTest(done, found))) {
-        return finish(running, "Errored");
+        return finish(running, TerminalState.Errored);
     }
     return finish(
         running,
-        steps.every((done) => done.outcome === StepOutcome.Passed) ? "Passed" : "Failed",
+        steps.every((done) => done.outcome === StepOutcome.Passed)
+            ? TerminalState.Passed
+            : TerminalState.Failed,
     );
 }

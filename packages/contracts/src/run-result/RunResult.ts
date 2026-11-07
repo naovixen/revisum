@@ -1,7 +1,8 @@
 // What a run gives back, sealed: one shape per way a run can end, so each carries exactly the fields
 // it can have. A plan run ran its steps (Passed, Failed or Errored), was denied by the policy gate's
 // runtime guard, was refused before any driver call, or found its target unavailable. An evidence
-// run ran its suite, or was refused before any suite code ran.
+// run ran its suite, or was refused before any suite code ran. Two plan shapes end Errored: a reader
+// tells them apart by `denial`, which only the one that came from a denied run holds.
 import type { ApprovalLabel } from "../approval.ts";
 import type { Unavailable } from "../browser-driver.ts";
 import type { GuaranteeStatement, RunMode } from "../evidence-mode.ts";
@@ -11,7 +12,7 @@ import type { CleanupResult } from "./CleanupResult.ts";
 import type { Denial } from "./Denial.ts";
 import type { EvidenceRunRecord } from "./EvidenceRunRecord.ts";
 import type { PlanRefusal, SuiteRefusal } from "./Refusal.ts";
-import type { RunManifest } from "./RunManifest.ts";
+import type { EvidenceRunManifest, PlanRunManifest } from "./RunManifest.ts";
 import type { RunReviewItem } from "./RunReviewItem.ts";
 import type { StepResult } from "./StepResult.ts";
 import type { SuiteRunRecord } from "./SuiteRunRecord.ts";
@@ -37,11 +38,6 @@ export type RunResultBasis = {
     readonly timings: RunTimings;
 };
 
-// The manifest and its hash: both present, or neither.
-export type ManifestOfTheRun =
-    | { readonly manifest: RunManifest; readonly manifestHash: string }
-    | { readonly manifest: null; readonly manifestHash: null };
-
 // What a result says of a run that ended before any step: no manifest, no step and nothing refused.
 export type NothingRanFields = {
     readonly manifest: null;
@@ -62,7 +58,7 @@ export type PlanRunLabels = {
 
 // What a plan run that reached its steps records.
 export type PlanStepsFields = {
-    readonly manifest: RunManifest;
+    readonly manifest: PlanRunManifest;
     readonly manifestHash: string;
     readonly steps: readonly StepResult[];
     readonly unavailable: null;
@@ -122,20 +118,19 @@ export type TargetUnavailableResult = RunResultBasis &
     };
 
 // An evidence run that ran its suite, or tried to: what the suite reported, never verified evidence.
-export type SuiteRanResult = RunResultBasis &
-    ManifestOfTheRun & {
-        readonly mode: typeof RunMode.Evidence;
-        readonly state:
-            | typeof TerminalState.Passed
-            | typeof TerminalState.Failed
-            | typeof TerminalState.Errored;
-        readonly steps: readonly [];
-        readonly unavailable: null;
-        readonly suite: SuiteRunRecord;
-        readonly evidence: EvidenceRunRecord;
-        // Present when the run raised something for a person to look at.
-        readonly reviewItems?: readonly RunReviewItem[];
-    };
+export type SuiteRanResult = RunResultBasis & {
+    readonly mode: typeof RunMode.Evidence;
+    readonly state:
+        typeof TerminalState.Passed | typeof TerminalState.Failed | typeof TerminalState.Errored;
+    readonly manifest: EvidenceRunManifest;
+    readonly manifestHash: string;
+    readonly steps: readonly [];
+    readonly unavailable: null;
+    readonly suite: SuiteRunRecord;
+    readonly evidence: EvidenceRunRecord;
+    // Present when the run raised something for a person to look at.
+    readonly reviewItems?: readonly RunReviewItem[];
+};
 
 // An evidence run refused before any suite code ran.
 export type SuiteRefusedResult = RunResultBasis &

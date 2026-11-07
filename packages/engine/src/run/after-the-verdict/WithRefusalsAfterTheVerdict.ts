@@ -1,5 +1,5 @@
 // What request decisions the browser refused after the verdict do to it.
-import { StepCode, stepFailed, type FailedStep } from "@revisum/contracts";
+import { StepCode, stepFailed, TerminalState, type FailedStep } from "@revisum/contracts";
 import { finish } from "../../lifecycle.ts";
 import { ranStep, TimedStepKind } from "../steps/TimedStep.ts";
 import type { StepsVerdict } from "../steps/VerdictOfSteps.ts";
@@ -23,10 +23,10 @@ export function withRefusalsAfterTheVerdict(
     verdict: StepsVerdict,
     refusals: readonly string[],
 ): VerdictAfterRefusals {
-    if (refusals.length === 0 || verdict.finished.state !== "Passed") {
+    if (refusals.length === 0 || verdict.finished.state !== TerminalState.Passed) {
         return { isSpoilt: false, verdict };
     }
-    const finished = finish(verdict.running, "Errored");
+    const finished = finish(verdict.running, TerminalState.Errored);
     const lastStep = verdict.steps.at(-1);
     // A plan with no steps has none to spoil.
     if (lastStep === undefined) {

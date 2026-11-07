@@ -15,28 +15,43 @@ import {
 import { runCleanup } from "../../service-calls/call-steps.ts";
 import type { SessionContext } from "../executors/StepExecutor.ts";
 import type { FinishedRun, StepsVerdict } from "../steps/VerdictOfSteps.ts";
-import { RECORD_UNREAD, readValueOr, recordRead, type RecordRead } from "./RecordRead.ts";
+import { RECORD_UNREAD, readValueOr, recordRead } from "./RecordRead.ts";
+import {
+    isVerdictLostToTheRecords,
+    type RecordsAfterTheSteps,
+    type RecordsBeforeTheEgress,
+} from "./RecordsAfterTheSteps.ts";
 import { logFailureAfterTheVerdict, readKeepingTheResult } from "./ReadKeepingTheResult.ts";
 
 export type AfterTheVerdict = {
     readonly cleanup: readonly CleanupResult[] | undefined;
     readonly cleanupReviewItems: readonly RunReviewItem[];
-    // The origins the egress refused.
-    readonly egress: RecordRead<readonly string[]>;
+    // Every record read after the steps, the origins the egress refused among them.
+    readonly records: RecordsAfterTheSteps;
     readonly end: EndOfTheRun;
 };
+
+// Whether the run's end keeps a denial.
+export const EndOfTheRunKind = {
+    WithoutDenial: "without-denial",
+    WithDenial: "with-denial",
+} as const;
+
+export type EndOfTheRunKind = (typeof EndOfTheRunKind)[keyof typeof EndOfTheRunKind];
 
 // The state the run ends in, and the denial a denied run keeps. The one place a run's end is decided
 // once every record is read: a run whose records leave it no verdict ends Errored, and a denied run
 // keeps its denial whichever record went unread, since the guard did stop an action.
 export type EndOfTheRun =
     | {
+          readonly kind: typeof EndOfTheRunKind.WithoutDenial;
           readonly state:
               | typeof TerminalState.Passed
               | typeof TerminalState.Failed
               | typeof TerminalState.Errored;
       }
     | {
+          readonly kind: typeof EndOfTheRunKind.WithDenial;
           readonly state: typeof TerminalState.Denied | typeof TerminalState.Errored;
           readonly denial: Denial;
       };
@@ -44,11 +59,15 @@ export type EndOfTheRun =
 function endOfTheRun(finished: FinishedRun, hasVerdict: boolean): EndOfTheRun {
     if (finished.state === TerminalState.Denied) {
         return {
+            kind: EndOfTheRunKind.WithDenial,
             state: hasVerdict ? TerminalState.Denied : TerminalState.Errored,
             denial: finished.denial,
         };
     }
-    return { state: hasVerdict ? finished.state : TerminalState.Errored };
+    return {
+        kind: EndOfTheRunKind.WithoutDenial,
+        state: hasVerdict ? finished.state : TerminalState.Errored,
+    };
 }
 
 // What the run's last part uses: the plan's cleanup and how it calls, the closed session's records
@@ -58,11 +77,10 @@ type AfterTheVerdictContext = Pick<
     "cleared" | "calls" | "commands" | "session" | "logger"
 >;
 
-// `isVerdictLost` says the records read before the egress already leave the run no verdict.
 export async function afterTheVerdict(
     context: AfterTheVerdictContext,
     verdict: StepsVerdict,
-    isVerdictLost: boolean,
+    readBeforeTheEgress: RecordsBeforeTheEgress,
 ): Promise<AfterTheVerdict> {
     const { plan } = context.cleared;
     // A failing cleanup step never changes the verdict; it raises a review item.
@@ -84,9 +102,13 @@ export async function afterTheVerdict(
         );
     }
     const egress = blockedRead.ok ? recordRead(blockedRead.value) : RECORD_UNREAD;
-    const end = endOfTheRun(verdict.finished, blockedRead.ok && !isVerdictLost);
+    const records = { ...readBeforeTheEgress, egress };
+    const end = endOfTheRun(
+        verdict.finished,
+        !isVerdictLostToTheRecords(verdict.finished, records),
+    );
     logTheEnd(context, readValueOr(egress, []), end);
-    return { cleanup, cleanupReviewItems, egress, end };
+    return { cleanup, cleanupReviewItems, records, end };
 }
 
 // The result claims what the egress refused and is hashed with that claim in it. So this is the one

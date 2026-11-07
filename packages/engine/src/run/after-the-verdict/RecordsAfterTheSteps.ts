@@ -22,35 +22,51 @@ export type RecordsAfterTheSteps = {
     readonly egress: RecordRead<readonly string[]>;
 };
 
-// Each record's review item, in the order the result lists them.
-const UNREAD_RECORD_ITEMS: readonly {
-    readonly record: keyof RecordsAfterTheSteps;
+// The records read before the egress, which decide whether the refusals read late are counted.
+export type RecordsBeforeTheEgress = Omit<RecordsAfterTheSteps, "egress">;
+
+// What a record left unread raises, and whether it leaves the steps no verdict to give.
+type UnreadRecordRule = {
     readonly code: UnreadRecordCode | typeof RunReviewItemCode.EgressUnread;
-}[] = [
-    { record: "refusals", code: UnreadRecordCode.Refusals },
-    { record: "rewrites", code: UnreadRecordCode.Rewrites },
-    { record: "stubAnswers", code: UnreadRecordCode.StubAnswers },
-    { record: "egress", code: RunReviewItemCode.EgressUnread },
-];
+    losesVerdict(finished: FinishedRun): boolean;
+};
+
+// Each record's rule, in the order the result lists their review items. A run that may have tested
+// a rewritten app has no verdict, nor has one whose egress went unread, which its result would
+// claim; nor has a passed run whose refusals went unread, since one refusal would stop it passing,
+// while a run that did not pass already says so. Unread stub answers leave the verdict standing.
+const UNREAD_RECORD_RULES = {
+    refusals: {
+        code: UnreadRecordCode.Refusals,
+        losesVerdict: (finished) => finished.state === TerminalState.Passed,
+    },
+    rewrites: { code: UnreadRecordCode.Rewrites, losesVerdict: () => true },
+    stubAnswers: { code: UnreadRecordCode.StubAnswers, losesVerdict: () => false },
+    egress: { code: RunReviewItemCode.EgressUnread, losesVerdict: () => true },
+} satisfies Record<keyof RecordsAfterTheSteps, UnreadRecordRule>;
+
+const isRecordName = (name: string): name is keyof RecordsAfterTheSteps =>
+    Object.hasOwn(UNREAD_RECORD_RULES, name);
+
+const RECORD_NAMES = Object.keys(UNREAD_RECORD_RULES).filter(isRecordName);
+
+// The rules of the records given that were left unread, in the order the result lists them.
+const unreadAmong = (records: Partial<RecordsAfterTheSteps>): UnreadRecordRule[] =>
+    RECORD_NAMES.flatMap((name) =>
+        records[name]?.kind === RecordReadKind.Unread ? [UNREAD_RECORD_RULES[name]] : [],
+    );
 
 // A result that went on without a record would claim what nobody saw, so each record left unread
 // raises a review item saying which.
 export function unreadRecordItems(records: RecordsAfterTheSteps): RunReviewItem[] {
-    return UNREAD_RECORD_ITEMS.flatMap(({ record, code }): RunReviewItem[] =>
-        records[record].kind === RecordReadKind.Unread ? [{ code }] : [],
-    );
+    return unreadAmong(records).map(({ code }) => ({ code }));
 }
 
-// True when the records read before the egress leave the steps no verdict to give. A run that may
-// have tested a rewritten app has none, nor has a passed run whose refusals went unread, since one
-// refusal would stop it passing; a run that did not pass already says so. Unread stub answers leave
-// the verdict standing.
+// True when the records given, all of them or those read before the egress, leave the steps no
+// verdict to give.
 export function isVerdictLostToTheRecords(
     finished: FinishedRun,
-    records: Omit<RecordsAfterTheSteps, "egress">,
+    records: RecordsAfterTheSteps | RecordsBeforeTheEgress,
 ): boolean {
-    const isRewriteUnknown = records.rewrites.kind === RecordReadKind.Unread;
-    const isRefusalUnknown =
-        records.refusals.kind === RecordReadKind.Unread && finished.state === TerminalState.Passed;
-    return isRewriteUnknown || isRefusalUnknown;
+    return unreadAmong(records).some((rule) => rule.losesVerdict(finished));
 }

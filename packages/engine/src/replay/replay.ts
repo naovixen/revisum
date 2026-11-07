@@ -12,7 +12,7 @@
 // among them. Neither is a pass. The result hash leaves out the blocked origins, so a replay that
 // differs only in those is identical.
 // Pure apart from calling run.
-import { failure, success, type DatabaseCommandRunner, type Result, type ServiceCaller, type TerminalState, type RunManifest } from '@revisum/contracts';
+import { failure, success, type DatabaseCommandRunner, type Result, type ServiceCaller, type TerminalState, type PlanRunManifest } from '@revisum/contracts';
 import { canonicalJson, sha256 } from '../hashing.ts';
 import {
   DATABASE_COMMANDS_INPUT, SERVICE_CALLS_INPUT, manifestHash, planHash, replayManifest,
@@ -83,7 +83,7 @@ type ReplayedReplies = {
 
 // The replies the manifest needs from the recording, or why the replay cannot have them. A run
 // with no calls or commands needs none, and any recording given is ignored.
-function repliesFor(manifest: RunManifest, input: unknown, ports: ReplayPorts): Result<ReplayedReplies, ReplayError> {
+function repliesFor(manifest: PlanRunManifest, input: unknown, ports: ReplayPorts): Result<ReplayedReplies, ReplayError> {
   const callsServices = manifest.nonHermeticInputs.includes(SERVICE_CALLS_INPUT);
   const runsCommands = manifest.nonHermeticInputs.includes(DATABASE_COMMANDS_INPUT);
   if (!callsServices && !runsCommands) return success({});
@@ -102,7 +102,7 @@ function repliesFor(manifest: RunManifest, input: unknown, ports: ReplayPorts): 
 }
 
 // The first fixture the reader does not hold, or holds with another hash, by its path.
-async function fixtureMismatch(manifest: RunManifest, reader: FixtureReader): Promise<string | null> {
+async function fixtureMismatch(manifest: PlanRunManifest, reader: FixtureReader): Promise<string | null> {
   for (const fixture of manifest.fixtures) {
     const bytes = await reader.read(fixture.path);
     if (bytes === null || sha256(bytes) !== fixture.sha256) return fixture.path;
@@ -111,9 +111,9 @@ async function fixtureMismatch(manifest: RunManifest, reader: FixtureReader): Pr
 }
 
 // The top-level fields whose canonical JSON differs between two manifests, sorted.
-function differingFields(recorded: RunManifest, replayed: RunManifest): string[] {
+function differingFields(recorded: PlanRunManifest, replayed: PlanRunManifest): string[] {
   const fields = new Set([...Object.keys(recorded), ...Object.keys(replayed)]);
-  const text = (manifest: RunManifest, field: string): string => {
+  const text = (manifest: PlanRunManifest, field: string): string => {
     const value: unknown = Object.getOwnPropertyDescriptor(manifest, field)?.value;
     return value === undefined ? '' : canonicalJson(value);
   };
@@ -123,13 +123,13 @@ function differingFields(recorded: RunManifest, replayed: RunManifest): string[]
 export async function replay(request: ReplayRequest, ports: ReplayPorts): Promise<Result<ReplayOutcome, ReplayError>> {
   const decoded = decodeManifest(request.manifest);
   if (!decoded.ok) return decoded;
-  const manifest = decoded.value;
-  const claimed = replayManifest(manifest);
+  const claimed = replayManifest(decoded.value);
   if (!claimed.ok) return claimed;
+  const manifest = claimed.value;
   const replies = repliesFor(manifest, request.recording, ports);
   if (!replies.ok) return replies;
   if (planHash(request.cleared.plan) !== manifest.planHash) return failure({ code: 'replay-mismatch', path: '$.planHash' });
-  if (manifest.target?.id !== request.cleared.targetId) return failure({ code: 'replay-mismatch', path: '$.target.id' });
+  if (manifest.target.id !== request.cleared.targetId) return failure({ code: 'replay-mismatch', path: '$.target.id' });
   const fixture = await fixtureMismatch(manifest, ports.fixtures);
   if (fixture !== null) return failure({ code: 'replay-mismatch', fixture });
 

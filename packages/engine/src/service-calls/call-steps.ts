@@ -42,7 +42,7 @@ type CallStepOutcome =
 
 // The codes of a call that got no answer from the service, not even through a gateway. A check then
 // learned nothing about the product, so the run could not test, in whatever step the call stood.
-export const NO_ANSWER_CODES: readonly string[] = [StepCode.ServiceUnreachable, StepCode.CallTimeout] satisfies readonly ServiceCallErrorCode[];
+export const NO_ANSWER_CODES: readonly StepCode[] = [StepCode.ServiceUnreachable, StepCode.CallTimeout] satisfies readonly ServiceCallErrorCode[];
 
 
 // What the run hands these steps. `remembered` is how a call adds to the run's values.

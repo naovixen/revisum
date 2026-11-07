@@ -12,7 +12,7 @@ import {
   SUITE_EVIDENCE_PATHS, SUITE_REPORT_FILE, WORKLOAD_OUTPUT_PATH,
   declaredSuite, defaultRedactor, evidenceManifest, evidenceResult, failure, isSuiteFile, mergeRefusedOrigins, parseSuiteReport, parseSuiteTrace, refusedSuiteResult,
   success, suiteArguments, suiteEnvironment, suiteRedactor, unreadSuiteResult,
-  type EgressEvent, type EgressPolicy, type EvidenceContext, type EvidenceLimits, type EvidenceSuiteDeclaration, type HostInfo, type Project, type Redactor,
+  type EgressEvent, type EgressPolicy, type EvidenceContext, type EvidenceLimits, type EvidenceRunManifest, type EvidenceSuiteDeclaration, type HostInfo, type Project, type Redactor,
   type Result, type RunResult, type SecretStore, type SuiteDecodeError, type SuiteFile, type SuitePass, type SuiteReport, type SuiteTrace,
   type WorkloadErrorCode, type WorkloadRequest, type WorkloadRunner, type WorkloadVariable,
 } from '@revisum/engine';
@@ -236,9 +236,9 @@ export async function runSuite(project: Project, suiteName: string, ports: Suite
     timeoutMilliseconds: suite.timeoutMilliseconds, outputDirectory: ports.outputDirectory,
   });
   const redactor = suiteRedactor(ports.redactor ?? defaultRedactor(), environment.value.secrets);
-  const context = (exitCode: number, timedOut: boolean, extra: Partial<EvidenceContext> = {}): EvidenceContext => ({
-    suite, pass: ports.pass, exitCode, redactor, timedOut, ...extra,
-  });
+  const context = (
+    exitCode: number, timedOut: boolean, manifest: EvidenceRunManifest, extra: Partial<Omit<EvidenceContext, 'manifest'>> = {},
+  ): EvidenceContext => ({ suite, pass: ports.pass, exitCode, redactor, timedOut, manifest, ...extra });
   const manifestFor = (report: SuiteReport | null, traces: readonly SuiteTrace[]) => evidenceManifest({
     suite, suiteFiles: files, host: host(),
     playwrightVersion: report?.playwrightVersion ?? traces.find((trace) => trace.playwrightVersion !== undefined)?.playwrightVersion,
@@ -254,11 +254,11 @@ export async function runSuite(project: Project, suiteName: string, ports: Suite
     const setup = await ports.workload.run(request(suite.setupCommand, environment.value.variables));
     if (!setup.ok) return refusedSuiteResult(suiteName, refusalFor(setup.error));
     if (setup.value.timedOut || setup.value.exitCode !== 0) {
-      return unreadSuiteResult(context(setup.value.exitCode, setup.value.timedOut, { manifest: manifestFor(null, []) }),
+      return unreadSuiteResult(context(setup.value.exitCode, setup.value.timedOut, manifestFor(null, [])),
         setup.value.timedOut ? 'suite-timeout' : 'setup-failed');
     }
     if (setup.value.egressRecordUnread === true) {
-      return unreadSuiteResult(context(setup.value.exitCode, false, { manifest: manifestFor(null, []), egressRecordUnread: true }), 'egress-unread');
+      return unreadSuiteResult(context(setup.value.exitCode, false, manifestFor(null, []), { egressRecordUnread: true }), 'egress-unread');
     }
   }
 
@@ -280,9 +280,9 @@ export async function runSuite(project: Project, suiteName: string, ports: Suite
 
   const read = readReport(ports.outputDirectory, limits);
   if (!read.ok) {
-    return unreadSuiteResult(context(exitCode, timedOut, { manifest: manifestFor(null, []), ...egress }),
+    return unreadSuiteResult(context(exitCode, timedOut, manifestFor(null, []), egress),
       timedOut ? 'suite-timeout' : 'suite-report-unread', read.errors);
   }
   const { traces, decodeErrors } = readTraces(ports.outputDirectory, read.report, limits);
-  return evidenceResult(read.report, traces, [], context(exitCode, timedOut, { manifest: manifestFor(read.report, traces), ...egress, traceDecodeErrors: decodeErrors }));
+  return evidenceResult(read.report, traces, [], context(exitCode, timedOut, manifestFor(read.report, traces), { ...egress, traceDecodeErrors: decodeErrors }));
 }

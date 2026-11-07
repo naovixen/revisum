@@ -2,10 +2,10 @@
 // always give the same bytes. An AI may only add a suggestion stored beside the draft, never
 // replace it, and never containing typed or expected values.
 import {
-  literalText, referencedValueName, RememberElementRead, RequestCountKind,
+  literalText, referencedValueName, RememberElementRead, RequestCountKind, StepOutcome, TerminalState,
   type AiWriter, type ArtifactReference, type ArtifactStore, type ClipboardAssertion, type ClockAdvance, type Locator, type Plan,
   type RememberedElementSource, type RememberRead, type RememberSource, type REQUEST_COUNT_KINDS, type RequestCount, type ResponseAssertion, type ScriptChoice, type Step, type StorageAssertion,
-  type TextOrValue, type PlanErrorCode, type RunResult,
+  type TextOrValue, type PlanErrorCode, type PlanRunResult,
 } from '@revisum/contracts';
 import { parseAiText } from './ai-text.ts';
 
@@ -151,7 +151,30 @@ const STORAGE_ASSERTION_TEXT: { readonly [Kind in StorageAssertion['kind']]: str
   present: 'is present', absent: 'is absent', equals: 'has the expected value',
 };
 
-export function releaseNoteDraft(plan: Plan, results: readonly RunResult[]): string {
+// A run's row in the table of where the plan was verified: what it ran on and how many steps passed,
+// or, for a run that ended before any step, why.
+const notRunRow = (result: PlanRunResult, reason: string, stepCount: number): string =>
+  `| ${result.targetId} | - | - | - | - | ${result.state}: ${reason} | 0 of ${stepCount} |`;
+
+function verifiedOnRow(result: PlanRunResult, stepCount: number): string {
+  switch (result.state) {
+    // A refusal's row has always given no reason.
+    case TerminalState.Refused:
+      return notRunRow(result, '', stepCount);
+    case TerminalState.TargetUnavailable:
+      return notRunRow(result, result.unavailable.reason, stepCount);
+    case TerminalState.Passed:
+    case TerminalState.Failed:
+    case TerminalState.Errored:
+    case TerminalState.Denied: {
+      const { target, browser } = result.manifest;
+      const passed = result.steps.filter((step) => step.outcome === StepOutcome.Passed).length;
+      return `| ${result.targetId} | ${browser.name} ${browser.version} | ${target.device} | ${target.locale} | ${target.timezone} | ${result.state} | ${passed} of ${stepCount} |`;
+    }
+  }
+}
+
+export function releaseNoteDraft(plan: Plan, results: readonly PlanRunResult[]): string {
   const lines: string[] = [
     `## ${markdownEscape(plan.meta.title)} (${markdownEscape(plan.meta.featureId)})`,
     '',
@@ -162,15 +185,7 @@ export function releaseNoteDraft(plan: Plan, results: readonly RunResult[]): str
     '| Target | Browser | Device | Locale | Time zone | Result | Steps passed |',
     '|---|---|---|---|---|---|---|',
   ];
-  for (const result of results) {
-    // Only a plan run's manifest names a target and browser; an evidence run's never does.
-    const target = result.manifest?.target;
-    const browser = result.manifest?.browser;
-    const passed = result.steps.filter((step) => step.outcome === 'passed').length;
-    lines.push(target === undefined || browser === undefined
-      ? `| ${result.targetId} | - | - | - | - | ${result.state}: ${result.unavailable?.reason ?? ''} | 0 of ${plan.steps.length} |`
-      : `| ${result.targetId} | ${browser.name} ${browser.version} | ${target.device} | ${target.locale} | ${target.timezone} | ${result.state} | ${passed} of ${plan.steps.length} |`);
-  }
+  lines.push(...results.map((result) => verifiedOnRow(result, plan.steps.length)));
   lines.push('', '### What was checked', '', ...plan.steps.map((step, index) => `${index + 1}. ${describeStep(step)}`));
 
   const screenshots = results.flatMap((result) => result.steps.flatMap((step) => (step.artifact === undefined ? [] : [step.artifact])));
@@ -190,7 +205,7 @@ export function releaseNoteDraft(plan: Plan, results: readonly RunResult[]): str
     lines.push('', 'Automated rules cover only part of WCAG 2.2 AA. This is not a conformance claim.');
   }
 
-  lines.push('', '### Provenance', '', ...results.map((result) => `- ${result.targetId}: manifest ${result.manifestHash?.slice(0, 16) ?? 'none'}, result ${result.resultHash.slice(0, 16)}`));
+  lines.push('', '### Provenance', '', ...results.map((result) => `- ${result.targetId}: manifest ${result.manifestHash === null ? 'none' : result.manifestHash.slice(0, 16)}, result ${result.resultHash.slice(0, 16)}`));
   lines.push('', '_Draft generated deterministically from the plan and the run results. No AI was used._', '');
   return lines.join('\n');
 }
@@ -209,7 +224,7 @@ export type ReleaseArtefacts = {
 
 // Stores the deterministic draft, then optionally an AI suggestion beside it, never instead of it.
 export async function writeReleaseNotes(
-  plan: Plan, results: readonly RunResult[], store: ArtifactStore, writer?: AiWriter,
+  plan: Plan, results: readonly PlanRunResult[], store: ArtifactStore, writer?: AiWriter,
 ): Promise<ReleaseArtefacts> {
   const text = releaseNoteDraft(plan, results);
   const draft = await store.put('release-notes.md', new TextEncoder().encode(text), 'text/markdown');

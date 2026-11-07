@@ -41,7 +41,7 @@ const END_OF_OPTIONS = '--';
 
 // The codes a command's run may end with besides a check that did not pass. A workload error says
 // the command never started, such as image-missing.
-export const COMMAND_ERROR_CODES: readonly string[] = [
+export const COMMAND_ERROR_CODES: readonly StepCode[] = [
   StepCode.CommandFailed, StepCode.CommandTimeout, StepCode.CommandOutputInvalid,
   StepCode.ImageMissing, StepCode.ImageDigestMismatch, StepCode.EgressUnenforceable, StepCode.WorkloadStartFailed,
 ] satisfies readonly (StepErrorCode | WorkloadErrorCode)[];

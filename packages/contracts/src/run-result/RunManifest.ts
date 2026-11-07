@@ -50,17 +50,13 @@ export type EvidenceManifestRecord = {
     };
 };
 
-export type RunManifest = {
+// What every run's manifest holds, a plan run's or an evidence run's.
+type ManifestBasis = {
     readonly schema: string;
     readonly engineVersion: string;
     // For an evidence run, which has no plan, the sha256 of the suite's declaration, which decides
     // what ran.
     readonly planHash: string;
-    // The target, adapter and browser of a plan run. An evidence run has none of its own: the
-    // suite's own browser is self-reported in its evidence record.
-    readonly target?: Target;
-    readonly adapter?: AdapterInfo;
-    readonly browser?: { readonly name: string; readonly version: string };
     // An evidence run fixes neither, so both are 0 for it; its evidence record says why.
     readonly seeds: { readonly random: number };
     readonly clock: { readonly fixedTimeMilliseconds: number };
@@ -80,8 +76,6 @@ export type RunManifest = {
     // Present only when the egress proxy applied a browser mutant's rewrite, so a mutated run can
     // never pass for a plain one, and a plain run's manifest and hash stay as they were.
     readonly responseRewrites?: readonly AppliedRewrite[];
-    // Present only for an evidence run, so a plan run's manifest and hash stay exactly as they were.
-    readonly evidence?: EvidenceManifestRecord;
     // The sha256 of the browser executable core launched, hashed by core itself before the browser
     // opened, never taken from what the adapter reports. Present only for an adapter that reports
     // its build; a run on any other has none, so its manifest and hash stay as they were.
@@ -100,3 +94,22 @@ export type RunManifest = {
     readonly fontsSha256?: string;
     readonly commit?: string | null;
 };
+
+// A plan run's manifest: the target, adapter and browser it ran on, and no evidence record.
+export type PlanRunManifest = ManifestBasis & {
+    readonly target: Target;
+    readonly adapter: AdapterInfo;
+    readonly browser: { readonly name: string; readonly version: string };
+    readonly evidence?: never;
+};
+
+// An evidence run's manifest: its evidence record, and no target, adapter or browser of its own,
+// since the suite's own browser is self-reported in that record.
+export type EvidenceRunManifest = ManifestBasis & {
+    readonly target?: never;
+    readonly adapter?: never;
+    readonly browser?: never;
+    readonly evidence: EvidenceManifestRecord;
+};
+
+export type RunManifest = PlanRunManifest | EvidenceRunManifest;
