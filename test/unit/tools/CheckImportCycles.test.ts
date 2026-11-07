@@ -23,6 +23,73 @@ function cyclesIn(files: Readonly<Record<string, string>>): string[] {
     }
 }
 
+type Edge = readonly [from: string, to: string];
+type ImportEdges = { readonly value: readonly Edge[]; readonly typeOnly: readonly Edge[] };
+
+// One file under tools/ for each name the edges use, each importing as they say.
+function filesFor(edges: ImportEdges): Record<string, string> {
+    const imports = new Map<string, string[]>();
+    const add = (from: string, line: string): void => {
+        imports.set(from, [...(imports.get(from) ?? []), line]);
+    };
+    for (const [from, to] of edges.value) {
+        add(from, `import { value as ${to}Value } from "./${to}.ts";`);
+    }
+    for (const [from, to] of edges.typeOnly) {
+        add(from, `import type { Shape as ${to}Shape } from "./${to}.ts";`);
+        add(to, "");
+    }
+    return Object.fromEntries(
+        [...imports].map(([name, lines]) => [
+            `tools/${name}.ts`,
+            [...lines, "export const value = 1;", "export type Shape = number;", ""].join("\n"),
+        ]),
+    );
+}
+
+const CYCLE_REPORT =
+    /^import cycle(?<typeOnly> through type-only imports)?: (?<chain>.+?)(?: \(\d+ files reach each other: [^)]*\))?(?:; move the shared types to a module both sides can import)?$/;
+
+type CycleReport = { readonly isTypeOnly: boolean; readonly chain: readonly string[] };
+
+function readReport(problem: string): CycleReport {
+    const groups = CYCLE_REPORT.exec(problem)?.groups;
+    if (groups?.["chain"] === undefined) {
+        throw new Error(`not a cycle report: ${problem}`);
+    }
+    return {
+        isTypeOnly: groups["typeOnly"] !== undefined,
+        chain: groups["chain"].split(" -> ").map((path) => path.replace(/^tools\/(.+)\.ts$/, "$1")),
+    };
+}
+
+const hasEdge = (edges: readonly Edge[], from: string, to: string): boolean =>
+    edges.some((edge) => edge[0] === from && edge[1] === to);
+
+// Each step of the chain, as from and to.
+const stepsOf = (chain: readonly string[]): Edge[] =>
+    chain.slice(1).map((to, index) => [chain[index] ?? "", to] as const);
+
+const isClosedChainOf = (chain: readonly string[], edges: ImportEdges): boolean =>
+    chain.length > 1 &&
+    chain[0] === chain.at(-1) &&
+    stepsOf(chain).every(
+        ([from, to]) => hasEdge(edges.value, from, to) || hasEdge(edges.typeOnly, from, to),
+    );
+
+const typeOnlyStepsOf = (chain: readonly string[], edges: ImportEdges): Edge[] =>
+    stepsOf(chain).filter(
+        ([from, to]) => !hasEdge(edges.value, from, to) && hasEdge(edges.typeOnly, from, to),
+    );
+
+// The two-file cycle through these names, starting from whichever file the report starts from.
+function chainFrom(problem: string | undefined, names: readonly [string, string]): string[] {
+    const [one, other] = names;
+    return problem?.includes(`: tools/${other}.ts -> `) === true
+        ? [other, one, other]
+        : [one, other, one];
+}
+
 describe("Using the import cycle check", () => {
     describe("given two files that import each other", () => {
         describe("when the check runs", () => {
@@ -67,9 +134,10 @@ describe("Using the import cycle check", () => {
                     "tools/second.ts":
                         'import type { First } from "./first.ts";\nexport const second: First = "";\n',
                 });
-                assert.deepEqual(cycles, [
-                    `import cycle through type-only imports: tools/first.ts -> tools/second.ts -> tools/first.ts${TYPE_ONLY_ADVICE}`,
+                assert.deepEqual(cycles.map(readReport), [
+                    { isTypeOnly: true, chain: chainFrom(cycles[0], ["first", "second"]) },
                 ]);
+                assert.equal(cycles[0]?.endsWith(TYPE_ONLY_ADVICE), true, cycles[0]);
             });
         });
     });
@@ -83,9 +151,10 @@ describe("Using the import cycle check", () => {
                     "tools/second.ts":
                         'import { type First, type Other } from "./first.ts";\nexport const second: First | Other = "";\n',
                 });
-                assert.deepEqual(cycles, [
-                    `import cycle through type-only imports: tools/first.ts -> tools/second.ts -> tools/first.ts${TYPE_ONLY_ADVICE}`,
+                assert.deepEqual(cycles.map(readReport), [
+                    { isTypeOnly: true, chain: chainFrom(cycles[0], ["first", "second"]) },
                 ]);
+                assert.equal(cycles[0]?.endsWith(TYPE_ONLY_ADVICE), true, cycles[0]);
             });
         });
     });
@@ -182,6 +251,85 @@ describe("Using the import cycle check", () => {
                         'import { empty } from "@revisum/contracts";\nexport const third = empty;\n',
                 });
                 assert.deepEqual(cycles, []);
+            });
+        });
+    });
+
+    describe("given a value cycle that type-only imports join to a second file", () => {
+        const edges: ImportEdges = {
+            value: [
+                ["first", "second"],
+                ["second", "first"],
+            ],
+            typeOnly: [
+                ["second", "third"],
+                ["third", "first"],
+            ],
+        };
+
+        describe("when the check runs", () => {
+            test("then it should report the value cycle, and a type-only cycle through a type-only import", () => {
+                const reports = cyclesIn(filesFor(edges)).map(readReport);
+                const valueReports = reports.filter((report) => !report.isTypeOnly);
+                const typeOnlyReports = reports.filter((report) => report.isTypeOnly);
+                assert.equal(valueReports.length, 1, JSON.stringify(reports));
+                assert.deepEqual(new Set(valueReports[0]?.chain), new Set(["first", "second"]));
+                assert.equal(typeOnlyReports.length, 1, JSON.stringify(reports));
+                const chain = typeOnlyReports[0]?.chain ?? [];
+                assert.ok(
+                    isClosedChainOf(chain, edges),
+                    `not a cycle of the graph: ${chain.join(" -> ")}`,
+                );
+                assert.notDeepEqual(
+                    typeOnlyStepsOf(chain, edges),
+                    [],
+                    `no type-only import in: ${chain.join(" -> ")}`,
+                );
+            });
+        });
+    });
+
+    describe("given two value cycles joined both ways by type-only imports", () => {
+        const edges: ImportEdges = {
+            value: [
+                ["first", "second"],
+                ["second", "first"],
+                ["third", "fourth"],
+                ["fourth", "third"],
+            ],
+            typeOnly: [
+                ["second", "third"],
+                ["fourth", "first"],
+            ],
+        };
+
+        describe("when the check runs", () => {
+            test("then it should report both value cycles, and the type-only cycle through all four files", () => {
+                const reports = cyclesIn(filesFor(edges)).map(readReport);
+                const valueCycles = reports
+                    .filter((report) => !report.isTypeOnly)
+                    .map((report) => [...new Set(report.chain)].toSorted());
+                const typeOnlyReports = reports.filter((report) => report.isTypeOnly);
+                assert.deepEqual(
+                    valueCycles.toSorted(),
+                    [
+                        ["first", "second"],
+                        ["fourth", "third"],
+                    ],
+                    JSON.stringify(reports),
+                );
+                assert.equal(typeOnlyReports.length, 1, JSON.stringify(reports));
+                const chain = typeOnlyReports[0]?.chain ?? [];
+                assert.ok(
+                    isClosedChainOf(chain, edges),
+                    `not a cycle of the graph: ${chain.join(" -> ")}`,
+                );
+                assert.notDeepEqual(
+                    typeOnlyStepsOf(chain, edges),
+                    [],
+                    `no type-only import in: ${chain.join(" -> ")}`,
+                );
+                assert.deepEqual(new Set(chain), new Set(["first", "second", "third", "fourth"]));
             });
         });
     });

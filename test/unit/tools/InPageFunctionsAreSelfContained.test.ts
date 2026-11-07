@@ -12,6 +12,8 @@ const SUPPORTING_FILES = {
     "src/page-runner.ts":
         'import type { PageFunction } from "./page-function.ts";\nexport const evaluate = (pageFunction: PageFunction): string => String(pageFunction);\n',
     "src/helpers.ts": "export function helper(): number {\n    return 1;\n}\n",
+    "src/page-methods.ts":
+        'export const page = {\n    read(): string | undefined {\n        return process.env["X"];\n    },\n};\n',
 };
 
 const IN_PAGE_PROBE =
@@ -96,6 +98,14 @@ describe("Using the in-page functions rule", () => {
                 assert.deepEqual(findingsInPage(source), []);
             });
         });
+
+        describe("when a function sits inside a top-level object", () => {
+            test("then it should report the function as not at the top level", () => {
+                const source =
+                    'export const page = {\n    read(): string | undefined {\n        return process.env["X"];\n    },\n};\n';
+                assert.deepEqual(findingsInPage(source), ["functionInObject"]);
+            });
+        });
     });
 
     describe("given a file that is not in-page", () => {
@@ -135,6 +145,30 @@ describe("Using the in-page functions rule", () => {
             test("then it should pass, by toString and as a page function", () => {
                 const source =
                     'import type { PageFunction } from "./page-function.ts";\nimport { evaluate } from "./page-runner.ts";\nexport const send = (pageFunction: PageFunction): string => evaluate(pageFunction) + pageFunction.toString();\n';
+                assert.deepEqual(findingsOutside(source), []);
+            });
+        });
+
+        describe("when it sends a method of its own object by toString", () => {
+            test("then it should report the method as sent from elsewhere", () => {
+                const source =
+                    'const page = {\n    read(): string | undefined {\n        return process.env["X"];\n    },\n};\nexport const source = page.read.toString();\n';
+                assert.deepEqual(findingsOutside(source), ["sentFromElsewhere"]);
+            });
+        });
+
+        describe("when it passes a method of an object imported from a file that is not in-page", () => {
+            test("then it should report the method as sent from elsewhere", () => {
+                const source =
+                    'import { evaluate } from "./page-runner.ts";\nimport { page } from "./page-methods.ts";\nexport const result = evaluate(page.read);\n';
+                assert.deepEqual(findingsOutside(source), ["sentFromElsewhere"]);
+            });
+        });
+
+        describe("when it sends an in-page function through the in-page module's namespace", () => {
+            test("then it should pass, by toString and as a page function", () => {
+                const source =
+                    'import { evaluate } from "./page-runner.ts";\nimport * as inPage from "./in-page.ts";\nexport const result = evaluate(inPage.probe);\nexport const source = inPage.probe.toString();\n';
                 assert.deepEqual(findingsOutside(source), []);
             });
         });

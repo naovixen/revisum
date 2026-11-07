@@ -6,8 +6,8 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 
 const requireFromLintTools = createRequire(resolve('tools/eslint/package.json'));
-const { Linter } = requireFromLintTools('eslint');
-const parser = requireFromLintTools('@typescript-eslint/parser');
+const { Linter } = requireFromLintTools('eslint') as { readonly Linter: RuleLinterConstructor };
+const parser = requireFromLintTools('@typescript-eslint/parser') as object;
 
 export type LintFinding = { readonly messageId: string };
 
@@ -25,8 +25,7 @@ export function lintWithRule(rule: unknown, source: string, repositoryPath: stri
     plugins: { local: { rules: { 'under-test': rule } } },
     rules: { 'local/under-test': 'error' },
   }];
-  const messages: readonly LintMessage[] =
-    linter.verify(source, config, { filename: join(process.cwd(), repositoryPath) });
+  const messages = linter.verify(source, config, { filename: join(process.cwd(), repositoryPath) });
   return messages.map((message) => ({ messageId: message.messageId ?? message.message }));
 }
 
@@ -69,10 +68,10 @@ export function lintWithTypedRule(
     if (source === undefined) {
       throw new Error(`no file ${lintedPath} to lint`);
     }
-    const linter = new (Linter as RuleLinterConstructor)({ configType: 'flat', cwd: folder });
+    const linter = new Linter({ configType: 'flat', cwd: folder });
     const config = [{
       files: ['**/*.ts'],
-      languageOptions: { parser: parser as object, parserOptions: { project: join(folder, 'tsconfig.json'), tsconfigRootDir: folder } },
+      languageOptions: { parser, parserOptions: { project: join(folder, 'tsconfig.json'), tsconfigRootDir: folder } },
       plugins: { local: { rules: { 'under-test': rule } } },
       rules: { 'local/under-test': ['error', ...options] },
     }];
