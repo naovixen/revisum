@@ -109,10 +109,18 @@ const projectOrigins = (): readonly unknown[] => {
     return origins;
 };
 
+// What a project whose origins are a number gives: wrong_type at the origins, then the refusals of
+// everything checked against the origins it could not read.
+const ORIGINS_OF_THE_WRONG_FORM = "as origins written as a number are";
+const originsOfTheWrongFormIssues = (): readonly CodeAndPath[] =>
+    projectIssues(withValue(testProjectInput(), ["origins"], 5));
+
 type UnreadableCase = {
     readonly name: string;
     readonly hostile: () => unknown;
     readonly expected: readonly CodeAndPath[];
+    // Says what the refusal is when listing its issues would not read well.
+    readonly refusal?: string;
 };
 
 type ParserCases = {
@@ -209,7 +217,8 @@ const PARSERS: readonly ParserCases[] = [
                         ["origins"],
                         listWithoutPrototype(projectOrigins()),
                     ),
-                expected: [{ code: "wrong_type", path: "$.origins" }],
+                expected: originsOfTheWrongFormIssues(),
+                refusal: ORIGINS_OF_THE_WRONG_FORM,
             },
             {
                 name: "the origins in a proxy over a list that throws on every read",
@@ -219,7 +228,8 @@ const PARSERS: readonly ParserCases[] = [
                         ["origins"],
                         proxyThatThrows([...projectOrigins()]),
                     ),
-                expected: [{ code: "wrong_type", path: "$.origins" }],
+                expected: originsOfTheWrongFormIssues(),
+                refusal: ORIGINS_OF_THE_WRONG_FORM,
             },
             {
                 name: "a first target whose engine has a getter that throws",
@@ -284,10 +294,10 @@ const MANIFEST_CASES: readonly { readonly name: string; readonly hostile: () => 
 
 for (const { parserName, inputName, parse, plain, cases } of PARSERS) {
     describe(`Using the ${parserName}`, () => {
-        for (const { name, hostile, expected } of cases) {
+        for (const { name, hostile, expected, refusal } of cases) {
             describe(`given ${name}`, () => {
                 describe(`when the ${inputName} is parsed`, () => {
-                    test(`then it should refuse it as ${expected.map((issue) => `${issue.code} at ${issue.path}`).join(", ")} without throwing`, () => {
+                    test(`then it should refuse it ${refusal ?? `as ${expected.map((issue) => `${issue.code} at ${issue.path}`).join(", ")}`} without throwing`, () => {
                         const input = hostile();
                         let issues: readonly CodeAndPath[] = [];
                         assert.doesNotThrow(() => {
@@ -312,6 +322,19 @@ for (const { parserName, inputName, parse, plain, cases } of PARSERS) {
         });
     });
 }
+
+describe("Using the project parser", () => {
+    describe("given origins written as a number", () => {
+        describe("when the project is parsed", () => {
+            test("then it should refuse the origins as wrong_type first", () => {
+                assert.deepEqual(originsOfTheWrongFormIssues()[0], {
+                    code: "wrong_type",
+                    path: "$.origins",
+                });
+            });
+        });
+    });
+});
 
 describe("Using the manifest decoder", () => {
     for (const { name, hostile } of MANIFEST_CASES) {

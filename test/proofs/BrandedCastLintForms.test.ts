@@ -10,7 +10,7 @@ const TIMEOUT = 300_000;
 const ONLY_THE_RULE = { rule: RepositoryRuleName.BrandedCasts };
 const PLANTED_FILE = "planted-plan-shortcut.ts";
 const PLANTED_MODULE = `packages/cli/src/${PLANTED_FILE}`;
-const OWNING_PARSER = "packages/engine/src/plan/plan-parser.ts";
+const OWNING_PARSER = "packages/engine/src/plan/parse/PlanParser.ts";
 
 type PlantedSource = { readonly how: string; readonly source: string };
 

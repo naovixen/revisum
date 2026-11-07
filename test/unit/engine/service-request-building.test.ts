@@ -29,7 +29,7 @@ const valuesOf = (entries: Readonly<Record<string, string>>): RunValues =>
 
 // The arguments of the first step of a plan the parser accepted: SafeText, typed by the parser.
 function parsedArguments(plan: Plan): CallArguments {
-  const step = plan.steps[0];
+  const step = plan.steps.at(0);
   assert.ok(step !== undefined && step.type === 'call', 'the first step is a call');
   return step.arguments;
 }
