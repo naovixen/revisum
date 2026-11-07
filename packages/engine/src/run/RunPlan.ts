@@ -10,7 +10,7 @@ import { StepCode, type PlanRunResult, type Session } from "@revisum/contracts";
 import { plan as planRun, resolve, targetUnavailable, type Planned } from "../lifecycle.ts";
 import type { Logger } from "../logging.ts";
 import { buildManifest, manifestHash } from "../manifest.ts";
-import { assertBranded } from "../plan/plan-parser.ts";
+import { assertBranded } from "../plan/parse/PlanParser.ts";
 import { assertCleared, type ClearedRun } from "../policy/ClearedRun.ts";
 import { afterTheVerdict, EndOfTheRunKind } from "./after-the-verdict/AfterTheVerdict.ts";
 import {

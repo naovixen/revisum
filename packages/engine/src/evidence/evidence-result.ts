@@ -14,7 +14,7 @@ import { guaranteeStatement } from '../guarantees.ts';
 import { canonicalJson, sha256 } from '../hashing.ts';
 import { manifestHash } from '../manifest.ts';
 import { runTimeTextOrDigest } from '../plan/plan-decoders.ts';
-import { criterionIdFrom } from '../plan/plan-parser.ts';
+import { criterionIdFrom } from '../plan/parse/text/ReadCriterionId.ts';
 import { RECORD_UNREAD, RecordReadKind, readValueOr, type RecordRead } from '../run/after-the-verdict/RecordRead.ts';
 import { refusedResult } from '../run/seal/RefusedResult.ts';
 import { withRunHashes } from '../run/seal/WithRunHashes.ts';

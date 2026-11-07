@@ -36,7 +36,7 @@ import { targetNotDeclared, type TargetNotDeclared } from './TargetNotDeclared.t
 import { everyIrreversiblePattern, patternsForLocale } from './irreversible-patterns.ts';
 import { callRuleBeforeRun, ruleBeforeRun, ruleDuringRun, type StaticContext } from './StepRules.ts';
 import { everyPlanStep, visitSteps } from '../plan/VisitSteps.ts';
-import { frameDepthAddedBy, holdsSteps, isStepIn, StepSection } from '../plan/StepFacts.ts';
+import { frameDepthInside, holdsSteps, isDeeperThanAllowed, isStepIn, StepSection } from '../plan/StepFacts.ts';
 import { secretsNamedBy } from '../plan/SecretsNamedBy.ts';
 
 // What the gate gives a plan it allows for one target id: a cleared run when both the plan and the
@@ -92,9 +92,9 @@ function everyStep(steps: readonly Step[]): { readonly step: Step; readonly inde
 function isOverLimit(plan: Plan, limits: Limits): boolean {
   const listTooLong = (steps: readonly Step[], depth: number): boolean =>
     steps.length > limits.maximumSteps
-    || steps.some((step) => holdsSteps(step) && innerTooDeepOrLong(step.steps, depth + frameDepthAddedBy(step)));
+    || steps.some((step) => holdsSteps(step) && innerTooDeepOrLong(step.steps, frameDepthInside(step.type, depth)));
   const innerTooDeepOrLong = (steps: readonly Step[], depth: number): boolean =>
-    depth > limits.maximumFrameDepth || listTooLong(steps, depth);
+    isDeeperThanAllowed(depth, limits.maximumFrameDepth) || listTooLong(steps, depth);
   const bytes = new TextEncoder().encode(JSON.stringify(plan)).length;
   const scripts = everyStep(plan.steps).filter(({ step }) => isStepIn(step, StepSection.PageScripts));
   const calls = callingSteps(plan).filter(({ step }) => isStepIn(step, StepSection.ServiceCalls, StepSection.DatabaseCommands));

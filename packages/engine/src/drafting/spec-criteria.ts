@@ -4,7 +4,7 @@
 // heading. Everything else in the spec (background, notes, links to screenshots) is never read
 // into a criterion, so it can never reach a planner.
 import { failure, success, type CriterionText, type Result } from '@revisum/contracts';
-import { criterionIdFrom } from '../plan/plan-parser.ts';
+import { criterionIdFrom } from '../plan/parse/text/ReadCriterionId.ts';
 
 const HEADING = /^#{1,6}\s/;
 const CRITERIA_HEADING = /^#{1,6}\s+acceptance criteria\s*#*\s*$/i;

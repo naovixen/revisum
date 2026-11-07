@@ -261,8 +261,18 @@ export const holdsSteps = (step: Step): step is StepByType[ContainerStepType] =>
 export const opensUrl = (step: Step): step is StepByType[UrlOpeningStepType] =>
     STEP_FACTS[step.type].opensUrl;
 
-// How many frames deeper than the step its own steps stand.
-export const frameDepthAddedBy = (step: Step): number => STEP_FACTS[step.type].frameDepthAdded;
+// The one frame depth rule, which the parser and the policy gate share. A list of steps stands at a
+// depth: the plan's own at 0, and the steps a frame or a second tab holds at the depth of the list
+// it stands in, plus its `frameDepthAdded`. A list deeper than the project's limit is too deep.
+export const frameDepthInside = (type: StepType, depth: number): number =>
+    depth + STEP_FACTS[type].frameDepthAdded;
+
+// True when a list of steps `depth` frames deep is deeper than `maximumFrameDepth` allows.
+export const isDeeperThanAllowed = (depth: number, maximumFrameDepth: number): boolean =>
+    depth > maximumFrameDepth;
+
+// True when a step of this type holds steps of its own.
+export const holdsStepsOfType = (type: StepType): boolean => STEP_FACTS[type].holdsSteps;
 
 // True when a failed step of this type means the run could not test.
 export const isSetupStepType = (type: StepType): boolean => STEP_FACTS[type].isSetup;

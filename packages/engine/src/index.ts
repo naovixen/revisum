@@ -15,7 +15,7 @@ export type { ClearedRun } from './policy/ClearedRun.ts';
 export { policyGate, type PlanClearance, type PolicyGate, type RunClearance, type TargetClearance } from './policy/policy-gate.ts';
 export type { TargetNotDeclared } from './policy/TargetNotDeclared.ts';
 export { BaseUrlRefusal, baseUrlOfOrigin, parseBaseUrl } from './ParseBaseUrl.ts';
-export { assertBranded, planParser } from './plan/plan-parser.ts';
+export { assertBranded, planParser } from './plan/parse/PlanParser.ts';
 export { unsafeFeaturesOf } from './plan/unsafe-features.ts';
 export { clockAdvanceMilliseconds, totalClockAdvanceMilliseconds } from './clock-advance.ts';
 export { planJsonSchema } from './plan/plan-schema.ts';

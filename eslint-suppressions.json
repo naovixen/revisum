@@ -916,23 +916,6 @@
       "count": 1
     }
   },
-  "packages/engine/src/plan/plan-parser.ts": {
-    "@typescript-eslint/naming-convention": {
-      "count": 3
-    },
-    "curly": {
-      "count": 142
-    },
-    "max-lines": {
-      "count": 1
-    },
-    "max-lines-per-function": {
-      "count": 1
-    },
-    "revisum/file-name-matches-export": {
-      "count": 1
-    }
-  },
   "packages/engine/src/plan/plan-schema.ts": {
     "curly": {
       "count": 2

@@ -27,7 +27,7 @@ import { deriveActor, pseudonymousActorId, sourceActorId } from '../actor.ts';
 import { brand } from '../brand.ts';
 import { canonicalJson, sha256 } from '../hashing.ts';
 import { planHash } from '../manifest.ts';
-import { planParser } from '../plan/plan-parser.ts';
+import { planParser } from '../plan/parse/PlanParser.ts';
 import { readPlanText } from '../plan/readable/plan-text.ts';
 import { CODE_OWNERS_PATHS, parseJson, repositoryPath, type TrustedProject } from '../project/trusted-project.ts';
 import {

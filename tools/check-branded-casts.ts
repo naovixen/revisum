@@ -14,7 +14,16 @@ import type { Token } from './lint-names.ts';
 import { codeTokens, isIdentifier, isPunctuator, listSourceFiles } from './source-files.ts';
 import { reportProblems } from './workspace-packages.ts';
 
-const PLAN_PARSER = 'packages/engine/src/plan/plan-parser.ts';
+const PLAN_PARSE = 'packages/engine/src/plan/parse';
+const PLAN_PARSER = `${PLAN_PARSE}/PlanParser.ts`;
+const PLAN_ENVELOPE = `${PLAN_PARSE}/ReadPlanData.ts`;
+const PLAN_URLS = `${PLAN_PARSE}/text/ReadUrl.ts`;
+const PLAN_CRITERIA = `${PLAN_PARSE}/text/ReadCriterionId.ts`;
+const PLAN_DECLARED_NAMES = `${PLAN_PARSE}/declarations/ReadDeclared.ts`;
+const PLAN_REMEMBERED_FIELDS = `${PLAN_PARSE}/declarations/ReadRememberedFields.ts`;
+const PLAN_SCRIPTS = `${PLAN_PARSE}/declarations/ReadScriptChoice.ts`;
+const PLAN_CAPTURES = `${PLAN_PARSE}/steps/EvidenceStepReaders.ts`;
+const PLAN_DOWNLOADS = `${PLAN_PARSE}/steps/DownloadStepReaders.ts`;
 const PROJECT_PARSER = 'packages/engine/src/project/project-parser.ts';
 const ACTOR_MODULE = 'packages/engine/src/actor.ts';
 const APPROVAL_VERIFIER = 'packages/engine/src/approval/approval-verifier.ts';
@@ -32,14 +41,14 @@ export const BRAND_OWNERS: Readonly<Record<string, readonly string[]>> = {
   Brand: ['packages/engine/src/brand.ts'],
   SafeText: ['packages/engine/src/plan/plan-decoders.ts'],
   // A path template resolves to a path on the run's base URL once its values are known.
-  AllowedUrl: [PLAN_PARSER, 'packages/engine/src/run-values.ts'],
-  CaptureName: [PLAN_PARSER],
+  AllowedUrl: [PLAN_URLS, 'packages/engine/src/run-values.ts'],
+  CaptureName: [PLAN_CAPTURES],
   // A download name is plain text the plan parser checks; it is never a path.
-  DownloadName: [PLAN_PARSER],
-  FeatureId: [PLAN_PARSER],
+  DownloadName: [PLAN_DOWNLOADS],
+  FeatureId: [PLAN_ENVELOPE],
   Plan: [PLAN_PARSER],
   // A suite's criterion annotations name criteria by the same rule as a plan.
-  CriterionId: [PLAN_PARSER, EVIDENCE_RESULT],
+  CriterionId: [PLAN_CRITERIA, EVIDENCE_RESULT],
   ValueName: ['packages/engine/src/plan/plan-values.ts'],
   // An empty proxy server would send a session's traffic direct.
   ProxyServer: ['packages/driver-cdp/src/SessionEgress.ts'],
@@ -59,16 +68,16 @@ export const BRAND_OWNERS: Readonly<Record<string, readonly string[]>> = {
   // Declared services and calls are read with the project; a plan names a call and its fields by
   // the names the declarations gave them.
   ServiceName: [CALL_DECLARATIONS],
-  CallName: [CALL_DECLARATIONS, PLAN_PARSER],
+  CallName: [CALL_DECLARATIONS, PLAN_DECLARED_NAMES],
   // A database command's argument vector names its declared parameters.
   ParameterName: [CALL_DECLARATIONS, UNSAFE_FEATURE_DECLARATIONS],
-  FieldName: [CALL_DECLARATIONS, PLAN_PARSER],
+  FieldName: [CALL_DECLARATIONS, PLAN_DECLARED_NAMES, PLAN_REMEMBERED_FIELDS],
   JsonPointer: [CALL_DECLARATIONS],
   // Stubs, observed requests and storage entries are named by the same declaration-section reader
   // as calls; a plan refers to them by those names.
-  StubName: [CALL_DECLARATIONS, PLAN_PARSER],
-  RequestName: [CALL_DECLARATIONS, PLAN_PARSER],
-  StorageEntryName: [CALL_DECLARATIONS, PLAN_PARSER],
+  StubName: [CALL_DECLARATIONS, PLAN_DECLARED_NAMES],
+  RequestName: [CALL_DECLARATIONS, PLAN_DECLARED_NAMES],
+  StorageEntryName: [CALL_DECLARATIONS, PLAN_DECLARED_NAMES],
   // Evidence mode: a suite and its image are named in the project file; a decoded report and a
   // test's id come only from the report decoder and the result built from it.
   SuiteName: [EVIDENCE_DECLARATIONS],
@@ -79,9 +88,9 @@ export const BRAND_OWNERS: Readonly<Record<string, readonly string[]>> = {
   // Unsafe plan features: page scripts and database commands are named by the declaration-section
   // reader, and a plan refers to them by those names; only the plan parser reads an inline
   // script's source.
-  ScriptName: [CALL_DECLARATIONS, PLAN_PARSER],
-  CommandName: [CALL_DECLARATIONS, PLAN_PARSER],
-  ScriptSource: [PLAN_PARSER],
+  ScriptName: [CALL_DECLARATIONS, PLAN_DECLARED_NAMES],
+  CommandName: [CALL_DECLARATIONS, PLAN_DECLARED_NAMES],
+  ScriptSource: [PLAN_SCRIPTS],
   SuiteTestId: [EVIDENCE_RESULT],
   ValidReport: ['packages/report/src/model/report-parser.ts'],
   ActorId: [ACTOR_MODULE],
