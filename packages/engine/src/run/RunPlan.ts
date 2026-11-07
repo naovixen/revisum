@@ -20,7 +20,6 @@ import {
 } from "./after-the-verdict/ReadKeepingTheResult.ts";
 import { withRefusalsAfterTheVerdict } from "./after-the-verdict/WithRefusalsAfterTheVerdict.ts";
 import type { StepsRun, StepsVerdict } from "./steps/VerdictOfSteps.ts";
-import type { SessionContext } from "./executors/StepExecutor.ts";
 import { checkPreflight, type PreflightPassed } from "./preflight/CheckPreflight.ts";
 import { refuseRun } from "./preflight/RefuseRun.ts";
 import type { RunContext, RunInputs, RunPorts } from "./RunContext.ts";
@@ -29,8 +28,9 @@ import type { RunResult } from "./RunResult.ts";
 import { sealResult, type NothingRanContext } from "./seal/SealResult.ts";
 import { unavailableResult } from "./seal/UnavailableResult.ts";
 import { createRunContext } from "./session/CreateRunContext.ts";
-import { manifestInputsOf } from "./session/ManifestInputsOf.ts";
-import { cannotPinDeterminism, openSession, type OpenedSession } from "./session/OpenSession.ts";
+import { manifestInputsOf, type ManifestInputs } from "./session/ManifestInputsOf.ts";
+import { cannotPinDeterminism, type OpenedSession } from "./session/OpenSession.ts";
+import { withOpenSession } from "./session/WithOpenSession.ts";
 import { runTheSteps } from "./steps/RunTheSteps.ts";
 
 export async function runPlan(
@@ -77,50 +77,55 @@ export async function runPlan(
         determinismUnpinned: isDeterminismUnpinned,
     });
 
-    const opened = await openSession(planned, context);
-    if (!opened.ok) {
-        const unavailable = targetUnavailable(planned, opened.error);
+    const inSession = await withOpenSession(planned, context, (opened) =>
+        runTheStepsInTheSession(planned, context, passed, opened, isPlanLogged),
+    );
+    if (!inSession.ok) {
+        const unavailable = targetUnavailable(planned, inSession.error);
         return unavailableResult(target.id, unavailable.unavailable, nothingRan, startedAt);
     }
-    return runInTheSession({
-        planned,
-        context,
-        passed,
-        opened: opened.value,
-        nothingRan,
-        startedAt,
-        isPlanLogged,
-    });
+    return finishAfterTheSteps(inSession.value, context, nothingRan, startedAt);
 }
 
-// A run whose session opened, and what it brings from before.
-type OpenedRun = {
-    readonly planned: Planned;
-    readonly context: RunContext;
-    readonly passed: PreflightPassed;
-    readonly opened: OpenedSession;
-    readonly nothingRan: NothingRanContext;
-    readonly startedAt: number;
-    readonly isPlanLogged: boolean;
+// What the steps leave once the session has closed.
+type StepsInTheSession = {
+    readonly session: Session;
+    readonly manifestInputs: ManifestInputs;
+    readonly ran: StepsRun;
 };
 
-// The steps, their verdict, what comes after it, and the seal.
-async function runInTheSession(run: OpenedRun): Promise<RunResult> {
-    const { context, opened, startedAt } = run;
-    const { logger, ports } = context;
+// The manifest as it stands before the steps, and the steps, while the session is open.
+async function runTheStepsInTheSession(
+    planned: Planned,
+    context: RunContext,
+    passed: PreflightPassed,
+    opened: OpenedSession,
+    isPlanLogged: boolean,
+): Promise<StepsInTheSession> {
     const { session, driver } = opened;
-    const stepContext: SessionContext = { ...context, session };
-    const manifestInputs = manifestInputsOf(context, run.passed, opened);
+    const manifestInputs = manifestInputsOf(context, passed, opened);
     const manifestBeforeTheSteps = buildManifest(manifestInputs);
     const resolved = resolve(
-        run.planned,
+        planned,
         session,
         manifestBeforeTheSteps,
         manifestHash(manifestBeforeTheSteps),
     );
-    const ran = await runTheSteps(stepContext, resolved, driver.info.id, run.isPlanLogged);
+    const ran = await runTheSteps({ ...context, session }, resolved, driver.info.id, isPlanLogged);
+    return { session, manifestInputs, ran };
+}
+
+// The verdict, what comes after it, and the seal.
+async function finishAfterTheSteps(
+    inSession: StepsInTheSession,
+    context: RunContext,
+    nothingRan: NothingRanContext,
+    startedAt: number,
+): Promise<RunResult> {
+    const { session, manifestInputs, ran } = inSession;
+    const { logger, ports } = context;
     const verdict = verdictAfterRefusals(ran, session, logger);
-    const after = await afterTheVerdict(stepContext, verdict);
+    const after = await afterTheVerdict({ ...context, session }, verdict);
     const manifest =
         ran.rewrites.length === 0
             ? verdict.finished.manifest
@@ -147,7 +152,7 @@ async function runInTheSession(run: OpenedRun): Promise<RunResult> {
                 stepMilliseconds: ran.stepMilliseconds,
             },
         },
-        run.nothingRan,
+        nothingRan,
     );
 }
 

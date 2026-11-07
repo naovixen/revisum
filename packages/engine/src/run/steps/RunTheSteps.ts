@@ -1,19 +1,21 @@
-// Runs the plan's steps in order and gives them a verdict, then closes the session, whatever happened.
-import { StepCode, type AppliedRewrite, type Session, type StubAnswer } from "@revisum/contracts";
+// Runs the plan's steps in order and gives them a verdict, reading what the session must give before it closes.
+import { StepCode, type AppliedRewrite, type Session } from "@revisum/contracts";
 import { finish, start, type Denial, type Resolved } from "../../lifecycle.ts";
 import {
     observedRequestNames,
     startObserving,
 } from "../../network-and-storage/network-and-storage-steps.ts";
 import type { RunStep } from "../../RunStep.ts";
-import { readKeepingTheResult } from "../after-the-verdict/ReadKeepingTheResult.ts";
+import {
+    logFailureAfterTheVerdict,
+    readKeepingTheResult,
+} from "../after-the-verdict/ReadKeepingTheResult.ts";
 import { codeForThrow } from "../CodeForThrow.ts";
 import { networkContext } from "../executors/network-and-storage/NetworkAndStorageExecutors.ts";
 import { ExecutorOutcome, type RanStep, type SessionContext } from "../executors/StepExecutor.ts";
-import { closeKeepingTheResult } from "../session/CloseKeepingTheResult.ts";
 import { failedStep, type StepResult } from "../StepResult.ts";
 import { runPlanStep } from "./RunPlanStep.ts";
-import { verdictOfSteps, type FinishedRun, type StepsRun } from "./VerdictOfSteps.ts";
+import { verdictOfSteps, type StepsRun } from "./VerdictOfSteps.ts";
 
 // What the steps have given so far, kept as each ends, so a log or clock that fails part way still
 // leaves every step accounted for.
@@ -39,9 +41,7 @@ export async function runTheSteps(
         denials: [],
         setupFailedInside: new Set(),
     };
-    let stubAnswers: readonly StubAnswer[];
-    let rewrites: readonly AppliedRewrite[];
-    let finished: FinishedRun;
+    let hasFailedPartWay = false;
     try {
         if (!isPlanLogged) {
             throw new Error("the log could not be written");
@@ -56,26 +56,31 @@ export async function runTheSteps(
         });
         logger.log({ kind: "run.state", state: running.state, targetId });
         await runEachStep(context, soFar);
-        // In the try: a port that cannot say what it rewrote must not leave a mutated run reading as plain.
-        rewrites = ports.rewritesApplied?.() ?? [];
-        finished = verdictOfSteps(soFar.steps, running, soFar);
-    } catch {
-        // A step's own failures never get here, so only the log or the clock can have failed. The result
-        // still accounts for every step.
+    } catch (error) {
+        // Only what the steps do not catch themselves gets here, such as a log or a clock that failed part
+        // way. The result still accounts for every step.
+        logFailureAfterTheVerdict(StepCode.AdapterError, error, logger);
         pushUnfinishedSteps(context.planSteps, soFar.steps);
-        finished = finish(running, "Errored");
-        rewrites = readKeepingTheResult(() => ports.rewritesApplied?.() ?? [], [], logger);
-    } finally {
-        // Read before the browser goes, with every answer the stubs gave.
-        stubAnswers = readKeepingTheResult(() => session.network.stubAnswers(), [], logger);
-        await closeKeepingTheResult(session, ports.clock, logger);
+        hasFailedPartWay = true;
     }
+    // Asked once: a port that cannot say what it rewrote must not leave a mutated run reading as plain.
+    const rewritesRead = readKeepingTheResult<readonly AppliedRewrite[] | undefined>(
+        () => ports.rewritesApplied?.() ?? [],
+        undefined,
+        logger,
+    );
+    const finished =
+        hasFailedPartWay || rewritesRead === undefined
+            ? finish(running, "Errored")
+            : verdictOfSteps(soFar.steps, running, soFar);
+    // Read before the browser goes, with every answer the stubs gave.
+    const stubAnswers = readKeepingTheResult(() => session.network.stubAnswers(), [], logger);
     return {
         running,
         steps: soFar.steps,
         stepMilliseconds: soFar.stepMilliseconds,
         stubAnswers,
-        rewrites,
+        rewrites: rewritesRead ?? [],
         finished,
     };
 }
