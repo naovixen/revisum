@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { arch, platform } from "node:os";
 import { join } from "node:path";
 import type { RunnerHandle } from "@revisum/contracts";
-import { parseProject, planParser, run, type RunResult } from "@revisum/engine";
+import { createRunService, parseProject, planParser, type RunResult } from "@revisum/engine";
 import { navigate, rawPlan, testId, textEquals } from "../support/browser/RawPlan.ts";
 import { BROWSERS } from "../support/browsers.ts";
 import {
@@ -114,15 +114,7 @@ async function runPlanAgainst(fixture: FixtureServer, proxyServer: string): Prom
     assert.ok(parsedPlan.ok, "the plan parses");
     const target = project.value.matrix[0];
     assert.ok(target !== undefined, "the project has a target");
-    return run(
-        clearRun(parsedPlan.value, await trustedProjectFrom(projectFile), target.id),
-        {
-            baseUrl: baseUrlOf(fixture.origin),
-            seed: SEED,
-            fixedTimeMilliseconds: FIXED_TIME_MILLISECONDS,
-            fixtures: fixture.fixtures,
-            host: { platform: platform(), arch: arch() },
-        },
+    return createRunService(
         realRunPorts({
             drivers: new Map([
                 [
@@ -135,7 +127,13 @@ async function runPlanAgainst(fixture: FixtureServer, proxyServer: string): Prom
             ]),
             clock: systemClock,
         }),
-    );
+    ).run(clearRun(parsedPlan.value, await trustedProjectFrom(projectFile), target.id), {
+        baseUrl: baseUrlOf(fixture.origin),
+        seed: SEED,
+        fixedTimeMilliseconds: FIXED_TIME_MILLISECONDS,
+        fixtures: fixture.fixtures,
+        host: { platform: platform(), arch: arch() },
+    });
 }
 
 async function runInThisContainer(): Promise<RunPastRefusals> {

@@ -4,11 +4,11 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import {
+    createRunService,
     evidenceResult,
     failure,
     planParser,
     refusedSuiteResult,
-    run,
     unreadSuiteResult,
     type RunManifest,
     type RunResult,
@@ -148,7 +148,7 @@ const planRunOnAnUnavailableTarget = async (): Promise<RunResult> => {
     const project = projectWith();
     const trusted = await trustedProjectFrom(projectFileWith());
     const plan = accepted(planParser(project), planOf([OPEN_ORDERS]));
-    return run(
+    return createRunService(fakePorts({ drivers: driversOf(unavailableDriver) })).run(
         clearRun(plan, trusted, project.matrix[0]?.id ?? assert.fail("no target")),
         {
             baseUrl: baseUrlOf(ORIGIN),
@@ -157,7 +157,6 @@ const planRunOnAnUnavailableTarget = async (): Promise<RunResult> => {
             fixtures: [],
             host: { platform: "test", arch: "test" },
         },
-        fakePorts({ drivers: driversOf(unavailableDriver) }),
     );
 };
 

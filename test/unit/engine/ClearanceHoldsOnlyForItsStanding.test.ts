@@ -5,8 +5,8 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import {
+    createRunService,
     policyGate,
-    run,
     success,
     type ClearedRun,
     type Plan,
@@ -146,18 +146,14 @@ async function runOnCountingSession(
     });
     let refused: unknown = null;
     try {
-        await run(
-            cleared,
-            {
-                baseUrl: baseUrlOf(ORIGIN),
-                seed: DEFAULT_SEED,
-                fixedTimeMilliseconds: DEFAULT_CLOCK_START,
-                fixtures: [],
-                host: { platform: "test", arch: "test" },
-                scriptSources: sourceBytes(),
-            },
-            ports,
-        );
+        await createRunService(ports).run(cleared, {
+            baseUrl: baseUrlOf(ORIGIN),
+            seed: DEFAULT_SEED,
+            fixedTimeMilliseconds: DEFAULT_CLOCK_START,
+            fixtures: [],
+            host: { platform: "test", arch: "test" },
+            scriptSources: sourceBytes(),
+        });
     } catch (error) {
         refused = error;
     }

@@ -9,7 +9,7 @@
 // `standing` in its inputs.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { PERSON_ACTOR_TYPES, approvalFor, mergeGateOpen, planHash, planStanding, run, unverified, type Approval, type Plan, type TargetId } from '@revisum/engine';
+import { createRunService, PERSON_ACTOR_TYPES, approvalFor, mergeGateOpen, planHash, planStanding, unverified, type Approval, type Plan, type TargetId } from '@revisum/engine';
 import { baseUrlOf, clearRun, trustedProjectFrom } from '../../support/policy-clearance.ts';
 import { memoryApprovalStore, parsedSignupPlan, withRepository, type TestRepository } from './approval-repositories.ts';
 import { ORIGIN, TARGET_ID, signupPlan, testProjectInput, withValue, type JsonRecord } from './plan-examples.ts';
@@ -60,9 +60,9 @@ async function runPlan(plan: Plan, standing: ReturnType<typeof planStanding>, ba
   const driver = fakeDriverNeverLaunching();
   // Every run is one the policy gate cleared, under the plan's standing.
   const cleared = clearRun(plan, await trustedProjectFrom(testProjectInput({}, productionFields(policy))), TARGET_ID as TargetId, standing);
-  const result = await run(cleared, {
+  const result = await createRunService(fakePorts({ drivers: driversOf(driver) })).run(cleared, {
     baseUrl: baseUrlOf(baseUrl), seed: 7, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: 'test', arch: 'test' },
-  }, fakePorts({ drivers: driversOf(driver) }));
+  });
   return { result, driverCalls: driver.calls.count() };
 }
 

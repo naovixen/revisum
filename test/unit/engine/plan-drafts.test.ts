@@ -22,7 +22,7 @@
 // "Konto löschen" (delete account) is denied as irreversible there, and "Create account" is not.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { admitDraft, assertBranded, failure, planHash, planStanding, policyGate, readPlanText, run, success, unverified, writePlanText, type BrowserDriver, type DerivedActor, type DraftError, type Plan, type PlanDraft, type PlanError, type PlanFormat, type PlanParse, type PlanProvenance, type PlanSource, type ProvenanceBasis } from '@revisum/engine';
+import { createRunService, admitDraft, assertBranded, failure, planHash, planStanding, policyGate, readPlanText, success, unverified, writePlanText, type BrowserDriver, type DerivedActor, type DraftError, type Plan, type PlanDraft, type PlanError, type PlanFormat, type PlanParse, type PlanProvenance, type PlanSource, type ProvenanceBasis } from '@revisum/engine';
 import { baseUrlOf, clearRun, trustedProjectFrom } from '../../support/policy-clearance.ts';
 import { memoryApprovalStore, memoryEventSink, parsedSignupPlan, withRepository } from './approval-repositories.ts';
 import { ORIGIN, accountClosurePlan, defaultParser, signupPlan, testProject, testProjectInput, withValue, type JsonRecord } from './plan-examples.ts';
@@ -123,10 +123,10 @@ async function runAdmitted(plan: Plan, log: CallLog): Promise<void> {
   const targetId = plan.targets[0];
   assert.ok(targetId !== undefined, 'the plan has no target');
   const cleared = clearRun(plan, trusted, targetId);
-  await run(cleared, {
+  await createRunService(fakePorts({ drivers: driversOf(loggingDriver(log)) })).run(cleared, {
     baseUrl: baseUrlOf(ORIGIN), seed: 7, fixedTimeMilliseconds: 0,
     fixtures: [], host: { platform: 'test', arch: 'test' },
-  }, fakePorts({ drivers: driversOf(loggingDriver(log)) }));
+  });
 }
 
 // ---- Every route's draft is parsed first ------------------------------------------------------------------

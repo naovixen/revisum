@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import { arch, platform } from 'node:os';
 import { test } from 'node:test';
-import { assertBranded, planParser, run, type ClearedRun, type Plan, type TargetId } from '@revisum/engine';
+import { createRunService, assertBranded, planParser, type ClearedRun, type Plan, type TargetId } from '@revisum/engine';
 import { baseUrlOf, clearRun, trustedProjectFrom } from '../support/policy-clearance.ts';
 import { ORIGIN, TARGET_ID, signupPlan, testProject, testProjectInput } from '../unit/engine/plan-examples.ts';
 import { fakeArtifactStore } from '#test-support/fakes/FakeArtifactStore.ts';
@@ -38,7 +38,7 @@ const FORGERIES: readonly (readonly [string, () => Plan])[] = [
 // that this one stopped them first.
 const REFUSED_AS_NOT_PARSED = { name: 'TypeError', message: 'refused a plan that the plan parser did not make' };
 
-type Watched = { readonly ports: Parameters<typeof run>[2]; readonly driverCalls: () => number; readonly storeWrites: () => number };
+type Watched = { readonly ports: Parameters<typeof createRunService>[0]; readonly driverCalls: () => number; readonly storeWrites: () => number };
 
 function watchedPorts(): Watched {
   const spy = fakeDriverNeverLaunching();
@@ -62,7 +62,7 @@ for (const [name, forge] of FORGERIES) {
   test(`run() refuses ${name} before any side effect`, async () => {
     const watched = watchedPorts();
     const cleared = await clearedRunOf(forge());
-    await assert.rejects(run(cleared, INPUTS, watched.ports), REFUSED_AS_NOT_PARSED);
+    await assert.rejects(createRunService(watched.ports).run(cleared, INPUTS), REFUSED_AS_NOT_PARSED);
     assert.equal(watched.driverCalls(), 0, 'no driver method was called');
     assert.equal(watched.ports.events.read().length, 0, 'nothing was logged');
     assert.equal(watched.storeWrites(), 0, 'nothing was stored');
@@ -85,7 +85,7 @@ test('assertBranded accepts a plan made by the parser', () => {
 
 test('run() accepts a plan made by the parser and reaches the driver', async () => {
   const watched = watchedPorts();
-  const result = await run(await clearedRun(), INPUTS, watched.ports);
+  const result = await createRunService(watched.ports).run(await clearedRun(), INPUTS);
   assert.equal(result.state, 'TargetUnavailable', 'the spy driver cannot launch, so the target is unavailable');
   assert.ok(watched.driverCalls() > 0, 'the driver was asked to open a session');
   assert.ok(watched.ports.events.read().length > 0, 'the run was logged');
@@ -95,7 +95,7 @@ test('a parser-made plan passes the check each time it is run', async () => {
   const cleared = await clearedRun();
   for (let attempt = 0; attempt < 2; attempt++) {
     const watched = watchedPorts();
-    await run(cleared, INPUTS, watched.ports);
+    await createRunService(watched.ports).run(cleared, INPUTS);
     assert.ok(watched.driverCalls() > 0, `run ${attempt + 1} reached the driver`);
   }
 });

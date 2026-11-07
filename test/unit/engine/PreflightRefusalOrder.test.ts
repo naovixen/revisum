@@ -9,7 +9,7 @@
 // takes the base URL of the earliest.
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { planParser, run, type RunPorts, type RunResult } from "@revisum/engine";
+import { createRunService, planParser, type RunPorts, type RunResult } from "@revisum/engine";
 import { baseUrlOf, clearRun, trustedProjectFrom } from "#test-support/policy-clearance.ts";
 import { fakeDriverNeverLaunching } from "#test-support/fakes/FakeDriver.ts";
 import { driversOf, fakePorts } from "#test-support/fakes/FakePorts.ts";
@@ -177,7 +177,7 @@ async function runFailing(
         CONDITIONS.find(
             (condition) => conditions.includes(condition) && condition.baseUrl !== undefined,
         )?.baseUrl ?? ORIGIN;
-    const result = await run(
+    const result = await createRunService(portsFor(conditions, { drivers: driversOf(driver) })).run(
         cleared,
         {
             baseUrl: baseUrlOf(baseUrl),
@@ -189,7 +189,6 @@ async function runFailing(
                 ? {}
                 : sourceBytes(),
         },
-        portsFor(conditions, { drivers: driversOf(driver) }),
     );
     return { result, driverCalls: driver.calls.count() };
 }

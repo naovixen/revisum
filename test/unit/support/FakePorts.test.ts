@@ -1,10 +1,9 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import {
+    createRunService,
     failure,
     planParser,
-    run,
-    runUntrusted,
     success,
     type Origin,
     type RunPorts,
@@ -185,7 +184,9 @@ describe("Using a fake port", () => {
             test("then it should pass and show what reached the driver", async () => {
                 const project = projectWith();
                 const driver = fakeDriver();
-                const result = await run(
+                const result = await createRunService(
+                    fakePorts({ drivers: driversOf(driver) }),
+                ).run(
                     clearRun(
                         accepted(planParser(project), planOf([OPEN_ORDERS])),
                         await trustedProjectFrom(projectFileWith()),
@@ -198,7 +199,6 @@ describe("Using a fake port", () => {
                         fixtures: [],
                         host: { platform: "test", arch: "test" },
                     },
-                    fakePorts({ drivers: driversOf(driver) }),
                 );
                 assert.equal(result.state, "Passed", JSON.stringify(result.steps));
                 assert.equal(driver.calls.count("open"), 1);
@@ -229,11 +229,10 @@ describe("Using a fake port", () => {
         describe("when it runs on the default fake", () => {
             test("then it should end Denied as an unnamed control, with the denial recorded", async () => {
                 const audit = fakeEventSink();
-                const outcome = await runUntrusted(
+                const outcome = await createRunService(fakePorts({ audit })).runUntrusted(
                     planOnThePolicyProject(DANGER_ZONE_STEPS),
                     parserFor(),
                     runBase(),
-                    fakePorts({ audit }),
                 );
                 assert.equal(finalState(outcome), "Denied", JSON.stringify(outcome));
                 assert.equal(onlyRun(outcome)?.denial?.rule, "unnamed-control");
@@ -244,12 +243,9 @@ describe("Using a fake port", () => {
         describe("when it runs on the guarded driver", () => {
             test("then it should end the same way as on the default fake", async () => {
                 const driven = guardedDriver(DANGER_ZONE_STEPS);
-                const outcome = await runUntrusted(
-                    planOnThePolicyProject(DANGER_ZONE_STEPS),
-                    parserFor(),
-                    runBase(),
+                const outcome = await createRunService(
                     fakePorts({ drivers: driversOf(driven.driver) }),
-                );
+                ).runUntrusted(planOnThePolicyProject(DANGER_ZONE_STEPS), parserFor(), runBase());
                 assert.equal(finalState(outcome), "Denied", JSON.stringify(outcome));
                 assert.equal(onlyRun(outcome)?.denial?.rule, "unnamed-control");
             });
@@ -259,11 +255,10 @@ describe("Using a fake port", () => {
             describe("when it runs on the default fake", () => {
                 test("then it should pass", async () => {
                     const steps = [OPEN_ACCOUNT_PAGE, click(testId(ALLOWED_UNNAMED_TEST_ID))];
-                    const outcome = await runUntrusted(
+                    const outcome = await createRunService(fakePorts()).runUntrusted(
                         planOnThePolicyProject(steps),
                         parserFor(withPolicy({})),
                         runBase(withPolicy({})),
-                        fakePorts(),
                     );
                     assert.equal(finalState(outcome), "Passed", JSON.stringify(outcome));
                 });

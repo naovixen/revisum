@@ -4,7 +4,7 @@
 // project: a copy of it under another project is refused before any browser opens.
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { run, runUntrusted, type ClearedRun } from "@revisum/engine";
+import { createRunService, type ClearedRun } from "@revisum/engine";
 import { finalState, guardedDriver, parserFor, runBase, runInputs } from "./guarded-driver.ts";
 import {
     ALLOWED,
@@ -186,7 +186,7 @@ describe("Using the policy gate", () => {
             const plan = parsedPlan(unsafePlan(steps), LOOSER);
             const guarded = guardedDriver(steps);
             const ports = fakePorts({ drivers: driversOf(guarded.driver) });
-            const outcome = await runUntrusted(
+            const outcome = await createRunService(ports).runUntrusted(
                 unsafePlan(steps),
                 parserFor(LOOSER),
                 {
@@ -195,7 +195,6 @@ describe("Using the policy gate", () => {
                     standing: await approvedStanding(plan),
                     scriptSources: sourceBytes(),
                 },
-                ports,
             );
             return { state: finalState(outcome), opens: guarded.opens() };
         };
@@ -232,10 +231,9 @@ describe("Using the policy gate", () => {
         };
         const runOn = (cleared: ClearedRun) => {
             const guarded = guardedDriver([OPEN_CART, CSS_CHECK]);
-            const ran = run(
+            const ran = createRunService(fakePorts({ drivers: driversOf(guarded.driver) })).run(
                 cleared,
                 runInputs(),
-                fakePorts({ drivers: driversOf(guarded.driver) }),
             );
             return { ran, opens: guarded.opens };
         };

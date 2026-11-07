@@ -4,8 +4,8 @@
 // and run, under a virtual clock, so a check that waits out its timeout costs no real time.
 import assert from "node:assert/strict";
 import {
+    createRunService,
     planParser,
-    run,
     success,
     type BrowserDriver,
     type Clock,
@@ -13,6 +13,7 @@ import {
     type NetworkPort,
     type ObservedExchange,
     type RunEventSink,
+    type RunPorts,
     type RunResult,
     type SecretStore,
     type Session,
@@ -83,6 +84,8 @@ export type FakeRunOptions = {
     readonly clock?: Clock;
     // What opening the browser does, when a test needs it to do other than give `session`.
     readonly open?: BrowserDriver["open"];
+    // What the egress proxy says it rewrote, when a test needs other than no rewrite.
+    readonly rewritesApplied?: RunPorts["rewritesApplied"];
 };
 
 export type FakeRun = {
@@ -108,16 +111,7 @@ export async function runOnFakeSession(
     });
     const audit = fakeEventSink();
     const events = options.events ?? fakeRunEventSink();
-    const result = await run(
-        clearRun(parsed.value, trusted, target.id),
-        {
-            baseUrl: baseUrlOf(ORIGIN),
-            seed: DEFAULT_SEED,
-            fixedTimeMilliseconds: DEFAULT_CLOCK_START,
-            fixtures: [],
-            host: { platform: "test", arch: "test" },
-            scriptSources: sourceBytes(),
-        },
+    const result = await createRunService(
         fakePorts({
             drivers: driversOf(driver),
             clock: options.clock ?? fakeClock(),
@@ -126,8 +120,18 @@ export async function runOnFakeSession(
             secrets: options.secrets ?? fakeSecretStore({ [DATABASE_SECRET]: DATABASE_PASSWORD }),
             services: routedServiceCaller(options.serviceRoute).caller,
             databaseCommands: fakeCommandRunner(options.commandRoute).port,
+            ...(options.rewritesApplied === undefined
+                ? {}
+                : { rewritesApplied: options.rewritesApplied }),
         }),
-    );
+    ).run(clearRun(parsed.value, trusted, target.id), {
+        baseUrl: baseUrlOf(ORIGIN),
+        seed: DEFAULT_SEED,
+        fixedTimeMilliseconds: DEFAULT_CLOCK_START,
+        fixtures: [],
+        host: { platform: "test", arch: "test" },
+        scriptSources: sourceBytes(),
+    });
     return { result, audit, events };
 }
 

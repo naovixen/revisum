@@ -5,8 +5,13 @@ import assert from 'node:assert/strict';
 import { arch, platform } from 'node:os';
 import { test } from 'node:test';
 import {
-  adapterRegistry, parseProject, planParser, run,
-  type BrowserDriver, type Project, type Target,
+  createRunService,
+  adapterRegistry,
+  parseProject,
+  planParser,
+  type BrowserDriver,
+  type Project,
+  type Target,
 } from '@revisum/engine';
 import { buildAdapters } from '../../packages/cli/src/BuildAdapters.ts';
 import { memoryArtifactStore, systemClock } from '../support/memory-ports.ts';
@@ -61,9 +66,9 @@ async function runOn(targetId: string, drivers: ReadonlyMap<string, BrowserDrive
   const parsed = planParser(project)(headingPlan(targetId));
   if (!parsed.ok) throw new Error(`bad test plan: ${JSON.stringify(parsed.error)}`);
   const store = memoryArtifactStore();
-  const result = await run(clearRun(parsed.value, await trustedProjectFrom(projectFile), target(targetId).id), {
+  const result = await createRunService(fakePorts({ drivers, clock: systemClock, artifacts: store })).run(clearRun(parsed.value, await trustedProjectFrom(projectFile), target(targetId).id), {
     baseUrl: baseUrlOf(ORIGIN), seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() },
-  }, fakePorts({ drivers, clock: systemClock, artifacts: store }));
+  });
   return { result, store };
 }
 

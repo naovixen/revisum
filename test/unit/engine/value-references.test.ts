@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import { arch, platform } from 'node:os';
 import { test } from 'node:test';
-import { runUntrusted } from '@revisum/engine';
+import { createRunService } from '@revisum/engine';
 import {
   CLOSING_CHECK, OPEN_ORDERS, ORIGIN, accepted, label, navigate, parserFor, planOf, projectWith, reference, rejection,
   type JsonRecord,
@@ -94,14 +94,14 @@ test('a plan with an undefined or duplicate value is refused before any driver i
     host: { platform: platform(), arch: arch() },
   };
   for (const plan of [withValues([OPEN_ORDERS, fill(reference('missingValue'))]), withValues([OPEN_ORDERS, remember(MARKED)])]) {
-    const outcome = await runUntrusted(plan, parsePlan, base, ports);
+    const outcome = await createRunService(ports).runUntrusted(plan, parsePlan, base);
     assert.ok(!Array.isArray(outcome) && 'errors' in outcome, JSON.stringify(outcome));
   }
   assert.equal(spy.calls.count(), 0, 'no driver method was called');
   assert.equal(events.read().length, 0, 'nothing was logged');
 
   // Positive control: a valid plan using a value does reach the driver.
-  await runUntrusted(withValues([OPEN_ORDERS, fill(MARKED_REFERENCE)]), parsePlan, base, ports);
+  await createRunService(ports).runUntrusted(withValues([OPEN_ORDERS, fill(MARKED_REFERENCE)]), parsePlan, base);
   assert.ok(spy.calls.count() > 0, 'a valid plan reaches the driver, so the zero above is meaningful');
 });
 

@@ -3,8 +3,18 @@
 // '@ts-expect-error' directive and the check fails.
 import { cdpDriver, type EgressSource } from '@revisum/driver-cdp';
 import {
-  lifecycle, policyGate, run,
-  type AiPlanner, type ClearedRun, type EventSink, type Logger, type Plan, type PlanData, type RunInputs, type RunPorts, type TargetId,
+  createRunService,
+  lifecycle,
+  policyGate,
+  type AiPlanner,
+  type ClearedRun,
+  type EventSink,
+  type Logger,
+  type Plan,
+  type PlanData,
+  type RunInputs,
+  type RunPorts,
+  type TargetId,
   type TrustedProject,
 } from '@revisum/engine';
 
@@ -38,7 +48,7 @@ const proposal = await planner.propose({ specReference: 'specs/x.md', text: 'x' 
 // @ts-expect-error AI output is unknown and cannot be used as a Plan
 const asPlan: Plan = proposal;
 // A run takes the run the policy gate cleared, which holds the plan the parser made.
-export const clearedRunRuns = run(cleared, inputs, ports);
+export const clearedRunRuns = createRunService(ports).run(cleared, inputs);
 // Typed as the plan's data, so every field is well typed and only the parser's brand is missing.
 const handBuiltPlan: PlanData = { version: '1.3', meta: cleared.plan.meta, targets: [targetId], steps: cleared.plan.steps };
 const gate = policyGate({ project: trusted, events });

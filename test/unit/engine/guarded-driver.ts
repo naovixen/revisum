@@ -8,7 +8,7 @@
 //
 // A dialog step acts on no element: the driver asks the guard with an element whose fields are all
 // null, and passes the open dialog's text as the guard's second argument.
-import { failure, planParser, runUntrusted, success, type BrowserDriver, type GuardVerdict, type Plan, type PlanError, type Project, type ResolvedElement, type Result, type RunInputs, type RunPorts, type RunResult } from '@revisum/engine';
+import { type RunService, failure, planParser, success, type BrowserDriver, type GuardVerdict, type Plan, type PlanError, type Project, type ResolvedElement, type Result, type RunInputs, type RunPorts, type RunResult } from '@revisum/engine';
 import { arch, platform } from 'node:os';
 import { ORIGIN, element, parserProject, policyProjectInput, type JsonRecord } from './policy-examples.ts';
 import { fakeArtifactStore } from '#test-support/fakes/FakeArtifactStore.ts';
@@ -100,7 +100,7 @@ export const portsWithoutAudit = (driver: BrowserDriver): Omit<RunPorts, 'audit'
 export const parserFor = (projectInput: JsonRecord = policyProjectInput()) =>
   (input: unknown): Result<Plan, readonly PlanError[]> => planParser(parserProject(projectInput))(input);
 
-export type UntrustedOutcome = Awaited<ReturnType<typeof runUntrusted>>;
+export type UntrustedOutcome = Awaited<ReturnType<RunService["runUntrusted"]>>;
 
 // The state a runUntrusted outcome ended in: Rejected or Denied before any run, or the one run's state.
 export function finalState(outcome: UntrustedOutcome): string {

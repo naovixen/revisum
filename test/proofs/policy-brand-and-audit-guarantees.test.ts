@@ -6,7 +6,7 @@
 //     without one rather than deny a plan with no record.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { runUntrusted, type RunPorts } from '@revisum/engine';
+import { createRunService, type RunPorts } from '@revisum/engine';
 import { memoryEventSink } from '../unit/engine/approval-repositories.ts';
 import { finalState, guardedDriver, parserFor, portsWithoutAudit, runBase } from '../unit/engine/guarded-driver.ts';
 import { CLOSING_CHECK, OPEN_ACCOUNT_PAGE, click, planOf, role } from '../unit/engine/policy-examples.ts';
@@ -89,7 +89,7 @@ test('a run cannot deny a plan without recording it: the audit port is required,
     const ports = portsWithoutAudit(driven.driver) as RunPorts;
     let state: string;
     try {
-      state = finalState(await runUntrusted(planOf(steps), parserFor(), runBase(), ports));
+      state = finalState(await createRunService(ports).runUntrusted(planOf(steps), parserFor(), runBase()));
     } catch {
       state = 'refused';
     }
@@ -102,8 +102,8 @@ test('a run cannot deny a plan without recording it: the audit port is required,
 test('with an audit sink, a denial is recorded and an allowed plan runs', async () => {
   const audit = memoryEventSink();
   const denied = guardedDriver([...DELETE_STEPS, CLOSING_CHECK]);
-  assert.equal(finalState(await runUntrusted(planOf(DELETE_STEPS), parserFor(), runBase(), { ...portsWithoutAudit(denied.driver), audit })), 'Denied');
+  assert.equal(finalState(await createRunService({ ...portsWithoutAudit(denied.driver), audit }).runUntrusted(planOf(DELETE_STEPS), parserFor(), runBase())), 'Denied');
   assert.deepEqual(audit.recorded.map(({ event }) => [event.kind, event.code]), [['plan.denied', 'irreversible-action']]);
   const allowed = guardedDriver([...SAVE_STEPS, CLOSING_CHECK]);
-  assert.equal(finalState(await runUntrusted(planOf(SAVE_STEPS), parserFor(), runBase(), { ...portsWithoutAudit(allowed.driver), audit })), 'Passed');
+  assert.equal(finalState(await createRunService({ ...portsWithoutAudit(allowed.driver), audit }).runUntrusted(planOf(SAVE_STEPS), parserFor(), runBase())), 'Passed');
 });

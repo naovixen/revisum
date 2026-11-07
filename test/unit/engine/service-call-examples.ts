@@ -17,7 +17,7 @@
 //     order, each with an `outcome` (passed, failed or skipped) and, on failure, a `code`;
 //   - a review item a run raises is in RunResult.reviewItems, each with a `code`.
 import assert from 'node:assert/strict';
-import { failure, parseProject, planParser, run, success, type LoggedEvent, type PlanStanding, type Project, type Result, type RunPorts, type RunResult, type ServiceCallErrorCode, type ServiceCaller, type ServiceRequest, type ServiceResponse } from '@revisum/engine';
+import { createRunService, failure, parseProject, planParser, success, type LoggedEvent, type PlanStanding, type Project, type Result, type RunPorts, type RunResult, type ServiceCallErrorCode, type ServiceCaller, type ServiceRequest, type ServiceResponse } from '@revisum/engine';
 import { baseUrlOf, clearRun, trustedProjectFrom } from '../../support/policy-clearance.ts';
 import {
   DEFAULT_CLOCK_START, DEFAULT_SEED, CURRENT_VERSION, ORIGIN, TARGET_ID, accepted, projectFileWith, recordingDriver,
@@ -290,11 +290,11 @@ export async function runWithCalls(raw: unknown, options: CallRunOptions = {}): 
   const { caller, requests } = routedServiceCaller(options.route);
   const clock = virtualClock();
   const events = fakeRunEventSink();
-  const result = await run(clearRun(plan, trusted, project.matrix[0]?.id ?? assert.fail('no target'), options.standing), {
-    baseUrl: baseUrlOf(ORIGIN), seed: DEFAULT_SEED, fixedTimeMilliseconds: DEFAULT_CLOCK_START, fixtures: [], host: { platform: 'test', arch: 'test' },
-  }, serviceCallPorts(fakePorts({
+  const result = await createRunService(serviceCallPorts(fakePorts({
     drivers: driversOf(driver), clock, events, secrets: fakeSecretStore(options.environment ?? SECRET_VALUES), services: options.caller ?? caller,
-  }), options.withCaller !== false));
+  }), options.withCaller !== false)).run(clearRun(plan, trusted, project.matrix[0]?.id ?? assert.fail('no target'), options.standing), {
+    baseUrl: baseUrlOf(ORIGIN), seed: DEFAULT_SEED, fixedTimeMilliseconds: DEFAULT_CLOCK_START, fixtures: [], host: { platform: 'test', arch: 'test' },
+  });
   const logged = events.read();
   return { result, recording, requests, events: logged, clock, everything: `${JSON.stringify(result)}\n${JSON.stringify(logged)}` };
 }

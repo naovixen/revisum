@@ -13,7 +13,7 @@ import {
     egressThroughExistingProxy,
     launchChromium,
 } from "@revisum/driver-cdp";
-import { parseProject, planParser, run } from "@revisum/engine";
+import { createRunService, parseProject, planParser } from "@revisum/engine";
 import { navigate, rawPlan, testId, textEquals } from "../support/browser/RawPlan.ts";
 import { BROWSERS } from "../support/browsers.ts";
 import { startFixtureServer, type FixtureServer } from "../support/fixture-server.ts";
@@ -128,7 +128,21 @@ async function openInRun(fixture: FixtureServer): Promise<string> {
     assert.ok(parsedPlan.ok, "the plan parses");
     const target = project.value.matrix[0];
     assert.ok(target !== undefined, "the project has a target");
-    const result = await run(
+    const ports = realRunPorts({
+        // The page is on the container's own loopback, which the proxy, in another container,
+        // cannot reach; everything else goes through the proxy.
+        drivers: new Map([
+            [
+                "cdp",
+                cdpDriver({
+                    executablePath: BROWSERS.chrome,
+                    egress: egressThroughExistingProxy(proxyServer),
+                }),
+            ],
+        ]),
+        clock: systemClock,
+    });
+    const result = await createRunService(ports).run(
         clearRun(parsedPlan.value, await trustedProjectFrom(projectFile), target.id),
         {
             baseUrl: baseUrlOf(fixture.origin),
@@ -137,20 +151,6 @@ async function openInRun(fixture: FixtureServer): Promise<string> {
             fixtures: fixture.fixtures,
             host: { platform: platform(), arch: arch() },
         },
-        realRunPorts({
-            // The page is on the container's own loopback, which the proxy, in another container,
-            // cannot reach; everything else goes through the proxy.
-            drivers: new Map([
-                [
-                    "cdp",
-                    cdpDriver({
-                        executablePath: BROWSERS.chrome,
-                        egress: egressThroughExistingProxy(proxyServer),
-                    }),
-                ],
-            ]),
-            clock: systemClock,
-        }),
     );
     return result.state;
 }

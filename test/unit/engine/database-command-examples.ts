@@ -23,7 +23,7 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { success, type EgressEvent, type WorkloadErrorCode, type WorkloadOutcome } from '@revisum/contracts';
-import { parseProject, planParser, run, runUntrusted, type LoggedEvent, type PlanStanding, type Project, type Result, type RunPorts, type RunResult } from '@revisum/engine';
+import { createRunService, type RunService, parseProject, planParser, type LoggedEvent, type PlanStanding, type Project, type Result, type RunPorts, type RunResult } from '@revisum/engine';
 import { baseUrlOf, clearRun, trustedProjectFrom } from '../../support/policy-clearance.ts';
 import { TEST_SERVICE, testProjectInput , TEST_SERVICE_SECRET_NAMES } from './plan-examples.ts';
 import { DEFAULT_CLOCK_START, DEFAULT_SEED, accepted, recordingDriver, type Recording } from './run-value-examples.ts';
@@ -262,18 +262,18 @@ export async function runWithCommands(raw: unknown, options: CommandRunOptions =
 
   const clock = virtualClock();
   const events = fakeRunEventSink();
-  const result = await run(clearRun(plan, trusted, project.matrix[0]?.id ?? assert.fail('no target'), options.standing), {
-    baseUrl: baseUrlOf(ORIGIN), seed: DEFAULT_SEED, fixedTimeMilliseconds: DEFAULT_CLOCK_START, fixtures: [], host: { platform: 'test', arch: 'test' },
-  }, withPortIf(options.withPort !== false, fakePorts({
+  const result = await createRunService(withPortIf(options.withPort !== false, fakePorts({
     drivers: driversOf(driver), clock, events, secrets: fakeSecretStore({ [DATABASE_SECRET]: DATABASE_PASSWORD }), databaseCommands: port,
-  })));
+  }))).run(clearRun(plan, trusted, project.matrix[0]?.id ?? assert.fail('no target'), options.standing), {
+    baseUrl: baseUrlOf(ORIGIN), seed: DEFAULT_SEED, fixedTimeMilliseconds: DEFAULT_CLOCK_START, fixtures: [], host: { platform: 'test', arch: 'test' },
+  });
   const logged = events.read();
   return { result, recording, commands, events: logged, clock, everything: `${JSON.stringify(result)}\n${JSON.stringify(logged)}` };
 }
 
 // runUntrusted with the fake port: the plan is parsed, then judged by the gate, then run.
 export async function runUntrustedWithCommands(raw: unknown, projectFile: JsonRecord): Promise<{
-  readonly outcome: Awaited<ReturnType<typeof runUntrusted>>;
+  readonly outcome: Awaited<ReturnType<RunService["runUntrusted"]>>;
   readonly commands: readonly SeenCommand[];
   readonly opens: number;
 }> {
@@ -281,9 +281,9 @@ export async function runUntrustedWithCommands(raw: unknown, projectFile: JsonRe
   const { driver, recording } = recordingDriver();
   const { port, commands } = fakeCommandRunner();
 
-  const outcome = await runUntrusted(raw, planParser(project), {
+  const outcome = await createRunService(fakePorts({ drivers: driversOf(driver), secrets: fakeSecretStore({ [DATABASE_SECRET]: DATABASE_PASSWORD }), databaseCommands: port })).runUntrusted(raw, planParser(project), {
     project, baseUrl: baseUrlOf(ORIGIN), seed: DEFAULT_SEED, fixedTimeMilliseconds: DEFAULT_CLOCK_START, fixtures: [], host: { platform: 'test', arch: 'test' },
-  }, fakePorts({ drivers: driversOf(driver), secrets: fakeSecretStore({ [DATABASE_SECRET]: DATABASE_PASSWORD }), databaseCommands: port }));
+  });
   return { outcome, commands, opens: recording.environments.length };
 }
 

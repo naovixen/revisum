@@ -3,7 +3,7 @@
 // proves incomplete. A level that falls before then is the level the result states.
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { GuaranteeLevel, planParser, run, type RunIsolation } from "@revisum/engine";
+import { createRunService, GuaranteeLevel, planParser, type RunIsolation } from "@revisum/engine";
 import { driversOf, fakePorts } from "#test-support/fakes/FakePorts.ts";
 import { baseUrlOf, clearRun, trustedProjectFrom } from "#test-support/policy-clearance.ts";
 import { ORIGIN } from "./plan-examples.ts";
@@ -42,17 +42,13 @@ async function runWith(isolation: RunIsolation, onClose: () => void) {
             return Promise.resolve();
         },
     });
-    return run(
-        cleared,
-        {
-            baseUrl: baseUrlOf(ORIGIN),
-            seed: DEFAULT_SEED,
-            fixedTimeMilliseconds: DEFAULT_CLOCK_START,
-            fixtures: [],
-            host: { platform: "test", arch: "test" },
-        },
-        fakePorts({ drivers: driversOf(driver), isolation }),
-    );
+    return createRunService(fakePorts({ drivers: driversOf(driver), isolation })).run(cleared, {
+        baseUrl: baseUrlOf(ORIGIN),
+        seed: DEFAULT_SEED,
+        fixedTimeMilliseconds: DEFAULT_CLOCK_START,
+        fixtures: [],
+        host: { platform: "test", arch: "test" },
+    });
 }
 
 describe("Using the run", () => {

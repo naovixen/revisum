@@ -7,7 +7,7 @@
 import assert from 'node:assert/strict';
 import { arch, platform } from 'node:os';
 import { test } from 'node:test';
-import { runUntrusted, type PlanErrorCode } from '@revisum/engine';
+import { createRunService, type PlanErrorCode } from '@revisum/engine';
 import { PRIVATE_MARKER } from './plan-examples.ts';
 import { accepted, rejection, type ParsePlan } from './run-value-examples.ts';
 import {
@@ -250,7 +250,7 @@ test('a refused plan reaches no driver method, and nothing is logged', async () 
   const ports = fakePorts({ drivers: driversOf(spy), events });
   const base = { project: stubProject(), baseUrl: baseUrlOf(ORIGIN), seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() } };
   for (const refused of REFUSED) {
-    const outcome = await runUntrusted(refused.plan, parsePlan, base, ports);
+    const outcome = await createRunService(ports).runUntrusted(refused.plan, parsePlan, base);
     assert.ok('errors' in outcome, `${refused.name}: ${JSON.stringify(outcome)}`);
   }
   assert.equal(spy.calls.count(), 0, 'no driver method was called');
@@ -263,6 +263,6 @@ test('counter-example: an accepted plan with a stub step does reach the driver',
   const spy = fakeDriverNeverLaunching();
   const ports = fakePorts({ drivers: driversOf(spy) });
   const base = { project: stubProject(), baseUrl: baseUrlOf(ORIGIN), seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() } };
-  await runUntrusted(planOf([OPEN_LOGIN, startStub('cartEmpty')]), parsePlan, base, ports);
+  await createRunService(ports).runUntrusted(planOf([OPEN_LOGIN, startStub('cartEmpty')]), parsePlan, base);
   assert.equal(spy.calls.count('open'), 1);
 });

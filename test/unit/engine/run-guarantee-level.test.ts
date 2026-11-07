@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { RunIsolation } from '@revisum/contracts';
-import { HOST_ISOLATION, guaranteeStatement, parseProject, planParser, run, type RunResult } from '@revisum/engine';
+import { createRunService, HOST_ISOLATION, guaranteeStatement, parseProject, planParser, type RunResult } from '@revisum/engine';
 import { baseUrlOf, clearRun, trustedProjectFrom } from '../../support/policy-clearance.ts';
 import { ORIGIN } from './plan-examples.ts';
 import { DEFAULT_CLOCK_START, DEFAULT_SEED, OPEN_ORDERS, accepted, planOf, projectFileWith, recordingDriver } from './run-value-examples.ts';
@@ -23,9 +23,9 @@ async function runWith(isolation: RunIsolation): Promise<RunResult> {
   const target = project.matrix[0];
   assert.ok(target !== undefined, 'the test project has a target');
   const { driver } = recordingDriver();
-  return run(clearRun(plan, trusted, target.id), { baseUrl: baseUrlOf(ORIGIN), seed: DEFAULT_SEED, fixedTimeMilliseconds: DEFAULT_CLOCK_START,
+  return createRunService(fakePorts({ drivers: driversOf(driver), isolation })).run(clearRun(plan, trusted, target.id), { baseUrl: baseUrlOf(ORIGIN), seed: DEFAULT_SEED, fixedTimeMilliseconds: DEFAULT_CLOCK_START,
     fixtures: [], host: { platform: 'test', arch: 'test' },
-  }, fakePorts({ drivers: driversOf(driver), isolation }));
+  });
 }
 
 const statementWith = (egressEnforced: boolean) => guaranteeStatement({ mode: 'plan', egressEnforced, unmaskedScreenshotsKept: false, unsafeFeatures: [] });

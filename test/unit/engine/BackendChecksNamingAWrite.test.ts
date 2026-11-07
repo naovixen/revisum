@@ -4,8 +4,8 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import {
+    createRunService,
     planParser,
-    run,
     type Project,
     type RunResult,
     type ServiceRequest,
@@ -78,22 +78,20 @@ const runUnder = async (
     const { driver } = recordingDriver();
     const { caller, requests } = routedServiceCaller(route);
     const clock = fakeClock();
-    const result = await run(
-        clearRun(plan, trusted, project.matrix[0]?.id ?? assert.fail("no target")),
-        {
-            baseUrl: baseUrlOf(ORIGIN),
-            seed: DEFAULT_SEED,
-            fixedTimeMilliseconds: DEFAULT_CLOCK_START,
-            fixtures: [],
-            host: { platform: "test", arch: "test" },
-        },
+    const result = await createRunService(
         fakePorts({
             drivers: driversOf(driver),
             clock,
             secrets: fakeSecretStore(SECRET_VALUES),
             services: caller,
         }),
-    );
+    ).run(clearRun(plan, trusted, project.matrix[0]?.id ?? assert.fail("no target")), {
+        baseUrl: baseUrlOf(ORIGIN),
+        seed: DEFAULT_SEED,
+        fixedTimeMilliseconds: DEFAULT_CLOCK_START,
+        fixtures: [],
+        host: { platform: "test", arch: "test" },
+    });
     return { result, requests, elapsed: clock.elapsed() };
 };
 

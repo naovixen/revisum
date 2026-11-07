@@ -3,7 +3,7 @@
 // production to needs it there, or the run it was approved for can't work.
 import assert from "node:assert/strict";
 import { describe, test, type TestContext } from "node:test";
-import { run, success, type BrowserDriver, type PlanStanding } from "@revisum/engine";
+import { createRunService, success, type BrowserDriver, type PlanStanding } from "@revisum/engine";
 import { baseUrlOf, clearRun, trustedProjectFrom } from "../../support/policy-clearance.ts";
 import { parsedSignupPlan, withRepository } from "./approval-repositories.ts";
 import {
@@ -62,17 +62,13 @@ async function allowedOriginsOfRun(
         target.id,
         standing,
     );
-    await run(
-        cleared,
-        {
-            baseUrl: baseUrlOf(ORIGIN),
-            seed: 7,
-            fixedTimeMilliseconds: 0,
-            fixtures: [],
-            host: { platform: "test", arch: "test" },
-        },
-        fakePorts({ drivers: driversOf(driver) }),
-    );
+    await createRunService(fakePorts({ drivers: driversOf(driver) })).run(cleared, {
+        baseUrl: baseUrlOf(ORIGIN),
+        seed: 7,
+        fixedTimeMilliseconds: 0,
+        fixtures: [],
+        host: { platform: "test", arch: "test" },
+    });
     assert.equal(open.mock.callCount(), OPENED_ONCE);
     const environment = open.mock.calls[0]?.arguments[1];
     assert.ok(environment !== undefined, "the driver was given an environment");

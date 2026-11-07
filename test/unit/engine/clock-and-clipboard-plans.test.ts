@@ -8,7 +8,7 @@
 import assert from 'node:assert/strict';
 import { arch, platform } from 'node:os';
 import { afterEach, beforeEach, test } from 'node:test';
-import { runUntrusted, type PlanErrorCode } from '@revisum/engine';
+import { createRunService, type PlanErrorCode } from '@revisum/engine';
 import { PRIVATE_MARKER } from './plan-examples.ts';
 import { projectWith } from './run-value-examples.ts';
 import { routedServiceCaller } from './service-call-examples.ts';
@@ -283,7 +283,7 @@ async function assertNothingReached(plans: readonly JsonRecord[]): Promise<void>
   const { ports, spy, requests, events } = countingPorts();
   assert.ok(plans.length >= 15, 'enough hostile plans');
   for (const plan of plans) {
-    const outcome = await runUntrusted(plan, parsePlan, base(), ports);
+    const outcome = await createRunService(ports).runUntrusted(plan, parsePlan, base());
     assert.ok('errors' in outcome, JSON.stringify(outcome));
   }
   assert.equal(spy.calls.count(), 0, 'no driver method was called');
@@ -304,6 +304,6 @@ test('every refused plan with a clipboard step reaches no driver, network or ser
 // so the zero above can fail.
 test('counter-example: an accepted plan that advances the clock and checks the clipboard reaches the driver', async () => {
   const { ports, spy } = countingPorts();
-  await runUntrusted(planOf([OPEN_ORDERS, advanceClock(10, 'minutes'), COPY_LINK, expectClipboard('textContains', '/invite/')]), parsePlan, base(), ports);
+  await createRunService(ports).runUntrusted(planOf([OPEN_ORDERS, advanceClock(10, 'minutes'), COPY_LINK, expectClipboard('textContains', '/invite/')]), parsePlan, base());
   assert.ok(spy.calls.count() > 0, 'the driver was asked to open a session');
 });

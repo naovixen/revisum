@@ -14,7 +14,7 @@
 //     the secret's value is the storage-state JSON.
 import { randomBytes } from 'node:crypto';
 import type { Secret, SecretStore } from '@revisum/contracts';
-import { environmentSecretStore, parseProject, planParser, run, success, type BrowserDriver, type Plan, type RunPorts, type Project, type RunResult, type SecretName, type TargetId } from '@revisum/engine';
+import { createRunService, environmentSecretStore, parseProject, planParser, success, type BrowserDriver, type Plan, type RunPorts, type Project, type RunResult, type SecretName, type TargetId } from '@revisum/engine';
 import { baseUrlOf, clearRun, trustedProjectFrom } from '../../support/policy-clearance.ts';
 import { fakeArtifactStore } from '#test-support/fakes/FakeArtifactStore.ts';
 import { fakeDriverNeverLaunching, fakeDriverOpening, type FakeDriver } from '#test-support/fakes/FakeDriver.ts';
@@ -177,9 +177,9 @@ export async function runWithSecrets(
   const events = fakeRunEventSink();
   const artifacts = fakeArtifactStore();
   const ports = fakePorts({ drivers: new Map([['fake', driver]]), artifacts, events });
-  const result = await run(clearRun(parsedPlan(project, plan), trusted, FAKE_TARGET as TargetId), { baseUrl: baseUrlOf(ORIGIN),
+  const result = await createRunService(environment === null ? leaveOut<RunPorts>(ports, ['secrets']) : { ...ports, secrets: fakeEnvironmentStore(environment) }).run(clearRun(parsedPlan(project, plan), trusted, FAKE_TARGET as TargetId), { baseUrl: baseUrlOf(ORIGIN),
     seed: 7, fixedTimeMilliseconds: Date.UTC(2026, 0, 1), fixtures: [], host: { platform: 'test', arch: 'test' },
-  }, environment === null ? leaveOut<RunPorts>(ports, ['secrets']) : { ...ports, secrets: fakeEnvironmentStore(environment) });
+  });
   const eventLines = events.read().map((event) => JSON.stringify(event)).join('\n');
   return { result, everything: JSON.stringify([result, events.read()]), eventLines, artifactsStored: artifacts.references().length };
 }

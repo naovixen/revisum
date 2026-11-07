@@ -8,7 +8,15 @@
 //     reads a plan reads it unchanged.
 // Each @ts-expect-error line must stay an error; the test deletes them to prove it.
 import {
-  run, type Authorised, type ClearedRun, type Plan, type PlanStanding, type Project, type RunInputs, type RunPorts, type TargetId,
+  createRunService,
+  type Authorised,
+  type ClearedRun,
+  type Plan,
+  type PlanStanding,
+  type Project,
+  type RunInputs,
+  type RunPorts,
+  type TargetId,
 } from '@revisum/engine';
 
 declare const inputs: RunInputs;
@@ -27,22 +35,22 @@ export const isClearedRunEmpty: IsNever<ClearedRun> = false;
 
 export const authorisedIsAPlan: Plan = authorised;
 export const clearedRunHoldsAPlan: Plan = cleared.plan;
-export const clearedRunRuns = run(cleared, inputs, ports);
+export const clearedRunRuns = createRunService(ports).run(cleared, inputs);
 
 // @ts-expect-error a parsed plan the policy gate has not cleared cannot be run
-export const unclearedPlanRuns = run(parsed, inputs, ports);
+export const unclearedPlanRuns = createRunService(ports).run(parsed, inputs);
 
 // @ts-expect-error an authorised plan alone is not a cleared run: it names no project, target or standing
-export const authorisedPlanRuns = run(authorised, inputs, ports);
+export const authorisedPlanRuns = createRunService(ports).run(authorised, inputs);
 
 // @ts-expect-error a cleared run written by hand is not one: only the policy gate makes one
-export const handMadeClearedRunRuns = run({ plan: authorised, project: otherProject, targetId: otherTarget, standing: otherStanding }, inputs, ports);
+export const handMadeClearedRunRuns = createRunService(ports).run({ plan: authorised, project: otherProject, targetId: otherTarget, standing: otherStanding }, inputs);
 
 // @ts-expect-error a spread copy of a cleared run under another project is not one
-export const clearedRunUnderAnotherProject = run({ ...cleared, project: otherProject }, inputs, ports);
+export const clearedRunUnderAnotherProject = createRunService(ports).run({ ...cleared, project: otherProject }, inputs);
 
 // @ts-expect-error a spread copy of a cleared run under another standing is not one
-export const clearedRunUnderAnotherStanding = run({ ...cleared, standing: otherStanding }, inputs, ports);
+export const clearedRunUnderAnotherStanding = createRunService(ports).run({ ...cleared, standing: otherStanding }, inputs);
 
 // @ts-expect-error a copy of a parsed plan is not Authorised: only the policy gate makes one
 export const forgedAuthorised: Authorised = { ...parsed };

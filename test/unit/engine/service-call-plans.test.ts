@@ -7,7 +7,7 @@
 import assert from 'node:assert/strict';
 import { arch, platform } from 'node:os';
 import { test } from 'node:test';
-import { runUntrusted, type PlanErrorCode } from '@revisum/engine';
+import { createRunService, type PlanErrorCode } from '@revisum/engine';
 import { PRIVATE_MARKER } from './plan-examples.ts';
 import { accepted, rejection } from './run-value-examples.ts';
 import {
@@ -267,7 +267,7 @@ test('a refused plan reaches neither the service caller nor the driver, and noth
   const ports = fakePorts({ drivers: driversOf(spy), events, services: caller });
   const base = { project: callProject(), baseUrl: baseUrlOf(ORIGIN), seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() } };
   for (const refused of REFUSED) {
-    const outcome = await runUntrusted(refused.plan, parsePlan, base, ports);
+    const outcome = await createRunService(ports).runUntrusted(refused.plan, parsePlan, base);
     assert.ok('errors' in outcome, `${refused.name}: ${JSON.stringify(outcome)}`);
   }
   assert.equal(requests.length, 0, 'no call was made');

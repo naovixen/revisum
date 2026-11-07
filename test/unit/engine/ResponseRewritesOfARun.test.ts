@@ -5,9 +5,9 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import {
+    createRunService,
     manifestHash,
     planParser,
-    run,
     success,
     type RunPorts,
     type RunResult,
@@ -53,7 +53,7 @@ const runWithRewrites = async (
     const everyPort = fakePorts({ drivers: driversOf(driver), rewritesApplied });
     const ports =
         applied === undefined ? leaveOut<RunPorts>(everyPort, ["rewritesApplied"]) : everyPort;
-    return run(
+    return createRunService(ports).run(
         clearRun(plan, trusted, project.matrix[0]?.id ?? assert.fail("no target")),
         {
             baseUrl: baseUrlOf(ORIGIN),
@@ -62,7 +62,6 @@ const runWithRewrites = async (
             fixtures: [],
             host: { platform: "test", arch: "test" },
         },
-        ports,
     );
 };
 

@@ -5,9 +5,9 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import {
+    createRunService,
     FillValueKind,
     planParser,
-    run,
     success,
     type PageScriptCall,
     type RunResult,
@@ -71,7 +71,7 @@ async function runWithScriptSources(
     );
     const [targetId = assert.fail("the test plan declares a target")] = plan.targets;
     const driver = fakeDriverNeverLaunching();
-    const result = await run(
+    const result = await createRunService(fakePorts({ drivers: driversOf(driver) })).run(
         clearRun(plan, await trustedProjectFrom(projectFile), targetId),
         {
             baseUrl: baseUrlOf(ORIGIN),
@@ -81,7 +81,6 @@ async function runWithScriptSources(
             host: { platform: "test", arch: "test" },
             scriptSources: sourceBytes(sources),
         },
-        fakePorts({ drivers: driversOf(driver) }),
     );
     return { result, driverCalls: driver.calls.count() };
 }

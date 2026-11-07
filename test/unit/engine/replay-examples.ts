@@ -30,7 +30,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { GuaranteeLevel, RunIsolation } from '@revisum/contracts';
-import { HOST_ISOLATION, parseProject, planParser, run, sha256, success, type BrowserDriver, type ClearedRun, type FixtureReference, type Plan, type Project, type RunManifest, type RunResult, type ServiceRequest } from '@revisum/engine';
+import { createRunService, type RunService, HOST_ISOLATION, parseProject, planParser, sha256, success, type BrowserDriver, type ClearedRun, type FixtureReference, type Plan, type Project, type RunManifest, type RunResult, type ServiceRequest } from '@revisum/engine';
 import { baseUrlOf, clearRun, trustedProjectFrom } from '../../support/policy-clearance.ts';
 import { DEFAULT_ROUTE, fakeCommandRunner, type CommandRoute, type SeenCommand } from './database-command-examples.ts';
 import { DEFAULT_CLOCK_START, DEFAULT_SEED, ORIGIN, accepted, recordingDriver, type JsonRecord } from './run-value-examples.ts';
@@ -339,7 +339,8 @@ export async function runScenario(scenario: Scenario, options: { readonly record
   };
   // Built as values, not literals: until the code exists, pins and the wrapped ports are outside
   // the run's types, and an excess field is simply ignored.
-  const result = await (Reflect.apply(run, undefined, [cleared, runInputs, ports]) as Promise<RunResult>);
+  const service: RunService = Reflect.apply(createRunService, undefined, [ports]);
+  const result = await (Reflect.apply(Reflect.get(service, "run"), service, [cleared, runInputs]) as Promise<RunResult>);
   const manifest: ManifestUnderTest | null = result.manifest;
   assert.ok(manifest !== null, `the run made no manifest: ${JSON.stringify(result)}`);
   return {

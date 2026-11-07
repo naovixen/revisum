@@ -5,10 +5,10 @@
 import assert from "node:assert/strict";
 import { arch, platform } from "node:os";
 import {
+    createRunService,
     oneElementOf,
     parseProject,
     planParser,
-    run,
     type ActionStep,
     type BrowserDriver,
     type DownloadStep,
@@ -243,15 +243,7 @@ async function runPlan(
     const store = memoryArtifactStore();
     const firstRequest = context.watch.paths.length;
     const scriptSources = options.scriptSources ?? context.definition.scriptSources;
-    const result = await run(
-        clearRun(plan, context.trusted, context.target(targetId).id, options.standing),
-        {
-            ...context.runInputs(),
-            ...(options.clockStartMilliseconds === undefined
-                ? {}
-                : { fixedTimeMilliseconds: options.clockStartMilliseconds }),
-            ...(scriptSources === undefined ? {} : { scriptSources }),
-        },
+    const result = await createRunService(
         realRunPorts({
             drivers: driversForRun(context, options, startedAt, pages),
             clock: systemClock,
@@ -260,7 +252,13 @@ async function runPlan(
             events,
             ...(options.secrets === undefined ? {} : { secrets: options.secrets }),
         }),
-    );
+    ).run(clearRun(plan, context.trusted, context.target(targetId).id, options.standing), {
+        ...context.runInputs(),
+        ...(options.clockStartMilliseconds === undefined
+            ? {}
+            : { fixedTimeMilliseconds: options.clockStartMilliseconds }),
+        ...(scriptSources === undefined ? {} : { scriptSources }),
+    });
     return {
         result,
         events,

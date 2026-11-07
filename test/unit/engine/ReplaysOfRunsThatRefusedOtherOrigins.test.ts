@@ -4,9 +4,9 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import {
+    createRunService,
     planParser,
     replay,
-    run,
     type ElementProbe,
     type Plan,
     type Project,
@@ -60,7 +60,7 @@ const record = async (page: PageState): Promise<Recorded> => {
     const project = projectWith();
     const trusted = await trustedProjectFrom(projectFileWith());
     const plan = accepted(planParser(project), PLAN);
-    const result = await run(
+    const result = await createRunService(portsOn(page)).run(
         clearRun(plan, trusted, project.matrix[0]?.id ?? assert.fail("no target")),
         {
             baseUrl: baseUrlOf(ORIGIN),
@@ -69,7 +69,6 @@ const record = async (page: PageState): Promise<Recorded> => {
             fixtures: [],
             host: THIS_MACHINE,
         },
-        portsOn(page),
     );
     return { project, plan, result };
 };

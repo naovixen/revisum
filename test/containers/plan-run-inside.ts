@@ -8,7 +8,7 @@
 // page shows that WebSocket was closed.
 import { arch, platform } from 'node:os';
 import { cdpDriver, egressThroughExistingProxy } from '@revisum/driver-cdp';
-import { parseProject, planParser, run, type BrowserDriver, type BrowserRequestRecord, type TargetId } from '@revisum/engine';
+import { createRunService, parseProject, planParser, type BrowserDriver, type BrowserRequestRecord, type TargetId } from '@revisum/engine';
 import { BROWSERS } from '../support/browsers.ts';
 import { systemClock } from '../support/memory-ports.ts';
 import { baseUrlOf, clearRun, trustedProjectFrom } from '../support/policy-clearance.ts';
@@ -57,9 +57,9 @@ async function main(): Promise<number> {
       ['cdp', keepingBrowserRecords(cdpDriver({ executablePath: BROWSERS.chrome, egress: egressThroughExistingProxy(proxyServer) }), (kept) => { browserRecords.push(...kept); })],
     ]);
     // The target id comes from the project written just above, so it is used as the branded value directly.
-    const result = await run(clearRun(parsed.value, trusted, TARGET_ID as TargetId), { baseUrl: baseUrlOf(fixture.origin), seed: SEED, fixedTimeMilliseconds: FIXED_TIME_MILLISECONDS, fixtures: fixture.fixtures,
+    const result = await createRunService(realRunPorts({ drivers, clock: systemClock })).run(clearRun(parsed.value, trusted, TARGET_ID as TargetId), { baseUrl: baseUrlOf(fixture.origin), seed: SEED, fixedTimeMilliseconds: FIXED_TIME_MILLISECONDS, fixtures: fixture.fixtures,
       host: { platform: platform(), arch: arch() },
-    }, realRunPorts({ drivers, clock: systemClock }));
+    });
     console.log(JSON.stringify({ browserRecords, fixtureOrigin: fixture.origin }));
     console.log(JSON.stringify({ state: result.state }));
     return 0;

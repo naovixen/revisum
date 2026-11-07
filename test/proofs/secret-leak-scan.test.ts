@@ -13,8 +13,15 @@ import { arch, platform, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, describe, test } from 'node:test';
 import {
-  leakScanner, parseProject, planParser, run,
-  type Plan, type Project, type RunResult, type TargetId, type TrustedProject,
+  createRunService,
+  leakScanner,
+  parseProject,
+  planParser,
+  type Plan,
+  type Project,
+  type RunResult,
+  type TargetId,
+  type TrustedProject,
 } from '@revisum/engine';
 import { startFixtureServer, type FixtureServer } from '#test-support/fixture-server.ts';
 import { memoryArtifactStore, memoryRunEventSink, systemClock } from '#test-support/memory-ports.ts';
@@ -77,13 +84,13 @@ function parsed(raw: unknown): Plan {
 async function runEcho(targetId: string, echo: string, value: unknown, secretValue: string, field?: string): Promise<Ran> {
   const events = memoryRunEventSink();
   const artifacts = memoryArtifactStore();
-  const result = await run(clearRun(parsed(echoPlan(targetId, echo, value, field)), trusted, targetId as TargetId), {
-    baseUrl: baseUrlOf(server.origin), seed: SEED, fixedTimeMilliseconds: FIXED_TIME_MILLISECONDS, fixtures: server.fixtures,
-    host: { platform: platform(), arch: arch() },
-  }, fakePorts({
+  const result = await createRunService(fakePorts({
     drivers: makeDrivers(), clock: systemClock, artifacts, events,
     secrets: fakeEnvironmentStore({ [SECRET]: secretValue }),
-  }));
+  })).run(clearRun(parsed(echoPlan(targetId, echo, value, field)), trusted, targetId as TargetId), {
+    baseUrl: baseUrlOf(server.origin), seed: SEED, fixedTimeMilliseconds: FIXED_TIME_MILLISECONDS, fixtures: server.fixtures,
+    host: { platform: platform(), arch: arch() },
+  });
   const images = artifacts.references().flatMap((reference) => {
     const bytes = artifacts.get(reference.name);
     return bytes === undefined ? [] : [bytes];

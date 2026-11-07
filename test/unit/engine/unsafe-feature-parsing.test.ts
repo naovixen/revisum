@@ -7,7 +7,7 @@
 import assert from 'node:assert/strict';
 import { arch, platform } from 'node:os';
 import { test } from 'node:test';
-import { runUntrusted } from '@revisum/engine';
+import { createRunService } from '@revisum/engine';
 import { PRIVATE_MARKER, defaultParser } from './plan-examples.ts';
 import { spyDriver } from './secret-examples.ts';
 import { routedServiceCaller } from './service-call-examples.ts';
@@ -103,7 +103,7 @@ test('a plan refused for a disabled feature opens no browser, makes no call and 
   const base = { project, baseUrl: baseUrlOf(ORIGIN), seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() } };
   const plans: readonly JsonRecord[] = [...FEATURE_EXAMPLES.map((example) => unsafePlan(example.steps)), ALL_FEATURES_PLAN()];
   for (const plan of plans) {
-    const outcome = await runUntrusted(plan, parse, base, ports);
+    const outcome = await createRunService(ports).runUntrusted(plan, parse, base);
     assert.ok('state' in outcome && outcome.state === 'Rejected', JSON.stringify(outcome));
     if ('errors' in outcome) assert.ok(outcome.errors.some((error) => error.code === 'unsafe_feature_disabled'), JSON.stringify(outcome.errors));
   }

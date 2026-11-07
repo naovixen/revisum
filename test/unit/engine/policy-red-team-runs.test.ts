@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { runUntrusted, type PolicyRuleId } from '@revisum/engine';
+import { createRunService, type PolicyRuleId } from '@revisum/engine';
 import { FIXTURES } from '../../support/repository.ts';
 import { memoryEventSink } from './approval-repositories.ts';
 import { finalState, guardedDriver, onlyRun, parserFor, runBase, type PageViews } from './guarded-driver.ts';
@@ -46,7 +46,7 @@ async function runVariant(variant: Variant, targetId: string) {
   const steps = [...variant.steps, CLOSING_CHECK];
   const driven = guardedDriver(steps, variant.page);
   const audit = memoryEventSink();
-  const outcome = await runUntrusted(planOf(variant.steps, [targetId]), parserFor(), runBase(), fakePorts({ drivers: driversOf(driven.driver), audit }));
+  const outcome = await createRunService(fakePorts({ drivers: driversOf(driven.driver), audit })).runUntrusted(planOf(variant.steps, [targetId]), parserFor(), runBase());
   return { outcome, driven, audit };
 }
 

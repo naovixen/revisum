@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import { arch, platform } from 'node:os';
 import { test } from 'node:test';
-import { runUntrusted } from '@revisum/engine';
+import { createRunService } from '@revisum/engine';
 import { OPEN_ACCOUNT_PAGE, ORIGIN, approvedStanding, comparable, decideOn, deniedCodes, parsedPlan, parserProject, policyProjectInput, testGate, type JsonRecord , planOf } from './policy-examples.ts';
 import { spyDriver } from './secret-examples.ts';
 import { fakePorts } from '#test-support/fakes/FakePorts.ts';
@@ -115,7 +115,7 @@ test('a plan the gate denies for a stub or a storage write opens no browser', as
   const parse = (raw: unknown) => ({ ok: true as const, value: parsedPlan(raw as JsonRecord, input) });
   const rules: string[] = [];
   for (const raw of [newerPlan([OPEN_ACCOUNT_PAGE, startStub('accountUnavailable')]), newerPlan([OPEN_ACCOUNT_PAGE, setStorage('chosenLanguage')])]) {
-    const outcome = await runUntrusted(raw, parse, base, ports);
+    const outcome = await createRunService(ports).runUntrusted(raw, parse, base);
     assert.ok('rule' in outcome, JSON.stringify(outcome));
     if ('rule' in outcome) rules.push(outcome.rule);
   }
@@ -130,6 +130,6 @@ test('counter-example: a proposal with a stub allowed in proposals opens the bro
   const ports = fakePorts({ drivers: new Map([['cdp', spy]]) });
   const base = { project: parserProject(input), baseUrl: baseUrlOf(ORIGIN), seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() } };
   const parse = (raw: unknown) => ({ ok: true as const, value: parsedPlan(raw as JsonRecord, input) });
-  await runUntrusted(newerPlan([OPEN_ACCOUNT_PAGE, startStub('noNotifications')]), parse, base, ports);
+  await createRunService(ports).runUntrusted(newerPlan([OPEN_ACCOUNT_PAGE, startStub('noNotifications')]), parse, base);
   assert.ok(spy.calls.count('open') > 0, 'the browser was opened');
 });
