@@ -1,9 +1,17 @@
 // A denied run that cannot read a record once its steps have run gives no verdict, so it ends Errored.
 // The denial still happened: the guard stopped an irreversible action. So the result keeps it,
-// whichever record went unread, exactly as a denied run whose records could all be read gives it.
+// whichever record went unread, exactly as a denied run whose records could all be read gives it,
+// and so does the log's last word on how the run ended.
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { type ActionGuard, failure, type RunPorts, type Session, success } from "@revisum/engine";
+import {
+    type ActionGuard,
+    failure,
+    type RunEventSink,
+    type RunPorts,
+    type Session,
+    success,
+} from "@revisum/engine";
 import { BrowserTarget, englishMatrix } from "#test-support/browser/BrowserTarget.ts";
 import { fakeSessionOnOrders, runOnFakeSession } from "./RunOnFakeSession.ts";
 import {
@@ -66,6 +74,19 @@ async function denialWithSoundRecords() {
     return result.denial;
 }
 
+// The state, code and step the log's last run.state entry gives, read as plain data so the entry's
+// own type does not decide which fields it may hold.
+const lastRunStateLogged = (events: RunEventSink): Readonly<Record<string, unknown>> => {
+    const last = events
+        .read()
+        .filter((event) => event.kind === "run.state")
+        .at(-1);
+    assert.ok(last !== undefined, "the log holds no run.state entry");
+    return Object.fromEntries(
+        Object.entries(last).filter(([field]) => ["state", "code", "stepIndex"].includes(field)),
+    );
+};
+
 const UNREAD_RECORDS = [
     {
         name: "behind an egress proxy whose rewrites cannot be read",
@@ -79,6 +100,20 @@ const UNREAD_RECORDS = [
 
 describe("Using the run", () => {
     describe("given a click the guard denies", () => {
+        describe("and a session whose records can all be read", () => {
+            describe("when the run ends", () => {
+                test("then it should log Denied as the run's last state, with the denial's rule and step", async () => {
+                    const { result, events } = await runDenied(sessionAskingTheGuard());
+                    assert.equal(result.state, "Denied", JSON.stringify(result.steps));
+                    assert.deepEqual(lastRunStateLogged(events), {
+                        state: "Denied",
+                        code: result.denial.rule,
+                        stepIndex: result.denial.stepIndex,
+                    });
+                });
+            });
+        });
+
         for (const record of UNREAD_RECORDS) {
             describe(`and a session ${record.name}`, () => {
                 describe("when the run ends", () => {
@@ -87,6 +122,16 @@ describe("Using the run", () => {
                         const { result } = await record.run();
                         assert.equal(result.state, "Errored", JSON.stringify(result.steps));
                         assert.deepEqual(result.denial, expected);
+                    });
+
+                    test("then it should log Errored as the run's last state, with the denial's rule and step", async () => {
+                        const expected = await denialWithSoundRecords();
+                        const { events } = await record.run();
+                        assert.deepEqual(lastRunStateLogged(events), {
+                            state: "Errored",
+                            code: expected.rule,
+                            stepIndex: expected.stepIndex,
+                        });
                     });
                 });
             });

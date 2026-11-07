@@ -67,7 +67,8 @@ test('control: a plan with no secret reference runs without a secret store', asy
   const spy = spyDriver();
   const ran = await runWithSecrets([], secretFillPlan([]), null, spy);
   assert.equal(spy.calls.count('open'), 1, 'the run reached the driver');
-  assert.notEqual(ran.result.refusal?.code, 'secret-missing');
+  assert.equal(ran.result.state, 'TargetUnavailable');
+  assert.equal(ran.result.unavailable.reason, 'launch-failed', 'the spy driver, not the secret check, ended the run');
 });
 
 test('control: when the store resolves every named secret, the run goes on to open the driver', async () => {
@@ -77,7 +78,8 @@ test('control: when the store resolves every named secret, the run goes on to op
     { ACCOUNT_TOKEN: fakeSecretValue(), MISSING_TOKEN: fakeSecretValue() }, spy,
   );
   assert.equal(spy.calls.count('open'), 1, 'the run reached the driver');
-  assert.notEqual(ran.result.refusal?.code, 'secret-missing');
+  assert.equal(ran.result.state, 'TargetUnavailable');
+  assert.equal(ran.result.unavailable.reason, 'launch-failed', 'the spy driver, not the secret check, ended the run');
 });
 
 // ---- key-only redaction for short secrets -------------------------------------------------------
