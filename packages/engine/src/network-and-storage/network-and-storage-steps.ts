@@ -12,7 +12,7 @@
 // field is logged by its name and sha256 only.
 import {
   failure, isSecret, stepFailed, StorageAssertionKind, success,
-  type StepCode, type CallArguments, type Clock, type FieldName, type JsonPointer, type ObservedExchange, type Plan, type RequestName, type ResolvedStub,
+  type StepCode, type StepOutcome, type CallArguments, type Clock, type FieldName, type JsonPointer, type ObservedExchange, type Plan, type RequestName, type ResolvedStub,
   type ResolvedStubResponse, type ResponseAssertion, type Result, type SafeText, type SecretStore, type RememberedResponseSource, type Session, type Step, type StubDeclaration,
   type StubName, type StubResponseBody,
 } from '@revisum/contracts';
@@ -43,13 +43,10 @@ export type NetworkStepContext = {
 };
 
 // What one of these steps gives its step result.
-type NetworkStepOutcome = {
-  readonly outcome: 'passed' | 'failed';
-  readonly code?: StepCode;
+type NetworkStepOutcome =
+  | { readonly outcome: typeof StepOutcome.Passed; readonly remembered?: RememberedRecord }
   // Only a count, or "present", "absent" or "differs": never a value read from the page or a response.
-  readonly observed?: string;
-  readonly remembered?: RememberedRecord;
-};
+  | { readonly outcome: typeof StepOutcome.Failed; readonly code: StepCode; readonly observed?: string };
 
 const passed: NetworkStepOutcome = { outcome: 'passed' };
 const failedWith = (code: StepCode, observed?: string): NetworkStepOutcome =>

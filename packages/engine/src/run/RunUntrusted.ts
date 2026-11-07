@@ -1,13 +1,20 @@
 // The only entry point for untrusted input, such as a plan an AI proposed.
-import { UnavailableReason, type Plan, type Result } from "@revisum/contracts";
+import {
+    TerminalState,
+    UnavailableReason,
+    type Plan,
+    type Result,
+    type PlanError,
+    type DeniedPlan,
+    type Rejected,
+    type PlanRunResult,
+} from "@revisum/contracts";
 import type { PlanStanding } from "../approval/plan-standing.ts";
-import type { PlanError } from "../plan/plan-decoders.ts";
 import { ClearedRunKind } from "../policy/ClearedRun.ts";
 import { policyGate } from "../policy/policy-gate.ts";
 import type { Project } from "../project/project-parser.ts";
 import type { RunInputs, RunPorts } from "./RunContext.ts";
 import { runPlan } from "./RunPlan.ts";
-import type { DeniedPlan, Rejected, RunResult } from "./RunResult.ts";
 import { targetNotDeclaredResult } from "./seal/TargetNotDeclaredResult.ts";
 
 export type ParsePlan = (input: unknown) => Result<Plan, readonly PlanError[]>;
@@ -32,7 +39,10 @@ export type UntrustedRunOutcomeKind =
 export type UntrustedRunOutcome =
     | ({ readonly kind: typeof UntrustedRunOutcomeKind.Rejected } & Rejected)
     | ({ readonly kind: typeof UntrustedRunOutcomeKind.Denied } & DeniedPlan)
-    | { readonly kind: typeof UntrustedRunOutcomeKind.Ran; readonly results: readonly RunResult[] };
+    | {
+          readonly kind: typeof UntrustedRunOutcomeKind.Ran;
+          readonly results: readonly PlanRunResult[];
+      };
 
 // Parsing happens first, then the policy gate's static check against the project, for the plan's
 // declared targets and standing; on any error or denial no driver method is called. A missing
@@ -56,13 +66,13 @@ export async function runUntrusted(
     if (decision.kind === "deny") {
         return {
             kind: UntrustedRunOutcomeKind.Denied,
-            state: "Denied",
+            state: TerminalState.Denied,
             rule: decision.rule,
             stepIndex: decision.stepIndex,
             ...(decision.unrecorded ? { unrecorded: true } : {}),
         };
     }
-    const results: RunResult[] = [];
+    const results: PlanRunResult[] = [];
     for (const clearance of decision.runs) {
         switch (clearance.kind) {
             case ClearedRunKind:

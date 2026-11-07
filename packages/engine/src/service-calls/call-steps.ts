@@ -12,13 +12,13 @@
 // Each request sent is logged by step, outcome, code, response sha256 and duration only: never an
 // argument, a header or the response itself. A body cut short or holding a secret has no sha256.
 import {
-  failure, StepCode, stepFailed, success,
-  type BackendAssertion, type CallArguments, type CallDeclaration, type CallName, type CallStep, type CleanupStep, type Clock, type CommandName, type DeclaredService, type HttpMethod, type JsonPointer, type ResponseReadErrorCode, type Result,
+  failure, StepCode, StepOutcome, stepFailed, success,
+  type BackendAssertion, type CallArguments, type CallDeclaration, type CallName, type CallStep, type CleanupStep, type Clock, type DeclaredService, type JsonPointer, type ResponseReadErrorCode, type Result,
   type SafeText,
-  type ScriptArguments, type SecretStore, type ServiceCallErrorCode, type ServiceCaller, type ServiceName, type ServiceRequest, type ServiceResponse,
+  type CleanupResult, type ScriptArguments, type SecretStore, type ServiceCallErrorCode, type ServiceCallRecord, type ServiceCaller, type ServiceRequest, type ServiceResponse,
   type Step, type ValueName,
 } from '@revisum/contracts';
-import { runDatabaseStep, type DatabaseCommandContext, type DatabaseStepCode } from '../database-commands/database-command-steps.ts';
+import { runDatabaseStep, type DatabaseCommandContext } from '../database-commands/database-command-steps.ts';
 import type { Logger } from '../logging.ts';
 import { rememberedFieldEntries } from '../plan/plan-values.ts';
 import type { Project } from '../project/project-parser.ts';
@@ -32,39 +32,18 @@ import { checkBackendField, fieldAt, fieldText, isGatewayStatus, isPendingStatus
 // How long a backend check waits between two reads of its call.
 const BACKEND_POLL_INTERVAL_MILLISECONDS = 250;
 
-// What a run records of a step's call: never an argument, a header value or the body, only its
-// status and the body's sha256. `attempts` counts a backend check's reads.
-export type ServiceCallRecord = {
-  readonly call: CallName;
-  readonly service: ServiceName;
-  readonly method: HttpMethod;
-  readonly status: number | null;
-  readonly responseSha256: string | null;
-  readonly attempts: number;
-};
-
 // Why a call or backend-check step failed: a service call error, a run value with no text or
 // unsafe text, a secret the run never resolved, or a check that did not pass.
 export type CallStepCode =
   | ServiceCallErrorCode | StepErrorCode | typeof StepCode.SecretMissing | typeof StepCode.AssertionFailed | typeof StepCode.UnsupportedStep;
-type CallStepOutcome = {
-  readonly outcome: 'passed' | 'failed';
-  readonly code?: CallStepCode;
-  readonly serviceCall?: ServiceCallRecord;
-};
+type CallStepOutcome =
+  | { readonly outcome: typeof StepOutcome.Passed; readonly serviceCall?: ServiceCallRecord }
+  | { readonly outcome: typeof StepOutcome.Failed; readonly code: CallStepCode; readonly serviceCall?: ServiceCallRecord };
 
 // The codes of a call that got no answer from the service, not even through a gateway. A check then
 // learned nothing about the product, so the run could not test, in whatever step the call stood.
 export const NO_ANSWER_CODES: readonly string[] = [StepCode.ServiceUnreachable, StepCode.CallTimeout] satisfies readonly ServiceCallErrorCode[];
 
-// A cleanup step's record, naming its call or its database command. A failed one is always
-// cleanup-failed; `cause` says what failed.
-export type CleanupResult = {
-  readonly index: number;
-  readonly outcome: 'passed' | 'failed' | 'skipped';
-  readonly code?: 'cleanup-failed';
-  readonly cause?: CallStepCode | DatabaseStepCode | 'unsupported-step';
-} & ({ readonly call: CallName } | { readonly command: CommandName });
 
 // What the run hands these steps. `remembered` is how a call adds to the run's values.
 export type CallStepContext = {
@@ -290,29 +269,29 @@ export async function runCleanup(
   for (const [index, step] of cleanup.entries()) {
     if (step.type === 'database') {
       const base = { index, command: step.command } as const;
-      if (needsUnsetValue(step.arguments, commands.values)) { results.push({ ...base, outcome: 'skipped' }); continue; }
+      if (needsUnsetValue(step.arguments, commands.values)) { results.push({ ...base, outcome: StepOutcome.Skipped }); continue; }
       let done: Awaited<ReturnType<typeof runDatabaseStep>>;
       try {
         done = await runDatabaseStep(step, firstIndex + index, commands);
       } catch {
         done = stepFailed(StepCode.CommandFailed);
       }
-      results.push(done.outcome === 'passed'
-        ? { ...base, outcome: 'passed' }
-        : { ...base, outcome: 'failed', code: 'cleanup-failed', ...(done.code === undefined ? {} : { cause: done.code }) });
+      results.push(done.outcome === StepOutcome.Passed
+        ? { ...base, outcome: StepOutcome.Passed }
+        : { ...base, outcome: StepOutcome.Failed, code: StepCode.CleanupFailed, cause: done.code });
       continue;
     }
     const base = { index, call: step.call } as const;
-    if (needsUnsetValue(step.arguments, context.values)) { results.push({ ...base, outcome: 'skipped' }); continue; }
+    if (needsUnsetValue(step.arguments, context.values)) { results.push({ ...base, outcome: StepOutcome.Skipped }); continue; }
     let outcome: CallStepOutcome;
     try {
       outcome = await runCallStep(step, firstIndex + index, context);
     } catch {
       outcome = failedWith('service-unreachable');
     }
-    results.push(outcome.outcome === 'passed'
-      ? { ...base, outcome: 'passed' }
-      : { ...base, outcome: 'failed', code: 'cleanup-failed', ...(outcome.code === undefined ? {} : { cause: outcome.code }) });
+    results.push(outcome.outcome === StepOutcome.Passed
+      ? { ...base, outcome: StepOutcome.Passed }
+      : { ...base, outcome: StepOutcome.Failed, code: StepCode.CleanupFailed, cause: outcome.code });
   }
   return results;
 }

@@ -1,5 +1,12 @@
 // Resolving the run's target to an open browser session.
-import type { BrowserDriver, Result, Session, Target, Unavailable } from "@revisum/contracts";
+import {
+    UnavailableReason,
+    type BrowserDriver,
+    type Result,
+    type Session,
+    type Target,
+    type Unavailable,
+} from "@revisum/contracts";
 import { totalClockAdvanceMilliseconds } from "../../clock-advance.ts";
 import type { Planned } from "../../lifecycle.ts";
 import { DETERMINISM_INPUTS } from "../../manifest.ts";
@@ -42,7 +49,7 @@ export async function openSession(
         return {
             ok: false,
             error: {
-                reason: "adapter-not-registered",
+                reason: UnavailableReason.AdapterNotRegistered,
                 detail: `no adapter '${planned.target.adapter}'`,
             },
         };

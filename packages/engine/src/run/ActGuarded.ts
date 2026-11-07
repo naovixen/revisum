@@ -9,8 +9,8 @@ import {
     type ResolvedElement,
     type Result,
     type Step,
+    type Denial,
 } from "@revisum/contracts";
-import type { Denial } from "../lifecycle.ts";
 import { deniedStep, type DeniedStep } from "./executors/StepExecutor.ts";
 import type { RunContext } from "./RunContext.ts";
 

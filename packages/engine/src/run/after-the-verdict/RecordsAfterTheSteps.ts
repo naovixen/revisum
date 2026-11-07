@@ -1,8 +1,13 @@
 // The records a run reads from the session once its steps have run, and what each one left unread
 // does to the verdict and the result.
-import type { AppliedRewrite, StubAnswer } from "@revisum/contracts";
+import {
+    type AppliedRewrite,
+    type StubAnswer,
+    RunReviewItemCode,
+    UnreadRecordCode,
+    type RunReviewItem,
+} from "@revisum/contracts";
 import { finish } from "../../lifecycle.ts";
-import { EGRESS_UNREAD, UnreadRecordCode, type RunReviewItem } from "../RunResult.ts";
 import type { StepsVerdict } from "../steps/VerdictOfSteps.ts";
 import { RecordReadKind, type RecordRead } from "./RecordRead.ts";
 
@@ -20,12 +25,12 @@ export type RecordsAfterTheSteps = {
 // Each record's review item, in the order the result lists them.
 const UNREAD_RECORD_ITEMS: readonly {
     readonly record: keyof RecordsAfterTheSteps;
-    readonly code: UnreadRecordCode | typeof EGRESS_UNREAD;
+    readonly code: UnreadRecordCode | typeof RunReviewItemCode.EgressUnread;
 }[] = [
     { record: "refusals", code: UnreadRecordCode.Refusals },
     { record: "rewrites", code: UnreadRecordCode.Rewrites },
     { record: "stubAnswers", code: UnreadRecordCode.StubAnswers },
-    { record: "egress", code: EGRESS_UNREAD },
+    { record: "egress", code: RunReviewItemCode.EgressUnread },
 ];
 
 // A result that went on without a record would claim what nobody saw, so each record left unread

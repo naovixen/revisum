@@ -7,6 +7,8 @@ import {
     stepFailed,
     type DocumentSession,
     type Step,
+    type RanStepResult,
+    type StepResult,
     type StubName,
 } from "@revisum/contracts";
 import { isAssertionStepType, isSetupStepType } from "../../plan/StepFacts.ts";
@@ -21,7 +23,7 @@ import {
     type SessionContext,
 } from "../executors/StepExecutor.ts";
 import { executeStep } from "../executors/StepExecutors.ts";
-import { failedStep, type StepResult } from "../StepResult.ts";
+import { failedStep } from "../FailedStep.ts";
 
 export async function runPlanStep(
     step: RunStep,
@@ -63,13 +65,13 @@ async function runStepOnLivePage(
         const isRequestHeld = context.session.refusedRequestDecisions().length > 0;
         switch (executed.outcome) {
             case ExecutorOutcome.SetupFailedInside: {
-                const failed: StepResult = { index, type: step.type, ...executed.failed };
+                const failed: RanStepResult = { index, type: step.type, ...executed.failed };
                 return setupFailedInside(
                     isRequestHeld ? { ...failed, ...stepFailed(StepCode.AdapterError) } : failed,
                 );
             }
             default: {
-                const done: StepResult = { index, type: step.type, ...executed };
+                const done: RanStepResult = { index, type: step.type, ...executed };
                 return isRequestHeld
                     ? { ...done, ...stepFailed(StepCode.AdapterError) }
                     : judgedOnLivePage(step, done, document, openingsBefore);
@@ -100,10 +102,10 @@ function deniedWhateverTheSessionSays(
 // nothing had opened.
 function judgedOnLivePage(
     step: RunStep,
-    done: StepResult,
+    done: RanStepResult,
     document: DocumentSession,
     openingsBefore: number,
-): StepResult {
+): RanStepResult {
     if (done.outcome !== StepOutcome.Passed) {
         return done;
     }
@@ -116,7 +118,7 @@ function judgedOnLivePage(
 }
 
 // True when a passed step left something beyond its outcome for a person to read.
-const holdsARecord = (done: StepResult): boolean =>
+const holdsARecord = (done: RanStepResult): boolean =>
     Object.keys(done).some((key) => key !== "index" && key !== "type" && key !== "outcome");
 
 // The steps of a frame or newTab step, in order, in the document they stand in. They have no results
@@ -129,8 +131,8 @@ async function runStepsInside(
     document: DocumentSession,
     context: SessionContext,
 ): Promise<RanStep> {
-    const kept: StepResult[] = [];
-    const withKept = (result: StepResult, nested: readonly StepResult[] = []): StepResult =>
+    const kept: RanStepResult[] = [];
+    const withKept = (result: RanStepResult, nested: readonly StepResult[] = []): RanStepResult =>
         kept.length + nested.length === 0
             ? result
             : { ...result, innerSteps: [...kept, ...nested] };
@@ -159,9 +161,9 @@ async function runStepsInside(
 // as the step ends are the ones active while it ran.
 function withActiveStubs(
     step: Step,
-    result: StepResult,
+    result: RanStepResult,
     activeStubs: ReadonlySet<StubName>,
-): StepResult {
+): RanStepResult {
     if (activeStubs.size === 0 || !isAssertionStepType(step.type)) {
         return result;
     }

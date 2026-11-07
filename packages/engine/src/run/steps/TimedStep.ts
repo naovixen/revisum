@@ -1,5 +1,5 @@
 // A step's result in the plan's list, and how long it took when it ran, kept together.
-import type { StepResult } from "../StepResult.ts";
+import type { StepResult } from "@revisum/contracts";
 
 export const TimedStepKind = {
     Ran: "ran",

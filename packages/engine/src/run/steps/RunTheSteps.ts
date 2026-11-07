@@ -1,6 +1,12 @@
 // Runs the plan's steps in order and gives them a verdict, reading what the session must give before it closes.
-import { StepCode, type Session } from "@revisum/contracts";
-import { finish, start, type Denial, type Resolved, type Running } from "../../lifecycle.ts";
+import {
+    StepCode,
+    StepOutcome,
+    type Denial,
+    type Session,
+    type StepResult,
+} from "@revisum/contracts";
+import { finish, start, type Resolved, type Running } from "../../lifecycle.ts";
 import {
     observedRequestNames,
     startObserving,
@@ -13,7 +19,7 @@ import {
 import { codeForThrow } from "../CodeForThrow.ts";
 import { networkContext } from "../executors/network-and-storage/NetworkAndStorageExecutors.ts";
 import { ExecutorOutcome, type RanStep, type SessionContext } from "../executors/StepExecutor.ts";
-import { failedStep, type StepResult } from "../StepResult.ts";
+import { failedStep } from "../FailedStep.ts";
 import { runPlanStep } from "./RunPlanStep.ts";
 import { ranStep, resultsOf, stepNotRun, type TimedStep } from "./TimedStep.ts";
 import { verdictOfSteps, type FinishedRun, type StepsRun } from "./VerdictOfSteps.ts";
@@ -119,8 +125,8 @@ async function runEachStep(context: SessionContext, soFar: StepsSoFar): Promise<
     const { steps } = soFar;
     const notObserved = await failureToObserveRequests(session, context);
     for (const [index, step] of planSteps.entries()) {
-        if (steps.some((done) => done.result.outcome === "failed")) {
-            steps.push(stepNotRun({ index, type: step.type, outcome: "skipped" }));
+        if (steps.some((done) => done.result.outcome === StepOutcome.Failed)) {
+            steps.push(stepNotRun({ index, type: step.type, outcome: StepOutcome.Skipped }));
             continue;
         }
         const stepStartedAt = ports.clock.now();
@@ -134,7 +140,7 @@ async function runEachStep(context: SessionContext, soFar: StepsSoFar): Promise<
         // With no later step to notice, a crash the last step did not report would go unseen.
         const isLastStep = index === planSteps.length - 1;
         const result =
-            isLastStep && done.outcome === "passed" && session.crashed()
+            isLastStep && done.outcome === StepOutcome.Passed && session.crashed()
                 ? failedStep(step, index, StepCode.TargetCrashed)
                 : done;
         const milliseconds = ports.clock.now() - stepStartedAt;
@@ -158,7 +164,9 @@ function pushUnfinishedSteps(planSteps: readonly RunStep[], steps: TimedStep[]):
         steps.push(stepNotRun(failedStep(unfinished, steps.length, StepCode.AdapterError)));
     }
     for (const step of unreached) {
-        steps.push(stepNotRun({ index: steps.length, type: step.type, outcome: "skipped" }));
+        steps.push(
+            stepNotRun({ index: steps.length, type: step.type, outcome: StepOutcome.Skipped }),
+        );
     }
 }
 

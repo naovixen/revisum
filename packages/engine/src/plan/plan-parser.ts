@@ -28,7 +28,7 @@ import {
   type Modifier, type MultiLineText, type NetworkAndStorageStep, type ObservedRequestDeclaration, type Origin, type PageAssertion, type PathTemplate,
   type Plan, type PlanData, type PlanMeta, type Position, type RememberSource, type RequestCount, type RequestName, type ResponseAssertion,
   type Result, type SafeText, type SecretName, type SecretReference, type Step, type StorageAssertion, type StorageEntryDeclaration,
-  type StorageEntryName, type StubDeclaration, type StubName, type TargetId, type TestIdAttribute, type TextOrValue, type ValueReference,
+  type StorageEntryName, type StubDeclaration, type StubName, type TargetId, type TestIdAttribute, type TextOrValue, type ValueReference, type PlanError,
 } from '@revisum/contracts';
 import { brand } from '../brand.ts';
 import { clockAdvanceMilliseconds } from '../clock-advance.ts';
@@ -38,7 +38,7 @@ import { readId, type Limits, type Project } from '../project/project-parser.ts'
 import { declaredCommands, declaredScripts, enabledUnsafeFeatures } from '../project/unsafe-feature-declarations.ts';
 import {
   INVALID, allValid, isOneOf, isUnsafeSource, peekRecord, readInteger, readList, readOneOf, readRecord, readText,
-  type Issues, type Parsed, type PlanError,
+  type Issues, type Parsed,
 } from './plan-decoders.ts';
 import {
   ALL_LOCATOR_KINDS, ATTRIBUTE_NAME, CAPTURE_NAME, CLASS_TOKEN, CRITERION_FIELD, CRITERION_ID, CURRENT_PLAN_VERSION,

@@ -7,10 +7,9 @@
 // objects.
 import {
   failure, success,
-  type CallDeclaration, type CallName, type CommandName, type DatabaseCommandDeclaration, type Plan, type Redactor, type Result, type Secret, type SecretName, type SecretStore, type Step,
+  type CallDeclaration, type CallName, type CommandName, type DatabaseCommandDeclaration, type Plan, type Redactor, type Result, type Secret, type SecretName, type SecretStore, type Step, type SecretRecord, type StorageStateRecord,
 } from '@revisum/contracts';
 import { sha256 } from '../hashing.ts';
-import type { SecretRecord, StorageStateRecord } from '../manifest.ts';
 import { stepsWithin } from '../plan/VisitSteps.ts';
 import type { RunStep } from '../RunStep.ts';
 import { redactionModeOf, secretRedaction, secretSha256, shortSecretMatch, storageStateSecrets } from './secret-values.ts';

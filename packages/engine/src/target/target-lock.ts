@@ -5,14 +5,14 @@
 import {
   failure, success,
   type AdapterRegistry, type BrowserDriver, type BuildFailureCode, type LockEntry, type LockFailure, type LockfileFailure, type Result,
-  type Target, type TargetId, type Unavailable, type UnavailableReason,
+  type Target, type TargetId, type Unavailable, UnavailableReason, type PlanError,
 } from '@revisum/contracts';
 import { createHash, randomUUID } from 'node:crypto';
 import { createReadStream } from 'node:fs';
 import { readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { canonicalJson } from '../hashing.ts';
-import { INVALID, allValid, readList, readRecord, type Issues, type Parsed, type PlanError } from '../plan/plan-decoders.ts';
+import { INVALID, allValid, readList, readRecord, type Issues, type Parsed } from '../plan/plan-decoders.ts';
 import { readBuildVersion, readId } from '../project/project-parser.ts';
 import type { TrustedProject } from '../project/trusted-project.ts';
 import { schemaId } from '../version.ts';
@@ -175,7 +175,7 @@ export async function lockToFile(
 // The lock-time codes have no run-time meaning of their own: at run time the build is simply not
 // there to launch.
 const runTimeReason = (code: BuildFailureCode): UnavailableReason =>
-  (code === 'lock-download-failed' || code === 'lock-offline' ? 'launch-failed' : code);
+  (code === 'lock-download-failed' || code === 'lock-offline' ? UnavailableReason.LaunchFailed : code);
 
 // What a run learns of the browser build before it opens the browser.
 //   executableSha256: the sha256 core took of the executable the adapter will launch; absent for an
@@ -215,7 +215,7 @@ export async function checkPinnedBuild(
   const built = await driver.build(target);
   if (!built.ok) return failure({ reason: runTimeReason(built.error.code), detail: built.error.detail });
   const hashed = await hashLaunchedExecutable(built.value.executablePath);
-  if (!hashed.ok) return failure({ reason: 'launch-failed', detail: hashed.error });
+  if (!hashed.ok) return failure({ reason: UnavailableReason.LaunchFailed, detail: hashed.error });
   if (pinned === undefined) return success({ executableSha256: hashed.value, unpinned: entries !== undefined });
   if (built.value.version !== pinned.version || hashed.value !== pinned.executableSha256) {
     return failure({

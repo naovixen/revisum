@@ -14,10 +14,10 @@
 // hand under the declaration's limits. Neither the output nor a field's value is kept: the result
 // and the log record the output's sha256, and a remembered value's name and sha256.
 import {
-  failure, StepCode, stepFailed, success,
+  failure, StepCode, stepFailed, success, type StepOutcome,
   type CommandName, type Clock, type DatabaseCommandDeclaration, type DatabaseCommandRequest, type DatabaseCommandRunner, type DatabaseStep,
   type DeclaredService, type ExpectDatabaseStep, type FieldName, type ParameterName, type Result, type ScriptArguments,
-  type SecretStore, type ServiceName, type ValueName, type WorkloadErrorCode, type WorkloadOutcome, type WorkloadVariable,
+  type DatabaseCommandRecord, type SecretStore, type ValueName, type WorkloadErrorCode, type WorkloadOutcome, type WorkloadVariable,
 } from '@revisum/contracts';
 import type { Logger } from '../logging.ts';
 import { MAXIMUM_SCRIPT_RESULT_DEPTH, nestingDepth } from '../page-scripts/page-script-result.ts';
@@ -46,16 +46,6 @@ export const COMMAND_ERROR_CODES: readonly string[] = [
   StepCode.ImageMissing, StepCode.ImageDigestMismatch, StepCode.EgressUnenforceable, StepCode.WorkloadStartFailed,
 ] satisfies readonly (StepErrorCode | WorkloadErrorCode)[];
 
-// What a run keeps of a database step: the command, its service, how many times it ran, and of
-// its last run the exit code and the sha256 of what it printed on standard output (null when it
-// did not run, or its output was cut short or held a secret). Never the output or an environment value.
-export type DatabaseCommandRecord = {
-  readonly command: CommandName;
-  readonly service: ServiceName;
-  readonly exitCode: number | null;
-  readonly outputSha256: string | null;
-  readonly attempts: number;
-};
 
 // Why a database step failed: a step error (the command's own codes among them), a workload error,
 // an argument that does not fit, a field the output lacks, a secret the run never resolved, a
@@ -66,13 +56,14 @@ export type DatabaseStepCode = StepErrorCode | WorkloadErrorCode
 
 // What one of these steps gives its step result. A step that remembers one value records it as
 // `remembered`; one that remembers several records them all in `rememberedValues`.
-type DatabaseStepOutcome = {
-  readonly outcome: 'passed' | 'failed';
-  readonly code?: DatabaseStepCode;
-  readonly databaseCommand?: DatabaseCommandRecord;
-  readonly remembered?: RememberedRecord;
-  readonly rememberedValues?: readonly RememberedRecord[];
-};
+type DatabaseStepOutcome =
+  | {
+    readonly outcome: typeof StepOutcome.Passed;
+    readonly databaseCommand?: DatabaseCommandRecord;
+    readonly remembered?: RememberedRecord;
+    readonly rememberedValues?: readonly RememberedRecord[];
+  }
+  | { readonly outcome: typeof StepOutcome.Failed; readonly code: DatabaseStepCode; readonly databaseCommand?: DatabaseCommandRecord };
 
 // What the run hands these steps. `remembered` is how a step adds to the run's values. `secrets`
 // holds only the secrets the run resolved for commands.

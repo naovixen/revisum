@@ -1,17 +1,16 @@
 // The verdict the plan's steps give the run.
-import { StepCode, type AppliedRewrite, type StubAnswer } from "@revisum/contracts";
-import { COMMAND_ERROR_CODES } from "../../database-commands/database-command-steps.ts";
 import {
-    deny,
-    finish,
+    StepCode,
+    StepOutcome,
+    type AppliedRewrite,
     type Denial,
-    type DeniedRun,
-    type Finished,
-    type Running,
-} from "../../lifecycle.ts";
+    type StepResult,
+    type StubAnswer,
+} from "@revisum/contracts";
+import { COMMAND_ERROR_CODES } from "../../database-commands/database-command-steps.ts";
+import { deny, finish, type DeniedRun, type Finished, type Running } from "../../lifecycle.ts";
 import { isSetupStepType } from "../../plan/StepFacts.ts";
 import { NO_ANSWER_CODES } from "../../service-calls/call-steps.ts";
-import type { StepResult } from "../StepResult.ts";
 import type { RecordRead } from "../after-the-verdict/RecordRead.ts";
 import type { TimedStep } from "./TimedStep.ts";
 
@@ -52,7 +51,7 @@ const UNUSABLE_RESULT_CODES: readonly string[] = [
 
 // True when a failed step means the run could not test, wherever in the plan the step stands.
 const couldNotTest = (done: StepResult, found: StepsFound): boolean =>
-    done.outcome === "failed" &&
+    done.outcome === StepOutcome.Failed &&
     (isSetupStepType(done.type) ||
         UNUSABLE_RESULT_CODES.some((code) => code === done.code) ||
         found.setupFailedInside.has(done.index));
@@ -72,5 +71,8 @@ export function verdictOfSteps(
     if (steps.some((done) => couldNotTest(done, found))) {
         return finish(running, "Errored");
     }
-    return finish(running, steps.every((done) => done.outcome === "passed") ? "Passed" : "Failed");
+    return finish(
+        running,
+        steps.every((done) => done.outcome === StepOutcome.Passed) ? "Passed" : "Failed",
+    );
 }

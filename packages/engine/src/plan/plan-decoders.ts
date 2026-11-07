@@ -1,47 +1,12 @@
 // Small "parse, don't validate" helpers for outside input. Each helper either returns a precise
 // value or records a PlanError and returns INVALID. Errors carry a code and a JSON path, never
 // the offending value, so hostile or private text is never echoed back.
-import { isPlainObject, type SafeText } from '@revisum/contracts';
+import { PlanErrorCode, isPlainObject, type PlanError, type SafeText } from '@revisum/contracts';
 import { brand } from '../brand.ts';
 import { sha256 } from '../hashing.ts';
 import { looksLikeCredential } from './literal-secrets.ts';
 import { UNSAFE_TEXT_CHARACTERS } from './plan-grammar.ts';
 
-export const PLAN_ERROR_CODES = [
-  'not_object', 'unknown_field', 'missing_field', 'wrong_type', 'unknown_step',
-  'unknown_value', 'invalid_url', 'scheme_not_allowed', 'origin_not_allowed',
-  'target_not_in_matrix', 'unsafe_text', 'too_large', 'too_long', 'duplicate',
-  'version_unsupported', 'empty',
-  // A check that would pass on anything, such as an expected text that is empty.
-  'vacuous',
-  // A secret written into the plan: literal text in a sensitive field, credential-shaped text, or
-  // saved storage state itself. A plan names secrets with { secretName }.
-  'literal_secret',
-  // A reference to a run value that no earlier part of the plan defines.
-  'undefined_value',
-  // A position on the locator of a check that counts matches (countEquals or absent), where
-  // picking one element would make the count meaningless.
-  'position_not_allowed',
-  // A step where the language does not allow it, such as a newTab inside a frame or another newTab.
-  'misplaced_step',
-  // A call declaration that writes a parameter into a string, when the parameter's type could
-  // hold a quote, a space or a separator and so change what the string says.
-  'unsafe_interpolation',
-  // A call declaration that sets a header deciding where or how a request travels, such as host.
-  'header_not_allowed',
-  // A suite declaration whose command does not invoke Playwright Test, or sets an argument Revisum
-  // sets itself.
-  'command_not_allowed',
-  // A suite declaration's path or working directory that is absolute or leaves the repository, or
-  // a page script declaration's file outside plans/scripts/.
-  'path_not_allowed',
-  // An unsafe plan feature, such as a css locator or a page script, that the trusted project does
-  // not enable. Reported at the field that names the feature, with nothing under it read.
-  'unsafe_feature_disabled',
-] as const;
-export type PlanErrorCode = (typeof PLAN_ERROR_CODES)[number];
-
-export type PlanError = { readonly code: PlanErrorCode; readonly path: string };
 
 export const INVALID: unique symbol = Symbol('invalid');
 export type Parsed<Value> = Value | typeof INVALID;
@@ -155,7 +120,7 @@ export function runTimeTextOrDigest(value: string, maximumLength: number): SafeT
 }
 
 export function readOneOf<Value extends string>(
-  input: unknown, path: string, issues: Issues, values: readonly Value[], code: PlanErrorCode = 'unknown_value',
+  input: unknown, path: string, issues: Issues, values: readonly Value[], code: PlanErrorCode = PlanErrorCode.UnknownValue,
 ): Parsed<Value> {
   if (typeof input !== 'string') { issues.push({ code: 'wrong_type', path }); return INVALID; }
   const found = values.find((value) => value === input);

@@ -8,8 +8,9 @@
 //
 // A plan reaches Planned only once the policy gate has authorised it. Denied is the run the gate's
 // runtime guard stopped before an action; the denied action sent no input event.
-import type { Plan, PolicyRuleId, SecretName, Session, Target, Unavailable } from '@revisum/contracts';
-import type { RunManifest } from './manifest.ts';
+import type {
+  Denial, Plan, PlanRefusal, RunManifest, Session, Target, TerminalState as EndState, Unavailable,
+} from '@revisum/contracts';
 
 type Transitions = {
   readonly Planned: 'Resolved' | 'TargetUnavailable' | 'Refused';
@@ -23,7 +24,10 @@ type Transitions = {
   readonly Denied: never;
 };
 type RunState = keyof Transitions;
-export type TerminalState = { [State in RunState]: Transitions[State] extends never ? State : never }[RunState];
+type TerminalState = { [State in RunState]: Transitions[State] extends never ? State : never }[RunState];
+// The states with no way out are exactly the states a result can end in, so a state added to either fails to compile.
+type EndStatesMatch<Check extends true> = Check;
+export type TerminalStatesMatchTheResult = EndStatesMatch<[TerminalState] extends [EndState] ? ([EndState] extends [TerminalState] ? true : false) : false>;
 
 // A type-level guard for logging state changes: only legal (from, to) pairs compile.
 export const transition = <From extends RunState, To extends Transitions[From]>(from: From, to: To): { readonly from: From; readonly to: To } => ({ from, to });
@@ -36,46 +40,8 @@ export type Running = Omit<Resolved, 'state'> & { readonly state: 'Running' };
 export type Finished<State extends 'Passed' | 'Failed' | 'Errored'> = Omit<Running, 'state' | 'session'> & { readonly state: State };
 type TargetUnavailableRun = Omit<Planned, 'state'> & { readonly state: 'TargetUnavailable'; readonly unavailable: Unavailable };
 
-// Why a run was refused before any driver call.
-//   origin-not-allowed: the run would reach one of the project's production origins, which only an
-//     approved plan may reach, and only when the project allows production for approved plans.
-//   secret-missing: the plan names a secret, or makes a call that needs one, that the secret store
-//     cannot resolve. The refusal names the secret, never a value.
-//   services-unavailable: the plan calls a declared service, but the run was given no service caller.
-//   storage-state-unsupported: the plan names saved storage state, which no driver can load yet.
-//   element-check-unsupported: the plan checks that an element is checked, unchecked or focused, which
-//     no driver's probe can decide, so no earlier step may act for a check that was always going to fail.
-//   database-commands-unavailable: the plan runs a database command, in its steps or its cleanup, but
-//     the run was given no command runner.
-//   script-source-missing: the plan names a page script whose source the run was not given, so the
-//     manifest could not record what would run.
-// And why an evidence run (`run --suite`) was refused before any container started:
-//   evidence-mode-disabled: the trusted project has no evidenceMode section.
-//   suite-not-declared: the evidenceMode section declares no suite of that name.
-//   egress-unenforceable: egress cannot be enforced on this host, and suite code never runs without it.
-//   image-missing, image-digest-mismatch: the suite's workload image is not here, or not the pinned one.
-//   workload-start-failed: the workload container did not start, so no suite code ran.
-// A suite whose declared secret the store cannot resolve is refused with secret-missing, as a plan is.
-export type RefusalCode =
-  | 'origin-not-allowed' | 'secret-missing' | 'services-unavailable' | 'storage-state-unsupported' | 'database-commands-unavailable'
-  | 'evidence-mode-disabled' | 'suite-not-declared' | 'egress-unenforceable' | 'script-source-missing' | 'image-missing' | 'image-digest-mismatch'
-  | 'workload-start-failed' | 'element-check-unsupported';
-export type Refusal =
-  | { readonly code: Extract<RefusalCode, 'origin-not-allowed'>; readonly origin: string }
-  | { readonly code: Extract<RefusalCode, 'secret-missing'>; readonly secretName: SecretName }
-  | { readonly code: Extract<RefusalCode, 'services-unavailable' | 'storage-state-unsupported' | 'database-commands-unavailable' | 'element-check-unsupported'> }
-  // The plan names a page script whose source file the run was not given, by its declared path.
-  | { readonly code: Extract<RefusalCode, 'script-source-missing'>; readonly file: string }
-  | EvidenceRefusal;
-export type EvidenceRefusal = {
-  readonly code: Extract<RefusalCode, 'evidence-mode-disabled' | 'suite-not-declared' | 'egress-unenforceable' | 'image-missing'
-    | 'image-digest-mismatch' | 'workload-start-failed'>;
-};
-type RefusedRun = Omit<Planned, 'state'> & { readonly state: 'Refused'; readonly refusal: Refusal };
+type RefusedRun = Omit<Planned, 'state'> & { readonly state: 'Refused'; readonly refusal: PlanRefusal };
 
-// Which policy rule stopped the run, and at which step. `unrecorded` is present when the audit sink
-// failed to record the denial, so the result differs from one whose denial was recorded.
-export type Denial = { readonly rule: PolicyRuleId; readonly stepIndex: number; readonly unrecorded?: true };
 export type DeniedRun = Omit<Running, 'state' | 'session'> & { readonly state: 'Denied'; readonly denial: Denial };
 
 export const plan = (approved: Plan, target: Target): Planned => ({ state: 'Planned', plan: approved, target });
@@ -86,7 +52,7 @@ export const resolve = (run: Planned, session: Session, manifest: RunManifest, m
 export const targetUnavailable = (run: Planned, unavailable: Unavailable): TargetUnavailableRun =>
   ({ ...run, state: 'TargetUnavailable', unavailable });
 
-export const refuse = (run: Planned, refusal: Refusal): RefusedRun => ({ ...run, state: 'Refused', refusal });
+export const refuse = (run: Planned, refusal: PlanRefusal): RefusedRun => ({ ...run, state: 'Refused', refusal });
 
 export const start = (run: Resolved): Running => ({ ...run, state: 'Running' });
 

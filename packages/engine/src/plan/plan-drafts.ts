@@ -10,12 +10,12 @@
 // as the source, basis core-recorded, under an actor of the engine's choosing.
 import {
   DECLARABLE_PLAN_SOURCES, failure, success,
-  type DerivedActor, type EventSink, type Plan, type PlanDraft, type PlanProvenance, type PlanSource, type Result,
+  type DerivedActor, type EventSink, type Plan, type PlanDraft, type PlanProvenance, type PlanSource, type Result, type PlanError,
 } from '@revisum/contracts';
 import { deriveActor, sourceActorId } from '../actor.ts';
 import { planHash } from '../manifest.ts';
 import { LIMIT_CEILINGS } from '../project/project-parser.ts';
-import { isUnsafeText, type PlanError } from './plan-decoders.ts';
+import { isUnsafeText } from './plan-decoders.ts';
 import { placedPlanErrors, readPlanText, type DraftError, type TextPosition } from './readable/plan-text.ts';
 import { isRecord } from './readable/text-syntax.ts';
 

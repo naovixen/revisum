@@ -4,9 +4,9 @@
 // format version, and a version this decoder does not know is refused as trace-unsupported, never
 // guessed at. What is kept is what a test did: the title of each action, in the order it started,
 // and what the trace says about its own Playwright and browser, which Revisum cannot check.
-import { failure, success, type EvidenceLimits, type Result } from '@revisum/contracts';
+import { failure, success, type EvidenceLimits, type Result, type SuiteDecodeError } from '@revisum/contracts';
 import { brand } from '../brand.ts';
-import type { SuiteDecodeError, SuiteTrace } from './suite-report.ts';
+import type { SuiteTrace } from './suite-report.ts';
 import { readZip } from './zip-reader.ts';
 
 // The trace format versions this decoder reads: what the repository's pinned Playwright writes.

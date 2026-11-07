@@ -4,21 +4,20 @@
 // text the report holds goes through the run's redactor and is kept only as safe text, or as its
 // sha256. A result built here is never verified evidence: it says what the suite reported.
 import {
-  SUITE_CRITERION_LINK,
-  type A11yFinding, type CriterionId, type EvidenceSuiteDeclaration, type Redactor, type SafeText, type SuiteFinding, type SuiteLocation,
-  type SuitePass, type SuiteTestId, type SuiteTestOutcome, type SuiteTestResult,
+  EvidenceOutcomeCode, RefusalCode, RunMode, RunReviewItemCode, SUITE_CRITERION_LINK, SuitePass, SuiteDecodeErrorCode, TerminalState,
+  type A11yFinding, type CriterionId, type EvidenceSuiteDeclaration, type ManifestOfTheRun, type Redactor, type RunManifest, type RunResult,
+  type RunReviewItem, type SafeText, type SuiteDecodeError, type SuiteFinding, type SuiteLocation, type SuiteRanResult, type SuiteRefusal,
+  type SuiteRefusedResult, type SuiteTestId, type SuiteTestOutcome, type SuiteTestResult,
 } from '@revisum/contracts';
 import { brand } from '../brand.ts';
 import { guaranteeStatement } from '../guarantees.ts';
 import { canonicalJson, sha256 } from '../hashing.ts';
-import type { Refusal, TerminalState } from '../lifecycle.ts';
-import { manifestHash, type RunManifest } from '../manifest.ts';
+import { manifestHash } from '../manifest.ts';
 import { runTimeTextOrDigest } from '../plan/plan-decoders.ts';
 import { criterionIdFrom } from '../plan/plan-parser.ts';
-import { refusedResult } from '../run/seal/NothingRanResult.ts';
+import { refusedResult } from '../run/seal/RefusedResult.ts';
 import { withRunHashes } from '../run/seal/WithRunHashes.ts';
-import type { EvidenceOutcomeCode, RunResult, RunReviewItem } from '../run/RunResult.ts';
-import type { SuiteDecodeError, SuiteReport, SuiteReportTest, SuiteTrace } from './suite-report.ts';
+import type { SuiteReport, SuiteReportTest, SuiteTrace } from './suite-report.ts';
 
 // What the result builder needs besides the decoded outputs: the declared suite, which pass this
 // is, the suite command's exit code, and the redactor every kept text goes through. A suite run
@@ -113,10 +112,11 @@ function failFinding(
 // ran, makes it Failed; otherwise it Passed.
 function evidenceState(
   outcomes: readonly SuiteTestOutcome[], exitCodeMismatch: boolean, outcomeCode: EvidenceOutcomeCode | undefined,
-): Extract<TerminalState, 'Passed' | 'Failed' | 'Errored'> {
-  if (outcomeCode === 'suite-timeout' || outcomeCode === 'egress-unread' || exitCodeMismatch || outcomes.includes('interrupted')) return 'Errored';
-  if (outcomeCode === 'vacuous') return 'Failed';
-  return outcomes.some((outcome) => FINDING_OUTCOMES.includes(outcome)) ? 'Failed' : 'Passed';
+): SuiteRanResult['state'] {
+  const isStopped = outcomeCode === EvidenceOutcomeCode.SuiteTimeout || outcomeCode === EvidenceOutcomeCode.EgressUnread;
+  if (isStopped || exitCodeMismatch || outcomes.includes('interrupted')) return TerminalState.Errored;
+  if (outcomeCode === EvidenceOutcomeCode.Vacuous) return TerminalState.Failed;
+  return outcomes.some((outcome) => FINDING_OUTCOMES.includes(outcome)) ? TerminalState.Failed : TerminalState.Passed;
 }
 
 // The guarantee statement every evidence result carries. A suite runs only inside the isolated
@@ -125,7 +125,7 @@ const evidenceGuarantees = (context: EvidenceContext) => guaranteeStatement({
   mode: 'evidence', egressEnforced: context.egressRecordUnread !== true, unmaskedScreenshotsKept: context.suite.keepSuiteScreenshots, unsafeFeatures: [],
 });
 
-const manifestFields = (context: EvidenceContext): Pick<RunResult, 'manifest' | 'manifestHash'> =>
+const manifestFields = (context: EvidenceContext): ManifestOfTheRun =>
   context.manifest === undefined ? { manifest: null, manifestHash: null } : { manifest: context.manifest, manifestHash: manifestHash(context.manifest) };
 
 // Each blocked origin once, redacted, in a stable order.
@@ -136,17 +136,17 @@ const keptOrigins = (context: EvidenceContext): readonly string[] =>
 // exit code says, so the caller compares neither with the outcomes.
 function outcomeCodeOf(context: EvidenceContext, outcomes: readonly SuiteTestOutcome[]): EvidenceOutcomeCode | undefined {
   if (context.timedOut === true) {
-    return 'suite-timeout';
+    return EvidenceOutcomeCode.SuiteTimeout;
   }
   if (context.egressRecordUnread === true) {
-    return 'egress-unread';
+    return EvidenceOutcomeCode.EgressUnread;
   }
-  return outcomes.every((outcome) => outcome === 'skipped') ? 'vacuous' : undefined;
+  return outcomes.every((outcome) => outcome === 'skipped') ? EvidenceOutcomeCode.Vacuous : undefined;
 }
 
 export function evidenceResult(
   report: SuiteReport, traces: readonly SuiteTrace[], audits: readonly A11yFinding[], context: EvidenceContext,
-): RunResult {
+): SuiteRanResult {
   const { suite, pass, exitCode, redactor } = context;
   const tests: SuiteTestResult[] = [];
   const findings: SuiteFinding[] = [];
@@ -155,12 +155,12 @@ export function evidenceResult(
   for (const [testIndex, test] of report.tests.entries()) {
     const id = suiteTestId(test);
     const { criterionIds, invalid } = linkedCriteria(test, redactor);
-    for (const annotationIndex of invalid) reviewItems.push({ code: 'spec-ambiguous', testId: id, annotationIndex });
-    if (test.outcome === 'expected-failure') reviewItems.push({ code: 'expected-failure', testId: id });
+    for (const annotationIndex of invalid) reviewItems.push({ code: RunReviewItemCode.SpecAmbiguous, testId: id, annotationIndex });
+    if (test.outcome === 'expected-failure') reviewItems.push({ code: RunReviewItemCode.ExpectedFailure, testId: id });
     const isFinding = FINDING_OUTCOMES.includes(test.outcome);
     const actions = isFinding ? traceActions(test, traces) : [];
     if (actions.length > MAXIMUM_FINDING_STEPS) {
-      decodeErrors.push({ code: 'too-large', path: `$.tests[${testIndex}].steps` });
+      decodeErrors.push({ code: SuiteDecodeErrorCode.TooLarge, path: `$.tests[${testIndex}].steps` });
     }
     const finding = isFinding ? failFinding(test, id, criterionIds, actions, redactor) : undefined;
     if (finding !== undefined) findings.push(finding);
@@ -176,18 +176,18 @@ export function evidenceResult(
   const reportedProjects = new Set(report.tests.map((test) => test.project));
   for (const project of suite.projects) {
     if (!reportedProjects.has(project)) {
-      reviewItems.push({ code: 'project-without-tests', project: keptText(project, redactor) });
+      reviewItems.push({ code: RunReviewItemCode.ProjectWithoutTests, project: keptText(project, redactor) });
     }
   }
   for (const decodeErrorIndex of decodeErrors.keys()) {
-    reviewItems.push({ code: 'suite-output-unread', decodeErrorIndex });
+    reviewItems.push({ code: RunReviewItemCode.SuiteOutputUnread, decodeErrorIndex });
   }
   const outcomes = report.tests.map((test) => test.outcome);
   const outcomeCode = outcomeCodeOf(context, outcomes);
   const exitCodeMismatch = outcomeCode === undefined && exitCode !== agreeingExitCode(outcomes);
   return withRunHashes({
     state: evidenceState(outcomes, exitCodeMismatch, outcomeCode),
-    mode: 'evidence',
+    mode: RunMode.Evidence,
     guarantees: evidenceGuarantees(context),
     targetId: suite.name,
     ...manifestFields(context),
@@ -203,13 +203,13 @@ export function evidenceResult(
 // it, or its setup command failed first or left no egress record. It could not test, so it is
 // Errored, with no tests.
 export function unreadSuiteResult(
-  context: EvidenceContext, outcomeCode: Extract<EvidenceOutcomeCode, 'suite-timeout' | 'setup-failed' | 'suite-report-unread' | 'egress-unread'>,
+  context: EvidenceContext, outcomeCode: Exclude<EvidenceOutcomeCode, typeof EvidenceOutcomeCode.Vacuous>,
   decodeErrors: readonly SuiteDecodeError[] = [],
-): RunResult {
+): SuiteRanResult {
   const { suite, pass, exitCode } = context;
   return withRunHashes({
-    state: 'Errored',
-    mode: 'evidence',
+    state: TerminalState.Errored,
+    mode: RunMode.Evidence,
     guarantees: evidenceGuarantees(context),
     targetId: suite.name,
     ...manifestFields(context),
@@ -222,14 +222,14 @@ export function unreadSuiteResult(
 
 // The result of `run --suite` refused before any suite code ran. Its guarantee statement says
 // egress was not enforced when that is why it was refused.
-export function refusedSuiteResult(suiteName: string, refusal: Refusal): RunResult {
+export function refusedSuiteResult(suiteName: string, refusal: SuiteRefusal): SuiteRefusedResult {
   // The state stays ahead of the mode and guarantees among the result's keys.
   const { state, ...nothingRan } = refusedResult(refusal, suiteName, 0);
   return withRunHashes({
     state,
-    mode: 'evidence',
+    mode: RunMode.Evidence,
     guarantees: guaranteeStatement({
-      mode: 'evidence', egressEnforced: refusal.code !== 'egress-unenforceable', unmaskedScreenshotsKept: false, unsafeFeatures: [],
+      mode: RunMode.Evidence, egressEnforced: refusal.code !== RefusalCode.EgressUnenforceable, unmaskedScreenshotsKept: false, unsafeFeatures: [],
     }),
     ...nothingRan,
   });
@@ -239,4 +239,5 @@ export function refusedSuiteResult(suiteName: string, refusal: Refusal): RunResu
 // protected branch's suite files, that passed with nothing left for a person to look at. A
 // proposal pass ran the change's own tests, so it never does; nor does a plan run's result.
 export const evidenceMergeGateOpen = (result: RunResult): boolean =>
-  result.mode === 'evidence' && result.evidence?.pass === 'gating' && result.state === 'Passed' && (result.reviewItems ?? []).length === 0;
+  result.mode === RunMode.Evidence && result.state === TerminalState.Passed && result.evidence.pass === SuitePass.Gating
+  && (result.reviewItems ?? []).length === 0;

@@ -1,8 +1,7 @@
 // A run whose target was unavailable, so no step ran: logged and sealed as TargetUnavailable.
-import type { Unavailable } from "@revisum/contracts";
+import type { PlanRunResult, Unavailable } from "@revisum/contracts";
 import { logKeepingTheResult } from "../after-the-verdict/ReadKeepingTheResult.ts";
-import type { RunResult } from "../RunResult.ts";
-import { targetUnavailableResult } from "./NothingRanResult.ts";
+import { targetUnavailableResult } from "./RefusedResult.ts";
 import { sealResult, type NothingRanContext } from "./SealResult.ts";
 
 export function unavailableResult(
@@ -10,7 +9,7 @@ export function unavailableResult(
     unavailable: Unavailable,
     context: NothingRanContext,
     startedAt: number,
-): RunResult {
+): PlanRunResult {
     logKeepingTheResult(
         { kind: "run.state", state: "TargetUnavailable", targetId, code: unavailable.reason },
         context.logger,

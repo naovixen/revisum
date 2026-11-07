@@ -1,17 +1,19 @@
 // What every step executor is: a function from one step and its context to what the step's result
 // records. The run adds the index and type, and judges what no executor can see alone: a crash, a
 // popup no step asked for.
-import type { DocumentSession, Session, StepType } from "@revisum/contracts";
-import type { Denial } from "../../lifecycle.ts";
+import type {
+    Denial,
+    DocumentSession,
+    Session,
+    StepRecord,
+    RanStepResult,
+    StepType,
+} from "@revisum/contracts";
 import type { ContainerRunStep, RunStep, RunStepByType } from "../../RunStep.ts";
 import type { RunContext } from "../RunContext.ts";
-import type { StepResult } from "../StepResult.ts";
 
 // The run's context once its session is open.
 export type SessionContext = RunContext & { readonly session: Session };
-
-// What a step's result holds beyond its index and type.
-export type StepRecord = Omit<StepResult, "index" | "type">;
 
 // The two outcomes of a step that its record alone cannot say.
 export const ExecutorOutcome = {
@@ -37,7 +39,7 @@ export type SetupFailedInside<Failed extends StepRecord> = {
 export type ExecutedStep = StepRecord | DeniedStep | SetupFailedInside<StepRecord>;
 
 // What the run made of one step, wherever in the plan it stands.
-export type RanStep = StepResult | DeniedStep | SetupFailedInside<StepResult>;
+export type RanStep = RanStepResult | DeniedStep | SetupFailedInside<RanStepResult>;
 
 export const deniedStep = (denial: Denial): DeniedStep => ({
     outcome: ExecutorOutcome.Denied,

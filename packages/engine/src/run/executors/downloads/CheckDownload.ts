@@ -6,11 +6,12 @@ import {
     type DownloadedFile,
     type DownloadTextKind,
     type StepByType,
+    type StepRecord,
     type TextOrValue,
 } from "@revisum/contracts";
 import { resolveText } from "../../../run-values.ts";
 import type { RunContext } from "../../RunContext.ts";
-import type { StepExecutor, StepRecord } from "../StepExecutor.ts";
+import type { StepExecutor } from "../StepExecutor.ts";
 
 const verdict = (isPassing: boolean): StepRecord =>
     isPassing ? { outcome: StepOutcome.Passed } : stepFailed(StepCode.AssertionFailed);

@@ -3,11 +3,11 @@ import {
     StepOutcome,
     type DownloadStep,
     type ResolvedDownloadStep,
+    type DownloadRecord,
 } from "@revisum/contracts";
 import { resolveLocator } from "../../../run-values.ts";
 import { actGuarded } from "../../ActGuarded.ts";
 import { keptText } from "../../Observe.ts";
-import type { DownloadRecord } from "../../StepResult.ts";
 import type { StepExecutor } from "../StepExecutor.ts";
 
 // The driver clicks the element, asking the runtime guard first as for any click, and saves the one

@@ -1,7 +1,6 @@
 // What request decisions the browser refused after the verdict do to it.
-import { StepCode, stepFailed } from "@revisum/contracts";
+import { StepCode, stepFailed, type FailedStep } from "@revisum/contracts";
 import { finish } from "../../lifecycle.ts";
-import type { StepResult } from "../StepResult.ts";
 import { ranStep, TimedStepKind } from "../steps/TimedStep.ts";
 import type { StepsVerdict } from "../steps/VerdictOfSteps.ts";
 
@@ -12,7 +11,7 @@ export type VerdictAfterRefusals =
     | {
           readonly isSpoilt: true;
           readonly verdict: StepsVerdict;
-          readonly spoiltStep: StepResult;
+          readonly spoiltStep: FailedStep;
           readonly spoiltStepMilliseconds: number;
       };
 
@@ -38,7 +37,7 @@ export function withRefusalsAfterTheVerdict(
     if (lastStep.kind === TimedStepKind.NotRun) {
         return { isSpoilt: false, verdict: { ...verdict, finished } };
     }
-    const spoiltStep: StepResult = { ...lastStep.result, ...stepFailed(StepCode.AdapterError) };
+    const spoiltStep: FailedStep = { ...lastStep.result, ...stepFailed(StepCode.AdapterError) };
     const steps = [...verdict.steps.slice(0, -1), ranStep(spoiltStep, lastStep.milliseconds)];
     return {
         isSpoilt: true,

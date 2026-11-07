@@ -8,11 +8,11 @@ import {
   type Brand, type CallDeclaration, type CallName, type DeclaredService, type DeviceProfileId, type FixtureName, type IrreversiblePatterns, type Locale, type Origin, type Result,
   type EmailDomain, type EvidenceMode, type PlannerEndpoint, type SafeText, type SecretName, type Target, type TestIdAttribute, type TimeZone,
   type ObservedRequestDeclaration, type RequestName, type StorageEntryDeclaration, type StorageEntryName, type StubDeclaration, type StubName,
-  type UnsafeFeaturesDeclaration, type VendorExtensionKey,
+  type UnsafeFeaturesDeclaration, type VendorExtensionKey, type PlanError,
 } from '@revisum/contracts';
 import { brand } from '../brand.ts';
 import {
-  INVALID, allValid, hasHoles, peekRecord, readInteger, readList, readOneOf, readRecord, readText, type Issues, type Parsed, type PlanError,
+  INVALID, allValid, hasHoles, peekRecord, readInteger, readList, readOneOf, readRecord, readText, type Issues, type Parsed,
 } from '../plan/plan-decoders.ts';
 import { readCallDeclarations, readServices } from './call-declarations.ts';
 import { readObservedRequestDeclarations, readStorageEntryDeclarations, readStubDeclarations } from './network-and-storage-declarations.ts';

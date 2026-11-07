@@ -3,11 +3,10 @@
 // refused, and a trusted file the change edits is ignored in favour of the protected version and
 // raised for review.
 import {
-  failure, success, type Approval, type EventSink, type Result, type TrustError, type VersionControlPort,
+  failure, success, type Approval, type EventSink, type Result, type TrustError, type VersionControlPort, type PlanError,
 } from '@revisum/contracts';
 import { deriveActor, sourceActorId } from '../actor.ts';
 import { isAnySuiteFile } from '../evidence/suite-choice.ts';
-import type { PlanError } from '../plan/plan-decoders.ts';
 import { repositoryPath } from '../relative-paths.ts';
 import { parseProject, type Project } from './project-parser.ts';
 

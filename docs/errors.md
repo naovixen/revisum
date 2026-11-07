@@ -7,7 +7,7 @@
 - Plan codes use underscores (`unknown_step`); every other union uses hyphens (`not-found`).
 - Each code says what was refused and what to do. Errors carry a code and a location, never the offending value, so private or hostile text is never echoed back.
 
-Plan errors (`PlanErrorCode`, from the plan parser in `engine`) come first, then readable plan errors (`TextErrorCode`, from the readable plan reader in `engine`) and suite output errors (`SuiteDecodeErrorCode`, from the evidence-mode decoders in `engine`), then step errors (`StepErrorCode`, decided by the engine at run time), then service call errors (`ServiceCallErrorCode`, from a declared call), then driver, runner, review recorder, event sink, command-line, approval, trust, policy and run refusal errors.
+Plan errors (`PlanErrorCode`, from the plan parser in `engine`) come first, then readable plan errors (`TextErrorCode`, from the readable plan reader in `engine`) and suite output errors (`SuiteDecodeErrorCode`, from the evidence-mode decoders in `engine`), then step errors (`StepErrorCode`, decided by the engine at run time), then service call errors (`ServiceCallErrorCode`, from a declared call), then driver, runner, review recorder, event sink, command-line, approval, trust, policy and run refusal errors, evidence run outcomes, the review items a run can raise (`RunReviewItemCode`) and why a target was unavailable (`UnavailableReason`).
 
 ## not_object
 
@@ -362,9 +362,11 @@ Driver error. The step made the page open a popup or a second page, or start a d
 
 ## assertion-failed
 
-Driver error. A `dialog` step's `expectText` is not the text of the dialog the page opened, so nothing answered the dialog. Check the expected text, or the step before it that opens the dialog.
+Step error. A check did not pass: what the step expected is not what the page, the app or the service gave by the step timeout, so the step fails, every later step is skipped and the run ends `Failed`. It is the product failure every check step can give: an element, page, download, storage, request, response, clipboard, page script, database or backend check whose expected value, count or state did not hold. A failed check keeps a redacted observation where one is safe, such as a count or `differs`, never the text itself. Check what the step expects against the app, or the step before it that should have brought the app there.
 
-A backend check fails with it too, ending the run `Failed`, when the check timeout runs out on a field that does not pass, or on a status in `pendingStatuses` other than 502, 503 or 504. The step's record keeps the last status. A pending answer's body is never read, so raise the timeout, or check why the job did not finish.
+A `dialog` step fails with it when its `expectText` is not the text of the dialog the page opened, so nothing answered the dialog. Check the expected text, or the step before it that opens the dialog.
+
+A backend check fails with it when the check timeout runs out on a field that does not pass, or on a status in `pendingStatuses` other than 502, 503 or 504. The step's record keeps the last status. A pending answer's body is never read, so raise the timeout, or check why the job did not finish.
 
 ## selector-invalid
 
@@ -708,11 +710,6 @@ Evidence run outcome. The suite's setup command exited with a non-zero code, so 
 
 Evidence run outcome. The suite's JSON report was missing or refused; the result's `evidence.decodeErrors` give each code and JSON path. The run ends `Errored`, with no tests.
 
-Review items an evidence run can raise beside its outcome, each keeping the merge gate shut:
-
-- `suite-output-unread`: a trace was refused, or a finding's steps were cut, so the result shows less than the suite recorded. It names its place in `evidence.decodeErrors`, which gives the code and path.
-- `project-without-tests`: a project in `evidenceMode.suites[].projects` has no test in the report, so less was tested than declared. Check its name against the suite's config.
-
 ## egress-unread
 
 Evidence run outcome. What the egress proxy decided could not be read back, or the proxy could not write all of it, such as when its `/tmp` is full. That is not the same as a proxy that blocked nothing, so the run ends `Errored` and its guarantee statement does not claim egress was enforced. Rerun, and look at what flooded the proxy if it recurs.
@@ -722,3 +719,55 @@ Plan run outcome, as a review item. The run's egress could not say what it refus
 ## suite-not-declared
 
 Run refusal. The trusted project's `evidenceMode` section declares no suite of the name `run --suite` was given, so no container starts. Names are exact and lowercase; use one from `evidenceMode.suites[].name`.
+
+## spec-ambiguous
+
+Review item, on an evidence run. A test's `criterion` annotation has a description that is not a valid criterion id, or holds text the redactor removes, so the link was dropped and its text never kept; the item names the test and the annotation's index. The verdict does not change, but the merge gate stays shut. Write the annotation's description as the criterion id alone.
+
+## expected-failure
+
+Review item, on an evidence run. A test the suite marks as expected to fail did fail. Playwright counts that as expected, so the verdict does not change, but a person should see why a failing test is kept, and the merge gate stays shut. Fix the product and remove the mark, or record why the test stays.
+
+## project-without-tests
+
+Review item, on an evidence run. A project in `evidenceMode.suites[].projects` has no test in the report, so less was tested than declared. The merge gate stays shut. Check its name against the suite's config.
+
+## suite-output-unread
+
+Review item, on an evidence run. A trace was refused, or a finding's steps were cut, so the result shows less than the suite recorded. It names its place in `evidence.decodeErrors`, which gives the code and path. The merge gate stays shut. Look at the decode error, and keep the suite's output within the evidence limits.
+
+## refusals-unread
+
+Review item, on a plan run. The run could not read, once its session had closed, which request decisions the browser refused, so the result does not claim it saw them all. A run that would have passed ends `Errored`, since one refusal would have stopped it passing; a run that did not pass keeps its verdict. The log holds why the read failed. Rerun on a working browser.
+
+## rewrites-unread
+
+Review item, on a plan run. The run could not read what the egress proxy rewrote, so it may have tested a rewritten app and has no verdict to give: it ends `Errored`, and its manifest records no rewrites. The log holds why the read failed. Check that the proxy container is up, then rerun.
+
+## stub-answers-unread
+
+Review item, on a plan run. The run could not read which stubs answered its requests, so the result lists none and does not claim that no stub answered. The verdict stands, since a stub only answers and never checks. The log holds why the read failed. Rerun if you need the list.
+
+## not-declared
+
+Target unavailable. The plan names a target the project's matrix does not declare, so no driver is asked and the run ends `TargetUnavailable`. Name the target in both the plan's `targets` and the project's `matrix`.
+
+## adapter-not-registered
+
+Target unavailable. The target names an adapter no driver is registered for, so nothing could open it and the run ends `TargetUnavailable`. Use an adapter this installation provides, such as `cdp`.
+
+## engine-not-supported
+
+Target unavailable. The target's adapter cannot drive the target's browser engine, such as the CDP adapter, which drives Chromium only, given a Firefox target. The run ends `TargetUnavailable`; nothing else is substituted. Pick an engine the adapter drives, or another adapter.
+
+## launch-failed
+
+Target unavailable. The browser could not be started or attached to, its build could not be fetched or is not where it should be, or its executable could not be hashed before launch. No step ran and the run ends `TargetUnavailable`. The detail says why. Install the pinned browser with `npm run browsers`, then rerun.
+
+## provider-unavailable
+
+Target unavailable. The cloud or device provider could not supply the target, so the run ends `TargetUnavailable`; another target is never substituted. Check the provider's status and your account, then rerun.
+
+## build-mismatch
+
+Target unavailable. The browser build on this machine is not the one the lockfile pins: another version, or the pinned version with other bytes. The run ends `TargetUnavailable` rather than test on a build nobody pinned. Install the pinned build, or re-lock on purpose and review the change.

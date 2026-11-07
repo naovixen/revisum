@@ -11,7 +11,7 @@
 //     rules as plan text; the result and the log keep its name and sha256 only.
 import {
   stepFailed,
-  type AdvanceClockStep, type ClipboardAssertion, type Clock, type DriverError, type ExpectClipboardStep, type Result, type Session, type Step, type StepCode,
+  type AdvanceClockStep, type ClipboardAssertion, type Clock, type DriverError, type ExpectClipboardStep, type Result, type Session, type Step, type StepCode, type StepOutcome,
 } from '@revisum/contracts';
 import { clockAdvanceMilliseconds } from './clock-advance.ts';
 import type { Project } from './project/project-parser.ts';
@@ -33,13 +33,10 @@ export type ClockAndClipboardContext = {
 };
 
 // What one of these steps gives its step result.
-type ClockAndClipboardOutcome = {
-  readonly outcome: 'passed' | 'failed';
-  readonly code?: StepCode;
+type ClockAndClipboardOutcome =
+  | { readonly outcome: typeof StepOutcome.Passed; readonly remembered?: RememberedRecord }
   // Only "empty" or "differs": never the clipboard's text.
-  readonly observed?: string;
-  readonly remembered?: RememberedRecord;
-};
+  | { readonly outcome: typeof StepOutcome.Failed; readonly code: StepCode; readonly observed?: string };
 
 const passed: ClockAndClipboardOutcome = { outcome: 'passed' };
 const failedWith = (code: StepCode, observed?: string): ClockAndClipboardOutcome =>

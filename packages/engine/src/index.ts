@@ -61,10 +61,6 @@ export { createRunService, type RunService } from './run/RunService.ts';
 export { emptySecretStore, noDatabaseCommandRunner, noRewrites, noServiceCaller, unwiredPorts } from './run/UnwiredPorts.ts';
 export { UntrustedRunOutcomeKind, type UntrustedRunOutcome } from './run/RunUntrusted.ts';
 export type { RunInputs, RunPorts } from './run/RunContext.ts';
-export type { DownloadRecord, RememberedValueRecord, StepResult } from './run/StepResult.ts';
-export type {
-  DeniedPlan, EvidenceOutcomeCode, EvidenceRunRecord, Rejected, RunResult, RunReviewItem, SuiteRunRecord,
-} from './run/RunResult.ts';
 export { adapterRegistry } from './target/adapter-registry.ts';
 export { testedOn } from './target/tested-on.ts';
 export { unavailableTargetOutcome } from './target/unavailable-target-outcome.ts';
@@ -77,7 +73,7 @@ export * from './ai-planning.ts';
 export * from './release-notes.ts';
 export { HOST_ISOLATION, guaranteeStatement } from './guarantees.ts';
 export { declaredSuite, isSuiteFile, suitePasses } from './evidence/suite-choice.ts';
-export { parseSuiteReport, type SuiteDecodeError, type SuiteDecodeErrorCode, type SuiteReport, type SuiteTrace } from './evidence/suite-report.ts';
+export { parseSuiteReport, type SuiteReport, type SuiteTrace } from './evidence/suite-report.ts';
 export { parseSuiteTrace } from './evidence/suite-trace.ts';
 export { SUITE_EVIDENCE_PATHS, SUITE_REPORT_FILE, suiteArguments } from './evidence/suite-arguments.ts';
 export { suiteEnvironment, suiteRedactor } from './evidence/suite-environment.ts';

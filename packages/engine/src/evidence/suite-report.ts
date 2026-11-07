@@ -8,20 +8,11 @@
 // Every refusal is a bare code and JSON path. Neither ever holds text from the report: the paths
 // name only the fields this decoder reads, and any other key is written "*".
 import { Buffer } from 'node:buffer';
-import { failure, isPlainObject, success, type Brand, type EvidenceLimits, type Result, type SuiteTestOutcome } from '@revisum/contracts';
+import { failure, isPlainObject, success, type Brand, type EvidenceLimits, type Result, type SuiteDecodeError, type SuiteTestOutcome } from '@revisum/contracts';
 import { brand } from '../brand.ts';
 import { INVALID, allValid, type Parsed } from '../plan/plan-decoders.ts';
 import { staysInside } from '../relative-paths.ts';
 
-// Why a suite's output was refused.
-//   suite-report-missing: the suite wrote no report.
-//   suite-report-invalid: the report does not have the shape of a Playwright Test JSON report.
-//   suite-report-unsupported: the report comes from a reporter or version Revisum does not read.
-//   trace-invalid, trace-unsupported: the same, for a trace archive.
-//   too-large: the output is over a size, count or depth limit.
-export type SuiteDecodeErrorCode =
-  | 'suite-report-missing' | 'suite-report-invalid' | 'suite-report-unsupported' | 'trace-invalid' | 'trace-unsupported' | 'too-large';
-export type SuiteDecodeError = { readonly code: SuiteDecodeErrorCode; readonly path: string };
 
 // How deeply a report may nest when the project sets no maximumReportDepth.
 const DEFAULT_REPORT_DEPTH = 64;

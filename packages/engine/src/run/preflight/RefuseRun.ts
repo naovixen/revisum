@@ -1,19 +1,19 @@
 // A run that preflight refused, before any driver call: logged and sealed as Refused.
-import { refuse, type Planned, type Refusal } from "../../lifecycle.ts";
+import { RefusalCode, type PlanRefusal, type PlanRunResult } from "@revisum/contracts";
+import { refuse, type Planned } from "../../lifecycle.ts";
 import { logKeepingTheResult } from "../after-the-verdict/ReadKeepingTheResult.ts";
-import type { RunResult } from "../RunResult.ts";
-import { refusedResult } from "../seal/NothingRanResult.ts";
+import { refusedResult } from "../seal/RefusedResult.ts";
 import { sealResult, type NothingRanContext } from "../seal/SealResult.ts";
 
 // What the event log says of a refusal beyond its code.
-function loggedWithRefusal(refusal: Refusal): {
+function loggedWithRefusal(refusal: PlanRefusal): {
     readonly origin?: string;
     readonly detail?: string;
 } {
     switch (refusal.code) {
-        case "origin-not-allowed":
+        case RefusalCode.OriginNotAllowed:
             return { origin: refusal.origin };
-        case "secret-missing":
+        case RefusalCode.SecretMissing:
             return { detail: `the secret store has no secret named ${refusal.secretName}` };
         default:
             return {};
@@ -22,10 +22,10 @@ function loggedWithRefusal(refusal: Refusal): {
 
 export function refuseRun(
     planned: Planned,
-    refusal: Refusal,
+    refusal: PlanRefusal,
     context: NothingRanContext,
     startedAt: number,
-): RunResult {
+): PlanRunResult {
     const refused = refuse(planned, refusal);
     logKeepingTheResult(
         {

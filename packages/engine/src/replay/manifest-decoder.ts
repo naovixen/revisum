@@ -2,10 +2,11 @@
 // of another schema version, or with a key this version does not know, is refused as
 // version-unsupported: a newer engine may have recorded an input this one would silently ignore.
 // A known field of the wrong shape is a replay-mismatch at its JSON path. Nothing is guessed.
-import { UNSAFE_FEATURES, failure, isPlainObject, success, type Result } from '@revisum/contracts';
-import type {
-  EvidenceManifestRecord, FixtureReference, HostInfo, RunManifest, RunVersions, SecretRecord, StorageStateRecord, UnsafeDeclarationRecord,
-} from '../manifest.ts';
+import {
+  UNSAFE_FEATURES, failure, isPlainObject, success,
+  type EvidenceManifestRecord, type FixtureReference, type HostInfo, type Result, type RunManifest, type RunVersions, type SecretRecord,
+  type StorageStateRecord, type UnsafeDeclarationRecord,
+} from '@revisum/contracts';
 import { INVALID, allValid, readInteger, readList, readOneOf, readRecord, type Issues, type Parsed } from '../plan/plan-decoders.ts';
 import { readImageDigest, readSuiteName } from '../project/evidence-declarations.ts';
 import { MAXIMUM_DAY_OFFSET } from '../plan/plan-grammar.ts';

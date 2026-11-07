@@ -1,25 +1,27 @@
 // What a cleared run is given, and what its steps run with once preflight has passed.
-import type {
-    AppliedRewrite,
-    ArtifactStore,
-    BaseUrl,
-    BrowserDriver,
-    Clock,
-    DatabaseCommandRunner,
-    DownloadedFile,
-    DownloadName,
-    EventSink,
-    LockEntry,
-    Redactor,
-    ResolvedLocator,
-    RunIsolation,
-    SecretStore,
-    ServiceCaller,
-    StubName,
+import {
+    type AppliedRewrite,
+    type ArtifactStore,
+    type BaseUrl,
+    type BrowserDriver,
+    type Clock,
+    type DatabaseCommandRunner,
+    type DownloadedFile,
+    type DownloadName,
+    type EventSink,
+    type LockEntry,
+    type Redactor,
+    type ResolvedLocator,
+    type RunIsolation,
+    type SecretStore,
+    type ServiceCaller,
+    type StubName,
+    type FixtureReference,
+    type HostInfo,
 } from "@revisum/contracts";
 import type { DatabaseCommandContext } from "../database-commands/database-command-steps.ts";
 import type { Logger, RunEventSink } from "../logging.ts";
-import type { FixtureReference, HostInfo, RunPins } from "../manifest.ts";
+import type { RunPins } from "../manifest.ts";
 import type { NamedScripts } from "../page-scripts/NamedScriptSources.ts";
 import type { ClearedRun } from "../policy/ClearedRun.ts";
 import type { PolicyGate } from "../policy/policy-gate.ts";

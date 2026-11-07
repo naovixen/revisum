@@ -13,12 +13,12 @@ export const ERRORS_PAGE = 'docs/errors.md';
 // Each error-code union: the file that declares it and the declared name. The codes are the string
 // literals in the declaration, whether a union type or a const list.
 export const ERROR_CODE_UNIONS: readonly { readonly file: string; readonly name: string }[] = [
-  { file: 'packages/engine/src/plan/plan-decoders.ts', name: 'PLAN_ERROR_CODES' },
+  { file: 'packages/contracts/src/run-result/PlanError.ts', name: 'PlanErrorCode' },
   { file: 'packages/engine/src/plan/readable/text-syntax.ts', name: 'TextErrorCode' },
   // StepErrorCode takes its codes from StepCode, every code a step's result can hold.
   { file: 'packages/contracts/src/foundation/StepCode.ts', name: 'StepCode' },
   { file: 'packages/engine/src/run-values.ts', name: 'StepErrorCode' },
-  { file: 'packages/engine/src/evidence/suite-report.ts', name: 'SuiteDecodeErrorCode' },
+  { file: 'packages/contracts/src/run-result/SuiteDecodeError.ts', name: 'SuiteDecodeErrorCode' },
   { file: 'packages/contracts/src/browser-driver.ts', name: 'DriverErrorCode' },
   // RunnerErrorCode and WorkloadErrorCode share these, and CliErrorCode these build-fetch codes.
   { file: 'packages/contracts/src/isolated-runner.ts', name: 'ContainerRefusalCode' },
@@ -34,9 +34,15 @@ export const ERROR_CODE_UNIONS: readonly { readonly file: string; readonly name:
   { file: 'packages/contracts/src/approval.ts', name: 'ApprovalErrorCode' },
   { file: 'packages/contracts/src/approval.ts', name: 'TrustErrorCode' },
   { file: 'packages/contracts/src/policy.ts', name: 'PolicyRuleId' },
-  { file: 'packages/engine/src/lifecycle.ts', name: 'RefusalCode' },
+  { file: 'packages/contracts/src/run-result/Refusal.ts', name: 'RefusalCode' },
   { file: 'packages/contracts/src/workload.ts', name: 'WorkloadErrorCode' },
-  { file: 'packages/engine/src/run/RunResult.ts', name: 'EvidenceOutcomeCode' },
+  { file: 'packages/contracts/src/run-result/EvidenceOutcomeCode.ts', name: 'EvidenceOutcomeCode' },
+  // RunReviewItemCode adds its own codes to UnreadRecordCode's, and borrows one each from
+  // ServiceCallErrorCode and EvidenceOutcomeCode.
+  { file: 'packages/contracts/src/run-result/RunReviewItem.ts', name: 'UnreadRecordCode' },
+  { file: 'packages/contracts/src/run-result/RunReviewItem.ts', name: 'RunReviewItemCode' },
+  // Why a declared target cannot run: a TargetUnavailable result's reason.
+  { file: 'packages/contracts/src/browser-driver.ts', name: 'UnavailableReason' },
   { file: 'packages/engine/src/manifest.ts', name: 'ReplayErrorCode' },
   // ServiceCallErrorCode adds its own codes to ResponseReadErrorCode's, so both are read.
   { file: 'packages/contracts/src/service-calls.ts', name: 'ResponseReadErrorCode' },

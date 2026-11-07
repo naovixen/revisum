@@ -21,8 +21,8 @@ import {
     type SecretName,
     type SecretStore,
     type ServiceCaller,
+    type PlanRefusal,
 } from "@revisum/contracts";
-import type { Refusal } from "../../lifecycle.ts";
 import { namedScriptSources, type NamedScripts } from "../../page-scripts/NamedScriptSources.ts";
 import { callsServices, runsDatabaseCommands } from "../../plan/CallsServices.ts";
 import { everyPlanStep } from "../../plan/VisitSteps.ts";
@@ -66,10 +66,10 @@ export type PreflightPassed = {
 // plan names, or none when one is missing.
 export type Preflight = {
     readonly redaction: ResolvedSecrets;
-    readonly outcome: Result<PreflightPassed, Refusal>;
+    readonly outcome: Result<PreflightPassed, PlanRefusal>;
 };
 
-type PreflightCheck = (facts: PreflightFacts) => Refusal | undefined;
+type PreflightCheck = (facts: PreflightFacts) => PlanRefusal | undefined;
 
 // A plan's relative paths resolve against the base URL, and the browser may reach only the project's
 // origins, so on any other origin every relative navigate would fail part way through the run.
@@ -124,7 +124,7 @@ const CHECKS_AFTER_SCRIPTS: readonly PreflightCheck[] = [
 const firstRefusal = (
     checks: readonly PreflightCheck[],
     facts: PreflightFacts,
-): Refusal | undefined =>
+): PlanRefusal | undefined =>
     checks.map((check) => check(facts)).find((refusal) => refusal !== undefined);
 
 // The secrets a plan names, resolved. A database command's secrets are resolved only for a run that
@@ -149,7 +149,7 @@ const resolvePreflightSecrets = (
 function passedOrRefused(
     facts: PreflightFacts,
     secrets: Result<PlanSecrets, SecretName>,
-): Result<PreflightPassed, Refusal> {
+): Result<PreflightPassed, PlanRefusal> {
     const origin = firstRefusal([refuseBaseUrlOffProject, refuseProductionOrigin], facts);
     if (origin !== undefined) {
         return failure(origin);

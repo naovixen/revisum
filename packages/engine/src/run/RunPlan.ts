@@ -6,7 +6,7 @@
 // storage go through the session's network and storage ports; clock advances and clipboard reads
 // through its clock and clipboard ports; page scripts through its script port. Database commands
 // go through the run's DatabaseCommandRunner port, which runs each in a workload container.
-import { StepCode, type Session } from "@revisum/contracts";
+import { StepCode, type PlanRunResult, type Session } from "@revisum/contracts";
 import { plan as planRun, resolve, targetUnavailable, type Planned } from "../lifecycle.ts";
 import type { Logger } from "../logging.ts";
 import { buildManifest, manifestHash } from "../manifest.ts";
@@ -28,7 +28,6 @@ import { checkPreflight, type PreflightPassed } from "./preflight/CheckPreflight
 import { refuseRun } from "./preflight/RefuseRun.ts";
 import type { RunContext, RunInputs, RunPorts } from "./RunContext.ts";
 import { runLogging } from "./RunLogging.ts";
-import type { RunResult } from "./RunResult.ts";
 import { sealRanResult, type NothingRanContext } from "./seal/SealResult.ts";
 import { unavailableResult } from "./seal/UnavailableResult.ts";
 import { createRunContext } from "./session/CreateRunContext.ts";
@@ -42,7 +41,7 @@ export async function runPlan(
     cleared: ClearedRun,
     inputs: RunInputs,
     ports: RunPorts,
-): Promise<RunResult> {
+): Promise<PlanRunResult> {
     // First, before any side effect: a run the gate did not clear, or a plan the parser did not make,
     // is refused, whatever its type says.
     assertCleared(cleared);
@@ -129,7 +128,7 @@ async function finishAfterTheSteps(
     context: RunContext,
     nothingRan: NothingRanContext,
     startedAt: number,
-): Promise<RunResult> {
+): Promise<PlanRunResult> {
     const { session, manifestInputs, ran } = inSession;
     const { logger, ports } = context;
     const refusals = refusalsAfterTheVerdict(session, logger);
@@ -149,31 +148,28 @@ async function finishAfterTheSteps(
         rewrites.length === 0
             ? verdict.finished.manifest
             : buildManifest({ ...manifestInputs, responseRewrites: rewrites });
-    return sealRanResult(
-        {
-            state: after.endState.state,
-            targetId: context.cleared.target.id,
-            manifest,
-            manifestHash: manifestHash(manifest),
-            steps: resultsOf(verdict.steps),
-            unavailable: null,
-            ...(verdict.finished.state === "Denied" ? { denial: verdict.finished.denial } : {}),
-            ...(after.cleanup === undefined ? {} : { cleanup: after.cleanup }),
-            ...(after.cleanupReviewItems.length === 0
-                ? {}
-                : { reviewItems: after.cleanupReviewItems }),
-            timings: {
-                totalMilliseconds: readKeepingTheResult(
-                    () => ports.clock.now() - startedAt,
-                    0,
-                    logger,
-                ),
-                stepMilliseconds: durationsOf(verdict.steps),
-            },
+    const beforeTheDenial = {
+        targetId: context.cleared.target.id,
+        manifest,
+        manifestHash: manifestHash(manifest),
+        steps: resultsOf(verdict.steps),
+        unavailable: null,
+    };
+    const afterTheDenial = {
+        ...(after.cleanup === undefined ? {} : { cleanup: after.cleanup }),
+        ...(after.cleanupReviewItems.length === 0 ? {} : { reviewItems: after.cleanupReviewItems }),
+        timings: {
+            totalMilliseconds: readKeepingTheResult(() => ports.clock.now() - startedAt, 0, logger),
+            stepMilliseconds: durationsOf(verdict.steps),
         },
-        nothingRan,
-        { ...readBeforeTheEgress, egress: after.egress },
-    );
+    };
+    const { end } = after;
+    // A result's key order is published: the denial stands between the steps and the cleanup.
+    const outcome =
+        "denial" in end
+            ? { state: end.state, ...beforeTheDenial, denial: end.denial, ...afterTheDenial }
+            : { state: end.state, ...beforeTheDenial, ...afterTheDenial };
+    return sealRanResult(outcome, nothingRan, { ...readBeforeTheEgress, egress: after.egress });
 }
 
 // The request decisions the browser refused, read once the session has closed, each logged.
@@ -203,7 +199,7 @@ function verdictAfterRefusals(
                 stepType: spoiltStep.type,
                 outcome: spoiltStep.outcome,
                 durationMilliseconds: spoiltStepMilliseconds,
-                ...(spoiltStep.code === undefined ? {} : { code: spoiltStep.code }),
+                code: spoiltStep.code,
             },
             logger,
         );

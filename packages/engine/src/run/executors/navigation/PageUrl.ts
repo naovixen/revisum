@@ -7,11 +7,12 @@ import {
     type AllowedUrl,
     type PathTemplate,
     type Result,
+    type StepRecord,
 } from "@revisum/contracts";
 import { resolvePathTemplate } from "../../../run-values.ts";
 import { denialNow } from "../../ActGuarded.ts";
 import type { RunContext } from "../../RunContext.ts";
-import { deniedStep, type DeniedStep, type StepRecord } from "../StepExecutor.ts";
+import { deniedStep, type DeniedStep } from "../StepExecutor.ts";
 
 // Why a page's URL cannot be opened: the step's failure, or the runtime guard's denial.
 type UrlRefused = StepRecord | DeniedStep;

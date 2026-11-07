@@ -9,6 +9,7 @@ import {
     type OneElementRead,
     type RememberedElementSource,
     type StepByType,
+    type StepRecord,
 } from "@revisum/contracts";
 import { rememberFromClipboard } from "../../../clock-and-clipboard-steps.ts";
 import { canonicalJson } from "../../../hashing.ts";
@@ -18,7 +19,7 @@ import { resolveLocator } from "../../../run-values.ts";
 import { poll } from "../../Poll.ts";
 import { clockAndClipboardContext } from "../clock-and-clipboard/ClockAndClipboardExecutors.ts";
 import { networkContext } from "../network-and-storage/NetworkAndStorageExecutors.ts";
-import type { StepContext, StepExecutor, StepRecord } from "../StepExecutor.ts";
+import type { StepContext, StepExecutor } from "../StepExecutor.ts";
 
 type RememberStep = StepByType["remember"];
 

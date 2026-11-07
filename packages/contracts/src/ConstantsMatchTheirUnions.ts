@@ -14,6 +14,10 @@ import type {
   StructuralLocatorKind, StructuralLocatorWith,
 } from './plan.ts';
 import type { GuardVerdict, PolicyVerdictKind } from './policy.ts';
+import type { Refusal, RefusalCode } from './run-result/Refusal.ts';
+import type { RunResult } from './run-result/RunResult.ts';
+import type { RunReviewItem, RunReviewItemCode } from './run-result/RunReviewItem.ts';
+import type { TerminalState } from './run-result/TerminalState.ts';
 import type { BackendAssertion, BackendAssertionKind, ParameterKind, ParameterType } from './service-calls.ts';
 
 type HoldSameValues<Constant, Union> = [Constant] extends [Union] ? ([Union] extends [Constant] ? true : false) : false;
@@ -43,4 +47,7 @@ export type ConstantsMatchTheirUnions = [
   MustHold<HoldSameValues<ParameterKind, ParameterType['kind']>>,
   MustHold<HoldSameValues<BackendAssertionKind, BackendAssertion['kind']>>,
   MustHold<HoldSameValues<FillValueKind, FillValue['kind']>>,
+  MustHold<HoldSameValues<TerminalState, RunResult['state']>>,
+  MustHold<HoldSameValues<RefusalCode, Refusal['code']>>,
+  MustHold<HoldSameValues<RunReviewItemCode, RunReviewItem['code']>>,
 ];

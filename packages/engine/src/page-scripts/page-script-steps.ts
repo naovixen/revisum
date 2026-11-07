@@ -11,10 +11,10 @@
 // are read. Neither the text nor a field's value is kept: the result and the log record the
 // text's sha256, and a remembered value's name and sha256.
 import {
-  failure, stepFailed, success,
+  failure, stepFailed, success, type StepOutcome,
   type StepCode, type BackendAssertion, type CallEffect, type Clock, type DocumentSession, type EvaluateStep, type ExpectScriptStep, type FieldName,
   type JsonPointer, type ParameterName, type Result, type SafeText, type ScriptArguments, type ScriptChoice, type ScriptName,
-  type ScriptParameterType, type ValueName,
+  type PageScriptRecord, type ScriptParameterType, type ValueName,
 } from '@revisum/contracts';
 import type { Logger } from '../logging.ts';
 import { rememberedFieldEntries } from '../plan/plan-values.ts';
@@ -47,21 +47,18 @@ export type PageScriptContext = {
   readonly holdsSecret: (text: string) => boolean;
 };
 
-// What a run keeps of a page-script step: the script's name (null for one written in the plan),
-// how many times it ran, and the sha256 of the last result text it accepted (null when none was, or
-// when it held a secret).
-export type PageScriptRecord = { readonly script: ScriptName | null; readonly attempts: number; readonly resultSha256: string | null };
 
 // What one of these steps gives its step result. An evaluate that remembers one value records it
 // as `remembered`, as a remember step does; one that remembers several records them all in
 // `rememberedValues`, in the order the plan names them.
-type PageScriptOutcome = {
-  readonly outcome: 'passed' | 'failed';
-  readonly code?: StepCode;
-  readonly pageScript?: PageScriptRecord;
-  readonly remembered?: RememberedRecord;
-  readonly rememberedValues?: readonly RememberedRecord[];
-};
+type PageScriptOutcome =
+  | {
+    readonly outcome: typeof StepOutcome.Passed;
+    readonly pageScript?: PageScriptRecord;
+    readonly remembered?: RememberedRecord;
+    readonly rememberedValues?: readonly RememberedRecord[];
+  }
+  | { readonly outcome: typeof StepOutcome.Failed; readonly code: StepCode; readonly pageScript?: PageScriptRecord };
 
 const failedWith = (code: StepCode, pageScript?: PageScriptRecord): PageScriptOutcome =>
   ({ ...stepFailed(code), ...(pageScript === undefined ? {} : { pageScript }) });

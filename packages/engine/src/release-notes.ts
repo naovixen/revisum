@@ -5,11 +5,9 @@ import {
   literalText, referencedValueName, RememberElementRead, RequestCountKind,
   type AiWriter, type ArtifactReference, type ArtifactStore, type ClipboardAssertion, type ClockAdvance, type Locator, type Plan,
   type RememberedElementSource, type RememberRead, type RememberSource, type REQUEST_COUNT_KINDS, type RequestCount, type ResponseAssertion, type ScriptChoice, type Step, type StorageAssertion,
-  type TextOrValue,
+  type TextOrValue, type PlanErrorCode, type RunResult,
 } from '@revisum/contracts';
 import { parseAiText } from './ai-text.ts';
-import type { PlanErrorCode } from './plan/plan-decoders.ts';
-import type { RunResult } from './run/RunResult.ts';
 
 const MARKDOWN_SPECIAL = /[\\`*_[\]<>#|!()]/g;
 // Markdown-safe text: every character with a Markdown meaning gets a backslash.

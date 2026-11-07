@@ -1,7 +1,7 @@
 // The two hashes of a run result, made the same way for plan runs and evidence runs. Neither is keyed:
 // anyone can recompute them, so an edit to a result shows only against a copy of the hash held elsewhere.
+import type { RunResult, RunResultBasis } from "@revisum/contracts";
 import { canonicalJson, sha256 } from "../../hashing.ts";
-import type { RunResult } from "../RunResult.ts";
 
 // Timings differ from run to run, and the manifest's hash stands in for its body.
 const LEFT_OUT_OF_BOTH: readonly (keyof RunResult)[] = [
@@ -27,7 +27,15 @@ const hashWithout = (result: object, leftOut: readonly string[]): string =>
         ),
     );
 
-export function withRunHashes(result: Omit<RunResult, "resultHash" | "evidenceHash">): RunResult {
+// The two hashes a result is sealed with.
+type RunHashes = Pick<RunResultBasis, "resultHash" | "evidenceHash">;
+
+// Each kind of result less its hashes.
+type Unhashed<Result> = Result extends unknown ? Omit<Result, keyof RunHashes> : never;
+
+export function withRunHashes<Result extends Unhashed<RunResult>>(
+    result: Result,
+): Result & RunHashes {
     return {
         ...result,
         resultHash: hashWithout(result, LEFT_OUT_OF_RESULT_HASH),

@@ -1,10 +1,19 @@
 // What a run does once its steps have a verdict: the plan's cleanup, whatever the outcome, then what
 // the egress refused, which the result claims, and the run's last log entries.
-import { failure, success, type Result, type Session } from "@revisum/contracts";
-import { finish } from "../../lifecycle.ts";
-import { runCleanup, type CleanupResult } from "../../service-calls/call-steps.ts";
+import {
+    failure,
+    RunReviewItemCode,
+    StepOutcome,
+    success,
+    TerminalState,
+    type CleanupResult,
+    type Denial,
+    type Result,
+    type RunReviewItem,
+    type Session,
+} from "@revisum/contracts";
+import { runCleanup } from "../../service-calls/call-steps.ts";
 import type { SessionContext } from "../executors/StepExecutor.ts";
-import { EGRESS_UNREAD, type RunReviewItem } from "../RunResult.ts";
 import type { FinishedRun, StepsVerdict } from "../steps/VerdictOfSteps.ts";
 import { RECORD_UNREAD, readValueOr, recordRead, type RecordRead } from "./RecordRead.ts";
 import { logFailureAfterTheVerdict, readKeepingTheResult } from "./ReadKeepingTheResult.ts";
@@ -14,8 +23,32 @@ export type AfterTheVerdict = {
     readonly cleanupReviewItems: readonly RunReviewItem[];
     // The origins the egress refused.
     readonly egress: RecordRead<readonly string[]>;
-    readonly endState: FinishedRun;
+    readonly end: EndOfTheRun;
 };
+
+// The state the run ends in, and the denial a denied run keeps: a denied run whose egress then went
+// unread ends Errored, since it cannot show its egress was enforced, and still keeps its denial.
+export type EndOfTheRun =
+    | {
+          readonly state:
+              | typeof TerminalState.Passed
+              | typeof TerminalState.Failed
+              | typeof TerminalState.Errored;
+      }
+    | {
+          readonly state: typeof TerminalState.Denied | typeof TerminalState.Errored;
+          readonly denial: Denial;
+      };
+
+function endOfTheRun(finished: FinishedRun, isEgressRead: boolean): EndOfTheRun {
+    if (finished.state === TerminalState.Denied) {
+        return {
+            state: isEgressRead ? TerminalState.Denied : TerminalState.Errored,
+            denial: finished.denial,
+        };
+    }
+    return { state: isEgressRead ? finished.state : TerminalState.Errored };
+}
 
 // What the run's last part uses: the plan's cleanup and how it calls, the closed session's records
 // and the log.
@@ -35,16 +68,22 @@ export async function afterTheVerdict(
             ? undefined
             : await runCleanup(plan.cleanup, plan.steps.length, context.calls, context.commands);
     const cleanupReviewItems = (cleanup ?? []).flatMap((done): RunReviewItem[] =>
-        done.outcome === "failed" ? [{ code: "cleanup-failed", cleanupIndex: done.index }] : [],
+        done.outcome === StepOutcome.Failed
+            ? [{ code: RunReviewItemCode.CleanupFailed, cleanupIndex: done.index }]
+            : [],
     );
     const blockedRead = readBlockedOrigins(context.session);
     if (!blockedRead.ok) {
-        logFailureAfterTheVerdict(EGRESS_UNREAD, blockedRead.error, context.logger);
+        logFailureAfterTheVerdict(
+            RunReviewItemCode.EgressUnread,
+            blockedRead.error,
+            context.logger,
+        );
     }
     const egress = blockedRead.ok ? recordRead(blockedRead.value) : RECORD_UNREAD;
-    const endState = blockedRead.ok ? verdict.finished : finish(verdict.running, "Errored");
-    logTheEnd(context, readValueOr(egress, []), endState);
-    return { cleanup, cleanupReviewItems, egress, endState };
+    const end = endOfTheRun(verdict.finished, blockedRead.ok);
+    logTheEnd(context, readValueOr(egress, []), end);
+    return { cleanup, cleanupReviewItems, egress, end };
 }
 
 // The result claims what the egress refused and is hashed with that claim in it. So this is the one
@@ -62,7 +101,7 @@ function readBlockedOrigins(session: Session): Result<readonly string[], unknown
 function logTheEnd(
     context: AfterTheVerdictContext,
     blocked: readonly string[],
-    endState: FinishedRun,
+    end: EndOfTheRun,
 ): void {
     const { session, logger } = context;
     readKeepingTheResult(
@@ -81,10 +120,10 @@ function logTheEnd(
             }
             logger.log({
                 kind: "run.state",
-                state: endState.state,
+                state: end.state,
                 targetId: context.cleared.target.id,
-                ...(endState.state === "Denied"
-                    ? { code: endState.denial.rule, stepIndex: endState.denial.stepIndex }
+                ...(end.state === TerminalState.Denied
+                    ? { code: end.denial.rule, stepIndex: end.denial.stepIndex }
                     : {}),
             });
         },

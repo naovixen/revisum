@@ -12,11 +12,10 @@
 // among them. Neither is a pass. The result hash leaves out the blocked origins, so a replay that
 // differs only in those is identical.
 // Pure apart from calling run.
-import { failure, success, type DatabaseCommandRunner, type Result, type ServiceCaller } from '@revisum/contracts';
+import { failure, success, type DatabaseCommandRunner, type Result, type ServiceCaller, type TerminalState, type RunManifest } from '@revisum/contracts';
 import { canonicalJson, sha256 } from '../hashing.ts';
-import type { TerminalState } from '../lifecycle.ts';
 import {
-  DATABASE_COMMANDS_INPUT, SERVICE_CALLS_INPUT, manifestHash, planHash, replayManifest, type RunManifest,
+  DATABASE_COMMANDS_INPUT, SERVICE_CALLS_INPUT, manifestHash, planHash, replayManifest,
 } from '../manifest.ts';
 import type { ClearedRun } from '../policy/ClearedRun.ts';
 import type { RunInputs, RunPorts } from '../run/RunContext.ts';

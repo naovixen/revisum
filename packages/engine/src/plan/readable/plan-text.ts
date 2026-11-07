@@ -11,10 +11,9 @@
 //
 // The writer writes exactly one text for a plan: LF line ends, a final newline, the headers in a
 // fixed order, a `Criterion:` line wherever the criterion id changes, and never `Origin:`.
-import { failure, success, type Plan, type Result, type SinkError, type StepType } from '@revisum/contracts';
+import { failure, success, type Plan, type Result, type SinkError, type StepType, type PlanError, type PlanErrorCode } from '@revisum/contracts';
 import { entriesInKeyOrder } from '../../hashing.ts';
 import type { PlanLimits } from '../../project/project-parser.ts';
-import type { PlanError, PlanErrorCode } from '../plan-decoders.ts';
 import { CRITERION_FIELD } from '../plan-grammar.ts';
 import { isAssertionStepType } from '../StepFacts.ts';
 import {
