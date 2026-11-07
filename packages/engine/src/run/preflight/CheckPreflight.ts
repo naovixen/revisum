@@ -13,9 +13,7 @@
 import {
     failure,
     isElementCheckNoDriverDecides,
-    ServiceCallErrorCode,
     success,
-    WorkloadErrorCode,
     type BaseUrl,
     type DatabaseCommandRunner,
     type Plan,
@@ -40,22 +38,22 @@ import {
     type PlanSecrets,
     type ResolvedSecrets,
 } from "../../secrets/secret-resolution.ts";
+import { noDatabaseCommandRunner, noServiceCaller } from "../UnwiredPorts.ts";
 
 export type PreflightFacts = {
     readonly cleared: ClearedRun;
     readonly baseUrl: BaseUrl;
-    // Where the plan's secrets are resolved. Without one, every secret the plan names is missing.
-    readonly secretStore: SecretStore | undefined;
+    // Where the plan's secrets are resolved.
+    readonly secretStore: SecretStore;
     readonly scriptSources: Readonly<Record<string, Uint8Array>>;
-    readonly services: ServiceCaller | undefined;
-    readonly databaseCommands: DatabaseCommandRunner | undefined;
+    readonly services: ServiceCaller;
+    readonly databaseCommands: DatabaseCommandRunner;
 };
 
 // What a run that passed preflight runs with. The secrets are every one the plan names, resolved,
 // and the steps are the plan's, each fill of a secret carrying its own. The scripts are every page
-// script the plan names, with its source. The service caller and command runner are the run's own
-// when the plan needs them; a plan that needs neither gets one that is never called, and fails as
-// unreachable if it were.
+// script the plan names, with its source. The service caller and command runner are the run's own;
+// a plan that needs neither may have been given the do-nothing ones, which it never calls.
 export type PreflightPassed = {
     readonly secrets: ResolvedSecrets;
     readonly steps: readonly RunStep[];
@@ -69,13 +67,6 @@ export type PreflightPassed = {
 export type Preflight = {
     readonly redaction: ResolvedSecrets;
     readonly outcome: Result<PreflightPassed, Refusal>;
-};
-
-const NO_SERVICE_CALLER: ServiceCaller = {
-    call: () => Promise.resolve(failure(ServiceCallErrorCode.ServiceUnreachable)),
-};
-const NO_COMMAND_RUNNER: DatabaseCommandRunner = {
-    run: () => Promise.resolve(failure(WorkloadErrorCode.WorkloadStartFailed)),
 };
 
 type PreflightCheck = (facts: PreflightFacts) => Refusal | undefined;
@@ -99,7 +90,7 @@ const refuseProductionOrigin: PreflightCheck = (facts) => {
 // A plan that needs one of the next four relies on it to mean anything: stopping part way would leave
 // test data behind or report on a run that never had what it declared.
 const refuseUnwiredServices: PreflightCheck = (facts) =>
-    callsServices(facts.cleared.plan) && facts.services === undefined
+    callsServices(facts.cleared.plan) && facts.services === noServiceCaller
         ? { code: "services-unavailable" }
         : undefined;
 
@@ -117,7 +108,7 @@ const refuseElementCheckNoDriverDecides: PreflightCheck = (facts) =>
 
 // Cleanup counts too: with no way to run it, the steps would leave their test data behind.
 const refuseUnwiredDatabaseCommands: PreflightCheck = (facts) =>
-    runsDatabaseCommands(facts.cleared.plan) && facts.databaseCommands === undefined
+    runsDatabaseCommands(facts.cleared.plan) && facts.databaseCommands === noDatabaseCommandRunner
         ? { code: "database-commands-unavailable" }
         : undefined;
 
@@ -142,14 +133,16 @@ const firstRefusal = (
 // secret no command of the run would use.
 const resolvePreflightSecrets = (
     subject: { readonly plan: Plan; readonly project: Project },
-    secretStore: SecretStore | undefined,
-    databaseCommands: DatabaseCommandRunner | undefined,
+    secretStore: SecretStore,
+    databaseCommands: DatabaseCommandRunner,
 ): Result<PlanSecrets, SecretName> =>
     resolvePlanSecrets(
         subject.plan,
         secretStore,
         subject.project.calls,
-        databaseCommands === undefined ? {} : declaredCommands(subject.project.unsafeFeatures),
+        databaseCommands === noDatabaseCommandRunner
+            ? {}
+            : declaredCommands(subject.project.unsafeFeatures),
     );
 
 // The first reason the run cannot go ahead, or what it runs with when nothing stops it.
@@ -181,8 +174,8 @@ function passedOrRefused(
         secrets: secrets.value.secrets,
         steps: secrets.value.steps,
         scripts: scripts.value,
-        services: facts.services ?? NO_SERVICE_CALLER,
-        databaseCommands: facts.databaseCommands ?? NO_COMMAND_RUNNER,
+        services: facts.services,
+        databaseCommands: facts.databaseCommands,
     });
 }
 
@@ -204,6 +197,6 @@ export function checkPreflight(facts: PreflightFacts): Preflight {
 // its plan would.
 export const secretsToRedact = (
     subject: { readonly plan: Plan; readonly project: Project },
-    secretStore: SecretStore | undefined,
-    databaseCommands: DatabaseCommandRunner | undefined,
+    secretStore: SecretStore,
+    databaseCommands: DatabaseCommandRunner,
 ): ResolvedSecrets => redactionOf(resolvePreflightSecrets(subject, secretStore, databaseCommands));

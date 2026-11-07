@@ -12,7 +12,7 @@
 // page map it prints is outside data: the host decodes it with the engine's decodePageMap.
 import { arch, platform } from 'node:os';
 import {
-  baseUrlOfOrigin, crawlSite, decodePageMap, exploreStartOrigin, failure, HOST_ISOLATION, redactPageMap, createRunService, sha256, success, UnavailableReason,
+  baseUrlOfOrigin, crawlSite, decodePageMap, exploreStartOrigin, failure, HOST_ISOLATION, redactPageMap, createRunService, sha256, unwiredPorts, success, UnavailableReason,
   type ArtifactStore, type BrowserDriver, type ClearedRun, type Clock, type EventSink, type ExploreDriver, type ExploreOptions,
   type ImageDigest, type Origin, type PageMap, type Project, type Redactor, type Result, type RunEventSink,
   type Runner, type SecretName, type SecretStore, type Session, type Target,
@@ -92,6 +92,7 @@ export async function crawlInBrowser(browser: BrowserDriver, crawl: BrowserCrawl
   try {
     if ('login' in crawl) {
       const runService = createRunService({
+        ...unwiredPorts,
         drivers: new Map([[target.adapter, sharingDriver(browser, session, target)]]), clock: systemClock, artifacts: discardingArtifacts,
         redactor: crawl.redactor, events: discardingRunEvents, audit: crawl.audit, secrets: crawl.secrets, isolation: HOST_ISOLATION,
       });

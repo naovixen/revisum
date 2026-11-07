@@ -21,6 +21,7 @@ import {
 import type { ClearedRun } from '../policy/ClearedRun.ts';
 import type { RunInputs, RunPorts } from '../run/RunContext.ts';
 import { createRunService } from '../run/RunService.ts';
+import { noDatabaseCommandRunner, noServiceCaller } from '../run/UnwiredPorts.ts';
 import { decodeManifest } from './manifest-decoder.ts';
 import {
   decodeRecording, replayedDatabaseCommands, replayedServices,
@@ -138,11 +139,9 @@ export async function replay(request: ReplayRequest, ports: ReplayPorts): Promis
   const { services, databaseCommands } = replies.value;
   const runPorts: RunPorts = {
     drivers: ports.drivers, clock: ports.clock, artifacts: ports.artifacts, redactor: ports.redactor, events: ports.events, audit: ports.audit,
-    isolation: ports.isolation,
-    ...(ports.secrets === undefined ? {} : { secrets: ports.secrets }),
-    ...(ports.rewritesApplied === undefined ? {} : { rewritesApplied: ports.rewritesApplied }),
-    ...(services === undefined ? {} : { services: services.port }),
-    ...(databaseCommands === undefined ? {} : { databaseCommands: databaseCommands.port }),
+    isolation: ports.isolation, secrets: ports.secrets, rewritesApplied: ports.rewritesApplied,
+    services: services?.port ?? noServiceCaller,
+    databaseCommands: databaseCommands?.port ?? noDatabaseCommandRunner,
   };
   const result = await createRunService(runPorts).run(request.cleared, {
     ...request.inputs, seed: manifest.seeds.random, fixedTimeMilliseconds: manifest.clock.fixedTimeMilliseconds, fixtures: manifest.fixtures,

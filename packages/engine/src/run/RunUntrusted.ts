@@ -19,7 +19,20 @@ export type UntrustedRunInputs = RunInputs & {
     readonly standing?: PlanStanding;
 };
 
-export type UntrustedRunOutcome = Rejected | DeniedPlan | readonly RunResult[];
+export const UntrustedRunOutcomeKind = {
+    Rejected: "rejected",
+    Denied: "denied",
+    Ran: "ran",
+} as const;
+
+export type UntrustedRunOutcomeKind =
+    (typeof UntrustedRunOutcomeKind)[keyof typeof UntrustedRunOutcomeKind];
+
+// The plan the parser rejected, the plan the policy gate denied, or one result per target it names.
+export type UntrustedRunOutcome =
+    | ({ readonly kind: typeof UntrustedRunOutcomeKind.Rejected } & Rejected)
+    | ({ readonly kind: typeof UntrustedRunOutcomeKind.Denied } & DeniedPlan)
+    | { readonly kind: typeof UntrustedRunOutcomeKind.Ran; readonly results: readonly RunResult[] };
 
 // Parsing happens first, then the policy gate's static check against the project, for the plan's
 // declared targets and standing; on any error or denial no driver method is called. A missing
@@ -33,7 +46,7 @@ export async function runUntrusted(
 ): Promise<UntrustedRunOutcome> {
     const parsed = parsePlan(input);
     if (!parsed.ok) {
-        return { state: "Rejected", errors: parsed.error };
+        return { kind: UntrustedRunOutcomeKind.Rejected, state: "Rejected", errors: parsed.error };
     }
     const { project, standing, ...inputs } = base;
     const gate = policyGate({ project, events: ports.audit });
@@ -42,6 +55,7 @@ export async function runUntrusted(
     const decision = gate.decide(parsed.value, parsed.value.targets, standing);
     if (decision.kind === "deny") {
         return {
+            kind: UntrustedRunOutcomeKind.Denied,
             state: "Denied",
             rule: decision.rule,
             stepIndex: decision.stepIndex,
@@ -64,5 +78,5 @@ export async function runUntrusted(
             }
         }
     }
-    return results;
+    return { kind: UntrustedRunOutcomeKind.Ran, results };
 }

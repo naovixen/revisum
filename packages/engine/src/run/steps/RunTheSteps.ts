@@ -92,7 +92,7 @@ function endOfTheSteps(
 ): StepsRun {
     const { session, logger, ports } = context;
     // Asked once: a port that cannot say what it rewrote must not leave a mutated run reading as plain.
-    const rewrites = readRecord(() => ports.rewritesApplied?.() ?? [], logger);
+    const rewrites = readRecord(() => ports.rewritesApplied(), logger);
     // Read before the browser goes, with every answer the stubs gave.
     const stubAnswers = readRecord(() => session.network.stubAnswers(), logger);
     return { running, steps: soFar.steps, stubAnswers, rewrites, finished: verdict };

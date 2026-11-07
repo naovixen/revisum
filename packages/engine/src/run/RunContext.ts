@@ -66,18 +66,19 @@ export type RunPorts = {
     // or its result hash differs and the replay is a mismatch.
     readonly isolation: RunIsolation;
     // Where the secrets the plan names are resolved, such as environmentSecretStore(process.env).
-    // Without one, every secret reference is missing and such a plan is refused.
-    readonly secrets?: SecretStore;
+    // With emptySecretStore, every secret reference is missing and such a plan is refused.
+    readonly secrets: SecretStore;
     // Sends the requests of the plan's declared calls: runner's caller, through the egress proxy.
-    // Without one, a plan that calls a service is refused before any side effect.
-    readonly services?: ServiceCaller;
+    // With noServiceCaller, a plan that calls a service is refused before any side effect.
+    readonly services: ServiceCaller;
     // Runs the plan's database commands, each in a workload container: cli's wiring of runner's
-    // workload runner. Without one, a plan with a database command, cleanup included, is refused
-    // before any side effect.
-    readonly databaseCommands?: DatabaseCommandRunner;
+    // workload runner. With noDatabaseCommandRunner, a plan with a database command, cleanup
+    // included, is refused before any side effect.
+    readonly databaseCommands: DatabaseCommandRunner;
     // The browser mutants' rewrites the egress proxy applied (EgressProxy.rewritesApplied). Only the
-    // proxy knows, and only once the steps have run, so the run reads it after them.
-    readonly rewritesApplied?: () => readonly AppliedRewrite[];
+    // proxy knows, and only once the steps have run, so the run reads it after them. A run with no
+    // proxy that rewrites is given noRewrites.
+    readonly rewritesApplied: () => readonly AppliedRewrite[];
 };
 
 export type RunContext = {

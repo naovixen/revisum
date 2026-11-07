@@ -58,6 +58,8 @@ export { replay, type ReplayError, type ReplayOutcome, type ReplayPorts, type Re
 export * from './oracle.ts';
 export * as lifecycle from './lifecycle.ts';
 export { createRunService, type RunService } from './run/RunService.ts';
+export { emptySecretStore, noDatabaseCommandRunner, noRewrites, noServiceCaller, unwiredPorts } from './run/UnwiredPorts.ts';
+export { UntrustedRunOutcomeKind, type UntrustedRunOutcome } from './run/RunUntrusted.ts';
 export type { RunInputs, RunPorts } from './run/RunContext.ts';
 export type { DownloadRecord, RememberedValueRecord, StepResult } from './run/StepResult.ts';
 export type {
