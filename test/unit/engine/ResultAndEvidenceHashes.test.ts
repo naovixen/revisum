@@ -8,6 +8,7 @@ import {
     evidenceResult,
     failure,
     planParser,
+    recordRead,
     refusedSuiteResult,
     unreadSuiteResult,
     type RunResult,
@@ -84,7 +85,7 @@ const evidenceRunRefusing = (
     Promise.resolve(
         evidenceResult(decodedReport(report), [], [], {
             ...evidenceContext(report),
-            blockedOrigins: origins,
+            egress: recordRead(origins),
         }),
     );
 
@@ -159,7 +160,7 @@ const unreadSuiteRun = (): RunResult => {
     return unreadSuiteResult(
         {
             ...evidenceContext(report, { suite: declaredCheckoutSuite() }),
-            blockedOrigins: REFUSED_ORIGINS,
+            egress: recordRead(REFUSED_ORIGINS),
         },
         "suite-report-unread",
     );

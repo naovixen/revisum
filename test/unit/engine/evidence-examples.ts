@@ -13,9 +13,9 @@
 //   - parseSuiteReport takes the report as parsed JSON (reportInput below), not as bytes;
 //   - an attachment path inside Revisum's output directory is written relative to it
 //     (ATTACHMENT_INSIDE_OUTPUT below);
-//   - EvidenceContext is { suite, manifest, pass, exitCode, redactor }: the declared suite, the
-//     run's manifest, which pass this is, the suite command's exit code, and the redactor every
-//     kept text goes through;
+//   - EvidenceContext is { suite, manifest, egress, pass, exitCode, redactor }: the declared suite,
+//     the run's manifest, what was read of the egress record, which pass this is, the suite
+//     command's exit code, and the redactor every kept text goes through;
 //   - declaredSuite(project, name) picks the suite `run --suite <name>` runs, or refuses with
 //     evidence-mode-disabled or suite-not-declared before any container starts;
 //   - suitePasses(suite, changedFiles) lists the passes a change gets, each with the version of
@@ -27,7 +27,7 @@ import { randomBytes } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  declaredSuite, defaultRedactor, evidenceManifest, evidenceMergeGateOpen, evidenceResult, parseProject, parseSuiteReport, suitePasses,
+  declaredSuite, defaultRedactor, evidenceManifest, evidenceMergeGateOpen, evidenceResult, parseProject, parseSuiteReport, recordRead, suitePasses,
   type EvidenceContext, type EvidenceLimits, type EvidenceRunManifest, type EvidenceSuiteDeclaration, type Project, type ProjectData, type RunResult, type SuiteDecodeError,
   type SuiteReport,
 } from '@revisum/engine';
@@ -181,6 +181,8 @@ export function evidenceContext(report: unknown, options: EvidenceOptions = {}):
   return {
     suite,
     manifest: suiteRunManifest(suite),
+    // The egress record was read, and the egress refused nothing.
+    egress: recordRead([]),
     pass: options.pass ?? 'gating',
     exitCode: options.exitCode ?? agreeingExitCode(report),
     redactor: defaultRedactor(),

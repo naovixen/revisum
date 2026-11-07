@@ -45,6 +45,9 @@ export type SuiteBehaviour = {
   readonly egressEvents?: readonly EgressEvent[];
   // The workload runner refuses every request with this code.
   readonly refusal?: WorkloadErrorCode;
+  // How the setup command ends, and what its egress proxy recorded. By default it exits 0 and the
+  // proxy blocked nothing.
+  readonly setup?: Partial<Pick<WorkloadOutcome, 'exitCode' | 'timedOut' | 'egressEvents' | 'egressRecordUnread'>>;
 };
 
 export type FakeWorkloadRunner = WorkloadRunner & { readonly requests: readonly WorkloadRequest[] };
@@ -71,7 +74,7 @@ export function fakeWorkloadRunner(behaviour: SuiteBehaviour = {}): FakeWorkload
       requests.push(request);
       if (behaviour.refusal !== undefined) return failure(behaviour.refusal);
       if (!isSuiteRequest(request)) {
-        const setup: WorkloadOutcome = { exitCode: 0, timedOut: false, egressEvents: [], stdout: captured(''), stderr: captured('') };
+        const setup: WorkloadOutcome = { exitCode: 0, timedOut: false, egressEvents: [], ...behaviour.setup, stdout: captured(''), stderr: captured('') };
         return success(setup);
       }
       const reportPath = variable(request, REPORT_VARIABLE) ?? '';
