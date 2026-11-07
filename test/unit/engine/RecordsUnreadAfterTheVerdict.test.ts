@@ -1,7 +1,8 @@
 // Once the steps have a verdict, a person needs it more than anything a broken session or log has
 // left to say. Stub answers, the session's close and the log may all throw by then, and the result
-// must still come back, as it would have been, with the browser closed. Blocked origins are not among
-// them, because the result claims them.
+// must still come back with that verdict, with the browser closed. Stub answers that went unread add a
+// review item saying so, since the result would otherwise claim no stub answered. Blocked origins are
+// not among them, because the result claims them.
 import assert from "node:assert/strict";
 import { describe, test, type TestContext } from "node:test";
 import type { RunEventSink, Session } from "@revisum/engine";
@@ -20,6 +21,7 @@ const throws = (): never => {
 };
 const BLOCKED_ORIGIN = "https://blocked.example.test";
 const RECORDS_UNREAD = "session-records-unread";
+const STUB_ANSWERS_UNREAD = "stub-answers-unread";
 
 const FAILING_CHECK: JsonRecord = {
     type: "expect",
@@ -50,17 +52,17 @@ const logFailingAfterTheVerdict = (): RunEventSink =>
 const BROKEN_READS: readonly {
     readonly name: string;
     readonly changes: Partial<Session>;
-    readonly isLogged: boolean;
+    readonly isStubAnswersUnread: boolean;
 }[] = [
     {
         name: "stubAnswers throws",
         changes: { network: { ...fakeNetwork(), stubAnswers: throws } },
-        isLogged: true,
+        isStubAnswersUnread: true,
     },
     {
         name: "close rejects",
         changes: { close: () => Promise.reject(new Error(BROKEN)) },
-        isLogged: false,
+        isStubAnswersUnread: false,
     },
     {
         name: "stubAnswers and close both fail",
@@ -68,7 +70,7 @@ const BROKEN_READS: readonly {
             network: { ...fakeNetwork(), stubAnswers: throws },
             close: () => Promise.reject(new Error(BROKEN)),
         },
-        isLogged: true,
+        isStubAnswersUnread: true,
     },
 ];
 
@@ -76,23 +78,42 @@ const spiedClose = (context: TestContext, close: Session["close"]) => context.mo
 
 describe("Using the run", () => {
     for (const verdict of VERDICTS) {
-        for (const { name, changes, isLogged } of BROKEN_READS) {
+        for (const { name, changes, isStubAnswersUnread } of BROKEN_READS) {
             describe(`given ${verdict.name}`, () => {
                 describe(`and a session where ${name}`, () => {
                     describe("when the run ends", () => {
-                        test("then it should give the result a sound session gives", async () => {
-                            const raw = unsafePlan(verdict.steps);
-                            const sound = await runOnFakeSession(raw);
-                            const broken = await runOnFakeSession(raw, {
-                                session: fakeSessionOnOrders(changes),
+                        if (isStubAnswersUnread) {
+                            test("then it should give the verdict and steps a sound session gives, with one review item saying the stub answers went unread", async () => {
+                                const raw = unsafePlan(verdict.steps);
+                                const sound = await runOnFakeSession(raw);
+                                const broken = await runOnFakeSession(raw, {
+                                    session: fakeSessionOnOrders(changes),
+                                });
+                                assert.equal(broken.result.state, verdict.state);
+                                assert.deepEqual(
+                                    stepSummaries(broken.result),
+                                    stepSummaries(sound.result),
+                                );
+                                assert.deepEqual(broken.result.reviewItems, [
+                                    ...(sound.result.reviewItems ?? []),
+                                    { code: STUB_ANSWERS_UNREAD },
+                                ]);
                             });
-                            assert.equal(broken.result.state, verdict.state);
-                            assert.deepEqual(
-                                stepSummaries(broken.result),
-                                stepSummaries(sound.result),
-                            );
-                            assert.equal(broken.result.resultHash, sound.result.resultHash);
-                        });
+                        } else {
+                            test("then it should give the result a sound session gives", async () => {
+                                const raw = unsafePlan(verdict.steps);
+                                const sound = await runOnFakeSession(raw);
+                                const broken = await runOnFakeSession(raw, {
+                                    session: fakeSessionOnOrders(changes),
+                                });
+                                assert.equal(broken.result.state, verdict.state);
+                                assert.deepEqual(
+                                    stepSummaries(broken.result),
+                                    stepSummaries(sound.result),
+                                );
+                                assert.equal(broken.result.resultHash, sound.result.resultHash);
+                            });
+                        }
 
                         test("then it should try to close the session once", async (context) => {
                             const close = spiedClose(
@@ -112,7 +133,7 @@ describe("Using the run", () => {
                             assert.equal(JSON.stringify(result).includes(BROKEN), false);
                         });
 
-                        if (isLogged) {
+                        if (isStubAnswersUnread) {
                             test("then it should say so in the log", async () => {
                                 const { events } = await runOnFakeSession(
                                     unsafePlan(verdict.steps),
