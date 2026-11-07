@@ -63,6 +63,15 @@ const PLANTED_VIOLATIONS: Readonly<Record<RepositoryRuleName, PlantedViolation>>
         },
         named: "planted-outside-import.ts",
     },
+    [RepositoryRuleName.ImportCycles]: {
+        edits: {
+            "packages/report/src/planted-cycle-first.ts":
+                "import { second } from './planted-cycle-second.ts';\nexport const first = (): number => second() + 1;\n",
+            "packages/report/src/planted-cycle-second.ts":
+                "import { first } from './planted-cycle-first.ts';\nexport const second = (): number => first() - 1;\n",
+        },
+        named: "planted-cycle-first.ts -> ",
+    },
     [RepositoryRuleName.RuntimeImports]: {
         edits: {
             "packages/report/src/planted-browser-library.ts":
