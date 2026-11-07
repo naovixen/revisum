@@ -18,8 +18,11 @@ import {
     type Parsed,
 } from "../../plan-decoders.ts";
 import { MAXIMUM_MODIFIERS } from "../../plan-grammar.ts";
+import { optionalField, readFields } from "../../ReadFields.ts";
 import type { StepSection, StepTypeIn } from "../../StepFacts.ts";
 import { readDeclared } from "../declarations/ReadDeclared.ts";
+import { knownField } from "../KnownField.ts";
+import { readLocator } from "../locators/ReadLocator.ts";
 import type { ParseContext } from "../ParseContext.ts";
 import { refuse } from "../Refuse.ts";
 import { holdsLiteralText, readFillValue } from "../text/ReadFillValue.ts";
@@ -43,9 +46,13 @@ function readModifiers(input: unknown, path: string, issues: Issues): Parsed<rea
     return modifiers;
 }
 
-const readOption = (step: StepFieldsRead, path: string, context: ParseContext) =>
+const readOption = (
+    step: StepFieldsRead<typeof StepType.Select>,
+    path: string,
+    context: ParseContext,
+) =>
     readTextOrValue(
-        step["option"],
+        step.option,
         `${path}.option`,
         context,
         context.rules.limits.maximumTextLength,
@@ -64,7 +71,7 @@ export const ACTION_STEP_READERS: StepReaderTable<StepTypeIn<typeof StepSection.
         const valuePath = `${path}.value`;
         const parts = [
             readStepLocator(step, path, context),
-            readFillValue(step["value"], valuePath, context),
+            readFillValue(step.value, valuePath, context),
         ] as const;
         if (!allValid(parts)) {
             return INVALID;
@@ -89,40 +96,36 @@ export const ACTION_STEP_READERS: StepReaderTable<StepTypeIn<typeof StepSection.
     upload(step, path, context) {
         const parts = [
             readStepLocator(step, path, context),
-            readDeclared(step["fixture"], `${path}.fixture`, context, context.rules.fixtures),
+            readDeclared(step.fixture, `${path}.fixture`, context, context.rules.fixtures),
         ] as const;
         return allValid(parts)
             ? { type: StepType.Upload, locator: parts[0], fixture: parts[1] }
             : INVALID;
     },
     press(step, path, context) {
-        const parts = [
-            readStepLocator(step, path, context),
-            readOneOf(step["key"], `${path}.key`, context.issues, KEYS),
-        ] as const;
-        if (!Object.hasOwn(step, "modifiers")) {
-            return allValid(parts)
-                ? { type: StepType.Press, locator: parts[0], key: parts[1] }
-                : INVALID;
-        }
-        const modifiers = readModifiers(step["modifiers"], `${path}.modifiers`, context.issues);
-        return allValid(parts) && modifiers !== INVALID
-            ? { type: StepType.Press, locator: parts[0], key: parts[1], modifiers }
-            : INVALID;
+        return readFields(step, path, context.issues, {
+            type: knownField(StepType.Press),
+            locator: (locator: unknown, locatorPath: string) =>
+                readLocator(locator, locatorPath, context),
+            key: (key: unknown, keyPath: string) => readOneOf(key, keyPath, context.issues, KEYS),
+            modifiers: optionalField((modifiers: unknown, modifiersPath: string) =>
+                readModifiers(modifiers, modifiersPath, context.issues),
+            ),
+        });
     },
     dialog(step, path, context) {
-        const action = readOneOf(step["action"], `${path}.action`, context.issues, DIALOG_ACTIONS);
-        if (!Object.hasOwn(step, "expectText")) {
-            return action === INVALID ? INVALID : { type: StepType.Dialog, action };
-        }
-        const expectText = readTextOrValue(
-            step["expectText"],
-            `${path}.expectText`,
-            context,
-            context.rules.limits.maximumTextLength,
-        );
-        return action === INVALID || expectText === INVALID
-            ? INVALID
-            : { type: StepType.Dialog, action, expectText };
+        return readFields(step, path, context.issues, {
+            type: knownField(StepType.Dialog),
+            action: (action: unknown, actionPath: string) =>
+                readOneOf(action, actionPath, context.issues, DIALOG_ACTIONS),
+            expectText: optionalField((expectText: unknown, expectTextPath: string) =>
+                readTextOrValue(
+                    expectText,
+                    expectTextPath,
+                    context,
+                    context.rules.limits.maximumTextLength,
+                ),
+            ),
+        });
     },
 };

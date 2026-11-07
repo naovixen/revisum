@@ -11,7 +11,7 @@ import { ReplayErrorCode } from '../manifest.ts';
 import { INVALID, allValid, readInteger, readList, readOneOf, readRecord, type Issues, type Parsed } from '../plan/plan-decoders.ts';
 import { readImageDigest, readSuiteName } from '../project/evidence-declarations.ts';
 import { MAXIMUM_DAY_OFFSET } from '../plan/plan-grammar.ts';
-import { readableCopy } from '../plan/ReadableCopy.ts';
+import { readableCopy } from '../decoding/ReadableCopy.ts';
 import { LIMIT_CEILINGS, readSecretName, readTarget } from '../project/project-parser.ts';
 import { schemaId } from '../version.ts';
 

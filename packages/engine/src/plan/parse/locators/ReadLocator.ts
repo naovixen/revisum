@@ -28,7 +28,7 @@ import {
     MAXIMUM_SELECTOR_LENGTH,
     MAXIMUM_TEST_ID_LENGTH,
     SELECTOR_FORBIDDEN_CHARACTERS,
-    type LOCATOR_FIELDS,
+    LOCATOR_FIELDS,
     type LocatorKind,
     type OPTIONAL_LOCATOR_FIELDS,
 } from "../../plan-grammar.ts";
@@ -112,13 +112,19 @@ function structuralFields(context: ParseContext, insideDepth: number) {
 
 const LOCATOR_READERS = {
     role(input, path, context) {
-        const fields = readFields(input, path, context.issues, {
-            by: knownField("role"),
-            position: POSITION,
-            role: (role: unknown, rolePath: string) =>
-                readOneOf(role, rolePath, context.issues, ROLES),
-            name: (name: unknown, namePath: string) => readWantedText(name, namePath, context),
-        } satisfies LocatorFields<"role">);
+        const fields = readFields(
+            input,
+            path,
+            context.issues,
+            {
+                by: knownField("role"),
+                position: POSITION,
+                role: (role: unknown, rolePath: string) =>
+                    readOneOf(role, rolePath, context.issues, ROLES),
+                name: (name: unknown, namePath: string) => readWantedText(name, namePath, context),
+            } satisfies LocatorFields<"role">,
+            LOCATOR_FIELDS.role,
+        );
         if (fields === INVALID) {
             return INVALID;
         }
@@ -130,37 +136,56 @@ const LOCATOR_READERS = {
         };
     },
     label(input, path, context) {
-        const fields = readFields(input, path, context.issues, {
-            by: knownField("label"),
-            position: POSITION,
-            label: (label: unknown, labelPath: string) => readWantedText(label, labelPath, context),
-        } satisfies LocatorFields<"label">);
+        const fields = readFields(
+            input,
+            path,
+            context.issues,
+            {
+                by: knownField("label"),
+                position: POSITION,
+                label: (label: unknown, labelPath: string) =>
+                    readWantedText(label, labelPath, context),
+            } satisfies LocatorFields<"label">,
+            LOCATOR_FIELDS.label,
+        );
         if (fields === INVALID) {
             return INVALID;
         }
         return { by: fields.by, label: fields.label, ...positioned(fields.position) };
     },
     text(input, path, context) {
-        const fields = readFields(input, path, context.issues, {
-            by: knownField("text"),
-            position: POSITION,
-            text: (text: unknown, textPath: string) => readWantedText(text, textPath, context),
-        } satisfies LocatorFields<"text">);
+        const fields = readFields(
+            input,
+            path,
+            context.issues,
+            {
+                by: knownField("text"),
+                position: POSITION,
+                text: (text: unknown, textPath: string) => readWantedText(text, textPath, context),
+            } satisfies LocatorFields<"text">,
+            LOCATOR_FIELDS.text,
+        );
         if (fields === INVALID) {
             return INVALID;
         }
         return { by: fields.by, text: fields.text, ...positioned(fields.position) };
     },
     testId(input, path, context) {
-        const fields = readFields(input, path, context.issues, {
-            by: knownField("testId"),
-            position: POSITION,
-            testId: (testId: unknown, testIdPath: string) =>
-                readTextOrValue(testId, testIdPath, context, MAXIMUM_TEST_ID_LENGTH),
-            attribute: optionalField((attribute: unknown, attributePath: string) =>
-                readDeclared(attribute, attributePath, context, context.rules.testIdAttributes),
-            ),
-        } satisfies LocatorFields<"testId">);
+        const fields = readFields(
+            input,
+            path,
+            context.issues,
+            {
+                by: knownField("testId"),
+                position: POSITION,
+                testId: (testId: unknown, testIdPath: string) =>
+                    readTextOrValue(testId, testIdPath, context, MAXIMUM_TEST_ID_LENGTH),
+                attribute: optionalField((attribute: unknown, attributePath: string) =>
+                    readDeclared(attribute, attributePath, context, context.rules.testIdAttributes),
+                ),
+            } satisfies LocatorFields<"testId">,
+            LOCATOR_FIELDS.testId,
+        );
         if (fields === INVALID) {
             return INVALID;
         }
@@ -172,13 +197,19 @@ const LOCATOR_READERS = {
         };
     },
     css(input, path, context, insideDepth) {
-        const fields = readFields(input, path, context.issues, {
-            by: knownField("css"),
-            position: POSITION,
-            selector: (selector: unknown, selectorPath: string) =>
-                readSelectorText(selector, selectorPath, context),
-            ...structuralFields(context, insideDepth),
-        } satisfies LocatorFields<"css">);
+        const fields = readFields(
+            input,
+            path,
+            context.issues,
+            {
+                by: knownField("css"),
+                position: POSITION,
+                selector: (selector: unknown, selectorPath: string) =>
+                    readSelectorText(selector, selectorPath, context),
+                ...structuralFields(context, insideDepth),
+            } satisfies LocatorFields<"css">,
+            LOCATOR_FIELDS.css,
+        );
         if (fields === INVALID) {
             return INVALID;
         }
@@ -191,13 +222,19 @@ const LOCATOR_READERS = {
         };
     },
     xpath(input, path, context, insideDepth) {
-        const fields = readFields(input, path, context.issues, {
-            by: knownField("xpath"),
-            position: POSITION,
-            expression: (expression: unknown, expressionPath: string) =>
-                readSelectorText(expression, expressionPath, context),
-            ...structuralFields(context, insideDepth),
-        } satisfies LocatorFields<"xpath">);
+        const fields = readFields(
+            input,
+            path,
+            context.issues,
+            {
+                by: knownField("xpath"),
+                position: POSITION,
+                expression: (expression: unknown, expressionPath: string) =>
+                    readSelectorText(expression, expressionPath, context),
+                ...structuralFields(context, insideDepth),
+            } satisfies LocatorFields<"xpath">,
+            LOCATOR_FIELDS.xpath,
+        );
         if (fields === INVALID) {
             return INVALID;
         }

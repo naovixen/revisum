@@ -22,7 +22,7 @@ export const PAGE_CHECK_STEP_READERS: StepReaderTable<StepTypeIn<typeof StepSect
     expect(step, path, context) {
         const parts = [
             readStepLocator(step, path, context),
-            readElementAssertion(step["assert"], `${path}.assert`, context),
+            readElementAssertion(step.assert, `${path}.assert`, context),
             readCriterionId(step, path, context),
         ] as const;
         if (!allValid(parts)) {
@@ -37,7 +37,7 @@ export const PAGE_CHECK_STEP_READERS: StepReaderTable<StepTypeIn<typeof StepSect
     },
     expectPage(step, path, context) {
         const parts = [
-            readPageAssertion(step["assert"], `${path}.assert`, context),
+            readPageAssertion(step.assert, `${path}.assert`, context),
             readCriterionId(step, path, context),
         ] as const;
         return allValid(parts)
@@ -48,7 +48,7 @@ export const PAGE_CHECK_STEP_READERS: StepReaderTable<StepTypeIn<typeof StepSect
     // it, and a name already defined is a duplicate.
     remember(step, path, context) {
         const namePath = `${path}.name`;
-        const name = readValueName(step["name"], namePath, context.issues);
+        const name = readValueName(step.name, namePath, context.issues);
         const from = readRememberSource(step[FROM_FIELD], `${path}.${FROM_FIELD}`, context);
         if (name === INVALID) {
             return INVALID;

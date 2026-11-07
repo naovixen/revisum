@@ -9,7 +9,9 @@ import {
 } from "@revisum/contracts";
 import { clockAdvanceMilliseconds } from "../../../clock-advance.ts";
 import { allValid, INVALID, readOneOf, readRecord, type Parsed } from "../../plan-decoders.ts";
+import { optionalField, readFields } from "../../ReadFields.ts";
 import type { StepSection, StepTypeIn } from "../../StepFacts.ts";
+import { knownField } from "../KnownField.ts";
 import { readClipboardAssertion } from "../assertions/ReadClipboardAssertion.ts";
 import type { ParseContext } from "../ParseContext.ts";
 import { refuse } from "../Refuse.ts";
@@ -68,19 +70,20 @@ export const CLOCK_AND_CLIPBOARD_STEP_READERS: StepReaderTable<
 > = {
     // The mode is left out when absent, so the step stays as written.
     advanceClock(step, path, context) {
-        const by = readClockAdvance(step["by"], `${path}.by`, context);
-        const isModeGiven = Object.hasOwn(step, "mode");
-        const mode = isModeGiven
-            ? readOneOf(step["mode"], `${path}.mode`, context.issues, CLOCK_ADVANCE_MODES)
-            : undefined;
-        if (by === INVALID || mode === INVALID || !isWithinTotalAfterAdding(by, path, context)) {
-            return INVALID;
-        }
-        return { type: StepType.AdvanceClock, by, ...(mode === undefined ? {} : { mode }) };
+        const advance = readFields(step, path, context.issues, {
+            type: knownField(StepType.AdvanceClock),
+            by: (by: unknown, byPath: string) => readClockAdvance(by, byPath, context),
+            mode: optionalField((mode: unknown, modePath: string) =>
+                readOneOf(mode, modePath, context.issues, CLOCK_ADVANCE_MODES),
+            ),
+        });
+        return advance !== INVALID && isWithinTotalAfterAdding(advance.by, path, context)
+            ? advance
+            : INVALID;
     },
     expectClipboard(step, path, context) {
         const parts = [
-            readClipboardAssertion(step["assert"], `${path}.assert`, context),
+            readClipboardAssertion(step.assert, `${path}.assert`, context),
             readCriterionId(step, path, context),
         ] as const;
         return allValid(parts)

@@ -17,6 +17,16 @@ type Fields = Record<string, unknown>;
 
 type OneLevel = unknown[] | Fields | typeof UNREADABLE | typeof NOT_PLAIN_DATA;
 
+// Every copy made here, once frozen. A frozen copy holds only own data and can't be changed, so
+// reading it again is safe, and a guard given one passes it on instead of copying it again.
+const FROZEN_COPIES = new WeakSet<object>();
+
+const frozenCopy = <Copy extends object>(copy: Copy): Copy => {
+    Object.freeze(copy);
+    FROZEN_COPIES.add(copy);
+    return copy;
+};
+
 // True for a fresh list or plain object, whose values are still the originals' until filled.
 const isUnfilledCopy = (copy: OneLevel): copy is unknown[] | Fields =>
     copy !== UNREADABLE && copy !== NOT_PLAIN_DATA;
@@ -88,11 +98,16 @@ function copyOneLevelOf(original: object): OneLevel {
     }
 }
 
-// One level of `value`: a fresh list or plain object holding its own data, the same values inside,
-// or UNREADABLE when it is neither a list nor a plain object, or can't be read safely. A guard
-// that narrows a value to a list or a record reads this, so what it lets through can be read.
+// One level of `value`: a frozen list or plain object holding its own data, the same values
+// inside, or UNREADABLE when it is neither a list nor a plain object, or can't be read safely. A
+// copy made here already, by this or by readableCopy, is itself. A guard that narrows a value to a
+// list or a record reads this, so what it lets through can be read.
 export function readOneLevel(value: unknown): unknown {
-    return typeof value === "object" && value !== null ? copyOneLevelOf(value) : value;
+    if (typeof value !== "object" || value === null || FROZEN_COPIES.has(value)) {
+        return value;
+    }
+    const copy = copyOneLevelOf(value);
+    return isUnfilledCopy(copy) ? frozenCopy(copy) : copy;
 }
 
 // A primitive JSON can't write is UNREADABLE too, so the copy can be written as JSON to be
@@ -100,9 +115,10 @@ export function readOneLevel(value: unknown): unknown {
 const isWritablePrimitive = (value: unknown): boolean =>
     typeof value !== "bigint" && typeof value !== "symbol" && typeof value !== "function";
 
-// A copy of `input` at every depth, read one level at a time without recursion, so input nested
-// thousands deep is copied too. A value met twice is copied once, so a cycle stays a cycle, as
-// writing it out as JSON would refuse it before.
+// A frozen copy of `input` at every depth, read one level at a time without recursion, so input
+// nested thousands deep is copied too. A value met twice is copied once, so a cycle stays a cycle,
+// as writing it out as JSON would refuse it before. A parser reads this once, at its edge, and
+// every guard inside then passes the copy's lists and records on as they are.
 export function readableCopy(input: unknown): unknown {
     const copies = new Map<object, OneLevel>();
     const unfilled: (unknown[] | Fields)[] = [];
@@ -129,11 +145,13 @@ export function readableCopy(input: unknown): unknown {
                 const index = Number(key);
                 items[index] = copyOf(items[index]);
             }
+            frozenCopy(items);
         } else {
             const fields: Fields = next;
             for (const key of Object.keys(fields)) {
                 fields[key] = copyOf(fields[key]);
             }
+            frozenCopy(fields);
         }
     }
     return top;

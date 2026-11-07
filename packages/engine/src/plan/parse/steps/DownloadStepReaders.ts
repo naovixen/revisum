@@ -49,7 +49,7 @@ export const DOWNLOAD_STEP_READERS: StepReaderTable<StepTypeIn<typeof StepSectio
     download(step, path, context) {
         const locator = readStepLocator(step, path, context);
         const namePath = `${path}.name`;
-        const name = readDownloadName(step["name"], namePath, context);
+        const name = readDownloadName(step.name, namePath, context);
         if (name === INVALID) {
             return INVALID;
         }
@@ -61,8 +61,8 @@ export const DOWNLOAD_STEP_READERS: StepReaderTable<StepTypeIn<typeof StepSectio
     },
     expectDownload(step, path, context) {
         const parts = [
-            readDownloadReference(step["download"], `${path}.download`, context),
-            readDownloadAssertion(step["assert"], `${path}.assert`, context),
+            readDownloadReference(step.download, `${path}.download`, context),
+            readDownloadAssertion(step.assert, `${path}.assert`, context),
             readCriterionId(step, path, context),
         ] as const;
         return allValid(parts)

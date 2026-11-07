@@ -24,12 +24,12 @@ import {
     FEATURE_ID,
     MAXIMUM_SPEC_REFERENCE_LENGTH,
     MAXIMUM_TITLE_LENGTH,
-    type META_FIELDS,
+    META_FIELDS,
     type OPTIONAL_PLAN_FIELDS,
-    type PLAN_FIELDS,
+    PLAN_FIELDS,
 } from "../plan-grammar.ts";
 import { readGeneratedValues, readPlanClock, type ValueContext } from "../plan-values.ts";
-import { readableCopy } from "../ReadableCopy.ts";
+import { readableCopy } from "../../decoding/ReadableCopy.ts";
 import { optionalField, readFields } from "../ReadFields.ts";
 import { isAssertionStepType } from "../StepFacts.ts";
 import { stepsWithin } from "../VisitSteps.ts";
@@ -60,13 +60,19 @@ function readFeatureId(input: unknown, path: string, issues: Issues): Parsed<Fea
 }
 
 function readMeta(input: unknown, path: string, context: ParseContext): Parsed<PlanMeta> {
-    const meta = readFields(input, path, context.issues, {
-        featureId: readFeatureId,
-        specReference: (text: unknown, textPath: string) =>
-            readWrittenText(text, textPath, context, MAXIMUM_SPEC_REFERENCE_LENGTH),
-        title: (text: unknown, textPath: string) =>
-            readWrittenText(text, textPath, context, MAXIMUM_TITLE_LENGTH),
-    } satisfies ListedFields<(typeof META_FIELDS)[number]>);
+    const meta = readFields(
+        input,
+        path,
+        context.issues,
+        {
+            featureId: readFeatureId,
+            specReference: (text: unknown, textPath: string) =>
+                readWrittenText(text, textPath, context, MAXIMUM_SPEC_REFERENCE_LENGTH),
+            title: (text: unknown, textPath: string) =>
+                readWrittenText(text, textPath, context, MAXIMUM_TITLE_LENGTH),
+        } satisfies ListedFields<(typeof META_FIELDS)[number]>,
+        META_FIELDS,
+    );
     return meta === INVALID
         ? INVALID
         : { featureId: meta.featureId, specReference: meta.specReference, title: meta.title };
@@ -147,20 +153,29 @@ function readEnvelope(input: unknown, context: ParseContext) {
         readText: (text, path, maximumLength) =>
             readWrittenText(text, path, context, maximumLength),
     };
-    return readFields(input, "$", context.issues, {
-        version: readVersion,
-        meta: (meta: unknown, path: string) => readMeta(meta, path, context),
-        targets: (targets: unknown, path: string) => readTargetIds(targets, path, context),
-        values: optionalField((values: unknown, path: string) =>
-            readGeneratedValues(values, path, valueContext, context.defined),
-        ),
-        clock: optionalField(readPlanClock),
-        steps: (steps: unknown, path: string) => readPlanSteps(steps, path, context),
-        cleanup: optionalField((cleanup: unknown) => readCleanup(cleanup, context)),
-        storageState: optionalField((storageState: unknown, path: string) =>
-            readStorageState(storageState, path, context),
-        ),
-    } satisfies ListedFields<(typeof PLAN_FIELDS)[number], (typeof OPTIONAL_PLAN_FIELDS)[number]>);
+    return readFields(
+        input,
+        "$",
+        context.issues,
+        {
+            version: readVersion,
+            meta: (meta: unknown, path: string) => readMeta(meta, path, context),
+            targets: (targets: unknown, path: string) => readTargetIds(targets, path, context),
+            values: optionalField((values: unknown, path: string) =>
+                readGeneratedValues(values, path, valueContext, context.defined),
+            ),
+            clock: optionalField(readPlanClock),
+            steps: (steps: unknown, path: string) => readPlanSteps(steps, path, context),
+            cleanup: optionalField((cleanup: unknown) => readCleanup(cleanup, context)),
+            storageState: optionalField((storageState: unknown, path: string) =>
+                readStorageState(storageState, path, context),
+            ),
+        } satisfies ListedFields<
+            (typeof PLAN_FIELDS)[number],
+            (typeof OPTIONAL_PLAN_FIELDS)[number]
+        >,
+        PLAN_FIELDS,
+    );
 }
 
 // Whatever its type says, JSON.stringify gives undefined for undefined or a symbol.

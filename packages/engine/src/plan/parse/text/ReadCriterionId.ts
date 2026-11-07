@@ -19,7 +19,7 @@ export function criterionIdFrom(text: string): CriterionId | undefined {
 // trace to nothing, so a missing or empty id is vacuous, which a field table can't say: there a
 // missing field is missing_field.
 export function readCriterionId(
-    step: Readonly<Record<string, unknown>>,
+    step: { readonly [CRITERION_FIELD]?: unknown },
     stepPath: string,
     context: ParseContext,
 ): Parsed<CriterionId> {

@@ -2,7 +2,8 @@
 // value or records a PlanError and returns INVALID. Errors carry a code and a JSON path, never
 // the offending value, so hostile or private text is never echoed back.
 import { PlanErrorCode, isPlainObject, type PlanError, type SafeText } from '@revisum/contracts';
-import { readOneLevel } from './ReadableCopy.ts';
+import type { NonEmptyList } from '../decoding/NonEmptyList.ts';
+import { readOneLevel } from '../decoding/ReadableCopy.ts';
 import { brand } from '../brand.ts';
 import { sha256 } from '../hashing.ts';
 import { looksLikeCredential } from './literal-secrets.ts';
@@ -136,6 +137,14 @@ export function readOneOf<Value extends string>(
   return found;
 }
 
+// A list of at most `maximumLength` items and at least `minimumLength`, which is 1 unless given, so
+// a list read without one holds at least one item.
+export function readList(
+  input: unknown, path: string, issues: Issues, maximumLength: number, minimumLength?: 1,
+): Parsed<NonEmptyList<unknown>>;
+export function readList(
+  input: unknown, path: string, issues: Issues, maximumLength: number, minimumLength: number,
+): Parsed<readonly unknown[]>;
 export function readList(
   input: unknown, path: string, issues: Issues, maximumLength: number, minimumLength = 1,
 ): Parsed<readonly unknown[]> {

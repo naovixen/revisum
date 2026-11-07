@@ -9,12 +9,12 @@ import type { StepReaderTable } from "./StepReader.ts";
 
 export const EVIDENCE_STEP_READERS: StepReaderTable<StepTypeIn<typeof StepSection.Evidence>> = {
     a11yAudit(step, path, context) {
-        const mode = readOneOf(step["mode"], `${path}.mode`, context.issues, AUDIT_MODES);
+        const mode = readOneOf(step.mode, `${path}.mode`, context.issues, AUDIT_MODES);
         return mode === INVALID ? INVALID : { type: StepType.A11yAudit, mode };
     },
     // A capture name names a file, so it follows the capture-name pattern.
     capture(step, path, context) {
-        const name = step["name"];
+        const name = step.name;
         const namePath = `${path}.name`;
         if (typeof name !== "string") {
             return refuse(context.issues, PlanErrorCode.WrongType, namePath);

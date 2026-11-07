@@ -3,7 +3,7 @@
 // test needs and whether it holds steps of its own. Every list of step types
 // the parser, the JSON Schema, the readable forms and the run read is derived from it, so adding a
 // step type is one entry here, which the compiler demands.
-import type { Step, StepByType, StepType } from "@revisum/contracts";
+import type { CleanupStep, Step, StepByType, StepType } from "@revisum/contracts";
 import { CRITERION_FIELD, FROM_FIELD } from "./plan-grammar.ts";
 
 // The family a step type belongs to. A run's executors are grouped the same way.
@@ -132,7 +132,11 @@ const openingUrl = <Fact extends AnyBuiltFact>(
     fact: Fact,
 ): Omit<Fact, "opensUrl"> & { readonly opensUrl: true } => ({ ...fact, opensUrl: true });
 
-const placedAt = <Fact extends AnyBuiltFact>(placement: StepPlacement, fact: Fact): Fact => ({
+// Its placement kept exact, so the step types a cleanup may hold are typed from the table itself.
+const placedAt = <Placement extends StepPlacement, Fact extends AnyBuiltFact>(
+    placement: Placement,
+    fact: Fact,
+): Omit<Fact, "placement"> & { readonly placement: Placement } => ({
     ...fact,
     placement,
 });
@@ -212,6 +216,32 @@ export type UrlOpeningStepType = {
     [Type in StepType]: (typeof FACTS)[Type]["opensUrl"] extends true ? Type : never;
 }[StepType];
 
+// The step types a plan's cleanup may hold, read from the table.
+type CleanupStepTypeInTable = {
+    [
+        Type in StepType
+    ]: (typeof FACTS)[Type]["placement"] extends typeof StepPlacement.TopLevelOrCleanup
+        ? Type
+        : never;
+}[StepType];
+
+// True when two unions hold exactly the same members.
+type IsSameUnion<Left, Right> = [Left] extends [Right]
+    ? [Right] extends [Left]
+        ? true
+        : false
+    : false;
+
+// Compiles only when its condition is true.
+type Holds<Condition extends true> = Condition;
+
+// The contracts' CleanupStep can't read this table, so this compiles only while the two name the
+// same step types.
+export type CleanupStepType =
+    Holds<IsSameUnion<CleanupStepTypeInTable, CleanupStep["type"]>> extends true
+        ? CleanupStepTypeInTable
+        : never;
+
 const stepTypesWhere = (isWanted: (fact: StepFact) => boolean): readonly StepType[] =>
     Object.entries(STEP_FACTS).flatMap(([type, fact]) =>
         isWanted(fact) && isStepType(type) ? [type] : [],
@@ -238,7 +268,7 @@ export const canStandInside = (type: StepType): boolean =>
     STEP_FACTS[type].placement === StepPlacement.Anywhere;
 
 // True when a plan's cleanup may hold a step of this type.
-export const canStandInCleanup = (type: StepType): boolean =>
+export const canStandInCleanup = (type: StepType): type is CleanupStepType =>
     STEP_FACTS[type].placement === StepPlacement.TopLevelOrCleanup;
 
 // True when a step of this type belongs to one of the sections given.

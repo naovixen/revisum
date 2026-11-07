@@ -56,21 +56,26 @@ const fieldsOf = (table: FieldTable): readonly (readonly [string, Field])[] => {
 // checked first, as by readRecord, with the same codes and paths, and a record that fails stops
 // there. Otherwise every field is read, in the table's order, so that every field's issues are
 // reported, in that order, under `path.field`. The result's keys follow the table's order too, not
-// the input's.
+// the input's. Missing fields are reported in `requiredOrder` when given, such as the grammar list
+// a table is checked against, and otherwise in the table's order.
 export function readFields<Table extends FieldTable>(
     input: unknown,
     path: string,
     issues: Issues,
     table: Table,
+    requiredOrder?: readonly RequiredKeys<Table>[],
 ): Parsed<FieldValues<Table>>;
 export function readFields(
     input: unknown,
     path: string,
     issues: Issues,
     table: FieldTable,
+    requiredOrder?: readonly string[],
 ): Parsed<Readonly<Record<string, unknown>>> {
     const entries = fieldsOf(table);
-    const required = entries.flatMap(([key, field]) => (typeof field === "function" ? [key] : []));
+    const required =
+        requiredOrder ??
+        entries.flatMap(([key, field]) => (typeof field === "function" ? [key] : []));
     const allowed = entries.map(([key]) => key);
     const fields = readRecord(input, path, issues, allowed, required);
     if (fields === INVALID) {

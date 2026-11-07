@@ -16,14 +16,14 @@ export const PAGE_SCRIPT_STEP_READERS: StepReaderTable<StepTypeIn<typeof StepSec
     {
         // Runs its script, and may remember fields of its result once its arguments are read.
         evaluate(step, path, context) {
-            const use = readScriptChoice(step["script"], `${path}.script`, context);
+            const use = readScriptChoice(step.script, `${path}.script`, context);
             if (use === INVALID) {
                 return INVALID;
             }
             const { script, parameters } = use;
             const argumentsPath = `${path}.arguments`;
             const scriptArguments = readScriptArguments(
-                step["arguments"],
+                step.arguments,
                 argumentsPath,
                 parameters,
                 context,
@@ -34,7 +34,7 @@ export const PAGE_SCRIPT_STEP_READERS: StepReaderTable<StepTypeIn<typeof StepSec
                     : { type: StepType.Evaluate, script, arguments: scriptArguments };
             }
             const remember = readRememberedFields(
-                step["remember"],
+                step.remember,
                 `${path}.remember`,
                 use.fields,
                 context,
@@ -46,7 +46,7 @@ export const PAGE_SCRIPT_STEP_READERS: StepReaderTable<StepTypeIn<typeof StepSec
         // A read script, one of its result fields and a check on it. A write script is refused as not
         // declared for this use, since a check may repeat its script.
         expectScript(step, path, context) {
-            const use = readScriptChoice(step["script"], `${path}.script`, context);
+            const use = readScriptChoice(step.script, `${path}.script`, context);
             if (use === INVALID) {
                 return INVALID;
             }
@@ -55,13 +55,13 @@ export const PAGE_SCRIPT_STEP_READERS: StepReaderTable<StepTypeIn<typeof StepSec
             }
             const parts = [
                 readScriptArguments(
-                    step["arguments"],
+                    step.arguments,
                     `${path}.arguments`,
                     use.parameters,
                     context,
                 ),
-                readDeclaredField(step["field"], `${path}.field`, use.fields, context),
-                readBackendAssertion(step["assert"], `${path}.assert`, context),
+                readDeclaredField(step.field, `${path}.field`, use.fields, context),
+                readBackendAssertion(step.assert, `${path}.assert`, context),
                 readCriterionId(step, path, context),
             ] as const;
             if (!allValid(parts)) {

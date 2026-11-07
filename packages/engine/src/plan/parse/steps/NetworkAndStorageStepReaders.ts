@@ -24,17 +24,17 @@ import {
 import type { ParseContext } from "../ParseContext.ts";
 import { refuse } from "../Refuse.ts";
 import { readCriterionId } from "../text/ReadCriterionId.ts";
-import type { StepFieldsRead, StepReaderTable } from "./StepReader.ts";
+import type { StepReaderTable } from "./StepReader.ts";
 
 // A storage entry a step may write or remove: one the project declares readWrite. An entry declared
 // read may only be checked, so writing it is refused as a name the plan may not use there.
 function readWritableEntry(
-    step: StepFieldsRead,
+    step: { readonly entry?: unknown },
     path: string,
     context: ParseContext,
 ): Parsed<Named<StorageEntryName, StorageEntryDeclaration>> {
     const entryPath = `${path}.entry`;
-    const named = readStorageEntryName(step["entry"], entryPath, context);
+    const named = readStorageEntryName(step.entry, entryPath, context);
     if (named !== INVALID && named.declaration.access !== StorageAccess.ReadWrite) {
         return refuse(context.issues, PlanErrorCode.UnknownValue, entryPath);
     }
@@ -48,8 +48,8 @@ export const NETWORK_AND_STORAGE_STEP_READERS: StepReaderTable<
     // an earlier step started, so a plan cannot stop what it never faked.
     stub(step, path, context) {
         const stubPath = `${path}.stub`;
-        const named = readStubName(step["stub"], stubPath, context);
-        const action = readOneOf(step["action"], `${path}.action`, context.issues, STUB_ACTIONS);
+        const named = readStubName(step.stub, stubPath, context);
+        const action = readOneOf(step.action, `${path}.action`, context.issues, STUB_ACTIONS);
         if (named === INVALID || action === INVALID) {
             return INVALID;
         }
@@ -70,16 +70,16 @@ export const NETWORK_AND_STORAGE_STEP_READERS: StepReaderTable<
             : { type: StepType.Stub, stub, action, ...stubArguments };
     },
     resetRequests(step, path, context) {
-        const named = readRequestName(step["request"], `${path}.request`, context);
+        const named = readRequestName(step.request, `${path}.request`, context);
         return named === INVALID ? INVALID : { type: StepType.ResetRequests, request: named.name };
     },
     expectRequests(step, path, context) {
-        const named = readRequestName(step["request"], `${path}.request`, context);
+        const named = readRequestName(step.request, `${path}.request`, context);
         if (named === INVALID) {
             return INVALID;
         }
         const parts = [
-            readRequestCount(step["count"], `${path}.count`, context),
+            readRequestCount(step.count, `${path}.count`, context),
             readCriterionId(step, path, context),
         ] as const;
         return allValid(parts)
@@ -92,12 +92,12 @@ export const NETWORK_AND_STORAGE_STEP_READERS: StepReaderTable<
             : INVALID;
     },
     expectResponse(step, path, context) {
-        const named = readRequestName(step["request"], `${path}.request`, context);
+        const named = readRequestName(step.request, `${path}.request`, context);
         if (named === INVALID) {
             return INVALID;
         }
         const parts = [
-            readResponseAssertion(step["assert"], `${path}.assert`, named.declaration, context),
+            readResponseAssertion(step.assert, `${path}.assert`, named.declaration, context),
             readCriterionId(step, path, context),
         ] as const;
         return allValid(parts)
@@ -125,12 +125,12 @@ export const NETWORK_AND_STORAGE_STEP_READERS: StepReaderTable<
         return named === INVALID ? INVALID : { type: StepType.RemoveStorage, entry: named.name };
     },
     expectStorage(step, path, context) {
-        const named = readStorageEntryName(step["entry"], `${path}.entry`, context);
+        const named = readStorageEntryName(step.entry, `${path}.entry`, context);
         if (named === INVALID) {
             return INVALID;
         }
         const parts = [
-            readStorageAssertion(step["assert"], `${path}.assert`, context),
+            readStorageAssertion(step.assert, `${path}.assert`, context),
             readCriterionId(step, path, context),
         ] as const;
         return allValid(parts)

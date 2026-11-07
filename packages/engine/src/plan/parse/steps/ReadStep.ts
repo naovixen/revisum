@@ -7,6 +7,7 @@ import {
     StepType,
     type CleanupStep,
     type Step,
+    type StepByType,
 } from "@revisum/contracts";
 import {
     allValid,
@@ -17,6 +18,7 @@ import {
     readRecord,
     type Parsed,
 } from "../../plan-decoders.ts";
+import { mapNonEmpty, type NonEmptyList } from "../../../decoding/NonEmptyList.ts";
 import {
     CRITERION_FIELD,
     DATABASE_COMMAND_FEATURE,
@@ -48,9 +50,7 @@ import { SERVICE_CALL_STEP_READERS } from "./ServiceCallStepReaders.ts";
 import { readStepLocator, type StepFieldsRead, type StepReaderTable } from "./StepReader.ts";
 
 // A list of steps holding at least one.
-export type StepList = readonly [Step, ...Step[]];
-
-const isNonEmpty = (steps: readonly Step[]): steps is StepList => steps.length > 0;
+export type StepList = NonEmptyList<Step>;
 
 // A frame and a second tab read their own steps here, where step lists are read. The frame depth
 // was checked before the walk began, so this recursion is bounded.
@@ -58,7 +58,7 @@ const FRAME_AND_TAB_STEP_READERS: StepReaderTable<StepTypeIn<typeof StepSection.
     frame(step, path, context) {
         const parts = [
             readStepLocator(step, path, context),
-            readStepList(step["steps"], `${path}.steps`, nestedContext(context)),
+            readStepList(step.steps, `${path}.steps`, nestedContext(context)),
         ] as const;
         return allValid(parts)
             ? { type: StepType.Frame, locator: parts[0], steps: parts[1] }
@@ -66,8 +66,8 @@ const FRAME_AND_TAB_STEP_READERS: StepReaderTable<StepTypeIn<typeof StepSection.
     },
     newTab(step, path, context) {
         const parts = [
-            readNavigation(step["url"], `${path}.url`, context),
-            readStepList(step["steps"], `${path}.steps`, nestedContext(context)),
+            readNavigation(step.url, `${path}.url`, context),
+            readStepList(step.steps, `${path}.steps`, nestedContext(context)),
         ] as const;
         return allValid(parts)
             ? { type: StepType.NewTab, url: parts[0], steps: parts[1] }
@@ -95,7 +95,7 @@ const STEP_READERS: StepReaderTable = {
 // project can enable that only together with page-script, so one check covers both.
 function isUnsafeStepEnabledElseRefused(
     type: Step["type"],
-    step: StepFieldsRead,
+    step: { readonly script?: unknown },
     path: string,
     context: ParseContext,
 ): boolean {
@@ -105,7 +105,7 @@ function isUnsafeStepEnabledElseRefused(
     if (!isStepTypeIn(type, StepSection.PageScripts)) {
         return true;
     }
-    const script = step["script"];
+    const script = step.script;
     if (isNonArrayObject(script) && Object.hasOwn(script, "inline")) {
         return isFeatureEnabledElseRefused(INLINE_SCRIPT_FEATURE, `${path}.script.inline`, context);
     }
@@ -114,42 +114,64 @@ function isUnsafeStepEnabledElseRefused(
 
 // The fields a step of `type` may have, every required one there. The criterion id is checked on
 // its own by the reader, so that a missing one is reported as vacuous.
-function readStepFields(
-    input: unknown,
-    type: Step["type"],
+function readStepFields<Type extends StepType>(
+    head: Readonly<Record<string, unknown>>,
+    type: Type,
     path: string,
     context: ParseContext,
-): Parsed<StepFieldsRead> {
+): Parsed<StepFieldsRead<Type>> {
     const { required, optional } = STEP_FACTS[type].fields;
     const requiredHere = required.filter((field) => field !== CRITERION_FIELD);
-    return readRecord(input, path, context.issues, [...required, ...optional], requiredHere);
+    return readRecord(head, path, context.issues, [...required, ...optional], requiredHere);
 }
 
-export function readStep(input: unknown, path: string, context: ParseContext): Parsed<Step> {
+// A step read as a record, and its type, one the plan language has.
+type StepHead = {
+    readonly head: Readonly<Record<string, unknown>>;
+    readonly type: StepType;
+};
+
+function readStepHead(input: unknown, path: string, context: ParseContext): Parsed<StepHead> {
     const head = peekRecord(input, path, context.issues);
     if (head === INVALID) {
         return INVALID;
     }
-    const typePath = `${path}.type`;
     const type = readOneOf(
         head["type"],
-        typePath,
+        `${path}.type`,
         context.issues,
         STEP_TYPES,
         PlanErrorCode.UnknownStep,
     );
-    if (type === INVALID) {
-        return INVALID;
-    }
-    // A second tab, a call or a database command stands only in the plan's own list of steps.
-    if (!canStandInside(type) && !context.topLevel) {
-        return refuse(context.issues, PlanErrorCode.MisplacedStep, path);
-    }
+    return type === INVALID ? INVALID : { head, type };
+}
+
+// A step whose head is read and which may stand where it is. Its unsafe feature is checked, then
+// its fields against its type's fact, and its type's reader reads them.
+function readStepOfType<Type extends StepType>(
+    head: Readonly<Record<string, unknown>>,
+    type: Type,
+    path: string,
+    context: ParseContext,
+): Parsed<StepByType[Type]> {
     if (!isUnsafeStepEnabledElseRefused(type, head, path, context)) {
         return INVALID;
     }
-    const step = readStepFields(input, type, path, context);
-    return step === INVALID ? INVALID : STEP_READERS[type](step, path, context);
+    const step = readStepFields(head, type, path, context);
+    const readerOfType: StepReaderTable[Type] = STEP_READERS[type];
+    return step === INVALID ? INVALID : readerOfType(step, path, context);
+}
+
+export function readStep(input: unknown, path: string, context: ParseContext): Parsed<Step> {
+    const read = readStepHead(input, path, context);
+    if (read === INVALID) {
+        return INVALID;
+    }
+    // A second tab, a call or a database command stands only in the plan's own list of steps.
+    if (!canStandInside(read.type) && !context.topLevel) {
+        return refuse(context.issues, PlanErrorCode.MisplacedStep, path);
+    }
+    return readStepOfType(read.head, read.type, path, context);
 }
 
 // A non-empty list of steps, every one read so that a rejection lists every problem.
@@ -162,35 +184,22 @@ export function readStepList(
     if (written === INVALID) {
         return INVALID;
     }
-    const steps = written.map((step, index) => readStep(step, `${path}[${index}]`, context));
-    return allValid(steps) && isNonEmpty(steps) ? steps : INVALID;
+    const steps = mapNonEmpty(written, (step, index) =>
+        readStep(step, `${path}[${index}]`, context),
+    );
+    return allValid(steps) ? steps : INVALID;
 }
 
-const isCleanupStep = (step: Step): step is CleanupStep =>
-    step.type === StepType.Call || step.type === StepType.Database;
-
 function readCleanupStep(input: unknown, path: string, context: ParseContext): Parsed<CleanupStep> {
-    const head = peekRecord(input, path, context.issues);
-    if (head === INVALID) {
-        return INVALID;
-    }
-    const typePath = `${path}.type`;
-    const type = readOneOf(
-        head["type"],
-        typePath,
-        context.issues,
-        STEP_TYPES,
-        PlanErrorCode.UnknownStep,
-    );
-    if (type === INVALID) {
+    const read = readStepHead(input, path, context);
+    if (read === INVALID) {
         return INVALID;
     }
     // Nothing inside a misplaced step is read.
-    if (!canStandInCleanup(type)) {
+    if (!canStandInCleanup(read.type)) {
         return refuse(context.issues, PlanErrorCode.MisplacedStep, path);
     }
-    const step = readStep(input, path, context);
-    return step !== INVALID && isCleanupStep(step) ? step : INVALID;
+    return readStepOfType(read.head, read.type, path, context);
 }
 
 // The plan's cleanup: calls and database commands only, read after the steps, so they may use the

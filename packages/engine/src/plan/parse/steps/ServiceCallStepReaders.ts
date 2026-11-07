@@ -16,7 +16,7 @@ export const SERVICE_CALL_STEP_READERS: StepReaderTable<
     // Its remembered values are defined only once its arguments have been read, so it cannot use
     // them itself.
     call(step, path, context) {
-        const named = readCallName(step["call"], `${path}.call`, context);
+        const named = readCallName(step.call, `${path}.call`, context);
         if (named === INVALID) {
             return INVALID;
         }
@@ -24,7 +24,7 @@ export const SERVICE_CALL_STEP_READERS: StepReaderTable<
         const argumentsPath = `${path}.arguments`;
         const parameters = declaration.parameters;
         const callArguments = readCallArguments(
-            step["arguments"],
+            step.arguments,
             argumentsPath,
             parameters,
             context,
@@ -36,7 +36,7 @@ export const SERVICE_CALL_STEP_READERS: StepReaderTable<
         }
         const rememberPath = `${path}.remember`;
         const remember = readRememberedFields(
-            step["remember"],
+            step.remember,
             rememberPath,
             declaration.fields,
             context,
@@ -49,7 +49,7 @@ export const SERVICE_CALL_STEP_READERS: StepReaderTable<
     // were not declared, since a check may repeat its call.
     expectBackend(step, path, context) {
         const callPath = `${path}.call`;
-        const named = readCallName(step["call"], callPath, context);
+        const named = readCallName(step.call, callPath, context);
         if (named === INVALID) {
             return INVALID;
         }
@@ -59,13 +59,13 @@ export const SERVICE_CALL_STEP_READERS: StepReaderTable<
         }
         const parts = [
             readCallArguments(
-                step["arguments"],
+                step.arguments,
                 `${path}.arguments`,
                 declaration.parameters,
                 context,
             ),
-            readDeclaredField(step["field"], `${path}.field`, declaration.fields, context),
-            readBackendAssertion(step["assert"], `${path}.assert`, context),
+            readDeclaredField(step.field, `${path}.field`, declaration.fields, context),
+            readBackendAssertion(step.assert, `${path}.assert`, context),
             readCriterionId(step, path, context),
         ] as const;
         if (!allValid(parts)) {

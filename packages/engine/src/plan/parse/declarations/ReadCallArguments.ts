@@ -128,13 +128,13 @@ export const readScriptArguments = (
 // Arguments for a stub start or a storage write. Left out of the step when the plan leaves them
 // out, and then read as none, so a declaration with parameters still has each one reported missing.
 export function readOptionalArguments(
-    step: Readonly<Record<string, unknown>>,
+    step: { readonly arguments?: unknown },
     path: string,
     declared: Readonly<Record<ParameterName, ParameterType>>,
     context: ParseContext,
 ): Parsed<{ readonly arguments?: CallArguments }> {
     const isGiven = Object.hasOwn(step, "arguments");
-    const written = isGiven ? step["arguments"] : {};
+    const written = isGiven ? step.arguments : {};
     const stepArguments = readCallArguments(written, `${path}.arguments`, declared, context);
     if (stepArguments === INVALID) {
         return INVALID;
