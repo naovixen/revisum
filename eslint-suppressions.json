@@ -1112,14 +1112,8 @@
     }
   },
   "packages/engine/src/release-notes.ts": {
-    "@typescript-eslint/strict-boolean-expressions": {
-      "count": 2
-    },
     "curly": {
       "count": 4
-    },
-    "no-nested-ternary": {
-      "count": 2
     },
     "revisum/file-name-matches-export": {
       "count": 1

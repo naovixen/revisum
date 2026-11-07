@@ -18,6 +18,5 @@ export function unavailableResult(
     return sealResult(
         targetUnavailableResult(unavailable, targetId, context.ports.clock.now() - startedAt),
         context,
-        false,
     );
 }

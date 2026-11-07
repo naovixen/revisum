@@ -15,7 +15,7 @@ import { networkContext } from "../executors/network-and-storage/NetworkAndStora
 import { ExecutorOutcome, type RanStep, type SessionContext } from "../executors/StepExecutor.ts";
 import { failedStep, type StepResult } from "../StepResult.ts";
 import { runPlanStep } from "./RunPlanStep.ts";
-import { resultsOf, type TimedStep } from "./TimedStep.ts";
+import { ranStep, resultsOf, stepNotRun, type TimedStep } from "./TimedStep.ts";
 import { verdictOfSteps, type FinishedRun, type StepsRun } from "./VerdictOfSteps.ts";
 
 // What the steps have given so far, kept as each ends, so a log or clock that fails part way still
@@ -130,10 +130,7 @@ async function runEachStep(context: SessionContext, soFar: StepsSoFar): Promise<
     const notObserved = await failureToObserveRequests(session, context);
     for (const [index, step] of planSteps.entries()) {
         if (steps.some((done) => done.result.outcome === "failed")) {
-            steps.push({
-                result: { index, type: step.type, outcome: "skipped" },
-                milliseconds: undefined,
-            });
+            steps.push(stepNotRun({ index, type: step.type, outcome: "skipped" }));
             continue;
         }
         const stepStartedAt = ports.clock.now();
@@ -151,7 +148,7 @@ async function runEachStep(context: SessionContext, soFar: StepsSoFar): Promise<
                 ? failedStep(step, index, StepCode.TargetCrashed)
                 : done;
         const milliseconds = ports.clock.now() - stepStartedAt;
-        steps.push({ result, milliseconds });
+        steps.push(ranStep(result, milliseconds));
         logger.log({
             kind: "step.end",
             stepIndex: index,
@@ -168,16 +165,10 @@ async function runEachStep(context: SessionContext, soFar: StepsSoFar): Promise<
 function pushUnfinishedSteps(planSteps: readonly RunStep[], steps: TimedStep[]): void {
     const [unfinished, ...unreached] = planSteps.slice(steps.length);
     if (unfinished !== undefined) {
-        steps.push({
-            result: failedStep(unfinished, steps.length, StepCode.AdapterError),
-            milliseconds: undefined,
-        });
+        steps.push(stepNotRun(failedStep(unfinished, steps.length, StepCode.AdapterError)));
     }
     for (const step of unreached) {
-        steps.push({
-            result: { index: steps.length, type: step.type, outcome: "skipped" },
-            milliseconds: undefined,
-        });
+        steps.push(stepNotRun({ index: steps.length, type: step.type, outcome: "skipped" }));
     }
 }
 

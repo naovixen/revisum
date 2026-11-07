@@ -2,6 +2,7 @@
 import { StepCode, stepFailed } from "@revisum/contracts";
 import { finish } from "../../lifecycle.ts";
 import type { StepResult } from "../StepResult.ts";
+import { ranStep, TimedStepKind } from "../steps/TimedStep.ts";
 import type { StepsVerdict } from "../steps/VerdictOfSteps.ts";
 
 // The verdict once the late refusals are counted, and the step they spoilt, whose end the log must
@@ -28,15 +29,17 @@ export function withRefusalsAfterTheVerdict(
     }
     const finished = finish(verdict.running, "Errored");
     const lastStep = verdict.steps.at(-1);
-    // Every step of a passed run ran to an end, so only a plan with no steps has none to spoil.
-    if (lastStep?.milliseconds === undefined) {
+    // A plan with no steps has none to spoil.
+    if (lastStep === undefined) {
+        return { isSpoilt: false, verdict: { ...verdict, finished } };
+    }
+    // Every step of a passed run ran to an end, so this is never so; were it, a step that did not run
+    // has no end for the refusals to spoil.
+    if (lastStep.kind === TimedStepKind.NotRun) {
         return { isSpoilt: false, verdict: { ...verdict, finished } };
     }
     const spoiltStep: StepResult = { ...lastStep.result, ...stepFailed(StepCode.AdapterError) };
-    const steps = [
-        ...verdict.steps.slice(0, -1),
-        { result: spoiltStep, milliseconds: lastStep.milliseconds },
-    ];
+    const steps = [...verdict.steps.slice(0, -1), ranStep(spoiltStep, lastStep.milliseconds)];
     return {
         isSpoilt: true,
         verdict: { running: verdict.running, steps, finished },

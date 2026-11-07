@@ -57,9 +57,6 @@ export type DownloadRecord = {
     readonly sha256: string;
 };
 
-// Something a run found that a person should look at, whatever the verdict: a cleanup call that
-// failed, so test data may be left behind; or a suite test's criterion annotation whose
-
 // A failed step's result that holds only its code.
 export const failedStep = (step: Step, index: number, code: StepCode): StepResult => ({
     index,

@@ -2,9 +2,9 @@
 // always give the same bytes. An AI may only add a suggestion stored beside the draft, never
 // replace it, and never containing typed or expected values.
 import {
-  literalText, referencedValueName,
+  literalText, referencedValueName, RememberElementRead, RequestCountKind,
   type AiWriter, type ArtifactReference, type ArtifactStore, type ClipboardAssertion, type ClockAdvance, type Locator, type Plan,
-  type RememberSource, type REQUEST_COUNT_KINDS, type RequestCount, type ResponseAssertion, type ScriptChoice, type Step, type StorageAssertion,
+  type RememberedElementSource, type RememberRead, type RememberSource, type REQUEST_COUNT_KINDS, type RequestCount, type ResponseAssertion, type ScriptChoice, type Step, type StorageAssertion,
   type TextOrValue,
 } from '@revisum/contracts';
 import { parseAiText } from './ai-text.ts';
@@ -110,10 +110,19 @@ const CLIPBOARD_ASSERTION_TEXT: { readonly [Kind in ClipboardAssertion['kind']]:
   textEquals: 'holds the expected text', textContains: 'contains the expected text', textExcludes: 'does not contain the excluded text',
 };
 
+const ELEMENT_READ_TEXT: { readonly [Read in RememberRead]: string } = { text: 'the text', value: 'the value' };
+
+// What a remember step reads of its element: an attribute it names, its text or its value.
+function describeElementRead(from: RememberedElementSource): string {
+  if (from.read === RememberElementRead.Attribute) {
+    return `the \`${codeSpanText(from.attribute)}\` attribute`;
+  }
+  return ELEMENT_READ_TEXT[from.read];
+}
+
 function describeRememberSource(from: RememberSource): string {
   if ('element' in from) {
-    const read = from.read === 'attribute' ? `the \`${codeSpanText(from.attribute)}\` attribute` : from.read === 'text' ? 'the text' : 'the value';
-    return `${read} of ${describeLocator(from.element)}`;
+    return `${describeElementRead(from)} of ${describeLocator(from.element)}`;
   }
   if ('clipboard' in from) return "the clipboard's text";
   const field = `field "${markdownEscape(from.field)}" of the latest \`${codeSpanText(from.response)}\` response`;
@@ -123,8 +132,12 @@ function describeRememberSource(from: RememberSource): string {
 const REQUEST_COUNT_TEXT: { readonly [Kind in (typeof REQUEST_COUNT_KINDS)[number]]: string } = {
   equals: 'the exact number', atLeast: 'the least number', atMost: 'the greatest number',
 };
-const requestCountKind = (count: RequestCount): (typeof REQUEST_COUNT_KINDS)[number] =>
-  ('equals' in count ? 'equals' : 'atLeast' in count ? 'atLeast' : 'atMost');
+function requestCountKind(count: RequestCount): RequestCountKind {
+  if (RequestCountKind.Equals in count) {
+    return RequestCountKind.Equals;
+  }
+  return RequestCountKind.AtLeast in count ? RequestCountKind.AtLeast : RequestCountKind.AtMost;
+}
 
 function describeResponseAssertion(assertion: ResponseAssertion): string {
   switch (assertion.kind) {
@@ -162,12 +175,12 @@ export function releaseNoteDraft(plan: Plan, results: readonly RunResult[]): str
   }
   lines.push('', '### What was checked', '', ...plan.steps.map((step, index) => `${index + 1}. ${describeStep(step)}`));
 
-  const screenshots = results.flatMap((result) => result.steps.flatMap((step) => (step.artifact ? [step.artifact] : [])));
+  const screenshots = results.flatMap((result) => result.steps.flatMap((step) => (step.artifact === undefined ? [] : [step.artifact])));
   if (screenshots.length > 0) {
     lines.push('', '### Screenshots', '', ...screenshots.map((artifact) => `- \`${artifact.name}\` (sha256 ${artifact.sha256.slice(0, 12)})`));
   }
 
-  const audits = results.flatMap((result) => result.steps.flatMap((step) => (step.findings ? [{ target: result.targetId, findings: step.findings }] : [])));
+  const audits = results.flatMap((result) => result.steps.flatMap((step) => (step.findings === undefined ? [] : [{ target: result.targetId, findings: step.findings }])));
   if (audits.length > 0) {
     lines.push('', '### Accessibility (automated rules only)', '');
     for (const audit of audits) {

@@ -8,7 +8,8 @@ import { callsServices } from "../../plan/CallsServices.ts";
 import { unsafeFeaturesOf } from "../../plan/unsafe-features.ts";
 import type { TargetNotDeclared } from "../../policy/TargetNotDeclared.ts";
 import type { RunPorts } from "../RunContext.ts";
-import type { RunResult } from "../RunResult.ts";
+import { EgressRecordKind, type EgressRecord } from "../after-the-verdict/EgressRecord.ts";
+import { EGRESS_UNREAD, type RunResult } from "../RunResult.ts";
 import { withRunHashes } from "./WithRunHashes.ts";
 
 // What a result is for, whether or not a run was cleared for its target.
@@ -41,14 +42,14 @@ export type UnsealedResult = Omit<
 const planRunGuarantees = (
     context: SealContext,
     unsafeFeatures: readonly UnsafeFeature[],
-    isEgressUnread: boolean,
+    canClaimEgress: boolean,
 ): GuaranteeStatement => {
     const { plan, project } = context.subject;
     const hasUnrecordedReplies = callsServices(plan) && project.replay?.recordReplies !== true;
     const isIsolated = context.ports.isolation.guaranteeLevel() === "isolated";
     return guaranteeStatement({
         mode: "plan",
-        egressEnforced: isIsolated && !isEgressUnread,
+        egressEnforced: isIsolated && canClaimEgress,
         unmaskedScreenshotsKept: false,
         unsafeFeatures,
         ...(context.determinismUnpinned ? { determinismUnpinned: true } : {}),
@@ -56,17 +57,45 @@ const planRunGuarantees = (
     });
 };
 
-export function sealResult(
-    outcome: UnsealedResult,
+// Seals the result of a run that ended before its session closed, so read no egress record.
+export function sealResult(outcome: UnsealedResult, context: SealContext): RunResult {
+    return seal(outcome, context, true);
+}
+
+// What a result holds before it is sealed, less what the egress record decides.
+export type UnsealedRanResult = Omit<UnsealedResult, "blockedOrigins">;
+
+// Seals the result of a run whose session closed. The one place its egress record goes into the
+// result: the origins the egress refused, or, when it could not say, an empty list, a review item and
+// no claim that egress was enforced.
+export function sealRanResult(
+    outcome: UnsealedRanResult,
     context: SealContext,
-    isEgressUnread: boolean,
+    egress: EgressRecord,
 ): RunResult {
+    switch (egress.kind) {
+        case EgressRecordKind.Read:
+            return seal({ ...outcome, blockedOrigins: egress.blocked }, context, true);
+        case EgressRecordKind.Unread:
+            return seal(
+                {
+                    ...outcome,
+                    blockedOrigins: [],
+                    reviewItems: [...(outcome.reviewItems ?? []), { code: EGRESS_UNREAD }],
+                },
+                context,
+                false,
+            );
+    }
+}
+
+function seal(outcome: UnsealedResult, context: SealContext, canClaimEgress: boolean): RunResult {
     const standing = context.subject.standing;
     const unsafeFeatures = unsafeFeaturesOf(context.subject.plan);
     const labelled = {
         ...outcome,
         mode: "plan" as const,
-        guarantees: planRunGuarantees(context, unsafeFeatures, isEgressUnread),
+        guarantees: planRunGuarantees(context, unsafeFeatures, canClaimEgress),
         ...(unsafeFeatures.length === 0 ? {} : { unsafeFeatures }),
     };
     return withRunHashes(

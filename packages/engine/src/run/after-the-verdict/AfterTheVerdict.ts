@@ -6,14 +6,13 @@ import { runCleanup, type CleanupResult } from "../../service-calls/call-steps.t
 import type { SessionContext } from "../executors/StepExecutor.ts";
 import { EGRESS_UNREAD, type RunReviewItem } from "../RunResult.ts";
 import type { FinishedRun, StepsVerdict } from "../steps/VerdictOfSteps.ts";
+import { EgressRecordKind, type EgressRecord } from "./EgressRecord.ts";
 import { logFailureAfterTheVerdict, readKeepingTheResult } from "./ReadKeepingTheResult.ts";
 
 export type AfterTheVerdict = {
     readonly cleanup: readonly CleanupResult[] | undefined;
-    readonly reviewItems: readonly RunReviewItem[];
-    readonly blocked: readonly string[];
-    // The egress could not say what it refused, so the run cannot claim it was enforced.
-    readonly isEgressUnread: boolean;
+    readonly cleanupReviewItems: readonly RunReviewItem[];
+    readonly egress: EgressRecord;
     readonly endState: FinishedRun;
 };
 
@@ -34,20 +33,19 @@ export async function afterTheVerdict(
         plan.cleanup === undefined
             ? undefined
             : await runCleanup(plan.cleanup, plan.steps.length, context.calls, context.commands);
-    const cleanupItems = (cleanup ?? []).flatMap((done): RunReviewItem[] =>
+    const cleanupReviewItems = (cleanup ?? []).flatMap((done): RunReviewItem[] =>
         done.outcome === "failed" ? [{ code: "cleanup-failed", cleanupIndex: done.index }] : [],
     );
     const blockedRead = readBlockedOrigins(context.session);
     if (!blockedRead.ok) {
         logFailureAfterTheVerdict(EGRESS_UNREAD, blockedRead.error, context.logger);
     }
-    const blocked = blockedRead.ok ? blockedRead.value : [];
-    const reviewItems: readonly RunReviewItem[] = blockedRead.ok
-        ? cleanupItems
-        : [...cleanupItems, { code: EGRESS_UNREAD }];
+    const egress: EgressRecord = blockedRead.ok
+        ? { kind: EgressRecordKind.Read, blocked: blockedRead.value }
+        : { kind: EgressRecordKind.Unread };
     const endState = blockedRead.ok ? verdict.finished : finish(verdict.running, "Errored");
-    logTheEnd(context, blocked, endState);
-    return { cleanup, reviewItems, blocked, isEgressUnread: !blockedRead.ok, endState };
+    logTheEnd(context, blockedRead.ok ? blockedRead.value : [], endState);
+    return { cleanup, cleanupReviewItems, egress, endState };
 }
 
 // The result claims what the egress refused and is hashed with that claim in it. So this is the one

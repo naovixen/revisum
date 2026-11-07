@@ -26,7 +26,7 @@ import { refuseRun } from "./preflight/RefuseRun.ts";
 import type { RunContext, RunInputs, RunPorts } from "./RunContext.ts";
 import { runLogging } from "./RunLogging.ts";
 import type { RunResult } from "./RunResult.ts";
-import { sealResult, type NothingRanContext } from "./seal/SealResult.ts";
+import { sealRanResult, type NothingRanContext } from "./seal/SealResult.ts";
 import { unavailableResult } from "./seal/UnavailableResult.ts";
 import { createRunContext } from "./session/CreateRunContext.ts";
 import { manifestInputsOf, type ManifestInputs } from "./session/ManifestInputsOf.ts";
@@ -135,18 +135,19 @@ async function finishAfterTheSteps(
         ran.rewrites.length === 0
             ? verdict.finished.manifest
             : buildManifest({ ...manifestInputs, responseRewrites: ran.rewrites });
-    return sealResult(
+    return sealRanResult(
         {
             state: after.endState.state,
             targetId: context.cleared.target.id,
             manifest,
             manifestHash: manifestHash(manifest),
             steps: resultsOf(verdict.steps),
-            blockedOrigins: after.blocked,
             unavailable: null,
             ...(verdict.finished.state === "Denied" ? { denial: verdict.finished.denial } : {}),
             ...(after.cleanup === undefined ? {} : { cleanup: after.cleanup }),
-            ...(after.reviewItems.length === 0 ? {} : { reviewItems: after.reviewItems }),
+            ...(after.cleanupReviewItems.length === 0
+                ? {}
+                : { reviewItems: after.cleanupReviewItems }),
             ...(ran.stubAnswers.length === 0 ? {} : { stubAnswers: [...ran.stubAnswers] }),
             timings: {
                 totalMilliseconds: readKeepingTheResult(
@@ -158,7 +159,7 @@ async function finishAfterTheSteps(
             },
         },
         nothingRan,
-        after.isEgressUnread,
+        after.egress,
     );
 }
 

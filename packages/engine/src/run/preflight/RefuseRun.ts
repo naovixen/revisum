@@ -40,6 +40,5 @@ export function refuseRun(
     return sealResult(
         refusedResult(refused.refusal, planned.target.id, context.ports.clock.now() - startedAt),
         context,
-        false,
     );
 }
