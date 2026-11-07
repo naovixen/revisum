@@ -14,7 +14,7 @@ import {
   recordRead, success, suiteArguments, suiteEnvironment, suiteRedactor, unreadSuiteResult,
   type EgressEvent, type EgressPolicy, type EvidenceContext, type EvidenceLimits, type EvidenceRunManifest, type EvidenceSuiteDeclaration, type HostInfo, type Project, type Redactor,
   type RecordRead, type Result, type RunResult, type SecretStore, type SuiteDecodeError, type SuiteFile, type SuitePass, type SuiteReport, type SuiteTrace,
-  type WorkloadErrorCode, type WorkloadRequest, type WorkloadRunner, type WorkloadVariable,
+  type WorkloadErrorCode, type WorkloadOutcome, type WorkloadRequest, type WorkloadRunner, type WorkloadVariable,
 } from '@revisum/engine';
 import { buildEgressPolicy } from '@revisum/runner';
 
@@ -122,6 +122,10 @@ async function removeEarlierEvidence(workload: WorkloadRunner, image: string, ou
     return failure('workload-start-failed');
   }
 }
+
+// What the egress proxy refused while a workload ran, or that its record could not be read back whole.
+const egressOf = (outcome: WorkloadOutcome): RecordRead<readonly string[]> =>
+  outcome.egressRecordUnread === true ? RECORD_UNREAD : recordRead(blockedOriginsOf(outcome.egressEvents));
 
 // Each refusal once. Only the browser's own records carry a form the browser saw.
 function blockedOriginsOf(events: readonly EgressEvent[]): readonly string[] {
@@ -241,9 +245,6 @@ export async function runSuite(project: Project, suiteName: string, ports: Suite
   ): EvidenceContext & { readonly egress: Egress } => ({
     suite, pass: ports.pass, exitCode, redactor, timedOut, manifest, egress, ...(traceDecodeErrors === undefined ? {} : { traceDecodeErrors }),
   });
-  // A setup command that failed is judged by its exit code alone: the suite never ran, so its egress
-  // record is not read.
-  const noEgressRead = recordRead<readonly string[]>([]);
   const manifestFor = (report: SuiteReport | null, traces: readonly SuiteTrace[]) => evidenceManifest({
     suite, suiteFiles: files, host: host(),
     playwrightVersion: report?.playwrightVersion ?? traces.find((trace) => trace.playwrightVersion !== undefined)?.playwrightVersion,
@@ -259,7 +260,9 @@ export async function runSuite(project: Project, suiteName: string, ports: Suite
     const setup = await ports.workload.run(request(suite.setupCommand, environment.value.variables));
     if (!setup.ok) return refusedSuiteResult(suiteName, refusalFor(setup.error));
     if (setup.value.timedOut || setup.value.exitCode !== 0) {
-      return unreadSuiteResult(context(setup.value.exitCode, setup.value.timedOut, manifestFor(null, []), noEgressRead), EvidenceOutcomeCode.SetupFailed);
+      // The suite never ran, but its setup ran behind the egress proxy, so its result says what the
+      // proxy refused, or that the proxy's record could not be read.
+      return unreadSuiteResult(context(setup.value.exitCode, setup.value.timedOut, manifestFor(null, []), egressOf(setup.value)), EvidenceOutcomeCode.SetupFailed);
     }
     if (setup.value.egressRecordUnread === true) {
       return unreadSuiteResult(context(setup.value.exitCode, false, manifestFor(null, []), RECORD_UNREAD));
@@ -279,8 +282,8 @@ export async function runSuite(project: Project, suiteName: string, ports: Suite
   // The project parser refuses a declared variable of a name Revisum sets, such as the report's.
   const ran = await ports.workload.run(request(built.argv, variables));
   if (!ran.ok) return refusedSuiteResult(suiteName, refusalFor(ran.error));
-  const { exitCode, timedOut, egressEvents } = ran.value;
-  const egress = ran.value.egressRecordUnread === true ? RECORD_UNREAD : recordRead(blockedOriginsOf(egressEvents));
+  const { exitCode, timedOut } = ran.value;
+  const egress = egressOf(ran.value);
 
   const read = readReport(ports.outputDirectory, limits);
   if (!read.ok) {

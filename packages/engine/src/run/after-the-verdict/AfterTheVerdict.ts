@@ -145,7 +145,7 @@ function logTheEnd(
                 kind: "run.state",
                 state: end.state,
                 targetId: context.cleared.target.id,
-                ...(end.state === TerminalState.Denied
+                ...(end.kind === EndOfTheRunKind.WithDenial
                     ? { code: end.denial.rule, stepIndex: end.denial.stepIndex }
                     : {}),
             });
