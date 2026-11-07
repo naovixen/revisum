@@ -3708,9 +3708,6 @@
     }
   },
   "test/unit/engine/policy-service-calls.test.ts": {
-    "curly": {
-      "count": 1
-    },
     "revisum/file-name-matches-export": {
       "count": 1
     },
@@ -3730,9 +3727,6 @@
     "@typescript-eslint/naming-convention": {
       "count": 1
     },
-    "curly": {
-      "count": 1
-    },
     "revisum/file-name-matches-export": {
       "count": 1
     },
@@ -3741,9 +3735,6 @@
     }
   },
   "test/unit/engine/policy-unsafe-features.test.ts": {
-    "curly": {
-      "count": 1
-    },
     "revisum/file-name-matches-export": {
       "count": 1
     },
@@ -4287,9 +4278,6 @@
     }
   },
   "test/unit/engine/unsafe-feature-parsing.test.ts": {
-    "curly": {
-      "count": 1
-    },
     "revisum/file-name-matches-export": {
       "count": 1
     },
