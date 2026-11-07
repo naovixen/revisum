@@ -5,6 +5,7 @@
 //
 // A draft's provenance says where it came from. It is recorded on the audit event and shown, but
 // never trusted: it changes no gate, approval or metric.
+import type { Brand } from './brand.ts';
 import type { PageMapEntry } from './explore-mode.ts';
 import type { Origin, TargetId } from './target.ts';
 import type { CriterionId } from './CriterionId.ts';
@@ -91,16 +92,20 @@ export const PlannerEndpointKind = {
 } as const;
 export type PlannerEndpointKind = (typeof PlannerEndpointKind)[keyof typeof PlannerEndpointKind];
 
+// The full http or https address a planner's requests are posted to, as the project parser
+// checked it: a URL with no user name, password or fragment.
+export type PlannerUrl = Brand<string, 'PlannerUrl'>;
+
 // The planner the draft command calls, declared in the trusted project.json. `url` is the full
 // address the request is posted to. A customer-key endpoint is reached over https only, with the
 // customer's own key, named as a secret; a local endpoint is on the loopback interface, such as a
 // model served by Ollama, and may need no key.
 export type PlannerEndpoint =
   | {
-    readonly kind: typeof PlannerEndpointKind.CustomerKey; readonly url: string; readonly model: string; readonly wire: PlannerWire;
+    readonly kind: typeof PlannerEndpointKind.CustomerKey; readonly url: PlannerUrl; readonly model: string; readonly wire: PlannerWire;
     readonly apiKey: { readonly secretName: SecretName };
   }
   | {
-    readonly kind: typeof PlannerEndpointKind.Local; readonly url: string; readonly model: string; readonly wire: PlannerWire;
+    readonly kind: typeof PlannerEndpointKind.Local; readonly url: PlannerUrl; readonly model: string; readonly wire: PlannerWire;
     readonly apiKey?: { readonly secretName: SecretName };
   };

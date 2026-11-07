@@ -2,8 +2,11 @@
 // it borrows from its module type-checks but throws there. In-page functions are the top-level
 // functions of the in-page files this rule is given; each may use only its own parameters and
 // locals and the globals TypeScript's own libraries declare, those of the browser and of JavaScript.
-// Node's globals, such as process, are not there. Every other file may send only a function
-// declared in an in-page file, so no in-page function can live where this rule does not look.
+// Node's globals, such as process, are not there. Every function sent by `toString()` or as a
+// PageFunction argument must be a top-level function of an in-page file, so no function sent that
+// way can live where this rule does not look. An in-page file may not keep functions in top-level
+// objects or classes either: a method's source does not run on its own. Page code written as a
+// string, not as a function, is outside what this rule can see.
 import { relative, sep } from "node:path";
 import {
     AST_NODE_TYPES,
@@ -15,7 +18,7 @@ import {
 import ts from "typescript";
 
 type Options = [{ readonly inPageFiles: readonly string[] }];
-type MessageId = "borrowedName" | "sentFromElsewhere" | "writtenInPlace";
+type MessageId = "borrowedName" | "functionInObject" | "sentFromElsewhere" | "writtenInPlace";
 type FunctionNode =
     TSESTree.FunctionDeclaration | TSESTree.FunctionExpression | TSESTree.ArrowFunctionExpression;
 
@@ -98,39 +101,144 @@ function borrowedNames(
         );
 }
 
-// The function a name stands for, followed through imports, or undefined when it is not one.
-function declaredFunction(checker: ts.TypeChecker, node: ts.Node): ts.Declaration | undefined {
-    const symbol = checker.getSymbolAtLocation(node);
+// The functions a top-level object literal or class holds, at any depth.
+function functionsInObjects(program: TSESTree.Program): TSESTree.Node[] {
+    const found: TSESTree.Node[] = [];
+    const visit = (node: TSESTree.Node | null | undefined): void => {
+        if (node?.type === AST_NODE_TYPES.ObjectExpression) {
+            for (const property of node.properties) {
+                if (property.type === AST_NODE_TYPES.Property) {
+                    if (isFunctionNode(property.value)) {
+                        found.push(property);
+                    } else {
+                        visit(property.value);
+                    }
+                }
+            }
+        } else if (node?.type === AST_NODE_TYPES.ArrayExpression) {
+            node.elements.forEach(visit);
+        } else if (
+            node?.type === AST_NODE_TYPES.ClassDeclaration ||
+            node?.type === AST_NODE_TYPES.ClassExpression
+        ) {
+            found.push(
+                ...node.body.body.filter(
+                    (member) =>
+                        member.type === AST_NODE_TYPES.MethodDefinition ||
+                        (member.type === AST_NODE_TYPES.PropertyDefinition &&
+                            isFunctionNode(member.value)),
+                ),
+            );
+        }
+    };
+    for (const statement of program.body) {
+        const declaration =
+            statement.type === AST_NODE_TYPES.ExportNamedDeclaration
+                ? statement.declaration
+                : statement;
+        if (declaration?.type === AST_NODE_TYPES.VariableDeclaration) {
+            declaration.declarations.forEach((declarator) => {
+                visit(declarator.init);
+            });
+        } else {
+            visit(declaration);
+        }
+    }
+    return found;
+}
+
+// An expression without its parentheses and type assertions, which change nothing at run time.
+function unwrapped(node: ts.Expression): ts.Expression {
+    if (
+        ts.isParenthesizedExpression(node) ||
+        ts.isAsExpression(node) ||
+        ts.isSatisfiesExpression(node) ||
+        ts.isNonNullExpression(node) ||
+        ts.isTypeAssertionExpression(node)
+    ) {
+        return unwrapped(node.expression);
+    }
+    return node;
+}
+
+// The declarations a sent expression's value may come from, followed through imports and both
+// branches of a condition; undefined for any the type checker cannot name.
+function sentDeclarations(
+    checker: ts.TypeChecker,
+    sent: ts.Expression,
+): readonly (ts.Declaration | undefined)[] {
+    const expression = unwrapped(sent);
+    if (ts.isConditionalExpression(expression)) {
+        return [
+            ...sentDeclarations(checker, expression.whenTrue),
+            ...sentDeclarations(checker, expression.whenFalse),
+        ];
+    }
+    const named = ts.isPropertyAccessExpression(expression) ? expression.name : expression;
+    const symbol =
+        checker.getSymbolAtLocation(named) ?? checker.getTypeAtLocation(expression).getSymbol();
     if (symbol === undefined) {
-        return undefined;
+        return [undefined];
     }
     const target =
         (symbol.flags & ts.SymbolFlags.Alias) === 0 ? symbol : checker.getAliasedSymbol(symbol);
-    const declaration = target.declarations?.[0];
-    if (declaration === undefined) {
-        return undefined;
-    }
-    const isFunctionValue =
-        ts.isFunctionDeclaration(declaration) ||
-        (ts.isVariableDeclaration(declaration) &&
-            declaration.initializer !== undefined &&
-            (ts.isArrowFunction(declaration.initializer) ||
-                ts.isFunctionExpression(declaration.initializer)));
-    return isFunctionValue ? declaration : undefined;
+    return [target.declarations?.[0]];
 }
 
-// `name.toString()`, which is how a function's source is sent.
-const sentByToString = (call: TSESTree.CallExpression): TSESTree.Identifier | undefined => {
+const isFunctionExpression = (node: ts.Node | undefined): boolean =>
+    node !== undefined && (ts.isArrowFunction(node) || ts.isFunctionExpression(node));
+
+// A declaration that holds a function of its own, rather than one handed to it from elsewhere, as a
+// parameter or a field typed as a page function is.
+const holdsItsOwnFunction = (declaration: ts.Declaration): boolean =>
+    ts.isFunctionDeclaration(declaration) ||
+    ts.isMethodDeclaration(declaration) ||
+    isFunctionExpression(declaration) ||
+    ((ts.isVariableDeclaration(declaration) ||
+        ts.isPropertyAssignment(declaration) ||
+        ts.isPropertyDeclaration(declaration)) &&
+        isFunctionExpression(declaration.initializer));
+
+// A function declared at the top level of its module, by name or as a constant.
+const isTopLevelFunction = (declaration: ts.Declaration): boolean =>
+    (ts.isFunctionDeclaration(declaration) && ts.isSourceFile(declaration.parent)) ||
+    (ts.isVariableDeclaration(declaration) &&
+        isFunctionExpression(declaration.initializer) &&
+        ts.isVariableStatement(declaration.parent.parent) &&
+        ts.isSourceFile(declaration.parent.parent.parent));
+
+// `expression.toString()`, which is how a function's source is sent.
+const sentByToString = (call: TSESTree.CallExpression): TSESTree.Expression | undefined => {
     const { callee } = call;
-    const isToString =
-        callee.type === AST_NODE_TYPES.MemberExpression &&
+    return callee.type === AST_NODE_TYPES.MemberExpression &&
         callee.property.type === AST_NODE_TYPES.Identifier &&
         callee.property.name === "toString" &&
-        call.arguments.length === 0;
-    return isToString && callee.object.type === AST_NODE_TYPES.Identifier
+        call.arguments.length === 0
         ? callee.object
         : undefined;
 };
+
+const isFunctionValue = (
+    services: ParserServicesWithTypeInformation,
+    node: TSESTree.Node,
+): boolean =>
+    services.program
+        .getTypeChecker()
+        .getTypeAtLocation(services.esTreeNodeToTSNodeMap.get(node))
+        .getCallSignatures().length > 0;
+
+// An argument the called function takes as a PageFunction, which it runs in the page.
+function isTypedAsPageFunction(
+    services: ParserServicesWithTypeInformation,
+    argument: TSESTree.Node,
+): boolean {
+    const expression = services.esTreeNodeToTSNodeMap.get(argument);
+    return (
+        ts.isExpression(expression) &&
+        services.program.getTypeChecker().getContextualType(expression)?.aliasSymbol?.name ===
+            PAGE_FUNCTION_TYPE
+    );
+}
 
 export const inPageFunctionsAreSelfContained = ESLintUtils.RuleCreator.withoutDocs<
     Options,
@@ -149,6 +257,8 @@ export const inPageFunctionsAreSelfContained = ESLintUtils.RuleCreator.withoutDo
         messages: {
             borrowedName:
                 "'{{name}}' does not exist in the page this in-page function runs in: use only its own parameters and locals and the browser's and JavaScript's globals, and pass anything else in as an argument.",
+            functionInObject:
+                "An in-page file keeps each function at its top level, where the in-page rule checks it: a method's source does not run on its own when sent to the page.",
             sentFromElsewhere: `'{{name}}' is sent to run in the page, so declare it at the top level of an in-page file, where the in-page rule checks it (${WHERE_THE_FILES_ARE}).`,
             writtenInPlace: `This function is sent to run in the page: declare it at the top level of an in-page file, where the in-page rule checks it (${WHERE_THE_FILES_ARE}).`,
         },
@@ -177,40 +287,54 @@ export const inPageFunctionsAreSelfContained = ESLintUtils.RuleCreator.withoutDo
             }
         };
 
-        const checkSentFunction = (node: TSESTree.Identifier): void => {
-            const declaration = declaredFunction(checker, services.esTreeNodeToTSNodeMap.get(node));
-            if (declaration !== undefined && !isInPageFile(declaration.getSourceFile().fileName)) {
-                context.report({ node, messageId: "sentFromElsewhere", data: { name: node.name } });
+        // A sent value must come from a top-level function of an in-page file. One handed in from
+        // elsewhere, as a parameter or a typed field, was checked where it was first sent.
+        const checkSentFunction = (node: TSESTree.Expression): void => {
+            const sent = services.esTreeNodeToTSNodeMap.get(node);
+            const declarations = ts.isExpression(sent)
+                ? sentDeclarations(checker, sent)
+                : [undefined];
+            const isSentFromInPageFile = declarations.every(
+                (declaration) =>
+                    declaration !== undefined &&
+                    (!holdsItsOwnFunction(declaration) ||
+                        (isTopLevelFunction(declaration) &&
+                            isInPageFile(declaration.getSourceFile().fileName))),
+            );
+            if (!isSentFromInPageFile) {
+                context.report({
+                    node,
+                    messageId: "sentFromElsewhere",
+                    data: { name: context.sourceCode.getText(node) },
+                });
             }
         };
 
-        const isPageFunctionArgument = (argument: TSESTree.Node): boolean => {
-            const expression = services.esTreeNodeToTSNodeMap.get(argument);
-            return (
-                ts.isExpression(expression) &&
-                checker.getContextualType(expression)?.aliasSymbol?.name === PAGE_FUNCTION_TYPE
-            );
-        };
+        const isPageFunctionArgument = (argument: TSESTree.Node): boolean =>
+            isTypedAsPageFunction(services, argument);
 
         return {
             Program(program) {
                 if (isInPageFile(context.filename)) {
                     topLevelFunctions(program).forEach(checkInPageFunction);
+                    for (const node of functionsInObjects(program)) {
+                        context.report({ node, messageId: "functionInObject" });
+                    }
                 }
             },
             CallExpression(call) {
                 const sent = sentByToString(call);
-                if (sent !== undefined) {
+                if (sent !== undefined && isFunctionValue(services, sent)) {
                     checkSentFunction(sent);
                 }
                 for (const argument of call.arguments) {
-                    if (
-                        argument.type === AST_NODE_TYPES.Identifier &&
-                        isPageFunctionArgument(argument)
-                    ) {
-                        checkSentFunction(argument);
-                    } else if (isFunctionNode(argument) && isPageFunctionArgument(argument)) {
+                    if (argument.type === AST_NODE_TYPES.SpreadElement) {
+                        continue;
+                    }
+                    if (isFunctionNode(argument) && isPageFunctionArgument(argument)) {
                         context.report({ node: argument, messageId: "writtenInPlace" });
+                    } else if (isPageFunctionArgument(argument)) {
+                        checkSentFunction(argument);
                     }
                 }
             },

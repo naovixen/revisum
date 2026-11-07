@@ -2,7 +2,7 @@
 // masking and auditing live here once, so every protocol behaves the same way.
 import { isDeepStrictEqual } from 'node:util';
 import {
-  DEFAULT_TEST_ID_ATTRIBUTE, failure, FillValueKind, isSeveralElements, NavigateScripts, reveal, success,
+  DEFAULT_TEST_ID_ATTRIBUTE, failure, FillValueKind, isSeveralElements, NavigateScripts, PageReadFailureCode, reveal, success,
   type ActionGuard, type BrowserRequestRecord, type DocumentSession, type DomRead, type DomValue, type DownloadedFile,
   type DriverError, type ElementProbe, type OneElementRead, type PageScriptCall, type PageMetaTag, type PageProbe, type PageReadFailure, type PerformableAction,
   type PerformableFill, type Position, type ResolvedDialogStep, type ResolvedDownloadStep,
@@ -967,7 +967,14 @@ function documentPorts<Handle>(
         return failure(failureOfRead(error));
       }
     },
-    audit: () => readOfPage(async () => toFindings(parseAudit(await answeredWithin(timeout, operations.callForString(pageAudit, []))))),
+    audit: async () => {
+      const report = await readOfPage(() => answeredWithin(timeout, operations.callForString(pageAudit, [])));
+      if (!report.ok) {
+        return report;
+      }
+      const rules = parseAudit(report.value);
+      return rules.ok ? success(toFindings(rules.value)) : failure({ code: PageReadFailureCode.PageUnreadable, detail: rules.error });
+    },
     accessibilitySnapshot: () => readOfPage(() => operations.accessibilityTree()),
     linkTargets: () => readOfPage(async () => decodeLinkTargets(await operations.callForString(linkTargetList, []))),
     async frame(locator) {

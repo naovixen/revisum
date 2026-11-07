@@ -208,9 +208,7 @@ async function prepare(options: DraftArguments, ports: DraftCommandPorts): Promi
   if (project.planner === undefined) return stop('usage', `${PROJECT_FILE}#planner`);
   const endpoint = project.planner;
   if (endpoint.kind === 'local' && !isLoopbackEndpoint(endpoint)) return stop('planner-endpoint-not-loopback', `${PROJECT_FILE}#planner.url`);
-  // The project parser has checked the url, so it always has an origin.
   const origin = plannerOrigin(endpoint);
-  if (origin === undefined) return stop('config-invalid', `${PROJECT_FILE}#planner.url`);
 
   // The spec's path is checked before the draft's, as the command line names them.
   if (options.from !== undefined && insideFolder(ports.workingDirectory, options.from) === undefined) return stop('usage', '--from');

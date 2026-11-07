@@ -6,7 +6,7 @@
 import {
   COLOR_SCHEMES, DEFAULT_TEST_ID_ATTRIBUTE, DEVICE_PROFILES, ENGINES, FIDELITIES, MOTION_PREFERENCES, PLANNER_WIRES, isPlainObject, success, failure,
   type Brand, type CallDeclaration, type CallName, type DeclaredService, type DeviceProfileId, type FixtureName, type IrreversiblePatterns, type Locale, type Origin, type Result,
-  type EmailDomain, type EvidenceMode, type PlannerEndpoint, type SafeText, type SecretName, type Target, type TestIdAttribute, type TimeZone,
+  type EmailDomain, type EvidenceMode, type PlannerEndpoint, type PlannerUrl, type SafeText, type SecretName, type Target, type TestIdAttribute, type TimeZone,
   type ObservedRequestDeclaration, type RequestName, type StorageEntryDeclaration, type StorageEntryName, type StubDeclaration, type StubName,
   type UnsafeFeaturesDeclaration, type VendorExtensionKey, type PlanError,
 } from '@revisum/contracts';
@@ -489,14 +489,14 @@ function readPlannerEndpoint(input: unknown, issues: Issues, secretNames: readon
 
 // The address a request is posted to, kept as written: http or https, with no user name, password
 // or fragment. `secureOnly` refuses http, for an endpoint that sends a key.
-function readPlannerUrl(input: unknown, path: string, issues: Issues, secureOnly: boolean): Parsed<string> {
+function readPlannerUrl(input: unknown, path: string, issues: Issues, secureOnly: boolean): Parsed<PlannerUrl> {
   const text = readText(input, path, issues, MAXIMUM_URL_LENGTH);
   if (text === INVALID) return INVALID;
   let url: URL;
   try { url = new URL(text); } catch { issues.push({ code: 'invalid_url', path }); return INVALID; }
   if (url.protocol !== 'https:' && (secureOnly || url.protocol !== 'http:')) { issues.push({ code: 'scheme_not_allowed', path }); return INVALID; }
   if (url.username !== '' || url.password !== '' || url.hash !== '') { issues.push({ code: 'invalid_url', path }); return INVALID; }
-  return text;
+  return brand<string, 'PlannerUrl'>(text);
 }
 
 function readPlannerKey(input: unknown, path: string, issues: Issues, secretNames: readonly SecretName[]): Parsed<{ readonly secretName: SecretName }> {

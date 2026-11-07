@@ -62,6 +62,7 @@ export const BRAND_OWNERS: Readonly<Record<string, readonly string[]>> = {
   AdapterId: [PROJECT_PARSER],
   Locale: [PROJECT_PARSER],
   TimeZone: [PROJECT_PARSER],
+  PlannerUrl: [PROJECT_PARSER],
   Origin: ['packages/engine/src/project/ReadOrigin.ts'],
   // A run's base URL is read where it enters, or taken from an origin the project parser read.
   BaseUrl: ['packages/engine/src/ParseBaseUrl.ts'],

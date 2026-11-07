@@ -161,51 +161,87 @@ function stronglyConnectedGroups(
     return groups;
 }
 
-// A shortest chain of imports from the group's first file back to itself, within the group.
-function shortestCycle(
+// A shortest chain of imports from one file of the group to another, within the group, or undefined
+// when there is none. From a file to itself it is a shortest cycle through it.
+function shortestChain(
     graph: ImportGraph,
-    group: readonly string[],
+    members: ReadonlySet<string>,
+    from: string,
+    to: string,
     follows: (edge: ImportEdge) => boolean,
-): string[] {
-    const members = new Set(group);
-    const start = group[0] ?? "";
+): string[] | undefined {
     const cameFrom = new Map<string, string>();
-    const queue = [start];
+    const queue = [from];
     for (let head = 0; head < queue.length; head++) {
         const file = queue[head] ?? "";
         for (const edge of (graph.get(file) ?? []).filter(follows)) {
-            if (edge.target === start) {
+            if (edge.target === to) {
                 const chain = [file];
                 for (let step = cameFrom.get(file); step !== undefined; step = cameFrom.get(step)) {
                     chain.unshift(step);
                 }
-                return [...chain, start];
+                return [...chain, to];
             }
-            if (members.has(edge.target) && !cameFrom.has(edge.target) && edge.target !== start) {
+            if (members.has(edge.target) && !cameFrom.has(edge.target) && edge.target !== from) {
                 cameFrom.set(edge.target, file);
                 queue.push(edge.target);
             }
         }
     }
-    return [start, start];
+    return undefined;
 }
+
+// A shortest cycle through the group's first file, along the edges given.
+function shortestCycle(
+    graph: ImportGraph,
+    group: readonly string[],
+    follows: (edge: ImportEdge) => boolean,
+): string[] {
+    const start = group[0] ?? "";
+    return shortestChain(graph, new Set(group), start, start, follows) ?? [start, start];
+}
+
+// A shortest cycle in the group that takes at least one type-only import: that import, then the
+// shortest chain from the file it names back to the file that holds it.
+function shortestCycleThroughTypeOnly(graph: ImportGraph, group: readonly string[]): string[] {
+    const members = new Set(group);
+    let shortest: string[] | undefined;
+    for (const file of group) {
+        for (const edge of graph.get(file) ?? []) {
+            if (!edge.isTypeOnly || !members.has(edge.target)) {
+                continue;
+            }
+            const back =
+                edge.target === file
+                    ? [file]
+                    : shortestChain(graph, members, edge.target, file, () => true);
+            const cycle = back === undefined ? undefined : [file, ...back];
+            if (cycle !== undefined && (shortest === undefined || cycle.length < shortest.length)) {
+                shortest = cycle;
+            }
+        }
+    }
+    return shortest ?? shortestCycle(graph, group, () => true);
+}
+
+const groupKey = (group: readonly string[]): string => group.join("\n");
 
 export function findImportCycles(graph: ImportGraph): string[] {
     const isValueImport = (edge: ImportEdge): boolean => !edge.isTypeOnly;
     const isAnyImport = (): boolean => true;
     const problems: string[] = [];
-    const inValueCycle = new Set<string>();
+    const valueGroups = new Set<string>();
     for (const group of stronglyConnectedGroups(graph, isValueImport)) {
-        group.forEach((file) => inValueCycle.add(file));
+        valueGroups.add(groupKey(group));
         problems.push(
             `import cycle: ${shortestCycle(graph, group, isValueImport).join(" -> ")}${describeGroup(group)}`,
         );
     }
+    // A group that is exactly one value cycle is reported above; any other holds a type-only import.
     for (const group of stronglyConnectedGroups(graph, isAnyImport)) {
-        const isOnlyValueCycle = group.every((file) => inValueCycle.has(file));
-        if (!isOnlyValueCycle) {
+        if (!valueGroups.has(groupKey(group))) {
             problems.push(
-                `import cycle through type-only imports: ${shortestCycle(graph, group, isAnyImport).join(" -> ")}${describeGroup(group)}; move the shared types to a module both sides can import`,
+                `import cycle through type-only imports: ${shortestCycleThroughTypeOnly(graph, group).join(" -> ")}${describeGroup(group)}; move the shared types to a module both sides can import`,
             );
         }
     }

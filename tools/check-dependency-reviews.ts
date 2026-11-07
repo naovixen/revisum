@@ -21,6 +21,27 @@ const TEST_CALL_MODIFIERS = new Set(['only', 'skip', 'todo']);
 
 type LockEntry = { readonly version?: unknown; readonly dev?: unknown; readonly dependencies?: unknown; readonly optionalDependencies?: unknown; readonly peerDependencies?: unknown };
 
+const fieldsOf = (value: unknown): Readonly<Record<string, unknown>> | undefined =>
+  typeof value === 'object' && value !== null && !Array.isArray(value) ? Object.fromEntries(Object.entries(value)) : undefined;
+
+// The lock file's installed packages by path; a field of any other shape counts as none.
+function lockPackages(lock: unknown): Readonly<Record<string, LockEntry>> {
+  const packages: Record<string, LockEntry> = {};
+  for (const [path, value] of Object.entries(fieldsOf(fieldsOf(lock)?.['packages']) ?? {})) {
+    const fields = fieldsOf(value);
+    if (fields !== undefined) {
+      packages[path] = {
+        version: fields['version'],
+        dev: fields['dev'],
+        dependencies: fields['dependencies'],
+        optionalDependencies: fields['optionalDependencies'],
+        peerDependencies: fields['peerDependencies'],
+      };
+    }
+  }
+  return packages;
+}
+
 const namesOf = (value: unknown): string[] =>
   typeof value === 'object' && value !== null && !Array.isArray(value) ? Object.keys(value) : [];
 
@@ -41,8 +62,7 @@ function installedEntry(packages: Readonly<Record<string, LockEntry>>, from: str
 // Each third-party package on the trust path and the version the lock file installs.
 export function trustPath(root: string): Map<string, string> {
   const lock: unknown = JSON.parse(readFileSync(join(root, 'package-lock.json'), 'utf8'));
-  const packagesField = typeof lock === 'object' && lock !== null ? Object.getOwnPropertyDescriptor(lock, 'packages')?.value : undefined;
-  const packages: Readonly<Record<string, LockEntry>> = typeof packagesField === 'object' && packagesField !== null ? packagesField : {};
+  const packages = lockPackages(lock);
   const workspaces = Object.keys(packages).filter((path) => path.startsWith('packages/'));
   const found = new Map<string, string>();
   const queue: { readonly from: string; readonly name: string }[] = [];

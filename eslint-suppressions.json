@@ -176,7 +176,7 @@
       "count": 3
     },
     "curly": {
-      "count": 50
+      "count": 49
     },
     "revisum/file-name-matches-export": {
       "count": 1
@@ -4733,15 +4733,6 @@
     }
   },
   "test/unit/tools/eslint-rule-harness.ts": {
-    "@typescript-eslint/no-unsafe-assignment": {
-      "count": 5
-    },
-    "@typescript-eslint/no-unsafe-call": {
-      "count": 2
-    },
-    "@typescript-eslint/no-unsafe-member-access": {
-      "count": 1
-    },
     "revisum/file-name-matches-export": {
       "count": 1
     }
@@ -4810,9 +4801,6 @@
     }
   },
   "tools/check-dependency-reviews.ts": {
-    "@typescript-eslint/no-unsafe-assignment": {
-      "count": 2
-    },
     "curly": {
       "count": 11
     },

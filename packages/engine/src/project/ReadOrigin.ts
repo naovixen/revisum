@@ -28,11 +28,6 @@ export function readOrigin(input: unknown, path: string, issues: Issues): Parsed
 }
 
 // The origin a planner endpoint's requests go to, which the egress proxy allows and nothing else.
-// Undefined for an address that is not a URL, which the project parser never lets through.
-export function plannerOrigin(endpoint: PlannerEndpoint): Origin | undefined {
-    try {
-        return brand<string, "Origin">(new URL(endpoint.url).origin);
-    } catch {
-        return undefined;
-    }
-}
+// The project parser has checked the address is an http or https URL, so it always has one.
+export const plannerOrigin = (endpoint: PlannerEndpoint): Origin =>
+    brand<string, "Origin">(new URL(endpoint.url).origin);
