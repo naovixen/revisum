@@ -121,6 +121,15 @@ const projectOrigins = (): readonly unknown[] => {
 const ORIGINS_OF_THE_WRONG_FORM = "as origins written as a number are";
 const originsOfTheWrongFormIssues = (): readonly CodeAndPath[] =>
     projectIssues(withValue(testProjectInput(), ["origins"], 5));
+// The stub, the observed request and the two storage entries of the test project each name an
+// origin, which no origin read from the project allows.
+const ISSUES_OF_ORIGINS_WRITTEN_AS_A_NUMBER: readonly CodeAndPath[] = [
+    { code: "wrong_type", path: "$.origins" },
+    { code: "origin_not_allowed", path: "$.stubs.loginNeedsCode.request.origin" },
+    { code: "origin_not_allowed", path: "$.observedRequests.likes.request.origin" },
+    { code: "origin_not_allowed", path: "$.storageEntries.pinnedMenu.origin" },
+    { code: "origin_not_allowed", path: "$.storageEntries.privateKey.origin" },
+];
 
 type UnreadableCase = {
     readonly name: string;
@@ -373,11 +382,11 @@ for (const { parserName, inputName, parse, plain, cases } of PARSERS) {
 describe("Using the project parser", () => {
     describe("given origins written as a number", () => {
         describe("when the project is parsed", () => {
-            test("then it should refuse the origins as wrong_type first", () => {
-                assert.deepEqual(originsOfTheWrongFormIssues()[0], {
-                    code: "wrong_type",
-                    path: "$.origins",
-                });
+            test("then it should refuse the origins as wrong_type, and every origin checked against them", () => {
+                assert.deepEqual(
+                    originsOfTheWrongFormIssues().map((issue) => ({ ...issue })),
+                    ISSUES_OF_ORIGINS_WRITTEN_AS_A_NUMBER,
+                );
             });
         });
     });
