@@ -1,7 +1,14 @@
 // What request decisions the browser refused after the verdict do to it.
 import { StepCode, stepFailed } from "@revisum/contracts";
 import { finish } from "../../lifecycle.ts";
+import type { StepResult } from "../StepResult.ts";
 import type { StepsVerdict } from "../steps/VerdictOfSteps.ts";
+
+// The verdict once the late refusals are counted, and the step they spoilt, whose end the log must
+// then tell again, as the result now does.
+export type VerdictAfterRefusals =
+    | { readonly isSpoilt: false; readonly verdict: StepsVerdict }
+    | { readonly isSpoilt: true; readonly verdict: StepsVerdict; readonly spoiltStep: StepResult };
 
 // Read once the session has closed, when no decision is left waiting for the browser's answer. With
 // no later step to report one the browser refused after the last step ended, the last step stands
@@ -10,13 +17,16 @@ import type { StepsVerdict } from "../steps/VerdictOfSteps.ts";
 export function withRefusalsAfterTheVerdict(
     verdict: StepsVerdict,
     refusals: readonly string[],
-): StepsVerdict {
+): VerdictAfterRefusals {
     if (refusals.length === 0 || verdict.finished.state !== "Passed") {
-        return verdict;
+        return { isSpoilt: false, verdict };
     }
-    const lastIndex = verdict.steps.length - 1;
-    const steps = verdict.steps.map((done, index) =>
-        index === lastIndex ? { ...done, ...stepFailed(StepCode.AdapterError) } : done,
-    );
-    return { running: verdict.running, steps, finished: finish(verdict.running, "Errored") };
+    const finished = finish(verdict.running, "Errored");
+    const lastStep = verdict.steps.at(-1);
+    if (lastStep === undefined) {
+        return { isSpoilt: false, verdict: { ...verdict, finished } };
+    }
+    const spoiltStep: StepResult = { ...lastStep, ...stepFailed(StepCode.AdapterError) };
+    const steps = [...verdict.steps.slice(0, -1), spoiltStep];
+    return { isSpoilt: true, verdict: { running: verdict.running, steps, finished }, spoiltStep };
 }

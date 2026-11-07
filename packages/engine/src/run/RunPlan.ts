@@ -19,6 +19,7 @@ import {
     readKeepingTheResult,
 } from "./after-the-verdict/ReadKeepingTheResult.ts";
 import { withRefusalsAfterTheVerdict } from "./after-the-verdict/WithRefusalsAfterTheVerdict.ts";
+import type { StepsRun, StepsVerdict } from "./steps/VerdictOfSteps.ts";
 import type { SessionContext } from "./executors/StepExecutor.ts";
 import { checkPreflight, type PreflightPassed } from "./preflight/CheckPreflight.ts";
 import { refuseRun } from "./preflight/RefuseRun.ts";
@@ -118,7 +119,7 @@ async function runInTheSession(run: OpenedRun): Promise<RunResult> {
         manifestHash(manifestBeforeTheSteps),
     );
     const ran = await runTheSteps(stepContext, resolved, driver.info.id, run.isPlanLogged);
-    const verdict = withRefusalsAfterTheVerdict(ran, refusalsAfterTheVerdict(session, logger));
+    const verdict = verdictAfterRefusals(ran, session, logger);
     const after = await afterTheVerdict(stepContext, verdict);
     const manifest =
         ran.rewrites.length === 0
@@ -161,4 +162,26 @@ function refusalsAfterTheVerdict(session: Session, logger: Logger): readonly str
         logFailureAfterTheVerdict(StepCode.AdapterError, refusal, logger);
     }
     return refusals;
+}
+
+// The verdict with the refusals read after it counted. A step they spoilt ends again in the log, as it
+// now does in the result, so the log alone never shows a pass where the result says the run could
+// not test.
+function verdictAfterRefusals(ran: StepsRun, session: Session, logger: Logger): StepsVerdict {
+    const counted = withRefusalsAfterTheVerdict(ran, refusalsAfterTheVerdict(session, logger));
+    if (counted.isSpoilt) {
+        const { spoiltStep } = counted;
+        logKeepingTheResult(
+            {
+                kind: "step.end",
+                stepIndex: spoiltStep.index,
+                stepType: spoiltStep.type,
+                outcome: spoiltStep.outcome,
+                durationMilliseconds: ran.stepMilliseconds.at(-1) ?? 0,
+                ...(spoiltStep.code === undefined ? {} : { code: spoiltStep.code }),
+            },
+            logger,
+        );
+    }
+    return counted.verdict;
 }
