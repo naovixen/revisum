@@ -2,6 +2,7 @@
 // value or records a PlanError and returns INVALID. Errors carry a code and a JSON path, never
 // the offending value, so hostile or private text is never echoed back.
 import { PlanErrorCode, isPlainObject, type PlanError, type SafeText } from '@revisum/contracts';
+import { readOneLevel } from './ReadableCopy.ts';
 import { brand } from '../brand.ts';
 import { sha256 } from '../hashing.ts';
 import { looksLikeCredential } from './literal-secrets.ts';
@@ -75,25 +76,32 @@ export function readRecord(
   input: unknown, path: string, issues: Issues,
   allowed: readonly string[], required: readonly string[] = allowed,
 ): Parsed<Readonly<Record<string, unknown>>> {
-  if (!isPlainObject(input)) {
-    issues.push({ code: 'not_object', path });
+  const fields = peekRecord(input, path, issues);
+  if (fields === INVALID) {
     return INVALID;
   }
   const before = issues.length;
-  for (const key of Object.keys(input)) {
+  for (const key of Object.keys(fields)) {
     if (allowed.includes(key)) continue;
     // Errors are kept and shown, so a key shaped like a credential is reported by where it sits.
     issues.push(looksLikeCredential(key) ? { code: 'literal_secret', path } : { code: 'unknown_field', path: `${path}.${key}` });
   }
   for (const key of required) {
-    if (!Object.hasOwn(input, key)) issues.push({ code: 'missing_field', path: `${path}.${key}` });
+    if (!Object.hasOwn(fields, key)) issues.push({ code: 'missing_field', path: `${path}.${key}` });
   }
-  return issues.length === before ? input : INVALID;
+  return issues.length === before ? fields : INVALID;
 }
 
-// A plain object with any keys, to read a discriminant before the strict check.
+// A plain object with any keys, to read a discriminant before the strict check. What it returns is
+// a copy of the record's own data, read once, so reading its fields can't throw; a record that
+// can't be read so is not_object.
 export function peekRecord(input: unknown, path: string, issues: Issues): Parsed<Readonly<Record<string, unknown>>> {
-  return readRecord(input, path, issues, typeof input === 'object' && input !== null ? Object.keys(input) : [], []);
+  const fields = readOneLevel(input);
+  if (!isPlainObject(fields)) {
+    issues.push({ code: 'not_object', path });
+    return INVALID;
+  }
+  return fields;
 }
 
 export function readText(
@@ -131,8 +139,10 @@ export function readOneOf<Value extends string>(
 export function readList(
   input: unknown, path: string, issues: Issues, maximumLength: number, minimumLength = 1,
 ): Parsed<readonly unknown[]> {
-  if (!Array.isArray(input)) { issues.push({ code: 'wrong_type', path }); return INVALID; }
-  const list: readonly unknown[] = input;
+  // A copy of the list, read once, so walking it can't throw; a list that can't be read so is wrong_type.
+  const read = readOneLevel(input);
+  if (!Array.isArray(read)) { issues.push({ code: 'wrong_type', path }); return INVALID; }
+  const list: readonly unknown[] = read;
   if (list.length < minimumLength) { issues.push({ code: 'empty', path }); return INVALID; }
   if (list.length > maximumLength) { issues.push({ code: 'too_large', path }); return INVALID; }
   if (hasHoles(list)) { issues.push({ code: 'wrong_type', path }); return INVALID; }

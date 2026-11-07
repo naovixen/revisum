@@ -19,6 +19,7 @@ import { readObservedRequestDeclarations, readStorageEntryDeclarations, readStub
 import { readEvidenceMode } from './evidence-declarations.ts';
 import { readUnsafeFeatures } from './unsafe-feature-declarations.ts';
 import { LARGEST_DOWNLOAD_BYTES, LOWERCASE_ID, MAXIMUM_TEST_ID_LENGTH, MAXIMUM_URL_LENGTH } from '../plan/plan-grammar.ts';
+import { readableCopy } from '../plan/ReadableCopy.ts';
 
 const DEVICE_IDS = Object.keys(DEVICE_PROFILES) as DeviceProfileId[];
 
@@ -530,7 +531,7 @@ export function plannerOrigin(endpoint: PlannerEndpoint): Origin | undefined {
 export function parseProject(input: unknown): Result<Project, readonly PlanError[]> {
   const issues: Issues = [];
   const fields = readRecord(
-    input, '$', issues,
+    readableCopy(input), '$', issues,
     [
       'origins', 'productionOrigins', 'matrix', 'limits', 'secretNames', 'fixtures', 'policy', 'testIdAttributes', 'generatedEmailDomains',
       'evidence', 'services', 'calls', 'stubs', 'observedRequests', 'storageEntries', 'evidenceMode', 'unsafeFeatures', 'planner',

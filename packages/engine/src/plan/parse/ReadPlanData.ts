@@ -29,6 +29,7 @@ import {
     type PLAN_FIELDS,
 } from "../plan-grammar.ts";
 import { readGeneratedValues, readPlanClock, type ValueContext } from "../plan-values.ts";
+import { readableCopy } from "../ReadableCopy.ts";
 import { optionalField, readFields } from "../ReadFields.ts";
 import { isAssertionStepType } from "../StepFacts.ts";
 import { stepsWithin } from "../VisitSteps.ts";
@@ -162,32 +163,36 @@ function readEnvelope(input: unknown, context: ParseContext) {
     } satisfies ListedFields<(typeof PLAN_FIELDS)[number], (typeof OPTIONAL_PLAN_FIELDS)[number]>);
 }
 
-// Whatever its type says, JSON.stringify gives undefined for undefined, a function or a symbol.
-const jsonTextOf = (input: unknown): string | undefined => JSON.stringify(input);
+// Whatever its type says, JSON.stringify gives undefined for undefined or a symbol.
+const jsonTextOf = (readable: unknown): string | undefined => JSON.stringify(readable);
 
-const sizeInBytes = (input: unknown): number => {
+// The size of a readable copy written as JSON. Writing it out can fail only for a cycle or nesting
+// too deep to write, and either is too large.
+const sizeInBytes = (readable: unknown): number => {
     try {
-        return new TextEncoder().encode(jsonTextOf(input) ?? "").length;
+        return new TextEncoder().encode(jsonTextOf(readable) ?? "").length;
     } catch {
         return Number.POSITIVE_INFINITY;
     }
 };
 
-// Reads a plan under `rules`. Size and frame depth are checked first, so an oversized plan gets
-// one error, too_large, and nothing inside it is walked.
+// Reads a plan under `rules`, from a readable copy of `input`. Size and frame depth are checked
+// first, on that copy, so an oversized plan gets one error, too_large, and nothing inside it is
+// read further.
 export function readPlanData(
     input: unknown,
     rules: PlanRules,
 ): Result<PlanData, readonly PlanError[]> {
-    if (sizeInBytes(input) > rules.limits.maximumPlanBytes) {
+    const readable = readableCopy(input);
+    if (sizeInBytes(readable) > rules.limits.maximumPlanBytes) {
         return failure([{ code: PlanErrorCode.TooLarge, path: "$" }]);
     }
-    const tooDeep = tooDeepFrame(input, rules.limits.maximumFrameDepth);
+    const tooDeep = tooDeepFrame(readable, rules.limits.maximumFrameDepth);
     if (tooDeep !== undefined) {
         return failure([{ code: PlanErrorCode.TooLarge, path: tooDeep }]);
     }
     const context = newParseContext(rules);
-    const plan = readEnvelope(input, context);
+    const plan = readEnvelope(readable, context);
     if (plan === INVALID) {
         return failure(context.issues);
     }

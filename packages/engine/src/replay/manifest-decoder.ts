@@ -11,6 +11,7 @@ import { ReplayErrorCode } from '../manifest.ts';
 import { INVALID, allValid, readInteger, readList, readOneOf, readRecord, type Issues, type Parsed } from '../plan/plan-decoders.ts';
 import { readImageDigest, readSuiteName } from '../project/evidence-declarations.ts';
 import { MAXIMUM_DAY_OFFSET } from '../plan/plan-grammar.ts';
+import { readableCopy } from '../plan/ReadableCopy.ts';
 import { LIMIT_CEILINGS, readSecretName, readTarget } from '../project/project-parser.ts';
 import { schemaId } from '../version.ts';
 
@@ -199,7 +200,8 @@ function optional<Value>(
   return Object.hasOwn(fields, key) ? read(fields[key], `$.${key}`, issues) : undefined;
 }
 
-export function decodeManifest(input: unknown): Result<RunManifest, DecodeError> {
+export function decodeManifest(written: unknown): Result<RunManifest, DecodeError> {
+  const input = readableCopy(written);
   if (!isPlainObject(input)) return failure({ code: ReplayErrorCode.VersionUnsupported, path: '$' });
   // The schema first: a manifest of another version is refused whole, before any field is read.
   if (input['schema'] !== MANIFEST_SCHEMA) return failure({ code: ReplayErrorCode.VersionUnsupported, path: '$.schema' });
