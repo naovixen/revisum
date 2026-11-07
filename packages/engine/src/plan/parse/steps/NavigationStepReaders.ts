@@ -1,20 +1,19 @@
 import { SCRIPT_MODES, StepType } from "@revisum/contracts";
-import { readOneOf } from "../../plan-decoders.ts";
-import { optionalField, readFields } from "../../ReadFields.ts";
+import { allValid, INVALID, readOneOf } from "../../plan-decoders.ts";
 import type { StepSection, StepTypeIn } from "../../StepFacts.ts";
-import { knownField } from "../KnownField.ts";
 import { readNavigation } from "../text/ReadNavigation.ts";
-import type { StepReaderTable } from "./StepReader.ts";
+import { readWhenPresent, type StepReaderTable } from "./StepReader.ts";
 
 export const NAVIGATION_STEP_READERS: StepReaderTable<StepTypeIn<typeof StepSection.Navigation>> = {
     navigate(step, path, context) {
-        return readFields(step, path, context.issues, {
-            type: knownField(StepType.Navigate),
-            url: (url: unknown, urlPath: string) => readNavigation(url, urlPath, context),
-            // Left out when absent, so a navigate without it stays exactly as it was.
-            scripts: optionalField((scripts: unknown, scriptsPath: string) =>
+        const parts = [
+            readNavigation(step.url, `${path}.url`, context),
+            readWhenPresent(step, "scripts", path, (scripts, scriptsPath) =>
                 readOneOf(scripts, scriptsPath, context.issues, SCRIPT_MODES),
             ),
-        });
+        ] as const;
+        return allValid(parts)
+            ? { type: StepType.Navigate, url: parts[0], scripts: parts[1] }
+            : INVALID;
     },
 };

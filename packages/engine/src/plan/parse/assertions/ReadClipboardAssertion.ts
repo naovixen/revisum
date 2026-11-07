@@ -9,6 +9,7 @@ import {
     type MultiLineText,
     type TextOrValue,
 } from "@revisum/contracts";
+import type { ReadableInput } from "../../../decoding/ReadableCopy.ts";
 import { INVALID, readOneOf, type Parsed } from "../../plan-decoders.ts";
 import type { ParseContext } from "../ParseContext.ts";
 import { refuse } from "../Refuse.ts";
@@ -30,11 +31,11 @@ function readExpectedLines(
     return lines;
 }
 
-const isWrittenAsLines = (value: unknown): boolean =>
+const isWrittenAsLines = (value: ReadableInput): boolean =>
     isNonArrayObject(value) && Object.hasOwn(value, "lines");
 
 const readTextOrLines = (
-    input: unknown,
+    input: ReadableInput,
     path: string,
     context: ParseContext,
 ): Parsed<TextOrValue | MultiLineText> =>
@@ -43,7 +44,7 @@ const readTextOrLines = (
         : readExpectedText(input, path, context);
 
 const readTextNotLines = (
-    input: unknown,
+    input: ReadableInput,
     path: string,
     context: ParseContext,
 ): Parsed<TextOrValue> =>
@@ -52,7 +53,7 @@ const readTextNotLines = (
         : readExpectedText(input, path, context);
 
 export function readClipboardAssertion(
-    input: unknown,
+    input: ReadableInput,
     path: string,
     context: ParseContext,
 ): Parsed<ClipboardAssertion> {

@@ -7,6 +7,31 @@
 
 export const UNREADABLE: unique symbol = Symbol("unreadable");
 
+// Marks the lists and records of a readable copy. Only this file makes one, so a reader that takes
+// a ReadableInput can be handed nothing but a copy made here.
+declare const READABLE: unique symbol;
+
+// A plain object of a readable copy: its own data only, each value readable too.
+export type ReadableRecord = {
+    readonly [field: string]: ReadableInput;
+    readonly [READABLE]: true;
+};
+
+// A list of a readable copy, each item readable too.
+export type ReadableList = readonly ReadableInput[] & { readonly [READABLE]: true };
+
+// A value of a readable copy: a primitive JSON can write, undefined, UNREADABLE, or a list or record
+// copied here. Reading its fields, keys or items can't throw.
+export type ReadableInput =
+    | string
+    | number
+    | boolean
+    | null
+    | undefined
+    | typeof UNREADABLE
+    | ReadableRecord
+    | ReadableList;
+
 // An object that is neither a plain object nor a list, such as a Date or a class instance, is
 // replaced by this: still an object, so a reader picks the same form for it as for the original
 // and refuses it there, but holding no field, so nothing of the original is read.
@@ -101,7 +126,10 @@ function copyOneLevelOf(original: object): OneLevel {
 // One level of `value`: a frozen list or plain object holding its own data, the same values
 // inside, or UNREADABLE when it is neither a list nor a plain object, or can't be read safely. A
 // copy made here already, by this or by readableCopy, is itself. A guard that narrows a value to a
-// list or a record reads this, so what it lets through can be read.
+// list or a record reads this, so what it lets through can be read. Only a readable copy's values
+// are readable themselves: a one-level copy of other input still holds that input's values.
+export function readOneLevel(value: ReadableInput): ReadableInput;
+export function readOneLevel(value: unknown): unknown;
 export function readOneLevel(value: unknown): unknown {
     if (typeof value !== "object" || value === null || FROZEN_COPIES.has(value)) {
         return value;
@@ -119,7 +147,7 @@ const isWritablePrimitive = (value: unknown): boolean =>
 // nested thousands deep is copied too. A value met twice is copied once, so a cycle stays a cycle,
 // as writing it out as JSON would refuse it before. A parser reads this once, at its edge, and
 // every guard inside then passes the copy's lists and records on as they are.
-export function readableCopy(input: unknown): unknown {
+export function readableCopy(input: unknown): ReadableInput {
     const copies = new Map<object, OneLevel>();
     const unfilled: (unknown[] | Fields)[] = [];
     const copyOf = (value: unknown): unknown => {
@@ -154,5 +182,7 @@ export function readableCopy(input: unknown): unknown {
             frozenCopy(fields);
         }
     }
-    return top;
+    // Every list and record in it was copied and filled above, and every primitive kept is one
+    // JSON can write, so the whole copy is readable.
+    return top as ReadableInput;
 }

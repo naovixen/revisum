@@ -1,31 +1,39 @@
 import { isNonArrayObject } from "@revisum/contracts";
+import type { ReadableInput } from "../decoding/ReadableCopy.ts";
 import { INVALID, readRecord, type Issues, type Parsed } from "./plan-decoders.ts";
 
 // Reads one field's value. A bad value must give INVALID and record an issue at `path` in `issues`.
 // The type can't require that: a function can't be typed to record anything, and Parsed<unknown>
-// collapses to unknown, so a FieldReader<unknown> may return anything at all.
-export type FieldReader<Value> = (input: unknown, path: string, issues: Issues) => Parsed<Value>;
+// collapses to unknown, so a FieldReader<unknown> may return anything at all. A reader that probes
+// its input's keys takes a ReadableInput, and is then read only from a readable copy.
+export type FieldReader<Value, Input = unknown> = (
+    input: Input,
+    path: string,
+    issues: Issues,
+) => Parsed<Value>;
 
 // A field that may be left out, and is then left out of what readFields returns too. When the field
 // is there, its reader has the same duty as any other.
-export type OptionalField<Value> = { readonly readWhenPresent: FieldReader<Value> };
+export type OptionalField<Value, Input = unknown> = {
+    readonly readWhenPresent: FieldReader<Value, Input>;
+};
 
-type Field = FieldReader<unknown> | OptionalField<unknown>;
+type Field<Input = unknown> = FieldReader<unknown, Input> | OptionalField<unknown, Input>;
 
-type FieldTable = Readonly<Record<string, Field>>;
+type FieldTable<Input = unknown> = Readonly<Record<string, Field<Input>>>;
 
-type RequiredKeys<Table extends FieldTable> = {
-    [Key in keyof Table]: Table[Key] extends FieldReader<unknown> ? Key : never;
+type RequiredKeys<Table extends FieldTable<never>> = {
+    [Key in keyof Table]: Table[Key] extends FieldReader<unknown, never> ? Key : never;
 }[keyof Table];
 
 type ValueOf<Field> =
-    Field extends FieldReader<infer Value>
+    Field extends FieldReader<infer Value, never>
         ? Value
-        : Field extends OptionalField<infer Value>
+        : Field extends OptionalField<infer Value, never>
           ? Value
           : never;
 
-export type FieldValues<Table extends FieldTable> = {
+export type FieldValues<Table extends FieldTable<never>> = {
     readonly [Key in RequiredKeys<Table>]: ValueOf<Table[Key]>;
 } & {
     readonly [Key in Exclude<keyof Table, RequiredKeys<Table>>]?: ValueOf<Table[Key]>;
@@ -58,6 +66,13 @@ const fieldsOf = (table: FieldTable): readonly (readonly [string, Field])[] => {
 // reported, in that order, under `path.field`. The result's keys follow the table's order too, not
 // the input's. Missing fields are reported in `requiredOrder` when given, such as the grammar list
 // a table is checked against, and otherwise in the table's order.
+export function readFields<Table extends FieldTable<ReadableInput>>(
+    input: ReadableInput,
+    path: string,
+    issues: Issues,
+    table: Table,
+    requiredOrder?: readonly RequiredKeys<Table>[],
+): Parsed<FieldValues<Table>>;
 export function readFields<Table extends FieldTable>(
     input: unknown,
     path: string,

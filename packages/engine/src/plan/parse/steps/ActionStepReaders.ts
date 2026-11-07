@@ -18,16 +18,18 @@ import {
     type Parsed,
 } from "../../plan-decoders.ts";
 import { MAXIMUM_MODIFIERS } from "../../plan-grammar.ts";
-import { optionalField, readFields } from "../../ReadFields.ts";
 import type { StepSection, StepTypeIn } from "../../StepFacts.ts";
 import { readDeclared } from "../declarations/ReadDeclared.ts";
-import { knownField } from "../KnownField.ts";
-import { readLocator } from "../locators/ReadLocator.ts";
 import type { ParseContext } from "../ParseContext.ts";
 import { refuse } from "../Refuse.ts";
 import { holdsLiteralText, readFillValue } from "../text/ReadFillValue.ts";
 import { readTextOrValue } from "../text/ReadTextOrValue.ts";
-import { readStepLocator, type StepFieldsRead, type StepReaderTable } from "./StepReader.ts";
+import {
+    readStepLocator,
+    readWhenPresent,
+    type StepFieldsRead,
+    type StepReaderTable,
+} from "./StepReader.ts";
 
 function readModifiers(input: unknown, path: string, issues: Issues): Parsed<readonly Modifier[]> {
     const written = readList(input, path, issues, MAXIMUM_MODIFIERS);
@@ -51,12 +53,7 @@ const readOption = (
     path: string,
     context: ParseContext,
 ) =>
-    readTextOrValue(
-        step.option,
-        `${path}.option`,
-        context,
-        context.rules.limits.maximumTextLength,
-    );
+    readTextOrValue(step.option, `${path}.option`, context, context.rules.limits.maximumTextLength);
 
 export const ACTION_STEP_READERS: StepReaderTable<StepTypeIn<typeof StepSection.Actions>> = {
     click(step, path, context) {
@@ -103,22 +100,21 @@ export const ACTION_STEP_READERS: StepReaderTable<StepTypeIn<typeof StepSection.
             : INVALID;
     },
     press(step, path, context) {
-        return readFields(step, path, context.issues, {
-            type: knownField(StepType.Press),
-            locator: (locator: unknown, locatorPath: string) =>
-                readLocator(locator, locatorPath, context),
-            key: (key: unknown, keyPath: string) => readOneOf(key, keyPath, context.issues, KEYS),
-            modifiers: optionalField((modifiers: unknown, modifiersPath: string) =>
+        const parts = [
+            readStepLocator(step, path, context),
+            readOneOf(step.key, `${path}.key`, context.issues, KEYS),
+            readWhenPresent(step, "modifiers", path, (modifiers, modifiersPath) =>
                 readModifiers(modifiers, modifiersPath, context.issues),
             ),
-        });
+        ] as const;
+        return allValid(parts)
+            ? { type: StepType.Press, locator: parts[0], key: parts[1], modifiers: parts[2] }
+            : INVALID;
     },
     dialog(step, path, context) {
-        return readFields(step, path, context.issues, {
-            type: knownField(StepType.Dialog),
-            action: (action: unknown, actionPath: string) =>
-                readOneOf(action, actionPath, context.issues, DIALOG_ACTIONS),
-            expectText: optionalField((expectText: unknown, expectTextPath: string) =>
+        const parts = [
+            readOneOf(step.action, `${path}.action`, context.issues, DIALOG_ACTIONS),
+            readWhenPresent(step, "expectText", path, (expectText, expectTextPath) =>
                 readTextOrValue(
                     expectText,
                     expectTextPath,
@@ -126,6 +122,9 @@ export const ACTION_STEP_READERS: StepReaderTable<StepTypeIn<typeof StepSection.
                     context.rules.limits.maximumTextLength,
                 ),
             ),
-        });
+        ] as const;
+        return allValid(parts)
+            ? { type: StepType.Dialog, action: parts[0], expectText: parts[1] }
+            : INVALID;
     },
 };

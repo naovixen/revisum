@@ -14,6 +14,7 @@ import {
     type ScriptParameterType,
 } from "@revisum/contracts";
 import { argumentProblem } from "../../../service-calls/parameter-values.ts";
+import { readableCopy, type ReadableInput } from "../../../decoding/ReadableCopy.ts";
 import { INVALID, type Parsed } from "../../plan-decoders.ts";
 import { readFields, type FieldReader } from "../../ReadFields.ts";
 import type { ParseContext } from "../ParseContext.ts";
@@ -23,7 +24,7 @@ import { readWrittenText } from "../text/ReadWrittenText.ts";
 import { readSecretReference } from "./ReadDeclared.ts";
 
 type ArgumentReader<Type, Argument> = (
-    input: unknown,
+    input: ReadableInput,
     path: string,
     type: Type,
     context: ParseContext,
@@ -53,7 +54,7 @@ function readLiteral(
 // under the same rules. A secret reference here is the wrong type: a page script or a command never
 // takes one.
 function readPlainArgument(
-    input: unknown,
+    input: ReadableInput,
     path: string,
     type: ScriptParameterType,
     context: ParseContext,
@@ -74,7 +75,7 @@ function readPlainArgument(
 // One call argument, as its parameter's type allows: a secret only by name, since literal text in
 // a secret parameter would put the secret in the plan; anything else as a plain argument.
 function readCallArgument(
-    input: unknown,
+    input: ReadableInput,
     path: string,
     type: ParameterType,
     context: ParseContext,
@@ -92,7 +93,7 @@ function readCallArgument(
 // Exactly the declaration's parameters, each read by `readOne`: a missing one and an extra one are
 // both refused.
 function readArgumentsWith<Type, Argument>(
-    input: unknown,
+    input: ReadableInput,
     path: string,
     declared: Readonly<Record<ParameterName, Type>>,
     context: ParseContext,
@@ -101,43 +102,48 @@ function readArgumentsWith<Type, Argument>(
     if (!isNonArrayObject(input)) {
         return refuse(context.issues, PlanErrorCode.WrongType, path);
     }
-    const parameters: Readonly<Record<string, FieldReader<Argument>>> = Object.fromEntries(
-        Object.entries<Type>(declared).map(([name, type]) => [
-            name,
-            (written: unknown, argumentPath: string) =>
-                readOne(written, argumentPath, type, context),
-        ]),
-    );
+    const parameters: Readonly<Record<string, FieldReader<Argument, ReadableInput>>> =
+        Object.fromEntries(
+            Object.entries<Type>(declared).map(([name, type]) => [
+                name,
+                (written: ReadableInput, argumentPath: string) =>
+                    readOne(written, argumentPath, type, context),
+            ]),
+        );
     return readFields(input, path, context.issues, parameters);
 }
 
 export const readCallArguments = (
-    input: unknown,
+    input: ReadableInput,
     path: string,
     declared: Readonly<Record<ParameterName, ParameterType>>,
     context: ParseContext,
 ): Parsed<CallArguments> => readArgumentsWith(input, path, declared, context, readCallArgument);
 
 export const readScriptArguments = (
-    input: unknown,
+    input: ReadableInput,
     path: string,
     declared: Readonly<Record<ParameterName, ScriptParameterType>>,
     context: ParseContext,
 ): Parsed<ScriptArguments> => readArgumentsWith(input, path, declared, context, readPlainArgument);
 
-// Arguments for a stub start or a storage write. Left out of the step when the plan leaves them
-// out, and then read as none, so a declaration with parameters still has each one reported missing.
+// The arguments read when a step gives none.
+const NO_ARGUMENTS = readableCopy({});
+
+// Arguments for a stub start or a storage write. Undefined, so left out of the step, when the plan
+// leaves them out, and then read as none, so a declaration with parameters still has each one
+// reported missing.
 export function readOptionalArguments(
-    step: { readonly arguments?: unknown },
+    step: { readonly arguments?: ReadableInput },
     path: string,
     declared: Readonly<Record<ParameterName, ParameterType>>,
     context: ParseContext,
-): Parsed<{ readonly arguments?: CallArguments }> {
+): Parsed<CallArguments | undefined> {
     const isGiven = Object.hasOwn(step, "arguments");
-    const written = isGiven ? step.arguments : {};
+    const written = isGiven ? step.arguments : NO_ARGUMENTS;
     const stepArguments = readCallArguments(written, `${path}.arguments`, declared, context);
     if (stepArguments === INVALID) {
         return INVALID;
     }
-    return isGiven ? { arguments: stepArguments } : {};
+    return isGiven ? stepArguments : undefined;
 }

@@ -17,6 +17,7 @@ import {
   type PageScriptRecord, type ScriptParameterType, type ValueName,
 } from '@revisum/contracts';
 import type { Logger } from '../logging.ts';
+import { isInlineChoice } from '../plan/IsInlineChoice.ts';
 import { rememberedFieldEntries } from '../plan/plan-values.ts';
 import type { Project } from '../project/project-parser.ts';
 import { recordsOfRemembered, type RememberedRecord, type RememberedValues } from '../RememberedValues.ts';
@@ -77,7 +78,7 @@ type ScriptToRun = {
 // The script a step names. The named scripts hold every one the run's plan names, with its source,
 // so a name not among them is a step from a plan the run was not cleared for, which cannot run here.
 function scriptToRun(choice: ScriptChoice, context: PageScriptContext): Result<ScriptToRun, StepCode> {
-  if (typeof choice !== 'string') {
+  if (isInlineChoice(choice)) {
     const inline = choice.inline;
     // An inline script declares no parameters, so it is called with one empty object.
     return success({

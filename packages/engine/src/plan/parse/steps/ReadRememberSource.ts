@@ -8,6 +8,7 @@ import {
     RESPONSE_READS,
     type RememberSource,
 } from "@revisum/contracts";
+import type { ReadableInput } from "../../../decoding/ReadableCopy.ts";
 import { INVALID, readOneOf, readRecord, type Parsed } from "../../plan-decoders.ts";
 import { ATTRIBUTE_NAME, DOM_CHECKS_FEATURE } from "../../plan-grammar.ts";
 import { readFields } from "../../ReadFields.ts";
@@ -89,7 +90,7 @@ function readElementSource(
 }
 
 export function readRememberSource(
-    input: unknown,
+    input: ReadableInput,
     path: string,
     context: ParseContext,
 ): Parsed<RememberSource> {

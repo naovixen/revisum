@@ -4,6 +4,7 @@ import {
     type PageAssertion,
     type SafeText,
 } from "@revisum/contracts";
+import type { ReadableInput } from "../../../decoding/ReadableCopy.ts";
 import { INVALID, readOneOf, type Parsed } from "../../plan-decoders.ts";
 import { MAXIMUM_META_NAME_LENGTH, MAXIMUM_URL_LENGTH, PAGE_KINDS } from "../../plan-grammar.ts";
 import { readFields } from "../../ReadFields.ts";
@@ -32,7 +33,7 @@ function readPathPrefix(input: unknown, path: string, context: ParseContext): Pa
 }
 
 function readMetaContent(
-    input: unknown,
+    input: ReadableInput,
     path: string,
     context: ParseContext,
 ): Parsed<PageAssertion> {
@@ -48,7 +49,7 @@ function readMetaContent(
 }
 
 export function readPageAssertion(
-    input: unknown,
+    input: ReadableInput,
     path: string,
     context: ParseContext,
 ): Parsed<PageAssertion> {

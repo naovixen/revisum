@@ -199,7 +199,19 @@ const FACTS = {
     ),
 } satisfies StepFactTable;
 
-export const STEP_FACTS: StepFactTable = FACTS;
+// The fields each step type's fact lists, read from the table.
+type ListedFieldOf<Type extends StepType> = (typeof FACTS)[Type]["fields"][
+    "required" | "optional"][number];
+
+// True when every step type's fact lists exactly the fields its steps have.
+type FactsListEveryField = IsSameUnion<
+    { [Type in StepType]: IsSameUnion<ListedFieldOf<Type>, FieldOf<Type>> }[StepType],
+    true
+>;
+
+// Compiles only while each fact lists every field of its type, so the one check of a step's keys,
+// against its fact, can't refuse a field its type has, and a reader is never handed one it lacks.
+export const STEP_FACTS: Holds<FactsListEveryField> extends true ? StepFactTable : never = FACTS;
 
 // The step types of the sections given, read from the table.
 export type StepTypeIn<Section extends StepSection> = {

@@ -8,7 +8,7 @@ import { readCallName, readDeclaredField } from "../declarations/ReadDeclared.ts
 import { readRememberedFields } from "../declarations/ReadRememberedFields.ts";
 import { refuse } from "../Refuse.ts";
 import { readCriterionId } from "../text/ReadCriterionId.ts";
-import type { StepReaderTable } from "./StepReader.ts";
+import { readWhenPresent, type StepReaderTable } from "./StepReader.ts";
 
 export const SERVICE_CALL_STEP_READERS: StepReaderTable<
     StepTypeIn<typeof StepSection.ServiceCalls>
@@ -23,23 +23,9 @@ export const SERVICE_CALL_STEP_READERS: StepReaderTable<
         const { name: call, declaration } = named;
         const argumentsPath = `${path}.arguments`;
         const parameters = declaration.parameters;
-        const callArguments = readCallArguments(
-            step.arguments,
-            argumentsPath,
-            parameters,
-            context,
-        );
-        if (!Object.hasOwn(step, "remember")) {
-            return callArguments === INVALID
-                ? INVALID
-                : { type: StepType.Call, call, arguments: callArguments };
-        }
-        const rememberPath = `${path}.remember`;
-        const remember = readRememberedFields(
-            step.remember,
-            rememberPath,
-            declaration.fields,
-            context,
+        const callArguments = readCallArguments(step.arguments, argumentsPath, parameters, context);
+        const remember = readWhenPresent(step, "remember", path, (fields, rememberPath) =>
+            readRememberedFields(fields, rememberPath, declaration.fields, context),
         );
         return callArguments === INVALID || remember === INVALID
             ? INVALID
@@ -58,12 +44,7 @@ export const SERVICE_CALL_STEP_READERS: StepReaderTable<
             return refuse(context.issues, PlanErrorCode.UnknownValue, callPath);
         }
         const parts = [
-            readCallArguments(
-                step.arguments,
-                `${path}.arguments`,
-                declaration.parameters,
-                context,
-            ),
+            readCallArguments(step.arguments, `${path}.arguments`, declaration.parameters, context),
             readDeclaredField(step.field, `${path}.field`, declaration.fields, context),
             readBackendAssertion(step.assert, `${path}.assert`, context),
             readCriterionId(step, path, context),

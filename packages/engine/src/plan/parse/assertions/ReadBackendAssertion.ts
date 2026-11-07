@@ -5,6 +5,7 @@ import {
     PlanErrorCode,
     type BackendAssertion,
 } from "@revisum/contracts";
+import type { ReadableInput } from "../../../decoding/ReadableCopy.ts";
 import { INVALID, readOneOf, type Issues, type Parsed } from "../../plan-decoders.ts";
 import type { ParseContext } from "../ParseContext.ts";
 import { refuse } from "../Refuse.ts";
@@ -17,7 +18,7 @@ const readFiniteNumber = (input: unknown, path: string, issues: Issues): Parsed<
         : refuse(issues, PlanErrorCode.WrongType, path);
 
 export function readBackendAssertion(
-    input: unknown,
+    input: ReadableInput,
     path: string,
     context: ParseContext,
 ): Parsed<BackendAssertion> {

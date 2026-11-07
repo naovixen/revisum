@@ -9,7 +9,7 @@ import { readCommandName, readDeclaredField } from "../declarations/ReadDeclared
 import { readRememberedFields } from "../declarations/ReadRememberedFields.ts";
 import { refuse } from "../Refuse.ts";
 import { readCriterionId } from "../text/ReadCriterionId.ts";
-import type { StepReaderTable } from "./StepReader.ts";
+import { readWhenPresent, type StepReaderTable } from "./StepReader.ts";
 
 export const DATABASE_COMMAND_STEP_READERS: StepReaderTable<
     StepTypeIn<typeof StepSection.DatabaseCommands>
@@ -27,16 +27,8 @@ export const DATABASE_COMMAND_STEP_READERS: StepReaderTable<
             declaration.parameters,
             context,
         );
-        if (!Object.hasOwn(step, "remember")) {
-            return commandArguments === INVALID
-                ? INVALID
-                : { type: StepType.Database, command, arguments: commandArguments };
-        }
-        const remember = readRememberedFields(
-            step.remember,
-            `${path}.remember`,
-            declaration.fields,
-            context,
+        const remember = readWhenPresent(step, "remember", path, (fields, rememberPath) =>
+            readRememberedFields(fields, rememberPath, declaration.fields, context),
         );
         return commandArguments === INVALID || remember === INVALID
             ? INVALID

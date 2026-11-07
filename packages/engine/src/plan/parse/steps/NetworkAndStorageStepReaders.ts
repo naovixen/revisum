@@ -9,6 +9,7 @@ import {
     type StorageEntryDeclaration,
     type StorageEntryName,
 } from "@revisum/contracts";
+import type { ReadableInput } from "../../../decoding/ReadableCopy.ts";
 import { allValid, INVALID, readOneOf, type Parsed } from "../../plan-decoders.ts";
 import type { StepSection, StepTypeIn } from "../../StepFacts.ts";
 import { readRequestCount } from "../assertions/ReadRequestCount.ts";
@@ -29,7 +30,7 @@ import type { StepReaderTable } from "./StepReader.ts";
 // A storage entry a step may write or remove: one the project declares readWrite. An entry declared
 // read may only be checked, so writing it is refused as a name the plan may not use there.
 function readWritableEntry(
-    step: { readonly entry?: unknown },
+    step: { readonly entry?: ReadableInput },
     path: string,
     context: ParseContext,
 ): Parsed<Named<StorageEntryName, StorageEntryDeclaration>> {
@@ -61,13 +62,13 @@ export const NETWORK_AND_STORAGE_STEP_READERS: StepReaderTable<
             if (!context.startedStubs.has(stub)) {
                 return refuse(context.issues, PlanErrorCode.UnknownValue, stubPath);
             }
-            return { type: StepType.Stub, stub, action };
+            return { type: StepType.Stub, stub, action, arguments: undefined };
         }
         context.startedStubs.add(stub);
         const stubArguments = readOptionalArguments(step, path, declaration.parameters, context);
         return stubArguments === INVALID
             ? INVALID
-            : { type: StepType.Stub, stub, action, ...stubArguments };
+            : { type: StepType.Stub, stub, action, arguments: stubArguments };
     },
     resetRequests(step, path, context) {
         const named = readRequestName(step.request, `${path}.request`, context);
@@ -118,7 +119,7 @@ export const NETWORK_AND_STORAGE_STEP_READERS: StepReaderTable<
         const entryArguments = readOptionalArguments(step, path, parameters, context);
         return entryArguments === INVALID
             ? INVALID
-            : { type: StepType.SetStorage, entry: named.name, ...entryArguments };
+            : { type: StepType.SetStorage, entry: named.name, arguments: entryArguments };
     },
     removeStorage(step, path, context) {
         const named = readWritableEntry(step, path, context);

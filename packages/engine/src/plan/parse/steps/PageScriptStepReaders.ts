@@ -10,7 +10,7 @@ import { readRememberedFields } from "../declarations/ReadRememberedFields.ts";
 import { readScriptChoice } from "../declarations/ReadScriptChoice.ts";
 import { refuse } from "../Refuse.ts";
 import { readCriterionId } from "../text/ReadCriterionId.ts";
-import type { StepReaderTable } from "./StepReader.ts";
+import { readWhenPresent, type StepReaderTable } from "./StepReader.ts";
 
 export const PAGE_SCRIPT_STEP_READERS: StepReaderTable<StepTypeIn<typeof StepSection.PageScripts>> =
     {
@@ -28,16 +28,8 @@ export const PAGE_SCRIPT_STEP_READERS: StepReaderTable<StepTypeIn<typeof StepSec
                 parameters,
                 context,
             );
-            if (!Object.hasOwn(step, "remember")) {
-                return scriptArguments === INVALID
-                    ? INVALID
-                    : { type: StepType.Evaluate, script, arguments: scriptArguments };
-            }
-            const remember = readRememberedFields(
-                step.remember,
-                `${path}.remember`,
-                use.fields,
-                context,
+            const remember = readWhenPresent(step, "remember", path, (fields, rememberPath) =>
+                readRememberedFields(fields, rememberPath, use.fields, context),
             );
             return scriptArguments === INVALID || remember === INVALID
                 ? INVALID
@@ -54,12 +46,7 @@ export const PAGE_SCRIPT_STEP_READERS: StepReaderTable<StepTypeIn<typeof StepSec
                 return refuse(context.issues, PlanErrorCode.UnknownValue, use.effectPath);
             }
             const parts = [
-                readScriptArguments(
-                    step.arguments,
-                    `${path}.arguments`,
-                    use.parameters,
-                    context,
-                ),
+                readScriptArguments(step.arguments, `${path}.arguments`, use.parameters, context),
                 readDeclaredField(step.field, `${path}.field`, use.fields, context),
                 readBackendAssertion(step.assert, `${path}.assert`, context),
                 readCriterionId(step, path, context),

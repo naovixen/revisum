@@ -3,7 +3,7 @@
 // the offending value, so hostile or private text is never echoed back.
 import { PlanErrorCode, isPlainObject, type PlanError, type SafeText } from '@revisum/contracts';
 import type { NonEmptyList } from '../decoding/NonEmptyList.ts';
-import { readOneLevel } from '../decoding/ReadableCopy.ts';
+import { readOneLevel, type ReadableInput, type ReadableRecord } from '../decoding/ReadableCopy.ts';
 import { brand } from '../brand.ts';
 import { sha256 } from '../hashing.ts';
 import { looksLikeCredential } from './literal-secrets.ts';
@@ -72,7 +72,14 @@ export const hasHoles = (list: readonly unknown[]): boolean => {
   return false;
 };
 
-// A plain object whose keys are all in `allowed` and include every key in `required`.
+// A plain object whose keys are all in `allowed` and include every key in `required`. A readable
+// copy's record is one, as read.
+export function readRecord(
+  input: ReadableInput, path: string, issues: Issues, allowed: readonly string[], required?: readonly string[],
+): Parsed<ReadableRecord>;
+export function readRecord(
+  input: unknown, path: string, issues: Issues, allowed: readonly string[], required?: readonly string[],
+): Parsed<Readonly<Record<string, unknown>>>;
 export function readRecord(
   input: unknown, path: string, issues: Issues,
   allowed: readonly string[], required: readonly string[] = allowed,
@@ -95,7 +102,9 @@ export function readRecord(
 
 // A plain object with any keys, to read a discriminant before the strict check. What it returns is
 // a copy of the record's own data, read once, so reading its fields can't throw; a record that
-// can't be read so is not_object.
+// can't be read so is not_object. A readable copy's record is itself.
+export function peekRecord(input: ReadableInput, path: string, issues: Issues): Parsed<ReadableRecord>;
+export function peekRecord(input: unknown, path: string, issues: Issues): Parsed<Readonly<Record<string, unknown>>>;
 export function peekRecord(input: unknown, path: string, issues: Issues): Parsed<Readonly<Record<string, unknown>>> {
   const fields = readOneLevel(input);
   if (!isPlainObject(fields)) {
@@ -138,7 +147,13 @@ export function readOneOf<Value extends string>(
 }
 
 // A list of at most `maximumLength` items and at least `minimumLength`, which is 1 unless given, so
-// a list read without one holds at least one item.
+// a list read without one holds at least one item. A readable copy's items are readable.
+export function readList(
+  input: ReadableInput, path: string, issues: Issues, maximumLength: number, minimumLength?: 1,
+): Parsed<NonEmptyList<ReadableInput>>;
+export function readList(
+  input: ReadableInput, path: string, issues: Issues, maximumLength: number, minimumLength: number,
+): Parsed<readonly ReadableInput[]>;
 export function readList(
   input: unknown, path: string, issues: Issues, maximumLength: number, minimumLength?: 1,
 ): Parsed<NonEmptyList<unknown>>;

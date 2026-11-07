@@ -5,6 +5,7 @@ import {
     PlanErrorCode,
     type DownloadAssertion,
 } from "@revisum/contracts";
+import type { ReadableInput } from "../../../decoding/ReadableCopy.ts";
 import {
     INVALID,
     isOneOf,
@@ -22,7 +23,7 @@ import { readAssertionHead, readKindAndValue } from "./ReadAssertionHead.ts";
 
 // A size in bytes. Every file is at least 0 bytes long, so a check that it is would prove nothing.
 function readSize(
-    input: unknown,
+    input: ReadableInput,
     path: string,
     issues: Issues,
     kind: DownloadSizeKind,
@@ -35,7 +36,7 @@ function readSize(
 }
 
 export function readDownloadAssertion(
-    input: unknown,
+    input: ReadableInput,
     path: string,
     context: ParseContext,
 ): Parsed<DownloadAssertion> {

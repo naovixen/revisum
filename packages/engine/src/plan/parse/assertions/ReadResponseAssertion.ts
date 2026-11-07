@@ -8,6 +8,7 @@ import {
     type ObservedRequestDeclaration,
     type ResponseAssertion,
 } from "@revisum/contracts";
+import type { ReadableInput } from "../../../decoding/ReadableCopy.ts";
 import { INVALID, isOneOf, readInteger, readOneOf, type Parsed } from "../../plan-decoders.ts";
 import { RESPONSE_STATUS } from "../../plan-grammar.ts";
 import { readFields } from "../../ReadFields.ts";
@@ -18,7 +19,7 @@ import { readExpectedText } from "../text/ReadTextOrValue.ts";
 import { readAssertionHead, readKindAndValue } from "./ReadAssertionHead.ts";
 
 export function readResponseAssertion(
-    input: unknown,
+    input: ReadableInput,
     path: string,
     declaration: ObservedRequestDeclaration,
     context: ParseContext,

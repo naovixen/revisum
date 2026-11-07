@@ -9,14 +9,12 @@ import {
 } from "@revisum/contracts";
 import { clockAdvanceMilliseconds } from "../../../clock-advance.ts";
 import { allValid, INVALID, readOneOf, readRecord, type Parsed } from "../../plan-decoders.ts";
-import { optionalField, readFields } from "../../ReadFields.ts";
 import type { StepSection, StepTypeIn } from "../../StepFacts.ts";
-import { knownField } from "../KnownField.ts";
 import { readClipboardAssertion } from "../assertions/ReadClipboardAssertion.ts";
 import type { ParseContext } from "../ParseContext.ts";
 import { refuse } from "../Refuse.ts";
 import { readCriterionId } from "../text/ReadCriterionId.ts";
-import type { StepReaderTable } from "./StepReader.ts";
+import { readWhenPresent, type StepReaderTable } from "./StepReader.ts";
 
 const isWholeAmount = (amount: unknown): amount is number =>
     typeof amount === "number" && Number.isInteger(amount) && amount >= 1;
@@ -68,18 +66,17 @@ function isWithinTotalAfterAdding(by: ClockAdvance, path: string, context: Parse
 export const CLOCK_AND_CLIPBOARD_STEP_READERS: StepReaderTable<
     StepTypeIn<typeof StepSection.ClockAndClipboard>
 > = {
-    // The mode is left out when absent, so the step stays as written.
     advanceClock(step, path, context) {
-        const advance = readFields(step, path, context.issues, {
-            type: knownField(StepType.AdvanceClock),
-            by: (by: unknown, byPath: string) => readClockAdvance(by, byPath, context),
-            mode: optionalField((mode: unknown, modePath: string) =>
+        const parts = [
+            readClockAdvance(step.by, `${path}.by`, context),
+            readWhenPresent(step, "mode", path, (mode, modePath) =>
                 readOneOf(mode, modePath, context.issues, CLOCK_ADVANCE_MODES),
             ),
-        });
-        return advance !== INVALID && isWithinTotalAfterAdding(advance.by, path, context)
-            ? advance
-            : INVALID;
+        ] as const;
+        if (!allValid(parts) || !isWithinTotalAfterAdding(parts[0], path, context)) {
+            return INVALID;
+        }
+        return { type: StepType.AdvanceClock, by: parts[0], mode: parts[1] };
     },
     expectClipboard(step, path, context) {
         const parts = [

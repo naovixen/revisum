@@ -9,6 +9,7 @@ import {
     type ElementAssertion,
     type TextOrValue,
 } from "@revisum/contracts";
+import type { ReadableInput } from "../../../decoding/ReadableCopy.ts";
 import { INVALID, isOneOf, readInteger, readOneOf, type Parsed } from "../../plan-decoders.ts";
 import {
     ATTRIBUTE_NAME,
@@ -50,7 +51,7 @@ const readAttributeName = (context: ParseContext) => (input: unknown, path: stri
 // may be empty, since an attribute set to "" is a real state.
 function readDomCheck(
     kind: DomCheckKind,
-    input: unknown,
+    input: ReadableInput,
     path: string,
     context: ParseContext,
 ): Parsed<ElementAssertion> {
@@ -93,7 +94,7 @@ function readDomCheck(
 }
 
 export function readElementAssertion(
-    input: unknown,
+    input: ReadableInput,
     path: string,
     context: ParseContext,
 ): Parsed<ElementAssertion> {

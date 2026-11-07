@@ -1,6 +1,7 @@
 // What every assertion starts with: an object that checks something, and a kind that says which
 // fields it has.
 import { PlanErrorCode } from "@revisum/contracts";
+import type { ReadableInput } from "../../../decoding/ReadableCopy.ts";
 import { INVALID, peekRecord, type Parsed } from "../../plan-decoders.ts";
 import { readFields, type FieldReader } from "../../ReadFields.ts";
 import { knownField } from "../KnownField.ts";
@@ -37,11 +38,11 @@ export function readKindAlone<const Kind extends string>(
 
 // An assertion of a kind already read with one more field, `value`, read by `readValue`.
 export function readKindAndValue<const Kind extends string, Value>(
-    input: unknown,
+    input: ReadableInput,
     path: string,
     context: ParseContext,
     kind: Kind,
-    readValue: FieldReader<Value>,
+    readValue: FieldReader<Value, ReadableInput>,
 ): Parsed<{ readonly kind: Kind; readonly value: Value }> {
     const fields = readFields(input, path, context.issues, {
         kind: knownField(kind),

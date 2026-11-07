@@ -1,4 +1,5 @@
 import { isNonArrayObject } from "@revisum/contracts";
+import type { ReadableInput, ReadableRecord } from "../../decoding/ReadableCopy.ts";
 import {
     canStandInside,
     frameDepthInside,
@@ -8,18 +9,18 @@ import {
 } from "../StepFacts.ts";
 
 type PendingList = {
-    readonly steps: unknown;
+    readonly steps: ReadableInput;
     readonly path: string;
     readonly depth: number;
     readonly topLevel: boolean;
 };
 
-const plainFields = (input: unknown): Readonly<Record<string, unknown>> | undefined =>
-    isNonArrayObject(input) ? Object.fromEntries(Object.entries(input)) : undefined;
+const plainFields = (input: ReadableInput): ReadableRecord | undefined =>
+    isNonArrayObject(input) ? input : undefined;
 
 // The type of a step that holds steps of its own and is read where it stands, or undefined. The
 // parser reads nothing inside a step standing where it may not, so neither does the walk.
-function holdingTypeOf(fields: Readonly<Record<string, unknown>> | undefined, isTopLevel: boolean) {
+function holdingTypeOf(fields: ReadableRecord | undefined, isTopLevel: boolean) {
     const type = fields?.["type"];
     if (typeof type !== "string" || !isStepType(type) || !holdsStepsOfType(type)) {
         return undefined;
@@ -31,7 +32,7 @@ function holdingTypeOf(fields: Readonly<Record<string, unknown>> | undefined, is
 // rule the policy gate applies too, or undefined. It looks only at steps that hold steps, without
 // recursion, so even a plan nested thousands deep is measured cheaply and before the parser walks
 // it.
-export function tooDeepFrame(input: unknown, maximumDepth: number): string | undefined {
+export function tooDeepFrame(input: ReadableInput, maximumDepth: number): string | undefined {
     const pending: PendingList[] = [
         { steps: plainFields(input)?.["steps"], path: "$.steps", depth: 0, topLevel: true },
     ];
@@ -39,7 +40,7 @@ export function tooDeepFrame(input: unknown, maximumDepth: number): string | und
         if (!Array.isArray(next.steps)) {
             continue;
         }
-        const list: readonly unknown[] = next.steps;
+        const list: readonly ReadableInput[] = next.steps;
         for (const [index, step] of list.entries()) {
             const fields = plainFields(step);
             const type = holdingTypeOf(fields, next.topLevel);

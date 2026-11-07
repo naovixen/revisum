@@ -18,19 +18,30 @@ import {
 import { brand } from "../../brand.ts";
 import { readId } from "../../project/project-parser.ts";
 import { looksLikeCredential } from "../literal-secrets.ts";
-import { allValid, INVALID, readList, type Issues, type Parsed } from "../plan-decoders.ts";
+import {
+    allValid,
+    INVALID,
+    readList,
+    readRecord,
+    type Issues,
+    type Parsed,
+} from "../plan-decoders.ts";
 import {
     CURRENT_PLAN_VERSION,
     FEATURE_ID,
     MAXIMUM_SPEC_REFERENCE_LENGTH,
     MAXIMUM_TITLE_LENGTH,
     META_FIELDS,
-    type OPTIONAL_PLAN_FIELDS,
+    OPTIONAL_PLAN_FIELDS,
     PLAN_FIELDS,
 } from "../plan-grammar.ts";
 import { readGeneratedValues, readPlanClock, type ValueContext } from "../plan-values.ts";
-import { readableCopy } from "../../decoding/ReadableCopy.ts";
-import { optionalField, readFields } from "../ReadFields.ts";
+import {
+    readableCopy,
+    type ReadableInput,
+    type ReadableRecord,
+} from "../../decoding/ReadableCopy.ts";
+import { readFields } from "../ReadFields.ts";
 import { isAssertionStepType } from "../StepFacts.ts";
 import { stepsWithin } from "../VisitSteps.ts";
 import { readSecretReference } from "./declarations/ReadDeclared.ts";
@@ -119,7 +130,11 @@ function checkWholePlan(steps: readonly Step[], path: string, issues: Issues): v
     }
 }
 
-function readPlanSteps(input: unknown, path: string, context: ParseContext): Parsed<StepList> {
+function readPlanSteps(
+    input: ReadableInput,
+    path: string,
+    context: ParseContext,
+): Parsed<StepList> {
     const steps = readStepList(input, path, context);
     if (steps !== INVALID) {
         checkWholePlan(steps, path, context.issues);
@@ -131,7 +146,7 @@ function readPlanSteps(input: unknown, path: string, context: ParseContext): Par
 // itself, as JSON text or as an object of cookies, is a literal secret: it is refused as a whole,
 // so no part of it is read or echoed.
 function readStorageState(
-    input: unknown,
+    input: ReadableInput,
     path: string,
     context: ParseContext,
 ): Parsed<SecretReference> {
@@ -144,38 +159,140 @@ function readStorageState(
     return readSecretReference(input, path, context);
 }
 
-// Every field of the plan, each read in turn. The plan's values come before every step, so every
-// step may use them, and the cleanup after, so it may use what the steps remember.
-function readEnvelope(input: unknown, context: ParseContext) {
+type PlanFieldReader<Value> = (input: ReadableInput, path: string) => Parsed<Value>;
+
+// One field of the plan, read at its path. A rejection always gives its reason, even when the
+// reader doesn't.
+function readPlanField<Value>(
+    plan: ReadableRecord,
+    field: string,
+    issues: Issues,
+    read: PlanFieldReader<Value>,
+): Parsed<Value> {
+    const path = `$.${field}`;
+    const issuesBefore = issues.length;
+    const value = read(plan[field], path);
+    if (value === INVALID && issues.length === issuesBefore) {
+        issues.push({ code: PlanErrorCode.WrongType, path });
+    }
+    return value;
+}
+
+// A field the plan may leave out: undefined when it does, otherwise read as any other.
+const readOptionalPlanField = <Value>(
+    plan: ReadableRecord,
+    field: string,
+    issues: Issues,
+    read: PlanFieldReader<Value>,
+): Parsed<Value> | undefined =>
+    Object.hasOwn(plan, field) ? readPlanField(plan, field, issues, read) : undefined;
+
+// The plan's values, and the context its steps are read in, where those values are defined.
+type ValuesRead = {
+    readonly values: Parsed<PlanData["values"]>;
+    readonly stepContext: ParseContext;
+};
+
+// The plan's steps, and the context its cleanup is read in, where what they remember and download
+// is defined too.
+type StepsRead = {
+    readonly steps: Parsed<StepList>;
+    readonly cleanupContext: ParseContext;
+};
+
+function readValuesStage(plan: ReadableRecord, context: ParseContext): ValuesRead {
     const valueContext: ValueContext = {
         issues: context.issues,
         emailDomains: context.rules.emailDomains,
         readText: (text, path, maximumLength) =>
             readWrittenText(text, path, context, maximumLength),
     };
-    return readFields(
+    const defined = new Set<string>();
+    const values = readOptionalPlanField(plan, "values", context.issues, (input, path) =>
+        readGeneratedValues(input, path, valueContext, defined),
+    );
+    return { values, stepContext: { ...context, defined } };
+}
+
+// Reads the steps in the context the values handed on. The steps add to its names as they define
+// them, so the cleanup is read in that same context once they are read.
+function readStepsStage(plan: ReadableRecord, valuesRead: ValuesRead): StepsRead {
+    const context = valuesRead.stepContext;
+    const steps = readPlanField(plan, "steps", context.issues, (input, path) =>
+        readPlanSteps(input, path, context),
+    );
+    return { steps, cleanupContext: context };
+}
+
+const readCleanupStage = (
+    plan: ReadableRecord,
+    stepsRead: StepsRead,
+): Parsed<PlanData["cleanup"]> =>
+    readOptionalPlanField(plan, "cleanup", stepsRead.cleanupContext.issues, (input, path) =>
+        readCleanup(input, path, stepsRead.cleanupContext),
+    );
+
+// Every field of the plan, each read in turn: version, meta, targets, values, clock, steps, cleanup
+// and storage state. The values, the steps and the cleanup are stages, each read in the context the
+// one before it hands on, so every step may use the plan's values and the cleanup what the steps
+// remember. A plan that fails the record check is read no further.
+function readEnvelope(input: ReadableInput, context: ParseContext): Parsed<PlanData> {
+    const { issues } = context;
+    const plan = readRecord(
         input,
         "$",
-        context.issues,
-        {
-            version: readVersion,
-            meta: (meta: unknown, path: string) => readMeta(meta, path, context),
-            targets: (targets: unknown, path: string) => readTargetIds(targets, path, context),
-            values: optionalField((values: unknown, path: string) =>
-                readGeneratedValues(values, path, valueContext, context.defined),
-            ),
-            clock: optionalField(readPlanClock),
-            steps: (steps: unknown, path: string) => readPlanSteps(steps, path, context),
-            cleanup: optionalField((cleanup: unknown) => readCleanup(cleanup, context)),
-            storageState: optionalField((storageState: unknown, path: string) =>
-                readStorageState(storageState, path, context),
-            ),
-        } satisfies ListedFields<
-            (typeof PLAN_FIELDS)[number],
-            (typeof OPTIONAL_PLAN_FIELDS)[number]
-        >,
+        issues,
+        [...PLAN_FIELDS, ...OPTIONAL_PLAN_FIELDS],
         PLAN_FIELDS,
     );
+    if (plan === INVALID) {
+        return INVALID;
+    }
+    const issuesBefore = issues.length;
+    const versionRead = readPlanField(plan, "version", issues, (written, path) =>
+        readVersion(written, path, issues),
+    );
+    const metaRead = readPlanField(plan, "meta", issues, (written, path) =>
+        readMeta(written, path, context),
+    );
+    const targetsRead = readPlanField(plan, "targets", issues, (written, path) =>
+        readTargetIds(written, path, context),
+    );
+    const valuesRead = readValuesStage(plan, context);
+    const clockRead = readOptionalPlanField(plan, "clock", issues, (written, path) =>
+        readPlanClock(written, path, issues),
+    );
+    const stepsRead = readStepsStage(plan, valuesRead);
+    const cleanupRead = readCleanupStage(plan, stepsRead);
+    const storageStateRead = readOptionalPlanField(plan, "storageState", issues, (written, path) =>
+        readStorageState(written, path, context),
+    );
+    const parts = [
+        versionRead,
+        metaRead,
+        targetsRead,
+        stepsRead.steps,
+        storageStateRead,
+        valuesRead.values,
+        clockRead,
+        cleanupRead,
+    ] as const;
+    // A check across the whole plan may refuse it once every field has been read.
+    if (!allValid(parts) || issues.length !== issuesBefore) {
+        return INVALID;
+    }
+    const [, meta, targets, steps, storageState, values, clock, cleanup] = parts;
+    // Optional fields are left out when absent, so a plan without them hashes as it always did.
+    return {
+        version: CURRENT_PLAN_VERSION,
+        meta,
+        targets,
+        steps,
+        ...(storageState === undefined ? {} : { storageState }),
+        ...(values === undefined ? {} : { values }),
+        ...(clock === undefined ? {} : { clock }),
+        ...(cleanup === undefined ? {} : { cleanup }),
+    };
 }
 
 // Whatever its type says, JSON.stringify gives undefined for undefined or a symbol.
@@ -208,19 +325,5 @@ export function readPlanData(
     }
     const context = newParseContext(rules);
     const plan = readEnvelope(readable, context);
-    if (plan === INVALID) {
-        return failure(context.issues);
-    }
-    const { meta, targets, steps, storageState, values, clock, cleanup } = plan;
-    // Optional fields are left out when absent, so a plan without them hashes as it always did.
-    return success({
-        version: CURRENT_PLAN_VERSION,
-        meta,
-        targets,
-        steps,
-        ...(storageState === undefined ? {} : { storageState }),
-        ...(values === undefined ? {} : { values }),
-        ...(clock === undefined ? {} : { clock }),
-        ...(cleanup === undefined ? {} : { cleanup }),
-    });
+    return plan === INVALID ? failure(context.issues) : success(plan);
 }

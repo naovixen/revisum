@@ -8,6 +8,7 @@ import {
   type TextOrValue, type PlanErrorCode, type PlanRunResult,
 } from '@revisum/contracts';
 import { parseAiText } from './ai-text.ts';
+import { isInlineChoice } from './plan/IsInlineChoice.ts';
 
 const MARKDOWN_SPECIAL = /[\\`*_[\]<>#|!()]/g;
 // Markdown-safe text: every character with a Markdown meaning gets a backslash.
@@ -99,7 +100,7 @@ export function describeStep(step: Step): string {
 
 // A page script by its declared name; an inline script's text is never quoted.
 const describeScript = (script: ScriptChoice): string =>
-  (typeof script === 'string' ? `the declared \`${codeSpanText(script)}\` page script` : 'an inline page script');
+  (isInlineChoice(script) ? 'an inline page script' : `the declared \`${codeSpanText(script)}\` page script`);
 
 // "1 minute", "10 minutes": the amount is a whole number the plan wrote, never page data.
 const describeClockAdvance = (by: ClockAdvance): string => `${by.amount} ${by.amount === 1 ? by.unit.slice(0, -1) : by.unit}`;

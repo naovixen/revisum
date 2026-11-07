@@ -18,6 +18,7 @@ import {
     type Parsed,
 } from "../../plan-decoders.ts";
 import { mapNonEmpty, type NonEmptyList } from "../../../decoding/NonEmptyList.ts";
+import type { ReadableInput, ReadableRecord } from "../../../decoding/ReadableCopy.ts";
 import {
     CRITERION_FIELD,
     DATABASE_COMMAND_FEATURE,
@@ -47,7 +48,12 @@ import { NETWORK_AND_STORAGE_STEP_READERS } from "./NetworkAndStorageStepReaders
 import { PAGE_CHECK_STEP_READERS } from "./PageCheckStepReaders.ts";
 import { PAGE_SCRIPT_STEP_READERS } from "./PageScriptStepReaders.ts";
 import { SERVICE_CALL_STEP_READERS } from "./ServiceCallStepReaders.ts";
-import { readStepLocator, type StepFieldsRead, type StepReaderTable } from "./StepReader.ts";
+import {
+    readStepLocator,
+    withoutLeftOutFields,
+    type StepFieldsRead,
+    type StepReaderTable,
+} from "./StepReader.ts";
 
 // A list of steps holding at least one.
 export type StepList = NonEmptyList<Step>;
@@ -95,7 +101,7 @@ const STEP_READERS: StepReaderTable = {
 // project can enable that only together with page-script, so one check covers both.
 function isUnsafeStepEnabledElseRefused(
     type: Step["type"],
-    step: { readonly script?: unknown },
+    step: ReadableRecord,
     path: string,
     context: ParseContext,
 ): boolean {
@@ -105,32 +111,37 @@ function isUnsafeStepEnabledElseRefused(
     if (!isStepTypeIn(type, StepSection.PageScripts)) {
         return true;
     }
-    if (isInlineScript(step.script)) {
+    if (isInlineScript(step["script"])) {
         return isFeatureEnabledElseRefused(INLINE_SCRIPT_FEATURE, `${path}.script.inline`, context);
     }
     return isFeatureEnabledElseRefused(NAMED_SCRIPT_FEATURE, `${path}.type`, context);
 }
 
-// The fields a step of `type` may have, every required one there. The criterion id is checked on
-// its own by the reader, so that a missing one is reported as vacuous.
+// The fields a step of `type` may have, every required one there: the one check of a step's keys,
+// against its type's fact. The criterion id is checked on its own by the reader, so that a missing
+// one is reported as vacuous.
 function readStepFields<Type extends StepType>(
-    head: Readonly<Record<string, unknown>>,
+    head: ReadableRecord,
     type: Type,
     path: string,
     context: ParseContext,
 ): Parsed<StepFieldsRead<Type>> {
     const { required, optional } = STEP_FACTS[type].fields;
+    const allowed = [...required, ...optional];
     const requiredHere = required.filter((field) => field !== CRITERION_FIELD);
-    return readRecord(head, path, context.issues, [...required, ...optional], requiredHere);
+    const fields = readRecord(head, path, context.issues, allowed, requiredHere);
+    // readRecord accepts only a record whose fields are all in `allowed`, the names of `Type`'s
+    // fields. The compiler can't relate a record of any keys to fields of a type not yet known.
+    return fields === INVALID ? INVALID : (fields as StepFieldsRead<Type>);
 }
 
 // A step read as a record, and its type, one the plan language has.
 type StepHead = {
-    readonly head: Readonly<Record<string, unknown>>;
+    readonly head: ReadableRecord;
     readonly type: StepType;
 };
 
-function readStepHead(input: unknown, path: string, context: ParseContext): Parsed<StepHead> {
+function readStepHead(input: ReadableInput, path: string, context: ParseContext): Parsed<StepHead> {
     const head = peekRecord(input, path, context.issues);
     if (head === INVALID) {
         return INVALID;
@@ -148,7 +159,7 @@ function readStepHead(input: unknown, path: string, context: ParseContext): Pars
 // A step whose head is read and which may stand where it is. Its unsafe feature is checked, then
 // its fields against its type's fact, and its type's reader reads them.
 function readStepOfType<Type extends StepType>(
-    head: Readonly<Record<string, unknown>>,
+    head: ReadableRecord,
     type: Type,
     path: string,
     context: ParseContext,
@@ -157,11 +168,15 @@ function readStepOfType<Type extends StepType>(
         return INVALID;
     }
     const step = readStepFields(head, type, path, context);
+    if (step === INVALID) {
+        return INVALID;
+    }
     const readerOfType: StepReaderTable[Type] = STEP_READERS[type];
-    return step === INVALID ? INVALID : readerOfType(step, path, context);
+    const read = readerOfType(step, path, context);
+    return read === INVALID ? INVALID : withoutLeftOutFields<Type>(read);
 }
 
-export function readStep(input: unknown, path: string, context: ParseContext): Parsed<Step> {
+export function readStep(input: ReadableInput, path: string, context: ParseContext): Parsed<Step> {
     const read = readStepHead(input, path, context);
     if (read === INVALID) {
         return INVALID;
@@ -175,7 +190,7 @@ export function readStep(input: unknown, path: string, context: ParseContext): P
 
 // A non-empty list of steps, every one read so that a rejection lists every problem.
 export function readStepList(
-    input: unknown,
+    input: ReadableInput,
     path: string,
     context: ParseContext,
 ): Parsed<StepList> {
@@ -189,7 +204,11 @@ export function readStepList(
     return allValid(steps) ? steps : INVALID;
 }
 
-function readCleanupStep(input: unknown, path: string, context: ParseContext): Parsed<CleanupStep> {
+function readCleanupStep(
+    input: ReadableInput,
+    path: string,
+    context: ParseContext,
+): Parsed<CleanupStep> {
     const read = readStepHead(input, path, context);
     if (read === INVALID) {
         return INVALID;
@@ -203,8 +222,11 @@ function readCleanupStep(input: unknown, path: string, context: ParseContext): P
 
 // The plan's cleanup: calls and database commands only, read after the steps, so they may use the
 // values the steps remember.
-export function readCleanup(input: unknown, context: ParseContext): Parsed<readonly CleanupStep[]> {
-    const path = "$.cleanup";
+export function readCleanup(
+    input: ReadableInput,
+    path: string,
+    context: ParseContext,
+): Parsed<readonly CleanupStep[]> {
     const written = readList(input, path, context.issues, context.rules.limits.maximumSteps, 0);
     if (written === INVALID) {
         return INVALID;
