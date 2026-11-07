@@ -1,14 +1,17 @@
 // Reads what pageAudit (page-audit.ts) reports from the page. The page's own scripts may have changed
 // what the browser hands back, so every field is checked and a report of any other shape is refused.
+// A refusal names a fixed code and the index path of the field, never the page's text.
 import {
     failure,
-    Impact,
     IMPACTS,
+    isNonArrayObject,
     success,
     type A11yFinding,
     type Box,
+    type Impact,
     type Result,
 } from "@revisum/contracts";
+import { PAGE_AUDIT_RULES } from "./PageAuditRules.ts";
 
 export type AuditNode = {
     readonly selector: string;
@@ -27,107 +30,120 @@ export type AuditRuleResult = {
     readonly nodes: readonly AuditNode[];
 };
 
-type Fields = Readonly<Record<string, unknown>>;
+export const AuditReportProblemCode = {
+    InvalidJson: "invalid_json",
+    WrongType: "wrong_type",
+    UnknownValue: "unknown_value",
+} as const;
+export type AuditReportProblemCode =
+    (typeof AuditReportProblemCode)[keyof typeof AuditReportProblemCode];
+// Why a report was refused, and where: `$` is the report, `$[1].nodes[0].box` a field inside it.
+export type AuditReportProblem = { readonly code: AuditReportProblemCode; readonly path: string };
 
-const fieldsOf = (value: unknown): Fields | undefined =>
-    typeof value === "object" && value !== null && !Array.isArray(value)
-        ? Object.fromEntries(Object.entries(value))
-        : undefined;
+type Read<Value> = Result<Value, AuditReportProblem>;
+
+const wrongType = (path: string): Read<never> =>
+    failure({ code: AuditReportProblemCode.WrongType, path });
 
 const isFiniteNumber = (value: unknown): value is number =>
     typeof value === "number" && Number.isFinite(value);
 
-// A box, null for an element with none, or undefined when the value is neither.
-function readBox(value: unknown): Box | null | undefined {
-    if (value === null) {
-        return null;
-    }
-    const fields = fieldsOf(value);
-    if (fields === undefined) {
-        return undefined;
-    }
-    const { x, y, width, height } = fields;
-    return isFiniteNumber(x) && isFiniteNumber(y) && isFiniteNumber(width) && isFiniteNumber(height)
-        ? { x, y, width, height }
-        : undefined;
-}
-
-function readNode(value: unknown): Result<AuditNode, string> {
-    const fields = fieldsOf(value);
-    if (fields === undefined) {
-        return failure("a failing element is not an object");
-    }
-    const { selector, offscreen, snippet } = fields;
-    const box = readBox(fields["box"]);
-    if (
-        typeof selector !== "string" ||
-        box === undefined ||
-        typeof offscreen !== "boolean" ||
-        typeof snippet !== "string"
-    ) {
-        return failure("a failing element lacks its selector, box, offscreen flag or snippet");
-    }
-    return success({ selector, box, offscreen, snippet });
-}
-
 const isStringList = (value: unknown): value is readonly string[] =>
     Array.isArray(value) && value.every((entry) => typeof entry === "string");
 
-function readRule(value: unknown): Result<AuditRuleResult, string> {
-    const fields = fieldsOf(value);
-    if (fields === undefined) {
-        return failure("a failing rule is not an object");
+function readBox(value: unknown, path: string): Read<Box | null> {
+    if (value === null) {
+        return success(null);
     }
-    const { ruleId, actRule, wcag, impact, nodes } = fields;
-    if (typeof ruleId !== "string") {
-        return failure("a failing rule has no rule id");
+    if (!isNonArrayObject(value)) {
+        return wrongType(path);
     }
-    if ((actRule !== null && typeof actRule !== "string") || !isStringList(wcag)) {
-        return failure(`rule ${ruleId} lacks its ACT rule or its WCAG criteria`);
-    }
-    if (typeof impact !== "string") {
-        return failure(`rule ${ruleId} has no impact`);
-    }
-    if (!Array.isArray(nodes)) {
-        return failure(`rule ${ruleId} lists no failing elements`);
-    }
-    const readNodes: AuditNode[] = [];
-    for (const node of nodes) {
-        const read = readNode(node);
-        if (!read.ok) {
-            return failure(`rule ${ruleId}: ${read.error}`);
-        }
-        readNodes.push(read.value);
-    }
-    return success({
-        ruleId,
-        actRule,
-        wcag,
-        impact: IMPACTS.find((known) => known === impact) ?? Impact.Unknown,
-        nodes: readNodes,
-    });
+    const { x, y, width, height } = value;
+    return isFiniteNumber(x) && isFiniteNumber(y) && isFiniteNumber(width) && isFiniteNumber(height)
+        ? success({ x, y, width, height })
+        : wrongType(path);
 }
 
-function parseJson(json: string): Result<unknown, string> {
+function readNode(value: unknown, path: string): Read<AuditNode> {
+    if (!isNonArrayObject(value)) {
+        return wrongType(path);
+    }
+    const { selector, offscreen, snippet } = value;
+    if (typeof selector !== "string") {
+        return wrongType(`${path}.selector`);
+    }
+    const box = readBox(value["box"], `${path}.box`);
+    if (!box.ok) {
+        return box;
+    }
+    if (typeof offscreen !== "boolean") {
+        return wrongType(`${path}.offscreen`);
+    }
+    if (typeof snippet !== "string") {
+        return wrongType(`${path}.snippet`);
+    }
+    return success({ selector, box: box.value, offscreen, snippet });
+}
+
+function readNodes(value: unknown, path: string): Read<readonly AuditNode[]> {
+    if (!Array.isArray(value)) {
+        return wrongType(path);
+    }
+    const nodes: AuditNode[] = [];
+    for (const [index, node] of value.entries()) {
+        const read = readNode(node, `${path}[${String(index)}]`);
+        if (!read.ok) {
+            return read;
+        }
+        nodes.push(read.value);
+    }
+    return success(nodes);
+}
+
+function readRule(value: unknown, path: string): Read<AuditRuleResult> {
+    if (!isNonArrayObject(value)) {
+        return wrongType(path);
+    }
+    const { ruleId, actRule, wcag, impact } = value;
+    if (typeof ruleId !== "string" || !Object.hasOwn(PAGE_AUDIT_RULES, ruleId)) {
+        return failure({ code: AuditReportProblemCode.UnknownValue, path: `${path}.ruleId` });
+    }
+    if (actRule !== null && typeof actRule !== "string") {
+        return wrongType(`${path}.actRule`);
+    }
+    if (!isStringList(wcag)) {
+        return wrongType(`${path}.wcag`);
+    }
+    const knownImpact = IMPACTS.find((known) => known === impact);
+    if (knownImpact === undefined) {
+        return failure({ code: AuditReportProblemCode.UnknownValue, path: `${path}.impact` });
+    }
+    const nodes = readNodes(value["nodes"], `${path}.nodes`);
+    return nodes.ok
+        ? success({ ruleId, actRule, wcag, impact: knownImpact, nodes: nodes.value })
+        : nodes;
+}
+
+function parseJson(json: string): Read<unknown> {
     try {
         return success(JSON.parse(json));
     } catch {
-        return failure("the audit report is not JSON");
+        return failure({ code: AuditReportProblemCode.InvalidJson, path: "$" });
     }
 }
 
 // The failing rules, or why the report cannot be read.
-export function parseAudit(json: string): Result<readonly AuditRuleResult[], string> {
+export function parseAudit(json: string): Read<readonly AuditRuleResult[]> {
     const parsed = parseJson(json);
     if (!parsed.ok) {
         return parsed;
     }
     if (!Array.isArray(parsed.value)) {
-        return failure("the audit report is not a list of rules");
+        return wrongType("$");
     }
     const rules: AuditRuleResult[] = [];
-    for (const rule of parsed.value) {
-        const read = readRule(rule);
+    for (const [index, rule] of parsed.value.entries()) {
+        const read = readRule(rule, `$[${String(index)}]`);
         if (!read.ok) {
             return read;
         }

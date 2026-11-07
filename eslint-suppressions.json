@@ -1039,7 +1039,7 @@
   },
   "packages/engine/src/project/project-parser.ts": {
     "@typescript-eslint/naming-convention": {
-      "count": 4
+      "count": 3
     },
     "curly": {
       "count": 52

@@ -10,7 +10,7 @@ export {
   CONTAINER_CRAWL_MODULE, crawlInBrowser, crawlInRunner, crawlTarget,
   type BrowserCrawl, type ContainerCrawlInput, type CrawlStop, type IsolatedRunner,
 } from './explore-crawl.ts';
-export { isLoopbackEndpoint, plannerAdapter, PlannerCallError, type PlannerCallFailure, type PlannerConnection } from './planner-adapters.ts';
+export { plannerAdapter, PlannerCallError, type PlannerCallFailure, type PlannerConnection } from './planner-adapters.ts';
 export { CLI_OUTPUT_SCHEMA, cliError, exitCodeFor, type CliError, type CliOutput, type Command, type CommandOutcome } from './cli-output.ts';
 export { runPins, type BaselineFile, type RunPinsOptions } from './run-pins.ts';
 export { benchmarkRuns, type BenchmarkRuns, type BenchmarkRunsOptions, type BenchmarkSample } from './benchmark-runs.ts';

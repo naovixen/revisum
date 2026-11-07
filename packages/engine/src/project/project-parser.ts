@@ -6,7 +6,7 @@
 import {
   COLOR_SCHEMES, DEFAULT_TEST_ID_ATTRIBUTE, DEVICE_PROFILES, ENGINES, FIDELITIES, MOTION_PREFERENCES, PLANNER_WIRES, isPlainObject, success, failure,
   type Brand, type CallDeclaration, type CallName, type DeclaredService, type DeviceProfileId, type FixtureName, type IrreversiblePatterns, type Locale, type Origin, type Result,
-  type EmailDomain, type EvidenceMode, type PlannerEndpoint, type PlannerUrl, type SafeText, type SecretName, type Target, type TestIdAttribute, type TimeZone,
+  type EmailDomain, type EvidenceMode, type PlannerAddress, type PlannerEndpoint, type PlannerEndpointKind, type PlannerUrl, type SafeText, type SecretName, type Target, type TestIdAttribute, type TimeZone,
   type ObservedRequestDeclaration, type RequestName, type StorageEntryDeclaration, type StorageEntryName, type StubDeclaration, type StubName,
   type UnsafeFeaturesDeclaration, type VendorExtensionKey, type PlanError,
 } from '@revisum/contracts';
@@ -18,7 +18,7 @@ import { readCallDeclarations, readServices } from './call-declarations.ts';
 import { readObservedRequestDeclarations, readStorageEntryDeclarations, readStubDeclarations } from './network-and-storage-declarations.ts';
 import { readEvidenceMode } from './evidence-declarations.ts';
 import { readUnsafeFeatures } from './unsafe-feature-declarations.ts';
-import { readOrigin } from './ReadOrigin.ts';
+import { originOfUrl, readOrigin } from './ReadOrigin.ts';
 import { LARGEST_DOWNLOAD_BYTES, LOWERCASE_ID, MAXIMUM_TEST_ID_LENGTH, MAXIMUM_URL_LENGTH } from '../plan/plan-grammar.ts';
 import { readableCopy } from '../decoding/ReadableCopy.ts';
 
@@ -475,28 +475,38 @@ function readPlannerEndpoint(input: unknown, issues: Issues, secretNames: readon
   const keys = ['kind', 'url', 'model', 'wire', 'apiKey'];
   const fields = readRecord(input, path, issues, keys, kind === 'customer-key' ? keys : ['kind', 'url', 'model', 'wire']);
   if (fields === INVALID) return INVALID;
-  const url = readPlannerUrl(fields['url'], `${path}.url`, issues, kind === 'customer-key');
+  const address = readPlannerUrl(fields['url'], `${path}.url`, issues, kind);
   const model = readText(fields['model'], `${path}.model`, issues, MAXIMUM_MODEL_LENGTH);
   const wire = readOneOf(fields['wire'], `${path}.wire`, issues, PLANNER_WIRES);
   const apiKey = fields['apiKey'] === undefined ? undefined : readPlannerKey(fields['apiKey'], `${path}.apiKey`, issues, secretNames);
-  if (url === INVALID || model === INVALID || wire === INVALID || apiKey === INVALID) return INVALID;
+  if (address === INVALID || model === INVALID || wire === INVALID || apiKey === INVALID) return INVALID;
   if (kind === 'customer-key') {
     // readRecord has already required the key, so it is present here.
-    return apiKey === undefined ? INVALID : { kind, url, model, wire, apiKey };
+    return apiKey === undefined ? INVALID : { kind, ...address, model, wire, apiKey };
   }
-  return { kind, url, model, wire, ...(apiKey === undefined ? {} : { apiKey }) };
+  return { kind, ...address, model, wire, ...(apiKey === undefined ? {} : { apiKey }) };
 }
 
+// A loopback host: an IPv4 address in 127.0.0.0/8, the IPv6 loopback address, or the name localhost.
+const isLoopbackHost = (hostname: string): boolean =>
+  hostname === 'localhost' || hostname === '[::1]' || /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname);
+
 // The address a request is posted to, kept as written: http or https, with no user name, password
-// or fragment. `secureOnly` refuses http, for an endpoint that sends a key.
-function readPlannerUrl(input: unknown, path: string, issues: Issues, secureOnly: boolean): Parsed<PlannerUrl> {
+// or fragment. A customer-key endpoint sends a key, so it must be https; a local one must be on
+// the loopback interface. Its origin and path are read here once, for the draft command.
+function readPlannerUrl(input: unknown, path: string, issues: Issues, kind: PlannerEndpointKind): Parsed<PlannerAddress & { readonly url: PlannerUrl }> {
   const text = readText(input, path, issues, MAXIMUM_URL_LENGTH);
   if (text === INVALID) return INVALID;
   let url: URL;
   try { url = new URL(text); } catch { issues.push({ code: 'invalid_url', path }); return INVALID; }
-  if (url.protocol !== 'https:' && (secureOnly || url.protocol !== 'http:')) { issues.push({ code: 'scheme_not_allowed', path }); return INVALID; }
+  if (url.protocol !== 'https:' && (kind === 'customer-key' || url.protocol !== 'http:')) { issues.push({ code: 'scheme_not_allowed', path }); return INVALID; }
   if (url.username !== '' || url.password !== '' || url.hash !== '') { issues.push({ code: 'invalid_url', path }); return INVALID; }
-  return brand<string, 'PlannerUrl'>(text);
+  if (kind === 'local' && !isLoopbackHost(url.hostname.toLowerCase())) { issues.push({ code: 'not_loopback', path }); return INVALID; }
+  return {
+    url: brand<string, 'PlannerUrl'>(text),
+    origin: originOfUrl(url),
+    pathAndQuery: `${url.pathname}${url.search}`,
+  };
 }
 
 function readPlannerKey(input: unknown, path: string, issues: Issues, secretNames: readonly SecretName[]): Parsed<{ readonly secretName: SecretName }> {

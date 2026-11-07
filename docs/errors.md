@@ -123,6 +123,10 @@ Project error. An evidence-mode suite's `paths` entry or `workingDirectory` is a
 
 Plan error. A plan uses an unsafe feature its trusted `project.json` does not enable: a CSS or XPath locator (reported at the locator's `by`), a DOM check (at the assertion's `kind`, or a `remember` source's `read`), a named page script or a database command (at the step's `type`), or an inline script (at its `script.inline`). Every use is reported, and nothing under it is read or echoed. A person turns a feature on under `unsafeFeatures` in `project.json` on the protected branch; a change that turns one on in its own `project.json` runs without it until the change is approved and merged. Inline scripts need `pageScripts.allowInline: true` too. Runs using any unsafe feature are labelled unsafe and never count as verified evidence.
 
+## not_loopback
+
+Project error. A `local` planner endpoint's `url` names a host off the loopback interface. A local endpoint may take plain http and no key, so it must be `localhost`, an address in `127.0.0.0/8` or `[::1]`. Serve the model on loopback, or declare it as a `customer-key` endpoint over https. The draft command reports it as `planner-endpoint-not-loopback`.
+
 ## unknown-statement
 
 Readable plan error. The line is not a statement the readable grammar has, or not one that may stand there: a header after the first step, or any statement after the `Clean up:` block. Check the statement's words against the grammar in SPEC-28, or move the line.

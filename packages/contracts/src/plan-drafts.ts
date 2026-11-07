@@ -96,11 +96,16 @@ export type PlannerEndpointKind = (typeof PlannerEndpointKind)[keyof typeof Plan
 // checked it: a URL with no user name, password or fragment.
 export type PlannerUrl = Brand<string, 'PlannerUrl'>;
 
+// Where a planner's requests go, read from its url once by the project parser: the origin, the one
+// origin the egress proxy allows, and the path and query each request is posted to. Neither is
+// written in project.json, and the planner is left out of the project's hash.
+export type PlannerAddress = { readonly origin: Origin; readonly pathAndQuery: string };
+
 // The planner the draft command calls, declared in the trusted project.json. `url` is the full
 // address the request is posted to. A customer-key endpoint is reached over https only, with the
 // customer's own key, named as a secret; a local endpoint is on the loopback interface, such as a
 // model served by Ollama, and may need no key.
-export type PlannerEndpoint =
+export type PlannerEndpoint = PlannerAddress & (
   | {
     readonly kind: typeof PlannerEndpointKind.CustomerKey; readonly url: PlannerUrl; readonly model: string; readonly wire: PlannerWire;
     readonly apiKey: { readonly secretName: SecretName };
@@ -108,4 +113,4 @@ export type PlannerEndpoint =
   | {
     readonly kind: typeof PlannerEndpointKind.Local; readonly url: PlannerUrl; readonly model: string; readonly wire: PlannerWire;
     readonly apiKey?: { readonly secretName: SecretName };
-  };
+  });

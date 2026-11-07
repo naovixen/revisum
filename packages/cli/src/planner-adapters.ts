@@ -9,7 +9,7 @@
 // reply, which may echo the key.
 import {
   ANTHROPIC_API_VERSION, MAXIMUM_PLANNER_REPLY_BYTES, PLANNER_TIMEOUT_MILLISECONDS, failure, headerSecret, plannerPrompt, plannerRequestBody, success,
-  type DraftPlanner, type DraftRequest, type HeaderScheme, type Origin, type PlannerEndpoint, type PlannerWire, type Result, type SecretStore,
+  type DraftPlanner, type DraftRequest, type HeaderScheme, type PlannerEndpoint, type PlannerWire, type Result, type SecretStore,
   type ServiceCallErrorCode, type ServiceCaller, type ServiceRequestHeader,
 } from '@revisum/engine';
 
@@ -41,21 +41,9 @@ export type PlannerConnection = {
   readonly secrets: SecretStore;
 };
 
-// True when a local endpoint's host is on the loopback interface: an IPv4 address in 127.0.0.0/8,
-// the IPv6 loopback address, or the name localhost.
-export function isLoopbackEndpoint(endpoint: PlannerEndpoint): boolean {
-  let hostname: string;
-  try {
-    hostname = new URL(endpoint.url).hostname.toLowerCase();
-  } catch {
-    return false;
-  }
-  return hostname === 'localhost' || hostname === '[::1]' || /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname);
-}
-
 // The adapter for the endpoint's wire format, or secret-missing when its key's secret is not in
-// the store. `origin` is the endpoint's origin, as the egress proxy allows it.
-export function plannerAdapter(endpoint: PlannerEndpoint, origin: Origin, connection: PlannerConnection): Result<DraftPlanner, 'secret-missing'> {
+// the store. Requests go to the endpoint's origin, the one the egress proxy allows.
+export function plannerAdapter(endpoint: PlannerEndpoint, connection: PlannerConnection): Result<DraftPlanner, 'secret-missing'> {
   const headers: ServiceRequestHeader[] = [];
   if (endpoint.apiKey !== undefined) {
     const secret = connection.secrets.resolve(endpoint.apiKey.secretName);
@@ -65,10 +53,7 @@ export function plannerAdapter(endpoint: PlannerEndpoint, origin: Origin, connec
   }
   if (endpoint.wire === 'anthropic-messages') headers.push({ name: 'anthropic-version', value: ANTHROPIC_API_VERSION });
   headers.push({ name: 'content-type', value: JSON_MEDIA_TYPE });
-  // The endpoint's url is the full address the request is posted to; the project parser has
-  // already checked it is one.
-  const address = new URL(endpoint.url);
-  const pathAndQuery = `${address.pathname}${address.search}`;
+  const { origin, pathAndQuery } = endpoint;
   return success({
     async draft(request: DraftRequest): Promise<unknown> {
       const body = plannerRequestBody(endpoint.wire, endpoint.model, plannerPrompt(request));

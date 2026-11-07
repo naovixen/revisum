@@ -4,8 +4,11 @@
 // boxes of failing elements; the full rules engine lives in the auditor-act package. Rule ids use
 // the common short names, so findings line up across engines.
 
-// Runs in the page and returns the failing rules as JSON. Self-contained: sent with toString().
-export function pageAudit(): string {
+// Runs in the page and returns the failing rules as JSON. Self-contained: sent with toString(). It is
+// given PAGE_AUDIT_RULES as JSON, so each rule's ACT rule, WCAG criteria and impact are written once.
+export function pageAudit(ruleTable: string): string {
+  type RuleDetails = { actRule: string | null; wcag: string[]; impact: string };
+  const details = JSON.parse(ruleTable) as Record<string, RuleDetails | undefined>;
   type PageBox = { x: number; y: number; width: number; height: number };
   type FailingNode = { selector: string; box: PageBox | null; offscreen: boolean; snippet: string };
   type FailingRule = { ruleId: string; actRule: string | null; wcag: string[]; impact: string; nodes: FailingNode[] };
@@ -49,40 +52,41 @@ export function pageAudit(): string {
     [normalise(element.getAttribute('aria-label')), labelledByText(element), normalise(element.getAttribute('title'))].find((name) => name !== '') ?? '';
   const shown = (selector: string): Element[] => Array.from(document.querySelectorAll(selector)).filter((element) => !hidden(element));
   const rules: FailingRule[] = [];
-  const add = (ruleId: string, actRule: string | null, wcag: string[], impact: string, elements: Element[]): void => {
-    if (elements.length > 0) rules.push({ ruleId, actRule, wcag, impact, nodes: elements.map(describe) });
+  const add = (ruleId: string, elements: Element[]): void => {
+    const rule = details[ruleId];
+    if (rule !== undefined && elements.length > 0) rules.push({ ruleId, actRule: rule.actRule, wcag: rule.wcag, impact: rule.impact, nodes: elements.map(describe) });
   };
 
   // 1.1.1 Image has an accessible name.
-  add('image-alt', '23a2a8', ['1.1.1'], 'critical', shown('img').filter((element) => {
+  add('image-alt', shown('img').filter((element) => {
     const role = element.getAttribute('role');
     if (role === 'presentation' || role === 'none') return false;
     return !element.hasAttribute('alt') && explicitName(element) === '';
   }));
 
   // 4.1.2 Button has an accessible name.
-  add('button-name', '97a4e1', ['4.1.2'], 'critical', shown('button, input[type="button"], [role="button"]').filter((element) => {
+  add('button-name', shown('button, input[type="button"], [role="button"]').filter((element) => {
     if (element instanceof HTMLInputElement) return normalise(element.value) === '' && explicitName(element) === '';
     return textName(element) === '' && explicitName(element) === '';
   }));
 
   // 2.4.4, 4.1.2 Link has an accessible name.
-  add('link-name', 'c487ae', ['2.4.4', '4.1.2'], 'serious', shown('a[href], [role="link"]').filter((element) => textName(element) === '' && explicitName(element) === ''));
+  add('link-name', shown('a[href], [role="link"]').filter((element) => textName(element) === '' && explicitName(element) === ''));
 
   // 4.1.2 Form field has an accessible name.
   const unlabelledTypes = ['hidden', 'submit', 'reset', 'button', 'image'];
-  add('label', 'e086e5', ['4.1.2', '1.3.1'], 'critical', shown('input, select, textarea').filter((element) => {
+  add('label', shown('input, select, textarea').filter((element) => {
     if (element instanceof HTMLInputElement && unlabelledTypes.includes(element.type)) return false;
     const labels = normalise(Array.from((element as HTMLInputElement).labels ?? []).map((label) => label.textContent).join(' '));
     return labels === '' && explicitName(element) === '' && normalise(element.getAttribute('placeholder')) === '';
   }));
 
   // 2.4.2 Document has a title.
-  if (normalise(document.title) === '') add('document-title', '2779a5', ['2.4.2'], 'serious', [document.documentElement]);
+  if (normalise(document.title) === '') add('document-title', [document.documentElement]);
 
   // 3.1.1 Page has a lang attribute; 3.1.1 and 3.1.2 lang values are valid.
   const root = document.documentElement;
-  if (normalise(root.getAttribute('lang')) === '' && normalise(root.getAttribute('xml:lang')) === '') add('html-has-lang', 'b5c3f8', ['3.1.1'], 'serious', [root]);
+  if (normalise(root.getAttribute('lang')) === '' && normalise(root.getAttribute('xml:lang')) === '') add('html-has-lang', [root]);
   const languageNames = new Intl.DisplayNames(['en'], { type: 'language', fallback: 'none' });
   const validLanguage = (tag: string): boolean => {
     try {
@@ -91,11 +95,11 @@ export function pageAudit(): string {
       return primary.length >= 2 && primary.length <= 3 && languageNames.of(primary) !== undefined;
     } catch { return false; }
   };
-  if (normalise(root.getAttribute('lang')) !== '' && !validLanguage(normalise(root.getAttribute('lang')))) add('html-lang-valid', 'bf051a', ['3.1.1'], 'serious', [root]);
-  add('valid-lang', 'de46e4', ['3.1.2'], 'serious', shown('body [lang]').filter((element) => normalise(element.getAttribute('lang')) !== '' && !validLanguage(normalise(element.getAttribute('lang')))));
+  if (normalise(root.getAttribute('lang')) !== '' && !validLanguage(normalise(root.getAttribute('lang')))) add('html-lang-valid', [root]);
+  add('valid-lang', shown('body [lang]').filter((element) => normalise(element.getAttribute('lang')) !== '' && !validLanguage(normalise(element.getAttribute('lang')))));
 
   // 1.3.1 Lists contain only list items.
-  add('list', null, ['1.3.1'], 'serious', shown('ul, ol').filter((element) => element.getAttribute('role') === null
+  add('list', shown('ul, ol').filter((element) => element.getAttribute('role') === null
     && Array.from(element.children).some((child) => !['LI', 'SCRIPT', 'TEMPLATE'].includes(child.tagName))));
 
   // 1.3.5 Autocomplete attribute has a valid value.
@@ -121,7 +125,7 @@ export function pageAudit(): string {
     if (tokens.length > 0 && (tokens[tokens.length - 1] ?? '').startsWith('section-')) tokens.pop();
     return tokens.length === 0;
   };
-  add('autocomplete-valid', '73f2c2', ['1.3.5'], 'serious', shown('input[autocomplete], select[autocomplete], textarea[autocomplete]')
+  add('autocomplete-valid', shown('input[autocomplete], select[autocomplete], textarea[autocomplete]')
     .filter((element) => !validAutocomplete(element.getAttribute('autocomplete') ?? '')));
 
   // 1.4.3 Text has enough contrast. Solid backgrounds only; images and gradients are skipped as undecidable.
@@ -154,7 +158,7 @@ export function pageAudit(): string {
     const linear = (value: number): number => { const scaled = value / 255; return scaled <= 0.04045 ? scaled / 12.92 : ((scaled + 0.055) / 1.055) ** 2.4; };
     return 0.2126 * linear(colour[0]) + 0.7152 * linear(colour[1]) + 0.0722 * linear(colour[2]);
   };
-  add('color-contrast', 'afw4f7', ['1.4.3'], 'serious', shown('body *').filter((element) => {
+  add('color-contrast', shown('body *').filter((element) => {
     if (['SCRIPT', 'STYLE', 'TEMPLATE', 'NOSCRIPT', 'OPTION'].includes(element.tagName)) return false;
     if ((element as HTMLButtonElement).disabled === true) return false;
     const ownText = Array.from(element.childNodes).some((child) => child.nodeType === Node.TEXT_NODE && normalise(child.textContent) !== '');
@@ -172,7 +176,7 @@ export function pageAudit(): string {
   }));
 
   // 1.4.4 Zoom is not disabled.
-  add('meta-viewport', 'b4f0c3', ['1.4.4'], 'critical', Array.from(document.querySelectorAll('meta[name="viewport"]')).filter((meta) => {
+  add('meta-viewport', Array.from(document.querySelectorAll('meta[name="viewport"]')).filter((meta) => {
     const content = (meta.getAttribute('content') ?? '').toLowerCase().replace(/\s+/g, '');
     const notScalable = /user-scalable=(no|0)(,|;|$)/.test(content);
     const largestScale = /maximum-scale=([\d.]+)/.exec(content);
@@ -180,13 +184,13 @@ export function pageAudit(): string {
   }));
 
   // 2.2.1 No timed refresh.
-  add('meta-refresh', 'bc659a', ['2.2.1'], 'critical', Array.from(document.querySelectorAll('meta[http-equiv="refresh" i]')).filter((meta) => {
+  add('meta-refresh', Array.from(document.querySelectorAll('meta[http-equiv="refresh" i]')).filter((meta) => {
     const delay = Number.parseFloat(meta.getAttribute('content') ?? '');
     return Number.isFinite(delay) && delay > 0 && delay <= 72000;
   }));
 
   // 2.2.2 No marquee.
-  add('marquee', null, ['2.2.2'], 'serious', Array.from(document.querySelectorAll('marquee')));
+  add('marquee', Array.from(document.querySelectorAll('marquee')));
 
   // 4.1.2 Role attribute has a valid value.
   const roles = ['alert', 'alertdialog', 'application', 'article', 'banner', 'blockquote', 'button', 'caption', 'cell', 'checkbox',
@@ -197,7 +201,7 @@ export function pageAudit(): string {
     'rowgroup', 'rowheader', 'scrollbar', 'search', 'searchbox', 'separator', 'slider', 'spinbutton', 'status', 'strong', 'subscript',
     'superscript', 'switch', 'tab', 'table', 'tablist', 'tabpanel', 'term', 'textbox', 'time', 'timer', 'toolbar', 'tooltip', 'tree',
     'treegrid', 'treeitem', 'graphics-document', 'graphics-object', 'graphics-symbol'];
-  add('aria-roles', '674b10', ['4.1.2'], 'critical', shown('[role]').filter((element) => {
+  add('aria-roles', shown('[role]').filter((element) => {
     const tokens = (element.getAttribute('role') ?? '').toLowerCase().split(/\s+/).filter((token) => token !== '');
     return tokens.length > 0 && !tokens.some((token) => roles.includes(token));
   }));

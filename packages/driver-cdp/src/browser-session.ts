@@ -20,12 +20,15 @@ import { HitCheckOutcome, hitChecks, type CheckedDocument, type HitChecks } from
 import { MalformedBrowserReply } from './MalformedBrowserReply.ts';
 import { heldModifierKeys } from './modifier-keys.ts';
 import { pageAudit } from './page-audit.ts';
+import { PAGE_AUDIT_RULES } from './PageAuditRules.ts';
 import { parseAudit, toFindings } from './ParseAudit.ts';
 import { ElementEnabledState, SelectOutcome, type Actionability, type DownloadCapture, type DriverSession, type HasStepEnded, type PageEvents, type PageOperations, type PageWithInput, type Point, type ScriptCallOutcome } from './page-operations.ts';
 import type { PageFunction } from './PageFunction.ts';
 import { PageHeldByDialog } from './PageHeldByDialog.ts';
 import type { ConnectionFailure } from './SessionEgress.ts';
 
+// What pageAudit is given: its rules' details, as JSON, the one form a page function's input takes.
+const PAGE_AUDIT_RULE_TABLE = JSON.stringify(PAGE_AUDIT_RULES);
 const REJECTED_SELECTOR: ElementProbe = { count: 'selector-invalid' };
 const NOTHING_MATCHES: ElementProbe = { count: 0 };
 const READ_FAILED: ElementProbe = { count: UnreadablePage.ReadFailed };
@@ -968,12 +971,12 @@ function documentPorts<Handle>(
       }
     },
     audit: async () => {
-      const report = await readOfPage(() => answeredWithin(timeout, operations.callForString(pageAudit, [])));
+      const report = await readOfPage(() => answeredWithin(timeout, operations.callForString(pageAudit, [PAGE_AUDIT_RULE_TABLE])));
       if (!report.ok) {
         return report;
       }
       const rules = parseAudit(report.value);
-      return rules.ok ? success(toFindings(rules.value)) : failure({ code: PageReadFailureCode.PageUnreadable, detail: rules.error });
+      return rules.ok ? success(toFindings(rules.value)) : failure({ code: PageReadFailureCode.PageUnreadable, detail: `the audit report is unreadable: ${rules.error.code} at ${rules.error.path}` });
     },
     accessibilitySnapshot: () => readOfPage(() => operations.accessibilityTree()),
     linkTargets: () => readOfPage(async () => decodeLinkTargets(await operations.callForString(linkTargetList, []))),

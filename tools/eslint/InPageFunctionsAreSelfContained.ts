@@ -161,30 +161,6 @@ function unwrapped(node: ts.Expression): ts.Expression {
     return node;
 }
 
-// The declarations a sent expression's value may come from, followed through imports and both
-// branches of a condition; undefined for any the type checker cannot name.
-function sentDeclarations(
-    checker: ts.TypeChecker,
-    sent: ts.Expression,
-): readonly (ts.Declaration | undefined)[] {
-    const expression = unwrapped(sent);
-    if (ts.isConditionalExpression(expression)) {
-        return [
-            ...sentDeclarations(checker, expression.whenTrue),
-            ...sentDeclarations(checker, expression.whenFalse),
-        ];
-    }
-    const named = ts.isPropertyAccessExpression(expression) ? expression.name : expression;
-    const symbol =
-        checker.getSymbolAtLocation(named) ?? checker.getTypeAtLocation(expression).getSymbol();
-    if (symbol === undefined) {
-        return [undefined];
-    }
-    const target =
-        (symbol.flags & ts.SymbolFlags.Alias) === 0 ? symbol : checker.getAliasedSymbol(symbol);
-    return [target.declarations?.[0]];
-}
-
 const isFunctionExpression = (node: ts.Node | undefined): boolean =>
     node !== undefined && (ts.isArrowFunction(node) || ts.isFunctionExpression(node));
 
@@ -206,6 +182,75 @@ const isTopLevelFunction = (declaration: ts.Declaration): boolean =>
         isFunctionExpression(declaration.initializer) &&
         ts.isVariableStatement(declaration.parent.parent) &&
         ts.isSourceFile(declaration.parent.parent.parent));
+
+// A PageFunction, or one that may be undefined.
+const isPageFunctionType = (checker: ts.TypeChecker, type: ts.Type): boolean =>
+    checker.getNonNullableType(type).aliasSymbol?.name === PAGE_FUNCTION_TYPE;
+
+// The value a declaration is given where it is declared, if it is one a sent value can be traced
+// through: a name, a property, an element or a condition.
+function tracedInitializer(declaration: ts.Declaration): ts.Expression | undefined {
+    const initializer =
+        ts.isVariableDeclaration(declaration) ||
+        ts.isPropertyAssignment(declaration) ||
+        ts.isPropertyDeclaration(declaration)
+            ? declaration.initializer
+            : undefined;
+    if (initializer === undefined) {
+        return undefined;
+    }
+    const value = unwrapped(initializer);
+    return ts.isIdentifier(value) ||
+        ts.isPropertyAccessExpression(value) ||
+        ts.isElementAccessExpression(value) ||
+        ts.isConditionalExpression(value)
+        ? value
+        : undefined;
+}
+
+// Whether every value a sent expression may hold is a top-level function of an in-page file. A name
+// is followed through imports, conditions and the names it was given from. One with nothing to
+// follow, such as a parameter, passes only when it is typed as a PageFunction: whoever handed it
+// in sent a PageFunction, and was checked there.
+function comesFromInPageFile(
+    checker: ts.TypeChecker,
+    isInPageFile: (file: string) => boolean,
+    sent: ts.Expression,
+    followed: ReadonlySet<ts.Declaration>,
+): boolean {
+    const expression = unwrapped(sent);
+    if (ts.isConditionalExpression(expression)) {
+        return (
+            comesFromInPageFile(checker, isInPageFile, expression.whenTrue, followed) &&
+            comesFromInPageFile(checker, isInPageFile, expression.whenFalse, followed)
+        );
+    }
+    const named = ts.isPropertyAccessExpression(expression) ? expression.name : expression;
+    const symbol = checker.getSymbolAtLocation(named);
+    if (symbol === undefined) {
+        return false;
+    }
+    const target =
+        (symbol.flags & ts.SymbolFlags.Alias) === 0 ? symbol : checker.getAliasedSymbol(symbol);
+    const declaration = target.declarations?.[0];
+    if (declaration === undefined || followed.has(declaration)) {
+        return false;
+    }
+    if (holdsItsOwnFunction(declaration)) {
+        return (
+            isTopLevelFunction(declaration) && isInPageFile(declaration.getSourceFile().fileName)
+        );
+    }
+    const initializer = tracedInitializer(declaration);
+    return initializer === undefined
+        ? isPageFunctionType(checker, checker.getTypeOfSymbol(target))
+        : comesFromInPageFile(
+              checker,
+              isInPageFile,
+              initializer,
+              new Set([...followed, declaration]),
+          );
+}
 
 // `expression.toString()`, which is how a function's source is sent.
 const sentByToString = (call: TSESTree.CallExpression): TSESTree.Expression | undefined => {
@@ -232,12 +277,12 @@ function isTypedAsPageFunction(
     services: ParserServicesWithTypeInformation,
     argument: TSESTree.Node,
 ): boolean {
+    const checker = services.program.getTypeChecker();
     const expression = services.esTreeNodeToTSNodeMap.get(argument);
-    return (
-        ts.isExpression(expression) &&
-        services.program.getTypeChecker().getContextualType(expression)?.aliasSymbol?.name ===
-            PAGE_FUNCTION_TYPE
-    );
+    const expected = ts.isExpression(expression)
+        ? checker.getContextualType(expression)
+        : undefined;
+    return expected !== undefined && isPageFunctionType(checker, expected);
 }
 
 export const inPageFunctionsAreSelfContained = ESLintUtils.RuleCreator.withoutDocs<
@@ -287,21 +332,12 @@ export const inPageFunctionsAreSelfContained = ESLintUtils.RuleCreator.withoutDo
             }
         };
 
-        // A sent value must come from a top-level function of an in-page file. One handed in from
-        // elsewhere, as a parameter or a typed field, was checked where it was first sent.
         const checkSentFunction = (node: TSESTree.Expression): void => {
             const sent = services.esTreeNodeToTSNodeMap.get(node);
-            const declarations = ts.isExpression(sent)
-                ? sentDeclarations(checker, sent)
-                : [undefined];
-            const isSentFromInPageFile = declarations.every(
-                (declaration) =>
-                    declaration !== undefined &&
-                    (!holdsItsOwnFunction(declaration) ||
-                        (isTopLevelFunction(declaration) &&
-                            isInPageFile(declaration.getSourceFile().fileName))),
-            );
-            if (!isSentFromInPageFile) {
+            if (
+                !ts.isExpression(sent) ||
+                !comesFromInPageFile(checker, isInPageFile, sent, new Set())
+            ) {
                 context.report({
                     node,
                     messageId: "sentFromElsewhere",

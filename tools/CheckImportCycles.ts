@@ -3,19 +3,15 @@
 // compiler cannot see that. Static imports and `export … from` count; a dynamic import loads
 // later, on demand, so it never takes part.
 //
-// A type-only import is erased before anything runs, so it cannot crash at load. It still makes
-// the two modules depend on each other, so a cycle through one is a problem too, reported as
-// type-only so the fix is plain: move the shared type to a module both sides can import.
+// A type-only import, `import type …` or `export type … from`, is erased before anything runs, so it
+// cannot crash at load. One whose names each carry their own `type`, `import { type A }`, is not:
+// under verbatimModuleSyntax the module is still loaded, so it counts as a value import. A type-only
+// import still makes the two modules depend on each other, so a cycle through one is a problem too,
+// reported as type-only so the fix is plain: move the shared type to a module both sides can import.
 
 import { readFileSync } from "node:fs";
 import { dirname, join, normalize } from "node:path";
-import {
-    isIdentifier,
-    isPunctuator,
-    listSourceFiles,
-    moduleSpecifiers,
-    type ModuleSpecifier,
-} from "./source-files.ts";
+import { listSourceFiles, moduleSpecifiers } from "./source-files.ts";
 import { readWorkspacePackages, reportProblems } from "./workspace-packages.ts";
 
 type ImportEdge = { readonly target: string; readonly isTypeOnly: boolean };
@@ -24,34 +20,6 @@ type ImportGraph = ReadonlyMap<string, readonly ImportEdge[]>;
 const WORKSPACE_SCOPE = "@revisum/";
 
 const toForwardSlashes = (path: string): string => path.replaceAll("\\", "/");
-
-// `import type …`, or `{ … }` where every name carries its own `type`.
-function isErased(loaded: ModuleSpecifier): boolean {
-    if (loaded.isTypeOnly) {
-        return true;
-    }
-    const clause = loaded.clause ?? [];
-    if (!isPunctuator(clause[0], "{")) {
-        return false;
-    }
-    const close = clause.findIndex((token) => isPunctuator(token, "}"));
-    const entries: (typeof clause)[number][][] = [[]];
-    for (const token of clause.slice(1, close)) {
-        if (isPunctuator(token, ",")) {
-            entries.push([]);
-        } else {
-            entries.at(-1)?.push(token);
-        }
-    }
-    const named = entries.filter((entry) => entry.length > 0);
-    return (
-        named.length > 0 &&
-        named.every(
-            (entry) =>
-                isIdentifier(entry[0], "type") && entry.length > 1 && !isIdentifier(entry[1], "as"),
-        )
-    );
-}
 
 // Each workspace package's name, then its entry file, repository-relative.
 function workspaceEntries(root: string): ReadonlyMap<string, string> {
@@ -99,7 +67,7 @@ export function readImportGraph(root: string): ImportGraph {
             }
             const target = resolveSpecifier(file, loaded.specifier, known, packages);
             if (target !== undefined) {
-                edges.push({ target, isTypeOnly: isErased(loaded) });
+                edges.push({ target, isTypeOnly: loaded.isTypeOnly });
             }
         }
         graph.set(file, edges);

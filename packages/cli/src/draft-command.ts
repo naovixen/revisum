@@ -24,16 +24,16 @@ import { dirname, isAbsolute, relative, resolve } from 'node:path';
 import {
   DEFAULT_EXPLORE_DEPTH, DEFAULT_EXPLORE_PAGES, DEFAULT_PAGE_TIMEOUT_MILLISECONDS, MAXIMUM_EXPLORE_DEPTH, MAXIMUM_EXPLORE_PAGES,
   READABLE_GRAMMAR_VERSION, admitCoreDraft, checkDraftLocators, defaultRedactor, exploreStartOrigin, extractCriteria, loadTrustedProject,
-  pageMapReference, pageMapText, parseAiText, parseProject, planParser, planStanding, plannerOrigin, plannerReplyText, policyGate,
-  readPlanText, withDeclaredSecretRedaction,
+  pageMapReference, pageMapText, parseAiText, parseProject, planParser, planStanding, plannerReplyText, policyGate,
+  PlanErrorCode, readPlanText, withDeclaredSecretRedaction,
   type ApprovalStore, type BrowserDriver, type ClearedRun, type CliErrorCode, type CriterionText, type DraftError, type DraftRequest,
-  type DraftWarning, type EventSink, type Origin, type PageMap, type PlanDraft, type PlannerEndpoint, type PlanProvenance, type PlanSource, type Project,
+  type DraftWarning, type EventSink, type Origin, type PageMap, type PlanDraft, type PlannerEndpoint, type PlanProvenance, type PlanSource, type Project, type ProjectLoadError,
   type Redactor, type SecretStore, type Target, type TrustedProject, type VersionControlPort,
 } from '@revisum/engine';
 import { serviceCaller, startProxyServer, type AddressConnector, type AddressResolver } from '@revisum/runner';
 import { CLI_OUTPUT_SCHEMA, cliError, exitCodeFor, type CliError, type CliOutput, type CommandOutcome } from './cli-output.ts';
 import { crawlInBrowser, crawlInRunner, crawlTarget, type CrawlStop, type IsolatedRunner } from './explore-crawl.ts';
-import { isLoopbackEndpoint, plannerAdapter } from './planner-adapters.ts';
+import { plannerAdapter } from './planner-adapters.ts';
 
 export type DraftCommandPorts = {
   // The project folder: --from, --out and --after are relative to it.
@@ -201,14 +201,22 @@ function readCriteria(options: DraftArguments, ports: DraftCommandPorts): { read
   return isStop(criteria) ? criteria : { specPath, criteria };
 }
 
+// Why the trusted project could not be used. A local planner off the loopback interface has a code
+// of its own, so the person sees which rule the endpoint broke.
+function projectRefusal(error: ProjectLoadError): Stop {
+  if (error.code !== 'config-invalid') return stop('untrusted-source', PROJECT_FILE);
+  return error.errors.some((issue) => issue.code === PlanErrorCode.NotLoopback)
+    ? stop('planner-endpoint-not-loopback', `${PROJECT_FILE}#planner.url`)
+    : stop('config-invalid', PROJECT_FILE);
+}
+
 async function prepare(options: DraftArguments, ports: DraftCommandPorts): Promise<Prepared | Stop> {
   const loaded = await loadTrustedProject(PROJECT_FILE, ports.versionControl, { files: [], events: ports.events });
-  if (!loaded.ok) return stop(loaded.error.code === 'config-invalid' ? 'config-invalid' : 'untrusted-source', PROJECT_FILE);
+  if (!loaded.ok) return projectRefusal(loaded.error);
   const project = loaded.value.project;
   if (project.planner === undefined) return stop('usage', `${PROJECT_FILE}#planner`);
   const endpoint = project.planner;
-  if (endpoint.kind === 'local' && !isLoopbackEndpoint(endpoint)) return stop('planner-endpoint-not-loopback', `${PROJECT_FILE}#planner.url`);
-  const origin = plannerOrigin(endpoint);
+  const origin = endpoint.origin;
 
   // The spec's path is checked before the draft's, as the command line names them.
   if (options.from !== undefined && insideFolder(ports.workingDirectory, options.from) === undefined) return stop('usage', '--from');
@@ -239,7 +247,7 @@ async function callPlanner(prepared: Prepared, request: DraftRequest, ports: Dra
   );
   try {
     const caller = serviceCaller({ proxy, ...(ports.trustedCertificates === undefined ? {} : { trustedCertificates: ports.trustedCertificates }) });
-    const adapter = plannerAdapter(endpoint, origin, { caller, secrets: ports.secrets });
+    const adapter = plannerAdapter(endpoint, { caller, secrets: ports.secrets });
     if (!adapter.ok) return stop('config-invalid', `${PROJECT_FILE}#planner.apiKey`);
     try {
       return { reply: await adapter.value.draft(request) };

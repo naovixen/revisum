@@ -21,13 +21,21 @@ const TEST_CALL_MODIFIERS = new Set(['only', 'skip', 'todo']);
 
 type LockEntry = { readonly version?: unknown; readonly dev?: unknown; readonly dependencies?: unknown; readonly optionalDependencies?: unknown; readonly peerDependencies?: unknown };
 
+// The fields of a JSON object, copied once; undefined for anything else.
 const fieldsOf = (value: unknown): Readonly<Record<string, unknown>> | undefined =>
   typeof value === 'object' && value !== null && !Array.isArray(value) ? Object.fromEntries(Object.entries(value)) : undefined;
 
-// The lock file's installed packages by path; a field of any other shape counts as none.
-function lockPackages(lock: unknown): Readonly<Record<string, LockEntry>> {
+const namesOf = (value: unknown): string[] => Object.keys(fieldsOf(value) ?? {});
+
+// The lock file's installed packages by path, or undefined when it has no packages object, so the
+// trust path cannot be read. An entry of any other shape counts as none.
+function lockPackages(lock: unknown): Readonly<Record<string, LockEntry>> | undefined {
+  const listed = fieldsOf(fieldsOf(lock)?.['packages']);
+  if (listed === undefined) {
+    return undefined;
+  }
   const packages: Record<string, LockEntry> = {};
-  for (const [path, value] of Object.entries(fieldsOf(fieldsOf(lock)?.['packages']) ?? {})) {
+  for (const [path, value] of Object.entries(listed)) {
     const fields = fieldsOf(value);
     if (fields !== undefined) {
       packages[path] = {
@@ -41,9 +49,6 @@ function lockPackages(lock: unknown): Readonly<Record<string, LockEntry>> {
   }
   return packages;
 }
-
-const namesOf = (value: unknown): string[] =>
-  typeof value === 'object' && value !== null && !Array.isArray(value) ? Object.keys(value) : [];
 
 // What a package depends on at run time, as its lock entry or manifest lists it.
 const runtimeNames = (entry: LockEntry): string[] =>
@@ -59,10 +64,14 @@ function installedEntry(packages: Readonly<Record<string, LockEntry>>, from: str
   return undefined;
 }
 
-// Each third-party package on the trust path and the version the lock file installs.
-export function trustPath(root: string): Map<string, string> {
+// Each third-party package on the trust path and the version the lock file installs, or undefined
+// when the lock file does not list its installed packages.
+export function trustPath(root: string): Map<string, string> | undefined {
   const lock: unknown = JSON.parse(readFileSync(join(root, 'package-lock.json'), 'utf8'));
   const packages = lockPackages(lock);
+  if (packages === undefined) {
+    return undefined;
+  }
   const workspaces = Object.keys(packages).filter((path) => path.startsWith('packages/'));
   const found = new Map<string, string>();
   const queue: { readonly from: string; readonly name: string }[] = [];
@@ -165,6 +174,9 @@ const evidenceTestName = (evidence: string, path: string): string | undefined =>
 export function checkDependencyReviews(root: string, reviews: readonly DependencyReview[] = DEPENDENCY_REVIEWS): string[] {
   const problems: string[] = [];
   const installed = trustPath(root);
+  if (installed === undefined) {
+    return ['package-lock.json lists no installed packages, so the trust path cannot be read'];
+  }
   const requested = manifestVersions(root);
   const reviewed = new Map(reviews.map((review) => [review.component, review]));
   for (const [name, version] of [...installed].sort(([left], [right]) => left.localeCompare(right))) {

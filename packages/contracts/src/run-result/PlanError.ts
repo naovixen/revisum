@@ -43,6 +43,8 @@ export const PlanErrorCode = {
     // An unsafe plan feature, such as a css locator or a page script, that the trusted project does
     // not enable. Reported at the field that names the feature, with nothing under it read.
     UnsafeFeatureDisabled: "unsafe_feature_disabled",
+    // A local planner endpoint whose host is not on the loopback interface.
+    NotLoopback: "not_loopback",
 } as const;
 
 export type PlanErrorCode = (typeof PlanErrorCode)[keyof typeof PlanErrorCode];

@@ -1,7 +1,10 @@
 // Reads an origin a person declared in the project file.
-import type { Origin, PlannerEndpoint } from "@revisum/contracts";
+import type { Origin } from "@revisum/contracts";
 import { brand } from "../brand.ts";
 import { INVALID, type Issues, type Parsed } from "../plan/plan-decoders.ts";
+
+// The origin of an http or https URL the caller has already checked.
+export const originOfUrl = (url: URL): Origin => brand<string, "Origin">(url.origin);
 
 // An http or https origin with no path, written exactly as the URL standard serialises it.
 export function readOrigin(input: unknown, path: string, issues: Issues): Parsed<Origin> {
@@ -26,8 +29,3 @@ export function readOrigin(input: unknown, path: string, issues: Issues): Parsed
     }
     return brand<string, "Origin">(input);
 }
-
-// The origin a planner endpoint's requests go to, which the egress proxy allows and nothing else.
-// The project parser has checked the address is an http or https URL, so it always has one.
-export const plannerOrigin = (endpoint: PlannerEndpoint): Origin =>
-    brand<string, "Origin">(new URL(endpoint.url).origin);
