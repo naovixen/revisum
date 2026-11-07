@@ -229,6 +229,8 @@ describe('(f) release artefacts', () => {
     const plan = testHarness.plan(signupPlan(['cdp-chromium']));
     const first = await testHarness.run(plan, 'cdp-chromium');
     const second = await testHarness.run(plan, 'cdp-chromium');
+    assert.equal(first.result.mode, 'plan');
+    assert.equal(second.result.mode, 'plan');
     const draft = releaseNoteDraft(plan, [first.result]);
     assert.equal(draft, releaseNoteDraft(plan, [second.result]), 'byte-identical drafts');
     assert.ok(!draft.includes(EMAIL) && !draft.includes(NAME), 'no typed values');

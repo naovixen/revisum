@@ -44,7 +44,7 @@ for (const targetId of Object.values(BrowserTarget)) {
       assert.equal(resolvePlanClock(plan.clock, CLOCK_START_MILLISECONDS, harness.target(targetId).timezone), FIRST_OF_NOVEMBER_AT_NINE);
       const { result } = await harness.run(plan, targetId);
       assert.equal(result.state, 'Passed', JSON.stringify(result.steps));
-      assert.equal(result.manifest?.clock.fixedTimeMilliseconds, CLOCK_START_MILLISECONDS, 'the manifest records the run\'s own clock start');
+      assert.equal(result.manifest.clock.fixedTimeMilliseconds, CLOCK_START_MILLISECONDS, 'the manifest records the run\'s own clock start');
     });
 
     test(`${determinismRuns()} replays of the plan give one result hash, each from the same session environment`, { timeout: 180_000, ...onTarget(targetId) }, async () => {
@@ -87,5 +87,5 @@ test('a clock start a month later freezes the page at the first of the month aft
   const plan = harness.plan(planFor(BrowserTarget.Chrome, clockSteps(firstOfDecemberAtNine), { clock: FIRST_OF_NEXT_MONTH_AT_NINE }));
   const { result } = await harness.run(plan, BrowserTarget.Chrome, { clockStartMilliseconds: laterStart });
   assert.equal(result.state, 'Passed', JSON.stringify(result.steps));
-  assert.equal(result.manifest?.clock.fixedTimeMilliseconds, laterStart);
+  assert.equal(result.manifest.clock.fixedTimeMilliseconds, laterStart);
 });

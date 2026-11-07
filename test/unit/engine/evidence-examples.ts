@@ -13,8 +13,9 @@
 //   - parseSuiteReport takes the report as parsed JSON (reportInput below), not as bytes;
 //   - an attachment path inside Revisum's output directory is written relative to it
 //     (ATTACHMENT_INSIDE_OUTPUT below);
-//   - EvidenceContext is { suite, pass, exitCode, redactor }: the declared suite, which pass this
-//     is, the suite command's exit code, and the redactor every kept text goes through;
+//   - EvidenceContext is { suite, manifest, pass, exitCode, redactor }: the declared suite, the
+//     run's manifest, which pass this is, the suite command's exit code, and the redactor every
+//     kept text goes through;
 //   - declaredSuite(project, name) picks the suite `run --suite <name>` runs, or refuses with
 //     evidence-mode-disabled or suite-not-declared before any container starts;
 //   - suitePasses(suite, changedFiles) lists the passes a change gets, each with the version of
@@ -26,8 +27,8 @@ import { randomBytes } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  declaredSuite, defaultRedactor, evidenceMergeGateOpen, evidenceResult, parseProject, parseSuiteReport, suitePasses,
-  type EvidenceContext, type EvidenceLimits, type EvidenceSuiteDeclaration, type Project, type ProjectData, type RunResult, type SuiteDecodeError,
+  declaredSuite, defaultRedactor, evidenceManifest, evidenceMergeGateOpen, evidenceResult, parseProject, parseSuiteReport, suitePasses,
+  type EvidenceContext, type EvidenceLimits, type EvidenceRunManifest, type EvidenceSuiteDeclaration, type Project, type ProjectData, type RunResult, type SuiteDecodeError,
   type SuiteReport,
 } from '@revisum/engine';
 import { FIXTURES } from '../../support/repository.ts';
@@ -164,9 +165,22 @@ function resultStatuses(value: unknown): string[] {
 // interrupted, otherwise 0.
 export const agreeingExitCode = (report: unknown): number => (resultStatuses(report).some((status) => FAILING_STATUSES.has(status)) ? 1 : 0);
 
+// The manifest a run of the suite makes: its one test file, the browsers it brings and the host.
+export function suiteRunManifest(suite: EvidenceSuiteDeclaration = declaredCheckoutSuite()): EvidenceRunManifest {
+  return evidenceManifest({
+    suite,
+    suiteFiles: [{ path: `${SUITE_FOLDER}/e2e/checkout.spec.ts`, bytes: new TextEncoder().encode('test("checkout", () => {});\n') }],
+    playwrightVersion: '1.50.0',
+    browsers: ['chromium'],
+    host: { platform: 'test', arch: 'test' },
+  });
+}
+
 export function evidenceContext(report: unknown, options: EvidenceOptions = {}): EvidenceContext {
+  const suite = options.suite ?? declaredCheckoutSuite();
   return {
-    suite: options.suite ?? declaredCheckoutSuite(),
+    suite,
+    manifest: suiteRunManifest(suite),
     pass: options.pass ?? 'gating',
     exitCode: options.exitCode ?? agreeingExitCode(report),
     redactor: defaultRedactor(),

@@ -10,7 +10,6 @@ import {
     planParser,
     refusedSuiteResult,
     unreadSuiteResult,
-    type RunManifest,
     type RunResult,
 } from "@revisum/engine";
 import { baseUrlOf, clearRun, trustedProjectFrom } from "../../support/policy-clearance.ts";
@@ -69,12 +68,6 @@ const planRunRefusing = async (
     return result;
 };
 
-const runManifest = async (): Promise<RunManifest> => {
-    const { manifest } = await planRunRefusing([]);
-    assert.ok(manifest !== null, "the plan run made no manifest");
-    return manifest;
-};
-
 const firstTestResult = (field: string): (string | number)[] => [
     ...specPath(0),
     "tests",
@@ -84,15 +77,16 @@ const firstTestResult = (field: string): (string | number)[] => [
     field,
 ];
 
-const evidenceRunRefusing = async (
+const evidenceRunRefusing = (
     origins: readonly string[],
     report: JsonRecord = recordedReport("passing-with-criteria"),
 ): Promise<RunResult> =>
-    evidenceResult(decodedReport(report), [], [], {
-        ...evidenceContext(report),
-        manifest: await runManifest(),
-        blockedOrigins: origins,
-    });
+    Promise.resolve(
+        evidenceResult(decodedReport(report), [], [], {
+            ...evidenceContext(report),
+            blockedOrigins: origins,
+        }),
+    );
 
 const failingSuiteReport = (): JsonRecord =>
     withValue(recordedReport("passing-with-criteria"), firstTestResult("status"), "failed");

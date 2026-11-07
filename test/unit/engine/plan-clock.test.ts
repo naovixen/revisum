@@ -75,7 +75,7 @@ test('with a plan clock, the driver freezes the page at resolvePlanClock\'s time
   assert.deepEqual(recording.environments.map((environment) => environment.fixedTimeMilliseconds), [Date.UTC(2026, 10, 1, 9, 0)]);
   const { clock, timezone } = planClockIn('Europe/London', FIRST_OF_NEXT_MONTH_AT_NINE);
   assert.equal(recording.environments[0]?.fixedTimeMilliseconds, resolvePlanClock(clock, CLOCK_START, timezone));
-  assert.equal(result.manifest?.clock.fixedTimeMilliseconds, CLOCK_START, 'the manifest records the run\'s own clock start');
+  assert.equal(result.manifest.clock.fixedTimeMilliseconds, CLOCK_START, 'the manifest records the run\'s own clock start');
 });
 
 // Counter-example: without a plan clock the page is frozen at the run's clock start, as before.
