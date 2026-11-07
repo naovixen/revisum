@@ -4,11 +4,11 @@ import {
     type AppliedRewrite,
     type StubAnswer,
     RunReviewItemCode,
+    TerminalState,
     UnreadRecordCode,
     type RunReviewItem,
 } from "@revisum/contracts";
-import { finish } from "../../lifecycle.ts";
-import type { StepsVerdict } from "../steps/VerdictOfSteps.ts";
+import type { FinishedRun } from "../steps/VerdictOfSteps.ts";
 import { RecordReadKind, type RecordRead } from "./RecordRead.ts";
 
 export type RecordsAfterTheSteps = {
@@ -41,19 +41,16 @@ export function unreadRecordItems(records: RecordsAfterTheSteps): RunReviewItem[
     );
 }
 
-// The verdict the records read before the egress leave. A run that may have tested a rewritten app
-// has no verdict to give, nor has a passed run whose refusals went unread, since one refusal would
-// stop it passing; a run that did not pass already says so. Unread stub answers leave the verdict
-// standing.
-export function verdictGivenTheRecords(
-    verdict: StepsVerdict,
+// True when the records read before the egress leave the steps no verdict to give. A run that may
+// have tested a rewritten app has none, nor has a passed run whose refusals went unread, since one
+// refusal would stop it passing; a run that did not pass already says so. Unread stub answers leave
+// the verdict standing.
+export function isVerdictLostToTheRecords(
+    finished: FinishedRun,
     records: Omit<RecordsAfterTheSteps, "egress">,
-): StepsVerdict {
+): boolean {
     const isRewriteUnknown = records.rewrites.kind === RecordReadKind.Unread;
     const isRefusalUnknown =
-        records.refusals.kind === RecordReadKind.Unread && verdict.finished.state === "Passed";
-    if (isRewriteUnknown || isRefusalUnknown) {
-        return { ...verdict, finished: finish(verdict.running, "Errored") };
-    }
-    return verdict;
+        records.refusals.kind === RecordReadKind.Unread && finished.state === TerminalState.Passed;
+    return isRewriteUnknown || isRefusalUnknown;
 }

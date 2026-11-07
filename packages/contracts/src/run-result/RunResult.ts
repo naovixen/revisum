@@ -75,9 +75,8 @@ export type PlanStepsFields = {
     readonly stubAnswers?: readonly StubAnswer[];
 };
 
-// A plan run whose steps gave a verdict. An Errored run holds no denial: a denied run that could not
-// read what the egress proxy rewrote ends Errored, and the denial stays in its step's code and the
-// audit log.
+// A plan run whose steps were not denied. An Errored one here holds no denial: an Errored run that
+// came from a denied run is a PlanDeniedThenErroredResult.
 export type PlanRanResult = RunResultBasis &
     PlanRunLabels &
     PlanStepsFields & {
@@ -95,8 +94,9 @@ export type PlanDeniedResult = RunResultBasis &
         readonly denial: Denial;
     };
 
-// A denied plan run whose egress could not then say what it refused: it ends Errored, since it
-// cannot show its egress was enforced, and keeps the denial.
+// A denied plan run that a record read after its steps left without a verdict, whichever record it
+// was: it ends Errored, since it cannot show what it tested or that its egress was enforced, and
+// always keeps its denial, since the guard did stop an action.
 export type PlanDeniedThenErroredResult = RunResultBasis &
     PlanRunLabels &
     PlanStepsFields & {

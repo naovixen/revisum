@@ -26,8 +26,9 @@ export type AfterTheVerdict = {
     readonly end: EndOfTheRun;
 };
 
-// The state the run ends in, and the denial a denied run keeps: a denied run whose egress then went
-// unread ends Errored, since it cannot show its egress was enforced, and still keeps its denial.
+// The state the run ends in, and the denial a denied run keeps. The one place a run's end is decided
+// once every record is read: a run whose records leave it no verdict ends Errored, and a denied run
+// keeps its denial whichever record went unread, since the guard did stop an action.
 export type EndOfTheRun =
     | {
           readonly state:
@@ -40,14 +41,14 @@ export type EndOfTheRun =
           readonly denial: Denial;
       };
 
-function endOfTheRun(finished: FinishedRun, isEgressRead: boolean): EndOfTheRun {
+function endOfTheRun(finished: FinishedRun, hasVerdict: boolean): EndOfTheRun {
     if (finished.state === TerminalState.Denied) {
         return {
-            state: isEgressRead ? TerminalState.Denied : TerminalState.Errored,
+            state: hasVerdict ? TerminalState.Denied : TerminalState.Errored,
             denial: finished.denial,
         };
     }
-    return { state: isEgressRead ? finished.state : TerminalState.Errored };
+    return { state: hasVerdict ? finished.state : TerminalState.Errored };
 }
 
 // What the run's last part uses: the plan's cleanup and how it calls, the closed session's records
@@ -57,9 +58,11 @@ type AfterTheVerdictContext = Pick<
     "cleared" | "calls" | "commands" | "session" | "logger"
 >;
 
+// `isVerdictLost` says the records read before the egress already leave the run no verdict.
 export async function afterTheVerdict(
     context: AfterTheVerdictContext,
     verdict: StepsVerdict,
+    isVerdictLost: boolean,
 ): Promise<AfterTheVerdict> {
     const { plan } = context.cleared;
     // A failing cleanup step never changes the verdict; it raises a review item.
@@ -81,7 +84,7 @@ export async function afterTheVerdict(
         );
     }
     const egress = blockedRead.ok ? recordRead(blockedRead.value) : RECORD_UNREAD;
-    const end = endOfTheRun(verdict.finished, blockedRead.ok);
+    const end = endOfTheRun(verdict.finished, blockedRead.ok && !isVerdictLost);
     logTheEnd(context, readValueOr(egress, []), end);
     return { cleanup, cleanupReviewItems, egress, end };
 }

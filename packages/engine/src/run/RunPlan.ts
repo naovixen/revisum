@@ -20,7 +20,7 @@ import {
     readRecord,
 } from "./after-the-verdict/ReadKeepingTheResult.ts";
 import { readValueOr, type RecordRead } from "./after-the-verdict/RecordRead.ts";
-import { verdictGivenTheRecords } from "./after-the-verdict/RecordsAfterTheSteps.ts";
+import { isVerdictLostToTheRecords } from "./after-the-verdict/RecordsAfterTheSteps.ts";
 import { withRefusalsAfterTheVerdict } from "./after-the-verdict/WithRefusalsAfterTheVerdict.ts";
 import type { SessionContext } from "./executors/StepExecutor.ts";
 import type { StepsRun, StepsVerdict } from "./steps/VerdictOfSteps.ts";
@@ -137,12 +137,12 @@ async function finishAfterTheSteps(
         rewrites: ran.rewrites,
         stubAnswers: ran.stubAnswers,
     };
-    const verdict = verdictAfterRefusals(
-        verdictGivenTheRecords(ran, readBeforeTheEgress),
-        readValueOr(refusals, []),
-        logger,
-    );
-    const after = await afterTheVerdict({ ...context, session }, verdict);
+    const isVerdictLost = isVerdictLostToTheRecords(ran.finished, readBeforeTheEgress);
+    // Refusals can only spoil a verdict there is to give; without one the run ends Errored anyway.
+    const verdict = isVerdictLost
+        ? ran
+        : verdictAfterRefusals(ran, readValueOr(refusals, []), logger);
+    const after = await afterTheVerdict({ ...context, session }, verdict, isVerdictLost);
     const rewrites = readValueOr(ran.rewrites, []);
     const manifest =
         rewrites.length === 0
