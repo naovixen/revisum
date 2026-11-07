@@ -23,7 +23,7 @@ export function describePlanError(code: PlanErrorCode): string {
     case 'version_unsupported': case 'empty': case 'vacuous':
     case 'literal_secret': case 'undefined_value': case 'position_not_allowed':
     case 'misplaced_step': case 'unsafe_interpolation': case 'header_not_allowed':
-    case 'command_not_allowed': case 'path_not_allowed': case 'unsafe_feature_disabled':
+    case 'command_not_allowed': case 'path_not_allowed': case 'unsafe_feature_disabled': case 'not_loopback':
       return 'plan rejected';
     default:
       return unreachable(code);
@@ -36,7 +36,7 @@ export function describePlanErrorForgettingOne(code: PlanErrorCode): string {
     case 'target_not_in_matrix': case 'unsafe_text': case 'too_large': case 'too_long': case 'duplicate':
     case 'version_unsupported': case 'empty': case 'literal_secret':
     case 'undefined_value': case 'position_not_allowed': case 'misplaced_step': case 'unsafe_interpolation':
-    case 'header_not_allowed': case 'command_not_allowed': case 'path_not_allowed': case 'unsafe_feature_disabled':
+    case 'header_not_allowed': case 'command_not_allowed': case 'path_not_allowed': case 'unsafe_feature_disabled': case 'not_loopback':
       return 'plan rejected';
     default:
       // @ts-expect-error 'vacuous' is not handled, so the code does not narrow to never
