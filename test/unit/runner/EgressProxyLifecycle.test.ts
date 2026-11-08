@@ -2,15 +2,16 @@
 // start, with nothing left listening behind it: a caller gets a failed outcome naming the listener,
 // never a rejection, and every port it took is free again. A listener's close failure is reported
 // rather than lost, closing waits for every listener, and a second close is safe. Once listening, a
-// listener's error, such as an accept failure, is reported and leaves the proxy serving.
+// listener's error, such as an accept failure, is reported and leaves the proxy serving. So does a
+// listener handed the proxy's decisions throwing, which must never end the process.
 import assert from "node:assert/strict";
 import { Server as HttpServer } from "node:http";
 import { Server as NetServer, createServer as createTcpServer } from "node:net";
-import { describe, test, type TestContext } from "node:test";
+import { afterEach, beforeEach, describe, test, type TestContext } from "node:test";
 import { startProxyServer, type EgressProxy } from "@revisum/runner";
 import { parsedProxyRules, startedProxyServer } from "#test-support/StartedEgressProxy.ts";
 import { closedPort } from "./local-service.ts";
-import { getThroughProxy } from "./proxy-requests.ts";
+import { connectThroughProxy, getThroughProxy } from "./proxy-requests.ts";
 import { fakeResolver } from "./runner-examples.ts";
 
 const RELAY_HOST = "database.test";
@@ -120,6 +121,27 @@ const flush = async (): Promise<void> => {
         });
     }
 };
+
+const RULES_DECLARING_NOTHING = { allowedOrigins: [], privateOrigins: [], rewrites: [] };
+const LISTENER_REASON = "the decision listener failed";
+const UNDECLARED_TARGET = "http://undeclared.test/";
+const ANSWER_LIMIT_MILLISECONDS = 1500;
+
+const DECIDED_REQUESTS: readonly {
+    readonly title: string;
+    readonly ask: (proxyUrl: string) => Promise<number>;
+}[] = [
+    {
+        title: "a plain request to an undeclared origin",
+        ask: async (proxyUrl) =>
+            (await getThroughProxy(proxyUrl, UNDECLARED_TARGET, ANSWER_LIMIT_MILLISECONDS)).status,
+    },
+    {
+        title: "a tunnel to an undeclared origin",
+        ask: (proxyUrl) =>
+            connectThroughProxy(proxyUrl, "undeclared.test:443", ANSWER_LIMIT_MILLISECONDS),
+    },
+];
 
 describe("Using the egress proxy", () => {
     describe("given every port it needs is free but one", () => {
@@ -302,6 +324,71 @@ describe("Using the egress proxy", () => {
                     } finally {
                         await proxy.close();
                     }
+                });
+            });
+        });
+    });
+
+    describe("given a decision listener that throws", () => {
+        let proxy: EgressProxy;
+        let listenerCalls: number;
+        const unhandled: unknown[] = [];
+        const noteUnhandled = (reason: unknown): void => {
+            unhandled.push(reason);
+        };
+
+        beforeEach(async () => {
+            unhandled.length = 0;
+            listenerCalls = 0;
+            process.on("unhandledRejection", noteUnhandled);
+            proxy = await startedProxyServer(RULES_DECLARING_NOTHING, {
+                resolve: fakeResolver({}).resolve,
+                onDecision: () => {
+                    listenerCalls += 1;
+                    throw new Error(LISTENER_REASON);
+                },
+            });
+        });
+        afterEach(async () => {
+            process.off("unhandledRejection", noteUnhandled);
+            await proxy.close();
+        });
+
+        for (const { title, ask } of DECIDED_REQUESTS) {
+            describe(`and ${title}`, () => {
+                describe("when the proxy decides it", () => {
+                    test("then it should answer, keep the decision, note the throw and leave no unhandled rejection", async () => {
+                        const status = await ask(proxy.url);
+                        await flush();
+                        assert.equal(status, 403);
+                        assert.deepEqual(unhandled, []);
+                        assert.equal(proxy.decisions().length, 1);
+                        assert.equal(listenerCalls, 1);
+                        assert.ok(
+                            proxy
+                                .listenerFailures()
+                                .some((failure) => failure.message.includes(LISTENER_REASON)),
+                            JSON.stringify(proxy.listenerFailures()),
+                        );
+                    });
+                });
+            });
+        }
+
+        describe("and a request has already made it throw", () => {
+            describe("when another request arrives", () => {
+                test("then it should keep serving", async () => {
+                    await getThroughProxy(proxy.url, UNDECLARED_TARGET, ANSWER_LIMIT_MILLISECONDS);
+                    const second = await getThroughProxy(
+                        proxy.url,
+                        UNDECLARED_TARGET,
+                        ANSWER_LIMIT_MILLISECONDS,
+                    );
+                    await flush();
+                    assert.equal(second.status, 403);
+                    assert.equal(proxy.decisions().length, 2);
+                    assert.equal(listenerCalls, 2);
+                    assert.deepEqual(unhandled, []);
                 });
             });
         });

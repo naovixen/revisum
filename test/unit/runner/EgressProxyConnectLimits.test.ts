@@ -1,14 +1,22 @@
 // What ends a connection attempt. A connector that throws at once is one more failed connection, not
 // a rejected promise that ends the process. A resolver that never answers, and a name whose every
 // address silently drops the attempt, must both end within the one 30-second limit a connection has,
-// so a dead origin can't hold a request open. Time is mocked: the limit may be kept with setTimeout
-// or a socket's setTimeout, and SilentlyDroppingSocket keeps a socket's on that same mock clock.
+// so a dead origin can't hold a request open. That limit is shared fairly: each attempt gets the time
+// left divided by the addresses left, so a silent first address can't starve a working second one.
+// Time is mocked: the limit may be kept with setTimeout or a socket's setTimeout, and
+// SilentlyDroppingSocket keeps a socket's on that same mock clock.
 import assert from "node:assert/strict";
+import { once } from "node:events";
 import { Socket } from "node:net";
 import { afterEach, beforeEach, describe, test, type TestContext } from "node:test";
 import { type AddressConnector, type AddressResolver, type EgressProxy } from "@revisum/runner";
 import { startedProxyServer } from "#test-support/StartedEgressProxy.ts";
-import { exchangeWithProxy, plainRequestText, tunnelRequestText } from "./proxy-requests.ts";
+import {
+    exchangeWithProxy,
+    plainRequestText,
+    startUpstream,
+    tunnelRequestText,
+} from "./proxy-requests.ts";
 
 const CONNECT_LIMIT_MILLISECONDS = 30_000;
 const EARLIEST_ALLOWED_END = 29_000;
@@ -20,6 +28,15 @@ const SHORT_REAL_LIMIT_MILLISECONDS = 1500;
 const BACKSTOP_REAL_LIMIT_MILLISECONDS = 20_000;
 const CONNECTOR_REASON = "the connector could not open a socket";
 const DROPPING_ADDRESSES = ["93.184.215.1", "93.184.215.2", "93.184.215.3", "93.184.215.4"];
+const DROPPING_ADDRESS = "93.184.215.1";
+const ACCEPTING_ADDRESS = "93.184.215.2";
+// Half of the limit, the share of the first of two addresses, with room for the ticks of mock time.
+const EARLIEST_FAIR_SHARE_OF_TWO = 14_000;
+const LATEST_FAIR_SHARE_OF_TWO = 16_000;
+const LOOKUP_MILLISECONDS = 10_000;
+// A lookup of 10 s leaves 20 s for two addresses, so the second is tried 10 s after it answers.
+const EARLIEST_SHARE_AFTER_LOOKUP = 19_000;
+const LATEST_SHARE_AFTER_LOOKUP = 21_000;
 
 const RULES = {
     allowedOrigins: ["http://service.test", "https://service.test"],
@@ -86,6 +103,26 @@ async function mockTimeUntil(
         await nextTurn();
     }
     return elapsed;
+}
+
+type WatchedExchange = {
+    readonly outcome: { isDone: boolean; received: string };
+    readonly finished: Promise<void>;
+};
+
+// An exchange a test can look at between ticks of mock time, whose failure only leaves it unfilled.
+function watchedExchange(proxy: EgressProxy, text: string): WatchedExchange {
+    const outcome = { isDone: false, received: "" };
+    const finished = exchangeWithProxy(proxy.url, text, BACKSTOP_REAL_LIMIT_MILLISECONDS).then(
+        (received) => {
+            outcome.received = received;
+            outcome.isDone = true;
+        },
+        () => {
+            outcome.isDone = true;
+        },
+    );
+    return { outcome, finished };
 }
 
 describe("Using the egress proxy", () => {
@@ -226,11 +263,147 @@ describe("Using the egress proxy", () => {
                     );
                     await exchange;
                     assert.match(outcome.received, /^HTTP\/1\.1 502/);
+                    assert.deepEqual(attempts, DROPPING_ADDRESSES);
                 } finally {
                     context.mock.timers.reset();
                     await proxy.close();
                 }
             });
         });
+    });
+
+    describe("given a name whose first address silently drops the attempt", () => {
+        describe("and whose second address accepts", () => {
+            describe("when the proxy connects across them", () => {
+                test("then it should give the first address half the limit and connect to the second", async (context) => {
+                    const upstream = await startUpstream();
+                    const attempts: string[] = [];
+                    const connector: AddressConnector = (address, port) => {
+                        attempts.push(address);
+                        return address === DROPPING_ADDRESS
+                            ? new SilentlyDroppingSocket()
+                            : upstream.connect(address, port);
+                    };
+                    const proxy = await startedProxyServer(RULES, {
+                        resolve: () => Promise.resolve([DROPPING_ADDRESS, ACCEPTING_ADDRESS]),
+                        connect: connector,
+                    });
+                    context.mock.timers.enable({ apis: ["setTimeout", "Date"] });
+                    const exchange = watchedExchange(
+                        proxy,
+                        plainRequestText("http://service.test"),
+                    );
+                    try {
+                        const elapsed = await mockTimeUntil(
+                            context,
+                            () => attempts.length > 0,
+                            () => attempts.length > 1 || exchange.outcome.isDone,
+                        );
+                        assert.ok(
+                            elapsed >= EARLIEST_FAIR_SHARE_OF_TWO &&
+                                elapsed <= LATEST_FAIR_SHARE_OF_TWO,
+                            `the first address held the walk for ${elapsed} ms of mock time`,
+                        );
+                        await exchange.finished;
+                        assert.deepEqual(attempts, [DROPPING_ADDRESS, ACCEPTING_ADDRESS]);
+                        assert.match(exchange.outcome.received, /^HTTP\/1\.1 200/);
+                        assert.deepEqual(upstream.hosts, ["service.test"]);
+                    } finally {
+                        context.mock.timers.reset();
+                        await proxy.close();
+                        await upstream.close();
+                    }
+                });
+            });
+        });
+
+        describe("and whose lookup used up part of the limit", () => {
+            describe("when the proxy connects across its two addresses", () => {
+                test("then it should share out only the time left", async (context) => {
+                    let asked = 0;
+                    const attempts: string[] = [];
+                    const connector: AddressConnector = (address) => {
+                        attempts.push(address);
+                        return new SilentlyDroppingSocket();
+                    };
+                    const slowResolver: AddressResolver = () => {
+                        asked += 1;
+                        return new Promise((resolve) => {
+                            setTimeout(() => {
+                                resolve([DROPPING_ADDRESS, ACCEPTING_ADDRESS]);
+                            }, LOOKUP_MILLISECONDS);
+                        });
+                    };
+                    const proxy = await startedProxyServer(RULES, {
+                        resolve: slowResolver,
+                        connect: connector,
+                    });
+                    context.mock.timers.enable({ apis: ["setTimeout", "Date"] });
+                    const exchange = watchedExchange(
+                        proxy,
+                        plainRequestText("http://service.test"),
+                    );
+                    try {
+                        const elapsed = await mockTimeUntil(
+                            context,
+                            () => asked > 0,
+                            () => attempts.length > 1 || exchange.outcome.isDone,
+                        );
+                        assert.ok(
+                            elapsed >= EARLIEST_SHARE_AFTER_LOOKUP &&
+                                elapsed <= LATEST_SHARE_AFTER_LOOKUP,
+                            `the second address was tried after ${elapsed} ms of mock time`,
+                        );
+                    } finally {
+                        context.mock.timers.reset();
+                        await proxy.close();
+                        await exchange.finished;
+                    }
+                });
+            });
+        });
+    });
+
+    describe("given a connector that gives back a socket already closed and done", () => {
+        for (const { title, text, origin } of REQUESTS) {
+            describe(`and ${title}`, () => {
+                describe("when the proxy waits for it to open", () => {
+                    test("then it should end the walk by the connect limit, not hang", async (context) => {
+                        const finished = new Socket();
+                        finished.destroy();
+                        await once(finished, "close");
+                        let attempts = 0;
+                        const proxy = await startedProxyServer(RULES, {
+                            resolve: () => Promise.resolve(["93.184.215.14"]),
+                            connect: () => {
+                                attempts += 1;
+                                return finished;
+                            },
+                        });
+                        context.mock.timers.enable({ apis: ["setTimeout", "Date"] });
+                        const exchange = watchedExchange(proxy, text);
+                        try {
+                            const elapsed = await mockTimeUntil(
+                                context,
+                                () => attempts > 0,
+                                () =>
+                                    exchange.outcome.isDone ||
+                                    proxy.connectionFailures().length > 0,
+                            );
+                            assert.ok(
+                                elapsed <= LATEST_ALLOWED_END,
+                                `took ${elapsed} ms of mock time`,
+                            );
+                            await exchange.finished;
+                            assert.match(exchange.outcome.received, /^HTTP\/1\.1 502/);
+                            assert.equal(proxy.connectionFailures()[0]?.origin, origin);
+                        } finally {
+                            context.mock.timers.reset();
+                            await proxy.close();
+                        }
+                    });
+                });
+            });
+        }
     });
 });

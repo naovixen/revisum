@@ -3,6 +3,7 @@
 //   - A TCP relay's host is a BareHost: a plain string is not one.
 //   - A proxy starts only from rules that went through the parser: plain data is not ProxyRules.
 //   - A proxy's optional ports accept undefined, so a caller can pass along what it was given.
+//   - Parsed rules always hold their TCP relays, so nothing reading them needs a default.
 import type { EgressPolicy } from "@revisum/contracts";
 import {
     startEgressProxy,
@@ -11,7 +12,7 @@ import {
     type ProxyRules,
 } from "@revisum/runner";
 
-type TcpRelay = NonNullable<ProxyRules["tcpRelays"]>[number];
+type TcpRelay = ProxyRules["tcpRelays"][number];
 
 declare const plainHost: string;
 declare const policy: EgressPolicy;
@@ -30,7 +31,10 @@ export const startedFromPlainRules = startProxyServer({
 // What a proxy starts from, each of which type-checks.
 export const egressProxyTypeGuarantees = {
     startsFromParsedRules: startProxyServer(parsedRules),
+    relaysReadWithoutADefault: parsedRules.tcpRelays.length,
 };
+
+export const everyRelay: readonly TcpRelay[] = parsedRules.tcpRelays;
 
 export const optionsWithPortsUndefined: EgressProxyOptions = {
     policy,

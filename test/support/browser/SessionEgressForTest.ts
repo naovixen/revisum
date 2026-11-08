@@ -41,7 +41,10 @@ export const realEgressSource: EgressSourceForTest = async (allowedOrigins) => {
     return {
         ...leavingProxyUp(proxy, 0),
         close: async () => {
-            await proxy.close();
+            const closed = await proxy.close();
+            if (!closed.ok) {
+                throw new Error(closed.error.message);
+            }
         },
     };
 };
