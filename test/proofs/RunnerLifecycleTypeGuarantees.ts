@@ -37,28 +37,34 @@ type IsExactly<Left, Right> =
         ? true
         : false;
 
-// True when any of a step's parameters would take a request nobody checked.
-type TakesAnUncheckedRequest<Step extends (...parameters: never[]) => unknown> = {
-    [Position in keyof Parameters<Step>]: WorkloadRequest extends Parameters<Step>[Position]
-        ? true
-        : false;
-}[number];
+// Each is mapped over a type parameter so that a tuple stays a tuple, position by position.
+type AcceptsAnUncheckedRequest<List extends readonly unknown[]> = true extends {
+    [Position in keyof List]: WorkloadRequest extends List[Position] ? true : false;
+}[number]
+    ? true
+    : false;
 
-// True when one of a step's parameters is the checked request.
-type TakesTheCheckedRequest<Step extends (...parameters: never[]) => unknown> = {
-    [Position in keyof Parameters<Step>]: IsExactly<
-        Parameters<Step>[Position],
-        CheckedWorkloadRequest
-    >;
-}[number];
+type IncludesTheCheckedRequest<List extends readonly unknown[]> = true extends {
+    [Position in keyof List]: IsExactly<List[Position], CheckedWorkloadRequest>;
+}[number]
+    ? true
+    : false;
 
 type TakesOnlyCheckedRequests<Step extends (...parameters: never[]) => unknown> = [
-    TakesAnUncheckedRequest<Step>,
-    TakesTheCheckedRequest<Step>,
-];
+    AcceptsAnUncheckedRequest<Parameters<Step>>,
+    IncludesTheCheckedRequest<Parameters<Step>>,
+] extends [false, true]
+    ? true
+    : false;
+
+type StepTakingTheRawRequest = (request: WorkloadRequest) => Promise<void>;
+type StepTakingBothRequests = (
+    checked: CheckedWorkloadRequest,
+    request: WorkloadRequest,
+) => Promise<void>;
+type StepTakingNoRequest = (engine: ContainerEngine) => Promise<void>;
 
 declare const engine: ContainerEngine;
-declare const scope: ContainerScope;
 declare const runner: Runner;
 declare const run: RunnerHandle;
 declare const image: ImageDigest;
@@ -66,7 +72,6 @@ declare const policy: EgressPolicy;
 declare const outcome: WorkloadOutcome;
 declare const unmarkedChecked: Omit<CheckedWorkloadRequest, "__brand">;
 declare const uncheckedRequest: WorkloadRequest;
-declare const withoutDaemonProblem: Omit<ContainerEngine, "daemonProblem">;
 declare const withoutGatewayAddress: Omit<ContainerEngine, "networkGatewayAddress">;
 declare const withoutImageUser: Omit<ContainerEngine, "imageUser">;
 declare const withoutContainerAddress: Omit<ContainerEngine, "containerAddress">;
@@ -77,8 +82,6 @@ const useNothing = (): Promise<void> => Promise.resolve();
 
 export const runnerLifecycleTypeGuarantees = {
     // ---- A complete engine ------------------------------------------------------------------------
-    // @ts-expect-error an engine must say why its daemon does not answer
-    missingDaemonProblem: withoutDaemonProblem satisfies ContainerEngine,
     // @ts-expect-error an engine must say where a gateway would be
     missingGatewayAddress: withoutGatewayAddress satisfies ContainerEngine,
     // @ts-expect-error an engine must say an image's user
@@ -98,7 +101,7 @@ export const runnerLifecycleTypeGuarantees = {
 
     // ---- A scope's network comes first ------------------------------------------------------------
     // @ts-expect-error a scope's network exists already, so a scope cannot make one
-    scopeMakingNetwork: scope.createNetwork({ internal: true }),
+    scopeMakingNetwork: "createNetwork" satisfies keyof ContainerScope,
     scopeExposesOnlyWhatRunnersUse: true satisfies IsExactly<
         Exclude<
             keyof ContainerScope,
@@ -128,11 +131,11 @@ export const runnerLifecycleTypeGuarantees = {
     // ---- A run's level, and its end ---------------------------------------------------------------
     runnerHasOnlyWithRun: true satisfies IsExactly<keyof Runner, "withRun">,
     // @ts-expect-error a runner holds no level of its own
-    runnersLevel: runner.guaranteeLevel(),
+    runnersLevel: "guaranteeLevel" satisfies keyof Runner,
     // @ts-expect-error a run is started by withRun, and ends with `use`
-    runnerStart: runner.start(image, policy),
+    runnerStart: "start" satisfies keyof Runner,
     // @ts-expect-error a run ends when `use` ends, so a handle cannot stop it
-    handleStop: run.stop(),
+    handleStop: "stop" satisfies keyof RunnerHandle,
     runGivesWhatUseReturned: runner.withRun(image, policy, (started) =>
         Promise.resolve(started.guaranteeLevel()),
     ) satisfies Promise<Result<GuaranteeLevel, RunnerError>>,
@@ -142,7 +145,7 @@ export const runnerLifecycleTypeGuarantees = {
     // @ts-expect-error a variable name is a checked value, never bare text
     execWithBareName: run.exec(["true"], ["PLAIN_NAME"]),
     // @ts-expect-error only an outcome that has exited has an exit code
-    exitCodeUnread: outcome.exitCode,
+    exitCodeUnread: "exitCode" satisfies keyof WorkloadOutcome,
     exitedHasACode: outcome.kind === "exited" ? outcome.exitCode : null,
     stdoutHeldEitherWay: outcome.stdout,
     inventedExitCode: {
@@ -160,21 +163,23 @@ export const runnerLifecycleTypeGuarantees = {
     handBuiltCheckedRequest: unmarkedChecked satisfies CheckedWorkloadRequest,
     // @ts-expect-error the raw request is not a checked one
     rawRequestAsChecked: uncheckedRequest satisfies CheckedWorkloadRequest,
-    pinningTakesOnlyChecked: [false, true] satisfies TakesOnlyCheckedRequests<
-        typeof pinWorkloadImages
-    >,
-    egressControlTakesOnlyChecked: [false, true] satisfies TakesOnlyCheckedRequests<
+    pinningTakesOnlyChecked: true satisfies TakesOnlyCheckedRequests<typeof pinWorkloadImages>,
+    egressControlTakesOnlyChecked: true satisfies TakesOnlyCheckedRequests<
         typeof showEgressControlled
     >,
-    teamContainerTakesOnlyChecked: [false, true] satisfies TakesOnlyCheckedRequests<
+    teamContainerTakesOnlyChecked: true satisfies TakesOnlyCheckedRequests<
         typeof startTeamContainer
     >,
-    commandRunTakesOnlyChecked: [false, true] satisfies TakesOnlyCheckedRequests<
+    commandRunTakesOnlyChecked: true satisfies TakesOnlyCheckedRequests<
         typeof runCommandUnderTimeout
     >,
-    egressReadTakesOnlyChecked: [false, true] satisfies TakesOnlyCheckedRequests<
-        typeof readWorkloadEgress
-    >,
+    egressReadTakesOnlyChecked: true satisfies TakesOnlyCheckedRequests<typeof readWorkloadEgress>,
+    // @ts-expect-error a step that takes the raw request is not one over checked requests
+    rawRequestStep: true satisfies TakesOnlyCheckedRequests<StepTakingTheRawRequest>,
+    // @ts-expect-error a step that also takes the raw request is not one over checked requests
+    bothRequestsStep: true satisfies TakesOnlyCheckedRequests<StepTakingBothRequests>,
+    // @ts-expect-error a step with no checked request is not one over checked requests
+    noRequestStep: true satisfies TakesOnlyCheckedRequests<StepTakingNoRequest>,
 
     // ---- A proxy's role ---------------------------------------------------------------------------
     roleIsAField: "role" satisfies keyof ProxyContainerFields,

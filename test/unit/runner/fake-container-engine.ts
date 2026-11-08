@@ -45,7 +45,7 @@ export const ENGINE_STARTING_CALLS: readonly string[] = ['createNetwork', 'start
 const FIRST_ADDRESS_OF_THE_NETWORK = '172.18.0.1';
 
 // The engine methods that only answer what the host is like, each recorded.
-type HostAnswers = Pick<ContainerEngine, 'imageId' | 'daemonProblem' | 'networkGatewayAddress' | 'probeEgress' | 'imageUser' | 'containerAddress'>;
+type HostAnswers = Pick<ContainerEngine, 'imageId' | 'networkGatewayAddress' | 'probeEgress' | 'imageUser' | 'containerAddress'>;
 
 function hostAnswers(settings: FakeEngineSettings, calls: string[]): HostAnswers {
   return {
@@ -58,10 +58,6 @@ function hostAnswers(settings: FakeEngineSettings, calls: string[]): HostAnswers
       const id = Object.hasOwn(images, reference) ? images[reference] ?? null : settings.localImageId;
       return id === null ? { kind: 'absent' } : { kind: 'found', id };
     },
-    async daemonProblem() {
-      calls.push('daemonProblem');
-      return settings.daemonProblem === undefined ? null : settings.daemonProblem();
-    },
     async networkGatewayAddress(network) {
       calls.push('networkGatewayAddress');
       return settings.networkGatewayAddress === undefined ? success(FIRST_ADDRESS_OF_THE_NETWORK) : settings.networkGatewayAddress(network);
@@ -69,6 +65,14 @@ function hostAnswers(settings: FakeEngineSettings, calls: string[]): HostAnswers
     async probeEgress(containerId, targets) {
       calls.push('probeEgress');
       return settings.probeEgress === undefined ? settings.probe : settings.probeEgress(containerId, targets);
+    },
+    async imageUser(reference) {
+      calls.push('imageUser');
+      return settings.imageUser === undefined ? null : settings.imageUser(reference);
+    },
+    async containerAddress(containerId, network) {
+      calls.push('containerAddress');
+      return settings.containerAddress === undefined ? null : settings.containerAddress(containerId, network);
     },
   };
 }
@@ -129,14 +133,6 @@ export function fakeContainerEngine(settings: FakeEngineSettings): FakeContainer
       const removed = settings.removeContainer === undefined ? success(undefined) : await settings.removeContainer(containerId);
       if (removed.ok) {running.delete(containerId);}
       return removed;
-    },
-    async imageUser(reference) {
-      calls.push('imageUser');
-      return settings.imageUser === undefined ? null : settings.imageUser(reference);
-    },
-    async containerAddress(containerId, network) {
-      calls.push('containerAddress');
-      return settings.containerAddress === undefined ? null : settings.containerAddress(containerId, network);
     },
   };
 }

@@ -2,12 +2,12 @@
 // replaced, so each test decides what it prints and how it ends. Replacing it on the module's CommonJS
 // exports and syncing the built-in ES module bindings reaches the engine's own import.
 import assert from "node:assert/strict";
+import childProcess from "node:child_process";
 import { EventEmitter } from "node:events";
-import { createRequire, syncBuiltinESMExports } from "node:module";
+import { syncBuiltinESMExports } from "node:module";
 import { afterEach, describe, test } from "node:test";
 import { dockerCliEngine, runDocker } from "@revisum/runner";
 
-const childProcess: object = createRequire(import.meta.url)("node:child_process");
 const realSpawn: unknown = Reflect.get(childProcess, "spawn");
 
 afterEach(() => {

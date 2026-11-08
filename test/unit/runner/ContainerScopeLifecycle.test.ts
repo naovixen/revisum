@@ -115,7 +115,10 @@ describe("Using a container scope", () => {
             test("then it should report the problem through the scope's log", async () => {
                 const { logged } = await startContainers(failingOne, 3);
                 assert.equal(logged.length, 1, JSON.stringify(logged));
-                assert.ok(logged[0]?.detail.includes(WHY_REMOVAL_FAILED), JSON.stringify(logged));
+                assert.ok(
+                    logged[0]?.detail.includes(WHY_REMOVAL_FAILED) === true,
+                    JSON.stringify(logged),
+                );
             });
 
             test("then it should keep the run's own result", async () => {
@@ -214,7 +217,7 @@ describe("Using a container scope", () => {
                     );
                     assert.equal(logged.length, 1, JSON.stringify(logged));
                     assert.ok(
-                        logged[0]?.detail.includes(WHY_REMOVAL_FAILED),
+                        logged[0]?.detail.includes(WHY_REMOVAL_FAILED) === true,
                         JSON.stringify(logged),
                     );
                 });

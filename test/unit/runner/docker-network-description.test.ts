@@ -74,7 +74,6 @@ function execRunsHere(): void {
 
 const gatewayAddress = (engine: ContainerEngine) => {
   const read = engine.networkGatewayAddress;
-  assert.ok(read !== undefined, 'the Docker engine says where a gateway would be');
   return read(NETWORK);
 };
 
