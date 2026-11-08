@@ -1249,23 +1249,6 @@
       "count": 1
     }
   },
-  "packages/runner/src/egress-proxy.ts": {
-    "@typescript-eslint/dot-notation": {
-      "count": 2
-    },
-    "@typescript-eslint/naming-convention": {
-      "count": 3
-    },
-    "curly": {
-      "count": 11
-    },
-    "max-lines-per-function": {
-      "count": 1
-    },
-    "revisum/file-name-matches-export": {
-      "count": 1
-    }
-  },
   "packages/runner/src/lookup-recorder.ts": {
     "curly": {
       "count": 8
@@ -1285,9 +1268,6 @@
   "packages/runner/src/run-containers.ts": {
     "curly": {
       "count": 5
-    },
-    "no-nested-ternary": {
-      "count": 1
     },
     "revisum/file-name-matches-export": {
       "count": 1

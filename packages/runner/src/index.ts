@@ -14,10 +14,14 @@ export { noSuchNameAnswer, readDnsQuestion, type DnsQuestion } from './lookup-re
 export { hostAndPort } from '@revisum/contracts';
 export { joinEgressEvents } from './egress-events.ts';
 export { buildEgressPolicy, type EgressPolicyError, type EgressPolicyInput } from './egress-policy.ts';
-export {
-  EGRESS_DECISION_HEADER, ProxyClient, proxyRules, startEgressProxy, startProxyServer,
-  type AddressConnector, type ConnectionFailure, type EgressDecisionMark, type AddressResolver, type EgressProxy, type EgressProxyOptions, type ProxyRules, type ProxyServerOptions, type RewriteRule,
-} from './egress-proxy.ts';
+export type { AddressConnector, AddressResolver } from './egress-proxy/AddressResolver.ts';
+export { EGRESS_DECISION_HEADER, type EgressDecisionMark } from './egress-proxy/EgressDecisionHeader.ts';
+export type { EgressProxy } from './egress-proxy/EgressProxy.ts';
+export { ProxyClient } from './egress-proxy/ProxyClient.ts';
+export type { ConnectionFailure } from './egress-proxy/ProxyRecord.ts';
+export { proxyRules, type ProxyRules, type RewriteRule } from './egress-proxy/ProxyRules.ts';
+export { startEgressProxy, type EgressProxyOptions } from './egress-proxy/StartEgressProxy.ts';
+export { startProxyServer, type ProxyServerOptions } from './egress-proxy/StartProxyServer.ts';
 export { readBrowserRefusals } from './ReadBrowserRefusals.ts';
 export { readProxyDecision, readProxyRules } from './proxy-container.ts';
 export { RUN_IMAGE_RECORD, RUN_IMAGE_TAG, prepareRunImage, readImageDigest, type RunImage, type RunImageError } from './run-image.ts';

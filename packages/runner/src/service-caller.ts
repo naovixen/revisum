@@ -16,7 +16,8 @@ import {
 import { request as sendHttpRequest, type ClientRequest, type IncomingMessage, type OutgoingHttpHeaders } from 'node:http';
 import { isIP, type Socket } from 'node:net';
 import { connect as connectSecurely, rootCertificates } from 'node:tls';
-import { EGRESS_DECISION_HEADER, type EgressProxy } from './egress-proxy.ts';
+import { EGRESS_DECISION_HEADER } from './egress-proxy/EgressDecisionHeader.ts';
+import type { EgressProxy } from './egress-proxy/EgressProxy.ts';
 
 // The request's headers as name and value text, in the declaration's order, for writing on the wire.
 export const headerFields = (headers: readonly ServiceRequestHeader[]): readonly (readonly [string, string])[] =>

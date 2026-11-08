@@ -6,7 +6,7 @@ import { PRODUCT, type AppliedRewrite, type DeclaredService, type EgressPolicy, 
 import { platform } from 'node:os';
 import { isAbsolute, join, normalize, sep } from 'node:path';
 import type { ContainerEngine, ContainerMount, ContainerOptions, ProbeTarget } from './container-engine.ts';
-import { proxyRules } from './egress-proxy.ts';
+import { proxyRules } from './egress-proxy/ProxyRules.ts';
 import {
   DECISIONS_FILE, LOOKUPS_FILE, LOOKUPS_VARIABLE, RECORDS_LOST, RECORDS_STATE_FILE, REWRITES_FILE, RULES_VARIABLE, PROXY_PORT, RUN_ADDRESSES_VARIABLE, SERVICE_PROXY_PORT, readAppliedRewrite, readProxyDecision,
 } from './proxy-container.ts';
@@ -60,8 +60,10 @@ export function repositoryFolder(input: string): string | null {
 
 // The Docker volume holding Linux dependencies, for a host whose own node_modules are not Linux's:
 // the dev container's volume everywhere but Linux, where the repository's own folder is mounted.
+const defaultDependenciesVolume = (): string | null => (platform() === 'linux' ? null : DEV_CONTAINER_DEPENDENCIES_VOLUME);
+
 export const dependenciesVolumeFor = (chosen: string | null | undefined): string | null =>
-  chosen === undefined ? (platform() === 'linux' ? null : DEV_CONTAINER_DEPENDENCIES_VOLUME) : chosen;
+  chosen === undefined ? defaultDependenciesVolume() : chosen;
 
 // Revisum's own code and dependencies, read-only, for the run image's containers.
 export const ownCodeMounts = (root: string, dependenciesVolume: string | null): ContainerMount[] => [

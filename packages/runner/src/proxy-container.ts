@@ -8,7 +8,10 @@
 import type { AppliedRewrite, ProxyDecision, ResponseRewrite } from '@revisum/contracts';
 import { appendFileSync, openSync, writeSync } from 'node:fs';
 import { startRefusalsServer } from './ReadBrowserRefusals.ts';
-import { ProxyClient, startProxyServer, type ProxyRules, type RewriteRule, type TcpRelay } from './egress-proxy.ts';
+import { ProxyClient } from './egress-proxy/ProxyClient.ts';
+import type { ProxyRules, RewriteRule } from './egress-proxy/ProxyRules.ts';
+import { startProxyServer } from './egress-proxy/StartProxyServer.ts';
+import type { TcpRelay } from './egress-proxy/TcpRelay.ts';
 import { startLookupRecorder } from './lookup-recorder.ts';
 
 export const PROXY_PORT = 3128;

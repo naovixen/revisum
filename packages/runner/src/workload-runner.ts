@@ -33,7 +33,7 @@ import { platform } from 'node:os';
 import { isAbsolute, join } from 'node:path';
 import type { ContainerEngine, ContainerMount, EngineProblem, HostEntry } from './container-engine.ts';
 import { joinEgressEvents } from './egress-events.ts';
-import { relayOrigin, tcpRelaysFor } from './egress-proxy.ts';
+import { relayOrigin, tcpRelaysFor } from './egress-proxy/TcpRelay.ts';
 import { PROXY_PORT } from './proxy-container.ts';
 import {
   DEFAULT_BRIDGE_NETWORK, SECCOMP_PROFILE, dependenciesVolumeFor, hasProxyLostRecords, isGitFolderName, ownCodeMounts, probeRunNetwork, proxyContainer, proxyReadyScript, proxyUrl,
