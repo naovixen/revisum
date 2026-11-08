@@ -6,6 +6,7 @@ import { dirname, join } from "node:path";
 import { runSuite } from "@revisum/cli";
 import {
     SUITE_REPORT_FILE,
+    defaultRedactor,
     environmentSecretStore,
     success,
     type Project,
@@ -91,6 +92,7 @@ export const runSuiteOn = (
         secrets: environmentSecretStore({
             [DECLARED_SECRET]: "shop-api-token-for-suite-runs-0042",
         }),
+        redactor: defaultRedactor(),
         checkout: suiteCheckout(),
         outputDirectory: options.outputDirectory ?? outputFolder(),
         pass: options.pass ?? "gating",

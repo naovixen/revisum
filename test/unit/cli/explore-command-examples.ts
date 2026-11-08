@@ -26,9 +26,10 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { buildAdapters } from '@revisum/cli';
 import { createBrowserDriver } from '#test-support/browser/CreateBrowserDriver.ts';
 import {
-  canonicalJson, environmentSecretStore, failure, planHash, planParser, readPlanText, sha256, success,
+  canonicalJson, defaultRedactor, environmentSecretStore, failure, planHash, planParser, readPlanText, sha256, success,
   type Approval, type ApprovalStore, type BrowserDriver, type EgressPolicy, type GuaranteeLevel, type ImageDigest, type Plan,
   type Runner, type Session, type SessionEnvironment,
 } from '@revisum/engine';
@@ -402,13 +403,15 @@ export async function withExploreRun(setup: ExploreSetup, body: (run: ExploreRun
     const events = memoryEventSink();
     // Every name the planner proxy looks up is recorded; the planner is on loopback, so none is needed.
     const resolver = fakeResolver({});
+    const secrets = environmentSecretStore(setup.secrets ?? exploreSecrets(loginName));
     const ports: ExploreCommandPorts = {
       workingDirectory: workspace.root,
-      secrets: environmentSecretStore(setup.secrets ?? exploreSecrets(loginName)),
+      secrets,
       events,
       versionControl: protectedBranchWith(workspace.protectedProject),
-      trustedCertificates: [TEST_CERTIFICATE],
-      resolve: resolver.resolve,
+      planner: buildAdapters.plannerCalls({ secrets, trustedCertificates: [TEST_CERTIFICATE], resolve: resolver.resolve }),
+      runLogin: buildAdapters.loginRunner,
+      redactor: defaultRedactor(),
       ...(browser === undefined ? {} : { browser: browser.driver }),
       ...(runner === undefined ? {} : { isolatedRunner: { runner: runner.runner, image: runner.image } }),
       ...(setup.isolatedRunner === undefined ? {} : { isolatedRunner: setup.isolatedRunner(site) }),

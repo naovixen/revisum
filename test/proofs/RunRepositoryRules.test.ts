@@ -63,6 +63,13 @@ const PLANTED_VIOLATIONS: Readonly<Record<RepositoryRuleName, PlantedViolation>>
         },
         named: "planted-outside-import.ts",
     },
+    [RepositoryRuleName.CompositionRoot]: {
+        edits: {
+            "packages/report/src/planted-own-driver.ts":
+                "import { cdpDriver } from '@revisum/driver-cdp';\nexport const driver = cdpDriver;\n",
+        },
+        named: "planted-own-driver.ts",
+    },
     [RepositoryRuleName.ImportCycles]: {
         edits: {
             "packages/report/src/planted-cycle-first.ts":

@@ -24,7 +24,7 @@ import {
   failure, isSecret, success,
   type EgressEvent, type WorkloadErrorCode, type WorkloadOutcome, type WorkloadRequest, type WorkloadRunner,
 } from '@revisum/contracts';
-import { environmentSecretStore, type Project, type RunResult } from '@revisum/engine';
+import { defaultRedactor, environmentSecretStore, type Project, type RunResult } from '@revisum/engine';
 import {
   DECLARED_SECRET, SUITE_NAME, evidenceModeInput, parsedProject, projectFileWithEvidence, recordedReport, specPath, suiteInput, withoutSpec,
   type JsonRecord,
@@ -145,6 +145,7 @@ export async function runDeclaredSuite(options: SuiteRunOptions = {}): Promise<S
   const result = await runSuite(options.project ?? evidenceProject(), options.suiteName ?? SUITE_NAME, {
     workload: runner,
     secrets: environmentSecretStore({ [DECLARED_SECRET]: options.secretValue ?? 'shop-api-token-for-suite-runs-0042' }),
+    redactor: defaultRedactor(),
     checkout: options.checkout ?? suiteCheckout(),
     outputDirectory,
     pass: 'gating',

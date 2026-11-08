@@ -4,7 +4,12 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import { runSuite, type SuiteRunPorts } from "@revisum/cli";
-import { environmentSecretStore, evidenceMergeGateOpen, type RunResult } from "@revisum/engine";
+import {
+    defaultRedactor,
+    environmentSecretStore,
+    evidenceMergeGateOpen,
+    type RunResult,
+} from "@revisum/engine";
 import {
     DECLARED_SECRET,
     SUITE_NAME,
@@ -28,6 +33,7 @@ const passingSuite = () =>
 // still compiles and runs once the field is required.
 const portsWithoutPass = () => ({
     workload: passingSuite(),
+    redactor: defaultRedactor(),
     secrets: environmentSecretStore({
         [DECLARED_SECRET]: "shop-api-token-for-suite-runs-0042",
     }),

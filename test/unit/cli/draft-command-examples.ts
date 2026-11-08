@@ -21,10 +21,10 @@
 //     ports.versionControl, as the run's trust step does (loadTrustedProject), never from the
 //     working tree; it reads the spec and writes --out relative to ports.workingDirectory, and
 //     appends its audit events to ports.events;
-//   - ports.resolve and ports.connect, when given, are handed to the egress proxy the command
-//     starts (runner's ProxyServerOptions), so a test reaches a fake planner on a made-up host
-//     without the network. Without them the proxy resolves and connects for real;
-//   - ports.trustedCertificates, a test-only option, holds PEM certificates the caller trusts for
+//   - ports.planner comes from the composition root, whose resolve and connect, when given, are
+//     handed to the egress proxy (runner's ProxyServerOptions), so a test reaches a fake planner on
+//     a made-up host without the network. Without them the proxy resolves and connects for real;
+//   - its trustedCertificates, a test-only option, holds PEM certificates the caller trusts for
 //     HTTPS through the proxy's CONNECT tunnel, besides the system's own;
 //   - a customer-key endpoint must be https:, refused by the project parser otherwise; a local
 //     endpoint, on loopback only, may be http:;
@@ -40,9 +40,9 @@ import { dirname, join } from 'node:path';
 import { createServer as createHttpServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { createServer as createHttpsServer } from 'node:https';
 import { connect as connectTcp, type Socket } from 'node:net';
-import { type EventSink, type SecretStore, type VersionControlPort } from '@revisum/contracts';
-import { environmentSecretStore } from '@revisum/engine';
-import type { AddressConnector, AddressResolver } from '@revisum/runner';
+import { type EventSink, type Redactor, type SecretStore, type VersionControlPort } from '@revisum/contracts';
+import { buildAdapters, type LoginRunner, type PlannerCall } from '@revisum/cli';
+import { defaultRedactor, environmentSecretStore } from '@revisum/engine';
 import { FIXTURES, GOLDEN } from '../../support/repository.ts';
 import { memoryEventSink, type MemoryEventSink } from '../../support/memory-ports.ts';
 import { consoleWrittenDuring, jsonAnswer, type Answer, type Dialled, type ReceivedRequest } from '../runner/local-service.ts';
@@ -58,9 +58,9 @@ export type DraftCommandPorts = {
   readonly events: EventSink;
   // The protected branch, where the trusted project.json is read.
   readonly versionControl: VersionControlPort;
-  readonly resolve?: AddressResolver;
-  readonly connect?: AddressConnector;
-  readonly trustedCertificates?: readonly string[];
+  readonly planner: PlannerCall;
+  readonly runLogin: LoginRunner;
+  readonly redactor: Redactor;
 };
 export type CommandOutcome = { readonly exitCode: number; readonly stdout: string; readonly stderr: string };
 export type DraftCommand = (argv: readonly string[], ports: DraftCommandPorts) => Promise<CommandOutcome>;
@@ -380,13 +380,19 @@ export async function runDraft(options: RunOptions): Promise<DraftRun> {
   const events = memoryEventSink();
   const resolver = fakeResolver(options.names ?? { [PLANNER_HOST]: [PUBLIC_ADDRESS] });
   const routeTo = options.routeTo;
+  const secrets = environmentSecretStore(options.secrets ?? seededSecrets().variables);
   const ports: DraftCommandPorts = {
     workingDirectory: options.workspace.root,
-    secrets: environmentSecretStore(options.secrets ?? seededSecrets().variables),
+    secrets,
     events,
     versionControl: protectedBranchWith(options.workspace.protectedProject),
-    trustedCertificates: [TEST_CERTIFICATE],
-    ...(routeTo === undefined ? {} : { resolve: resolver.resolve, connect: (address: string, port: number) => routeTo.connect(address, port) }),
+    planner: buildAdapters.plannerCalls({
+      secrets,
+      trustedCertificates: [TEST_CERTIFICATE],
+      ...(routeTo === undefined ? {} : { resolve: resolver.resolve, connect: (address: string, port: number) => routeTo.connect(address, port) }),
+    }),
+    runLogin: buildAdapters.loginRunner,
+    redactor: defaultRedactor(),
   };
   let outcome: CommandOutcome | undefined;
   const printed = await consoleWrittenDuring(async () => { outcome = await command(options.argv ?? draftArguments(), ports); });

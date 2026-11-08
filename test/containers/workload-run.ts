@@ -10,7 +10,7 @@ import { mkdtempSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PRODUCT, type WorkloadOutcome, type WorkloadRunner } from '@revisum/contracts';
-import { environmentSecretStore, type Project, type RunResult } from '@revisum/engine';
+import { defaultRedactor, environmentSecretStore, type Project, type RunResult } from '@revisum/engine';
 import { runSuite } from '@revisum/cli';
 import { RUN_IMAGE_TAG, dockerCliEngine, runDocker, workloadRunner, type ContainerEngine } from '@revisum/runner';
 import { FIXTURES, REPOSITORY_ROOT } from '../support/repository.ts';
@@ -88,7 +88,7 @@ export async function runFixtureSuite(image: string, secretValue: string, engine
   const outputDirectory = outputFolder();
   const { runner } = realWorkloadRunner(engine);
   const result = await withSeededHost(() => runSuite(fixtureSuiteProject(image), SUITE_NAME, {
-    workload: runner, secrets: environmentSecretStore({ [DECLARED_SECRET]: secretValue }), checkout: REPOSITORY_ROOT, outputDirectory, pass: 'gating',
+    workload: runner, secrets: environmentSecretStore({ [DECLARED_SECRET]: secretValue }), redactor: defaultRedactor(), checkout: REPOSITORY_ROOT, outputDirectory, pass: 'gating',
   }));
   return { result, outputDirectory };
 }

@@ -3,7 +3,7 @@
 // in to is what the crawl reads.
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { crawlInBrowser } from "@revisum/cli";
+import { buildAdapters, crawlInBrowser } from "@revisum/cli";
 import { failure, success, type ExploreOptions, type Session, type Target } from "@revisum/engine";
 import { clearRun } from "#test-support/policy-clearance.ts";
 import { fakeDriverOpening } from "#test-support/fakes/FakeDriver.ts";
@@ -110,6 +110,7 @@ describe("Using the crawl in a browser", () => {
                 const browser = fakeDriverOpening(session);
                 const crawled = await crawlInBrowser(browser, {
                     login,
+                    runLogin: buildAdapters.loginRunner,
                     options: OPTIONS,
                     redactor: fakeRedactor(),
                     secrets: fakeSecretStore(),
