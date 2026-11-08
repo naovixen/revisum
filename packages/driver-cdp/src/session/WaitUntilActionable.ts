@@ -15,7 +15,7 @@ import {
     type PageOperations,
     type Point,
 } from "../page/PageOperations.ts";
-import { locate, rethrowUnlessPassing } from "./FindElements.ts";
+import { locate, rethrowUnlessDocumentGone } from "./FindElements.ts";
 import {
     forAtMost,
     notAnswering,
@@ -46,11 +46,12 @@ export async function isElementEnabled<Handle>(
 
 type Actionable<Handle> = Result<{ readonly element: Handle; readonly at: Point }, DriverError>;
 
-type ActionabilityLook<Handle> = {
-    readonly count: number;
-    readonly element?: Handle;
-    readonly check: Actionability | null;
-};
+// What one look found: not exactly one match; one match that went before it could be checked; or one
+// match and how it stands.
+type ActionabilityLook<Handle> =
+    | { readonly kind: "not-one-match"; readonly count: number }
+    | { readonly kind: "unreadable" }
+    | { readonly kind: "checked"; readonly element: Handle; readonly check: Actionability };
 
 // Decodes what actionability (in-page/Actionability.ts) reports.
 function decodeActionability(text: string): Omit<Actionability, "enabled"> {
@@ -73,14 +74,14 @@ async function lookForActionable<Handle>(
     const found = await locate(operations, locator);
     const element = found[0];
     if (found.length !== 1 || element === undefined) {
-        return { count: found.length, check: null };
+        return { kind: "not-one-match", count: found.length };
     }
     try {
         const shown = decodeActionability(
             await operations.callForString(actionability, [{ element }]),
         );
         return {
-            count: 1,
+            kind: "checked",
             element,
             check: {
                 ...shown,
@@ -88,9 +89,9 @@ async function lookForActionable<Handle>(
             },
         };
     } catch (error) {
-        rethrowUnlessPassing(error);
-        // Detached during the check: locate again.
-        return { count: 1, check: null };
+        rethrowUnlessDocumentGone(error);
+        // The document went during the check: locate again.
+        return { kind: "unreadable" };
     }
 }
 
@@ -100,19 +101,30 @@ function whyNotActionable<Handle>(
     look: ActionabilityLook<Handle>,
     timeoutMilliseconds: number,
 ): DriverError {
-    if (look.count === 0) {
-        return { code: "not-found", detail: `not-found after ${timeoutMilliseconds} ms` };
+    switch (look.kind) {
+        case "not-one-match":
+            return look.count === 0
+                ? { code: "not-found", detail: `not-found after ${timeoutMilliseconds} ms` }
+                : {
+                      code: "ambiguous",
+                      detail: `${look.count} matches after ${timeoutMilliseconds} ms`,
+                  };
+        case "unreadable":
+            return {
+                code: "not-actionable",
+                detail: `not attached after ${timeoutMilliseconds} ms`,
+            };
+        case "checked": {
+            const missing = REQUIRED_STATES.find((state) => !look.check[state]);
+            return {
+                code: "not-actionable",
+                detail:
+                    missing === undefined
+                        ? `its centre was unreadable after ${timeoutMilliseconds} ms`
+                        : `not ${missing} after ${timeoutMilliseconds} ms`,
+            };
+        }
     }
-    if (look.count > 1) {
-        return {
-            code: "ambiguous",
-            detail: `${look.count} matches after ${timeoutMilliseconds} ms`,
-        };
-    }
-    const check = look.check;
-    const missing =
-        check === null ? "attached" : (REQUIRED_STATES.find((state) => !check[state]) ?? "unknown");
-    return { code: "not-actionable", detail: `not ${missing} after ${timeoutMilliseconds} ms` };
 }
 
 // How long one wait for an element has. A look gets the whole of its limit, however little of the
@@ -142,10 +154,12 @@ export async function waitUntilActionable<Handle>(
         if (look === TIMED_OUT) {
             return failure(notAnswering(wait.stepTimeoutMilliseconds));
         }
-        const centre = look.check?.centre ?? null;
-        const isActionable = REQUIRED_STATES.every((state) => look.check?.[state] === true);
-        if (look.element !== undefined && centre !== null && isActionable) {
-            return success({ element: look.element, at: centre });
+        if (look.kind === "checked") {
+            const { centre } = look.check;
+            const isActionable = REQUIRED_STATES.every((state) => look.check[state]);
+            if (centre !== null && isActionable) {
+                return success({ element: look.element, at: centre });
+            }
         }
         if (crashed()) {
             return failure(CRASHED);

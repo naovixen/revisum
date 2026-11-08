@@ -13,8 +13,7 @@ import { PAGE_AUDIT_RULES } from "../capabilities/PageAuditRules.ts";
 import { parseAudit, toFindings } from "../capabilities/ParseAudit.ts";
 import { pageAudit } from "../in-page/PageAudit.ts";
 import { linkTargetList, pageInfo } from "../in-page/PageInfo.ts";
-import { readOfPage, type DocumentScope } from "./DocumentScope.ts";
-import { answeredWithin } from "./ForAtMost.ts";
+import { readOfPage, readWithinStep, withinStep, type DocumentScope } from "./DocumentScope.ts";
 import { BROWSER_ERROR_PAGE } from "./ProbeDocument.ts";
 import { fieldsOf } from "./ReportedFields.ts";
 
@@ -56,33 +55,35 @@ export const readPage = <Handle>(
     scope: DocumentScope<Handle>,
 ): Promise<Result<PageProbe, PageReadFailure>> =>
     readOfPage(scope, async (): Promise<PageProbe> => {
+        const stepDeadline = Date.now() + scope.timeout;
         const shown = decodePageInfo(
-            await answeredWithin(scope.timeout, scope.operations.callForString(pageInfo, [])),
+            await withinStep(scope, stepDeadline, () =>
+                scope.operations.callForString(pageInfo, []),
+            ),
         );
         // In place of a page it could not show, the browser shows its own error page at an internal
         // URL. The address bar still shows the URL it wanted, which is not a page that loaded.
         if (!shown.url.startsWith(BROWSER_ERROR_PAGE)) {
             return shown;
         }
-        const unreachable = await scope.operations.unreachableUrl();
+        const unreachable = await withinStep(scope, stepDeadline, () =>
+            scope.operations.unreachableUrl(),
+        );
         return { ...shown, url: unreachable ?? shown.url, browserErrorPage: true };
     });
 
 export const readLinkTargets = <Handle>(
     scope: DocumentScope<Handle>,
 ): Promise<Result<readonly string[], PageReadFailure>> =>
-    readOfPage(scope, async () =>
+    readWithinStep(scope, async () =>
         decodeLinkTargets(await scope.operations.callForString(linkTargetList, [])),
     );
 
 export async function auditPage<Handle>(
     scope: DocumentScope<Handle>,
 ): Promise<Result<readonly A11yFinding[], PageReadFailure>> {
-    const report = await readOfPage(scope, () =>
-        answeredWithin(
-            scope.timeout,
-            scope.operations.callForString(pageAudit, [PAGE_AUDIT_RULE_TABLE]),
-        ),
+    const report = await readWithinStep(scope, () =>
+        scope.operations.callForString(pageAudit, [PAGE_AUDIT_RULE_TABLE]),
     );
     if (!report.ok) {
         return report;

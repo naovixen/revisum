@@ -96,9 +96,11 @@ type DraftArguments = {
   readonly explore?: ExploreArguments;
 };
 
-// A failure the command stops with: its code and, when it helps, where.
-type Stop = { readonly stopped: CliError };
-const stop = (code: CliErrorCode, path?: string): Stop => ({ stopped: cliError(code, path) });
+// A failure the command stops with: its code, when it helps, where, and what went wrong closing the
+// crawl's browser session, if anything did.
+type Stop = { readonly stopped: CliError; readonly closeFailure?: string };
+const stop = (code: CliErrorCode, path?: string, closeFailure: string | null = null): Stop =>
+  ({ stopped: cliError(code, path), ...(closeFailure === null ? {} : { closeFailure }) });
 
 const VALUE_FLAGS = ['--from', '--out', '--criteria', '--explore', '--after', '--max-pages', '--max-depth'];
 const EXPLORE_ONLY_FLAGS = ['--after', '--max-pages', '--max-depth', '--host'];
@@ -263,7 +265,7 @@ async function callPlanner(prepared: Prepared, request: DraftRequest, ports: Dra
 // ---- Explore mode ----------------------------------------------------------------------------------
 
 // What a crawl gave: the page map, its file's text, and whether egress was enforced while it ran.
-type Explored = { readonly map: PageMap; readonly text: string; readonly egressEnforced: boolean };
+type Explored = { readonly map: PageMap; readonly text: string; readonly egressEnforced: boolean; readonly closeFailure: string | null };
 
 // The protected project.json as written, and parsed into the project a run takes.
 async function runnableProject(ports: DraftCommandPorts): Promise<{ readonly written: unknown; readonly project: Project } | Stop> {
@@ -304,7 +306,7 @@ function clearedLogin(path: string, project: Project, target: Target, ports: Dra
   return { cleared: decision.run, text };
 }
 
-const crawlStop = (code: CrawlStop): Stop => stop(code, code === 'plan-rejected' ? '--after' : '--explore');
+const crawlStop = (code: CrawlStop, closeFailure: string | null): Stop => stop(code, code === 'plan-rejected' ? '--after' : '--explore', closeFailure);
 
 async function exploreSite(explore: ExploreArguments, prepared: Prepared, ports: DraftCommandPorts): Promise<Explored | Stop> {
   const origin = exploreStartOrigin(prepared.project, explore.start);
@@ -326,17 +328,21 @@ async function exploreSite(explore: ExploreArguments, prepared: Prepared, ports:
       redactor, secrets: ports.secrets, audit: ports.events, options: { ...bounds, placement: 'host' },
       ...(login === undefined ? { project, target } : { login: login.cleared }),
     });
-    return crawled.ok ? { map: crawled.value, text: pageMapText(crawled.value), egressEnforced: false } : crawlStop(crawled.error);
+    return crawled.ok
+      ? { map: crawled.value, text: pageMapText(crawled.value), egressEnforced: false, closeFailure: crawled.closeFailure }
+      : crawlStop(crawled.error, crawled.closeFailure);
   }
   if (ports.isolatedRunner === undefined) return stop('explore-runner-unavailable', '--explore');
   const input = { project: written, ...bounds, ...(login === undefined ? {} : { afterPlan: login.text }) };
   const crawled = await crawlInRunner(ports.isolatedRunner, input, origin, project.secretNames, redactor);
-  return crawled.ok ? { map: crawled.value, text: pageMapText(crawled.value), egressEnforced: true } : crawlStop(crawled.error);
+  return crawled.ok
+    ? { map: crawled.value, text: pageMapText(crawled.value), egressEnforced: true, closeFailure: null }
+    : crawlStop(crawled.error, null);
 }
 
 // ---- The draft -------------------------------------------------------------------------------------
 
-type Drafted = { readonly result: DraftCommandResult; readonly crawledOrigin?: string; readonly calledOrigins: readonly string[] };
+type Drafted = { readonly result: DraftCommandResult; readonly crawledOrigin?: string; readonly calledOrigins: readonly string[]; readonly closeFailure: string | null };
 
 // Writes a file that must not exist yet, its folder made first.
 function writeNew(ports: DraftCommandPorts, path: string, content: string): boolean {
@@ -389,7 +395,7 @@ async function draft(options: DraftArguments, ports: DraftCommandPorts): Promise
     warnings,
     ...(explored === undefined ? {} : { egressEnforced: explored.egressEnforced }),
   };
-  return { result, ...(explored === undefined ? {} : { crawledOrigin: explored.map.origin }), calledOrigins: [origin] };
+  return { result, ...(explored === undefined ? {} : { crawledOrigin: explored.map.origin }), calledOrigins: [origin], closeFailure: explored?.closeFailure ?? null };
 }
 
 // The human-readable account of a draft, one fact per line.
@@ -404,22 +410,27 @@ function draftReport(result: DraftCommandResult): string {
   return `${lines.join('\n')}\n`;
 }
 
+const closeFailureField = (closeFailure: string | null): { readonly closeFailure?: string } => (closeFailure === null ? {} : { closeFailure });
+// A close that failed changes nothing the crawl found, so it is said beside whatever came of it.
+const closeFailureLine = (closeFailure: string | null): string =>
+  (closeFailure === null ? '' : `The crawl's browser session did not close cleanly, so something of it may still run or hold files: ${closeFailure}\n`);
+
 export async function draftCommand(argv: readonly string[], ports: DraftCommandPorts): Promise<CommandOutcome> {
   const json = argv.includes('--json');
   const options = readArguments(argv);
   const outcome = isStop(options) ? options : await draft(options, ports);
   if (isStop(outcome)) {
-    const output: CliOutput<DraftCommandData> = { schema: CLI_OUTPUT_SCHEMA, command: 'draft', ok: false, errors: [outcome.stopped] };
+    const output: CliOutput<DraftCommandData> = { schema: CLI_OUTPUT_SCHEMA, command: 'draft', ok: false, errors: [outcome.stopped], ...closeFailureField(outcome.closeFailure ?? null) };
     const where = outcome.stopped.path === undefined ? '' : ` at ${outcome.stopped.path}`;
     return {
       exitCode: exitCodeFor(outcome.stopped.code),
       stdout: json ? `${JSON.stringify(output, null, 2)}\n` : '',
-      stderr: json ? '' : `draft: ${outcome.stopped.code}${where} (see docs/errors.md#${outcome.stopped.code})\n`,
+      stderr: json ? '' : `draft: ${outcome.stopped.code}${where} (see docs/errors.md#${outcome.stopped.code})\n${closeFailureLine(outcome.closeFailure ?? null)}`,
     };
   }
   const data: DraftCommandData = {
     ...outcome.result, ...(outcome.crawledOrigin === undefined ? {} : { crawledOrigin: outcome.crawledOrigin }), calledOrigins: outcome.calledOrigins,
   };
-  const output: CliOutput<DraftCommandData> = { schema: CLI_OUTPUT_SCHEMA, command: 'draft', ok: true, data };
-  return { exitCode: 0, stdout: json ? `${JSON.stringify(output, null, 2)}\n` : draftReport(outcome.result), stderr: '' };
+  const output: CliOutput<DraftCommandData> = { schema: CLI_OUTPUT_SCHEMA, command: 'draft', ok: true, data, ...closeFailureField(outcome.closeFailure) };
+  return { exitCode: 0, stdout: json ? `${JSON.stringify(output, null, 2)}\n` : `${draftReport(outcome.result)}${closeFailureLine(outcome.closeFailure)}`, stderr: '' };
 }

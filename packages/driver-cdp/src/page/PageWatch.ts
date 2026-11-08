@@ -20,8 +20,8 @@
 import { errorText } from '../connection/ErrorText.ts';
 import { ATTACHED_TO_TARGET, DETACHED_FROM_TARGET, DIALOG_CLOSED, DIALOG_OPENING, DOWNLOAD_WILL_BEGIN, INSPECTOR_TARGET_CRASHED, type DownloadBegun, FRAME_NAVIGATED, FRAME_REQUESTED_NAVIGATION, FRAME_STOPPED_LOADING, NAVIGATED_WITHIN_DOCUMENT, REQUEST_PAUSED, TARGET_CRASHED, type BrowserEvent, type RequestPaused } from '../connection/BrowserEvent.ts';
 import { CLOSE_TARGET, ENABLE_INSPECTOR, HANDLE_DIALOG, SET_AUTO_ATTACH, SET_DOWNLOAD_BEHAVIOUR, type BrowserCommand } from '../connection/BrowserCommand.ts';
-import { ENABLE_REQUEST_HOLDING } from '../connection/DispatchMouseEvent.ts';
-import { RUN_IF_WAITING_FOR_DEBUGGER } from '../connection/CallFunctionOn.ts';
+import { ENABLE_REQUEST_HOLDING } from '../connection/FetchDomain.ts';
+import { RUN_IF_WAITING_FOR_DEBUGGER } from '../connection/RuntimeDomain.ts';
 import type { CdpConnection } from '../connection/CdpConnection.ts';
 import { CdpError } from '../connection/CdpError.ts';
 import type { PageEvents } from './PageEvents.ts';
@@ -93,8 +93,8 @@ export class PageWatch implements PageEvents {
   readonly #ownsBrowserContext: boolean;
   readonly #claimsDownload: (begun: DownloadBegun) => boolean;
   readonly #isDownloadStepUnderWay: () => boolean;
-  // A promise per popup still being given its chance to ask for its first page.
-  readonly #popupFirstRequests = new Set<Promise<void>>();
+  // A promise per popup still being held back and closed, each with what went wrong noted by its end.
+  readonly #popupsClosing = new Set<Promise<void>>();
   #pressCount = 0;
   // Hands the next page opened without an opener to the newTab step waiting for it.
   #tabClaim: ((page: AttachedPage) => void) | null = null;
@@ -149,7 +149,7 @@ export class PageWatch implements PageEvents {
           return;
         }
         this.#openings += 1;
-        void this.#closePopup(attached.sessionId, info.targetId);
+        this.#keepClosing(this.#closePopup(attached.sessionId, info.targetId));
         return;
       }
       if (attached.waitingForDebugger && info.browserContextId === browserContextId) {
@@ -227,12 +227,12 @@ export class PageWatch implements PageEvents {
     return [...this.#failures.refusedDecisions];
   }
 
-  // Waits until each popup open now has asked for its first page or used up its wait, so the
-  // session's record of them is complete, and rejects with every clean-up that failed, in any tab.
-  // Popups opened during the wait are not waited for, so a page that keeps opening them cannot hold
-  // the session's close.
+  // Waits until each popup open now has been held back, has asked for its first page or used up its
+  // wait, and been closed, so the session's record of them is complete and one that would not close is
+  // reported, and rejects with every clean-up that failed, in any tab. Popups opened during the wait are
+  // not waited for, so a page that keeps opening them cannot hold the session's close.
   async settleHeldPopupsAndReportCleanUp(): Promise<void> {
-    await Promise.all(this.#popupFirstRequests);
+    await Promise.all(this.#popupsClosing);
     if (this.#failures.cleanUp.length > 0) {
       throw new Error(this.#failures.cleanUp.join('; '));
     }
@@ -408,7 +408,6 @@ export class PageWatch implements PageEvents {
         resolve();
       };
     });
-    this.#popupFirstRequests.add(firstRequest);
     try {
       await connection.ask(popupSessionId, ENABLE_REQUEST_HOLDING, { patterns: [{ urlPattern: '*', requestStage: 'Request' }] });
       await connection.ask(popupSessionId, RUN_IF_WAITING_FOR_DEBUGGER, {});
@@ -417,9 +416,13 @@ export class PageWatch implements PageEvents {
       this.noteTargetFailure('a popup could not be held back', error);
     } finally {
       endWait();
-      this.#popupFirstRequests.delete(firstRequest);
     }
     await connection.ask(undefined, CLOSE_TARGET, { targetId: popupTargetId }).catch((error: unknown) => { this.noteTargetFailure('a popup could not be closed', error); });
+  }
+
+  #keepClosing(closing: Promise<void>): void {
+    this.#popupsClosing.add(closing);
+    void closing.finally(() => { this.#popupsClosing.delete(closing); });
   }
 
   #crash(): void {

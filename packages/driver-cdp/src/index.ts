@@ -34,24 +34,22 @@ export {
     SET_FOCUS_EMULATION,
 } from "./connection/BrowserCommand.ts";
 export type { AccessibilityTreeNode, FrameTree } from "./connection/RemoteObject.ts";
+export { GET_FULL_ACCESSIBILITY_TREE } from "./connection/AccessibilityDomain.ts";
+export { GET_MATCHED_STYLES } from "./connection/CssDomain.ts";
 export {
-    CALL_FUNCTION_ON,
-    CAPTURE_SNAPSHOT,
     DESCRIBE_NODE,
-    EVALUATE,
     GET_DOCUMENT,
-    GET_FULL_ACCESSIBILITY_TREE,
-    GET_MATCHED_STYLES,
     PUSH_NODES_BY_BACKEND_IDS,
-    RELEASE_OBJECT,
     RESOLVE_NODE,
-} from "./connection/CallFunctionOn.ts";
+} from "./connection/DomDomain.ts";
+export { CAPTURE_SNAPSHOT } from "./connection/DomSnapshotDomain.ts";
 export {
     CONTINUE_REQUEST,
-    DISPATCH_KEY_EVENT,
     ENABLE_REQUEST_HOLDING,
     FAIL_REQUEST,
-} from "./connection/DispatchMouseEvent.ts";
+} from "./connection/FetchDomain.ts";
+export { DISPATCH_KEY_EVENT } from "./connection/InputDomain.ts";
+export { CALL_FUNCTION_ON, EVALUATE, RELEASE_OBJECT } from "./connection/RuntimeDomain.ts";
 export { LOAD_EVENT_FIRED, REQUEST_PAUSED } from "./connection/BrowserEvent.ts";
 export { launchChromium, type LaunchedChromium } from "./launch/LaunchChromium.ts";
 export type { DriverSession, OwnBrowserDriver } from "./session/DriverSession.ts";

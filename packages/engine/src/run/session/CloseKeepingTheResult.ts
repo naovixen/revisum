@@ -1,6 +1,7 @@
 // Closing the session once the steps have a verdict, without letting the close change it.
-import { failure, type Clock, type ClosedSession, type Session } from "@revisum/contracts";
+import type { Clock, ClosedSession, Session } from "@revisum/contracts";
 import type { Logger } from "../../logging.ts";
+import { recordsWithoutAClose } from "../../target/GuardedDriver.ts";
 import { errorText } from "../CodeForThrow.ts";
 import {
     FailureAfterTheVerdictCode,
@@ -10,12 +11,14 @@ import { POLL_INTERVAL_MILLISECONDS } from "../Poll.ts";
 
 // Longer than a driver's stop takes to give up by itself, so this deadline is only for what has wedged.
 const LONGEST_SESSION_CLOSE_MILLISECONDS = 60_000;
+// How many turns of the event loop a close with nothing to wait for may take, the driver's guard included.
+const TURNS_OF_A_PROMPT_CLOSE = 4;
 
 // A session that will not close, such as a browser profile Windows still holds, says nothing about
 // what the steps found. It stays out of the result, whose hash a replay on a calmer machine must match.
 // Nor does one that never answers hold the result back. Whatever comes of it after that goes unlogged, so
-// the failure is logged once. Gives what the closed session left, or, when it did not close in time
-// or, against its port, rejected, what the session had noted by then.
+// the failure is logged once. Gives what the closed session left, or, when it did not close in time,
+// what the session had noted by then. A session's close never rejects: the guarded driver sees to that.
 export async function closeKeepingTheResult(
     session: Session,
     clock: Clock,
@@ -41,21 +44,15 @@ export async function closeKeepingTheResult(
                 );
             }
             progress.closed = closed;
-        } catch (error) {
-            if (!progress.hasStoppedWaiting) {
-                logFailureAfterTheVerdict(
-                    FailureAfterTheVerdictCode.SessionCloseFailed,
-                    error,
-                    logger,
-                );
-            }
         } finally {
             progress.hasEnded = true;
         }
     })();
     try {
-        // A close with nothing to wait for has ended after one turn, which takes nothing from the clock.
-        await Promise.race([closing, clock.sleep(0)]);
+        // A close with nothing to wait for has ended within a few turns, which take nothing from the clock.
+        for (let turn = 0; turn < TURNS_OF_A_PROMPT_CLOSE && !progress.hasEnded; turn += 1) {
+            await Promise.race([closing, clock.sleep(0)]);
+        }
         const deadline = clock.now() + LONGEST_SESSION_CLOSE_MILLISECONDS;
         while (!progress.hasEnded) {
             if (clock.now() >= deadline) {
@@ -77,21 +74,5 @@ export async function closeKeepingTheResult(
             logFailureAfterTheVerdict(FailureAfterTheVerdictCode.SessionCloseFailed, error, logger);
         }
         return progress.closed ?? recordsWithoutAClose(session, errorText(error));
-    }
-}
-
-// What the session had noted when its close did not give a record. A session that cannot say that
-// either still ends with a record, and each of its parts says why it could not be read.
-function recordsWithoutAClose(session: Session, closeFailure: string): ClosedSession {
-    try {
-        return { ...session.recordsSoFar(), closeFailure };
-    } catch (error) {
-        const unread = failure(errorText(error));
-        return {
-            blockedOrigins: unread,
-            connectionFailures: unread,
-            refusedRequestDecisions: unread,
-            closeFailure,
-        };
     }
 }

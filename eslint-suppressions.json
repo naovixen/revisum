@@ -2069,9 +2069,6 @@
     }
   },
   "test/proofs/database-command-dependencies.test.ts": {
-    "@typescript-eslint/no-unsafe-assignment": {
-      "count": 1
-    },
     "curly": {
       "count": 1
     },

@@ -1,5 +1,6 @@
 // How the browser says what a command was about has gone. Each is the browser's own text.
 import { errorText } from "../connection/ErrorText.ts";
+import { DocumentGone } from "./DocumentGone.ts";
 
 // Messages of a command about an object whose document was replaced, or whose tab has closed.
 export const LOST_OBJECT =
@@ -16,6 +17,12 @@ export const isFrameOutOfReach = (error: unknown): boolean => FRAME_REMOVED.test
 // True when a command failed because its object has gone with its document or tab.
 export const isLostObject = (error: unknown): boolean => LOST_OBJECT.test(errorText(error));
 
-// True when a command failed because its document has gone: its objects, or its frame.
+// How a command fails once its session has closed the connection, which took every document with it.
+const CONNECTION_CLOSED = /connection closed/;
+
+// True when a command failed because its document has gone: its objects, its frame, or the whole session.
 export const isDocumentGone = (error: unknown): boolean =>
-    isLostObject(error) || FRAME_REMOVED.test(errorText(error));
+    error instanceof DocumentGone ||
+    isLostObject(error) ||
+    FRAME_REMOVED.test(errorText(error)) ||
+    CONNECTION_CLOSED.test(errorText(error));

@@ -15,7 +15,7 @@ import {
     type DriverError,
     type Result,
 } from "@revisum/contracts";
-import { CALL_FUNCTION_ON } from "../connection/CallFunctionOn.ts";
+import { CALL_FUNCTION_ON } from "../connection/RuntimeDomain.ts";
 import {
     CREATE_ISOLATED_WORLD,
     GET_FRAME_TREE,
@@ -23,6 +23,7 @@ import {
 } from "../connection/BrowserCommand.ts";
 import type { CallResult } from "../connection/RemoteObject.ts";
 import type { CdpConnection } from "../connection/CdpConnection.ts";
+import { errorText } from "../connection/ErrorText.ts";
 import { readClipboardText } from "../in-page/ReadClipboardText.ts";
 import { PageHeldByDialog } from "../page/PageHeldByDialog.ts";
 import type { PageCommand } from "./PageStorage.ts";
@@ -31,9 +32,6 @@ import type { PageCommand } from "./PageStorage.ts";
 const CLIPBOARD_WORLD_NAME = "driver-clipboard";
 const CLIPBOARD_READ = { name: "clipboard-read" } as const;
 const CLIPBOARD_WRITE = { name: "clipboard-write" } as const;
-
-const errorText = (error: unknown): string =>
-    (error instanceof Error ? error.message : String(error)).slice(0, 200);
 
 // Lets every page of the browser context copy, and none read, the clipboard.
 export async function allowRunClipboard(
@@ -51,6 +49,13 @@ export async function allowRunClipboard(
         browserContextId,
     });
 }
+
+// What a browser needs from a session to give it a clipboard.
+export type ClipboardOfASession = {
+    readonly browserContextId: string;
+    readonly command: PageCommand;
+    readonly crashed: () => boolean;
+};
 
 export const SHARED_BROWSER_CLIPBOARD: ClipboardPort = {
     readText: () =>

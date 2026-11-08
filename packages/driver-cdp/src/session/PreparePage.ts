@@ -22,7 +22,7 @@ import {
     FAIL_REQUEST,
     FULFIL_REQUEST,
     GET_RESPONSE_BODY,
-} from "../connection/DispatchMouseEvent.ts";
+} from "../connection/FetchDomain.ts";
 import { errorText } from "../connection/ErrorText.ts";
 import { CLICK_WATCH_SCRIPT } from "../page/HitChecks.ts";
 import type { PageWatch } from "../page/PageWatch.ts";

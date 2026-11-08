@@ -32,6 +32,22 @@ export function maskElements(selectors: readonly string[]): string {
     return String(elements.length);
 }
 
+// Every element in the document, or in an open shadow root of it, that holds a framed document.
+export function framedDocumentElements(): Element[] {
+    const frames: Element[] = [];
+    const roots: (Document | ShadowRoot)[] = [document];
+    for (const root of roots) {
+        frames.push(...Array.from(root.querySelectorAll("iframe,frame")));
+        for (const element of Array.from(root.querySelectorAll("*"))) {
+            const shadowRoot = Reflect.get(Element.prototype, "shadowRoot", element);
+            if (shadowRoot !== null) {
+                roots.push(shadowRoot);
+            }
+        }
+    }
+    return frames;
+}
+
 // What every field in the document holds, as JSON. The caller only compares it, and keeps none of it.
 export function fieldValues(): string {
     const fields = [

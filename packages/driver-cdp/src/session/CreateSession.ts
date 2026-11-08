@@ -12,15 +12,12 @@ import {
 } from "@revisum/contracts";
 import { BrowserClock } from "../capabilities/BrowserClock.ts";
 import { BrowserNetwork } from "../capabilities/BrowserNetwork.ts";
+import { reportingReleaseFailures } from "../capabilities/DownloadCapture.ts";
 import { DownloadFolder } from "../capabilities/DownloadFolder.ts";
 import { EgressRecorder } from "../capabilities/EgressRecorder.ts";
 import { fixtureFilePath, readFixture } from "../capabilities/FixtureFilePath.ts";
 import { PageStorage } from "../capabilities/PageStorage.ts";
-import {
-    RunClipboard,
-    SHARED_BROWSER_CLIPBOARD,
-    allowRunClipboard,
-} from "../capabilities/RunClipboard.ts";
+import { allowRunClipboard } from "../capabilities/RunClipboard.ts";
 import type { OpenedSessionEgress } from "../capabilities/SessionEgress.ts";
 import {
     ATTACH_TO_TARGET,
@@ -86,7 +83,7 @@ export async function createSession(
         },
         events: watch,
         fixturePath: (fixture) => fixtureFilePath(fixturesFolder, fixture),
-        downloads: browser.downloads,
+        downloads: browser.downloadCapture,
         secretTypedFields: [],
         openTab: () => openTab(browser, watch, details),
         network: browser.network,
@@ -95,14 +92,11 @@ export async function createSession(
             () => watch.crashed(),
         ),
         clock: browser.clock,
-        clipboard: attached.isShared
-            ? SHARED_BROWSER_CLIPBOARD
-            : new RunClipboard(
-                  connection,
-                  browserContextId,
-                  (command, parameters) => watch.askRunningPage(command, parameters),
-                  () => watch.crashed(),
-              ),
+        clipboard: attached.clipboardOf({
+            browserContextId,
+            command: (command, parameters) => watch.askRunningPage(command, parameters),
+            crashed: () => watch.crashed(),
+        }),
     };
     return buildSession(CdpPage.topDocument(connection, sessionId, watch), environment, details);
 }
@@ -123,6 +117,7 @@ function sessionBrowserOf(
     const failures: SessionFailures = { refusedDecisions: [], cleanUp: [] };
     // Every request's origin and channel, for the run's egress events.
     const recorder = new EgressRecorder(connection, failures);
+    const downloads = new DownloadFolder(connection, browserContextId);
     return {
         connection,
         browserContextId,
@@ -131,7 +126,10 @@ function sessionBrowserOf(
         environment: settings.environment,
         blocked: [],
         recorder,
-        downloads: new DownloadFolder(connection, browserContextId),
+        downloads,
+        downloadCapture: reportingReleaseFailures(downloads, (failure) => {
+            failures.cleanUp.push(failure);
+        }),
         network: new BrowserNetwork(connection, {
             readFixture: (fixture) => readFixture(settings.fixturesFolder, fixture),
             onAnsweredInBrowser: (requestId) => {

@@ -10,12 +10,11 @@ import {
     type ResolvedLocator,
     type Result,
 } from "@revisum/contracts";
-import { errorText } from "../connection/ErrorText.ts";
 import { heldModifierKeys } from "../page/HeldModifierKeys.ts";
 import { HitCheckOutcome } from "../page/HitChecks.ts";
 import { SelectOutcome, type HasStepEnded, type Point } from "../page/PageOperations.ts";
 import { answerDialog } from "./AnswerDialog.ts";
-import { clickDenial, denial } from "./ClickDenial.ts";
+import { clickDenial, denial, guardWhileStepLasts } from "./ClickDenial.ts";
 import {
     failureOfRefusedDecision,
     failureOfThrow,
@@ -23,10 +22,10 @@ import {
     inputWithinTimeout,
     SELECTOR_INVALID,
     waitWithin,
+    withinStep,
     type DocumentScope,
 } from "./DocumentScope.ts";
 import { rejectsSelector } from "./FindElements.ts";
-import { forAtMost, notAnswering, TIMED_OUT } from "./ForAtMost.ts";
 import { isSecretFill, typeFill } from "./TextToFill.ts";
 import { CRASHED, waitUntilActionable, waitUntilFound } from "./WaitUntilActionable.ts";
 
@@ -66,11 +65,13 @@ async function click<Handle>(
             return waited;
         }
         const { element, at } = waited.value;
-        const denied = await clickDenial(operations, element, at, guard);
+        const denied = await withinStep(scope, stepDeadline, (hasStepEnded) =>
+            clickDenial(operations, element, at, guardWhileStepLasts(guard, hasStepEnded)),
+        );
         if (denied !== null) {
             return failure(denied);
         }
-        await beforePress(element, at);
+        await withinStep(scope, stepDeadline, () => beforePress(element, at));
         const hit = await inputWithinTimeout(
             scope,
             (hasStepEnded) => clickChecks.around(element, at, hasStepEnded),
@@ -141,7 +142,9 @@ async function upload<Handle>(
     if (!found.ok) {
         return found;
     }
-    const denied = await denial(operations, found.value, guard);
+    const denied = await withinStep(scope, stepDeadline, (hasStepEnded) =>
+        denial(operations, found.value, guardWhileStepLasts(guard, hasStepEnded)),
+    );
     if (denied !== null) {
         return failure(denied);
     }
@@ -222,7 +225,9 @@ async function perform<Handle>(
         return waited;
     }
     const { element, at } = waited.value;
-    const denied = await denial(operations, element, guard);
+    const denied = await withinStep(scope, stepDeadline, (hasStepEnded) =>
+        denial(operations, element, guardWhileStepLasts(guard, hasStepEnded)),
+    );
     if (denied !== null) {
         return failure(denied);
     }
@@ -278,23 +283,17 @@ export async function actBeforePress<Handle>(
         try {
             return await answerDialog(scope, action, guard);
         } catch (error) {
-            return failure(
-                events.crashed() ? CRASHED : { code: "not-actionable", detail: errorText(error) },
-            );
+            return failure(failureOfThrow(scope, error));
         }
     }
     const openingsBefore = events.unsupportedOpenings();
     const stepDeadline = Date.now() + scope.timeout;
     let acted: Result<void, DriverError>;
     try {
-        const rejected = await forAtMost(
-            scope.timeout,
+        const isRejected = await withinStep(scope, stepDeadline, () =>
             rejectsSelector(scope.operations, action.locator),
         );
-        if (rejected === TIMED_OUT) {
-            return failure(notAnswering(scope.timeout));
-        }
-        if (rejected) {
+        if (isRejected) {
             return failure(SELECTOR_INVALID);
         }
         acted = await performAndSettle(scope, action, guard, beforePress, stepDeadline);

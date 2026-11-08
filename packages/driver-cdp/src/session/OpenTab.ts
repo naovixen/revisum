@@ -7,7 +7,7 @@ import {
     type SessionTab,
 } from "@revisum/contracts";
 import { CLOSE_TARGET, CREATE_TARGET } from "../connection/BrowserCommand.ts";
-import { RUN_IF_WAITING_FOR_DEBUGGER } from "../connection/CallFunctionOn.ts";
+import { RUN_IF_WAITING_FOR_DEBUGGER } from "../connection/RuntimeDomain.ts";
 import { errorText } from "../connection/ErrorText.ts";
 import { CdpPage } from "../page/CdpPage.ts";
 import type { AttachedPage, PageWatch } from "../page/PageWatch.ts";
@@ -69,7 +69,7 @@ export async function openTab(
     return success(
         buildTab(CdpPage.topDocument(connection, attached.sessionId, watch), browser.environment, {
             fixturePath: firstDetails.fixturePath,
-            downloads: browser.downloads,
+            downloads: browser.downloadCapture,
             events: watch,
             close,
             secretTypedFields: firstDetails.secretTypedFields,

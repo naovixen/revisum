@@ -1,4 +1,5 @@
 import type { DownloadedFile, DriverError, Result } from "@revisum/contracts";
+import { errorText } from "../connection/ErrorText.ts";
 
 // The browser's downloads for one session and its tabs: saved into a folder of the session's own,
 // and refused at every other time.
@@ -28,6 +29,30 @@ export interface ArmedDownload {
         shouldStopWaiting: () => boolean,
     ): Promise<Result<DownloadedFile, DriverError>>;
     // Refuses downloads again. Unless `shouldKeep` is true and the file finished, the download is
-    // cancelled and its bytes deleted; a kept file stays until the session closes.
+    // cancelled and its bytes deleted; a kept file stays until the session closes. Rejects with what
+    // it could not do: reportingReleaseFailures keeps that from a step, whose outcome it must not touch.
     release(shouldKeep: boolean): Promise<void>;
+}
+
+// A capture whose release never rejects: what stopped it is told to `noteFailure` instead, for the
+// session's close to report, since a clean-up that failed says nothing of what a step found.
+export function reportingReleaseFailures(
+    capture: DownloadCapture,
+    noteFailure: (failure: string) => void,
+): DownloadCapture {
+    return {
+        arm: () => {
+            const armed = capture.arm();
+            return {
+                ...armed,
+                release: async (shouldKeep) => {
+                    try {
+                        await armed.release(shouldKeep);
+                    } catch (error) {
+                        noteFailure(`a download could not be let go: ${errorText(error)}`);
+                    }
+                },
+            };
+        },
+    };
 }

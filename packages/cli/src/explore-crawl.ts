@@ -22,9 +22,14 @@ import { buildEgressPolicy } from '@revisum/runner';
 // Why a crawl stopped, as the command reports it.
 // target-unavailable: the browser did not open.
 // plan-rejected: the --after plan did not pass, so the pages would not be the signed-in ones.
-// internal: the browser session did not close cleanly, so something of it may still run or hold files.
 export type CrawlStop =
-  | 'explore-origin-refused' | 'explore-start-unreachable' | 'explore-runner-unavailable' | 'target-unavailable' | 'plan-rejected' | 'internal';
+  | 'explore-origin-refused' | 'explore-start-unreachable' | 'explore-runner-unavailable' | 'target-unavailable' | 'plan-rejected';
+
+// What a crawl in a browser found or why it stopped, and what its session's close said. The close says
+// nothing of the pages, so the crawl's outcome stands whatever it was; it is carried to the command's
+// output so that a browser left running, or a profile still held, is not lost.
+export type BrowserCrawlOutcome = Result<PageMap, CrawlStop> & { readonly closeFailure: string | null };
+const stoppedBeforeTheSession = (stop: CrawlStop): BrowserCrawlOutcome => ({ ...failure(stop), closeFailure: null });
 
 // One crawl in a browser session: the bounds, how text read from pages is redacted, and either the
 // gate-cleared --after run, whose project and target the crawl's session is, or, with no --after
@@ -79,11 +84,11 @@ function sharingDriver(browser: BrowserDriver, session: Session, sessionTarget: 
 const sessionFor = (crawl: BrowserCrawl): { readonly project: Project; readonly target: Target } =>
   ('login' in crawl ? crawl.login : crawl);
 
-export async function crawlInBrowser(browser: BrowserDriver, crawl: BrowserCrawl): Promise<Result<PageMap, CrawlStop>> {
+export async function crawlInBrowser(browser: BrowserDriver, crawl: BrowserCrawl): Promise<BrowserCrawlOutcome> {
   const { project, target } = sessionFor(crawl);
   const origin = exploreStartOrigin(project, crawl.options.start);
-  if (origin === undefined) return failure('explore-origin-refused');
-  if (!browser.supports(target).ok) return failure('target-unavailable');
+  if (origin === undefined) return stoppedBeforeTheSession('explore-origin-refused');
+  if (!browser.supports(target).ok) return stoppedBeforeTheSession('target-unavailable');
   const fixedTimeMilliseconds = Date.now();
   // The session may reach the start origin and nothing else.
   const baseUrl = baseUrlOfOrigin(origin);
@@ -91,18 +96,20 @@ export async function crawlInBrowser(browser: BrowserDriver, crawl: BrowserCrawl
     baseUrl, allowedOrigins: [origin], seed: CRAWL_SEED, fixedTimeMilliseconds,
     sensitiveSelectors: crawl.redactor.selectors, timeoutMilliseconds: project.limits.stepTimeoutMilliseconds,
   });
-  if (!opened.ok) return failure('target-unavailable');
+  if (!opened.ok) return stoppedBeforeTheSession('target-unavailable');
   const session = opened.value;
   let crawled: Result<PageMap, CrawlStop>;
   try {
     crawled = await crawlOpenSession(session, browser, crawl, { target, baseUrl, fixedTimeMilliseconds });
   } catch (error) {
-    await session.close();
-    throw error;
+    const { closeFailure } = await session.close();
+    if (closeFailure === null) {
+      throw error;
+    }
+    throw new Error(`${error instanceof Error ? error.message : String(error)}; the crawl's session also did not close: ${closeFailure}`, { cause: error });
   }
-  // A crawl that stopped for its own reason keeps it; one that finished reports the close that did not.
-  const closed = await session.close();
-  return crawled.ok && closed.closeFailure !== null ? failure('internal') : crawled;
+  const { closeFailure } = await session.close();
+  return { ...crawled, closeFailure };
 }
 
 // What a crawl's --after run needs of the session it shares.

@@ -8,7 +8,7 @@ import {
     type Result,
 } from "@revisum/contracts";
 import { denialOf, NO_RESOLVED_ELEMENT } from "./ClickDenial.ts";
-import type { DocumentScope } from "./DocumentScope.ts";
+import { withinStep, type DocumentScope } from "./DocumentScope.ts";
 import { normalise } from "./FindElements.ts";
 import { pause, POLL_INTERVAL_MILLISECONDS } from "./ForAtMost.ts";
 import { CRASHED } from "./WaitUntilActionable.ts";
@@ -16,15 +16,15 @@ import { CRASHED } from "./WaitUntilActionable.ts";
 // The text of the dialog the page has open, or opens within the timeout, or why there is none.
 async function dialogText<Handle>(
     scope: DocumentScope<Handle>,
+    stepDeadline: number,
 ): Promise<Result<string, DriverError>> {
     const { events, timeout } = scope;
-    const deadline = Date.now() + timeout;
     let text = events.openDialog();
     while (text === null) {
         if (events.crashed()) {
             return failure(CRASHED);
         }
-        if (Date.now() >= deadline) {
+        if (Date.now() >= stepDeadline) {
             return failure({ code: "not-found", detail: `no dialog opened within ${timeout} ms` });
         }
         await pause(POLL_INTERVAL_MILLISECONDS);
@@ -39,7 +39,8 @@ export async function answerDialog<Handle>(
     step: ResolvedDialogStep,
     guard: ActionGuard,
 ): Promise<Result<void, DriverError>> {
-    const text = await dialogText(scope);
+    const stepDeadline = Date.now() + scope.timeout;
+    const text = await dialogText(scope, stepDeadline);
     if (!text.ok) {
         return text;
     }
@@ -54,6 +55,8 @@ export async function answerDialog<Handle>(
     if (denied !== null) {
         return failure(denied);
     }
-    await scope.events.answerDialog(step.action === "accept");
+    await withinStep(scope, stepDeadline, () =>
+        scope.events.answerDialog(step.action === "accept"),
+    );
     return success(undefined);
 }

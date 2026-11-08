@@ -174,6 +174,10 @@ export class DownloadFolder implements DownloadCapture {
         let isBrowserSaving = false;
         return {
             expectFromPress: async (press) => {
+                // A step that ran out of time may reach here only after it has let the download go.
+                if (this.#armed !== armed) {
+                    return;
+                }
                 // A press aimed anew was not sent, so a file claimed since the last aim is none of its doing.
                 const claimedTooEarly = armed.claimed;
                 if (claimedTooEarly !== null) {

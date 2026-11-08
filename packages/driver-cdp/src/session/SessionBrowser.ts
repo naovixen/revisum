@@ -2,6 +2,7 @@
 import type { SessionEnvironment, Target } from "@revisum/contracts";
 import type { BrowserClock } from "../capabilities/BrowserClock.ts";
 import type { BrowserNetwork } from "../capabilities/BrowserNetwork.ts";
+import type { DownloadCapture } from "../capabilities/DownloadCapture.ts";
 import type { DownloadFolder } from "../capabilities/DownloadFolder.ts";
 import type { EgressRecorder } from "../capabilities/EgressRecorder.ts";
 import type { CdpConnection } from "../connection/CdpConnection.ts";
@@ -20,6 +21,8 @@ export type SessionBrowser = {
     readonly blocked: string[];
     readonly recorder: EgressRecorder;
     readonly downloads: DownloadFolder;
+    // The folder, as a session's steps use it: what fails letting a download go goes to `failures`.
+    readonly downloadCapture: DownloadCapture;
     readonly network: BrowserNetwork;
     readonly clock: BrowserClock;
     readonly failures: SessionFailures;

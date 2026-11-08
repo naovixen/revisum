@@ -3,7 +3,7 @@ import { isDeepStrictEqual } from "node:util";
 import type { ResolvedLocator } from "@revisum/contracts";
 import { fieldValues } from "../in-page/MaskElements.ts";
 import type { PageOperations } from "../page/PageOperations.ts";
-import { rethrowUnlessPassing } from "./FindElements.ts";
+import { rethrowUnlessDocumentGone } from "./FindElements.ts";
 import type { SecretTypedField } from "./SessionDetails.ts";
 
 // True when every element a secret was typed into under this locator has gone. One the session has
@@ -17,7 +17,7 @@ export async function hasTypedFieldGone(
         const gone = await Promise.all(typed.map((field) => field.isGone()));
         return typed.length > 0 && gone.every(Boolean);
     } catch (error) {
-        rethrowUnlessPassing(error);
+        rethrowUnlessDocumentGone(error);
         return false;
     }
 }

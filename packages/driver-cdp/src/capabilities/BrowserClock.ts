@@ -25,13 +25,8 @@ import {
     REMOVE_SCRIPT_ON_NEW_DOCUMENT,
 } from "../connection/BrowserCommand.ts";
 import type { FrameTree } from "../connection/RemoteObject.ts";
-import {
-    CALL_FUNCTION_ON,
-    DESCRIBE_NODE,
-    EVALUATE,
-    GET_FRAME_OWNER,
-    RESOLVE_NODE,
-} from "../connection/CallFunctionOn.ts";
+import { CALL_FUNCTION_ON, EVALUATE } from "../connection/RuntimeDomain.ts";
+import { DESCRIBE_NODE, GET_FRAME_OWNER, RESOLVE_NODE } from "../connection/DomDomain.ts";
 import { errorText } from "../connection/ErrorText.ts";
 import { advanceDocumentClock } from "../in-page/AdvanceDocumentClock.ts";
 import { isDocumentGone } from "../page/LostObject.ts";

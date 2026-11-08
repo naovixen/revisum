@@ -17,6 +17,15 @@ export const notAnswering = (timeoutMilliseconds: number): DriverError => ({
     detail: `the page did not answer within ${timeoutMilliseconds} ms`,
 });
 
+// What a read of a step throws when the page has not answered by the step's deadline, for the step's
+// own catch to say what became of it.
+export class StepOutOfTime extends Error {
+    constructor(message: string) {
+        super(message);
+        this.name = "StepOutOfTime";
+    }
+}
+
 // Waits for what the page was asked for at most this long. While a navigation of the page waits for
 // its server, the browser answers no command to that page, and nor does the mouse release that began
 // it, so a server that holds its answer would otherwise hold the step for as long as a command's own
@@ -56,17 +65,4 @@ export async function inputForAtMost<Value>(
     } finally {
         clearTimeout(timer);
     }
-}
-
-// What a page is asked for at most this long, or the failure to answer, as a throw for the read's own
-// catch to say what became of it.
-export async function answeredWithin<Value>(
-    milliseconds: number,
-    work: Promise<Value>,
-): Promise<Value> {
-    const answered = await forAtMost(milliseconds, work);
-    if (answered === TIMED_OUT) {
-        throw new Error(notAnswering(milliseconds).detail);
-    }
-    return answered;
 }

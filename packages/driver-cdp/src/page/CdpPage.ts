@@ -8,14 +8,9 @@ import {
     NAVIGATE,
     SET_SCRIPT_EXECUTION_DISABLED,
 } from "../connection/BrowserCommand.ts";
-import {
-    CALL_FUNCTION_ON,
-    DESCRIBE_NODE,
-    EVALUATE,
-    GET_PROPERTIES,
-    QUERY_ACCESSIBILITY_TREE,
-    RESOLVE_NODE,
-} from "../connection/CallFunctionOn.ts";
+import { CALL_FUNCTION_ON, EVALUATE, GET_PROPERTIES } from "../connection/RuntimeDomain.ts";
+import { DESCRIBE_NODE, RESOLVE_NODE } from "../connection/DomDomain.ts";
+import { QUERY_ACCESSIBILITY_TREE } from "../connection/AccessibilityDomain.ts";
 import type { CdpConnection } from "../connection/CdpConnection.ts";
 import { MalformedBrowserReply } from "../connection/MalformedBrowserReply.ts";
 import type { CallResult, FrameTree } from "../connection/RemoteObject.ts";

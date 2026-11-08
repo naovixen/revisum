@@ -2,8 +2,9 @@
 import type { ActionGuard, DriverError, GuardVerdict, ResolvedElement } from "@revisum/contracts";
 import { whatAClickActivates } from "../in-page/Actionability.ts";
 import { guardDetails } from "../in-page/GuardDetails.ts";
-import type { PageOperations, Point } from "../page/PageOperations.ts";
-import { boxOf, fieldsOf } from "./ReportedFields.ts";
+import type { HasStepEnded, PageOperations, Point } from "../page/PageOperations.ts";
+import { StepHasEnded } from "../page/StepHasEnded.ts";
+import { reportedBoxOrNull, reportedFields, reportedTextOrNull } from "./ReportedFields.ts";
 
 // What the runtime guard is told for a dialog step, which acts on no element.
 export const NO_RESOLVED_ELEMENT: ResolvedElement = {
@@ -14,17 +15,16 @@ export const NO_RESOLVED_ELEMENT: ResolvedElement = {
     linkUrl: null,
 };
 
-const textOrNull = (value: unknown): string | null => (typeof value === "string" ? value : null);
-
-// Decodes what guardDetails (in-page/GuardDetails.ts) reports. A field of another shape is read as
-// not shown.
+// Decodes what guardDetails (in-page/GuardDetails.ts) reports. A field of another shape says the report
+// cannot be trusted: reading it as "not shown" would have the guard judge what the page failed to say.
 function decodeGuardDetails(text: string): Omit<ResolvedElement, "role" | "name"> {
-    const fields = fieldsOf(JSON.parse(text));
-    const testId = textOrNull(fields["testId"]);
+    const source = "guardDetails";
+    const fields = reportedFields(text, source);
+    const testId = reportedTextOrNull(fields, "testId", source);
     return {
-        box: boxOf(fields["box"]),
-        formSubmitName: textOrNull(fields["formSubmitName"]),
-        linkUrl: textOrNull(fields["linkUrl"]),
+        box: reportedBoxOrNull(fields, "box", source),
+        formSubmitName: reportedTextOrNull(fields, "formSubmitName", source),
+        linkUrl: reportedTextOrNull(fields, "linkUrl", source),
         ...(testId === null ? {} : { testId }),
     };
 }
@@ -41,6 +41,17 @@ async function resolvedElement<Handle>(
         ...decodeGuardDetails(await operations.callForString(guardDetails, [{ element }])),
     };
 }
+
+// The guard, for a read a step's deadline may outlive: once the step has ended, the read goes no
+// further than asking, so no verdict is recorded for a step that has already failed.
+export const guardWhileStepLasts =
+    (guard: ActionGuard, hasStepEnded: HasStepEnded): ActionGuard =>
+    (element, dialogText) => {
+        if (hasStepEnded()) {
+            throw new StepHasEnded("the runtime guard");
+        }
+        return guard(element, dialogText);
+    };
 
 // A denial as the step's error, or null for an allow.
 export function denialOf(verdict: GuardVerdict): DriverError | null {

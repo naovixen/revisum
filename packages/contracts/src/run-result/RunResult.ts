@@ -2,8 +2,10 @@
 // it can have. A plan run ran its steps (Passed, Failed or Errored), was denied by the policy gate's
 // runtime guard, was refused before any driver call, found its target unavailable, or ended Errored
 // when its driver broke its promise before any step. An evidence
-// run ran its suite, or was refused before any suite code ran. Two plan shapes end Errored: a reader
-// tells them apart by `denial`, which only the one that came from a denied run holds.
+// run ran its suite, or was refused before any suite code ran. Three plan shapes end Errored: a reader
+// tells them apart by `denial`, which only the one that came from a denied run holds, and by `manifest`,
+// which is null only on the one whose driver broke its promise before any step ran. The third, holding
+// a manifest and no denial, ran its steps and ended Errored by itself.
 import type { ApprovalLabel } from "../approval.ts";
 import type { Unavailable } from "../browser-driver.ts";
 import type { GuaranteeStatement, RunMode } from "../evidence-mode.ts";

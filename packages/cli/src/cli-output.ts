@@ -8,6 +8,8 @@ export type Command = 'validate' | 'lock' | 'run' | 'export' | 'review' | 'appro
 export type CliError = { readonly code: CliErrorCode; readonly path?: string; readonly docs: `errors#${CliErrorCode}` };
 export type CliOutput<Data> = {
   readonly schema: string; readonly command: Command; readonly ok: boolean; readonly data?: Data; readonly errors?: readonly CliError[];
+  // What went wrong closing a browser session the command used. It changes nothing the command found.
+  readonly closeFailure?: string;
 };
 
 // What a command answers with: its exit code and the text it prints on each stream.

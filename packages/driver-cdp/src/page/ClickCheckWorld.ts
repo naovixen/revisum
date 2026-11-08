@@ -4,11 +4,10 @@ import { BINDING_CALLED } from "../connection/BrowserEvent.ts";
 import { GET_FRAME_TREE } from "../connection/BrowserCommand.ts";
 import {
     CALL_FUNCTION_ON,
-    DESCRIBE_NODE,
     RELEASE_OBJECT,
     RELEASE_OBJECT_GROUP,
-    RESOLVE_NODE,
-} from "../connection/CallFunctionOn.ts";
+} from "../connection/RuntimeDomain.ts";
+import { DESCRIBE_NODE, RESOLVE_NODE } from "../connection/DomDomain.ts";
 import { errorText } from "../connection/ErrorText.ts";
 import type { FrameTree } from "../connection/RemoteObject.ts";
 import { throwIfThePageThrew } from "./CallDelivery.ts";

@@ -4,7 +4,7 @@ import type { A11yNode } from "@revisum/contracts";
 import {
     GET_FULL_ACCESSIBILITY_TREE,
     GET_PARTIAL_ACCESSIBILITY_TREE,
-} from "../connection/CallFunctionOn.ts";
+} from "../connection/AccessibilityDomain.ts";
 import type { AccessibilityTreeNode } from "../connection/RemoteObject.ts";
 import type { PageCommands } from "./PageCommands.ts";
 import type { ExposedStates, RoleAndName } from "./PageOperations.ts";

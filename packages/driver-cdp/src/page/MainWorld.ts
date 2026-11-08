@@ -3,13 +3,12 @@
 import type { CallArgument } from "../connection/BrowserCommand.ts";
 import {
     CALL_FUNCTION_ON,
-    DESCRIBE_NODE,
     EVALUATE,
-    GET_EVENT_LISTENERS,
     RELEASE_OBJECT,
     RELEASE_OBJECT_GROUP,
-    RESOLVE_NODE,
-} from "../connection/CallFunctionOn.ts";
+} from "../connection/RuntimeDomain.ts";
+import { DESCRIBE_NODE, RESOLVE_NODE } from "../connection/DomDomain.ts";
+import { GET_EVENT_LISTENERS } from "../connection/DomDebuggerDomain.ts";
 import type { RemoteObject } from "../connection/RemoteObject.ts";
 import { isNotDisabledByItsProperty } from "../in-page/EnabledState.ts";
 import { scriptResultText } from "../in-page/ScriptResultText.ts";

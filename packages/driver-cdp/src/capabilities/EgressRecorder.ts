@@ -11,7 +11,7 @@ import {
     WEB_SOCKET_CREATED,
 } from "../connection/BrowserEvent.ts";
 import { ENABLE_NETWORK, SET_AUTO_ATTACH } from "../connection/BrowserCommand.ts";
-import { RUN_IF_WAITING_FOR_DEBUGGER } from "../connection/CallFunctionOn.ts";
+import { RUN_IF_WAITING_FOR_DEBUGGER } from "../connection/RuntimeDomain.ts";
 import type { CdpConnection } from "../connection/CdpConnection.ts";
 import { holdUnreadableEvent, type SessionFailures } from "../page/PageWatch.ts";
 

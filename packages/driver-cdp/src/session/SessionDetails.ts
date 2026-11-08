@@ -26,7 +26,8 @@ export type DocumentDetails = {
     readonly events: PageEvents;
     // The absolute path of a declared upload fixture, or why it cannot be sent.
     readonly fixturePath: (fixture: string) => Result<string, DriverError>;
-    // Where a download step's file is saved.
+    // Where a download step's file is saved. Its release never rejects: what stops it is for the
+    // session's close to report.
     readonly downloads: DownloadCapture;
     // Every field the session and its tabs have typed a secret into, in the order they were typed.
     readonly secretTypedFields: SecretTypedField[];

@@ -30,6 +30,33 @@ export function reportedBoolean(
     return value;
 }
 
+// A field that is text or null. Anything else says the report cannot be read.
+export function reportedTextOrNull(
+    fields: Readonly<Record<string, unknown>>,
+    name: string,
+    source: string,
+): string | null {
+    const value = fields[name];
+    if (typeof value === "string" || value === null) {
+        return value;
+    }
+    throw new MalformedBrowserReply(source, `report.${name}`);
+}
+
+// A field that is a box or null. Anything else says the report cannot be read.
+export function reportedBoxOrNull(
+    fields: Readonly<Record<string, unknown>>,
+    name: string,
+    source: string,
+): ReturnType<typeof boxOf> {
+    const value = fields[name];
+    const box = boxOf(value);
+    if (box !== null || value === null) {
+        return box;
+    }
+    throw new MalformedBrowserReply(source, `report.${name}`);
+}
+
 // A box of four numbers, or null for anything else.
 export function boxOf(value: unknown): {
     readonly x: number;

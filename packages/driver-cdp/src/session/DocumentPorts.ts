@@ -20,9 +20,10 @@ import {
     failureOfThrow,
     inputSettled,
     isTopDocument,
-    readOfPage,
+    readWithinStep,
     SELECTOR_INVALID,
     waitWithin,
+    withinStep,
     type DocumentScope,
 } from "./DocumentScope.ts";
 import { downloadOnDocument } from "./DownloadOnDocument.ts";
@@ -96,21 +97,22 @@ async function frameOf<Handle>(
     if (events.crashed()) {
         return failure(CRASHED);
     }
+    const stepDeadline = Date.now() + scope.timeout;
     let inner: CheckedDocument<Handle> | null;
     try {
-        if (await rejectsSelector(operations, locator)) {
+        if (await withinStep(scope, stepDeadline, () => rejectsSelector(operations, locator))) {
             return failure(SELECTOR_INVALID);
         }
         const found = await waitUntilFound(
             operations,
             locator,
-            waitWithin(scope, Date.now() + scope.timeout),
+            waitWithin(scope, stepDeadline),
             () => events.crashed(),
         );
         if (!found.ok) {
             return found;
         }
-        inner = await scope.clickChecks.frame(found.value);
+        inner = await withinStep(scope, stepDeadline, () => scope.clickChecks.frame(found.value));
     } catch (error) {
         return failure(failureOfThrow(scope, error));
     }
@@ -128,6 +130,7 @@ async function frameOf<Handle>(
             [...scope.masked, inner.operations],
             scope.environment,
             scope.details,
+            scope.topDocument,
         ),
     );
 }
@@ -138,11 +141,13 @@ export function documentPorts<Handle>(
     masked: readonly PageOperations<Handle>[],
     environment: SessionEnvironment,
     details: DocumentDetails,
+    topDocument: CheckedDocument<Handle> = { operations, checks: clickChecks },
 ): DocumentSession {
     const scope: DocumentScope<Handle> = {
         operations,
         clickChecks,
         masked,
+        topDocument,
         environment,
         details,
         events: details.events,
@@ -160,7 +165,7 @@ export function documentPorts<Handle>(
         screenshotHidingFields: (mask, fields, holdsSecret) =>
             screenshotHidingFields(scope, mask, fields, holdsSecret),
         audit: () => auditPage(scope),
-        accessibilitySnapshot: () => readOfPage(scope, () => operations.accessibilityTree()),
+        accessibilitySnapshot: () => readWithinStep(scope, () => operations.accessibilityTree()),
         linkTargets: () => readLinkTargets(scope),
         frame: (locator) => frameOf(scope, locator),
         crashed: () => details.events.crashed(),

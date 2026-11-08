@@ -2,12 +2,13 @@
 // only while its step lasts, except the release of what it has already pressed down.
 import type { Key } from "@revisum/contracts";
 import { MalformedBrowserReply } from "../connection/MalformedBrowserReply.ts";
-import { CALL_FUNCTION_ON, SET_FILE_INPUT_FILES } from "../connection/CallFunctionOn.ts";
+import { CALL_FUNCTION_ON } from "../connection/RuntimeDomain.ts";
+import { SET_FILE_INPUT_FILES } from "../connection/DomDomain.ts";
 import {
     DISPATCH_KEY_EVENT,
     DISPATCH_MOUSE_EVENT,
     INSERT_TEXT,
-} from "../connection/DispatchMouseEvent.ts";
+} from "../connection/InputDomain.ts";
 import { focusAndSelect, focusElement, selectOption } from "../in-page/FocusAndSelect.ts";
 import { isSamePoint } from "./DecodePoint.ts";
 import type { HeldModifierKey } from "./HeldModifierKeys.ts";

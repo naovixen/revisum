@@ -1,5 +1,5 @@
-// A download step: the click, guarded as any click, with the browser armed, just before the press,
-// to save the one download it starts. A popup the click opens, or a download that is not its own,
+// A download step: the click, guarded as any click, whose selector check is the one every action
+// has, with the browser armed, just before the press, to save the one download it starts. A popup the click opens, or a download that is not its own,
 // fails the step with unsupported-step and nothing of it is kept.
 import {
     failure,
@@ -9,9 +9,9 @@ import {
     type ResolvedDownloadStep,
     type Result,
 } from "@revisum/contracts";
+import type { ArmedDownload } from "../capabilities/DownloadCapture.ts";
 import { actBeforePress } from "./ActOnDocument.ts";
-import { failureOfThrow, SELECTOR_INVALID, type DocumentScope } from "./DocumentScope.ts";
-import { rejectsSelector } from "./FindElements.ts";
+import { failureOfThrow, type DocumentScope } from "./DocumentScope.ts";
 import { CRASHED } from "./WaitUntilActionable.ts";
 
 export async function downloadOnDocument<Handle>(
@@ -25,16 +25,14 @@ export async function downloadOnDocument<Handle>(
         return failure(CRASHED);
     }
     const locator = step.locator;
+    const openingsBefore = events.unsupportedOpenings();
+    const hasOpenedAnother = (): boolean => events.unsupportedOpenings() > openingsBefore;
+    let armed: ArmedDownload;
     try {
-        if (await rejectsSelector(operations, locator)) {
-            return failure(SELECTOR_INVALID);
-        }
+        armed = scope.details.downloads.arm();
     } catch (error) {
         return failure(failureOfThrow(scope, error));
     }
-    const openingsBefore = events.unsupportedOpenings();
-    const hasOpenedAnother = (): boolean => events.unsupportedOpenings() > openingsBefore;
-    const armed = scope.details.downloads.arm();
     let isKept = false;
     try {
         const clicked = await actBeforePress(
@@ -67,6 +65,8 @@ export async function downloadOnDocument<Handle>(
         }
         isKept = saved.ok;
         return saved;
+    } catch (error) {
+        return failure(failureOfThrow(scope, error));
     } finally {
         await armed.release(isKept);
     }

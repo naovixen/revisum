@@ -6,6 +6,12 @@
 // A key press can still paste what an earlier session copied, so tests that copy or paste keep to a
 // browser of their own. Each session's egress proxy goes on its context, so every browser holds a dead
 // browser-wide one for Chrome's own traffic.
+import type { ClipboardPort } from "@revisum/contracts";
+import {
+    RunClipboard,
+    SHARED_BROWSER_CLIPBOARD,
+    type ClipboardOfASession,
+} from "../capabilities/RunClipboard.ts";
 import { GET_BROWSER_CONTEXTS } from "../connection/BrowserCommand.ts";
 import { CdpConnection } from "../connection/CdpConnection.ts";
 import { sessionEgressChromeFlags } from "./SessionEgressChromeFlags.ts";
@@ -44,7 +50,9 @@ export type BrowserSource = (locale: string) => Promise<SharedBrowser>;
 export type AttachedBrowser = {
     readonly connection: CdpConnection;
     readonly processId: number;
-    readonly isShared: boolean;
+    // The clipboard a session on this browser reads. A browser shared between sessions gives none:
+    // what it would read may be another session's.
+    clipboardOf(session: ClipboardOfASession): ClipboardPort;
     // Ends the session's use of the browser. Once it resolves, nothing of the session runs.
     close(): Promise<void>;
 };
@@ -84,7 +92,13 @@ async function launchDriverChromium(
 const browserOfItsOwn = (launched: LaunchedChromium): AttachedBrowser => ({
     connection: launched.connection,
     processId: launched.processId,
-    isShared: false,
+    clipboardOf: (session) =>
+        new RunClipboard(
+            launched.connection,
+            session.browserContextId,
+            session.command,
+            session.crashed,
+        ),
     close: () => launched.stop(),
 });
 
@@ -161,7 +175,7 @@ export async function attachToSharedBrowser(
     return {
         connection: opened,
         processId: shared.processId,
-        isShared: true,
+        clipboardOf: () => SHARED_BROWSER_CLIPBOARD,
         close: () => {
             closing ??= closeSharedSession(shared, opened);
             return closing;

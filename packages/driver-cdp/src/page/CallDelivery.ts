@@ -1,6 +1,6 @@
 // How a page function is called and what comes back of it.
 import type { CallArgument } from "../connection/BrowserCommand.ts";
-import { CALL_FUNCTION_ON } from "../connection/CallFunctionOn.ts";
+import { CALL_FUNCTION_ON } from "../connection/RuntimeDomain.ts";
 import { MalformedBrowserReply } from "../connection/MalformedBrowserReply.ts";
 import type { CallResult } from "../connection/RemoteObject.ts";
 import type { PageArgument } from "./PageOperations.ts";

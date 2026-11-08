@@ -9,15 +9,47 @@ import {
 } from "@revisum/contracts";
 import {
     fontsReady,
+    framedDocumentElements,
     maskElements,
     maskGivenElements,
     unmaskElements,
 } from "../in-page/MaskElements.ts";
+import type { CheckedDocument } from "../page/HitChecks.ts";
 import type { PageOperations } from "../page/PageOperations.ts";
-import { failureOfRead, readOfPage, type DocumentScope } from "./DocumentScope.ts";
+import { failureOfRead, readWithinStep, type DocumentScope } from "./DocumentScope.ts";
 import { findElementsUnlessDocumentGone } from "./FindElements.ts";
-import { answeredWithin, forAtMost, notAnswering, TIMED_OUT } from "./ForAtMost.ts";
+import { forAtMost, notAnswering, TIMED_OUT } from "./ForAtMost.ts";
 import { hasFieldHoldingASecret, hasTypedFieldGone } from "./HasTypedFieldGone.ts";
+
+// Every document framed in this one, however deep, found through the browser. A frame the driver
+// cannot reach, such as one whose document runs in another process, cannot be masked, so the capture
+// fails rather than show what it may hold.
+async function framedDocumentsIn<Handle>(
+    framing: CheckedDocument<Handle>,
+): Promise<PageOperations<Handle>[]> {
+    const frames = await framing.operations.callForElements(framedDocumentElements, []);
+    const found: PageOperations<Handle>[] = [];
+    for (const frame of frames) {
+        const inner = await framing.checks.frame(frame);
+        if (inner === null) {
+            throw new Error("a framed document cannot be reached, so the masks cannot hide it");
+        }
+        found.push(inner.operations, ...(await framedDocumentsIn(inner)));
+    }
+    return found;
+}
+
+// The documents a mask must reach: the top document and all it frames, since what a mask hides may sit
+// in any of them. With nothing to mask no frame matters, and those not yet masked are left alone.
+async function documentsToMask<Handle>(
+    scope: DocumentScope<Handle>,
+    mask: readonly string[],
+): Promise<readonly PageOperations<Handle>[]> {
+    if (mask.length === 0) {
+        return scope.masked;
+    }
+    return [scope.topDocument.operations, ...(await framedDocumentsIn(scope.topDocument))];
+}
 
 // What masks paint before the viewport is captured, then take away.
 async function maskedScreenshot<Handle>(
@@ -26,15 +58,16 @@ async function maskedScreenshot<Handle>(
     paintBesides: () => Promise<void>,
 ): Promise<Uint8Array> {
     await scope.operations.callForString(fontsReady, []);
-    for (const framed of scope.masked) {
-        await framed.callForString(maskElements, [mask]);
+    const documents = await documentsToMask(scope, mask);
+    for (const document of documents) {
+        await document.callForString(maskElements, [mask]);
     }
     try {
         await paintBesides();
         return await scope.operations.screenshotPng();
     } finally {
-        for (const framed of scope.masked) {
-            await framed.callForString(unmaskElements, []);
+        for (const document of documents) {
+            await document.callForString(unmaskElements, []);
         }
     }
 }
@@ -43,12 +76,7 @@ export const screenshotDocument = <Handle>(
     scope: DocumentScope<Handle>,
     mask: readonly string[],
 ): Promise<Result<Uint8Array, PageReadFailure>> =>
-    readOfPage(scope, () =>
-        answeredWithin(
-            scope.timeout,
-            maskedScreenshot(scope, mask, () => Promise.resolve()),
-        ),
-    );
+    readWithinStep(scope, () => maskedScreenshot(scope, mask, () => Promise.resolve()));
 
 type ElementsToPaint<Handle> = {
     readonly framed: PageOperations<Handle>;
