@@ -7,7 +7,8 @@ import assert from 'node:assert/strict';
 import { request, type IncomingMessage } from 'node:http';
 import type { Socket } from 'node:net';
 import { after, before, test } from 'node:test';
-import { startEgressProxy, type EgressProxy } from '@revisum/runner';
+import { type EgressProxy } from '@revisum/runner';
+import { startedEgressProxy } from '#test-support/StartedEgressProxy.ts';
 import { connectThroughProxy, startUpstream, UPSTREAM_BODY, type Upstream } from './proxy-requests.ts';
 import { egressPolicy, fakeResolver, type FakeResolver } from './runner-examples.ts';
 
@@ -27,7 +28,7 @@ before(async () => {
     // Public on the first lookup, loopback on every later one: a DNS rebinding attack.
     'rebind.test': [[PUBLIC_ADDRESS], ['127.0.0.1']],
   });
-  proxy = await startEgressProxy({
+  proxy = await startedEgressProxy({
     policy: egressPolicy({
       allowOrigins: ['https://public.test', 'https://carrier.test', 'https://private-ten.test', 'https://metadata.test', 'https://rebind.test'],
     }),

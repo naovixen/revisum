@@ -2,17 +2,17 @@
 // builder nor the proxy may accept anything wider. The builder alone knows which origins are
 // fixtures, and refuses one that is undeclared or not plain HTTP. EgressPolicy stays unbranded, so
 // a policy can be built by hand; the proxy therefore refuses to start with such a rewrite too, both
-// through startEgressProxy and through startProxyServer, which is how the proxy's container starts it
-// from the rules in its environment. A declared plain-HTTP origin, accepted and rewritten, is the
-// counter-example.
+// through startEgressProxy and through the proxy's container, which reads its rules from their text in
+// its environment. A declared plain-HTTP origin, accepted and rewritten, is the counter-example.
 // What these tests assume about shapes the spec leaves open: each refusal from the builder names
-// the origin it refused, and the proxy refuses by rejecting, as it does when it cannot listen.
+// the origin it refused, and a refused start is a failed outcome that says the rules were refused.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { EgressPolicy, FixtureRewrite, Origin } from '@revisum/contracts';
 import {
-  buildEgressPolicy, proxyRules, readProxyRules, startEgressProxy, startProxyServer, type EgressProxy, type ProxyRules, type ResponseRewrite,
+  buildEgressPolicy, readProxyRules, startEgressProxy, type ResponseRewrite,
 } from '@revisum/runner';
+import { proxyRulesFromText, startedEgressProxy, startedProxyServer } from '#test-support/StartedEgressProxy.ts';
 import { getThroughProxy, startUpstream, UPSTREAM_BODY } from './proxy-requests.ts';
 import { fakeResolver, origin } from './runner-examples.ts';
 
@@ -62,25 +62,10 @@ test('counter-example: the builder accepts a declared plain-HTTP fixture origin 
 const handBuilt = (allowOrigins: readonly Origin[], rewrites: readonly FixtureRewrite[]): EgressPolicy =>
   ({ allowOrigins, allowServices: [], allowTcpServices: [], denyPrivateRanges: true, responseRewrites: rewrites });
 
-// True when the proxy refused to start. One that did start is closed again, so a proxy that should
-// have refused fails its test rather than keeping the test process alive.
-async function refusesToStart(start: () => Promise<EgressProxy>): Promise<boolean> {
-  try {
-    const proxy = await start();
-    await proxy.close();
-    return false;
-  } catch {
-    return true;
-  }
-}
-
-// The rules exactly as the proxy's container reads them: the policy's rules, through the text of its
-// environment variable.
-function rulesInContainer(policy: EgressPolicy): ProxyRules {
-  const rules = readProxyRules(JSON.stringify(proxyRules(policy)));
-  assert.ok(rules !== null, 'the rules survive being written to the container\'s environment');
-  return rules;
-}
+// The text of the container's environment variable for a policy, written straight from the policy so
+// that a rule the parser would refuse still reaches it.
+const rulesTextInContainer = (policy: EgressPolicy): string =>
+  JSON.stringify({ allowedOrigins: policy.allowOrigins, privateOrigins: [], rewrites: policy.responseRewrites });
 
 const REFUSED_POLICIES: readonly { readonly title: string; readonly policy: EgressPolicy }[] = [
   { title: 'a hand-built rewrite on an undeclared origin', policy: handBuilt([PLAIN], [rewriteOn(UNDECLARED)]) },
@@ -91,17 +76,21 @@ const REFUSED_POLICIES: readonly { readonly title: string; readonly policy: Egre
 
 for (const { title, policy } of REFUSED_POLICIES) {
   test(`startEgressProxy refuses to start with ${title}`, async () => {
-    assert.equal(await refusesToStart(() => startEgressProxy({ policy, resolve: fakeResolver({}).resolve })), true);
+    const started = await startEgressProxy({ policy, resolve: fakeResolver({}).resolve });
+    if (started.ok) {await started.value.close();}
+    assert.ok(!started.ok, 'the proxy did not start');
+    assert.equal(started.error.code, 'rules-refused');
   });
 
-  test(`startProxyServer, as the proxy's container calls it, refuses to start with ${title}`, async () => {
-    assert.equal(await refusesToStart(() => startProxyServer(rulesInContainer(policy), { resolve: fakeResolver({}).resolve })), true);
+  test(`the proxy's container refuses its rules with ${title}`, () => {
+    const read = readProxyRules(rulesTextInContainer(policy));
+    assert.ok(!read.ok, 'the rules were refused');
   });
 }
 
-test('counter-example: startProxyServer, as the proxy\'s container calls it, starts with a rewrite on a declared plain-HTTP origin, and applies it', async () => {
+test('counter-example: the proxy, from the rules its container reads, starts with a rewrite on a declared plain-HTTP origin, and applies it', async () => {
   const upstream = await startUpstream();
-  const proxy = await startProxyServer(rulesInContainer(handBuilt([PLAIN], [rewriteOn(PLAIN)])), {
+  const proxy = await startedProxyServer(proxyRulesFromText(rulesTextInContainer(handBuilt([PLAIN], [rewriteOn(PLAIN)]))), {
     resolve: fakeResolver({ 'fixture.test': ['93.184.215.14'] }).resolve,
     connect: (address, port) => upstream.connect(address, port),
   });
@@ -117,7 +106,7 @@ test('counter-example: startProxyServer, as the proxy\'s container calls it, sta
 
 test('counter-example: the proxy starts with a hand-built rewrite on a declared plain-HTTP origin, and applies it', async () => {
   const upstream = await startUpstream();
-  const proxy = await startEgressProxy({
+  const proxy = await startedEgressProxy({
     policy: handBuilt([PLAIN], [rewriteOn(PLAIN)]),
     resolve: fakeResolver({ 'fixture.test': ['93.184.215.14'] }).resolve,
     connect: (address, port) => upstream.connect(address, port),

@@ -6,7 +6,8 @@
 // connects to a local stand-in server, so allowed requests never leave the machine either.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
-import { startEgressProxy, type EgressProxy } from '@revisum/runner';
+import { type EgressProxy } from '@revisum/runner';
+import { startedEgressProxy } from '#test-support/StartedEgressProxy.ts';
 import { connectThroughProxy, getThroughProxy, startUpstream, UPSTREAM_BODY, type Upstream } from './proxy-requests.ts';
 import { declaredService, egressPolicy, fakeResolver, origin, type FakeResolver } from './runner-examples.ts';
 
@@ -69,7 +70,7 @@ before(async () => {
   resolver = fakeResolver(NAMES);
   const literalOrigins = REFUSED_LITERALS.map((literal) => new URL(literal).origin);
   const nameOrigins = Object.keys(NAMES).filter((name) => !name.endsWith('-api.test')).map((name) => `http://${name}`);
-  proxy = await startEgressProxy({
+  proxy = await startedEgressProxy({
     policy: egressPolicy({ allowOrigins: [...new Set([...nameOrigins, ...literalOrigins, 'http://8.8.8.8'])], allowServices: ['private-api', 'internal-api'] }),
     services: [declaredService('private-api', 'http://private-api.test', true), declaredService('internal-api', 'http://internal-api.test', false)],
     resolve: resolver.resolve,

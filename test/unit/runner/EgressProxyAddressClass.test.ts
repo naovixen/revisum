@@ -4,7 +4,8 @@
 // Names resolve through a fake resolver, and every allowed connection goes to a stand-in server.
 import assert from "node:assert/strict";
 import { after, before, describe, test } from "node:test";
-import { startProxyServer, type EgressProxy } from "@revisum/runner";
+import { type EgressProxy } from "@revisum/runner";
+import { startedProxyServer } from "#test-support/StartedEgressProxy.ts";
 import {
     connectThroughProxy,
     getThroughProxy,
@@ -40,7 +41,7 @@ let proxy: EgressProxy;
 
 before(async () => {
     upstream = await startUpstream();
-    proxy = await startProxyServer(
+    proxy = await startedProxyServer(
         { allowedOrigins: ORIGINS, privateOrigins: ORIGINS, rewrites: [] },
         {
             ...SERVICE_CLIENT,

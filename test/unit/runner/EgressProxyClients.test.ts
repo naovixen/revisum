@@ -8,7 +8,8 @@ import assert from "node:assert/strict";
 import { createServer, type Server } from "node:http";
 import { connect, type AddressInfo, type Socket } from "node:net";
 import { after, before, describe, test } from "node:test";
-import { startProxyServer, type EgressProxy, type ProxyRules } from "@revisum/runner";
+import { type EgressProxy } from "@revisum/runner";
+import { startedProxyServer } from "#test-support/StartedEgressProxy.ts";
 import {
     connectThroughProxy,
     exchangeWithProxy,
@@ -67,7 +68,7 @@ let appPort: number;
 let browserProxy: EgressProxy;
 let serviceProxy: EgressProxy;
 
-const rules = (): ProxyRules => ({
+const rules = () => ({
     allowedOrigins: [
         `http://127.0.0.1:${appPort}`,
         deadOrigin,
@@ -158,8 +159,8 @@ before(async () => {
         response.writeHead(200, { "content-type": "text/plain" }).end(APP_BODY);
     });
     appPort = await listen(app);
-    browserProxy = await startProxyServer(rules(), { ...BROWSER_CLIENT, resolve: resolver() });
-    serviceProxy = await startProxyServer(rules(), { ...SERVICE_CLIENT, resolve: resolver() });
+    browserProxy = await startedProxyServer(rules(), { ...BROWSER_CLIENT, resolve: resolver() });
+    serviceProxy = await startedProxyServer(rules(), { ...SERVICE_CLIENT, resolve: resolver() });
 });
 after(async () => {
     await browserProxy.close();
@@ -258,7 +259,7 @@ describe("Using the egress proxy", () => {
             });
             const port = await listen(slowApp);
             const origin = `http://127.0.0.1:${port}`;
-            const proxy = await startProxyServer(
+            const proxy = await startedProxyServer(
                 { allowedOrigins: [origin], privateOrigins: [origin], rewrites: [] },
                 {
                     ...clientOption,

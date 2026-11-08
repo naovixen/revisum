@@ -6,7 +6,8 @@ import assert from "node:assert/strict";
 import { join } from "node:path";
 import { after, before, describe, test } from "node:test";
 import { CONTAINER_EXIT } from "../../../packages/cli/src/explore-crawl.ts";
-import { ProxyClient, startProxyServer, type EgressProxy } from "@revisum/runner";
+import { ProxyClient, type EgressProxy } from "@revisum/runner";
+import { startedProxyServer } from "#test-support/StartedEgressProxy.ts";
 import { BROWSERS } from "../../support/browsers.ts";
 import { startFixtureServer, type FixtureServer } from "../../support/fixture-server.ts";
 import { FIXTURES } from "../../support/repository.ts";
@@ -23,7 +24,7 @@ let proxy: EgressProxy;
 
 before(async () => {
     site = await startFixtureServer(join(FIXTURES, "explore-site"));
-    proxy = await startProxyServer(
+    proxy = await startedProxyServer(
         { allowedOrigins: [site.origin], privateOrigins: [site.origin], rewrites: [] },
         { client: ProxyClient.Browser },
     );

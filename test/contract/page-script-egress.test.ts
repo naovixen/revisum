@@ -13,7 +13,8 @@ import { createBrowserDriver } from '#test-support/browser/CreateBrowserDriver.t
 import { keepingBrowserRecords } from '#test-support/browser/KeepingBrowserRecords.ts';
 import { egressThrough } from '#test-support/browser/SessionEgressForTest.ts';
 import type { BrowserDriver, BrowserRequestRecord, EgressEvent } from '@revisum/engine';
-import { hostAndPort, joinEgressEvents, startEgressProxy, type EgressProxy } from '@revisum/runner';
+import { hostAndPort, joinEgressEvents, type EgressProxy } from '@revisum/runner';
+import { startedEgressProxy } from '#test-support/StartedEgressProxy.ts';
 import { BROWSERS } from '#test-support/browsers.ts';
 import { createCleanUpScope } from '#test-support/CleanUpScope.ts';
 import { declaredService, egressPolicy, fakeResolver, hostOf, type FakeResolver } from '../unit/runner/runner-examples.ts';
@@ -43,7 +44,7 @@ before(async () => {
   cleanUps.add(() => harness.close());
   // No name is ever resolved: the fixture origin is an IP literal and every other origin is undeclared.
   resolver = fakeResolver({});
-  proxy = await startEgressProxy({
+  proxy = await startedEgressProxy({
     policy: egressPolicy({ allowOrigins: [harness.origin], allowServices: ['fixture-app'] }),
     // The fixture app listens on loopback, so it is declared as a private service.
     services: [declaredService('fixture-app', harness.origin, true)],

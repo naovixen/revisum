@@ -4,7 +4,8 @@
 // A well-formed request, which adds its own one decision, is the counter-example.
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
-import { readProxyDecision, startEgressProxy, type EgressProxy } from '@revisum/runner';
+import { readProxyDecision, type EgressProxy } from '@revisum/runner';
+import { startedEgressProxy } from '#test-support/StartedEgressProxy.ts';
 import { connectThroughProxy, getThroughProxy, startUpstream, type Upstream } from './proxy-requests.ts';
 import { egressPolicy, fakeResolver } from './runner-examples.ts';
 
@@ -13,7 +14,7 @@ let proxy: EgressProxy;
 
 before(async () => {
   upstream = await startUpstream();
-  proxy = await startEgressProxy({
+  proxy = await startedEgressProxy({
     policy: egressPolicy({ allowOrigins: ['http://public.test'] }),
     resolve: fakeResolver({ 'public.test': ['93.184.215.14'] }).resolve,
     connect: (address, port) => upstream.connect(address, port),
@@ -30,6 +31,9 @@ const MALFORMED: readonly { readonly title: string; readonly send: () => Promise
   { title: 'an HTTPS URL sent as a plain request instead of a tunnel', send: async () => (await getThroughProxy(proxy.url, 'https://public.test/')).status },
   { title: 'a tunnel to a port beyond the last one', send: () => connectThroughProxy(proxy.url, 'public.test:70000') },
   { title: 'a tunnel to port zero', send: () => connectThroughProxy(proxy.url, 'public.test:0') },
+  // A name before an @ is the kind of credential a CONNECT target has no place for, and a parser that
+  // reads past it would let the tunnel go to the name after it.
+  { title: 'a tunnel whose target holds a user name', send: () => connectThroughProxy(proxy.url, 'user@public.test:443') },
 ];
 
 for (const { title, send } of MALFORMED) {

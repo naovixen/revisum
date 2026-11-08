@@ -15,7 +15,8 @@ import { allowEveryAction } from '#test-support/browser/AllowEveryAction.ts';
 import { createBrowserDriver } from '#test-support/browser/CreateBrowserDriver.ts';
 import { egressThrough } from '#test-support/browser/SessionEgressForTest.ts';
 import { defaultRedactor, type SessionEnvironment } from '@revisum/engine';
-import { joinEgressEvents, startEgressProxy, type EgressProxy } from '@revisum/runner';
+import { joinEgressEvents, type EgressProxy } from '@revisum/runner';
+import { startedEgressProxy } from '#test-support/StartedEgressProxy.ts';
 import type { EgressEvent } from '@revisum/contracts';
 import { BROWSERS } from '#test-support/browsers.ts';
 import { createCleanUpScope } from '#test-support/CleanUpScope.ts';
@@ -46,7 +47,7 @@ before(async () => {
   cleanUps.add(() => fixture.close());
   // No name is ever resolved: the fixture origin is an IP literal and every other origin is undeclared.
   resolver = fakeResolver({});
-  proxy = await startEgressProxy({
+  proxy = await startedEgressProxy({
     policy: egressPolicy({ allowOrigins: [fixture.origin], allowServices: ['fixture-app'] }),
     // The fixture app listens on loopback, so it is declared as a private service.
     services: [declaredService('fixture-app', fixture.origin, true)],

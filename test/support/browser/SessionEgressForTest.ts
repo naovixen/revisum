@@ -1,7 +1,8 @@
 // What browser tests give a driver for its sessions' egress. What they assume about a session's egress
 // is gathered here, so a change to it is a change to this file.
 import type { ConnectionFailure } from "@revisum/driver-cdp";
-import { ProxyClient, startProxyServer, type EgressProxy } from "@revisum/runner";
+import { ProxyClient, type EgressProxy } from "@revisum/runner";
+import { startedProxyServer } from "#test-support/StartedEgressProxy.ts";
 
 export type SessionEgressForTest = {
     readonly proxy: { readonly server: string; readonly includeLoopback: boolean };
@@ -33,11 +34,16 @@ const leavingProxyUp = (
 // A session's egress on a real proxy of its own, whose rules are the ones a host run gives it: every
 // declared origin may reach a private address, and nothing else is let through.
 export const realEgressSource: EgressSourceForTest = async (allowedOrigins) => {
-    const proxy = await startProxyServer(
+    const proxy = await startedProxyServer(
         { allowedOrigins, privateOrigins: allowedOrigins, rewrites: [] },
         { client: ProxyClient.Browser },
     );
-    return { ...leavingProxyUp(proxy, 0), close: () => proxy.close() };
+    return {
+        ...leavingProxyUp(proxy, 0),
+        close: async () => {
+            await proxy.close();
+        },
+    };
 };
 
 // For a test that shapes or watches a proxy of its own, which outlives each session: a session is told

@@ -7,7 +7,8 @@ import assert from "node:assert/strict";
 import { createServer, type Server } from "node:http";
 import { connect, type AddressInfo } from "node:net";
 import { after, before, describe, test } from "node:test";
-import { startProxyServer, type EgressProxy, type ProxyRules } from "@revisum/runner";
+import { type EgressProxy } from "@revisum/runner";
+import { startedProxyServer } from "#test-support/StartedEgressProxy.ts";
 import {
     connectThroughProxy,
     getThroughProxy,
@@ -68,12 +69,12 @@ async function proxyDeclaring(
 ): Promise<Proxied> {
     const resolver = fakeResolver(NAME_ANSWERS);
     const dialled: string[] = [];
-    const rules: ProxyRules = {
+    const rules = {
         allowedOrigins: origins,
         privateOrigins: origins,
         rewrites: [],
     };
-    const proxy = await startProxyServer(rules, {
+    const proxy = await startedProxyServer(rules, {
         ...clientOption,
         resolve: resolver.resolve,
         connect: (address, port) => {
@@ -177,7 +178,7 @@ describe("Using the egress proxy", () => {
         before(async () => {
             upstream = await startUpstream();
             resolver = fakeResolver({});
-            proxy = await startProxyServer(
+            proxy = await startedProxyServer(
                 { allowedOrigins: ["http://localhost"], privateOrigins: [], rewrites: [] },
                 {
                     ...SERVICE_CLIENT,
@@ -212,7 +213,7 @@ describe("Using the egress proxy", () => {
             before(async () => {
                 upstream = await startUpstream();
                 resolver = fakeResolver(NAME_ANSWERS);
-                proxy = await startProxyServer(
+                proxy = await startedProxyServer(
                     { allowedOrigins: [`http://${name}`], privateOrigins: [], rewrites: [] },
                     {
                         ...SERVICE_CLIENT,

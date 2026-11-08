@@ -5,7 +5,8 @@
 // the proxy with a fake resolver, so a name resolving to one is refused before anything is dialled.
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
-import { checkResolvedAddress, startEgressProxy, type EgressProxy } from '@revisum/runner';
+import { checkResolvedAddress, type EgressProxy } from '@revisum/runner';
+import { startedEgressProxy } from '#test-support/StartedEgressProxy.ts';
 import { connectThroughProxy, getThroughProxy, startUpstream, type Upstream } from './proxy-requests.ts';
 import { egressPolicy, fakeResolver } from './runner-examples.ts';
 
@@ -62,7 +63,7 @@ let proxy: EgressProxy;
 before(async () => {
   upstream = await startUpstream();
   const names = Object.keys(NAMES);
-  proxy = await startEgressProxy({
+  proxy = await startedEgressProxy({
     policy: egressPolicy({ allowOrigins: [...names.map((name) => `http://${name}`), ...names.map((name) => `https://${name}`)] }),
     resolve: fakeResolver(NAMES).resolve,
     connect: (address, port) => upstream.connect(address, port),

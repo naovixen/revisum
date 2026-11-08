@@ -7,7 +7,8 @@ import assert from 'node:assert/strict';
 import { createServer as createTcpServer, connect, type AddressInfo } from 'node:net';
 import { after, before, test } from 'node:test';
 import type { DeclaredService } from '@revisum/contracts';
-import { checkResolvedAddress, startEgressProxy, type EgressProxy } from '@revisum/runner';
+import { checkResolvedAddress, type EgressProxy } from '@revisum/runner';
+import { startedEgressProxy } from '#test-support/StartedEgressProxy.ts';
 import { connectThroughProxy, getThroughProxy, startUpstream, UPSTREAM_BODY, type Upstream } from './proxy-requests.ts';
 import { declaredService, egressPolicy, fakeResolver, origin, serviceName } from './runner-examples.ts';
 
@@ -41,7 +42,7 @@ before(async () => {
     declaredService('private-api', 'http://private-api.test', true),
     declaredService('private-tunnel', 'https://private-api.test', true),
   ];
-  proxy = await startEgressProxy({
+  proxy = await startedEgressProxy({
     policy: egressPolicy({ allowServices: services.map((service) => service.name) }),
     services,
     resolve: fakeResolver({ ...METADATA_ANSWERS, 'private-api.test': [PRIVATE_ADDRESS] }).resolve,
@@ -119,7 +120,7 @@ test('a TCP relay to a private service that resolves to a metadata address close
   const port = await freePort();
   const service: DeclaredService = { name: serviceName('metadata-database'), origin: origin('http://metadata-database.test'), private: true, port };
   const relayUpstream = await startUpstream();
-  const relayProxy = await startEgressProxy({
+  const relayProxy = await startedEgressProxy({
     policy: { ...egressPolicy({ allowServices: [] }), allowTcpServices: [service.name] },
     services: [service],
     resolve: fakeResolver({ 'metadata-database.test': ['169.254.169.254'] }).resolve,

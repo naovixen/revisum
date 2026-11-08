@@ -11,7 +11,8 @@ import type { DriverSession } from '@revisum/driver-cdp';
 import { createBrowserDriver } from '#test-support/browser/CreateBrowserDriver.ts';
 import { egressThrough } from '#test-support/browser/SessionEgressForTest.ts';
 import { buildManifest, defaultRedactor, type SessionEnvironment } from '@revisum/engine';
-import { startEgressProxy, type EgressProxy, type ResponseRewrite } from '@revisum/runner';
+import { type EgressProxy, type ResponseRewrite } from '@revisum/runner';
+import { startedEgressProxy } from '#test-support/StartedEgressProxy.ts';
 import { BROWSERS } from '#test-support/browsers.ts';
 import { createCleanUpScope } from '#test-support/CleanUpScope.ts';
 import { BrowserTarget } from '#test-support/browser/BrowserTarget.ts';
@@ -39,7 +40,7 @@ before(async () => {
   cleanUps.add(() => fixtureApp.close());
   secondApp = await startEgressFixtureServer();
   cleanUps.add(() => secondApp.close());
-  proxy = await startEgressProxy({
+  proxy = await startedEgressProxy({
     policy: egressPolicy({
       allowOrigins: [fixtureApp.origin, secondApp.origin], allowServices: ['fixture-app', 'second-app'], fixtureOrigins: [fixtureApp.origin],
       responseRewrites: [{ origin: fixtureApp.origin, rewrite: HEADING_CHANGED }],

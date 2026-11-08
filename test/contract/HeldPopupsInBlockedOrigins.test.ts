@@ -8,7 +8,8 @@ import type { AddressInfo } from "node:net";
 import { after, before, describe, test } from "node:test";
 import { setTimeout as pause } from "node:timers/promises";
 import type { BrowserRequestRecord, ClosedSession, EgressEvent } from "@revisum/contracts";
-import { joinEgressEvents, startEgressProxy, type EgressProxy } from "@revisum/runner";
+import { joinEgressEvents, type EgressProxy } from "@revisum/runner";
+import { startedEgressProxy } from "#test-support/StartedEgressProxy.ts";
 import { allowEveryAction } from "#test-support/browser/AllowEveryAction.ts";
 import { BrowserTarget } from "#test-support/browser/BrowserTarget.ts";
 import { createBrowserDriver } from "#test-support/browser/CreateBrowserDriver.ts";
@@ -71,7 +72,7 @@ before(async () => {
                 : `${partner.origin}/welcome`,
         ),
     );
-    proxy = await startEgressProxy({
+    proxy = await startedEgressProxy({
         policy: egressPolicy({
             allowOrigins: [opener.origin, partner.origin],
             allowServices: ["opener-site", "partner-site"],

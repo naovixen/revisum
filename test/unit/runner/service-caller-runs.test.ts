@@ -20,7 +20,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { leakScanner } from '@revisum/engine';
-import { startEgressProxy, type EgressProxy } from '@revisum/runner';
+import { type EgressProxy } from '@revisum/runner';
+import { startedEgressProxy } from '#test-support/StartedEgressProxy.ts';
 import {
   ADMIN_LOGIN_SECRET, ADMIN_PASSWORD_SECRET, CALLS, CREATE_ORDER, HEADER_MARKER, ORDER_ID, RESET_SHOP, SECRET_VALUES, SHOP, SHOP_ORIGIN, SHOP_SERVICE,
   TOKEN_SECRET, call, callPlanOf, callProjectFile, cleanupRecords, expectBackend, runWithCalls, stepLines, withCleanup, type CallRun, type JsonRecord,
@@ -71,7 +72,7 @@ type RealRunOptions = {
 async function runThroughProxy(plan: JsonRecord, options: RealRunOptions = {}): Promise<RealRun> {
   const shop = await startLocalService(shopAnswer(options.override));
   const nothingListens = await closedPort();
-  const proxy = await startEgressProxy({
+  const proxy = await startedEgressProxy({
     policy: egressPolicy({ allowServices: [SHOP_SERVICE, STOPPED_SERVICE] }),
     services: [declaredService(SHOP_SERVICE, SHOP_ORIGIN, options.shopPrivate ?? true), declaredService(STOPPED_SERVICE, STOPPED_ORIGIN, true)],
     resolve: async (hostname) => { throw new Error(`the test looks up no name, but was asked for ${hostname}`); },

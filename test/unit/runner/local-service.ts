@@ -20,7 +20,8 @@ import { createServer, type IncomingHttpHeaders, type OutgoingHttpHeaders, type 
 import type { AddressInfo } from 'node:net';
 import { connect, type Socket } from 'node:net';
 import type { DeclaredService, HttpMethod, Secret, ServiceCaller, ServiceRequest, ServiceRequestHeader } from '@revisum/contracts';
-import { serviceCaller, startEgressProxy, type EgressProxy } from '@revisum/runner';
+import { serviceCaller, type EgressProxy } from '@revisum/runner';
+import { startedEgressProxy } from '#test-support/StartedEgressProxy.ts';
 import { declaredService, egressPolicy, fakeResolver, origin, type FakeResolver } from './runner-examples.ts';
 
 // ---- The local service ---------------------------------------------------------------------------
@@ -188,7 +189,7 @@ export async function withCallerHarness(options: HarnessOptions, body: (harness:
   const service = await startLocalService(options.answer);
   const services = [declaredService(LOCAL_SERVICE_NAME, service.origin, options.localServicePrivate ?? true), ...(options.services ?? [])];
   const resolver = fakeResolver(options.names ?? {});
-  const proxy = await startEgressProxy({
+  const proxy = await startedEgressProxy({
     policy: egressPolicy({ allowServices: services.map((declared) => declared.name) }),
     services,
     resolve: resolver.resolve,

@@ -10,11 +10,10 @@ import { Socket, type AddressInfo } from "node:net";
 import { afterEach, beforeEach, describe, test } from "node:test";
 import {
     ProxyClient,
-    startProxyServer,
     type AddressConnector,
     type EgressProxy,
-    type ProxyRules,
 } from "@revisum/runner";
+import { startedProxyServer } from "#test-support/StartedEgressProxy.ts";
 import {
     exchangeWithProxy,
     getThroughProxy,
@@ -37,7 +36,7 @@ const NAME_ANSWERS = {
     "all-loopback.test": ["127.0.0.1", "::1"],
     "loopback-and-lan.test": ["127.0.0.1", "192.168.1.10"],
 };
-const RULES: ProxyRules = {
+const RULES = {
     allowedOrigins: [
         "http://dead-public.test",
         "https://dead-public.test",
@@ -170,7 +169,7 @@ const FAILED_ATTEMPTS: readonly FailedAttempt[] = [
 ];
 
 const startProxy = (client: ProxyClient, connect: AddressConnector): Promise<EgressProxy> =>
-    startProxyServer(RULES, { client, connect, resolve: fakeResolver(NAME_ANSWERS).resolve });
+    startedProxyServer(RULES, { client, connect, resolve: fakeResolver(NAME_ANSWERS).resolve });
 
 // A port nobody is listening on now.
 async function deadPort(): Promise<number> {
@@ -308,7 +307,7 @@ describe("Using the egress proxy", () => {
                 test("then it should give the operating system's reason in the shorter message", async () => {
                     const port = await deadPort();
                     const origin = `http://127.0.0.1:${port}`;
-                    const proxy = await startProxyServer(
+                    const proxy = await startedProxyServer(
                         { allowedOrigins: [origin], privateOrigins: [origin], rewrites: [] },
                         { client },
                     );

@@ -4,7 +4,8 @@
 // just outside each refused edge are the counter-examples.
 import assert from "node:assert/strict";
 import { after, before, describe, test } from "node:test";
-import { checkResolvedAddress, startProxyServer, type EgressProxy } from "@revisum/runner";
+import { checkResolvedAddress, type EgressProxy } from "@revisum/runner";
+import { startedProxyServer } from "#test-support/StartedEgressProxy.ts";
 import { getThroughProxy, startUpstream, type Upstream } from "./proxy-requests.ts";
 import { fakeResolver } from "./runner-examples.ts";
 
@@ -106,7 +107,7 @@ describe("Using the egress proxy", () => {
         before(async () => {
             upstream = await startUpstream();
             const origin = `http://${LINK_LOCAL_APP}`;
-            proxy = await startProxyServer(
+            proxy = await startedProxyServer(
                 { allowedOrigins: [origin], privateOrigins: [origin], rewrites: [] },
                 {
                     ...SERVICE_CLIENT,

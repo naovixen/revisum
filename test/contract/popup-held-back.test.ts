@@ -14,7 +14,8 @@ import { allowEveryAction } from '#test-support/browser/AllowEveryAction.ts';
 import { createBrowserDriver } from '#test-support/browser/CreateBrowserDriver.ts';
 import { egressThrough } from '#test-support/browser/SessionEgressForTest.ts';
 import { defaultRedactor, type SessionEnvironment } from '@revisum/engine';
-import { joinEgressEvents, startEgressProxy, type EgressProxy } from '@revisum/runner';
+import { joinEgressEvents, type EgressProxy } from '@revisum/runner';
+import { startedEgressProxy } from '#test-support/StartedEgressProxy.ts';
 import { BROWSERS } from '#test-support/browsers.ts';
 import { createCleanUpScope } from '#test-support/CleanUpScope.ts';
 import { BrowserTarget } from '#test-support/browser/BrowserTarget.ts';
@@ -62,7 +63,7 @@ before(async () => {
   opener = await startSite(() => `<!doctype html><html lang="en"><title>Opener</title><h1>Opener</h1>
     <button type="button" onclick="window.open('${reachable.origin}/welcome', 'partner', 'width=400,height=300')">${OPEN_BUTTON}</button></html>`);
   cleanUps.add(() => opener.close());
-  proxy = await startEgressProxy({
+  proxy = await startedEgressProxy({
     policy: egressPolicy({ allowOrigins: [opener.origin, reachable.origin], allowServices: ['opener-site', 'partner-site'] }),
     // Both sites listen on loopback, so both are declared as private services.
     services: [declaredService('opener-site', opener.origin, true), declaredService('partner-site', reachable.origin, true)],
