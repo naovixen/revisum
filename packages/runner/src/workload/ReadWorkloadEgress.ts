@@ -1,5 +1,5 @@
 // What the proxy decided for a workload, read back from its container and turned into egress events.
-import type { EgressEvent, ProxyDecision, WorkloadRequest } from "@revisum/contracts";
+import type { EgressEvent, ProxyDecision } from "@revisum/contracts";
 import type { ContainerEngine } from "../container-engine.ts";
 import { joinEgressEvents } from "../egress-events.ts";
 import { hasProxyLostRecords, readDecisions, readLookups } from "../run-containers.ts";
@@ -29,7 +29,6 @@ function relayEvents(
 export async function readWorkloadEgress(
     engine: ContainerEngine,
     proxyId: string,
-    request: WorkloadRequest,
     checked: CheckedWorkloadRequest,
     log: WorkloadLog,
 ): Promise<WorkloadEgressRecord> {
@@ -53,7 +52,7 @@ export async function readWorkloadEgress(
                 decisions.filter((decision) => !relayedOrigins.has(decision.origin)),
             ),
             ...relayEvents(decisions, relayedOrigins),
-            ...processEvents(lookups, decisions, request.policy),
+            ...processEvents(lookups, decisions, checked.policy),
         ],
         isUnread,
     };

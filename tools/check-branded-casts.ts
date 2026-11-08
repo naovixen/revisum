@@ -66,6 +66,10 @@ export const BRAND_OWNERS: Readonly<Record<string, readonly string[]>> = {
   // In contracts, because the engine and the runner, which may not import each other, both read origins.
   Origin: ['packages/contracts/src/ParseOrigin.ts'],
   ProxyRules: ['packages/runner/src/egress-proxy/ParseProxyRules.ts'],
+  // A workload request is read once, before any container starts.
+  CheckedWorkloadRequest: ['packages/runner/src/workload/CheckWorkloadRequest.ts'],
+  // In contracts, because a runner's handle takes it; only the runner reads one.
+  VariableName: ['packages/runner/src/ReadVariableName.ts'],
   // A run's base URL is read where it enters, or taken from an origin the project parser read.
   BaseUrl: ['packages/engine/src/ParseBaseUrl.ts'],
   // Declared services and calls are read with the project; a plan names a call and its fields by

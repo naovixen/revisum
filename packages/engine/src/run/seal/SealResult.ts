@@ -17,6 +17,7 @@ import { guaranteeStatement } from "../../guarantees.ts";
 import type { Logger } from "../../logging.ts";
 import { callsServices } from "../../plan/CallsServices.ts";
 import { unsafeFeaturesOf } from "../../plan/unsafe-features.ts";
+import { readKeepingTheResult } from "../after-the-verdict/ReadKeepingTheResult.ts";
 import type { TargetNotDeclared } from "../../policy/TargetNotDeclared.ts";
 import type { RunPorts } from "../RunContext.ts";
 import {
@@ -48,9 +49,10 @@ export type NothingRanContext = SealContext & {
     readonly startedAt: number;
 };
 
-// How long a run that ended before any step took.
+// How long a run that ended before any step took, or 0 when the clock can't say: a timing is not part
+// of the result's hash, so a clock that fails must not reject the run.
 export const runTimeOfNothingRan = (context: NothingRanContext): number =>
-    context.ports.clock.now() - context.startedAt;
+    readKeepingTheResult(() => context.ports.clock.now() - context.startedAt, 0, context.logger);
 
 // What sealing adds to a plan run's result: its labels and its hashes.
 export type SealedFields =

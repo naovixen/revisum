@@ -16,7 +16,7 @@ import {
     type WorkloadRunner,
 } from "@revisum/contracts";
 import type { ContainerEngine } from "../container-engine.ts";
-import { withContainerScope, type ContainerScope } from "../ContainerScope.ts";
+import { NetworkKind, withContainerScope, type ContainerScope } from "../ContainerScope.ts";
 import { dependenciesVolumeFor } from "../run-containers.ts";
 import { capturedOutput } from "./CapturedOutput.ts";
 import { checkWorkloadRequest, type CheckedWorkloadRequest } from "./CheckWorkloadRequest.ts";
@@ -56,33 +56,35 @@ type WorkloadTools = {
 async function runInScope(
     scope: ContainerScope,
     tools: WorkloadTools,
-    request: WorkloadRequest,
     checked: CheckedWorkloadRequest,
     runImage: string,
 ): Promise<Result<WorkloadOutcome, WorkloadRefusal>> {
     const { engine, log } = tools;
-    const proxy = await showEgressControlled(scope, { ...tools, runImage }, request);
+    const proxy = await showEgressControlled(scope, { ...tools, runImage }, checked);
     if (!proxy.ok) {
         return proxy;
     }
-    const team = await startTeamContainer(scope, tools, request, checked, proxy.value);
+    const team = await startTeamContainer(scope, tools, checked, proxy.value);
     if (!team.ok) {
         return team;
     }
-    const command = await runCommandUnderTimeout(scope, engine, team.value, request);
+    const command = await runCommandUnderTimeout(scope, engine, team.value, checked);
     if (!command.ok) {
         return command;
     }
-    const egress = await readWorkloadEgress(engine, proxy.value.id, request, checked, log);
-    const { printed, hasTimedOut } = command.value;
-    return success({
-        exitCode: printed.exitCode,
-        timedOut: hasTimedOut,
+    const egress = await readWorkloadEgress(engine, proxy.value.id, checked, log);
+    const ended = command.value;
+    const records = {
         egressEvents: egress.events,
         ...(egress.isUnread ? { egressRecordUnread: true } : {}),
-        stdout: capturedOutput(printed.stdout, checked.outputLimit),
-        stderr: capturedOutput(printed.stderr, checked.outputLimit),
-    });
+        stdout: capturedOutput(ended.printed.stdout, checked.outputLimit),
+        stderr: capturedOutput(ended.printed.stderr, checked.outputLimit),
+    };
+    return success(
+        ended.kind === "exited"
+            ? { kind: "exited", exitCode: ended.exitCode, ...records }
+            : { kind: "timed-out", stop: ended.stop, ...records },
+    );
 }
 
 export function workloadRunner(options: WorkloadRunnerOptions): WorkloadRunner {
@@ -105,14 +107,28 @@ export function workloadRunner(options: WorkloadRunnerOptions): WorkloadRunner {
         if (!checked.ok) {
             return refuse(checked.error);
         }
-        const runImage = await pinWorkloadImages(engine, request);
+        const runImage = await pinWorkloadImages(engine, checked.value);
         if (!runImage.ok) {
             return refuse(runImage.error);
         }
-        return withContainerScope(engine, `${PRODUCT.name}-workload`, async (scope) => {
-            const outcome = await runInScope(scope, tools, request, checked.value, runImage.value);
-            return outcome.ok ? outcome : refuse(outcome.error);
-        });
+        const scoped = await withContainerScope(
+            engine,
+            {
+                namePrefix: `${PRODUCT.name}-workload`,
+                networkKinds: [NetworkKind.Internal],
+                log: (entry) => {
+                    log({ code: "notice", detail: entry.detail });
+                },
+            },
+            (scope) => runInScope(scope, tools, checked.value, runImage.value),
+        );
+        if (!scoped.ok) {
+            return refuse({
+                code: "egress-unenforceable",
+                detail: `Docker could not create a network with no route out: ${scoped.error.detail}`,
+            });
+        }
+        return scoped.value.ok ? scoped.value : refuse(scoped.value.error);
     }
 
     return {

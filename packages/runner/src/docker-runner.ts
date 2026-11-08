@@ -11,25 +11,23 @@
 // empty list, and only the code, dependencies and browsers the run needs are mounted, read-only.
 import {
   PRODUCT, failure, success,
-  type AppliedRewrite, type DeclaredService, type EgressPolicy, type ExecOutcome, type GuaranteeLevel, type ImageDigest, type ProxyDecision, type Result, type Runner,
-  type RunnerError, type RunnerHandle,
+  type AppliedRewrite, type DeclaredService, type EgressPolicy, type ImageDigest, type ProxyDecision, type Result, type Runner, type RunnerError, type RunnerHandle,
+  type GuaranteeLevel,
 } from '@revisum/contracts';
 import { join } from 'node:path';
+import { adapterAnswer } from './AdapterAnswer.ts';
 import type { ContainerEngine, ContainerMount } from './container-engine.ts';
-import { keepingContainerScope, type ContainerScope, type RemoveAll } from './ContainerScope.ts';
+import { NetworkKind, withContainerScope, type ContainerScope } from './ContainerScope.ts';
 import { joinEgressEvents } from './egress-events.ts';
 import {
-  DEFAULT_BRIDGE_NETWORK, WORKSPACE, dependenciesVolumeFor, hasProxyLostRecords, ownCodeMounts, probeRunNetwork, proxyUrl,
+  DEFAULT_BRIDGE_NETWORK, ProxyRole, WORKSPACE, dependenciesVolumeFor, hasProxyLostRecords, ownCodeMounts, probeRunNetwork, proxyUrl,
   readAppliedRewrites, readDecisions, repositoryFolder, runImageContainer, serviceProxyUrl,
 } from './run-containers.ts';
 import { SERVICE_PROXY_VARIABLE } from './proxy-container.ts';
 import { RUN_IMAGE_TAG } from './run-image.ts';
 import { proxyUnreachableDetail, startProxyContainer } from './StartProxyContainer.ts';
 
-// A variable name Docker copies from the client's environment, never read as NAME=value.
-const VARIABLE_NAME = /^[A-Za-z_][A-Za-z0-9_]{0,127}$/;
-
-export type RunnerLogEntry = { readonly code: 'egress-unenforceable' | 'start-failed'; readonly detail: string };
+export type RunnerLogEntry = { readonly code: 'egress-unenforceable' | 'start-failed' | 'cleanup-failed'; readonly detail: string };
 
 export type DockerRunnerOptions = {
   readonly engine: ContainerEngine;
@@ -64,16 +62,16 @@ type RunContainerIds = { readonly runId: string; readonly proxyId: string; reado
 // Null when the run image is here and is the one pinned, otherwise why it cannot be used. A daemon
 // that does not answer says nothing about whether the image exists.
 async function pinRunImage(engine: ContainerEngine, image: ImageDigest, log: RunnerLog): Promise<RunnerError | null> {
-  const localId = await engine.imageId(RUN_IMAGE_TAG);
-  if (localId === null) {
-    const unanswered = await engine.daemonProblem?.() ?? null;
-    if (unanswered === null) {
+  const local = await engine.imageId(RUN_IMAGE_TAG);
+  switch (local.kind) {
+    case 'found':
+      return local.id === image ? null : { code: 'image-digest-mismatch' };
+    case 'absent':
       return { code: 'image-missing' };
-    }
-    log({ code: 'start-failed', detail: `Docker did not answer: ${unanswered.detail}` });
-    return { code: 'start-failed' };
+    case 'unanswered':
+      log({ code: 'start-failed', detail: `Docker did not answer: ${local.problem.detail}` });
+      return { code: 'start-failed' };
   }
-  return localId === image ? null : { code: 'image-digest-mismatch' };
 }
 
 // The inputs as folders inside the repository, or null when one is not.
@@ -90,20 +88,6 @@ function repositoryInputs(inputs: readonly string[], log: RunnerLog): readonly s
   return folders;
 }
 
-// Why the run's network does not enforce egress, or null when it has no route out. Where Docker
-// cannot make a network with no route out, the run goes ahead on an ordinary one, at the host level.
-async function createRunNetwork(scope: ContainerScope): Promise<Result<string | null, string>> {
-  const internal = await scope.createNetwork({ internal: true });
-  if (internal.ok) {
-    return success(null);
-  }
-  const ordinary = await scope.createNetwork({ internal: false });
-  if (!ordinary.ok) {
-    return failure(`Docker could not create the run's network: ${ordinary.error.detail}`);
-  }
-  return success(`Docker could not create a network with no route out: ${internal.error.detail}`);
-}
-
 // A browser takes HTTP_PROXY by default, so that is the address that closes the socket on a
 // refusal. Whatever calls services has to ask for the one that answers. Wrongly used, that gives a
 // service a failed call, never a page a readable answer.
@@ -116,73 +100,83 @@ function runContainerEnvironment(proxyName: string): Readonly<Record<string, str
   };
 }
 
-// The handle a started run is given. It reads the proxy's files back as the run goes, and stop reads
-// them once more before the scope's containers go.
-function runnerHandleFor(setup: RunSetup, ids: RunContainerIds, startingLevel: GuaranteeLevel, removeAll: RemoveAll): RunnerHandle {
+// The handle `use` is given, and how the run ends: what the proxy decided is read once more, and from
+// then on nothing can reach the containers through the handle.
+type OpenRun = { readonly handle: RunnerHandle; readonly end: () => Promise<void> };
+
+const readFailureDetail = (thrown: unknown): string =>
+  `what the proxy decided could not be read back: ${thrown instanceof Error ? thrown.message : String(thrown)}`;
+
+function openRun(setup: RunSetup, ids: RunContainerIds, startingLevel: GuaranteeLevel): OpenRun {
   const { engine, log } = setup;
   const { runContainerId, proxyId } = ids;
   let decisions: readonly ProxyDecision[] = [];
   let rewrites: readonly AppliedRewrite[] = [];
   let level = startingLevel;
-  // A read that fails keeps what the last one found, since each file only grows. But the record may
-  // then be incomplete, and egress is enforced only as far as it can be shown, so the run no longer
-  // counts as isolated.
-  const refreshEvidence = async (): Promise<void> => {
-    const [readNow, appliedNow, hasLostRecords] = await Promise.all([
-      readDecisions(engine, proxyId), readAppliedRewrites(engine, proxyId), hasProxyLostRecords(engine, proxyId),
-    ]);
-    decisions = readNow ?? decisions;
-    rewrites = appliedNow ?? rewrites;
-    if (level === 'isolated' && (readNow === null || hasLostRecords)) {
+  let hasEnded = false;
+  const fallToHost = (detail: string): void => {
+    if (level === 'isolated') {
       level = 'host';
-      log({ code: 'egress-unenforceable', detail: 'what the proxy decided could not be read back whole' });
+      log({ code: 'egress-unenforceable', detail });
     }
   };
-  let isStopped = false;
-  return {
+  // A read that fails keeps what the last one found, since each file only grows. But the record may
+  // then be incomplete, and egress is enforced only as far as it can be shown, so the run no longer
+  // counts as isolated. A read that rejects is the same, so it cannot stop a removal.
+  const refreshEvidence = async (): Promise<void> => {
+    try {
+      const [readNow, appliedNow, hasLostRecords] = await Promise.all([
+        readDecisions(engine, proxyId), readAppliedRewrites(engine, proxyId), hasProxyLostRecords(engine, proxyId),
+      ]);
+      decisions = readNow ?? decisions;
+      rewrites = appliedNow ?? rewrites;
+      if (readNow === null || hasLostRecords) {
+        fallToHost('what the proxy decided could not be read back whole');
+      }
+    } catch (thrown) {
+      fallToHost(readFailureDetail(thrown));
+    }
+  };
+  const handle: RunnerHandle = {
     runId: ids.runId,
     egressEvents: (records = [], directOrigins = []) => joinEgressEvents(records, decisions, directOrigins),
     proxyDecisions: () => decisions,
     rewritesApplied: () => rewrites,
-    async exec(command, environmentNames = []): Promise<ExecOutcome> {
-      // A name that is not a plain variable name could be read by Docker as NAME=value.
-      if (!environmentNames.every((name) => VARIABLE_NAME.test(name))) {
-        return { exitCode: -1, stdout: '', stderr: 'an environment variable name is not a plain name' };
+    async exec(command, environmentNames = []) {
+      if (hasEnded) {
+        return failure({ detail: 'the run has ended, so its containers are gone' });
       }
-      const outcome = await engine.exec(runContainerId, command, environmentNames);
+      const outcome = await adapterAnswer(() => engine.exec(runContainerId, command, environmentNames));
       await refreshEvidence();
-      return outcome.ok ? outcome.value : { exitCode: -1, stdout: '', stderr: outcome.error.detail };
-    },
-    async stop() {
-      if (isStopped) {
-        return;
-      }
-      isStopped = true;
-      await refreshEvidence();
-      await removeAll();
+      return outcome;
     },
     guaranteeLevel: () => level,
   };
+  return {
+    handle,
+    end: async () => {
+      hasEnded = true;
+      await refreshEvidence();
+    },
+  };
 }
 
-// The network, the proxy and the run container, in their order, and what they show about egress. A
-// problem leaves nothing behind, since the scope removes whatever was started.
-async function startRunInScope(setup: RunSetup, scope: ContainerScope, removeAll: RemoveAll): Promise<Result<RunnerHandle, RunnerError>> {
+// The proxy and the run container, in their order, and what they show about egress. A problem leaves
+// nothing behind, since the scope removes whatever was started.
+async function startRunInScope(setup: RunSetup, scope: ContainerScope): Promise<Result<OpenRun, RunnerError>> {
   const { engine, root, log, image, inputs, ownMounts } = setup;
-  const refuse = (detail: string): Result<RunnerHandle, RunnerError> => {
+  const refuse = (detail: string): Result<OpenRun, RunnerError> => {
     log({ code: 'start-failed', detail });
     return failure({ code: 'start-failed' });
   };
-
-  const network = await createRunNetwork(scope);
-  if (!network.ok) {
-    return refuse(network.error);
-  }
-  const whyNotEnforced = network.value;
+  // Where Docker cannot make a network with no route out, the run goes ahead on an ordinary one, at the host level.
+  const whyNotEnforced = scope.networkKind === NetworkKind.Internal
+    ? null
+    : `Docker could not create a network with no route out: ${scope.refusedNetworks.map((refused) => refused.detail).join('; ')}`;
 
   const proxy = await startProxyContainer(scope, root, {
     image, networks: whyNotEnforced === null ? [scope.network, DEFAULT_BRIDGE_NETWORK] : [scope.network],
-    policy: setup.policy, services: setup.services, mounts: ownMounts, hasRunAddresses: true,
+    policy: setup.policy, services: setup.services, mounts: ownMounts, role: ProxyRole.RunContainer,
   });
   if (!proxy.ok) {
     return refuse(proxy.error);
@@ -212,7 +206,21 @@ async function startRunInScope(setup: RunSetup, scope: ContainerScope, removeAll
     log({ code: 'egress-unenforceable', detail: unenforceable });
   }
   const ids = { runId: scope.runId, proxyId: proxy.value.id, runContainerId: runContainer.value };
-  return success(runnerHandleFor(setup, ids, unenforceable === null ? 'isolated' : 'host', removeAll));
+  return success(openRun(setup, ids, unenforceable === null ? 'isolated' : 'host'));
+}
+
+// `use` over a started run. The last read of the proxy's evidence and the end of the handle happen
+// before the scope removes the containers, whatever `use` did.
+async function useRun<Value>(setup: RunSetup, scope: ContainerScope, use: (run: RunnerHandle) => Promise<Value>): Promise<Result<Value, RunnerError>> {
+  const opened = await startRunInScope(setup, scope);
+  if (!opened.ok) {
+    return opened;
+  }
+  try {
+    return success(await use(opened.value.handle));
+  } finally {
+    await opened.value.end();
+  }
 }
 
 export function dockerRunner(options: DockerRunnerOptions): Runner {
@@ -220,28 +228,32 @@ export function dockerRunner(options: DockerRunnerOptions): Runner {
   const root = options.repositoryRoot;
   const log: RunnerLog = options.log ?? ((): void => undefined);
   const ownMounts = ownCodeMounts(root, dependenciesVolumeFor(options.dependenciesVolume));
-  let latestRun: RunnerHandle | null = null;
-
-  async function start(image: ImageDigest, policy: EgressPolicy): Promise<Result<RunnerHandle, RunnerError>> {
-    latestRun = null;
-    const refusal = await pinRunImage(engine, image, log);
-    if (refusal !== null) {
-      return failure(refusal);
-    }
-    const inputs = repositoryInputs(options.inputs ?? [], log);
-    if (inputs === null) {
-      return failure({ code: 'start-failed' });
-    }
-    const setup: RunSetup = { engine, root, log, image, policy, services: options.services, inputs, ownMounts };
-    const started = await keepingContainerScope(engine, `${PRODUCT.name}-run`, (scope, removeAll) => startRunInScope(setup, scope, removeAll));
-    if (started.ok) {
-      latestRun = started.value;
-    }
-    return started;
-  }
 
   return {
-    start,
-    guaranteeLevel: () => latestRun?.guaranteeLevel() ?? 'host',
+    async withRun(image, policy, use) {
+      const refusal = await pinRunImage(engine, image, log);
+      if (refusal !== null) {
+        return failure(refusal);
+      }
+      const inputs = repositoryInputs(options.inputs ?? [], log);
+      if (inputs === null) {
+        return failure({ code: 'start-failed' });
+      }
+      const setup: RunSetup = { engine, root, log, image, policy, services: options.services, inputs, ownMounts };
+      const scoped = await withContainerScope(
+        engine,
+        {
+          namePrefix: `${PRODUCT.name}-run`,
+          networkKinds: [NetworkKind.Internal, NetworkKind.Ordinary],
+          log: (entry) => log({ code: 'cleanup-failed', detail: entry.detail }),
+        },
+        (scope) => useRun(setup, scope, use),
+      );
+      if (!scoped.ok) {
+        log({ code: 'start-failed', detail: `Docker could not create the run's network: ${scoped.error.detail}` });
+        return failure({ code: 'start-failed' });
+      }
+      return scoped.value;
+    },
   };
 }

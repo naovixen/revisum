@@ -36,6 +36,10 @@ export type SuiteRunPorts = {
 };
 
 const TRACE_ATTACHMENT = 'trace';
+// A suite stopped at its timeout has no exit code, and the published result's field is a number: its
+// outcome code says why, and nothing compares this one with the outcomes.
+const STOPPED_SUITE_EXIT_CODE = -1;
+const exitCodeOf = (outcome: WorkloadOutcome): number => (outcome.kind === 'exited' ? outcome.exitCode : STOPPED_SUITE_EXIT_CODE);
 const host = (): HostInfo => ({ platform: process.platform, arch: process.arch });
 
 // The suite may reach the project's own origins, never its production ones, and no service.
@@ -259,13 +263,13 @@ export async function runSuite(project: Project, suiteName: string, ports: Suite
   if (suite.setupCommand !== undefined) {
     const setup = await ports.workload.run(request(suite.setupCommand, environment.value.variables));
     if (!setup.ok) return refusedSuiteResult(suiteName, refusalFor(setup.error));
-    if (setup.value.timedOut || setup.value.exitCode !== 0) {
+    if (setup.value.kind === 'timed-out' || setup.value.exitCode !== 0) {
       // The suite never ran, but its setup ran behind the egress proxy, so its result says what the
       // proxy refused, or that the proxy's record could not be read.
-      return unreadSuiteResult(context(setup.value.exitCode, setup.value.timedOut, manifestFor(null, []), egressOf(setup.value)), EvidenceOutcomeCode.SetupFailed);
+      return unreadSuiteResult(context(exitCodeOf(setup.value), setup.value.kind === 'timed-out', manifestFor(null, []), egressOf(setup.value)), EvidenceOutcomeCode.SetupFailed);
     }
     if (setup.value.egressRecordUnread === true) {
-      return unreadSuiteResult(context(setup.value.exitCode, false, manifestFor(null, []), RECORD_UNREAD));
+      return unreadSuiteResult(context(exitCodeOf(setup.value), false, manifestFor(null, []), RECORD_UNREAD));
     }
   }
 
@@ -282,7 +286,8 @@ export async function runSuite(project: Project, suiteName: string, ports: Suite
   // The project parser refuses a declared variable of a name Revisum sets, such as the report's.
   const ran = await ports.workload.run(request(built.argv, variables));
   if (!ran.ok) return refusedSuiteResult(suiteName, refusalFor(ran.error));
-  const { exitCode, timedOut } = ran.value;
+  const exitCode = exitCodeOf(ran.value);
+  const timedOut = ran.value.kind === 'timed-out';
   const egress = egressOf(ran.value);
 
   const read = readReport(ports.outputDirectory, limits);

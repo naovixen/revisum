@@ -180,9 +180,6 @@
     "@typescript-eslint/require-await": {
       "count": 2
     },
-    "curly": {
-      "count": 14
-    },
     "revisum/file-name-matches-export": {
       "count": 1
     }
@@ -1206,9 +1203,6 @@
     "@typescript-eslint/strict-boolean-expressions": {
       "count": 1
     },
-    "curly": {
-      "count": 10
-    },
     "revisum/file-name-matches-export": {
       "count": 1
     }
@@ -1252,7 +1246,7 @@
   },
   "packages/runner/src/run-containers.ts": {
     "curly": {
-      "count": 5
+      "count": 4
     },
     "revisum/file-name-matches-export": {
       "count": 1
@@ -1287,17 +1281,11 @@
     "@typescript-eslint/naming-convention": {
       "count": 1
     },
-    "curly": {
-      "count": 1
-    },
     "revisum/file-name-matches-export": {
       "count": 1
     }
   },
   "test/containers/browser-channels-and-direct-connections.test.ts": {
-    "curly": {
-      "count": 3
-    },
     "revisum/file-name-matches-export": {
       "count": 1
     },
@@ -1314,9 +1302,6 @@
     }
   },
   "test/containers/database-command-run.ts": {
-    "curly": {
-      "count": 3
-    },
     "no-restricted-syntax": {
       "count": 1
     },
@@ -1325,9 +1310,6 @@
     }
   },
   "test/containers/database-commands.test.ts": {
-    "curly": {
-      "count": 1
-    },
     "revisum/file-name-matches-export": {
       "count": 1
     },
@@ -1347,9 +1329,6 @@
     "@typescript-eslint/require-await": {
       "count": 2
     },
-    "curly": {
-      "count": 7
-    },
     "revisum/file-name-matches-export": {
       "count": 1
     },
@@ -1366,9 +1345,6 @@
     }
   },
   "test/containers/image-pinning.test.ts": {
-    "curly": {
-      "count": 1
-    },
     "revisum/file-name-matches-export": {
       "count": 1
     },
@@ -1377,9 +1353,6 @@
     }
   },
   "test/containers/isolated-run.ts": {
-    "curly": {
-      "count": 4
-    },
     "revisum/file-name-matches-export": {
       "count": 1
     }
@@ -1412,9 +1385,6 @@
     }
   },
   "test/containers/stopped-docker-daemon.test.ts": {
-    "curly": {
-      "count": 3
-    },
     "revisum/file-name-matches-export": {
       "count": 1
     },
@@ -1423,9 +1393,6 @@
     }
   },
   "test/containers/workload-isolation.test.ts": {
-    "curly": {
-      "count": 2
-    },
     "revisum/file-name-matches-export": {
       "count": 1
     },
@@ -2744,13 +2711,10 @@
   },
   "test/unit/cli/explore-command-examples.ts": {
     "@typescript-eslint/require-await": {
-      "count": 3
+      "count": 1
     },
     "@typescript-eslint/unbound-method": {
       "count": 1
-    },
-    "curly": {
-      "count": 12
     },
     "max-lines": {
       "count": 1
@@ -2783,9 +2747,6 @@
   },
   "test/unit/cli/suite-run-examples.ts": {
     "@typescript-eslint/require-await": {
-      "count": 1
-    },
-    "curly": {
       "count": 1
     },
     "no-restricted-syntax": {
@@ -2983,9 +2944,6 @@
     },
     "@typescript-eslint/require-await": {
       "count": 1
-    },
-    "curly": {
-      "count": 5
     },
     "no-restricted-syntax": {
       "count": 1
@@ -4276,12 +4234,6 @@
     }
   },
   "test/unit/runner/fake-container-engine.ts": {
-    "@typescript-eslint/require-await": {
-      "count": 7
-    },
-    "curly": {
-      "count": 2
-    },
     "revisum/file-name-matches-export": {
       "count": 1
     }
@@ -4303,9 +4255,6 @@
     }
   },
   "test/unit/runner/git-mount-check.test.ts": {
-    "curly": {
-      "count": 2
-    },
     "revisum/file-name-matches-export": {
       "count": 1
     },
@@ -4336,9 +4285,6 @@
     },
     "@typescript-eslint/require-await": {
       "count": 2
-    },
-    "curly": {
-      "count": 1
     },
     "revisum/file-name-matches-export": {
       "count": 1
@@ -4394,28 +4340,19 @@
     "@typescript-eslint/require-await": {
       "count": 1
     },
-    "curly": {
-      "count": 2
-    },
     "revisum/file-name-matches-export": {
       "count": 1
     }
   },
   "test/unit/runner/runner-guarantee-level.test.ts": {
-    "curly": {
-      "count": 1
-    },
     "revisum/file-name-matches-export": {
       "count": 1
     },
     "revisum/test-title-format": {
-      "count": 5
+      "count": 4
     }
   },
   "test/unit/runner/runner-handle-evidence.test.ts": {
-    "curly": {
-      "count": 2
-    },
     "revisum/file-name-matches-export": {
       "count": 1
     },
@@ -4428,7 +4365,7 @@
       "count": 1
     },
     "revisum/test-title-format": {
-      "count": 4
+      "count": 3
     }
   },
   "test/unit/runner/runner-source-rules.test.ts": {

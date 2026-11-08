@@ -329,7 +329,14 @@ function clearedLogin(path: string, project: Project, target: Target, ports: Dra
   return { cleared: decision.run, text };
 }
 
-const crawlStop = (code: CrawlStop, closeFailure: string | null): Stop => stop(code, code === 'plan-rejected' ? '--after' : '--explore', closeFailure);
+// A crawl that ran and crashed is told apart from a runner that could not run it by what the error
+// says, since a crawl's stop is the run's concern and the published error codes don't change here.
+function crawlStop(code: CrawlStop, closeFailure: string | null): Stop {
+  if (code === 'explore-crawl-crashed') {
+    return { ...stop('explore-runner-unavailable', '--explore', closeFailure), stopped: { ...cliError('explore-runner-unavailable', '--explore'), reason: 'the crawl started in the run container and then crashed' } };
+  }
+  return stop(code, code === 'plan-rejected' ? '--after' : '--explore', closeFailure);
+}
 
 async function exploreSite(explore: ExploreArguments, prepared: Prepared, ports: DraftCommandPorts): Promise<Explored | Stop> {
   const origin = exploreStartOrigin(prepared.project, explore.start);

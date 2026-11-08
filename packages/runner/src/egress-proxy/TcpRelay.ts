@@ -9,22 +9,28 @@ export type TcpRelay = {
     readonly private: boolean;
 };
 
-// The services a policy allows over TCP, each by the host its origin names and its declared port.
+type RelayedService = DeclaredService & { readonly port: number };
+
+// The one selection of the services a policy allows over TCP: each with its declared port.
+export const relayedServices = (
+    policy: EgressPolicy,
+    services: readonly DeclaredService[],
+): readonly RelayedService[] =>
+    services.filter(
+        (service): service is RelayedService =>
+            policy.allowTcpServices.includes(service.name) && service.port !== undefined,
+    );
+
+// The relays those services need, each by the host its origin names and its declared port.
 export function tcpRelaysFor(
     policy: EgressPolicy,
     services: readonly DeclaredService[],
 ): readonly TcpRelay[] {
-    return services.flatMap((service) =>
-        policy.allowTcpServices.includes(service.name) && service.port !== undefined
-            ? [
-                  {
-                      host: bareHost(new URL(service.origin).hostname),
-                      port: service.port,
-                      private: service.private,
-                  },
-              ]
-            : [],
-    );
+    return relayedServices(policy, services).map((service) => ({
+        host: bareHost(new URL(service.origin).hostname),
+        port: service.port,
+        private: service.private,
+    }));
 }
 
 // How a relay's decisions name what was reached: "host:port", an IPv6 host in brackets.

@@ -6,9 +6,11 @@ export type { ExecOutcome, ResponseRewrite } from '@revisum/contracts';
 export { checkResolvedAddress, type AddressCheckOptions, type AddressVerdict } from './address-check.ts';
 export {
   createArguments, dockerCliEngine, runDocker,
-  type ContainerEngine, type ContainerMount, type ContainerOptions, type DockerOutcome, type EngineProblem, type ProbeTarget,
+  type ContainerEngine, type ContainerMount, type ContainerOptions, type DockerOutcome, type EngineProblem, type ImageAnswer, type ProbeTarget,
 } from './container-engine.ts';
 export { dockerRunner, type DockerRunnerOptions, type RunnerLogEntry } from './docker-runner.ts';
+export { readVariableName } from './ReadVariableName.ts';
+export type { VariableName } from '@revisum/contracts';
 export { workloadRunner, type WorkloadLogEntry, type WorkloadRunnerOptions } from './workload/WorkloadRunner.ts';
 export { noSuchNameAnswer, readDnsQuestion, type DnsQuestion } from './lookup-recorder.ts';
 export { hostAndPort } from '@revisum/contracts';

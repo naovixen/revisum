@@ -35,16 +35,21 @@ export function holdFocusedElement(): boolean {
     return element !== null;
 }
 
-// Takes focus off the held element, so a screenshot can show what focus changed.
+// Takes focus off the held element, so a screenshot can show what focus changed. A page can remove
+// an element's blur or focus, so each is checked before it is called.
 export function blurHeldElement(): void {
     const element = (window as WindowHoldingFocus).__focusedElement as
         HTMLElement | null | undefined;
-    element?.blur();
+    if (typeof element?.blur === "function") {
+        element.blur();
+    }
 }
 
 // Gives the held element its focus back, without scrolling to it.
 export function refocusHeldElement(): void {
     const element = (window as WindowHoldingFocus).__focusedElement as
         HTMLElement | null | undefined;
-    element?.focus({ preventScroll: true });
+    if (typeof element?.focus === "function") {
+        element.focus({ preventScroll: true });
+    }
 }

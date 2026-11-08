@@ -7,7 +7,8 @@ import { SECCOMP_PROFILE } from "../run-containers.ts";
 // The uid and gid used when the image's own user is root, or the image names none.
 const UNPRIVILEGED_USER = "1000:1000";
 
-const isRoot = (user: string): boolean => /^(root|0)(:|$)/.test(user.trim());
+// Root by name or by uid however it is spelled: Docker reads "00" as uid 0 too.
+const isRoot = (user: string): boolean => /^(root|0+)(:|$)/.test(user.trim());
 
 const containerUser = (imageUser: string | null): string =>
     imageUser === null || isRoot(imageUser) ? UNPRIVILEGED_USER : imageUser;

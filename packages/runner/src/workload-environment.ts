@@ -2,11 +2,9 @@
 // revealed by service-caller.ts, runner's one module that may read one, then Revisum's own, which
 // always win.
 // Nothing comes from the host's environment: the list starts empty.
-import type { WorkloadVariable } from '@revisum/contracts';
+import type { Secret, VariableName } from '@revisum/contracts';
 import { variableFields } from './service-caller.ts';
 
-// A name the container's environment can hold as written: no "=", no space, no control character.
-const VARIABLE_NAME = /^[A-Za-z_][A-Za-z0-9_]{0,127}$/;
 // Loopback stays inside the container, so an app the suite starts itself is reached directly.
 export const LOOPBACK_HOSTS = 'localhost,127.0.0.1,::1';
 // The home folder every workload process gets: the container's private /tmp.
@@ -23,13 +21,13 @@ export function proxyVariables(proxyUrl: string): Readonly<Record<string, string
   };
 }
 
-// The whole environment, or null when a declared name could not be written as a variable.
-// `httpProxy` false leaves the proxy variables out, for a command that speaks only TCP, such as a
+export type CheckedVariable = { readonly name: VariableName; readonly value: string | Secret };
+
+// The whole environment. `httpProxy` false leaves the proxy variables out, for a command that speaks only TCP, such as a
 // database client: it reaches its service through the proxy's TCP relay, by the service's name.
 export function workloadEnvironment(
-  declared: readonly WorkloadVariable[], proxyUrl: string, httpProxy = true,
-): Readonly<Record<string, string>> | null {
-  if (!declared.every((variable) => VARIABLE_NAME.test(variable.name))) return null;
+  declared: readonly CheckedVariable[], proxyUrl: string, httpProxy = true,
+): Readonly<Record<string, string>> {
   const own: Readonly<Record<string, string>> = httpProxy ? proxyVariables(proxyUrl) : HOME;
   // Revisum's own names are refused in either case, so a declared proxy variable never slips in.
   const ownNames = new Set(Object.keys(proxyVariables(proxyUrl)).map((name) => name.toUpperCase()));

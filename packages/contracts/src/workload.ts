@@ -43,10 +43,18 @@ export type WorkloadRequest = {
 // What a process printed on one stream, cut at the runner's limit. `truncated` says it was cut.
 export type CapturedOutput = { readonly bytes: Uint8Array; readonly truncated: boolean };
 
-export type WorkloadOutcome = {
-  readonly exitCode: number;
-  // True when the runner stopped the container at the request's timeout.
-  readonly timedOut: boolean;
+// How a stopped command's container went. removed: it is gone, so the command ended with it.
+// removal-failed: the engine could not remove it, or did not say it had, within the bounded wait.
+// command-never-settled: the container is gone but the engine never said the command ended.
+export const WorkloadStop = {
+  Removed: 'removed',
+  RemovalFailed: 'removal-failed',
+  CommandNeverSettled: 'command-never-settled',
+} as const;
+export type WorkloadStop = (typeof WorkloadStop)[keyof typeof WorkloadStop];
+
+// Common to every outcome: what the proxy recorded and what the command printed.
+type WorkloadRecords = {
   readonly egressEvents: readonly EgressEvent[];
   // True when the proxy's record could not be read back or the proxy could not write all of it, so
   // egressEvents may lack what it decided. Absent otherwise.
@@ -55,6 +63,10 @@ export type WorkloadOutcome = {
   readonly stdout: CapturedOutput;
   readonly stderr: CapturedOutput;
 };
+
+// A command that ended by itself has an exit code; one the runner stopped at its timeout has none.
+export type WorkloadOutcome = WorkloadRecords &
+  ({ readonly kind: 'exited'; readonly exitCode: number } | { readonly kind: 'timed-out'; readonly stop: WorkloadStop });
 
 // Why the workload runner did not run a request. No code of the team's image ran.
 //   image-missing: the team's image, or Revisum's own run image, is not on this host. It is never pulled.

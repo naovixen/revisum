@@ -1,50 +1,45 @@
 // Removes what an earlier container of the image left in the output folder, as its own user, in a
-// container of the same image with no network and only the output folder.
+// container of the same image with no network and only the output folder. The caller looks for itself
+// whether the paths have gone, so nothing here decides the run, and each step that fails is reported.
 import { PRODUCT, WORKLOAD_OUTPUT_PATH, type OutputRemoval } from "@revisum/contracts";
 import { randomBytes } from "node:crypto";
-import { isAbsolute } from "node:path";
+import { adapterAnswer } from "../AdapterAnswer.ts";
 import type { ContainerEngine } from "../container-engine.ts";
-import { isSafeInMountArgument } from "./IsSafeInMountArgument.ts";
+import { NetworkKind, withContainerScope, type ContainerScope } from "../ContainerScope.ts";
+import { areMountablePaths } from "./AreMountablePaths.ts";
 import { readyOutputFolder } from "./ReadyOutputFolder.ts";
 import { teamImageContainer } from "./TeamImageContainer.ts";
 import type { WorkloadLog } from "./WorkloadRefusal.ts";
 
+const noticeOf =
+    (log: WorkloadLog) =>
+    (detail: string): void => {
+        log({ code: "notice", detail });
+    };
+
+type RemovalContext = {
+    readonly engine: ContainerEngine;
+    readonly root: string;
+    readonly log: (detail: string) => void;
+    readonly removal: OutputRemoval;
+};
+
 // A mode the suite set on its own files could stop even its own user, so that is lifted first.
-// Neither command's outcome is read, since the caller looks for itself, and an image that lacks them
-// fails safe as a folder still there.
-export async function removeFromOutput(
-    engine: ContainerEngine,
-    root: string,
-    log: WorkloadLog,
-    removal: OutputRemoval,
-): Promise<void> {
-    const { image, outputDirectory, paths, hostFailure } = removal;
-    if (
-        !isAbsolute(outputDirectory) ||
-        !isSafeInMountArgument(outputDirectory) ||
-        !isSafeInMountArgument(root) ||
-        (await engine.imageId(image)) !== image ||
-        !readyOutputFolder(outputDirectory)
-    ) {
-        log({
-            code: "notice",
-            detail: `the host could not remove what an earlier run left (${hostFailure}), and no container can be used to`,
-        });
-        return;
-    }
-    const insideOutput = paths.map((path) => `${WORKLOAD_OUTPUT_PATH}/${path}`);
-    const imageUser = (await engine.imageUser?.(image)) ?? null;
-    const remover = await engine.startContainer(
+async function removeInContainer(context: RemovalContext, scope: ContainerScope): Promise<void> {
+    const { engine, root, log, removal } = context;
+    const insideOutput = removal.paths.map((path) => `${WORKLOAD_OUTPUT_PATH}/${path}`);
+    const imageUser = await engine.imageUser(removal.image);
+    const remover = await scope.startContainer(
         teamImageContainer(root, imageUser, {
             name: `${PRODUCT.name}-output-removal-${randomBytes(6).toString("hex")}`,
-            image,
+            image: removal.image,
             networks: [],
             workingFolder: WORKLOAD_OUTPUT_PATH,
             environment: { HOME: "/tmp" },
             mounts: [
                 {
                     kind: "folder",
-                    source: outputDirectory,
+                    source: removal.outputDirectory,
                     target: WORKLOAD_OUTPUT_PATH,
                     writable: true,
                 },
@@ -52,16 +47,69 @@ export async function removeFromOutput(
         }),
     );
     if (!remover.ok) {
-        log({
-            code: "notice",
-            detail: `the host could not remove what an earlier run left (${hostFailure}), and the container to do it did not start: ${remover.error.detail}`,
-        });
+        log(
+            `the host could not remove what an earlier run left (${removal.hostFailure}), and the container to do it did not start: ${remover.error.detail}`,
+        );
         return;
     }
-    try {
-        await engine.exec(remover.value, ["chmod", "-R", "u+rwx", ...insideOutput]);
-        await engine.exec(remover.value, ["rm", "-rf", ...insideOutput]);
-    } finally {
-        await engine.removeContainer(remover.value);
+    for (const command of [
+        ["chmod", "-R", "u+rwx", ...insideOutput],
+        ["rm", "-rf", ...insideOutput],
+    ]) {
+        const ran = await adapterAnswer(() => engine.exec(remover.value, command));
+        const step = command[0] ?? "";
+        if (!ran.ok) {
+            log(`${step} could not run in the removal's container: ${ran.error.detail}`);
+        } else if (ran.value.exitCode !== 0) {
+            log(
+                `${step} exited ${ran.value.exitCode} in the removal's container: ${ran.value.stderr.trim()}`,
+            );
+        }
+    }
+}
+
+export async function removeFromOutput(
+    engine: ContainerEngine,
+    root: string,
+    workloadLog: WorkloadLog,
+    removal: OutputRemoval,
+): Promise<void> {
+    const log = noticeOf(workloadLog);
+    const cannotUseAContainer = (why: string): void => {
+        log(
+            `the host could not remove what an earlier run left (${removal.hostFailure}), and no container can be used to: ${why}`,
+        );
+    };
+    if (!areMountablePaths(removal.outputDirectory, [root])) {
+        cannotUseAContainer("the output folder or repository path cannot be mounted");
+        return;
+    }
+    const answer = await engine.imageId(removal.image);
+    if (answer.kind === "unanswered") {
+        cannotUseAContainer(`Docker did not answer: ${answer.problem.detail}`);
+        return;
+    }
+    if (answer.kind === "absent" || answer.id !== removal.image) {
+        cannotUseAContainer("the image is not on this host");
+        return;
+    }
+    if (!readyOutputFolder(removal.outputDirectory)) {
+        cannotUseAContainer("the output folder cannot be made writable");
+        return;
+    }
+    const context: RemovalContext = { engine, root, log, removal };
+    const removed = await withContainerScope(
+        engine,
+        {
+            namePrefix: `${PRODUCT.name}-output-removal`,
+            networkKinds: [NetworkKind.Internal],
+            log: (entry) => {
+                log(`the removal's container could not be cleaned up: ${entry.detail}`);
+            },
+        },
+        (scope) => removeInContainer(context, scope),
+    );
+    if (!removed.ok) {
+        cannotUseAContainer(removed.error.detail);
     }
 }

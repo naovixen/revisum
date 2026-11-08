@@ -39,6 +39,7 @@ export type * from './run-ports.ts';
 export * from './GuaranteeLevel.ts';
 export type * from './ArtifactReference.ts';
 export type * from './isolated-runner.ts';
+export type * from './VariableName.ts';
 export { BrowserChannel, EgressChannel, EgressDecision } from './isolated-runner.ts';
 export * from './ContainerRefusalCode.ts';
 export * from './workload.ts';

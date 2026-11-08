@@ -31,8 +31,7 @@ const GATEWAY_PROBE_PORT = 80;
 // remove it would keep. 'reached' too when the network cannot be read or shows no IPv4 subnet, so an
 // unknown is never taken for 'blocked'.
 export async function probeRunNetwork(engine: ContainerEngine, containerId: string, network: string): Promise<'reached' | 'blocked'> {
-  const gateway = await engine.networkGatewayAddress?.(network);
-  if (gateway === undefined) return engine.probeEgress(containerId, OUTSIDE_PROBE_TARGETS);
+  const gateway = await engine.networkGatewayAddress(network);
   if (!gateway.ok) return 'reached';
   const gatewayTargets: readonly ProbeTarget[] = gateway.value === null ? [] : [{ host: gateway.value, port: GATEWAY_PROBE_PORT, refusalCountsAsReached: true }];
   return engine.probeEgress(containerId, [...OUTSIDE_PROBE_TARGETS, ...gatewayTargets]);
@@ -81,6 +80,19 @@ export const runImageContainer = (root: string, fields: {
   readonly environment: Readonly<Record<string, string>>; readonly mounts: readonly ContainerMount[]; readonly command: readonly string[];
 }): ContainerOptions => ({ ...fields, user: RUN_IMAGE_USER, seccompProfile: join(root, SECCOMP_PROFILE), workingFolder: WORKSPACE });
 
+// What a run's proxy is for. run-container: a plan run's browser and its service calls each get an
+// address. workload: it also answers and records the run network's name lookups.
+export const ProxyRole = {
+  RunContainer: 'run-container',
+  Workload: 'workload',
+} as const;
+export type ProxyRole = (typeof ProxyRole)[keyof typeof ProxyRole];
+
+const PROXY_ROLE_VARIABLES = {
+  [ProxyRole.RunContainer]: { [RUN_ADDRESSES_VARIABLE]: '1' },
+  [ProxyRole.Workload]: { [LOOKUPS_VARIABLE]: '1' },
+} satisfies Record<ProxyRole, Readonly<Record<string, string>>>;
+
 export type ProxyContainerFields = {
   readonly name: string;
   readonly image: string;
@@ -88,10 +100,7 @@ export type ProxyContainerFields = {
   readonly policy: EgressPolicy;
   readonly services?: readonly DeclaredService[] | undefined;
   readonly mounts: readonly ContainerMount[];
-  // Also answer and record the run network's name lookups, for a workload container.
-  readonly recordLookups?: boolean;
-  // Give a run container's browser and its service calls an address each.
-  readonly hasRunAddresses?: boolean;
+  readonly role: ProxyRole;
 };
 
 // The egress proxy's container, with its rules in its environment and nothing from the host's.
@@ -104,8 +113,7 @@ export function proxyContainer(root: string, fields: ProxyContainerFields): Resu
     name: fields.name, image: fields.image, networks: fields.networks, mounts: fields.mounts,
     environment: {
       HOME: '/tmp', [RULES_VARIABLE]: JSON.stringify(rules.value),
-      ...(fields.recordLookups === true ? { [LOOKUPS_VARIABLE]: '1' } : {}),
-      ...(fields.hasRunAddresses === true ? { [RUN_ADDRESSES_VARIABLE]: '1' } : {}),
+      ...PROXY_ROLE_VARIABLES[fields.role],
     },
     command: ['node', 'packages/runner/src/proxy-container.ts'],
   }));

@@ -5,7 +5,6 @@ import {
     WORKLOAD_OUTPUT_PATH,
     success,
     type Result,
-    type WorkloadRequest,
 } from "@revisum/contracts";
 import type { ContainerEngine, HostEntry } from "../container-engine.ts";
 import type { ContainerScope } from "../ContainerScope.ts";
@@ -32,31 +31,24 @@ const START_FAILED = "workload-start-failed";
 export async function startTeamContainer(
     scope: ContainerScope,
     fields: TeamContainerFields,
-    request: WorkloadRequest,
     checked: CheckedWorkloadRequest,
     proxy: StartedProxy,
 ): Promise<Result<string, WorkloadRefusal>> {
     const { engine, root, checkout, log } = fields;
     const environment = workloadEnvironment(
-        request.environment,
+        checked.environment,
         proxyUrl(proxy.name),
-        request.httpProxyVariables !== false,
+        checked.hasHttpProxyVariables,
     );
-    if (environment === null) {
-        return workloadRefused(
-            START_FAILED,
-            "a declared variable has a name an environment cannot hold",
-        );
-    }
     const mounts = checkoutMounts(checkout, log);
     if (mounts === null) {
         return workloadRefused(START_FAILED, "the checkout cannot be read");
     }
-    if (!readyOutputFolder(request.outputDirectory)) {
+    if (!readyOutputFolder(checked.outputDirectory)) {
         return workloadRefused(START_FAILED, "the output folder cannot be made writable");
     }
-    const imageUser = (await engine.imageUser?.(request.image)) ?? null;
-    const proxyAddress = (await engine.containerAddress?.(proxy.id, scope.network)) ?? null;
+    const imageUser = await engine.imageUser(checked.image);
+    const proxyAddress = await engine.containerAddress(proxy.id, scope.network);
     if (proxyAddress === null) {
         log({
             code: "notice",
@@ -64,7 +56,7 @@ export async function startTeamContainer(
         });
     }
     // A relayed service is reached by name at the proxy, so without the proxy's address it cannot be reached.
-    const relayedNames = relayedHostNames(request);
+    const relayedNames = relayedHostNames(checked);
     if (relayedNames.length > 0 && proxyAddress === null) {
         return workloadRefused(
             START_FAILED,
@@ -77,7 +69,7 @@ export async function startTeamContainer(
     const team = await scope.startContainer(
         teamImageContainer(root, imageUser, {
             name: `${scope.runId}-workload`,
-            image: request.image,
+            image: checked.image,
             networks: [scope.network],
             workingFolder:
                 checked.workingFolder === ""
@@ -88,7 +80,7 @@ export async function startTeamContainer(
                 ...mounts,
                 {
                     kind: "folder",
-                    source: request.outputDirectory,
+                    source: checked.outputDirectory,
                     target: WORKLOAD_OUTPUT_PATH,
                     writable: true,
                 },

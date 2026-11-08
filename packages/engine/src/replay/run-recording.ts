@@ -159,7 +159,7 @@ export function recordingPorts(ports: RepliedPorts, runSecrets: readonly Secret[
         ? {
           requestSha256,
           outcome: {
-            exitCode: reply.value.exitCode, timedOut: reply.value.timedOut,
+            exitCode: reply.value.kind === 'exited' ? reply.value.exitCode : STOPPED_COMMAND_EXIT_CODE, timedOut: reply.value.kind === 'timed-out',
             stdout: recordedBytes(reply.value.stdout.bytes, secrets), truncated: reply.value.stdout.truncated,
           },
         }
@@ -222,6 +222,13 @@ export function replayedServices(replies: readonly RecordedServiceReply[], secre
   return { port: { call: async (request) => replayed.answerFor(request) }, mismatchAt: replayed.mismatchAt };
 }
 
+// How a recorded command ended, as the outcome a replay gives. A recording keeps only whether it timed
+// out, and the run saw the same either way, so its stop is taken as the container going.
+const replayedCommandEnd = (outcome: { readonly exitCode: number; readonly timedOut: boolean }) =>
+  (outcome.timedOut
+    ? ({ kind: 'timed-out', stop: 'removed' } as const)
+    : ({ kind: 'exited', exitCode: outcome.exitCode } as const));
+
 // The database-command runner of a replay: it answers from the recorded outputs and runs nothing.
 export function replayedDatabaseCommands(
   replies: readonly RecordedCommandReply[], secrets: SecretStore | undefined,
@@ -231,7 +238,7 @@ export function replayedDatabaseCommands(
     (reply: RecordedCommandReply): Result<WorkloadOutcome, WorkloadErrorCode> => ('failure' in reply
       ? failure(reply.failure)
       : success({
-        exitCode: reply.outcome.exitCode, timedOut: reply.outcome.timedOut, egressEvents: [],
+        ...replayedCommandEnd(reply.outcome), egressEvents: [],
         stdout: { bytes: replayedBytes(reply.outcome.stdout, secrets), truncated: reply.outcome.truncated },
         stderr: { bytes: new Uint8Array(), truncated: false },
       })),
@@ -252,6 +259,9 @@ const WORKLOAD_ERROR_CODES: { readonly [Code in WorkloadErrorCode]: true } = {
 };
 const codesOf = <Code extends string>(codes: { readonly [Name in Code]: true }): readonly Code[] =>
   Object.keys(codes).filter((code): code is Code => Object.hasOwn(codes, code));
+
+// The recording format keeps a number here even for a command the runner stopped, which has none.
+const STOPPED_COMMAND_EXIT_CODE = -1;
 
 const MAXIMUM_REPLIES = 100_000;
 const MAXIMUM_ECHOES = 10_000;

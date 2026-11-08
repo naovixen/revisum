@@ -1,10 +1,11 @@
 // Egress control, shown before any code of the team's image runs: a network with no route out, the
 // proxy on it, and a probe on that network that fails to get out without the proxy.
-import { success, type Failure, type Result, type WorkloadRequest } from "@revisum/contracts";
+import { success, type Failure, type Result } from "@revisum/contracts";
 import type { ContainerEngine } from "../container-engine.ts";
 import type { ContainerScope } from "../ContainerScope.ts";
 import {
     DEFAULT_BRIDGE_NETWORK,
+    ProxyRole,
     ownCodeMounts,
     probeRunNetwork,
     runImageContainer,
@@ -14,6 +15,7 @@ import {
     startProxyContainer,
     type StartedProxy,
 } from "../StartProxyContainer.ts";
+import type { CheckedWorkloadRequest } from "./CheckWorkloadRequest.ts";
 import { workloadRefused, type WorkloadRefusal } from "./WorkloadRefusal.ts";
 
 type EgressControlFields = {
@@ -29,22 +31,16 @@ const unenforceable = (detail: string): Failure<WorkloadRefusal> =>
 export async function showEgressControlled(
     scope: ContainerScope,
     fields: EgressControlFields,
-    request: WorkloadRequest,
+    checked: CheckedWorkloadRequest,
 ): Promise<Result<StartedProxy, WorkloadRefusal>> {
     const { engine, root, runImage } = fields;
-    const created = await scope.createNetwork({ internal: true });
-    if (!created.ok) {
-        return unenforceable(
-            `Docker could not create a network with no route out: ${created.error.detail}`,
-        );
-    }
     const proxy = await startProxyContainer(scope, root, {
         image: runImage,
         networks: [scope.network, DEFAULT_BRIDGE_NETWORK],
-        policy: request.policy,
-        services: request.services,
+        policy: checked.policy,
+        services: checked.services,
         mounts: ownCodeMounts(root, fields.dependenciesVolume),
-        recordLookups: true,
+        role: ProxyRole.Workload,
     });
     if (!proxy.ok) {
         return unenforceable(proxy.error);

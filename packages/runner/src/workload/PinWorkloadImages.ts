@@ -1,39 +1,50 @@
 // The two images a workload needs, here and pinned: Revisum's run image, and the team's, which is
 // never pulled and must have the id the request pins.
-import { success, type Failure, type Result, type WorkloadRequest } from "@revisum/contracts";
-import type { ContainerEngine } from "../container-engine.ts";
+import { success, type Result } from "@revisum/contracts";
+import type { ContainerEngine, ImageAnswer } from "../container-engine.ts";
 import { RUN_IMAGE_TAG } from "../run-image.ts";
+import type { CheckedWorkloadRequest } from "./CheckWorkloadRequest.ts";
 import { workloadRefused, type WorkloadRefusal } from "./WorkloadRefusal.ts";
 
 // A daemon that does not answer says nothing about whether an image exists.
-async function imageAbsent(
-    engine: ContainerEngine,
-    detail: string,
-): Promise<Failure<WorkloadRefusal>> {
-    const unanswered = (await engine.daemonProblem?.()) ?? null;
-    return unanswered === null
-        ? workloadRefused("image-missing", detail)
-        : workloadRefused("workload-start-failed", `Docker did not answer: ${unanswered.detail}`);
+function presentImage(answer: ImageAnswer, absent: string): Result<string, WorkloadRefusal> {
+    switch (answer.kind) {
+        case "found":
+            return success(answer.id);
+        case "absent":
+            return workloadRefused("image-missing", absent);
+        case "unanswered":
+            return workloadRefused(
+                "workload-start-failed",
+                `Docker did not answer: ${answer.problem.detail}`,
+            );
+    }
 }
 
 // The run image's id, once both images are shown to be here.
 export async function pinWorkloadImages(
     engine: ContainerEngine,
-    request: WorkloadRequest,
+    checked: CheckedWorkloadRequest,
 ): Promise<Result<string, WorkloadRefusal>> {
-    const runImage = await engine.imageId(RUN_IMAGE_TAG);
-    if (runImage === null) {
-        return imageAbsent(engine, `the run image ${RUN_IMAGE_TAG} is not on this host`);
+    const runImage = presentImage(
+        await engine.imageId(RUN_IMAGE_TAG),
+        `the run image ${RUN_IMAGE_TAG} is not on this host`,
+    );
+    if (!runImage.ok) {
+        return runImage;
     }
-    const teamImage = await engine.imageId(request.image);
-    if (teamImage === null) {
-        return imageAbsent(engine, "the workload image is not on this host");
+    const teamImage = presentImage(
+        await engine.imageId(checked.image),
+        "the workload image is not on this host",
+    );
+    if (!teamImage.ok) {
+        return teamImage;
     }
-    if (teamImage !== request.image) {
+    if (teamImage.value !== checked.image) {
         return workloadRefused(
             "image-digest-mismatch",
             "the local workload image has another id than the request pins",
         );
     }
-    return success(runImage);
+    return runImage;
 }

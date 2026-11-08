@@ -533,7 +533,7 @@ Command-line error, from `draft --explore --after`. The plan `--after` names has
 
 ## explore-runner-unavailable
 
-Command-line error, from `draft --explore`. The crawl runs in the isolated runner, but there is none, it did not start, it could not enforce egress, or the crawl inside it gave no usable page map. Nothing was drafted. Start Docker and pull the pinned run image, or give `--host` to crawl in a browser on this machine, where egress is not enforced.
+Command-line error, from `draft --explore`. The crawl runs in the isolated runner, but there is none, it did not start, it could not enforce egress, or the crawl inside it crashed or gave no usable page map; a crashed crawl says so in its `reason`. Nothing was drafted. Start Docker and pull the pinned run image, or give `--host` to crawl in a browser on this machine, where egress is not enforced.
 
 ## explore-start-unreachable
 

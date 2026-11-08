@@ -3,6 +3,7 @@
 // sealed as any run that never opened its target is.
 import { UnavailableReason, type PlanRunResult } from "@revisum/contracts";
 import type { TargetNotDeclared } from "../../policy/TargetNotDeclared.ts";
+import { readKeepingTheResult } from "../after-the-verdict/ReadKeepingTheResult.ts";
 import { secretsToRedact } from "../preflight/CheckPreflight.ts";
 import type { RunPorts } from "../RunContext.ts";
 import { runLogging } from "../RunLogging.ts";
@@ -15,13 +16,13 @@ export function targetNotDeclaredResult(
     seed: number,
     ports: RunPorts,
 ): PlanRunResult {
-    const startedAt = ports.clock.now();
     const { logger } = runLogging(
         notDeclared,
         seed,
         ports,
         secretsToRedact(notDeclared, ports.secrets, ports.databaseCommands),
     );
+    const startedAt = readKeepingTheResult(() => ports.clock.now(), 0, logger);
     const target = notDeclared.project.matrix.find(
         (candidate) => candidate.id === notDeclared.targetId,
     );

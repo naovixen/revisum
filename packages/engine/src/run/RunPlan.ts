@@ -52,7 +52,6 @@ export async function runPlan(
     assertCleared(cleared);
     assertBranded(cleared.plan);
     const { plan, target } = cleared;
-    const startedAt = ports.clock.now();
     const preflight = checkPreflight({
         cleared,
         baseUrl: inputs.baseUrl,
@@ -62,6 +61,7 @@ export async function runPlan(
         databaseCommands: ports.databaseCommands,
     });
     const { redactor, logger } = runLogging(cleared, inputs.seed, ports, preflight.redaction);
+    const startedAt = readKeepingTheResult(() => ports.clock.now(), 0, logger);
     const isDeterminismUnpinned = cannotPinDeterminism(ports.drivers, target);
     const nothingRan: NothingRanContext = {
         subject: cleared,

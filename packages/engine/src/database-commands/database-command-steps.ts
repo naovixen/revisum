@@ -192,7 +192,7 @@ function judgedReply(
 ): Result<unknown, DatabaseStepCode> {
   if (!reply.ok) return reply;
   const outcome = reply.value;
-  if (outcome.timedOut) return failure('command-timeout');
+  if (outcome.kind === 'timed-out') return failure('command-timeout');
   if (!declaration.successExitCodes.includes(outcome.exitCode)) return failure('command-failed');
   if (outcome.stdout.truncated || outcome.stdout.bytes.length > maximumOutputBytes) return failure('command-output-invalid');
   return declaration.output === 'json' ? outputJson(outcome.stdout.bytes) : success(null);
@@ -222,7 +222,7 @@ async function runOnce(
     ...(result.ok ? {} : { code: result.error }), ...(outputSha256 === null ? {} : { sha256: outputSha256 }),
     durationMilliseconds: context.clock.now() - startedAt,
   });
-  return { result, exitCode: reply.ok ? reply.value.exitCode : null, outputSha256 };
+  return { result, exitCode: reply.ok && reply.value.kind === 'exited' ? reply.value.exitCode : null, outputSha256 };
 }
 
 const record = (found: Declared, once: OneRun | null, attempts: number): DatabaseCommandRecord => ({

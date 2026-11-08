@@ -8,6 +8,7 @@ import type { Result } from './result.ts';
 import type { ServiceName } from './service-calls.ts';
 import type { Origin } from './target.ts';
 import type { GuaranteeLevel } from './GuaranteeLevel.ts';
+import type { VariableName } from './VariableName.ts';
 
 // How a page sent a request, as the browser reports it: an ordinary request of the page, a
 // WebSocket, a request of a worker, the first load of a popup, a redirect it followed, or a beacon.
@@ -82,6 +83,8 @@ export type EgressPolicy = {
 // What a command run inside the run container printed, and how it ended.
 export type ExecOutcome = { readonly exitCode: number; readonly stdout: string; readonly stderr: string };
 
+// A run a Runner holds open while `use` runs. Everything it read back outlives the run's containers;
+// only `exec` needs them, so it answers a failure once `use` has ended.
 export interface RunnerHandle {
   readonly runId: string;
   // Every request the proxy decided on so far, as egress events. Only a process inside the run
@@ -95,19 +98,18 @@ export interface RunnerHandle {
   rewritesApplied(): readonly AppliedRewrite[];
   // Runs an argument vector inside the run container, without a shell. Each variable named in
   // `environmentNames` is copied into the command's environment from the container client's own,
-  // by name only, so a secret is never on a command line.
-  exec(command: readonly string[], environmentNames?: readonly string[]): Promise<ExecOutcome>;
-  // Removes the run's containers and network.
-  stop(): Promise<void>;
+  // by name only, so a secret is never on a command line. A failure means the engine could not run
+  // it at all, which is not the same as a command that ran and exited with a problem.
+  exec(command: readonly string[], environmentNames?: readonly VariableName[]): Promise<Result<ExecOutcome, { readonly detail: string }>>;
   // 'isolated' only while egress is shown to be enforced for this run, else 'host'. It falls to 'host'
-  // when the proxy's record proves incomplete, which is known only after exec or stop, so a starter
-  // must read it again then before it claims anything for the run.
+  // when the proxy's record proves incomplete, which is known only after exec, or when `use` ends, so
+  // a run's claim must be read again then. Still readable after `use` has ended.
   guaranteeLevel(): GuaranteeLevel;
 }
 
 export interface Runner {
-  start(image: ImageDigest, policy: EgressPolicy): Promise<Result<RunnerHandle, RunnerError>>;
-  // The level of the latest run this runner started, or 'host' before it has one. A runner may hold
-  // several runs at once, so what a run claims for itself comes from its own handle.
-  guaranteeLevel(): GuaranteeLevel;
+  // Starts a run and gives `use` its handle; the run's containers are gone when this returns, however
+  // `use` ended, and what `use` returned or threw is given back unchanged. A failure means no run
+  // started, and `use` was not called.
+  withRun<Value>(image: ImageDigest, policy: EgressPolicy, use: (run: RunnerHandle) => Promise<Value>): Promise<Result<Value, RunnerError>>;
 }
