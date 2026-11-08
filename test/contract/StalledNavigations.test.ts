@@ -2,7 +2,9 @@
 // does. The step that started it must give up at its timeout, rather than hold the run for as long
 // as the server holds its answer or pass and leave the next check a page it cannot read: it is the
 // step whose effect has not arrived. This holds for every way of starting one, on a browser's first
-// page as on a later one.
+// page as on a later one, and for a navigate step whose page moves on by itself as it loads. A page
+// that only holds its own thread has arrived, so its navigate passes and the next check finds it
+// unreadable.
 import assert from "node:assert/strict";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
@@ -55,6 +57,12 @@ const FORM_SUBMISSIONS: readonly { readonly name: string; readonly step: JsonRec
 
 const CLICK_STEP = 1;
 
+const REDIRECT_HELD_PATH = "/redirect-held.html";
+const THREAD_HELD_PATH = "/thread-held.html";
+const NAVIGATE_STEP = 0;
+// The load is quick here, so a navigate that stopped at the timeout ends well inside two of them.
+const LONGEST_NAVIGATE_MILLISECONDS = 2 * STEP_TIMEOUT_MILLISECONDS;
+
 const BROWSERS_OF_A_RUN = [
     { name: "a shared browser", runOptions: () => ({}) },
     {
@@ -86,6 +94,18 @@ before(async () => {
                   <form action="${heldOrigin}/by-form"><button>${FORM_BUTTON}</button></form>
                   <form action="${heldOrigin}/by-enter"><label>${SEARCH_FIELD}<input name="q"></label></form>`),
             ],
+            [
+                REDIRECT_HELD_PATH,
+                htmlPage(
+                    `<script>addEventListener('load', () => { location.href = '${heldOrigin}/by-redirect'; });</script>`,
+                ),
+            ],
+            [
+                THREAD_HELD_PATH,
+                htmlPage(
+                    "<script>addEventListener('load', () => { setTimeout(() => { for (;;); }, 0); });</script>",
+                ),
+            ],
         ]),
     });
 });
@@ -100,6 +120,47 @@ after(async () => {
 });
 
 describe("Using a run in a real browser", () => {
+    describe("given a navigate to a page whose own redirect the server holds back while it settles", () => {
+        describe("when a check follows it", () => {
+            test("then it should fail the navigate with timeout at about the step's timeout, and skip the check", async () => {
+                const { result } = await harness.runSteps(TARGET, [
+                    navigate(REDIRECT_HELD_PATH),
+                    NEVER_SHOWN_CHECK,
+                ]);
+                assert.deepEqual(
+                    outcomes(result),
+                    [
+                        [NAVIGATE_STEP, "failed", "timeout"],
+                        [1, "skipped", undefined],
+                    ],
+                    JSON.stringify(result.steps),
+                );
+                const took = result.timings.stepMilliseconds[NAVIGATE_STEP] ?? Infinity;
+                assert.ok(took >= STEP_TIMEOUT_MILLISECONDS / 2, `gave up after ${took} ms`);
+                assert.ok(took < LONGEST_NAVIGATE_MILLISECONDS, `gave up after ${took} ms`);
+            });
+        });
+    });
+
+    describe("given a navigate to a page that holds its own thread once it has loaded", () => {
+        describe("when a check follows it", () => {
+            test("then it should pass the navigate and fail the check with page-unreadable", async () => {
+                const { result } = await harness.runSteps(TARGET, [
+                    navigate(THREAD_HELD_PATH),
+                    NEVER_SHOWN_CHECK,
+                ]);
+                assert.deepEqual(
+                    outcomes(result),
+                    [
+                        [NAVIGATE_STEP, "passed", undefined],
+                        [1, "failed", "page-unreadable"],
+                    ],
+                    JSON.stringify(result.steps),
+                );
+            });
+        });
+    });
+
     for (const { name, step } of CLICKS) {
         describe(`given a click on ${name} to a page the server holds back`, () => {
             describe("when the run ends", () => {
