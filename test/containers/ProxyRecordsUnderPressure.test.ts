@@ -18,7 +18,7 @@ import {
 import type { RunResult } from "@revisum/engine";
 import { createCleanUpScope } from "../support/CleanUpScope.ts";
 import { REPOSITORY_ROOT } from "../support/repository.ts";
-import { declaredService, egressPolicy } from "../unit/runner/runner-examples.ts";
+import { declaredService, egressPolicy, startRun } from "../unit/runner/runner-examples.ts";
 import { jsonInside, pinnedRunImage } from "./isolated-run.ts";
 import { fixtureWorkloadImage, runFixtureSuite } from "./workload-run.ts";
 
@@ -169,13 +169,15 @@ describe("Using the egress proxy on real Docker", () => {
                     },
                     services: [declaredService(SERVER_SERVICE, serverOrigin, true)],
                 });
-                const started = await runner.start(
+                const started = await startRun(
+                    runner,
                     await pinnedRunImage(),
                     egressPolicy({ allowOrigins: [serverOrigin], allowServices: [SERVER_SERVICE] }),
                 );
                 assert.ok(started.ok, JSON.stringify(started));
                 handle = started.value;
-                cleanUps.add(() => handle.stop());
+                const held = started.value;
+                cleanUps.add(() => held.stop());
             },
             { timeout: TIMEOUT },
         );
@@ -202,7 +204,7 @@ describe("Using the egress proxy on real Docker", () => {
             });
 
             test("then it should lose nothing from the run's record", () => {
-                assert.equal(runner.guaranteeLevel(), "isolated");
+                assert.equal(handle.guaranteeLevel(), "isolated");
                 assert.equal(handle.proxyDecisions().length, 2);
             });
         });
@@ -239,7 +241,7 @@ describe("Using the egress proxy on real Docker", () => {
             });
 
             test("then it should drop the run to the host level of guarantee", () => {
-                assert.equal(runner.guaranteeLevel(), "host");
+                assert.equal(handle.guaranteeLevel(), "host");
                 assert.ok(
                     logged.some((entry) => entry.code === "egress-unenforceable"),
                     JSON.stringify(logged),

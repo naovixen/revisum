@@ -2,7 +2,7 @@
 // constants, egress policies, a fake name resolver that never touches the network, and the
 // undeclared hosts the fixture pages send traffic to.
 import assert from 'node:assert/strict';
-import type { DeclaredService, EgressPolicy, ImageDigest, Origin, ServiceName } from '@revisum/contracts';
+import { success, type DeclaredService, type EgressPolicy, type ImageDigest, type Origin, type Result, type Runner, type RunnerError, type RunnerHandle, type ServiceName } from '@revisum/contracts';
 import { buildEgressPolicy, type AddressResolver, type ResponseRewrite } from '@revisum/runner';
 
 // The tests' own constants stand in for values the trusted project's parser would have checked,
@@ -44,7 +44,7 @@ export const UNDECLARED_CHANNEL_ORIGINS: readonly string[] = [
 export function hostOf(recorded: string): string {
   const withoutScheme = recorded.replace(/^[a-z][a-z0-9+.-]*:\/\//i, '');
   const bracketed = /^\[([^\]]+)\]/.exec(withoutScheme);
-  if (bracketed !== null) return bracketed[1] ?? '';
+  if (bracketed !== null) {return bracketed[1] ?? '';}
   return withoutScheme.split(/[:/]/)[0] ?? '';
 }
 
@@ -69,6 +69,33 @@ export function egressPolicy(input: PolicyInput): EgressPolicy {
   return built.value;
 }
 
+// A run held open for a test to read and then end: `stop` ends the runner's `withRun` and waits for it.
+export type StartedRun = RunnerHandle & { stop(): Promise<void> };
+
+// Starts a run and keeps it open until the test calls `stop`.
+export function startRun(runner: Runner, image: ImageDigest, policy: EgressPolicy): Promise<Result<StartedRun, RunnerError>> {
+  let endUse: () => void = () => undefined;
+  const useEnds = new Promise<void>((resolve) => { endUse = resolve; });
+  return new Promise((resolve, reject) => {
+    const ended = runner.withRun(image, policy, (run) => {
+      resolve(success({
+        runId: run.runId,
+        egressEvents: (records, directOrigins) => run.egressEvents(records, directOrigins),
+        proxyDecisions: () => run.proxyDecisions(),
+        rewritesApplied: () => run.rewritesApplied(),
+        exec: (command, environmentNames) => run.exec(command, environmentNames),
+        guaranteeLevel: () => run.guaranteeLevel(),
+        stop: async () => {
+          endUse();
+          await ended;
+        },
+      }));
+      return useEnds;
+    });
+    ended.then((outcome) => { if (!outcome.ok) {resolve(outcome);} }, reject);
+  });
+}
+
 // A resolver that answers from a fixed table and records every name it is asked for. A name
 // whose answers are a list of lists answers each lookup with the next list, then keeps the last,
 // so a test can change what a name resolves to between lookups, as a rebinding attacker would.
@@ -79,7 +106,7 @@ export function fakeResolver(table: Readonly<Record<string, readonly string[] | 
   const resolve: AddressResolver = async (hostname) => {
     asked.push(hostname);
     const answers = Object.hasOwn(table, hostname) ? table[hostname] : undefined;
-    if (answers === undefined) throw new Error(`the fake resolver has no answer for ${hostname}`);
+    if (answers === undefined) {throw new Error(`the fake resolver has no answer for ${hostname}`);}
     const lists = answers.length > 0 && Array.isArray(answers[0]) ? answers as readonly (readonly string[])[] : [answers as readonly string[]];
     const lookup = asked.filter((name) => name === hostname).length;
     return lists[Math.min(lookup, lists.length) - 1] ?? [];

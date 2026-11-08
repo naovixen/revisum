@@ -15,7 +15,7 @@ import { REPOSITORY_ROOT } from '../../support/repository.ts';
 import type { Token } from '../../../tools/lint-names.ts';
 import { codeTokens, listSourceFiles } from '../../../tools/source-files.ts';
 import { fakeContainerEngine } from './fake-container-engine.ts';
-import { egressPolicy, imageDigest, PINNED_IMAGE_ID } from './runner-examples.ts';
+import { egressPolicy, imageDigest, PINNED_IMAGE_ID, startRun } from './runner-examples.ts';
 
 const runnerSources = (): readonly { readonly path: string; readonly tokens: readonly Token[] }[] =>
   listSourceFiles(REPOSITORY_ROOT, ['packages/runner/src']).map((path) => ({ path, tokens: codeTokens(readFileSync(join(REPOSITORY_ROOT, path), 'utf8')) }));
@@ -49,7 +49,7 @@ test('an image id read from Docker becomes a digest only when it is one', () => 
 test('a run\'s image tag, run id and containers are all named from PRODUCT', async () => {
   assert.ok(RUN_IMAGE_TAG.startsWith(PRODUCT.name), RUN_IMAGE_TAG);
   const engine = fakeContainerEngine({ localImageId: PINNED_IMAGE_ID, internalNetworks: true, probe: 'blocked' });
-  const started = await dockerRunner({ engine, repositoryRoot: REPOSITORY_ROOT }).start(imageDigest(PINNED_IMAGE_ID), egressPolicy({ allowOrigins: [] }));
+  const started = await startRun(dockerRunner({ engine, repositoryRoot: REPOSITORY_ROOT }), imageDigest(PINNED_IMAGE_ID), egressPolicy({ allowOrigins: [] }));
   assert.ok(started.ok, JSON.stringify(started));
   try {
     assert.ok(started.value.runId.startsWith(`${PRODUCT.name}-`), started.value.runId);

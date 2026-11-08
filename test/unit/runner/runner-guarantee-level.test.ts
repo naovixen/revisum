@@ -12,7 +12,7 @@ import { dockerRunner, type RunnerLogEntry } from '@revisum/runner';
 import type { GuaranteeLevel } from '@revisum/contracts';
 import { REPOSITORY_ROOT } from '../../support/repository.ts';
 import { fakeContainerEngine, type FakeEngineSettings } from './fake-container-engine.ts';
-import { egressPolicy, imageDigest, PINNED_IMAGE_ID } from './runner-examples.ts';
+import { egressPolicy, imageDigest, PINNED_IMAGE_ID, startRun } from './runner-examples.ts';
 
 const POLICY = egressPolicy({ allowOrigins: ['https://staging.example.test'] });
 
@@ -24,9 +24,9 @@ async function startOn(settings: Omit<FakeEngineSettings, 'localImageId'>): Prom
   const engine = fakeContainerEngine({ localImageId: PINNED_IMAGE_ID, ...settings });
   const logged: RunnerLogEntry[] = [];
   const runner = dockerRunner({ engine, repositoryRoot: REPOSITORY_ROOT, log: (entry) => { logged.push(entry); } });
-  const started = await runner.start(imageDigest(PINNED_IMAGE_ID), POLICY);
-  const level = runner.guaranteeLevel();
-  if (started.ok) await started.value.stop();
+  const started = await startRun(runner, imageDigest(PINNED_IMAGE_ID), POLICY);
+  const level: GuaranteeLevel = started.ok ? started.value.guaranteeLevel() : 'host';
+  if (started.ok) {await started.value.stop();}
   return { level, logged, startedCode: started.ok ? null : started.error.code };
 }
 
@@ -35,11 +35,6 @@ const loggedCodes = (logged: readonly RunnerLogEntry[]): readonly string[] => lo
 // What a run with this guarantee level vouches for, as its result and report state it.
 const statementFor = (level: GuaranteeLevel) =>
   guaranteeStatement({ mode: 'plan', egressEnforced: level === 'isolated', unmaskedScreenshotsKept: false, unsafeFeatures: [] });
-
-test('before any run has started, the runner claims only the host level', () => {
-  const engine = fakeContainerEngine({ localImageId: PINNED_IMAGE_ID, internalNetworks: true, probe: 'blocked' });
-  assert.equal(dockerRunner({ engine, repositoryRoot: REPOSITORY_ROOT }).guaranteeLevel(), 'host');
-});
 
 test('when the probe from inside the container reaches outside, the level is host and egress-unenforceable is logged', async () => {
   const { level, logged, startedCode } = await startOn({ internalNetworks: true, probe: 'reached' });

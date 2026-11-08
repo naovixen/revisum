@@ -203,7 +203,7 @@ function recordingPort(name: string, port: object, calls: SessionCall[]): object
   return new Proxy(port, {
     get(target, property) {
       const value: unknown = Reflect.get(target, property, target);
-      if (typeof property !== 'string' || typeof value !== 'function') return value;
+      if (typeof property !== 'string' || typeof value !== 'function') {return value;}
       return (...inputs: readonly unknown[]): unknown => {
         calls.push({ method: `${name}.${property}` });
         const answer: unknown = Reflect.apply(value, target, inputs);
@@ -217,9 +217,9 @@ function recordingSession(session: Session, calls: SessionCall[]): Session {
   return new Proxy(session, {
     get(target, property) {
       const value: unknown = Reflect.get(target, property, target);
-      if (typeof property !== 'string') return value;
-      if (PORTS.includes(property) && typeof value === 'object' && value !== null) return recordingPort(property, value, calls);
-      if (typeof value !== 'function') return value;
+      if (typeof property !== 'string') {return value;}
+      if (PORTS.includes(property) && typeof value === 'object' && value !== null) {return recordingPort(property, value, calls);}
+      if (typeof value !== 'function') {return value;}
       return (...inputs: readonly unknown[]): unknown => {
         const first = inputs[0];
         calls.push(property === 'navigate' && typeof first === 'string' ? { method: property, url: first } : { method: property });
@@ -279,16 +279,17 @@ export function watchedFakeRunner(options: WatchedFakeRunnerOptions): WatchedFak
     guaranteeLevel: () => options.level,
     async exec(command, environmentNames) {
       execs.push({ command, environmentNames });
-      return { exitCode: 0, stdout: options.output ?? '', stderr: '' };
+      return success({ exitCode: 0, stdout: options.output ?? '', stderr: '' });
     },
-    async stop() { stops += 1; },
   });
   const runner = fakeRunner({
-    async start(image, policy) {
+    async withRun(image, policy, use) {
       started.push(policy);
-      return options.startFails === true ? failure({ code: 'start-failed' }) : success(handle);
+      if (options.startFails === true) {return failure({ code: 'start-failed' });}
+      const value = await use(handle);
+      stops += 1;
+      return success(value);
     },
-    guaranteeLevel: () => options.level,
   });
   return { runner, image: imageDigest(PINNED_IMAGE_ID), started, execs, stops: () => stops };
 }
@@ -310,9 +311,9 @@ export const containerPageMap = (origin: string): { readonly printed: string; re
 export async function parsedPlan(text: string, project: JsonRecord): Promise<Plan> {
   const trusted = await trustedProjectFrom(project);
   const read = readPlanText(text, trusted.limits);
-  if (!read.ok) assert.fail(`the plan text was refused: ${JSON.stringify(read.error)}`);
+  if (!read.ok) {assert.fail(`the plan text was refused: ${JSON.stringify(read.error)}`);}
   const parsed = planParser(trusted)(read.value.json);
-  if (!parsed.ok) assert.fail(`the plan was refused: ${JSON.stringify(parsed.error)}`);
+  if (!parsed.ok) {assert.fail(`the plan was refused: ${JSON.stringify(parsed.error)}`);}
   return parsed.value;
 }
 
@@ -322,7 +323,7 @@ export async function approvalOfPlan(text: string, project: JsonRecord): Promise
   const repository = openRepository('solo', (fixture) => { fixture.protectedFiles[PLAN_PATH] = plan; });
   try {
     const verified = await repository.verify({ kind: 'plan', hash: planHash(plan), path: PLAN_PATH }, repository.lockdownProof());
-    if (!verified.ok) assert.fail(`the plan was not approved: ${verified.error}`);
+    if (!verified.ok) {assert.fail(`the plan was not approved: ${verified.error}`);}
     return verified.value.approval;
   } finally {
     repository.dispose();
@@ -393,7 +394,7 @@ export async function withExploreRun(setup: ExploreSetup, body: (run: ExploreRun
   const project = exploreProjectFile(site, localPlanner(planner.origin));
   const workspace = draftWorkspace({ planner: undefined, project, ...(setup.spec === undefined ? {} : { spec: setup.spec }) });
   try {
-    for (const [path, content] of Object.entries(setup.files ?? {})) workspace.write(path, content);
+    for (const [path, content] of Object.entries(setup.files ?? {})) {workspace.write(path, content);}
     const loginName = `Readername${letterNonce(20)}`;
     const browser = setup.browser === false ? undefined : setup.browser ?? spyBrowser();
     const runner = setup.runner?.(site);
@@ -445,7 +446,7 @@ export function exploreData(run: ExploreRun): JsonRecord {
 export function exploreErrorCodes(run: ExploreRun): readonly string[] {
   assert.ok(run.output !== undefined, `stdout is not one JSON object:\n${run.outcome.stdout}\n${run.outcome.stderr}`);
   const errors = run.output['errors'];
-  if (!Array.isArray(errors)) return [];
+  if (!Array.isArray(errors)) {return [];}
   return errors.map((error: unknown) => (typeof error === 'object' && error !== null ? String(Reflect.get(error, 'code')) : ''));
 }
 
@@ -516,9 +517,9 @@ export function plannerRequestTexts(run: ExploreRun): readonly string[] {
   const body: unknown = JSON.parse(request.body);
   const unescaped: string[] = [];
   const collect = (value: unknown): void => {
-    if (typeof value === 'string') unescaped.push(value);
-    else if (Array.isArray(value)) value.forEach(collect);
-    else if (typeof value === 'object' && value !== null) Object.values(value).forEach(collect);
+    if (typeof value === 'string') {unescaped.push(value);}
+    else if (Array.isArray(value)) {value.forEach(collect);}
+    else if (typeof value === 'object' && value !== null) {Object.values(value).forEach(collect);}
   };
   collect(body);
   return [request.body, unescaped.join('\n')];

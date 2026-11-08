@@ -180,11 +180,13 @@ export async function attemptWebRtcInside(
     handle: RunnerHandle,
     attempt: WebRtcAttempt,
 ): Promise<string> {
-    const outcome = await handle.exec([
+    const ran = await handle.exec([
         "node",
         THIS_FILE_IN_THE_WORKSPACE,
         JSON.stringify(attempt),
     ]);
+    assert.ok(ran.ok, `the attempt inside the container did not run: ${ran.ok ? "" : ran.error.detail}`);
+    const outcome = ran.value;
     assert.equal(outcome.exitCode, 0, `the attempt inside the container failed: ${outcome.stderr}`);
     const printed = JSON.parse(outcome.stdout.trim().split("\n").at(-1) ?? "null") as {
         readonly state: string;

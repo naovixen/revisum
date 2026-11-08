@@ -107,7 +107,7 @@ export const commandProjectFile = (fields: JsonRecord = {}, limits: Readonly<Rec
 
 export function commandProject(projectFile: JsonRecord = commandProjectFile()): Project {
   const parsed = parseProject(projectFile);
-  if (!parsed.ok) throw new Error(`bad test project: ${JSON.stringify(parsed.error)}`);
+  if (!parsed.ok) {throw new Error(`bad test project: ${JSON.stringify(parsed.error)}`);}
   return parsed.value;
 }
 
@@ -184,10 +184,10 @@ export const TWO_LINE_NOTE = 'first line; rm -rf /\nsecond line $(id)';
 // value, count prints three orders, seed and wipe print nothing.
 export const DEFAULT_ROUTE: CommandRoute = (seen) => {
   const mode = modeOf(seen);
-  if (mode === 'echo') return { stdout: ECHO_OUTPUT(seen) };
-  if (mode === 'flag') return { stdout: JSON.stringify({ flag: FLAG_VALUE }) };
-  if (mode === 'note') return { stdout: JSON.stringify({ note: TWO_LINE_NOTE }) };
-  if (mode === 'count') return { stdout: JSON.stringify({ count: 3 }) };
+  if (mode === 'echo') {return { stdout: ECHO_OUTPUT(seen) };}
+  if (mode === 'flag') {return { stdout: JSON.stringify({ flag: FLAG_VALUE }) };}
+  if (mode === 'note') {return { stdout: JSON.stringify({ note: TWO_LINE_NOTE }) };}
+  if (mode === 'count') {return { stdout: JSON.stringify({ count: 3 }) };}
   return { stdout: '' };
 };
 
@@ -202,10 +202,8 @@ export const modeAnswers = (mode: string, answer: CommandAnswer): CommandRoute =
 const outputOf = (text: string, truncated = false) => ({ bytes: new TextEncoder().encode(text), truncated });
 
 export function outcomeOf(answer: CommandAnswer): CommandReply {
-  return success({
-    exitCode: answer.exitCode ?? 0, timedOut: answer.timedOut ?? false, egressEvents: [...(answer.egressEvents ?? [])],
-    stdout: outputOf(answer.stdout ?? '', answer.truncated ?? false), stderr: outputOf(''),
-  });
+  const records = { egressEvents: [...(answer.egressEvents ?? [])], stdout: outputOf(answer.stdout ?? '', answer.truncated ?? false), stderr: outputOf('') };
+  return success(answer.timedOut === true ? { kind: 'timed-out', stop: 'removed', ...records } : { kind: 'exited', exitCode: answer.exitCode ?? 0, ...records });
 }
 
 export type FakeCommandRunner = {

@@ -52,13 +52,15 @@ export function suiteThatWrites(suite: WrittenSuite): WorkloadRunner {
                 mkdirSync(request.outputDirectory, { recursive: true });
                 const isSuite = isSuiteRequest(request);
                 (isSuite ? suite.duringSuite : suite.duringSetup)?.(request.outputDirectory);
-                const outcome: WorkloadOutcome = {
-                    exitCode: isSuite ? (suite.exitCode ?? 0) : 0,
-                    timedOut: isSuite && suite.timedOut === true,
+                const records = {
                     egressEvents: [],
                     stdout: nothingPrinted(),
                     stderr: nothingPrinted(),
                 };
+                const outcome: WorkloadOutcome =
+                    isSuite && suite.timedOut === true
+                        ? { kind: "timed-out", stop: "removed", ...records }
+                        : { kind: "exited", exitCode: isSuite ? (suite.exitCode ?? 0) : 0, ...records };
                 return Promise.resolve(success(outcome));
             },
         },

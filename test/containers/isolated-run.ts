@@ -10,7 +10,7 @@ import { spawnSync } from 'node:child_process';
 import type { DeclaredService, EgressPolicy, ImageDigest, Runner, RunnerHandle } from '@revisum/contracts';
 import { dockerCliEngine, dockerRunner, prepareRunImage, type ExecOutcome, type RunnerLogEntry } from '@revisum/runner';
 import { REPOSITORY_ROOT } from '../support/repository.ts';
-import { egressPolicy } from '../unit/runner/runner-examples.ts';
+import { egressPolicy, startRun } from '../unit/runner/runner-examples.ts';
 
 // Fake credentials of the kinds a developer's or CI's environment holds: publishing, cloud and
 // package-registry. None is real; each value is unique so it can be searched for.
@@ -64,7 +64,7 @@ export type IsolatedRunOptions = {
 export async function startIsolatedRun(options: IsolatedRunOptions = {}): Promise<IsolatedRun> {
   const image = await pinnedRunImage();
   const previous = new Map(Object.keys(SEEDED_CREDENTIALS).map((name) => [name, process.env[name]] as const));
-  for (const [name, value] of Object.entries(SEEDED_CREDENTIALS)) process.env[name] = value;
+  for (const [name, value] of Object.entries(SEEDED_CREDENTIALS)) {process.env[name] = value;}
   const logged: RunnerLogEntry[] = [];
   const runner = dockerRunner({
     engine: dockerCliEngine(), repositoryRoot: REPOSITORY_ROOT, inputs: options.inputs ?? [], log: (entry) => { logged.push(entry); },
@@ -72,12 +72,12 @@ export async function startIsolatedRun(options: IsolatedRunOptions = {}): Promis
   });
   const restore = (): void => {
     for (const [name, value] of previous) {
-      if (value === undefined) Reflect.deleteProperty(process.env, name);
-      else process.env[name] = value;
+      if (value === undefined) {Reflect.deleteProperty(process.env, name);}
+      else {process.env[name] = value;}
     }
   };
-  const started = await runner.start(image, options.policy ?? egressPolicy({ allowOrigins: [] }));
-  if (!started.ok) restore();
+  const started = await startRun(runner, image, options.policy ?? egressPolicy({ allowOrigins: [] }));
+  if (!started.ok) {restore();}
   assert.ok(started.ok, `the isolated run starts: ${started.ok ? '' : JSON.stringify(started.error)} ${JSON.stringify(logged)}`);
   const handle = started.value;
   return {
@@ -90,7 +90,14 @@ export async function startIsolatedRun(options: IsolatedRunOptions = {}): Promis
 
 // Runs a Node script inside the run container, without a shell, and returns what it printed.
 export async function nodeInside(handle: RunnerHandle, script: string): Promise<ExecOutcome> {
-  return handle.exec(['node', '-e', script]);
+  return execInside(handle, ['node', '-e', script]);
+}
+
+// Runs a command inside the run container. The engine must have run it: a test's command never fails to start.
+export async function execInside(handle: RunnerHandle, command: readonly string[]): Promise<ExecOutcome> {
+  const ran = await handle.exec(command);
+  assert.ok(ran.ok, `the command did not run: ${ran.ok ? '' : ran.error.detail}`);
+  return ran.value;
 }
 
 // Runs a Node script inside the run container that prints one JSON value on its last line.

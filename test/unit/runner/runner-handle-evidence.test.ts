@@ -9,13 +9,13 @@
 // The tests in test/containers/proxy-evidence.test.ts run the same behaviour on the real proxy.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { success, type ExecOutcome, type RunnerHandle } from '@revisum/contracts';
+import { success, type ExecOutcome } from '@revisum/contracts';
 import { buildManifest, manifestHash, type AdapterInfo } from '@revisum/engine';
 import { dockerRunner, type ContainerEngine } from '@revisum/runner';
 import { REPOSITORY_ROOT } from '../../support/repository.ts';
 import { defaultParser, signupPlan, testProject } from '../engine/plan-examples.ts';
 import { fakeContainerEngine } from './fake-container-engine.ts';
-import { egressPolicy, imageDigest, origin, PINNED_IMAGE_ID } from './runner-examples.ts';
+import { egressPolicy, imageDigest, origin, PINNED_IMAGE_ID, startRun, type StartedRun } from './runner-examples.ts';
 
 const POLICY = egressPolicy({ allowOrigins: ['http://app.test'] });
 const APP = origin('http://app.test');
@@ -40,16 +40,16 @@ function engineWithProxyFiles(answers: FileAnswers): ContainerEngine {
     ...inner,
     async exec(containerId, command, environmentNames) {
       const words = command.join(' ');
-      if (/rewrite/i.test(words)) return success(answer('rewrites'));
-      if (/decision/i.test(words)) return success(answer('decisions'));
+      if (/rewrite/i.test(words)) {return success(answer('rewrites'));}
+      if (/decision/i.test(words)) {return success(answer('decisions'));}
       return inner.exec(containerId, command, environmentNames);
     },
   };
 }
 
-async function startedHandle(answers: FileAnswers): Promise<RunnerHandle> {
+async function startedHandle(answers: FileAnswers): Promise<StartedRun> {
   const runner = dockerRunner({ engine: engineWithProxyFiles(answers), repositoryRoot: REPOSITORY_ROOT });
-  const started = await runner.start(imageDigest(PINNED_IMAGE_ID), POLICY);
+  const started = await startRun(runner, imageDigest(PINNED_IMAGE_ID), POLICY);
   assert.ok(started.ok, JSON.stringify(started));
   return started.value;
 }
@@ -92,7 +92,7 @@ test('a mutated run\'s manifest hash differs from a plain run\'s, from what each
   const target = testProject().matrix[0];
   assert.ok(target !== undefined);
   const adapter: AdapterInfo = { id: 'cdp', version: '0.1.0', protocol: 'Chrome DevTools Protocol (raw WebSocket)' };
-  const manifestOf = (handle: RunnerHandle) => buildManifest({
+  const manifestOf = (handle: StartedRun) => buildManifest({
     plan: parsed.value, target, adapter, browser: { name: 'chromium', version: '156.0.8078.47' }, seed: 42,
     fixedTimeMilliseconds: Date.UTC(2026, 10, 1, 9, 0, 0), fixtures: [], host: { platform: 'linux', arch: 'x64' }, responseRewrites: handle.rewritesApplied(),
   });

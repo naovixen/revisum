@@ -9,7 +9,7 @@
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
 import { createCleanUpScope } from '../support/CleanUpScope.ts';
-import { jsonInside, startIsolatedRun, type IsolatedRun } from './isolated-run.ts';
+import { execInside, jsonInside, startIsolatedRun, type IsolatedRun } from './isolated-run.ts';
 
 const TIMEOUT = 600_000;
 const NO_CAPABILITIES = '0000000000000000';
@@ -69,6 +69,6 @@ test('Node inside the container reports a non-zero user id', { timeout: TIMEOUT 
 });
 
 test('the seccomp profile is the pinned one: it lets an unprivileged process create a user namespace, as Chrome\'s sandbox needs', { timeout: TIMEOUT }, async () => {
-  const outcome = await run.handle.exec(['unshare', '--user', '--map-root-user', 'true']);
+  const outcome = await execInside(run.handle, ['unshare', '--user', '--map-root-user', 'true']);
   assert.equal(outcome.exitCode, 0, `creating a user namespace failed, as under Docker's default profile: ${outcome.stderr}`);
 });

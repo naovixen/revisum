@@ -52,7 +52,7 @@ const step = (command: string, commandArguments: Readonly<Record<string, unknown
 test('"; rm -rf /" and "$(id)" reach the program as literal single arguments, and "-rf" after a declared "--" as one argument', { timeout: TIMEOUT }, async () => {
   const ran = await runCommandStep(commandProjectFile(image, listeners), step('echoArguments', { first: '; rm -rf /', second: '$(id)', late: '-rf' }), fakeSecretValue());
   const outcome = onlyOutcome(ran);
-  assert.equal(outcome.exitCode, 0, JSON.stringify(outcome));
+  assert.ok(outcome.kind === 'exited' && outcome.exitCode === 0, JSON.stringify(outcome));
   assert.deepEqual(printedJson(outcome), { arguments: ['; rm -rf /', '$(id)', '--', '-rf'] });
   assert.equal(ran.result.state, 'Passed', JSON.stringify(ran.result.steps));
 });
@@ -87,7 +87,7 @@ async function reachAttempts(): Promise<Attempts> {
       databaseAddress: DATABASE_SERVICE_NAME, otherAddress: listeners.otherService.address, hostAddress: dockerHost,
     }), fakeSecretValue());
     const outcome = onlyOutcome(ran);
-    assert.equal(outcome.exitCode, 0, `the reach attempts failed to run: ${JSON.stringify(outcome)}`);
+    assert.ok(outcome.kind === 'exited' && outcome.exitCode === 0, `the reach attempts failed to run: ${JSON.stringify(outcome)}`);
     const seen = printedJson(outcome);
     assert.ok(typeof seen === 'object' && seen !== null, JSON.stringify(seen));
     attempts = { seen: Object.fromEntries(Object.entries(seen)), events: outcome.egressEvents };
@@ -176,7 +176,7 @@ test('no host credential\'s name or value is in the command\'s environment', { t
   const environment = await environmentInside();
   assert.deepEqual(Object.keys(environment).filter((name) => name.startsWith('GITHUB_') || /^(AWS_|AZURE_|GOOGLE_|GCP_|NPM_|ACTIONS_)/.test(name)), []);
   const values = Object.values(environment);
-  for (const value of DISTINCTIVE_HOST_VALUES) assert.ok(!values.some((text) => text.includes(value)), 'a host credential\'s value is inside');
+  for (const value of DISTINCTIVE_HOST_VALUES) {assert.ok(!values.some((text) => text.includes(value)), 'a host credential\'s value is inside');}
 });
 
 test('counter-example: the declared literal and the declared secret\'s value are in the command\'s environment', { timeout: TIMEOUT }, async () => {

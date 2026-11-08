@@ -56,9 +56,9 @@ export async function fixtureCommandImage(): Promise<string> {
     'build', '--tag', COMMAND_IMAGE_TAG, '--build-arg', `RUN_IMAGE=${RUN_IMAGE_TAG}`, join(FIXTURES, 'database-command-workload'),
   ], BUILD_TIMEOUT_MILLISECONDS);
   assert.equal(built.status, 0, `the fixture database-command image did not build: ${built.stderr.slice(-2000)}`);
-  const id = await dockerCliEngine().imageId(COMMAND_IMAGE_TAG);
-  assert.ok(id !== null, 'the fixture database-command image has no id');
-  return id;
+  const image = await dockerCliEngine().imageId(COMMAND_IMAGE_TAG);
+  assert.ok(image.kind === 'found', 'the fixture database-command image has no id');
+  return image.id;
 }
 
 // ---- Services on Docker's default bridge ------------------------------------------------------------
@@ -92,10 +92,10 @@ export async function startFixtureService(image: string, banner: string): Promis
   assert.equal(started.status, 0, `the fixture service did not start: ${started.stderr}`);
   const stop = async (): Promise<void> => { await runDocker(['stop', '--time', '1', name]); };
   const logs = async (): Promise<string> => (await runDocker(['logs', name])).stdout;
-  for (let tries = 0; tries < 50 && !(await logs()).includes('listening'); tries++) await new Promise((resolve) => setTimeout(resolve, 200));
+  for (let tries = 0; tries < 50 && !(await logs()).includes('listening'); tries++) {await new Promise((resolve) => setTimeout(resolve, 200));}
   const inspected = await runDocker(['inspect', '--format', '{{.NetworkSettings.Networks.bridge.IPAddress}}', name]);
   const address = inspected.stdout.trim();
-  if (!IPV4_ADDRESS.test(address)) await stop();
+  if (!IPV4_ADDRESS.test(address)) {await stop();}
   assert.match(address, IPV4_ADDRESS, `the fixture service has no bridge address: ${inspected.stdout} ${inspected.stderr}`);
   return {
     address,
@@ -163,7 +163,7 @@ export type RealCommandRun = { readonly result: RunResult; readonly handed: read
 // workload runner, with the database secret's value and the host seeded with fake credentials.
 export async function runCommandSteps(projectFile: JsonRecord, steps: readonly JsonRecord[], secretValue: string): Promise<RealCommandRun> {
   const parsed = parseProject(projectFile);
-  if (!parsed.ok) throw new Error(`bad test project: ${JSON.stringify(parsed.error)}`);
+  if (!parsed.ok) {throw new Error(`bad test project: ${JSON.stringify(parsed.error)}`);}
   const project: Project = parsed.value;
   const plan = accepted(planParser(project), unsafePlan(steps));
   const trusted = await trustedProjectFrom(projectFile);

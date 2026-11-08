@@ -9,7 +9,7 @@ import type { ContainerOptions } from "@revisum/runner";
 import { dockerRunner } from "@revisum/runner";
 import { REPOSITORY_ROOT } from "../../support/repository.ts";
 import { fakeContainerEngine } from "./fake-container-engine.ts";
-import { egressPolicy, imageDigest, PINNED_IMAGE_ID } from "./runner-examples.ts";
+import { egressPolicy, imageDigest, PINNED_IMAGE_ID, startRun } from "./runner-examples.ts";
 
 const POLICY = egressPolicy({ allowOrigins: ["http://app.test"] });
 const BROWSER_PROXY_PORT = "3128";
@@ -31,10 +31,11 @@ describe("Using the isolated runner", () => {
                     internalNetworks: true,
                     probe: "blocked",
                 });
-                const started = await dockerRunner({
-                    engine,
-                    repositoryRoot: REPOSITORY_ROOT,
-                }).start(imageDigest(PINNED_IMAGE_ID), POLICY);
+                const started = await startRun(
+                    dockerRunner({ engine, repositoryRoot: REPOSITORY_ROOT }),
+                    imageDigest(PINNED_IMAGE_ID),
+                    POLICY,
+                );
                 assert.ok(started.ok, JSON.stringify(started));
                 const named = (ending: string): ContainerOptions => {
                     const found = engine.started.find((each) => each.name.endsWith(ending));

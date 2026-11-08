@@ -11,8 +11,8 @@ export function fakeWorkloadRunner(
         run: () =>
             Promise.resolve(
                 success({
+                    kind: "exited",
                     exitCode: 0,
-                    timedOut: false,
                     egressEvents: [],
                     stdout: { bytes: new Uint8Array(), truncated: false },
                     stderr: { bytes: new Uint8Array(), truncated: false },

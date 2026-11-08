@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { dockerCliEngine, dockerRunner } from '@revisum/runner';
 import { REPOSITORY_ROOT } from '../support/repository.ts';
-import { egressPolicy, imageDigest } from '../unit/runner/runner-examples.ts';
+import { egressPolicy, imageDigest, startRun } from '../unit/runner/runner-examples.ts';
 import { dockerIds, newIds, pinnedRunImage } from './isolated-run.ts';
 
 const TIMEOUT = 600_000;
@@ -20,13 +20,12 @@ test('a digest that differs from the local run image\'s id is refused with image
   const containersBefore = dockerIds('containers');
   const networksBefore = dockerIds('networks');
   const runner = dockerRunner({ engine: dockerCliEngine(), repositoryRoot: REPOSITORY_ROOT });
-  const started = await runner.start(imageDigest(alteredDigest(pinned)), POLICY);
-  if (started.ok) await started.value.stop();
+  const started = await startRun(runner, imageDigest(alteredDigest(pinned)), POLICY);
+  if (started.ok) {await started.value.stop();}
   assert.ok(!started.ok, 'the altered digest must be refused');
   assert.deepEqual(started.error, { code: 'image-digest-mismatch' });
   assert.deepEqual(newIds(containersBefore, dockerIds('containers')), [], 'no container was created');
   assert.deepEqual(newIds(networksBefore, dockerIds('networks')), [], 'no network was created');
-  assert.equal(runner.guaranteeLevel(), 'host');
 });
 
 test('counter-example: the pinned id starts the run, and stopping it removes every container and network it created', { timeout: TIMEOUT }, async () => {
@@ -34,7 +33,7 @@ test('counter-example: the pinned id starts the run, and stopping it removes eve
   const containersBefore = dockerIds('containers');
   const networksBefore = dockerIds('networks');
   const runner = dockerRunner({ engine: dockerCliEngine(), repositoryRoot: REPOSITORY_ROOT });
-  const started = await runner.start(pinned, POLICY);
+  const started = await startRun(runner, pinned, POLICY);
   assert.ok(started.ok, JSON.stringify(started));
   try {
     assert.ok(newIds(containersBefore, dockerIds('containers')).length >= 1, 'the run created its containers');

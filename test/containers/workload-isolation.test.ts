@@ -34,7 +34,7 @@ let attempts: Attempts | undefined;
 async function egressAttempts(): Promise<Attempts> {
   if (attempts === undefined) {
     const outcome = await runInWorkload(image, { argv: ['node', 'egress-attempts.mjs'], timeoutMilliseconds: 300_000 });
-    assert.equal(outcome.exitCode, 0, `the egress attempts failed to run: ${JSON.stringify(outcome)}`);
+    assert.ok(outcome.kind === 'exited' && outcome.exitCode === 0, `the egress attempts failed to run: ${JSON.stringify(outcome)}`);
     const seen = printedJson(outcome);
     assert.ok(typeof seen === 'object' && seen !== null);
     attempts = { seen: seen as Readonly<Record<string, unknown>>, events: outcome.egressEvents };
@@ -117,7 +117,7 @@ test('no CI token, cloud credential or GITHUB_* value is in the environment insi
   const inside = await environmentInside(fakeSecretValue());
   assert.deepEqual(Object.keys(inside).filter((name) => name.startsWith('GITHUB_') || /^(AWS_|AZURE_|GOOGLE_|GCP_|NPM_|ACTIONS_)/.test(name)), []);
   const values = Object.values(inside);
-  for (const value of DISTINCTIVE_HOST_VALUES) assert.ok(!values.some((text) => text.includes(value)), 'a host credential\'s value is inside');
+  for (const value of DISTINCTIVE_HOST_VALUES) {assert.ok(!values.some((text) => text.includes(value)), 'a host credential\'s value is inside');}
 });
 
 test('counter-example: the declared literal and the declared secret\'s value are inside', { timeout: TIMEOUT }, async () => {
@@ -138,7 +138,7 @@ function engineWhere(change: 'no-internal-network' | 'probe-reaches'): Container
     ...real,
     images,
     async createNetwork(name, options) {
-      if (change === 'no-internal-network' && options.internal) return failure({ detail: 'this host cannot make a network with no route out' });
+      if (change === 'no-internal-network' && options.internal) {return failure({ detail: 'this host cannot make a network with no route out' });}
       return real.createNetwork(name, options);
     },
     async probeEgress(containerId, targets) {
@@ -176,6 +176,7 @@ test('counter-example: with egress enforced, the same suite runs and writes its 
 
 test('declared arguments of "; rm -rf /" and "$(id)" reach the process as literal text, with no shell', { timeout: TIMEOUT }, async () => {
   const outcome = await runInWorkload(image, { argv: ['node', '-e', 'console.log(JSON.stringify(process.argv.slice(1)))', '; rm -rf /', '$(id)'] });
+  assert.ok(outcome.kind === 'exited', JSON.stringify(outcome));
   assert.equal(outcome.exitCode, 0);
   assert.deepEqual(printedJson(outcome), ['; rm -rf /', '$(id)']);
 });

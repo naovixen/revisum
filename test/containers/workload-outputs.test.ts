@@ -78,7 +78,7 @@ test('a command still running at its timeout is stopped, and the runner says it 
   const outcome = await runInWorkload(image, {
     argv: ['node', '-e', 'console.log("started"); setInterval(() => {}, 1000)'], timeoutMilliseconds: TIMEOUT_MILLISECONDS,
   });
-  assert.equal(outcome.timedOut, true);
+  assert.equal(outcome.kind, 'timed-out');
   assert.ok(Date.now() - started < TIMEOUT_MILLISECONDS + STOP_ALLOWANCE_MILLISECONDS, `the run took ${Date.now() - started} ms`);
   assert.ok(printed(outcome.stdout).includes('started'), 'the command never started, so the timeout shows nothing');
   assert.deepEqual(newIds(containersBefore, dockerIds('containers')), [], 'a container was left behind');
@@ -87,6 +87,6 @@ test('a command still running at its timeout is stopped, and the runner says it 
 
 test('counter-example: a command that ends within its timeout is not marked timed out', { timeout: TIMEOUT }, async () => {
   const outcome = await runInWorkload(image, { argv: ['node', '-e', 'console.log("done")'], timeoutMilliseconds: 60_000 });
-  assert.equal(outcome.timedOut, false);
+  assert.ok(outcome.kind === 'exited', JSON.stringify(outcome));
   assert.equal(outcome.exitCode, 0);
 });

@@ -24,7 +24,7 @@ import { Arrival, startRecordingOrigin, type RecordingOrigin } from '../proofs/S
 import { declaredService, egressPolicy, hostOf } from '../unit/runner/runner-examples.ts';
 import { attemptWebRtcInside, WebRtcBrowser, BARE_BROWSER_STATE } from './AttemptWebRtcInside.ts';
 import { createCleanUpScope } from '../support/CleanUpScope.ts';
-import { jsonInside, pinnedRunImage, startIsolatedRun, type IsolatedRun } from './isolated-run.ts';
+import { execInside, jsonInside, pinnedRunImage, startIsolatedRun, type IsolatedRun } from './isolated-run.ts';
 
 const TIMEOUT = 600_000;
 const OUTSIDE_HOST = 'outside.invalid';
@@ -51,7 +51,7 @@ async function startDockerHostService(): Promise<DockerHostService> {
   assert.equal(started.status, 0, `the service on the Docker host did not start: ${started.stderr}`);
   for (let tries = 0; tries < 50; tries++) {
     const port = /listening (\d+)/.exec((await runDocker(['logs', name])).stdout)?.[1];
-    if (port !== undefined) return { name, image, port: Number(port) };
+    if (port !== undefined) {return { name, image, port: Number(port) };}
     await new Promise((resolve) => setTimeout(resolve, 200));
   }
   await runDocker(['stop', '--time', '1', name]);
@@ -107,8 +107,8 @@ let printedRecords: PrintedRecords | undefined;
 
 // The plan runs once; each test reads what it printed and what the proxy decided.
 async function planRecords(): Promise<PrintedRecords> {
-  if (printedRecords !== undefined) return printedRecords;
-  const outcome = await run.handle.exec(['node', 'test/containers/plan-run-inside.ts']);
+  if (printedRecords !== undefined) {return printedRecords;}
+  const outcome = await execInside(run.handle, ['node', 'test/containers/plan-run-inside.ts']);
   assert.equal(outcome.exitCode, 0, `the plan run inside the container failed: ${outcome.stderr}`);
   const lines = outcome.stdout.trim().split('\n');
   assert.deepEqual(JSON.parse(lines.at(-1) ?? 'null'), { state: 'Passed' });
@@ -213,7 +213,7 @@ test('counter-example: the same probe reaches the run\'s proxy, which is on the 
 // ---- The run still works on its network ------------------------------------------------------------
 
 test('the runner reports the isolated level on the run\'s network, with nothing logged as unenforceable', { timeout: TIMEOUT }, () => {
-  assert.equal(run.runner.guaranteeLevel(), 'isolated');
+  assert.equal(run.handle.guaranteeLevel(), 'isolated');
   assert.ok(!run.logged.some((entry) => entry.code === 'egress-unenforceable'), JSON.stringify(run.logged));
 });
 
@@ -251,7 +251,7 @@ test('peers on the run\'s network still reach each other by name, in both direct
     const probed = await runDocker(['exec', proxyContainer, 'node', '-e', directConnection(runContainer, peerPort)]);
     assert.equal(probed.status, 0, probed.stderr);
     fromProxy = JSON.parse(probed.stdout.trim());
-    if (fromProxy !== 'reached') await new Promise((resolve) => setTimeout(resolve, 250));
+    if (fromProxy !== 'reached') {await new Promise((resolve) => setTimeout(resolve, 250));}
   }
   assert.equal(fromProxy, 'reached', 'the proxy reached the run container');
   assert.equal(await jsonInside(run.handle, directConnection(proxyContainer, 3128)), 'reached', 'the run container reached the proxy');

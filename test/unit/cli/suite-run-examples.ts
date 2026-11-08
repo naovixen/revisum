@@ -47,7 +47,7 @@ export type SuiteBehaviour = {
   readonly refusal?: WorkloadErrorCode;
   // How the setup command ends, and what its egress proxy recorded. By default it exits 0 and the
   // proxy blocked nothing.
-  readonly setup?: Partial<Pick<WorkloadOutcome, 'exitCode' | 'timedOut' | 'egressEvents' | 'egressRecordUnread'>>;
+  readonly setup?: { readonly exitCode?: number; readonly timedOut?: boolean; readonly egressEvents?: readonly EgressEvent[]; readonly egressRecordUnread?: boolean };
 };
 
 export type FakeWorkloadRunner = WorkloadRunner & { readonly requests: readonly WorkloadRequest[] };
@@ -72,9 +72,11 @@ export function fakeWorkloadRunner(behaviour: SuiteBehaviour = {}): FakeWorkload
     requests,
     async run(request) {
       requests.push(request);
-      if (behaviour.refusal !== undefined) return failure(behaviour.refusal);
+      if (behaviour.refusal !== undefined) {return failure(behaviour.refusal);}
       if (!isSuiteRequest(request)) {
-        const setup: WorkloadOutcome = { exitCode: 0, timedOut: false, egressEvents: [], ...behaviour.setup, stdout: captured(''), stderr: captured('') };
+        const { exitCode = 0, timedOut: isTimedOut = false, egressEvents = [], egressRecordUnread: isEgressRecordUnread } = behaviour.setup ?? {};
+        const records = { egressEvents, ...(isEgressRecordUnread === undefined ? {} : { egressRecordUnread: isEgressRecordUnread }), stdout: captured(''), stderr: captured('') };
+        const setup: WorkloadOutcome = isTimedOut ? { kind: 'timed-out', stop: 'removed', ...records } : { kind: 'exited', exitCode, ...records };
         return success(setup);
       }
       const reportPath = variable(request, REPORT_VARIABLE) ?? '';
@@ -82,10 +84,8 @@ export function fakeWorkloadRunner(behaviour: SuiteBehaviour = {}): FakeWorkload
         mkdirSync(request.outputDirectory, { recursive: true });
         writeFileSync(join(request.outputDirectory, posix.basename(reportPath)), JSON.stringify(behaviour.report));
       }
-      const outcome: WorkloadOutcome = {
-        exitCode: behaviour.exitCode ?? 0, timedOut: behaviour.timedOut ?? false, egressEvents: behaviour.egressEvents ?? [],
-        stdout: captured(behaviour.stdout ?? ''), stderr: captured(behaviour.stderr ?? ''),
-      };
+      const records = { egressEvents: behaviour.egressEvents ?? [], stdout: captured(behaviour.stdout ?? ''), stderr: captured(behaviour.stderr ?? '') };
+      const outcome: WorkloadOutcome = behaviour.timedOut === true ? { kind: 'timed-out', stop: 'removed', ...records } : { kind: 'exited', exitCode: behaviour.exitCode ?? 0, ...records };
       return success(outcome);
     },
   };

@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { dockerCliEngine, dockerRunner, type ContainerEngine, type RunnerLogEntry } from '@revisum/runner';
 import { REPOSITORY_ROOT } from '../support/repository.ts';
-import { egressPolicy, imageDigest, PINNED_IMAGE_ID } from '../unit/runner/runner-examples.ts';
+import { egressPolicy, imageDigest, PINNED_IMAGE_ID, startRun } from '../unit/runner/runner-examples.ts';
 import { errorCode, runnerOn, workloadRequest } from '../unit/runner/workload-examples.ts';
 import { requireDocker } from './isolated-run.ts';
 
@@ -18,7 +18,7 @@ const NO_DAEMON_HERE = 'tcp://127.0.0.1:1';
 function startOn(engine: ContainerEngine) {
   const logged: RunnerLogEntry[] = [];
   const runner = dockerRunner({ engine, repositoryRoot: REPOSITORY_ROOT, log: (entry) => { logged.push(entry); } });
-  return { logged, runner, started: runner.start(imageDigest(PINNED_IMAGE_ID), POLICY) };
+  return { logged, runner, started: startRun(runner, imageDigest(PINNED_IMAGE_ID), POLICY) };
 }
 
 // Runs `body` with the Docker client pointed where no daemon listens, then points it back.
@@ -28,8 +28,8 @@ async function withNoDaemon(body: () => Promise<void>): Promise<void> {
   try {
     await body();
   } finally {
-    if (previous === undefined) Reflect.deleteProperty(process.env, 'DOCKER_HOST');
-    else process.env['DOCKER_HOST'] = previous;
+    if (previous === undefined) {Reflect.deleteProperty(process.env, 'DOCKER_HOST');}
+    else {process.env['DOCKER_HOST'] = previous;}
   }
 }
 
@@ -42,19 +42,18 @@ function engineWithoutTheImage(): ContainerEngine {
 test('with no Docker daemon to answer, start gives start-failed, not image-missing', { timeout: TIMEOUT }, async () => {
   requireDocker();
   await withNoDaemon(async () => {
-    const { logged, runner, started } = startOn(dockerCliEngine());
+    const { logged, started } = startOn(dockerCliEngine());
     const outcome = await started;
     assert.ok(!outcome.ok, 'nothing can start without a daemon');
     assert.deepEqual(outcome.error, { code: 'start-failed' });
     assert.ok(logged.some((entry) => entry.code === 'start-failed'), JSON.stringify(logged));
-    assert.equal(runner.guaranteeLevel(), 'host');
   });
 });
 
 test('counter-example: with the daemon running and the run image absent, start gives image-missing', { timeout: TIMEOUT }, async () => {
   requireDocker();
   const outcome = await startOn(engineWithoutTheImage()).started;
-  if (outcome.ok) await outcome.value.stop();
+  if (outcome.ok) {await outcome.value.stop();}
   assert.ok(!outcome.ok, 'the image is absent');
   assert.deepEqual(outcome.error, { code: 'image-missing' });
 });

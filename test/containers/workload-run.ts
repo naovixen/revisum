@@ -30,9 +30,9 @@ export async function fixtureWorkloadImage(): Promise<string> {
     'build', '--tag', WORKLOAD_IMAGE_TAG, '--build-arg', `RUN_IMAGE=${RUN_IMAGE_TAG}`, join(FIXTURES, 'evidence-workload'),
   ], BUILD_TIMEOUT_MILLISECONDS);
   assert.equal(built.status, 0, `the fixture workload image did not build: ${built.stderr.slice(-2000)}`);
-  const id = await dockerCliEngine().imageId(WORKLOAD_IMAGE_TAG);
-  assert.ok(id !== null, 'the fixture workload image has no id');
-  return id;
+  const image = await dockerCliEngine().imageId(WORKLOAD_IMAGE_TAG);
+  assert.ok(image.kind === 'found', 'the fixture workload image has no id');
+  return image.id;
 }
 
 // The names the image itself sets in its environment, such as PATH and NODE_VERSION: the team's

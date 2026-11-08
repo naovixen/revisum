@@ -163,7 +163,9 @@ async function runInThisContainer(): Promise<RunPastRefusals> {
 
 // Starts the plan inside the run container and answers with what it printed.
 export async function runBrowserPastRefusalsInside(handle: RunnerHandle): Promise<RunPastRefusals> {
-    const outcome = await handle.exec(["node", THIS_FILE_IN_THE_WORKSPACE]);
+    const ran = await handle.exec(["node", THIS_FILE_IN_THE_WORKSPACE]);
+    assert.ok(ran.ok, `the plan inside the container did not run: ${ran.ok ? "" : ran.error.detail}`);
+    const outcome = ran.value;
     assert.equal(outcome.exitCode, 0, `the plan inside the container failed: ${outcome.stderr}`);
     return JSON.parse(outcome.stdout.trim().split("\n").at(-1) ?? "null") as RunPastRefusals;
 }

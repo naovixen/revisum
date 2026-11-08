@@ -3,11 +3,11 @@
 // that stays isolated must not lose that because another lost its proxy's records.
 import assert from "node:assert/strict";
 import { before, describe, test } from "node:test";
-import { success, type Runner, type RunnerHandle } from "@revisum/contracts";
+import { success, type Runner } from "@revisum/contracts";
 import { dockerRunner, type ContainerEngine } from "@revisum/runner";
 import { REPOSITORY_ROOT } from "../../support/repository.ts";
 import { fakeContainerEngine } from "./fake-container-engine.ts";
-import { egressPolicy, imageDigest, PINNED_IMAGE_ID } from "./runner-examples.ts";
+import { egressPolicy, imageDigest, PINNED_IMAGE_ID, startRun, type StartedRun } from "./runner-examples.ts";
 
 const POLICY = egressPolicy({ allowOrigins: ["http://app.test"] });
 const NO_LEVEL_OF_ITS_OWN = "no level of its own";
@@ -61,14 +61,14 @@ function engineFor({ probes }: EngineSettings): EngineWithUnreadableProxy {
     };
 }
 
-async function startRun(runner: Runner): Promise<RunnerHandle> {
-    const started = await runner.start(imageDigest(PINNED_IMAGE_ID), POLICY);
+async function startedRun(runner: Runner): Promise<StartedRun> {
+    const started = await startRun(runner, imageDigest(PINNED_IMAGE_ID), POLICY);
     assert.ok(started.ok, JSON.stringify(started));
     return started.value;
 }
 
 // A run's own level, read from its handle. Only a handle can say which run it means.
-function levelOfRun(handle: RunnerHandle): unknown {
+function levelOfRun(handle: StartedRun): unknown {
     const read: unknown = Reflect.get(handle, "guaranteeLevel");
     return typeof read === "function" ? Reflect.apply(read, handle, []) : NO_LEVEL_OF_ITS_OWN;
 }
@@ -79,12 +79,12 @@ const runnerOn = (engine: ContainerEngine): Runner =>
 describe("Using the isolated runner", () => {
     describe("given a run that could not enforce egress, and a later run that could", () => {
         describe("when both are running on one runner", () => {
-            let unenforced: RunnerHandle;
-            let isolated: RunnerHandle;
+            let unenforced: StartedRun;
+            let isolated: StartedRun;
             before(async () => {
                 const runner = runnerOn(engineFor({ probes: ["reached", "blocked"] }));
-                unenforced = await startRun(runner);
-                isolated = await startRun(runner);
+                unenforced = await startedRun(runner);
+                isolated = await startedRun(runner);
             });
 
             test("then it should keep the first run at the host level", () => {
@@ -99,12 +99,12 @@ describe("Using the isolated runner", () => {
 
     describe("given a run that enforced egress, and a later run that could not", () => {
         describe("when both are running on one runner", () => {
-            let isolated: RunnerHandle;
-            let unenforced: RunnerHandle;
+            let isolated: StartedRun;
+            let unenforced: StartedRun;
             before(async () => {
                 const runner = runnerOn(engineFor({ probes: ["blocked", "reached"] }));
-                isolated = await startRun(runner);
-                unenforced = await startRun(runner);
+                isolated = await startedRun(runner);
+                unenforced = await startedRun(runner);
             });
 
             test("then it should keep the first run at the isolated level", () => {
@@ -119,13 +119,13 @@ describe("Using the isolated runner", () => {
 
     describe("given two isolated runs on one runner", () => {
         describe("when what the first run's proxy decided can no longer be read", () => {
-            let first: RunnerHandle;
-            let second: RunnerHandle;
+            let first: StartedRun;
+            let second: StartedRun;
             before(async () => {
                 const engine = engineFor({ probes: ["blocked", "blocked"] });
                 const runner = runnerOn(engine);
-                first = await startRun(runner);
-                second = await startRun(runner);
+                first = await startedRun(runner);
+                second = await startedRun(runner);
                 engine.stopReadingProxyOf(0);
                 await first.exec(["true"]);
             });
@@ -142,28 +142,10 @@ describe("Using the isolated runner", () => {
         describe("when both proxies can still be read", () => {
             test("then it should keep both runs at the isolated level", async () => {
                 const runner = runnerOn(engineFor({ probes: ["blocked", "blocked"] }));
-                const first = await startRun(runner);
-                const second = await startRun(runner);
+                const first = await startedRun(runner);
+                const second = await startedRun(runner);
                 await first.exec(["true"]);
                 assert.deepEqual([levelOfRun(first), levelOfRun(second)], ["isolated", "isolated"]);
-            });
-        });
-    });
-
-    describe("given one run on a runner", () => {
-        describe("when the run enforced egress", () => {
-            test("then it should say so through the runner too", async () => {
-                const runner = runnerOn(engineFor({ probes: ["blocked"] }));
-                await startRun(runner);
-                assert.equal(runner.guaranteeLevel(), "isolated");
-            });
-        });
-
-        describe("when the run could not enforce egress", () => {
-            test("then it should say so through the runner too", async () => {
-                const runner = runnerOn(engineFor({ probes: ["reached"] }));
-                await startRun(runner);
-                assert.equal(runner.guaranteeLevel(), "host");
             });
         });
     });

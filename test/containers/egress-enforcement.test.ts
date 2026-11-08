@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
 import { hostOf } from '../unit/runner/runner-examples.ts';
 import { createCleanUpScope } from '../support/CleanUpScope.ts';
-import { jsonInside, startIsolatedRun, type IsolatedRun } from './isolated-run.ts';
+import { execInside, jsonInside, startIsolatedRun, type IsolatedRun } from './isolated-run.ts';
 
 const TIMEOUT = 600_000;
 // Public addresses that answer on these ports from any ordinary network.
@@ -33,7 +33,7 @@ const directConnection = (host: string, port: number): string => `
   socket.on('error', () => finish('blocked'));`;
 
 test('the runner reports the isolated level once the probe from inside has failed', { timeout: TIMEOUT }, () => {
-  assert.equal(run.runner.guaranteeLevel(), 'isolated');
+  assert.equal(run.handle.guaranteeLevel(), 'isolated');
   assert.ok(!run.logged.some((entry) => entry.code === 'egress-unenforceable'), JSON.stringify(run.logged));
 });
 
@@ -51,7 +51,7 @@ test('counter-example: the same probe reaches the run\'s proxy, which is on the 
 });
 
 test('a plan run inside the container passes while its WebSocket to an undeclared origin is blocked by the proxy', { timeout: TIMEOUT }, async () => {
-  const outcome = await run.handle.exec(['node', 'test/containers/plan-run-inside.ts']);
+  const outcome = await execInside(run.handle, ['node', 'test/containers/plan-run-inside.ts']);
   assert.equal(outcome.exitCode, 0, `the plan run inside the container failed: ${outcome.stderr}`);
   const printed: unknown = JSON.parse(outcome.stdout.trim().split('\n').at(-1) ?? 'null');
   // The plan's last check passes only once the page shows its WebSocket was closed.

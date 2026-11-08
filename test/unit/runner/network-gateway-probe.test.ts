@@ -21,7 +21,7 @@ import { failure, success, type Result } from '@revisum/contracts';
 import { dockerRunner, type ContainerEngine, type EngineProblem, type ProbeTarget, type RunnerLogEntry } from '@revisum/runner';
 import { REPOSITORY_ROOT } from '../../support/repository.ts';
 import { fakeContainerEngine, type FakeContainerEngine } from './fake-container-engine.ts';
-import { egressPolicy, imageDigest, PINNED_IMAGE_ID } from './runner-examples.ts';
+import { egressPolicy, imageDigest, PINNED_IMAGE_ID, startRun } from './runner-examples.ts';
 import { PRESENT_IMAGES, errorCode, runnerOn, teamContainers, workloadRequest } from './workload-examples.ts';
 
 const FIRST_ADDRESS = '172.18.0.1';
@@ -29,7 +29,7 @@ const PUBLIC_ADDRESS = '1.1.1.1';
 
 // What the run's network is like, as the fake engine answers for it.
 type NetworkWorld = {
-  // What networkGatewayAddress answers; absent for an engine that does not offer it.
+  // What networkGatewayAddress answers; absent for the fake's own answer, an address to try.
   readonly gateway?: Result<string | null, EngineProblem>;
   // Hosts where a machine accepts every connection.
   readonly listening?: readonly string[];
@@ -82,15 +82,15 @@ async function throughIsolatedRunner(world: NetworkWorld): Promise<Finding> {
   const { engine, record } = engineIn(world);
   const logged: RunnerLogEntry[] = [];
   const runner = dockerRunner({ engine, repositoryRoot: REPOSITORY_ROOT, log: (entry) => { logged.push(entry); } });
-  const started = await runner.start(imageDigest(PINNED_IMAGE_ID), egressPolicy({ allowOrigins: [] }));
+  const started = await startRun(runner, imageDigest(PINNED_IMAGE_ID), egressPolicy({ allowOrigins: [] }));
   assert.ok(started.ok, `a plan run still starts, at whichever level: ${JSON.stringify(started)}`);
-  const level = runner.guaranteeLevel();
+  const level = started.value.guaranteeLevel();
   await started.value.stop();
   return { record, enforced: level === 'isolated', loggedUnenforceable: logged.some((entry) => entry.code === 'egress-unenforceable') };
 }
 
 const outputFolders: string[] = [];
-after(() => { for (const folder of outputFolders.splice(0)) rmSync(folder, { recursive: true, force: true }); });
+after(() => { for (const folder of outputFolders.splice(0)) {rmSync(folder, { recursive: true, force: true });} });
 
 async function throughWorkloadRunner(world: NetworkWorld): Promise<Finding> {
   const { engine, record } = engineIn(world);
@@ -174,7 +174,7 @@ for (const { title, probeIn } of RUNNERS) {
     assert.deepEqual(finding.record.gatewayAskedAbout, internal);
   });
 
-  test(`counter-example: ${title}, on an engine that cannot say where a gateway would be, goes by the public addresses alone`, async () => {
+  test(`counter-example: ${title}, with the fake's own gateway address and nothing answering there, goes by the public addresses`, async () => {
     assertEnforced(await probeIn({}));
     assertUnenforceable(await probeIn({ listening: [PUBLIC_ADDRESS] }));
   });
@@ -186,9 +186,9 @@ test('reached leaves the isolated runner at the host level, and not reached give
   const levelIn = async (world: NetworkWorld): Promise<string> => {
     const { engine } = engineIn(world);
     const runner = dockerRunner({ engine, repositoryRoot: REPOSITORY_ROOT });
-    const started = await runner.start(imageDigest(PINNED_IMAGE_ID), egressPolicy({ allowOrigins: [] }));
+    const started = await startRun(runner, imageDigest(PINNED_IMAGE_ID), egressPolicy({ allowOrigins: [] }));
     assert.ok(started.ok, JSON.stringify(started));
-    const level = runner.guaranteeLevel();
+    const level = started.value.guaranteeLevel();
     await started.value.stop();
     return level;
   };

@@ -19,7 +19,7 @@ import assert from 'node:assert/strict';
 import { createRequire, syncBuiltinESMExports } from 'node:module';
 import { before, test } from 'node:test';
 import {
-  success, type EgressEvent, type EgressPolicy, type ExecOutcome, type ImageDigest, type Runner, type RunnerHandle,
+  type EgressEvent, type EgressPolicy, type ExecOutcome, type ImageDigest, type Result, type Runner, type RunnerHandle,
 } from '@revisum/contracts';
 import { dockerCliEngine, dockerRunner } from '@revisum/runner';
 import { REPOSITORY_ROOT } from '../support/repository.ts';
@@ -56,7 +56,7 @@ function spyOnDockerCommandLines(): CommandLineSpy {
   const lines: (readonly string[])[] = [];
   Reflect.set(childProcess, 'spawn', (...inputs: readonly unknown[]) => {
     const [command, words] = inputs;
-    if (command === 'docker' && Array.isArray(words)) lines.push(['docker', ...words.map(String)]);
+    if (command === 'docker' && Array.isArray(words)) {lines.push(['docker', ...words.map(String)]);}
     return spawnOriginal.call(childProcess, ...inputs);
   });
   syncBuiltinESMExports();
@@ -114,6 +114,12 @@ const productionRequestScript = `
   request.on('error', (error) => { console.log(JSON.stringify(String(error))); process.exit(0); });
   request.end();`;
 
+// What a command run inside the container printed, once it has run.
+function printedInside(ran: Result<ExecOutcome, { readonly detail: string }>): ExecOutcome {
+  assert.ok(ran.ok, `the command did not run: ${ran.ok ? '' : ran.error.detail}`);
+  return ran.value;
+}
+
 function parsedRequests(outcome: ExecOutcome): readonly SiteRequest[] {
   assert.equal(outcome.exitCode, 0, `the site's request log could not be read: ${outcome.stderr}`);
   const text: unknown = JSON.parse(outcome.stdout.trim().split('\n').at(-1) ?? '""');
@@ -133,40 +139,32 @@ function parsedRequests(outcome: ExecOutcome): readonly SiteRequest[] {
 function watchedRunner(image: ImageDigest, watch: RunnerWatch): { readonly runner: Runner; readonly image: ImageDigest } {
   const inner = dockerRunner({ engine: dockerCliEngine(), repositoryRoot: REPOSITORY_ROOT, inputs: ['test', 'fixtures', 'golden'] });
   const runner: Runner = {
-    guaranteeLevel: () => inner.guaranteeLevel(),
-    async start(started, policy) {
+    withRun: (started, policy, use) => {
       watch.policies.push(policy);
-      const result = await inner.start(started, policy);
-      if (!result.ok) return result;
-      const handle = result.value;
-      const site = await handle.exec(['node', '-e', startSiteScript]);
-      if (site.exitCode !== 0) {
-        await handle.stop();
-        assert.fail(`the fixture site did not start inside the run container: ${site.stdout} ${site.stderr}`);
-      }
-      const watched: RunnerHandle = {
-        runId: handle.runId,
-        egressEvents: () => handle.egressEvents(),
-        proxyDecisions: () => handle.proxyDecisions(),
-        rewritesApplied: () => handle.rewritesApplied(),
-        guaranteeLevel: () => handle.guaranteeLevel(),
-        async exec(command, environmentNames = []) {
-          const outcome = await handle.exec(command, environmentNames);
-          watch.execs.push({ command, environmentNames, outcome });
-          return outcome;
-        },
-        async stop() {
-          try {
-            watch.requests = parsedRequests(await handle.exec(['node', '-e', readRequestsScript]));
-            watch.crawlEgress = handle.egressEvents();
-            await handle.exec(['node', '-e', productionRequestScript]);
-            watch.probeEgress = handle.egressEvents();
-          } finally {
-            await handle.stop();
-          }
-        },
-      };
-      return success(watched);
+      return inner.withRun(started, policy, async (handle) => {
+        const site = printedInside(await handle.exec(['node', '-e', startSiteScript]));
+        assert.equal(site.exitCode, 0, `the fixture site did not start inside the run container: ${site.stdout} ${site.stderr}`);
+        const watched: RunnerHandle = {
+          runId: handle.runId,
+          egressEvents: () => handle.egressEvents(),
+          proxyDecisions: () => handle.proxyDecisions(),
+          rewritesApplied: () => handle.rewritesApplied(),
+          guaranteeLevel: () => handle.guaranteeLevel(),
+          async exec(command, environmentNames = []) {
+            const ran = await handle.exec(command, environmentNames);
+            watch.execs.push({ command, environmentNames, outcome: printedInside(ran) });
+            return ran;
+          },
+        };
+        try {
+          return await use(watched);
+        } finally {
+          watch.requests = parsedRequests(printedInside(await handle.exec(['node', '-e', readRequestsScript])));
+          watch.crawlEgress = handle.egressEvents();
+          await handle.exec(['node', '-e', productionRequestScript]);
+          watch.probeEgress = handle.egressEvents();
+        }
+      });
     },
   };
   return { runner, image };
@@ -199,7 +197,7 @@ async function crawlInContainer(extra: readonly string[], setup: Partial<Explore
   const secrets = exploreSecrets(loginName);
   // The Docker client copies each secret by name from its own environment, which is this process's.
   const previous = new Map([OFFICE_KEY_NAME, LOGIN_NAME_SECRET].map((name) => [name, process.env[name]] as const));
-  for (const [name, value] of Object.entries(secrets)) process.env[name] = value;
+  for (const [name, value] of Object.entries(secrets)) {process.env[name] = value;}
   const siteRequested: string[] = [];
   const secondRequested: string[] = [];
   const insideSite = async (): Promise<ExploreSite> => ({
@@ -233,8 +231,8 @@ async function crawlInContainer(extra: readonly string[], setup: Partial<Explore
   } finally {
     spy.restore();
     for (const [name, value] of previous) {
-      if (value === undefined) Reflect.deleteProperty(process.env, name);
-      else process.env[name] = value;
+      if (value === undefined) {Reflect.deleteProperty(process.env, name);}
+      else {process.env[name] = value;}
     }
   }
   assert.ok(captured !== undefined, 'the draft command was not run');
@@ -316,7 +314,7 @@ test('the crawl never requests the second origin the home page links to', { time
   assertCrawled(crawl);
   assert.deepEqual(crawl.watch.requests.filter((request) => request.server === 'second'), []);
   const paths = crawl.map.pages.map((page) => page.path);
-  for (const foreign of ['/partner.html', '/checkout']) assert.equal(paths.includes(foreign), false, `${foreign} is in the page map`);
+  for (const foreign of ['/partner.html', '/checkout']) {assert.equal(paths.includes(foreign), false, `${foreign} is in the page map`);}
 });
 
 test('counter-example: the site\'s own server, inside the container, recorded the crawl\'s requests', { timeout: TIMEOUT }, async () => {
@@ -380,7 +378,7 @@ test('the typed secret\'s value is in no page map, draft, output or event, nor i
     ...crawl.watch.execs.flatMap((exec) => [exec.outcome.stdout, exec.outcome.stderr]),
     JSON.stringify(crawl.watch.crawlEgress),
   ].join('\n');
-  for (const value of secretValues(crawl)) assert.equal(everything.includes(value), false, 'a secret\'s value leaked');
+  for (const value of secretValues(crawl)) {assert.equal(everything.includes(value), false, 'a secret\'s value leaked');}
 });
 
 test('counter-example: the signed-in pages did show the typed name, and the map holds its heading with the name redacted', { timeout: TIMEOUT }, async () => {
