@@ -4,7 +4,7 @@
 // stop at its first failure: each part closes, and the rejection names all that went wrong.
 import assert from "node:assert/strict";
 import { after, afterEach, before, beforeEach, describe, test } from "node:test";
-import { success } from "@revisum/contracts";
+import { failure, success } from "@revisum/contracts";
 import type { DriverSession } from "@revisum/driver-cdp";
 import { allowEveryAction } from "#test-support/browser/AllowEveryAction.ts";
 import { BrowserTarget } from "#test-support/browser/BrowserTarget.ts";
@@ -203,7 +203,7 @@ describe("Using the real browser driver", () => {
                         close: async () => {
                             wasEgressAskedToClose = true;
                             await egress.close();
-                            throw new Error(WHY_THE_EGRESS_WOULD_NOT_CLOSE);
+                            return failure(WHY_THE_EGRESS_WOULD_NOT_CLOSE);
                         },
                     })),
                 );
@@ -239,7 +239,7 @@ describe("Using the real browser driver", () => {
                         ...egress,
                         close: async () => {
                             await egress.close();
-                            throw new Error(WHY_THE_EGRESS_WOULD_NOT_CLOSE);
+                            return failure(WHY_THE_EGRESS_WOULD_NOT_CLOSE);
                         },
                     })),
                 );

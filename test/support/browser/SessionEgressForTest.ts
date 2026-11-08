@@ -1,6 +1,6 @@
 // What browser tests give a driver for its sessions' egress. What they assume about a session's egress
 // is gathered here, so a change to it is a change to this file.
-import { success, type Result } from "@revisum/contracts";
+import { failure, success, type Result } from "@revisum/contracts";
 import type { ConnectionFailure } from "@revisum/driver-cdp";
 import { ProxyClient, type EgressProxy } from "@revisum/runner";
 import { startedProxyServer } from "#test-support/StartedEgressProxy.ts";
@@ -9,7 +9,7 @@ export type SessionEgressForTest = {
     readonly proxy: { readonly server: string; readonly includeLoopback: boolean };
     refusedOrigins(): Result<readonly string[], string>;
     connectionFailures(): readonly ConnectionFailure[];
-    close(): Promise<void>;
+    close(): Promise<Result<void, string>>;
 };
 
 export type EgressSourceForTest = (
@@ -49,9 +49,7 @@ export const realEgressSource: EgressSourceForTest = async (allowedOrigins) => {
         ...leavingProxyUp(proxy, 0),
         close: async () => {
             const closed = await proxy.close();
-            if (!closed.ok) {
-                throw new Error(closed.error.message);
-            }
+            return closed.ok ? success(undefined) : failure(closed.error.message);
         },
     });
 };
@@ -64,6 +62,6 @@ export const egressThrough =
         Promise.resolve(
             success({
                 ...leavingProxyUp(proxy, proxy.decisions().length),
-                close: () => Promise.resolve(),
+                close: () => Promise.resolve(success(undefined)),
             }),
         );

@@ -60,7 +60,7 @@ const fakeEgress = (
     proxy: { server: PROXY_SERVER, includeLoopback: isProxyingLoopback },
     refusedOrigins,
     connectionFailures: () => [],
-    close: () => Promise.resolve(),
+    close: () => Promise.resolve(success(undefined)),
 });
 
 // The session's records as the driver gives them: what the egress refused, or why it could not say.

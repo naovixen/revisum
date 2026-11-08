@@ -134,5 +134,13 @@ export const answersBareEgress: EgressSource = () => Promise.resolve(bareEgress)
 // @ts-expect-error what an egress refused may be unknown, which only a Result can say
 export const refusedOriginsAsAList: readonly string[] = bareEgress.refusedOrigins();
 
+export const closeAnswersWhatHappened: Promise<Result<void, string>> = bareEgress.close();
+
+export const closeThatSaysNothing: SessionEgress = {
+    ...bareEgress,
+    // @ts-expect-error a failing proxy close is an outcome, so a close must say what happened
+    close: () => Promise.resolve(),
+};
+
 // @ts-expect-error the benchmark's stand-in protected branch is not handed to anyone outside the cli
 export type BenchmarkBranch = BenchmarkPorts["protectedBranchHolding"];

@@ -30,4 +30,24 @@ describe("Using the variable name reader", () => {
             });
         }
     });
+
+    // The run's own proxy is set by the run alone, so a project's secret can't move it.
+    describe("given a name that would set the run's proxy", () => {
+        for (const name of [
+            "HTTP_PROXY",
+            "http_proxy",
+            "HTTPS_PROXY",
+            "https_proxy",
+            "ALL_PROXY",
+            "all_proxy",
+            "NO_PROXY",
+            "no_proxy",
+        ]) {
+            describe(`when the name is ${name}`, () => {
+                test("then it should refuse it", () => {
+                    assert.equal(readVariableName(name), null);
+                });
+            });
+        }
+    });
 });

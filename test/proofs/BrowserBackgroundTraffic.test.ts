@@ -72,7 +72,7 @@ const egressOnRecordingProxy: EgressSourceForTest = () =>
             proxy: { server: proxy.server, includeLoopback: true },
             refusedOrigins: () => success([]),
             connectionFailures: () => [],
-            close: () => Promise.resolve(),
+            close: () => Promise.resolve(success(undefined)),
         }),
     );
 

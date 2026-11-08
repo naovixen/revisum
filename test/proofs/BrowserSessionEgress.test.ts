@@ -175,7 +175,7 @@ const egressOn = (
         proxy: { server: proxy.server, includeLoopback: true },
         refusedOrigins: () => success(refusedOrigins),
         connectionFailures: () => [],
-        close: () => Promise.resolve(),
+        close: () => Promise.resolve(success(undefined)),
     };
     return () => Promise.resolve(success(egress));
 };
@@ -198,7 +198,7 @@ describe("Using the driver's session egress", () => {
                             proxy: { server: "", includeLoopback: true },
                             refusedOrigins: () => success([]),
                             connectionFailures: () => [],
-                            close: () => Promise.resolve(),
+                            close: () => Promise.resolve(success(undefined)),
                         }),
                     );
                 const opened = await openOutcome(driverOn(emptyProxy));
