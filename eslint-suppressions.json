@@ -145,9 +145,6 @@
     "@typescript-eslint/naming-convention": {
       "count": 1
     },
-    "@typescript-eslint/require-await": {
-      "count": 7
-    },
     "curly": {
       "count": 12
     },
@@ -170,16 +167,13 @@
       "count": 3
     },
     "curly": {
-      "count": 49
+      "count": 48
     },
     "revisum/file-name-matches-export": {
       "count": 1
     }
   },
   "packages/cli/src/explore-crawl.ts": {
-    "@typescript-eslint/require-await": {
-      "count": 2
-    },
     "revisum/file-name-matches-export": {
       "count": 1
     }
@@ -201,15 +195,6 @@
     }
   },
   "packages/cli/src/run-pins.ts": {
-    "@typescript-eslint/no-unsafe-argument": {
-      "count": 1
-    },
-    "curly": {
-      "count": 4
-    },
-    "no-nested-ternary": {
-      "count": 1
-    },
     "revisum/file-name-matches-export": {
       "count": 1
     }

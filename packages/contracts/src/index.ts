@@ -17,6 +17,7 @@ export * from './Role.ts';
 export * from './plan-drafts.ts';
 export * from './literal-steps.ts';
 export * from './secret.ts';
+export * from './UnwiredPort.ts';
 export * from './service-calls.ts';
 export * from './network-and-storage.ts';
 export * from './clock-and-clipboard.ts';

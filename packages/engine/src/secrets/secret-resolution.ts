@@ -6,7 +6,7 @@
 // manifest records, and each fill of a secret its secret; their values stay inside the opaque Secret
 // objects.
 import {
-  failure, success,
+  failure, NavigateScripts, success,
   type CallDeclaration, type CallName, type CommandName, type DatabaseCommandDeclaration, type Plan, type Redactor, type Result, type Secret, type SecretName, type SecretStore, type Step, type SecretRecord, type StorageStateRecord,
 } from '@revisum/contracts';
 import { sha256 } from '../hashing.ts';
@@ -48,11 +48,12 @@ function callSecretNames(plan: Plan, calls: Readonly<Record<CallName, CallDeclar
 }
 
 // The steps as the run runs them, inside frames and second tabs too, in plan order: each fill of a
-// secret carries the secret, or the first name the store cannot resolve stops them.
-function withFillSecrets(steps: readonly Step[], resolveName: ResolveName): Result<RunStep[], SecretName> {
+// secret carries the secret and each navigate how its page loads, or the first name the store
+// cannot resolve stops them.
+function runStepsOf(steps: readonly Step[], resolveName: ResolveName): Result<RunStep[], SecretName> {
   const runSteps: RunStep[] = [];
   for (const step of steps) {
-    const runStep = withFillSecret(step, resolveName);
+    const runStep = runStepOf(step, resolveName);
     if (!runStep.ok) {
       return runStep;
     }
@@ -61,13 +62,15 @@ function withFillSecrets(steps: readonly Step[], resolveName: ResolveName): Resu
   return success(runSteps);
 }
 
-function withFillSecret(step: Step, resolveName: ResolveName): Result<RunStep, SecretName> {
+function runStepOf(step: Step, resolveName: ResolveName): Result<RunStep, SecretName> {
   switch (step.type) {
     case 'frame':
     case 'newTab': {
-      const inner = withFillSecrets(step.steps, resolveName);
+      const inner = runStepsOf(step.steps, resolveName);
       return inner.ok ? success({ ...step, steps: inner.value }) : inner;
     }
+    case 'navigate':
+      return success({ ...step, navigation: { scripts: step.scripts ?? NavigateScripts.Enabled } });
     case 'fill': {
       const value = step.value;
       if (typeof value === 'string' || !('secretName' in value)) {
@@ -126,7 +129,7 @@ export function resolvePlanSecrets(
     fills.set(name, secret);
     return success(secret);
   };
-  const steps = withFillSecrets(plan.steps, resolveFill);
+  const steps = runStepsOf(plan.steps, resolveFill);
   if (!steps.ok) {
     return steps;
   }

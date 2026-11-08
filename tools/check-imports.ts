@@ -50,7 +50,7 @@ function importedName(entry: readonly Token[]): string | undefined {
 }
 
 // The names a statement's `{ … }` takes from the module.
-function importedNames(clause: readonly Token[]): string[] {
+export function importedNames(clause: readonly Token[]): string[] {
   const open = clause.findIndex((token) => isPunctuator(token, '{'));
   if (open === -1) {
     return [];
@@ -69,7 +69,7 @@ function importedNames(clause: readonly Token[]): string[] {
 
 // A dynamic import, a require, a namespace, a default import or `export *`: anything but `{ … }`,
 // or an import for its side effects, which takes no names at all.
-function takesModuleWhole({ clause, isTypeOnly }: ModuleSpecifier): boolean {
+export function takesModuleWhole({ clause, isTypeOnly }: ModuleSpecifier): boolean {
   if (clause === undefined) {
     return true;
   }

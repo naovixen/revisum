@@ -23,17 +23,27 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, relative, resolve } from 'node:path';
 import {
   DEFAULT_EXPLORE_DEPTH, DEFAULT_EXPLORE_PAGES, DEFAULT_PAGE_TIMEOUT_MILLISECONDS, MAXIMUM_EXPLORE_DEPTH, MAXIMUM_EXPLORE_PAGES,
-  READABLE_GRAMMAR_VERSION, admitCoreDraft, checkDraftLocators, defaultRedactor, exploreStartOrigin, extractCriteria, loadTrustedProject,
+  READABLE_GRAMMAR_VERSION, admitCoreDraft, checkDraftLocators, exploreStartOrigin, extractCriteria, loadTrustedProject,
   pageMapReference, pageMapText, parseAiText, parseProject, planParser, planStanding, plannerReplyText, policyGate,
   PlanErrorCode, readPlanText, withDeclaredSecretRedaction,
   type ApprovalStore, type BrowserDriver, type ClearedRun, type CliErrorCode, type CriterionText, type DraftError, type DraftRequest,
-  type DraftWarning, type EventSink, type Origin, type PageMap, type PlanDraft, type PlannerEndpoint, type PlanProvenance, type PlanSource, type Project, type ProjectLoadError,
+  type DraftWarning, type EventSink, type PageMap, type PlanDraft, type PlannerEndpoint, type PlanProvenance, type PlanSource, type Project, type ProjectLoadError,
   type Redactor, type SecretStore, type Target, type TrustedProject, type VersionControlPort,
 } from '@revisum/engine';
-import { parseProxyRules, serviceCaller, startProxyServer, type AddressConnector, type AddressResolver, type EgressProxy, type ProxyRulesRefusal, type ProxyStartFailure } from '@revisum/runner';
+import type { ProxyRulesRefusal, ProxyStartFailure } from '@revisum/runner';
 import { CLI_OUTPUT_SCHEMA, cliError, exitCodeFor, type CliError, type CliOutput, type CommandOutcome } from './cli-output.ts';
-import { crawlInBrowser, crawlInRunner, crawlTarget, type CrawlStop, type IsolatedRunner } from './explore-crawl.ts';
-import { plannerAdapter } from './planner-adapters.ts';
+import { crawlInBrowser, crawlInRunner, crawlTarget, type CrawlStop, type IsolatedRunner, type LoginRunner } from './explore-crawl.ts';
+
+// What a planner call came to: its reply, or why there is none, and what went wrong with the egress
+// proxy it went through, if anything did. `proxy-failed` means the proxy never ran.
+export type PlannerCallOutcome =
+  | { readonly kind: 'answered'; readonly reply: unknown; readonly closeFailure: string | null }
+  | { readonly kind: 'proxy-failed'; readonly failure: ProxyRulesRefusal | ProxyStartFailure }
+  | { readonly kind: 'secret-missing'; readonly closeFailure: string | null }
+  | { readonly kind: 'call-failed'; readonly closeFailure: string | null };
+
+// Sends the planner the request through an egress proxy that allows only the endpoint's origin.
+export type PlannerCall = (endpoint: PlannerEndpoint, request: DraftRequest) => Promise<PlannerCallOutcome>;
 
 export type DraftCommandPorts = {
   // The project folder: --from, --out and --after are relative to it.
@@ -43,11 +53,11 @@ export type DraftCommandPorts = {
   readonly events: EventSink;
   // The protected branch, where the trusted project.json is read.
   readonly versionControl: VersionControlPort;
-  // Handed to the egress proxy; it resolves and connects for real unless given.
-  readonly resolve?: AddressResolver | undefined;
-  readonly connect?: AddressConnector | undefined;
-  // PEM certificates trusted for HTTPS besides the system's own, such as a test authority.
-  readonly trustedCertificates?: readonly string[];
+  readonly planner: PlannerCall;
+  // Runs an --after plan in the crawl's session.
+  readonly runLogin: LoginRunner;
+  // The personal-data redaction that page text goes through, after the declared secrets are removed.
+  readonly redactor: Redactor;
   // Explore mode's browser on the host, used only with --host. Always headless.
   readonly browser?: BrowserDriver;
   // The isolated runner and its pinned image, where explore mode crawls without --host.
@@ -175,8 +185,6 @@ const isStop = (value: object): value is Stop => 'stopped' in value;
 type Prepared = {
   readonly project: TrustedProject;
   readonly endpoint: PlannerEndpoint;
-  // The endpoint's origin, the one origin the egress proxy allows.
-  readonly origin: Origin;
   readonly request: DraftRequest;
   readonly specPath?: string;
   readonly draftPath: string;
@@ -218,7 +226,6 @@ async function prepare(options: DraftArguments, ports: DraftCommandPorts): Promi
   const project = loaded.value.project;
   if (project.planner === undefined) return stop('usage', `${PROJECT_FILE}#planner`);
   const endpoint = project.planner;
-  const origin = endpoint.origin;
 
   // The spec's path is checked before the draft's, as the command line names them.
   if (options.from !== undefined && insideFolder(ports.workingDirectory, options.from) === undefined) return stop('usage', '--from');
@@ -233,7 +240,7 @@ async function prepare(options: DraftArguments, ports: DraftCommandPorts): Promi
     criteria: read.criteria, grammarVersion: READABLE_GRAMMAR_VERSION, origins: project.origins, targets: project.matrix.map((target) => target.id),
   };
   return {
-    project, endpoint, origin, request, draftPath,
+    project, endpoint, request, draftPath,
     ...(read.specPath === undefined ? {} : { specPath: read.specPath }), ...(pageMapPath === undefined ? {} : { pageMapPath }),
   };
 }
@@ -242,46 +249,15 @@ async function prepare(options: DraftArguments, ports: DraftCommandPorts): Promi
 export const plannerProxyStop = (failure: ProxyRulesRefusal | ProxyStartFailure): Stop =>
   ({ stopped: { ...cliError('planner-call-failed', `${PROJECT_FILE}#planner`), reason: failure.message } });
 
-// What went wrong with the planner's proxy while it ran and as it closed, or null if nothing did. The
-// reply stands either way, but a person should know the proxy's record may be incomplete.
-function plannerProxyFailure(proxy: Pick<EgressProxy, 'listenerFailures'>, closed: Awaited<ReturnType<EgressProxy['close']>>): string | null {
-  const failures = [
-    ...proxy.listenerFailures().map((failure) => `a listener of the planner's egress proxy failed: ${failure.message}`),
-    ...(closed.ok ? [] : [`the planner's egress proxy did not close: ${closed.error.message}`]),
-  ];
-  return failures.length === 0 ? null : failures.join('; ');
-}
-
-// Calls the planner through an egress proxy that allows only its origin, and answers with the
-// reply as received, or the code the call failed with. The proxy is closed either way.
-async function callPlanner(prepared: Prepared, request: DraftRequest, ports: DraftCommandPorts): Promise<{ readonly reply: unknown; readonly closeFailure: string | null } | Stop> {
-  const { endpoint, origin } = prepared;
-  // A local endpoint is a private service on loopback; any other must resolve to a public address.
-  const rules = parseProxyRules({ allowedOrigins: [origin], privateOrigins: endpoint.kind === 'local' ? [origin] : [], rewrites: [] });
-  if (!rules.ok) {
-    return plannerProxyStop(rules.error);
-  }
-  const started = await startProxyServer(rules.value, { resolve: ports.resolve, connect: ports.connect });
-  if (!started.ok) {
-    return plannerProxyStop(started.error);
-  }
-  const proxy = started.value;
-  const answered = await askPlanner(prepared, request, ports, proxy);
-  const closed = await proxy.close();
-  const closeFailure = plannerProxyFailure(proxy, closed);
-  return isStop(answered) ? { ...answered, ...closeFailureField(closeFailure) } : { reply: answered.reply, closeFailure };
-}
-
-// The planner's reply through a running proxy, or why there is none.
-async function askPlanner(prepared: Prepared, request: DraftRequest, ports: DraftCommandPorts, proxy: Pick<EgressProxy, 'url'>): Promise<{ readonly reply: unknown } | Stop> {
-  const caller = serviceCaller({ proxy, trustedCertificates: ports.trustedCertificates });
-  const adapter = plannerAdapter(prepared.endpoint, { caller, secrets: ports.secrets });
-  if (!adapter.ok) return stop('config-invalid', `${PROJECT_FILE}#planner.apiKey`);
-  try {
-    return { reply: await adapter.value.draft(request) };
-  } catch {
-    // The adapter's error carries only a code, and none of it is shown: the failure is enough.
-    return stop('planner-call-failed', `${PROJECT_FILE}#planner`);
+// The command's stop for a planner call with no reply, saying why, and what its proxy's close said.
+function plannerCallStop(outcome: Exclude<PlannerCallOutcome, { readonly kind: 'answered' }>): Stop {
+  switch (outcome.kind) {
+    case 'proxy-failed':
+      return plannerProxyStop(outcome.failure);
+    case 'secret-missing':
+      return { ...stop('config-invalid', `${PROJECT_FILE}#planner.apiKey`), ...closeFailureField(outcome.closeFailure) };
+    case 'call-failed':
+      return { ...stop('planner-call-failed', `${PROJECT_FILE}#planner`), ...closeFailureField(outcome.closeFailure) };
   }
 }
 
@@ -349,14 +325,14 @@ async function exploreSite(explore: ExploreArguments, prepared: Prepared, ports:
   const login = explore.after === undefined ? undefined : clearedLogin(explore.after, project, target, ports);
   if (login !== undefined && isStop(login)) return login;
   // Page text is redacted of every declared secret, then of personal-data shapes.
-  const redactor: Redactor = withDeclaredSecretRedaction(defaultRedactor(), project.secretNames, ports.secrets);
+  const redactor: Redactor = withDeclaredSecretRedaction(ports.redactor, project.secretNames, ports.secrets);
   const bounds = { start: explore.start, maximumPages: explore.maximumPages, maximumDepth: explore.maximumDepth, pageTimeoutMilliseconds: DEFAULT_PAGE_TIMEOUT_MILLISECONDS };
 
   if (explore.host) {
     if (ports.browser === undefined) return stop('internal', '--host');
     const crawled = await crawlInBrowser(ports.browser, {
       redactor, secrets: ports.secrets, audit: ports.events, options: { ...bounds, placement: 'host' },
-      ...(login === undefined ? { project, target } : { login: login.cleared }),
+      ...(login === undefined ? { project, target } : { login: login.cleared, runLogin: ports.runLogin }),
     });
     return crawled.ok
       ? { map: crawled.value, text: pageMapText(crawled.value), egressEnforced: false, closeFailure: crawled.closeFailure }
@@ -389,12 +365,12 @@ function writeNew(ports: DraftCommandPorts, path: string, content: string): bool
 async function draft(options: DraftArguments, ports: DraftCommandPorts): Promise<Drafted | Stop> {
   const prepared = await prepare(options, ports);
   if (isStop(prepared)) return prepared;
-  const { project, endpoint, origin, draftPath, pageMapPath } = prepared;
+  const { project, endpoint, draftPath, pageMapPath } = prepared;
   const explored = options.explore === undefined ? undefined : await exploreSite(options.explore, prepared, ports);
   if (explored !== undefined && isStop(explored)) return explored;
   const request: DraftRequest = explored === undefined ? prepared.request : { ...prepared.request, pages: explored.map.pages };
-  const called = await callPlanner(prepared, request, ports);
-  if (isStop(called)) return called;
+  const called = await ports.planner(endpoint, request);
+  if (called.kind !== 'answered') return plannerCallStop(called);
 
   // The reply is outside input: decoded by the engine, then bounded as text no longer than the
   // largest plan the project allows. Anything else is refused whole, and nothing of it is shown.
@@ -426,7 +402,7 @@ async function draft(options: DraftArguments, ports: DraftCommandPorts): Promise
     ...(explored === undefined ? {} : { egressEnforced: explored.egressEnforced }),
   };
   const closeFailures = [explored?.closeFailure ?? null, called.closeFailure].filter((each) => each !== null);
-  return { result, ...(explored === undefined ? {} : { crawledOrigin: explored.map.origin }), calledOrigins: [origin], closeFailure: closeFailures.length === 0 ? null : closeFailures.join('; ') };
+  return { result, ...(explored === undefined ? {} : { crawledOrigin: explored.map.origin }), calledOrigins: [endpoint.origin], closeFailure: closeFailures.length === 0 ? null : closeFailures.join('; ') };
 }
 
 // The human-readable account of a draft, one fact per line.

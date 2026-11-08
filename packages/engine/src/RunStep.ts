@@ -1,10 +1,11 @@
 // A plan step as a cleared run runs it: the plan's own step, except that a fill of a secret carries
-// the secret preflight resolved for it, inside frames and second tabs too. Only secret resolution
-// makes these, from the plan the run was cleared for, so a fill never looks its secret up and
-// cannot miss it.
-import type { Secret, SecretReference, Step, StepType } from "@revisum/contracts";
+// the secret preflight resolved for it and a navigate says how its page loads, inside frames and
+// second tabs too. Only secret resolution makes these, from the plan the run was cleared for, so a
+// fill never looks its secret up and a navigate has no default to apply.
+import type { NavigateOptions, Secret, SecretReference, Step, StepType } from "@revisum/contracts";
 
 type FillStep = Extract<Step, { type: typeof StepType.Fill }>;
+type NavigateStep = Extract<Step, { type: typeof StepType.Navigate }>;
 type FrameStep = Extract<Step, { type: typeof StepType.Frame }>;
 type NewTabStep = Extract<Step, { type: typeof StepType.NewTab }>;
 
@@ -22,9 +23,23 @@ export type SecretFillStep = Omit<FillStep, "value"> & {
 
 export type RunFillStep = TextFillStep | SecretFillStep;
 
+// A navigate keeps the plan's step as written, whose absent `scripts` the plan's hash relies on, and
+// says beside it how the page loads.
+export type RunNavigateStep = NavigateStep & { readonly navigation: NavigateOptions };
+
 export type RunStep =
-    | Exclude<Step, { type: typeof StepType.Fill | typeof StepType.Frame | typeof StepType.NewTab }>
+    | Exclude<
+          Step,
+          {
+              type:
+                  | typeof StepType.Fill
+                  | typeof StepType.Navigate
+                  | typeof StepType.Frame
+                  | typeof StepType.NewTab;
+          }
+      >
     | RunFillStep
+    | RunNavigateStep
     | (Omit<FrameStep, "steps"> & { readonly steps: readonly RunStep[] })
     | (Omit<NewTabStep, "steps"> & { readonly steps: readonly RunStep[] });
 

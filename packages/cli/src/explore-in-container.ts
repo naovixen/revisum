@@ -7,8 +7,8 @@
 import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  defaultRedactor, environmentSecretStore, exploreStartOrigin, pageMapText, parseProject, planParser, policyGate, readPlanText, success,
-  withDeclaredSecretRedaction, type ClearedRun, type EventSink, type Project, type Target,
+  exploreStartOrigin, pageMapText, parseProject, planParser, policyGate, readPlanText,
+  type ClearedRun, type EventSink, type Project, type Target,
 } from '@revisum/engine';
 import { buildAdapters } from './BuildAdapters.ts';
 import { CONTAINER_EXIT, crawlInBrowser, crawlTarget, decodeContainerCrawlInput } from './explore-crawl.ts';
@@ -29,22 +29,19 @@ function pinnedChrome(): string | undefined {
   return newest === undefined ? undefined : join(BROWSER_CACHE, newest, 'chrome-linux64', 'chrome');
 }
 
-// The container keeps no audit log of its own: the host recorded the gate's decision already.
-const discardingAudit: EventSink = { append: () => success({ sequence: 0 }) };
-
 function stop(code: number, reason: string): number {
   process.stderr.write(`${reason}\n`);
   return code;
 }
 
 // The --after plan, cleared by the policy gate for the crawl's target, or undefined when it is refused.
-function clearedLogin(text: string, project: Project, target: Target): ClearedRun | undefined {
+function clearedLogin(text: string, project: Project, target: Target, audit: EventSink): ClearedRun | undefined {
   const read = readPlanText(text, project.limits);
   if (!read.ok) return undefined;
   const parsed = planParser(project)(read.value.json);
   if (!parsed.ok) return undefined;
   // The host checked the approval; here the plan runs as the proposal it is to the container.
-  const decision = policyGate({ project, events: discardingAudit }).clear(parsed.value, target.id);
+  const decision = policyGate({ project, events: audit }).clear(parsed.value, target.id);
   return decision.kind === 'allow' ? decision.run : undefined;
 }
 
@@ -68,24 +65,22 @@ async function main(): Promise<number> {
     return stop(CONTAINER_EXIT.failed, 'HTTP_PROXY is unset or empty, so the crawl has no egress proxy to run behind');
   }
 
-  // Only the declared secrets are read from the environment.
-  const variables = Object.fromEntries(project.value.secretNames.map((name) => [name, process.env[name]]));
-  const secrets = environmentSecretStore(variables);
-  const redactor = withDeclaredSecretRedaction(defaultRedactor(), project.value.secretNames, secrets);
+  const ports = buildAdapters.containerCrawlPorts({
+    executablePath: browserPath, proxyServer, secretNames: project.value.secretNames, environment: process.env,
+  });
   let login: ClearedRun | undefined;
   if (input.afterPlan !== undefined) {
-    login = clearedLogin(input.afterPlan, project.value, target);
+    login = clearedLogin(input.afterPlan, project.value, target, ports.audit);
     if (login === undefined) return stop(CONTAINER_EXIT.loginRefused, 'the --after plan was refused');
   }
 
-  const browser = buildAdapters.containerBrowserDriver({ executablePath: browserPath, proxyServer });
-  const crawled = await crawlInBrowser(browser, {
-    redactor, secrets, audit: discardingAudit,
+  const crawled = await crawlInBrowser(ports.browser, {
+    redactor: ports.redactor, secrets: ports.secrets, audit: ports.audit,
     options: {
       start: input.start, maximumPages: input.maximumPages, maximumDepth: input.maximumDepth,
       pageTimeoutMilliseconds: input.pageTimeoutMilliseconds, placement: 'isolated',
     },
-    ...(login === undefined ? { project: project.value, target } : { login }),
+    ...(login === undefined ? { project: project.value, target } : { login, runLogin: ports.runLogin }),
   });
   if (!crawled.ok) {
     if (crawled.error === 'explore-start-unreachable') return stop(CONTAINER_EXIT.startUnreachable, crawled.error);

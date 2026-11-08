@@ -3,28 +3,25 @@
 // side effect, every secret the plan names is missing, and no response was rewritten.
 import {
     failure,
+    isWiredPort,
     ServiceCallErrorCode,
+    UNWIRED_PORT,
     WorkloadErrorCode,
     type AppliedRewrite,
     type DatabaseCommandRunner,
     type SecretStore,
     type ServiceCaller,
+    type UnwiredPort,
 } from "@revisum/contracts";
 import type { RunPorts } from "./RunContext.ts";
 
 export const emptySecretStore: SecretStore = { resolve: () => null };
 
-// Preflight knows this caller by identity and refuses a plan that calls a service. A plan that calls
-// none never uses it, and a call through it would fail as unreachable.
-export const noServiceCaller: ServiceCaller = {
-    call: () => Promise.resolve(failure(ServiceCallErrorCode.ServiceUnreachable)),
-};
+// Preflight refuses a plan that calls a service when its caller is unwired.
+export const noServiceCaller: UnwiredPort = UNWIRED_PORT;
 
-// Preflight knows this runner by identity and refuses a plan with a database command. A plan with
-// none never uses it, and a command through it would fail to start.
-export const noDatabaseCommandRunner: DatabaseCommandRunner = {
-    run: () => Promise.resolve(failure(WorkloadErrorCode.WorkloadStartFailed)),
-};
+// Preflight refuses a plan with a database command when its runner is unwired.
+export const noDatabaseCommandRunner: UnwiredPort = UNWIRED_PORT;
 
 export const noRewrites = (): readonly AppliedRewrite[] => [];
 
@@ -37,3 +34,19 @@ export const unwiredPorts: Pick<
     databaseCommands: noDatabaseCommandRunner,
     rewritesApplied: noRewrites,
 };
+
+// What a plan that passed preflight runs with in place of an unwired port. It calls neither, since a
+// plan that does was refused, and a call through one would fail as unreachable or unstarted.
+const serviceCallerNeverCalled: ServiceCaller = {
+    call: () => Promise.resolve(failure(ServiceCallErrorCode.ServiceUnreachable)),
+};
+const databaseCommandRunnerNeverCalled: DatabaseCommandRunner = {
+    run: () => Promise.resolve(failure(WorkloadErrorCode.WorkloadStartFailed)),
+};
+
+export const serviceCallerOf = (port: ServiceCaller | UnwiredPort): ServiceCaller =>
+    isWiredPort(port) ? port : serviceCallerNeverCalled;
+
+export const databaseCommandRunnerOf = (
+    port: DatabaseCommandRunner | UnwiredPort,
+): DatabaseCommandRunner => (isWiredPort(port) ? port : databaseCommandRunnerNeverCalled);

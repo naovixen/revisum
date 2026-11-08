@@ -43,15 +43,20 @@ function redactorHash(maskSelectors: readonly string[]): string {
 const rulesetHash = (): string =>
   sha256(canonicalJson({ rules: ALL_RULES.map((rule) => rule.meta.id).sort(), probes: { viewport: SCAN_VIEWPORT } }));
 
+const byPath = (left: { readonly path: string }, right: { readonly path: string }): number => {
+  if (left.path === right.path) {return 0;}
+  return left.path < right.path ? -1 : 1;
+};
+
 const baselinesHash = (baselines: readonly BaselineFile[]): string =>
   sha256(canonicalJson([...baselines].map((file) => ({ path: file.path, sha256: sha256(file.bytes) }))
-    .sort((left, right) => (left.path < right.path ? -1 : left.path > right.path ? 1 : 0))));
+    .toSorted(byPath)));
 
 // The run image's id, as runner's prepareRunImage recorded it beside the repository; undefined on
 // a machine that never prepared one, where the run is a host run.
 function runImageDigest(repositoryRoot: string): string | undefined {
   const path = join(repositoryRoot, RUN_IMAGE_RECORD);
-  if (!existsSync(path)) return undefined;
+  if (!existsSync(path)) {return undefined;}
   try {
     const record: unknown = JSON.parse(readFileSync(path, 'utf8'));
     const id: unknown = typeof record === 'object' && record !== null ? Reflect.get(record, 'id') : undefined;
@@ -77,7 +82,7 @@ function fontFolders(): string[] {
 }
 
 function filesUnder(folder: string): string[] {
-  if (!existsSync(folder)) return [];
+  if (!existsSync(folder)) {return [];}
   try {
     return readdirSync(folder, { recursive: true, withFileTypes: true })
       .filter((entry) => entry.isFile())
@@ -90,7 +95,8 @@ function filesUnder(folder: string): string[] {
 async function fileSha256(path: string): Promise<string | null> {
   try {
     const hash = createHash('sha256');
-    for await (const chunk of createReadStream(path)) hash.update(chunk);
+    const chunks: AsyncIterable<Buffer> = createReadStream(path);
+    for await (const chunk of chunks) {hash.update(chunk);}
     return hash.digest('hex');
   } catch {
     return null;
@@ -104,7 +110,7 @@ function systemFontsHash(): Promise<string> {
   fontsHash ??= (async () => {
     const files = fontFolders().flatMap(filesUnder).sort();
     const entries: { readonly path: string; readonly sha256: string | null }[] = [];
-    for (const path of files) entries.push({ path, sha256: await fileSha256(path) });
+    for (const path of files) {entries.push({ path, sha256: await fileSha256(path) });}
     return sha256(canonicalJson(entries));
   })();
   return fontsHash;

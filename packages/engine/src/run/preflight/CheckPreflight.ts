@@ -13,6 +13,7 @@
 import {
     failure,
     isElementCheckNoDriverDecides,
+    isWiredPort,
     success,
     type BaseUrl,
     type DatabaseCommandRunner,
@@ -22,6 +23,7 @@ import {
     type SecretStore,
     type ServiceCaller,
     type PlanRefusal,
+    type UnwiredPort,
 } from "@revisum/contracts";
 import { namedScriptSources, type NamedScripts } from "../../page-scripts/NamedScriptSources.ts";
 import { callsServices, runsDatabaseCommands } from "../../plan/CallsServices.ts";
@@ -38,7 +40,7 @@ import {
     type PlanSecrets,
     type ResolvedSecrets,
 } from "../../secrets/secret-resolution.ts";
-import { noDatabaseCommandRunner, noServiceCaller } from "../UnwiredPorts.ts";
+import { databaseCommandRunnerOf, serviceCallerOf } from "../UnwiredPorts.ts";
 
 export type PreflightFacts = {
     readonly cleared: ClearedRun;
@@ -46,14 +48,14 @@ export type PreflightFacts = {
     // Where the plan's secrets are resolved.
     readonly secretStore: SecretStore;
     readonly scriptSources: Readonly<Record<string, Uint8Array>>;
-    readonly services: ServiceCaller;
-    readonly databaseCommands: DatabaseCommandRunner;
+    readonly services: ServiceCaller | UnwiredPort;
+    readonly databaseCommands: DatabaseCommandRunner | UnwiredPort;
 };
 
 // What a run that passed preflight runs with. The secrets are every one the plan names, resolved,
 // and the steps are the plan's, each fill of a secret carrying its own. The scripts are every page
-// script the plan names, with its source. The service caller and command runner are the run's own;
-// a plan that needs neither may have been given the do-nothing ones, which it never calls.
+// script the plan names, with its source. The service caller and command runner are the run's own,
+// or, for a plan that needs neither, ones it never calls.
 export type PreflightPassed = {
     readonly secrets: ResolvedSecrets;
     readonly steps: readonly RunStep[];
@@ -90,7 +92,7 @@ const refuseProductionOrigin: PreflightCheck = (facts) => {
 // A plan that needs one of the next four relies on it to mean anything: stopping part way would leave
 // test data behind or report on a run that never had what it declared.
 const refuseUnwiredServices: PreflightCheck = (facts) =>
-    callsServices(facts.cleared.plan) && facts.services === noServiceCaller
+    callsServices(facts.cleared.plan) && !isWiredPort(facts.services)
         ? { code: "services-unavailable" }
         : undefined;
 
@@ -108,7 +110,7 @@ const refuseElementCheckNoDriverDecides: PreflightCheck = (facts) =>
 
 // Cleanup counts too: with no way to run it, the steps would leave their test data behind.
 const refuseUnwiredDatabaseCommands: PreflightCheck = (facts) =>
-    runsDatabaseCommands(facts.cleared.plan) && facts.databaseCommands === noDatabaseCommandRunner
+    runsDatabaseCommands(facts.cleared.plan) && !isWiredPort(facts.databaseCommands)
         ? { code: "database-commands-unavailable" }
         : undefined;
 
@@ -134,15 +136,13 @@ const firstRefusal = (
 const resolvePreflightSecrets = (
     subject: { readonly plan: Plan; readonly project: Project },
     secretStore: SecretStore,
-    databaseCommands: DatabaseCommandRunner,
+    databaseCommands: DatabaseCommandRunner | UnwiredPort,
 ): Result<PlanSecrets, SecretName> =>
     resolvePlanSecrets(
         subject.plan,
         secretStore,
         subject.project.calls,
-        databaseCommands === noDatabaseCommandRunner
-            ? {}
-            : declaredCommands(subject.project.unsafeFeatures),
+        isWiredPort(databaseCommands) ? declaredCommands(subject.project.unsafeFeatures) : {},
     );
 
 // The first reason the run cannot go ahead, or what it runs with when nothing stops it.
@@ -174,8 +174,8 @@ function passedOrRefused(
         secrets: secrets.value.secrets,
         steps: secrets.value.steps,
         scripts: scripts.value,
-        services: facts.services,
-        databaseCommands: facts.databaseCommands,
+        services: serviceCallerOf(facts.services),
+        databaseCommands: databaseCommandRunnerOf(facts.databaseCommands),
     });
 }
 
@@ -198,5 +198,5 @@ export function checkPreflight(facts: PreflightFacts): Preflight {
 export const secretsToRedact = (
     subject: { readonly plan: Plan; readonly project: Project },
     secretStore: SecretStore,
-    databaseCommands: DatabaseCommandRunner,
+    databaseCommands: DatabaseCommandRunner | UnwiredPort,
 ): ResolvedSecrets => redactionOf(resolvePreflightSecrets(subject, secretStore, databaseCommands));

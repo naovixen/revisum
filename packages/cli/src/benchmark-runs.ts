@@ -4,9 +4,8 @@
 // and every process it started (Chromium), sampled from /proc every 100 ms. tools/benchmark.ts
 // calls this and compares the medians with the stored Linux baseline; it is never a gate.
 import {
-  defaultRedactor, failure, HOST_ISOLATION, loadTrustedProject, parseBaseUrl, planParser, policyGate, createRunService, sha256, unwiredPorts, success,
-  type ArtifactReference, type ArtifactStore, type Clock, type EventSink, type FixtureReference, type LoggedEvent, type RunEventSink,
-  type VersionControlPort,
+  loadTrustedProject, parseBaseUrl, planParser, policyGate, sha256,
+  type FixtureReference, type LoggedEvent, type RunEventSink,
 } from '@revisum/engine';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
@@ -51,26 +50,6 @@ const projectFileFor = (origin: string): unknown => ({
     colorScheme: 'light', reducedMotion: 'reduce',
   }],
 });
-
-// A protected branch holding only the benchmark's own project file, so the project is trusted the
-// way core trusts any project.
-function protectedBranchWith(projectFile: unknown): VersionControlPort {
-  return {
-    protectedBranch: 'main',
-    async protectedFile(path) {
-      return path === 'project.json'
-        ? success({ bytes: new TextEncoder().encode(JSON.stringify(projectFile)), commit: 'benchmark' })
-        : failure('not-found');
-    },
-    reviews: async () => failure('unavailable'),
-    changedFiles: async () => failure('unavailable'),
-    pullRequest: async () => failure('unavailable'),
-    lastCommitTouching: async () => failure('unavailable'),
-    landedBy: async () => failure('unavailable'),
-  };
-}
-
-const discardingAudit: EventSink = { append: () => success({ sequence: 0 }) };
 
 const MEDIA_TYPES: Readonly<Record<string, string>> = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml',
@@ -127,23 +106,13 @@ function treeResidentBytes(): number {
   return total;
 }
 
-const memoryArtifacts = (): ArtifactStore => ({
-  async put(name, bytes, mediaType): Promise<ArtifactReference> {
-    return { name, mediaType, sha256: sha256(bytes), bytes: bytes.length };
-  },
-});
-
-const systemClock: Clock = {
-  now: () => performance.now(),
-  sleep: (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)),
-};
-
 export async function benchmarkRuns(options: BenchmarkRunsOptions): Promise<BenchmarkRuns> {
   const { server, origin, fixtures } = await serveFixtures(join(options.repositoryRoot, 'fixtures', 'signup-app'));
   try {
     const projectFile = projectFileFor(origin);
+    const ports = buildAdapters.benchmarkPorts({ executablePath: options.executablePath });
     // The gate clears the plan under the trusted project, and the run runs under the project it cleared.
-    const loaded = await loadTrustedProject('project.json', protectedBranchWith(projectFile), { files: [], events: discardingAudit });
+    const loaded = await loadTrustedProject('project.json', ports.protectedBranchHolding(projectFile), { files: [], events: ports.audit });
     if (!loaded.ok) throw new Error(`the benchmark project was refused: ${JSON.stringify(loaded.error)}`);
     const project = loaded.value.project;
     const parsed = planParser(project)(SIGNUP_PLAN);
@@ -153,12 +122,11 @@ export async function benchmarkRuns(options: BenchmarkRunsOptions): Promise<Benc
     // The plan names the one target it runs on, typed as the parser read it.
     const [targetId] = parsed.value.targets;
     if (targetId === undefined) throw new Error('the benchmark plan names no target');
-    const decision = policyGate({ project, events: discardingAudit }).clear(parsed.value, targetId);
+    const decision = policyGate({ project, events: ports.audit }).clear(parsed.value, targetId);
     if (decision.kind === 'deny') throw new Error(`the policy gate denied the benchmark plan: ${decision.rule}`);
     if (decision.kind === 'not-declared') {
       throw new Error(`the benchmark project does not declare the target ${decision.targetId}`);
     }
-    const drivers = new Map([['cdp', buildAdapters.hostBrowserDriver({ executablePath: options.executablePath })]]);
     const samples: BenchmarkSample[] = [];
     for (let index = 0; index < options.runs; index++) {
       // Set by the event sink, which the run calls back.
@@ -175,8 +143,7 @@ export async function benchmarkRuns(options: BenchmarkRunsOptions): Promise<Benc
       const sampler = setInterval(() => { peak = Math.max(peak, treeResidentBytes()); }, SAMPLE_INTERVAL_MILLISECONDS);
       const started = performance.now();
       try {
-        const runService = createRunService({ ...unwiredPorts, drivers, clock: systemClock, artifacts: memoryArtifacts(), redactor: defaultRedactor(), audit: discardingAudit, events: sink, isolation: HOST_ISOLATION });
-        const result = await runService.run(decision.run, {
+        const result = await ports.runService(sink).run(decision.run, {
           baseUrl: baseUrl.value, seed: 42, fixedTimeMilliseconds: Date.UTC(2026, 0, 15, 10, 30), fixtures, host: { platform: platform(), arch: arch() },
         });
         if (result.state !== 'Passed') throw new Error(`benchmark run ${index + 1} ended ${result.state}`);

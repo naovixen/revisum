@@ -14,6 +14,7 @@ export const RepositoryRuleName = {
     Licences: "licences",
     Layout: "layout",
     Imports: "imports",
+    CompositionRoot: "composition-root",
     ImportCycles: "import-cycles",
     RuntimeImports: "runtime-imports",
     BrandedCasts: "branded-casts",
@@ -55,6 +56,12 @@ export const REPOSITORY_RULES: Readonly<Record<RepositoryRuleName, RepositoryRul
         label: "import check",
         file: "check-imports.ts",
         check: async ({ root }) => (await import("./check-imports.ts")).checkImports(root),
+    },
+    [RepositoryRuleName.CompositionRoot]: {
+        label: "composition root check",
+        file: "CheckCompositionRoot.ts",
+        check: async ({ root }) =>
+            (await import("./CheckCompositionRoot.ts")).checkCompositionRoot(root),
     },
     [RepositoryRuleName.ImportCycles]: {
         label: "import cycle check",

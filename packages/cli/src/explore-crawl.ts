@@ -4,17 +4,16 @@
 //
 // An approved --after plan, such as a login, runs first in the crawl's own session, so the crawl
 // sees what a signed-in person sees. It runs through the engine's normal run path, already cleared
-// by the policy gate, writing no result file. This module is the one place in the draft command
-// that may call the run function, and only for that plan: draft-command.ts stays route code.
+// by the policy gate, writing no result file, through the login runner the composition root hands in.
 //
 // In the run container the crawl is this package's explore-in-container.ts, started through
 // RunnerHandle.exec. Secrets reach it by variable name only, never on its command line, and the
 // page map it prints is outside data: the host decodes it with the engine's decodePageMap.
 import { arch, platform } from 'node:os';
 import {
-  baseUrlOfOrigin, crawlSite, decodePageMap, exploreStartOrigin, failure, HOST_ISOLATION, redactPageMap, createRunService, sha256, unwiredPorts, success, UnavailableReason,
-  type ArtifactStore, type BrowserDriver, type ClearedRun, type Clock, type ClosedSession, type EventSink, type ExploreDriver, type ExploreOptions,
-  type ImageDigest, type Origin, type PageMap, type Project, type Redactor, type Result, type RunEventSink,
+  baseUrlOfOrigin, crawlSite, decodePageMap, exploreStartOrigin, failure, redactPageMap, success,
+  type BrowserDriver, type ClearedRun, type ClosedSession, type EventSink, type ExploreDriver, type ExploreOptions,
+  type ImageDigest, type Origin, type PageMap, type Project, type Redactor, type Result, type RunInputs, type RunResult,
   type Runner, type RunnerHandle, type SecretName, type SecretStore, type Session, type Target,
   type VariableName,
 } from '@revisum/engine';
@@ -43,7 +42,19 @@ export type BrowserCrawl = {
   readonly secrets: SecretStore;
   // Where the --after run's policy denials are recorded.
   readonly audit: EventSink;
-} & ({ readonly login: ClearedRun } | { readonly project: Project; readonly target: Target });
+} & ({ readonly login: ClearedRun; readonly runLogin: LoginRunner } | { readonly project: Project; readonly target: Target });
+
+// What a login run needs of the crawl's session, which it shares.
+export type LoginRun = {
+  readonly browser: BrowserDriver;
+  readonly session: Session;
+  readonly redactor: Redactor;
+  readonly secrets: SecretStore;
+  readonly audit: EventSink;
+};
+
+// Runs a cleared --after plan in the crawl's own session, leaving it open.
+export type LoginRunner = (login: ClearedRun, onSession: LoginRun, inputs: RunInputs) => Promise<RunResult>;
 
 // The page's random numbers are seeded, so a page that uses them shows the same each time.
 const CRAWL_SEED = 0;
@@ -51,16 +62,6 @@ const CRAWL_SEED = 0;
 // The target a crawl opens its session on: the project's first Chromium target, since the crawl
 // reads pages through the CDP driver.
 export const crawlTarget = (project: Project): Target | undefined => project.matrix.find((target) => target.engine === 'chromium');
-
-const systemClock: Clock = {
-  now: () => Date.now(),
-  sleep: (milliseconds) => new Promise((resolve) => { setTimeout(resolve, milliseconds); }),
-};
-// The --after run keeps nothing: no screenshot, step log or result file is written.
-const discardingArtifacts: ArtifactStore = {
-  put: async (name, bytes, mediaType) => ({ name, mediaType, sha256: sha256(bytes), bytes: bytes.length }),
-};
-const discardingRunEvents: RunEventSink = { append: () => undefined, read: () => [] };
 
 // Longer than a driver's stop takes to give up by itself, so this deadline is only for what has wedged.
 const SESSION_CLOSE_DEADLINE_MILLISECONDS = 60_000;
@@ -74,26 +75,6 @@ async function closeByTheDeadline(session: Session): Promise<ClosedSession | { r
   const closed = await Promise.race([session.close(), deadline]);
   clearTimeout(timer);
   return closed;
-}
-
-// What the run is told when its close leaves the crawl's session open: what the session has noted by
-// then. Only the run's state is read, and the crawl goes on using the session after it.
-const keptOpen = (session: Session): Promise<ClosedSession> => Promise.resolve({ ...session.recordsSoFar(), closeFailure: null });
-
-// A driver that hands the run the crawl's own session instead of opening another, and keeps it
-// open when the run ends, so the crawl reads the pages the run signed in to. The session was opened
-// for one target, so a run asking for any other is given none.
-function sharingDriver(browser: BrowserDriver, session: Session, sessionTarget: Target): BrowserDriver {
-  const shared = new Proxy(session, {
-    get: (target, property): unknown => (property === 'close' ? () => keptOpen(session) : Reflect.get(target, property)),
-  });
-  return {
-    info: browser.info,
-    supports: (target) => browser.supports(target),
-    open: async (target) => (target.id === sessionTarget.id
-      ? success(shared)
-      : failure({ reason: UnavailableReason.LaunchFailed, detail: `the crawl's session is for the target ${sessionTarget.id}, not ${target.id}` })),
-  };
 }
 
 // The project and target the crawl's session is for: the --after run's own when there is one.
@@ -116,7 +97,7 @@ export async function crawlInBrowser(browser: BrowserDriver, crawl: BrowserCrawl
   const session = opened.value;
   let crawled: Result<PageMap, CrawlStop>;
   try {
-    crawled = await crawlOpenSession(session, browser, crawl, { target, baseUrl, fixedTimeMilliseconds });
+    crawled = await crawlOpenSession(session, browser, crawl, { baseUrl, fixedTimeMilliseconds });
   } catch (error) {
     const { closeFailure } = await closeByTheDeadline(session);
     if (closeFailure === null) {
@@ -130,7 +111,6 @@ export async function crawlInBrowser(browser: BrowserDriver, crawl: BrowserCrawl
 
 // What a crawl's --after run needs of the session it shares.
 type CrawlOfASession = {
-  readonly target: Target;
   readonly baseUrl: ReturnType<typeof baseUrlOfOrigin>;
   readonly fixedTimeMilliseconds: number;
 };
@@ -140,14 +120,9 @@ async function crawlOpenSession(
   session: Session, browser: BrowserDriver, crawl: BrowserCrawl, opened: CrawlOfASession,
 ): Promise<Result<PageMap, CrawlStop>> {
   const { project } = sessionFor(crawl);
-  const { target, baseUrl, fixedTimeMilliseconds } = opened;
+  const { baseUrl, fixedTimeMilliseconds } = opened;
   if ('login' in crawl) {
-    const runService = createRunService({
-      ...unwiredPorts,
-      drivers: new Map([[target.adapter, sharingDriver(browser, session, target)]]), clock: systemClock, artifacts: discardingArtifacts,
-      redactor: crawl.redactor, events: discardingRunEvents, audit: crawl.audit, secrets: crawl.secrets, isolation: HOST_ISOLATION,
-    });
-    const loggedIn = await runService.run(crawl.login, {
+    const loggedIn = await crawl.runLogin(crawl.login, { browser, session, redactor: crawl.redactor, secrets: crawl.secrets, audit: crawl.audit }, {
       baseUrl, seed: CRAWL_SEED, fixedTimeMilliseconds, fixtures: [], host: { platform: platform(), arch: arch() },
     });
     if (loggedIn.state !== 'Passed') {return failure('plan-rejected');}

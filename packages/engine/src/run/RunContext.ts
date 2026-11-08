@@ -15,6 +15,7 @@ import {
     type RunIsolation,
     type SecretStore,
     type ServiceCaller,
+    type UnwiredPort,
     type StubName,
     type FixtureReference,
     type HostInfo,
@@ -72,11 +73,11 @@ export type RunPorts = {
     readonly secrets: SecretStore;
     // Sends the requests of the plan's declared calls: runner's caller, through the egress proxy.
     // With noServiceCaller, a plan that calls a service is refused before any side effect.
-    readonly services: ServiceCaller;
+    readonly services: ServiceCaller | UnwiredPort;
     // Runs the plan's database commands, each in a workload container: cli's wiring of runner's
     // workload runner. With noDatabaseCommandRunner, a plan with a database command, cleanup
     // included, is refused before any side effect.
-    readonly databaseCommands: DatabaseCommandRunner;
+    readonly databaseCommands: DatabaseCommandRunner | UnwiredPort;
     // The browser mutants' rewrites the egress proxy applied (EgressProxy.rewritesApplied). Only the
     // proxy knows, and only once the steps have run, so the run reads it after them. A run with no
     // proxy that rewrites is given noRewrites.

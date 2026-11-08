@@ -10,7 +10,7 @@ import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSy
 import { isAbsolute, join, posix, relative, sep } from 'node:path';
 import {
   EvidenceOutcomeCode, RECORD_UNREAD, SUITE_EVIDENCE_PATHS, SUITE_REPORT_FILE, WORKLOAD_OUTPUT_PATH,
-  declaredSuite, defaultRedactor, evidenceManifest, evidenceResult, failure, isSuiteFile, mergeRefusedOrigins, parseSuiteReport, parseSuiteTrace, refusedSuiteResult,
+  declaredSuite, evidenceManifest, evidenceResult, failure, isSuiteFile, mergeRefusedOrigins, parseSuiteReport, parseSuiteTrace, refusedSuiteResult,
   recordRead, success, suiteArguments, suiteEnvironment, suiteRedactor, unreadSuiteResult,
   type EgressEvent, type EgressPolicy, type EvidenceContext, type EvidenceLimits, type EvidenceRunManifest, type EvidenceSuiteDeclaration, type HostInfo, type Project, type Redactor,
   type RecordRead, type Result, type RunResult, type SecretStore, type SuiteDecodeError, type SuiteFile, type SuitePass, type SuiteReport, type SuiteTrace,
@@ -27,9 +27,8 @@ export type SuiteRunPorts = {
   // The host folder Revisum owns for the suite's output, which the workload runner mounts. Each run
   // deletes any earlier report and traces in it.
   readonly outputDirectory: string;
-  // The personal-data redaction every kept text goes through, before the suite's secrets are
-  // removed; defaultRedactor() when absent.
-  readonly redactor?: Redactor;
+  // The personal-data redaction every kept text goes through, before the suite's secrets are removed.
+  readonly redactor: Redactor;
   // Which pass this is (suitePasses). Required, because a caller that left it out must not get the
   // pass that may open the merge gate.
   readonly pass: SuitePass;
@@ -243,7 +242,7 @@ export async function runSuite(project: Project, suiteName: string, ports: Suite
     image: suite.image, argv, workingDirectory: suite.workingDirectory, environment: variables, policy,
     timeoutMilliseconds: suite.timeoutMilliseconds, outputDirectory: ports.outputDirectory,
   });
-  const redactor = suiteRedactor(ports.redactor ?? defaultRedactor(), environment.value.secrets);
+  const redactor = suiteRedactor(ports.redactor, environment.value.secrets);
   const context = <Egress extends RecordRead<readonly string[]>>(
     exitCode: number, timedOut: boolean, manifest: EvidenceRunManifest, egress: Egress, traceDecodeErrors?: readonly SuiteDecodeError[],
   ): EvidenceContext & { readonly egress: Egress } => ({
