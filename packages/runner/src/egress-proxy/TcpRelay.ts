@@ -1,9 +1,13 @@
 import type { DeclaredService, EgressPolicy } from "@revisum/contracts";
-import { bareHost } from "./BareHost.ts";
+import { bareHost, type BareHost } from "./BareHost.ts";
 
 // A TCP port the proxy relays: it listens on `port` and connects each client to `host` at the same
 // port. `private` says the host may resolve to a private address, as for a service declared private.
-export type TcpRelay = { readonly host: string; readonly port: number; readonly private: boolean };
+export type TcpRelay = {
+    readonly host: BareHost;
+    readonly port: number;
+    readonly private: boolean;
+};
 
 // The services a policy allows over TCP, each by the host its origin names and its declared port.
 export function tcpRelaysFor(

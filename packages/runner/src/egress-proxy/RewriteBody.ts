@@ -6,17 +6,41 @@ export type RewrittenBody = {
     readonly appliedNames: readonly string[];
 };
 
-// Applies each rewrite whose text the body holds. A body that holds none goes back byte for byte.
+// Every whole occurrence of `find` replaced, or null when `find` isn't there. Bytes, not text, so a
+// body that isn't UTF-8 keeps every byte but the found ones.
+function replacedOccurrences(body: Buffer, find: Buffer, replace: Buffer): Buffer | null {
+    let found = body.indexOf(find);
+    if (found === -1) {
+        return null;
+    }
+    const pieces: Buffer[] = [];
+    let keptFrom = 0;
+    while (found !== -1) {
+        pieces.push(body.subarray(keptFrom, found), replace);
+        keptFrom = found + find.length;
+        found = body.indexOf(find, keptFrom);
+    }
+    pieces.push(body.subarray(keptFrom));
+    return Buffer.concat(pieces);
+}
+
+// Applies each rewrite whose bytes the body holds. A body that holds none goes back as it came.
 export function rewriteBody(body: Buffer, rewrites: readonly ResponseRewrite[]): RewrittenBody {
-    const original = body.toString("utf8");
-    let text = original;
+    let current = body;
     const appliedNames: string[] = [];
     for (const rewrite of rewrites) {
-        if (rewrite.find === "" || !text.includes(rewrite.find)) {
-            continue;
+        const replaced =
+            rewrite.find === ""
+                ? null
+                : replacedOccurrences(
+                      current,
+                      Buffer.from(rewrite.find),
+                      Buffer.from(rewrite.replace),
+                  );
+        if (replaced !== null) {
+            current = replaced;
+            appliedNames.push(rewrite.name);
         }
-        text = text.split(rewrite.find).join(rewrite.replace);
-        appliedNames.push(rewrite.name);
     }
-    return { body: text === original ? body : Buffer.from(text, "utf8"), appliedNames };
+    return { body: current, appliedNames };
 }

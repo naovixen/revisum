@@ -1259,7 +1259,7 @@
   },
   "packages/runner/src/proxy-container.ts": {
     "curly": {
-      "count": 13
+      "count": 2
     },
     "revisum/file-name-matches-export": {
       "count": 1

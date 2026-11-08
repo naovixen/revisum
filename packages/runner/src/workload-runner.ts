@@ -244,10 +244,14 @@ export function workloadRunner(options: WorkloadRunnerOptions): WorkloadRunner {
       networkCreated = true;
 
       const proxyName = `${runId}-proxy`;
-      const proxy = await engine.startContainer(proxyContainer(root, {
+      const proxyOptions = proxyContainer(root, {
         name: proxyName, image: runImage, networks: [network, DEFAULT_BRIDGE_NETWORK], policy: request.policy, services: request.services,
         mounts: ownCodeMounts(root, dependenciesVolume), recordLookups: true,
-      }));
+      });
+      if (!proxyOptions.ok) {
+        return unenforceable(`the egress proxy's rules were refused: ${proxyOptions.error.message}`);
+      }
+      const proxy = await engine.startContainer(proxyOptions.value);
       if (!proxy.ok) return unenforceable(`the proxy container did not start: ${proxy.error.detail}`);
       containers.push(proxy.value);
       const proxyId = proxy.value;

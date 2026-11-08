@@ -1,5 +1,4 @@
 import type { Socket } from "node:net";
-import { bareHost } from "./BareHost.ts";
 import type { OpenSockets } from "./OpenSockets.ts";
 import { OriginDeclaration } from "./OriginDeclaration.ts";
 import { GateOutcomeKind, type OutboundGate } from "./OutboundGate.ts";
@@ -22,7 +21,7 @@ export function createTcpConnectionRelay(ports: RelayTcpConnectionPorts): RelayT
         const outcome = await gate(
             {
                 seen: relayOrigin(relay),
-                host: bareHost(relay.host),
+                host: relay.host,
                 port: relay.port,
                 declaration: relay.private ? OriginDeclaration.Private : OriginDeclaration.Public,
                 client: ProxyClient.Service,

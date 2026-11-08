@@ -30,7 +30,7 @@ import {
   type DraftWarning, type EventSink, type Origin, type PageMap, type PlanDraft, type PlannerEndpoint, type PlanProvenance, type PlanSource, type Project, type ProjectLoadError,
   type Redactor, type SecretStore, type Target, type TrustedProject, type VersionControlPort,
 } from '@revisum/engine';
-import { serviceCaller, startProxyServer, type AddressConnector, type AddressResolver } from '@revisum/runner';
+import { parseProxyRules, serviceCaller, startProxyServer, type AddressConnector, type AddressResolver, type EgressProxy } from '@revisum/runner';
 import { CLI_OUTPUT_SCHEMA, cliError, exitCodeFor, type CliError, type CliOutput, type CommandOutcome } from './cli-output.ts';
 import { crawlInBrowser, crawlInRunner, crawlTarget, type CrawlStop, type IsolatedRunner } from './explore-crawl.ts';
 import { plannerAdapter } from './planner-adapters.ts';
@@ -44,8 +44,8 @@ export type DraftCommandPorts = {
   // The protected branch, where the trusted project.json is read.
   readonly versionControl: VersionControlPort;
   // Handed to the egress proxy; it resolves and connects for real unless given.
-  readonly resolve?: AddressResolver;
-  readonly connect?: AddressConnector;
+  readonly resolve?: AddressResolver | undefined;
+  readonly connect?: AddressConnector | undefined;
   // PEM certificates trusted for HTTPS besides the system's own, such as a test authority.
   readonly trustedCertificates?: readonly string[];
   // Explore mode's browser on the host, used only with --host. Always headless.
@@ -240,25 +240,34 @@ async function prepare(options: DraftArguments, ports: DraftCommandPorts): Promi
 
 // Calls the planner through an egress proxy that allows only its origin, and answers with the
 // reply as received, or the code the call failed with. The proxy is closed either way.
-async function callPlanner(prepared: Prepared, request: DraftRequest, ports: DraftCommandPorts): Promise<{ readonly reply: unknown } | Stop> {
+async function callPlanner(prepared: Prepared, request: DraftRequest, ports: DraftCommandPorts): Promise<{ readonly reply: unknown; readonly closeFailure: string | null } | Stop> {
   const { endpoint, origin } = prepared;
   // A local endpoint is a private service on loopback; any other must resolve to a public address.
-  const proxy = await startProxyServer(
-    { allowedOrigins: [origin], privateOrigins: endpoint.kind === 'local' ? [origin] : [], rewrites: [] },
-    { ...(ports.resolve === undefined ? {} : { resolve: ports.resolve }), ...(ports.connect === undefined ? {} : { connect: ports.connect }) },
-  );
+  const rules = parseProxyRules({ allowedOrigins: [origin], privateOrigins: endpoint.kind === 'local' ? [origin] : [], rewrites: [] });
+  if (!rules.ok) {
+    return stop('planner-call-failed', `${PROJECT_FILE}#planner`);
+  }
+  const started = await startProxyServer(rules.value, { resolve: ports.resolve, connect: ports.connect });
+  if (!started.ok) {
+    return stop('planner-call-failed', `${PROJECT_FILE}#planner`);
+  }
+  const proxy = started.value;
+  const answered = await askPlanner(prepared, request, ports, proxy);
+  const closed = await proxy.close();
+  const closeFailure = closed.ok ? null : `the planner's egress proxy did not close: ${closed.error.message}`;
+  return isStop(answered) ? { ...answered, ...closeFailureField(closeFailure) } : { reply: answered.reply, closeFailure };
+}
+
+// The planner's reply through a running proxy, or why there is none.
+async function askPlanner(prepared: Prepared, request: DraftRequest, ports: DraftCommandPorts, proxy: Pick<EgressProxy, 'url'>): Promise<{ readonly reply: unknown } | Stop> {
+  const caller = serviceCaller({ proxy, trustedCertificates: ports.trustedCertificates });
+  const adapter = plannerAdapter(prepared.endpoint, { caller, secrets: ports.secrets });
+  if (!adapter.ok) return stop('config-invalid', `${PROJECT_FILE}#planner.apiKey`);
   try {
-    const caller = serviceCaller({ proxy, ...(ports.trustedCertificates === undefined ? {} : { trustedCertificates: ports.trustedCertificates }) });
-    const adapter = plannerAdapter(endpoint, { caller, secrets: ports.secrets });
-    if (!adapter.ok) return stop('config-invalid', `${PROJECT_FILE}#planner.apiKey`);
-    try {
-      return { reply: await adapter.value.draft(request) };
-    } catch {
-      // The adapter's error carries only a code, and none of it is shown: the failure is enough.
-      return stop('planner-call-failed', `${PROJECT_FILE}#planner`);
-    }
-  } finally {
-    await proxy.close();
+    return { reply: await adapter.value.draft(request) };
+  } catch {
+    // The adapter's error carries only a code, and none of it is shown: the failure is enough.
+    return stop('planner-call-failed', `${PROJECT_FILE}#planner`);
   }
 }
 
@@ -395,7 +404,8 @@ async function draft(options: DraftArguments, ports: DraftCommandPorts): Promise
     warnings,
     ...(explored === undefined ? {} : { egressEnforced: explored.egressEnforced }),
   };
-  return { result, ...(explored === undefined ? {} : { crawledOrigin: explored.map.origin }), calledOrigins: [origin], closeFailure: explored?.closeFailure ?? null };
+  const closeFailures = [explored?.closeFailure ?? null, called.closeFailure].filter((each) => each !== null);
+  return { result, ...(explored === undefined ? {} : { crawledOrigin: explored.map.origin }), calledOrigins: [origin], closeFailure: closeFailures.length === 0 ? null : closeFailures.join('; ') };
 }
 
 // The human-readable account of a draft, one fact per line.
@@ -413,7 +423,7 @@ function draftReport(result: DraftCommandResult): string {
 const closeFailureField = (closeFailure: string | null): { readonly closeFailure?: string } => (closeFailure === null ? {} : { closeFailure });
 // A close that failed changes nothing the crawl found, so it is said beside whatever came of it.
 const closeFailureLine = (closeFailure: string | null): string =>
-  (closeFailure === null ? '' : `The crawl's browser session did not close cleanly, so something of it may still run or hold files: ${closeFailure}\n`);
+  (closeFailure === null ? '' : `Something the command started did not close cleanly, so it may still run or hold files: ${closeFailure}\n`);
 
 export async function draftCommand(argv: readonly string[], ports: DraftCommandPorts): Promise<CommandOutcome> {
   const json = argv.includes('--json');

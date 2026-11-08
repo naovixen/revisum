@@ -15,17 +15,24 @@
 // connection is vetted like a request (resolved by the proxy, metadata addresses refused) and
 // recorded as a decision on "host:port".
 // It runs in-process for tests and, in a run, in its own container (proxy-container.ts).
-import type { AppliedRewrite, ProxyDecision } from "@revisum/contracts";
-import type { ConnectionFailure } from "./ProxyRecord.ts";
+import type { AppliedRewrite, ProxyDecision, Result } from "@revisum/contracts";
+import type { ProxyCloseFailure } from "./ProxyListeners.ts";
+import type { ConnectionFailure, ListenerFailure } from "./ProxyRecord.ts";
 
 export type EgressProxy = {
     // The proxy's address, such as "http://127.0.0.1:41234", for --proxy-server or HTTP_PROXY.
     readonly url: string;
     // Every decision so far, in the order made.
     decisions(): readonly ProxyDecision[];
+    // The origin of every refused decision so far, in the order made.
+    refusedOrigins(): readonly string[];
     // Each rewrite applied so far, once per origin and mutant.
     rewritesApplied(): readonly AppliedRewrite[];
     // Each origin it could not connect to so far, once per origin, with what to tell whoever is running.
     connectionFailures(): readonly ConnectionFailure[];
-    close(): Promise<void>;
+    // Each listener's failure after it started listening, such as a failed accept.
+    listenerFailures(): readonly ListenerFailure[];
+    // Ends every connection and listener and waits for them. A listener's close failure is the failed
+    // outcome. Closing again gives the same outcome.
+    close(): Promise<Result<void, ProxyCloseFailure>>;
 };

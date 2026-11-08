@@ -103,10 +103,14 @@ export function dockerRunner(options: DockerRunnerOptions): Runner {
     }
 
     const proxyName = `${runId}-proxy`;
-    const proxy = await engine.startContainer(proxyContainer(root, {
+    const proxyOptions = proxyContainer(root, {
       name: proxyName, image, networks: unenforceable === null ? [network, DEFAULT_BRIDGE_NETWORK] : [network],
       policy, services: options.services, mounts: sharedMounts(), hasRunAddresses: true,
-    }));
+    });
+    if (!proxyOptions.ok) {
+      return refuse(`the egress proxy's rules were refused: ${proxyOptions.error.message}`);
+    }
+    const proxy = await engine.startContainer(proxyOptions.value);
     if (!proxy.ok) return refuse(`the proxy container did not start: ${proxy.error.detail}`);
     containers.push(proxy.value);
     const proxyId = proxy.value;

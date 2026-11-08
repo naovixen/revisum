@@ -2,11 +2,11 @@
 // proxy container and how its decisions are read back, the waits and probes that show egress is
 // enforced, and the hardening every container gets. Both runners build their networks from these,
 // so a plan run and an evidence run are isolated the same way.
-import { PRODUCT, type AppliedRewrite, type DeclaredService, type EgressPolicy, type ProxyDecision } from '@revisum/contracts';
+import { PRODUCT, success, type AppliedRewrite, type DeclaredService, type EgressPolicy, type ProxyDecision, type Result } from '@revisum/contracts';
 import { platform } from 'node:os';
 import { isAbsolute, join, normalize, sep } from 'node:path';
 import type { ContainerEngine, ContainerMount, ContainerOptions, ProbeTarget } from './container-engine.ts';
-import { proxyRules } from './egress-proxy/ProxyRules.ts';
+import { proxyRules, type ProxyRulesRefusal } from './egress-proxy/ParseProxyRules.ts';
 import {
   DECISIONS_FILE, LOOKUPS_FILE, LOOKUPS_VARIABLE, RECORDS_LOST, RECORDS_STATE_FILE, REWRITES_FILE, RULES_VARIABLE, PROXY_PORT, RUN_ADDRESSES_VARIABLE, SERVICE_PROXY_PORT, readAppliedRewrite, readProxyDecision,
 } from './proxy-container.ts';
@@ -94,15 +94,21 @@ export type ProxyContainerFields = {
 };
 
 // The egress proxy's container, with its rules in its environment and nothing from the host's.
-export const proxyContainer = (root: string, fields: ProxyContainerFields): ContainerOptions => runImageContainer(root, {
-  name: fields.name, image: fields.image, networks: fields.networks, mounts: fields.mounts,
-  environment: {
-    HOME: '/tmp', [RULES_VARIABLE]: JSON.stringify(proxyRules(fields.policy, fields.services)),
-    ...(fields.recordLookups === true ? { [LOOKUPS_VARIABLE]: '1' } : {}),
-    ...(fields.hasRunAddresses === true ? { [RUN_ADDRESSES_VARIABLE]: '1' } : {}),
-  },
-  command: ['node', 'packages/runner/src/proxy-container.ts'],
-});
+export function proxyContainer(root: string, fields: ProxyContainerFields): Result<ContainerOptions, ProxyRulesRefusal> {
+  const rules = proxyRules(fields.policy, fields.services);
+  if (!rules.ok) {
+    return rules;
+  }
+  return success(runImageContainer(root, {
+    name: fields.name, image: fields.image, networks: fields.networks, mounts: fields.mounts,
+    environment: {
+      HOME: '/tmp', [RULES_VARIABLE]: JSON.stringify(rules.value),
+      ...(fields.recordLookups === true ? { [LOOKUPS_VARIABLE]: '1' } : {}),
+      ...(fields.hasRunAddresses === true ? { [RUN_ADDRESSES_VARIABLE]: '1' } : {}),
+    },
+    command: ['node', 'packages/runner/src/proxy-container.ts'],
+  }));
+}
 
 export const proxyUrl = (proxyName: string): string => `http://${proxyName}:${PROXY_PORT}`;
 export const serviceProxyUrl = (proxyName: string): string => `http://${proxyName}:${SERVICE_PROXY_PORT}`;

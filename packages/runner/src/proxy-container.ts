@@ -5,13 +5,14 @@
 // them the same way. The rules and those lines all cross a process boundary, so each is decoded here
 // before use. A write that fails does not stop the proxy: the state file says records were lost, and
 // the runner decides what that means for the run.
-import type { AppliedRewrite, ProxyDecision, ResponseRewrite } from '@revisum/contracts';
+import type { AppliedRewrite, ProxyDecision } from '@revisum/contracts';
 import { appendFileSync, openSync, writeSync } from 'node:fs';
 import { startRefusalsServer } from './ReadBrowserRefusals.ts';
+import { readExactOrigin } from './egress-proxy/ReadExactOrigin.ts';
+import { ownField } from './egress-proxy/OwnField.ts';
+import { readProxyRules } from './egress-proxy/ParseProxyRules.ts';
 import { ProxyClient } from './egress-proxy/ProxyClient.ts';
-import type { ProxyRules, RewriteRule } from './egress-proxy/ProxyRules.ts';
 import { startProxyServer } from './egress-proxy/StartProxyServer.ts';
-import type { TcpRelay } from './egress-proxy/TcpRelay.ts';
 import { startLookupRecorder } from './lookup-recorder.ts';
 
 export const PROXY_PORT = 3128;
@@ -35,72 +36,6 @@ export const RECORDS_STATE_FILE = '/tmp/egress-records-state';
 const RECORDS_KEPT = 'kept';
 export const RECORDS_LOST = 'lost';
 
-const field = (value: unknown, name: string): unknown =>
-  typeof value === 'object' && value !== null && !Array.isArray(value) ? Object.getOwnPropertyDescriptor(value, name)?.value : undefined;
-
-// A URL origin written exactly as the URL parser would write it, such as "http://127.0.0.1:4310".
-function readOrigin(value: unknown): string | null {
-  if (typeof value !== 'string') return null;
-  try {
-    return new URL(value).origin === value ? value : null;
-  } catch {
-    return null;
-  }
-}
-
-function readOrigins(value: unknown): readonly string[] | null {
-  if (!Array.isArray(value)) return null;
-  const origins = value.map(readOrigin);
-  return origins.every((origin) => origin !== null) ? origins : null;
-}
-
-function readRewriteRule(value: unknown): RewriteRule | null {
-  const origin = readOrigin(field(value, 'origin'));
-  const rewrite = field(value, 'rewrite');
-  const name = field(rewrite, 'name');
-  const find = field(rewrite, 'find');
-  const replace = field(rewrite, 'replace');
-  if (origin === null || typeof name !== 'string' || typeof find !== 'string' || typeof replace !== 'string') return null;
-  const decoded: ResponseRewrite = { name, find, replace };
-  return { origin, rewrite: decoded };
-}
-
-// A host a relay connects to: a DNS name or an IP address, as a URL's host name holds it.
-const RELAY_HOST = /^[A-Za-z0-9.:_-]{1,253}$/;
-
-function readTcpRelay(value: unknown): TcpRelay | null {
-  const host = field(value, 'host');
-  const port = field(value, 'port');
-  const isPrivate = field(value, 'private');
-  if (typeof host !== 'string' || !RELAY_HOST.test(host) || typeof isPrivate !== 'boolean') return null;
-  if (typeof port !== 'number' || !Number.isInteger(port) || port < 1 || port > 65_535) return null;
-  return { host, port, private: isPrivate };
-}
-
-// The proxy's rules from their JSON text, or null when the text is not exactly that shape.
-export function readProxyRules(text: string): ProxyRules | null {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(text);
-  } catch {
-    return null;
-  }
-  const allowedOrigins = readOrigins(field(parsed, 'allowedOrigins'));
-  const privateOrigins = readOrigins(field(parsed, 'privateOrigins'));
-  const rawRewrites = field(parsed, 'rewrites');
-  if (allowedOrigins === null || privateOrigins === null || !Array.isArray(rawRewrites)) return null;
-  const rewrites = rawRewrites.map(readRewriteRule);
-  if (!rewrites.every((rule) => rule !== null)) return null;
-  const rules: ProxyRules = { allowedOrigins, privateOrigins, rewrites };
-  // TCP relays are present only for a database command's run.
-  const rawRelays = field(parsed, 'tcpRelays');
-  if (rawRelays === undefined) return rules;
-  if (!Array.isArray(rawRelays)) return null;
-  const tcpRelays = rawRelays.map(readTcpRelay);
-  if (!tcpRelays.every((relay) => relay !== null)) return null;
-  return { ...rules, tcpRelays };
-}
-
 // One decision line written by the proxy container, or null when the line is anything else.
 export function readProxyDecision(line: string): ProxyDecision | null {
   let parsed: unknown;
@@ -109,8 +44,8 @@ export function readProxyDecision(line: string): ProxyDecision | null {
   } catch {
     return null;
   }
-  const origin = field(parsed, 'origin');
-  const decision = field(parsed, 'decision');
+  const origin = ownField(parsed, 'origin');
+  const decision = ownField(parsed, 'decision');
   if (typeof origin !== 'string' || origin === '' || (decision !== 'allowed' && decision !== 'blocked')) return null;
   return { origin, decision };
 }
@@ -123,8 +58,8 @@ export function readAppliedRewrite(line: string): AppliedRewrite | null {
   } catch {
     return null;
   }
-  const origin = readOrigin(field(parsed, 'origin'));
-  const name = field(parsed, 'name');
+  const origin = readExactOrigin(ownField(parsed, 'origin'));
+  const name = ownField(parsed, 'name');
   if (origin === null || typeof name !== 'string' || name === '') return null;
   return { origin, name };
 }
@@ -155,8 +90,8 @@ export function startRecordKeeping(stateFile: string): RecordKeeper {
 
 async function main(): Promise<number> {
   const rules = readProxyRules(process.env[RULES_VARIABLE] ?? '');
-  if (rules === null) {
-    console.error(`${RULES_VARIABLE} does not hold the egress proxy's rules`);
+  if (!rules.ok) {
+    console.error(`${RULES_VARIABLE} does not hold the egress proxy's rules: ${rules.error.message}`);
     return 2;
   }
   const records = startRecordKeeping(RECORDS_STATE_FILE);
@@ -166,7 +101,7 @@ async function main(): Promise<number> {
   if (hasRunAddresses) {
     await startRefusalsServer(browserRefusals);
   }
-  const proxy = await startProxyServer(rules, {
+  const started = await startProxyServer(rules.value, {
     listenHost: '0.0.0.0', port: PROXY_PORT,
     ...(hasRunAddresses ? { client: ProxyClient.Browser, servicePort: SERVICE_PROXY_PORT } : {}),
     onDecision: (decision, client) => {
@@ -176,8 +111,13 @@ async function main(): Promise<number> {
       }
     },
     onRewriteApplied: (applied) => records.append(REWRITES_FILE, applied),
+    onListenerFailure: (failure) => console.error(`an egress proxy listener failed: ${failure.message}`),
   });
-  console.log(`egress proxy listening at ${proxy.url}`);
+  if (!started.ok) {
+    console.error(`the egress proxy did not start: ${started.error.message}`);
+    return 1;
+  }
+  console.log(`egress proxy listening at ${started.value.url}`);
   if (process.env[LOOKUPS_VARIABLE] === '1') {
     // Without the recorder, egress is still blocked: only the record of ignored-proxy attempts is lost.
     try {
@@ -190,4 +130,11 @@ async function main(): Promise<number> {
   return 0;
 }
 
-if (import.meta.main) process.exitCode = await main();
+if (import.meta.main) {
+  const exitCode = await main();
+  // Exiting outright, since a failed proxy may leave the refusals server listening, which would keep
+  // the container running with no proxy in it.
+  if (exitCode !== 0) {
+    process.exit(exitCode);
+  }
+}

@@ -16,7 +16,7 @@ import {
 import { request as sendHttpRequest, type ClientRequest, type IncomingMessage, type OutgoingHttpHeaders } from 'node:http';
 import { isIP, type Socket } from 'node:net';
 import { connect as connectSecurely, rootCertificates } from 'node:tls';
-import { EGRESS_DECISION_HEADER } from './egress-proxy/EgressDecisionHeader.ts';
+import { EGRESS_DECISION_HEADER, EgressDecisionMark, parseEgressDecisionMark } from './egress-proxy/EgressDecisionHeader.ts';
 import type { EgressProxy } from './egress-proxy/EgressProxy.ts';
 
 // The request's headers as name and value text, in the declaration's order, for writing on the wire.
@@ -47,7 +47,7 @@ export type ServiceCallerOptions = {
   readonly timeouts?: ServiceCallerTimeouts;
   // PEM certificates trusted for HTTPS besides the system's own, such as a test certificate
   // authority. None unless given.
-  readonly trustedCertificates?: readonly string[];
+  readonly trustedCertificates?: readonly string[] | undefined;
 };
 
 const LONGEST_CALL_MILLISECONDS = 120_000;
@@ -181,6 +181,11 @@ function sendThroughTunnel(
   tunnelRequest.end();
 }
 
+const FAILURE_OF_MARK = {
+  [EgressDecisionMark.Blocked]: 'egress-blocked',
+  [EgressDecisionMark.Unreachable]: 'service-unreachable',
+} as const satisfies Record<EgressDecisionMark, string>;
+
 // Reads one answer. An answer the proxy marked as its own is its refusal or failure; any other is
 // the service's, returned with its status as received, a redirect included. The body is read one byte
 // past `maximumResponseBytes` and no further: only the engine can say what a status means, so a longer
@@ -189,7 +194,7 @@ function readAnswer(answer: IncomingMessage, maximumResponseBytes: number, finis
   answer.on('error', () => finish(failure('service-unreachable')));
   const mark = answer.headers[EGRESS_DECISION_HEADER];
   if (mark !== undefined) {
-    finish(failure(mark === 'blocked' ? 'egress-blocked' : 'service-unreachable'));
+    finish(failure(FAILURE_OF_MARK[parseEgressDecisionMark(mark)]));
     return;
   }
   const chunks: Buffer[] = [];

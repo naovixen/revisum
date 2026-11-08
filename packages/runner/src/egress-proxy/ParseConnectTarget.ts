@@ -1,7 +1,9 @@
 import { bareHost, type BareHost } from "./BareHost.ts";
 import { MALFORMED_REQUEST_ORIGIN } from "./MalformedRequestOrigin.ts";
 
-const AUTHORITY = /^(\[[0-9a-fA-F:.%a-zA-Z]+\]|[^:[\]/\s]+):(\d{1,5})$/;
+// A name holds nothing the URL parser would read past: a name before an @ is a credential, and the
+// tunnel would go to whatever came after it.
+const AUTHORITY = /^(\[[0-9a-fA-F:.%a-zA-Z]+\]|[^:[\]/\\?#@\s]+):(\d{1,5})$/;
 const LAST_PORT = 65_535;
 
 export const ConnectTargetKind = { Malformed: "malformed", HostAndPort: "host-and-port" } as const;

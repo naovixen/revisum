@@ -63,7 +63,9 @@ export const BRAND_OWNERS: Readonly<Record<string, readonly string[]>> = {
   Locale: [PROJECT_PARSER],
   TimeZone: [PROJECT_PARSER],
   PlannerUrl: [PROJECT_PARSER],
-  Origin: ['packages/engine/src/project/ReadOrigin.ts'],
+  // The egress proxy's rules are read in runner, which may not import the engine.
+  Origin: ['packages/engine/src/project/ReadOrigin.ts', 'packages/runner/src/egress-proxy/ReadExactOrigin.ts'],
+  ProxyRules: ['packages/runner/src/egress-proxy/ParseProxyRules.ts'],
   // A run's base URL is read where it enters, or taken from an origin the project parser read.
   BaseUrl: ['packages/engine/src/ParseBaseUrl.ts'],
   // Declared services and calls are read with the project; a plan names a call and its fields by

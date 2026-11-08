@@ -3,7 +3,8 @@ import type { Socket } from "node:net";
 import { isLoopbackAddress } from "../address-check.ts";
 import { VettingKind, type AddressVetter, type ReachableVetting } from "./AddressVetter.ts";
 import type { BareHost } from "./BareHost.ts";
-import type { ConnectInTurn } from "./ConnectInTurn.ts";
+import { startConnectDeadline, type ConnectDeadline } from "./ConnectDeadline.ts";
+import { ConnectOutcomeKind, type ConnectInTurn, type ConnectOutcome } from "./ConnectInTurn.ts";
 import type { OriginDeclaration } from "./OriginDeclaration.ts";
 import type { ProxyClient } from "./ProxyClient.ts";
 import type { ProxyRecord } from "./ProxyRecord.ts";
@@ -58,28 +59,47 @@ function connectionFailureMessage(
         : `Could not connect to ${origin} (${failure.message}). Either nothing answers there, or this machine reaches the network only through a proxy, and a machine proxy isn't supported yet.`;
 }
 
+const connectionTo = (
+    vetting: ReachableVetting,
+    target: OutboundTarget,
+    connectInTurn: ConnectInTurn,
+    deadline: ConnectDeadline,
+): Promise<ConnectOutcome> =>
+    vetting.kind === VettingKind.NoAddress
+        ? Promise.resolve({ kind: ConnectOutcomeKind.Failed, failure: vetting.failure })
+        : connectInTurn(vetting.addresses, target.port, deadline);
+
 export function createOutboundGate(ports: OutboundGatePorts): OutboundGate {
     const { vetAddresses, connectInTurn, record } = ports;
-    return async (target, abandoned) => {
-        const vetting = await vetAddresses(target.host, target.declaration);
+    const passThrough = async (
+        target: OutboundTarget,
+        abandoned: AbortSignal,
+        deadline: ConnectDeadline,
+    ): Promise<GateOutcome> => {
+        const vetting = await vetAddresses(target.host, target.declaration, deadline);
         if (vetting.kind === VettingKind.Refused) {
             record.noteDecision(target.seen, EgressDecision.Blocked, target.client);
             return { kind: GateOutcomeKind.Refused };
         }
         record.noteDecision(target.seen, EgressDecision.Allowed, target.client);
-        const connection =
-            vetting.kind === VettingKind.NoAddress
-                ? vetting.failure
-                : await connectInTurn(vetting.addresses, target.port, abandoned);
-        if (!(connection instanceof Error)) {
-            return { kind: GateOutcomeKind.Connected, socket: connection };
+        const connection = await connectionTo(vetting, target, connectInTurn, deadline);
+        if (connection.kind === ConnectOutcomeKind.Connected) {
+            return { kind: GateOutcomeKind.Connected, socket: connection.socket };
         }
         if (!abandoned.aborted) {
             record.noteConnectionFailure(
                 target.seen,
-                connectionFailureMessage(target.seen, vetting, connection),
+                connectionFailureMessage(target.seen, vetting, connection.failure),
             );
         }
         return { kind: GateOutcomeKind.Unreachable };
+    };
+    return async (target, abandoned) => {
+        const deadline = startConnectDeadline(abandoned);
+        try {
+            return await passThrough(target, abandoned, deadline);
+        } finally {
+            deadline.stop();
+        }
     };
 }

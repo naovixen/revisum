@@ -1,11 +1,11 @@
 import { EgressDecision } from "@revisum/contracts";
 import { request, type ClientRequest, type IncomingMessage, type ServerResponse } from "node:http";
 import type { Socket } from "node:net";
+import { abortedOnClose } from "./AbortedOnClose.ts";
 import { pipedDelivery, rewritingDelivery, type AnswerDelivery } from "./AnswerDelivery.ts";
 import type { ClientTreatment } from "./ClientTreatment.ts";
 import { EgressDecisionMark } from "./EgressDecisionHeader.ts";
 import { forwardedHeaders } from "./ForwardedHeaders.ts";
-import { abortedOnClose } from "./OpenSockets.ts";
 import type { DeclarationLookup } from "./OriginDeclaration.ts";
 import { GateOutcomeKind, type OutboundGate } from "./OutboundGate.ts";
 import { parseRequestTarget, RequestTargetKind, type RequestTarget } from "./ParseRequestTarget.ts";
@@ -105,11 +105,22 @@ function carryRequest(
 
 export function createRequestForwarder(ports: RequestForwarderPorts): RequestForwarder {
     const { declarationOf, gate, rewrites, record } = ports;
-    const deliveryFor = (response: ServerResponse, origin: string): AnswerDelivery => {
+    const deliveryFor = (exchange: Exchange, origin: string): AnswerDelivery => {
         const originRewrites = rewrites.filter((rule) => rule.origin === origin);
         return originRewrites.length === 0
-            ? pipedDelivery(response)
-            : rewritingDelivery(response, origin, originRewrites, record.noteRewriteApplied);
+            ? pipedDelivery(exchange.response)
+            : rewritingDelivery({
+                  response: exchange.response,
+                  origin,
+                  rewrites: originRewrites,
+                  noteRewriteApplied: record.noteRewriteApplied,
+                  declineOversized: () => {
+                      declineAsUnreachable(
+                          exchange,
+                          "the service's answer was too long to rewrite",
+                      );
+                  },
+              });
     };
     return async (incoming, response, treatment) => {
         const abandoned = abortedOnClose(response);
@@ -145,7 +156,7 @@ export function createRequestForwarder(ports: RequestForwarderPorts): RequestFor
         } else if (outcome.kind === GateOutcomeKind.Unreachable) {
             declineAsUnreachable(exchange, SERVICE_DID_NOT_ANSWER);
         } else {
-            carryRequest(exchange, target, outcome.socket, deliveryFor(response, target.origin));
+            carryRequest(exchange, target, outcome.socket, deliveryFor(exchange, target.origin));
         }
     };
 }

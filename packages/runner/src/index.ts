@@ -14,16 +14,20 @@ export { noSuchNameAnswer, readDnsQuestion, type DnsQuestion } from './lookup-re
 export { hostAndPort } from '@revisum/contracts';
 export { joinEgressEvents } from './egress-events.ts';
 export { buildEgressPolicy, type EgressPolicyError, type EgressPolicyInput } from './egress-policy.ts';
-export type { AddressConnector, AddressResolver } from './egress-proxy/AddressResolver.ts';
+export type { AddressConnector } from './egress-proxy/AddressConnector.ts';
+export type { AddressResolver } from './egress-proxy/AddressResolver.ts';
 export { EGRESS_DECISION_HEADER, type EgressDecisionMark } from './egress-proxy/EgressDecisionHeader.ts';
 export type { EgressProxy } from './egress-proxy/EgressProxy.ts';
+export { parseProxyRules, proxyRules, readProxyRules, type ProxyRulesRefusal } from './egress-proxy/ParseProxyRules.ts';
 export { ProxyClient } from './egress-proxy/ProxyClient.ts';
-export type { ConnectionFailure } from './egress-proxy/ProxyRecord.ts';
-export { proxyRules, type ProxyRules, type RewriteRule } from './egress-proxy/ProxyRules.ts';
+export type { ProxyCloseFailure } from './egress-proxy/ProxyListeners.ts';
+export type { ConnectionFailure, ListenerFailure } from './egress-proxy/ProxyRecord.ts';
+export type { ParsedRewriteRule, ProxyRules, RewriteRule } from './egress-proxy/ProxyRules.ts';
+export type { ProxyStartFailure } from './egress-proxy/ProxyStartFailure.ts';
 export { startEgressProxy, type EgressProxyOptions } from './egress-proxy/StartEgressProxy.ts';
 export { startProxyServer, type ProxyServerOptions } from './egress-proxy/StartProxyServer.ts';
 export { readBrowserRefusals } from './ReadBrowserRefusals.ts';
-export { readProxyDecision, readProxyRules } from './proxy-container.ts';
+export { readProxyDecision } from './proxy-container.ts';
 export { RUN_IMAGE_RECORD, RUN_IMAGE_TAG, prepareRunImage, readImageDigest, type RunImage, type RunImageError } from './run-image.ts';
 export {
   bodyText, headerFields, serviceCaller, type ServiceCallerOptions, type ServiceCallerTimeouts,

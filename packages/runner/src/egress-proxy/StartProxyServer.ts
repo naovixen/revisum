@@ -1,35 +1,30 @@
-import { hostAndPort } from "@revisum/contracts";
+import { hostAndPort, success, type Result } from "@revisum/contracts";
 import { createServer, type IncomingMessage, type Server } from "node:http";
-import { createServer as createTcpServer, type Server as TcpServer } from "node:net";
+import { createServer as createTcpServer } from "node:net";
 import type { Duplex } from "node:stream";
-import { isPlainHttpOrigin } from "../egress-events.ts";
-import {
-    directConnector,
-    systemResolver,
-    type AddressConnector,
-    type AddressResolver,
-} from "./AddressResolver.ts";
+import { directConnector, type AddressConnector } from "./AddressConnector.ts";
+import { systemResolver, type AddressResolver } from "./AddressResolver.ts";
 import { createAddressVetter } from "./AddressVetter.ts";
 import { TREATMENT_OF_CLIENT } from "./ClientTreatment.ts";
 import { connectingInTurn } from "./ConnectInTurn.ts";
 import type { EgressProxy } from "./EgressProxy.ts";
-import { createRequestForwarder } from "./RequestForwarder.ts";
-import { listenOn } from "./ListenOn.ts";
 import { createOpenSockets } from "./OpenSockets.ts";
-import { createTunnelOpener } from "./TunnelOpener.ts";
-import { declarationLookup, OriginDeclaration } from "./OriginDeclaration.ts";
+import { declarationLookup } from "./OriginDeclaration.ts";
 import { createOutboundGate } from "./OutboundGate.ts";
 import { ProxyClient } from "./ProxyClient.ts";
+import { createProxyListeners, type PlannedListener } from "./ProxyListeners.ts";
 import { createProxyRecord, type ProxyRecordListeners } from "./ProxyRecord.ts";
 import type { ProxyRules } from "./ProxyRules.ts";
-import { createTcpConnectionRelay, type RelayTcpConnection } from "./RelayTcpConnection.ts";
-import type { TcpRelay } from "./TcpRelay.ts";
+import type { ProxyStartFailure } from "./ProxyStartFailure.ts";
+import { createTcpConnectionRelay } from "./RelayTcpConnection.ts";
+import { createRequestForwarder } from "./RequestForwarder.ts";
+import { createTunnelOpener } from "./TunnelOpener.ts";
 
 export type ProxyServerOptions = ProxyRecordListeners & {
     // A service unless given.
     readonly client?: ProxyClient;
-    readonly resolve?: AddressResolver;
-    readonly connect?: AddressConnector;
+    readonly resolve?: AddressResolver | undefined;
+    readonly connect?: AddressConnector | undefined;
     // Where the proxy listens: 127.0.0.1 on a free port unless given.
     readonly listenHost?: string;
     readonly port?: number;
@@ -41,65 +36,12 @@ export type ProxyServerOptions = ProxyRecordListeners & {
 const LOOPBACK_LISTEN_HOST = "127.0.0.1";
 const ANY_FREE_PORT = 0;
 
-// Each relay listens before the proxy's own port does, so a proxy that answers relays too.
-async function listeningRelays(
-    relays: readonly TcpRelay[],
-    listenHost: string,
-    relayConnection: RelayTcpConnection,
-): Promise<readonly TcpServer[]> {
-    const relayServers: TcpServer[] = [];
-    try {
-        for (const relay of relays) {
-            const relayServer = createTcpServer((client) => {
-                void relayConnection(client, relay);
-            });
-            relayServers.push(relayServer);
-            await listenOn(relayServer, relay.port, listenHost);
-        }
-    } catch (error) {
-        for (const relayServer of relayServers) {
-            relayServer.close();
-        }
-        throw error;
-    }
-    return relayServers;
-}
-
-function portOf(server: Server): number {
-    const address = server.address();
-    if (address === null || typeof address === "string") {
-        throw new Error("the egress proxy's listener has no port");
-    }
-    return address.port;
-}
-
-const closedServer = (server: Server): Promise<void> =>
-    new Promise<void>((resolveClosed) => {
-        server.closeAllConnections();
-        server.close(() => {
-            resolveClosed();
-        });
-    });
-
-// Starts a proxy from rules that are already plain text, as the proxy's container does. A rewrite of
-// anything but a declared plain-HTTP origin, or a port that can't be listened on, rejects.
+// Starts a proxy from rules the parser has read. Never rejects: a port that can't be listened on is a
+// failed outcome, with every listener already opened closed again.
 export async function startProxyServer(
     rules: ProxyRules,
     options: ProxyServerOptions = {},
-): Promise<EgressProxy> {
-    const declarationOfOrigin = declarationLookup(rules, (origin) => origin);
-    const declarationOfHost = declarationLookup(rules, hostAndPort);
-    // EgressPolicy is not branded, so a policy built by hand gets here without the builder's checks.
-    const refusedRewrite = rules.rewrites.find(
-        (rule) =>
-            declarationOfOrigin(rule.origin) === OriginDeclaration.Undeclared ||
-            !isPlainHttpOrigin(rule.origin),
-    );
-    if (refusedRewrite !== undefined) {
-        throw new Error(
-            `a response rewrite may change only a declared plain-HTTP origin, not ${refusedRewrite.origin}`,
-        );
-    }
+): Promise<Result<EgressProxy, ProxyStartFailure>> {
     const record = createProxyRecord(options);
     const sockets = createOpenSockets();
     const gate = createOutboundGate({
@@ -108,24 +50,20 @@ export async function startProxyServer(
         record,
     });
     const forward = createRequestForwarder({
-        declarationOf: declarationOfOrigin,
+        declarationOf: declarationLookup(rules, (origin) => origin),
         gate,
         rewrites: rules.rewrites,
         record,
     });
     const openTunnel = createTunnelOpener({
-        declarationOf: declarationOfHost,
+        declarationOf: declarationLookup(rules, hostAndPort),
         gate,
         sockets,
         record,
     });
-    const listenHost = options.listenHost ?? LOOPBACK_LISTEN_HOST;
-    const relayServers = await listeningRelays(
-        rules.tcpRelays ?? [],
-        listenHost,
-        createTcpConnectionRelay({ gate, sockets }),
-    );
-    const listeningFor = async (client: ProxyClient, port: number): Promise<Server> => {
+    const relayConnection = createTcpConnectionRelay({ gate, sockets });
+
+    const proxyServerFor = (client: ProxyClient): Server => {
         const treatment = TREATMENT_OF_CLIENT[client];
         const server = createServer((incoming, response) => {
             void forward(incoming, response, treatment);
@@ -133,28 +71,43 @@ export async function startProxyServer(
         server.on("connect", (incoming: IncomingMessage, socket: Duplex, head: Buffer) => {
             void openTunnel(incoming, socket, head, treatment);
         });
-        await listenOn(server, port, listenHost);
         return server;
     };
-    const serviceServers =
-        options.servicePort === undefined
+
+    // Each relay listens before the proxy's own port does, so a proxy that answers relays too. The
+    // proxy's own port comes last, so its port is the one given back.
+    const planned: readonly PlannedListener[] = [
+        ...(rules.tcpRelays ?? []).map((relay) => ({
+            server: createTcpServer((client) => {
+                void relayConnection(client, relay);
+            }),
+            port: relay.port,
+        })),
+        ...(options.servicePort === undefined
             ? []
-            : [await listeningFor(ProxyClient.Service, options.servicePort)];
-    const server = await listeningFor(
-        options.client ?? ProxyClient.Service,
-        options.port ?? ANY_FREE_PORT,
-    );
-    return {
-        url: `http://${listenHost}:${portOf(server)}`,
+            : [{ server: proxyServerFor(ProxyClient.Service), port: options.servicePort }]),
+        {
+            server: proxyServerFor(options.client ?? ProxyClient.Service),
+            port: options.port ?? ANY_FREE_PORT,
+        },
+    ];
+    const listenHost = options.listenHost ?? LOOPBACK_LISTEN_HOST;
+    const listeners = createProxyListeners({
+        listenHost,
+        sockets,
+        noteFailure: record.noteListenerFailure,
+    });
+    const listening = await listeners.openInOrder(planned);
+    if (!listening.ok) {
+        return listening;
+    }
+    return success({
+        url: `http://${listenHost}:${listening.value}`,
         decisions: record.decisions,
+        refusedOrigins: record.refusedOrigins,
         rewritesApplied: record.rewritesApplied,
         connectionFailures: record.connectionFailures,
-        close: async () => {
-            sockets.destroyAll();
-            for (const relayServer of relayServers) {
-                relayServer.close();
-            }
-            await Promise.all([server, ...serviceServers].map(closedServer));
-        },
-    };
+        listenerFailures: record.listenerFailures,
+        close: listeners.close,
+    });
 }

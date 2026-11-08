@@ -1,5 +1,5 @@
-import type { EventEmitter } from "node:events";
 import type { Duplex } from "node:stream";
+import { abortedOnClose } from "./AbortedOnClose.ts";
 
 // Every open socket of one proxy, so that closing the proxy can end them.
 export type OpenSockets = {
@@ -9,15 +9,6 @@ export type OpenSockets = {
     readonly adoptClient: (client: Duplex) => AbortSignal;
     readonly destroyAll: () => void;
 };
-
-// Aborts once the client's side has closed, so the proxy stops connecting on its behalf.
-export function abortedOnClose(clientSide: EventEmitter): AbortSignal {
-    const controller = new AbortController();
-    clientSide.once("close", () => {
-        controller.abort();
-    });
-    return controller.signal;
-}
 
 export function createOpenSockets(): OpenSockets {
     const open = new Set<Duplex>();
