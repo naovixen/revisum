@@ -1235,9 +1235,6 @@
     }
   },
   "packages/runner/src/run-image.ts": {
-    "@typescript-eslint/no-unsafe-assignment": {
-      "count": 3
-    },
     "curly": {
       "count": 7
     },

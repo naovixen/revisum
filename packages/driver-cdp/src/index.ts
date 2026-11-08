@@ -1,6 +1,7 @@
 // Public entry point: the own Chromium driver over the Chrome DevTools Protocol, and the CDP
 // connection and launcher that the accessibility engine also uses.
 export { cdpDriver, type CdpDriverOptions } from "./CdpDriver.ts";
+export { parseProxyServer, type ProxyServer } from "./capabilities/SessionEgress.ts";
 export {
     egressThroughExistingProxy,
     type ConnectionFailure,

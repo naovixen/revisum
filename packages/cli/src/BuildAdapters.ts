@@ -4,6 +4,7 @@
 import {
     cdpDriver,
     egressThroughExistingProxy,
+    parseProxyServer,
     type EgressSource,
     type OwnBrowserDriver,
 } from "@revisum/driver-cdp";
@@ -80,9 +81,7 @@ export const startHostSessionEgress: EgressSource = async (allowedOrigins) => {
         ],
         close: async () => {
             const closed = await proxy.close();
-            if (!closed.ok) {
-                throw new Error(closed.error.message);
-            }
+            return closed.ok ? success(undefined) : failure(closed.error.message);
         },
     });
 };
@@ -208,8 +207,14 @@ const keptOpen = (session: Session): Promise<ClosedSession> =>
 // when the run ends. The run opens only its cleared target, the one the session was opened for.
 function driverOnTheCrawlSession(browser: BrowserDriver, session: Session): BrowserDriver {
     const shared = new Proxy(session, {
-        get: (target, property): unknown =>
-            property === "close" ? () => keptOpen(session) : Reflect.get(target, property),
+        get: (target, property): unknown => {
+            if (property === "close") {
+                return () => keptOpen(session);
+            }
+            const value: unknown = Reflect.get(target, property);
+            // A class's private state is reachable only with the instance itself as `this`.
+            return typeof value === "function" ? value.bind(target) : value;
+        },
     });
     return {
         info: browser.info,
@@ -343,15 +348,18 @@ export const buildAdapters = {
         readonly secretNames: readonly SecretName[];
         readonly environment: NodeJS.ProcessEnv;
     }): Result<ContainerCrawlPorts, "no-egress-proxy"> {
-        const proxyServer = environment["HTTP_PROXY"]?.trim();
-        if (proxyServer === undefined || proxyServer === "") {
+        const proxyServer = parseProxyServer(environment["HTTP_PROXY"]?.trim() ?? "");
+        if (!proxyServer.ok) {
             return failure("no-egress-proxy");
         }
         const secrets = environmentSecretStore(
             Object.fromEntries(secretNames.map((name) => [name, environment[name]])),
         );
         return success({
-            browser: buildAdapters.containerBrowserDriver({ executablePath, proxyServer }),
+            browser: buildAdapters.containerBrowserDriver({
+                executablePath,
+                proxyServer: proxyServer.value,
+            }),
             secrets,
             redactor: withDeclaredSecretRedaction(defaultRedactor(), secretNames, secrets),
             audit: discardingAudit,

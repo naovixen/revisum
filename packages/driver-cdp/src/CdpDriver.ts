@@ -1,6 +1,6 @@
 // The own CDP driver: launches Chromium itself and speaks the Chrome DevTools Protocol over a
 // WebSocket, with no third-party automation library.
-import { failure, success } from "@revisum/contracts";
+import { failure, success, type Result } from "@revisum/contracts";
 import { openSessionEgress, type EgressSource } from "./capabilities/SessionEgress.ts";
 import { errorText } from "./connection/ErrorText.ts";
 import { chromiumBuild } from "./launch/ChromiumBuild.ts";
@@ -10,6 +10,7 @@ import {
     type AttachedBrowser,
     type BrowserSource,
 } from "./launch/SharedBrowser.ts";
+import { closeFailureOf, type Closer } from "./session/CloseInTurn.ts";
 import { createSession } from "./session/CreateSession.ts";
 import type { OwnBrowserDriver } from "./session/DriverSession.ts";
 
@@ -60,7 +61,7 @@ export function cdpDriver(options: CdpDriverOptions): OwnBrowserDriver {
                 return failure({ reason: "launch-failed", detail: opened.error });
             }
             const sessionEgress = opened.value;
-            const closeEgress = (): Promise<void> => sessionEgress.egress.close();
+            const closeEgress = (): Promise<Result<void, string>> => sessionEgress.egress.close();
             let attached: AttachedBrowser;
             try {
                 attached = await attachBrowser(options, target.locale);
@@ -102,16 +103,12 @@ function attachBrowser(options: CdpDriverOptions, locale: string): Promise<Attac
 }
 
 // Why a session did not open, then anything that also went wrong clearing up after it.
-async function detailAfterClosing(
-    error: unknown,
-    closers: readonly (() => Promise<void>)[],
-): Promise<string> {
+async function detailAfterClosing(error: unknown, closers: readonly Closer[]): Promise<string> {
     const details = [errorText(error)];
     for (const close of closers) {
-        try {
-            await close();
-        } catch (closeError) {
-            details.push(`closing what it had opened failed too: ${errorText(closeError)}`);
+        const closeFailure = await closeFailureOf(close);
+        if (closeFailure !== null) {
+            details.push(`closing what it had opened failed too: ${closeFailure}`);
         }
     }
     return details.join("; ");

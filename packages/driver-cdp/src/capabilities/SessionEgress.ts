@@ -1,5 +1,4 @@
 import { failure, success, type Brand, type Result } from "@revisum/contracts";
-import { errorText } from "../connection/ErrorText.ts";
 import { LOOPBACK_THROUGH_PROXY, type ProxySettings } from "../launch/SessionEgressChromeFlags.ts";
 
 // A declared origin the egress could not connect to, with what to tell whoever is running.
@@ -14,7 +13,8 @@ export type SessionEgress = {
     // A diagnostic for whoever is running, which stays out of the hashed result. It also holds any
     // failure of the egress itself while it ran, named after the egress rather than an origin.
     connectionFailures(): readonly ConnectionFailure[];
-    close(): Promise<void>;
+    // Says whether the egress closed, and if not, why. It never rejects for that.
+    close(): Promise<Result<void, string>>;
 };
 
 // Starts a session's egress. The allow-list first exists when a session opens, so the source is asked
@@ -50,17 +50,25 @@ export const egressThroughExistingProxy =
                 sinceOpening = atClose.ok
                     ? success(atClose.value.slice(refusedBeforeOpening))
                     : atClose;
+                return success(undefined);
             },
         });
     };
 
-type ProxyServer = Brand<string, "ProxyServer">;
+export type ProxyServer = Brand<string, "ProxyServer">;
 
-// An empty proxyServer creates a browser context without error, and everything in it then goes
-// direct, even with a browser-wide proxy up. So nothing else may reach a context's proxy.
-function parseProxyServer(server: string): Result<ProxyServer, string> {
-    if (server.trim() === "") {
-        return failure("the session's egress named no proxy server");
+// A host name, a container's name or a bracketed IPv6 address, then a port of up to five digits.
+const PROXY_ADDRESS = /^https?:\/\/(?:\[[0-9A-Fa-f:.]+\]|[A-Za-z0-9._-]+):([0-9]{1,5})$/;
+const HIGHEST_PORT = 65_535;
+
+// Chrome takes more in a context's proxyServer than a proxy: an empty value or `direct://` sends the
+// context straight out, even with a browser-wide proxy up, and a list or a socks entry goes elsewhere
+// than the egress. So nothing but one http or https address with a port may reach a context's proxy.
+// The value is left out of the reason, since a proxy's address can hold a password.
+export function parseProxyServer(server: string): Result<ProxyServer, string> {
+    const port = PROXY_ADDRESS.exec(server)?.[1];
+    if (port === undefined || Number(port) === 0 || Number(port) > HIGHEST_PORT) {
+        return failure("the session's egress named no proxy at one http(s)://host:port address");
     }
     return success(server as ProxyServer);
 }
@@ -101,10 +109,6 @@ export async function openSessionEgress(
 }
 
 async function reasonAfterClosing(reason: string, egress: SessionEgress): Promise<string> {
-    try {
-        await egress.close();
-        return reason;
-    } catch (error) {
-        return `${reason}; its egress did not close: ${errorText(error)}`;
-    }
+    const closed = await egress.close();
+    return closed.ok ? reason : `${reason}; its egress did not close: ${closed.error}`;
 }

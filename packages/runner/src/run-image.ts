@@ -49,9 +49,7 @@ function readRecord(path: string): RunImage | null {
     return null;
   }
   if (typeof parsed !== 'object' || parsed === null) return null;
-  const id = Reflect.get(parsed, 'id');
-  const baseImage = Reflect.get(parsed, 'baseImage');
-  const dockerfileSha256 = Reflect.get(parsed, 'dockerfileSha256');
+  const { id, baseImage, dockerfileSha256 } = parsed as Readonly<Record<string, unknown>>;
   if (typeof id !== 'string' || typeof baseImage !== 'string' || typeof dockerfileSha256 !== 'string') return null;
   const digest = readImageDigest(id);
   return digest === null ? null : { id: digest, baseImage, dockerfileSha256 };

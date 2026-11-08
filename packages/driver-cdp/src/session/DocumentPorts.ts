@@ -10,6 +10,7 @@ import {
     type SessionEnvironment,
 } from "@revisum/contracts";
 import { errorText } from "../connection/ErrorText.ts";
+import { pageAnswers } from "../in-page/AfterTwoFrames.ts";
 import type { CheckedDocument, HitChecks } from "../page/HitChecks.ts";
 import { PageHeldByDialog } from "../page/PageHeldByDialog.ts";
 import type { PageOperations } from "../page/PageOperations.ts";
@@ -28,7 +29,7 @@ import {
 } from "./DocumentScope.ts";
 import { downloadOnDocument } from "./DownloadOnDocument.ts";
 import { rejectsSelector } from "./FindElements.ts";
-import { forAtMost, notAnswering, TIMED_OUT } from "./ForAtMost.ts";
+import { forAtMost, notAnswering, SHORTEST_INPUT_MILLISECONDS, TIMED_OUT } from "./ForAtMost.ts";
 import { probeDocument } from "./ProbeDocument.ts";
 import { auditPage, readLinkTargets, readPage } from "./ReadPage.ts";
 import { runPageScript } from "./RunPageScript.ts";
@@ -72,10 +73,27 @@ async function navigateDocument<Handle>(
         if (refused !== null) {
             return failure(refused);
         }
-        return settled === TIMED_OUT ? failure(notAnswering(timeout)) : success(undefined);
+        return settled === TIMED_OUT && !(await isHeldByItsOwnScript(scope))
+            ? failure(notAnswering(timeout))
+            : success(undefined);
     } catch (error) {
         return failure(failureOfNavigation(scope, error));
     }
+}
+
+// Whether a settle that ran out of time was only the page's own script holding its thread, on a page
+// the navigate reached, which is for the next step to find unreadable. A navigation of the page's own
+// still on its way is not that, however little the page answers meanwhile: that is the navigate's
+// effect not having arrived. Nor is a page that still answers and just never settled.
+async function isHeldByItsOwnScript<Handle>(scope: DocumentScope<Handle>): Promise<boolean> {
+    if ((await forAtMost(0, scope.events.navigationEnded())) === TIMED_OUT) {
+        return false;
+    }
+    const answered = await forAtMost(
+        Math.min(SHORTEST_INPUT_MILLISECONDS, scope.timeout),
+        scope.operations.callForString(pageAnswers, []),
+    );
+    return answered === TIMED_OUT;
 }
 
 // A dead page says so before a dialog does. A dialog that opened as the document loaded is the

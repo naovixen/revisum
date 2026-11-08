@@ -23,3 +23,8 @@ export async function afterTwoFrames(): Promise<string> {
     await nextFrame();
     return "ok";
 }
+
+// Answers as soon as the page's thread is free to run anything at all.
+export function pageAnswers(): string {
+    return "ok";
+}
