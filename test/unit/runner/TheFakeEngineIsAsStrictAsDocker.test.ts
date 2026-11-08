@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import { success } from "@revisum/contracts";
-import { fakeRunner } from "#test-support/fakes/FakeRunner.ts";
+import { fakeRunEnding, fakeRunner } from "#test-support/fakes/FakeRunner.ts";
 import { fakeRunnerHandle } from "#test-support/fakes/FakeRunnerHandle.ts";
 import type { ContainerOptions } from "@revisum/runner";
 import { fakeContainerEngine, type FakeEngineSettings } from "./fake-container-engine.ts";
@@ -80,11 +80,7 @@ describe("Using a fake runner's handle", () => {
             test("then it should fail, as a real handle does", async () => {
                 const kept = fakeRunnerHandle();
                 const runner = fakeRunner({
-                    withRun: async (image, policy, use) => {
-                        const value = await use(kept);
-                        kept.end();
-                        return success(value);
-                    },
+                    withRun: (image, policy, use) => fakeRunEnding(kept, use),
                 });
                 await runner.withRun(imageDigest(PINNED_IMAGE_ID), egressPolicy({}), () =>
                     Promise.resolve(),
