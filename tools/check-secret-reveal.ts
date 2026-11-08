@@ -25,7 +25,7 @@ const DEFINING_MODULE = 'packages/contracts/src/secret.ts';
 //     sends the request.
 // Add a module here only with a reason beside it.
 export const REVEAL_ALLOWED_MODULES: readonly string[] = [
-  'packages/driver-cdp/src/browser-session.ts',
+  'packages/driver-cdp/src/session/TextToFill.ts',
   'packages/engine/src/secrets/secret-values.ts',
   'packages/runner/src/service-caller.ts',
 ];

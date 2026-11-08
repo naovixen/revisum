@@ -1,7 +1,7 @@
 // Reading and logging where a failure must not reject the run. By then the steps have a verdict, or
 // the run has ended before them, and a person needs the result more than anything a broken session
 // or log has left to say.
-import { RunReviewItemCode, StepCode } from "@revisum/contracts";
+import { RunReviewItemCode, StepCode, type Result } from "@revisum/contracts";
 import type { Logger } from "../../logging.ts";
 import { errorText } from "../CodeForThrow.ts";
 import { RECORD_UNREAD, recordRead, type RecordRead } from "./RecordRead.ts";
@@ -41,6 +41,22 @@ export function readRecord<Value>(read: () => Value, logger: Logger): RecordRead
         logFailureAfterTheVerdict(FailureAfterTheVerdictCode.SessionRecordsUnread, error, logger);
         return RECORD_UNREAD;
     }
+}
+
+// A record the closed session gave, or, when it could not say, unread, with why logged.
+export function closedSessionRecord<Value>(
+    record: Result<Value, string>,
+    logger: Logger,
+): RecordRead<Value> {
+    if (!record.ok) {
+        logFailureAfterTheVerdict(
+            FailureAfterTheVerdictCode.SessionRecordsUnread,
+            record.error,
+            logger,
+        );
+        return RECORD_UNREAD;
+    }
+    return recordRead(record.value);
 }
 
 export function logFailureAfterTheVerdict(

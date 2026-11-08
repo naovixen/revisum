@@ -213,6 +213,7 @@ revisum/
 
 - Inside a package, folders are named after what they hold: `src/plan/`, `src/policy/`, `src/audit-log/`, never `src/p3/` or `src/r11/`.
 - One concept per file, named after its main export: `policy-gate.ts` exports `evaluatePolicy`.
+- `driver-cdp/src/` holds `connection/` (the CDP socket, commands and event decoders), `launch/` (starting and stopping Chromium), `page/` (one page's commands, reads and input), `in-page/` (functions that run in the page), `session/` (the session's ports, built once over any page) and `capabilities/` (downloads, egress, network stubs, clock, clipboard, storage, audit rules).
 - Customer repositories may hold `plans/scripts/`, the page scripts their project declares (SPEC-36). Like everything under `plans/`, they are trusted files.
 
 **Action:** SPEC-00 creates this tree; CI fails if a source file sits outside `packages/*/src` or a test sits outside `test/`.

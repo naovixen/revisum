@@ -62,7 +62,7 @@ async function runStepOnLivePage(
         }
         // A request the browser would not let go on stays held, so neither a pass nor a failure of this
         // step says anything about the app: the run could not test. The reason goes to the log at the end.
-        const isRequestHeld = context.session.refusedRequestDecisions().length > 0;
+        const isRequestHeld = context.session.isRequestHeld();
         switch (executed.outcome) {
             case ExecutorOutcome.SetupFailedInside: {
                 const failed: RanStepResult = { index, type: step.type, ...executed.failed };
@@ -90,7 +90,7 @@ function deniedWhateverTheSessionSays(
     context: SessionContext,
 ): DeniedStep {
     try {
-        context.session.refusedRequestDecisions();
+        context.session.isRequestHeld();
     } catch (error) {
         codeForThrow(error, document, context.logger);
     }

@@ -1,16 +1,15 @@
 // What a run does once its steps have a verdict: the plan's cleanup, whatever the outcome, then what
 // the egress refused, which the result claims, and the run's last log entries.
 import {
-    failure,
     RunReviewItemCode,
     StepOutcome,
     success,
     TerminalState,
     type CleanupResult,
     type Denial,
+    type ClosedSession,
     type Result,
     type RunReviewItem,
-    type Session,
 } from "@revisum/contracts";
 import { runCleanup } from "../../service-calls/call-steps.ts";
 import type { SessionContext } from "../executors/StepExecutor.ts";
@@ -21,7 +20,11 @@ import {
     type RecordsAfterTheSteps,
     type RecordsBeforeTheEgress,
 } from "./RecordsAfterTheSteps.ts";
-import { logFailureAfterTheVerdict, readKeepingTheResult } from "./ReadKeepingTheResult.ts";
+import {
+    closedSessionRecord,
+    logFailureAfterTheVerdict,
+    readKeepingTheResult,
+} from "./ReadKeepingTheResult.ts";
 
 export type AfterTheVerdict = {
     readonly cleanup: readonly CleanupResult[] | undefined;
@@ -71,12 +74,11 @@ function endOfTheRun(finished: FinishedRun, records: RecordsAfterTheSteps): EndO
     };
 }
 
-// What the run's last part uses: the plan's cleanup and how it calls, the closed session's records
+// What the run's last part uses: the plan's cleanup and how it calls, what the closed session left,
 // and the log.
-type AfterTheVerdictContext = Pick<
-    SessionContext,
-    "cleared" | "calls" | "commands" | "session" | "logger"
->;
+type AfterTheVerdictContext = Pick<SessionContext, "cleared" | "calls" | "commands" | "logger"> & {
+    readonly closed: ClosedSession;
+};
 
 export async function afterTheVerdict(
     context: AfterTheVerdictContext,
@@ -94,7 +96,7 @@ export async function afterTheVerdict(
             ? [{ code: RunReviewItemCode.CleanupFailed, cleanupIndex: done.index }]
             : [],
     );
-    const blockedRead = readBlockedOrigins(context.session);
+    const blockedRead = readBlockedOrigins(context.closed);
     if (!blockedRead.ok) {
         logFailureAfterTheVerdict(
             RunReviewItemCode.EgressUnread,
@@ -112,12 +114,9 @@ export async function afterTheVerdict(
 // The result claims what the egress refused and is hashed with that claim in it. So this is the one
 // record read after the verdict that can't take an empty default: an empty list says nothing was
 // refused, and when that isn't known the run has no verdict to give.
-function readBlockedOrigins(session: Session): Result<readonly string[], unknown> {
-    try {
-        return success([...new Set(session.blockedOrigins())].sort());
-    } catch (error) {
-        return failure(error);
-    }
+function readBlockedOrigins(closed: ClosedSession): Result<readonly string[], string> {
+    const blocked = closed.blockedOrigins;
+    return blocked.ok ? success([...new Set(blocked.value)].sort()) : blocked;
 }
 
 // The connections that failed, the origins the egress refused and the state the run ended in.
@@ -126,10 +125,11 @@ function logTheEnd(
     blocked: readonly string[],
     end: EndOfTheRun,
 ): void {
-    const { session, logger } = context;
+    const { closed, logger } = context;
+    const connectionFailures = closedSessionRecord(closed.connectionFailures, logger);
     readKeepingTheResult(
         () => {
-            for (const { origin, message } of session.connectionFailures()) {
+            for (const { origin, message } of readValueOr(connectionFailures, [])) {
                 logger.log({ kind: "session.connection-failed", origin, detail: message });
             }
         },

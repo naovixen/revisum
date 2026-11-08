@@ -6,7 +6,7 @@
 // storage go through the session's network and storage ports; clock advances and clipboard reads
 // through its clock and clipboard ports; page scripts through its script port. Database commands
 // go through the run's DatabaseCommandRunner port, which runs each in a workload container.
-import { StepCode, type PlanRunResult, type Session } from "@revisum/contracts";
+import { StepCode, type ClosedSession, type PlanRunResult } from "@revisum/contracts";
 import { plan as planRun, resolve, targetUnavailable, type Planned } from "../lifecycle.ts";
 import type { Logger } from "../logging.ts";
 import { buildManifest, manifestHash } from "../manifest.ts";
@@ -17,7 +17,7 @@ import {
     logFailureAfterTheVerdict,
     logKeepingTheResult,
     readKeepingTheResult,
-    readRecord,
+    closedSessionRecord,
 } from "./after-the-verdict/ReadKeepingTheResult.ts";
 import { readValueOr, type RecordRead } from "./after-the-verdict/RecordRead.ts";
 import {
@@ -91,12 +91,17 @@ export async function runPlan(
         const unavailable = targetUnavailable(planned, inSession.error);
         return unavailableResult(target.id, unavailable.unavailable, nothingRan, startedAt);
     }
-    return finishAfterTheSteps(inSession.value, context, nothingRan, startedAt);
+    return finishAfterTheSteps(
+        inSession.value.used,
+        inSession.value.closed,
+        context,
+        nothingRan,
+        startedAt,
+    );
 }
 
 // What the steps leave once the session has closed.
 type StepsInTheSession = {
-    readonly session: Session;
     readonly manifestInputs: ManifestInputs;
     readonly ran: StepsRun;
 };
@@ -122,19 +127,20 @@ async function runTheStepsInTheSession(
     const ran = isPlanLogged
         ? await runTheSteps(stepContext, resolved, driver.info.id)
         : stepsNotRunForTheLog(stepContext, resolved);
-    return { session, manifestInputs, ran };
+    return { manifestInputs, ran };
 }
 
 // The verdict, what comes after it, and the seal.
 async function finishAfterTheSteps(
     inSession: StepsInTheSession,
+    closed: ClosedSession,
     context: RunContext,
     nothingRan: NothingRanContext,
     startedAt: number,
 ): Promise<PlanRunResult> {
-    const { session, manifestInputs, ran } = inSession;
+    const { manifestInputs, ran } = inSession;
     const { logger, ports } = context;
-    const refusals = refusalsAfterTheVerdict(session, logger);
+    const refusals = refusalsAfterTheVerdict(closed, logger);
     const readBeforeTheEgress: RecordsBeforeTheEgress = {
         refusals,
         rewrites: ran.rewrites,
@@ -144,7 +150,7 @@ async function finishAfterTheSteps(
     const verdict = isVerdictLostToTheRecords(ran.finished, readBeforeTheEgress)
         ? ran
         : verdictAfterRefusals(ran, readValueOr(refusals, []), logger);
-    const after = await afterTheVerdict({ ...context, session }, verdict, readBeforeTheEgress);
+    const after = await afterTheVerdict({ ...context, closed }, verdict, readBeforeTheEgress);
     const rewrites = readValueOr(ran.rewrites, []);
     const manifest =
         rewrites.length === 0
@@ -175,8 +181,11 @@ async function finishAfterTheSteps(
 }
 
 // The request decisions the browser refused, read once the session has closed, each logged.
-function refusalsAfterTheVerdict(session: Session, logger: Logger): RecordRead<readonly string[]> {
-    const refusals = readRecord(() => session.refusedRequestDecisions(), logger);
+function refusalsAfterTheVerdict(
+    closed: ClosedSession,
+    logger: Logger,
+): RecordRead<readonly string[]> {
+    const refusals = closedSessionRecord(closed.refusedRequestDecisions, logger);
     for (const refusal of readValueOr(refusals, [])) {
         logFailureAfterTheVerdict(StepCode.AdapterError, refusal, logger);
     }

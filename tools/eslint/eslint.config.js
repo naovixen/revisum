@@ -13,11 +13,23 @@ const GENERIC_NAME_ENDINGS = "(Manager|Helper|Util|Utils)$";
 // The files whose top-level functions run inside the page. The in-page rule checks that each uses
 // nothing from its module, and that no other file sends a function to the page.
 const IN_PAGE_FILES = [
-    "packages/driver-cdp/src/in-page.ts",
-    "packages/driver-cdp/src/FindByLabel.ts",
-    "packages/driver-cdp/src/NodesAPressPasses.ts",
-    "packages/driver-cdp/src/ArmHitCheck.ts",
-    "packages/driver-cdp/src/page-audit.ts",
+    "packages/driver-cdp/src/in-page/Actionability.ts",
+    "packages/driver-cdp/src/in-page/AdvanceDocumentClock.ts",
+    "packages/driver-cdp/src/in-page/AfterTwoFrames.ts",
+    "packages/driver-cdp/src/in-page/ArmHitCheck.ts",
+    "packages/driver-cdp/src/in-page/EnabledState.ts",
+    "packages/driver-cdp/src/in-page/FindByLabel.ts",
+    "packages/driver-cdp/src/in-page/FocusAndSelect.ts",
+    "packages/driver-cdp/src/in-page/GuardDetails.ts",
+    "packages/driver-cdp/src/in-page/MaskElements.ts",
+    "packages/driver-cdp/src/in-page/NodesAPressPasses.ts",
+    "packages/driver-cdp/src/in-page/PageAudit.ts",
+    "packages/driver-cdp/src/in-page/PageInfo.ts",
+    "packages/driver-cdp/src/in-page/ProbeElement.ts",
+    "packages/driver-cdp/src/in-page/ReadClipboardText.ts",
+    "packages/driver-cdp/src/in-page/ScriptResultText.ts",
+    "packages/driver-cdp/src/in-page/StructuralSelectorValidity.ts",
+    "packages/driver-cdp/src/in-page/WindowOfTheDocument.ts",
 ];
 
 const everywhereSyntax = [

@@ -184,7 +184,7 @@
   },
   "packages/cli/src/explore-crawl.ts": {
     "@typescript-eslint/require-await": {
-      "count": 3
+      "count": 2
     },
     "curly": {
       "count": 14
@@ -370,137 +370,7 @@
       "count": 1
     }
   },
-  "packages/driver-cdp/src/browser-build.ts": {
-    "curly": {
-      "count": 2
-    },
-    "revisum/file-name-matches-export": {
-      "count": 1
-    }
-  },
-  "packages/driver-cdp/src/browser-session.ts": {
-    "@typescript-eslint/naming-convention": {
-      "count": 2
-    },
-    "curly": {
-      "count": 40
-    },
-    "max-lines": {
-      "count": 1
-    },
-    "max-lines-per-function": {
-      "count": 1
-    },
-    "revisum/file-name-matches-export": {
-      "count": 1
-    }
-  },
-  "packages/driver-cdp/src/cdp-connection.ts": {
-    "curly": {
-      "count": 3
-    },
-    "no-restricted-syntax": {
-      "count": 9
-    },
-    "revisum/file-name-matches-export": {
-      "count": 1
-    }
-  },
-  "packages/driver-cdp/src/cdp-driver.ts": {
-    "@typescript-eslint/naming-convention": {
-      "count": 2
-    },
-    "@typescript-eslint/no-base-to-string": {
-      "count": 1
-    },
-    "@typescript-eslint/no-unused-vars": {
-      "count": 1
-    },
-    "@typescript-eslint/require-await": {
-      "count": 1
-    },
-    "@typescript-eslint/restrict-template-expressions": {
-      "count": 1
-    },
-    "curly": {
-      "count": 34
-    },
-    "max-lines": {
-      "count": 1
-    },
-    "revisum/file-name-matches-export": {
-      "count": 1
-    }
-  },
-  "packages/driver-cdp/src/chrome-flags.ts": {
-    "revisum/file-name-matches-export": {
-      "count": 1
-    }
-  },
-  "packages/driver-cdp/src/chromium-launcher.ts": {
-    "@typescript-eslint/naming-convention": {
-      "count": 1
-    },
-    "revisum/file-name-matches-export": {
-      "count": 1
-    }
-  },
-  "packages/driver-cdp/src/downloads.ts": {
-    "@typescript-eslint/naming-convention": {
-      "count": 2
-    },
-    "curly": {
-      "count": 10
-    },
-    "no-control-regex": {
-      "count": 1
-    },
-    "revisum/file-name-matches-export": {
-      "count": 1
-    }
-  },
-  "packages/driver-cdp/src/egress-records.ts": {
-    "curly": {
-      "count": 1
-    },
-    "revisum/file-name-matches-export": {
-      "count": 1
-    }
-  },
-  "packages/driver-cdp/src/in-page.ts": {
-    "@typescript-eslint/naming-convention": {
-      "count": 12
-    },
-    "curly": {
-      "count": 23
-    },
-    "revisum/file-name-matches-export": {
-      "count": 1
-    }
-  },
-  "packages/driver-cdp/src/modifier-keys.ts": {
-    "curly": {
-      "count": 1
-    },
-    "no-nested-ternary": {
-      "count": 1
-    },
-    "revisum/file-name-matches-export": {
-      "count": 1
-    }
-  },
-  "packages/driver-cdp/src/network-stubs.ts": {
-    "@typescript-eslint/naming-convention": {
-      "count": 1
-    },
-    "curly": {
-      "count": 17
-    },
-    "revisum/file-name-matches-export": {
-      "count": 1
-    }
-  },
-  "packages/driver-cdp/src/page-audit.ts": {
+  "packages/driver-cdp/src/in-page/PageAudit.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 5
     },
@@ -508,52 +378,6 @@
       "count": 23
     },
     "max-lines-per-function": {
-      "count": 1
-    },
-    "revisum/file-name-matches-export": {
-      "count": 1
-    }
-  },
-  "packages/driver-cdp/src/page-operations.ts": {
-    "revisum/file-name-matches-export": {
-      "count": 1
-    }
-  },
-  "packages/driver-cdp/src/page-watch.ts": {
-    "@typescript-eslint/naming-convention": {
-      "count": 2
-    },
-    "curly": {
-      "count": 9
-    },
-    "revisum/file-name-matches-export": {
-      "count": 1
-    }
-  },
-  "packages/driver-cdp/src/run-clipboard.ts": {
-    "curly": {
-      "count": 3
-    },
-    "revisum/file-name-matches-export": {
-      "count": 1
-    }
-  },
-  "packages/driver-cdp/src/virtual-clock.ts": {
-    "@typescript-eslint/naming-convention": {
-      "count": 2
-    },
-    "curly": {
-      "count": 11
-    },
-    "revisum/file-name-matches-export": {
-      "count": 1
-    }
-  },
-  "packages/driver-cdp/src/web-storage.ts": {
-    "curly": {
-      "count": 2
-    },
-    "revisum/file-name-matches-export": {
       "count": 1
     }
   },

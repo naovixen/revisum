@@ -341,26 +341,45 @@ export interface SessionTab extends DocumentSession {
   close(): Promise<void>;
 }
 
-// One open browser session: every driver port together.
-export interface Session extends SessionTab {
-  readonly browser: { readonly name: string; readonly version: string };
+// What a session has noted about its requests and connections. Each record is what it says, or why
+// it could not say: an empty list means nothing was noted, never that the record went unread.
+export type SessionRecords = {
   // Origins of the requests that were refused and seen by the browser or the proxy, as evidence that
   // the run stayed hermetic. Not every attempt: what never reaches either, such as WebRTC's UDP, sends
   // nothing and leaves nothing to show.
-  blockedOrigins(): readonly string[];
+  readonly blockedOrigins: Result<readonly string[], string>;
   // Declared origins the session could not connect to, each with what to tell whoever is running. A
   // machine's network says nothing about the app, so these go to the run's log and stay out of the
-  // result and its hash. Complete once the session has closed.
-  connectionFailures(): readonly { readonly origin: string; readonly message: string }[];
+  // result and its hash.
+  readonly connectionFailures: Result<readonly { readonly origin: string; readonly message: string }[], string>;
   // Why the browser refused each of the driver's decisions on the session's requests, and each request
   // it held that the driver could not read to decide on. A refused request stays held, so nothing that
   // happens after it says anything about the app, and a run with one cannot pass. A page that gave up
-  // on a request, or a tab that has gone, is no refusal. The text
-  // goes to the run's log and stays out of the result and its hash. Complete once the session has
-  // closed.
-  refusedRequestDecisions(): readonly string[];
-  // Ends the session; every process it started exits.
-  close(): Promise<void>;
+  // on a request, or a tab that has gone, is no refusal. The text goes to the run's log and stays out
+  // of the result and its hash.
+  readonly refusedRequestDecisions: Result<readonly string[], string>;
+};
+
+// What a session leaves once it has closed: its records, now complete, and what went wrong closing
+// it. Only close gives one.
+export type ClosedSession = SessionRecords & {
+  // What stopped part of the close, such as a browser profile the system still holds; null when all
+  // of it closed. The records are read all the same, once everything the close could end has ended.
+  readonly closeFailure: string | null;
+};
+
+// One open browser session: every driver port together.
+export interface Session extends DocumentSession {
+  readonly browser: { readonly name: string; readonly version: string };
+  // True once the browser has refused a decision of the driver's on one of the session's requests, or
+  // held one the driver could not read, so far: what the session's records will list.
+  isRequestHeld(): boolean;
+  // What the session has noted so far. Incomplete until it has closed, so a result reads what close
+  // gives, and reads this only for a session whose close did not finish.
+  recordsSoFar(): SessionRecords;
+  // Ends the session; every process it started exits. It never rejects: what went wrong closing is in
+  // the record it gives. Closing again gives the same record and does nothing more.
+  close(): Promise<ClosedSession>;
   // Opens the URL in a new tab of the session's own browser context, so it shares cookies and
   // storage, with the same environment, egress control and determinism script as the first tab.
   // The tab's blocked origins join this session's.
