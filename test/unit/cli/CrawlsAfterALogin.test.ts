@@ -4,13 +4,13 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import { crawlInBrowser } from "@revisum/cli";
-import { success, type ExploreOptions, type Target } from "@revisum/engine";
+import { failure, success, type ExploreOptions, type Session, type Target } from "@revisum/engine";
 import { clearRun } from "#test-support/policy-clearance.ts";
 import { fakeDriverOpening } from "#test-support/fakes/FakeDriver.ts";
 import { fakeEventSink } from "#test-support/fakes/FakeEventSink.ts";
 import { fakeRedactor } from "#test-support/fakes/FakeRedactor.ts";
 import { fakeSecretStore } from "#test-support/fakes/FakeSecretStore.ts";
-import { closedSession, fakeSession } from "#test-support/fakes/FakeSession.ts";
+import { closedSession, fakeSession, type FakeSession } from "#test-support/fakes/FakeSession.ts";
 import { ORIGIN } from "../engine/plan-examples.ts";
 import { parsedPlan } from "../engine/secret-examples.ts";
 import {
@@ -47,6 +47,43 @@ const LOGIN_PLAN = {
         },
     ],
 };
+
+const WHY_THE_CLOSE_FAILED = "the crawl's profile folder is still held";
+const WHY_THE_CRAWL_THREW = "the driver broke while reading the page";
+
+const THE_HOME_PAGE = {
+    url: `${ORIGIN}/`,
+    title: "Home",
+    meta: [],
+    canonicalUrl: null,
+};
+
+function sessionWhoseCloseFails(changes: Partial<Session> = {}): FakeSession {
+    return fakeSession({
+        page: () => Promise.resolve(success(THE_HOME_PAGE)),
+        close: () => Promise.resolve({ ...closedSession(), closeFailure: WHY_THE_CLOSE_FAILED }),
+        ...changes,
+    });
+}
+
+async function crawlOn(session: Session): ReturnType<typeof crawlInBrowser> {
+    const trusted = await trustedProjectWith(MATRIX);
+    return crawlInBrowser(fakeDriverOpening(session), {
+        project: projectWith(MATRIX),
+        target: targetOf(trusted, "chromium-desktop"),
+        options: OPTIONS,
+        redactor: fakeRedactor(),
+        secrets: fakeSecretStore(),
+        audit: fakeEventSink(),
+    });
+}
+
+function assertCarriesTheCloseFailure(crawled: unknown): void {
+    assert.ok(
+        JSON.stringify(crawled).includes(WHY_THE_CLOSE_FAILED),
+        `the close's failure was not carried along: ${JSON.stringify(crawled)}`,
+    );
+}
 
 describe("Using the crawl in a browser", () => {
     describe("given a login plan cleared for the matrix's second target", () => {
@@ -91,43 +128,57 @@ describe("Using the crawl in a browser", () => {
     });
 
     describe("given a session whose close reports a failure", () => {
-        describe("when the crawl has run", () => {
-            test("then it should say so, in the crawl's outcome or its audit log", async () => {
-                const whyTheCloseFailed = "the crawl's profile folder is still held";
-                const trusted = await trustedProjectWith(MATRIX);
-                const desktop: Target = targetOf(trusted, "chromium-desktop");
-                const session = fakeSession({
-                    page: () =>
+        describe("when the crawl finishes", () => {
+            test("then it should keep the page map and carry the close's failure along", async () => {
+                const session = sessionWhoseCloseFails();
+                const crawled = await crawlOn(session);
+                assert.ok(crawled.ok, JSON.stringify(crawled));
+                assert.equal(crawled.value.pages.length, 1);
+                assertCarriesTheCloseFailure(crawled);
+                assert.equal(session.calls.count("close"), 1);
+            });
+        });
+
+        describe("when the crawl stops for its own reason", () => {
+            test("then it should keep that reason and carry the close's failure along", async () => {
+                const session = sessionWhoseCloseFails({
+                    navigate: () =>
                         Promise.resolve(
-                            success({
-                                url: `${ORIGIN}/`,
-                                title: "Home",
-                                meta: [],
-                                canonicalUrl: null,
-                            }),
+                            failure({ code: "navigation-failed", detail: "the site is down" }),
                         ),
-                    close: () =>
-                        Promise.resolve({
-                            ...closedSession(),
-                            closeFailure: whyTheCloseFailed,
-                        }),
                 });
-                const audit = fakeEventSink();
-                const crawled = await crawlInBrowser(fakeDriverOpening(session), {
-                    project: projectWith(MATRIX),
-                    target: desktop,
-                    options: OPTIONS,
-                    redactor: fakeRedactor(),
-                    secrets: fakeSecretStore(),
-                    audit,
+                const crawled = await crawlOn(session);
+                assert.ok(!crawled.ok, JSON.stringify(crawled));
+                assert.equal(crawled.error, "explore-start-unreachable");
+                assertCarriesTheCloseFailure(crawled);
+                assert.equal(session.calls.count("close"), 1);
+            });
+        });
+
+        describe("when the crawl throws", () => {
+            test("then it should reject with its own throw and carry the close's failure along", async () => {
+                const session = sessionWhoseCloseFails({
+                    page: () => Promise.reject(new Error(WHY_THE_CRAWL_THREW)),
                 });
-                const isInTheOutcome = !crawled.ok;
-                const isInTheLog = JSON.stringify(audit.recorded).includes(whyTheCloseFailed);
-                assert.equal(
-                    isInTheOutcome || isInTheLog,
-                    true,
-                    `the close's failure was reported nowhere: ${JSON.stringify(crawled)}`,
-                );
+                await assert.rejects(crawlOn(session), (error: unknown) => {
+                    assert.ok(error instanceof Error);
+                    assert.ok(error.message.includes(WHY_THE_CRAWL_THREW), error.message);
+                    assert.ok(error.message.includes(WHY_THE_CLOSE_FAILED), error.message);
+                    return true;
+                });
+                assert.equal(session.calls.count("close"), 1);
+            });
+        });
+    });
+
+    describe("given a session that closes", () => {
+        describe("when the crawl throws", () => {
+            test("then it should reject with its own throw alone", async () => {
+                const session = fakeSession({
+                    page: () => Promise.reject(new Error(WHY_THE_CRAWL_THREW)),
+                });
+                await assert.rejects(crawlOn(session), new Error(WHY_THE_CRAWL_THREW));
+                assert.equal(session.calls.count("close"), 1);
             });
         });
     });

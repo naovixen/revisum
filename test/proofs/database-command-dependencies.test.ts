@@ -46,7 +46,7 @@ function foreignModules(source: string, allowedPackages: readonly string[]): str
 function declaredDependencies(packageName: string): Readonly<Record<string, unknown>> {
   const manifest: unknown = JSON.parse(readFileSync(join(PACKAGES, packageName, 'package.json'), 'utf8'));
   assert.ok(typeof manifest === 'object' && manifest !== null && !Array.isArray(manifest), `the ${packageName} manifest is an object`);
-  const fields = new Map(Object.entries(manifest));
+  const fields = new Map<string, unknown>(Object.entries(manifest));
   const declared: Record<string, unknown> = {};
   for (const field of DEPENDENCY_FIELDS) {
     const value = fields.get(field);

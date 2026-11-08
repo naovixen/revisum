@@ -12,8 +12,10 @@
 // the real browser, or with a fake isolated runner. The hostile page and draft are in
 // test/proofs/explore-hostile-page.test.ts.
 import assert from 'node:assert/strict';
-import { test } from 'node:test';
+import { describe, test } from 'node:test';
 import { CLI_OUTPUT_SCHEMA } from '@revisum/cli';
+import { failure } from '@revisum/engine';
+import { sessionWith, wrappingSessions } from '#test-support/browser/WrappingSessions.ts';
 import { jsonAnswer } from '../runner/local-service.ts';
 import { CRITERION_TEXTS, EARLIER_ARTEFACT, EARLIER_ARTEFACT_MARK, GRAMMAR_VERSION, SPEC_PATH, replyWithContent, replyWithoutText } from './draft-command-examples.ts';
 import {
@@ -22,7 +24,7 @@ import {
   OUTPUT_PLANNER_PLACEHOLDER, OUTPUT_REFERENCE_PLACEHOLDER, OUTPUT_SITE_PLACEHOLDER, PAGE_MAP_OUT, PLANNER_DRAFT, PRODUCTION_ORIGIN,
   SIGN_IN_PLAN, SITE_PLACEHOLDER, TARGET_ID, UNDECLARED_ORIGIN, UPKEEP_CALLS,
   allWrittenNodes, approvalOfPlan, containerPageMap, crawlOrder, draftText, everythingExplored, exploreArguments, exploreData,
-  exploreDraftWithLine, exploreErrorCodes, watchedFakeRunner, pageMapReference, pageMapText, plannerRequestTexts, writtenMap,
+  exploreDraftWithLine, exploreErrorCodes, spyBrowser, watchedFakeRunner, pageMapReference, pageMapText, plannerRequestTexts, writtenMap,
   withExploreRun, type ExploreRun, type ExploreSetup, type SessionCall,
 } from './explore-command-examples.ts';
 import { shareBrowserInThisFile } from '#test-support/browser/ShareBrowserInThisFile.ts';
@@ -529,6 +531,52 @@ test('with --host, the crawl runs in a host session limited to the start origin,
     assert.deepEqual(run.browser?.opened.map((environment) => environment.allowedOrigins), [[run.site.origin]]);
     assert.equal(writtenMap(run).guaranteeLevel, 'host');
     assert.equal(exploreData(run)['egressEnforced'], false);
+  });
+});
+
+const WHY_THE_CLOSE_FAILED = 'the crawl\'s profile folder is still held';
+
+// A host run whose session reports this failure as it closes, with `changes` to the session besides.
+const hostRunWhoseCloseFails = (extra: readonly string[] = ['--json'], changes: Readonly<Record<string, unknown>> = {}): ExploreSetup => {
+  const spy = spyBrowser();
+  const driver = wrappingSessions(spy.driver, (session) => sessionWith(session, {
+    close: async () => ({ ...await session.close(), closeFailure: WHY_THE_CLOSE_FAILED }),
+    ...changes,
+  }));
+  return { argv: (site) => exploreArguments(home(site), ['--host', ...extra]), browser: { ...spy, driver } };
+};
+
+describe('Using the draft command\'s explore mode', () => {
+  describe('given a host crawl whose session fails to close', () => {
+    describe('when the crawl finishes and --json is asked for', () => {
+      test('then it should keep the page map and draft, and the output should say why', async () => {
+        await withExploreRun(hostRunWhoseCloseFails(), (run) => {
+          assert.equal(run.outcome.exitCode, 0, run.outcome.stderr);
+          assert.equal(writtenMap(run).origin, run.site.origin);
+          assert.equal(run.workspace.exists(DRAFT_OUT), true, 'no draft was written');
+          assert.ok(run.outcome.stdout.includes(WHY_THE_CLOSE_FAILED), run.outcome.stdout);
+        });
+      });
+    });
+
+    describe('when the crawl finishes and the output is for a person', () => {
+      test('then it should say why', async () => {
+        await withExploreRun(hostRunWhoseCloseFails([]), (run) => {
+          assert.equal(run.outcome.exitCode, 0, run.outcome.stderr);
+          assert.ok(`${run.outcome.stdout}\n${run.outcome.stderr}`.includes(WHY_THE_CLOSE_FAILED), run.outcome.stdout);
+        });
+      });
+    });
+
+    describe('when the crawl stops for its own reason', () => {
+      test('then it should keep its own code, and the output should say why', async () => {
+        const unreachable = { navigate: () => Promise.resolve(failure({ code: 'navigation-failed', detail: 'the site is down' })) };
+        await withExploreRun(hostRunWhoseCloseFails(['--json'], unreachable), (run) => {
+          assert.deepEqual(exploreErrorCodes(run), ['explore-start-unreachable'], run.outcome.stdout);
+          assert.ok(run.outcome.stdout.includes(WHY_THE_CLOSE_FAILED), run.outcome.stdout);
+        });
+      });
+    });
   });
 });
 

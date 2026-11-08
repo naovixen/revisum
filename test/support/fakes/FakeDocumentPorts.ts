@@ -3,6 +3,7 @@
 // replaced, so a test sees exactly what the ports do with what the page gives.
 import { success, type DocumentSession, type DriverError, type Result } from "@revisum/engine";
 import type { PageEvents } from "../../../packages/driver-cdp/src/page/PageEvents.ts";
+import type { DownloadCapture } from "../../../packages/driver-cdp/src/capabilities/DownloadCapture.ts";
 import type { HitChecks } from "../../../packages/driver-cdp/src/page/HitChecks.ts";
 import { HitCheckOutcome } from "../../../packages/driver-cdp/src/page/HitChecks.ts";
 import {
@@ -21,6 +22,8 @@ export type FakeDocumentOptions = {
     readonly timeoutMilliseconds?: number;
     readonly operations?: Partial<PageOperations<string>>;
     readonly events?: Partial<PageEvents>;
+    readonly hitChecks?: Partial<HitChecks<string>>;
+    readonly downloads?: DownloadCapture;
     readonly fixturePath?: (fixture: string) => Result<string, DriverError>;
 };
 
@@ -76,7 +79,7 @@ export function fakeDocumentPorts(options: FakeDocumentOptions = {}): DocumentSe
     const timeoutMilliseconds = options.timeoutMilliseconds ?? DEFAULT_STEP_TIMEOUT_MILLISECONDS;
     return documentPorts(
         operations,
-        HIT_CHECKS_ON_THE_FAKE_PAGE,
+        { ...HIT_CHECKS_ON_THE_FAKE_PAGE, ...options.hitChecks },
         [operations],
         {
             baseUrl: baseUrlOf(FAKE_ORIGIN),
@@ -89,7 +92,7 @@ export function fakeDocumentPorts(options: FakeDocumentOptions = {}): DocumentSe
         {
             events,
             fixturePath: options.fixturePath ?? (() => success(FAKE_FIXTURE_PATH)),
-            downloads: {
+            downloads: options.downloads ?? {
                 arm: () => {
                     throw new Error("the fake page starts no download");
                 },

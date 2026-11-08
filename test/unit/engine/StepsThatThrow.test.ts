@@ -1,9 +1,10 @@
 // An adapter that throws, or a read of the page that says only that it could not read it, must leave a
 // full account in the result: the step is recorded with adapter-error, every later step is marked
-// skipped, and the run ends Errored.
+// skipped, and the run ends Errored. A tab's or a session's close never rejects: one that breaks that
+// promise keeps what the steps found, and is reported as a close failure in the log.
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { failure } from "@revisum/engine";
+import { failure, type RunEventSink, type Session, type SessionTab } from "@revisum/engine";
 import { fakeSession } from "#test-support/fakes/FakeSession.ts";
 import { fakeSessionOnOrders, runOnFakeSession, stepSummaries } from "./RunOnFakeSession.ts";
 import { CLOSING_CHECK, OPEN_CART, unsafePlan, type JsonRecord } from "./unsafe-feature-steps.ts";
@@ -103,6 +104,30 @@ const UNREADABLE_STEPS: typeof THROWING_STEPS = [
     },
 ];
 
+// A session as a tab whose close breaks its promise by rejecting, as a tab's never should.
+const asTabThatRejectsWhenClosed = (session: Session): SessionTab => ({
+    ...session,
+    close: breaks,
+});
+
+const tabThatWillNotClose = (changes: Partial<Session> = {}): Session =>
+    fakeSessionOnOrders({
+        newTab: () =>
+            Promise.resolve({
+                ok: true,
+                value: asTabThatRejectsWhenClosed(fakeSessionOnOrders(changes)),
+            }),
+    });
+
+const SESSION_CLOSE_FAILED = "session-close-failed";
+
+// The rejection reached the log as a close failure, once, saying why.
+function assertReportedAsCloseFailure(events: RunEventSink): void {
+    const logged = events.read().filter((event) => event.code === SESSION_CLOSE_FAILED);
+    assert.equal(logged.length, 1, JSON.stringify(logged));
+    assert.match(logged[0]?.detail ?? "", new RegExp(ADAPTER_BROKE));
+}
+
 describe("Using the run", () => {
     for (const { name, step, session } of [
         ...THROWING_STEPS.map((given) => ({ ...given, name: `${given.name} throws` })),
@@ -179,6 +204,101 @@ describe("Using the run", () => {
                     assert.equal(result.state, "Failed", JSON.stringify(result.steps));
                     assert.equal(result.steps[1]?.code, "assertion-failed");
                 });
+            });
+        });
+
+        describe("and the tab rejects as it closes", () => {
+            describe("when the run ends", () => {
+                test("then it should keep the check's own failure and report the close", async () => {
+                    const { result, events } = await runOnFakeSession(
+                        unsafePlan([OPEN_CART, newTabHolding(FAILING_CHECK)]),
+                        { session: tabThatWillNotClose() },
+                    );
+                    assert.deepEqual(
+                        { state: result.state, steps: stepSummaries(result) },
+                        {
+                            state: "Failed",
+                            steps: [
+                                ["passed", undefined],
+                                ["failed", "assertion-failed"],
+                                ["skipped", undefined],
+                            ],
+                        },
+                    );
+                    assertReportedAsCloseFailure(events);
+                });
+            });
+        });
+    });
+
+    describe("given a new tab whose check passes", () => {
+        describe("and the tab rejects as it closes", () => {
+            describe("when the run ends", () => {
+                test("then it should keep the pass and report the close", async () => {
+                    const { result, events } = await runOnFakeSession(
+                        unsafePlan([OPEN_CART, newTabHolding(PASSING_CHECK)]),
+                        { session: tabThatWillNotClose() },
+                    );
+                    assert.deepEqual(
+                        { state: result.state, steps: stepSummaries(result) },
+                        {
+                            state: "Passed",
+                            steps: [
+                                ["passed", undefined],
+                                ["passed", undefined],
+                                ["passed", undefined],
+                            ],
+                        },
+                    );
+                    assertReportedAsCloseFailure(events);
+                });
+            });
+        });
+    });
+
+    describe("given a new tab whose step throws", () => {
+        describe("and the tab rejects as it closes", () => {
+            describe("when the run ends", () => {
+                test("then it should still have tried the close, keep the throw as adapter-error and report the close", async () => {
+                    const tab = fakeSession({ screenshot: breaks, close: breaks });
+                    const { result, events } = await runOnFakeSession(
+                        unsafePlan([OPEN_CART, newTabHolding({ type: "capture", name: "cart" })]),
+                        {
+                            session: fakeSession({
+                                newTab: () =>
+                                    Promise.resolve({
+                                        ok: true,
+                                        value: asTabThatRejectsWhenClosed(tab),
+                                    }),
+                            }),
+                        },
+                    );
+                    assert.deepEqual(
+                        { state: result.state, steps: stepSummaries(result) },
+                        {
+                            state: "Errored",
+                            steps: [
+                                ["passed", undefined],
+                                ["failed", "adapter-error"],
+                                ["skipped", undefined],
+                            ],
+                        },
+                    );
+                    assertReportedAsCloseFailure(events);
+                });
+            });
+        });
+    });
+
+    describe("given a session whose close rejects", () => {
+        describe("when the run ends", () => {
+            test("then it should keep the pass and report the close", async () => {
+                const { result, events } = await runOnFakeSession(
+                    unsafePlan([OPEN_CART, PASSING_CHECK]),
+                    { session: fakeSessionOnOrders({ close: breaks }) },
+                );
+                assert.equal(result.state, "Passed", JSON.stringify(result.steps));
+                assertReportedAsCloseFailure(events);
             });
         });
     });
