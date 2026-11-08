@@ -56,6 +56,9 @@ const LONGEST_FILE_NAME = 255;
 const DOWNLOAD_ALREADY_GONE =
     /connection closed|Failed to find browser context|No download item found/;
 
+const isFolderMissing = (error: unknown): boolean =>
+    error instanceof Error && Reflect.get(error, "code") === "ENOENT";
+
 const pause = (milliseconds: number): Promise<void> =>
     new Promise((resolve) => setTimeout(resolve, milliseconds));
 // A path separator, a control character or delete.
@@ -415,11 +418,16 @@ export class DownloadFolder implements DownloadCapture {
         }
     }
 
+    // A folder that has gone holds nothing. One that cannot be read says nothing about what is in it,
+    // so it throws: its bytes must not read as none.
     #entriesOf(folder: string, downloadId: string): readonly string[] {
         try {
             return readdirSync(folder).filter((entry) => entry.startsWith(downloadId));
-        } catch {
-            return [];
+        } catch (error) {
+            if (isFolderMissing(error)) {
+                return [];
+            }
+            throw error;
         }
     }
 }

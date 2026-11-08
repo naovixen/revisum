@@ -4,7 +4,7 @@
 // browser sends is decoded here, at the edge, before anyone else sees it.
 import type { BrowserCommand } from "./BrowserCommand.ts";
 import type { BrowserEvent } from "./BrowserEvent.ts";
-import { CdpError } from "./CdpError.ts";
+import { CdpError, commandTimeoutText } from "./CdpError.ts";
 
 export const DEFAULT_COMMAND_TIMEOUT_MILLISECONDS = 15_000;
 const DEFAULT_CONNECT_TIMEOUT_MILLISECONDS = 15_000;
@@ -176,7 +176,7 @@ export class CdpConnection {
         return new Promise<unknown>((resolve, reject) => {
             const timer = setTimeout(() => {
                 this.#pending.delete(id);
-                reject(new CdpError(method, `timeout after ${timeoutMilliseconds} ms`));
+                reject(new CdpError(method, commandTimeoutText(timeoutMilliseconds)));
             }, timeoutMilliseconds);
             this.#pending.set(id, { resolve, reject, timer, method });
             this.#socket.send(

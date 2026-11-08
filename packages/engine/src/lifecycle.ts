@@ -3,8 +3,9 @@
 //
 //   Planned ──► Resolved ──► Running ──► Passed | Failed | Errored | Denied
 //      ├──► TargetUnavailable   (explicit; the engine never substitutes a target)
-//      └──► Refused             (production it may not reach, a secret the store lacks, or something the plan needs
-//                                that this run can't do; no driver is called and no call is made)
+//      ├──► Refused             (production it may not reach, a secret the store lacks, or something the plan needs
+//      │                         that this run can't do; no driver is called and no call is made)
+//      └──► Errored             (a driver that broke its promise of a Result as the session opened)
 //
 // A plan reaches Planned only once the policy gate has authorised it. Denied is the run the gate's
 // runtime guard stopped before an action; the denied action sent no input event.
@@ -13,7 +14,7 @@ import type {
 } from '@revisum/contracts';
 
 type Transitions = {
-  readonly Planned: 'Resolved' | 'TargetUnavailable' | 'Refused';
+  readonly Planned: 'Resolved' | 'TargetUnavailable' | 'Refused' | 'Errored';
   readonly Resolved: 'Running';
   readonly Running: 'Passed' | 'Failed' | 'Errored' | 'Denied';
   readonly Passed: never;

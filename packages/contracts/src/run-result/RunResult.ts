@@ -1,6 +1,7 @@
 // What a run gives back, sealed: one shape per way a run can end, so each carries exactly the fields
 // it can have. A plan run ran its steps (Passed, Failed or Errored), was denied by the policy gate's
-// runtime guard, was refused before any driver call, or found its target unavailable. An evidence
+// runtime guard, was refused before any driver call, found its target unavailable, or ended Errored
+// when its driver broke its promise before any step. An evidence
 // run ran its suite, or was refused before any suite code ran. Two plan shapes end Errored: a reader
 // tells them apart by `denial`, which only the one that came from a denied run holds.
 import type { ApprovalLabel } from "../approval.ts";
@@ -109,6 +110,15 @@ export type PlanRefusedResult = RunResultBasis &
         readonly refusal: PlanRefusal;
     };
 
+// A plan run whose driver broke its promise of a Result before any step ran. That says nothing about
+// the target, so the run ends Errored, with no step and no manifest.
+export type PlanDriverBrokeResult = RunResultBasis &
+    PlanRunLabels &
+    NothingRanFields & {
+        readonly state: typeof TerminalState.Errored;
+        readonly unavailable: null;
+    };
+
 // A plan run whose target could not be opened, or is not declared.
 export type TargetUnavailableResult = RunResultBasis &
     PlanRunLabels &
@@ -146,6 +156,7 @@ type EachShape =
     | PlanDeniedResult
     | PlanDeniedThenErroredResult
     | PlanRefusedResult
+    | PlanDriverBrokeResult
     | TargetUnavailableResult
     | SuiteRanResult
     | SuiteRefusedResult;

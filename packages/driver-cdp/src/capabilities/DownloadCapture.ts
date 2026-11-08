@@ -21,6 +21,7 @@ export interface ArmedDownload {
     // Waits up to `beginTimeoutMilliseconds` for the claimed download to start (no-download), then
     // for its last byte. A file over `maximumBytes` is cancelled and its bytes deleted
     // (download-too-large). Stops waiting as soon as `shouldStopWaiting` says the step is over.
+    // Rejects when the session's folder cannot be read, which no outcome here can say.
     finish(
         maximumBytes: number,
         beginTimeoutMilliseconds: number,

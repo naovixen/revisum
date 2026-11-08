@@ -83,7 +83,7 @@ async function launchDriverChromium(
 
 const browserOfItsOwn = (launched: LaunchedChromium): AttachedBrowser => ({
     connection: launched.connection,
-    processId: launched.browserProcess.pid ?? -1,
+    processId: launched.processId,
     isShared: false,
     close: () => launched.stop(),
 });
@@ -103,7 +103,7 @@ export async function launchSharedBrowser(
     return {
         ...settings,
         webSocketUrl: launched.webSocketUrl,
-        processId: browserProcess.pid ?? -1,
+        processId: launched.processId,
         isAlive: () => browserProcess.exitCode === null && browserProcess.signalCode === null,
         stop: () => launched.stop(),
     };

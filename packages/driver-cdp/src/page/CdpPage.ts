@@ -35,7 +35,7 @@ import { CdpPageInput } from "./CdpPageInput.ts";
 import { ClickCheckWorld } from "./ClickCheckWorld.ts";
 import { decodePoint } from "./DecodePoint.ts";
 import type { HeldModifierKey } from "./HeldModifierKeys.ts";
-import { isDocumentGone, isLostObject } from "./LostObject.ts";
+import { isDocumentGone, isFrameOutOfReach, isLostObject } from "./LostObject.ts";
 import { MainWorld } from "./MainWorld.ts";
 import { PageCommands } from "./PageCommands.ts";
 import type { PageFunction } from "./PageFunction.ts";
@@ -53,7 +53,7 @@ import type {
 import type { PageWatch } from "./PageWatch.ts";
 import type { PressCheck, PressSent } from "./PressCheck.ts";
 import { accessibilityTreeOf, exposedStatesOf, roleAndNameOf } from "./RoleAndNameOf.ts";
-import { WhenLoaded } from "./WhenLoaded.ts";
+import { WhenLoaded, type LoadWait } from "./WhenLoaded.ts";
 
 // Where a CdpPage's document is when it is an iframe's: its element in the parent document, and its frame.
 type FrameScope = {
@@ -116,27 +116,40 @@ export class CdpPage implements PageWithInput<string> {
             frameId === undefined
                 ? this.#whenLoaded.topDocument(timeoutMilliseconds)
                 : this.#whenLoaded.frame(frameId, timeoutMilliseconds);
+        // A page that opens a dialog as it loads loads no further until a step answers it, and only a
+        // step after this navigate can, so the navigate ends as one opens. Only one that opens from
+        // now on counts: what the page was showing before is ended by the navigation.
+        const nextDialog = watch.nextDialogOpened();
+        const heldByDialog = nextDialog.promise.then((): never => {
+            throw new PageHeldByDialog(NAVIGATE.method);
+        });
         try {
-            // Sent whatever holds the page: a navigation away ends a dialog, and the browser answers
-            // it. The browser answers once the document's own request has gone on, which a refused
-            // decision stops.
-            const navigated = await watch.failingOnRefusedDecision(
-                watch.ask(NAVIGATE, { url, ...(frameId === undefined ? {} : { frameId }) }),
-            );
-            // An HTTP error status with an empty body is a page the server did send: the browser
-            // shows its own error page for it, and the plan's checks decide what that means.
-            const navigationError = navigated.errorText ?? "";
-            if (navigationError !== "" && navigationError !== HTTP_ERROR_STATUS) {
-                throw new Error(navigationError);
-            }
-            const notLoaded = await watch.failingOnRefusedDecision(
-                watch.failingOnCrash(NAVIGATE.method, loaded.promise),
-            );
-            if (notLoaded !== null) {
-                throw new Error(notLoaded);
-            }
+            await Promise.race([this.#sendAndLoad(url, frameId, loaded), heldByDialog]);
         } finally {
+            nextDialog.cancel();
             loaded.cancel();
+        }
+    }
+
+    async #sendAndLoad(url: string, frameId: string | undefined, loaded: LoadWait): Promise<void> {
+        const watch = this.#commands.watch;
+        // Sent whatever holds the page: a navigation away ends a dialog, and the browser answers
+        // it. The browser answers once the document's own request has gone on, which a refused
+        // decision stops.
+        const navigated = await watch.failingOnRefusedDecision(
+            watch.ask(NAVIGATE, { url, ...(frameId === undefined ? {} : { frameId }) }),
+        );
+        // An HTTP error status with an empty body is a page the server did send: the browser
+        // shows its own error page for it, and the plan's checks decide what that means.
+        const navigationError = navigated.errorText ?? "";
+        if (navigationError !== "" && navigationError !== HTTP_ERROR_STATUS) {
+            throw new Error(navigationError);
+        }
+        const notLoaded = await watch.failingOnRefusedDecision(
+            watch.failingOnCrash(NAVIGATE.method, loaded.promise),
+        );
+        if (notLoaded !== null) {
+            throw new Error(notLoaded);
         }
     }
 
@@ -406,7 +419,8 @@ export class CdpPage implements PageWithInput<string> {
             await this.#commands.isolatedWorld(frameId);
         } catch (error) {
             // A frame whose document runs in another renderer process has no world in this session.
-            if (this.#commands.watch.crashed()) {
+            // Any other failure says nothing about the frame.
+            if (this.#commands.watch.crashed() || !isFrameOutOfReach(error)) {
                 throw error;
             }
             return null;

@@ -6,3 +6,13 @@ export class CdpError extends Error {
         this.method = method;
     }
 }
+
+// What a command fails with when no answer comes in time.
+export const commandTimeoutText = (timeoutMilliseconds: number): string =>
+    `timeout after ${timeoutMilliseconds} ms`;
+
+const COMMAND_TIMEOUT = /timeout after \d+ ms/;
+
+// True when a command ended because no answer came in time.
+export const isCommandTimeout = (error: unknown): boolean =>
+    error instanceof CdpError && COMMAND_TIMEOUT.test(error.message);

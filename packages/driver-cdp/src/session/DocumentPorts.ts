@@ -11,20 +11,23 @@ import {
 } from "@revisum/contracts";
 import { errorText } from "../connection/ErrorText.ts";
 import type { CheckedDocument, HitChecks } from "../page/HitChecks.ts";
+import { PageHeldByDialog } from "../page/PageHeldByDialog.ts";
 import type { PageOperations } from "../page/PageOperations.ts";
 import { actOnDocument } from "./ActOnDocument.ts";
 import {
+    DIALOG_OPEN,
     failureOfRefusedDecision,
     failureOfThrow,
     inputSettled,
     isTopDocument,
     readOfPage,
     SELECTOR_INVALID,
+    waitWithin,
     type DocumentScope,
 } from "./DocumentScope.ts";
 import { downloadOnDocument } from "./DownloadOnDocument.ts";
 import { rejectsSelector } from "./FindElements.ts";
-import { forAtMost } from "./ForAtMost.ts";
+import { forAtMost, notAnswering, TIMED_OUT } from "./ForAtMost.ts";
 import { probeDocument } from "./ProbeDocument.ts";
 import { auditPage, readLinkTargets, readPage } from "./ReadPage.ts";
 import { runPageScript } from "./RunPageScript.ts";
@@ -63,14 +66,26 @@ async function navigateDocument<Handle>(
         );
         // What the page started as it loaded is the navigate's, once it has reached the browser, and
         // a navigation of its own as it loaded may yet turn out to be a download.
-        await forAtMost(timeout, inputSettled(scope));
+        const settled = await forAtMost(timeout, inputSettled(scope));
         const refused = failureOfRefusedDecision(scope, "navigation-failed");
-        return refused === null ? success(undefined) : failure(refused);
+        if (refused !== null) {
+            return failure(refused);
+        }
+        return settled === TIMED_OUT ? failure(notAnswering(timeout)) : success(undefined);
     } catch (error) {
-        return failure(
-            events.crashed() ? CRASHED : { code: "navigation-failed", detail: errorText(error) },
-        );
+        return failure(failureOfNavigation(scope, error));
     }
+}
+
+// A dead page says so before a dialog does. A dialog that opened as the document loaded is the
+// page's to answer for, and a plan can reach a dialog step to answer it.
+function failureOfNavigation<Handle>(scope: DocumentScope<Handle>, error: unknown): DriverError {
+    if (scope.events.crashed()) {
+        return CRASHED;
+    }
+    return error instanceof PageHeldByDialog
+        ? DIALOG_OPEN
+        : { code: "navigation-failed", detail: errorText(error) };
 }
 
 async function frameOf<Handle>(
@@ -86,8 +101,11 @@ async function frameOf<Handle>(
         if (await rejectsSelector(operations, locator)) {
             return failure(SELECTOR_INVALID);
         }
-        const found = await waitUntilFound(operations, locator, scope.timeout, () =>
-            events.crashed(),
+        const found = await waitUntilFound(
+            operations,
+            locator,
+            waitWithin(scope, Date.now() + scope.timeout),
+            () => events.crashed(),
         );
         if (!found.ok) {
             return found;

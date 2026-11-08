@@ -168,6 +168,9 @@ function verifiedOnRow(result: PlanRunResult, stepCount: number): string {
     case TerminalState.Failed:
     case TerminalState.Errored:
     case TerminalState.Denied: {
+      if (result.manifest === null) {
+        return notRunRow(result, 'the browser driver failed', stepCount);
+      }
       const { target, browser } = result.manifest;
       const passed = result.steps.filter((step) => step.outcome === StepOutcome.Passed).length;
       return `| ${result.targetId} | ${browser.name} ${browser.version} | ${target.device} | ${target.locale} | ${target.timezone} | ${result.state} | ${passed} of ${stepCount} |`;

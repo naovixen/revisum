@@ -1,0 +1,20 @@
+# Refactor assumptions to validate
+
+## In short
+
+The founder asked (2026-11-08) for the refactor to run to the end without stopping, taking the recommended option each time and listing the assumptions for validation afterwards. This is that list. Each row says what was decided, why, what else was possible and how to reverse it.
+
+## Decisions
+
+| # | Part | Assumption made | Why | Alternative | To reverse |
+|---|---|---|---|---|---|
+| 1 | Split `cdp-driver` | The `REVEAL_ALLOWED_MODULES` entry moved from `browser-session.ts` to `session/TextToFill.ts` is a move, not a new entry, so it did not wait for a ruling, though the review brief sends new entries to the founder | The same one reveal, for the same fill, moved with its code. The module now sends the text itself and returns nothing | Hold the part until the founder rules | Change the entry in `tools/check-secret-reveal.ts` |
+| 2 | Split `cdp-driver` | The session port gained `recordsSoFar()`, used only for a close that does not finish | A run whose close hangs must keep its egress records and result hash, and a `close()` that has not returned has no value to read | Let such a run end Errored with its egress unread, which changes the result hash | Remove the member and accept the hash change |
+| 3 | Split `cdp-driver` | Closing a tab never rejects; a failure is reported by the session's close. An engine branch and a test fake for a rejecting tab are removed | This is what the real driver does, and one rule lets an adapter be written from the port alone | Have a tab's close give an outcome | Add the outcome to the port |
+| 4 | Split `cdp-driver` | Committed proofs and test fakes were changed where the refactor forced it, without stopping, though the build loop normally stops to ask before changing a committed test | The founder said not to stop; no assertion was loosened | Stop and ask for each | Read the tests commits of this part |
+| 6 | Split `cdp-driver` | A driver that throws against its `Result` contract ends the run `Errored`, in a new public result shape `PlanDriverBrokeResult` (no manifest, no steps), not `TargetUnavailable` | A broken driver says nothing about the target, and a result must not blame it | Report `TargetUnavailable`, as defect row 302 first proposed | Change `engine/src/target/GuardedDriver.ts` and its test |
+| 7 | Split `cdp-driver` | Only the text "No frame for given id found" counts as a frame in another renderer process. **Not observed:** it comes from the existing pattern and memory of Chromium's source, and no test uses a real cross-process iframe | Everything else must surface as `dialog-open` or `timeout`, not `unsupported-step` | Test against a real cross-process iframe | If the text differs, such a frame gives `not-actionable`; correct the match in `page/CdpPage.ts` |
+| 8 | Split `cdp-driver` | Windows stop reads taskkill's English output to tell that a tree has ended. In any other Windows language it falls back to asking the browser to close, as before | taskkill gives exit code 255 for both outcomes, so only its text tells them apart | Treat every 255 as ended, which would hide an access-denied stop | `launch/LaunchChromium.ts` |
+| 9 | Split `cdp-driver` | Once taskkill has ended the tree, stop waits up to 12 s for Node to see the browser exit, up from about 5 s | Under load the exit was seen late and stop wrongly reported the browser as left. It only waits; nothing is sent again | A shorter wait, with the rare false report | `launch/LaunchChromium.ts` |
+| 10 | Split `cdp-driver` | A crawl that finishes but whose browser fails to close stops as `internal`. The close failure's text isn't shown, because `CrawlStop` carries no detail | The failure must be reported, and a new code or audit event was more than this fix needs | A new explore code with detail | `cli/src/explore-crawl.ts` |
+| 5 | Split `cdp-driver` | `PageWatch.ts`, 422 lines with four concerns, stays whole for now. Prettier is held back on it, `Actionability.ts` and `PageAudit.ts`, which it would push over the length limits | The review marked it `consider` and nothing is wrong yet | Split popup holding out now | Split it in phase 4 |

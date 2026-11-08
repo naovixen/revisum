@@ -27,7 +27,7 @@ import {
 } from "./DocumentScope.ts";
 import { rejectsSelector } from "./FindElements.ts";
 import { forAtMost, notAnswering, TIMED_OUT } from "./ForAtMost.ts";
-import { isSecretFill, textToFill } from "./TextToFill.ts";
+import { isSecretFill, typeFill } from "./TextToFill.ts";
 import { CRASHED, waitUntilActionable, waitUntilFound } from "./WaitUntilActionable.ts";
 
 // An action on an element: every action but answering a dialog.
@@ -132,8 +132,11 @@ async function upload<Handle>(
     if (!path.ok) {
         return path;
     }
-    const found = await waitUntilFound(operations, action.locator, scope.timeout, () =>
-        scope.events.crashed(),
+    const found = await waitUntilFound(
+        operations,
+        action.locator,
+        waitWithin(scope, stepDeadline),
+        () => scope.events.crashed(),
     );
     if (!found.ok) {
         return found;
@@ -163,7 +166,7 @@ async function sendInput<Handle>(
             await input.hover(at, hasStepEnded);
             return success(undefined);
         case "fill":
-            await input.fill(element, textToFill(action.value), hasStepEnded);
+            await typeFill(input, element, action.value, hasStepEnded);
             return success(undefined);
         // Enter on a form or a link starts a navigation as a click does.
         case "press":
@@ -208,15 +211,11 @@ async function perform<Handle>(
     if (action.type === "upload") {
         return upload(scope, action, guard, stepDeadline);
     }
-    const { operations, timeout } = scope;
+    const { operations } = scope;
     const waited = await waitUntilActionable(
         operations,
         action.locator,
-        {
-            waitMilliseconds: timeout,
-            lookLimitMilliseconds: timeout,
-            stepTimeoutMilliseconds: timeout,
-        },
+        waitWithin(scope, stepDeadline),
         () => scope.events.crashed(),
     );
     if (!waited.ok) {

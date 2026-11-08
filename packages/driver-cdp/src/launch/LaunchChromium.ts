@@ -57,6 +57,7 @@ type LaunchOptions = ConnectOptions & {
 export type LaunchedChromium = {
     readonly connection: CdpConnection;
     readonly browserProcess: ChildProcess;
+    readonly processId: number;
     readonly webSocketUrl: string;
     readonly userDataFolder: string;
     // Settles once the browser process has ended, whatever ended it.
@@ -78,6 +79,9 @@ const TASKKILL_LIMIT_MILLISECONDS = 5_000;
 const CLOSE_LIMIT_MILLISECONDS = 4_000;
 const FORCE_AFTER_MILLISECONDS = 3_000;
 const EXIT_GRACE_MILLISECONDS = 4_000;
+// How long a browser whose tree taskkill has ended is given for Node to see it exit, which under load
+// can come many seconds after: the process has been told to end, so only this wait is left of it.
+const EXIT_GRACE_AFTER_TREE_ENDED_MILLISECONDS = 12_000;
 const EXIT_WHEN_FORCED_MILLISECONDS = 1_000;
 // How long the browser's other processes on Windows are given to end, and so let go of the profile folder,
 // once the browser has: ending a process tree only asks Windows to end each process, and one being torn down
@@ -194,6 +198,28 @@ type TreeEnding = { readonly hasEnded: boolean; readonly whyNot: string | null }
 const TREE_NOT_TRIED: TreeEnding = { hasEnded: false, whyNot: null };
 const treeNotEnded = (whyNot: string): TreeEnding => ({ hasEnded: false, whyNot });
 
+// Under load taskkill can end every child and then find the browser itself already ending, and exit
+// non-zero for that alone. Each failure it reports is an "ERROR:" line with its "Reason:" under it, so
+// the tree has ended when every reason says its process was already going. Its text is English only;
+// another language reads as the tree not ended, and the stop asks the browser to close as well.
+const TASK_ALREADY_ENDING = "There is no running instance of the task";
+
+function hasOnlyEndingFailures(output: string): boolean {
+    const lines = output.split(/\r?\n/);
+    const failures = lines.filter((line) => line.startsWith("ERROR:"));
+    const reasons = lines.filter((line) => line.startsWith("Reason:"));
+    return (
+        failures.length > 0 &&
+        failures.length === reasons.length &&
+        reasons.every((reason) => reason.includes(TASK_ALREADY_ENDING))
+    );
+}
+
+const treeEnding = (code: number | null, output: string): TreeEnding =>
+    code === 0 || hasOnlyEndingFailures(output)
+        ? { hasEnded: true, whyNot: null }
+        : treeNotEnded(`taskkill exited with code ${String(code)}`);
+
 // The browser's crashpad handlers answer to no job object, and under load outlive it by half a minute.
 // taskkill finds them through parent ids, so it has to run while the browser is alive: it replaces
 // asking the browser to close, rather than following it. Node holds the process's handle until it has
@@ -205,23 +231,32 @@ function endWindowsProcessTree(browserProcess: ChildProcess): Promise<TreeEnding
     }
     return new Promise((resolve) => {
         const taskkill = spawn("taskkill", ["/T", "/F", "/PID", String(browserProcess.pid)], {
-            stdio: "ignore",
+            stdio: ["ignore", "pipe", "pipe"],
             windowsHide: true,
         });
+        const outputStreams = outputStreamsOf(taskkill);
+        let output = "";
+        for (const stream of outputStreams) {
+            stream.on("data", (chunk: Buffer) => {
+                if (output.length < OUTPUT_LIMIT) {
+                    output += chunk.toString();
+                }
+            });
+        }
         const limit = setTimeout(() => {
             taskkill.kill();
+            for (const stream of outputStreams) {
+                stream.destroy();
+            }
             taskkill.unref();
             resolve(
                 treeNotEnded(`taskkill did not answer within ${TASKKILL_LIMIT_MILLISECONDS} ms`),
             );
         }, TASKKILL_LIMIT_MILLISECONDS);
-        taskkill.once("exit", (code) => {
+        // 'close', not 'exit': what it reported is read once its output has ended.
+        taskkill.once("close", (code) => {
             clearTimeout(limit);
-            resolve(
-                code === 0
-                    ? { hasEnded: true, whyNot: null }
-                    : treeNotEnded(`taskkill exited with code ${String(code)}`),
-            );
+            resolve(treeEnding(code, output));
         });
         taskkill.once("error", (error) => {
             clearTimeout(limit);
@@ -234,11 +269,12 @@ function endWindowsProcessTree(browserProcess: ChildProcess): Promise<TreeEnding
 async function hasBrowserExitedInTime(
     browserProcess: ChildProcess,
     exited: Promise<void>,
+    graceMilliseconds: number,
 ): Promise<boolean> {
     const force = setTimeout(() => {
         browserProcess.kill();
     }, FORCE_AFTER_MILLISECONDS);
-    const hasExitedByItself = await settledWithin(exited, EXIT_GRACE_MILLISECONDS);
+    const hasExitedByItself = await settledWithin(exited, graceMilliseconds);
     clearTimeout(force);
     if (hasExitedByItself) {
         return true;
@@ -293,7 +329,11 @@ async function stopBrowser(
               );
     const processId = browserProcess.pid;
     const processesLeft = [
-        ...((await hasBrowserExitedInTime(browserProcess, exited))
+        ...((await hasBrowserExitedInTime(
+            browserProcess,
+            exited,
+            ending.hasEnded ? EXIT_GRACE_AFTER_TREE_ENDED_MILLISECONDS : EXIT_GRACE_MILLISECONDS,
+        ))
             ? []
             : [`the browser process ${String(processId)}`]),
         ...((await endProcessGroup(processId)) ? [] : [`the process group ${String(processId)}`]),
@@ -367,6 +407,15 @@ function announcedDevToolsAddress(
     });
 }
 
+// A process that has answered has a process id: Node leaves it unset only for one that never started.
+function processIdOf(browserProcess: ChildProcess): number {
+    const processId = browserProcess.pid;
+    if (processId === undefined) {
+        throw new Error("Chromium answered without a process id");
+    }
+    return processId;
+}
+
 export async function launchChromium(
     executablePath: string,
     options: LaunchOptions = {},
@@ -409,10 +458,12 @@ export async function launchChromium(
             browserProcess,
             options.launchTimeoutMilliseconds ?? 30_000,
         );
+        const processId = processIdOf(browserProcess);
         const connection = await CdpConnection.open(webSocketUrl, options);
         return {
             connection,
             browserProcess,
+            processId,
             webSocketUrl,
             userDataFolder,
             exited,

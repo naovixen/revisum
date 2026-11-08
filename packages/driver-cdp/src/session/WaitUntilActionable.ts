@@ -162,12 +162,13 @@ export async function waitUntilActionable<Handle>(
 export async function waitUntilFound<Handle>(
     operations: PageOperations<Handle>,
     locator: ResolvedLocator,
-    timeoutMilliseconds: number,
+    wait: ActionableWait,
     crashed: () => boolean,
 ): Promise<Result<Handle, DriverError>> {
-    const deadline = Date.now() + timeoutMilliseconds;
+    const timeoutMilliseconds = wait.stepTimeoutMilliseconds;
+    const deadline = Date.now() + wait.waitMilliseconds;
     for (;;) {
-        const found = await forAtMost(timeoutMilliseconds, locate(operations, locator));
+        const found = await forAtMost(wait.lookLimitMilliseconds, locate(operations, locator));
         if (found === TIMED_OUT) {
             return failure(notAnswering(timeoutMilliseconds));
         }

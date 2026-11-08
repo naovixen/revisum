@@ -1,6 +1,7 @@
 // The scope a run's open session lives in: once it opens, it closes, whatever the use of it throws.
 import { success, type ClosedSession, type Result, type Unavailable } from "@revisum/contracts";
 import type { Planned } from "../../lifecycle.ts";
+import type { BrokenDriver } from "../../target/GuardedDriver.ts";
 import type { RunContext } from "../RunContext.ts";
 import { closeKeepingTheResult } from "./CloseKeepingTheResult.ts";
 import { openSession, type OpenedSession } from "./OpenSession.ts";
@@ -12,12 +13,12 @@ type SessionScopeContext = Pick<RunContext, "cleared" | "inputs" | "ports" | "lo
 export type UsedSession<Value> = { readonly used: Value; readonly closed: ClosedSession };
 
 // Opens the session, gives it to `use`, and closes it once `use` has settled. A target that cannot be
-// opened gives why, and `use` never runs.
+// opened, or a driver that broke its promise opening it, gives why, and `use` never runs.
 export async function withOpenSession<Value>(
     planned: Planned,
     context: SessionScopeContext,
     use: (opened: OpenedSession) => Promise<Value>,
-): Promise<Result<UsedSession<Value>, Unavailable>> {
+): Promise<Result<UsedSession<Value>, Unavailable | BrokenDriver>> {
     const opened = await openSession(planned, context);
     if (!opened.ok) {
         return opened;

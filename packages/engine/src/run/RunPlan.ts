@@ -12,6 +12,7 @@ import type { Logger } from "../logging.ts";
 import { buildManifest, manifestHash } from "../manifest.ts";
 import { assertBranded } from "../plan/parse/PlanParser.ts";
 import { assertCleared, type ClearedRun } from "../policy/ClearedRun.ts";
+import { isBrokenDriver } from "../target/GuardedDriver.ts";
 import { afterTheVerdict, EndOfTheRunKind } from "./after-the-verdict/AfterTheVerdict.ts";
 import {
     logFailureAfterTheVerdict,
@@ -31,6 +32,7 @@ import { checkPreflight, type PreflightPassed } from "./preflight/CheckPreflight
 import { refuseRun } from "./preflight/RefuseRun.ts";
 import type { RunContext, RunInputs, RunPorts } from "./RunContext.ts";
 import { runLogging } from "./RunLogging.ts";
+import { driverBrokeResultOfRun } from "./seal/DriverBrokeResultOfRun.ts";
 import { sealRanResult, type NothingRanContext } from "./seal/SealResult.ts";
 import { unavailableResult } from "./seal/UnavailableResult.ts";
 import { createRunContext } from "./session/CreateRunContext.ts";
@@ -88,6 +90,9 @@ export async function runPlan(
         runTheStepsInTheSession(planned, context, passed, opened, isPlanLogged),
     );
     if (!inSession.ok) {
+        if (isBrokenDriver(inSession.error)) {
+            return driverBrokeResultOfRun(target.id, inSession.error, nothingRan, startedAt);
+        }
         const unavailable = targetUnavailable(planned, inSession.error);
         return unavailableResult(target.id, unavailable.unavailable, nothingRan, startedAt);
     }

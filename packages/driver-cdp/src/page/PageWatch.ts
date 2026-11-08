@@ -306,6 +306,17 @@ export class PageWatch implements PageEvents {
     return { promise, cancel: () => { this.#onDialog.delete(notify); } };
   }
 
+  // Resolves when a dialog opens from now on, whatever is open already: the wait of a navigation, which
+  // ends the page's old dialog and answers for the new document's.
+  nextDialogOpened(): { readonly promise: Promise<void>; cancel(): void } {
+    let notify = (): void => undefined;
+    const promise = new Promise<void>((resolve) => {
+      notify = () => { this.#onDialog.delete(notify); resolve(); };
+      this.#onDialog.add(notify);
+    });
+    return { promise, cancel: () => { this.#onDialog.delete(notify); } };
+  }
+
   // Resolves once the top document is not on its way to another, or a dialog or a crash has stopped
   // it from getting there: at once when it is not. A press sends its navigation before the browser
   // has anything to show for it, and the old page goes on answering meanwhile.

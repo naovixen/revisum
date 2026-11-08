@@ -1,6 +1,7 @@
 import {
     TerminalState,
     type NothingRanFields,
+    type PlanDriverBrokeResult,
     type PlanRefusedResult,
     type Refusal,
     type RunTimings,
@@ -58,5 +59,17 @@ export const targetUnavailableResult = (
     state: TerminalState.TargetUnavailable,
     ...nothingRanFields(targetId),
     unavailable,
+    timings: noStepTimings(totalMilliseconds),
+});
+
+// What a run's result says when its driver broke its promise before any step ran. The caller adds the
+// mode and guarantees of its kind of run.
+export const driverBrokeResult = (
+    targetId: string,
+    totalMilliseconds: number,
+): Omit<PlanDriverBrokeResult, SealedFields> => ({
+    state: TerminalState.Errored,
+    ...nothingRanFields(targetId),
+    unavailable: null,
     timings: noStepTimings(totalMilliseconds),
 });

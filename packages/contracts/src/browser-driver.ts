@@ -337,7 +337,9 @@ export interface DocumentSession extends PageNavigator, ActionRunner, Prober, Ca
 // A second tab of a session. Steps run in its document as in any other; it opens no tab of its own,
 // since a plan opens tabs only at its top level.
 export interface SessionTab extends DocumentSession {
-  // Closes only the tab.
+  // Closes only the tab. It never rejects, whatever state the tab is in, closing again and closing
+  // after the session has closed included: what went wrong closing a tab is reported by the session's
+  // close.
   close(): Promise<void>;
 }
 
@@ -372,7 +374,8 @@ export type ClosedSession = SessionRecords & {
 export interface Session extends DocumentSession {
   readonly browser: { readonly name: string; readonly version: string };
   // True once the browser has refused a decision of the driver's on one of the session's requests, or
-  // held one the driver could not read, so far: what the session's records will list.
+  // held one the driver could not read, so far: what the session's records will list. It only reads
+  // what the session already knows, so it never throws, a closed session included.
   isRequestHeld(): boolean;
   // What the session has noted so far. Incomplete until it has closed, so a result reads what close
   // gives, and reads this only for a session whose close did not finish.

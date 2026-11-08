@@ -22,8 +22,9 @@ import { buildEgressPolicy } from '@revisum/runner';
 // Why a crawl stopped, as the command reports it.
 // target-unavailable: the browser did not open.
 // plan-rejected: the --after plan did not pass, so the pages would not be the signed-in ones.
+// internal: the browser session did not close cleanly, so something of it may still run or hold files.
 export type CrawlStop =
-  | 'explore-origin-refused' | 'explore-start-unreachable' | 'explore-runner-unavailable' | 'target-unavailable' | 'plan-rejected';
+  | 'explore-origin-refused' | 'explore-start-unreachable' | 'explore-runner-unavailable' | 'target-unavailable' | 'plan-rejected' | 'internal';
 
 // One crawl in a browser session: the bounds, how text read from pages is redacted, and either the
 // gate-cleared --after run, whose project and target the crawl's session is, or, with no --after
@@ -80,8 +81,7 @@ const sessionFor = (crawl: BrowserCrawl): { readonly project: Project; readonly 
 
 export async function crawlInBrowser(browser: BrowserDriver, crawl: BrowserCrawl): Promise<Result<PageMap, CrawlStop>> {
   const { project, target } = sessionFor(crawl);
-  const { options } = crawl;
-  const origin = exploreStartOrigin(project, options.start);
+  const origin = exploreStartOrigin(project, crawl.options.start);
   if (origin === undefined) return failure('explore-origin-refused');
   if (!browser.supports(target).ok) return failure('target-unavailable');
   const fixedTimeMilliseconds = Date.now();
@@ -93,30 +93,51 @@ export async function crawlInBrowser(browser: BrowserDriver, crawl: BrowserCrawl
   });
   if (!opened.ok) return failure('target-unavailable');
   const session = opened.value;
+  let crawled: Result<PageMap, CrawlStop>;
   try {
-    if ('login' in crawl) {
-      const runService = createRunService({
-        ...unwiredPorts,
-        drivers: new Map([[target.adapter, sharingDriver(browser, session, target)]]), clock: systemClock, artifacts: discardingArtifacts,
-        redactor: crawl.redactor, events: discardingRunEvents, audit: crawl.audit, secrets: crawl.secrets, isolation: HOST_ISOLATION,
-      });
-      const loggedIn = await runService.run(crawl.login, {
-        baseUrl, seed: CRAWL_SEED, fixedTimeMilliseconds, fixtures: [], host: { platform: platform(), arch: arch() },
-      });
-      if (loggedIn.state !== 'Passed') return failure('plan-rejected');
-    }
-    // Navigation and reads only: nothing else of the session is in reach of the crawl.
-    const explorer: ExploreDriver = {
-      navigate: (url, navigation) => session.navigate(url, navigation),
-      page: () => session.page(),
-      accessibilitySnapshot: () => session.accessibilitySnapshot(),
-      linkTargets: () => session.linkTargets(),
-    };
-    const crawled = await crawlSite(explorer, project, options, crawl.redactor);
-    return crawled.ok ? crawled : failure(crawled.error.code);
-  } finally {
+    crawled = await crawlOpenSession(session, browser, crawl, { target, baseUrl, fixedTimeMilliseconds });
+  } catch (error) {
     await session.close();
+    throw error;
   }
+  // A crawl that stopped for its own reason keeps it; one that finished reports the close that did not.
+  const closed = await session.close();
+  return crawled.ok && closed.closeFailure !== null ? failure('internal') : crawled;
+}
+
+// What a crawl's --after run needs of the session it shares.
+type CrawlOfASession = {
+  readonly target: Target;
+  readonly baseUrl: ReturnType<typeof baseUrlOfOrigin>;
+  readonly fixedTimeMilliseconds: number;
+};
+
+// The --after run, if there is one, and the crawl, on the session that is open already.
+async function crawlOpenSession(
+  session: Session, browser: BrowserDriver, crawl: BrowserCrawl, opened: CrawlOfASession,
+): Promise<Result<PageMap, CrawlStop>> {
+  const { project } = sessionFor(crawl);
+  const { target, baseUrl, fixedTimeMilliseconds } = opened;
+  if ('login' in crawl) {
+    const runService = createRunService({
+      ...unwiredPorts,
+      drivers: new Map([[target.adapter, sharingDriver(browser, session, target)]]), clock: systemClock, artifacts: discardingArtifacts,
+      redactor: crawl.redactor, events: discardingRunEvents, audit: crawl.audit, secrets: crawl.secrets, isolation: HOST_ISOLATION,
+    });
+    const loggedIn = await runService.run(crawl.login, {
+      baseUrl, seed: CRAWL_SEED, fixedTimeMilliseconds, fixtures: [], host: { platform: platform(), arch: arch() },
+    });
+    if (loggedIn.state !== 'Passed') return failure('plan-rejected');
+  }
+  // Navigation and reads only: nothing else of the session is in reach of the crawl.
+  const explorer: ExploreDriver = {
+    navigate: (url, navigation) => session.navigate(url, navigation),
+    page: () => session.page(),
+    accessibilitySnapshot: () => session.accessibilitySnapshot(),
+    linkTargets: () => session.linkTargets(),
+  };
+  const crawled = await crawlSite(explorer, project, crawl.options, crawl.redactor);
+  return crawled.ok ? crawled : failure(crawled.error.code);
 }
 
 // ---- The crawl in the run container ----------------------------------------------------------------

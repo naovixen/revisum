@@ -4,7 +4,7 @@
 // is not the pinned one. A build is never upgraded or swapped silently.
 import {
   failure, success,
-  type AdapterRegistry, type BrowserDriver, type BuildFailureCode, type LockEntry, type LockFailure, type LockfileFailure, type Result,
+  type AdapterRegistry, type BuildFailureCode, type LockEntry, type LockFailure, type LockfileFailure, type Result,
   type Target, type TargetId, type Unavailable, UnavailableReason, type PlanError,
 } from '@revisum/contracts';
 import { createHash, randomUUID } from 'node:crypto';
@@ -15,6 +15,7 @@ import { canonicalJson } from '../hashing.ts';
 import { INVALID, allValid, readList, readRecord, type Issues, type Parsed } from '../plan/plan-decoders.ts';
 import { readBuildVersion, readId } from '../project/project-parser.ts';
 import type { TrustedProject } from '../project/trusted-project.ts';
+import { isBrokenDriver, type BrokenDriver, type GuardedDriver } from './GuardedDriver.ts';
 import { schemaId } from '../version.ts';
 
 const LOCKFILE_NAME = 'targets.lock.json';
@@ -208,12 +209,12 @@ async function hashLaunchedExecutable(path: string): Promise<Result<string, stri
 // is never launched. When a lockfile is given and pins the target, the build must have the pinned
 // version and executable hash, or the target is unavailable with build-mismatch.
 export async function checkPinnedBuild(
-  driver: BrowserDriver, target: Target, entries: readonly LockEntry[] | undefined,
-): Promise<Result<CheckedBuild, Unavailable>> {
+  driver: Pick<GuardedDriver, 'build'>, target: Target, entries: readonly LockEntry[] | undefined,
+): Promise<Result<CheckedBuild, Unavailable | BrokenDriver>> {
   const pinned = entries?.find((entry) => entry.targetId === target.id);
   if (driver.build === undefined) return success({ unpinned: entries !== undefined });
   const built = await driver.build(target);
-  if (!built.ok) return failure({ reason: runTimeReason(built.error.code), detail: built.error.detail });
+  if (!built.ok) return isBrokenDriver(built.error) ? failure(built.error) : failure({ reason: runTimeReason(built.error.code), detail: built.error.detail });
   const hashed = await hashLaunchedExecutable(built.value.executablePath);
   if (!hashed.ok) return failure({ reason: UnavailableReason.LaunchFailed, detail: hashed.error });
   if (pinned === undefined) return success({ executableSha256: hashed.value, unpinned: entries !== undefined });

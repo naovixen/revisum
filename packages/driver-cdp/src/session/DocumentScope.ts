@@ -8,6 +8,7 @@ import {
     type Result,
     type SessionEnvironment,
 } from "@revisum/contracts";
+import { isCommandTimeout } from "../connection/CdpError.ts";
 import { errorText } from "../connection/ErrorText.ts";
 import type { HitChecks } from "../page/HitChecks.ts";
 import type { PageEvents } from "../page/PageEvents.ts";
@@ -124,9 +125,16 @@ export async function readOfPage<Handle, Value>(
     }
 }
 
+// A command the browser never answered says nothing about the element or the frame it was for.
 export function failureOfThrow<Handle>(scope: DocumentScope<Handle>, error: unknown): DriverError {
     if (error instanceof PageHeldByDialog) {
         return DIALOG_OPEN;
     }
-    return scope.events.crashed() ? CRASHED : { code: "not-actionable", detail: errorText(error) };
+    if (scope.events.crashed()) {
+        return CRASHED;
+    }
+    return {
+        code: isCommandTimeout(error) ? "timeout" : "not-actionable",
+        detail: errorText(error),
+    };
 }

@@ -32,7 +32,9 @@ import {
     GET_FRAME_OWNER,
     RESOLVE_NODE,
 } from "../connection/CallFunctionOn.ts";
+import { errorText } from "../connection/ErrorText.ts";
 import { advanceDocumentClock } from "../in-page/AdvanceDocumentClock.ts";
+import { isDocumentGone } from "../page/LostObject.ts";
 import type { PageCommand } from "./PageStorage.ts";
 
 // One page of the session, as the clock reaches it.
@@ -136,10 +138,14 @@ export class BrowserClock implements ClockPort {
                     }
                 }
             } catch (error) {
-                if (page.crashed()) {
-                    return failure(CRASHED);
-                }
-                throw error;
+                return failure(
+                    page.crashed()
+                        ? CRASHED
+                        : {
+                              code: "page-unreadable",
+                              detail: `the clock could not be advanced: ${errorText(error)}`,
+                          },
+                );
             }
         }
         return success(undefined);
@@ -160,7 +166,9 @@ export class BrowserClock implements ClockPort {
     }
 
     // Runs one frame's controller in its main world. A frame whose document went away meanwhile
-    // fires nothing here: the document that replaced it started at the new time.
+    // fires nothing here: the document that replaced it started at the new time. Any other failure,
+    // a throw in the controller included, fails the advance, since a timer that did not run must not
+    // look like a page with no timers due.
     async #advanceFrame(
         page: ClockPage,
         frameId: string,
@@ -189,11 +197,13 @@ export class BrowserClock implements ClockPort {
                 ],
             });
             if (called.exceptionDetails !== undefined) {
-                return { fired: 0, runaway: false };
+                throw new Error(
+                    `the clock advance threw in a frame: ${called.exceptionDetails.text}`,
+                );
             }
             return frameAdvance(called.result.value);
         } catch (error) {
-            if (page.crashed()) {
+            if (page.crashed() || !isDocumentGone(error)) {
                 throw error;
             }
             return { fired: 0, runaway: false };

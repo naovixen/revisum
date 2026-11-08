@@ -9,6 +9,7 @@ import {
     type PlanRefusedResult,
     type PlanRunResult,
     type TargetUnavailableResult,
+    type PlanDriverBrokeResult,
     type UnsafeFeature,
 } from "@revisum/contracts";
 import { approvalLabel } from "../../approval/plan-standing.ts";
@@ -59,7 +60,9 @@ type Unsealed<Result, Others extends PropertyKey = never> = Result extends unkno
 type UnsealedResult = Unsealed<PlanRunResult>;
 
 // What the result of a run that ended before any step holds before it is sealed.
-export type UnsealedNothingRanResult = Unsealed<PlanRefusedResult | TargetUnavailableResult>;
+export type UnsealedNothingRanResult = Unsealed<
+    PlanRefusedResult | TargetUnavailableResult | PlanDriverBrokeResult
+>;
 
 // What a plan run vouches for: decided by the plan, its project's recording setting, the run's
 // isolation and the target's adapter alone, so two runs of one plan say the same, unless one leaves its

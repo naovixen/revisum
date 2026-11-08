@@ -13,12 +13,17 @@ import { DETERMINISM_INPUTS } from "../../manifest.ts";
 import { reachableOrigins } from "../../ReachableOrigins.ts";
 import { resolvePlanClock } from "../../run-values.ts";
 import { adapterRegistry } from "../../target/adapter-registry.ts";
+import {
+    guardedDriver,
+    type BrokenDriver,
+    type GuardedDriver,
+} from "../../target/GuardedDriver.ts";
 import { BROWSER_BUILD_INPUT, checkPinnedBuild } from "../../target/target-lock.ts";
 import type { RunContext } from "../RunContext.ts";
 
 export type OpenedSession = {
     readonly session: Session;
-    readonly driver: BrowserDriver;
+    readonly driver: GuardedDriver;
     // Inputs the run could not pin, for the manifest's nonHermeticInputs.
     readonly unpinned: readonly string[];
     // The sha256 of the executable the driver launched, when it reports its build.
@@ -43,9 +48,9 @@ export function cannotPinDeterminism(
 export async function openSession(
     planned: Planned,
     context: OpenContext,
-): Promise<Result<OpenedSession, Unavailable>> {
-    const driver = adapterRegistry(context.ports.drivers).find(planned.target.adapter);
-    if (driver === null) {
+): Promise<Result<OpenedSession, Unavailable | BrokenDriver>> {
+    const registered = adapterRegistry(context.ports.drivers).find(planned.target.adapter);
+    if (registered === null) {
         return {
             ok: false,
             error: {
@@ -54,6 +59,7 @@ export async function openSession(
             },
         };
     }
+    const driver = guardedDriver(registered);
     const supported = driver.supports(planned.target);
     if (!supported.ok) {
         return supported;

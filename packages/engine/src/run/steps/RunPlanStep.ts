@@ -17,7 +17,6 @@ import { codeForThrow } from "../CodeForThrow.ts";
 import {
     ExecutorOutcome,
     setupFailedInside,
-    type DeniedStep,
     type RanStep,
     type RunInnerSteps,
     type SessionContext,
@@ -57,8 +56,9 @@ async function runStepOnLivePage(
         runStepsInside(container, index, inner, context);
     try {
         const executed = await executeStep(step, { ...context, index, document, runInnerSteps });
+        // The audit log holds the denial, so nothing the session says next changes it.
         if (executed.outcome === ExecutorOutcome.Denied) {
-            return deniedWhateverTheSessionSays(executed, document, context);
+            return executed;
         }
         // A request the browser would not let go on stays held, so neither a pass nor a failure of this
         // step says anything about the app: the run could not test. The reason goes to the log at the end.
@@ -80,21 +80,6 @@ async function runStepOnLivePage(
     } catch (error) {
         return failedStep(step, index, codeForThrow(error, document, context.logger));
     }
-}
-
-// The audit log holds the denial, so nothing the session says next changes it. The session is still
-// asked about held requests, as after every step, and a read that throws is logged.
-function deniedWhateverTheSessionSays(
-    denied: DeniedStep,
-    document: DocumentSession,
-    context: SessionContext,
-): DeniedStep {
-    try {
-        context.session.isRequestHeld();
-    } catch (error) {
-        codeForThrow(error, document, context.logger);
-    }
-    return denied;
 }
 
 // A passed step's result once the page has had its say: a check that passed from memory while the
