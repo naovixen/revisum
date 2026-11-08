@@ -4,7 +4,7 @@
 // policy gate applies, written by a person. AI output never reaches this type. The person declares
 // every target; the engine never invents one.
 import {
-  COLOR_SCHEMES, DEFAULT_TEST_ID_ATTRIBUTE, DEVICE_PROFILES, ENGINES, FIDELITIES, MOTION_PREFERENCES, PLANNER_WIRES, isPlainObject, success, failure,
+  COLOR_SCHEMES, DEFAULT_TEST_ID_ATTRIBUTE, DEVICE_PROFILES, ENGINES, FIDELITIES, MOTION_PREFERENCES, PLANNER_WIRES, isPlainObject, originOfUrl, success, failure,
   type Brand, type CallDeclaration, type CallName, type DeclaredService, type DeviceProfileId, type FixtureName, type IrreversiblePatterns, type Locale, type Origin, type Result,
   type EmailDomain, type EvidenceMode, type PlannerAddress, type PlannerEndpoint, type PlannerEndpointKind, type PlannerUrl, type SafeText, type SecretName, type Target, type TestIdAttribute, type TimeZone,
   type ObservedRequestDeclaration, type RequestName, type StorageEntryDeclaration, type StorageEntryName, type StubDeclaration, type StubName,
@@ -18,7 +18,7 @@ import { readCallDeclarations, readServices } from './call-declarations.ts';
 import { readObservedRequestDeclarations, readStorageEntryDeclarations, readStubDeclarations } from './network-and-storage-declarations.ts';
 import { readEvidenceMode } from './evidence-declarations.ts';
 import { readUnsafeFeatures } from './unsafe-feature-declarations.ts';
-import { originOfUrl, readOrigin } from './ReadOrigin.ts';
+import { readOrigin } from './ReadOrigin.ts';
 import { LARGEST_DOWNLOAD_BYTES, LOWERCASE_ID, MAXIMUM_TEST_ID_LENGTH, MAXIMUM_URL_LENGTH } from '../plan/plan-grammar.ts';
 import { readableCopy } from '../decoding/ReadableCopy.ts';
 

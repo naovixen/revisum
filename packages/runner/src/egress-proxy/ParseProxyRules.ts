@@ -1,5 +1,6 @@
 import {
     failure,
+    parseOrigin,
     success,
     type DeclaredService,
     type EgressPolicy,
@@ -9,61 +10,70 @@ import {
 import { isIP } from "node:net";
 import { isPlainHttpOrigin } from "../egress-events.ts";
 import { bareHost, type BareHost } from "./BareHost.ts";
-import { readExactOrigin } from "./ReadExactOrigin.ts";
 import { ownField } from "./OwnField.ts";
 import type { ParsedRewriteRule, ProxyRules } from "./ProxyRules.ts";
+import {
+    ProxyRulesRefusalCode,
+    proxyRulesRefusal,
+    type ProxyRulesRefusal,
+} from "./ProxyRulesRefusal.ts";
 import { tcpRelaysFor, type TcpRelay } from "./TcpRelay.ts";
-
-export type ProxyRulesRefusal = { readonly message: string };
 
 type Parsed<Value> = Result<Value, ProxyRulesRefusal>;
 
-const refused = (message: string): Parsed<never> => failure({ message });
+// One rule read on its own: the list it is in supplies the rest of the refusal's path.
+type ReadRule<Value> = Result<Value, ProxyRulesRefusalCode>;
+
+const WHOLE_RULES_TEXT = "$";
+
+const NO_TCP_RELAYS: readonly unknown[] = [];
 
 const isList = (value: unknown): value is readonly unknown[] => Array.isArray(value);
 
 function parseEach<Value>(
     values: unknown,
     listName: string,
-    parseOne: (value: unknown) => Parsed<Value>,
+    readOne: (value: unknown) => ReadRule<Value>,
 ): Parsed<readonly Value[]> {
     if (!isList(values)) {
-        return refused(`${listName} is not a list`);
+        return failure(proxyRulesRefusal(ProxyRulesRefusalCode.NotAList, listName));
     }
     const parsed: Value[] = [];
-    for (const value of values) {
-        const one = parseOne(value);
+    for (const [index, value] of values.entries()) {
+        const one = readOne(value);
         if (!one.ok) {
-            return one;
+            return failure(proxyRulesRefusal(one.error, `${listName}[${index}]`));
         }
         parsed.push(one.value);
     }
     return success(parsed);
 }
 
-function parseOrigin(value: unknown): Parsed<Origin> {
-    const origin = readExactOrigin(value);
-    return origin === null
-        ? refused(`${String(value)} is not an origin the proxy can match`)
-        : success(origin);
+function readRuleOrigin(value: unknown): ReadRule<Origin> {
+    const origin = parseOrigin(value);
+    return origin.ok ? origin : failure(ProxyRulesRefusalCode.NotAnOrigin);
 }
 
-function parseRewriteRule(value: unknown, allowed: ReadonlySet<string>): Parsed<ParsedRewriteRule> {
-    const origin = parseOrigin(ownField(value, "origin"));
+function readRewriteRule(
+    value: unknown,
+    allowed: ReadonlySet<string>,
+): ReadRule<ParsedRewriteRule> {
+    const origin = readRuleOrigin(ownField(value, "origin"));
     if (!origin.ok) {
         return origin;
     }
     if (!allowed.has(origin.value) || !isPlainHttpOrigin(origin.value)) {
-        return refused(
-            `a response rewrite may change only a declared plain-HTTP origin, not ${origin.value}`,
-        );
+        return failure(ProxyRulesRefusalCode.RewriteOriginNotRewritable);
     }
     const rewrite = ownField(value, "rewrite");
     const name = ownField(rewrite, "name");
     const find = ownField(rewrite, "find");
     const replace = ownField(rewrite, "replace");
     if (typeof name !== "string" || typeof find !== "string" || typeof replace !== "string") {
-        return refused(`the response rewrite on ${origin.value} is not a name, find and replace`);
+        return failure(ProxyRulesRefusalCode.MalformedRewrite);
+    }
+    if (find === "") {
+        return failure(ProxyRulesRefusalCode.EmptyFind);
     }
     return success({ origin: origin.value, rewrite: { name, find, replace } });
 }
@@ -81,30 +91,30 @@ function parseRelayHost(value: unknown): BareHost | null {
     return isNamed || isIP(host) === 6 ? host : null;
 }
 
-function parseTcpRelay(value: unknown): Parsed<TcpRelay> {
-    const rawHost = ownField(value, "host");
-    const host = parseRelayHost(rawHost);
+function readTcpRelay(value: unknown): ReadRule<TcpRelay> {
+    const host = parseRelayHost(ownField(value, "host"));
     const port = ownField(value, "port");
     const isPrivate = ownField(value, "private");
     if (host === null) {
-        return refused(`${String(rawHost)} is not a host a TCP relay can connect to`);
+        return failure(ProxyRulesRefusalCode.InvalidRelayHost);
     }
     if (typeof port !== "number" || !Number.isInteger(port) || port < 1 || port > LAST_PORT) {
-        return refused(`the TCP relay to ${host} does not name a port`);
+        return failure(ProxyRulesRefusalCode.InvalidRelayPort);
     }
     if (typeof isPrivate !== "boolean") {
-        return refused(`the TCP relay to ${host} does not say whether it is private`);
+        return failure(ProxyRulesRefusalCode.RelayPrivacyMissing);
     }
     return success({ host, port, private: isPrivate });
 }
 
 // The proxy's rules from plain data, in one pass. A rule the proxy could not honour is refused here,
-// with what was wrong with it, so a proxy only ever starts from rules it can keep.
+// saying what kind of problem it is and where, so a proxy only ever starts from rules it can keep.
+// Rules that leave out their TCP relays have none.
 export function parseProxyRules(raw: unknown): Parsed<ProxyRules> {
     const allowedOrigins = parseEach(
         ownField(raw, "allowedOrigins"),
         "allowedOrigins",
-        parseOrigin,
+        readRuleOrigin,
     );
     if (!allowedOrigins.ok) {
         return allowedOrigins;
@@ -112,40 +122,48 @@ export function parseProxyRules(raw: unknown): Parsed<ProxyRules> {
     const privateOrigins = parseEach(
         ownField(raw, "privateOrigins"),
         "privateOrigins",
-        parseOrigin,
+        readRuleOrigin,
     );
     if (!privateOrigins.ok) {
         return privateOrigins;
     }
     const allowed: ReadonlySet<string> = new Set(allowedOrigins.value);
     const rewrites = parseEach(ownField(raw, "rewrites"), "rewrites", (value) =>
-        parseRewriteRule(value, allowed),
+        readRewriteRule(value, allowed),
     );
     if (!rewrites.ok) {
         return rewrites;
     }
-    const rules = {
+    const namedRelays = ownField(raw, "tcpRelays");
+    const tcpRelays = parseEach(
+        namedRelays === undefined ? NO_TCP_RELAYS : namedRelays,
+        "tcpRelays",
+        readTcpRelay,
+    );
+    if (!tcpRelays.ok) {
+        return tcpRelays;
+    }
+    return success({
         allowedOrigins: allowedOrigins.value,
         privateOrigins: privateOrigins.value,
         rewrites: rewrites.value,
-    };
-    const rawRelays = ownField(raw, "tcpRelays");
-    if (rawRelays === undefined) {
-        return success(rules as ProxyRules);
+        tcpRelays: tcpRelays.value,
+    } as ProxyRules);
+}
+
+function parseJsonText(text: string): Parsed<unknown> {
+    try {
+        const parsed: unknown = JSON.parse(text);
+        return success(parsed);
+    } catch {
+        return failure(proxyRulesRefusal(ProxyRulesRefusalCode.NotJson, WHOLE_RULES_TEXT));
     }
-    const tcpRelays = parseEach(rawRelays, "tcpRelays", parseTcpRelay);
-    return tcpRelays.ok
-        ? success({ ...rules, tcpRelays: tcpRelays.value } as ProxyRules)
-        : tcpRelays;
 }
 
 // The proxy's rules from their JSON text, as its container receives them.
 export function readProxyRules(text: string): Parsed<ProxyRules> {
-    try {
-        return parseProxyRules(JSON.parse(text));
-    } catch {
-        return refused("the egress proxy's rules are not JSON");
-    }
+    const json = parseJsonText(text);
+    return json.ok ? parseProxyRules(json.value) : json;
 }
 
 // The proxy's rules for a policy: its origins, the origins of the services it allows, which of
@@ -158,7 +176,6 @@ export function proxyRules(
     const allowedServices = services.filter((service) =>
         policy.allowServices.includes(service.name),
     );
-    const tcpRelays = tcpRelaysFor(policy, services);
     return parseProxyRules({
         allowedOrigins: [
             ...new Set([
@@ -170,6 +187,6 @@ export function proxyRules(
             .filter((service) => service.private)
             .map((service) => service.origin),
         rewrites: policy.responseRewrites ?? [],
-        ...(tcpRelays.length === 0 ? {} : { tcpRelays }),
+        tcpRelays: tcpRelaysFor(policy, services),
     });
 }

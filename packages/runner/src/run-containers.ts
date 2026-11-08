@@ -6,7 +6,8 @@ import { PRODUCT, success, type AppliedRewrite, type DeclaredService, type Egres
 import { platform } from 'node:os';
 import { isAbsolute, join, normalize, sep } from 'node:path';
 import type { ContainerEngine, ContainerMount, ContainerOptions, ProbeTarget } from './container-engine.ts';
-import { proxyRules, type ProxyRulesRefusal } from './egress-proxy/ParseProxyRules.ts';
+import { proxyRules } from './egress-proxy/ParseProxyRules.ts';
+import type { ProxyRulesRefusal } from './egress-proxy/ProxyRulesRefusal.ts';
 import {
   DECISIONS_FILE, LOOKUPS_FILE, LOOKUPS_VARIABLE, RECORDS_LOST, RECORDS_STATE_FILE, REWRITES_FILE, RULES_VARIABLE, PROXY_PORT, RUN_ADDRESSES_VARIABLE, SERVICE_PROXY_PORT, readAppliedRewrite, readProxyDecision,
 } from './proxy-container.ts';

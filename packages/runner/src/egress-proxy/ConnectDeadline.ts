@@ -8,12 +8,15 @@ export type ConnectDeadline = {
     readonly ended: AbortSignal;
     // Why it ended. Only meaningful once it has.
     readonly failure: () => Error;
+    // How much of the limit is left, never below zero.
+    readonly millisecondsLeft: () => number;
     // Gives up the timer, once the waiting is over.
     readonly stop: () => void;
 };
 
 export function startConnectDeadline(abandoned: AbortSignal): ConnectDeadline {
     const controller = new AbortController();
+    const endsAt = Date.now() + CONNECT_LIMIT_MILLISECONDS;
     let reason = new Error("the client left before a connection opened");
     const onAbandoned = (): void => {
         controller.abort();
@@ -30,6 +33,7 @@ export function startConnectDeadline(abandoned: AbortSignal): ConnectDeadline {
     return {
         ended: controller.signal,
         failure: () => reason,
+        millisecondsLeft: () => Math.max(0, endsAt - Date.now()),
         stop: () => {
             clearTimeout(timer);
             abandoned.removeEventListener("abort", onAbandoned);

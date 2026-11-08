@@ -24,19 +24,17 @@ function replacedOccurrences(body: Buffer, find: Buffer, replace: Buffer): Buffe
     return Buffer.concat(pieces);
 }
 
-// Applies each rewrite whose bytes the body holds. A body that holds none goes back as it came.
+// Applies each rewrite whose bytes the body holds. A body that holds none goes back as it came. The
+// rewrites come from the proxy's rules, whose parser refuses an empty `find`.
 export function rewriteBody(body: Buffer, rewrites: readonly ResponseRewrite[]): RewrittenBody {
     let current = body;
     const appliedNames: string[] = [];
     for (const rewrite of rewrites) {
-        const replaced =
-            rewrite.find === ""
-                ? null
-                : replacedOccurrences(
-                      current,
-                      Buffer.from(rewrite.find),
-                      Buffer.from(rewrite.replace),
-                  );
+        const replaced = replacedOccurrences(
+            current,
+            Buffer.from(rewrite.find),
+            Buffer.from(rewrite.replace),
+        );
         if (replaced !== null) {
             current = replaced;
             appliedNames.push(rewrite.name);

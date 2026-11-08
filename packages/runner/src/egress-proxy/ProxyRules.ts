@@ -16,8 +16,8 @@ export type ProxyRules = Brand<
         // here that is not also in `allowedOrigins` is still refused.
         readonly privateOrigins: readonly Origin[];
         readonly rewrites: readonly ParsedRewriteRule[];
-        // Present only when the policy allows a service over TCP.
-        readonly tcpRelays?: readonly TcpRelay[];
+        // Empty unless the policy allows a service over TCP.
+        readonly tcpRelays: readonly TcpRelay[];
     },
     "ProxyRules"
 >;

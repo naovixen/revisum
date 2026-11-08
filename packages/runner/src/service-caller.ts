@@ -18,6 +18,7 @@ import { isIP, type Socket } from 'node:net';
 import { connect as connectSecurely, rootCertificates } from 'node:tls';
 import { EGRESS_DECISION_HEADER, EgressDecisionMark, parseEgressDecisionMark } from './egress-proxy/EgressDecisionHeader.ts';
 import type { EgressProxy } from './egress-proxy/EgressProxy.ts';
+import { bareHost } from './egress-proxy/BareHost.ts';
 
 // The request's headers as name and value text, in the declaration's order, for writing on the wire.
 export const headerFields = (headers: readonly ServiceRequestHeader[]): readonly (readonly [string, string])[] =>
@@ -60,11 +61,9 @@ type ProxyAddress = { readonly host: string; readonly port: number };
 // given, since naming any replaces the system's list.
 type TrustedAuthorities = readonly string[] | undefined;
 
-const withoutBrackets = (hostname: string): string => hostname.replace(/^\[(.*)\]$/, '$1');
-
 export function serviceCaller(options: ServiceCallerOptions): ServiceCaller {
   const proxyUrl = new URL(options.proxy.url);
-  const proxy: ProxyAddress = { host: withoutBrackets(proxyUrl.hostname), port: Number(proxyUrl.port === '' ? 80 : proxyUrl.port) };
+  const proxy: ProxyAddress = { host: bareHost(proxyUrl.hostname), port: Number(proxyUrl.port === '' ? 80 : proxyUrl.port) };
   const longest = options.timeouts?.longestCallMilliseconds ?? LONGEST_CALL_MILLISECONDS;
   const authorities: TrustedAuthorities = options.trustedCertificates === undefined || options.trustedCertificates.length === 0
     ? undefined : [...rootCertificates, ...options.trustedCertificates];
@@ -115,7 +114,12 @@ function sendOnce(request: ServiceRequest, proxy: ProxyAddress, timeoutMilliseco
     }
     const body = bodyText(request.body);
     const headers = wireHeaders(request, target, body);
-    const onResponse = (answer: IncomingMessage): void => readAnswer(answer, request.maximumResponseBytes, finish);
+    const onServiceAnswer = (answer: IncomingMessage): void => readAnswer(answer, request.maximumResponseBytes, finish);
+    const onProxyAnswer = (answer: IncomingMessage): void => {
+      if (!finishWithProxyMark(answer, finish)) {
+        onServiceAnswer(answer);
+      }
+    };
     const track = (connection: ClientRequest | Socket): void => {
       opened.push(connection);
       // A failure to reach the proxy, or a dropped connection, before an answer has been read.
@@ -129,10 +133,10 @@ function sendOnce(request: ServiceRequest, proxy: ProxyAddress, timeoutMilliseco
           host: proxy.host, port: proxy.port, method: request.method, path: `${request.origin}${request.pathAndQuery}`, headers, agent: false,
         });
         track(outgoing);
-        outgoing.on('response', onResponse);
+        outgoing.on('response', onProxyAnswer);
         outgoing.end(body ?? undefined);
       } else if (target.protocol === 'https:') {
-        sendThroughTunnel(request, target, headers, body, { proxy, authorities }, track, onResponse, finish);
+        sendThroughTunnel(request, target, headers, body, { proxy, authorities }, track, onServiceAnswer, finish);
       } else {
         // The proxy forwards only HTTP and HTTPS, so any other scheme is refused here.
         finish(failure('egress-blocked'));
@@ -164,7 +168,7 @@ function sendThroughTunnel(
       return;
     }
     try {
-      const hostname = withoutBrackets(target.hostname);
+      const hostname = bareHost(target.hostname);
       const secure = connectSecurely({
         socket: tunnel, host: hostname, ...(isIP(hostname) === 0 ? { servername: hostname } : {}), ...(authorities === undefined ? {} : { ca: [...authorities] }),
       });
@@ -186,17 +190,25 @@ const FAILURE_OF_MARK = {
   [EgressDecisionMark.Unreachable]: 'service-unreachable',
 } as const satisfies Record<EgressDecisionMark, string>;
 
-// Reads one answer. An answer the proxy marked as its own is its refusal or failure; any other is
-// the service's, returned with its status as received, a redirect included. The body is read one byte
-// past `maximumResponseBytes` and no further: only the engine can say what a status means, so a longer
-// one answers with its status and the body cut there, and the connection is closed.
+// A plain-HTTP answer the proxy marked as its own is its refusal or failure. Says whether this one
+// was, and if so has finished the call. A mark means nothing on an answer from inside a tunnel, so
+// only plain-HTTP answers come here.
+function finishWithProxyMark(answer: IncomingMessage, finish: (result: CallResult) => void): boolean {
+  const mark = answer.headers[EGRESS_DECISION_HEADER];
+  if (mark === undefined) {
+    return false;
+  }
+  answer.on('error', () => finish(failure('service-unreachable')));
+  finish(failure(FAILURE_OF_MARK[parseEgressDecisionMark(mark)]));
+  return true;
+}
+
+// Reads one answer of the service's, returned with its status as received, a redirect included. The
+// body is read one byte past `maximumResponseBytes` and no further: only the engine can say what a
+// status means, so a longer one answers with its status and the body cut there, and the connection is
+// closed.
 function readAnswer(answer: IncomingMessage, maximumResponseBytes: number, finish: (result: CallResult) => void): void {
   answer.on('error', () => finish(failure('service-unreachable')));
-  const mark = answer.headers[EGRESS_DECISION_HEADER];
-  if (mark !== undefined) {
-    finish(failure(FAILURE_OF_MARK[parseEgressDecisionMark(mark)]));
-    return;
-  }
   const chunks: Buffer[] = [];
   let length = 0;
   const finishWithBody = (body: Buffer): void => {

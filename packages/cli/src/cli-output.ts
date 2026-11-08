@@ -5,10 +5,12 @@
 import { schemaId, type CliErrorCode, type ExitCode } from '@revisum/engine';
 
 export type Command = 'validate' | 'lock' | 'run' | 'export' | 'review' | 'approve' | 'doctor' | 'convert' | 'draft';
-export type CliError = { readonly code: CliErrorCode; readonly path?: string; readonly docs: `errors#${CliErrorCode}` };
+// `reason` says what went wrong, when that holds no input value and helps a person more than the code.
+export type CliError = { readonly code: CliErrorCode; readonly path?: string; readonly reason?: string; readonly docs: `errors#${CliErrorCode}` };
 export type CliOutput<Data> = {
   readonly schema: string; readonly command: Command; readonly ok: boolean; readonly data?: Data; readonly errors?: readonly CliError[];
-  // What went wrong closing a browser session the command used. It changes nothing the command found.
+  // What went wrong closing a browser session the command used, or with its egress proxy while that
+  // ran. It changes nothing the command found.
   readonly closeFailure?: string;
 };
 

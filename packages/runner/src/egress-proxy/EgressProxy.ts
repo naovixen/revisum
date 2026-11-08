@@ -30,7 +30,8 @@ export type EgressProxy = {
     rewritesApplied(): readonly AppliedRewrite[];
     // Each origin it could not connect to so far, once per origin, with what to tell whoever is running.
     connectionFailures(): readonly ConnectionFailure[];
-    // Each listener's failure after it started listening, such as a failed accept.
+    // Each listener's failure after it started listening, such as a failed accept, and each throw
+    // from a listener given in the options.
     listenerFailures(): readonly ListenerFailure[];
     // Ends every connection and listener and waits for them. A listener's close failure is the failed
     // outcome. Closing again gives the same outcome.

@@ -4,9 +4,11 @@ import type { ProxyClient } from "./ProxyClient.ts";
 // A declared origin the proxy allowed but could not connect to.
 export type ConnectionFailure = { readonly origin: string; readonly message: string };
 
-// A listener's failure after it started listening, such as a failed accept.
+// A socket listener's failure after it started listening, such as a failed accept, or a throw from
+// one of the record's listeners.
 export type ListenerFailure = { readonly message: string };
 
+// Each may throw: the throw is kept as a listener failure, and the proxy goes on.
 export type ProxyRecordListeners = {
     // Called with each decision as it is made, such as to write it where the runner can read it, and
     // who it was made for.
@@ -16,6 +18,8 @@ export type ProxyRecordListeners = {
     // Called with each listener failure, for a process that nothing reads the record of.
     readonly onListenerFailure?: (failure: ListenerFailure) => void;
 };
+
+const NOT_AN_ERROR = "a listener of the proxy's record threw something that is not an Error";
 
 // Everything one proxy has decided and noted.
 export type ProxyRecord = {
@@ -41,11 +45,21 @@ export function createProxyRecord(listeners: ProxyRecordListeners): ProxyRecord 
     const applied = new Map<string, AppliedRewrite>();
     const failures = new Map<string, ConnectionFailure>();
     const listenerFailures: ListenerFailure[] = [];
+    // The proxy calls these from its request handlers, where a throw would end the process.
+    const callContained = (callListener: () => void): void => {
+        try {
+            callListener();
+        } catch (thrown) {
+            listenerFailures.push({
+                message: thrown instanceof Error ? thrown.message : NOT_AN_ERROR,
+            });
+        }
+    };
     return {
         noteDecision: (origin, decision, client) => {
             const entry: ProxyDecision = { origin, decision };
             decided.push(entry);
-            listeners.onDecision?.(entry, client);
+            callContained(() => listeners.onDecision?.(entry, client));
         },
         noteConnectionFailure: (origin, message) => {
             if (!failures.has(origin)) {
@@ -59,12 +73,12 @@ export function createProxyRecord(listeners: ProxyRecordListeners): ProxyRecord 
             }
             const entry: AppliedRewrite = { origin, name: rewriteName };
             applied.set(key, entry);
-            listeners.onRewriteApplied?.(entry);
+            callContained(() => listeners.onRewriteApplied?.(entry));
         },
         noteListenerFailure: (message) => {
             const entry: ListenerFailure = { message };
             listenerFailures.push(entry);
-            listeners.onListenerFailure?.(entry);
+            callContained(() => listeners.onListenerFailure?.(entry));
         },
         decisions: () => [...decided],
         refusedOrigins: () =>

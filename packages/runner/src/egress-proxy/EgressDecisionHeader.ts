@@ -1,6 +1,8 @@
-// The header on every answer the proxy writes itself, rather than passes on from a service, so a
-// client such as runner's service caller can tell the proxy's refusal or failure from a status the
-// service sent. The proxy strips it from every service response, so a service cannot forge it.
+// The header on every plain-HTTP answer the proxy writes itself, rather than passes on from a service,
+// so a client such as runner's service caller can tell the proxy's refusal or failure from a status
+// the service sent. The proxy strips it from every plain-HTTP service response, so a service cannot
+// forge it there. Inside a CONNECT tunnel the proxy sees only encrypted bytes and can neither write
+// nor strip it, so a client must not read it on an answer that came through one.
 export const EGRESS_DECISION_HEADER = "x-egress-decision";
 
 // What the header says: the proxy refused the request, or could not get an answer from the service.

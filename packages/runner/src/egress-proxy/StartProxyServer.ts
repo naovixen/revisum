@@ -77,7 +77,7 @@ export async function startProxyServer(
     // Each relay listens before the proxy's own port does, so a proxy that answers relays too. The
     // proxy's own port comes last, so its port is the one given back.
     const planned: readonly PlannedListener[] = [
-        ...(rules.tcpRelays ?? []).map((relay) => ({
+        ...rules.tcpRelays.map((relay) => ({
             server: createTcpServer((client) => {
                 void relayConnection(client, relay);
             }),

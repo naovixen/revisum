@@ -26,6 +26,7 @@ export * from './UnsafeFeature.ts';
 export * from './browser-driver.ts';
 export * from './DriverError.ts';
 export { hostAndPort } from './HostAndPort.ts';
+export { originOfUrl, parseOrigin } from './ParseOrigin.ts';
 export { mergeRefusedOrigins } from './MergeRefusedOrigins.ts';
 export type * from './explore-mode.ts';
 export { DraftWarningCode, ExploreErrorCode } from './explore-mode.ts';

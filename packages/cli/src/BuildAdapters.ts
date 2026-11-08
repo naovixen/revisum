@@ -14,7 +14,7 @@ import {
 // A host run's session goes through its own proxy. Only host runs allow declared private addresses,
 // so internal staging and localhost keep working, and every other address is refused. A source says
 // it failed by rejecting, which the driver turns into its own outcome.
-const startHostSessionEgress: EgressSource = async (allowedOrigins) => {
+export const startHostSessionEgress: EgressSource = async (allowedOrigins) => {
     const rules = parseProxyRules({
         allowedOrigins,
         privateOrigins: allowedOrigins,
@@ -31,7 +31,14 @@ const startHostSessionEgress: EgressSource = async (allowedOrigins) => {
     return {
         proxy: { server: proxy.url, includeLoopback: true },
         refusedOrigins: () => proxy.refusedOrigins(),
-        connectionFailures: () => proxy.connectionFailures(),
+        // A listener's failure belongs to no declared origin, so it is named after the proxy.
+        connectionFailures: () => [
+            ...proxy.connectionFailures(),
+            ...proxy.listenerFailures().map((failure) => ({
+                origin: proxy.url,
+                message: `A listener of the egress proxy failed, so its record may be incomplete: ${failure.message}`,
+            })),
+        ],
         close: async () => {
             const closed = await proxy.close();
             if (!closed.ok) {

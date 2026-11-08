@@ -5,10 +5,9 @@
 // them the same way. The rules and those lines all cross a process boundary, so each is decoded here
 // before use. A write that fails does not stop the proxy: the state file says records were lost, and
 // the runner decides what that means for the run.
-import type { AppliedRewrite, ProxyDecision } from '@revisum/contracts';
+import { parseOrigin, type AppliedRewrite, type ProxyDecision } from '@revisum/contracts';
 import { appendFileSync, openSync, writeSync } from 'node:fs';
 import { startRefusalsServer } from './ReadBrowserRefusals.ts';
-import { readExactOrigin } from './egress-proxy/ReadExactOrigin.ts';
 import { ownField } from './egress-proxy/OwnField.ts';
 import { readProxyRules } from './egress-proxy/ParseProxyRules.ts';
 import { ProxyClient } from './egress-proxy/ProxyClient.ts';
@@ -58,10 +57,10 @@ export function readAppliedRewrite(line: string): AppliedRewrite | null {
   } catch {
     return null;
   }
-  const origin = readExactOrigin(ownField(parsed, 'origin'));
+  const origin = parseOrigin(ownField(parsed, 'origin'));
   const name = ownField(parsed, 'name');
-  if (origin === null || typeof name !== 'string' || name === '') return null;
-  return { origin, name };
+  if (!origin.ok || typeof name !== 'string' || name === '') return null;
+  return { origin: origin.value, name };
 }
 
 export type RecordKeeper = { append(file: string, record: unknown): void };

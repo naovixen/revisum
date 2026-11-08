@@ -30,7 +30,7 @@ import {
   type DraftWarning, type EventSink, type Origin, type PageMap, type PlanDraft, type PlannerEndpoint, type PlanProvenance, type PlanSource, type Project, type ProjectLoadError,
   type Redactor, type SecretStore, type Target, type TrustedProject, type VersionControlPort,
 } from '@revisum/engine';
-import { parseProxyRules, serviceCaller, startProxyServer, type AddressConnector, type AddressResolver, type EgressProxy } from '@revisum/runner';
+import { parseProxyRules, serviceCaller, startProxyServer, type AddressConnector, type AddressResolver, type EgressProxy, type ProxyRulesRefusal, type ProxyStartFailure } from '@revisum/runner';
 import { CLI_OUTPUT_SCHEMA, cliError, exitCodeFor, type CliError, type CliOutput, type CommandOutcome } from './cli-output.ts';
 import { crawlInBrowser, crawlInRunner, crawlTarget, type CrawlStop, type IsolatedRunner } from './explore-crawl.ts';
 import { plannerAdapter } from './planner-adapters.ts';
@@ -238,6 +238,20 @@ async function prepare(options: DraftArguments, ports: DraftCommandPorts): Promi
   };
 }
 
+// The command's stop for a proxy that never ran, saying why. Neither kind of failure repeats an input.
+export const plannerProxyStop = (failure: ProxyRulesRefusal | ProxyStartFailure): Stop =>
+  ({ stopped: { ...cliError('planner-call-failed', `${PROJECT_FILE}#planner`), reason: failure.message } });
+
+// What went wrong with the planner's proxy while it ran and as it closed, or null if nothing did. The
+// reply stands either way, but a person should know the proxy's record may be incomplete.
+function plannerProxyFailure(proxy: Pick<EgressProxy, 'listenerFailures'>, closed: Awaited<ReturnType<EgressProxy['close']>>): string | null {
+  const failures = [
+    ...proxy.listenerFailures().map((failure) => `a listener of the planner's egress proxy failed: ${failure.message}`),
+    ...(closed.ok ? [] : [`the planner's egress proxy did not close: ${closed.error.message}`]),
+  ];
+  return failures.length === 0 ? null : failures.join('; ');
+}
+
 // Calls the planner through an egress proxy that allows only its origin, and answers with the
 // reply as received, or the code the call failed with. The proxy is closed either way.
 async function callPlanner(prepared: Prepared, request: DraftRequest, ports: DraftCommandPorts): Promise<{ readonly reply: unknown; readonly closeFailure: string | null } | Stop> {
@@ -245,16 +259,16 @@ async function callPlanner(prepared: Prepared, request: DraftRequest, ports: Dra
   // A local endpoint is a private service on loopback; any other must resolve to a public address.
   const rules = parseProxyRules({ allowedOrigins: [origin], privateOrigins: endpoint.kind === 'local' ? [origin] : [], rewrites: [] });
   if (!rules.ok) {
-    return stop('planner-call-failed', `${PROJECT_FILE}#planner`);
+    return plannerProxyStop(rules.error);
   }
   const started = await startProxyServer(rules.value, { resolve: ports.resolve, connect: ports.connect });
   if (!started.ok) {
-    return stop('planner-call-failed', `${PROJECT_FILE}#planner`);
+    return plannerProxyStop(started.error);
   }
   const proxy = started.value;
   const answered = await askPlanner(prepared, request, ports, proxy);
   const closed = await proxy.close();
-  const closeFailure = closed.ok ? null : `the planner's egress proxy did not close: ${closed.error.message}`;
+  const closeFailure = plannerProxyFailure(proxy, closed);
   return isStop(answered) ? { ...answered, ...closeFailureField(closeFailure) } : { reply: answered.reply, closeFailure };
 }
 
@@ -431,7 +445,7 @@ export async function draftCommand(argv: readonly string[], ports: DraftCommandP
   const outcome = isStop(options) ? options : await draft(options, ports);
   if (isStop(outcome)) {
     const output: CliOutput<DraftCommandData> = { schema: CLI_OUTPUT_SCHEMA, command: 'draft', ok: false, errors: [outcome.stopped], ...closeFailureField(outcome.closeFailure ?? null) };
-    const where = outcome.stopped.path === undefined ? '' : ` at ${outcome.stopped.path}`;
+    const where = `${outcome.stopped.path === undefined ? '' : ` at ${outcome.stopped.path}`}${outcome.stopped.reason === undefined ? '' : `: ${outcome.stopped.reason}`}`;
     return {
       exitCode: exitCodeFor(outcome.stopped.code),
       stdout: json ? `${JSON.stringify(output, null, 2)}\n` : '',

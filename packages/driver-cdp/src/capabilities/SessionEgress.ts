@@ -11,7 +11,8 @@ export type SessionEgress = {
     readonly proxy: ProxySettings;
     // What the egress refused, in its own form, such as "host:443". Throws when that can't be known.
     refusedOrigins(): readonly string[];
-    // A diagnostic for whoever is running, which stays out of the hashed result.
+    // A diagnostic for whoever is running, which stays out of the hashed result. It also holds any
+    // failure of the egress itself while it ran, named after the egress rather than an origin.
     connectionFailures(): readonly ConnectionFailure[];
     close(): Promise<void>;
 };
