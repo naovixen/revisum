@@ -211,7 +211,10 @@ export async function crawlInRunner(
   if (variableNames.includes(null)) {return failure('explore-runner-unavailable');}
   const crawled = await isolated.runner.withRun(isolated.image, policy.value, (run) =>
     crawlInRun(run, isolated, input, origin, variableNames.filter((name) => name !== null), redactor));
-  return crawled.ok ? crawled.value : failure('explore-runner-unavailable');
+  if (!crawled.ok) {return failure('explore-runner-unavailable');}
+  // Read after the run's end, so this says whether all of the crawl's egress was recorded.
+  const isStillIsolated = crawled.value.final.guaranteeLevel === 'isolated';
+  return isStillIsolated ? crawled.value.value : failure('explore-runner-unavailable');
 }
 
 // The crawl inside a run that has started, to the end of what its exit status says.
@@ -234,10 +237,6 @@ async function crawlInRun(
   }
   const decoded = decodePageMap(printed, origin);
   if (!decoded.ok || decoded.value.guaranteeLevel !== 'isolated') {return failure('explore-runner-unavailable');}
-  // The exec read the proxy's record back, so this says whether all of the crawl's egress was recorded.
-  if (run.guaranteeLevel() !== 'isolated') {
-    return failure('explore-runner-unavailable');
-  }
   // Redacted again on the host, in case the container lacked a secret's value.
   return success(redactPageMap(decoded.value, redactor));
 }

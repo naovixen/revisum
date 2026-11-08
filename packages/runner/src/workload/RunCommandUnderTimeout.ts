@@ -2,8 +2,7 @@
 // stopped by removing its container, and the wait for that to end the command is bounded, so a daemon
 // that never answers cannot hold the run open.
 import { WorkloadStop, success, type ExecOutcome, type Result } from "@revisum/contracts";
-import { adapterAnswer, type ProblemDetail } from "../AdapterAnswer.ts";
-import type { ContainerEngine } from "../container-engine.ts";
+import type { ContainerEngine, EngineProblem } from "../container-engine.ts";
 import type { ContainerScope } from "../ContainerScope.ts";
 import type { CheckedWorkloadRequest } from "./CheckWorkloadRequest.ts";
 import { workloadRefused, type WorkloadRefusal } from "./WorkloadRefusal.ts";
@@ -29,7 +28,7 @@ function timerOf(milliseconds: number): Timer {
     return { elapsed, cancel: () => clearTimeout(handle) };
 }
 
-type CommandAnswer = Result<ExecOutcome, ProblemDetail>;
+type CommandAnswer = Result<ExecOutcome, EngineProblem>;
 
 // What became of a command the timeout stopped. Removing its container ends it, and what it printed
 // until then is still returned.
@@ -38,7 +37,7 @@ async function stopped(
     teamId: string,
     execution: Promise<CommandAnswer>,
 ): Promise<Extract<CommandEnd, { kind: "timed-out" }>> {
-    const progress: { removal: Result<void, ProblemDetail> | null; ended: CommandAnswer | null } = {
+    const progress: { removal: Result<void, EngineProblem> | null; ended: CommandAnswer | null } = {
         removal: null,
         ended: null,
     };
@@ -71,7 +70,7 @@ export async function runCommandUnderTimeout(
     teamId: string,
     checked: CheckedWorkloadRequest,
 ): Promise<Result<CommandEnd, WorkloadRefusal>> {
-    const execution = adapterAnswer(() => engine.exec(teamId, checked.argv));
+    const execution = engine.exec(teamId, checked.argv);
     const timeout = timerOf(checked.timeoutMilliseconds);
     const first = await Promise.race([execution, timeout.elapsed]);
     timeout.cancel();

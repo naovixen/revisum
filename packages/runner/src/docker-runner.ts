@@ -11,11 +11,11 @@
 // empty list, and only the code, dependencies and browsers the run needs are mounted, read-only.
 import {
   PRODUCT, failure, success,
-  type AppliedRewrite, type DeclaredService, type EgressPolicy, type ImageDigest, type ProxyDecision, type Result, type Runner, type RunnerError, type RunnerHandle,
+  type AppliedRewrite, type DeclaredService, type EgressPolicy, type FinalRunFacts, type FinishedRun, type ImageDigest, type ProxyDecision, type Result, type Runner, type RunnerError, type RunnerHandle,
   type GuaranteeLevel,
 } from '@revisum/contracts';
 import { join } from 'node:path';
-import { adapterAnswer } from './AdapterAnswer.ts';
+import { answeringEngine } from './AnsweringEngine.ts';
 import type { ContainerEngine, ContainerMount } from './container-engine.ts';
 import { NetworkKind, withContainerScope, type ContainerScope } from './ContainerScope.ts';
 import { joinEgressEvents } from './egress-events.ts';
@@ -25,6 +25,7 @@ import {
 } from './run-containers.ts';
 import { SERVICE_PROXY_VARIABLE } from './proxy-container.ts';
 import { RUN_IMAGE_TAG } from './run-image.ts';
+import { safeLog } from './SafeLog.ts';
 import { proxyUnreachableDetail, startProxyContainer } from './StartProxyContainer.ts';
 
 export type RunnerLogEntry = { readonly code: 'egress-unenforceable' | 'start-failed' | 'cleanup-failed'; readonly detail: string };
@@ -102,10 +103,7 @@ function runContainerEnvironment(proxyName: string): Readonly<Record<string, str
 
 // The handle `use` is given, and how the run ends: what the proxy decided is read once more, and from
 // then on nothing can reach the containers through the handle.
-type OpenRun = { readonly handle: RunnerHandle; readonly end: () => Promise<void> };
-
-const readFailureDetail = (thrown: unknown): string =>
-  `what the proxy decided could not be read back: ${thrown instanceof Error ? thrown.message : String(thrown)}`;
+type OpenRun = { readonly handle: RunnerHandle; readonly end: () => Promise<FinalRunFacts> };
 
 function openRun(setup: RunSetup, ids: RunContainerIds, startingLevel: GuaranteeLevel): OpenRun {
   const { engine, log } = setup;
@@ -122,19 +120,15 @@ function openRun(setup: RunSetup, ids: RunContainerIds, startingLevel: Guarantee
   };
   // A read that fails keeps what the last one found, since each file only grows. But the record may
   // then be incomplete, and egress is enforced only as far as it can be shown, so the run no longer
-  // counts as isolated. A read that rejects is the same, so it cannot stop a removal.
+  // counts as isolated.
   const refreshEvidence = async (): Promise<void> => {
-    try {
-      const [readNow, appliedNow, hasLostRecords] = await Promise.all([
-        readDecisions(engine, proxyId), readAppliedRewrites(engine, proxyId), hasProxyLostRecords(engine, proxyId),
-      ]);
-      decisions = readNow ?? decisions;
-      rewrites = appliedNow ?? rewrites;
-      if (readNow === null || hasLostRecords) {
-        fallToHost('what the proxy decided could not be read back whole');
-      }
-    } catch (thrown) {
-      fallToHost(readFailureDetail(thrown));
+    const [readNow, appliedNow, hasLostRecords] = await Promise.all([
+      readDecisions(engine, proxyId), readAppliedRewrites(engine, proxyId), hasProxyLostRecords(engine, proxyId),
+    ]);
+    decisions = readNow ?? decisions;
+    rewrites = appliedNow ?? rewrites;
+    if (readNow === null || hasLostRecords) {
+      fallToHost('what the proxy decided could not be read back whole');
     }
   };
   const handle: RunnerHandle = {
@@ -146,7 +140,7 @@ function openRun(setup: RunSetup, ids: RunContainerIds, startingLevel: Guarantee
       if (hasEnded) {
         return failure({ detail: 'the run has ended, so its containers are gone' });
       }
-      const outcome = await adapterAnswer(() => engine.exec(runContainerId, command, environmentNames));
+      const outcome = await engine.exec(runContainerId, command, environmentNames);
       await refreshEvidence();
       return outcome;
     },
@@ -157,6 +151,7 @@ function openRun(setup: RunSetup, ids: RunContainerIds, startingLevel: Guarantee
     end: async () => {
       hasEnded = true;
       await refreshEvidence();
+      return { guaranteeLevel: level, proxyDecisions: decisions, rewritesApplied: rewrites };
     },
   };
 }
@@ -211,22 +206,26 @@ async function startRunInScope(setup: RunSetup, scope: ContainerScope): Promise<
 
 // `use` over a started run. The last read of the proxy's evidence and the end of the handle happen
 // before the scope removes the containers, whatever `use` did.
-async function useRun<Value>(setup: RunSetup, scope: ContainerScope, use: (run: RunnerHandle) => Promise<Value>): Promise<Result<Value, RunnerError>> {
+async function useRun<Value>(setup: RunSetup, scope: ContainerScope, use: (run: RunnerHandle) => Promise<Value>): Promise<Result<FinishedRun<Value>, RunnerError>> {
   const opened = await startRunInScope(setup, scope);
   if (!opened.ok) {
     return opened;
   }
+  const { handle, end } = opened.value;
+  let value: Value;
   try {
-    return success(await use(opened.value.handle));
-  } finally {
-    await opened.value.end();
+    value = await use(handle);
+  } catch (thrown) {
+    await end();
+    throw thrown;
   }
+  return success({ value, final: await end() });
 }
 
 export function dockerRunner(options: DockerRunnerOptions): Runner {
-  const { engine } = options;
+  const engine = answeringEngine(options.engine);
   const root = options.repositoryRoot;
-  const log: RunnerLog = options.log ?? ((): void => undefined);
+  const log: RunnerLog = safeLog(options.log ?? ((): void => undefined));
   const ownMounts = ownCodeMounts(root, dependenciesVolumeFor(options.dependenciesVolume));
 
   return {

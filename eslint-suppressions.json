@@ -1200,9 +1200,6 @@
     "@typescript-eslint/naming-convention": {
       "count": 1
     },
-    "@typescript-eslint/strict-boolean-expressions": {
-      "count": 1
-    },
     "revisum/file-name-matches-export": {
       "count": 1
     }
@@ -4168,12 +4165,6 @@
   "test/unit/runner/docker-network-description.test.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 2
-    },
-    "@typescript-eslint/no-unsafe-assignment": {
-      "count": 1
-    },
-    "@typescript-eslint/no-unsafe-return": {
-      "count": 1
     },
     "@typescript-eslint/unbound-method": {
       "count": 1

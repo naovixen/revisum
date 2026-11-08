@@ -107,9 +107,19 @@ export interface RunnerHandle {
   guaranteeLevel(): GuaranteeLevel;
 }
 
+// What a run finally showed, read after `use` had ended, so a level that fell at the very end is seen.
+export type FinalRunFacts = {
+  readonly guaranteeLevel: GuaranteeLevel;
+  readonly proxyDecisions: readonly ProxyDecision[];
+  readonly rewritesApplied: readonly AppliedRewrite[];
+};
+
+// What a finished run gives back: `use`'s value, and what the run finally showed beside it.
+export type FinishedRun<Value> = { readonly value: Value; readonly final: FinalRunFacts };
+
 export interface Runner {
   // Starts a run and gives `use` its handle; the run's containers are gone when this returns, however
-  // `use` ended, and what `use` returned or threw is given back unchanged. A failure means no run
-  // started, and `use` was not called.
-  withRun<Value>(image: ImageDigest, policy: EgressPolicy, use: (run: RunnerHandle) => Promise<Value>): Promise<Result<Value, RunnerError>>;
+  // `use` ended. What `use` returned comes back with the run's final facts, and what it threw is
+  // rethrown. A failure means no run started, and `use` was not called.
+  withRun<Value>(image: ImageDigest, policy: EgressPolicy, use: (run: RunnerHandle) => Promise<Value>): Promise<Result<FinishedRun<Value>, RunnerError>>;
 }

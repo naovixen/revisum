@@ -42,6 +42,16 @@ export type ContainerOptions = {
 export type HostEntry = { readonly name: string; readonly address: string };
 
 export type EngineProblem = { readonly detail: string };
+
+// internal-refused: Docker said it cannot make a network with no route out, so an ordinary one may
+// be tried instead. failed: any other reason, which says nothing about what Docker can make.
+export const NetworkFailureKind = {
+  InternalRefused: 'internal-refused',
+  Failed: 'failed',
+} as const;
+export type NetworkFailureKind = (typeof NetworkFailureKind)[keyof typeof NetworkFailureKind];
+
+export type NetworkFailure = { readonly kind: NetworkFailureKind; readonly detail: string };
 export type ProbeTarget = {
   readonly host: string;
   readonly port: number;
@@ -61,7 +71,7 @@ export interface ContainerEngine {
   // nothing about whether the image exists, so it answers 'unanswered', never 'absent'.
   imageId(reference: string): Promise<ImageAnswer>;
   // internal: a network with no route out of the host and no gateway to the Docker host.
-  createNetwork(name: string, options: { readonly internal: boolean }): Promise<Result<void, EngineProblem>>;
+  createNetwork(name: string, options: { readonly internal: boolean }): Promise<Result<void, NetworkFailure>>;
   removeNetwork(name: string): Promise<Result<void, EngineProblem>>;
   // Where a gateway to the Docker host would be on this network, for a probe to try: the first
   // address of its IPv4 subnet. Null when there is nothing to try, because a container on the network
@@ -72,7 +82,9 @@ export interface ContainerEngine {
   startContainer(options: ContainerOptions): Promise<Result<string, EngineProblem>>;
   // Runs an argument vector inside a running container, without a shell. Each variable named in
   // `environmentNames` is passed by name only, so Docker copies its value from the client's own
-  // environment and no secret is ever on a command line.
+  // environment and no secret is ever on a command line. A failure means the command never ran; any
+  // exit of the command, whatever its number, is a success carrying that code. It runs for as long
+  // as the command does: it is the caller who bounds it.
   exec(containerId: string, command: readonly string[], environmentNames?: readonly string[]): Promise<Result<ExecOutcome, EngineProblem>>;
   // Tries a direct connection from inside the container to each target. 'reached' when any one
   // answered, or when the probe itself could not run, so an unknown is never taken for 'blocked'.
@@ -80,26 +92,30 @@ export interface ContainerEngine {
   // Removes a container, running or not. A problem means it may still be there.
   removeContainer(containerId: string): Promise<Result<void, EngineProblem>>;
   // The user an image's containers run as by default, such as "node" or "1000:1000", or null when
-  // the image has none.
-  imageUser(reference: string): Promise<string | null>;
-  // A running container's address on one of its networks, or null when it has none there.
-  containerAddress(containerId: string, network: string): Promise<string | null>;
+  // the image has none. A problem says nothing about the user, so it is never taken for none.
+  imageUser(reference: string): Promise<Result<string | null, EngineProblem>>;
+  // A running container's address on one of its networks. A problem when it has none there, or when
+  // Docker could not say.
+  containerAddress(containerId: string, network: string): Promise<Result<string, EngineProblem>>;
 }
 
 // Output beyond this is dropped, so a chatty command cannot exhaust memory.
 const OUTPUT_LIMIT_BYTES = 16 * 1024 * 1024;
-const DOCKER_COMMAND_TIMEOUT_MILLISECONDS = 120_000;
+export const DOCKER_COMMAND_TIMEOUT_MILLISECONDS = 120_000;
 const PROBE_TIMEOUT_MILLISECONDS = 4_000;
 // An --internal network alone keeps a gateway, through which its containers can reach a service on
 // the Docker host. This takes the gateway away and leaves the network's peers connected.
 const NO_GATEWAY_OPTION = 'com.docker.network.bridge.inhibit_ipv4=true';
 
-export type DockerOutcome = { readonly status: number; readonly stdout: string; readonly stderr: string };
+// A null status is a client ended by `signal`, as one that ran out of time is, so no exit is invented.
+export type DockerOutcome = { readonly status: number | null; readonly signal: NodeJS.Signals | null; readonly stdout: string; readonly stderr: string };
 
-// Runs the Docker client with these arguments, without a shell. Status -1 means it could not run
-// or ran out of time, whether spawn threw, no streams opened or an error came later. Values in
-// `environment` reach the client through its own environment, never its command line, which other
-// users of the host can read. It never rejects.
+const CLIENT_DID_NOT_RUN_STATUS = -1;
+
+// Runs the Docker client with these arguments, without a shell. Status -1 means it could not run,
+// whether spawn threw, no streams opened or an error came later. Values in `environment` reach the
+// client through its own environment, never its command line, which other users of the host can
+// read. It never rejects.
 export function runDocker(
   words: readonly string[], timeoutMilliseconds: number | null = DOCKER_COMMAND_TIMEOUT_MILLISECONDS,
   environment: Readonly<Record<string, string>> = {},
@@ -109,7 +125,7 @@ export function runDocker(
     try {
       child = spawn('docker', [...words], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true, ['env']: { ...process.env, ...environment } });
     } catch (error) {
-      resolve({ status: -1, stdout: '', stderr: error instanceof Error ? error.message : String(error) });
+      resolve({ status: CLIENT_DID_NOT_RUN_STATUS, signal: null, stdout: '', stderr: error instanceof Error ? error.message : String(error) });
       return;
     }
     const stdout: Buffer[] = [];
@@ -124,22 +140,50 @@ export function runDocker(
     child.stdout?.on('data', keep(stdout));
     child.stderr?.on('data', keep(stderr));
     const timer = timeoutMilliseconds === null ? undefined : setTimeout(() => child.kill(), timeoutMilliseconds);
-    const finish = (status: number, extra = ''): void => {
+    const finish = (status: number | null, signal: NodeJS.Signals | null, extra = ''): void => {
       clearTimeout(timer);
-      resolve({ status, stdout: Buffer.concat(stdout).toString('utf8'), stderr: `${Buffer.concat(stderr).toString('utf8')}${extra}` });
+      resolve({ status, signal, stdout: Buffer.concat(stdout).toString('utf8'), stderr: `${Buffer.concat(stderr).toString('utf8')}${extra}` });
     };
-    child.once('error', (error) => finish(-1, error.message));
-    child.once('close', (code) => finish(code ?? -1));
+    child.once('error', (error) => finish(CLIENT_DID_NOT_RUN_STATUS, null, error.message));
+    child.once('close', (code, signal) => finish(code, signal));
   });
 }
 
-const problem = (outcome: DockerOutcome): EngineProblem => ({ detail: (outcome.stderr.trim() || outcome.stdout.trim()).slice(0, 500) });
+function problem(outcome: DockerOutcome): EngineProblem {
+  const errors = outcome.stderr.trim();
+  const printed = errors === '' ? outcome.stdout.trim() : errors;
+  if (outcome.status !== null) {return { detail: printed.slice(0, 500) };}
+  const killed = `the Docker client was killed by ${outcome.signal ?? 'a signal'}`;
+  return { detail: (printed === '' ? killed : `${killed}: ${printed}`).slice(0, 500) };
+}
 
-// Docker's own exit status for a failure in the client or daemon, so nothing in the container ran.
-const DOCKER_CLIENT_FAILED_STATUS = 125;
 const NO_SUCH_IMAGE = /no such image/i;
 
-const isCommandUnrun = (outcome: DockerOutcome): boolean => outcome.status === -1 || outcome.status === DOCKER_CLIENT_FAILED_STATUS;
+// What the client prints, first, when `docker exec` could not run its command. Exit statuses cannot
+// say: the client exits 1 for a container that is gone, and a command may exit 1 or even 125 for its
+// own reasons. Only these words, about this container or from a client with no daemon, tell them
+// apart, and a command printing them further down its output has not said them.
+const clientFailureOpenings = (containerId: string): readonly string[] => [
+  `Error response from daemon: No such container: ${containerId}`,
+  `Error response from daemon: container ${containerId} is not running`,
+  'Cannot connect to the Docker daemon at',
+  'error during connect:',
+  'failed to connect to the docker API at',
+];
+
+const didCommandRun = (outcome: DockerOutcome, containerId: string): boolean =>
+  outcome.status !== CLIENT_DID_NOT_RUN_STATUS &&
+  (outcome.status === 0 || !clientFailureOpenings(containerId).some((opening) => outcome.stderr.startsWith(opening)));
+
+// Only Docker's refusal of the options that make a network with no route out: everything else, a
+// full pool or a stopped daemon, says nothing about whether such a network could be made.
+const INTERNAL_NETWORK_REFUSALS: readonly RegExp[] = [
+  /com\.docker\.network\.bridge\.inhibit_ipv4/,
+  /\binternal\b.*\b(not supported|unsupported)\b|\b(does not support|not supported|unknown flag)\b.*\binternal\b/i,
+];
+
+const isInternalNetworkRefused = (outcome: DockerOutcome): boolean =>
+  INTERNAL_NETWORK_REFUSALS.some((refusal) => refusal.test(outcome.stderr));
 
 // A start that failed part-way, and what became of the container it rolled back.
 const startProblem = (cause: DockerOutcome, removed: Result<void, EngineProblem>): EngineProblem =>
@@ -187,10 +231,11 @@ const probeScript = (targets: readonly ProbeTarget[]): string => `
 
 // The container engine over the Docker command-line client.
 export function dockerCliEngine(): ContainerEngine {
-  const exec = async (containerId: string, command: readonly string[], environmentNames: readonly string[] = []): Promise<Result<ExecOutcome, EngineProblem>> => {
-    const outcome = await runDocker(['exec', ...environmentNames.flatMap((name) => ['--env', name]), containerId, ...command], null);
-    if (isCommandUnrun(outcome)) {return failure(problem(outcome));}
-    return success({ exitCode: outcome.status, stdout: outcome.stdout, stderr: outcome.stderr });
+  const execWithin = async (timeoutMilliseconds: number | null, containerId: string, command: readonly string[], environmentNames: readonly string[] = []): Promise<Result<ExecOutcome, EngineProblem>> => {
+    const outcome = await runDocker(['exec', ...environmentNames.flatMap((name) => ['--env', name]), containerId, ...command], timeoutMilliseconds);
+    const { status } = outcome;
+    if (status === null || !didCommandRun(outcome, containerId)) {return failure(problem(outcome));}
+    return success({ exitCode: status, stdout: outcome.stdout, stderr: outcome.stderr });
   };
   const removeContainer = async (containerId: string): Promise<Result<void, EngineProblem>> => {
     const outcome = await runDocker(['rm', '--force', '--volumes', containerId]);
@@ -206,7 +251,9 @@ export function dockerCliEngine(): ContainerEngine {
     },
     async createNetwork(name, options) {
       const outcome = await runDocker(['network', 'create', ...(options.internal ? ['--internal', '--opt', NO_GATEWAY_OPTION] : []), name]);
-      return outcome.status === 0 ? success(undefined) : failure(problem(outcome));
+      if (outcome.status === 0) {return success(undefined);}
+      const kind = options.internal && isInternalNetworkRefused(outcome) ? NetworkFailureKind.InternalRefused : NetworkFailureKind.Failed;
+      return failure({ kind, detail: problem(outcome).detail });
     },
     async removeNetwork(name) {
       const outcome = await runDocker(['network', 'rm', name]);
@@ -232,22 +279,22 @@ export function dockerCliEngine(): ContainerEngine {
       }
       return success(containerId);
     },
-    exec,
+    exec: (containerId, command, environmentNames) => execWithin(null, containerId, command, environmentNames),
     async probeEgress(containerId, targets) {
-      const probed = await exec(containerId, ['node', '-e', probeScript(targets)]);
+      const probed = await execWithin(DOCKER_COMMAND_TIMEOUT_MILLISECONDS, containerId, ['node', '-e', probeScript(targets)]);
       if (!probed.ok || probed.value.exitCode !== 0) {return 'reached';}
       return probed.value.stdout.trim().split('\n').at(-1) === 'blocked' ? 'blocked' : 'reached';
     },
     removeContainer,
     async imageUser(reference) {
       const outcome = await runDocker(['image', 'inspect', '--format', '{{.Config.User}}', reference]);
+      if (outcome.status !== 0) {return failure(problem(outcome));}
       const user = outcome.stdout.trim();
-      return outcome.status === 0 && user !== '' ? user : null;
+      return success(user === '' ? null : user);
     },
     async containerAddress(containerId, network) {
       const outcome = await runDocker(['container', 'inspect', '--format', '{{json .NetworkSettings.Networks}}', containerId]);
-      if (outcome.status !== 0) {return null;}
-      return networkAddress(outcome.stdout, network);
+      return outcome.status === 0 ? networkAddress(outcome.stdout, network) : failure(problem(outcome));
     },
   };
 }
@@ -297,15 +344,15 @@ function gatewayAddressIn(description: string): Result<string | null, EngineProb
 }
 
 // A container's IPv4 address on `network`, from Docker's JSON listing of its networks.
-function networkAddress(listing: string, network: string): string | null {
+function networkAddress(listing: string, network: string): Result<string, EngineProblem> {
   let parsed: unknown;
   try {
     parsed = JSON.parse(listing);
   } catch {
-    return null;
+    return failure({ detail: 'Docker\'s listing of the container\'s networks is not JSON' });
   }
-  if (typeof parsed !== 'object' || parsed === null) {return null;}
-  const settings: unknown = Object.getOwnPropertyDescriptor(parsed, network)?.value;
-  const address: unknown = typeof settings === 'object' && settings !== null ? Reflect.get(settings, 'IPAddress') : undefined;
-  return typeof address === 'string' && /^\d{1,3}(\.\d{1,3}){3}$/.test(address) ? address : null;
+  const address = fieldOf(fieldOf(parsed, network), 'IPAddress');
+  return typeof address === 'string' && /^\d{1,3}(\.\d{1,3}){3}$/.test(address)
+    ? success(address)
+    : failure({ detail: `the container has no address on the network ${network}` });
 }

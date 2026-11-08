@@ -11,6 +11,7 @@ import type { ProxyRulesRefusal } from './egress-proxy/ProxyRulesRefusal.ts';
 import {
   DECISIONS_FILE, LOOKUPS_FILE, LOOKUPS_VARIABLE, RECORDS_LOST, RECORDS_STATE_FILE, REWRITES_FILE, RULES_VARIABLE, PROXY_PORT, RUN_ADDRESSES_VARIABLE, SERVICE_PROXY_PORT, readAppliedRewrite, readProxyDecision,
 } from './proxy-container.ts';
+import { readInContainer } from './WithinReadBound.ts';
 
 // Where Revisum's own files appear inside the run image's containers.
 export const WORKSPACE = '/workspace';
@@ -25,6 +26,7 @@ const PROXY_READY_SECONDS = 30;
 const OUTSIDE_PROBE_TARGETS: readonly ProbeTarget[] = [{ host: '1.1.1.1', port: 443 }, { host: '8.8.8.8', port: 53 }];
 // Any port will do for a gateway, since its refusal counts as reaching it.
 const GATEWAY_PROBE_PORT = 80;
+const NO_SUCH_FILE = /no such file/i;
 
 // Tries, from a container on the run's network, to get out without the proxy: to public addresses,
 // and to the Docker host through the network's gateway, which a Docker that ignores the option to
@@ -127,10 +129,10 @@ export const serviceProxyUrl = (proxyName: string): string => `http://${proxyNam
 // once it has something to record. Only the message tells that apart: a stopped container exits
 // with the same status.
 async function linesOf(engine: ContainerEngine, containerId: string, file: string): Promise<readonly string[] | null> {
-  const read = await engine.exec(containerId, ['cat', file]);
+  const read = await readInContainer(engine, containerId, ['cat', file]);
   if (!read.ok) return null;
   if (read.value.exitCode === 0) return read.value.stdout.split('\n');
-  return read.value.stderr.includes('No such file') ? [] : null;
+  return NO_SUCH_FILE.test(read.value.stderr) ? [] : null;
 }
 
 // The proxy's decisions so far, read back from its container, or null when they cannot be read.

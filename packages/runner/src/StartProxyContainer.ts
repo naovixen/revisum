@@ -4,6 +4,7 @@ import { failure, success, type Result } from "@revisum/contracts";
 import type { ContainerEngine } from "./container-engine.ts";
 import type { ContainerScope } from "./ContainerScope.ts";
 import { proxyContainer, proxyReadyScript, type ProxyContainerFields } from "./run-containers.ts";
+import { readInContainer } from "./WithinReadBound.ts";
 
 export type StartedProxy = { readonly id: string; readonly name: string };
 
@@ -32,7 +33,11 @@ export async function proxyUnreachableDetail(
     containerId: string,
     proxyName: string,
 ): Promise<string | null> {
-    const ready = await engine.exec(containerId, ["node", "-e", proxyReadyScript(proxyName)]);
+    const ready = await readInContainer(engine, containerId, [
+        "node",
+        "-e",
+        proxyReadyScript(proxyName),
+    ]);
     if (ready.ok && ready.value.exitCode === 0) {
         return null;
     }

@@ -1,5 +1,5 @@
-// The two images a workload needs, here and pinned: Revisum's run image, and the team's, which is
-// never pulled and must have the id the request pins.
+// The two images a workload needs, both here: Revisum's run image, taken as tagged, and the team's,
+// which is never pulled and is the only one compared with the id the request pins.
 import { success, type Result } from "@revisum/contracts";
 import type { ContainerEngine, ImageAnswer } from "../container-engine.ts";
 import { RUN_IMAGE_TAG } from "../run-image.ts";

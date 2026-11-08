@@ -15,9 +15,11 @@ import {
     type WorkloadRequest,
     type WorkloadRunner,
 } from "@revisum/contracts";
-import type { ContainerEngine } from "../container-engine.ts";
+import { answeringEngine } from "../AnsweringEngine.ts";
+import { NetworkFailureKind, type ContainerEngine } from "../container-engine.ts";
 import { NetworkKind, withContainerScope, type ContainerScope } from "../ContainerScope.ts";
 import { dependenciesVolumeFor } from "../run-containers.ts";
+import { safeLog } from "../SafeLog.ts";
 import { capturedOutput } from "./CapturedOutput.ts";
 import { checkWorkloadRequest, type CheckedWorkloadRequest } from "./CheckWorkloadRequest.ts";
 import { pinWorkloadImages } from "./PinWorkloadImages.ts";
@@ -88,8 +90,9 @@ async function runInScope(
 }
 
 export function workloadRunner(options: WorkloadRunnerOptions): WorkloadRunner {
-    const { engine, repositoryRoot: root, checkout } = options;
-    const log: WorkloadLog = options.log ?? ((): void => undefined);
+    const { repositoryRoot: root, checkout } = options;
+    const engine = answeringEngine(options.engine);
+    const log: WorkloadLog = safeLog(options.log ?? ((): void => undefined));
     const tools: WorkloadTools = {
         engine,
         root,
@@ -123,10 +126,17 @@ export function workloadRunner(options: WorkloadRunnerOptions): WorkloadRunner {
             (scope) => runInScope(scope, tools, checked.value, runImage.value),
         );
         if (!scoped.ok) {
-            return refuse({
-                code: "egress-unenforceable",
-                detail: `Docker could not create a network with no route out: ${scoped.error.detail}`,
-            });
+            return refuse(
+                scoped.error.kind === NetworkFailureKind.InternalRefused
+                    ? {
+                          code: "egress-unenforceable",
+                          detail: `Docker could not create a network with no route out: ${scoped.error.detail}`,
+                      }
+                    : {
+                          code: "workload-start-failed",
+                          detail: `the run's network could not be made: ${scoped.error.detail}`,
+                      },
+            );
         }
         return scoped.value.ok ? scoped.value : refuse(scoped.value.error);
     }

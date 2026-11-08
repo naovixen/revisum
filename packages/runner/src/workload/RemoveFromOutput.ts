@@ -3,9 +3,8 @@
 // whether the paths have gone, so nothing here decides the run, and each step that fails is reported.
 import { PRODUCT, WORKLOAD_OUTPUT_PATH, type OutputRemoval } from "@revisum/contracts";
 import { randomBytes } from "node:crypto";
-import { adapterAnswer } from "../AdapterAnswer.ts";
 import type { ContainerEngine } from "../container-engine.ts";
-import { NetworkKind, withContainerScope, type ContainerScope } from "../ContainerScope.ts";
+import { withContainerScope, type ContainerLifetime } from "../ContainerScope.ts";
 import { areMountablePaths } from "./AreMountablePaths.ts";
 import { readyOutputFolder } from "./ReadyOutputFolder.ts";
 import { teamImageContainer } from "./TeamImageContainer.ts";
@@ -25,12 +24,18 @@ type RemovalContext = {
 };
 
 // A mode the suite set on its own files could stop even its own user, so that is lifted first.
-async function removeInContainer(context: RemovalContext, scope: ContainerScope): Promise<void> {
+async function removeInContainer(context: RemovalContext, scope: ContainerLifetime): Promise<void> {
     const { engine, root, log, removal } = context;
     const insideOutput = removal.paths.map((path) => `${WORKLOAD_OUTPUT_PATH}/${path}`);
     const imageUser = await engine.imageUser(removal.image);
+    if (!imageUser.ok) {
+        log(
+            `the host could not remove what an earlier run left (${removal.hostFailure}), and the image's user could not be read: ${imageUser.error.detail}`,
+        );
+        return;
+    }
     const remover = await scope.startContainer(
-        teamImageContainer(root, imageUser, {
+        teamImageContainer(root, imageUser.value, {
             name: `${PRODUCT.name}-output-removal-${randomBytes(6).toString("hex")}`,
             image: removal.image,
             networks: [],
@@ -52,12 +57,12 @@ async function removeInContainer(context: RemovalContext, scope: ContainerScope)
         );
         return;
     }
-    for (const command of [
-        ["chmod", "-R", "u+rwx", ...insideOutput],
-        ["rm", "-rf", ...insideOutput],
-    ]) {
-        const ran = await adapterAnswer(() => engine.exec(remover.value, command));
-        const step = command[0] ?? "";
+    const steps = [
+        { step: "chmod", argv: ["chmod", "-R", "u+rwx", ...insideOutput] },
+        { step: "rm", argv: ["rm", "-rf", ...insideOutput] },
+    ];
+    for (const { step, argv } of steps) {
+        const ran = await engine.exec(remover.value, argv);
         if (!ran.ok) {
             log(`${step} could not run in the removal's container: ${ran.error.detail}`);
         } else if (ran.value.exitCode !== 0) {
@@ -98,18 +103,15 @@ export async function removeFromOutput(
         return;
     }
     const context: RemovalContext = { engine, root, log, removal };
-    const removed = await withContainerScope(
+    await withContainerScope(
         engine,
         {
             namePrefix: `${PRODUCT.name}-output-removal`,
-            networkKinds: [NetworkKind.Internal],
+            networkKinds: [],
             log: (entry) => {
                 log(`the removal's container could not be cleaned up: ${entry.detail}`);
             },
         },
         (scope) => removeInContainer(context, scope),
     );
-    if (!removed.ok) {
-        cannotUseAContainer(removed.error.detail);
-    }
 }

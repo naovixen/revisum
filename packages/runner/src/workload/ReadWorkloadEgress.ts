@@ -1,4 +1,5 @@
 // What the proxy decided for a workload, read back from its container and turned into egress events.
+// Each read has its own bound, so a wedged one leaves the record marked unread and still reaches removal.
 import type { EgressEvent, ProxyDecision } from "@revisum/contracts";
 import type { ContainerEngine } from "../container-engine.ts";
 import { joinEgressEvents } from "../egress-events.ts";

@@ -117,7 +117,7 @@ async function removeEarlierEvidence(workload: WorkloadRunner, image: string, ou
   });
   const [firstFailure] = hostFailures;
   if (firstFailure !== undefined) {
-    await workload.removeFromOutput?.({ image, outputDirectory, paths: hostFailures.map(({ path }) => path), hostFailure: firstFailure.hostFailure });
+    await workload.removeFromOutput({ image, outputDirectory, paths: hostFailures.map(({ path }) => path), hostFailure: firstFailure.hostFailure });
   }
   try {
     const hasAllGone = SUITE_EVIDENCE_PATHS.every((path) => lstatSync(join(outputDirectory, path), { throwIfNoEntry: false }) === undefined);

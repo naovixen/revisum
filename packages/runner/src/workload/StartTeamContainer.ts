@@ -26,6 +26,7 @@ type TeamContainerFields = {
 };
 
 const START_FAILED = "workload-start-failed";
+const UNENFORCEABLE = "egress-unenforceable";
 
 // The id of the started container.
 export async function startTeamContainer(
@@ -48,26 +49,28 @@ export async function startTeamContainer(
         return workloadRefused(START_FAILED, "the output folder cannot be made writable");
     }
     const imageUser = await engine.imageUser(checked.image);
-    const proxyAddress = await engine.containerAddress(proxy.id, scope.network);
-    if (proxyAddress === null) {
-        log({
-            code: "notice",
-            detail: "the proxy has no address on the run's network, so lookups are not recorded",
-        });
-    }
-    // A relayed service is reached by name at the proxy, so without the proxy's address it cannot be reached.
-    const relayedNames = relayedHostNames(checked);
-    if (relayedNames.length > 0 && proxyAddress === null) {
+    if (!imageUser.ok) {
         return workloadRefused(
-            START_FAILED,
-            "the proxy has no address on the run's network, so the service allowed over TCP cannot be reached",
+            UNENFORCEABLE,
+            `the image's user could not be read: ${imageUser.error.detail}`,
         );
     }
-    const hosts: HostEntry[] =
-        proxyAddress === null ? [] : relayedNames.map((name) => ({ name, address: proxyAddress }));
+    // Lookups go to the proxy, which is how a process that ignores it is seen, and a relayed service
+    // is reached by name at it: no team container starts without knowing where it is.
+    const proxyAddress = await engine.containerAddress(proxy.id, scope.network);
+    if (!proxyAddress.ok) {
+        return workloadRefused(
+            UNENFORCEABLE,
+            `the proxy's address could not be read: ${proxyAddress.error.detail}`,
+        );
+    }
+    const hosts: HostEntry[] = relayedHostNames(checked).map((name) => ({
+        name,
+        address: proxyAddress.value,
+    }));
 
     const team = await scope.startContainer(
-        teamImageContainer(root, imageUser, {
+        teamImageContainer(root, imageUser.value, {
             name: `${scope.runId}-workload`,
             image: checked.image,
             networks: [scope.network],
@@ -85,7 +88,7 @@ export async function startTeamContainer(
                     writable: true,
                 },
             ],
-            ...(proxyAddress === null ? {} : { dns: [proxyAddress] }),
+            dns: [proxyAddress.value],
             ...(hosts.length === 0 ? {} : { hosts }),
         }),
     );
