@@ -155,6 +155,21 @@ function closedSessionContract(open: OpenSessionUnderTest): void {
                 assert.equal(session.crashed(), true);
             });
         });
+
+        describe("when it is asked whether a request is held", () => {
+            test("then it should say none is, without throwing", async () => {
+                const { session } = await open();
+                await session.close();
+                assert.equal(session.isRequestHeld(), false);
+            });
+        });
+
+        describe("when it has closed cleanly", () => {
+            test("then it should report no close failure", async () => {
+                const { session } = await open();
+                assert.equal((await session.close()).closeFailure, null);
+            });
+        });
     });
 }
 
@@ -245,6 +260,31 @@ function openTabContract(open: OpenSessionUnderTest): void {
             test("then it should have no way to", async () => {
                 const tab = await openTab(await open());
                 assert.equal("newTab" in tab, false);
+            });
+        });
+
+        describe("when the tab is asked to close twice", () => {
+            test("then it should resolve each time", async () => {
+                const tab = await openTab(await open());
+                await assert.doesNotReject(tab.close());
+                await assert.doesNotReject(tab.close());
+            });
+        });
+
+        describe("when the tab closes after its session has", () => {
+            test("then it should resolve, and leave the session's close to report what failed", async () => {
+                const subject = await open();
+                const tab = await openTab(subject);
+                await subject.session.close();
+                await assert.doesNotReject(tab.close());
+            });
+        });
+
+        describe("when the session is asked whether a request is held", () => {
+            test("then it should say none is, without throwing", async () => {
+                const subject = await open();
+                await openTab(subject);
+                assert.equal(subject.session.isRequestHeld(), false);
             });
         });
 

@@ -84,6 +84,8 @@ export type FakeRunOptions = {
     readonly clock?: Clock;
     // What opening the browser does, when a test needs it to do other than give `session`.
     readonly open?: BrowserDriver["open"];
+    // Anything else of the driver a test needs it to do otherwise.
+    readonly driver?: Partial<BrowserDriver>;
     // What the egress proxy says it rewrote, when a test needs other than no rewrite.
     readonly rewritesApplied?: RunPorts["rewritesApplied"];
 };
@@ -108,6 +110,7 @@ export async function runOnFakeSession(
     const session = options.session ?? fakeSessionOnOrders();
     const driver = fakeDriver({
         open: options.open ?? (() => Promise.resolve(success(session))),
+        ...options.driver,
     });
     const audit = fakeEventSink();
     const events = options.events ?? fakeRunEventSink();

@@ -54,10 +54,48 @@ const sessionReporting = (reported: DriverError | null, elementName: string): Se
         },
     });
 
+// A session that says a request is held only once the denied click has been asked of it, as one would
+// that noticed a held request in the same moment as the denial.
+function sessionHoldingARequestAfterTheClick(isHeldThen: boolean): Session {
+    const reporting = sessionReporting(null, "Delete account");
+    let hasClicked = false;
+    return {
+        ...reporting,
+        act: (step, guard) => {
+            hasClicked = true;
+            return reporting.act(step, guard);
+        },
+        isRequestHeld: () => isHeldThen && hasClicked,
+    };
+}
+
 const CRASH: DriverError = { code: "target-crashed", detail: "the page's renderer died" };
 const POPUP: DriverError = { code: "unsupported-step", detail: "the step opened a popup" };
 
 describe("Using the run", () => {
+    for (const { name, isHeld } of [
+        { name: "says a request is held", isHeld: true },
+        { name: "says no request is held", isHeld: false },
+    ]) {
+        describe("given a click the guard denies", () => {
+            describe(`and a session that ${name}`, () => {
+                describe("when the run ends", () => {
+                    test("then it should end Denied with policy-denied", async () => {
+                        const { result } = await runOnFakeSession(
+                            unsafePlan([OPEN_CART, clickOn(DANGER_ZONE)]),
+                            {
+                                projectFile: PROJECT_FILE,
+                                session: sessionHoldingARequestAfterTheClick(isHeld),
+                            },
+                        );
+                        assert.equal(result.state, "Denied", JSON.stringify(result.steps));
+                        assert.equal(result.steps[1]?.code, "policy-denied");
+                    });
+                });
+            });
+        });
+    }
+
     for (const { name, reported } of [
         { name: "a crash", reported: CRASH },
         { name: "a popup", reported: POPUP },

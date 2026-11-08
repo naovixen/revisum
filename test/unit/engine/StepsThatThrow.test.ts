@@ -1,10 +1,9 @@
 // An adapter that throws, or a read of the page that says only that it could not read it, must leave a
 // full account in the result: the step is recorded with adapter-error, every later step is marked
-// skipped, and the run ends Errored. A tab that fails to close afterwards must not take the place of
-// what its steps found.
+// skipped, and the run ends Errored.
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { failure, type Session, type SessionTab } from "@revisum/engine";
+import { failure } from "@revisum/engine";
 import { fakeSession } from "#test-support/fakes/FakeSession.ts";
 import { fakeSessionOnOrders, runOnFakeSession, stepSummaries } from "./RunOnFakeSession.ts";
 import { CLOSING_CHECK, OPEN_CART, unsafePlan, type JsonRecord } from "./unsafe-feature-steps.ts";
@@ -104,20 +103,6 @@ const UNREADABLE_STEPS: typeof THROWING_STEPS = [
     },
 ];
 
-// A session as a tab: its close gives nothing back, as a tab's does.
-const asTab = (session: Session): SessionTab => ({
-    ...session,
-    close: async () => {
-        await session.close();
-    },
-});
-
-// A session whose tabs fail to close.
-const sessionWithTabThatWillNotClose = () => {
-    const tab = fakeSessionOnOrders({ close: breaks });
-    return fakeSessionOnOrders({ newTab: () => Promise.resolve({ ok: true, value: asTab(tab) }) });
-};
-
 describe("Using the run", () => {
     for (const { name, step, session } of [
         ...THROWING_STEPS.map((given) => ({ ...given, name: `${given.name} throws` })),
@@ -185,28 +170,6 @@ describe("Using the run", () => {
     }
 
     describe("given a new tab whose check fails", () => {
-        describe("and the tab fails to close", () => {
-            describe("when the run ends", () => {
-                test("then it should report the check's own failure", async () => {
-                    const { result } = await runOnFakeSession(
-                        unsafePlan([OPEN_CART, newTabHolding(FAILING_CHECK)]),
-                        { session: sessionWithTabThatWillNotClose() },
-                    );
-                    assert.deepEqual(
-                        { state: result.state, steps: stepSummaries(result) },
-                        {
-                            state: "Failed",
-                            steps: [
-                                ["passed", undefined],
-                                ["failed", "assertion-failed"],
-                                ["skipped", undefined],
-                            ],
-                        },
-                    );
-                });
-            });
-        });
-
         describe("and the tab closes", () => {
             describe("when the run ends", () => {
                 test("then it should report the check's own failure", async () => {
@@ -246,62 +209,6 @@ describe("Using the run", () => {
                             ],
                             tabs: 1,
                             closes: 1,
-                        },
-                    );
-                });
-            });
-        });
-
-        describe("and the tab fails to close", () => {
-            describe("when the run ends", () => {
-                test("then it should still have tried the close, and report the throw as adapter-error", async () => {
-                    const tab = fakeSession({ screenshot: breaks, close: breaks });
-                    const { result } = await runOnFakeSession(
-                        unsafePlan([OPEN_CART, newTabHolding({ type: "capture", name: "cart" })]),
-                        {
-                            session: fakeSession({
-                                newTab: () => Promise.resolve({ ok: true, value: asTab(tab) }),
-                            }),
-                        },
-                    );
-                    assert.deepEqual(
-                        {
-                            state: result.state,
-                            steps: stepSummaries(result),
-                            closes: tab.calls.count("close"),
-                        },
-                        {
-                            state: "Errored",
-                            steps: [
-                                ["passed", undefined],
-                                ["failed", "adapter-error"],
-                                ["skipped", undefined],
-                            ],
-                            closes: 1,
-                        },
-                    );
-                });
-            });
-        });
-    });
-
-    describe("given a new tab whose check passes", () => {
-        describe("and the tab fails to close", () => {
-            describe("when the run ends", () => {
-                test("then it should record the step with adapter-error and end Errored", async () => {
-                    const { result } = await runOnFakeSession(
-                        unsafePlan([OPEN_CART, newTabHolding(PASSING_CHECK)]),
-                        { session: sessionWithTabThatWillNotClose() },
-                    );
-                    assert.deepEqual(
-                        { state: result.state, steps: stepSummaries(result) },
-                        {
-                            state: "Errored",
-                            steps: [
-                                ["passed", undefined],
-                                ["failed", "adapter-error"],
-                                ["skipped", undefined],
-                            ],
                         },
                     );
                 });

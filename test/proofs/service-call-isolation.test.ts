@@ -19,6 +19,15 @@ const DEPENDENCY_FIELDS = ['dependencies', 'peerDependencies', 'optionalDependen
 // Imported module names in TypeScript source: static imports, re-exports and dynamic imports.
 const IMPORTED = /\b(?:from|import)\s*\(?\s*['"]([^'"]+)['"]/g;
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+function parsedRecord(text: string): Record<string, unknown> {
+  const parsed: unknown = JSON.parse(text);
+  assert.ok(isRecord(parsed), 'the file holds a JSON object');
+  return parsed;
+}
+
 const sourceFiles = (folder: string): string[] =>
   readdirSync(folder, { withFileTypes: true, recursive: true })
     .filter((entry) => entry.isFile() && entry.name.endsWith('.ts'))
@@ -43,7 +52,7 @@ const PACKAGES_CHECKED = [
 
 for (const checked of PACKAGES_CHECKED) {
   test(`${checked.name}'s package manifest declares no runtime dependency`, () => {
-    const manifest: Record<string, unknown> = JSON.parse(readFileSync(join(PACKAGES, checked.name, 'package.json'), 'utf8'));
+    const manifest = parsedRecord(readFileSync(join(PACKAGES, checked.name, 'package.json'), 'utf8'));
     const declared = DEPENDENCY_FIELDS.filter((field) => {
       const value = manifest[field];
       return value !== undefined && !(typeof value === 'object' && value !== null && Object.keys(value).length === 0);
@@ -51,7 +60,8 @@ for (const checked of PACKAGES_CHECKED) {
     assert.deepEqual(declared, []);
   });
 
-  test(`every import in ${checked.name}'s sources is relative, a Node built-in or ${checked.allowed.join(', ') || 'nothing else'}`, () => {
+  const allowedNames = checked.allowed.join(', ');
+  test(`every import in ${checked.name}'s sources is relative, a Node built-in or ${allowedNames === '' ? 'nothing else' : allowedNames}`, () => {
     const folder = join(PACKAGES, checked.name, 'src');
     const found = sourceFiles(folder).flatMap((file) =>
       foreignImports(readFileSync(file, 'utf8'), checked.allowed).map((name) => `${relative(PACKAGES, file)}: ${name}`));
@@ -160,8 +170,11 @@ test('the 1.2 changelog entry names the call steps, settings and codes, in code 
 test('a golden plan uses a call that remembers a field, an expectBackend and cleanup', () => {
   const folder = join(REPOSITORY_ROOT, 'golden', 'plans');
   const plans = readdirSync(folder).filter((name) => name.endsWith('.json'))
-    .map((name): Record<string, unknown> => JSON.parse(readFileSync(join(folder, name), 'utf8')));
-  const stepsOf = (plan: Record<string, unknown>): Record<string, unknown>[] => (Array.isArray(plan['steps']) ? plan['steps'] : []);
+    .map((name) => parsedRecord(readFileSync(join(folder, name), 'utf8')));
+  const stepsOf = (plan: Record<string, unknown>): Record<string, unknown>[] => {
+    const steps: unknown = plan['steps'];
+    return Array.isArray(steps) ? steps.filter(isRecord) : [];
+  };
   const uses = plans.filter((plan) =>
     stepsOf(plan).some((step) => step['type'] === 'call' && step['remember'] !== undefined)
     && stepsOf(plan).some((step) => step['type'] === 'expectBackend')

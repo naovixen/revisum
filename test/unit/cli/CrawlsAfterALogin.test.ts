@@ -10,7 +10,7 @@ import { fakeDriverOpening } from "#test-support/fakes/FakeDriver.ts";
 import { fakeEventSink } from "#test-support/fakes/FakeEventSink.ts";
 import { fakeRedactor } from "#test-support/fakes/FakeRedactor.ts";
 import { fakeSecretStore } from "#test-support/fakes/FakeSecretStore.ts";
-import { fakeSession } from "#test-support/fakes/FakeSession.ts";
+import { closedSession, fakeSession } from "#test-support/fakes/FakeSession.ts";
 import { ORIGIN } from "../engine/plan-examples.ts";
 import { parsedPlan } from "../engine/secret-examples.ts";
 import {
@@ -86,6 +86,48 @@ describe("Using the crawl in a browser", () => {
                 // The login's one navigation, then the crawl's, in the one session.
                 assert.equal(session.calls.count("navigate"), 2);
                 assert.equal(session.calls.count("close"), 1);
+            });
+        });
+    });
+
+    describe("given a session whose close reports a failure", () => {
+        describe("when the crawl has run", () => {
+            test("then it should say so, in the crawl's outcome or its audit log", async () => {
+                const whyTheCloseFailed = "the crawl's profile folder is still held";
+                const trusted = await trustedProjectWith(MATRIX);
+                const desktop: Target = targetOf(trusted, "chromium-desktop");
+                const session = fakeSession({
+                    page: () =>
+                        Promise.resolve(
+                            success({
+                                url: `${ORIGIN}/`,
+                                title: "Home",
+                                meta: [],
+                                canonicalUrl: null,
+                            }),
+                        ),
+                    close: () =>
+                        Promise.resolve({
+                            ...closedSession(),
+                            closeFailure: whyTheCloseFailed,
+                        }),
+                });
+                const audit = fakeEventSink();
+                const crawled = await crawlInBrowser(fakeDriverOpening(session), {
+                    project: projectWith(MATRIX),
+                    target: desktop,
+                    options: OPTIONS,
+                    redactor: fakeRedactor(),
+                    secrets: fakeSecretStore(),
+                    audit,
+                });
+                const isInTheOutcome = !crawled.ok;
+                const isInTheLog = JSON.stringify(audit.recorded).includes(whyTheCloseFailed);
+                assert.equal(
+                    isInTheOutcome || isInTheLog,
+                    true,
+                    `the close's failure was reported nowhere: ${JSON.stringify(crawled)}`,
+                );
             });
         });
     });

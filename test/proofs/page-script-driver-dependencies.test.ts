@@ -12,8 +12,11 @@
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
-import { test } from 'node:test';
+import { describe, test } from 'node:test';
+import { pathToFileURL } from 'node:url';
+import { createSecret, FillValueKind, type FillValue } from '@revisum/contracts';
 import { PACKAGES, REPOSITORY_ROOT } from '../support/repository.ts';
+import { parsedSecretName, SECRET_NAME } from '../support/session-contract/SessionUnderTest.ts';
 
 const DEPENDENCY_FIELDS = ['dependencies', 'peerDependencies', 'optionalDependencies', 'bundleDependencies', 'bundledDependencies'];
 
@@ -83,9 +86,82 @@ for (const driver of DRIVERS) {
     assert.equal(calls[0]?.file, driver.inputModule);
     // The one call reveals the secret the fill carries, in the text the fill types and nowhere else.
     assert.match(calls[0].line, /\breveal\(value\.secret\)/, 'the one call reveals the secret its fill carries');
-    const source = [driver.inputModule, driver.fillModule].map((module) => readFileSync(join(REPOSITORY_ROOT, module), 'utf8')).join('\n');
-    assert.match(source, /\binput\.fill\(\s*element,\s*textToFill\(/, 'the text holding the secret is typed by the fill');
-    assert.equal(source.match(/\btextToFill\(/g)?.length, 2, 'the text holding the secret is made for the fill alone');
+    const fillModule = readFileSync(join(REPOSITORY_ROOT, driver.fillModule), 'utf8');
+    // The fill hands the input module the value and the input itself, and is handed nothing back to send.
+    assert.match(fillModule, /\btypeFill\(\s*input,\s*element,\s*action\.value,\s*hasStepEnded\b/, 'the fill goes through typeFill');
+    assert.doesNotMatch(fillModule, /\binput\.fill\(/, 'the fill module sends no text of its own');
+    assert.doesNotMatch(readFileSync(join(REPOSITORY_ROOT, driver.inputModule), 'utf8'), /\btextToFill\b/, 'no function gives the text back');
+  });
+
+  describe(`Using ${driver.name}'s input module`, () => {
+    const secretValue = 'test-only-input-module-secret';
+    const secret = createSecret(parsedSecretName(SECRET_NAME), secretValue);
+    const secretFill: FillValue = { kind: FillValueKind.Secret, secret };
+    // Only the module under test reads it, and lines hold no secret, so plain strings do.
+    const linesFill: unknown = { kind: FillValueKind.Lines, lines: ['one', 'two'] };
+    const element = 'the-field';
+    const hasStepEnded = (): boolean => false;
+    const exportsOfTheModule = async (): Promise<ReadonlyMap<string, unknown>> => {
+      const loaded: unknown = await import(pathToFileURL(join(REPOSITORY_ROOT, driver.inputModule)).href);
+      assert.ok(typeof loaded === 'object' && loaded !== null, 'the module loads');
+      return new Map(Object.entries(loaded));
+    };
+
+    // Asked of any function the module exports: whatever it takes, what it gives back never holds the text.
+    const callWithAFill = async (exported: unknown): Promise<unknown> => {
+      if (typeof exported !== 'function') {
+        return undefined;
+      }
+      try {
+        const given = { value: secretFill, ...secretFill };
+        const returned: unknown = await Promise.resolve(Reflect.apply(exported, undefined, [given, given]));
+        return returned;
+      } catch {
+        return undefined;
+      }
+    };
+
+    describe('given the functions it exports', () => {
+      describe('when each is called with a fill of a secret', () => {
+        test('then it should have none return the secret as text', async () => {
+          const exported = await exportsOfTheModule();
+          const returned = await Promise.all(
+            [...exported.entries()]
+              .filter(([name, value]) => name !== 'typeFill' && typeof value === 'function')
+              .map(async ([name, value]) => ({ name, value: await callWithAFill(value) })),
+          );
+          assert.deepEqual(
+            returned.filter(({ value }) => typeof value === 'string' && value.includes(secretValue)).map(({ name }) => name),
+            [],
+          );
+        });
+      });
+    });
+
+    describe('given the input a fill is sent through', () => {
+      describe('when typeFill fills a secret and a set of lines', () => {
+        test('then it should send the text itself and return none of it', async () => {
+          const exported = await exportsOfTheModule();
+          const typeFill = exported.get('typeFill');
+          assert.ok(typeof typeFill === 'function', 'the module exports typeFill');
+          const sent: unknown[][] = [];
+          const input = {
+            fill: (...given: unknown[]) => {
+              sent.push(given);
+              return Promise.resolve();
+            },
+          };
+          const secretReturned: unknown = await Promise.resolve(Reflect.apply(typeFill, undefined, [input, element, secretFill, hasStepEnded]));
+          const linesReturned: unknown = await Promise.resolve(Reflect.apply(typeFill, undefined, [input, element, linesFill, hasStepEnded]));
+          assert.deepEqual(sent, [
+            [element, secretValue, hasStepEnded],
+            [element, 'one\ntwo', hasStepEnded],
+          ]);
+          assert.equal(secretReturned, undefined);
+          assert.equal(linesReturned, undefined);
+        });
+      });
+    });
   });
 }
 
