@@ -45,7 +45,12 @@ export type SealContext = {
 export type NothingRanContext = SealContext & {
     readonly ports: Pick<RunPorts, "clock">;
     readonly logger: Logger;
+    readonly startedAt: number;
 };
+
+// How long a run that ended before any step took.
+export const runTimeOfNothingRan = (context: NothingRanContext): number =>
+    context.ports.clock.now() - context.startedAt;
 
 // What sealing adds to a plan run's result: its labels and its hashes.
 export type SealedFields =

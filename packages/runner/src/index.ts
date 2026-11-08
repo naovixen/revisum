@@ -9,7 +9,7 @@ export {
   type ContainerEngine, type ContainerMount, type ContainerOptions, type DockerOutcome, type EngineProblem, type ProbeTarget,
 } from './container-engine.ts';
 export { dockerRunner, type DockerRunnerOptions, type RunnerLogEntry } from './docker-runner.ts';
-export { workloadRunner, type WorkloadLogEntry, type WorkloadRunnerOptions } from './workload-runner.ts';
+export { workloadRunner, type WorkloadLogEntry, type WorkloadRunnerOptions } from './workload/WorkloadRunner.ts';
 export { noSuchNameAnswer, readDnsQuestion, type DnsQuestion } from './lookup-recorder.ts';
 export { hostAndPort } from '@revisum/contracts';
 export { joinEgressEvents } from './egress-events.ts';

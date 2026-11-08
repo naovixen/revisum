@@ -42,6 +42,9 @@ export type NetworkStepContext = {
   readonly activeStubs: Set<StubName>;
 };
 
+// What a step that only reads the session's network needs: everything but the record of stubs.
+export type NetworkReadContext = Omit<NetworkStepContext, 'activeStubs'>;
+
 // What one of these steps gives its step result.
 type NetworkStepOutcome =
   | { readonly outcome: typeof StepOutcome.Passed; readonly remembered?: RememberedRecord }
@@ -107,7 +110,7 @@ export async function resetRequests(step: Extract<Step, { type: 'resetRequests' 
 
 // Repeats a look until it passes, says no later look can change the answer, or the project's step
 // timeout runs out, and gives the last look.
-function poll<Seen extends { readonly pass: boolean; readonly final?: boolean }>(context: NetworkStepContext, look: () => Promise<Seen>): Promise<Seen> {
+function poll<Seen extends { readonly pass: boolean; readonly final?: boolean }>(context: NetworkReadContext, look: () => Promise<Seen>): Promise<Seen> {
   return pollUntil(context.clock, {
     timeoutMilliseconds: context.project.limits.stepTimeoutMilliseconds,
     intervalMilliseconds: POLL_INTERVAL_MILLISECONDS,
@@ -161,7 +164,7 @@ const REQUEST_NOT_SEEN = 'request-not-seen';
 // The latest exchange of a request, once no matching request has been in flight for the quiet
 // window: "latest" means the latest the page asked for, not the latest answered so far, which a
 // newer request in flight is about to replace. request-not-seen when there is none yet.
-async function latestSettledExchange(context: NetworkStepContext, request: RequestName): Promise<Result<ObservedExchange, StepCode>> {
+async function latestSettledExchange(context: NetworkReadContext, request: RequestName): Promise<Result<ObservedExchange, StepCode>> {
   const network = context.session.network;
   const limits = context.project.limits;
   const quiet = await network.quiet(request, limits.requestQuietMilliseconds, limits.stepTimeoutMilliseconds);
@@ -224,7 +227,7 @@ function rememberedText(found: { readonly value: unknown } | undefined, read: 't
 // A remember step that reads a field of the latest response. The value must pass the same rules as
 // plan text; only its name and sha256 are kept.
 export async function rememberFromResponse(
-  step: Extract<Step, { type: 'remember' }>, from: RememberedResponseSource, index: number, context: NetworkStepContext,
+  step: Extract<Step, { type: 'remember' }>, from: RememberedResponseSource, index: number, context: NetworkReadContext,
 ): Promise<NetworkStepOutcome> {
   const cap = declaredIn(context.project.observedRequests, from.response)?.maximumResponseBytes ?? 0;
   const pointer = pointerOf(context.project, from.response, from.field);

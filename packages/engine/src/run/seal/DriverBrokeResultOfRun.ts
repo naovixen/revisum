@@ -4,17 +4,16 @@ import type { PlanRunResult } from "@revisum/contracts";
 import type { BrokenDriver } from "../../target/GuardedDriver.ts";
 import { logKeepingTheResult } from "../after-the-verdict/ReadKeepingTheResult.ts";
 import { driverBrokeResult } from "./RefusedResult.ts";
-import { sealResult, type NothingRanContext } from "./SealResult.ts";
+import { runTimeOfNothingRan, sealResult, type NothingRanContext } from "./SealResult.ts";
 
 export function driverBrokeResultOfRun(
     targetId: string,
     broken: BrokenDriver,
     context: NothingRanContext,
-    startedAt: number,
 ): PlanRunResult {
     logKeepingTheResult(
         { kind: "run.state", state: "Errored", targetId, detail: broken.brokeItsPromise },
         context.logger,
     );
-    return sealResult(driverBrokeResult(targetId, context.ports.clock.now() - startedAt), context);
+    return sealResult(driverBrokeResult(targetId, runTimeOfNothingRan(context)), context);
 }

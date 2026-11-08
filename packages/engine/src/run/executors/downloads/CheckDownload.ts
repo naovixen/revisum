@@ -11,7 +11,7 @@ import {
 } from "@revisum/contracts";
 import { resolveText } from "../../../run-values.ts";
 import type { RunContext } from "../../RunContext.ts";
-import type { StepExecutor } from "../StepExecutor.ts";
+import type { StepExecutor, StepNeeds } from "../StepExecutor.ts";
 
 const verdict = (isPassing: boolean): StepRecord =>
     isPassing ? { outcome: StepOutcome.Passed } : stepFailed(StepCode.AssertionFailed);
@@ -35,7 +35,7 @@ function downloadText(bytes: Uint8Array): string | undefined {
 function checkText(
     file: DownloadedFile,
     assertion: { readonly kind: DownloadTextKind; readonly value: TextOrValue },
-    context: RunContext,
+    context: Pick<RunContext, "values" | "cleared">,
 ): StepRecord {
     const expected = resolveText(
         assertion.value,
@@ -64,7 +64,10 @@ function checkText(
 
 // Checks a file an earlier download step saved. None of its text is ever kept: a failed check
 // keeps only its code.
-export const checkDownload: StepExecutor<StepByType["expectDownload"]> = (step, context) => {
+export const checkDownload: StepExecutor<
+    StepByType["expectDownload"],
+    StepNeeds<"downloads" | "values" | "cleared">
+> = (step, context) => {
     // A run has the file: the parser rejects a check of a download no earlier step defined, and a
     // failed download skips every later step. A context without it, as a caller may build, fails the
     // check as no download.

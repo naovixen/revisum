@@ -51,7 +51,7 @@ const isFinal = (verdict: CheckAnswer): boolean =>
 // Repeats a check until it passes or the step timeout runs out. A page that crashes stops the
 // wait at once: nothing on it can change any more, and the same goes for a read of the page that failed.
 export function poll<Answer extends CheckAnswer>(
-    context: RunContext,
+    context: Pick<RunContext, "ports" | "cleared">,
     document: DocumentSession,
     check: () => Promise<Answer | CheckStopped>,
 ): Promise<Answer | CheckStopped> {

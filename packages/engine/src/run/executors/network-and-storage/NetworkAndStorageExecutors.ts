@@ -6,20 +6,33 @@ import {
     resetRequests,
     runStubStep,
     writeStorage,
+    type NetworkReadContext,
     type NetworkStepContext,
 } from "../../../network-and-storage/network-and-storage-steps.ts";
 import { stubAndStorageSecretStore } from "../../../secrets/secret-resolution.ts";
 import type { SessionContext, StepExecutorTable } from "../StepExecutor.ts";
 
+type NetworkContextSource = Pick<
+    SessionContext,
+    "cleared" | "session" | "values" | "remembered" | "secrets" | "ports"
+>;
+
 // What the stub, request-check and storage steps use: the run's session, values and the secrets
 // resolved for stub starts and storage writes.
-export const networkContext = (context: SessionContext): NetworkStepContext => ({
+export const networkReadContext = (context: NetworkContextSource): NetworkReadContext => ({
     project: context.cleared.project,
     session: context.session,
     values: context.values,
     remembered: context.remembered,
     secrets: stubAndStorageSecretStore(context.secrets),
     clock: context.ports.clock,
+});
+
+// A stub step also writes the run's record of the stubs started and not yet stopped.
+export const networkContext = (
+    context: NetworkContextSource & Pick<SessionContext, "activeStubs">,
+): NetworkStepContext => ({
+    ...networkReadContext(context),
     activeStubs: context.activeStubs,
 });
 

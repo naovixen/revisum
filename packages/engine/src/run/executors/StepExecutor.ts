@@ -4,10 +4,14 @@
 import type {
     Denial,
     DocumentSession,
+    DownloadedFile,
+    DownloadName,
+    ResolvedLocator,
     Session,
     StepRecord,
     RanStepResult,
     StepType,
+    StubName,
 } from "@revisum/contracts";
 import type { ContainerRunStep, RunStep, RunStepByType } from "../../RunStep.ts";
 import type { RunContext } from "../RunContext.ts";
@@ -67,10 +71,24 @@ export type StepContext = SessionContext & {
     readonly runInnerSteps: RunInnerSteps;
 };
 
-// An executor that needs nothing from the browser may answer at once.
-export type StepExecutor<TypedStep extends RunStep> = (
+// The run's records, which only the step that keeps each may write: every other step reads them.
+type RunRecordsRead = {
+    readonly secretFilledFields: ReadonlyMap<string, ResolvedLocator>;
+    readonly downloads: ReadonlyMap<DownloadName, DownloadedFile>;
+    readonly rememberedTexts: ReadonlySet<string>;
+    readonly activeStubs: ReadonlySet<StubName>;
+};
+
+type StepContextRead = Omit<StepContext, keyof RunRecordsRead> & RunRecordsRead;
+
+// What an executor declares it uses: only these, and the run's records read-only.
+export type StepNeeds<Field extends keyof StepContextRead> = Pick<StepContextRead, Field>;
+
+// An executor that needs nothing from the browser may answer at once. It names what it uses of the
+// context, so the table still hands it everything and no executor can reach for more.
+export type StepExecutor<TypedStep extends RunStep, Context = StepContext> = (
     step: TypedStep,
-    context: StepContext,
+    context: Context,
 ) => Promise<ExecutedStep> | ExecutedStep;
 
 // One executor per step type: a new type does not compile until it has one.

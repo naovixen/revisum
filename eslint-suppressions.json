@@ -53,14 +53,8 @@
     "@typescript-eslint/require-await": {
       "count": 4
     },
-    "@typescript-eslint/strict-boolean-expressions": {
-      "count": 12
-    },
     "curly": {
       "count": 32
-    },
-    "no-nested-ternary": {
-      "count": 1
     },
     "prefer-template": {
       "count": 6
@@ -1220,15 +1214,6 @@
     }
   },
   "packages/runner/src/docker-runner.ts": {
-    "@typescript-eslint/naming-convention": {
-      "count": 2
-    },
-    "curly": {
-      "count": 11
-    },
-    "max-lines-per-function": {
-      "count": 2
-    },
     "revisum/file-name-matches-export": {
       "count": 1
     }
@@ -1303,23 +1288,6 @@
       "count": 1
     },
     "curly": {
-      "count": 1
-    },
-    "revisum/file-name-matches-export": {
-      "count": 1
-    }
-  },
-  "packages/runner/src/workload-runner.ts": {
-    "@typescript-eslint/naming-convention": {
-      "count": 1
-    },
-    "curly": {
-      "count": 21
-    },
-    "max-lines-per-function": {
-      "count": 3
-    },
-    "no-control-regex": {
       "count": 1
     },
     "revisum/file-name-matches-export": {

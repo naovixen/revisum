@@ -36,11 +36,16 @@ function withoutRememberedTexts(observed: string, remembered: ReadonlySet<string
     return kept;
 }
 
+// What keeping an observation needs of the run.
+type ObserveContext = Pick<RunContext, "isShortSecret" | "withoutSecrets" | "redactor"> & {
+    readonly rememberedTexts: ReadonlySet<string>;
+};
+
 // What a failed check saw, redacted: never the text of a sensitive element, nothing read from a
 // field a secret was typed into, and no text that is a whole short secret.
 export function observe(
     probe: ElementProbe | null,
-    context: RunContext,
+    context: ObserveContext,
     isFilledFromSecret: boolean,
 ): string {
     if (probe === null || probe.count === 0 || probe.count === "selector-invalid") {
@@ -68,7 +73,10 @@ export function observe(
 }
 
 // Text the server chose that a result keeps, such as a file name: redacted and capped.
-export const keptText = (text: string, context: RunContext): string =>
+export const keptText = (
+    text: string,
+    context: Pick<RunContext, "isShortSecret" | "redactor">,
+): string =>
     context.isShortSecret(text)
         ? SECRET_PLACEHOLDER
         : context.redactor.text(text).slice(0, LONGEST_KEPT_TEXT);

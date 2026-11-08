@@ -1,8 +1,11 @@
 import { NavigateScripts, stepFailed, StepOutcome, type StepByType } from "@revisum/contracts";
-import type { StepExecutor } from "../StepExecutor.ts";
+import type { StepExecutor, StepNeeds } from "../StepExecutor.ts";
 import { pageUrl } from "./PageUrl.ts";
 
-export const navigate: StepExecutor<StepByType["navigate"]> = async (step, context) => {
+export const navigate: StepExecutor<
+    StepByType["navigate"],
+    StepNeeds<"values" | "cleared" | "gate" | "inputs" | "index" | "document">
+> = async (step, context) => {
     const url = pageUrl(step.url, context.index, context);
     if (!url.ok) {
         return url.error;

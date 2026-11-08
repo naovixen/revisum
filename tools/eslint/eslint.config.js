@@ -13,6 +13,13 @@ const GENERIC_NAME_ENDINGS = "(Manager|Helper|Util|Utils)$";
 // The files whose top-level functions run inside the page. The in-page rule checks that each uses
 // nothing from its module, and that no other file sends a function to the page.
 const IN_PAGE_FILES = [
+    "packages/auditor-act/src/in-page/ActiveElementHolder.ts",
+    "packages/auditor-act/src/in-page/DocumentWidths.ts",
+    "packages/auditor-act/src/in-page/FocusThisElement.ts",
+    "packages/auditor-act/src/in-page/HoldFocusedElement.ts",
+    "packages/auditor-act/src/in-page/MeasureOcclusion.ts",
+    "packages/auditor-act/src/in-page/HideSampledText.ts",
+    "packages/auditor-act/src/in-page/SettleFrames.ts",
     "packages/driver-cdp/src/in-page/Actionability.ts",
     "packages/driver-cdp/src/in-page/AdvanceDocumentClock.ts",
     "packages/driver-cdp/src/in-page/AfterTwoFrames.ts",

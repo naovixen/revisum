@@ -14,6 +14,9 @@ import { denialNow } from "../../ActGuarded.ts";
 import type { RunContext } from "../../RunContext.ts";
 import { deniedStep, type DeniedStep } from "../StepExecutor.ts";
 
+// What resolving a page's URL needs of the run.
+type PageUrlContext = Pick<RunContext, "values" | "cleared" | "gate" | "inputs">;
+
 // Why a page's URL cannot be opened: the step's failure, or the runtime guard's denial.
 type UrlRefused = StepRecord | DeniedStep;
 
@@ -22,7 +25,7 @@ type UrlRefused = StepRecord | DeniedStep;
 function pathOf(
     url: AllowedUrl | PathTemplate,
     index: number,
-    context: RunContext,
+    context: PageUrlContext,
 ): Result<string, UrlRefused> {
     if (typeof url === "string") {
         return success(url);
@@ -41,7 +44,7 @@ function pathOf(
 export function pageUrl(
     url: AllowedUrl | PathTemplate,
     index: number,
-    context: RunContext,
+    context: PageUrlContext,
 ): Result<URL, UrlRefused> {
     const path = pathOf(url, index, context);
     if (!path.ok) {

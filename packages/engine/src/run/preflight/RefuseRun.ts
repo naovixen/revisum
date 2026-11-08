@@ -3,7 +3,7 @@ import { RefusalCode, type PlanRefusal, type PlanRunResult } from "@revisum/cont
 import { refuse, type Planned } from "../../lifecycle.ts";
 import { logKeepingTheResult } from "../after-the-verdict/ReadKeepingTheResult.ts";
 import { refusedResult } from "../seal/RefusedResult.ts";
-import { sealResult, type NothingRanContext } from "../seal/SealResult.ts";
+import { runTimeOfNothingRan, sealResult, type NothingRanContext } from "../seal/SealResult.ts";
 
 // What the event log says of a refusal beyond its code.
 type LoggedWithRefusal = { readonly origin?: string; readonly detail?: string };
@@ -44,7 +44,6 @@ export function refuseRun(
     planned: Planned,
     refusal: PlanRefusal,
     context: NothingRanContext,
-    startedAt: number,
 ): PlanRunResult {
     const refused = refuse(planned, refusal);
     logKeepingTheResult(
@@ -58,7 +57,7 @@ export function refuseRun(
         context.logger,
     );
     return sealResult(
-        refusedResult(refused.refusal, planned.target.id, context.ports.clock.now() - startedAt),
+        refusedResult(refused.refusal, planned.target.id, runTimeOfNothingRan(context)),
         context,
     );
 }

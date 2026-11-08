@@ -2,44 +2,9 @@
 // whether focus is visible and whether the focused element is covered at each step.
 import { isPlainObject } from '@revisum/contracts';
 import type { FocusOcclusion, PageDriver, PageSnapshot, TabWalk } from './accessibility-types.ts';
+import { blurHeldElement, holdFocusedElement, refocusHeldElement } from './in-page/HoldFocusedElement.ts';
+import { measureOcclusion } from './in-page/MeasureOcclusion.ts';
 import { inSequentialFocus } from './rules/rule-predicates.ts';
-
-// Keeps a handle on the deepest focused element, through shadow roots and same-origin frames.
-const HOLD_FOCUSED_ELEMENT = `(() => {
-  let element = document.activeElement;
-  for (;;) {
-    if (!element) break;
-    if (element.shadowRoot && element.shadowRoot.activeElement) { element = element.shadowRoot.activeElement; continue; }
-    if ((element.tagName === 'IFRAME' || element.tagName === 'FRAME') && element.contentDocument && element.contentDocument.activeElement
-      && element.contentDocument.activeElement !== element.contentDocument.body) { element = element.contentDocument.activeElement; continue; }
-    break;
-  }
-  window.__focusedElement = element;
-  return !!element;
-})()`;
-
-// Samples a 5 by 5 grid over the held element and counts the points where it is on top.
-const MEASURE_OCCLUSION = `(() => {
-  const element = window.__focusedElement;
-  if (!element || !element.getBoundingClientRect) return { inView: false, hits: 0, total: 0 };
-  const ownerDocument = element.ownerDocument, view = ownerDocument.defaultView;
-  const rectangle = element.getBoundingClientRect();
-  const left = Math.max(rectangle.left, 0), right = Math.min(rectangle.right, view.innerWidth);
-  const top = Math.max(rectangle.top, 0), bottom = Math.min(rectangle.bottom, view.innerHeight);
-  if (right - left < 1 || bottom - top < 1) return { inView: false, hits: 0, total: 0 };
-  const inside = (hit) => { for (let node = hit; node; node = node.parentNode || node.host) { if (node === element) return true; } return false; };
-  let hits = 0, total = 0;
-  for (let i = 0; i < 5; i++) for (let j = 0; j < 5; j++) {
-    const x = left + (right - left) * (i + 0.5) / 5, y = top + (bottom - top) * (j + 0.5) / 5;
-    let hit = ownerDocument.elementFromPoint(x, y);
-    while (hit && hit.shadowRoot) { const inner = hit.shadowRoot.elementFromPoint(x, y); if (!inner || inner === hit) break; hit = inner; }
-    total++; if (hit && inside(hit)) hits++;
-  }
-  return { inView: true, hits, total };
-})()`;
-
-const BLUR_HELD_ELEMENT = `(() => { const element = window.__focusedElement; if (element && element.blur) element.blur(); })()`;
-const REFOCUS_HELD_ELEMENT = `(() => { const element = window.__focusedElement; if (element && element.focus) element.focus({ preventScroll: true }); })()`;
 
 // The measure runs in the page's own world, where the page can patch what it calls. An answer that
 // makes no sense stops the walk, as a script that threw does. Leaving the element unmeasured would
@@ -81,16 +46,16 @@ export async function tabWalk(page: PageDriver, snapshot: PageSnapshot, options:
     if (walk.sequence.includes(index)) continue;
     walk.sequence.push(index);
     if (active.box !== null) walk.boxes.set(index, active.box);
-    await page.evaluate(HOLD_FOCUSED_ELEMENT);
+    await page.evaluate(`(${holdFocusedElement.toString()})()`);
     if (options.occlusion) {
-      walk.obscured.set(index, decodeOcclusion(await page.evaluate(MEASURE_OCCLUSION)));
+      walk.obscured.set(index, decodeOcclusion(await page.evaluate(`(${measureOcclusion.toString()})()`)));
     }
     if (options.focusVisibility) {
       const focused = await page.screenshot();
-      await page.evaluate(BLUR_HELD_ELEMENT);
+      await page.evaluate(`(${blurHeldElement.toString()})()`);
       const blurred = await page.screenshot();
       walk.focusVisible.set(index, focused !== blurred);
-      await page.evaluate(REFOCUS_HELD_ELEMENT);
+      await page.evaluate(`(${refocusHeldElement.toString()})()`);
     }
   }
   return walk;

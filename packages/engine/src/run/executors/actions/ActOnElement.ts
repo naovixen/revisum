@@ -1,11 +1,14 @@
 import { stepFailed, StepOutcome } from "@revisum/contracts";
 import { resolveInputStep, type InputStep } from "../../../run-values.ts";
 import { actGuarded } from "../../ActGuarded.ts";
-import type { StepExecutor } from "../StepExecutor.ts";
+import type { StepExecutor, StepNeeds } from "../StepExecutor.ts";
 
 // A click, hover, select, upload or key press. Values are substituted first, so the runtime guard
 // and the driver see the final text.
-export const actOnElement: StepExecutor<InputStep> = async (step, context) => {
+export const actOnElement: StepExecutor<
+    InputStep,
+    StepNeeds<"values" | "cleared" | "gate" | "index" | "document">
+> = async (step, context) => {
     const action = resolveInputStep(step, context.values, context.cleared.project);
     if (!action.ok) {
         return stepFailed(action.error);

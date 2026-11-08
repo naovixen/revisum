@@ -18,8 +18,8 @@ import { normalise, type Verdict } from "../../../oracle.ts";
 import { resolveLocator } from "../../../run-values.ts";
 import { poll } from "../../Poll.ts";
 import { clockAndClipboardContext } from "../clock-and-clipboard/ClockAndClipboardExecutors.ts";
-import { networkContext } from "../network-and-storage/NetworkAndStorageExecutors.ts";
-import type { StepContext, StepExecutor } from "../StepExecutor.ts";
+import { networkReadContext } from "../network-and-storage/NetworkAndStorageExecutors.ts";
+import type { StepExecutor, StepNeeds } from "../StepExecutor.ts";
 
 type RememberStep = StepByType["remember"];
 
@@ -48,7 +48,9 @@ function textOf(element: OneElementRead, from: RememberedElementSource): string 
 async function rememberFromPage(
     step: RememberStep,
     from: RememberedElementSource,
-    context: StepContext,
+    context: StepNeeds<
+        "values" | "cleared" | "document" | "ports" | "index" | "remembered" | "secretFilledFields"
+    >,
 ): Promise<StepRecord> {
     const locator = resolveLocator(from.element, context.values, context.cleared.project);
     if (!locator.ok) {
@@ -84,9 +86,22 @@ async function rememberFromPage(
 
 // A remember step reads from the page, from the latest response a declared request check saw, or
 // from the clipboard.
-export const remember: StepExecutor<RememberStep> = async (step, context) => {
+export const remember: StepExecutor<
+    RememberStep,
+    StepNeeds<
+        | "values"
+        | "cleared"
+        | "document"
+        | "ports"
+        | "index"
+        | "remembered"
+        | "secretFilledFields"
+        | "session"
+        | "secrets"
+    >
+> = async (step, context) => {
     if ("response" in step.from) {
-        return rememberFromResponse(step, step.from, context.index, networkContext(context));
+        return rememberFromResponse(step, step.from, context.index, networkReadContext(context));
     }
     if ("clipboard" in step.from) {
         return rememberFromClipboard(step, context.index, clockAndClipboardContext(context));

@@ -15,14 +15,17 @@ import type { RunFillStep } from "../../../RunStep.ts";
 import { resolveFillText, resolveLocator } from "../../../run-values.ts";
 import { actGuarded } from "../../ActGuarded.ts";
 import type { RunContext } from "../../RunContext.ts";
-import type { StepExecutor } from "../StepExecutor.ts";
+import type { StepContext, StepExecutor, StepNeeds } from "../StepExecutor.ts";
 
 // A fill as the runtime guard reads it, with the plan's secret reference, and as the driver performs
 // it, with the secret preflight resolved for it, opaque, so the driver reveals it only as it types.
 type ResolvedFill = { readonly guarded: ResolvedActionStep; readonly performable: PerformableFill };
 
 // Values are substituted first, so the runtime guard and the driver see the final text.
-function resolveFill(step: RunFillStep, context: RunContext): Result<ResolvedFill, StepCode> {
+function resolveFill(
+    step: RunFillStep,
+    context: Pick<RunContext, "values" | "cleared">,
+): Result<ResolvedFill, StepCode> {
     const locator = resolveLocator(step.locator, context.values, context.cleared.project);
     if (!locator.ok) {
         return locator;
@@ -70,7 +73,11 @@ function markFilledField(
     }
 }
 
-export const fillField: StepExecutor<RunFillStep> = async (step, context) => {
+export const fillField: StepExecutor<
+    RunFillStep,
+    StepNeeds<"values" | "cleared" | "gate" | "index" | "document"> &
+        Pick<StepContext, "secretFilledFields">
+> = async (step, context) => {
     const fill = resolveFill(step, context);
     if (!fill.ok) {
         return stepFailed(fill.error);

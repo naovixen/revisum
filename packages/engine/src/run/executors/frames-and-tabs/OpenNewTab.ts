@@ -1,12 +1,15 @@
 import { stepFailed } from "@revisum/contracts";
 import type { RunStepByType } from "../../../RunStep.ts";
 import { pageUrl } from "../navigation/PageUrl.ts";
-import type { StepExecutor } from "../StepExecutor.ts";
+import type { StepExecutor, StepNeeds } from "../StepExecutor.ts";
 import { withTab } from "./WithTab.ts";
 
 // Opens the step's URL in a second tab of the session's browser context, runs its steps there in
 // order and closes the tab, whatever they did.
-export const openNewTab: StepExecutor<RunStepByType["newTab"]> = async (step, context) => {
+export const openNewTab: StepExecutor<
+    RunStepByType["newTab"],
+    StepNeeds<"values" | "cleared" | "gate" | "inputs" | "index" | "session" | "runInnerSteps">
+> = async (step, context) => {
     const url = pageUrl(step.url, context.index, context);
     if (!url.ok) {
         return url.error;

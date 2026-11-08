@@ -12,12 +12,12 @@ import { resolveText } from "../../../run-values.ts";
 import { SECRET_PLACEHOLDER } from "../../../secrets/secret-values.ts";
 import { isCheckStopped, poll, verdictOfFailedRead } from "../../Poll.ts";
 import type { RunContext } from "../../RunContext.ts";
-import type { StepExecutor } from "../StepExecutor.ts";
+import type { StepExecutor, StepNeeds } from "../StepExecutor.ts";
 
 // A page check with a meta tag's expected content resolved, when it is a value reference.
 function resolvePageAssertion(
     assertion: PageAssertion,
-    context: RunContext,
+    context: Pick<RunContext, "values" | "cleared">,
 ): Result<PageAssertion, StepCode> {
     if (assertion.kind !== PageAssertionKind.MetaContent) {
         return { ok: true, value: assertion };
@@ -32,7 +32,19 @@ function resolvePageAssertion(
 
 // Waits until the page passes the check, or the step timeout runs out. A failed check keeps the
 // page's title, redacted.
-export const checkPage: StepExecutor<StepByType["expectPage"]> = async (step, context) => {
+export const checkPage: StepExecutor<
+    StepByType["expectPage"],
+    StepNeeds<
+        | "values"
+        | "cleared"
+        | "document"
+        | "inputs"
+        | "ports"
+        | "logger"
+        | "isShortSecret"
+        | "redactor"
+    >
+> = async (step, context) => {
     const assertion = resolvePageAssertion(step.assert, context);
     if (!assertion.ok) {
         return stepFailed(assertion.error);

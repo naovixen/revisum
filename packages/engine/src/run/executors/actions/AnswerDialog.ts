@@ -10,12 +10,12 @@ import {
 import { resolveText } from "../../../run-values.ts";
 import { actGuarded } from "../../ActGuarded.ts";
 import type { RunContext } from "../../RunContext.ts";
-import type { StepExecutor } from "../StepExecutor.ts";
+import type { StepExecutor, StepNeeds } from "../StepExecutor.ts";
 
 // A dialog step with its expected text's value references replaced, as a driver must receive it.
 function resolveDialogStep(
     step: DialogStep,
-    context: RunContext,
+    context: Pick<RunContext, "values" | "cleared">,
 ): Result<ResolvedDialogStep, StepCode> {
     if (step.expectText === undefined) {
         return success({ type: step.type, action: step.action });
@@ -32,7 +32,10 @@ function resolveDialogStep(
 
 // The driver answers the dialog the page opened, asking the runtime guard first with the dialog's
 // text, so accepting an irreversible one ends the run Denied with nothing sent.
-export const answerDialog: StepExecutor<DialogStep> = async (step, context) => {
+export const answerDialog: StepExecutor<
+    DialogStep,
+    StepNeeds<"values" | "cleared" | "gate" | "index" | "document">
+> = async (step, context) => {
     const answer = resolveDialogStep(step, context);
     if (!answer.ok) {
         return stepFailed(answer.error);

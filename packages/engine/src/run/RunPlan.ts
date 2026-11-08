@@ -68,6 +68,7 @@ export async function runPlan(
         ports,
         logger,
         determinismUnpinned: isDeterminismUnpinned,
+        startedAt,
     };
     const planned = planRun(plan, target);
     // A log that fails this early ends the run Errored like one that fails later, once there are steps
@@ -77,7 +78,7 @@ export async function runPlan(
         logger,
     );
     if (!preflight.outcome.ok) {
-        return refuseRun(planned, preflight.outcome.error, nothingRan, startedAt);
+        return refuseRun(planned, preflight.outcome.error, nothingRan);
     }
     const passed = preflight.outcome.value;
     const context = createRunContext(cleared, inputs, ports, passed, {
@@ -91,18 +92,12 @@ export async function runPlan(
     );
     if (!inSession.ok) {
         if (isBrokenDriver(inSession.error)) {
-            return driverBrokeResultOfRun(target.id, inSession.error, nothingRan, startedAt);
+            return driverBrokeResultOfRun(target.id, inSession.error, nothingRan);
         }
         const unavailable = targetUnavailable(planned, inSession.error);
-        return unavailableResult(target.id, unavailable.unavailable, nothingRan, startedAt);
+        return unavailableResult(target.id, unavailable.unavailable, nothingRan);
     }
-    return finishAfterTheSteps(
-        inSession.value.used,
-        inSession.value.closed,
-        context,
-        nothingRan,
-        startedAt,
-    );
+    return finishAfterTheSteps(inSession.value.used, inSession.value.closed, context, nothingRan);
 }
 
 // What the steps leave once the session has closed.
@@ -141,7 +136,6 @@ async function finishAfterTheSteps(
     closed: ClosedSession,
     context: RunContext,
     nothingRan: NothingRanContext,
-    startedAt: number,
 ): Promise<PlanRunResult> {
     const { manifestInputs, ran } = inSession;
     const { logger, ports } = context;
@@ -172,7 +166,11 @@ async function finishAfterTheSteps(
         ...(after.cleanup === undefined ? {} : { cleanup: after.cleanup }),
         ...(after.cleanupReviewItems.length === 0 ? {} : { reviewItems: after.cleanupReviewItems }),
         timings: {
-            totalMilliseconds: readKeepingTheResult(() => ports.clock.now() - startedAt, 0, logger),
+            totalMilliseconds: readKeepingTheResult(
+                () => ports.clock.now() - nothingRan.startedAt,
+                0,
+                logger,
+            ),
             stepMilliseconds: durationsOf(verdict.steps),
         },
     };

@@ -8,15 +8,14 @@ import {
     type StepByType,
 } from "@revisum/contracts";
 import { codeOfFailedCapture } from "../../CodeForThrow.ts";
-import type { RunContext } from "../../RunContext.ts";
-import type { StepExecutor } from "../StepExecutor.ts";
+import type { StepExecutor, StepNeeds } from "../StepExecutor.ts";
 
 // The viewport with personal data and every field a secret was typed into masked. Not-found says one of
 // those fields cannot be masked: text drawn as pixels is out of reach of any later scan, so no image is
 // better than an image that may show the secret. Any other failure says the page could not be captured.
 async function pixelsWithSecretsHidden(
     document: DocumentSession,
-    context: RunContext,
+    context: StepNeeds<"ports" | "secretFilledFields" | "holdsSecret">,
 ): Promise<Result<Uint8Array, DriverError>> {
     const selectors = context.ports.redactor.selectors;
     const fields = [...context.secretFilledFields.values()];
@@ -27,7 +26,12 @@ async function pixelsWithSecretsHidden(
 }
 
 // Keeps a screenshot of the page as an artifact, under the target's id and the capture's name.
-export const capture: StepExecutor<StepByType["capture"]> = async (step, context) => {
+export const capture: StepExecutor<
+    StepByType["capture"],
+    StepNeeds<
+        "document" | "ports" | "secretFilledFields" | "holdsSecret" | "cleared" | "logger" | "index"
+    >
+> = async (step, context) => {
     const taken = await pixelsWithSecretsHidden(context.document, context);
     if (!taken.ok) {
         return taken.error.code === StepCode.NotFound

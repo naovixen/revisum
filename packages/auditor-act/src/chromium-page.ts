@@ -9,6 +9,10 @@ import {
 import type { Browser, PageDriver, PageKey, PageSnapshot } from './accessibility-types.ts';
 import { buildSnapshot } from './page-snapshot.ts';
 import { decodePng, extremes } from './png-reader.ts';
+import { activeElementHolder, boxesOfHolder, elementOfHolder } from './in-page/ActiveElementHolder.ts';
+import { focusThisElement } from './in-page/FocusThisElement.ts';
+import { hideSampledText, showSampledText } from './in-page/HideSampledText.ts';
+import { settleFontsAndFrames, settleFrames } from './in-page/SettleFrames.ts';
 
 export const SCAN_VIEWPORT = { width: 1024, height: 768 } as const;
 const KEY_CODES: Record<PageKey, { code: string; virtualKeyCode: number }> = {
@@ -16,57 +20,6 @@ const KEY_CODES: Record<PageKey, { code: string; virtualKeyCode: number }> = {
   Escape: { code: 'Escape', virtualKeyCode: 27 },
   Enter: { code: 'Enter', virtualKeyCode: 13 },
 };
-// Two animation frames and a short timer, so blur and focus handlers and timeouts run.
-const SETTLE = `new Promise(r => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(r, 30))))`;
-
-// The deepest active element across shadow roots and same-origin frames, with its box in page
-// and in viewport coordinates.
-const ACTIVE_ELEMENT_FUNCTION = `function () {
-  let ownerDocument = document, element = document.activeElement, offsetX = 0, offsetY = 0;
-  for (;;) {
-    if (!element) return null;
-    if (element.shadowRoot && element.shadowRoot.activeElement) { element = element.shadowRoot.activeElement; continue; }
-    if ((element.tagName === 'IFRAME' || element.tagName === 'FRAME') && element.contentDocument && element.contentDocument.activeElement) {
-      const frame = element.getBoundingClientRect(); offsetX += frame.left + element.clientLeft; offsetY += frame.top + element.clientTop;
-      ownerDocument = element.contentDocument; element = ownerDocument.activeElement;
-      if (element === ownerDocument.body || element === ownerDocument.documentElement) return null;
-      continue;
-    }
-    break;
-  }
-  if (element === document.body || element === document.documentElement) return null;
-  const rectangle = element.getBoundingClientRect();
-  return {
-    element,
-    box: [rectangle.left + offsetX + window.scrollX, rectangle.top + offsetY + window.scrollY, rectangle.width, rectangle.height],
-    view: [rectangle.left + offsetX, rectangle.top + offsetY, rectangle.width, rectangle.height],
-  };
-}`;
-
-// Hides the text of the element (so the background shows) and returns the text's page box.
-const HIDE_TEXT_FUNCTION = `function () {
-  const element = this.nodeType === 3 ? this.parentElement : this;
-  const ownerDocument = element.ownerDocument;
-  if (!ownerDocument.getElementById('contrast-sample-hide-style')) {
-    const style = ownerDocument.createElement('style');
-    style.id = 'contrast-sample-hide-style';
-    style.textContent = '[data-contrast-sample-hide], [data-contrast-sample-hide] * { color: transparent !important; text-shadow: none !important; -webkit-text-stroke: 0 !important; caret-color: transparent !important; text-decoration-color: transparent !important; }';
-    (ownerDocument.head || ownerDocument.documentElement).appendChild(style);
-  }
-  element.setAttribute('data-contrast-sample-hide', '');
-  element.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-  const range = ownerDocument.createRange();
-  range.selectNodeContents(this);
-  const rectangle = range.getBoundingClientRect();
-  return [rectangle.left + window.scrollX, rectangle.top + window.scrollY, rectangle.width, rectangle.height];
-}`;
-const SHOW_TEXT_FUNCTION = `function () {
-  const element = this.nodeType === 3 ? this.parentElement : this;
-  element.removeAttribute('data-contrast-sample-hide');
-  const style = element.ownerDocument.getElementById('contrast-sample-hide-style');
-  if (style) style.remove();
-}`;
-
 // How a command fails when the page, its request or the browser has already gone, which leaves nothing
 // to clean up.
 const ALREADY_GONE = /Invalid InterceptionId|Session with given id not found|No target with given id|Cannot find context|Could not find object|connection closed/i;
@@ -132,7 +85,7 @@ class ChromiumPage implements PageDriver {
     const navigated = await this.#session.ask(NAVIGATE, { url }, timeoutMilliseconds);
     if (navigated.errorText !== undefined && navigated.errorText !== '') throw new Error(`navigate ${url}: ${navigated.errorText}`);
     await loaded;
-    await this.evaluate(`document.fonts ? document.fonts.ready.then(() => ${SETTLE}) : ${SETTLE}`);
+    await this.evaluate(`(${settleFontsAndFrames.toString()})()`);
   }
 
   snapshot(): Promise<PageSnapshot> { return buildSnapshot(this.#session); }
@@ -142,18 +95,18 @@ class ChromiumPage implements PageDriver {
     const event = { key, code: codes.code, windowsVirtualKeyCode: codes.virtualKeyCode, nativeVirtualKeyCode: codes.virtualKeyCode, modifiers: shift ? 8 : 0 };
     await this.#session.ask(DISPATCH_KEY_EVENT, { type: 'rawKeyDown', ...event });
     await this.#session.ask(DISPATCH_KEY_EVENT, { type: 'keyUp', ...event });
-    await this.evaluate(SETTLE);
+    await this.evaluate(`(${settleFrames.toString()})()`);
   }
 
   async activeElement(): Promise<{ backendId: number; box: Box | null } | null> {
-    const found = await this.#session.ask(EVALUATE, { expression: `(${ACTIVE_ELEMENT_FUNCTION})()`, returnByValue: false });
+    const found = await this.#session.ask(EVALUATE, { expression: `(${activeElementHolder.toString()})()`, returnByValue: false });
     const holder = found.result;
     if (holder.subtype === 'null' || holder.objectId === undefined) return null;
     const boxes = await this.#session.ask(CALL_FUNCTION_ON, {
-      objectId: holder.objectId, functionDeclaration: 'function(){return [this.box, this.view]}', returnByValue: true,
+      objectId: holder.objectId, functionDeclaration: boxesOfHolder.toString(), returnByValue: true,
     });
     const element = await this.#session.ask(CALL_FUNCTION_ON, {
-      objectId: holder.objectId, functionDeclaration: 'function(){return this.element}', returnByValue: false,
+      objectId: holder.objectId, functionDeclaration: elementOfHolder.toString(), returnByValue: false,
     });
     if (element.result.objectId === undefined) return null;
     const described = await this.#session.ask(DESCRIBE_NODE, { objectId: element.result.objectId });
@@ -203,10 +156,10 @@ class ChromiumPage implements PageDriver {
       const { object } = await this.#session.ask(RESOLVE_NODE, { backendNodeId: backendId });
       const focused = await this.#session.ask(CALL_FUNCTION_ON, {
         objectId: object.objectId, returnByValue: true,
-        functionDeclaration: 'function(){ this.focus(); return this.getRootNode().activeElement === this || document.activeElement === this; }',
+        functionDeclaration: focusThisElement.toString(),
       });
       await this.#session.ask(RELEASE_OBJECT, { objectId: object.objectId });
-      await this.evaluate(SETTLE);
+      await this.evaluate(`(${settleFrames.toString()})()`);
       return focused.result.value === true;
     } catch {
       return false;
@@ -217,8 +170,8 @@ class ChromiumPage implements PageDriver {
     let objectId: string | undefined;
     try {
       objectId = (await this.#session.ask(RESOLVE_NODE, { backendNodeId: textBackendId })).object.objectId;
-      const hidden = await this.#session.ask(CALL_FUNCTION_ON, { objectId, returnByValue: true, functionDeclaration: HIDE_TEXT_FUNCTION });
-      await this.evaluate(SETTLE);
+      const hidden = await this.#session.ask(CALL_FUNCTION_ON, { objectId, returnByValue: true, functionDeclaration: hideSampledText.toString() });
+      await this.evaluate(`(${settleFrames.toString()})()`);
       const [x, y, width, height] = numbersIn(hidden.result.value) ?? [];
       if (x === undefined || y === undefined || width === undefined || width === 0 || height === undefined || height === 0) return null;
       const shot = await this.screenshotClip({ x: Math.floor(x), y: Math.floor(y), width: Math.max(1, Math.ceil(width)), height: Math.max(1, Math.ceil(height)) });
@@ -227,7 +180,7 @@ class ChromiumPage implements PageDriver {
       return null;
     } finally {
       if (objectId !== undefined) {
-        await this.#session.ask(CALL_FUNCTION_ON, { objectId, functionDeclaration: SHOW_TEXT_FUNCTION }).catch((error: unknown) => { this.#noteCleanUpFailure('hidden text could not be shown again', error); });
+        await this.#session.ask(CALL_FUNCTION_ON, { objectId, functionDeclaration: showSampledText.toString() }).catch((error: unknown) => { this.#noteCleanUpFailure('hidden text could not be shown again', error); });
         await this.#session.ask(RELEASE_OBJECT, { objectId }).catch((error: unknown) => { this.#noteCleanUpFailure('a sampled node could not be released', error); });
       }
     }

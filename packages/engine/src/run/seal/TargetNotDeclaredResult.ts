@@ -30,10 +30,11 @@ export function targetNotDeclaredResult(
         ports,
         logger,
         determinismUnpinned: target !== undefined && cannotPinDeterminism(ports.drivers, target),
+        startedAt,
     };
     const unavailable = {
         reason: UnavailableReason.NotDeclared,
         detail: "target is not in both the plan and the matrix",
     };
-    return unavailableResult(notDeclared.targetId, unavailable, nothingRan, startedAt);
+    return unavailableResult(notDeclared.targetId, unavailable, nothingRan);
 }

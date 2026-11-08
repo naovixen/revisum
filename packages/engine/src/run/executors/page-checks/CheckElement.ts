@@ -4,11 +4,25 @@ import { checkElement as judgeElement, domReadFor } from "../../../oracle.ts";
 import { resolveElementAssertion, resolveLocator } from "../../../run-values.ts";
 import { observe } from "../../Observe.ts";
 import { isCheckStopped, poll } from "../../Poll.ts";
-import type { StepExecutor } from "../StepExecutor.ts";
+import type { StepExecutor, StepNeeds } from "../StepExecutor.ts";
 
 // Waits until the element the locator finds passes the check, or the step timeout runs out. A failed
 // check keeps what it last saw, redacted.
-export const checkElement: StepExecutor<StepByType["expect"]> = async (step, context) => {
+export const checkElement: StepExecutor<
+    StepByType["expect"],
+    StepNeeds<
+        | "values"
+        | "cleared"
+        | "document"
+        | "inputs"
+        | "ports"
+        | "secretFilledFields"
+        | "isShortSecret"
+        | "withoutSecrets"
+        | "redactor"
+        | "rememberedTexts"
+    >
+> = async (step, context) => {
     const locator = resolveLocator(step.locator, context.values, context.cleared.project);
     if (!locator.ok) {
         return stepFailed(locator.error);

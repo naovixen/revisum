@@ -3,6 +3,8 @@
 // meta.source.
 import { isPlainObject, type Box } from '@revisum/contracts';
 import type { InteractiveRule, PageDriver, PageSnapshot, SnapshotNode, TargetResult } from '../accessibility-types.ts';
+import { documentWidths } from '../in-page/DocumentWidths.ts';
+import { settleFrames } from '../in-page/SettleFrames.ts';
 import { snapshotExtras } from '../page-snapshot.ts';
 import { ancestors, descendants, isVisible, parentElement } from '../snapshot-queries.ts';
 import { trapSet } from '../tab-walk.ts';
@@ -16,7 +18,7 @@ const result = (index: number, outcome: TargetResult['outcome'], message = ''): 
 async function focusEscapes(page: PageDriver, shift: boolean, limit: number): Promise<boolean> {
   for (let i = 0; i < limit; i++) {
     await page.pressKey('Tab', shift);
-    if (!(await page.activeElement())) return true;
+    if ((await page.activeElement()) === null) return true;
   }
   return false;
 }
@@ -33,7 +35,7 @@ export const keyboardTrapRule: InteractiveRule = {
     const trapped = trapSet(walk);
     // The forward walk left the page, so every element it visited cycles back to the browser.
     for (const index of walk.sequence) if (!trapped.includes(index)) results.set(index, result(index, 'passed'));
-    if (trapped.length) {
+    if (trapped.length > 0) {
       // Standard keyboard navigation (ACT glossary) includes Tab, Shift+Tab and Escape: try Shift+Tab, then Escape and Tab.
       let escaped = await focusEscapes(page, true, limit);
       if (!escaped) {
@@ -88,7 +90,7 @@ export const focusNotObscuredProbe: InteractiveRule = {
     for (const index of walk.sequence) {
       if (index < 0) continue;
       const occlusion = walk.obscured.get(index);
-      if (!occlusion) continue;
+      if (occlusion === undefined) continue;
       if (!occlusion.inView) results.push(result(index, 'cantTell', 'Focused element is outside the viewport'));
       else if (occlusion.hits === 0) results.push(result(index, 'failed', `Focused element is entirely covered by other content (0 of ${occlusion.total} sample points visible)`));
       else results.push(result(index, 'passed'));
@@ -110,8 +112,8 @@ function reorderCause(snapshot: PageSnapshot, from: SnapshotNode, to: SnapshotNo
   const toSet = new Set(toChain);
   const common = fromChain.find((node) => toSet.has(node));
   const chain = [
-    ...fromChain.slice(0, common ? fromChain.indexOf(common) + 1 : fromChain.length),
-    ...toChain.slice(0, common ? toChain.indexOf(common) : undefined),
+    ...fromChain.slice(0, common === undefined ? fromChain.length : fromChain.indexOf(common) + 1),
+    ...toChain.slice(0, common === undefined ? undefined : toChain.indexOf(common)),
   ];
   for (const node of chain) {
     if ((node.style?.['order'] ?? '0') !== '0') return 'CSS order';
@@ -134,15 +136,14 @@ export const focusOrderProbe: InteractiveRule = {
       const toBox = walk.boxes.get(toIndex);
       const fromNode = nodeAt(snapshot, fromIndex);
       const toNode = nodeAt(snapshot, toIndex);
-      if (!fromBox || !toBox || !fromNode || !toNode || fromBox.width < 1 || fromBox.height < 1 || toBox.width < 1 || toBox.height < 1) continue;
+      if (fromBox === undefined || toBox === undefined || fromNode === undefined || toNode === undefined || fromBox.width < 1 || fromBox.height < 1 || toBox.width < 1 || toBox.height < 1) continue;
       const sameRow = onSameRow(fromBox, toBox);
-      const backwards = sameRow
-        ? (rightToLeft ? toBox.x >= fromBox.x + fromBox.width - 1 : toBox.x + toBox.width <= fromBox.x + 1)
-        : toBox.y + toBox.height <= fromBox.y + 1;
+      const isBackwardsInRow = rightToLeft ? toBox.x >= fromBox.x + fromBox.width - 1 : toBox.x + toBox.width <= fromBox.x + 1;
+      const backwards = sameRow ? isBackwardsInRow : toBox.y + toBox.height <= fromBox.y + 1;
       if (!backwards) continue;
       const cause = reorderCause(snapshot, fromNode, toNode);
       const message = `Focus moves from "${fromNode.accessibility?.name ?? fromNode.name}" back to "${toNode.accessibility?.name ?? toNode.name}", which is visually ${sameRow ? 'before it on the same line' : 'above it'}`;
-      results.set(toIndex, cause ? result(toIndex, 'failed', `${message} (${cause})`) : result(toIndex, 'cantTell', message));
+      results.set(toIndex, cause === null ? result(toIndex, 'cantTell', message) : result(toIndex, 'failed', `${message} (${cause})`));
     }
     return [...results.values()];
   },
@@ -160,7 +161,7 @@ export const keyboardReachProbe: InteractiveRule = {
     const visited = new Set(walk.sequence);
     for (const index of clickable) {
       const node = nodeAt(snapshot, index);
-      if (!node || node.nodeType !== 1 || NEVER_CHECKED_FOR_REACH.has(node.name) || !isVisible(snapshot, node) || actuallyDisabled(snapshot, node)) continue;
+      if (node === undefined || node.nodeType !== 1 || NEVER_CHECKED_FOR_REACH.has(node.name) || !isVisible(snapshot, node) || actuallyDisabled(snapshot, node)) continue;
       if (node.name === 'a' && node.attributes['href'] === undefined && !clickable.has(index)) continue;
       const nodeAncestors = ancestors(snapshot, node);
       if (nodeAncestors.some((ancestor) => ancestor.name === 'label' || ancestor.name === 'button' || ancestor.name === 'a' || ancestor.name === 'summary')) continue;
@@ -221,7 +222,7 @@ export const targetSizeProbe: InteractiveRule = {
         const distanceY = Math.max(otherBounds.y - centre.y, 0, centre.y - (otherBounds.y + otherBounds.height));
         return Math.hypot(distanceX, distanceY) < 12;
       });
-      if (clash) results.push(result(target.index, 'failed', `Target is ${Math.round(bounds.width)} x ${Math.round(bounds.height)} CSS px and too close to another target`));
+      if (clash !== undefined) results.push(result(target.index, 'failed', `Target is ${Math.round(bounds.width)} x ${Math.round(bounds.height)} CSS px and too close to another target`));
       else results.push(result(target.index, 'passed', 'spacing exception'));
     }
     return results;
@@ -251,9 +252,8 @@ export const reflowProbe: InteractiveRule = {
     if (root === undefined) return [];
     await page.setViewport(320, 256);
     try {
-      await page.evaluate(`new Promise(r => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(r, 30))))`);
-      const widths = decodeDocumentWidths(await page.evaluate(
-        `({ scrollWidth: document.documentElement.scrollWidth, clientWidth: document.documentElement.clientWidth })`));
+      await page.evaluate(`(${settleFrames.toString()})()`);
+      const widths = decodeDocumentWidths(await page.evaluate(`(${documentWidths.toString()})()`));
       if (widths.scrollWidth <= widths.clientWidth + 1) return [result(root.index, 'passed')];
       const narrow = await page.snapshot();
       const indexByBackend = new Map(snapshot.nodes.map((node) => [node.backendId, node.index]));

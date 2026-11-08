@@ -7,7 +7,9 @@ import {
 import type { SessionContext, StepExecutorTable } from "../StepExecutor.ts";
 
 // What the clock and clipboard steps use: the run's session and values.
-export const clockAndClipboardContext = (context: SessionContext): ClockAndClipboardContext => ({
+export const clockAndClipboardContext = (
+    context: Pick<SessionContext, "cleared" | "session" | "values" | "remembered" | "ports">,
+): ClockAndClipboardContext => ({
     project: context.cleared.project,
     session: context.session,
     values: context.values,

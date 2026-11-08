@@ -8,7 +8,12 @@ import type { RunContext } from "../../RunContext.ts";
 import type { StepExecutorTable } from "../StepExecutor.ts";
 
 // What the page-script steps use: the run's values and the scripts the plan names, with their sources.
-const pageScriptContext = (context: RunContext): PageScriptContext => ({
+const pageScriptContext = (
+    context: Pick<
+        RunContext,
+        "cleared" | "scripts" | "values" | "remembered" | "ports" | "logger" | "holdsSecret"
+    >,
+): PageScriptContext => ({
     project: context.cleared.project,
     scripts: context.scripts,
     values: context.values,
