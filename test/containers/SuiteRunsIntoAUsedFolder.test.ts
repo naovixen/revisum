@@ -13,9 +13,9 @@ import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, describe, test } from "node:test";
-import { runSuite } from "@revisum/cli";
+import { buildAdapters, runSuite } from "@revisum/cli";
 import { WORKLOAD_OUTPUT_PATH, success } from "@revisum/contracts";
-import { defaultRedactor, environmentSecretStore, type RunResult } from "@revisum/engine";
+import { environmentSecretStore, type RunResult } from "@revisum/engine";
 import { dockerCliEngine, workloadRunner, type ContainerEngine } from "@revisum/runner";
 import { REPOSITORY_ROOT } from "../support/repository.ts";
 import {
@@ -131,18 +131,17 @@ const runSuiteInto = (
     return runSuite(
         parsedProject(projectFileWithEvidence(evidenceModeInput([suite]))),
         SUITE_NAME,
-        {
+        buildAdapters.suiteRunPorts({
             workload: workloadRunner({
                 engine: engineRunningSuitesAs(containerUser),
                 repositoryRoot: REPOSITORY_ROOT,
                 checkout,
             }),
             secrets: environmentSecretStore({}),
-            redactor: defaultRedactor(),
             checkout,
             outputDirectory,
             pass: "gating",
-        },
+        }),
     );
 };
 

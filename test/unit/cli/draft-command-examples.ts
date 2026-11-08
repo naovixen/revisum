@@ -42,7 +42,7 @@ import { createServer as createHttpsServer } from 'node:https';
 import { connect as connectTcp, type Socket } from 'node:net';
 import { type EventSink, type Redactor, type SecretStore, type VersionControlPort } from '@revisum/contracts';
 import { buildAdapters, type LoginRunner, type PlannerCall } from '@revisum/cli';
-import { defaultRedactor, environmentSecretStore } from '@revisum/engine';
+import { environmentSecretStore } from '@revisum/engine';
 import { FIXTURES, GOLDEN } from '../../support/repository.ts';
 import { memoryEventSink, type MemoryEventSink } from '../../support/memory-ports.ts';
 import { consoleWrittenDuring, jsonAnswer, type Answer, type Dialled, type ReceivedRequest } from '../runner/local-service.ts';
@@ -381,7 +381,7 @@ export async function runDraft(options: RunOptions): Promise<DraftRun> {
   const resolver = fakeResolver(options.names ?? { [PLANNER_HOST]: [PUBLIC_ADDRESS] });
   const routeTo = options.routeTo;
   const secrets = environmentSecretStore(options.secrets ?? seededSecrets().variables);
-  const ports: DraftCommandPorts = {
+  const ports: DraftCommandPorts = buildAdapters.draftCommandPorts({
     workingDirectory: options.workspace.root,
     secrets,
     events,
@@ -391,9 +391,7 @@ export async function runDraft(options: RunOptions): Promise<DraftRun> {
       trustedCertificates: [TEST_CERTIFICATE],
       ...(routeTo === undefined ? {} : { resolve: resolver.resolve, connect: (address: string, port: number) => routeTo.connect(address, port) }),
     }),
-    runLogin: buildAdapters.loginRunner,
-    redactor: defaultRedactor(),
-  };
+  });
   let outcome: CommandOutcome | undefined;
   const printed = await consoleWrittenDuring(async () => { outcome = await command(options.argv ?? draftArguments(), ports); });
   assert.ok(outcome !== undefined, 'the draft command gave no outcome');

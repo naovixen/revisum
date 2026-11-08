@@ -1,19 +1,26 @@
 // What browser tests give a driver for its sessions' egress. What they assume about a session's egress
 // is gathered here, so a change to it is a change to this file.
+import { success, type Result } from "@revisum/contracts";
 import type { ConnectionFailure } from "@revisum/driver-cdp";
 import { ProxyClient, type EgressProxy } from "@revisum/runner";
 import { startedProxyServer } from "#test-support/StartedEgressProxy.ts";
 
 export type SessionEgressForTest = {
     readonly proxy: { readonly server: string; readonly includeLoopback: boolean };
-    refusedOrigins(): readonly string[];
+    refusedOrigins(): Result<readonly string[], string>;
     connectionFailures(): readonly ConnectionFailure[];
     close(): Promise<void>;
 };
 
 export type EgressSourceForTest = (
     allowedOrigins: readonly string[],
-) => Promise<SessionEgressForTest>;
+) => Promise<Result<SessionEgressForTest, string>>;
+
+// A source's answer with the egress it started changed, or why it did not start, as it is.
+export const withStartedEgress = (
+    started: Result<SessionEgressForTest, string>,
+    change: (egress: SessionEgressForTest) => SessionEgressForTest,
+): Result<SessionEgressForTest, string> => (started.ok ? success(change(started.value)) : started);
 
 const refusedSince = (proxy: EgressProxy, firstDecision: number): readonly string[] =>
     proxy
@@ -27,7 +34,7 @@ const leavingProxyUp = (
     firstDecision: number,
 ): Omit<SessionEgressForTest, "close"> => ({
     proxy: { server: proxy.url, includeLoopback: true },
-    refusedOrigins: () => refusedSince(proxy, firstDecision),
+    refusedOrigins: () => success(refusedSince(proxy, firstDecision)),
     connectionFailures: () => proxy.connectionFailures(),
 });
 
@@ -38,7 +45,7 @@ export const realEgressSource: EgressSourceForTest = async (allowedOrigins) => {
         { allowedOrigins, privateOrigins: allowedOrigins, rewrites: [] },
         { client: ProxyClient.Browser },
     );
-    return {
+    return success({
         ...leavingProxyUp(proxy, 0),
         close: async () => {
             const closed = await proxy.close();
@@ -46,7 +53,7 @@ export const realEgressSource: EgressSourceForTest = async (allowedOrigins) => {
                 throw new Error(closed.error.message);
             }
         },
-    };
+    });
 };
 
 // For a test that shapes or watches a proxy of its own, which outlives each session: a session is told
@@ -54,7 +61,9 @@ export const realEgressSource: EgressSourceForTest = async (allowedOrigins) => {
 export const egressThrough =
     (proxy: EgressProxy): EgressSourceForTest =>
     () =>
-        Promise.resolve({
-            ...leavingProxyUp(proxy, proxy.decisions().length),
-            close: () => Promise.resolve(),
-        });
+        Promise.resolve(
+            success({
+                ...leavingProxyUp(proxy, proxy.decisions().length),
+                close: () => Promise.resolve(),
+            }),
+        );

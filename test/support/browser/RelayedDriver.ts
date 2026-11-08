@@ -3,15 +3,11 @@
 // is built here, not by createBrowserDriver, which gives a sharing file's driver its own browser
 // source. Ask for it only in a file that calls shareBrowserInThisFile. A test that opens a second page
 // keeps away from a shared browser, and asks for startRelayedDriverOnItsOwnBrowser instead.
-import {
-    cdpDriver,
-    launchSharedBrowser,
-    type LaunchedSharedBrowser,
-    type OwnBrowserDriver,
-} from "@revisum/driver-cdp";
+import { cdpDriver, type LaunchedSharedBrowser, type OwnBrowserDriver } from "@revisum/driver-cdp";
 import { BROWSERS } from "../browsers.ts";
 import { startBrowserWatchdog, type BrowserWatchdog } from "./BrowserWatchdog.ts";
 import { startCdpRelay, type CdpRelay } from "./CdpRelay.ts";
+import { launchSharedBrowser } from "@revisum/driver-cdp/testing";
 import { realEgressSource, type EgressSourceForTest } from "./SessionEgressForTest.ts";
 import { sharedBrowserFor } from "./ShareBrowserInThisFile.ts";
 

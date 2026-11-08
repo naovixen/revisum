@@ -32,6 +32,7 @@ const CASES_WITH_NO_PROXY: readonly {
 }[] = [
     { name: "unset", environment: {} },
     { name: "empty", environment: { [HTTP_PROXY_VARIABLE]: "" } },
+    { name: "a space", environment: { [HTTP_PROXY_VARIABLE]: " " } },
 ];
 
 describe("Using the crawl's entry module", () => {
@@ -49,6 +50,10 @@ describe("Using the crawl's entry module", () => {
 
                 test("then it should say the proxy is why", () => {
                     assert.match(crawl.stderr, SAYS_THERE_IS_NO_PROXY);
+                });
+
+                test("then it should not read as a browser that would not start", () => {
+                    assert.doesNotMatch(crawl.stderr, /target-unavailable/);
                 });
 
                 test("then it should print no page map", () => {

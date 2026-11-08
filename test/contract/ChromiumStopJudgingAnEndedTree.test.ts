@@ -8,6 +8,7 @@ import { platform, tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, mock, test } from "node:test";
 import { launchChromium, type LaunchedChromium } from "@revisum/driver-cdp";
+import { launchChromiumWithArguments } from "@revisum/driver-cdp/testing";
 import { CLOSE_THE_BROWSER } from "#test-support/browser/TestCommand.ts";
 import { BROWSERS } from "#test-support/browsers.ts";
 import { FIXTURES } from "#test-support/repository.ts";
@@ -128,7 +129,7 @@ describe("Using the Chromium launcher", () => {
                     async () => {
                         const folder = mkdtempSync(join(tmpdir(), "stand-in-late-browser-"));
                         const ranFile = join(folder, "taskkill-ran");
-                        const launched = await launchChromium(process.execPath, {
+                        const launched = await launchChromiumWithArguments(process.execPath, {
                             arguments: [
                                 join(STAND_INS, "browser-that-exits-late.cjs"),
                                 ranFile,

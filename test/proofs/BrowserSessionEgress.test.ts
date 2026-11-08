@@ -7,9 +7,12 @@ import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { join } from "node:path";
 import { after, before, describe, test } from "node:test";
-import { launchSharedBrowser, type OwnBrowserDriver } from "@revisum/driver-cdp";
+import type { OwnBrowserDriver } from "@revisum/driver-cdp";
+import { launchSharedBrowser } from "@revisum/driver-cdp/testing";
 import {
     defaultRedactor,
+    failure,
+    success,
     type LoggedEvent,
     type SessionEnvironment,
     type Target,
@@ -27,6 +30,7 @@ import {
 import { navigate, testId, textEquals } from "#test-support/browser/RawPlan.ts";
 import {
     realEgressSource,
+    withStartedEgress,
     type EgressSourceForTest,
     type SessionEgressForTest,
 } from "#test-support/browser/SessionEgressForTest.ts";
@@ -152,14 +156,13 @@ function watchedSource(delegate: EgressSourceForTest) {
     let closes = 0;
     const source: EgressSourceForTest = async (allowedOrigins) => {
         askedFor.push(allowedOrigins);
-        const egress = await delegate(allowedOrigins);
-        return {
+        return withStartedEgress(await delegate(allowedOrigins), (egress) => ({
             ...egress,
             close: () => {
                 closes += 1;
                 return egress.close();
             },
-        };
+        }));
     };
     return { source, askedFor, closes: () => closes };
 }
@@ -170,11 +173,11 @@ const egressOn = (
 ): EgressSourceForTest => {
     const egress: SessionEgressForTest = {
         proxy: { server: proxy.server, includeLoopback: true },
-        refusedOrigins: () => refusedOrigins,
+        refusedOrigins: () => success(refusedOrigins),
         connectionFailures: () => [],
         close: () => Promise.resolve(),
     };
-    return () => Promise.resolve(egress);
+    return () => Promise.resolve(success(egress));
 };
 
 async function openOutcome(driver: OwnBrowserDriver, target: Target = harness.target(TARGET)) {
@@ -190,12 +193,14 @@ describe("Using the driver's session egress", () => {
         describe("when a session opens", () => {
             test("then it should refuse to open, since a context with no proxy goes direct", async () => {
                 const emptyProxy: EgressSourceForTest = () =>
-                    Promise.resolve({
-                        proxy: { server: "", includeLoopback: true },
-                        refusedOrigins: () => [],
-                        connectionFailures: () => [],
-                        close: () => Promise.resolve(),
-                    });
+                    Promise.resolve(
+                        success({
+                            proxy: { server: "", includeLoopback: true },
+                            refusedOrigins: () => success([]),
+                            connectionFailures: () => [],
+                            close: () => Promise.resolve(),
+                        }),
+                    );
                 const opened = await openOutcome(driverOn(emptyProxy));
                 assert.ok(!opened.ok, "the session opened with an empty proxy value");
                 assert.equal(opened.error.reason, "launch-failed");
@@ -230,7 +235,7 @@ describe("Using the driver's session egress", () => {
         describe("when a session opens", () => {
             test("then it should refuse to open, saying why", async () => {
                 const failing: EgressSourceForTest = () =>
-                    Promise.reject(new Error("no port for the proxy"));
+                    Promise.resolve(failure("no port for the proxy"));
                 const opened = await openOutcome(driverOn(failing));
                 assert.ok(!opened.ok, "the session opened with no egress");
                 assert.equal(opened.error.reason, "launch-failed");

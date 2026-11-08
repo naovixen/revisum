@@ -19,12 +19,11 @@ import { after, before, describe, test } from "node:test";
 import { setTimeout as pause } from "node:timers/promises";
 import {
     CdpConnection,
-    launchChromium,
-    launchSharedBrowser,
     type LaunchedChromium,
     type SharedBrowser,
     CREATE_TARGET,
 } from "@revisum/driver-cdp";
+import { launchChromiumWithArguments, launchSharedBrowser } from "@revisum/driver-cdp/testing";
 import { LIST_TARGET_URLS } from "#test-support/browser/TestCommand.ts";
 import {
     startBrowserHarness,
@@ -198,7 +197,7 @@ async function runWithNetworkLog(
 ): Promise<{ readonly ran: BrowserRun; readonly networkLog: string }> {
     const logFile = networkLogFile("through-driver");
     const executablePath = BROWSERS.chrome;
-    const launched = await launchChromium(executablePath, {
+    const launched = await launchChromiumWithArguments(executablePath, {
         arguments: networkLogFlags(logFile),
         profilePrefix: "egress-network-log-",
     });
@@ -228,7 +227,7 @@ async function loadInDefaultContext(
 ): Promise<string> {
     undeclared.forgetArrivals();
     const logFile = networkLogFile("default-context");
-    const launched = await launchChromium(executablePath, {
+    const launched = await launchChromiumWithArguments(executablePath, {
         arguments: networkLogFlags(logFile),
         profilePrefix: "egress-default-context-",
     });

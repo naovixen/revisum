@@ -7,18 +7,36 @@ import { startHostSessionEgress } from "../../../packages/cli/src/BuildAdapters.
 
 const SESSION_ORIGIN = "http://127.0.0.1:4173";
 const LISTENER_REASON = "accept failed on the proxy's listener";
+const ORIGIN_WITH_A_PASSWORD = "http://user:hunter2@x.test/";
 
 describe("Using a host run's session egress", () => {
+    describe("given origins the proxy's rules refuse", () => {
+        describe("when the session's egress starts", () => {
+            test("then it should answer with why, and not throw", async () => {
+                const started = await startHostSessionEgress([ORIGIN_WITH_A_PASSWORD]);
+                assert.equal(started.ok, false, JSON.stringify(started));
+            });
+        });
+    });
+
     describe("given a proxy that is running", () => {
         describe("and a listener that fails after listening", () => {
             describe("when the session's failures are read", () => {
                 test("then it should report the listener's failure", async (context) => {
                     const listen = context.mock.method(NetServer.prototype, "listen");
-                    const egress = await startHostSessionEgress([SESSION_ORIGIN]);
+                    const started = await startHostSessionEgress([SESSION_ORIGIN]);
                     const listeners = listen.mock.calls.flatMap((call) =>
                         call.this instanceof NetServer ? [call.this] : [],
                     );
                     listen.mock.restore();
+                    // A listener left open would keep this file's process from ever exiting.
+                    context.after(() => {
+                        for (const listener of listeners) {
+                            listener.close();
+                        }
+                    });
+                    assert.ok(started.ok, JSON.stringify(started));
+                    const egress = started.value;
                     try {
                         assert.deepEqual(egress.connectionFailures(), []);
                         for (const listener of listeners) {

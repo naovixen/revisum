@@ -3,10 +3,9 @@
 // test here never depends on what a run does when the caller leaves it out.
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { runSuite } from "@revisum/cli";
+import { buildAdapters, runSuite } from "@revisum/cli";
 import {
     SUITE_REPORT_FILE,
-    defaultRedactor,
     environmentSecretStore,
     success,
     type Project,
@@ -87,13 +86,16 @@ export const runSuiteOn = (
     workload: WorkloadRunner,
     options: WrittenRunOptions = {},
 ): Promise<RunResult> =>
-    runSuite(options.project ?? evidenceProject(), SUITE_NAME, {
-        workload,
-        secrets: environmentSecretStore({
-            [DECLARED_SECRET]: "shop-api-token-for-suite-runs-0042",
+    runSuite(
+        options.project ?? evidenceProject(),
+        SUITE_NAME,
+        buildAdapters.suiteRunPorts({
+            workload,
+            secrets: environmentSecretStore({
+                [DECLARED_SECRET]: "shop-api-token-for-suite-runs-0042",
+            }),
+            checkout: suiteCheckout(),
+            outputDirectory: options.outputDirectory ?? outputFolder(),
+            pass: options.pass ?? "gating",
         }),
-        redactor: defaultRedactor(),
-        checkout: suiteCheckout(),
-        outputDirectory: options.outputDirectory ?? outputFolder(),
-        pass: options.pass ?? "gating",
-    });
+    );

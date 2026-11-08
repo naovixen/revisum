@@ -9,7 +9,7 @@ import { join } from "node:path";
 import { connect } from "node:net";
 import { after, before, describe, test } from "node:test";
 import type { OwnBrowserDriver } from "@revisum/driver-cdp";
-import { defaultRedactor, type SessionEnvironment } from "@revisum/engine";
+import { defaultRedactor, success, type SessionEnvironment } from "@revisum/engine";
 import { startBrowserHarness, type BrowserHarness } from "#test-support/browser/BrowserHarness.ts";
 import {
     ADAPTER_OF_TARGET,
@@ -67,12 +67,14 @@ let proxy: RecordingProxy;
 let harness: BrowserHarness;
 
 const egressOnRecordingProxy: EgressSourceForTest = () =>
-    Promise.resolve({
-        proxy: { server: proxy.server, includeLoopback: true },
-        refusedOrigins: () => [],
-        connectionFailures: () => [],
-        close: () => Promise.resolve(),
-    });
+    Promise.resolve(
+        success({
+            proxy: { server: proxy.server, includeLoopback: true },
+            refusedOrigins: () => success([]),
+            connectionFailures: () => [],
+            close: () => Promise.resolve(),
+        }),
+    );
 
 const recordingDriverFor = (target: BrowserTarget): OwnBrowserDriver =>
     driverWithEgress({

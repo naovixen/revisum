@@ -10,7 +10,7 @@ import { allowEveryAction } from "#test-support/browser/AllowEveryAction.ts";
 import { BrowserTarget } from "#test-support/browser/BrowserTarget.ts";
 import { click, testId } from "#test-support/browser/RawPlan.ts";
 import { startRelayedDriver, type RelayedDriver } from "#test-support/browser/RelayedDriver.ts";
-import { realEgressSource } from "#test-support/browser/SessionEgressForTest.ts";
+import { realEgressSource, withStartedEgress } from "#test-support/browser/SessionEgressForTest.ts";
 import { shareBrowserInThisFile } from "#test-support/browser/ShareBrowserInThisFile.ts";
 import { capabilityHarness, type CapabilityHarness } from "#test-support/capability-harness.ts";
 import type { FixtureRoute } from "#test-support/fixture-server.ts";
@@ -197,17 +197,16 @@ describe("Using the real browser driver", () => {
         describe("when the session closes", () => {
             test("then it should say what failed, naming both, having closed each", async () => {
                 let wasEgressAskedToClose = false;
-                const failing = await startRelayedDriver(undefined, async (allowedOrigins) => {
-                    const egress = await realEgressSource(allowedOrigins);
-                    return {
+                const failing = await startRelayedDriver(undefined, async (allowedOrigins) =>
+                    withStartedEgress(await realEgressSource(allowedOrigins), (egress) => ({
                         ...egress,
                         close: async () => {
                             wasEgressAskedToClose = true;
                             await egress.close();
                             throw new Error(WHY_THE_EGRESS_WOULD_NOT_CLOSE);
                         },
-                    };
-                });
+                    })),
+                );
                 const opened = await failing.driver.open(
                     harness.target(TARGET),
                     harness.environment(),
@@ -235,16 +234,15 @@ describe("Using the real browser driver", () => {
     describe("given one part of a session that fails to close", () => {
         describe("when the session closes", () => {
             test("then it should give that failure as it is", async () => {
-                const failing = await startRelayedDriver(undefined, async (allowedOrigins) => {
-                    const egress = await realEgressSource(allowedOrigins);
-                    return {
+                const failing = await startRelayedDriver(undefined, async (allowedOrigins) =>
+                    withStartedEgress(await realEgressSource(allowedOrigins), (egress) => ({
                         ...egress,
                         close: async () => {
                             await egress.close();
                             throw new Error(WHY_THE_EGRESS_WOULD_NOT_CLOSE);
                         },
-                    };
-                });
+                    })),
+                );
                 const opened = await failing.driver.open(
                     harness.target(TARGET),
                     harness.environment(),

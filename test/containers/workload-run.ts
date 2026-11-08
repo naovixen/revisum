@@ -10,8 +10,8 @@ import { mkdtempSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PRODUCT, type WorkloadOutcome, type WorkloadRunner } from '@revisum/contracts';
-import { defaultRedactor, environmentSecretStore, type Project, type RunResult } from '@revisum/engine';
-import { runSuite } from '@revisum/cli';
+import { environmentSecretStore, type Project, type RunResult } from '@revisum/engine';
+import { buildAdapters, runSuite } from '@revisum/cli';
 import { RUN_IMAGE_TAG, dockerCliEngine, runDocker, workloadRunner, type ContainerEngine } from '@revisum/runner';
 import { FIXTURES, REPOSITORY_ROOT } from '../support/repository.ts';
 import { DECLARED_SECRET, SUITE_NAME, evidenceModeInput, parsedProject, projectFileWithEvidence, suiteInput } from '../unit/engine/evidence-examples.ts';
@@ -87,8 +87,8 @@ export type RealSuiteRun = { readonly result: RunResult; readonly outputDirector
 export async function runFixtureSuite(image: string, secretValue: string, engine?: ContainerEngine): Promise<RealSuiteRun> {
   const outputDirectory = outputFolder();
   const { runner } = realWorkloadRunner(engine);
-  const result = await withSeededHost(() => runSuite(fixtureSuiteProject(image), SUITE_NAME, {
-    workload: runner, secrets: environmentSecretStore({ [DECLARED_SECRET]: secretValue }), redactor: defaultRedactor(), checkout: REPOSITORY_ROOT, outputDirectory, pass: 'gating',
-  }));
+  const result = await withSeededHost(() => runSuite(fixtureSuiteProject(image), SUITE_NAME, buildAdapters.suiteRunPorts({
+    workload: runner, secrets: environmentSecretStore({ [DECLARED_SECRET]: secretValue }), checkout: REPOSITORY_ROOT, outputDirectory, pass: 'gating',
+  })));
   return { result, outputDirectory };
 }

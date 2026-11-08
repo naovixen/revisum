@@ -30,6 +30,8 @@ const throws = (): never => {
     throw new Error(BROKEN);
 };
 
+const refusalsUnreadable = () => failure(BROKEN);
+
 const FAILING_CHECK: JsonRecord = {
     type: "expect",
     locator: { by: "testId", testId: "status" },
@@ -63,15 +65,10 @@ const fakeEgress = (
 
 // The session's records as the driver gives them: what the egress refused, or why it could not say.
 function recordsOfEgress(egress: SessionEgress) {
-    try {
-        return sessionRecords({
-            blockedOrigins: success(mergeRefusedOrigins([], egress.refusedOrigins())),
-        });
-    } catch (error) {
-        return sessionRecords({
-            blockedOrigins: failure(error instanceof Error ? error.message : String(error)),
-        });
-    }
+    const refused = egress.refusedOrigins();
+    return sessionRecords({
+        blockedOrigins: refused.ok ? success(mergeRefusedOrigins([], refused.value)) : refused,
+    });
 }
 
 // A session that treats its egress as the driver does: closes it, and only then reads its refusals.
@@ -127,7 +124,7 @@ describe("Using the run", () => {
             describe(`given ${verdict.name}`, () => {
                 describe(`and ${name} whose egress can't say what it refused`, () => {
                     const session = (changes: Partial<Session> = {}): Session =>
-                        sessionOver(fakeEgress(isProxyingLoopback, throws), changes);
+                        sessionOver(fakeEgress(isProxyingLoopback, refusalsUnreadable), changes);
 
                     describe("when the run ends", () => {
                         test("then it should end Errored", async () => {
@@ -209,7 +206,9 @@ describe("Using the run", () => {
 
                 describe(`and ${name} whose egress says what it refused`, () => {
                     const session = (): Session =>
-                        sessionOver(fakeEgress(isProxyingLoopback, () => [REFUSED_IN_THE_RUN]));
+                        sessionOver(
+                            fakeEgress(isProxyingLoopback, () => success([REFUSED_IN_THE_RUN])),
+                        );
 
                     describe("when the run ends", () => {
                         test("then it should keep the verdict and list the refusal", async () => {
@@ -229,7 +228,9 @@ describe("Using the run", () => {
                     describe("when the run ends", () => {
                         test("then it should keep the verdict with an empty list", async () => {
                             const { result } = await runOnFakeSession(raw, {
-                                session: sessionOver(fakeEgress(isProxyingLoopback, () => [])),
+                                session: sessionOver(
+                                    fakeEgress(isProxyingLoopback, () => success([])),
+                                ),
                             });
                             assert.equal(result.state, verdict.state);
                             assert.deepEqual(result.blockedOrigins, []);
@@ -242,6 +243,17 @@ describe("Using the run", () => {
 
         describe(`given ${verdict.name}`, () => {
             describe("and an isolated run's real egress that can't read the proxy at close", () => {
+                describe("when its refusals are read", () => {
+                    test("then it should answer with why, and not throw", async () => {
+                        const egress = await egressReadingInTurn(
+                            success([REFUSED_EARLIER]),
+                            failure(BROKEN),
+                        );
+                        await egress.close();
+                        assert.deepEqual(egress.refusedOrigins(), failure(BROKEN));
+                    });
+                });
+
                 describe("when the run ends", () => {
                     test("then it should end Errored with the code", async () => {
                         const egress = await egressReadingInTurn(

@@ -10,14 +10,14 @@ import { setTimeout as pause } from "node:timers/promises";
 import {
     CdpConnection,
     cdpDriver,
-    launchSharedBrowser,
     type CdpDriverOptions,
     type LaunchedSharedBrowser,
     type OwnBrowserDriver,
     type SharedBrowser,
 } from "@revisum/driver-cdp";
+import { launchSharedBrowser } from "@revisum/driver-cdp/testing";
 import { CLOSE_THE_BROWSER, LIST_CONTEXTS } from "./TestCommand.ts";
-import type { ClosedSession, SessionEnvironment, Target } from "@revisum/engine";
+import { success, type ClosedSession, type SessionEnvironment, type Target } from "@revisum/engine";
 import { startBrowserWatchdog, type BrowserWatchdog } from "./BrowserWatchdog.ts";
 import type { EgressSourceForTest, SessionEgressForTest } from "./SessionEgressForTest.ts";
 import { driverWith, sessionWith } from "./WrappingSessions.ts";
@@ -45,15 +45,19 @@ const egressStillOpen = new Set<SessionEgressForTest>();
 const closedWithTheFile =
     (source: EgressSourceForTest): EgressSourceForTest =>
     async (allowedOrigins) => {
-        const egress = await source(allowedOrigins);
+        const started = await source(allowedOrigins);
+        if (!started.ok) {
+            return started;
+        }
+        const egress = started.value;
         egressStillOpen.add(egress);
-        return {
+        return success({
             ...egress,
             close: () => {
                 egressStillOpen.delete(egress);
                 return egress.close();
             },
-        };
+        });
     };
 
 const keyOf = ({ executablePath, locale }: LaunchSettings): string =>

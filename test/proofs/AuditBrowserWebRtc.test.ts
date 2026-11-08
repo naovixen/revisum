@@ -6,7 +6,8 @@ import { join } from "node:path";
 import { after, before, describe, test } from "node:test";
 import { setTimeout as pause } from "node:timers/promises";
 import { launchBrowser, scan, type Browser, type PageDriver } from "@revisum/auditor-act";
-import { CREATE_TARGET, launchChromium } from "@revisum/driver-cdp";
+import { CREATE_TARGET } from "@revisum/driver-cdp";
+import { launchChromiumWithArguments } from "@revisum/driver-cdp/testing";
 import { BrowserTarget } from "#test-support/browser/BrowserTarget.ts";
 import { startFixtureServer, type FixtureServer } from "#test-support/fixture-server.ts";
 import { FIXTURES } from "#test-support/repository.ts";
@@ -86,7 +87,7 @@ async function withAuditPage<Value>(
 
 async function datagramsWithNoPolicy(executablePath: string): Promise<readonly string[]> {
     witness.forgetArrivals();
-    const launched = await launchChromium(executablePath, {
+    const launched = await launchChromiumWithArguments(executablePath, {
         arguments: FLAGS_WITH_NO_WEBRTC_POLICY,
         profilePrefix: "webrtc-with-no-policy-",
     });

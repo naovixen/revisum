@@ -29,9 +29,9 @@ import { join } from 'node:path';
 import { buildAdapters } from '@revisum/cli';
 import { createBrowserDriver } from '#test-support/browser/CreateBrowserDriver.ts';
 import {
-  canonicalJson, defaultRedactor, environmentSecretStore, failure, planHash, planParser, readPlanText, sha256, success,
+  canonicalJson, environmentSecretStore, failure, planHash, planParser, readPlanText, sha256, success,
   type Approval, type ApprovalStore, type BrowserDriver, type EgressPolicy, type GuaranteeLevel, type ImageDigest, type Plan,
-  type Runner, type Session, type SessionEnvironment,
+  type Runner, type Session, type SessionEnvironment, type VersionControlPort,
 } from '@revisum/engine';
 import { BROWSERS } from '#test-support/browsers.ts';
 import { startFixtureServer, type FixtureRoute } from '#test-support/fixture-server.ts';
@@ -351,6 +351,8 @@ export type ExploreSetup = {
   readonly isolatedRunner?: (site: ExploreSite) => { readonly runner: Runner; readonly image: ImageDigest };
   readonly site?: () => Promise<ExploreSite>;
   readonly approvals?: readonly Approval[] | ((project: JsonRecord) => Promise<readonly Approval[]>);
+  // The protected branch; one that just holds the project unless given.
+  readonly versionControl?: (project: JsonRecord) => VersionControlPort;
   // Files to write into the workspace before the run, by relative path.
   readonly files?: Readonly<Record<string, string>>;
   // The secret store's variables; the two declared secrets, the login name fresh, unless given.
@@ -404,19 +406,18 @@ export async function withExploreRun(setup: ExploreSetup, body: (run: ExploreRun
     // Every name the planner proxy looks up is recorded; the planner is on loopback, so none is needed.
     const resolver = fakeResolver({});
     const secrets = environmentSecretStore(setup.secrets ?? exploreSecrets(loginName));
-    const ports: ExploreCommandPorts = {
+    const ports: ExploreCommandPorts = buildAdapters.draftCommandPorts({
       workingDirectory: workspace.root,
       secrets,
       events,
-      versionControl: protectedBranchWith(workspace.protectedProject),
+      versionControl: setup.versionControl?.(project) ?? protectedBranchWith(workspace.protectedProject),
       planner: buildAdapters.plannerCalls({ secrets, trustedCertificates: [TEST_CERTIFICATE], resolve: resolver.resolve }),
-      runLogin: buildAdapters.loginRunner,
-      redactor: defaultRedactor(),
+    }, {
       ...(browser === undefined ? {} : { browser: browser.driver }),
       ...(runner === undefined ? {} : { isolatedRunner: { runner: runner.runner, image: runner.image } }),
       ...(setup.isolatedRunner === undefined ? {} : { isolatedRunner: setup.isolatedRunner(site) }),
       ...(approvals === undefined ? {} : { approvals: fakeApprovalStore(approvals) }),
-    };
+    });
     const command = await loadDraftCommand();
     let outcome: CommandOutcome | undefined;
     const printed = await consoleWrittenDuring(async () => { outcome = await command(setup.argv(site), ports); });

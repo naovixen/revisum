@@ -19,12 +19,12 @@ import { Buffer } from 'node:buffer';
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, posix } from 'node:path';
-import { runSuite } from '@revisum/cli';
+import { buildAdapters, runSuite } from '@revisum/cli';
 import {
   failure, isSecret, success,
   type EgressEvent, type WorkloadErrorCode, type WorkloadOutcome, type WorkloadRequest, type WorkloadRunner,
 } from '@revisum/contracts';
-import { defaultRedactor, environmentSecretStore, type Project, type RunResult } from '@revisum/engine';
+import { environmentSecretStore, type Project, type RunResult } from '@revisum/engine';
 import {
   DECLARED_SECRET, SUITE_NAME, evidenceModeInput, parsedProject, projectFileWithEvidence, recordedReport, specPath, suiteInput, withoutSpec,
   type JsonRecord,
@@ -142,14 +142,13 @@ export type SuiteRun = { readonly result: RunResult; readonly runner: FakeWorklo
 export async function runDeclaredSuite(options: SuiteRunOptions = {}): Promise<SuiteRun> {
   const runner = fakeWorkloadRunner(options.behaviour ?? { report: recordedReport('passing-with-criteria'), exitCode: 0 });
   const outputDirectory = outputFolder();
-  const result = await runSuite(options.project ?? evidenceProject(), options.suiteName ?? SUITE_NAME, {
+  const result = await runSuite(options.project ?? evidenceProject(), options.suiteName ?? SUITE_NAME, buildAdapters.suiteRunPorts({
     workload: runner,
     secrets: environmentSecretStore({ [DECLARED_SECRET]: options.secretValue ?? 'shop-api-token-for-suite-runs-0042' }),
-    redactor: defaultRedactor(),
     checkout: options.checkout ?? suiteCheckout(),
     outputDirectory,
     pass: 'gating',
-  });
+  }));
   return { result, runner, outputDirectory };
 }
 

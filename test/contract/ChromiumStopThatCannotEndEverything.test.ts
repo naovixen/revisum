@@ -17,6 +17,7 @@ import { platform, tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, test } from "node:test";
 import { launchChromium, type LaunchedChromium } from "@revisum/driver-cdp";
+import { launchChromiumWithArguments } from "@revisum/driver-cdp/testing";
 import { BROWSERS } from "#test-support/browsers.ts";
 import { endAtOnce, isRunning, listProcesses } from "#test-support/process-tree.ts";
 import { FIXTURES } from "#test-support/repository.ts";
@@ -134,7 +135,7 @@ async function withWedgedTaskkill<Answer>(
 
 // Node, run with a stand-in browser as its script, takes every flag the launcher adds as that script's.
 const launchStandIn = (program: string, idFile: string): Promise<LaunchedChromium> =>
-    launchChromium(process.execPath, {
+    launchChromiumWithArguments(process.execPath, {
         arguments: [join(STAND_INS, program), idFile, "--headless", "--mute-audio"],
         profilePrefix: "chromium-stop-stand-in-",
     });

@@ -11,8 +11,8 @@ import {
     CREATE_TARGET,
     cdpDriver,
     egressThroughExistingProxy,
-    launchChromium,
 } from "@revisum/driver-cdp";
+import { launchChromiumWithArguments } from "@revisum/driver-cdp/testing";
 import { createRunService, parseProject, planParser } from "@revisum/engine";
 import { navigate, rawPlan, testId, textEquals } from "../support/browser/RawPlan.ts";
 import { BROWSERS } from "../support/browsers.ts";
@@ -75,7 +75,7 @@ function pageFor({ channelName, address }: WebRtcAttempt): string {
 }
 
 async function openInBareBrowser(fixture: FixtureServer): Promise<string> {
-    const launched = await launchChromium(BROWSERS.chrome, {
+    const launched = await launchChromiumWithArguments(BROWSERS.chrome, {
         arguments: BARE_BROWSER_FLAGS,
         profilePrefix: "webrtc-attempt-",
     });

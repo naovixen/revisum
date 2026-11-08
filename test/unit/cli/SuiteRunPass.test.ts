@@ -3,13 +3,8 @@
 // pass that opens the gate.
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { runSuite, type SuiteRunPorts } from "@revisum/cli";
-import {
-    defaultRedactor,
-    environmentSecretStore,
-    evidenceMergeGateOpen,
-    type RunResult,
-} from "@revisum/engine";
+import { buildAdapters, runSuite, type SuiteRunPorts } from "@revisum/cli";
+import { environmentSecretStore, evidenceMergeGateOpen, type RunResult } from "@revisum/engine";
 import {
     DECLARED_SECRET,
     SUITE_NAME,
@@ -31,15 +26,20 @@ const passingSuite = () =>
 
 // The ports a caller gives when it leaves the pass out. Handed over through Reflect.apply, so this
 // still compiles and runs once the field is required.
-const portsWithoutPass = () => ({
-    workload: passingSuite(),
-    redactor: defaultRedactor(),
-    secrets: environmentSecretStore({
-        [DECLARED_SECRET]: "shop-api-token-for-suite-runs-0042",
-    }),
-    checkout: suiteCheckout(),
-    outputDirectory: outputFolder(),
-});
+const portsWithoutPass = () =>
+    Object.fromEntries(
+        Object.entries(
+            buildAdapters.suiteRunPorts({
+                workload: passingSuite(),
+                secrets: environmentSecretStore({
+                    [DECLARED_SECRET]: "shop-api-token-for-suite-runs-0042",
+                }),
+                checkout: suiteCheckout(),
+                outputDirectory: outputFolder(),
+                pass: "gating",
+            }),
+        ).filter(([name]) => name !== "pass"),
+    );
 
 const isPassRequired: Pick<SuiteRunPorts, "pass"> extends Required<Pick<SuiteRunPorts, "pass">>
     ? true
