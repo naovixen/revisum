@@ -94,7 +94,7 @@ describe("Using the workload runner", () => {
     const userFor = async (imageUser: string | null): Promise<string> => {
         const { engine } = await runOn({
             ...ENFORCING,
-            imageUser: () => Promise.resolve(imageUser),
+            imageUser: () => Promise.resolve(success(imageUser)),
         });
         const [team] = teamContainers(engine.started);
         assert.ok(team !== undefined, "the team's container started");
@@ -344,6 +344,60 @@ describe("Using the workload runner at a timeout", () => {
                     });
                     const ended = assertTimedOutWith(outcome, "removed");
                     assert.ok(!("exitCode" in ended), JSON.stringify(ended));
+                });
+            });
+        });
+
+        describe("and a removal that answers only after the bounded wait", () => {
+            describe("when it has answered", () => {
+                test("then it should return only then, with the container gone and the network after it", async (context) => {
+                    context.mock.timers.enable({ apis: ["setTimeout"] });
+                    const commandStarted = deferred<void>();
+                    const removalAnswers = deferred<Result<void, EngineProblem>>();
+                    const engine = fakeContainerEngine({
+                        ...ENFORCING,
+                        exec: (containerId, command) => {
+                            if (!isTeamCommand(command)) {
+                                return Promise.resolve(success(FINISHED));
+                            }
+                            commandStarted.resolve();
+                            return NEVER();
+                        },
+                        removeContainer: (id) =>
+                            id === teamContainerId()
+                                ? removalAnswers.promise
+                                : Promise.resolve(success(undefined)),
+                    });
+                    const teamContainerId = (): string =>
+                        `fake-container-${engine.started.findIndex((options) => options.image === TEAM_IMAGE_ID) + 1}`;
+                    const running = runnerOn(engine).runner.run(
+                        workloadRequest({ timeoutMilliseconds: TIMEOUT_MILLISECONDS }),
+                    );
+                    await Promise.race([commandStarted.promise, running]);
+                    context.mock.timers.tick(TIMEOUT_MILLISECONDS);
+                    await manyTurns();
+                    context.mock.timers.tick(STOP_WAIT_MILLISECONDS);
+                    await manyTurns();
+                    assert.equal(await Promise.race([running, Promise.resolve(PENDING)]), PENDING);
+                    assert.ok(
+                        !engine.calls.includes("removeNetwork"),
+                        JSON.stringify(engine.calls),
+                    );
+                    removalAnswers.resolve(success(undefined));
+                    await manyTurns();
+                    context.mock.timers.tick(STOP_WAIT_MILLISECONDS);
+                    await manyTurns();
+                    const outcome = await Promise.race([running, Promise.resolve(PENDING)]);
+                    assert.ok(
+                        typeof outcome === "object",
+                        "run() had not returned once the removal answered",
+                    );
+                    assert.ok(
+                        outcome.ok && outcome.value.kind === "timed-out",
+                        JSON.stringify(outcome),
+                    );
+                    assert.deepEqual(engine.runningContainers(), []);
+                    assert.deepEqual(engine.existingNetworks(), []);
                 });
             });
         });

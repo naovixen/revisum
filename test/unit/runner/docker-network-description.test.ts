@@ -7,8 +7,9 @@
 //   - probeEgress's script really runs, in Node, against a loopback port with nothing listening: a
 //     refused connection is reached only for a target that counts a refusal.
 import assert from 'node:assert/strict';
+import childProcess, { type SpawnOptions } from 'node:child_process';
 import { EventEmitter } from 'node:events';
-import { createRequire, syncBuiltinESMExports } from 'node:module';
+import { syncBuiltinESMExports } from 'node:module';
 import { createServer, type AddressInfo } from 'node:net';
 import { afterEach, test } from 'node:test';
 import { dockerCliEngine, type ContainerEngine } from '@revisum/runner';
@@ -17,9 +18,7 @@ const NETWORK = 'run-network';
 
 // ---- The Docker client, replaced ---------------------------------------------------------------------
 
-const childProcess: object = createRequire(import.meta.url)('node:child_process');
-const originalSpawn: unknown = Reflect.get(childProcess, 'spawn');
-assert.ok(typeof originalSpawn === 'function', 'child_process has no spawn');
+const originalSpawn: typeof childProcess.spawn = childProcess.spawn;
 
 afterEach(() => {
   Reflect.set(childProcess, 'spawn', originalSpawn);
@@ -64,10 +63,9 @@ function dockerCannotStart(): void {
 
 // `docker exec` runs its command here, in Node, in place of a container.
 function execRunsHere(): void {
-  Reflect.set(childProcess, 'spawn', (_command: unknown, words: readonly string[], options: unknown) => {
+  Reflect.set(childProcess, 'spawn', (_command: unknown, words: readonly string[], options: SpawnOptions) => {
     const [, , , ...nodeArguments] = words;
-    assert.ok(typeof originalSpawn === 'function', 'child_process has no spawn');
-    return Reflect.apply(originalSpawn, childProcess, [process.execPath, nodeArguments, options]);
+    return originalSpawn(process.execPath, nodeArguments, options);
   });
   syncBuiltinESMExports();
 }

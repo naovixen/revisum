@@ -2,7 +2,9 @@
 // given settings, and records every call, so a test can see what the runner asked for: which
 // networks and containers it created, what it ran inside them, and whether it started anything.
 // Any method can be answered differently through the same settings: a test gives that method, and
-// the fake still records the call and keeps its lists of what exists.
+// the fake still records the call and keeps its lists of what exists. As strict as Docker where it
+// matters: a network with containers attached cannot be removed, and exec fails on a container that is
+// not running, whichever answer a test gives.
 import { failure, success } from '@revisum/contracts';
 import type { ContainerEngine, ContainerOptions } from '@revisum/runner';
 
@@ -43,6 +45,8 @@ export const ENGINE_STARTING_CALLS: readonly string[] = ['createNetwork', 'start
 
 // Where the fake says a gateway would be, so a run's gateway probe happens unless a test says otherwise.
 const FIRST_ADDRESS_OF_THE_NETWORK = '172.18.0.1';
+// The address a container is given on the run's network, unless a test says otherwise.
+export const CONTAINER_ADDRESS_ON_THE_NETWORK = '172.18.0.3';
 
 // The engine methods that only answer what the host is like, each recorded.
 type HostAnswers = Pick<ContainerEngine, 'imageId' | 'networkGatewayAddress' | 'probeEgress' | 'imageUser' | 'containerAddress'>;
@@ -68,11 +72,11 @@ function hostAnswers(settings: FakeEngineSettings, calls: string[]): HostAnswers
     },
     async imageUser(reference) {
       calls.push('imageUser');
-      return settings.imageUser === undefined ? null : settings.imageUser(reference);
+      return settings.imageUser === undefined ? success(null) : settings.imageUser(reference);
     },
     async containerAddress(containerId, network) {
       calls.push('containerAddress');
-      return settings.containerAddress === undefined ? null : settings.containerAddress(containerId, network);
+      return settings.containerAddress === undefined ? success(CONTAINER_ADDRESS_ON_THE_NETWORK) : settings.containerAddress(containerId, network);
     },
   };
 }
@@ -85,6 +89,12 @@ export function fakeContainerEngine(settings: FakeEngineSettings): FakeContainer
   const removals: string[] = [];
   const running = new Set<string>();
   const networks = new Set<string>();
+  const attachedNetworks = new Map<string, readonly string[]>();
+  const hasStarted = (containerId: string, options: ContainerOptions): void => {
+    running.add(containerId);
+    attachedNetworks.set(containerId, options.networks);
+  };
+  const isAttached = (network: string): boolean => [...running].some((containerId) => (attachedNetworks.get(containerId) ?? []).includes(network));
   return {
     ...hostAnswers(settings, calls),
     calls, started, createdNetworks, executed, removals,
@@ -94,10 +104,13 @@ export function fakeContainerEngine(settings: FakeEngineSettings): FakeContainer
       calls.push('createNetwork');
       if (settings.createNetwork !== undefined) {
         const created = await settings.createNetwork(name, options);
-        if (created.ok) {networks.add(name);}
+        if (created.ok) {
+          createdNetworks.push({ name, internal: options.internal });
+          networks.add(name);
+        }
         return created;
       }
-      if (options.internal && !settings.internalNetworks) {return failure({ detail: 'this Docker cannot create an internal network' });}
+      if (options.internal && !settings.internalNetworks) {return failure({ kind: 'internal-refused', detail: 'this Docker cannot create an internal network' });}
       createdNetworks.push({ name, internal: options.internal });
       networks.add(name);
       return success(undefined);
@@ -105,6 +118,9 @@ export function fakeContainerEngine(settings: FakeEngineSettings): FakeContainer
     async removeNetwork(name) {
       calls.push('removeNetwork');
       removals.push(name);
+      if (settings.removeNetwork === undefined && isAttached(name)) {
+        return failure({ detail: `error while removing network: network ${name} has active endpoints` });
+      }
       const removed = settings.removeNetwork === undefined ? success(undefined) : await settings.removeNetwork(name);
       if (removed.ok) {networks.delete(name);}
       return removed;
@@ -114,17 +130,18 @@ export function fakeContainerEngine(settings: FakeEngineSettings): FakeContainer
       started.push(options);
       if (settings.startContainer !== undefined) {
         const answered = await settings.startContainer(options);
-        if (answered.ok) {running.add(answered.value);}
+        if (answered.ok) {hasStarted(answered.value, options);}
         return answered;
       }
       if (settings.failsToStart?.(options) === true) {return failure({ detail: 'the container exited as it started' });}
       const id = `fake-container-${started.length}`;
-      running.add(id);
+      hasStarted(id, options);
       return success(id);
     },
     async exec(containerId, command, environmentNames) {
       calls.push('exec');
       executed.push({ containerId, command: [...command] });
+      if (!running.has(containerId)) {return failure({ detail: `Error response from daemon: No such container: ${containerId}` });}
       return settings.exec === undefined ? success({ exitCode: 0, stdout: '', stderr: '' }) : settings.exec(containerId, command, environmentNames);
     },
     async removeContainer(containerId) {

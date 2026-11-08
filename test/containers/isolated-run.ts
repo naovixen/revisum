@@ -7,10 +7,10 @@
 // passed any of the host's environment into the container would be caught.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import type { DeclaredService, EgressPolicy, ImageDigest, Runner, RunnerHandle } from '@revisum/contracts';
+import { success, type DeclaredService, type EgressPolicy, type ImageDigest, type Result, type Runner, type RunnerError, type RunnerHandle } from '@revisum/contracts';
 import { dockerCliEngine, dockerRunner, prepareRunImage, type ExecOutcome, type RunnerLogEntry } from '@revisum/runner';
 import { REPOSITORY_ROOT } from '../support/repository.ts';
-import { egressPolicy, startRun } from '../unit/runner/runner-examples.ts';
+import { egressPolicy } from '../unit/runner/runner-examples.ts';
 
 // Fake credentials of the kinds a developer's or CI's environment holds: publishing, cloud and
 // package-registry. None is real; each value is unique so it can be searched for.
@@ -42,6 +42,33 @@ export async function pinnedRunImage(): Promise<ImageDigest> {
   const prepared = await prepareRunImage({ repositoryRoot: REPOSITORY_ROOT });
   assert.ok(prepared.ok, `the run image is prepared: ${prepared.ok ? '' : JSON.stringify(prepared.error)}`);
   return prepared.value.id;
+}
+
+// A run held open across a test's own steps, with `stop` ending it. Real-container suites start their
+// run in `before` and end it in `after`, so unlike a unit test they cannot do their work inside `use`.
+export type HeldOpenRun = RunnerHandle & { stop(): Promise<void> };
+
+export function holdRunOpen(runner: Runner, image: ImageDigest, policy: EgressPolicy): Promise<Result<HeldOpenRun, RunnerError>> {
+  let endUse: () => void = () => undefined;
+  const useEnds = new Promise<void>((resolve) => { endUse = resolve; });
+  return new Promise((resolve, reject) => {
+    const ended = runner.withRun(image, policy, (run) => {
+      resolve(success({
+        runId: run.runId,
+        egressEvents: (records, directOrigins) => run.egressEvents(records, directOrigins),
+        proxyDecisions: () => run.proxyDecisions(),
+        rewritesApplied: () => run.rewritesApplied(),
+        exec: (command, environmentNames) => run.exec(command, environmentNames),
+        guaranteeLevel: () => run.guaranteeLevel(),
+        stop: async () => {
+          endUse();
+          await ended;
+        },
+      }));
+      return useEnds;
+    });
+    ended.then((outcome) => { if (!outcome.ok) {resolve(outcome);} }, reject);
+  });
 }
 
 export type IsolatedRun = {
@@ -76,7 +103,7 @@ export async function startIsolatedRun(options: IsolatedRunOptions = {}): Promis
       else {process.env[name] = value;}
     }
   };
-  const started = await startRun(runner, image, options.policy ?? egressPolicy({ allowOrigins: [] }));
+  const started = await holdRunOpen(runner, image, options.policy ?? egressPolicy({ allowOrigins: [] }));
   if (!started.ok) {restore();}
   assert.ok(started.ok, `the isolated run starts: ${started.ok ? '' : JSON.stringify(started.error)} ${JSON.stringify(logged)}`);
   const handle = started.value;

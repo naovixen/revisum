@@ -35,7 +35,7 @@ import {
 import { BROWSERS } from '#test-support/browsers.ts';
 import { startFixtureServer, type FixtureRoute } from '#test-support/fixture-server.ts';
 import { fakeApprovalStore } from '#test-support/fakes/FakeApprovalStore.ts';
-import { fakeRunner } from '#test-support/fakes/FakeRunner.ts';
+import { fakeRunEnding, fakeRunner } from '#test-support/fakes/FakeRunner.ts';
 import { fakeRunnerHandle } from '#test-support/fakes/FakeRunnerHandle.ts';
 import { memoryEventSink, type MemoryEventSink } from '#test-support/memory-ports.ts';
 import { trustedProjectFrom } from '#test-support/policy-clearance.ts';
@@ -286,9 +286,9 @@ export function watchedFakeRunner(options: WatchedFakeRunnerOptions): WatchedFak
     async withRun(image, policy, use) {
       started.push(policy);
       if (options.startFails === true) {return failure({ code: 'start-failed' });}
-      const value = await use(handle);
+      const ended = await fakeRunEnding(handle, use);
       stops += 1;
-      return success(value);
+      return ended;
     },
   });
   return { runner, image: imageDigest(PINNED_IMAGE_ID), started, execs, stops: () => stops };

@@ -18,8 +18,8 @@ import {
 import type { RunResult } from "@revisum/engine";
 import { createCleanUpScope } from "../support/CleanUpScope.ts";
 import { REPOSITORY_ROOT } from "../support/repository.ts";
-import { declaredService, egressPolicy, startRun } from "../unit/runner/runner-examples.ts";
-import { jsonInside, pinnedRunImage } from "./isolated-run.ts";
+import { declaredService, egressPolicy } from "../unit/runner/runner-examples.ts";
+import { holdRunOpen, jsonInside, pinnedRunImage } from "./isolated-run.ts";
 import { fixtureWorkloadImage, runFixtureSuite } from "./workload-run.ts";
 
 const TIMEOUT = 300_000;
@@ -169,7 +169,7 @@ describe("Using the egress proxy on real Docker", () => {
                     },
                     services: [declaredService(SERVER_SERVICE, serverOrigin, true)],
                 });
-                const started = await startRun(
+                const started = await holdRunOpen(
                     runner,
                     await pinnedRunImage(),
                     egressPolicy({ allowOrigins: [serverOrigin], allowServices: [SERVER_SERVICE] }),

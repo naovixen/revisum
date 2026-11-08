@@ -18,7 +18,7 @@ import type { ExecOutcome } from "@revisum/contracts";
 import { fakeDriverOpening } from "#test-support/fakes/FakeDriver.ts";
 import { fakeEventSink } from "#test-support/fakes/FakeEventSink.ts";
 import { fakeRedactor } from "#test-support/fakes/FakeRedactor.ts";
-import { fakeRunner } from "#test-support/fakes/FakeRunner.ts";
+import { fakeRunEnding, fakeRunner } from "#test-support/fakes/FakeRunner.ts";
 import { fakeRunnerHandle } from "#test-support/fakes/FakeRunnerHandle.ts";
 import { fakeSecretStore } from "#test-support/fakes/FakeSecretStore.ts";
 import { fakeSession } from "#test-support/fakes/FakeSession.ts";
@@ -152,14 +152,13 @@ const crawlAnswering = (answer: Result<ExecOutcome, { readonly detail: string }>
     crawlInRunner(
         {
             runner: fakeRunner({
-                withRun: async (image, policy, use) =>
-                    success(
-                        await use(
-                            fakeRunnerHandle({
-                                guaranteeLevel: () => "isolated",
-                                exec: () => Promise.resolve(answer),
-                            }),
-                        ),
+                withRun: (image, policy, use) =>
+                    fakeRunEnding(
+                        fakeRunnerHandle({
+                            guaranteeLevel: () => "isolated",
+                            exec: () => Promise.resolve(answer),
+                        }),
+                        use,
                     ),
             }),
             image: IMAGE,

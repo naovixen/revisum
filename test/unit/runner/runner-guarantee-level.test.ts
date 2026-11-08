@@ -12,22 +12,24 @@ import { dockerRunner, type RunnerLogEntry } from '@revisum/runner';
 import type { GuaranteeLevel } from '@revisum/contracts';
 import { REPOSITORY_ROOT } from '../../support/repository.ts';
 import { fakeContainerEngine, type FakeEngineSettings } from './fake-container-engine.ts';
-import { egressPolicy, imageDigest, PINNED_IMAGE_ID, startRun } from './runner-examples.ts';
+import { egressPolicy, imageDigest, PINNED_IMAGE_ID } from './runner-examples.ts';
 
 const POLICY = egressPolicy({ allowOrigins: ['https://staging.example.test'] });
 
-// The level is read while the run is up, before it is stopped.
+// The level is read while the run is up, inside `use`.
 type Started = { readonly level: GuaranteeLevel; readonly logged: readonly RunnerLogEntry[]; readonly startedCode: string | null };
 
-// Starts a run on a fake engine with the given settings, notes the level and outcome, and stops it again.
+// Runs on a fake engine with the given settings, noting the level inside `use` and the outcome.
 async function startOn(settings: Omit<FakeEngineSettings, 'localImageId'>): Promise<Started> {
   const engine = fakeContainerEngine({ localImageId: PINNED_IMAGE_ID, ...settings });
   const logged: RunnerLogEntry[] = [];
   const runner = dockerRunner({ engine, repositoryRoot: REPOSITORY_ROOT, log: (entry) => { logged.push(entry); } });
-  const started = await startRun(runner, imageDigest(PINNED_IMAGE_ID), POLICY);
-  const level: GuaranteeLevel = started.ok ? started.value.guaranteeLevel() : 'host';
-  if (started.ok) {await started.value.stop();}
-  return { level, logged, startedCode: started.ok ? null : started.error.code };
+  const levels: GuaranteeLevel[] = [];
+  const started = await runner.withRun(imageDigest(PINNED_IMAGE_ID), POLICY, (run) => {
+    levels.push(run.guaranteeLevel());
+    return Promise.resolve();
+  });
+  return { level: levels[0] ?? 'host', logged, startedCode: started.ok ? null : started.error.code };
 }
 
 const loggedCodes = (logged: readonly RunnerLogEntry[]): readonly string[] => logged.map((entry) => entry.code);

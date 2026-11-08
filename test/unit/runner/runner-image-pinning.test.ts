@@ -8,7 +8,7 @@ import { test } from 'node:test';
 import { dockerRunner, type RunnerLogEntry } from '@revisum/runner';
 import { REPOSITORY_ROOT } from '../../support/repository.ts';
 import { ENGINE_STARTING_CALLS, fakeContainerEngine, type FakeEngineSettings } from './fake-container-engine.ts';
-import { egressPolicy, imageDigest, OTHER_IMAGE_ID, PINNED_IMAGE_ID, startRun } from './runner-examples.ts';
+import { egressPolicy, imageDigest, OTHER_IMAGE_ID, PINNED_IMAGE_ID } from './runner-examples.ts';
 
 const POLICY = egressPolicy({ allowOrigins: ['https://staging.example.test'] });
 
@@ -23,7 +23,7 @@ const startingCalls = (calls: readonly string[]): readonly string[] => calls.fil
 
 test('with no local run image, start returns image-missing and starts nothing', async () => {
   const { engine, runner } = runnerOn({ localImageId: null, internalNetworks: true, probe: 'blocked' });
-  const started = await startRun(runner, imageDigest(PINNED_IMAGE_ID), POLICY);
+  const started = await runner.withRun(imageDigest(PINNED_IMAGE_ID), POLICY, () => Promise.resolve());
   assert.ok(!started.ok);
   assert.deepEqual(started.error, { code: 'image-missing' });
   assert.deepEqual(startingCalls(engine.calls), []);
@@ -33,7 +33,7 @@ test('with no local run image, start returns image-missing and starts nothing', 
 
 test('when the local run image has another id, start returns image-digest-mismatch and starts nothing', async () => {
   const { engine, runner } = runnerOn({ localImageId: OTHER_IMAGE_ID, internalNetworks: true, probe: 'blocked' });
-  const started = await startRun(runner, imageDigest(PINNED_IMAGE_ID), POLICY);
+  const started = await runner.withRun(imageDigest(PINNED_IMAGE_ID), POLICY, () => Promise.resolve());
   assert.ok(!started.ok);
   assert.deepEqual(started.error, { code: 'image-digest-mismatch' });
   assert.deepEqual(startingCalls(engine.calls), []);
@@ -43,14 +43,12 @@ test('when the local run image has another id, start returns image-digest-mismat
 
 test('counter-example: with the pinned image present, the same runner starts its containers and removes them on stop', async () => {
   const { engine, runner } = runnerOn({ localImageId: PINNED_IMAGE_ID, internalNetworks: true, probe: 'blocked' });
-  const started = await startRun(runner, imageDigest(PINNED_IMAGE_ID), POLICY);
-  assert.ok(started.ok, JSON.stringify(started));
-  try {
+  const started = await runner.withRun(imageDigest(PINNED_IMAGE_ID), POLICY, () => {
     assert.ok(engine.started.length >= 1, 'at least the run container started');
     assert.ok(engine.started.every((options) => options.image === PINNED_IMAGE_ID), 'every container runs the pinned image');
-  } finally {
-    await started.value.stop();
-  }
+    return Promise.resolve();
+  });
+  assert.ok(started.ok, JSON.stringify(started));
   assert.deepEqual(engine.runningContainers(), [], 'stop removes every container the run started');
   assert.deepEqual(engine.existingNetworks(), [], 'stop removes the run\'s network');
 });

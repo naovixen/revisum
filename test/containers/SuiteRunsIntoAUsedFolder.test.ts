@@ -14,7 +14,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, describe, test } from "node:test";
 import { runSuite } from "@revisum/cli";
-import { WORKLOAD_OUTPUT_PATH } from "@revisum/contracts";
+import { WORKLOAD_OUTPUT_PATH, success } from "@revisum/contracts";
 import { environmentSecretStore, type RunResult } from "@revisum/engine";
 import { dockerCliEngine, workloadRunner, type ContainerEngine } from "@revisum/runner";
 import { REPOSITORY_ROOT } from "../support/repository.ts";
@@ -66,7 +66,9 @@ const ANOTHER_USER = hostUid === 1000 ? "1001:1001" : "1000:1000";
 
 const engineRunningSuitesAs = (user: string | undefined): ContainerEngine => {
     const engine = dockerCliEngine();
-    return user === undefined ? engine : { ...engine, imageUser: () => Promise.resolve(user) };
+    return user === undefined
+        ? engine
+        : { ...engine, imageUser: () => Promise.resolve(success(user)) };
 };
 
 // The host's own user where it has one, so nothing stops it emptying what the container made.

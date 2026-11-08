@@ -7,9 +7,9 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { dockerCliEngine, dockerRunner, type ContainerEngine, type RunnerLogEntry } from '@revisum/runner';
 import { REPOSITORY_ROOT } from '../support/repository.ts';
-import { egressPolicy, imageDigest, PINNED_IMAGE_ID, startRun } from '../unit/runner/runner-examples.ts';
+import { egressPolicy, imageDigest, PINNED_IMAGE_ID } from '../unit/runner/runner-examples.ts';
 import { errorCode, runnerOn, workloadRequest } from '../unit/runner/workload-examples.ts';
-import { requireDocker } from './isolated-run.ts';
+import { holdRunOpen, requireDocker } from './isolated-run.ts';
 
 const TIMEOUT = 120_000;
 const POLICY = egressPolicy({ allowOrigins: [] });
@@ -18,7 +18,7 @@ const NO_DAEMON_HERE = 'tcp://127.0.0.1:1';
 function startOn(engine: ContainerEngine) {
   const logged: RunnerLogEntry[] = [];
   const runner = dockerRunner({ engine, repositoryRoot: REPOSITORY_ROOT, log: (entry) => { logged.push(entry); } });
-  return { logged, runner, started: startRun(runner, imageDigest(PINNED_IMAGE_ID), POLICY) };
+  return { logged, runner, started: holdRunOpen(runner, imageDigest(PINNED_IMAGE_ID), POLICY) };
 }
 
 // Runs `body` with the Docker client pointed where no daemon listens, then points it back.

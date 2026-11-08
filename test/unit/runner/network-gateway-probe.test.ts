@@ -21,7 +21,7 @@ import { failure, success, type Result } from '@revisum/contracts';
 import { dockerRunner, type ContainerEngine, type EngineProblem, type ProbeTarget, type RunnerLogEntry } from '@revisum/runner';
 import { REPOSITORY_ROOT } from '../../support/repository.ts';
 import { fakeContainerEngine, type FakeContainerEngine } from './fake-container-engine.ts';
-import { egressPolicy, imageDigest, PINNED_IMAGE_ID, startRun } from './runner-examples.ts';
+import { egressPolicy, imageDigest, PINNED_IMAGE_ID } from './runner-examples.ts';
 import { PRESENT_IMAGES, errorCode, runnerOn, teamContainers, workloadRequest } from './workload-examples.ts';
 
 const FIRST_ADDRESS = '172.18.0.1';
@@ -82,11 +82,13 @@ async function throughIsolatedRunner(world: NetworkWorld): Promise<Finding> {
   const { engine, record } = engineIn(world);
   const logged: RunnerLogEntry[] = [];
   const runner = dockerRunner({ engine, repositoryRoot: REPOSITORY_ROOT, log: (entry) => { logged.push(entry); } });
-  const started = await startRun(runner, imageDigest(PINNED_IMAGE_ID), egressPolicy({ allowOrigins: [] }));
+  const levels: string[] = [];
+  const started = await runner.withRun(imageDigest(PINNED_IMAGE_ID), egressPolicy({ allowOrigins: [] }), (run) => {
+    levels.push(run.guaranteeLevel());
+    return Promise.resolve();
+  });
   assert.ok(started.ok, `a plan run still starts, at whichever level: ${JSON.stringify(started)}`);
-  const level = started.value.guaranteeLevel();
-  await started.value.stop();
-  return { record, enforced: level === 'isolated', loggedUnenforceable: logged.some((entry) => entry.code === 'egress-unenforceable') };
+  return { record, enforced: levels[0] === 'isolated', loggedUnenforceable: logged.some((entry) => entry.code === 'egress-unenforceable') };
 }
 
 const outputFolders: string[] = [];
@@ -186,11 +188,13 @@ test('reached leaves the isolated runner at the host level, and not reached give
   const levelIn = async (world: NetworkWorld): Promise<string> => {
     const { engine } = engineIn(world);
     const runner = dockerRunner({ engine, repositoryRoot: REPOSITORY_ROOT });
-    const started = await startRun(runner, imageDigest(PINNED_IMAGE_ID), egressPolicy({ allowOrigins: [] }));
+    const levels: string[] = [];
+    const started = await runner.withRun(imageDigest(PINNED_IMAGE_ID), egressPolicy({ allowOrigins: [] }), (run) => {
+      levels.push(run.guaranteeLevel());
+      return Promise.resolve();
+    });
     assert.ok(started.ok, JSON.stringify(started));
-    const level = started.value.guaranteeLevel();
-    await started.value.stop();
-    return level;
+    return levels[0] ?? '';
   };
   assert.equal(await levelIn({ gateway: success(FIRST_ADDRESS), refusing: [FIRST_ADDRESS] }), 'host');
   assert.equal(await levelIn({ gateway: failure({ detail: 'no such network' }) }), 'host');

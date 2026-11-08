@@ -2,7 +2,7 @@
 // constants, egress policies, a fake name resolver that never touches the network, and the
 // undeclared hosts the fixture pages send traffic to.
 import assert from 'node:assert/strict';
-import { success, type DeclaredService, type EgressPolicy, type ImageDigest, type Origin, type Result, type Runner, type RunnerError, type RunnerHandle, type ServiceName } from '@revisum/contracts';
+import type { DeclaredService, EgressPolicy, ImageDigest, Origin, ServiceName } from '@revisum/contracts';
 import { buildEgressPolicy, type AddressResolver, type ResponseRewrite } from '@revisum/runner';
 
 // The tests' own constants stand in for values the trusted project's parser would have checked,
@@ -67,33 +67,6 @@ export function egressPolicy(input: PolicyInput): EgressPolicy {
   });
   assert.ok(built.ok, `the test policy is accepted: ${built.ok ? '' : JSON.stringify(built.error)}`);
   return built.value;
-}
-
-// A run held open for a test to read and then end: `stop` ends the runner's `withRun` and waits for it.
-export type StartedRun = RunnerHandle & { stop(): Promise<void> };
-
-// Starts a run and keeps it open until the test calls `stop`.
-export function startRun(runner: Runner, image: ImageDigest, policy: EgressPolicy): Promise<Result<StartedRun, RunnerError>> {
-  let endUse: () => void = () => undefined;
-  const useEnds = new Promise<void>((resolve) => { endUse = resolve; });
-  return new Promise((resolve, reject) => {
-    const ended = runner.withRun(image, policy, (run) => {
-      resolve(success({
-        runId: run.runId,
-        egressEvents: (records, directOrigins) => run.egressEvents(records, directOrigins),
-        proxyDecisions: () => run.proxyDecisions(),
-        rewritesApplied: () => run.rewritesApplied(),
-        exec: (command, environmentNames) => run.exec(command, environmentNames),
-        guaranteeLevel: () => run.guaranteeLevel(),
-        stop: async () => {
-          endUse();
-          await ended;
-        },
-      }));
-      return useEnds;
-    });
-    ended.then((outcome) => { if (!outcome.ok) {resolve(outcome);} }, reject);
-  });
 }
 
 // A resolver that answers from a fixed table and records every name it is asked for. A name

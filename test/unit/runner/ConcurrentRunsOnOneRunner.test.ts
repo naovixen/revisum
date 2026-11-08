@@ -3,11 +3,11 @@
 // that stays isolated must not lose that because another lost its proxy's records.
 import assert from "node:assert/strict";
 import { before, describe, test } from "node:test";
-import { success, type Runner } from "@revisum/contracts";
+import { success, type Runner, type RunnerHandle } from "@revisum/contracts";
 import { dockerRunner, type ContainerEngine } from "@revisum/runner";
 import { REPOSITORY_ROOT } from "../../support/repository.ts";
 import { fakeContainerEngine } from "./fake-container-engine.ts";
-import { egressPolicy, imageDigest, PINNED_IMAGE_ID, startRun, type StartedRun } from "./runner-examples.ts";
+import { egressPolicy, imageDigest, PINNED_IMAGE_ID } from "./runner-examples.ts";
 
 const POLICY = egressPolicy({ allowOrigins: ["http://app.test"] });
 const NO_LEVEL_OF_ITS_OWN = "no level of its own";
@@ -61,16 +61,28 @@ function engineFor({ probes }: EngineSettings): EngineWithUnreadableProxy {
     };
 }
 
-async function startedRun(runner: Runner): Promise<StartedRun> {
-    const started = await startRun(runner, imageDigest(PINNED_IMAGE_ID), POLICY);
-    assert.ok(started.ok, JSON.stringify(started));
-    return started.value;
-}
-
 // A run's own level, read from its handle. Only a handle can say which run it means.
-function levelOfRun(handle: StartedRun): unknown {
+function levelOfRun(handle: RunnerHandle): unknown {
     const read: unknown = Reflect.get(handle, "guaranteeLevel");
     return typeof read === "function" ? Reflect.apply(read, handle, []) : NO_LEVEL_OF_ITS_OWN;
+}
+
+type TwoLevels = { readonly first: unknown; readonly second: unknown };
+
+// Both runs held open at once, the second started while the first is up, with `body` run inside both.
+async function levelsOfTwoRuns(
+    runner: Runner,
+    body: (first: RunnerHandle, second: RunnerHandle) => Promise<void> = () => Promise.resolve(),
+): Promise<TwoLevels> {
+    const outer = await runner.withRun(imageDigest(PINNED_IMAGE_ID), POLICY, (first) =>
+        runner.withRun(imageDigest(PINNED_IMAGE_ID), POLICY, async (second) => {
+            await body(first, second);
+            return { first: levelOfRun(first), second: levelOfRun(second) };
+        }),
+    );
+    assert.ok(outer.ok, JSON.stringify(outer));
+    assert.ok(outer.value.value.ok, JSON.stringify(outer));
+    return outer.value.value.value.value;
 }
 
 const runnerOn = (engine: ContainerEngine): Runner =>
@@ -79,73 +91,71 @@ const runnerOn = (engine: ContainerEngine): Runner =>
 describe("Using the isolated runner", () => {
     describe("given a run that could not enforce egress, and a later run that could", () => {
         describe("when both are running on one runner", () => {
-            let unenforced: StartedRun;
-            let isolated: StartedRun;
+            let levels: TwoLevels;
             before(async () => {
-                const runner = runnerOn(engineFor({ probes: ["reached", "blocked"] }));
-                unenforced = await startedRun(runner);
-                isolated = await startedRun(runner);
+                levels = await levelsOfTwoRuns(
+                    runnerOn(engineFor({ probes: ["reached", "blocked"] })),
+                );
             });
 
             test("then it should keep the first run at the host level", () => {
-                assert.equal(levelOfRun(unenforced), "host");
+                assert.equal(levels.first, "host");
             });
 
             test("then it should give the later run the isolated level", () => {
-                assert.equal(levelOfRun(isolated), "isolated");
+                assert.equal(levels.second, "isolated");
             });
         });
     });
 
     describe("given a run that enforced egress, and a later run that could not", () => {
         describe("when both are running on one runner", () => {
-            let isolated: StartedRun;
-            let unenforced: StartedRun;
+            let levels: TwoLevels;
             before(async () => {
-                const runner = runnerOn(engineFor({ probes: ["blocked", "reached"] }));
-                isolated = await startedRun(runner);
-                unenforced = await startedRun(runner);
+                levels = await levelsOfTwoRuns(
+                    runnerOn(engineFor({ probes: ["blocked", "reached"] })),
+                );
             });
 
             test("then it should keep the first run at the isolated level", () => {
-                assert.equal(levelOfRun(isolated), "isolated");
+                assert.equal(levels.first, "isolated");
             });
 
             test("then it should give the later run the host level", () => {
-                assert.equal(levelOfRun(unenforced), "host");
+                assert.equal(levels.second, "host");
             });
         });
     });
 
     describe("given two isolated runs on one runner", () => {
         describe("when what the first run's proxy decided can no longer be read", () => {
-            let first: StartedRun;
-            let second: StartedRun;
+            let levels: TwoLevels;
             before(async () => {
                 const engine = engineFor({ probes: ["blocked", "blocked"] });
-                const runner = runnerOn(engine);
-                first = await startedRun(runner);
-                second = await startedRun(runner);
-                engine.stopReadingProxyOf(0);
-                await first.exec(["true"]);
+                levels = await levelsOfTwoRuns(runnerOn(engine), async (first) => {
+                    engine.stopReadingProxyOf(0);
+                    await first.exec(["true"]);
+                });
             });
 
             test("then it should take the first run down to the host level", () => {
-                assert.equal(levelOfRun(first), "host");
+                assert.equal(levels.first, "host");
             });
 
             test("then it should leave the second run at the isolated level", () => {
-                assert.equal(levelOfRun(second), "isolated");
+                assert.equal(levels.second, "isolated");
             });
         });
 
         describe("when both proxies can still be read", () => {
             test("then it should keep both runs at the isolated level", async () => {
-                const runner = runnerOn(engineFor({ probes: ["blocked", "blocked"] }));
-                const first = await startedRun(runner);
-                const second = await startedRun(runner);
-                await first.exec(["true"]);
-                assert.deepEqual([levelOfRun(first), levelOfRun(second)], ["isolated", "isolated"]);
+                const levels = await levelsOfTwoRuns(
+                    runnerOn(engineFor({ probes: ["blocked", "blocked"] })),
+                    async (first) => {
+                        await first.exec(["true"]);
+                    },
+                );
+                assert.deepEqual(levels, { first: "isolated", second: "isolated" });
             });
         });
     });

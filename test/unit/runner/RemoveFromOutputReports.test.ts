@@ -57,7 +57,6 @@ async function removeOn(
 ) {
     const engine = fakeContainerEngine({ ...settings, exec: (containerId, command) => exec(command) });
     const { runner, logged } = runnerOn(engine);
-    assert.ok(runner.removeFromOutput !== undefined, "the workload runner offers removal");
     await runner.removeFromOutput(removal);
     return { engine, logged };
 }
@@ -100,6 +99,36 @@ describe("Using the removal from a workload's output folder", () => {
                 assert.deepEqual(teamContainers(engine.started)[0]?.networks, []);
                 removerGone(engine);
                 assert.deepEqual(logged, []);
+            });
+        });
+    });
+
+    describe("given a host that cannot make any network", () => {
+        describe("when what the run left is removed", () => {
+            test("then it should still remove it, asking Docker for no network", async () => {
+                const { engine, logged } = await removeOn({ ...HOST, internalNetworks: false });
+                assert.ok(!engine.calls.includes("createNetwork"), JSON.stringify(engine.calls));
+                assert.ok(!engine.calls.includes("removeNetwork"), JSON.stringify(engine.calls));
+                assert.deepEqual(
+                    engine.executed.map((run) => run.command[0]),
+                    ["chmod", "rm"],
+                );
+                removerGone(engine);
+                assert.deepEqual(logged, []);
+            });
+        });
+    });
+
+    describe("given an image whose user Docker cannot read", () => {
+        describe("when what the run left is removed", () => {
+            test("then it should report why and start nothing", async () => {
+                const reason = "Docker could not answer";
+                const { engine, logged } = await removeOn({
+                    ...HOST,
+                    imageUser: () => Promise.resolve(failure({ detail: reason })),
+                });
+                assertLogged(logged, reason);
+                assert.deepEqual(engine.started, []);
             });
         });
     });

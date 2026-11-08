@@ -88,6 +88,7 @@ export function fakeWorkloadRunner(behaviour: SuiteBehaviour = {}): FakeWorkload
       const outcome: WorkloadOutcome = behaviour.timedOut === true ? { kind: 'timed-out', stop: 'removed', ...records } : { kind: 'exited', exitCode: behaviour.exitCode ?? 0, ...records };
       return success(outcome);
     },
+    removeFromOutput: () => Promise.resolve(),
   };
 }
 

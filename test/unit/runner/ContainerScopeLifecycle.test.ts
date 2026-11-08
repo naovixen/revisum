@@ -20,6 +20,7 @@ const HOST: FakeEngineSettings = {
 const RESULT = "the run's own result";
 const WHY_REMOVAL_FAILED = "the container is held by the kernel";
 const WHY_NETWORK_FAILED = "the network still has active endpoints";
+const ACTIVE_ENDPOINTS = "has active endpoints";
 
 const CONTAINER: ContainerOptions = {
     name: "container",
@@ -56,7 +57,7 @@ async function startContainers(
     const outcome = await withContainerScope(engine, scopeOptions(logged), async (scope) => {
         networkName = scope.network;
         for (let started = 0; started < count; started += 1) {
-            await scope.startContainer(CONTAINER);
+            await scope.startContainer({ ...CONTAINER, networks: [scope.network] });
         }
         return value;
     });
@@ -112,11 +113,15 @@ describe("Using a container scope", () => {
                 ]);
             });
 
-            test("then it should report the problem through the scope's log", async () => {
+            test("then it should report the problem, and the network it left held, through the scope's log", async () => {
                 const { logged } = await startContainers(failingOne, 3);
-                assert.equal(logged.length, 1, JSON.stringify(logged));
+                assert.equal(logged.length, 2, JSON.stringify(logged));
                 assert.ok(
                     logged[0]?.detail.includes(WHY_REMOVAL_FAILED) === true,
+                    JSON.stringify(logged),
+                );
+                assert.ok(
+                    logged[1]?.detail.includes(ACTIVE_ENDPOINTS) === true,
                     JSON.stringify(logged),
                 );
             });
@@ -201,7 +206,10 @@ describe("Using a container scope", () => {
                     const logged: Logged[] = [];
                     const answers: Awaited<ReturnType<ContainerScope["removeContainer"]>>[] = [];
                     await withContainerScope(engine, scopeOptions(logged), async (scope) => {
-                        const started = await scope.startContainer(CONTAINER);
+                        const started = await scope.startContainer({
+                            ...CONTAINER,
+                            networks: [scope.network],
+                        });
                         assert.ok(started.ok);
                         answers.push(await scope.removeContainer(started.value));
                     });
@@ -215,9 +223,13 @@ describe("Using a container scope", () => {
                         engine.removals.filter((id) => id === "fake-container-1").length,
                         1,
                     );
-                    assert.equal(logged.length, 1, JSON.stringify(logged));
+                    assert.equal(logged.length, 2, JSON.stringify(logged));
                     assert.ok(
                         logged[0]?.detail.includes(WHY_REMOVAL_FAILED) === true,
+                        JSON.stringify(logged),
+                    );
+                    assert.ok(
+                        logged[1]?.detail.includes(ACTIVE_ENDPOINTS) === true,
                         JSON.stringify(logged),
                     );
                 });

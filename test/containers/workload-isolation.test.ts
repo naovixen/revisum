@@ -138,7 +138,7 @@ function engineWhere(change: 'no-internal-network' | 'probe-reaches'): Container
     ...real,
     images,
     async createNetwork(name, options) {
-      if (change === 'no-internal-network' && options.internal) {return failure({ detail: 'this host cannot make a network with no route out' });}
+      if (change === 'no-internal-network' && options.internal) {return failure({ kind: 'internal-refused', detail: 'this host cannot make a network with no route out' });}
       return real.createNetwork(name, options);
     },
     async probeEgress(containerId, targets) {

@@ -10,7 +10,7 @@ import { test } from 'node:test';
 import { dockerRunner, type RunnerLogEntry } from '@revisum/runner';
 import { REPOSITORY_ROOT } from '../../support/repository.ts';
 import { fakeContainerEngine } from './fake-container-engine.ts';
-import { egressPolicy, imageDigest, PINNED_IMAGE_ID, startRun } from './runner-examples.ts';
+import { egressPolicy, imageDigest, PINNED_IMAGE_ID } from './runner-examples.ts';
 import { PRESENT_IMAGES, errorCode, outputFolder, runnerOn, teamContainers, workloadRequest } from './workload-examples.ts';
 
 const POLICY = egressPolicy({ allowOrigins: [] });
@@ -27,8 +27,7 @@ const GIT_FOLDER_INPUTS = ['.git', '.GIT', '.Git', '.gIt', 'fixtures/.GIT', '.GI
 for (const input of GIT_FOLDER_INPUTS) {
   test(`the input ${input} names a .git folder, so start fails and nothing is started`, async () => {
     const { engine, runner, logged } = runnerWithInputs([input]);
-    const started = await startRun(runner, imageDigest(PINNED_IMAGE_ID), POLICY);
-    if (started.ok) {await started.value.stop();}
+    const started = await runner.withRun(imageDigest(PINNED_IMAGE_ID), POLICY, () => Promise.resolve());
     assert.ok(!started.ok, `the input ${input} was accepted, with mounts ${JSON.stringify(engine.started.flatMap((options) => options.mounts))}`);
     assert.deepEqual(started.error, { code: 'start-failed' });
     assert.ok(logged.some((entry) => entry.code === 'start-failed'), JSON.stringify(logged));
@@ -40,14 +39,12 @@ for (const input of GIT_FOLDER_INPUTS) {
 for (const input of ['.github', '.gitignored', 'fixtures/.github', 'fixtures/git']) {
   test(`counter-example: the input ${input} is only named like .git, so it is mounted`, async () => {
     const { engine, runner } = runnerWithInputs([input]);
-    const started = await startRun(runner, imageDigest(PINNED_IMAGE_ID), POLICY);
-    assert.ok(started.ok, JSON.stringify(started));
-    try {
+    const started = await runner.withRun(imageDigest(PINNED_IMAGE_ID), POLICY, () => {
       const targets = engine.started.flatMap((options) => options.mounts).map((mount) => mount.target);
       assert.ok(targets.some((target) => target.endsWith(`/${input}`)), JSON.stringify(targets));
-    } finally {
-      await started.value.stop();
-    }
+      return Promise.resolve();
+    });
+    assert.ok(started.ok, JSON.stringify(started));
   });
 }
 

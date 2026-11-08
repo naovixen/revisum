@@ -1,9 +1,10 @@
 // An isolated run lasts as long as what `withRun` is given: the run's level is on what `use` gets
 // back, and when `use` ends the run's containers go, whatever the last read of evidence does, and
-// nothing can reach them through a handle kept past that point.
+// nothing can reach them through a handle kept past that point. What `withRun` gives back is `use`'s
+// value and what the run finally read, read after the run's end, so a level that falls then is seen.
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { failure, success, type RunnerHandle } from "@revisum/contracts";
+import { failure, success, type Result, type RunnerHandle } from "@revisum/contracts";
 import { dockerRunner, type RunnerLogEntry } from "@revisum/runner";
 import { REPOSITORY_ROOT } from "../../support/repository.ts";
 import { fakeContainerEngine, type FakeEngineSettings } from "./fake-container-engine.ts";
@@ -21,6 +22,12 @@ const WHY_THE_LAST_READ_FAILED = "the proxy's files could not be read back";
 const SILENT = "Cannot connect to the Docker daemon";
 
 const isBrokenCommand = (command: readonly string[]): boolean => command[0] === "broken-command";
+
+// What `withRun` gave back as `use`'s own value, with what the run finally read beside it.
+const assertValue = (outcome: Result<unknown, unknown>, value: unknown): void => {
+    assert.ok(outcome.ok, JSON.stringify(outcome));
+    assert.deepEqual(Reflect.get(Object(outcome.value), "value"), value);
+};
 
 function runnerOn(settings: FakeEngineSettings) {
     const engine = fakeContainerEngine(settings);
@@ -45,7 +52,7 @@ describe("Using an isolated run", () => {
                     level = run.guaranteeLevel();
                     return Promise.resolve(RESULT);
                 });
-                assert.deepEqual(outcome, success(RESULT));
+                assertValue(outcome, RESULT);
                 assert.equal(level, "isolated");
             });
 
@@ -71,11 +78,7 @@ describe("Using an isolated run", () => {
                 const outcome = await runner.withRun(IMAGE, POLICY, (run) =>
                     run.exec(["broken-command"]),
                 );
-                assert.ok(outcome.ok, JSON.stringify(outcome));
-                assert.deepEqual(
-                    outcome.value,
-                    failure({ detail: "the daemon lost the container" }),
-                );
+                assertValue(outcome, failure({ detail: "the daemon lost the container" }));
             });
         });
 
@@ -95,11 +98,7 @@ describe("Using an isolated run", () => {
                 const outcome = await runner.withRun(IMAGE, POLICY, (run) =>
                     run.exec(["broken-command"]),
                 );
-                assert.ok(outcome.ok, JSON.stringify(outcome));
-                assert.deepEqual(
-                    outcome.value,
-                    success({ exitCode: 3, stdout: "out", stderr: "err" }),
-                );
+                assertValue(outcome, success({ exitCode: 3, stdout: "out", stderr: "err" }));
             });
         });
 
@@ -143,7 +142,9 @@ describe("Using an isolated run", () => {
                     kept.push(run);
                     return Promise.resolve(RESULT);
                 });
-                assert.deepEqual(outcome, success(RESULT));
+                assertValue(outcome, RESULT);
+                assert.ok(outcome.ok, JSON.stringify(outcome));
+                assert.equal(outcome.value.final.guaranteeLevel, "host");
                 assert.equal(kept[0]?.guaranteeLevel(), "host");
             });
         });
@@ -156,7 +157,7 @@ describe("Using an isolated run", () => {
                     removeContainer: () => Promise.resolve(failure({ detail: reason })),
                 });
                 const outcome = await runner.withRun(IMAGE, POLICY, () => Promise.resolve(RESULT));
-                assert.deepEqual(outcome, success(RESULT));
+                assertValue(outcome, RESULT);
                 assert.ok(
                     logged.some((entry) => entry.detail.includes(reason)),
                     JSON.stringify(logged),
@@ -178,6 +179,131 @@ describe("Using an isolated run", () => {
         });
     });
 
+    describe("given a run whose proxy files are read back at its end", () => {
+        const decision = { origin: "http://outside.test", decision: "blocked" };
+        const rewrite = { origin: "http://app.test", name: "heading-changed" };
+        const proxyFiles: FakeEngineSettings = {
+            ...ENFORCING,
+            exec: (containerId, command) => {
+                const path = command[1] ?? "";
+                if (command[0] !== "cat") {
+                    return Promise.resolve(success({ exitCode: 0, stdout: "", stderr: "" }));
+                }
+                if (path.includes("rewrite")) {
+                    return Promise.resolve(
+                        success({
+                            exitCode: 0,
+                            stdout: `${JSON.stringify(rewrite)}\n`,
+                            stderr: "",
+                        }),
+                    );
+                }
+                if (path.includes("decision")) {
+                    return Promise.resolve(
+                        success({
+                            exitCode: 0,
+                            stdout: `${JSON.stringify(decision)}\n`,
+                            stderr: "",
+                        }),
+                    );
+                }
+                return Promise.resolve(
+                    success({ exitCode: 1, stdout: "", stderr: "cat: no such file\n" }),
+                );
+            },
+        };
+
+        describe("when the run ends", () => {
+            test("then it should give back the level, decisions and rewrites read after the end", async () => {
+                const { runner } = runnerOn(proxyFiles);
+                let levelDuringUse = "";
+                const outcome = await runner.withRun(IMAGE, POLICY, (run) => {
+                    levelDuringUse = run.guaranteeLevel();
+                    return Promise.resolve(RESULT);
+                });
+                assert.ok(outcome.ok, JSON.stringify(outcome));
+                assert.equal(levelDuringUse, "isolated");
+                assert.deepEqual(outcome.value, {
+                    value: RESULT,
+                    final: {
+                        guaranteeLevel: "isolated",
+                        proxyDecisions: [decision],
+                        rewritesApplied: [rewrite],
+                    },
+                });
+            });
+        });
+
+        describe("and the level falls at the run's end", () => {
+            describe("when the run ends", () => {
+                test("then it should give back the fallen level", async () => {
+                    const { runner } = runnerOn({
+                        ...ENFORCING,
+                        exec: (containerId, command) =>
+                            Promise.resolve(
+                                success(
+                                    command[0] === "cat"
+                                        ? { exitCode: 1, stdout: "", stderr: "cat: I/O error\n" }
+                                        : { exitCode: 0, stdout: "", stderr: "" },
+                                ),
+                            ),
+                    });
+                    const outcome = await runner.withRun(IMAGE, POLICY, (run) =>
+                        Promise.resolve(run.guaranteeLevel()),
+                    );
+                    assert.ok(outcome.ok, JSON.stringify(outcome));
+                    assert.equal(outcome.value.value, "isolated");
+                    assert.equal(outcome.value.final.guaranteeLevel, "host");
+                });
+            });
+        });
+    });
+
+    describe("given a Docker that refuses a network with no route out", () => {
+        describe("when a run is used", () => {
+            test("then it should go ahead on an ordinary network at the host level", async () => {
+                const { runner, logged } = runnerOn({ ...ENFORCING, internalNetworks: false });
+                const outcome = await runner.withRun(IMAGE, POLICY, (run) =>
+                    Promise.resolve(run.guaranteeLevel()),
+                );
+                assertValue(outcome, "host");
+                assert.ok(
+                    logged.some((entry) => entry.code === "egress-unenforceable"),
+                    JSON.stringify(logged),
+                );
+            });
+        });
+    });
+
+    describe("given a Docker that cannot make the network for another reason", () => {
+        const reason = "the daemon stopped answering";
+        const notARefusal: FakeEngineSettings = {
+            ...ENFORCING,
+            createNetwork: () => Promise.resolve(failure({ kind: "failed", detail: reason })),
+        };
+
+        describe("when a run is asked for", () => {
+            test("then it should refuse with start-failed, not fall back to an ordinary network", async () => {
+                const { engine, runner, logged } = runnerOn(notARefusal);
+                let wasUsed = false;
+                const outcome = await runner.withRun(IMAGE, POLICY, () => {
+                    wasUsed = true;
+                    return Promise.resolve();
+                });
+                assert.deepEqual(outcome, failure({ code: "start-failed" }));
+                assert.equal(wasUsed, false);
+                assert.equal(engine.calls.filter((call) => call === "createNetwork").length, 1);
+                assert.deepEqual(engine.started, []);
+                assert.ok(
+                    logged.some(
+                        (entry) => entry.code === "start-failed" && entry.detail.includes(reason),
+                    ),
+                    JSON.stringify(logged),
+                );
+            });
+        });
+    });
+
     describe("given a host where a probe gets out", () => {
         describe("when a run is used", () => {
             test("then it should hand `use` a run at the host level", async () => {
@@ -185,7 +311,7 @@ describe("Using an isolated run", () => {
                 const outcome = await runner.withRun(IMAGE, POLICY, (run) =>
                     Promise.resolve(run.guaranteeLevel()),
                 );
-                assert.deepEqual(outcome, success("host"));
+                assertValue(outcome, "host");
             });
         });
     });

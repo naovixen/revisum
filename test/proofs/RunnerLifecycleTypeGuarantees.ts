@@ -3,21 +3,26 @@
 //   - An engine is complete: omitting any member fails to compile, and removals answer a Result.
 //   - A scope's network exists before anything can start in it: a scope has no way to make one,
 //     and only asks for what a runner uses.
-//   - A run's level belongs to the run: the runner holds none, and a run ends when `use` ends.
+//   - A run's level belongs to the run: the runner holds none, a run ends when `use` ends, and what
+//     it finally read comes back with `use`'s value.
+//   - A workload runner always has removeFromOutput: one with no use for it does nothing.
 //   - A command's end is a Result of an exit or a timeout, with no invented exit code.
 //   - One checked request is all the workload steps take.
 //   - A proxy has one role, not independent flags.
 import type {
+    AppliedRewrite,
     EgressPolicy,
     ExecOutcome,
     GuaranteeLevel,
     ImageDigest,
+    ProxyDecision,
     Result,
     Runner,
     RunnerError,
     RunnerHandle,
     WorkloadOutcome,
     WorkloadRequest,
+    WorkloadRunner,
 } from "@revisum/contracts";
 import type { ContainerEngine, EngineProblem } from "@revisum/runner";
 import {
@@ -75,6 +80,7 @@ declare const uncheckedRequest: WorkloadRequest;
 declare const withoutGatewayAddress: Omit<ContainerEngine, "networkGatewayAddress">;
 declare const withoutImageUser: Omit<ContainerEngine, "imageUser">;
 declare const withoutContainerAddress: Omit<ContainerEngine, "containerAddress">;
+declare const withoutRemoveFromOutput: Omit<WorkloadRunner, "removeFromOutput">;
 
 const NO_OUTPUT = { bytes: new Uint8Array(), truncated: false };
 const noLog = (): void => undefined;
@@ -99,6 +105,24 @@ export const runnerLifecycleTypeGuarantees = {
         >,
     ],
 
+    imageUserAndAddressAnswerAResult: [true, true] satisfies [
+        IsExactly<
+            Awaited<ReturnType<ContainerEngine["imageUser"]>>,
+            Result<string | null, EngineProblem>
+        >,
+        IsExactly<
+            Awaited<ReturnType<ContainerEngine["containerAddress"]>>,
+            Result<string, EngineProblem>
+        >,
+    ],
+    networkFailureNamesARefusal: true satisfies IsExactly<
+        Extract<
+            Awaited<ReturnType<ContainerEngine["createNetwork"]>>,
+            { ok: false }
+        >["error"]["kind"],
+        "internal-refused" | "failed"
+    >,
+
     // ---- A scope's network comes first ------------------------------------------------------------
     // @ts-expect-error a scope's network exists already, so a scope cannot make one
     scopeMakingNetwork: "createNetwork" satisfies keyof ContainerScope,
@@ -121,9 +145,9 @@ export const runnerLifecycleTypeGuarantees = {
     ),
     // @ts-expect-error a scope takes its network kinds up front
     scopeWithoutKinds: withContainerScope(engine, { namePrefix: "run", log: noLog }, useNothing),
-    scopeWithNoKinds: withContainerScope(
+    // A scope asked for no network kinds gets no network: the output-removal container has none.
+    scopeWithNoNetwork: withContainerScope(
         engine,
-        // @ts-expect-error a scope must have at least one network kind to try
         { namePrefix: "run", networkKinds: [], log: noLog },
         useNothing,
     ),
@@ -138,7 +162,23 @@ export const runnerLifecycleTypeGuarantees = {
     handleStop: "stop" satisfies keyof RunnerHandle,
     runGivesWhatUseReturned: runner.withRun(image, policy, (started) =>
         Promise.resolve(started.guaranteeLevel()),
-    ) satisfies Promise<Result<GuaranteeLevel, RunnerError>>,
+    ) satisfies Promise<
+        Result<
+            {
+                readonly value: GuaranteeLevel;
+                readonly final: {
+                    readonly guaranteeLevel: GuaranteeLevel;
+                    readonly proxyDecisions: readonly ProxyDecision[];
+                    readonly rewritesApplied: readonly AppliedRewrite[];
+                };
+            },
+            RunnerError
+        >
+    >,
+
+    // ---- A workload runner always removes what it left ---------------------------------------------
+    // @ts-expect-error a workload runner must offer removeFromOutput, a do-nothing one where it has no use
+    missingRemoveFromOutput: withoutRemoveFromOutput satisfies WorkloadRunner,
 
     // ---- How a command ends -------------------------------------------------------------------------
     execAnswersAResult: run.exec(["true"]) satisfies Promise<Result<ExecOutcome, unknown>>,

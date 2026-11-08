@@ -9,13 +9,13 @@
 // The tests in test/containers/proxy-evidence.test.ts run the same behaviour on the real proxy.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { success, type ExecOutcome } from '@revisum/contracts';
+import { success, type ExecOutcome, type RunnerHandle } from '@revisum/contracts';
 import { buildManifest, manifestHash, type AdapterInfo } from '@revisum/engine';
 import { dockerRunner, type ContainerEngine } from '@revisum/runner';
 import { REPOSITORY_ROOT } from '../../support/repository.ts';
 import { defaultParser, signupPlan, testProject } from '../engine/plan-examples.ts';
 import { fakeContainerEngine } from './fake-container-engine.ts';
-import { egressPolicy, imageDigest, origin, PINNED_IMAGE_ID, startRun, type StartedRun } from './runner-examples.ts';
+import { egressPolicy, imageDigest, origin, PINNED_IMAGE_ID } from './runner-examples.ts';
 
 const POLICY = egressPolicy({ allowOrigins: ['http://app.test'] });
 const APP = origin('http://app.test');
@@ -47,12 +47,23 @@ function engineWithProxyFiles(answers: FileAnswers): ContainerEngine {
   };
 }
 
-async function startedHandle(answers: FileAnswers): Promise<StartedRun> {
+// Runs `body` inside a run on these files, and gives back the handle for what it reads after the end.
+async function ranWith(answers: FileAnswers, body: (handle: RunnerHandle) => Promise<void> = () => Promise.resolve()): Promise<RunnerHandle> {
   const runner = dockerRunner({ engine: engineWithProxyFiles(answers), repositoryRoot: REPOSITORY_ROOT });
-  const started = await startRun(runner, imageDigest(PINNED_IMAGE_ID), POLICY);
-  assert.ok(started.ok, JSON.stringify(started));
-  return started.value;
+  const kept: RunnerHandle[] = [];
+  const ended = await runner.withRun(imageDigest(PINNED_IMAGE_ID), POLICY, async (run) => {
+    kept.push(run);
+    await body(run);
+  });
+  assert.ok(ended.ok, JSON.stringify(ended));
+  const [handle] = kept;
+  assert.ok(handle !== undefined);
+  return handle;
 }
+
+const execOnce = async (handle: RunnerHandle): Promise<void> => {
+  await handle.exec(['true']);
+};
 
 // ---- Applied rewrites -------------------------------------------------------------------------------
 
@@ -60,29 +71,26 @@ const HEADING_CHANGED = { origin: APP, name: 'heading-changed' };
 const STATUS_FLIPPED = { origin: APP, name: 'status-flipped' };
 
 test('the handle gives back each rewrite the proxy container wrote to its file', async () => {
-  const handle = await startedHandle({ rewrites: [lines(HEADING_CHANGED, STATUS_FLIPPED)] });
-  await handle.exec(['true']);
-  assert.deepEqual(handle.rewritesApplied(), [HEADING_CHANGED, STATUS_FLIPPED]);
-  await handle.stop();
+  await ranWith({ rewrites: [lines(HEADING_CHANGED, STATUS_FLIPPED)] }, async (handle) => {
+    await handle.exec(['true']);
+    assert.deepEqual(handle.rewritesApplied(), [HEADING_CHANGED, STATUS_FLIPPED]);
+  });
 });
 
 test('the applied rewrites are still there after the run has stopped and its containers are gone', async () => {
-  const handle = await startedHandle({ rewrites: [lines(HEADING_CHANGED)] });
-  await handle.stop();
+  const handle = await ranWith({ rewrites: [lines(HEADING_CHANGED)] });
   assert.deepEqual(handle.rewritesApplied(), [HEADING_CHANGED]);
 });
 
 test('a line in the rewrites file that is not an applied rewrite is left out', async () => {
-  const handle = await startedHandle({
+  const handle = await ranWith({
     rewrites: [{ exitCode: 0, stdout: `not json\n${JSON.stringify({ origin: APP })}\n${JSON.stringify(HEADING_CHANGED)}\n`, stderr: '' }],
   });
-  await handle.stop();
   assert.deepEqual(handle.rewritesApplied(), [HEADING_CHANGED]);
 });
 
 test('counter-example: a run whose proxy applied no rewrite has none, so its file does not exist', async () => {
-  const handle = await startedHandle({ rewrites: [notWrittenYet] });
-  await handle.stop();
+  const handle = await ranWith({ rewrites: [notWrittenYet] });
   assert.deepEqual(handle.rewritesApplied(), []);
 });
 
@@ -92,14 +100,12 @@ test('a mutated run\'s manifest hash differs from a plain run\'s, from what each
   const target = testProject().matrix[0];
   assert.ok(target !== undefined);
   const adapter: AdapterInfo = { id: 'cdp', version: '0.1.0', protocol: 'Chrome DevTools Protocol (raw WebSocket)' };
-  const manifestOf = (handle: StartedRun) => buildManifest({
+  const manifestOf = (handle: RunnerHandle) => buildManifest({
     plan: parsed.value, target, adapter, browser: { name: 'chromium', version: '156.0.8078.47' }, seed: 42,
     fixedTimeMilliseconds: Date.UTC(2026, 10, 1, 9, 0, 0), fixtures: [], host: { platform: 'linux', arch: 'x64' }, responseRewrites: handle.rewritesApplied(),
   });
-  const mutated = await startedHandle({ rewrites: [lines(HEADING_CHANGED)] });
-  const plain = await startedHandle({ rewrites: [notWrittenYet] });
-  await mutated.stop();
-  await plain.stop();
+  const mutated = await ranWith({ rewrites: [lines(HEADING_CHANGED)] });
+  const plain = await ranWith({ rewrites: [notWrittenYet] });
   assert.deepEqual(manifestOf(mutated).responseRewrites, [HEADING_CHANGED]);
   assert.ok(!Object.hasOwn(manifestOf(plain), 'responseRewrites'));
   assert.notEqual(manifestHash(manifestOf(mutated)), manifestHash(manifestOf(plain)));
@@ -111,36 +117,36 @@ const OUTSIDE_BLOCKED = { origin: OUTSIDE, decision: 'blocked' };
 const APP_ALLOWED = { origin: APP, decision: 'allowed' };
 
 test('the handle gives back the proxy\'s decisions, in the order they were made', async () => {
-  const handle = await startedHandle({ decisions: [lines(APP_ALLOWED, OUTSIDE_BLOCKED)] });
-  await handle.exec(['true']);
-  assert.deepEqual(handle.proxyDecisions(), [APP_ALLOWED, OUTSIDE_BLOCKED]);
-  await handle.stop();
+  await ranWith({ decisions: [lines(APP_ALLOWED, OUTSIDE_BLOCKED)] }, async (handle) => {
+    await handle.exec(['true']);
+    assert.deepEqual(handle.proxyDecisions(), [APP_ALLOWED, OUTSIDE_BLOCKED]);
+  });
 });
 
 test('egress events take their channels from the browser\'s records the run hands in', async () => {
-  const handle = await startedHandle({ decisions: [lines(OUTSIDE_BLOCKED)] });
-  await handle.exec(['true']);
-  assert.deepEqual(handle.egressEvents([{ origin: 'wss://outside.test', channel: 'websocket' }]), [
-    { origin: 'wss://outside.test', channel: 'websocket', decision: 'blocked' },
-  ]);
-  await handle.stop();
+  await ranWith({ decisions: [lines(OUTSIDE_BLOCKED)] }, async (handle) => {
+    await handle.exec(['true']);
+    assert.deepEqual(handle.egressEvents([{ origin: 'wss://outside.test', channel: 'websocket' }]), [
+      { origin: 'wss://outside.test', channel: 'websocket', decision: 'blocked' },
+    ]);
+  });
 });
 
 test('egress events judge a record with no decision by the direct origins the run hands in', async () => {
-  const handle = await startedHandle({ decisions: [notWrittenYet] });
-  await handle.exec(['true']);
-  const loopback = origin('http://127.0.0.1:4310');
-  const records = [{ origin: loopback, channel: 'page' as const }];
-  assert.deepEqual(handle.egressEvents(records, [loopback]), [{ origin: loopback, channel: 'page', decision: 'allowed' }]);
-  assert.deepEqual(handle.egressEvents(records), [{ origin: loopback, channel: 'page', decision: 'blocked' }]);
-  await handle.stop();
+  await ranWith({ decisions: [notWrittenYet] }, async (handle) => {
+    await handle.exec(['true']);
+    const loopback = origin('http://127.0.0.1:4310');
+    const records = [{ origin: loopback, channel: 'page' as const }];
+    assert.deepEqual(handle.egressEvents(records, [loopback]), [{ origin: loopback, channel: 'page', decision: 'allowed' }]);
+    assert.deepEqual(handle.egressEvents(records), [{ origin: loopback, channel: 'page', decision: 'blocked' }]);
+  });
 });
 
 test('counter-example: with no records handed in, every decision stays unattributed', async () => {
-  const handle = await startedHandle({ decisions: [lines(OUTSIDE_BLOCKED)] });
-  await handle.exec(['true']);
-  assert.deepEqual(handle.egressEvents(), [{ origin: OUTSIDE, channel: 'unattributed', decision: 'blocked' }]);
-  await handle.stop();
+  await ranWith({ decisions: [lines(OUTSIDE_BLOCKED)] }, async (handle) => {
+    await handle.exec(['true']);
+    assert.deepEqual(handle.egressEvents(), [{ origin: OUTSIDE, channel: 'unattributed', decision: 'blocked' }]);
+  });
 });
 
 // ---- A read that fails ------------------------------------------------------------------------------------
@@ -155,29 +161,27 @@ const FAILED_READS: readonly { readonly why: string; readonly read: ExecOutcome 
 
 for (const { why, read } of FAILED_READS) {
   test(`the decisions already read survive a failed read: ${why}`, async () => {
-    const handle = await startedHandle({ decisions: [lines(OUTSIDE_BLOCKED), read] });
-    await handle.exec(['true']);
-    assert.deepEqual(handle.proxyDecisions(), [OUTSIDE_BLOCKED], 'the first read found the decision');
-    await handle.exec(['true']);
-    assert.deepEqual(handle.proxyDecisions(), [OUTSIDE_BLOCKED]);
-    assert.deepEqual(handle.egressEvents(), [{ origin: OUTSIDE, channel: 'unattributed', decision: 'blocked' }]);
-    await handle.stop();
-    assert.deepEqual(handle.proxyDecisions(), [OUTSIDE_BLOCKED], 'stopping does not lose them either');
+    const handle = await ranWith({ decisions: [lines(OUTSIDE_BLOCKED), read] }, async (running) => {
+      await running.exec(['true']);
+      assert.deepEqual(running.proxyDecisions(), [OUTSIDE_BLOCKED], 'the first read found the decision');
+      await running.exec(['true']);
+      assert.deepEqual(running.proxyDecisions(), [OUTSIDE_BLOCKED]);
+      assert.deepEqual(running.egressEvents(), [{ origin: OUTSIDE, channel: 'unattributed', decision: 'blocked' }]);
+    });
+    assert.deepEqual(handle.proxyDecisions(), [OUTSIDE_BLOCKED], 'ending the run does not lose them either');
   });
 
   test(`the rewrites already read survive a failed read: ${why}`, async () => {
-    const handle = await startedHandle({ rewrites: [lines(HEADING_CHANGED), read] });
-    await handle.exec(['true']);
-    await handle.stop();
+    const handle = await ranWith({ rewrites: [lines(HEADING_CHANGED), read] }, execOnce);
     assert.deepEqual(handle.rewritesApplied(), [HEADING_CHANGED]);
   });
 }
 
 test('counter-example: a file that does not exist yet reads as no lines, and later lines still arrive', async () => {
-  const handle = await startedHandle({ decisions: [notWrittenYet, lines(OUTSIDE_BLOCKED)] });
-  await handle.exec(['true']);
-  assert.deepEqual(handle.proxyDecisions(), []);
-  await handle.exec(['true']);
-  assert.deepEqual(handle.proxyDecisions(), [OUTSIDE_BLOCKED]);
-  await handle.stop();
+  await ranWith({ decisions: [notWrittenYet, lines(OUTSIDE_BLOCKED)] }, async (handle) => {
+    await handle.exec(['true']);
+    assert.deepEqual(handle.proxyDecisions(), []);
+    await handle.exec(['true']);
+    assert.deepEqual(handle.proxyDecisions(), [OUTSIDE_BLOCKED]);
+  });
 });

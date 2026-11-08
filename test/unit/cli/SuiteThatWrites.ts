@@ -64,7 +64,6 @@ export function suiteThatWrites(suite: WrittenSuite): WorkloadRunner {
                 return Promise.resolve(success(outcome));
             },
         },
-        ["removeFromOutput"],
     );
 }
 
