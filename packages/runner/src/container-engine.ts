@@ -60,8 +60,6 @@ export interface ContainerEngine {
   // The id ("sha256:…") of the local image with this reference. A daemon that does not answer says
   // nothing about whether the image exists, so it answers 'unanswered', never 'absent'.
   imageId(reference: string): Promise<ImageAnswer>;
-  // Why the engine's daemon does not answer, or null when it does.
-  daemonProblem(): Promise<EngineProblem | null>;
   // internal: a network with no route out of the host and no gateway to the Docker host.
   createNetwork(name: string, options: { readonly internal: boolean }): Promise<Result<void, EngineProblem>>;
   removeNetwork(name: string): Promise<Result<void, EngineProblem>>;
@@ -205,10 +203,6 @@ export function dockerCliEngine(): ContainerEngine {
       if (outcome.status === 0 && id !== '') {return { kind: 'found', id };}
       if (outcome.status !== 0 && NO_SUCH_IMAGE.test(outcome.stderr)) {return { kind: 'absent' };}
       return { kind: 'unanswered', problem: problem(outcome) };
-    },
-    async daemonProblem() {
-      const outcome = await runDocker(['version', '--format', '{{.Server.Version}}']);
-      return outcome.status === 0 ? null : problem(outcome);
     },
     async createNetwork(name, options) {
       const outcome = await runDocker(['network', 'create', ...(options.internal ? ['--internal', '--opt', NO_GATEWAY_OPTION] : []), name]);
