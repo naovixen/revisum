@@ -76,6 +76,26 @@ export const navigateAllowingSteps: StepFact<FieldOf<'navigate'>> = { ...STEP_FA
 // @ts-expect-error the facts table cannot give a step type a field no step of it has
 export const tableWithMisnamedField: typeof STEP_FACTS = { ...STEP_FACTS, navigate: { ...STEP_FACTS.navigate, fields: { required: ['type', 'href'], optional: [] } } };
 
+// A step type states whether it may change the page, so a new type can't leave that out.
+export const everyFactStatesWhetherItChangesThePage: { readonly [Type in StepType]: { readonly changesPage: boolean } } = STEP_FACTS;
+
+// @ts-expect-error a fact that does not state whether its step changes the page does not compile
+export const factWithoutChangesPage: StepFact = {
+  section: STEP_FACTS.click.section,
+  fields: STEP_FACTS.click.fields,
+  isAssertion: STEP_FACTS.click.isAssertion,
+  placement: STEP_FACTS.click.placement,
+  isSetup: STEP_FACTS.click.isSetup,
+  holdsSteps: STEP_FACTS.click.holdsSteps,
+  frameDepthAdded: STEP_FACTS.click.frameDepthAdded,
+  opensUrl: STEP_FACTS.click.opensUrl,
+};
+
+// A step type states whether it is unsafe in the table, so a new type can't leave that to a separate
+// list. The column's own name is the table's to choose, as long as it says "unsafe" and is required.
+type UnsafeStatusColumn = Extract<keyof StepFact, `${string}${'unsafe' | 'Unsafe'}${string}`>;
+export const isUnsafeStatusARequiredColumn: Record<never, never> extends Pick<StepFact, UnsafeStatusColumn> ? false : true = true;
+
 // ---- Verdicts -----------------------------------------------------------------------------------
 
 export const verdictsThatCompile: readonly Verdict[] = [{ pass: true }, { pass: false, code: 'not-found' }];

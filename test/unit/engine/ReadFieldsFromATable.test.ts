@@ -9,18 +9,21 @@ import {
     optionalField,
     readFields,
     readInteger,
-    readText,
     type FieldReader,
     type Issues,
     type Parsed,
 } from "@revisum/engine";
 import { tokenShapedText } from "./evidence-examples.ts";
 
-const MAXIMUM_NAME_LENGTH = 20;
 const OLDEST_AGE = 150;
 
-const readName: FieldReader<string> = (input, path, issues) =>
-    readText(input, path, issues, MAXIMUM_NAME_LENGTH);
+const readName: FieldReader<string> = (input, path, issues) => {
+    if (typeof input === "string") {
+        return input;
+    }
+    issues.push({ code: "wrong_type", path });
+    return INVALID;
+};
 const readAge: FieldReader<number> = (input, path, issues) =>
     readInteger(input, path, issues, 0, OLDEST_AGE);
 const readAnything: FieldReader<unknown> = (input) => input;

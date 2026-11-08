@@ -5,11 +5,11 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import {
+    INVALID,
     decodeManifest,
     parseProject,
     readFields,
     readInteger,
-    readText,
     type FieldReader,
     type Issues,
 } from "@revisum/engine";
@@ -72,10 +72,14 @@ const planIssues = (input: unknown): readonly CodeAndPath[] => issuesOf(defaultP
 
 const projectIssues = (input: unknown): readonly CodeAndPath[] => issuesOf(parseProject(input));
 
-const MAXIMUM_NAME_LENGTH = 20;
 const OLDEST_AGE = 150;
-const readName: FieldReader<string> = (input, path, issues) =>
-    readText(input, path, issues, MAXIMUM_NAME_LENGTH);
+const readName: FieldReader<string> = (input, path, issues) => {
+    if (typeof input === "string") {
+        return input;
+    }
+    issues.push({ code: "wrong_type", path });
+    return INVALID;
+};
 const readAge: FieldReader<number> = (input, path, issues) =>
     readInteger(input, path, issues, 0, OLDEST_AGE);
 const PERSON = { name: readName, age: readAge };

@@ -7,17 +7,19 @@ import {
     INVALID,
     optionalField,
     readFields,
-    readText,
     type FieldReader,
     type Issues,
     type Parsed,
 } from "@revisum/engine";
 import { classInstanceHolding } from "../../support/ClassInstanceHolding.ts";
 
-const MAXIMUM_NAME_LENGTH = 20;
-
-const readName: FieldReader<string> = (input, path, issues) =>
-    readText(input, path, issues, MAXIMUM_NAME_LENGTH);
+const readName: FieldReader<string> = (input, path, issues) => {
+    if (typeof input === "string") {
+        return input;
+    }
+    issues.push({ code: "wrong_type", path });
+    return INVALID;
+};
 const readAnything: FieldReader<unknown> = (input) => input;
 
 const tableWithPrototypeKey = () => ({ name: readName, __proto__: readAnything });
