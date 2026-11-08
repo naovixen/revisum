@@ -77,7 +77,7 @@ describe("Using the run", () => {
                         const raw = unsafePlan(verdict.steps);
                         const closing = await runOnFakeSession(raw);
                         context.mock.timers.enable({ apis: ["setTimeout"] });
-                        const close = context.mock.fn(() => new Promise<void>(() => {}));
+                        const close = context.mock.fn(() => new Promise<never>(() => {}));
                         const progress = { isFinished: false };
                         const running = runOnFakeSession(raw, {
                             session: fakeSessionOnOrders({ close }),

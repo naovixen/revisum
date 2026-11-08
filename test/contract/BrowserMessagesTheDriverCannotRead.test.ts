@@ -4,6 +4,7 @@
 // stop at its first failure: each part closes, and the rejection names all that went wrong.
 import assert from "node:assert/strict";
 import { after, afterEach, before, beforeEach, describe, test } from "node:test";
+import { success } from "@revisum/contracts";
 import type { DriverSession } from "@revisum/driver-cdp";
 import { allowEveryAction } from "#test-support/browser/AllowEveryAction.ts";
 import { BrowserTarget } from "#test-support/browser/BrowserTarget.ts";
@@ -100,14 +101,14 @@ describe("Using the real browser driver", () => {
                         await session.probe(harness.locator(testId(BUTTON)), null);
                         return {
                             acted: await clickTheButton(session),
-                            refusals: session.refusedRequestDecisions(),
+                            refusals: session.recordsSoFar().refusedRequestDecisions,
                         };
                     });
                     assert.ok(!acted.ok, "the step fails");
                     assert.equal(acted.error.code, "not-actionable");
                     assert.match(acted.error.detail, /could not read what the browser said/);
                     assert.doesNotMatch(acted.error.detail, WHAT_A_LANGUAGE_ERROR_SAYS);
-                    assert.ok(refusals.length > 0, "the session holds it");
+                    assert.ok(refusals.ok && refusals.value.length > 0, "the session holds it");
                 });
             });
         });
@@ -156,9 +157,9 @@ describe("Using the real browser driver", () => {
             test("then it should pass the step, with nothing held as a refusal", async () => {
                 const { acted, refusals } = await onOpenSession(async (session) => ({
                     acted: await clickTheButton(session),
-                    refusals: session.refusedRequestDecisions(),
+                    refusals: session.recordsSoFar().refusedRequestDecisions,
                 }));
-                assert.deepEqual({ ok: acted.ok, refusals }, { ok: true, refusals: [] });
+                assert.deepEqual({ ok: acted.ok, refusals }, { ok: true, refusals: success([]) });
             });
         });
     });
@@ -194,7 +195,7 @@ describe("Using the real browser driver", () => {
 
     describe("given two parts of a session that each fail to close", () => {
         describe("when the session closes", () => {
-            test("then it should reject naming both, having closed each", async () => {
+            test("then it should say what failed, naming both, having closed each", async () => {
                 let wasEgressAskedToClose = false;
                 const failing = await startRelayedDriver(undefined, async (allowedOrigins) => {
                     const egress = await realEgressSource(allowedOrigins);
@@ -220,10 +221,7 @@ describe("Using the real browser driver", () => {
                 try {
                     assert.ok((await session.navigate(harness.url(PAGE), scriptsEnabled)).ok);
                     assert.ok((await clickTheButton(session)).ok);
-                    const closing = await session.close().then(
-                        () => "closed",
-                        (error: unknown) => String(error),
-                    );
+                    const closing = (await session.close()).closeFailure ?? "closed";
                     assert.ok(wasEgressAskedToClose, "the egress was asked to close");
                     assert.match(closing, /the release was refused/);
                     assert.match(closing, /the egress would not close/);
@@ -236,7 +234,7 @@ describe("Using the real browser driver", () => {
 
     describe("given one part of a session that fails to close", () => {
         describe("when the session closes", () => {
-            test("then it should reject with that failure as it is", async () => {
+            test("then it should give that failure as it is", async () => {
                 const failing = await startRelayedDriver(undefined, async (allowedOrigins) => {
                     const egress = await realEgressSource(allowedOrigins);
                     return {
@@ -253,9 +251,8 @@ describe("Using the real browser driver", () => {
                 );
                 assert.ok(opened.ok, JSON.stringify(opened));
                 try {
-                    await assert.rejects(opened.value.close(), {
-                        message: WHY_THE_EGRESS_WOULD_NOT_CLOSE,
-                    });
+                    const closed = await opened.value.close();
+                    assert.equal(closed.closeFailure, WHY_THE_EGRESS_WOULD_NOT_CLOSE);
                 } finally {
                     await failing.relay.close();
                 }

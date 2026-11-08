@@ -10,7 +10,7 @@ const TIMEOUT = 300_000;
 const ONLY_THE_RULE = { rule: RepositoryRuleName.SecretReveal };
 const PLANTED_FILE = "planted-secret-peek.ts";
 const PLANTED_MODULE = `packages/cli/src/${PLANTED_FILE}`;
-const ALLOWED_MODULE = "packages/driver-cdp/src/browser-session.ts";
+const ALLOWED_MODULE = "packages/driver-cdp/src/session/TextToFill.ts";
 
 type PlantedSource = { readonly how: string; readonly source: string };
 

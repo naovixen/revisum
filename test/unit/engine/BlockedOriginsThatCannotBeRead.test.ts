@@ -18,6 +18,7 @@ import {
 } from "./RunOnFakeSession.ts";
 import { OPEN_CART, unsafePlan, type JsonRecord } from "./unsafe-feature-steps.ts";
 import { fakeRunEventSinkFailingOn } from "#test-support/fakes/FakeRunEventSink.ts";
+import { closedSession, sessionRecords } from "#test-support/fakes/FakeSession.ts";
 
 const REFUSALS_UNREAD = "egress-unread";
 const BROKEN = "the proxy's refusals could not be read: connect ECONNREFUSED";
@@ -60,11 +61,27 @@ const fakeEgress = (
     close: () => Promise.resolve(),
 });
 
+// The session's records as the driver gives them: what the egress refused, or why it could not say.
+function recordsOfEgress(egress: SessionEgress) {
+    try {
+        return sessionRecords({
+            blockedOrigins: success(mergeRefusedOrigins([], egress.refusedOrigins())),
+        });
+    } catch (error) {
+        return sessionRecords({
+            blockedOrigins: failure(error instanceof Error ? error.message : String(error)),
+        });
+    }
+}
+
 // A session that treats its egress as the driver does: closes it, and only then reads its refusals.
 const sessionOver = (egress: SessionEgress, changes: Partial<Session> = {}): Session =>
     fakeSessionOnOrders({
-        blockedOrigins: () => mergeRefusedOrigins([], egress.refusedOrigins()),
-        close: () => egress.close(),
+        recordsSoFar: () => recordsOfEgress(egress),
+        close: async () => {
+            await egress.close();
+            return { ...recordsOfEgress(egress), closeFailure: null };
+        },
         ...changes,
     });
 
@@ -149,7 +166,7 @@ describe("Using the run", () => {
                         });
 
                         test("then it should close the session once", async (context) => {
-                            const close = context.mock.fn(() => Promise.resolve());
+                            const close = context.mock.fn(() => Promise.resolve(closedSession()));
                             await runOnFakeSession(raw, { session: session({ close }) });
                             assert.equal(close.mock.callCount(), 1);
                         });

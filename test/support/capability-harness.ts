@@ -6,6 +6,7 @@
 // (the project's fixtures folder); the CDP driver is told where that folder is.
 import assert from "node:assert/strict";
 import { join } from "node:path";
+import type { ClosedSession } from "@revisum/contracts";
 import type { DriverSession, OwnBrowserDriver } from "@revisum/driver-cdp";
 import {
     defaultRedactor,
@@ -119,7 +120,7 @@ export function watchedDriver(
         };
         sessions.push(watched);
         announce(session.processId);
-        const close = async (): Promise<void> => {
+        const close = async (): Promise<ClosedSession> => {
             watched.closeCalls += 1;
             if (beforeClose !== undefined) {
                 try {
@@ -129,12 +130,12 @@ export function watchedDriver(
                 }
             }
             watched.processesBeforeClose = processTree(session.processId);
-            try {
-                await session.close();
-            } catch (error) {
-                watched.closeError = error;
+            const closed = await session.close();
+            if (closed.closeFailure !== null) {
+                watched.closeError = new Error(closed.closeFailure);
             }
             watched.stillRunningAfterClose = stillRunning(watched.processesBeforeClose);
+            return closed;
         };
         return sessionWith(session, { close });
     };

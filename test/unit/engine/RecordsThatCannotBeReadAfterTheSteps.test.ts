@@ -5,9 +5,10 @@
 // verdict; unread stub answers leave the steps' verdict standing.
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import type { RunPorts, RunResult, Session } from "@revisum/engine";
+import { failure, type RunPorts, type RunResult, type Session } from "@revisum/engine";
 import { fakeNetwork, fakeSessionOnOrders, runOnFakeSession } from "./RunOnFakeSession.ts";
 import { OPEN_CART, unsafePlan } from "./unsafe-feature-steps.ts";
+import { closedSession, sessionRecords } from "#test-support/fakes/FakeSession.ts";
 
 const BROKEN = "the record could not be read";
 const RECORDS_UNREAD = "session-records-unread";
@@ -16,14 +17,16 @@ const throws = (): never => {
     throw new Error(BROKEN);
 };
 
+const UNREAD_REFUSALS = { refusedRequestDecisions: failure(BROKEN) };
+
 // A session whose refused decisions can be read while the steps run, but not once it has closed.
 function sessionWhoseRefusalsGoUnreadAfterClose(): Session {
     let isClosed = false;
     return fakeSessionOnOrders({
-        refusedRequestDecisions: () => (isClosed ? throws() : []),
+        recordsSoFar: () => sessionRecords(isClosed ? UNREAD_REFUSALS : {}),
         close: () => {
             isClosed = true;
-            return Promise.resolve();
+            return Promise.resolve(closedSession(UNREAD_REFUSALS));
         },
     });
 }
@@ -119,7 +122,7 @@ describe("Using the run", () => {
                     describe("when the run ends", () => {
                         test(`then it should end ${record.state} with one review item saying ${record.code}`, async () => {
                             const session = record.session();
-                            const close = async (): Promise<void> => {
+                            const close = async (): Promise<never> => {
                                 await session.close();
                                 throw new Error(BROKEN);
                             };

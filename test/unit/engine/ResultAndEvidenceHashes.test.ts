@@ -44,6 +44,7 @@ import {
 import { OPEN_CART, unsafePlan } from "./unsafe-feature-steps.ts";
 import { fakeDriver } from "#test-support/fakes/FakeDriver.ts";
 import { driversOf, fakePorts } from "#test-support/fakes/FakePorts.ts";
+import { notingBlockedOrigins } from "#test-support/fakes/FakeSession.ts";
 
 const EARLY_ORIGIN = "https://early.example.test";
 const LATE_ORIGIN = "https://late.example.test";
@@ -64,7 +65,7 @@ const planRunRefusing = async (
     steps: readonly JsonRecord[] = [OPEN_CART],
 ): Promise<RunResult> => {
     const { result } = await runOnFakeSession(unsafePlan(steps), {
-        session: fakeSessionOnOrders({ blockedOrigins: () => origins }),
+        session: fakeSessionOnOrders(notingBlockedOrigins(origins)),
     });
     return result;
 };

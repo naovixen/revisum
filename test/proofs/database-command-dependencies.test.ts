@@ -24,7 +24,7 @@ const RESOLVED = /\b\w*[rR]equire\w*(?:\.resolve)?\(\s*['"]([^'"./][^'"]*)['"]/g
 
 // The reveal allow-list before database commands, and the one module it may gain for them.
 const ALLOW_LIST_BEFORE = [
-  'packages/driver-cdp/src/browser-session.ts',
+  'packages/driver-cdp/src/session/TextToFill.ts',
   'packages/engine/src/secrets/secret-values.ts',
   'packages/runner/src/service-caller.ts',
 ];

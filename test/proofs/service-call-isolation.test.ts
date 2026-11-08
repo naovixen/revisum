@@ -92,7 +92,7 @@ test('mutant: the checks report a pack import, a runner import of engine and an 
 const REVEAL_CHECK = 'tools/check-secret-reveal.ts';
 // The allow-list before declared service calls: the driver's input module and the engine's secret values module.
 const EARLIER_ALLOWED = [
-  'packages/driver-cdp/src/browser-session.ts',
+  'packages/driver-cdp/src/session/TextToFill.ts',
   'packages/engine/src/secrets/secret-values.ts',
 ];
 

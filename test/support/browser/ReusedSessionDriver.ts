@@ -1,4 +1,10 @@
-import type { BrowserDriver, Session, SessionEnvironment, Target } from "@revisum/engine";
+import type {
+    BrowserDriver,
+    ClosedSession,
+    Session,
+    SessionEnvironment,
+    Target,
+} from "@revisum/engine";
 import { driverWith, sessionWith } from "./WrappingSessions.ts";
 
 // A driver that opens one real session on its first open() and hands that same session to every
@@ -23,8 +29,10 @@ export function reusedSessionDriver(inner: BrowserDriver): ReusedSessionDriver {
                 }
                 shared.session = opened.value;
             }
-            const close = (): Promise<void> => Promise.resolve();
-            return { ok: true as const, value: sessionWith(shared.session, { close }) };
+            const { session } = shared;
+            const close = (): Promise<ClosedSession> =>
+                Promise.resolve({ ...session.recordsSoFar(), closeFailure: null });
+            return { ok: true as const, value: sessionWith(session, { close }) };
         },
     });
     return {

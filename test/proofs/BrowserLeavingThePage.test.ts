@@ -260,7 +260,9 @@ describe("Using a run on the host", () => {
                                 read: [],
                                 beforePageRead: async (session) => {
                                     await pause(POPUP_HELD_MILLISECONDS);
-                                    blocked = session.blockedOrigins();
+                                    const noted = session.recordsSoFar().blockedOrigins;
+                                    assert.ok(noted.ok, JSON.stringify(noted));
+                                    blocked = noted.value;
                                 },
                             },
                         );

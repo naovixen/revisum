@@ -5,7 +5,7 @@
 // not among them, because the result claims them.
 import assert from "node:assert/strict";
 import { describe, test, type TestContext } from "node:test";
-import type { RunEventSink, Session } from "@revisum/engine";
+import { success, type RunEventSink, type Session } from "@revisum/engine";
 import {
     fakeSessionOnOrders,
     runOnFakeSession,
@@ -14,6 +14,7 @@ import {
 } from "./RunOnFakeSession.ts";
 import { OPEN_CART, unsafePlan, type JsonRecord } from "./unsafe-feature-steps.ts";
 import { fakeRunEventSinkFailingOn } from "#test-support/fakes/FakeRunEventSink.ts";
+import { closedSession, notingBlockedOrigins } from "#test-support/fakes/FakeSession.ts";
 
 const BROKEN = "the session has gone";
 const throws = (): never => {
@@ -118,7 +119,7 @@ describe("Using the run", () => {
                         test("then it should try to close the session once", async (context) => {
                             const close = spiedClose(
                                 context,
-                                changes.close ?? (() => Promise.resolve()),
+                                changes.close ?? (() => Promise.resolve(closedSession())),
                             );
                             await runOnFakeSession(unsafePlan(verdict.steps), {
                                 session: fakeSessionOnOrders({ ...changes, close }),
@@ -158,7 +159,7 @@ describe("Using the run", () => {
                         test("then it should give the verdict and the blocked origin", async () => {
                             const raw = unsafePlan(verdict.steps);
                             const sessionOfOneRun = () =>
-                                fakeSessionOnOrders({ blockedOrigins: () => [BLOCKED_ORIGIN] });
+                                fakeSessionOnOrders(notingBlockedOrigins([BLOCKED_ORIGIN]));
                             const sound = await runOnFakeSession(raw, {
                                 session: sessionOfOneRun(),
                             });
@@ -172,12 +173,13 @@ describe("Using the run", () => {
                         });
 
                         test("then it should close the session once", async (context) => {
-                            const close = spiedClose(context, () => Promise.resolve());
+                            const close = spiedClose(context, () =>
+                                Promise.resolve(
+                                    closedSession({ blockedOrigins: success([BLOCKED_ORIGIN]) }),
+                                ),
+                            );
                             await runOnFakeSession(unsafePlan(verdict.steps), {
-                                session: fakeSessionOnOrders({
-                                    blockedOrigins: () => [BLOCKED_ORIGIN],
-                                    close,
-                                }),
+                                session: fakeSessionOnOrders({ close }),
                                 events: logFailingAfterTheVerdict(),
                             });
                             assert.equal(close.mock.callCount(), 1);

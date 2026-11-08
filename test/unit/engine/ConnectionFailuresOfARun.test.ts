@@ -5,6 +5,9 @@ import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import {
     defaultRedactor,
+    failure,
+    success,
+    type Result,
     type LoggedEvent,
     type RunEventSink,
     type Session,
@@ -13,8 +16,11 @@ import { evidenceHashOf } from "../../support/ExpectedEvidenceHash.ts";
 import { fakeSessionOnOrders, runOnFakeSession } from "./RunOnFakeSession.ts";
 import { OPEN_CART, unsafePlan, type JsonRecord } from "./unsafe-feature-steps.ts";
 import { fakeRunEventSinkFailingOn } from "#test-support/fakes/FakeRunEventSink.ts";
+import { closedSession, notingBlockedOrigins } from "#test-support/fakes/FakeSession.ts";
 
 type ConnectionFailure = { readonly origin: string; readonly message: string };
+
+type SessionChanges = Partial<Session> & { readonly blockedOrigins?: () => readonly string[] };
 
 const CONNECTION_FAILED = "session.connection-failed";
 const RECORDS_UNREAD = "session-records-unread";
@@ -52,15 +58,30 @@ const throws = (): never => {
     throw new Error(BROKEN);
 };
 
-// A session with the optional read, which fakeSessionOnOrders's sessions do not have.
+// What a read gives as a record of the session: the value, or why it could not say.
+function recordOf<Value>(read: () => Value): Result<Value, string> {
+    try {
+        return success(read());
+    } catch (error) {
+        return failure(error instanceof Error ? error.message : String(error));
+    }
+}
+
+// A session that has noted these connection failures, and the blocked origins it is told of.
 function sessionReading(
     connectionFailures: () => readonly ConnectionFailure[],
-    changes: Partial<Session> = {},
+    { blockedOrigins = () => [], ...changes }: SessionChanges = {},
 ): Session {
-    const session: Session & {
-        connectionFailures(): readonly ConnectionFailure[];
-    } = { ...fakeSessionOnOrders(changes), connectionFailures };
-    return session;
+    return fakeSessionOnOrders({
+        close: () =>
+            Promise.resolve(
+                closedSession({
+                    connectionFailures: recordOf(connectionFailures),
+                    blockedOrigins: recordOf(blockedOrigins),
+                }),
+            ),
+        ...changes,
+    });
 }
 
 const connectionFailedEvents = (events: RunEventSink): readonly LoggedEvent[] =>
@@ -172,12 +193,16 @@ describe("Using the run", () => {
                     });
 
                     test("then it should still give the blocked origins and close the session once", async (context) => {
-                        const close = context.mock.fn(() => Promise.resolve());
+                        const close = context.mock.fn(() =>
+                            Promise.resolve(
+                                closedSession({
+                                    connectionFailures: failure(BROKEN),
+                                    blockedOrigins: success([BLOCKED_ORIGIN]),
+                                }),
+                            ),
+                        );
                         const { result } = await runOnFakeSession(raw, {
-                            session: sessionReading(throws, {
-                                blockedOrigins: () => [BLOCKED_ORIGIN],
-                                close,
-                            }),
+                            session: sessionReading(throws, { close }),
                         });
                         assert.deepEqual(result.blockedOrigins, [BLOCKED_ORIGIN]);
                         assert.equal(close.mock.callCount(), 1);
@@ -204,7 +229,7 @@ describe("Using the run", () => {
                 const raw = unsafePlan([OPEN_CART]);
                 const blockedOrigins = (): readonly string[] => [BLOCKED_ORIGIN];
                 const blockedOnly = await runOnFakeSession(raw, {
-                    session: fakeSessionOnOrders({ blockedOrigins }),
+                    session: fakeSessionOnOrders(notingBlockedOrigins(blockedOrigins())),
                 });
                 const { result } = await runOnFakeSession(raw, {
                     session: sessionReading(() => FAILURES, { blockedOrigins }),

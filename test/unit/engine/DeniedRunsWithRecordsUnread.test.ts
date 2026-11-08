@@ -13,6 +13,7 @@ import {
     success,
 } from "@revisum/engine";
 import { BrowserTarget, englishMatrix } from "#test-support/browser/BrowserTarget.ts";
+import { sessionRecords } from "#test-support/fakes/FakeSession.ts";
 import { fakeSessionOnOrders, runOnFakeSession } from "./RunOnFakeSession.ts";
 import {
     OPEN_CART,
@@ -94,7 +95,13 @@ const UNREAD_RECORDS = [
     },
     {
         name: "whose blocked origins cannot be read",
-        run: () => runDenied(sessionAskingTheGuard({ blockedOrigins: throws })),
+        run: () =>
+            runDenied(
+                sessionAskingTheGuard({
+                    recordsSoFar: () =>
+                        sessionRecords({ blockedOrigins: failure("the record could not be read") }),
+                }),
+            ),
     },
 ];
 

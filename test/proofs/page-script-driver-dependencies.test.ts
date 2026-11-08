@@ -27,7 +27,7 @@ const RESOLVED = /\b\w*[rR]equire\w*\.resolve\(\s*['"]([^'"./][^'"]*)['"]/g;
 const REVEAL_CALL = /\breveal\s*\(/g;
 
 const DRIVERS = [
-  { name: 'driver-cdp', dependencies: {}, packages: ['@revisum/contracts'], inputModule: 'packages/driver-cdp/src/browser-session.ts' },
+  { name: 'driver-cdp', dependencies: {}, packages: ['@revisum/contracts'], inputModule: 'packages/driver-cdp/src/session/TextToFill.ts', fillModule: 'packages/driver-cdp/src/session/ActOnDocument.ts' },
 ] as const;
 
 const sourceFiles = (folder: string): string[] =>
@@ -83,7 +83,7 @@ for (const driver of DRIVERS) {
     assert.equal(calls[0]?.file, driver.inputModule);
     // The one call reveals the secret the fill carries, in the text the fill types and nowhere else.
     assert.match(calls[0].line, /\breveal\(value\.secret\)/, 'the one call reveals the secret its fill carries');
-    const source = readFileSync(join(REPOSITORY_ROOT, driver.inputModule), 'utf8');
+    const source = [driver.inputModule, driver.fillModule].map((module) => readFileSync(join(REPOSITORY_ROOT, module), 'utf8')).join('\n');
     assert.match(source, /\binput\.fill\(\s*element,\s*textToFill\(/, 'the text holding the secret is typed by the fill');
     assert.equal(source.match(/\btextToFill\(/g)?.length, 2, 'the text holding the secret is made for the fill alone');
   });

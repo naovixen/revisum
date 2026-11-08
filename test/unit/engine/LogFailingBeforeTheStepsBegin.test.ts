@@ -16,6 +16,7 @@ import {
     type JsonRecord,
 } from "./unsafe-feature-steps.ts";
 import { fakeRunEventSinkFailingOn } from "#test-support/fakes/FakeRunEventSink.ts";
+import { closedSession } from "#test-support/fakes/FakeSession.ts";
 
 const STATES_LOGGED_BEFORE_THE_STEPS = ["Planned", "Resolved", "Running"] as const;
 const STATES_LOGGED_FOR_A_REFUSAL: readonly {
@@ -47,7 +48,7 @@ const runRefused = (events: RunEventSink) =>
     });
 
 const runWithLogFailingOn = async (context: TestContext, state: string) => {
-    const close = context.mock.fn(() => Promise.resolve());
+    const close = context.mock.fn(() => Promise.resolve(closedSession()));
     const run = await runOnFakeSession(unsafePlan([OPEN_CART]), {
         session: fakeSessionOnOrders({ close }),
         events: logFailingOnState(state),

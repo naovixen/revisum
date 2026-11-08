@@ -3,21 +3,20 @@
 // alone must not see a pass where the result says the run could not test.
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import type { LoggedEvent, RunResult, Session } from "@revisum/engine";
+import { success, type LoggedEvent, type RunResult, type Session } from "@revisum/engine";
 import { fakeSessionOnOrders, runOnFakeSession } from "./RunOnFakeSession.ts";
 import { OPEN_CART, unsafePlan } from "./unsafe-feature-steps.ts";
+import { closedSession } from "#test-support/fakes/FakeSession.ts";
 
 const REFUSAL = "the browser would not let a held request go on";
 
 // A session that reports a refused decision only once it has closed, so no step sees it while it runs.
 function sessionRefusingAfterClose(isRefusing: boolean): Session {
-    let isClosed = false;
     return fakeSessionOnOrders({
-        refusedRequestDecisions: () => (isRefusing && isClosed ? [REFUSAL] : []),
-        close: () => {
-            isClosed = true;
-            return Promise.resolve();
-        },
+        close: () =>
+            Promise.resolve(
+                closedSession(isRefusing ? { refusedRequestDecisions: success([REFUSAL]) } : {}),
+            ),
     });
 }
 

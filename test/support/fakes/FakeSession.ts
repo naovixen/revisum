@@ -5,12 +5,14 @@ import {
     type A11yNode,
     type ClipboardPort,
     type ClockPort,
+    type ClosedSession,
     type DocumentSession,
     type DriverError,
     type PageProbe,
     type PageReadFailure,
     type Result,
     type Session,
+    type SessionRecords,
     type SessionTab,
     type StoragePort,
 } from "@revisum/engine";
@@ -45,6 +47,25 @@ export const FAKE_SNAPSHOT: A11yNode = {
     children: [],
 };
 export const FAKE_PNG = new Uint8Array([137, 80, 78, 71]);
+
+// What a session has noted, as a test wants it: nothing, unless said otherwise.
+export const sessionRecords = (noted: Partial<SessionRecords> = {}): SessionRecords => ({
+    blockedOrigins: success([]),
+    connectionFailures: success([]),
+    refusedRequestDecisions: success([]),
+    ...noted,
+});
+
+// What a session's close gives, as a test wants it: every record read and nothing that failed.
+export const closedSession = (noted: Partial<SessionRecords> = {}): ClosedSession => ({
+    ...sessionRecords(noted),
+    closeFailure: null,
+});
+
+// A session that has noted these origins as blocked.
+export const notingBlockedOrigins = (origins: readonly string[]): Partial<Session> => ({
+    recordsSoFar: () => sessionRecords({ blockedOrigins: success(origins) }),
+});
 
 type PageControls = {
     // Holds the page with a dialog saying `text`, until a dialog step answers it.
@@ -125,14 +146,13 @@ function documentOnceClosed(open: DocumentSession): DocumentSession {
 
 // What the session noted while it ran can still be asked for, and the network port only reads back
 // what it recorded, so it goes on answering.
-function sessionOnceClosed(open: Session): Session {
+function sessionOnceClosed(open: Session, lastClosed: () => ClosedSession): Session {
     return {
         ...documentOnceClosed(open),
         browser: open.browser,
-        blockedOrigins: () => open.blockedOrigins(),
-        connectionFailures: () => open.connectionFailures(),
-        refusedRequestDecisions: () => open.refusedRequestDecisions(),
-        close: () => Promise.resolve(),
+        isRequestHeld: () => open.isRequestHeld(),
+        recordsSoFar: () => open.recordsSoFar(),
+        close: () => Promise.resolve(lastClosed()),
         newTab: () => refusing(CLOSED),
         network: open.network,
         storage: open.storage,
@@ -212,9 +232,8 @@ function fakeTab(session: SessionOfTab): FakeTab {
         ...pageAnswers(page, () => tab),
         ...leaveOut<Partial<Session>>(session.overrides, [
             "browser",
-            "blockedOrigins",
-            "connectionFailures",
-            "refusedRequestDecisions",
+            "isRequestHeld",
+            "recordsSoFar",
             "newTab",
             "network",
             "storage",
@@ -247,15 +266,18 @@ function fakeTab(session: SessionOfTab): FakeTab {
 export function fakeSession(overrides: Partial<Session> = {}): FakeSession {
     let isClosed = false;
     const hasClosed = (): boolean => isClosed;
+    let lastClosed = closedSession();
     const page: FakePage = { dialogText: null };
     const tabs: FakeTab[] = [];
     const answers: Session = {
         ...pageAnswers(page, () => session),
         browser: { name: "fake-browser", version: "1.0" },
-        blockedOrigins: () => [],
-        connectionFailures: () => [],
-        refusedRequestDecisions: () => [],
-        close: () => Promise.resolve(),
+        isRequestHeld: () => {
+            const refused = answers.recordsSoFar().refusedRequestDecisions;
+            return refused.ok && refused.value.length > 0;
+        },
+        recordsSoFar: () => sessionRecords(),
+        close: () => Promise.resolve({ ...answers.recordsSoFar(), closeFailure: null }),
         newTab: () => {
             const tab = fakeTab({ overrides, hasClosed });
             tabs.push(tab);
@@ -274,12 +296,17 @@ export function fakeSession(overrides: Partial<Session> = {}): FakeSession {
         clipboard: untilEnded(answers.clipboard, CLIPBOARD_ONCE_CLOSED, hasClosed),
         // A close that fails closed nothing, so the session goes on.
         close: async () => {
-            await answers.close();
+            lastClosed = await answers.close();
             isClosed = true;
+            return lastClosed;
         },
     };
     const session: FakeSession = recordCalls({
-        ...untilEnded(reachable, sessionOnceClosed(reachable), hasClosed),
+        ...untilEnded(
+            reachable,
+            sessionOnceClosed(reachable, () => lastClosed),
+            hasClosed,
+        ),
         ...opensDialogs(page),
         openedTabs: () => [...tabs],
     });

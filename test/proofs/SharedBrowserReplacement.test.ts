@@ -153,11 +153,7 @@ describe("Using a browser shared by the sessions of a test file", () => {
                     await control.ask(undefined, CREATE_A_CONTEXT, {
                         disposeOnDetach: true,
                     });
-                    try {
-                        await opened.value.close();
-                    } catch (error) {
-                        closeFailure = error;
-                    }
+                    closeFailure = (await opened.value.close()).closeFailure;
                     control.close();
                     await waitUntilNoContextIsLeft(usedBefore);
                     replacement = await browserForTheNextSession();
@@ -165,8 +161,8 @@ describe("Using a browser shared by the sessions of a test file", () => {
                 });
 
                 test("then it should have failed the close for the reason forced", () => {
-                    assert.ok(closeFailure instanceof Error, String(closeFailure));
-                    assert.match(closeFailure.message, KEPT_THE_CONTEXT);
+                    assert.ok(typeof closeFailure === "string", String(closeFailure));
+                    assert.match(closeFailure, KEPT_THE_CONTEXT);
                 });
 
                 test("then it should launch a new browser", () => {

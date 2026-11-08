@@ -7,7 +7,7 @@ import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { after, before, describe, test } from "node:test";
 import { setTimeout as pause } from "node:timers/promises";
-import type { BrowserRequestRecord, EgressEvent } from "@revisum/contracts";
+import type { BrowserRequestRecord, ClosedSession, EgressEvent } from "@revisum/contracts";
 import { joinEgressEvents, startEgressProxy, type EgressProxy } from "@revisum/runner";
 import { allowEveryAction } from "#test-support/browser/AllowEveryAction.ts";
 import { BrowserTarget } from "#test-support/browser/BrowserTarget.ts";
@@ -112,6 +112,7 @@ async function openPopupFrom(page: string): Promise<HeldPopup> {
     assert.ok(opened.ok, JSON.stringify(opened));
     const session = opened.value;
     let records: readonly BrowserRequestRecord[];
+    let closed: ClosedSession;
     try {
         const navigated = await session.navigate(`${opener.origin}${page}`, scriptsEnabled);
         assert.ok(navigated.ok, JSON.stringify(navigated));
@@ -127,9 +128,10 @@ async function openPopupFrom(page: string): Promise<HeldPopup> {
             await pause(POLL_MILLISECONDS);
         }
     } finally {
-        await session.close();
+        closed = await session.close();
         records = session.egressRecords();
     }
+    assert.ok(closed.blockedOrigins.ok, JSON.stringify(closed.blockedOrigins));
     const events = joinEgressEvents(records, proxy.decisions());
     const { result } = await runDeclaredSuite({
         behaviour: {
@@ -140,7 +142,7 @@ async function openPopupFrom(page: string): Promise<HeldPopup> {
     });
     return {
         records,
-        sessionBlocked: session.blockedOrigins(),
+        sessionBlocked: closed.blockedOrigins.value,
         events,
         suiteBlocked: result.blockedOrigins,
     };

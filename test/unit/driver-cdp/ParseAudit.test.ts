@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { parseAudit } from "../../../packages/driver-cdp/src/ParseAudit.ts";
+import { parseAudit } from "../../../packages/driver-cdp/src/capabilities/ParseAudit.ts";
 
 const NODE = {
     selector: "img:nth-of-type(1)",

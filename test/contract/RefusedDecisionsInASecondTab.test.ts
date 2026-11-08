@@ -84,10 +84,9 @@ describe("Using a run in a real browser", () => {
                         );
                         const tab = await session.newTab(harness.url(PAGE_NEVER_REACHED));
                         assert.ok(!tab.ok, "the tab's page does not load");
-                        assert.match(
-                            session.refusedRequestDecisions().join(),
-                            /this decision was refused/,
-                        );
+                        const refusals = session.recordsSoFar().refusedRequestDecisions;
+                        assert.ok(refusals.ok, JSON.stringify(refusals));
+                        assert.match(refusals.value.join(), /this decision was refused/);
                         const next = await session.navigate(
                             harness.url(PAGE_READY),
                             scriptsEnabled,

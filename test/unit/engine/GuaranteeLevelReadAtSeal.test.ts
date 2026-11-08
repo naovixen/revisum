@@ -17,6 +17,7 @@ import {
     projectWith,
     recordingDriver,
 } from "./run-value-examples.ts";
+import { closedSession } from "#test-support/fakes/FakeSession.ts";
 
 // An isolated runner's handle whose level falls to host once the browser has closed.
 function isolationFallingAtClose(): {
@@ -39,7 +40,7 @@ async function runWith(isolation: RunIsolation, onClose: () => void) {
     const { driver } = recordingDriver({
         close: () => {
             onClose();
-            return Promise.resolve();
+            return Promise.resolve(closedSession());
         },
     });
     return createRunService(fakePorts({ drivers: driversOf(driver), isolation })).run(cleared, {

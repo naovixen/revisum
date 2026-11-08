@@ -17,7 +17,7 @@ import {
     type SharedBrowser,
 } from "@revisum/driver-cdp";
 import { CLOSE_THE_BROWSER, LIST_CONTEXTS } from "./TestCommand.ts";
-import type { SessionEnvironment, Target } from "@revisum/engine";
+import type { ClosedSession, SessionEnvironment, Target } from "@revisum/engine";
 import { startBrowserWatchdog, type BrowserWatchdog } from "./BrowserWatchdog.ts";
 import type { EgressSourceForTest, SessionEgressForTest } from "./SessionEgressForTest.ts";
 import { driverWith, sessionWith } from "./WrappingSessions.ts";
@@ -186,13 +186,12 @@ export function driverOnSharedBrowser(
                 return opened;
             }
             const session = opened.value;
-            const close = async (): Promise<void> => {
-                try {
-                    await session.close();
-                } catch (error) {
+            const close = async (): Promise<ClosedSession> => {
+                const closed = await session.close();
+                if (closed.closeFailure !== null) {
                     await markStuck(settingsFor(target.locale));
-                    throw error;
                 }
+                return closed;
             };
             return { ok: true as const, value: sessionWith(session, { close }) };
         },

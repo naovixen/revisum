@@ -19,7 +19,7 @@ after(() => { scratch.dispose(); });
 const TIMEOUT = 300_000;
 const CONTRACTS = '@revisum/contracts';
 // An allow-listed module: the CDP driver types a secret into the page.
-const ALLOWED_MODULE = 'packages/driver-cdp/src/browser-session.ts';
+const ALLOWED_MODULE = 'packages/driver-cdp/src/session/TextToFill.ts';
 
 const NAMESPACE_DESTRUCTURE = (exported: string) => [
   `import * as contracts from '${CONTRACTS}';`,

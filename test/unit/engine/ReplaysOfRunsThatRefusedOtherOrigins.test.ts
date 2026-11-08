@@ -30,6 +30,7 @@ import {
 import { fakeDriverOpening } from "#test-support/fakes/FakeDriver.ts";
 import { FAKE_ELEMENT } from "#test-support/fakes/FakePage.ts";
 import { driversOf, fakePorts } from "#test-support/fakes/FakePorts.ts";
+import { notingBlockedOrigins } from "#test-support/fakes/FakeSession.ts";
 
 const THIS_MACHINE = { platform: "test", arch: "test" };
 
@@ -45,7 +46,7 @@ const HIDDEN_ELEMENT: ElementProbe = { ...FAKE_ELEMENT, visible: false, value: "
 type PageState = { readonly probe: ElementProbe; readonly origins: readonly string[] };
 
 const sessionOn = ({ probe, origins }: PageState): Session =>
-    fakeSessionOnOrders({ probe: () => Promise.resolve(probe), blockedOrigins: () => origins });
+    fakeSessionOnOrders({ probe: () => Promise.resolve(probe), ...notingBlockedOrigins(origins) });
 
 const portsOn = (page: PageState) =>
     fakePorts({ drivers: driversOf(fakeDriverOpening(sessionOn(page))) });

@@ -4,7 +4,7 @@
 // what its steps found.
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { failure } from "@revisum/engine";
+import { failure, type Session, type SessionTab } from "@revisum/engine";
 import { fakeSession } from "#test-support/fakes/FakeSession.ts";
 import { fakeSessionOnOrders, runOnFakeSession, stepSummaries } from "./RunOnFakeSession.ts";
 import { CLOSING_CHECK, OPEN_CART, unsafePlan, type JsonRecord } from "./unsafe-feature-steps.ts";
@@ -104,10 +104,18 @@ const UNREADABLE_STEPS: typeof THROWING_STEPS = [
     },
 ];
 
+// A session as a tab: its close gives nothing back, as a tab's does.
+const asTab = (session: Session): SessionTab => ({
+    ...session,
+    close: async () => {
+        await session.close();
+    },
+});
+
 // A session whose tabs fail to close.
 const sessionWithTabThatWillNotClose = () => {
     const tab = fakeSessionOnOrders({ close: breaks });
-    return fakeSessionOnOrders({ newTab: () => Promise.resolve({ ok: true, value: tab }) });
+    return fakeSessionOnOrders({ newTab: () => Promise.resolve({ ok: true, value: asTab(tab) }) });
 };
 
 describe("Using the run", () => {
@@ -252,7 +260,7 @@ describe("Using the run", () => {
                         unsafePlan([OPEN_CART, newTabHolding({ type: "capture", name: "cart" })]),
                         {
                             session: fakeSession({
-                                newTab: () => Promise.resolve({ ok: true, value: tab }),
+                                newTab: () => Promise.resolve({ ok: true, value: asTab(tab) }),
                             }),
                         },
                     );

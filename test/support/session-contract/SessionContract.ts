@@ -137,10 +137,10 @@ function closedSessionContract(open: OpenSessionUnderTest): void {
         describe("when it is asked what it noted, and whether it crashed", () => {
             test("then it should still answer, and say it has", async () => {
                 const { session } = await open();
-                await session.close();
-                assert.deepEqual(session.blockedOrigins(), []);
-                assert.deepEqual(session.connectionFailures(), []);
-                assert.deepEqual(session.refusedRequestDecisions(), []);
+                const closed = await session.close();
+                assert.deepEqual(closed.blockedOrigins, success([]));
+                assert.deepEqual(closed.connectionFailures, success([]));
+                assert.deepEqual(closed.refusedRequestDecisions, success([]));
                 assert.equal(session.unsupportedOpenings(), 0);
                 assert.equal(await isHeldByADialog(session), false);
                 assert.equal(session.crashed(), true);

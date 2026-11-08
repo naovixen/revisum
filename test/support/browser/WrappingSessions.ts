@@ -1,6 +1,12 @@
 // Stand-ins for a driver and its sessions, for tests that watch or change one member and leave the
 // rest real.
-import type { BrowserDriver, Session, SessionEnvironment, Target } from "@revisum/engine";
+import type {
+    BrowserDriver,
+    ClosedSession,
+    Session,
+    SessionEnvironment,
+    Target,
+} from "@revisum/engine";
 
 // The object with the named members replaced, and its other members its own.
 function withMembers<Subject extends object>(
@@ -53,12 +59,14 @@ export const runningAtClose = (
 ): BrowserDriver =>
     wrappingSessions(inner, (session) =>
         sessionWith(session, {
-            close: async (): Promise<void> => {
+            close: async (): Promise<ClosedSession> => {
+                let closed: ClosedSession;
                 try {
                     await atClose(session);
                 } finally {
-                    await session.close();
+                    closed = await session.close();
                 }
+                return closed;
             },
         }),
     );
