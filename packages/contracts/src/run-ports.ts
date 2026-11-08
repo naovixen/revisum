@@ -31,8 +31,8 @@ export interface AiPlanner {
   propose(spec: SpecInput): Promise<unknown>;
 }
 // The draft command's planner. It answers with the planner's reply as received, typed unknown: the
-// engine decodes it, and only its text, once bounded, becomes a draft. A call that fails (the
-// network, the egress proxy or the planner's status) rejects, carrying nothing from the reply.
+// engine decodes it, and only its text, once bounded, becomes a draft. How a failed call is said is
+// the adapter's to name; the cli's adapter answers a Result, carrying nothing from the reply.
 export interface DraftPlanner {
   draft(request: DraftRequest): Promise<unknown>;
 }

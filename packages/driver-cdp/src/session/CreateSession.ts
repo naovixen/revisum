@@ -172,18 +172,19 @@ async function closeSession(
     return { ...recordsSoFar(), closeFailure };
 }
 
-// What the session has noted, each record read on its own: the egress is handed in and can fail to
-// say what it refused, which says nothing about the other records.
+// What the session has noted, each record read on its own: the egress can answer that it does not
+// know what it refused, which says nothing about the other records.
 function sessionRecordsOf(
     browser: SessionBrowser,
     sessionEgress: OpenedSessionEgress,
     firstPage: PageWatch,
 ): SessionRecords {
     const { egress } = sessionEgress;
+    const refused = egress.refusedOrigins();
     return {
-        blockedOrigins: readOrSayWhy(() =>
-            mergeRefusedOrigins(browser.blocked, egress.refusedOrigins()),
-        ),
+        blockedOrigins: refused.ok
+            ? success(mergeRefusedOrigins(browser.blocked, refused.value))
+            : refused,
         connectionFailures: readOrSayWhy(() => egress.connectionFailures()),
         refusedRequestDecisions: readOrSayWhy(() => firstPage.refusedRequestDecisions()),
     };

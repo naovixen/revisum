@@ -60,14 +60,13 @@ async function main(): Promise<number> {
   if (target === undefined || exploreStartOrigin(project.value, input.start) === undefined) return stop(CONTAINER_EXIT.failed, 'nothing may be crawled');
   const browserPath = input.browserPath ?? pinnedChrome();
   if (browserPath === undefined) return stop(CONTAINER_EXIT.failed, 'no browser is installed');
-  const proxyServer = process.env['HTTP_PROXY'];
-  if (proxyServer === undefined || proxyServer === '') {
-    return stop(CONTAINER_EXIT.failed, 'HTTP_PROXY is unset or empty, so the crawl has no egress proxy to run behind');
-  }
-
-  const ports = buildAdapters.containerCrawlPorts({
-    executablePath: browserPath, proxyServer, secretNames: project.value.secretNames, environment: process.env,
+  const built = buildAdapters.containerCrawlPorts({
+    executablePath: browserPath, secretNames: project.value.secretNames, environment: process.env,
   });
+  if (!built.ok) {
+    return stop(CONTAINER_EXIT.failed, 'HTTP_PROXY is unset or blank, so the crawl has no egress proxy to run behind');
+  }
+  const ports = built.value;
   let login: ClearedRun | undefined;
   if (input.afterPlan !== undefined) {
     login = clearedLogin(input.afterPlan, project.value, target, ports.audit);

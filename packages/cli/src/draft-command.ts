@@ -24,7 +24,7 @@ import { dirname, isAbsolute, relative, resolve } from 'node:path';
 import {
   DEFAULT_EXPLORE_DEPTH, DEFAULT_EXPLORE_PAGES, DEFAULT_PAGE_TIMEOUT_MILLISECONDS, MAXIMUM_EXPLORE_DEPTH, MAXIMUM_EXPLORE_PAGES,
   READABLE_GRAMMAR_VERSION, admitCoreDraft, checkDraftLocators, exploreStartOrigin, extractCriteria, loadTrustedProject,
-  pageMapReference, pageMapText, parseAiText, parseProject, planParser, planStanding, plannerReplyText, policyGate,
+  pageMapReference, pageMapText, parseAiText, planParser, planStanding, plannerReplyText, policyGate,
   PlanErrorCode, readPlanText, withDeclaredSecretRedaction,
   type ApprovalStore, type BrowserDriver, type ClearedRun, type CliErrorCode, type CriterionText, type DraftError, type DraftRequest,
   type DraftWarning, type EventSink, type PageMap, type PlanDraft, type PlannerEndpoint, type PlanProvenance, type PlanSource, type Project, type ProjectLoadError,
@@ -58,10 +58,12 @@ export type DraftCommandPorts = {
   readonly runLogin: LoginRunner;
   // The personal-data redaction that page text goes through, after the declared secrets are removed.
   readonly redactor: Redactor;
-  // Explore mode's browser on the host, used only with --host. Always headless.
-  readonly browser?: BrowserDriver;
-  // The isolated runner and its pinned image, where explore mode crawls without --host.
-  readonly isolatedRunner?: IsolatedRunner;
+  // Explore mode's browser on the host, used only with --host. Always headless. One that is absent
+  // says so itself, so the command never branches on it.
+  readonly browser: BrowserDriver;
+  // The isolated runner and its pinned image, where explore mode crawls without --host. One that is
+  // absent says so itself, by refusing every run.
+  readonly isolatedRunner: IsolatedRunner;
   // The approvals the protected branch gives, against which an --after plan's hash is checked.
   readonly approvals?: ApprovalStore;
 };
@@ -184,6 +186,8 @@ const isStop = (value: object): value is Stop => 'stopped' in value;
 // spec is read, and an endpoint off loopback before anything is looked up.
 type Prepared = {
   readonly project: TrustedProject;
+  // The protected project.json as it was read for the trust check.
+  readonly written: unknown;
   readonly endpoint: PlannerEndpoint;
   readonly request: DraftRequest;
   readonly specPath?: string;
@@ -223,7 +227,7 @@ function projectRefusal(error: ProjectLoadError): Stop {
 async function prepare(options: DraftArguments, ports: DraftCommandPorts): Promise<Prepared | Stop> {
   const loaded = await loadTrustedProject(PROJECT_FILE, ports.versionControl, { files: [], events: ports.events });
   if (!loaded.ok) return projectRefusal(loaded.error);
-  const project = loaded.value.project;
+  const { project, asWritten: written } = loaded.value;
   if (project.planner === undefined) return stop('usage', `${PROJECT_FILE}#planner`);
   const endpoint = project.planner;
 
@@ -240,7 +244,7 @@ async function prepare(options: DraftArguments, ports: DraftCommandPorts): Promi
     criteria: read.criteria, grammarVersion: READABLE_GRAMMAR_VERSION, origins: project.origins, targets: project.matrix.map((target) => target.id),
   };
   return {
-    project, endpoint, request, draftPath,
+    project, written, endpoint, request, draftPath,
     ...(read.specPath === undefined ? {} : { specPath: read.specPath }), ...(pageMapPath === undefined ? {} : { pageMapPath }),
   };
 }
@@ -265,20 +269,6 @@ function plannerCallStop(outcome: Exclude<PlannerCallOutcome, { readonly kind: '
 
 // What a crawl gave: the page map, its file's text, and whether egress was enforced while it ran.
 type Explored = { readonly map: PageMap; readonly text: string; readonly egressEnforced: boolean; readonly closeFailure: string | null };
-
-// The protected project.json as written, and parsed into the project a run takes.
-async function runnableProject(ports: DraftCommandPorts): Promise<{ readonly written: unknown; readonly project: Project } | Stop> {
-  const file = await ports.versionControl.protectedFile(PROJECT_FILE);
-  if (!file.ok) return stop('untrusted-source', PROJECT_FILE);
-  let written: unknown;
-  try {
-    written = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(file.value.bytes));
-  } catch {
-    return stop('config-invalid', PROJECT_FILE);
-  }
-  const project = parseProject(written);
-  return project.ok ? { written, project: project.value } : stop('config-invalid', PROJECT_FILE);
-}
 
 type Login = { readonly cleared: ClearedRun; readonly text: string };
 
@@ -317,9 +307,7 @@ function crawlStop(code: CrawlStop, closeFailure: string | null): Stop {
 async function exploreSite(explore: ExploreArguments, prepared: Prepared, ports: DraftCommandPorts): Promise<Explored | Stop> {
   const origin = exploreStartOrigin(prepared.project, explore.start);
   if (origin === undefined) return stop('explore-origin-refused', '--explore');
-  const runnable = await runnableProject(ports);
-  if (isStop(runnable)) return runnable;
-  const { project, written } = runnable;
+  const { project, written } = prepared;
   const target = crawlTarget(project);
   if (target === undefined) return stop('target-unavailable', `${PROJECT_FILE}#matrix`);
   const login = explore.after === undefined ? undefined : clearedLogin(explore.after, project, target, ports);
@@ -329,7 +317,6 @@ async function exploreSite(explore: ExploreArguments, prepared: Prepared, ports:
   const bounds = { start: explore.start, maximumPages: explore.maximumPages, maximumDepth: explore.maximumDepth, pageTimeoutMilliseconds: DEFAULT_PAGE_TIMEOUT_MILLISECONDS };
 
   if (explore.host) {
-    if (ports.browser === undefined) return stop('internal', '--host');
     const crawled = await crawlInBrowser(ports.browser, {
       redactor, secrets: ports.secrets, audit: ports.events, options: { ...bounds, placement: 'host' },
       ...(login === undefined ? { project, target } : { login: login.cleared, runLogin: ports.runLogin }),
@@ -338,7 +325,6 @@ async function exploreSite(explore: ExploreArguments, prepared: Prepared, ports:
       ? { map: crawled.value, text: pageMapText(crawled.value), egressEnforced: false, closeFailure: crawled.closeFailure }
       : crawlStop(crawled.error, crawled.closeFailure);
   }
-  if (ports.isolatedRunner === undefined) return stop('explore-runner-unavailable', '--explore');
   const input = { project: written, ...bounds, ...(login === undefined ? {} : { afterPlan: login.text }) };
   const crawled = await crawlInRunner(ports.isolatedRunner, input, origin, project.secretNames, redactor);
   return crawled.ok

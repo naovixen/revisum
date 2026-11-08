@@ -4,8 +4,8 @@
 // and every process it started (Chromium), sampled from /proc every 100 ms. tools/benchmark.ts
 // calls this and compares the medians with the stored Linux baseline; it is never a gate.
 import {
-  loadTrustedProject, parseBaseUrl, planParser, policyGate, sha256,
-  type FixtureReference, type LoggedEvent, type RunEventSink,
+  failure, loadTrustedProject, parseBaseUrl, planParser, policyGate, sha256, success,
+  type FixtureReference, type LoggedEvent, type RunEventSink, type VersionControlPort,
 } from '@revisum/engine';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
@@ -106,13 +106,27 @@ function treeResidentBytes(): number {
   return total;
 }
 
+// A protected branch holding only the one project file, so the benchmark's project is trusted the way
+// core trusts any project.
+const protectedBranchHolding = (projectFile: unknown): VersionControlPort => ({
+  protectedBranch: 'main',
+  protectedFile: (path) => Promise.resolve(
+    path === 'project.json' ? success({ bytes: new TextEncoder().encode(JSON.stringify(projectFile)), commit: 'benchmark' }) : failure('not-found'),
+  ),
+  reviews: () => Promise.resolve(failure('unavailable')),
+  changedFiles: () => Promise.resolve(failure('unavailable')),
+  pullRequest: () => Promise.resolve(failure('unavailable')),
+  lastCommitTouching: () => Promise.resolve(failure('unavailable')),
+  landedBy: () => Promise.resolve(failure('unavailable')),
+});
+
 export async function benchmarkRuns(options: BenchmarkRunsOptions): Promise<BenchmarkRuns> {
   const { server, origin, fixtures } = await serveFixtures(join(options.repositoryRoot, 'fixtures', 'signup-app'));
   try {
     const projectFile = projectFileFor(origin);
     const ports = buildAdapters.benchmarkPorts({ executablePath: options.executablePath });
     // The gate clears the plan under the trusted project, and the run runs under the project it cleared.
-    const loaded = await loadTrustedProject('project.json', ports.protectedBranchHolding(projectFile), { files: [], events: ports.audit });
+    const loaded = await loadTrustedProject('project.json', protectedBranchHolding(projectFile), { files: [], events: ports.audit });
     if (!loaded.ok) throw new Error(`the benchmark project was refused: ${JSON.stringify(loaded.error)}`);
     const project = loaded.value.project;
     const parsed = planParser(project)(SIGNUP_PLAN);

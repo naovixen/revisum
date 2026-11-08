@@ -9,8 +9,8 @@ export type ConnectionFailure = { readonly origin: string; readonly message: str
 export type SessionEgress = {
     // What the source says. The driver parses it before any browser context uses it.
     readonly proxy: ProxySettings;
-    // What the egress refused, in its own form, such as "host:443". Throws when that can't be known.
-    refusedOrigins(): readonly string[];
+    // What the egress refused, in its own form, such as "host:443", or why that can't be known.
+    refusedOrigins(): Result<readonly string[], string>;
     // A diagnostic for whoever is running, which stays out of the hashed result. It also holds any
     // failure of the egress itself while it ran, named after the egress rather than an origin.
     connectionFailures(): readonly ConnectionFailure[];
@@ -18,8 +18,11 @@ export type SessionEgress = {
 };
 
 // Starts a session's egress. The allow-list first exists when a session opens, so the source is asked
-// then. The driver may not import the runner, so whoever builds the driver hands this in.
-export type EgressSource = (allowedOrigins: readonly string[]) => Promise<SessionEgress>;
+// then. The driver may not import the runner, so whoever builds the driver hands this in. A source
+// says in its answer that it could not start, and why, and leaves nothing running when it does.
+export type EgressSource = (
+    allowedOrigins: readonly string[],
+) => Promise<Result<SessionEgress, string>>;
 
 // Everything a proxy has refused so far, oldest first, in its own form, or why that can't be read.
 export type RefusalReader = () => Promise<Result<readonly string[], string>>;
@@ -38,14 +41,9 @@ export const egressThroughExistingProxy =
         const atOpen = await readRefusals();
         const refusedBeforeOpening = atOpen.ok ? atOpen.value.length : 0;
         let sinceOpening: Result<readonly string[], string> = success([]);
-        return {
+        return success({
             proxy: { server, includeLoopback: false },
-            refusedOrigins: () => {
-                if (!sinceOpening.ok) {
-                    throw new Error(sinceOpening.error);
-                }
-                return sinceOpening.value;
-            },
+            refusedOrigins: () => sinceOpening,
             connectionFailures: () => [],
             close: async () => {
                 const atClose = await readRefusals();
@@ -53,7 +51,7 @@ export const egressThroughExistingProxy =
                     ? success(atClose.value.slice(refusedBeforeOpening))
                     : atClose;
             },
-        };
+        });
     };
 
 type ProxyServer = Brand<string, "ProxyServer">;
@@ -79,28 +77,34 @@ export type OpenedSessionEgress = {
 };
 
 // The session's egress, started and with its proxy parsed, or why not. A proxy that fails the parse
-// was started all the same, so it is closed here.
+// was started all the same, so it is closed here, and what its close said joins the reason.
 export async function openSessionEgress(
     source: EgressSource,
     allowedOrigins: readonly string[],
 ): Promise<Result<OpenedSessionEgress, string>> {
+    const started = await source(allowedOrigins);
+    if (!started.ok) {
+        return started;
+    }
+    const egress = started.value;
+    const proxyServer = parseProxyServer(egress.proxy.server);
+    if (!proxyServer.ok) {
+        return failure(await reasonAfterClosing(proxyServer.error, egress));
+    }
+    return success({
+        egress,
+        contextProxy: {
+            proxyServer: proxyServer.value,
+            ...(egress.proxy.includeLoopback ? { proxyBypassList: LOOPBACK_THROUGH_PROXY } : {}),
+        },
+    });
+}
+
+async function reasonAfterClosing(reason: string, egress: SessionEgress): Promise<string> {
     try {
-        const egress = await source(allowedOrigins);
-        const proxyServer = parseProxyServer(egress.proxy.server);
-        if (!proxyServer.ok) {
-            await egress.close();
-            return proxyServer;
-        }
-        return success({
-            egress,
-            contextProxy: {
-                proxyServer: proxyServer.value,
-                ...(egress.proxy.includeLoopback
-                    ? { proxyBypassList: LOOPBACK_THROUGH_PROXY }
-                    : {}),
-            },
-        });
+        await egress.close();
+        return reason;
     } catch (error) {
-        return failure(errorText(error));
+        return `${reason}; its egress did not close: ${errorText(error)}`;
     }
 }

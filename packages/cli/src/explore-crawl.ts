@@ -44,17 +44,36 @@ export type BrowserCrawl = {
   readonly audit: EventSink;
 } & ({ readonly login: ClearedRun; readonly runLogin: LoginRunner } | { readonly project: Project; readonly target: Target });
 
-// What a login run needs of the crawl's session, which it shares.
-export type LoginRun = {
+// What a login run takes from the crawl besides the login and its session.
+type SharedWithTheLogin = {
   readonly browser: BrowserDriver;
-  readonly session: Session;
   readonly redactor: Redactor;
   readonly secrets: SecretStore;
   readonly audit: EventSink;
 };
 
+// A login and the session it signs in to, as one value made only where the crawl opens that session.
+// The private field is what keeps the two together: nothing can spread one into a copy with another
+// session, or write one by hand, and still have this type.
+class LoginOnTheCrawlSession {
+  readonly login: ClearedRun;
+  readonly session: Session;
+  readonly #shared: SharedWithTheLogin;
+
+  constructor(login: ClearedRun, session: Session, shared: SharedWithTheLogin) {
+    this.login = login;
+    this.session = session;
+    this.#shared = shared;
+  }
+
+  shared(): SharedWithTheLogin {
+    return this.#shared;
+  }
+}
+export type LoginOnItsSession = LoginOnTheCrawlSession;
+
 // Runs a cleared --after plan in the crawl's own session, leaving it open.
-export type LoginRunner = (login: ClearedRun, onSession: LoginRun, inputs: RunInputs) => Promise<RunResult>;
+export type LoginRunner = (onItsSession: LoginOnItsSession, inputs: RunInputs) => Promise<RunResult>;
 
 // The page's random numbers are seeded, so a page that uses them shows the same each time.
 const CRAWL_SEED = 0;
@@ -122,7 +141,8 @@ async function crawlOpenSession(
   const { project } = sessionFor(crawl);
   const { baseUrl, fixedTimeMilliseconds } = opened;
   if ('login' in crawl) {
-    const loggedIn = await crawl.runLogin(crawl.login, { browser, session, redactor: crawl.redactor, secrets: crawl.secrets, audit: crawl.audit }, {
+    const onItsSession = new LoginOnTheCrawlSession(crawl.login, session, { browser, redactor: crawl.redactor, secrets: crawl.secrets, audit: crawl.audit });
+    const loggedIn = await crawl.runLogin(onItsSession, {
       baseUrl, seed: CRAWL_SEED, fixedTimeMilliseconds, fixtures: [], host: { platform: platform(), arch: arch() },
     });
     if (loggedIn.state !== 'Passed') {return failure('plan-rejected');}

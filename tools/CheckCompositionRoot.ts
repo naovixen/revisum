@@ -1,18 +1,33 @@
 // A browser driver opened without its egress proxy would be a run with no egress enforcement, so
 // production code builds drivers in one file: the composition root. Each command gets finished ports
 // from it, so the names that build a driver, a proxy, a service caller or a run service do not appear
-// in any other command. The test set builds its own drivers, and is not read here.
+// in any other command. Other ways of starting a browser are refused too: a launcher, the test-only
+// entry, a module named only while running, a created require and a process of its own. The test set
+// builds its own drivers and launches, and is not read here.
 import { readFileSync } from "node:fs";
 import { importedNames, takesModuleWhole } from "./check-imports.ts";
-import { listSourceFiles, moduleSpecifiers, type ModuleSpecifier } from "./source-files.ts";
+import type { Token } from "./lint-names.ts";
+import {
+    closingParenthesis,
+    codeTokens,
+    isIdentifier,
+    isPunctuator,
+    listSourceFiles,
+    moduleSpecifiers,
+    type ModuleSpecifier,
+} from "./source-files.ts";
 import { reportProblems } from "./workspace-packages.ts";
 
 export const COMPOSITION_ROOT = "packages/cli/src/BuildAdapters.ts";
 
-// The driver package's entry point re-exports what it defines; that makes nothing reachable the
-// check of its importers does not see.
-const DRIVER_ENTRY_POINT = "packages/driver-cdp/src/index.ts";
+// The driver package's entry points re-export what it defines; that makes nothing reachable the
+// check of their importers does not see.
+const DRIVER_ENTRY_POINTS = [
+    "packages/driver-cdp/src/index.ts",
+    "packages/driver-cdp/src/testing.ts",
+];
 const CLI_SOURCES = "packages/cli/src/";
+const PACKAGE_SOURCES = "packages/";
 
 // Anywhere in the packages and tools, only the composition root may take these.
 const DRIVER_BUILDERS = new Set(["cdpDriver", "egressThroughExistingProxy"]);
@@ -24,36 +39,155 @@ const PORT_BUILDERS = new Set([
     "serviceCaller",
     "createRunService",
 ]);
+// Each launcher, and the only files that may take it.
+const LAUNCHER_ALLOWED_FILES = new Map<string, readonly string[]>([
+    // The accessibility scan's own browser, which takes no flags and opens no run.
+    ["launchChromium", ["packages/auditor-act/src/chromium-page.ts"]],
+    ["launchSharedBrowser", []],
+    // The driver's own launch, the one production use of a flag list of its own.
+    ["launchChromiumWithArguments", ["packages/driver-cdp/src/launch/SharedBrowser.ts"]],
+]);
+const TEST_ONLY_DRIVER_ENTRY = "@revisum/driver-cdp/testing";
+
+// The packages that manage processes: the browser's, and the containers'.
+const PROCESS_PACKAGES = ["packages/driver-cdp/", "packages/runner/"];
+const PROCESS_MODULES = new Set(["node:child_process", "child_process"]);
+const MAY_START_A_PROCESS = new Set([
+    // Reads the git commit a run is pinned to.
+    "packages/cli/src/run-pins.ts",
+]);
+const MODULE_LOADERS = new Set(["node:module", "module"]);
+const MAY_CREATE_A_REQUIRE = new Set([
+    // Finds the axe-core file it reads, by the package's own resolution.
+    "packages/auditor-axe/src/axe-auditor.ts",
+]);
 
 const isDriverPackageOrFile = (specifier: string): boolean =>
-    specifier === "@revisum/driver-cdp" || specifier.endsWith("/CdpDriver.ts");
+    specifier === "@revisum/driver-cdp" ||
+    specifier.endsWith("/CdpDriver.ts") ||
+    specifier.endsWith("/LaunchChromium.ts") ||
+    specifier.endsWith("/SharedBrowser.ts");
 
-function problemsIn(path: string, loaded: ModuleSpecifier): readonly string[] {
-    const taken = importedNames(loaded.clause ?? []);
+const isTestOnlyDriverEntry = (specifier: string): boolean =>
+    specifier === TEST_ONLY_DRIVER_ENTRY || specifier.endsWith("/testing.ts");
+
+function namedBuilderProblems(
+    path: string,
+    loaded: ModuleSpecifier,
+    taken: readonly string[],
+): readonly string[] {
     const builders = taken.filter(
         (name) =>
             DRIVER_BUILDERS.has(name) || (path.startsWith(CLI_SOURCES) && PORT_BUILDERS.has(name)),
     );
-    const named = builders.map(
+    const launchers = taken.filter(
+        (name) => LAUNCHER_ALLOWED_FILES.get(name)?.includes(path) === false,
+    );
+    return [...builders, ...launchers].map(
         (name) =>
             `${path}:${loaded.line} imports "${name}"; only ${COMPOSITION_ROOT} builds adapters, so a command gets finished ports and no caller can open a browser without its egress proxy`,
     );
+}
+
+function moduleWholeProblems(path: string, loaded: ModuleSpecifier): readonly string[] {
     return isDriverPackageOrFile(loaded.specifier) && takesModuleWhole(loaded)
         ? [
-              ...named,
               `${path}:${loaded.line} imports ${loaded.specifier} whole; only named imports can be checked, so the driver cannot be taken this way`,
           ]
-        : named;
+        : [];
+}
+
+// A file the packages may not use for its own browser or process, whatever is taken from it.
+function refusedModuleProblems(
+    path: string,
+    loaded: ModuleSpecifier,
+    taken: readonly string[],
+): readonly string[] {
+    const { specifier, line, isTypeOnly } = loaded;
+    if (isTypeOnly || !path.startsWith(PACKAGE_SOURCES)) {
+        return [];
+    }
+    if (isTestOnlyDriverEntry(specifier)) {
+        return [
+            `${path}:${line} imports ${specifier}; the test-only driver entry is for tests alone`,
+        ];
+    }
+    const canStartProcesses =
+        PROCESS_PACKAGES.some((folder) => path.startsWith(folder)) || MAY_START_A_PROCESS.has(path);
+    if (PROCESS_MODULES.has(specifier) && !canStartProcesses) {
+        return [
+            `${path}:${line} imports ${specifier}; only the driver and the runner start processes`,
+        ];
+    }
+    const isCreatingARequire =
+        MODULE_LOADERS.has(specifier) &&
+        (taken.includes("createRequire") || takesModuleWhole(loaded));
+    if (isCreatingARequire && !MAY_CREATE_A_REQUIRE.has(path)) {
+        return [
+            `${path}:${line} takes createRequire from ${specifier}; a created require can load a package no rule reads`,
+        ];
+    }
+    return [];
+}
+
+function problemsIn(path: string, loaded: ModuleSpecifier): readonly string[] {
+    const taken = importedNames(loaded.clause ?? []);
+    return [
+        ...namedBuilderProblems(path, loaded, taken),
+        ...moduleWholeProblems(path, loaded),
+        ...refusedModuleProblems(path, loaded, taken),
+    ];
+}
+
+// `import(name: string): unknown` in a type or object: a method called import, not a loaded module.
+function isMethodCalledImport(tokens: readonly Token[], index: number): boolean {
+    const before = tokens[index - 1];
+    const isListEntry =
+        isPunctuator(before, "{") || isPunctuator(before, ",") || isPunctuator(before, ";");
+    return isListEntry && isPunctuator(tokens[closingParenthesis(tokens, index + 1) + 1], ":");
+}
+
+// True when the argument is a single fixed string: a template with a substitution is several tokens.
+function namesAFixedModule(tokens: readonly Token[], index: number): boolean {
+    const argument = tokens[index + 2];
+    const after = tokens[index + 3];
+    return (
+        (argument?.kind === "string" || argument?.kind === "template") &&
+        (isPunctuator(after, ")") || isPunctuator(after, ","))
+    );
+}
+
+// Each dynamic import whose module can only be known while it runs, so no rule can read it.
+function computedImportProblems(path: string, source: string): readonly string[] {
+    if (!path.startsWith(PACKAGE_SOURCES)) {
+        return [];
+    }
+    const tokens = codeTokens(source);
+    return [...tokens.entries()].flatMap(([index, token]) => {
+        const isDynamicImport =
+            isIdentifier(token, "import") &&
+            !isPunctuator(tokens[index - 1], ".") &&
+            isPunctuator(tokens[index + 1], "(");
+        return isDynamicImport &&
+            !isMethodCalledImport(tokens, index) &&
+            !namesAFixedModule(tokens, index)
+            ? [
+                  `${path}:${token.line} imports a module named only while running, which no rule can read`,
+              ]
+            : [];
+    });
 }
 
 export function checkCompositionRoot(root: string): string[] {
     return listSourceFiles(root)
-        .filter((path) => path !== COMPOSITION_ROOT && path !== DRIVER_ENTRY_POINT)
-        .flatMap((path) =>
-            moduleSpecifiers(readFileSync(`${root}/${path}`, "utf8")).flatMap((loaded) =>
-                problemsIn(path, loaded),
-            ),
-        );
+        .filter((path) => path !== COMPOSITION_ROOT && !DRIVER_ENTRY_POINTS.includes(path))
+        .flatMap((path) => {
+            const source = readFileSync(`${root}/${path}`, "utf8");
+            return [
+                ...moduleSpecifiers(source).flatMap((loaded) => problemsIn(path, loaded)),
+                ...computedImportProblems(path, source),
+            ];
+        });
 }
 
 if (import.meta.main) {

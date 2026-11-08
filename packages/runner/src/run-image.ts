@@ -31,6 +31,9 @@ export type RunImageError = {
   readonly detail: string;
 };
 
+// A digest no image has, for a runner that says it cannot run anything: nothing ever looks it up.
+export const NO_IMAGE = `sha256:${'0'.repeat(64)}` as ImageDigest;
+
 // The one place an image id read from Docker becomes an ImageDigest: "sha256:" and 64 hex digits.
 export function readImageDigest(text: string): ImageDigest | null {
   return IMAGE_ID.test(text) ? text as ImageDigest : null;

@@ -53,12 +53,8 @@ export { CALL_FUNCTION_ON, EVALUATE, RELEASE_OBJECT } from "./connection/Runtime
 export { LOAD_EVENT_FIRED, REQUEST_PAUSED } from "./connection/BrowserEvent.ts";
 export { launchChromium, type LaunchedChromium } from "./launch/LaunchChromium.ts";
 export type { DriverSession, OwnBrowserDriver } from "./session/DriverSession.ts";
-// For tests only, to save a launch per run. Production keeps a fresh browser per run, because
-// isolation between runs matters more than speed: all the sessions on a shared browser have one
-// process, one clipboard and one set of launch flags.
-export {
-    launchSharedBrowser,
-    type BrowserSource,
-    type LaunchedSharedBrowser,
-    type SharedBrowser,
+export type {
+    BrowserSource,
+    LaunchedSharedBrowser,
+    SharedBrowser,
 } from "./launch/SharedBrowser.ts";

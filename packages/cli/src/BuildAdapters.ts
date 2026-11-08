@@ -13,8 +13,10 @@ import {
     environmentSecretStore,
     failure,
     HOST_ISOLATION,
+    RunnerErrorCode,
     sha256,
     success,
+    UnavailableReason,
     unwiredPorts,
     withDeclaredSecretRedaction,
     type ArtifactReference,
@@ -26,14 +28,15 @@ import {
     type EventSink,
     type PlannerEndpoint,
     type Redactor,
+    type Result,
     type RunEventSink,
     type RunService,
     type SecretName,
     type SecretStore,
     type Session,
-    type VersionControlPort,
 } from "@revisum/engine";
 import {
+    NO_IMAGE,
     parseProxyRules,
     ProxyClient,
     readBrowserRefusals,
@@ -43,13 +46,13 @@ import {
     type AddressResolver,
     type EgressProxy,
 } from "@revisum/runner";
-import type { PlannerCall } from "./draft-command.ts";
-import type { LoginRunner } from "./explore-crawl.ts";
+import type { DraftCommandPorts, PlannerCall } from "./draft-command.ts";
+import type { IsolatedRunner, LoginRunner } from "./explore-crawl.ts";
 import { plannerAdapter } from "./planner-adapters.ts";
+import type { SuiteRunPorts } from "./suite-run.ts";
 
 // A host run's session goes through its own proxy. Only host runs allow declared private addresses,
-// so internal staging and localhost keep working, and every other address is refused. A source says
-// it failed by rejecting, which the driver turns into its own outcome.
+// so internal staging and localhost keep working, and every other address is refused.
 export const startHostSessionEgress: EgressSource = async (allowedOrigins) => {
     const rules = parseProxyRules({
         allowedOrigins,
@@ -57,16 +60,16 @@ export const startHostSessionEgress: EgressSource = async (allowedOrigins) => {
         rewrites: [],
     });
     if (!rules.ok) {
-        throw new Error(rules.error.message);
+        return failure(rules.error.message);
     }
     const started = await startProxyServer(rules.value, { client: ProxyClient.Browser });
     if (!started.ok) {
-        throw new Error(started.error.message);
+        return failure(started.error.message);
     }
     const proxy = started.value;
-    return {
+    return success({
         proxy: { server: proxy.url, includeLoopback: true },
-        refusedOrigins: () => proxy.refusedOrigins(),
+        refusedOrigins: () => success(proxy.refusedOrigins()),
         // A listener's failure belongs to no declared origin, so it is named after the proxy.
         connectionFailures: () => [
             ...proxy.connectionFailures(),
@@ -81,7 +84,7 @@ export const startHostSessionEgress: EgressSource = async (allowedOrigins) => {
                 throw new Error(closed.error.message);
             }
         },
-    };
+    });
 };
 
 // How a planner call reaches the network, with the store its key is read from. `resolve` and
@@ -111,12 +114,9 @@ async function askPlanner(
     if (!adapter.ok) {
         return { kind: "secret-missing" };
     }
-    try {
-        return { kind: "answered", reply: await adapter.value.draft(request) };
-    } catch {
-        // The adapter's error carries only a code, and none of it is shown: the failure is enough.
-        return { kind: "call-failed" };
-    }
+    const drafted = await adapter.value.draft(request);
+    // The code tells a person nothing that the failure itself does not, so none of it is shown.
+    return drafted.ok ? { kind: "answered", reply: drafted.value } : { kind: "call-failed" };
 }
 
 // What went wrong with the planner's proxy while it ran and as it closed, or null if nothing did. The
@@ -137,8 +137,8 @@ function plannerProxyFailure(
 }
 
 // Each planner call goes through an egress proxy of its own that allows only the planner's origin,
-// and is closed either way. A local endpoint is a private service on loopback; any other must resolve
-// to a public address.
+// and is closed either way, even when the call hits a programming error, which still rejects. A local
+// endpoint is a private service on loopback; any other must resolve to a public address.
 const plannerCallThroughItsOwnProxy =
     (network: PlannerNetwork): PlannerCall =>
     async (endpoint, request) => {
@@ -159,10 +159,27 @@ const plannerCallThroughItsOwnProxy =
             return { kind: "proxy-failed", failure: started.error };
         }
         const proxy = started.value;
-        const answered = await askPlanner(endpoint, request, network, proxy);
+        let answered: PlannerAnswer;
+        try {
+            answered = await askPlanner(endpoint, request, network, proxy);
+        } catch (programmingError) {
+            throw errorAfterClosing(
+                programmingError,
+                plannerProxyFailure(proxy, await proxy.close()),
+            );
+        }
         const closed = await proxy.close();
         return { ...answered, closeFailure: plannerProxyFailure(proxy, closed) };
     };
+
+// The error as it was thrown, or, when the proxy also failed to close, one saying both.
+function errorAfterClosing(error: unknown, closeFailure: string | null): unknown {
+    if (closeFailure === null) {
+        return error;
+    }
+    const message = error instanceof Error ? error.message : String(error);
+    return new Error(`${message}; ${closeFailure}`, { cause: error });
+}
 
 const systemClock: Clock = {
     now: () => Date.now(),
@@ -202,46 +219,48 @@ function driverOnTheCrawlSession(browser: BrowserDriver, session: Session): Brow
 }
 
 // The --after run, in the crawl's session, writing no result file.
-const loginInTheCrawlSession: LoginRunner = (login, onSession, inputs) =>
-    createRunService({
+const loginInTheCrawlSession: LoginRunner = (onItsSession, inputs) => {
+    const { browser, redactor, secrets, audit } = onItsSession.shared();
+    return createRunService({
         ...unwiredPorts,
         drivers: new Map([
-            [login.target.adapter, driverOnTheCrawlSession(onSession.browser, onSession.session)],
+            [
+                onItsSession.login.target.adapter,
+                driverOnTheCrawlSession(browser, onItsSession.session),
+            ],
         ]),
         clock: systemClock,
         artifacts: discardingArtifacts,
-        redactor: onSession.redactor,
+        redactor,
         events: discardingRunEvents,
-        audit: onSession.audit,
-        secrets: onSession.secrets,
+        audit,
+        secrets,
         isolation: HOST_ISOLATION,
-    }).run(login, inputs);
+    }).run(onItsSession.login, inputs);
+};
 
-// A protected branch holding only the one project file, for the benchmark, so its project is trusted
-// the way core trusts any project.
-const protectedBranchHolding = (projectFile: unknown): VersionControlPort => ({
-    protectedBranch: "main",
-    protectedFile: (path) =>
-        Promise.resolve(
-            path === "project.json"
-                ? success({
-                      bytes: new TextEncoder().encode(JSON.stringify(projectFile)),
-                      commit: "benchmark",
-                  })
-                : failure("not-found"),
-        ),
-    reviews: () => Promise.resolve(failure("unavailable")),
-    changedFiles: () => Promise.resolve(failure("unavailable")),
-    pullRequest: () => Promise.resolve(failure("unavailable")),
-    lastCommitTouching: () => Promise.resolve(failure("unavailable")),
-    landedBy: () => Promise.resolve(failure("unavailable")),
-});
+// A command given no browser says so for every target, so it stops the way any target it cannot
+// drive stops, and needs no branch of its own.
+const WHY_NO_BROWSER = {
+    reason: UnavailableReason.AdapterNotRegistered,
+    detail: "this command was given no browser",
+};
+const NO_BROWSER: BrowserDriver = {
+    info: { id: "no-browser", version: "none", protocol: "none" },
+    supports: () => failure(WHY_NO_BROWSER),
+    open: () => Promise.resolve(failure(WHY_NO_BROWSER)),
+};
+
+// A command given no isolated runner has it refuse every run, having started nothing.
+const NO_ISOLATED_RUNNER: IsolatedRunner = {
+    runner: { withRun: () => Promise.resolve(failure({ code: RunnerErrorCode.StartFailed })) },
+    image: NO_IMAGE,
+};
 
 export type BenchmarkPorts = {
     // A run service for one sample, whose steps its own event sink times.
     runService(events: RunEventSink): RunService;
     readonly audit: EventSink;
-    protectedBranchHolding(projectFile: unknown): VersionControlPort;
 };
 
 export type ContainerCrawlPorts = {
@@ -252,6 +271,21 @@ export type ContainerCrawlPorts = {
     readonly audit: EventSink;
     readonly runLogin: LoginRunner;
 };
+
+// What the draft command's ports cannot be built without. `executablePath` is the browser for --host,
+// and with none the command's browser says it is absent.
+export type DraftCommandNeeds = Pick<
+    DraftCommandPorts,
+    "workingDirectory" | "secrets" | "events" | "versionControl" | "planner"
+> & { readonly executablePath?: string | undefined };
+
+// What only an explicit override can change, in plain sight.
+export type DraftCommandOverrides = Partial<
+    Pick<DraftCommandPorts, "redactor" | "runLogin" | "browser" | "isolatedRunner" | "approvals">
+>;
+
+export type SuiteRunNeeds = Omit<SuiteRunPorts, "redactor">;
+export type SuiteRunOverrides = Partial<Pick<SuiteRunPorts, "redactor">>;
 
 export const buildAdapters = {
     hostBrowserDriver({ executablePath }: { readonly executablePath: string }): OwnBrowserDriver {
@@ -277,35 +311,58 @@ export const buildAdapters = {
 
     loginRunner: loginInTheCrawlSession,
 
-    // Only the declared secrets are read from the container's environment.
+    draftCommandPorts(
+        { executablePath, ...needs }: DraftCommandNeeds,
+        overrides: DraftCommandOverrides = {},
+    ): DraftCommandPorts {
+        return {
+            ...needs,
+            redactor: defaultRedactor(),
+            runLogin: loginInTheCrawlSession,
+            browser:
+                executablePath === undefined
+                    ? NO_BROWSER
+                    : buildAdapters.hostBrowserDriver({ executablePath }),
+            isolatedRunner: NO_ISOLATED_RUNNER,
+            ...overrides,
+        };
+    },
+
+    suiteRunPorts(needs: SuiteRunNeeds, overrides: SuiteRunOverrides = {}): SuiteRunPorts {
+        return { ...needs, redactor: defaultRedactor(), ...overrides };
+    },
+
+    // The run's egress proxy is the crawl's only way out, so whether HTTP_PROXY names one is settled
+    // here, before any browser is built. Only the declared secrets are read from the environment.
     containerCrawlPorts({
         executablePath,
-        proxyServer,
         secretNames,
         environment,
     }: {
         readonly executablePath: string;
-        readonly proxyServer: string;
         readonly secretNames: readonly SecretName[];
         readonly environment: NodeJS.ProcessEnv;
-    }): ContainerCrawlPorts {
+    }): Result<ContainerCrawlPorts, "no-egress-proxy"> {
+        const proxyServer = environment["HTTP_PROXY"]?.trim();
+        if (proxyServer === undefined || proxyServer === "") {
+            return failure("no-egress-proxy");
+        }
         const secrets = environmentSecretStore(
             Object.fromEntries(secretNames.map((name) => [name, environment[name]])),
         );
-        return {
+        return success({
             browser: buildAdapters.containerBrowserDriver({ executablePath, proxyServer }),
             secrets,
             redactor: withDeclaredSecretRedaction(defaultRedactor(), secretNames, secrets),
             audit: discardingAudit,
             runLogin: loginInTheCrawlSession,
-        };
+        });
     },
 
     benchmarkPorts({ executablePath }: { readonly executablePath: string }): BenchmarkPorts {
         const drivers = new Map([["cdp", buildAdapters.hostBrowserDriver({ executablePath })]]);
         return {
             audit: discardingAudit,
-            protectedBranchHolding,
             runService: (events) =>
                 createRunService({
                     ...unwiredPorts,

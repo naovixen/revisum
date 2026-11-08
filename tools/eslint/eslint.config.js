@@ -231,6 +231,11 @@ export default defineConfig([
         rules: { "no-restricted-syntax": ["error", ...everywhereSyntax] },
     },
     {
+        // An entry point of the package, like index.ts: named for what it is, not for an export.
+        files: ["packages/driver-cdp/src/testing.ts"],
+        rules: { "revisum/file-name-matches-export": "off" },
+    },
+    {
         // A test file is one long describe callback, so function length says nothing about it.
         files: ["test/**/*.test.ts"],
         rules: {

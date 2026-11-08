@@ -5,7 +5,7 @@
 //
 // The key, the customer's own, travels as an opaque secret in its wire format's header alone:
 // x-api-key (as it is) for Anthropic, "Authorization: Bearer" for the OpenAI-compatible format. A
-// local endpoint may have none. A failed call rejects with its code alone, never the planner's
+// local endpoint may have none. A failed call answers with its code alone, never the planner's
 // reply, which may echo the key.
 import {
   ANTHROPIC_API_VERSION, MAXIMUM_PLANNER_REPLY_BYTES, PLANNER_TIMEOUT_MILLISECONDS, failure, headerSecret, plannerPrompt, plannerRequestBody, success,
@@ -16,16 +16,10 @@ import {
 // Why a planner call failed: the service caller's code, or a status other than success.
 export type PlannerCallFailure = ServiceCallErrorCode | 'planner-status';
 
-// What a planner adapter rejects with. Its message is fixed and it carries only the code, so
-// nothing the planner sent can travel with it.
-export class PlannerCallError extends Error {
-  readonly code: PlannerCallFailure;
-
-  constructor(code: PlannerCallFailure) {
-    super('the planner call failed');
-    this.name = 'PlannerCallError';
-    this.code = code;
-  }
+// A draft planner whose answer is the reply as received, or the code that says why there is none. A
+// programming error is not a failed call, so it rejects.
+export interface PlannerAdapter extends DraftPlanner {
+  draft(request: DraftRequest): Promise<Result<Uint8Array, PlannerCallFailure>>;
 }
 
 // The header each wire format carries the key in, and how.
@@ -43,7 +37,7 @@ export type PlannerConnection = {
 
 // The adapter for the endpoint's wire format, or secret-missing when its key's secret is not in
 // the store. Requests go to the endpoint's origin, the one the egress proxy allows.
-export function plannerAdapter(endpoint: PlannerEndpoint, connection: PlannerConnection): Result<DraftPlanner, 'secret-missing'> {
+export function plannerAdapter(endpoint: PlannerEndpoint, connection: PlannerConnection): Result<PlannerAdapter, 'secret-missing'> {
   const headers: ServiceRequestHeader[] = [];
   if (endpoint.apiKey !== undefined) {
     const secret = connection.secrets.resolve(endpoint.apiKey.secretName);
@@ -55,20 +49,20 @@ export function plannerAdapter(endpoint: PlannerEndpoint, connection: PlannerCon
   headers.push({ name: 'content-type', value: JSON_MEDIA_TYPE });
   const { origin, pathAndQuery } = endpoint;
   return success({
-    async draft(request: DraftRequest): Promise<unknown> {
+    async draft(request: DraftRequest): Promise<Result<Uint8Array, PlannerCallFailure>> {
       const body = plannerRequestBody(endpoint.wire, endpoint.model, plannerPrompt(request));
       const answered = await connection.caller.call({
         origin, method: 'POST', pathAndQuery, headers, body: { jsonParts: [body] },
         timeoutMilliseconds: PLANNER_TIMEOUT_MILLISECONDS, maximumResponseBytes: MAXIMUM_PLANNER_REPLY_BYTES,
       });
-      if (!answered.ok) throw new PlannerCallError(answered.error);
+      if (!answered.ok) return failure(answered.error);
       // The caller reads one byte past the cap and leaves whoever set it to refuse a body that long.
       if (answered.value.body.length > MAXIMUM_PLANNER_REPLY_BYTES) {
-        throw new PlannerCallError('response-too-large');
+        return failure('response-too-large');
       }
-      if (answered.value.status < 200 || answered.value.status > 299) throw new PlannerCallError('planner-status');
+      if (answered.value.status < 200 || answered.value.status > 299) return failure('planner-status');
       // The reply as received, for the engine to decode.
-      return answered.value.body;
+      return success(answered.value.body);
     },
   });
 }

@@ -33,7 +33,9 @@ export type ChangeUnderTest = {
   readonly events: EventSink;
 };
 
-export type LoadedProject = { readonly project: TrustedProject; readonly reviewItems: readonly TrustedFileReviewItem[] };
+// `asWritten` is the file's JSON as read, so a caller never has to read the protected branch again and
+// can hand on exactly the project whose trust was checked.
+export type LoadedProject = { readonly project: TrustedProject; readonly asWritten: unknown; readonly reviewItems: readonly TrustedFileReviewItem[] };
 
 // config-invalid: the protected-branch project.json exists but is not a valid project.
 export type ProjectLoadError = TrustError | { readonly code: 'config-invalid'; readonly path: string; readonly errors: readonly PlanError[] };
@@ -66,7 +68,8 @@ export async function loadTrustedProject(
   const protectedFile = await versionControl.protectedFile(projectPath);
   // Unavailable is refused too: without the protected version there is nothing core may trust.
   if (!protectedFile.ok) return failure({ code: 'untrusted-source', path: projectPath });
-  const parsed = parseProject(parseJson(protectedFile.value.bytes));
+  const asWritten = parseJson(protectedFile.value.bytes);
+  const parsed = parseProject(asWritten);
   if (!parsed.ok) return failure({ code: 'config-invalid', path: projectPath, errors: parsed.error });
 
   // The one place a TrustedProject is made, from the project the parser gave.
@@ -81,7 +84,7 @@ export async function loadTrustedProject(
   const reviewItems = edited.map((file): TrustedFileReviewItem => ({ code: 'changed-with-code', path: file }));
   // The review items carry the finding whether or not the sink accepts the event.
   for (const item of reviewItems) change.events.append({ kind: 'trusted.changed-with-code', path: item.path }, CHANGE_AUTHOR);
-  return success({ project, reviewItems });
+  return success({ project, asWritten, reviewItems });
 }
 
 // JSON from file bytes, or undefined when it is not JSON, which the project parser then refuses.

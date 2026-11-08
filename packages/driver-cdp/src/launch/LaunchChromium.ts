@@ -47,11 +47,14 @@ const ISOLATED_CHROMIUM_ARGUMENTS: readonly string[] = [
 const ALWAYS_HEADLESS_AND_MUTED: readonly string[] = ["--headless=new", "--mute-audio"];
 
 type LaunchOptions = ConnectOptions & {
-    // Flags passed to Chromium. The launcher always adds headless mode, muted audio, the DevTools
-    // port, the profile folder and a blank first page.
-    readonly arguments?: readonly string[];
     readonly launchTimeoutMilliseconds?: number;
     readonly profilePrefix?: string;
+};
+
+type LaunchWithArgumentsOptions = LaunchOptions & {
+    // Flags passed to Chromium instead of the isolated set. The launcher always adds headless mode,
+    // muted audio, the DevTools port, the profile folder and a blank first page.
+    readonly arguments: readonly string[];
 };
 
 export type LaunchedChromium = {
@@ -416,14 +419,25 @@ function processIdOf(browserProcess: ChildProcess): number {
     return processId;
 }
 
-export async function launchChromium(
+export const launchChromium = (
     executablePath: string,
     options: LaunchOptions = {},
+): Promise<LaunchedChromium> =>
+    launchWithFlags(executablePath, ISOLATED_CHROMIUM_ARGUMENTS, options);
+
+export const launchChromiumWithArguments = (
+    executablePath: string,
+    { arguments: chosen, ...options }: LaunchWithArgumentsOptions,
+): Promise<LaunchedChromium> => launchWithFlags(executablePath, chosen, options);
+
+async function launchWithFlags(
+    executablePath: string,
+    chosen: readonly string[],
+    options: LaunchOptions,
 ): Promise<LaunchedChromium> {
     const userDataFolder = mkdtempSync(
         join(tmpdir(), options.profilePrefix ?? "chromium-profile-"),
     );
-    const chosen = options.arguments ?? ISOLATED_CHROMIUM_ARGUMENTS;
     const flags = [
         ...chosen,
         ...ALWAYS_HEADLESS_AND_MUTED.filter(

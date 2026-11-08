@@ -156,6 +156,8 @@ function outputFile(outputDirectory: string, path: string): Result<string, Outpu
   return isInsideFolder(folder, real) ? success(real) : failure('refused');
 }
 
+const isFileGone = (error: unknown): boolean => error instanceof Error && 'code' in error && error.code === 'ENOENT';
+
 type ReadReport = { readonly ok: true; readonly report: SuiteReport } | { readonly ok: false; readonly errors: readonly SuiteDecodeError[] };
 
 // The report the suite wrote at the top of the output folder, decoded under the evidence limits.
@@ -164,17 +166,19 @@ function readReport(outputDirectory: string, limits: EvidenceLimits): ReadReport
   if (!file.ok) {
     return { ok: false, errors: [{ code: file.error === 'refused' ? 'suite-report-invalid' : 'suite-report-missing', path: '$' }] };
   }
-  if (!statSync(file.value).isFile()) {
-    return { ok: false, errors: [{ code: 'suite-report-missing', path: '$' }] };
-  }
-  if (statSync(file.value).size > limits.maximumReportBytes) {
-    return { ok: false, errors: [{ code: 'too-large', path: '$' }] };
-  }
   let parsed: unknown;
   try {
+    // A suite still running can remove the report at any moment here, so nothing is looked at twice.
+    const found = statSync(file.value, { throwIfNoEntry: false });
+    if (found === undefined || !found.isFile()) {
+      return { ok: false, errors: [{ code: 'suite-report-missing', path: '$' }] };
+    }
+    if (found.size > limits.maximumReportBytes) {
+      return { ok: false, errors: [{ code: 'too-large', path: '$' }] };
+    }
     parsed = JSON.parse(readFileSync(file.value, 'utf8'));
-  } catch {
-    return { ok: false, errors: [{ code: 'suite-report-invalid', path: '$' }] };
+  } catch (error) {
+    return { ok: false, errors: [{ code: isFileGone(error) ? 'suite-report-missing' : 'suite-report-invalid', path: '$' }] };
   }
   const decoded = parseSuiteReport(parsed, limits, { outputDirectory: WORKLOAD_OUTPUT_PATH });
   return decoded.ok ? { ok: true, report: decoded.value } : { ok: false, errors: decoded.error };

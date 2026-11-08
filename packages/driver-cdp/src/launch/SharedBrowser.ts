@@ -15,7 +15,7 @@ import {
 import { GET_BROWSER_CONTEXTS } from "../connection/BrowserCommand.ts";
 import { CdpConnection } from "../connection/CdpConnection.ts";
 import { sessionEgressChromeFlags } from "./SessionEgressChromeFlags.ts";
-import { launchChromium, type LaunchedChromium } from "./LaunchChromium.ts";
+import { launchChromiumWithArguments, type LaunchedChromium } from "./LaunchChromium.ts";
 import { holdDeadProxy } from "./HoldDeadProxy.ts";
 
 const COMMAND_TIMEOUT_MILLISECONDS = 30_000;
@@ -66,7 +66,7 @@ async function launchDriverChromium(
     const deadProxy = await holdDeadProxy();
     let launched: LaunchedChromium;
     try {
-        launched = await launchChromium(settings.executablePath, {
+        launched = await launchChromiumWithArguments(settings.executablePath, {
             arguments: [...sessionEgressChromeFlags(deadProxy.server), `--lang=${settings.locale}`],
             launchTimeoutMilliseconds,
             commandTimeoutMilliseconds: COMMAND_TIMEOUT_MILLISECONDS,

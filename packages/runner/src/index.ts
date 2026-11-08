@@ -31,7 +31,7 @@ export { startEgressProxy, type EgressProxyOptions } from './egress-proxy/StartE
 export { startProxyServer, type ProxyServerOptions } from './egress-proxy/StartProxyServer.ts';
 export { readBrowserRefusals } from './ReadBrowserRefusals.ts';
 export { readProxyDecision } from './proxy-container.ts';
-export { RUN_IMAGE_RECORD, RUN_IMAGE_TAG, prepareRunImage, readImageDigest, type RunImage, type RunImageError } from './run-image.ts';
+export { NO_IMAGE, RUN_IMAGE_RECORD, RUN_IMAGE_TAG, prepareRunImage, readImageDigest, type RunImage, type RunImageError } from './run-image.ts';
 export {
   bodyText, headerFields, serviceCaller, type ServiceCallerOptions, type ServiceCallerTimeouts,
 } from './service-caller.ts';
