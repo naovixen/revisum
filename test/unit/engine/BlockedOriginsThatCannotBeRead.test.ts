@@ -83,13 +83,15 @@ const sessionOver = (egress: SessionEgress, changes: Partial<Session> = {}): Ses
     });
 
 // The real egress of an isolated run, reading the refusals once as it opens and once as it closes.
-function egressReadingInTurn(
+async function egressReadingInTurn(
     atOpen: Awaited<ReturnType<RefusalReader>>,
     atClose: Awaited<ReturnType<RefusalReader>>,
 ): Promise<SessionEgress> {
     const answers = [atOpen, atClose].values();
     const read: RefusalReader = () => Promise.resolve(answers.next().value ?? atClose);
-    return egressThroughExistingProxy(PROXY_SERVER, read)([]);
+    const egress = await egressThroughExistingProxy(PROXY_SERVER, read)([]);
+    assert.ok(egress.ok, JSON.stringify(egress));
+    return egress.value;
 }
 
 // Every code the result holds, so these tests fix what it says and not where it keeps it.

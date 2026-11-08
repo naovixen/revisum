@@ -23,7 +23,6 @@ import type {
     WorkloadRunner,
 } from "@revisum/engine";
 
-declare const benchmarkPorts: BenchmarkPorts;
 declare const browser: BrowserDriver;
 declare const login: ClearedRun;
 declare const loginOnItsSession: Parameters<LoginRunner>[0];
@@ -136,4 +135,4 @@ export const answersBareEgress: EgressSource = () => Promise.resolve(bareEgress)
 export const refusedOriginsAsAList: readonly string[] = bareEgress.refusedOrigins();
 
 // @ts-expect-error the benchmark's stand-in protected branch is not handed to anyone outside the cli
-export const benchmarkBranch = benchmarkPorts.protectedBranchHolding({});
+export type BenchmarkBranch = BenchmarkPorts["protectedBranchHolding"];

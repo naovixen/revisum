@@ -6,6 +6,7 @@ import assert from "node:assert/strict";
 import { after, before, describe, test } from "node:test";
 import { setTimeout as pause } from "node:timers/promises";
 import { CdpConnection, type SharedBrowser } from "@revisum/driver-cdp";
+import { failure } from "@revisum/engine";
 import { CREATE_A_CONTEXT, LIST_CONTEXTS } from "#test-support/browser/TestCommand.ts";
 import { BrowserTarget } from "#test-support/browser/BrowserTarget.ts";
 import { createBrowserDriver } from "#test-support/browser/CreateBrowserDriver.ts";
@@ -46,7 +47,7 @@ const driverThroughARealEgress = () => createBrowserDriver({ executablePath: EXE
 const driverWhoseEgressWontStart = () =>
     createBrowserDriver({
         executablePath: EXECUTABLE_PATH,
-        egress: () => Promise.reject(new Error(WHY_THE_EGRESS_FAILED)),
+        egress: () => Promise.resolve(failure(WHY_THE_EGRESS_FAILED)),
     });
 
 async function openAndCloseASession(): Promise<number> {
