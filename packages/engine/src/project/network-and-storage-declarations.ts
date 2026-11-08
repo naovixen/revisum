@@ -12,8 +12,9 @@ import {
   type StubResponse, type StubResponseBody,
 } from '@revisum/contracts';
 import {
-  INVALID, allValid, peekRecord, readInteger, readList, readOneOf, readRecord, readText, type Issues, type Parsed,
+  INVALID, allValid, peekRecord, readInteger, readList, readOneOf, readRecord, type Issues, type Parsed,
 } from '../plan/plan-decoders.ts';
+import { readUnscannedText } from '../plan/ReadUnscannedText.ts';
 import { HEADER_NAME, readDeclarationSection, readFieldPointers, readJsonTemplate, readParameters } from './call-declarations.ts';
 import { readOrigin } from './ReadOrigin.ts';
 
@@ -101,7 +102,7 @@ function readPermittedOrigin(input: unknown, path: string, issues: Issues, permi
 }
 
 function readMatcherPath(input: unknown, path: string, issues: Issues): Parsed<string> {
-  const text = readText(input, path, issues, MAXIMUM_MATCHER_PATH_LENGTH);
+  const text = readUnscannedText(input, path, issues, MAXIMUM_MATCHER_PATH_LENGTH);
   if (text === INVALID) return INVALID;
   if (!MATCHER_PATH.test(text)) { issues.push({ code: 'unknown_value', path }); return INVALID; }
   return text;
@@ -174,7 +175,7 @@ function readStubHeaders(input: unknown, path: string, issues: Issues): Parsed<R
     // Header names are case-insensitive, so "Retry-After" and "retry-after" are one header set twice.
     if (seen.has(lower)) { issues.push({ code: 'duplicate', path: at }); return INVALID; }
     seen.add(lower);
-    const text = readText(value, at, issues, MAXIMUM_HEADER_VALUE_LENGTH);
+    const text = readUnscannedText(value, at, issues, MAXIMUM_HEADER_VALUE_LENGTH);
     return text === INVALID ? INVALID : [name, text];
   });
   return allValid(entries) ? Object.fromEntries(entries) : INVALID;
@@ -210,7 +211,7 @@ function readStubBody(
       return json === INVALID ? INVALID : { json };
     }
     case 'text': {
-      const text = readText(head['text'], at, issues, MAXIMUM_TEXT_BODY_LENGTH);
+      const text = readUnscannedText(head['text'], at, issues, MAXIMUM_TEXT_BODY_LENGTH);
       return text === INVALID ? INVALID : { text };
     }
   }
@@ -243,7 +244,7 @@ function readStorageEntry(input: unknown, path: string, context: NetworkDeclarat
   const parts = [
     readOneOf(fields['area'], `${path}.area`, issues, STORAGE_AREAS),
     readPermittedOrigin(fields['origin'], `${path}.origin`, issues, context.origins),
-    readText(fields['key'], `${path}.key`, issues, MAXIMUM_STORAGE_KEY_LENGTH),
+    readUnscannedText(fields['key'], `${path}.key`, issues, MAXIMUM_STORAGE_KEY_LENGTH),
     readOneOf(fields['access'], `${path}.access`, issues, STORAGE_ACCESS),
     readAllowInProposals(fields, path, issues),
   ] as const;

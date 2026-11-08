@@ -12,10 +12,9 @@
 // XPath), names that are run values, and steps on pages not in the map are not checked. Pure.
 import type { DraftWarning, Locator, PageMap, PageMapNode, Plan, Step } from '@revisum/contracts';
 import type { TextReading } from '../plan/readable/plan-text.ts';
+import { STEP_FACTS } from '../plan/StepFacts.ts';
 import { MAXIMUM_PAGE_MAP_NAME_LENGTH } from './page-map.ts';
 
-// Steps after which the page may no longer be the one the map shows.
-const PAGE_CHANGING_STEPS: readonly Step['type'][] = ['click', 'press', 'select', 'upload', 'download', 'dialog', 'evaluate'];
 // The roles a label names.
 const FORM_CONTROL_ROLES: readonly string[] = [
   'textbox', 'searchbox', 'checkbox', 'radio', 'combobox', 'listbox', 'slider', 'spinbutton', 'switch',
@@ -91,7 +90,7 @@ export function checkDraftLocators(plan: Plan, reading: TextReading, map: PageMa
       const position = reading.positions.get(`$.steps[${index}]`);
       if (code !== undefined && position !== undefined) warnings.push({ code, position });
     }
-    if (PAGE_CHANGING_STEPS.includes(step.type)) page = undefined;
+    if (STEP_FACTS[step.type].changesPage) page = undefined;
   }
   return warnings;
 }

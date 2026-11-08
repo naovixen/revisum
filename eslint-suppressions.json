@@ -718,7 +718,7 @@
   },
   "packages/engine/src/plan/plan-schema.ts": {
     "curly": {
-      "count": 2
+      "count": 1
     },
     "max-lines-per-function": {
       "count": 1
@@ -782,7 +782,7 @@
   },
   "packages/engine/src/plan/unsafe-features.ts": {
     "curly": {
-      "count": 4
+      "count": 2
     },
     "revisum/file-name-matches-export": {
       "count": 1

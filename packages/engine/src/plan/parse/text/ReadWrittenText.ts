@@ -1,6 +1,7 @@
 import { PlanErrorCode, type SafeText } from "@revisum/contracts";
 import { looksLikeCredential } from "../../literal-secrets.ts";
-import { INVALID, readText, type Parsed } from "../../plan-decoders.ts";
+import { INVALID, type Parsed } from "../../plan-decoders.ts";
+import { readUnscannedText } from "../../ReadUnscannedText.ts";
 import type { ParseContext } from "../ParseContext.ts";
 import { refuse } from "../Refuse.ts";
 
@@ -12,7 +13,7 @@ export function readWrittenText(
     maximumLength: number,
     minimumLength = 1,
 ): Parsed<SafeText> {
-    const text = readText(input, path, context.issues, maximumLength, minimumLength);
+    const text = readUnscannedText(input, path, context.issues, maximumLength, minimumLength);
     if (text !== INVALID && looksLikeCredential(text)) {
         return refuse(context.issues, PlanErrorCode.LiteralSecret, path);
     }

@@ -12,8 +12,9 @@ import {
 } from '@revisum/contracts';
 import { brand } from '../brand.ts';
 import {
-  INVALID, allValid, hasHoles, peekRecord, readInteger, readList, readOneOf, readRecord, readText, type Issues, type Parsed,
+  INVALID, allValid, hasHoles, peekRecord, readInteger, readList, readOneOf, readRecord, type Issues, type Parsed,
 } from '../plan/plan-decoders.ts';
+import { readUnscannedText } from '../plan/ReadUnscannedText.ts';
 import { readCallDeclarations, readServices } from './call-declarations.ts';
 import { readObservedRequestDeclarations, readStorageEntryDeclarations, readStubDeclarations } from './network-and-storage-declarations.ts';
 import { readEvidenceMode } from './evidence-declarations.ts';
@@ -355,7 +356,7 @@ function readTextList(input: unknown, path: string, issues: Issues, maximumLengt
   if (raw === INVALID) return INVALID;
   const texts = raw.map((value, index): Parsed<SafeText> => {
     const at = `${path}[${index}]`;
-    const text = readText(value, at, issues, maximumLength);
+    const text = readUnscannedText(value, at, issues, maximumLength);
     // A blank pattern or name would match the spaces in any text, so it is refused outright.
     if (text !== INVALID && text.trim() === '') { issues.push({ code: 'empty', path: at }); return INVALID; }
     return text;
@@ -387,7 +388,7 @@ function readDestructivePaths(input: unknown, path: string, issues: Issues): Par
   if (raw === INVALID) return INVALID;
   const paths = raw.map((value, index): Parsed<string> => {
     const at = `${path}[${index}]`;
-    const text = readText(value, at, issues, MAXIMUM_URL_LENGTH);
+    const text = readUnscannedText(value, at, issues, MAXIMUM_URL_LENGTH);
     if (text === INVALID) return INVALID;
     let url: URL | undefined;
     try { url = new URL(text, PATH_BASE); } catch { url = undefined; }
@@ -476,7 +477,7 @@ function readPlannerEndpoint(input: unknown, issues: Issues, secretNames: readon
   const fields = readRecord(input, path, issues, keys, kind === 'customer-key' ? keys : ['kind', 'url', 'model', 'wire']);
   if (fields === INVALID) return INVALID;
   const address = readPlannerUrl(fields['url'], `${path}.url`, issues, kind);
-  const model = readText(fields['model'], `${path}.model`, issues, MAXIMUM_MODEL_LENGTH);
+  const model = readUnscannedText(fields['model'], `${path}.model`, issues, MAXIMUM_MODEL_LENGTH);
   const wire = readOneOf(fields['wire'], `${path}.wire`, issues, PLANNER_WIRES);
   const apiKey = fields['apiKey'] === undefined ? undefined : readPlannerKey(fields['apiKey'], `${path}.apiKey`, issues, secretNames);
   if (address === INVALID || model === INVALID || wire === INVALID || apiKey === INVALID) return INVALID;
@@ -495,7 +496,7 @@ const isLoopbackHost = (hostname: string): boolean =>
 // or fragment. A customer-key endpoint sends a key, so it must be https; a local one must be on
 // the loopback interface. Its origin and path are read here once, for the draft command.
 function readPlannerUrl(input: unknown, path: string, issues: Issues, kind: PlannerEndpointKind): Parsed<PlannerAddress & { readonly url: PlannerUrl }> {
-  const text = readText(input, path, issues, MAXIMUM_URL_LENGTH);
+  const text = readUnscannedText(input, path, issues, MAXIMUM_URL_LENGTH);
   if (text === INVALID) return INVALID;
   let url: URL;
   try { url = new URL(text); } catch { issues.push({ code: 'invalid_url', path }); return INVALID; }

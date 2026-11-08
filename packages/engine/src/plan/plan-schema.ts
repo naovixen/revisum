@@ -150,8 +150,15 @@ function stepSchema(type: StepType): JsonSchema {
   const fields = STEP_FACTS[type].fields;
   const properties: Record<string, JsonSchema> = { type: { const: type } };
   for (const field of [...fields.required, ...fields.optional]) {
+    if (field === 'type') {
+      continue;
+    }
     const schema = STEP_TYPE_FIELD_SCHEMAS[type]?.[field] ?? STEP_FIELD_SCHEMAS[field];
-    if (field !== 'type' && schema !== undefined) properties[field] = schema;
+    // A field left out here would be one the published schema requires but never describes.
+    if (schema === undefined) {
+      throw new Error(`cannot build the plan schema: the ${type} step's field "${field}" has no schema`);
+    }
+    properties[field] = schema;
   }
   return closedObject(properties, fields.required);
 }

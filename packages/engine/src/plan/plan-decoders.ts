@@ -114,16 +114,6 @@ export function peekRecord(input: unknown, path: string, issues: Issues): Parsed
   return fields;
 }
 
-export function readText(
-  input: unknown, path: string, issues: Issues, maximumLength: number, minimumLength = 1,
-): Parsed<SafeText> {
-  if (typeof input !== 'string') { issues.push({ code: 'wrong_type', path }); return INVALID; }
-  if (input.length < minimumLength) { issues.push({ code: 'empty', path }); return INVALID; }
-  if (input.length > maximumLength) { issues.push({ code: 'too_long', path }); return INVALID; }
-  if (isUnsafeText(input)) { issues.push({ code: 'unsafe_text', path }); return INVALID; }
-  return brand<string, 'SafeText'>(input);
-}
-
 // Text made at run time, such as a generated value, branded only once it passes the safety rules
 // for run-time text and its length limit. Undefined means it failed them.
 export function runTimeText(value: string, maximumLength: number): SafeText | undefined {

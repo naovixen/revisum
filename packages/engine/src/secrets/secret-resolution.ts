@@ -79,7 +79,15 @@ function runStepOf(step: Step, resolveName: ResolveName): Result<RunStep, Secret
       const secret = resolveName(value.secretName);
       return secret.ok ? success({ ...step, value, secret: secret.value }) : secret;
     }
-    default:
+    case 'click': case 'hover': case 'select': case 'upload': case 'press': case 'dialog':
+    case 'expect': case 'expectPage': case 'a11yAudit': case 'capture': case 'remember':
+    case 'download': case 'expectDownload':
+    case 'call': case 'expectBackend':
+    case 'stub': case 'resetRequests': case 'expectRequests': case 'expectResponse':
+    case 'setStorage': case 'removeStorage': case 'expectStorage':
+    case 'advanceClock': case 'expectClipboard':
+    case 'evaluate': case 'expectScript':
+    case 'database': case 'expectDatabase':
       return success(step);
   }
 }

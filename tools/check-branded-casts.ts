@@ -39,7 +39,7 @@ const UNSAFE_FEATURE_DECLARATIONS = 'packages/engine/src/project/unsafe-feature-
 export const BRAND_OWNERS: Readonly<Record<string, readonly string[]>> = {
   // The generic brand: only the engine's brand() helper casts to it.
   Brand: ['packages/engine/src/brand.ts'],
-  SafeText: ['packages/engine/src/plan/plan-decoders.ts'],
+  SafeText: ['packages/engine/src/plan/plan-decoders.ts', 'packages/engine/src/plan/ReadUnscannedText.ts'],
   // A path template resolves to a path on the run's base URL once its values are known.
   AllowedUrl: [PLAN_URLS, 'packages/engine/src/run-values.ts'],
   CaptureName: [PLAN_CAPTURES],

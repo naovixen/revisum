@@ -10,8 +10,9 @@ import { SuiteFramework } from '@revisum/contracts';
 import { brand } from '../brand.ts';
 import { looksLikeCredential } from '../plan/literal-secrets.ts';
 import {
-  INVALID, allValid, readInteger, readList, readOneOf, readRecord, readText, type Issues, type Parsed,
+  INVALID, allValid, readInteger, readList, readOneOf, readRecord, type Issues, type Parsed,
 } from '../plan/plan-decoders.ts';
+import { readUnscannedText } from '../plan/ReadUnscannedText.ts';
 import { staysInside } from '../relative-paths.ts';
 import { readDeclarationSection } from './call-declarations.ts';
 
@@ -161,7 +162,7 @@ export function readImageDigest(input: unknown, path: string, issues: Issues): P
 
 // Repository-relative text that stays inside the repository.
 function readInsidePath(input: unknown, path: string, issues: Issues): Parsed<SafeText> {
-  const text = readText(input, path, issues, MAXIMUM_PATH_LENGTH);
+  const text = readUnscannedText(input, path, issues, MAXIMUM_PATH_LENGTH);
   if (text === INVALID) return INVALID;
   if (!staysInside(text)) { issues.push({ code: 'path_not_allowed', path }); return INVALID; }
   return text;
@@ -180,7 +181,7 @@ function readSuitePaths(input: unknown, path: string, issues: Issues): Parsed<re
 function readArgumentVector(input: unknown, path: string, issues: Issues): Parsed<readonly SafeText[]> {
   const raw = readList(input, path, issues, MAXIMUM_ARGUMENTS);
   if (raw === INVALID) return INVALID;
-  const argumentVector = raw.map((entry, index) => readText(entry, `${path}[${index}]`, issues, MAXIMUM_ARGUMENT_LENGTH));
+  const argumentVector = raw.map((entry, index) => readUnscannedText(entry, `${path}[${index}]`, issues, MAXIMUM_ARGUMENT_LENGTH));
   return allValid(argumentVector) ? argumentVector : INVALID;
 }
 
@@ -200,7 +201,7 @@ function readPlaywrightCommand(input: unknown, path: string, issues: Issues): Pa
 function readProjects(input: unknown, path: string, issues: Issues): Parsed<readonly SafeText[]> {
   const raw = readList(input, path, issues, MAXIMUM_PROJECTS);
   if (raw === INVALID) return INVALID;
-  const projects = raw.map((entry, index) => readText(entry, `${path}[${index}]`, issues, MAXIMUM_PROJECT_NAME_LENGTH));
+  const projects = raw.map((entry, index) => readUnscannedText(entry, `${path}[${index}]`, issues, MAXIMUM_PROJECT_NAME_LENGTH));
   if (!allValid(projects)) return INVALID;
   if (new Set(projects).size !== projects.length) { issues.push({ code: 'duplicate', path }); return INVALID; }
   return projects;
@@ -229,7 +230,7 @@ function readEnvironmentValue(input: unknown, path: string, context: SuiteContex
     const fields = readRecord(input, path, issues, ['literal']);
     if (fields === INVALID) return INVALID;
     const at = `${path}.literal`;
-    const literal = readText(fields['literal'], at, issues, MAXIMUM_LITERAL_LENGTH, 0);
+    const literal = readUnscannedText(fields['literal'], at, issues, MAXIMUM_LITERAL_LENGTH, 0);
     if (literal === INVALID) return INVALID;
     if (looksLikeCredential(literal)) { issues.push({ code: 'literal_secret', path: at }); return INVALID; }
     return { literal };

@@ -1,10 +1,20 @@
 // What the plan language says of each step type, in one table: the section it belongs to, its
 // fields, whether it checks something, where in a plan it may stand, whether it sets up what the
-// test needs and whether it holds steps of its own. Every list of step types
+// test needs, whether it holds steps of its own, whether it may change the page and what of it is
+// unsafe. Every list of step types
 // the parser, the JSON Schema, the readable forms and the run read is derived from it, so adding a
 // step type is one entry here, which the compiler demands.
 import type { CleanupStep, Step, StepByType, StepType } from "@revisum/contracts";
 import { CRITERION_FIELD, FROM_FIELD } from "./plan-grammar.ts";
+import {
+    databaseStepConstructs,
+    expectStepConstructs,
+    locatorStepConstructs,
+    noUnsafeConstructs,
+    pageScriptStepConstructs,
+    rememberStepConstructs,
+    type UnsafeConstruct,
+} from "./UnsafeConstruct.ts";
 
 // The family a step type belongs to. A run's executors are grouped the same way.
 export const StepSection = {
@@ -49,8 +59,9 @@ export type StepFields<Field extends string = string> = {
     readonly optional: readonly Field[];
 };
 
-// A step type's fact. The table types `Field` as the names its steps have.
-export type StepFact<Field extends string = string> = {
+// A step type's fact. The table types `Field` as the names its steps have and `OwnStep` as the step
+// it reads. A fact read without one can't be handed a step: nothing but the table's own lookup can.
+export type StepFact<Field extends string = string, OwnStep = never> = {
     readonly section: StepSection;
     readonly fields: StepFields<Field>;
     // A step that checks something. A plan needs at least one, or it would pass without proving anything.
@@ -65,20 +76,28 @@ export type StepFact<Field extends string = string> = {
     readonly frameDepthAdded: number;
     // A navigate step or a second tab: its `url` field names a page the browser opens.
     readonly opensUrl: boolean;
+    // A step after which the page may no longer be the one it stood on.
+    readonly changesPage: boolean;
+    // Each use of an unsafe feature a step of this type makes, at the JSON path of the field that names it.
+    readonly unsafeConstructs: (step: OwnStep, path: string) => readonly UnsafeConstruct[];
 };
 
 // One fact per step type, each naming only fields its steps have.
-type StepFactTable = { readonly [Type in StepType]: StepFact<FieldOf<Type>> };
+type StepFactTable = { readonly [Type in StepType]: StepFact<FieldOf<Type>, StepByType[Type]> };
 
 // A fact as the builders below make it, with its section, whether it holds steps and whether it
 // opens a URL kept exact, so the step types of a section, those that hold steps and those that open
-// a URL are typed from the table itself.
+// a URL are typed from the table itself. Whether it changes the page and what of it is unsafe are
+// left to each entry of the table, so a new step type can't inherit an answer from its builder.
 type BuiltFact<
     Section extends StepSection,
     Field extends string,
     HoldsSteps extends boolean,
     OpensUrl extends boolean = false,
-> = Omit<StepFact, "section" | "fields" | "holdsSteps" | "opensUrl"> & {
+> = Omit<
+    StepFact,
+    "section" | "fields" | "holdsSteps" | "opensUrl" | "changesPage" | "unsafeConstructs"
+> & {
     readonly section: Section;
     readonly fields: StepFields<Field>;
     readonly holdsSteps: HoldsSteps;
@@ -143,60 +162,167 @@ const placedAt = <Placement extends StepPlacement, Fact extends AnyBuiltFact>(
 
 const settingUp = <Fact extends AnyBuiltFact>(fact: Fact): Fact => ({ ...fact, isSetup: true });
 
+// A step that keeps the page it stands on and uses no unsafe feature.
+const CLOSED_AND_KEEPS_PAGE = { changesPage: false, unsafeConstructs: noUnsafeConstructs };
+
 // In the order the published JSON Schema and the readable forms list the step types.
 const FACTS = {
-    navigate: openingUrl(anywhere(StepSection.Navigation, ["url"], ["scripts"])),
-    click: anywhere(StepSection.Actions, ["locator"]),
-    hover: anywhere(StepSection.Actions, ["locator"]),
-    fill: anywhere(StepSection.Actions, ["locator", "value"]),
-    select: anywhere(StepSection.Actions, ["locator", "option"]),
-    upload: anywhere(StepSection.Actions, ["locator", "fixture"]),
-    press: anywhere(StepSection.Actions, ["locator", "key"], ["modifiers"]),
-    frame: holdingSteps(StepSection.FramesAndTabs, ["locator"], 1),
-    dialog: anywhere(StepSection.Actions, ["action"], ["expectText"]),
-    expect: assertion(StepSection.PageChecks, ["locator", "assert"]),
-    expectPage: assertion(StepSection.PageChecks, ["assert"]),
-    a11yAudit: anywhere(StepSection.Evidence, ["mode"]),
-    capture: anywhere(StepSection.Evidence, ["name"]),
-    remember: anywhere(StepSection.PageChecks, ["name", FROM_FIELD]),
-    download: anywhere(StepSection.Downloads, ["name", "locator"]),
-    expectDownload: assertion(StepSection.Downloads, ["download", "assert"]),
+    navigate: {
+        ...openingUrl(anywhere(StepSection.Navigation, ["url"], ["scripts"])),
+        ...CLOSED_AND_KEEPS_PAGE,
+    },
+    click: {
+        ...anywhere(StepSection.Actions, ["locator"]),
+        changesPage: true,
+        unsafeConstructs: locatorStepConstructs,
+    },
+    hover: {
+        ...anywhere(StepSection.Actions, ["locator"]),
+        changesPage: false,
+        unsafeConstructs: locatorStepConstructs,
+    },
+    fill: {
+        ...anywhere(StepSection.Actions, ["locator", "value"]),
+        changesPage: false,
+        unsafeConstructs: locatorStepConstructs,
+    },
+    select: {
+        ...anywhere(StepSection.Actions, ["locator", "option"]),
+        changesPage: true,
+        unsafeConstructs: locatorStepConstructs,
+    },
+    upload: {
+        ...anywhere(StepSection.Actions, ["locator", "fixture"]),
+        changesPage: true,
+        unsafeConstructs: locatorStepConstructs,
+    },
+    press: {
+        ...anywhere(StepSection.Actions, ["locator", "key"], ["modifiers"]),
+        changesPage: true,
+        unsafeConstructs: locatorStepConstructs,
+    },
+    frame: {
+        ...holdingSteps(StepSection.FramesAndTabs, ["locator"], 1),
+        changesPage: false,
+        unsafeConstructs: locatorStepConstructs,
+    },
+    dialog: {
+        ...anywhere(StepSection.Actions, ["action"], ["expectText"]),
+        changesPage: true,
+        unsafeConstructs: noUnsafeConstructs,
+    },
+    expect: {
+        ...assertion(StepSection.PageChecks, ["locator", "assert"]),
+        changesPage: false,
+        unsafeConstructs: expectStepConstructs,
+    },
+    expectPage: { ...assertion(StepSection.PageChecks, ["assert"]), ...CLOSED_AND_KEEPS_PAGE },
+    a11yAudit: { ...anywhere(StepSection.Evidence, ["mode"]), ...CLOSED_AND_KEEPS_PAGE },
+    capture: { ...anywhere(StepSection.Evidence, ["name"]), ...CLOSED_AND_KEEPS_PAGE },
+    remember: {
+        ...anywhere(StepSection.PageChecks, ["name", FROM_FIELD]),
+        changesPage: false,
+        unsafeConstructs: rememberStepConstructs,
+    },
+    download: {
+        ...anywhere(StepSection.Downloads, ["name", "locator"]),
+        changesPage: true,
+        unsafeConstructs: locatorStepConstructs,
+    },
+    expectDownload: {
+        ...assertion(StepSection.Downloads, ["download", "assert"]),
+        ...CLOSED_AND_KEEPS_PAGE,
+    },
     // A second tab's steps count frames from the depth of the list it stands in.
-    newTab: placedAt(
-        StepPlacement.TopLevel,
-        openingUrl(holdingSteps(StepSection.FramesAndTabs, ["url"], 0)),
-    ),
-    call: placedAt(
-        StepPlacement.TopLevelOrCleanup,
-        settingUp(anywhere(StepSection.ServiceCalls, ["call", "arguments"], ["remember"])),
-    ),
-    expectBackend: assertion(
-        StepSection.ServiceCalls,
-        ["call", "arguments", "field", "assert"],
-        StepPlacement.TopLevel,
-    ),
+    newTab: {
+        ...placedAt(
+            StepPlacement.TopLevel,
+            openingUrl(holdingSteps(StepSection.FramesAndTabs, ["url"], 0)),
+        ),
+        ...CLOSED_AND_KEEPS_PAGE,
+    },
+    call: {
+        ...placedAt(
+            StepPlacement.TopLevelOrCleanup,
+            settingUp(anywhere(StepSection.ServiceCalls, ["call", "arguments"], ["remember"])),
+        ),
+        ...CLOSED_AND_KEEPS_PAGE,
+    },
+    expectBackend: {
+        ...assertion(
+            StepSection.ServiceCalls,
+            ["call", "arguments", "field", "assert"],
+            StepPlacement.TopLevel,
+        ),
+        ...CLOSED_AND_KEEPS_PAGE,
+    },
     // Arguments only with a start; the parser refuses them on a stop.
-    stub: anywhere(StepSection.NetworkAndStorage, ["stub", "action"], ["arguments"]),
-    resetRequests: anywhere(StepSection.NetworkAndStorage, ["request"]),
-    expectRequests: assertion(StepSection.NetworkAndStorage, ["request", "count"]),
-    expectResponse: assertion(StepSection.NetworkAndStorage, ["request", "assert"]),
-    setStorage: anywhere(StepSection.NetworkAndStorage, ["entry"], ["arguments"]),
-    removeStorage: anywhere(StepSection.NetworkAndStorage, ["entry"]),
-    expectStorage: assertion(StepSection.NetworkAndStorage, ["entry", "assert"]),
+    stub: {
+        ...anywhere(StepSection.NetworkAndStorage, ["stub", "action"], ["arguments"]),
+        ...CLOSED_AND_KEEPS_PAGE,
+    },
+    resetRequests: {
+        ...anywhere(StepSection.NetworkAndStorage, ["request"]),
+        ...CLOSED_AND_KEEPS_PAGE,
+    },
+    expectRequests: {
+        ...assertion(StepSection.NetworkAndStorage, ["request", "count"]),
+        ...CLOSED_AND_KEEPS_PAGE,
+    },
+    expectResponse: {
+        ...assertion(StepSection.NetworkAndStorage, ["request", "assert"]),
+        ...CLOSED_AND_KEEPS_PAGE,
+    },
+    setStorage: {
+        ...anywhere(StepSection.NetworkAndStorage, ["entry"], ["arguments"]),
+        ...CLOSED_AND_KEEPS_PAGE,
+    },
+    removeStorage: {
+        ...anywhere(StepSection.NetworkAndStorage, ["entry"]),
+        ...CLOSED_AND_KEEPS_PAGE,
+    },
+    expectStorage: {
+        ...assertion(StepSection.NetworkAndStorage, ["entry", "assert"]),
+        ...CLOSED_AND_KEEPS_PAGE,
+    },
     // An advance without a mode runs timers. It checks nothing.
-    advanceClock: anywhere(StepSection.ClockAndClipboard, ["by"], ["mode"]),
-    expectClipboard: assertion(StepSection.ClockAndClipboard, ["assert"]),
-    evaluate: settingUp(anywhere(StepSection.PageScripts, ["script", "arguments"], ["remember"])),
-    expectScript: assertion(StepSection.PageScripts, ["script", "arguments", "field", "assert"]),
-    database: placedAt(
-        StepPlacement.TopLevelOrCleanup,
-        settingUp(anywhere(StepSection.DatabaseCommands, ["command", "arguments"], ["remember"])),
-    ),
-    expectDatabase: assertion(
-        StepSection.DatabaseCommands,
-        ["command", "arguments", "field", "assert"],
-        StepPlacement.TopLevel,
-    ),
+    advanceClock: {
+        ...anywhere(StepSection.ClockAndClipboard, ["by"], ["mode"]),
+        ...CLOSED_AND_KEEPS_PAGE,
+    },
+    expectClipboard: {
+        ...assertion(StepSection.ClockAndClipboard, ["assert"]),
+        ...CLOSED_AND_KEEPS_PAGE,
+    },
+    evaluate: {
+        ...settingUp(anywhere(StepSection.PageScripts, ["script", "arguments"], ["remember"])),
+        changesPage: true,
+        unsafeConstructs: pageScriptStepConstructs,
+    },
+    expectScript: {
+        ...assertion(StepSection.PageScripts, ["script", "arguments", "field", "assert"]),
+        changesPage: false,
+        unsafeConstructs: pageScriptStepConstructs,
+    },
+    database: {
+        ...placedAt(
+            StepPlacement.TopLevelOrCleanup,
+            settingUp(
+                anywhere(StepSection.DatabaseCommands, ["command", "arguments"], ["remember"]),
+            ),
+        ),
+        changesPage: false,
+        unsafeConstructs: databaseStepConstructs,
+    },
+    expectDatabase: {
+        ...assertion(
+            StepSection.DatabaseCommands,
+            ["command", "arguments", "field", "assert"],
+            StepPlacement.TopLevel,
+        ),
+        changesPage: false,
+        unsafeConstructs: databaseStepConstructs,
+    },
 } satisfies StepFactTable;
 
 // The fields each step type's fact lists, read from the table.

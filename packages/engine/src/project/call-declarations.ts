@@ -11,8 +11,9 @@ import {
 } from '@revisum/contracts';
 import { brand } from '../brand.ts';
 import {
-  INVALID, allValid, peekRecord, readInteger, readList, readOneOf, readRecord, readText, type Issues, type Parsed,
+  INVALID, allValid, peekRecord, readInteger, readList, readOneOf, readRecord, type Issues, type Parsed,
 } from '../plan/plan-decoders.ts';
+import { readUnscannedText } from '../plan/ReadUnscannedText.ts';
 import { DECLARED_NAME, QUERY_KEY } from '../plan/plan-grammar.ts';
 import { isInterpolationSafe } from '../service-calls/parameter-values.ts';
 import { readOrigin } from './ReadOrigin.ts';
@@ -261,7 +262,7 @@ function readHeaderValue(input: unknown, path: string, context: DeclarationConte
   if (isNonArrayObject(input) && Object.hasOwn(input, 'literal')) {
     const fields = readRecord(input, path, issues, ['literal']);
     if (fields === INVALID) return INVALID;
-    const literal = readText(fields['literal'], `${path}.literal`, issues, MAXIMUM_HEADER_LITERAL_LENGTH);
+    const literal = readUnscannedText(fields['literal'], `${path}.literal`, issues, MAXIMUM_HEADER_LITERAL_LENGTH);
     return literal === INVALID ? INVALID : { literal };
   }
   const fields = readRecord(input, path, issues, ['secretName', 'scheme']);
@@ -316,7 +317,7 @@ function readParameterType(input: unknown, path: string, issues: Issues): Parsed
       if (readRecord(input, path, issues, ['kind', 'values']) === INVALID) return INVALID;
       const raw = readList(head['values'], `${path}.values`, issues, MAXIMUM_ONE_OF_VALUES);
       if (raw === INVALID) return INVALID;
-      const values = raw.map((value, index): Parsed<SafeText> => readText(value, `${path}.values[${index}]`, issues, MAXIMUM_TEXT_PARAMETER_LENGTH));
+      const values = raw.map((value, index): Parsed<SafeText> => readUnscannedText(value, `${path}.values[${index}]`, issues, MAXIMUM_TEXT_PARAMETER_LENGTH));
       if (!allValid(values)) return INVALID;
       if (new Set(values).size !== values.length) { issues.push({ code: 'duplicate', path: `${path}.values` }); return INVALID; }
       return { kind, values };

@@ -5,62 +5,22 @@
 // refuses a disabled one at: a locator's `by`, an assertion's `kind`, a remember source's `read`,
 // a step's `type`, and an inline script's `inline`.
 import {
-  DOM_CHECK_KINDS, UNSAFE_FEATURES,
-  type CommandName, type Locator, type Plan, type ScriptName, type Step, type UnsafeFeature,
+  UNSAFE_FEATURES,
+  type CommandName, type Plan, type ScriptName, type Step, type StepByType, type StepType, type UnsafeFeature,
 } from '@revisum/contracts';
 import { isInlineChoice } from './IsInlineChoice.ts';
-import { isOneOf } from './plan-decoders.ts';
-import {
-  DATABASE_COMMAND_FEATURE, DOM_CHECKS_FEATURE, INLINE_SCRIPT_FEATURE, LOCATOR_FEATURES, NAMED_SCRIPT_FEATURE,
-} from './plan-grammar.ts';
-import { isStepIn, StepSection } from './StepFacts.ts';
+import { isStepIn, STEP_FACTS, StepSection } from './StepFacts.ts';
+import type { UnsafeConstruct } from './UnsafeConstruct.ts';
 import { everyPlanStep, visitSteps } from './VisitSteps.ts';
 
-// One use of an unsafe feature, at the JSON path of the field that names it.
-export type UnsafeConstruct = { readonly feature: UnsafeFeature; readonly path: string };
-
-// A locator's own feature, then those of the locators it is evaluated inside.
-function locatorConstructs(locator: Locator, path: string): UnsafeConstruct[] {
-  if (locator.by !== 'css' && locator.by !== 'xpath') return [];
-  const own = { feature: LOCATOR_FEATURES[locator.by], path: `${path}.by` };
-  return locator.inside === undefined ? [own] : [own, ...locatorConstructs(locator.inside, `${path}.inside`)];
-}
-
-function stepConstructs(step: Step, path: string): UnsafeConstruct[] {
-  switch (step.type) {
-    case 'click': case 'download': case 'hover': case 'fill': case 'select': case 'upload': case 'press':
-      return locatorConstructs(step.locator, `${path}.locator`);
-    // The steps inside a frame or a second tab are visited on their own.
-    case 'frame':
-      return locatorConstructs(step.locator, `${path}.locator`);
-    case 'expect': {
-      const check = isOneOf(DOM_CHECK_KINDS, step.assert.kind) ? [{ feature: DOM_CHECKS_FEATURE, path: `${path}.assert.kind` }] : [];
-      return [...locatorConstructs(step.locator, `${path}.locator`), ...check];
-    }
-    case 'remember': {
-      if (!('element' in step.from)) return [];
-      const read = step.from.read === 'attribute' ? [{ feature: DOM_CHECKS_FEATURE, path: `${path}.from.read` }] : [];
-      return [...read, ...locatorConstructs(step.from.element, `${path}.from.element`)];
-    }
-    case 'evaluate': case 'expectScript':
-      return [isInlineChoice(step.script)
-        ? { feature: INLINE_SCRIPT_FEATURE, path: `${path}.script.inline` }
-        : { feature: NAMED_SCRIPT_FEATURE, path: `${path}.type` }];
-    case 'database': case 'expectDatabase':
-      return [{ feature: DATABASE_COMMAND_FEATURE, path: `${path}.type` }];
-    case 'navigate': case 'newTab': case 'dialog': case 'expectPage': case 'expectDownload': case 'a11yAudit': case 'capture':
-    case 'call': case 'expectBackend':
-    case 'stub': case 'resetRequests': case 'expectRequests': case 'expectResponse':
-    case 'setStorage': case 'removeStorage': case 'expectStorage':
-    case 'advanceClock': case 'expectClipboard':
-      return [];
-  }
-}
+// Each step type's own entry says what of it is unsafe, so a step and the entry reading it can't disagree.
+const constructsOfStepOfType = <Type extends StepType>(type: Type, step: StepByType[Type], path: string): readonly UnsafeConstruct[] =>
+  STEP_FACTS[type].unsafeConstructs(step, path);
 
 function listConstructs(steps: readonly Step[], path: string): UnsafeConstruct[] {
   const constructs: UnsafeConstruct[] = [];
   visitSteps(steps, (step, place) => {
-    constructs.push(...stepConstructs(step, place.path));
+    constructs.push(...constructsOfStepOfType(step.type, step, place.path));
   }, path);
   return constructs;
 }

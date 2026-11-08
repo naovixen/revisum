@@ -14,7 +14,8 @@ import {
   type UnsafeFeature, type UnsafeFeaturesDeclaration,
 } from '@revisum/contracts';
 import { brand } from '../brand.ts';
-import { INVALID, allValid, readInteger, readList, readOneOf, readRecord, readText, type Issues, type Parsed } from '../plan/plan-decoders.ts';
+import { INVALID, allValid, readInteger, readList, readOneOf, readRecord, type Issues, type Parsed } from '../plan/plan-decoders.ts';
+import { readUnscannedText } from '../plan/ReadUnscannedText.ts';
 import { MAXIMUM_SELECTOR_LENGTH, SELECTOR_FORBIDDEN_CHARACTERS } from '../plan/plan-grammar.ts';
 import { readDeclarationSection, readFieldPointers, readParameters } from './call-declarations.ts';
 import { readEnvironmentVariables, readImageDigest } from './evidence-declarations.ts';
@@ -158,7 +159,7 @@ function readPageScript(input: unknown, path: string, issues: Issues): Parsed<Pa
 }
 
 function readScriptFile(input: unknown, path: string, issues: Issues): Parsed<SafeText> {
-  const file = readText(input, path, issues, MAXIMUM_SCRIPT_FILE_LENGTH);
+  const file = readUnscannedText(input, path, issues, MAXIMUM_SCRIPT_FILE_LENGTH);
   if (file === INVALID) return INVALID;
   const segments = file.slice(SCRIPT_FOLDER.length).split('/');
   if (!SCRIPT_FILE.test(file) || segments.some((segment) => segment === '' || segment === '.' || segment === '..')) {
@@ -245,7 +246,7 @@ function readArgumentVector(
     }
     const fields = readRecord(entry, at, issues, ['literal']);
     if (fields === INVALID) return INVALID;
-    const literal = readText(fields['literal'], `${at}.literal`, issues, MAXIMUM_ARGUMENT_LENGTH);
+    const literal = readUnscannedText(fields['literal'], `${at}.literal`, issues, MAXIMUM_ARGUMENT_LENGTH);
     return literal === INVALID ? INVALID : { literal };
   });
   return allValid(argv) ? argv : INVALID;
@@ -268,7 +269,7 @@ function readSelectorList(input: unknown, path: string, issues: Issues): Parsed<
   if (raw === INVALID) return INVALID;
   const selectors = raw.map((value, index): Parsed<SafeText> => {
     const at = `${path}[${index}]`;
-    const selector = readText(value, at, issues, MAXIMUM_SELECTOR_LENGTH);
+    const selector = readUnscannedText(value, at, issues, MAXIMUM_SELECTOR_LENGTH);
     if (selector !== INVALID && SELECTOR_FORBIDDEN_CHARACTERS.test(selector)) { issues.push({ code: 'unsafe_text', path: at }); return INVALID; }
     return selector;
   });
