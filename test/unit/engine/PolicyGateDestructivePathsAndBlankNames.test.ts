@@ -31,6 +31,9 @@ const DESTRUCTIVE_SPELLINGS: readonly string[] = [
     "/account/delete;x=1",
     "/ACCOUNT/DELETE;x=1",
     "/account/delete;x=1/confirm",
+    // Five layers of encoding is more than the gate reads, and what it can't read might be anything.
+    "/account/%2525252564elete",
+    "/account/s%2525252565ttings",
 ];
 
 const ORDINARY_PATHS: readonly string[] = [
@@ -38,6 +41,8 @@ const ORDINARY_PATHS: readonly string[] = [
     "/account/settings;x=1",
     "/account/deleted",
     "/account/delete-history",
+    // Four layers is the most the gate can still read to the end.
+    "/account/s%25252565ttings",
 ];
 
 const ALREADY_READ_AS_DESTRUCTIVE: readonly string[] = [

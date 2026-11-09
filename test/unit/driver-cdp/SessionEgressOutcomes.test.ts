@@ -18,6 +18,7 @@ const NOT_A_PROXY: readonly { readonly name: string; readonly server: string }[]
     { name: "a PAC-style entry", server: "PROXY proxy.test:3128" },
     { name: "a host with no scheme", server: "proxy.test:3128" },
     { name: "an address with no port", server: "http://proxy.test" },
+    { name: "an address on port 0", server: "http://proxy.test:0" },
 ];
 
 const PROXIES: readonly string[] = [
