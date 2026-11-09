@@ -3,7 +3,7 @@ fixtures/
 golden/
 test/fixtures/
 test/golden/
-docs/
+/docs/
 *.md
 package-lock.json
 licences.json
