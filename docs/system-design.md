@@ -1,14 +1,14 @@
 # System design: what is built, with what, and where it lives
 
 - **Serves:** the founder's approval of `09`. It shows what phase 1 implements and how, in one place, before any product code exists.
-- **As of:** 2026-10-27. It brings together `04` (architecture), `06` (stack), `11` (interface), `12` (drivers and engines) and the specs in `specs/`, and adds the package layout, folder structure and naming rules.
+- **As of:** 2026-10-27, with the packages, folders, naming and run stages brought in line with the code on 2026-11-09, after the architecture refactor (`docs/decisions/architecture-refactor.md`). It brings together `04` (architecture), `06` (stack), `11` (interface), `12` (drivers and engines) and the specs in `specs/`, and adds the package layout, folder structure and naming rules.
 - **Terms:** *engine* means the trusted core library (the "core" of `04`). *Package* means one npm workspace in the product repo. *Revisum* is the product name (chosen 2026-10-27; UK and EU trademark checks pending); `revisum` is the repo, package and CLI name.
 - **Research references:** two-digit doc numbers such as `04` or `09`, claim IDs `[C-…]` and `[calc:…]` markers point to the research repo `E:\core\docs`. They are background, never names in code.
 
 ## In short
 
 - **One TypeScript monorepo on Node 24 with eight phase-1 packages (changed by the founder, 2026-11-02: `driver-playwright` and the stub `action` were removed; SPEC-16 recreates `action`).** A zero-dependency engine sits in the middle. Drivers, auditors, renderers, the runner and the CLI plug into it through typed ports. The compiler rejects any import in the wrong direction.
-- **One run is a straight pipeline:** parse the plan, then check trust and policy, resolve targets, run in an isolated container, capture masked evidence, audit accessibility with two engines, and decide with a pure oracle. The run ends by writing a hashed result, report, PR comment and review queue.
+- **One run is a straight pipeline:** parse the plan, then check trust and policy, make the preflight checks, resolve targets, run in an isolated container, capture masked evidence, audit accessibility with two engines, and decide with a pure oracle. The run ends by writing a hashed result, report, PR comment and review queue.
 - **AI never reaches execution unparsed.** Plans arrive as `unknown` and become typed only through the engine's parser. Every human decision goes into a hash-chained audit log.
 - **The closed plan language is the default.** Evidence mode (a team's own Playwright suite, wrapped with Revisum's evidence) and unsafe plan features are opt-in in the trusted project file, and every output resting on them is labelled `host` (`docs/decisions/language-fit-pivot.md`).
 - **The code must read without the research.** No research IDs appear in any identifier, names are domain words, and a CI lint enforces both (Finding 6).
@@ -21,10 +21,10 @@
 | TypeScript on Node 24 LTS, erasable syntax only, `tsc` as a required gate | Node strips types but checks nothing [C-R10-001][C-R10-002]; the P3 core ran this way with 0 [spike:p3_core_runtime_deps] runtime dependencies (`06`) | high |
 | One repo, npm workspaces, one package per port family; TypeScript project references make wrong-way imports a compile error | `04` Finding 5 and `06` Finding 1 ask for compiler-enforced direction; SPEC-00 AC-02 | high |
 | Public contracts live in an Apache-2.0 `contracts` package; the engine, runner, own accessibility engine and CLI are FSL-1.1 | Adapters must not depend on FSL code; the layer split follows `07` Finding 3; where the CLI and Action fall is a design call | med |
-| Own CDP driver on Chromium, the only driver in phase 1 (changed by the founder, 2026-11-02: the Playwright fallback adapter was removed; Firefox comes through BiDi in SPEC-19) | Own drivers passed 32 [spike:p4_contract_passed] of 32 contract tests with 0 [spike:p4_adapter_runtime_deps] runtime dependencies; iframes, dialogs, uploads and crash recovery are unbuilt (`12`) | med |
+| Own CDP driver on Chromium, the only driver in phase 1 (changed by the founder, 2026-11-02: the Playwright fallback adapter was removed; Firefox comes through BiDi in SPEC-19) | Own drivers passed 32 [spike:p4_contract_passed] of 32 contract tests with 0 [spike:p4_adapter_runtime_deps] runtime dependencies (`12`); iframes, dialogs, uploads and crash recovery have since been built | med |
 | axe-core 4.14.0 and core's own ACT engine run side by side; axe is the reference the own engine is measured against | axe covers 8 [calc:f2_a11y_sc_axe_only] criteria the own engine doesn't (`12`); founder decision, 2026-10-27 | high |
 | Runs execute in a container pinned by digest, with an egress proxy outside the browser; the same image is the dev container | Container digests pin OS and fonts [C-R13-004]; in-browser routing leaks [C-F1-005]; one image keeps local and CI runs equal | med |
-| Tests, proofs, fixtures and golden files live in top-level folders that code owners hold, apart from the code | Models edit tests to pass [C-R13-062]; SPEC-00 AC-05 | high |
+| Tests, proofs, fixtures and golden files live under one top-level `test/` folder that the founder owns, apart from the code | Models edit tests to pass [C-R13-062]; SPEC-00 AC-05 | high |
 | No product names, research IDs or single letters in code identifiers; a lint enforces it | Founder requirement, 2026-10-27: maintainable by people without AI | high |
 | The closed language stays the default; evidence mode and unsafe features are enabled only in the trusted project file, labelled `host` and never counted as verified evidence | The coverage study found 36% of fresh intents expressible against the 70% language-fit criterion; founder decision, 2026-10-28 (`docs/decisions/language-fit-pivot.md`) | high |
 
@@ -40,14 +40,14 @@
 | Language | TypeScript, erasable syntax only; strict mode | `tsc --noEmit` is a required check; TypeScript 7 when stable [C-R10-004] |
 | Workspace | npm workspaces, project references | No build step for the engine; packages publish compiled JS and `.d.ts` |
 | Validation | Hand-written decoders in the engine | No Zod in the trust path; 29 [spike:p3_hostile_rejected] of 29 hostile plans rejected (P3) |
-| Public schema | JSON Schema 2020-12, generated from the TypeScript types | Agents draft plans against it |
-| Browser | Chrome for Testing and chrome-headless-shell, pinned by version and executable hash | Headless shell in CI [C-R10-016] |
+| Public schema | JSON Schema 2020-12, built by the engine from its step tables | Agents draft plans against it |
+| Browser | Chrome for Testing and chrome-headless-shell, pinned by version and executable hash | Chrome for Testing on every push; the headless-shell target in the weekly full tier |
 | Accessibility | axe-core 4.14.0 (MPL-2.0, files unmodified) and core's own ACT-rule engine | Run side by side on Chromium |
 | Isolation | Docker image pinned by digest; an egress proxy allows only declared origins. Evidence suites and database commands run in the team's own workload images, also pinned by digest | The same image runs CI and the dev container |
 | Outputs | JSON result, JUnit XML, SARIF, HTML report, PR image and comment | GitHub reads SARIF; other CIs read JUnit [C-R07-027][C-R07-025] |
 | Audit | Append-only JSONL, hash-chained, anchored outside the agent's write scope | Actors pseudonymous |
 | CI | GitHub Actions on a pinned Linux image; short-lived OIDC tokens | [C-R09-022] |
-| Tests | `node:test`; one contract suite per port; proofs; golden replays | No retries |
+| Tests | `node:test`; one session contract run over the fake and the real driver; proofs; golden replays | No retries |
 
 **Action:** pin every version above in the M0 seed; any new third-party package needs a dependency review (SPEC-00).
 
@@ -74,17 +74,17 @@ flowchart LR
 
 ### 3. Packages and how they depend on each other
 
-**Every arrow points towards `contracts`; the engine imports no adapter, and the CLI is the only place where parts are wired together.** One exception: `auditor-act` reuses `driver-cdp`'s browser connection and launcher rather than keeping a second copy (founder decision, 2026-10-28).
+**Every arrow points towards `contracts`; the engine imports no adapter, and the CLI is the only place where parts are wired together.** One exception: `auditor-act` reuses `driver-cdp`'s browser connection and launcher rather than keeping a second copy (founder decision, 2026-10-28). The diagrams of the layers, services, run pipeline and driver port are in `docs/architecture.md`.
 
 ```mermaid
 flowchart TB
-  contracts[contracts<br/>Apache-2.0<br/>types, JSON Schema, ports]
-  engine[engine<br/>FSL<br/>parser, trust, policy, lifecycle,<br/>interpreter, oracle, manifest,<br/>redaction, audit log, review queue, metrics]
+  contracts[contracts<br/>Apache-2.0<br/>types, ports, result model]
+  engine[engine<br/>FSL<br/>parser, trust, policy, run service,<br/>oracle, manifest, secrets, replay, drafting]
   cdp[driver-cdp<br/>Apache-2.0]
   axe[auditor-axe<br/>Apache-2.0]
   act[auditor-act<br/>FSL, own engine]
-  runner[runner<br/>FSL<br/>container, egress proxy]
-  report[report<br/>Apache-2.0<br/>HTML, PR image, JUnit, SARIF]
+  runner[runner<br/>FSL<br/>containers, egress proxy, workloads]
+  report[report<br/>Apache-2.0<br/>HTML report, PR comment]
   cli[cli<br/>FSL<br/>composition root]
   engine --> contracts
   cdp --> contracts
@@ -96,20 +96,23 @@ flowchart TB
   cli --> engine & cdp & axe & act & runner & report
 ```
 
-| Package | Job | Seeded from | Spec |
-|---|---|---|---|
-| `contracts` | Shared types, plan and result schemas, port interfaces | P7 core types, P3 `ports.ts` | SPEC-27, SPEC-01 |
-| `engine` | Everything trusted: parse (readable and JSON plans), trust, policy, lifecycle, interpret, decide, hash, redact, record; decode suite reports and traces | P3 `src/core` | SPEC-01 to 05, 08, 11, 13 to 15, 28, 35, 36 |
-| `driver-cdp` | Drive Chromium over CDP | P4 `src/drivers/cdp` and `shared` | SPEC-06 |
-| `auditor-axe` | Run axe-core in the page | P3 `src/adapters/shared/axe.ts` | SPEC-10 |
-| `auditor-act` | Core's own ACT-rule engine | P5 `src` | SPEC-10 |
-| `runner` | Start the pinned container and egress proxy; the workload runner starts team images by digest | New | SPEC-07, SPEC-35 |
-| `report` | Report, PR image and exporters | P6 `src/render`, `src/model` | SPEC-11, SPEC-12 |
-| `cli` | Commands `validate`, `lock`, `run`, `draft`, `export`, `review`, `approve`, `doctor` | P6 `cli.ts` (shape only) | SPEC-16, SPEC-28 |
+| Package | Job, as built | Spec |
+|---|---|---|
+| `contracts` | Shared types, port interfaces, the result model, constant objects and small foundation helpers. The JSON Schema is built in `engine` | SPEC-27, SPEC-01 |
+| `engine` | Everything trusted: parse (readable and JSON plans), project, approval, policy, secrets, the run service, oracle, manifest, replay, drafting; decode suite reports and traces. M3 adds the audit log, review queue and metrics | SPEC-01 to 05, 08, 11, 13 to 15, 28, 35, 36 |
+| `driver-cdp` | Drive Chromium over CDP. A test-only entry, `./testing`, holds the launchers production must not reach | SPEC-06 |
+| `auditor-axe` | Run axe-core in the page | SPEC-10 |
+| `auditor-act` | Core's own ACT-rule engine | SPEC-10 |
+| `runner` | Start the pinned container and egress proxy; the workload runner starts team images by digest; the service caller goes through the proxy | SPEC-07, SPEC-35 |
+| `report` | The HTML report and PR comment, with their model. The other exporters are still to come | SPEC-11, SPEC-12 |
+| `cli` | The composition root, `packages/cli/src/wiring/BuildAdapters.ts`, and the `draft` (with explore) and suite-run commands. It has no `bin` yet; SPEC-16 adds the rest of the commands | SPEC-16, SPEC-28 |
 
-Evidence mode and unsafe features add no package (SPEC-35, SPEC-36). SPEC-16 creates the `action` package (the GitHub Action wrapper). Phase 2 adds `driver-bidi` (Firefox, from P4), `mcp-server`, `tracker-github` and protocol packs under `packs/` (from P7).
+- `cli` references `report` in its `tsconfig.json` but doesn't import it yet.
+- `contracts` and `engine` import only Node built-ins and, for `engine`, `contracts`: `tools/repo-rules/code/CheckImports.ts` enforces it and `tsc` rejects a wrong-way import between packages.
 
-**Action:** create exactly these packages at M0; a new package needs a spec that names its port.
+Evidence mode and unsafe features add no package (SPEC-35, SPEC-36). SPEC-16 creates the `action` package (the GitHub Action wrapper). Phase 2 adds `driver-bidi` (Firefox), `mcp-server`, `tracker-github` and protocol packs.
+
+**Action:** a new package needs a spec that names its port.
 
 ### 4. One run, step by step
 
@@ -133,11 +136,12 @@ flowchart LR
 flowchart TD
   A[Plan file, untrusted] --> B{Parse against<br/>plan language}
   B -- invalid --> R1[Rejected: error code<br/>and JSON path, no value echoed]
-  B -- valid --> C{Trust check:<br/>project from protected branch,<br/>plan approved by a person}
-  C -- no --> R2[Needs approval]
-  C -- yes --> D{Policy gate:<br/>deny by default}
+  B -- valid --> C[Trust:<br/>project from protected branch;<br/>plan approved by a person,<br/>or else only a proposal]
+  C --> D{Policy gate:<br/>deny by default}
   D -- denied --> R3[Denied, logged]
-  D -- allowed --> E{Resolve targets<br/>from the lock file}
+  D -- allowed --> P2{Preflight:<br/>can this run at all}
+  P2 -- no --> R2[Refused,<br/>before any side effect]
+  P2 -- yes --> E{Resolve targets<br/>from the lock file}
   E -- missing --> R4[Target unavailable,<br/>never substituted]
   E -- found --> F[Start container<br/>and egress proxy]
   F --> G[Interpreter runs each step<br/>through the driver]
@@ -165,7 +169,8 @@ flowchart TD
 ```
 
 - **Unsafe features** (SPEC-36): the parse stage accepts CSS and XPath locators, DOM checks, page scripts and database commands only when the trusted project enables them; otherwise the plan is rejected.
-- **Lifecycle states** follow `04` Finding 4: Proposed, Rejected, Planned, Denied, TargetUnavailable, Authorised, Resolved, Running, Passed, Failed, Errored. Illegal transitions are compile errors.
+- **Who may run:** a run takes only a `ClearedRun`, made only by the policy gate for one plan, project, target and standing. A plan with no approval of its own hash is a proposal: the gate judges it more strictly and it never reaches a production origin.
+- **Lifecycle states** are in `packages/engine/src/run/outcome/Transition.ts`: Planned, Resolved, Running, then Passed, Failed, Errored, Denied, TargetUnavailable or Refused. Illegal transitions are compile errors. A plan the parser rejects never gets a state of the run; it ends as Rejected.
 - **Approval routes** (SPEC-02, `13` FR-06). No gate sits behind a second person (founder, 2026-10-27):
   - **Declared:** the owner's approval under the agent lock-down in `15`. The coding agent may commit but can't push or merge, so a push or merge to the default branch is the founder's (`docs/decisions/single-session-workflow.md`). It suffices for every subject: plans, trusted files, review decisions, high-risk extra reviews and holdout plans. Anything built on it is labelled `declared`.
   - **Verified (optional):** a code owner's review from an account other than the author's, for teams that have one. No feature, level or metric requires it.
@@ -181,56 +186,69 @@ flowchart TD
 
 ```
 revisum/
-├─ README.md               what it is, quick start, the "never more restrictive" licence promise
-├─ CLAUDE.md               rules for coding agents (template in docs/build/)
-├─ CONTRIBUTING.md         spec template, Definition of Done, session workflow
+├─ README.md  CLAUDE.md  CONTRIBUTING.md  START.md
 ├─ LICENSE-APACHE  LICENSE-FSL  licences.json   per-package licence map, checked in CI
-├─ package.json            npm workspaces and scripts: check, test, lint, proofs, replay
-├─ tsconfig.base.json      strict, erasable syntax only, project references
-├─ .devcontainer/          the pinned image used by CI and `npm run check:linux`; no GitHub credentials inside
-├─ .claude/settings.json   agent deny rules: no push, merge, history rewrite or PR approval
+├─ package.json            npm workspaces and scripts
+├─ tsconfig.json  tsconfig.base.json            strict, erasable syntax only, project references
+├─ .prettierrc.json  .editorconfig  eslint-suppressions.json
+├─ .devcontainer/          the pinned image used by CI and `npm run check:linux`
+├─ .claude/                settings.json (agent deny rules) and rules/ (conventions by path)
 ├─ .github/
-│  ├─ workflows/ci.yml     tsc, lint, naming lint, contract, proofs, replay, a11y re-score, tests-apart
-│  └─ CODEOWNERS           test/, proofs/, fixtures/, golden/, .github/ owned by the founder
+│  ├─ workflows/           ci.yml, full-tier.yml, benchmark.yml, browser-upkeep.yml
+│  └─ CODEOWNERS           test/ and .github/ owned by the founder
 ├─ docs/
-│  ├─ system-design.md     this doc, without research IDs
-│  ├─ glossary.md          domain term → code name
+│  ├─ system-design.md  architecture.md  glossary.md  guarantees.md  errors.md  build-loop.md
 │  ├─ decisions/           one short record per design decision
-│  └─ specs/               SPEC-00 … SPEC-27
+│  ├─ plan-language/       the published plan schema and its changelog
+│  ├─ coverage-study/      the record of the language-fit question
+│  ├─ prompts/             briefs for helper sessions
+│  └─ specs/               one spec per unit of work
 ├─ packages/
-│  ├─ contracts/   engine/   driver-cdp/   auditor-axe/
-│  ├─ auditor-act/  runner/   report/   cli/
-│  │   each: src/, package.json, tsconfig.json, README.md
+│  ├─ contracts/src/       foundation/ plan/ ports/ run-result/ events/ errors/ modes/ product/
+│  ├─ engine/src/          plan/ project/ approval/ policy/ secrets/ target/ run/ replay/
+│  │                       evidence/ drafting/ decoding/ foundation/
+│  ├─ driver-cdp/src/      connection/ launch/ page/ session/ in-page/ capabilities/ testing/
+│  ├─ runner/src/          containers/ egress/ egress-proxy/ workload/ service-calls/ image/
+│  ├─ auditor-act/src/     scan/ page/ rules/ in-page/
+│  ├─ auditor-axe/src/     audit/
+│  ├─ report/src/          model/ render/
+│  └─ cli/src/             commands/ explore/ planners/ output/ wiring/
 ├─ test/
-│  ├─ contract/            one suite every driver and auditor must pass unchanged
-│  ├─ wcag/                data-driven WCAG 2.2 test base: one runner over every criterion (SPEC-29)
-│  ├─ unit/<package>/      tests written from the spec's acceptance criteria
-│  └─ proofs/              hostile plans, secret leaks, egress, PII, audit chain, manifest sufficiency
-├─ fixtures/               small test sites and ACT cases
-├─ golden/                 recorded runs and reports replayed in CI
-└─ tools/                  naming lint, trace index, guarantee table and logging manifest generators
+│  ├─ unit/<package>/<feature>/   tests of one package, by public API; test data in examples/
+│  ├─ browser/<capability>/       real Chromium
+│  ├─ proofs/<guarantee>/         hostile plans, secrets, egress, repository rules
+│  ├─ containers/  replay/  support/
+│  └─ fixtures/  golden/          test sites, plans and recorded runs
+└─ tools/                  repo-rules/ test-runner/ metrics/ browsers/ scheduled/ eslint/
 ```
 
-- Inside a package, folders are named after what they hold: `src/plan/`, `src/policy/`, `src/audit-log/`, never `src/p3/` or `src/r11/`.
-- One concept per file, named after its main export: `policy-gate.ts` exports `evaluatePolicy`.
-- `driver-cdp/src/` holds `connection/` (the CDP socket, commands and event decoders), `launch/` (starting and stopping Chromium), `page/` (one page's commands, reads and input), `in-page/` (functions that run in the page), `session/` (the session's ports, built once over any page) and `capabilities/` (downloads, egress, network stubs, clock, clipboard, storage, audit rules).
+- Each package also has `package.json`, `tsconfig.json`, `README.md` and `src/index.ts`, which holds what other packages may use.
+- `packages/engine/src/run/` holds the run service and preflight/, session/, steps/, executors/, outcome/, after-the-verdict/, seal/, logging/ and values/. `packages/engine/src/run/executors/` has one folder per step section.
+- `packages/engine/src/plan/` holds `StepFacts.ts`, and parse/, readable/ and schema/. M3 adds folders for the review queue, audit log and metrics as their specs need them.
+- `packages/driver-cdp/src/` holds `connection/` (the CDP socket, commands and event decoders), `launch/` (starting and stopping Chromium), `page/` (one page's commands, reads and input), `in-page/` (functions that run in the page), `session/` (the session's ports) and `capabilities/` (downloads, egress, network stubs, clock, clipboard, storage, audit rules).
+- A package has no loose files beside `src/index.ts`, and no folder has more than 12 code files directly in it. Both hold today but no tool checks them.
 - Customer repositories may hold `plans/scripts/`, the page scripts their project declares (SPEC-36). Like everything under `plans/`, they are trusted files.
 
-**Action:** SPEC-00 creates this tree; CI fails if a source file sits outside `packages/*/src` or a test sits outside `test/`.
+**Action:** `tools/repo-rules/CheckLayout.ts` fails if a source file sits outside `packages/*/src` or `tools/`, a test sits outside `test/`, or a package lacks one of its four required files.
 
 ### 6. Naming and readability rules
 
-**The code must make sense to a developer who has never seen the research, so names carry meaning and IDs stay in data.**
+**The code must make sense to a developer who has never seen the research, so names carry meaning and IDs stay in data.** `.claude/rules/typescript.md` holds the rules no tool can check, and `docs/decisions/code-conventions.md` says why.
 
 | Rule | Example: no | Example: yes |
 |---|---|---|
 | No research or process IDs in identifiers, files, folders, packages, JSON keys, error codes or flags (R1–R13, RC, FR, NFR, UP, SC, FD, H, P1–P7, job or claim IDs, doc numbers) | `R11Test`, `checkFr06`, `p4Driver` | `DependencyCheck`, `rejectSelfApproval`, `CdpDriver` |
 | Domain words, no single letters (except loop indices and x/y), no unexplained abbreviations | `T`, `V`, `acId`, `w` | `tracedCriteriaShare`, `verifiedWithoutReviewShare`, `criterionId`, `width` |
-| Comments explain what and why in plain English and never cite a spec | `// see 04 Finding 1` | `// Deny by default: an unknown action could be destructive.` |
-| Traceability lives in commit trailers: spec and criterion IDs never appear in code, tests or comments | `function ac_spec_01_03()`, `// SPEC-03 says so` | `Criteria: AC-SPEC-01-03` in the commit message |
+| A file is named in PascalCase after its main export; folders are kebab-case; `index.ts` stays lowercase | `policy-gate.ts`, `utils.ts` | `PolicyGate.ts`, `run-result/` |
+| A fixed set of values is a constant object with a type of the same name, because real enums can't run under Node's type stripping | `kind === "textEquals"` | `kind === ClipboardAssertionKind.TextEquals` |
+| `function` for named declarations and anything relying on `this`; method shorthand on objects; arrows for callbacks and functions assigned to a declared type | `export const run = function () { … }` | `export function createRunService(…)` |
+| Comments say why in plain English and never cite a spec | `// see 04 Finding 1` | `// Deny by default: an unknown action could be destructive.` |
+| Traceability lives in the `Spec:` and `Criteria:` commit trailers: spec and criterion IDs never appear in code, tests or comments | A spec ID in a function name or comment | The ID in the commit message's trailer |
 | The product name appears once, in the `PRODUCT` constant | `'core-plan/v1'` scattered | `` `${PRODUCT.schemaNamespace}-plan/v1` `` |
 
 Allowed abbreviations: id, url, uri, html, css, json, http, api, cli, ci, pr, cdp, bidi, wcag, act, a11y, pii, sha256, svg, png, dom, os. Standard names, each spelled out in the glossary: ai, mcp, sarif, junit, oidc, jwt, lti.
+
+A customer's own `criterionId` in a plan is product data, not a name, and stays.
 
 | Research term | Code name |
 |---|---|
@@ -241,7 +259,7 @@ Allowed abbreviations: id, url, uri, html, css, json, http, api, cli, ci, pr, cd
 | AC | `criterion` (`criterionId`, `criteriaInScope`) |
 | Change class | `changeClass` (`changeClassId`) |
 
-**Action:** ship the naming lint at M0 (SPEC-00) and `docs/glossary.md` with these rows. The lint fails on banned patterns, on single-letter exports and on research citations in comments.
+**Action:** `npm run lint:names` and ESLint (`npm run lint:code`) enforce these, with `revisum/file-name-matches-export` for file names. Magic strings still baselined in `eslint-suppressions.json` go in phase 6.
 
 ### 7. What is built when
 
