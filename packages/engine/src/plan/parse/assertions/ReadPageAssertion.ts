@@ -1,5 +1,6 @@
 import {
     PageAssertionKind,
+    PageTextKind,
     PlanErrorCode,
     type PageAssertion,
     type SafeText,
@@ -79,7 +80,8 @@ export function readPageAssertion(
             return readKindAndValue(input, path, context, kind, (value, valuePath) =>
                 readPathPrefix(value, valuePath, context),
             );
-        default: {
+        case PageTextKind.Title:
+        case PageTextKind.UrlPath: {
             // A page may have an empty title, so an empty expected title or path is a real check.
             const longest = context.rules.limits.maximumTextLength;
             return readKindAndValue(input, path, context, kind, (value, valuePath) =>

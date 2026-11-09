@@ -114,7 +114,8 @@ function keepOutcome(step: RunStep, index: number, ran: RanStep, soFar: StepsSoF
         case ExecutorOutcome.SetupFailedInside:
             soFar.setupFailedInside.add(index);
             return ran.failed;
-        default:
+        case StepOutcome.Passed:
+        case StepOutcome.Failed:
             return ran;
     }
 }

@@ -35,7 +35,8 @@ export function readBackendAssertion(
             return readKindAlone(input, path, context, kind);
         case BackendAssertionKind.NumberEquals:
             return readKindAndValue(input, path, context, kind, readFiniteNumber);
-        default:
+        case BackendAssertionKind.Equals:
+        case BackendAssertionKind.Contains:
             return readKindAndValue(input, path, context, kind, (value, valuePath) =>
                 readExpectedText(value, valuePath, context),
             );

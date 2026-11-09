@@ -36,7 +36,8 @@ export async function runPlanStep(
             return ran;
         case ExecutorOutcome.SetupFailedInside:
             return setupFailedInside(withActiveStubs(step, ran.failed, context.activeStubs));
-        default:
+        case StepOutcome.Passed:
+        case StepOutcome.Failed:
             return withActiveStubs(step, ran, context.activeStubs);
     }
 }
@@ -70,7 +71,8 @@ async function runStepOnLivePage(
                     isRequestHeld ? { ...failed, ...stepFailed(StepCode.AdapterError) } : failed,
                 );
             }
-            default: {
+            case StepOutcome.Passed:
+            case StepOutcome.Failed: {
                 const done: RanStepResult = { index, type: step.type, ...executed };
                 return isRequestHeld
                     ? { ...done, ...stepFailed(StepCode.AdapterError) }

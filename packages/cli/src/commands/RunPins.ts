@@ -110,19 +110,19 @@ function commitOf(repositoryRoot: string): string | null {
 
 // Where each operating system keeps its fonts.
 function fontFolders(): string[] {
-    switch (platform()) {
-        case "win32":
-            return [join(process.env["SystemRoot"] ?? "C:\\Windows", "Fonts")];
-        case "darwin":
-            return ["/System/Library/Fonts", "/Library/Fonts", join(homedir(), "Library", "Fonts")];
-        default:
-            return [
-                "/usr/share/fonts",
-                "/usr/local/share/fonts",
-                join(homedir(), ".fonts"),
-                join(homedir(), ".local", "share", "fonts"),
-            ];
+    const system = platform();
+    if (system === "win32") {
+        return [join(process.env["SystemRoot"] ?? "C:\\Windows", "Fonts")];
     }
+    if (system === "darwin") {
+        return ["/System/Library/Fonts", "/Library/Fonts", join(homedir(), "Library", "Fonts")];
+    }
+    return [
+        "/usr/share/fonts",
+        "/usr/local/share/fonts",
+        join(homedir(), ".fonts"),
+        join(homedir(), ".local", "share", "fonts"),
+    ];
 }
 
 function filesUnder(folder: string): string[] {

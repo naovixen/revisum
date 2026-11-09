@@ -1,20 +1,29 @@
 {
   "packages/auditor-act/src/page/BuildSnapshot.ts": {
     "max-lines-per-function": {
-      "count": 1
+      "count": 2
     },
     "no-useless-assignment": {
       "count": 1
     }
   },
   "packages/auditor-act/src/page/DecodePng.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    },
     "no-nested-ternary": {
       "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 3
     }
   },
   "packages/auditor-act/src/page/InAccessibilityTree.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 2
+    },
+    "no-restricted-syntax": {
+      "count": 8
     },
     "prefer-template": {
       "count": 1
@@ -23,6 +32,9 @@
   "packages/auditor-act/src/page/LaunchBrowser.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 2
+    },
+    "no-restricted-syntax": {
+      "count": 9
     },
     "prefer-template": {
       "count": 2
@@ -34,6 +46,12 @@
     },
     "@typescript-eslint/strict-boolean-expressions": {
       "count": 9
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 57
     }
   },
   "packages/auditor-act/src/rules/InteractiveRules.ts": {
@@ -43,8 +61,22 @@
     "@typescript-eslint/require-await": {
       "count": 4
     },
+    "max-lines": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 15
+    },
     "prefer-template": {
       "count": 6
+    }
+  },
+  "packages/auditor-act/src/rules/Rule.ts": {
+    "no-restricted-syntax": {
+      "count": 4
     }
   },
   "packages/auditor-act/src/rules/StaticRules.ts": {
@@ -57,8 +89,14 @@
     "max-lines": {
       "count": 1
     },
+    "max-lines-per-function": {
+      "count": 1
+    },
     "no-nested-ternary": {
       "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 71
     },
     "prefer-template": {
       "count": 4
@@ -72,19 +110,73 @@
       "count": 4
     }
   },
+  "packages/auditor-axe/src/audit/RunAxe.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
   "packages/cli/src/commands/BenchmarkRuns.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 13
     }
   },
   "packages/cli/src/commands/DraftCommand.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 3
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 2
+    },
+    "no-restricted-syntax": {
+      "count": 10
+    }
+  },
+  "packages/cli/src/commands/RunPins.ts": {
+    "no-restricted-syntax": {
+      "count": 2
     }
   },
   "packages/cli/src/commands/RunSuite.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 2
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 4
+    }
+  },
+  "packages/cli/src/explore/ExploreInContainer.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "packages/cli/src/wiring/BuildAdapters.ts": {
+    "no-restricted-syntax": {
+      "count": 6
+    }
+  },
+  "packages/contracts/src/foundation/ParseOrigin.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "packages/contracts/src/plan/Plan.ts": {
+    "max-lines": {
+      "count": 1
     }
   },
   "packages/contracts/src/ports/DeterminismScript.ts": {
@@ -92,40 +184,190 @@
       "count": 1
     }
   },
+  "packages/driver-cdp/src/capabilities/DownloadFolder.ts": {
+    "no-restricted-syntax": {
+      "count": 3
+    }
+  },
+  "packages/driver-cdp/src/capabilities/EgressRecorder.ts": {
+    "no-restricted-syntax": {
+      "count": 3
+    }
+  },
+  "packages/driver-cdp/src/capabilities/PageStorage.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "packages/driver-cdp/src/connection/CdpConnection.ts": {
+    "no-restricted-syntax": {
+      "count": 3
+    }
+  },
   "packages/driver-cdp/src/in-page/document/PageAudit.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 5
     },
+    "max-lines": {
+      "count": 1
+    },
     "max-lines-per-function": {
       "count": 1
+    }
+  },
+  "packages/driver-cdp/src/in-page/elements/Actionability.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "packages/driver-cdp/src/launch/LaunchChromium.ts": {
+    "no-restricted-syntax": {
+      "count": 4
+    }
+  },
+  "packages/driver-cdp/src/page/CdpPage.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "packages/driver-cdp/src/page/MainWorld.ts": {
+    "no-restricted-syntax": {
+      "count": 6
+    }
+  },
+  "packages/driver-cdp/src/page/PageWatch.ts": {
+    "max-lines": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 3
+    }
+  },
+  "packages/driver-cdp/src/page/checks/ClickCheckWorld.ts": {
+    "no-restricted-syntax": {
+      "count": 4
+    }
+  },
+  "packages/driver-cdp/src/page/checks/HitChecks.ts": {
+    "no-restricted-syntax": {
+      "count": 10
+    }
+  },
+  "packages/driver-cdp/src/page/checks/RoleAndNameOf.ts": {
+    "no-restricted-syntax": {
+      "count": 3
+    }
+  },
+  "packages/driver-cdp/src/page/input/CdpPageInput.ts": {
+    "no-restricted-syntax": {
+      "count": 9
+    }
+  },
+  "packages/driver-cdp/src/page/input/HeldModifierKeys.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "packages/driver-cdp/src/page/input/KeyDefinitions.ts": {
+    "no-restricted-syntax": {
+      "count": 29
+    }
+  },
+  "packages/driver-cdp/src/session/PreparePage.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "packages/driver-cdp/src/session/actions/WaitUntilActionable.ts": {
+    "no-restricted-syntax": {
+      "count": 6
+    }
+  },
+  "packages/driver-cdp/src/session/document/FindElements.ts": {
+    "no-restricted-syntax": {
+      "count": 3
+    }
+  },
+  "packages/driver-cdp/src/session/document/ProbeDocument.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "packages/driver-cdp/src/session/document/RunPageScript.ts": {
+    "no-restricted-syntax": {
+      "count": 3
     }
   },
   "packages/engine/src/approval/ApprovalVerifier.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 1
     },
+    "max-lines": {
+      "count": 1
+    },
     "max-lines-per-function": {
       "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 2
     }
   },
   "packages/engine/src/approval/ParseCodeOwners.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 2
+    },
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "packages/engine/src/decoding/ReadableCopy.ts": {
+    "no-restricted-syntax": {
+      "count": 1
     }
   },
   "packages/engine/src/drafting/CheckDraftLocators.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 2
     }
   },
   "packages/engine/src/drafting/CrawlSite.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "packages/engine/src/drafting/ExtractCriteria.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "packages/engine/src/drafting/PageMapEntry.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 3
+    }
+  },
+  "packages/engine/src/drafting/PlannerRequestBody.ts": {
+    "no-restricted-syntax": {
+      "count": 3
     }
   },
   "packages/engine/src/evidence/EvidenceResult.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 2
+    },
+    "max-lines-per-function": {
+      "count": 1
     },
     "no-control-regex": {
       "count": 1
@@ -134,6 +376,17 @@
   "packages/engine/src/evidence/ParseSuiteTrace.ts": {
     "@typescript-eslint/strict-boolean-expressions": {
       "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "packages/engine/src/evidence/ReadZip.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 2
     }
   },
   "packages/engine/src/evidence/SuitePasses.ts": {
@@ -141,9 +394,20 @@
       "count": 1
     }
   },
+  "packages/engine/src/evidence/SuiteReport.ts": {
+    "max-lines": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
   "packages/engine/src/foundation/RepositoryPath.ts": {
     "no-control-regex": {
       "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 4
     }
   },
   "packages/engine/src/foundation/Sha256.ts": {
@@ -154,6 +418,9 @@
   "packages/engine/src/plan/parse/AdmitDraft.ts": {
     "@typescript-eslint/no-unsafe-assignment": {
       "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 1
     }
   },
   "packages/engine/src/plan/parse/ReadRecord.ts": {
@@ -161,20 +428,47 @@
       "count": 2
     }
   },
+  "packages/engine/src/plan/parse/declarations/ReadPlanClock.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "packages/engine/src/plan/parse/text/ReadNavigation.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "packages/engine/src/plan/parse/text/ReadUrl.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
   "packages/engine/src/plan/readable/ReadPlanText.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 6
     },
-    "max-lines-per-function": {
+    "max-lines": {
       "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 3
     },
     "no-irregular-whitespace": {
       "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 16
     }
   },
   "packages/engine/src/plan/readable/StepStatements.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 1
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 4
     }
   },
   "packages/engine/src/plan/readable/Syntax.ts": {
@@ -186,16 +480,38 @@
     },
     "no-nested-ternary": {
       "count": 2
+    },
+    "no-restricted-syntax": {
+      "count": 15
     }
   },
   "packages/engine/src/plan/schema/PlanJsonSchema.ts": {
+    "max-lines": {
+      "count": 1
+    },
     "max-lines-per-function": {
       "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 53
+    }
+  },
+  "packages/engine/src/policy/IsDestructivePath.ts": {
+    "no-restricted-syntax": {
+      "count": 2
     }
   },
   "packages/engine/src/policy/PolicyGate.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 3
+    },
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "packages/engine/src/project/ParseBaseUrl.ts": {
+    "no-restricted-syntax": {
+      "count": 2
     }
   },
   "packages/engine/src/project/ParseProject.ts": {
@@ -204,36 +520,83 @@
     },
     "max-lines": {
       "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 5
     }
   },
   "packages/engine/src/project/ReadCallDeclarations.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 1
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 2
+    },
+    "no-restricted-syntax": {
+      "count": 6
     }
   },
   "packages/engine/src/project/ReadEvidenceMode.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 6
+    },
+    "max-lines": {
+      "count": 1
     }
   },
   "packages/engine/src/project/ReadStubDeclarations.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 1
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 3
     }
   },
   "packages/engine/src/project/ReadUnsafeFeatures.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 5
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 3
     }
   },
   "packages/engine/src/project/TrustedProject.ts": {
     "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "packages/engine/src/replay/DecodeManifest.ts": {
+    "max-lines": {
+      "count": 1
+    },
+    "max-lines-per-function": {
       "count": 1
     }
   },
   "packages/engine/src/replay/Replay.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 2
+    },
+    "max-lines-per-function": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 4
     }
   },
   "packages/engine/src/replay/RunRecording.ts": {
@@ -242,10 +605,42 @@
     },
     "@typescript-eslint/unbound-method": {
       "count": 2
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "packages/engine/src/run/CodeForThrow.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "packages/engine/src/run/Observe.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "packages/engine/src/run/after-the-verdict/ReadKeepingTheResult.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "packages/engine/src/run/executors/clock-and-clipboard/CheckClipboard.ts": {
+    "no-restricted-syntax": {
+      "count": 11
     }
   },
   "packages/engine/src/run/executors/database-commands/RunDatabaseStep.ts": {
     "@typescript-eslint/naming-convention": {
+      "count": 1
+    },
+    "max-lines": {
       "count": 1
     }
   },
@@ -255,16 +650,25 @@
     },
     "@typescript-eslint/require-await": {
       "count": 1
+    },
+    "max-lines": {
+      "count": 1
     }
   },
   "packages/engine/src/run/executors/page-scripts/DecodeScriptResult.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 7
     }
   },
   "packages/engine/src/run/executors/service-calls/ArgumentValue.ts": {
     "no-nested-ternary": {
       "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 2
     }
   },
   "packages/engine/src/run/executors/service-calls/BuildServiceRequest.ts": {
@@ -273,6 +677,9 @@
     },
     "@typescript-eslint/no-unsafe-argument": {
       "count": 2
+    },
+    "no-restricted-syntax": {
+      "count": 7
     }
   },
   "packages/engine/src/run/executors/service-calls/CheckBackendField.ts": {
@@ -280,14 +687,28 @@
       "count": 1
     }
   },
+  "packages/engine/src/run/executors/service-calls/RunCallStep.ts": {
+    "max-lines": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 7
+    }
+  },
   "packages/engine/src/run/logging/JsonLinesEventSink.ts": {
     "@typescript-eslint/naming-convention": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
       "count": 1
     }
   },
   "packages/engine/src/run/logging/LoggingManifest.ts": {
     "@typescript-eslint/no-unnecessary-type-assertion": {
       "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 20
     }
   },
   "packages/engine/src/run/outcome/Transition.ts": {
@@ -296,6 +717,9 @@
     },
     "@typescript-eslint/no-unused-vars": {
       "count": 2
+    },
+    "no-restricted-syntax": {
+      "count": 3
     }
   },
   "packages/engine/src/run/outcome/Verdict.ts": {
@@ -309,6 +733,14 @@
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "packages/engine/src/run/seal/DriverBrokeResultOfRun.ts": {
+    "no-restricted-syntax": {
+      "count": 1
     }
   },
   "packages/engine/src/run/seal/GuaranteeStatement.ts": {
@@ -316,13 +748,52 @@
       "count": 3
     }
   },
+  "packages/engine/src/run/seal/UnavailableResult.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "packages/engine/src/run/steps/RunPlanStep.ts": {
+    "no-restricted-syntax": {
+      "count": 3
+    }
+  },
+  "packages/engine/src/run/values/RunValues.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "packages/engine/src/secrets/EncodedEchoes.ts": {
+    "no-restricted-syntax": {
+      "count": 3
+    }
+  },
+  "packages/engine/src/secrets/LeakScanner.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
   "packages/engine/src/secrets/SecretRedaction.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 4
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 6
+    }
+  },
+  "packages/engine/src/target/GuardedDriver.ts": {
+    "no-restricted-syntax": {
+      "count": 3
     }
   },
   "packages/engine/src/target/ReadLockfile.ts": {
     "@typescript-eslint/naming-convention": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
       "count": 1
     }
   },
@@ -336,6 +807,17 @@
       "count": 2
     }
   },
+  "packages/report/src/model/ParseReportInput.ts": {
+    "max-lines": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 3
+    },
+    "no-restricted-syntax": {
+      "count": 12
+    }
+  },
   "packages/report/src/model/ReportView.ts": {
     "@typescript-eslint/strict-boolean-expressions": {
       "count": 4
@@ -346,6 +828,11 @@
   },
   "packages/report/src/render/FigureSvg.ts": {
     "@typescript-eslint/strict-boolean-expressions": {
+      "count": 1
+    }
+  },
+  "packages/report/src/render/Generate.ts": {
+    "max-lines-per-function": {
       "count": 1
     }
   },
@@ -362,6 +849,9 @@
     "@typescript-eslint/strict-boolean-expressions": {
       "count": 7
     },
+    "no-restricted-syntax": {
+      "count": 2
+    },
     "prefer-template": {
       "count": 6
     }
@@ -373,6 +863,9 @@
     "@typescript-eslint/strict-boolean-expressions": {
       "count": 1
     },
+    "max-lines-per-function": {
+      "count": 1
+    },
     "no-nested-ternary": {
       "count": 1
     }
@@ -380,6 +873,50 @@
   "packages/runner/src/containers/ContainerEngine.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 1
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "packages/runner/src/containers/DockerRunner.ts": {
+    "no-restricted-syntax": {
+      "count": 8
+    }
+  },
+  "packages/runner/src/containers/RunImageContainer.ts": {
+    "no-restricted-syntax": {
+      "count": 4
+    }
+  },
+  "packages/runner/src/egress-proxy/addresses/AddressVetter.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "packages/runner/src/egress-proxy/requests/ParseRequestTarget.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "packages/runner/src/egress/BuildEgressPolicy.ts": {
+    "no-restricted-syntax": {
+      "count": 3
+    }
+  },
+  "packages/runner/src/egress/StartRecordKeeping.ts": {
+    "no-restricted-syntax": {
+      "count": 4
+    }
+  },
+  "packages/runner/src/image/RunImage.ts": {
+    "no-restricted-syntax": {
+      "count": 4
     }
   },
   "packages/runner/src/service-calls/ServiceCaller.ts": {
@@ -388,11 +925,62 @@
     },
     "@typescript-eslint/naming-convention": {
       "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "packages/runner/src/workload/CheckWorkloadRequest.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "packages/runner/src/workload/ReadWorkloadEgress.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "packages/runner/src/workload/RunCommandUnderTimeout.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "packages/runner/src/workload/ShowEgressControlled.ts": {
+    "no-restricted-syntax": {
+      "count": 1
     }
   },
   "packages/runner/src/workload/WorkloadEnvironment.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 1
+    }
+  },
+  "packages/runner/src/workload/WorkloadRunner.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "packages/runner/src/workload/output/ReadyOutputFolder.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "packages/runner/src/workload/output/RemoveFromOutput.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "packages/runner/src/workload/team-container/CheckoutMounts.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "packages/runner/src/workload/team-container/IsSafeInMountArgument.ts": {
+    "no-restricted-syntax": {
+      "count": 3
     }
   },
   "test/browser/accessibility/ActRuleAgreement.test.ts": {
@@ -2158,8 +2746,26 @@
       "count": 13
     }
   },
+  "tools/eslint/FileNameMatchesExport.ts": {
+    "no-restricted-syntax": {
+      "count": 6
+    }
+  },
+  "tools/eslint/InPageFunctionsAreSelfContained.ts": {
+    "no-restricted-syntax": {
+      "count": 5
+    }
+  },
+  "tools/eslint/TestTitleFormat.ts": {
+    "no-restricted-syntax": {
+      "count": 10
+    }
+  },
   "tools/metrics/GuaranteeMap.ts": {
     "@typescript-eslint/naming-convention": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
       "count": 1
     }
   },
@@ -2168,31 +2774,63 @@
       "count": 1
     }
   },
+  "tools/repo-rules/MatchesAny.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
   "tools/repo-rules/ReadWorkspacePackages.ts": {
     "@typescript-eslint/no-unsafe-assignment": {
       "count": 1
     }
   },
+  "tools/repo-rules/RunRepositoryRules.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
   "tools/repo-rules/ValidateAgainstSchema.ts": {
     "max-lines-per-function": {
-      "count": 1
+      "count": 2
     },
     "no-nested-ternary": {
       "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 25
     }
   },
   "tools/repo-rules/code/CheckApprovalStrength.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 4
+    },
+    "no-restricted-syntax": {
+      "count": 6
+    }
+  },
+  "tools/repo-rules/code/CheckBrandedCasts.ts": {
+    "no-restricted-syntax": {
+      "count": 3
+    }
+  },
+  "tools/repo-rules/code/CheckCompositionRoot.ts": {
+    "no-restricted-syntax": {
+      "count": 1
     }
   },
   "tools/repo-rules/code/CheckPersonGates.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 2
+    },
+    "no-restricted-syntax": {
+      "count": 1
     }
   },
   "tools/repo-rules/code/CheckSecretReveal.ts": {
     "@typescript-eslint/naming-convention": {
+      "count": 1
+    },
+    "max-lines-per-function": {
       "count": 1
     }
   },
@@ -2204,11 +2842,27 @@
   "tools/repo-rules/commits/CommitTrailers.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 4
+    }
+  },
+  "tools/repo-rules/docs/CheckDependencyReviews.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "tools/repo-rules/docs/CheckErrorAnchors.ts": {
+    "no-restricted-syntax": {
+      "count": 1
     }
   },
   "tools/repo-rules/docs/CheckGlossary.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 2
+    },
+    "no-restricted-syntax": {
+      "count": 20
     }
   },
   "tools/repo-rules/docs/CheckLicences.ts": {
@@ -2224,17 +2878,26 @@
       "count": 1
     },
     "max-lines-per-function": {
-      "count": 1
+      "count": 2
+    },
+    "no-restricted-syntax": {
+      "count": 32
     }
   },
   "tools/scheduled/BenchmarkRuns.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 5
     }
   },
   "tools/scheduled/SummariseUpkeep.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 2
     }
   },
   "tools/test-runner/LoadEngineFunction.ts": {
@@ -2245,11 +2908,24 @@
   "tools/test-runner/ReadTestResults.ts": {
     "@typescript-eslint/strict-boolean-expressions": {
       "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 3
+    }
+  },
+  "tools/test-runner/RecordGoldens.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "tools/test-runner/RunTestFolder.ts": {
+    "no-restricted-syntax": {
+      "count": 4
     }
   },
   "tools/test-runner/TestResultLine.ts": {
     "no-restricted-syntax": {
-      "count": 1
+      "count": 7
     }
   }
 }

@@ -76,6 +76,26 @@ const noExportStar = {
     message: "Use export * only in a package's index.ts.",
 };
 
+const NON_EMPTY_STRING = "Literal[value=/[\\s\\S]/]";
+const FIXED_VALUE_PROPERTY = "(type|kind|code|outcome|state)";
+const useNamedConstant =
+    "Use the member of the value's constant object, not a string literal: .claude/rules/typescript.md.";
+
+const noMagicStrings = [
+    {
+        selector: `BinaryExpression[operator=/^[!=]==$/]:not([left.operator='typeof']):not([right.operator='typeof']) > ${NON_EMPTY_STRING}`,
+        message: useNamedConstant,
+    },
+    {
+        selector: `SwitchStatement:not([discriminant.operator='typeof']) > SwitchCase > ${NON_EMPTY_STRING}`,
+        message: useNamedConstant,
+    },
+    {
+        selector: `Property[computed=false]:matches([key.name=/^${FIXED_VALUE_PROPERTY}$/], [key.value=/^${FIXED_VALUE_PROPERTY}$/]) > ${NON_EMPTY_STRING}.value`,
+        message: useNamedConstant,
+    },
+];
+
 export default defineConfig([
     globalIgnores([
         "**/dist/**",
@@ -221,7 +241,19 @@ export default defineConfig([
     {
         // Tests join when their sweep lands.
         files: ["packages/**/*.ts", "tools/**/*.ts"],
-        rules: { curly: ["error", "all"] },
+        rules: {
+            curly: ["error", "all"],
+            "@typescript-eslint/switch-exhaustiveness-check": "error",
+        },
+    },
+    {
+        files: ["packages/**/*.ts", "tools/**/*.ts"],
+        // In-page functions can't import a constant, and their callbacks are left as written.
+        ignores: IN_PAGE_FILES,
+        rules: {
+            "prefer-arrow-callback": "error",
+            "no-restricted-syntax": ["error", ...everywhereSyntax, noExportStar, ...noMagicStrings],
+        },
     },
     {
         files: ["packages/**/*.ts"],
@@ -234,7 +266,7 @@ export default defineConfig([
     },
     {
         files: ["packages/*/src/index.ts"],
-        rules: { "no-restricted-syntax": ["error", ...everywhereSyntax] },
+        rules: { "no-restricted-syntax": ["error", ...everywhereSyntax, ...noMagicStrings] },
     },
     {
         // A test file is one long describe callback, so function length says nothing about it.

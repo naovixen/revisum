@@ -22,7 +22,9 @@ function thrownText(details: NonNullable<CallResult["exceptionDetails"]>): strin
             return String(thrown);
         case "object":
             return thrown === null ? details.text : "[object Object]";
-        default:
+        case "undefined":
+        case "function":
+        case "symbol":
             return details.text;
     }
 }

@@ -91,7 +91,12 @@ export function runValueArgument(type: ParameterType, text: SafeText): ArgumentV
                 return DECIMAL_INTEGER.test(text) ? Number(text) : undefined;
             case ParameterKind.Boolean:
                 return text === "true" ? true : text === "false" ? false : undefined;
-            default:
+            case ParameterKind.Text:
+            case ParameterKind.Identifier:
+            case ParameterKind.Email:
+            case ParameterKind.YearMonthDay:
+            case ParameterKind.OneOf:
+            case ParameterKind.Secret:
                 return text;
         }
     })();

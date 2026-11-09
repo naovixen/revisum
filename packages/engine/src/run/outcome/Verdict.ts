@@ -4,6 +4,7 @@ import {
     PageAssertionKind,
     PageTextKind,
     ElementStateKind,
+    ElementTextKind,
     DomCheckKind,
     DomReadKind,
     ElementAssertionKind,
@@ -56,7 +57,27 @@ export function domReadFor(assertion: ResolvedElementAssertion): DomRead | null 
         case ElementAssertionKind.AttributeEquals:
         case ElementAssertionKind.AttributeAbsent:
             return { kind: DomReadKind.Attribute, name: assertion.name };
-        default:
+        case ElementStateKind.Visible:
+        case ElementStateKind.Hidden:
+        case ElementStateKind.Enabled:
+        case ElementStateKind.Disabled:
+        case ElementStateKind.Absent:
+        case ElementStateKind.Checked:
+        case ElementStateKind.Unchecked:
+        case ElementStateKind.Focused:
+        case ElementStateKind.Selected:
+        case ElementStateKind.Unselected:
+        case ElementStateKind.Expanded:
+        case ElementStateKind.Collapsed:
+        case ElementStateKind.Pressed:
+        case ElementStateKind.Unpressed:
+        case ElementStateKind.Current:
+        case ElementTextKind.TextEquals:
+        case ElementTextKind.TextContains:
+        case ElementTextKind.ValueEquals:
+        case ElementTextKind.ValueContains:
+        case ElementAssertionKind.CountEquals:
+        case ElementAssertionKind.HrefEquals:
             return null;
     }
 }

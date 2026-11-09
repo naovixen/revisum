@@ -7,6 +7,7 @@ import {
     StepType,
     ElementTextKind,
     ElementAssertionKind,
+    ElementStateKind,
     StructuralLocatorKind,
     SemanticLocatorKind,
     GeneratedValueKind,
@@ -296,8 +297,22 @@ export function resolveElementAssertion(
             const value = resolveText(assertion.value, values, project.limits.maximumTextLength);
             return value.ok ? success({ kind: assertion.kind, value: value.value }) : value;
         }
-        default:
-            // The state checks compare against nothing.
+        // The state checks compare against nothing.
+        case ElementStateKind.Visible:
+        case ElementStateKind.Hidden:
+        case ElementStateKind.Enabled:
+        case ElementStateKind.Disabled:
+        case ElementStateKind.Absent:
+        case ElementStateKind.Checked:
+        case ElementStateKind.Unchecked:
+        case ElementStateKind.Focused:
+        case ElementStateKind.Selected:
+        case ElementStateKind.Unselected:
+        case ElementStateKind.Expanded:
+        case ElementStateKind.Collapsed:
+        case ElementStateKind.Pressed:
+        case ElementStateKind.Unpressed:
+        case ElementStateKind.Current:
             return success(assertion);
     }
 }
