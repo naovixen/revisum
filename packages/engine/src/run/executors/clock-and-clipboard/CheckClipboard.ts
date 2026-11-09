@@ -28,10 +28,7 @@ import { clockAdvanceMilliseconds } from "./ClockAdvanceMilliseconds.ts";
 import type { Project } from "../../../project/ParseProject.ts";
 import type { RememberedRecord, RememberedValues } from "../../values/RememberedValues.ts";
 import { resolveText, type RunValues } from "../../values/RunValues.ts";
-import { pollUntil } from "../../PollUntil.ts";
-
-// How long a clipboard check or remember waits between two reads of the clipboard.
-const POLL_INTERVAL_MILLISECONDS = 50;
+import { POLL_INTERVAL_MILLISECONDS, pollUntil } from "../../PollUntil.ts";
 
 // What the run hands these steps. `remembered` is how a remember step adds to the run's values.
 export type ClockAndClipboardContext = {

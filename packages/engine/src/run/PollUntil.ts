@@ -1,6 +1,9 @@
 // Waiting by looking again: one look after another until one is done or the time runs out.
 import type { Clock } from "@revisum/contracts";
 
+// How long a check waits between two looks, unless it has its own reason to wait longer.
+export const POLL_INTERVAL_MILLISECONDS = 50;
+
 // When a wait stops: how long it may go on, how long it waits between two looks, and which look
 // ends it early.
 export type PollRule<Look> = {

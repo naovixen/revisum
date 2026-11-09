@@ -90,5 +90,5 @@ export const fillField: StepExecutor<
     if (!acted.ok) {
         return acted.error;
     }
-    return acted.value.ok ? { outcome: StepOutcome.Passed } : stepFailed(acted.value.error.code);
+    return { outcome: StepOutcome.Passed };
 };

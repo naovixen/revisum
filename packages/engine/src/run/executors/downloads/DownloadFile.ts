@@ -37,10 +37,7 @@ export const downloadFile: StepExecutor<
     if (!saved.ok) {
         return saved.error;
     }
-    if (!saved.value.ok) {
-        return stepFailed(saved.value.error.code);
-    }
-    const file = saved.value.value;
+    const file = saved.value;
     context.downloads.set(step.name, file);
     const record: DownloadRecord = {
         downloadName: step.name,

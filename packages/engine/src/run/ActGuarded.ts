@@ -3,13 +3,15 @@
 import {
     failure,
     PolicyVerdictKind,
-    success,
+    stepFailed,
     type ActionGuard,
+    type Denial,
+    type DriverError,
     type GuardVerdict,
     type ResolvedElement,
     type Result,
     type Step,
-    type Denial,
+    type StepFailure,
 } from "@revisum/contracts";
 import { deniedStep, type DeniedStep } from "./executors/StepExecutor.ts";
 import type { RunContext } from "./RunContext.ts";
@@ -50,13 +52,14 @@ export function denialNow(step: Step, index: number, context: GuardContext): Den
 
 // Makes one driver call with the runtime guard the driver asks before the step's input event, with
 // the element it resolved and, for a dialog step, the open dialog's text. The guard's first denial is
-// the outcome, whatever the driver then answered or threw.
+// the outcome, whatever the driver then answered or threw; otherwise a driver failure is the step's
+// failure, so a caller has one failure to pass on and one value to use.
 export async function actGuarded<Acted>(
     step: Step,
     index: number,
     context: GuardContext,
-    act: (guard: ActionGuard) => Promise<Acted>,
-): Promise<Result<Acted, DeniedStep>> {
+    act: (guard: ActionGuard) => Promise<Result<Acted, DriverError>>,
+): Promise<Result<Acted, DeniedStep | StepFailure<DriverError["code"]>>> {
     const verdicts: { denial?: Denial } = {};
     const guard: ActionGuard = (element, dialogText) => {
         const verdict = context.gate.guardAction(
@@ -73,9 +76,10 @@ export async function actGuarded<Acted>(
     };
     try {
         const acted = await act(guard);
-        return verdicts.denial === undefined
-            ? success(acted)
-            : failure(deniedStep(verdicts.denial));
+        if (verdicts.denial !== undefined) {
+            return failure(deniedStep(verdicts.denial));
+        }
+        return acted.ok ? acted : failure(stepFailed(acted.error.code));
     } catch (error) {
         if (verdicts.denial === undefined) {
             throw error;

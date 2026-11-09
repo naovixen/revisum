@@ -8,11 +8,8 @@ import {
 import type { Logger } from "./logging/LoggingManifest.ts";
 import type { Verdict } from "./outcome/Verdict.ts";
 import { codeOfFailedRead } from "./CodeForThrow.ts";
-import { pollUntil } from "./PollUntil.ts";
+import { POLL_INTERVAL_MILLISECONDS, pollUntil } from "./PollUntil.ts";
 import type { RunContext } from "./RunContext.ts";
-
-// How long a check waits between two looks at the page.
-export const POLL_INTERVAL_MILLISECONDS = 50;
 
 // A check the page stopped rather than answered: its renderer died while the check waited, or a read
 // of it failed for a reason that is the adapter's. What the check last saw then says nothing about the

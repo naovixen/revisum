@@ -7,7 +7,7 @@ import {
     FailureAfterTheVerdictCode,
     logFailureAfterTheVerdict,
 } from "../after-the-verdict/ReadKeepingTheResult.ts";
-import { POLL_INTERVAL_MILLISECONDS } from "../Poll.ts";
+import { POLL_INTERVAL_MILLISECONDS } from "../PollUntil.ts";
 
 // Longer than a driver's stop takes to give up by itself, so this deadline is only for what has wedged.
 const LONGEST_SESSION_CLOSE_MILLISECONDS = 60_000;

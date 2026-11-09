@@ -57,10 +57,7 @@ import {
     type RequestBuildError,
 } from "../service-calls/BuildServiceRequest.ts";
 import { fieldAt, fieldText, responseJson } from "../service-calls/CheckBackendField.ts";
-import { pollUntil } from "../../PollUntil.ts";
-
-// How long a check waits between two looks at the exchanges or the storage.
-const POLL_INTERVAL_MILLISECONDS = 50;
+import { POLL_INTERVAL_MILLISECONDS, pollUntil } from "../../PollUntil.ts";
 
 // What the run hands these steps. `remembered` is how a remember step adds to the run's values.
 // `activeStubs` is the run's record of the stubs started and not yet stopped.
