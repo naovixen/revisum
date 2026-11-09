@@ -50,6 +50,7 @@ import {
     type SecretEcho,
 } from "../secrets/SecretRedaction.ts";
 import { schemaId } from "../foundation/EngineVersion.ts";
+import { readableCopy } from "../decoding/ReadableCopy.ts";
 import { decodeErrorOf, readSha256, readString, type DecodeError } from "./DecodeManifest.ts";
 
 export const RECORDING_SCHEMA = schemaId("run-recording", 1);
@@ -655,7 +656,8 @@ function readReplies<Reply>(
 // Reads a recording back, as decodeManifest reads a manifest: another schema version, or a key this
 // version does not know, is version-unsupported; a known field of the wrong shape, a mismatch at
 // its JSON path.
-export function decodeRecording(input: unknown): Result<RunRecording, DecodeError> {
+export function decodeRecording(written: unknown): Result<RunRecording, DecodeError> {
+    const input = readableCopy(written);
     if (!isPlainObject(input)) {
         return failure({ code: ReplayErrorCode.VersionUnsupported, path: "$" });
     }

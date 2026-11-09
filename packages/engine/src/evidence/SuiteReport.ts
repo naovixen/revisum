@@ -22,6 +22,7 @@ import {
 import { brand } from "../foundation/Brand.ts";
 import { INVALID, allValid, type Parsed } from "../plan/parse/ReadRecord.ts";
 import { staysInside } from "../foundation/RepositoryPath.ts";
+import { readableCopy } from "../decoding/ReadableCopy.ts";
 
 // How deeply a report may nest when the project sets no maximumReportDepth.
 const DEFAULT_REPORT_DEPTH = 64;
@@ -138,10 +139,11 @@ const READ_KEYS: ReadonlySet<string> = new Set([
 ]);
 
 export function parseSuiteReport(
-    input: unknown,
+    written: unknown,
     limits: EvidenceLimits,
     options: SuiteReportOptions = {},
 ): Result<SuiteReport, readonly SuiteDecodeError[]> {
+    const input = readableCopy(written);
     const walked = walk(input, limits);
     if (walked !== undefined) {
         return failure([walked]);

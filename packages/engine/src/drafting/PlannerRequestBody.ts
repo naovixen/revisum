@@ -48,10 +48,11 @@ type PlannerReplyError = { readonly code: "reply-not-json" | "no-text" };
 
 // The reply's JSON, from the body bytes the planner adapter answered with.
 function replyJson(reply: unknown): unknown {
-    if (!(reply instanceof Uint8Array)) {
-        return undefined;
-    }
     try {
+        // Inside the try because instanceof reads the prototype, which a proxy can refuse.
+        if (!(reply instanceof Uint8Array)) {
+            return undefined;
+        }
         return JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(reply));
     } catch {
         return undefined;

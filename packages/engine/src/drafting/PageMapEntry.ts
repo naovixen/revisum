@@ -21,6 +21,7 @@ import {
     type Result,
 } from "@revisum/contracts";
 import { canonicalJson, sha256 } from "../foundation/Sha256.ts";
+import { readableCopy } from "../decoding/ReadableCopy.ts";
 
 // The roles a page map keeps. A node of any other role is dropped and its kept descendants take
 // its place, in order.
@@ -164,7 +165,11 @@ class Refusal extends Error {
 // printed. Every field is checked: the origin is the one asked for, the guarantee level one of the
 // two, at most 100 pages no deeper than 5, each with a path, a title and names of at most 80
 // characters and only kept roles, and no other field anywhere.
-export function decodePageMap(input: unknown, origin: Origin): Result<PageMap, PageMapDecodeError> {
+export function decodePageMap(
+    written: unknown,
+    origin: Origin,
+): Result<PageMap, PageMapDecodeError> {
+    const input = readableCopy(written);
     let nodes = 0;
     const decodeNodes = (value: unknown, path: string, nesting: number): PageMapNode[] => {
         if (!Array.isArray(value) || nesting > MAXIMUM_TREE_NESTING) {
