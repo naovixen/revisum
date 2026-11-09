@@ -1,5 +1,5 @@
 // The workload container's environment: the variables the request declares, with each secret
-// revealed by service-caller.ts, runner's one module that may read one, then Revisum's own, which
+// revealed by ServiceCaller.ts, runner's one module that may read one, then Revisum's own, which
 // always win.
 // Nothing comes from the host's environment: the list starts empty.
 import type { Secret, VariableName } from "@revisum/contracts";

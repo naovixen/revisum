@@ -31,7 +31,7 @@ export const DECISIONS_FILE = "/tmp/egress-decisions.jsonl";
 export const REWRITES_FILE = "/tmp/egress-rewrites.jsonl";
 export const RULES_VARIABLE = "EGRESS_PROXY_RULES";
 // Set for a workload's proxy: it also answers the run network's name lookups and records each name
-// in LOOKUPS_FILE, one JSON line each (lookup-recorder.ts).
+// in LOOKUPS_FILE, one JSON line each (StartLookupRecorder.ts).
 export const LOOKUPS_VARIABLE = "EGRESS_PROXY_RECORDS_LOOKUPS";
 export const LOOKUPS_FILE = "/tmp/egress-lookups.jsonl";
 // Says whether every record reached its file. The two words have the same length on purpose: see

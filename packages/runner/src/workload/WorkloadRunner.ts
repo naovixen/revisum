@@ -81,11 +81,12 @@ async function runInScope(
     }
     const egress = await readWorkloadEgress(engine, proxy.value.id, checked, log);
     const ended = command.value;
+    const wasCutShort = ended.printed.isOutputCutShort === true;
     const records = {
         egressEvents: egress.events,
         ...(egress.isUnread ? { egressRecordUnread: true } : {}),
-        stdout: capturedOutput(ended.printed.stdout, checked.outputLimit),
-        stderr: capturedOutput(ended.printed.stderr, checked.outputLimit),
+        stdout: capturedOutput(ended.printed.stdout, checked.outputLimit, wasCutShort),
+        stderr: capturedOutput(ended.printed.stderr, checked.outputLimit, wasCutShort),
     };
     return success(
         ended.kind === WorkloadOutcomeKind.Exited

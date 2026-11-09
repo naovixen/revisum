@@ -1,14 +1,12 @@
 // The command, through exec as an argument vector, under its timeout. A command that outlives it is
 // stopped by removing its container, and the wait for that to end the command is bounded, so a daemon
 // that never answers cannot hold the run open.
-import {
-    WorkloadOutcomeKind,
-    WorkloadStop,
-    success,
-    type ExecOutcome,
-    type Result,
-} from "@revisum/contracts";
-import type { ContainerEngine, EngineProblem } from "../containers/ContainerEngine.ts";
+import { WorkloadOutcomeKind, WorkloadStop, success, type Result } from "@revisum/contracts";
+import type {
+    ContainerEngine,
+    ContainerExecOutcome,
+    EngineProblem,
+} from "../containers/ContainerEngine.ts";
 import type { ContainerScope } from "../containers/ContainerScope.ts";
 import type { CheckedWorkloadRequest } from "./CheckWorkloadRequest.ts";
 import { workloadRefused, type WorkloadRefusal } from "./WorkloadRefusal.ts";
@@ -16,7 +14,7 @@ import { workloadRefused, type WorkloadRefusal } from "./WorkloadRefusal.ts";
 // How long a stopped command's end is waited for, once its timeout has passed.
 const STOPPED_COMMAND_WAIT_MILLISECONDS = 10_000;
 
-type Printed = Pick<ExecOutcome, "stdout" | "stderr">;
+type Printed = Pick<ContainerExecOutcome, "stdout" | "stderr" | "isOutputCutShort">;
 
 const NOTHING_PRINTED: Printed = { stdout: "", stderr: "" };
 
@@ -34,7 +32,7 @@ function timerOf(milliseconds: number): Timer {
     return { elapsed, cancel: () => clearTimeout(handle) };
 }
 
-type CommandAnswer = Result<ExecOutcome, EngineProblem>;
+type CommandAnswer = Result<ContainerExecOutcome, EngineProblem>;
 
 // What became of a command the timeout stopped. Removing its container ends it, and what it printed
 // until then is still returned.

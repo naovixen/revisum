@@ -7,7 +7,7 @@ import { PRODUCT, failure, success, type ImageDigest, type Result } from "@revis
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { runDocker } from "../containers/ContainerEngine.ts";
+import { isWholeAnswer, runDocker } from "../containers/ContainerEngine.ts";
 
 // The local tag of the run image. A run is pinned by the image's id, never by this tag.
 export const RUN_IMAGE_TAG = `${PRODUCT.name}-run`;
@@ -83,7 +83,7 @@ export async function prepareRunImage(options: {
     const recordPath = join(root, RUN_IMAGE_RECORD);
 
     const inspected = await runDocker(["image", "inspect", "--format", "{{.Id}}", RUN_IMAGE_TAG]);
-    const current = inspected.status === 0 ? readImageDigest(inspected.stdout.trim()) : null;
+    const current = isWholeAnswer(inspected) ? readImageDigest(inspected.stdout.trim()) : null;
     const recorded = readRecord(recordPath);
     if (
         current !== null &&
@@ -117,7 +117,7 @@ export async function prepareRunImage(options: {
     }
     const rebuilt = await runDocker(["image", "inspect", "--format", "{{.Id}}", RUN_IMAGE_TAG]);
     const id = readImageDigest(rebuilt.stdout.trim());
-    if (rebuilt.status !== 0 || id === null) {
+    if (!isWholeAnswer(rebuilt) || id === null) {
         return failure({
             code: "build-failed",
             detail: `the built image has no id: ${rebuilt.stderr.trim()}`,

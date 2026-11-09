@@ -54,6 +54,12 @@ export type HostEntry = { readonly name: string; readonly address: string };
 
 export type EngineProblem = { readonly detail: string };
 
+// What a command printed, and how it ended. isOutputCutShort: more was printed than could be kept, so
+// what is here is only the start of it and nothing may be read from it as complete.
+export type ContainerExecOutcome = ExecOutcome & { readonly isOutputCutShort?: true };
+
+export const OUTPUT_CUT_SHORT_DETAIL = "the command printed more than can be read back whole";
+
 // internal-refused: Docker said it cannot make a network with no route out, so an ordinary one may
 // be tried instead. failed: any other reason, which says nothing about what Docker can make.
 export const NetworkFailureKind = {
@@ -111,7 +117,7 @@ export interface ContainerEngine {
         containerId: string,
         command: readonly string[],
         environmentNames?: readonly string[],
-    ): Promise<Result<ExecOutcome, EngineProblem>>;
+    ): Promise<Result<ContainerExecOutcome, EngineProblem>>;
     // Tries a direct connection from inside the container to each target. 'reached' when any one
     // answered, or when the probe itself could not run, so an unknown is never taken for 'blocked'.
     probeEgress(
@@ -128,7 +134,7 @@ export interface ContainerEngine {
     containerAddress(containerId: string, network: string): Promise<Result<string, EngineProblem>>;
 }
 
-// Output beyond this is dropped, so a chatty command cannot exhaust memory.
+// Output beyond this is dropped, and the outcome says so, so a chatty command cannot exhaust memory.
 const OUTPUT_LIMIT_BYTES = 16 * 1024 * 1024;
 export const DOCKER_COMMAND_TIMEOUT_MILLISECONDS = 120_000;
 const PROBE_TIMEOUT_MILLISECONDS = 4_000;
@@ -142,7 +148,13 @@ export type DockerOutcome = {
     readonly signal: NodeJS.Signals | null;
     readonly stdout: string;
     readonly stderr: string;
+    // True when more was printed, on either stream, than was kept.
+    readonly isOutputCutShort: boolean;
 };
+
+// True when the client exited 0 with all it printed kept: only then can its output be parsed.
+export const isWholeAnswer = (outcome: DockerOutcome): boolean =>
+    outcome.status === 0 && !outcome.isOutputCutShort;
 
 const CLIENT_DID_NOT_RUN_STATUS = -1;
 
@@ -169,16 +181,19 @@ export function runDocker(
                 signal: null,
                 stdout: "",
                 stderr: error instanceof Error ? error.message : String(error),
+                isOutputCutShort: false,
             });
             return;
         }
         const stdout: Buffer[] = [];
         const stderr: Buffer[] = [];
         let kept = 0;
+        let isOutputCutShort = false;
         const keep =
             (into: Buffer[]) =>
             (chunk: Buffer): void => {
                 if (kept >= OUTPUT_LIMIT_BYTES) {
+                    isOutputCutShort = true;
                     return;
                 }
                 kept += chunk.length;
@@ -198,6 +213,7 @@ export function runDocker(
                 signal,
                 stdout: Buffer.concat(stdout).toString("utf8"),
                 stderr: `${Buffer.concat(stderr).toString("utf8")}${extra}`,
+                isOutputCutShort,
             });
         };
         child.once("error", (error) => finish(CLIENT_DID_NOT_RUN_STATUS, null, error.message));
@@ -206,6 +222,9 @@ export function runDocker(
 }
 
 function problem(outcome: DockerOutcome): EngineProblem {
+    if (outcome.status === 0 && outcome.isOutputCutShort) {
+        return { detail: OUTPUT_CUT_SHORT_DETAIL };
+    }
     const errors = outcome.stderr.trim();
     const printed = errors === "" ? outcome.stdout.trim() : errors;
     if (outcome.status !== null) {
@@ -318,7 +337,7 @@ export function dockerCliEngine(): ContainerEngine {
         containerId: string,
         command: readonly string[],
         environmentNames: readonly string[] = [],
-    ): Promise<Result<ExecOutcome, EngineProblem>> => {
+    ): Promise<Result<ContainerExecOutcome, EngineProblem>> => {
         const outcome = await runDocker(
             [
                 "exec",
@@ -332,7 +351,12 @@ export function dockerCliEngine(): ContainerEngine {
         if (status === null || !didCommandRun(outcome, containerId)) {
             return failure(problem(outcome));
         }
-        return success({ exitCode: status, stdout: outcome.stdout, stderr: outcome.stderr });
+        return success({
+            exitCode: status,
+            stdout: outcome.stdout,
+            stderr: outcome.stderr,
+            ...(outcome.isOutputCutShort ? { isOutputCutShort: true } : {}),
+        });
     };
     const removeContainer = async (containerId: string): Promise<Result<void, EngineProblem>> => {
         const outcome = await runDocker(["rm", "--force", "--volumes", containerId]);
@@ -342,7 +366,7 @@ export function dockerCliEngine(): ContainerEngine {
         async imageId(reference) {
             const outcome = await runDocker(["image", "inspect", "--format", "{{.Id}}", reference]);
             const id = outcome.stdout.trim();
-            if (outcome.status === 0 && id !== "") {
+            if (isWholeAnswer(outcome) && id !== "") {
                 return { kind: ImageAnswerKind.Found, id };
             }
             if (outcome.status !== 0 && NO_SUCH_IMAGE.test(outcome.stderr)) {
@@ -378,7 +402,7 @@ export function dockerCliEngine(): ContainerEngine {
                 "{{json .}}",
                 network,
             ]);
-            return outcome.status === 0
+            return isWholeAnswer(outcome)
                 ? gatewayAddressIn(outcome.stdout)
                 : failure(problem(outcome));
         },
@@ -390,6 +414,10 @@ export function dockerCliEngine(): ContainerEngine {
             );
             if (created.status !== 0) {
                 return failure(problem(created));
+            }
+            // It was created, but its id is not known: only its name can remove it.
+            if (created.isOutputCutShort) {
+                return failure(startProblem(created, await removeContainer(options.name)));
             }
             const containerId = created.stdout.trim();
             for (const network of options.networks.slice(1)) {
@@ -412,7 +440,11 @@ export function dockerCliEngine(): ContainerEngine {
                 "-e",
                 probeScript(targets),
             ]);
-            if (!probed.ok || probed.value.exitCode !== 0) {
+            if (
+                !probed.ok ||
+                probed.value.exitCode !== 0 ||
+                probed.value.isOutputCutShort === true
+            ) {
                 return "reached";
             }
             return probed.value.stdout.trim().split("\n").at(-1) === "blocked"
@@ -428,7 +460,7 @@ export function dockerCliEngine(): ContainerEngine {
                 "{{.Config.User}}",
                 reference,
             ]);
-            if (outcome.status !== 0) {
+            if (!isWholeAnswer(outcome)) {
                 return failure(problem(outcome));
             }
             const user = outcome.stdout.trim();
@@ -442,7 +474,7 @@ export function dockerCliEngine(): ContainerEngine {
                 "{{json .NetworkSettings.Networks}}",
                 containerId,
             ]);
-            return outcome.status === 0
+            return isWholeAnswer(outcome)
                 ? networkAddress(outcome.stdout, network)
                 : failure(problem(outcome));
         },

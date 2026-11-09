@@ -3,7 +3,6 @@
 # prepareRunImage passes in as BASE_IMAGE. It adds only the system libraries Chromium needs and
 # one font family, so text renders. The browsers themselves are not built in: the run mounts the
 # pinned builds in .browsers/ read-only. The run's containers start as the image's "node" user.
-# See docs/specs/SPEC-07-isolated-runner-and-egress.md.
 ARG BASE_IMAGE
 FROM ${BASE_IMAGE}
 RUN apt-get update \

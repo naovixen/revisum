@@ -118,7 +118,8 @@ export interface RunnerHandle {
     // Runs an argument vector inside the run container, without a shell. Each variable named in
     // `environmentNames` is copied into the command's environment from the container client's own,
     // by name only, so a secret is never on a command line. A failure means the engine could not run
-    // it at all, which is not the same as a command that ran and exited with a problem.
+    // it at all, or could not read back all it wrote, which is not the same as a command that ran
+    // and exited with a problem.
     exec(
         command: readonly string[],
         environmentNames?: readonly VariableName[],

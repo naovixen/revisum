@@ -29,7 +29,13 @@ import {
 } from "@revisum/contracts";
 import { join } from "node:path";
 import { answeringEngine } from "./AnsweringEngine.ts";
-import type { ContainerEngine, ContainerMount } from "./ContainerEngine.ts";
+import {
+    ImageAnswerKind,
+    MountKind,
+    OUTPUT_CUT_SHORT_DETAIL,
+    type ContainerEngine,
+    type ContainerMount,
+} from "./ContainerEngine.ts";
 import { NetworkKind, withContainerScope, type ContainerScope } from "./ContainerScope.ts";
 import { joinEgressEvents } from "../egress/JoinEgressEvents.ts";
 import {
@@ -51,7 +57,7 @@ import { SERVICE_PROXY_VARIABLE } from "../egress/StartRecordKeeping.ts";
 import { RUN_IMAGE_TAG } from "../image/RunImage.ts";
 import { safeLog } from "./SafeLog.ts";
 import { proxyUnreachableDetail, startProxyContainer } from "../egress/StartProxyContainer.ts";
-import { MountKind, ImageAnswerKind } from "./ContainerEngine.ts";
+import { isSafeInMountArgument } from "../workload/team-container/IsSafeInMountArgument.ts";
 
 export type RunnerLogEntry = {
     readonly code: "egress-unenforceable" | "start-failed" | "cleanup-failed";
@@ -111,17 +117,25 @@ async function pinRunImage(
     }
 }
 
-// The inputs as folders inside the repository, or null when one is not.
-function repositoryInputs(inputs: readonly string[], log: RunnerLog): readonly string[] | null {
+// The inputs as folders inside the repository, or null when one is not, or when the repository's own
+// path, which every mount starts from, cannot be carried in a Docker --mount argument.
+function repositoryInputs(
+    root: string,
+    inputs: readonly string[],
+    log: RunnerLog,
+): readonly string[] | null {
+    const refuse = (detail: string): null => {
+        log({ code: "start-failed", detail });
+        return null;
+    };
+    if (!isSafeInMountArgument(root)) {
+        return refuse(`the repository root ${root} cannot be mounted`);
+    }
     const folders: string[] = [];
     for (const input of inputs) {
         const folder = repositoryFolder(input);
         if (folder === null) {
-            log({
-                code: "start-failed",
-                detail: `the input ${input} is not a folder inside the repository`,
-            });
-            return null;
+            return refuse(`the input ${input} is not a folder inside the repository`);
         }
         folders.push(folder);
     }
@@ -189,7 +203,9 @@ function openRun(setup: RunSetup, ids: RunContainerIds, startingLevel: Guarantee
             }
             const outcome = await engine.exec(runContainerId, command, environmentNames);
             await refreshEvidence();
-            return outcome;
+            return outcome.ok && outcome.value.isOutputCutShort === true
+                ? failure({ detail: OUTPUT_CUT_SHORT_DETAIL })
+                : outcome;
         },
         guaranteeLevel: () => level,
     };
@@ -311,7 +327,7 @@ export function dockerRunner(options: DockerRunnerOptions): Runner {
             if (refusal !== null) {
                 return failure(refusal);
             }
-            const inputs = repositoryInputs(options.inputs ?? [], log);
+            const inputs = repositoryInputs(root, options.inputs ?? [], log);
             if (inputs === null) {
                 return failure({ code: RunnerErrorCode.StartFailed });
             }

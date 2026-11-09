@@ -37,6 +37,7 @@ import {
 } from "../egress/StartRecordKeeping.ts";
 import { readInContainer } from "./WithinReadBound.ts";
 import { MountKind } from "./ContainerEngine.ts";
+import { isSafeInMountArgument } from "../workload/team-container/IsSafeInMountArgument.ts";
 
 // Where Revisum's own files appear inside the run image's containers.
 export const WORKSPACE = "/workspace";
@@ -90,13 +91,15 @@ export const proxyReadyScript = (host: string): string => `
 // True for a name that is the .git folder however it is written, since Windows ignores case.
 export const isGitFolderName = (name: string): boolean => name.toLowerCase() === ".git";
 
-// A repository-relative folder, refused when it leads out of the repository or into .git.
+// A repository-relative folder, refused when it leads out of the repository or into .git, or holds
+// what a Docker --mount argument cannot carry.
 export function repositoryFolder(input: string): string | null {
     const path = normalize(input);
     if (
         path === "" ||
         path === "." ||
         isAbsolute(path) ||
+        !isSafeInMountArgument(path) ||
         path.split(/[\\/]/).some((part) => part === ".." || isGitFolderName(part))
     ) {
         return null;
@@ -206,9 +209,9 @@ export const proxyUrl = (proxyName: string): string => `http://${proxyName}:${PR
 export const serviceProxyUrl = (proxyName: string): string =>
     `http://${proxyName}:${SERVICE_PROXY_PORT}`;
 
-// The lines of a file inside a container, or null when it cannot be read, so a caller can keep what
-// it read before. A file not yet written reads as no lines, since the proxy writes each file only
-// once it has something to record. Only the message tells that apart: a stopped container exits
+// The lines of a file inside a container, or null when it cannot be read whole, so a caller can keep
+// what it read before. A file not yet written reads as no lines, since the proxy writes each file
+// only once it has something to record. Only the message tells that apart: a stopped container exits
 // with the same status.
 async function linesOf(
     engine: ContainerEngine,
@@ -216,7 +219,7 @@ async function linesOf(
     file: string,
 ): Promise<readonly string[] | null> {
     const read = await readInContainer(engine, containerId, ["cat", file]);
-    if (!read.ok) {
+    if (!read.ok || read.value.isOutputCutShort === true) {
         return null;
     }
     if (read.value.exitCode === 0) {

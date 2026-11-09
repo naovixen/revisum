@@ -1,9 +1,10 @@
 // The runner's own short reads, each with a limit of its own, so one that never answers still reaches
 // the run's removal. A command the caller asked for is not a read, and runs for as long as it does.
-import { failure, type ExecOutcome, type Result } from "@revisum/contracts";
+import { failure, type Result } from "@revisum/contracts";
 import {
     DOCKER_COMMAND_TIMEOUT_MILLISECONDS,
     type ContainerEngine,
+    type ContainerExecOutcome,
     type EngineProblem,
 } from "./ContainerEngine.ts";
 
@@ -31,5 +32,5 @@ export const readInContainer = (
     engine: ContainerEngine,
     containerId: string,
     command: readonly string[],
-): Promise<Result<ExecOutcome, EngineProblem>> =>
+): Promise<Result<ContainerExecOutcome, EngineProblem>> =>
     withinReadBound(engine.exec(containerId, command), (detail) => failure({ detail }));
