@@ -26,9 +26,11 @@ const CHECKS_THAT_ARE_NOT_REPOSITORY_RULES = [
 ];
 
 // Check files keep the name of what they check; the commit-trailers check is named for its subject.
-const isCheckFile = (path: string): boolean => /^(?:Check[A-Z].*|CommitTrailers)\.ts$/.test(basename(path));
+const isCheckFile = (path: string): boolean =>
+    /^(?:Check[A-Z].*|CommitTrailers)\.ts$/.test(basename(path));
 // The compiled copies and the ESLint project are not checks of their own.
-const isToolSource = (path: string): boolean => !/^(?:dist|eslint)\//.test(path) && !path.endsWith(".d.ts");
+const isToolSource = (path: string): boolean =>
+    !/^(?:dist|eslint)\//.test(path) && !path.endsWith(".d.ts");
 
 type PlantedViolation = {
     readonly edits: Readonly<Record<string, FileEdit>>;
@@ -132,7 +134,10 @@ const PLANTED_VIOLATIONS: Readonly<Record<RepositoryRuleName, PlantedViolation>>
         named: "plan.schema.json",
     },
     [RepositoryRuleName.DependencyReviews]: {
-        edits: { "tools/repo-rules/docs/DependencyReviews.ts": (text) => text.replace("4.14.0", "4.13.0") },
+        edits: {
+            "tools/repo-rules/docs/DependencyReviews.ts": (text) =>
+                text.replace("4.14.0", "4.13.0"),
+        },
         named: "axe-core",
     },
     [RepositoryRuleName.DenyRules]: {
@@ -174,7 +179,10 @@ describe("Using the repository rules tool", () => {
                 ) as {
                     readonly scripts: Readonly<Record<string, string>>;
                 };
-                assert.equal(manifest.scripts["lint"], "node tools/repo-rules/RunRepositoryRules.ts");
+                assert.equal(
+                    manifest.scripts["lint"],
+                    "node tools/repo-rules/RunRepositoryRules.ts",
+                );
             });
         });
 
@@ -274,9 +282,13 @@ describe("Using the repository rules tool", () => {
 
         describe("when it names a rule that does not exist", () => {
             test("then it should run nothing and fail, naming the rule and the rules there are", () => {
-                const run = runTool("repo-rules/RunRepositoryRules.ts", ["--only", "layout,planted-rule"], {
-                    cwd: REPOSITORY_ROOT,
-                });
+                const run = runTool(
+                    "repo-rules/RunRepositoryRules.ts",
+                    ["--only", "layout,planted-rule"],
+                    {
+                        cwd: REPOSITORY_ROOT,
+                    },
+                );
                 assert.equal(run.status, 2, describeRun(run));
                 assert.ok(run.output.includes("planted-rule"), describeRun(run));
                 assert.ok(run.output.includes(RepositoryRuleName.Glossary), describeRun(run));
@@ -296,7 +308,12 @@ describe("Using the repository rules tool", () => {
                         { "tools/repo-rules/CheckLayout.ts": "export const = ;\n" },
                         () =>
                             runTool(
-                                join(scratch.root(), "tools", "repo-rules", "RunRepositoryRules.ts"),
+                                join(
+                                    scratch.root(),
+                                    "tools",
+                                    "repo-rules",
+                                    "RunRepositoryRules.ts",
+                                ),
                                 ["--only", "layout,glossary"],
                                 { cwd: scratch.root() },
                             ),

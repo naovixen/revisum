@@ -4,8 +4,14 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { after, before, describe, test } from "node:test";
-import { checkGoldenChanges, readDefectNumbers } from "../../../../tools/repo-rules/commits/CheckGoldenChanges.ts";
-import { createGitRepository, type GitRepository } from "../../../support/repository/GitRepository.ts";
+import {
+    checkGoldenChanges,
+    readDefectNumbers,
+} from "../../../../tools/repo-rules/commits/CheckGoldenChanges.ts";
+import {
+    createGitRepository,
+    type GitRepository,
+} from "../../../support/repository/GitRepository.ts";
 import { REPOSITORY_ROOT } from "../../../support/repository/RepositoryRoot.ts";
 
 const DEFECT_LOG = `# Defects

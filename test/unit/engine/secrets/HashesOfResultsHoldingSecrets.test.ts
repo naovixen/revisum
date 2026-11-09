@@ -25,7 +25,12 @@ import {
     runWithCalls,
     shopWith,
 } from "../run/executors/service-calls/examples/ShopService.ts";
-import { DATABASE_SECRET, OPEN_CART, unsafePlan, type JsonRecord } from "../plan/unsafe-features/examples/UnsafePlan.ts";
+import {
+    DATABASE_SECRET,
+    OPEN_CART,
+    unsafePlan,
+    type JsonRecord,
+} from "../plan/unsafe-features/examples/UnsafePlan.ts";
 
 const TOKEN = SECRET_VALUES[TOKEN_SECRET] ?? assert.fail("no token");
 const READ_ORDER = `GET /api/orders/${ORDER_ID}`;

@@ -10,7 +10,12 @@ import {
     runOnFakeSession,
     stepSummaries,
 } from "../examples/RunOnFakeSession.ts";
-import { CLOSING_CHECK, OPEN_CART, unsafePlan, type JsonRecord } from "../../plan/unsafe-features/examples/UnsafePlan.ts";
+import {
+    CLOSING_CHECK,
+    OPEN_CART,
+    unsafePlan,
+    type JsonRecord,
+} from "../../plan/unsafe-features/examples/UnsafePlan.ts";
 
 const HOVER_MENU: JsonRecord = { type: "hover", locator: { by: "testId", testId: "menu" } };
 

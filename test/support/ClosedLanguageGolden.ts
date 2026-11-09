@@ -2,7 +2,11 @@
 // hash of each golden plan, and the state and hashes of a few runs on the recording driver.
 // tools/test-runner/RecordGoldens.ts runs this file and writes what it prints.
 import { planHash } from "@revisum/engine";
-import { defaultParser, goldenPlan, goldenPlanNames } from "../unit/engine/plan/examples/GoldenPlan.ts";
+import {
+    defaultParser,
+    goldenPlan,
+    goldenPlanNames,
+} from "../unit/engine/plan/examples/GoldenPlan.ts";
 import {
     OPEN_ORDERS,
     planOf,

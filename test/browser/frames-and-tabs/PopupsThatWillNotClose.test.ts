@@ -10,7 +10,10 @@ import {
     type RelayedDriverOnItsOwnBrowser,
 } from "#test-support/browser/driver/RelayedDriver.ts";
 import { scriptsEnabled } from "#test-support/browser/ScriptsEnabled.ts";
-import { capabilityHarness, type CapabilityHarness } from "#test-support/browser/harnesses/CapabilityHarness.ts";
+import {
+    capabilityHarness,
+    type CapabilityHarness,
+} from "#test-support/browser/harnesses/CapabilityHarness.ts";
 import type { FixtureRoute } from "#test-support/builders/FixtureServer.ts";
 
 const STEP_TIMEOUT_MILLISECONDS = 4000;

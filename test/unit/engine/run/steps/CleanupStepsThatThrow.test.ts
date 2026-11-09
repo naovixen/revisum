@@ -5,9 +5,17 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import type { RunEventSink, RunResult } from "@revisum/engine";
-import { SEED_ORDERS, WIPE_ORDERS, commandProjectFile } from "../executors/database-commands/examples/Database.ts";
+import {
+    SEED_ORDERS,
+    WIPE_ORDERS,
+    commandProjectFile,
+} from "../executors/database-commands/examples/Database.ts";
 import { runOnFakeSession, stepSummaries } from "../examples/RunOnFakeSession.ts";
-import { OPEN_CART, unsafePlan, type JsonRecord } from "../../plan/unsafe-features/examples/UnsafePlan.ts";
+import {
+    OPEN_CART,
+    unsafePlan,
+    type JsonRecord,
+} from "../../plan/unsafe-features/examples/UnsafePlan.ts";
 import { fakeRunEventSinkFailingOn } from "#test-support/fakes/ports/FakeRunEventSink.ts";
 import { EventKind } from "@revisum/engine";
 

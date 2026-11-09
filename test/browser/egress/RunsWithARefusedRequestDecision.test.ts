@@ -20,7 +20,10 @@ import {
 } from "#test-support/browser/RawPlan.ts";
 import { startRelayedDriver } from "#test-support/browser/driver/RelayedDriver.ts";
 import { shareBrowserInThisFile } from "#test-support/browser/ShareBrowserInThisFile.ts";
-import { capabilityHarness, type CapabilityHarness } from "#test-support/browser/harnesses/CapabilityHarness.ts";
+import {
+    capabilityHarness,
+    type CapabilityHarness,
+} from "#test-support/browser/harnesses/CapabilityHarness.ts";
 import type { FixtureRoute } from "#test-support/builders/FixtureServer.ts";
 import { EventKind } from "@revisum/engine";
 

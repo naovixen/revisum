@@ -10,7 +10,11 @@ import { after, before, describe, test } from "node:test";
 import { startBrowserHarness, type BrowserHarness } from "#test-support/browser/BrowserHarness.ts";
 import { BrowserTarget, englishMatrix } from "#test-support/browser/BrowserTarget.ts";
 import { navigate, testId, textEquals } from "#test-support/browser/RawPlan.ts";
-import { FIXED_TIME_MILLISECONDS, SEED, capabilityPlan } from "#test-support/browser/harnesses/CapabilityHarness.ts";
+import {
+    FIXED_TIME_MILLISECONDS,
+    SEED,
+    capabilityPlan,
+} from "#test-support/browser/harnesses/CapabilityHarness.ts";
 import type { FixtureRoute } from "#test-support/builders/FixtureServer.ts";
 import { FIXTURES } from "#test-support/repository/RepositoryRoot.ts";
 import { evidenceHashOf, expectedEvidenceHash } from "#test-support/ExpectedEvidenceHash.ts";

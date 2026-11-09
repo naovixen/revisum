@@ -14,7 +14,12 @@ import {
     type StepExample,
 } from "../../plan/examples/EveryStepTypeExamples.ts";
 import { withValue } from "../../plan/examples/GoldenPlan.ts";
-import { errorsOf, parserEnabling, rejection, type ParsePlan } from "../../plan/unsafe-features/examples/LostByFeature.ts";
+import {
+    errorsOf,
+    parserEnabling,
+    rejection,
+    type ParsePlan,
+} from "../../plan/unsafe-features/examples/LostByFeature.ts";
 import { FEATURES, unsafePlan } from "../../plan/unsafe-features/examples/UnsafePlan.ts";
 
 const LITERAL_SECRET = "AKIAABCDEFGHIJKLMNOP";

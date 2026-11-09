@@ -55,7 +55,10 @@ async function removeOn(
     exec: ExecAnswer = exitingZero,
     removal = removalOf(),
 ) {
-    const engine = fakeContainerEngine({ ...settings, exec: (containerId, command) => exec(command) });
+    const engine = fakeContainerEngine({
+        ...settings,
+        exec: (containerId, command) => exec(command),
+    });
     const { runner, logged } = runnerOn(engine);
     await runner.removeFromOutput(removal);
     return { engine, logged };

@@ -31,7 +31,11 @@ import {
 import { driverWith, sessionWith } from "#test-support/browser/driver/WrappingSessions.ts";
 import { endAtOnce, rendererProcesses } from "#test-support/browser/harnesses/ProcessTree.ts";
 import { download, expectDownload } from "../page-reads/support/PageStatesHarness.ts";
-import { TARGET, htmlPage, routedPagesHarness } from "../../support/browser/harnesses/RoutedPagesHarness.ts";
+import {
+    TARGET,
+    htmlPage,
+    routedPagesHarness,
+} from "../../support/browser/harnesses/RoutedPagesHarness.ts";
 import { StepType } from "@revisum/contracts";
 
 const STEP_TIMEOUT_MILLISECONDS = 8000;

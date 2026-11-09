@@ -6,7 +6,12 @@ import { after, before, describe, test } from "node:test";
 import { type BrowserHarness } from "#test-support/browser/BrowserHarness.ts";
 import { click, navigate, role, type JsonRecord } from "#test-support/browser/RawPlan.ts";
 import { shareBrowserInThisFile } from "#test-support/browser/ShareBrowserInThisFile.ts";
-import { TARGET, closedOrigin, htmlPage, routedPagesHarness } from "../../support/browser/harnesses/RoutedPagesHarness.ts";
+import {
+    TARGET,
+    closedOrigin,
+    htmlPage,
+    routedPagesHarness,
+} from "../../support/browser/harnesses/RoutedPagesHarness.ts";
 import { StepOutcome } from "@revisum/contracts";
 
 shareBrowserInThisFile();
@@ -71,7 +76,9 @@ describe("Using a run in a real browser", () => {
                         planClicking(REFUSED_LINK, assertion()),
                     );
                     assert.notEqual(result.state, "Passed", JSON.stringify(result.steps));
-                    const firstFailed = result.steps.find((step) => step.outcome === StepOutcome.Failed);
+                    const firstFailed = result.steps.find(
+                        (step) => step.outcome === StepOutcome.Failed,
+                    );
                     assert.equal(
                         firstFailed?.code,
                         "navigation-failed",
@@ -90,7 +97,9 @@ describe("Using a run in a real browser", () => {
                     planClicking(BLOCKED_LINK, { kind: "urlPath", value: ORDER_PATH }),
                 );
                 assert.notEqual(result.state, "Passed", JSON.stringify(result.steps));
-                const firstFailed = result.steps.find((step) => step.outcome === StepOutcome.Failed);
+                const firstFailed = result.steps.find(
+                    (step) => step.outcome === StepOutcome.Failed,
+                );
                 assert.equal(firstFailed?.code, "navigation-failed", JSON.stringify(result.steps));
             });
         });

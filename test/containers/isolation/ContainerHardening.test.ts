@@ -6,31 +6,44 @@
 // Seccomp mode 2 shows that a filter is on, not which one. The pinned profile is Docker's default
 // plus the namespace calls Chrome's sandbox needs, so creating a user namespace, which Docker's
 // default profile refuses to a process without capabilities, tells the two apart.
-import assert from 'node:assert/strict';
-import { after, before, test } from 'node:test';
-import { createCleanUpScope } from '../../support/CleanUpScope.ts';
-import { execInside, jsonInside, startIsolatedRun, type IsolatedRun } from '../support/IsolatedRun.ts';
+import assert from "node:assert/strict";
+import { after, before, test } from "node:test";
+import { createCleanUpScope } from "../../support/CleanUpScope.ts";
+import {
+    execInside,
+    jsonInside,
+    startIsolatedRun,
+    type IsolatedRun,
+} from "../support/IsolatedRun.ts";
 
 const TIMEOUT = 600_000;
-const NO_CAPABILITIES = '0000000000000000';
+const NO_CAPABILITIES = "0000000000000000";
 // Seccomp's filter mode in /proc/<pid>/status: 0 off, 1 strict, 2 filter.
-const SECCOMP_FILTER_MODE = '2';
+const SECCOMP_FILTER_MODE = "2";
 
 const cleanUps = createCleanUpScope();
 let run: IsolatedRun;
-before(async () => {
-  run = await startIsolatedRun();
-  cleanUps.add(() => run.stop());
-}, { timeout: TIMEOUT });
+before(
+    async () => {
+        run = await startIsolatedRun();
+        cleanUps.add(() => run.stop());
+    },
+    { timeout: TIMEOUT },
+);
 after(() => cleanUps.runAll(), { timeout: TIMEOUT });
 
-type ProcessStatus = { readonly uid: string; readonly seccomp: string; readonly capabilities: readonly string[]; readonly noNewPrivileges: string };
+type ProcessStatus = {
+    readonly uid: string;
+    readonly seccomp: string;
+    readonly capabilities: readonly string[];
+    readonly noNewPrivileges: string;
+};
 
 // The status fields of a process inside the container: its real, effective, saved and file-system
 // user ids, its seccomp mode, its effective, permitted, inheritable, bounding and ambient
 // capability sets, and its no-new-privileges flag.
-async function statusOf(processId: 'self' | '1'): Promise<ProcessStatus> {
-  const script = `
+async function statusOf(processId: "self" | "1"): Promise<ProcessStatus> {
+    const script = `
     const { readFileSync } = require('node:fs');
     const fields = Object.fromEntries(readFileSync('/proc/${processId}/status', 'utf8').split('\\n')
       .map((line) => line.split(':\\t')).filter((parts) => parts.length === 2).map(([name, value]) => [name, value.trim()]));
@@ -40,35 +53,70 @@ async function statusOf(processId: 'self' | '1'): Promise<ProcessStatus> {
       capabilities: ['CapEff', 'CapPrm', 'CapInh', 'CapBnd', 'CapAmb'].map((name) => fields[name] ?? ''),
       noNewPrivileges: fields.NoNewPrivs ?? '',
     }));`;
-  return await jsonInside(run.handle, script) as ProcessStatus;
+    return (await jsonInside(run.handle, script)) as ProcessStatus;
 }
 
-for (const processId of ['self', '1'] as const) {
-  const which = processId === '1' ? 'the container\'s first process' : 'a process started through exec';
-  test(`${which} runs as a non-root user`, { timeout: TIMEOUT }, async () => {
-    const status = await statusOf(processId);
-    const ids = status.uid.split(/\s+/);
-    assert.equal(ids.length, 4, status.uid);
-    assert.ok(ids.every((id) => id !== '0'), `user ids: ${status.uid}`);
-  });
+for (const processId of ["self", "1"] as const) {
+    const which =
+        processId === "1" ? "the container's first process" : "a process started through exec";
+    test(`${which} runs as a non-root user`, { timeout: TIMEOUT }, async () => {
+        const status = await statusOf(processId);
+        const ids = status.uid.split(/\s+/);
+        assert.equal(ids.length, 4, status.uid);
+        assert.ok(
+            ids.every((id) => id !== "0"),
+            `user ids: ${status.uid}`,
+        );
+    });
 
-  test(`${which} runs under a seccomp filter`, { timeout: TIMEOUT }, async () => {
-    assert.equal((await statusOf(processId)).seccomp, SECCOMP_FILTER_MODE);
-  });
+    test(`${which} runs under a seccomp filter`, { timeout: TIMEOUT }, async () => {
+        assert.equal((await statusOf(processId)).seccomp, SECCOMP_FILTER_MODE);
+    });
 
-  test(`${which} holds no capability and cannot gain privileges`, { timeout: TIMEOUT }, async () => {
-    const status = await statusOf(processId);
-    assert.deepEqual(status.capabilities, [NO_CAPABILITIES, NO_CAPABILITIES, NO_CAPABILITIES, NO_CAPABILITIES, NO_CAPABILITIES]);
-    assert.equal(status.noNewPrivileges, '1');
-  });
+    test(
+        `${which} holds no capability and cannot gain privileges`,
+        { timeout: TIMEOUT },
+        async () => {
+            const status = await statusOf(processId);
+            assert.deepEqual(status.capabilities, [
+                NO_CAPABILITIES,
+                NO_CAPABILITIES,
+                NO_CAPABILITIES,
+                NO_CAPABILITIES,
+                NO_CAPABILITIES,
+            ]);
+            assert.equal(status.noNewPrivileges, "1");
+        },
+    );
 }
 
-test('Node inside the container reports a non-zero user id', { timeout: TIMEOUT }, async () => {
-  const ids = await jsonInside(run.handle, 'console.log(JSON.stringify([process.getuid(), process.geteuid(), process.getgid()]))');
-  assert.ok(Array.isArray(ids) && ids.length === 3 && ids.every((id) => typeof id === 'number' && id !== 0), JSON.stringify(ids));
+test("Node inside the container reports a non-zero user id", { timeout: TIMEOUT }, async () => {
+    const ids = await jsonInside(
+        run.handle,
+        "console.log(JSON.stringify([process.getuid(), process.geteuid(), process.getgid()]))",
+    );
+    assert.ok(
+        Array.isArray(ids) &&
+            ids.length === 3 &&
+            ids.every((id) => typeof id === "number" && id !== 0),
+        JSON.stringify(ids),
+    );
 });
 
-test('the seccomp profile is the pinned one: it lets an unprivileged process create a user namespace, as Chrome\'s sandbox needs', { timeout: TIMEOUT }, async () => {
-  const outcome = await execInside(run.handle, ['unshare', '--user', '--map-root-user', 'true']);
-  assert.equal(outcome.exitCode, 0, `creating a user namespace failed, as under Docker's default profile: ${outcome.stderr}`);
-});
+test(
+    "the seccomp profile is the pinned one: it lets an unprivileged process create a user namespace, as Chrome's sandbox needs",
+    { timeout: TIMEOUT },
+    async () => {
+        const outcome = await execInside(run.handle, [
+            "unshare",
+            "--user",
+            "--map-root-user",
+            "true",
+        ]);
+        assert.equal(
+            outcome.exitCode,
+            0,
+            `creating a user namespace failed, as under Docker's default profile: ${outcome.stderr}`,
+        );
+    },
+);

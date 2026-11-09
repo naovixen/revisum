@@ -26,10 +26,17 @@ import {
     fakeCommandRunner,
     type CommandRoute,
 } from "../executors/database-commands/examples/Database.ts";
-import { routedServiceCaller, type Route } from "../executors/service-calls/examples/ShopService.ts";
+import {
+    routedServiceCaller,
+    type Route,
+} from "../executors/service-calls/examples/ShopService.ts";
 import { DEFAULT_CLOCK_START, DEFAULT_SEED, ORIGIN } from "../values/examples/RunPlan.ts";
 import { parsedProject, sourceBytes } from "../../plan/unsafe-features/examples/LostByFeature.ts";
-import { DATABASE_SECRET, unsafeProjectFile, type JsonRecord } from "../../plan/unsafe-features/examples/UnsafePlan.ts";
+import {
+    DATABASE_SECRET,
+    unsafeProjectFile,
+    type JsonRecord,
+} from "../../plan/unsafe-features/examples/UnsafePlan.ts";
 import { fakeClock } from "#test-support/fakes/session/FakeClock.ts";
 import { fakeDriver } from "#test-support/fakes/session/FakeDriver.ts";
 import { fakeEventSink } from "#test-support/fakes/ports/FakeEventSink.ts";

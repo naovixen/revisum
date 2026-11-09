@@ -7,33 +7,45 @@
 //     an Approval, the owner's declared approval passes exactly as a verified one does.
 // Each @ts-expect-error line must stay an error; the test deletes them to prove it.
 import {
-  unverified,
-  type ActorId, type Approval, type ApprovalSubject, type DeclaredApproval, type DerivedActor, type VerifiedApproval,
-} from '@revisum/engine';
+    unverified,
+    type ActorId,
+    type Approval,
+    type ApprovalSubject,
+    type DeclaredApproval,
+    type DerivedActor,
+    type VerifiedApproval,
+} from "@revisum/engine";
 
-const subject: ApprovalSubject = { kind: 'plan', hash: 'plan-hash' };
+const subject: ApprovalSubject = { kind: "plan", hash: "plan-hash" };
 
 // A gate as later specs write it: it takes an Approval, never a VerifiedApproval.
 const opensGate = (approval: Approval): boolean => approval.subject.hash.length > 0;
 
 // ---- What a decision without a usable proof yields ----------------------------------------------
-export const localDecision: DerivedActor = unverified(subject, 'local');
-export const mcpDecision: DerivedActor = unverified(subject, 'mcp');
-export const tokenDecision: DerivedActor = unverified(subject, 'token');
+export const localDecision: DerivedActor = unverified(subject, "local");
+export const mcpDecision: DerivedActor = unverified(subject, "mcp");
+export const tokenDecision: DerivedActor = unverified(subject, "token");
 
 // @ts-expect-error the actor for a local decision is not an Approval, so it cannot open a gate
-export const localDecisionAtGate = opensGate(unverified(subject, 'local'));
+export const localDecisionAtGate = opensGate(unverified(subject, "local"));
 
 // @ts-expect-error the actor for an MCP decision is not an Approval, so it cannot open a gate
-export const mcpDecisionAtGate = opensGate(unverified(subject, 'mcp'));
+export const mcpDecisionAtGate = opensGate(unverified(subject, "mcp"));
 
-export const forgedApproval = (approver: ActorId): boolean => opensGate(
-  // @ts-expect-error an object literal is not an Approval: only the approval verifier mints one
-  { subject, approver, proofKind: 'agent-lockdown-merge', strength: 'declared', at: '2026-10-28T09:00:00Z' },
-);
+export const forgedApproval = (approver: ActorId): boolean =>
+    opensGate(
+        // @ts-expect-error an object literal is not an Approval: only the approval verifier mints one
+        {
+            subject,
+            approver,
+            proofKind: "agent-lockdown-merge",
+            strength: "declared",
+            at: "2026-10-28T09:00:00Z",
+        },
+    );
 
 // @ts-expect-error unverified() takes only a local, MCP or token source, never a person
-export const personSource = unverified(subject, 'person');
+export const personSource = unverified(subject, "person");
 
 // ---- Declared and verified pass the same gate ---------------------------------------------------
 export const declaredAtGate = (approval: DeclaredApproval): boolean => opensGate(approval);

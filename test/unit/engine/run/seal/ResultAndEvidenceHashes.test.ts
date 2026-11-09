@@ -137,7 +137,8 @@ const LIST_EDITS: readonly ListEdit[] = [
 ];
 
 const unavailableDriver = fakeDriver({
-    supports: () => failure({ reason: UnavailableReason.EngineNotSupported, detail: "not this engine" }),
+    supports: () =>
+        failure({ reason: UnavailableReason.EngineNotSupported, detail: "not this engine" }),
     open: () => assert.fail("a target that is unavailable is never opened"),
 });
 

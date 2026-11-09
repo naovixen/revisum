@@ -7,11 +7,7 @@ import { arch, platform } from "node:os";
 import { join } from "node:path";
 import { setTimeout as pause } from "node:timers/promises";
 import type { RunnerHandle } from "@revisum/contracts";
-import {
-    CREATE_TARGET,
-    cdpDriver,
-    egressThroughExistingProxy,
-} from "@revisum/driver-cdp";
+import { CREATE_TARGET, cdpDriver, egressThroughExistingProxy } from "@revisum/driver-cdp";
 import { launchChromiumWithArguments } from "@revisum/driver-cdp/testing";
 import { createRunService, parseProject, planParser } from "@revisum/engine";
 import { navigate, rawPlan, testId, textEquals } from "../../support/browser/RawPlan.ts";
@@ -180,12 +176,11 @@ export async function attemptWebRtcInside(
     handle: RunnerHandle,
     attempt: WebRtcAttempt,
 ): Promise<string> {
-    const ran = await handle.exec([
-        "node",
-        THIS_FILE_IN_THE_WORKSPACE,
-        JSON.stringify(attempt),
-    ]);
-    assert.ok(ran.ok, `the attempt inside the container did not run: ${ran.ok ? "" : ran.error.detail}`);
+    const ran = await handle.exec(["node", THIS_FILE_IN_THE_WORKSPACE, JSON.stringify(attempt)]);
+    assert.ok(
+        ran.ok,
+        `the attempt inside the container did not run: ${ran.ok ? "" : ran.error.detail}`,
+    );
     const outcome = ran.value;
     assert.equal(outcome.exitCode, 0, `the attempt inside the container failed: ${outcome.stderr}`);
     const printed = JSON.parse(outcome.stdout.trim().split("\n").at(-1) ?? "null") as {

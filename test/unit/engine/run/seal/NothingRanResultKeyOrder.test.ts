@@ -59,7 +59,12 @@ const refusedPlanRun = async (): Promise<RunResult> => {
 const planRunOnAnUnavailableTarget = async (): Promise<RunResult> => {
     const { result } = await runOnFakeSession(unsafePlan([OPEN_CART]), {
         open: () =>
-            Promise.resolve(failure({ reason: UnavailableReason.LaunchFailed, detail: "the browser is broken" })),
+            Promise.resolve(
+                failure({
+                    reason: UnavailableReason.LaunchFailed,
+                    detail: "the browser is broken",
+                }),
+            ),
         clock: clockThatTakes(TIME_TAKEN),
     });
     return result;

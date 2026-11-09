@@ -7,7 +7,11 @@ import type { BrowserHarness } from "#test-support/browser/BrowserHarness.ts";
 import { navigate, type JsonRecord } from "#test-support/browser/RawPlan.ts";
 import { shareBrowserInThisFile } from "#test-support/browser/ShareBrowserInThisFile.ts";
 import { assertStepFailedWith } from "../../support/browser/harnesses/AssertStepFailedWith.ts";
-import { TARGET, htmlPage, routedPagesHarness } from "../../support/browser/harnesses/RoutedPagesHarness.ts";
+import {
+    TARGET,
+    htmlPage,
+    routedPagesHarness,
+} from "../../support/browser/harnesses/RoutedPagesHarness.ts";
 
 shareBrowserInThisFile();
 

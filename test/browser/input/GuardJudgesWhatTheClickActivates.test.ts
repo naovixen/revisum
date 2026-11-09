@@ -15,7 +15,10 @@ import {
     type JsonRecord,
 } from "#test-support/browser/RawPlan.ts";
 import { shareBrowserInThisFile } from "#test-support/browser/ShareBrowserInThisFile.ts";
-import { capabilityHarness, type CapabilityHarness } from "#test-support/browser/harnesses/CapabilityHarness.ts";
+import {
+    capabilityHarness,
+    type CapabilityHarness,
+} from "#test-support/browser/harnesses/CapabilityHarness.ts";
 import type { FixtureRoute } from "#test-support/builders/FixtureServer.ts";
 import type { GuardVerdict, PerformableAction, Session } from "@revisum/engine";
 import { scriptsEnabled } from "#test-support/browser/ScriptsEnabled.ts";

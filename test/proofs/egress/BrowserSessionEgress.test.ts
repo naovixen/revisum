@@ -35,7 +35,11 @@ import {
     type SessionEgressForTest,
 } from "#test-support/browser/driver/SessionEgressForTest.ts";
 import { BROWSERS } from "#test-support/browser/Browsers.ts";
-import { FIXED_TIME_MILLISECONDS, SEED, capabilityPlan } from "#test-support/browser/harnesses/CapabilityHarness.ts";
+import {
+    FIXED_TIME_MILLISECONDS,
+    SEED,
+    capabilityPlan,
+} from "#test-support/browser/harnesses/CapabilityHarness.ts";
 import type { FixtureRoute } from "#test-support/builders/FixtureServer.ts";
 import { FIXTURES } from "#test-support/repository/RepositoryRoot.ts";
 import { ATTEMPT_SETTLED, ATTEMPT_STATE, attemptPage } from "./support/EgressChannels.ts";

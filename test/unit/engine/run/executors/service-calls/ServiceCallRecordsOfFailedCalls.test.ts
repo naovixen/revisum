@@ -77,7 +77,10 @@ describe("Using the run", () => {
             describe("when the run records the call", () => {
                 test("then it should hold no status and no sha256", async () => {
                     const ran = await runWithCalls(callPlanOf([CREATE_ORDER]), {
-                        route: creatingAnOrderAnswers({ ok: false, error: ServiceCallErrorCode.ServiceUnreachable }),
+                        route: creatingAnOrderAnswers({
+                            ok: false,
+                            error: ServiceCallErrorCode.ServiceUnreachable,
+                        }),
                     });
                     const step = ran.result.steps[0];
                     assert.equal(step?.code, "service-unreachable");

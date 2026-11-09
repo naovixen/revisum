@@ -5,7 +5,11 @@ import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import { sha256, success, type StepResult } from "@revisum/engine";
 import { copyOf } from "../executors/network-and-storage/examples/Stubs.ts";
-import { fakeSessionOnOrders, runOnFakeSession, type FakeRunOptions } from "../examples/RunOnFakeSession.ts";
+import {
+    fakeSessionOnOrders,
+    runOnFakeSession,
+    type FakeRunOptions,
+} from "../examples/RunOnFakeSession.ts";
 import {
     DATABASE_COMMANDS,
     FEATURES,

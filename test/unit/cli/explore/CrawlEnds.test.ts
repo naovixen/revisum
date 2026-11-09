@@ -110,7 +110,9 @@ describe("Using the crawl in a browser", () => {
 
         describe("when the deadline has not yet passed", () => {
             test("then it should still be waiting", async (context) => {
-                const ended = await crawlWithWedgedClose(context, {}, [SAME_DEADLINE_MILLISECONDS - 1]);
+                const ended = await crawlWithWedgedClose(context, {}, [
+                    SAME_DEADLINE_MILLISECONDS - 1,
+                ]);
                 assert.equal(ended, PENDING);
             });
         });

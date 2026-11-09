@@ -19,7 +19,11 @@ import { startBrowserHarness, type BrowserHarness } from "#test-support/browser/
 import { BrowserTarget, englishMatrix } from "#test-support/browser/BrowserTarget.ts";
 import { driversForTargets } from "#test-support/browser/driver/CreateBrowserDriver.ts";
 import { rawPlan, type JsonRecord } from "#test-support/browser/RawPlan.ts";
-import { portWith, sessionWith, wrappingSessions } from "#test-support/browser/driver/WrappingSessions.ts";
+import {
+    portWith,
+    sessionWith,
+    wrappingSessions,
+} from "#test-support/browser/driver/WrappingSessions.ts";
 import type { FixtureRoute } from "#test-support/builders/FixtureServer.ts";
 import { FIXTURES } from "#test-support/repository/RepositoryRoot.ts";
 import { letterNonce } from "../../../unit/engine/secrets/examples/SecretRun.ts";
@@ -34,7 +38,6 @@ export const MAXIMUM_ADVANCE_REAL_MILLISECONDS = 2000;
 const SECOND = 1000;
 export const MINUTE = 60 * SECOND;
 export const HOUR = 60 * MINUTE;
-
 
 // The secret the leak page's token field is filled with, and copies.
 export const COPY_SECRET = "CLIPBOARD_ACCESS_TOKEN";

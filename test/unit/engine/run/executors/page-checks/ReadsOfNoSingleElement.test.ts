@@ -24,7 +24,11 @@ import {
     safe,
     TWO_ELEMENTS,
 } from "../../examples/ShownElement.ts";
-import { OPEN_CART, REMEMBER_ATTRIBUTE, unsafePlan } from "../../../plan/unsafe-features/examples/UnsafePlan.ts";
+import {
+    OPEN_CART,
+    REMEMBER_ATTRIBUTE,
+    unsafePlan,
+} from "../../../plan/unsafe-features/examples/UnsafePlan.ts";
 import { FAKE_ELEMENT } from "#test-support/fakes/session/FakePage.ts";
 import { SemanticLocatorKind, DomReadKind } from "@revisum/contracts";
 

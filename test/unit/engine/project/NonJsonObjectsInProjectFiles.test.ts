@@ -6,7 +6,11 @@ import { describe, test } from "node:test";
 import { parseProject } from "@revisum/engine";
 import { classInstanceHolding } from "../../../support/ClassInstanceHolding.ts";
 import { testProjectInput, withValue, type JsonRecord } from "../plan/examples/GoldenPlan.ts";
-import { callProjectFile, declarationOf, projectRefusal } from "../run/executors/service-calls/examples/ShopService.ts";
+import {
+    callProjectFile,
+    declarationOf,
+    projectRefusal,
+} from "../run/executors/service-calls/examples/ShopService.ts";
 
 const NOT_JSON_VALUES: readonly { readonly name: string; readonly value: unknown }[] = [
     { name: "a Date", value: new Date(0) },

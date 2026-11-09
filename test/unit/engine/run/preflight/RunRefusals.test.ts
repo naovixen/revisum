@@ -22,7 +22,12 @@ import {
     runPlan,
     type Recording,
 } from "../values/examples/RunPlan.ts";
-import { echoesIn, fakeStorageState, runWithSecrets, secretFillPlan } from "../../secrets/examples/SecretRun.ts";
+import {
+    echoesIn,
+    fakeStorageState,
+    runWithSecrets,
+    secretFillPlan,
+} from "../../secrets/examples/SecretRun.ts";
 import { parserEnabling, rejection } from "../../plan/unsafe-features/examples/LostByFeature.ts";
 
 const SAVED_SESSION = "SAVED_SESSION";

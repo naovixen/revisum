@@ -5,7 +5,12 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import { planHash, readPlanText, writePlanText } from "@revisum/engine";
-import { accepted, navigate, reference, type JsonRecord } from "../../run/values/examples/RunPlan.ts";
+import {
+    accepted,
+    navigate,
+    reference,
+    type JsonRecord,
+} from "../../run/values/examples/RunPlan.ts";
 import { unsafeLimits } from "./examples/UnsafeMark.ts";
 import { parserEnabling } from "../unsafe-features/examples/LostByFeature.ts";
 import {

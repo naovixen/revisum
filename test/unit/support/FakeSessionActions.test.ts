@@ -33,7 +33,11 @@ import {
 import { PolicyRuleId, PolicyVerdictKind } from "@revisum/contracts";
 
 const ALLOW: GuardVerdict = { kind: PolicyVerdictKind.Allow };
-const DENY: GuardVerdict = { kind: PolicyVerdictKind.Deny, rule: PolicyRuleId.IrreversibleAction, stepIndex: 1 };
+const DENY: GuardVerdict = {
+    kind: PolicyVerdictKind.Deny,
+    rule: PolicyRuleId.IrreversibleAction,
+    stepIndex: 1,
+};
 const NAMED_BUTTON = role("button", "Export");
 const UNNAMED_ELEMENT: ResolvedElement = {
     role: null,

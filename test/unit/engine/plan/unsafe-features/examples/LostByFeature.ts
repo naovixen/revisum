@@ -14,52 +14,100 @@
 //     of before plan 1.3 (unsafe-feature-closed-plans-unchanged.test.ts);
 //   - a run on the recording driver, which declares no page scripts, still builds its manifest, and
 //     reports those steps as unsupported-step. Its database commands go to a fake runner.
-import assert from 'node:assert/strict';
-import { createRunService, guaranteeStatement, parseProject, planParser, unsafeFeaturesOf, type GuaranteeId, type GuaranteeStatement, type Plan, type PlanError, type PlanStanding, type Project, type Result, type RunResult, UnsafeFeature } from '@revisum/engine';
-import { baseUrlOf, clearRun, trustedProjectFrom } from '../../../../../support/builders/ClearRun.ts';
-import { DATABASE_PASSWORD, fakeCommandRunner } from '../../../run/executors/database-commands/examples/Database.ts';
-import { DEFAULT_CLOCK_START, DEFAULT_SEED, recordingDriver, type Recording } from '../../../run/values/examples/RunPlan.ts';
-import { DATABASE_SECRET, FEATURES, ORIGIN, SCRIPT_SOURCES, unsafeProjectFile, type FeatureName, type JsonRecord } from './UnsafePlan.ts';
-import { driversOf, fakePorts } from '#test-support/fakes/FakePorts.ts';
-import { fakeSecretStore } from '#test-support/fakes/ports/FakeSecretStore.ts';
-import { RunMode, PlanErrorCode } from '@revisum/contracts';
+import assert from "node:assert/strict";
+import {
+    createRunService,
+    guaranteeStatement,
+    parseProject,
+    planParser,
+    unsafeFeaturesOf,
+    type GuaranteeId,
+    type GuaranteeStatement,
+    type Plan,
+    type PlanError,
+    type PlanStanding,
+    type Project,
+    type Result,
+    type RunResult,
+    UnsafeFeature,
+} from "@revisum/engine";
+import {
+    baseUrlOf,
+    clearRun,
+    trustedProjectFrom,
+} from "../../../../../support/builders/ClearRun.ts";
+import {
+    DATABASE_PASSWORD,
+    fakeCommandRunner,
+} from "../../../run/executors/database-commands/examples/Database.ts";
+import {
+    DEFAULT_CLOCK_START,
+    DEFAULT_SEED,
+    recordingDriver,
+    type Recording,
+} from "../../../run/values/examples/RunPlan.ts";
+import {
+    DATABASE_SECRET,
+    FEATURES,
+    ORIGIN,
+    SCRIPT_SOURCES,
+    unsafeProjectFile,
+    type FeatureName,
+    type JsonRecord,
+} from "./UnsafePlan.ts";
+import { driversOf, fakePorts } from "#test-support/fakes/FakePorts.ts";
+import { fakeSecretStore } from "#test-support/fakes/ports/FakeSecretStore.ts";
+import { RunMode, PlanErrorCode } from "@revisum/contracts";
 
 export type ParsePlan = (input: unknown) => Result<Plan, readonly PlanError[]>;
 
 export function parsedProject(projectFile: unknown): Project {
-  const parsed = parseProject(projectFile);
-  assert.ok(parsed.ok, `the project was rejected: ${JSON.stringify(parsed)}`);
-  return parsed.value;
+    const parsed = parseProject(projectFile);
+    assert.ok(parsed.ok, `the project was rejected: ${JSON.stringify(parsed)}`);
+    return parsed.value;
 }
 
 // The plan parser of a project enabling exactly `enabled`, every feature by default.
-export const parserEnabling = (enabled: readonly FeatureName[] = FEATURES, fields: JsonRecord = {}): ParsePlan =>
-  planParser(parsedProject(unsafeProjectFile(enabled, fields)));
+export const parserEnabling = (
+    enabled: readonly FeatureName[] = FEATURES,
+    fields: JsonRecord = {},
+): ParsePlan => planParser(parsedProject(unsafeProjectFile(enabled, fields)));
 
 // Every feature but `feature`. Without page scripts there is no pageScripts entry, so inline
 // scripts are off too.
 export const allBut = (feature: FeatureName): readonly FeatureName[] =>
-  FEATURES.filter((other) => other !== feature && !(feature === UnsafeFeature.PageScript && other === UnsafeFeature.InlinePageScript));
+    FEATURES.filter(
+        (other) =>
+            other !== feature &&
+            !(feature === UnsafeFeature.PageScript && other === UnsafeFeature.InlinePageScript),
+    );
 
 export function acceptedBy(parse: ParsePlan, raw: unknown): Plan {
-  const parsed = parse(raw);
-  assert.ok(parsed.ok, `the plan was rejected: ${JSON.stringify(parsed)}`);
-  return parsed.value;
+    const parsed = parse(raw);
+    assert.ok(parsed.ok, `the plan was rejected: ${JSON.stringify(parsed)}`);
+    return parsed.value;
 }
 
 // The errors of a rejected plan, as returned.
 export function errorsOf(parse: ParsePlan, raw: unknown): readonly PlanError[] {
-  const parsed = parse(raw);
-  assert.equal(parsed.ok, false, 'the plan was accepted');
-  return parsed.error;
+    const parsed = parse(raw);
+    assert.equal(parsed.ok, false, "the plan was accepted");
+    return parsed.error;
 }
 
 // The errors of a rejected plan as "code path" lines, in the parser's order.
-export const rejection = (parse: ParsePlan, raw: unknown): string[] => errorsOf(parse, raw).map((error) => `${error.code} ${error.path}`);
+export const rejection = (parse: ParsePlan, raw: unknown): string[] =>
+    errorsOf(parse, raw).map((error) => `${error.code} ${error.path}`);
 
 // The paths of the unsafe_feature_disabled errors, sorted, and each only once.
 export const disabledPaths = (errors: readonly PlanError[]): string[] =>
-  [...new Set(errors.filter((error) => error.code === PlanErrorCode.UnsafeFeatureDisabled).map((error) => error.path))].sort();
+    [
+        ...new Set(
+            errors
+                .filter((error) => error.code === PlanErrorCode.UnsafeFeatureDisabled)
+                .map((error) => error.path),
+        ),
+    ].sort();
 
 export const featuresOf = (plan: Plan): readonly UnsafeFeature[] => unsafeFeaturesOf(plan);
 
@@ -67,64 +115,99 @@ export const featuresOf = (plan: Plan): readonly UnsafeFeature[] => unsafeFeatur
 
 // The guarantees each feature loses, from the spec's table, and only those.
 export const LOST_BY_FEATURE: Readonly<Record<FeatureName, readonly GuaranteeId[]>> = {
-  'css-locator': ['semantic-locators'],
-  'xpath-locator': ['semantic-locators'],
-  'dom-checks': ['observable-checks'],
-  'page-script': ['plan-closed', 'actions-guarded', 'observable-checks', 'pii-masked'],
-  'inline-page-script': ['plan-closed', 'actions-guarded', 'observable-checks', 'pii-masked'],
-  'database-command': ['plan-closed', 'actions-guarded', 'replay-identical'],
+    "css-locator": ["semantic-locators"],
+    "xpath-locator": ["semantic-locators"],
+    "dom-checks": ["observable-checks"],
+    "page-script": ["plan-closed", "actions-guarded", "observable-checks", "pii-masked"],
+    "inline-page-script": ["plan-closed", "actions-guarded", "observable-checks", "pii-masked"],
+    "database-command": ["plan-closed", "actions-guarded", "replay-identical"],
 };
 
 // The guarantees a set of features loses together.
 export const lostBy = (features: readonly FeatureName[]): GuaranteeId[] =>
-  [...new Set(features.flatMap((feature) => LOST_BY_FEATURE[feature]))].sort();
+    [...new Set(features.flatMap((feature) => LOST_BY_FEATURE[feature]))].sort();
 
 // The gate's statement for a plan run with these features. egressEnforced says whether the run was
 // inside the isolated runner; with it, a closed plan run keeps every guarantee.
-export const statementFor = (features: readonly UnsafeFeature[], egressEnforced: boolean): GuaranteeStatement =>
-  guaranteeStatement({ mode: RunMode.Plan, egressEnforced, unmaskedScreenshotsKept: false, unsafeFeatures: features });
+export const statementFor = (
+    features: readonly UnsafeFeature[],
+    egressEnforced: boolean,
+): GuaranteeStatement =>
+    guaranteeStatement({
+        mode: RunMode.Plan,
+        egressEnforced,
+        unmaskedScreenshotsKept: false,
+        unsafeFeatures: features,
+    });
 
-export const lostIds = (statement: GuaranteeStatement): string[] => [...new Set(statement.lost.map((entry) => entry.guarantee))].sort();
+export const lostIds = (statement: GuaranteeStatement): string[] =>
+    [...new Set(statement.lost.map((entry) => entry.guarantee))].sort();
 
 // The reasons the statement gives for losing `guarantee`.
 export const reasonsFor = (statement: GuaranteeStatement, guarantee: GuaranteeId): string[] =>
-  statement.lost.filter((entry) => entry.guarantee === guarantee).map((entry) => entry.because).sort();
+    statement.lost
+        .filter((entry) => entry.guarantee === guarantee)
+        .map((entry) => entry.because)
+        .sort();
 
 // The guarantees lost because of an unsafe feature, whatever else was lost.
 export const lostToFeatures = (statement: GuaranteeStatement): string[] =>
-  [...new Set(statement.lost.filter((entry) => (FEATURES as readonly string[]).includes(entry.because)).map((entry) => entry.guarantee))].sort();
+    [
+        ...new Set(
+            statement.lost
+                .filter((entry) => (FEATURES as readonly string[]).includes(entry.because))
+                .map((entry) => entry.guarantee),
+        ),
+    ].sort();
 
 // ---- Runs ---------------------------------------------------------------------------------------
 
-export const sourceBytes = (sources: Readonly<Record<string, string>> = SCRIPT_SOURCES): Readonly<Record<string, Uint8Array>> =>
-  Object.fromEntries(Object.entries(sources).map(([file, text]) => [file, new TextEncoder().encode(text)]));
+export const sourceBytes = (
+    sources: Readonly<Record<string, string>> = SCRIPT_SOURCES,
+): Readonly<Record<string, Uint8Array>> =>
+    Object.fromEntries(
+        Object.entries(sources).map(([file, text]) => [file, new TextEncoder().encode(text)]),
+    );
 
 export type UnsafeRunOptions = {
-  readonly projectFile?: JsonRecord;
-  readonly scriptSources?: Readonly<Record<string, string>>;
-  readonly standing?: PlanStanding;
-  readonly seed?: number;
+    readonly projectFile?: JsonRecord;
+    readonly scriptSources?: Readonly<Record<string, string>>;
+    readonly standing?: PlanStanding;
+    readonly seed?: number;
 };
 
 // Parses `raw` against the project file (every feature enabled by default), clears it through the
 // policy gate and runs it on the project's target with a fresh recording driver and a fake command runner.
-export async function runUnsafePlan(raw: unknown, options: UnsafeRunOptions = {}): Promise<{ readonly result: RunResult; readonly recording: Recording }> {
-  const projectFile = options.projectFile ?? unsafeProjectFile();
-  const project = parsedProject(projectFile);
-  const plan = acceptedBy(planParser(project), raw);
-  const trusted = await trustedProjectFrom(projectFile);
-  const target = project.matrix[0];
-  assert.ok(target !== undefined, 'the test project has a target');
-  const { driver, recording } = recordingDriver();
-  const result = await createRunService(fakePorts({ drivers: driversOf(driver), secrets: fakeSecretStore({ [DATABASE_SECRET]: DATABASE_PASSWORD }), databaseCommands: fakeCommandRunner().port })).run(clearRun(plan, trusted, target.id, options.standing), { baseUrl: baseUrlOf(ORIGIN),
-    seed: options.seed ?? DEFAULT_SEED, fixedTimeMilliseconds: DEFAULT_CLOCK_START, fixtures: [], host: { platform: 'test', arch: 'test' },
-    scriptSources: sourceBytes(options.scriptSources),
-  });
-  return { result, recording };
+export async function runUnsafePlan(
+    raw: unknown,
+    options: UnsafeRunOptions = {},
+): Promise<{ readonly result: RunResult; readonly recording: Recording }> {
+    const projectFile = options.projectFile ?? unsafeProjectFile();
+    const project = parsedProject(projectFile);
+    const plan = acceptedBy(planParser(project), raw);
+    const trusted = await trustedProjectFrom(projectFile);
+    const target = project.matrix[0];
+    assert.ok(target !== undefined, "the test project has a target");
+    const { driver, recording } = recordingDriver();
+    const result = await createRunService(
+        fakePorts({
+            drivers: driversOf(driver),
+            secrets: fakeSecretStore({ [DATABASE_SECRET]: DATABASE_PASSWORD }),
+            databaseCommands: fakeCommandRunner().port,
+        }),
+    ).run(clearRun(plan, trusted, target.id, options.standing), {
+        baseUrl: baseUrlOf(ORIGIN),
+        seed: options.seed ?? DEFAULT_SEED,
+        fixedTimeMilliseconds: DEFAULT_CLOCK_START,
+        fixtures: [],
+        host: { platform: "test", arch: "test" },
+        scriptSources: sourceBytes(options.scriptSources),
+    });
+    return { result, recording };
 }
 
 // The run's manifest, which every run that opened its browser has.
-export function manifestOf(result: RunResult): NonNullable<RunResult['manifest']> {
-  assert.ok(result.manifest !== null, `the run has no manifest: ${result.state}`);
-  return result.manifest;
+export function manifestOf(result: RunResult): NonNullable<RunResult["manifest"]> {
+    assert.ok(result.manifest !== null, `the run has no manifest: ${result.state}`);
+    return result.manifest;
 }

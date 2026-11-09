@@ -70,8 +70,14 @@ function sessionHoldingARequestAfterTheClick(isHeldThen: boolean): Session {
     };
 }
 
-const CRASH: DriverError = { code: DriverErrorCode.TargetCrashed, detail: "the page's renderer died" };
-const POPUP: DriverError = { code: DriverErrorCode.UnsupportedStep, detail: "the step opened a popup" };
+const CRASH: DriverError = {
+    code: DriverErrorCode.TargetCrashed,
+    detail: "the page's renderer died",
+};
+const POPUP: DriverError = {
+    code: DriverErrorCode.UnsupportedStep,
+    detail: "the step opened a popup",
+};
 
 describe("Using the run", () => {
     for (const { name, isHeld } of [

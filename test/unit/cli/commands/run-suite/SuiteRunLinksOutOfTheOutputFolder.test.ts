@@ -7,7 +7,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, test } from "node:test";
 import { SUITE_REPORT_FILE, WORKLOAD_OUTPUT_PATH, evidenceMergeGateOpen } from "@revisum/engine";
-import { specPath, testsOf, type JsonRecord } from "../../../engine/evidence/examples/EvidenceRun.ts";
+import {
+    specPath,
+    testsOf,
+    type JsonRecord,
+} from "../../../engine/evidence/examples/EvidenceRun.ts";
 import { withValue } from "../../../engine/plan/examples/GoldenPlan.ts";
 import { traceArchive } from "../../../engine/evidence/examples/ZipArchive.ts";
 import { reportWithFailure } from "./examples/SuiteRun.ts";

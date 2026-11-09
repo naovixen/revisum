@@ -28,7 +28,11 @@ import { startRelayedDriver } from "#test-support/browser/driver/RelayedDriver.t
 import { shareBrowserInThisFile } from "#test-support/browser/ShareBrowserInThisFile.ts";
 import { assertStepFailedWith } from "../../support/browser/harnesses/AssertStepFailedWith.ts";
 import { download } from "../page-reads/support/PageStatesHarness.ts";
-import { TARGET, htmlPage, routedPagesHarness } from "../../support/browser/harnesses/RoutedPagesHarness.ts";
+import {
+    TARGET,
+    htmlPage,
+    routedPagesHarness,
+} from "../../support/browser/harnesses/RoutedPagesHarness.ts";
 import { evaluate, expectScript, inlineScript } from "../page-scripts/support/UnsafePagePlan.ts";
 import { approvedStanding } from "../../unit/engine/policy/examples/Policy.ts";
 

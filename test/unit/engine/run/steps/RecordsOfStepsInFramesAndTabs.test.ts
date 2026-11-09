@@ -10,7 +10,12 @@ import {
     recordsNamed,
     runOnFakeSession,
 } from "../examples/RunOnFakeSession.ts";
-import { OPEN_CART, READ_CART, unsafePlan, type JsonRecord } from "../../plan/unsafe-features/examples/UnsafePlan.ts";
+import {
+    OPEN_CART,
+    READ_CART,
+    unsafePlan,
+    type JsonRecord,
+} from "../../plan/unsafe-features/examples/UnsafePlan.ts";
 
 const STATUS: JsonRecord = { by: "testId", testId: "status" };
 const FINDING = { ruleId: "image-alt", impact: "serious", elementCount: 2 } as const;

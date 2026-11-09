@@ -6,7 +6,10 @@ import { after, before, describe, test } from "node:test";
 import { allowEveryAction } from "#test-support/browser/AllowEveryAction.ts";
 import { BrowserTarget } from "#test-support/browser/BrowserTarget.ts";
 import { click, testId } from "#test-support/browser/RawPlan.ts";
-import { capabilityHarness, type CapabilityHarness } from "#test-support/browser/harnesses/CapabilityHarness.ts";
+import {
+    capabilityHarness,
+    type CapabilityHarness,
+} from "#test-support/browser/harnesses/CapabilityHarness.ts";
 import type { FixtureRoute } from "#test-support/builders/FixtureServer.ts";
 import { scriptsEnabled } from "#test-support/browser/ScriptsEnabled.ts";
 

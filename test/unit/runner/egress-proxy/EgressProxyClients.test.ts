@@ -152,7 +152,9 @@ const attempts = (): readonly Attempt[] => [
 ];
 
 const blockedDecisions = (proxy: EgressProxy, seenAs: string): readonly unknown[] =>
-    proxy.decisions().filter((entry) => entry.origin === seenAs && entry.decision === EgressDecision.Blocked);
+    proxy
+        .decisions()
+        .filter((entry) => entry.origin === seenAs && entry.decision === EgressDecision.Blocked);
 
 before(async () => {
     app = createServer((incoming, response) => {

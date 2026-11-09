@@ -4,7 +4,10 @@
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, describe, test } from "node:test";
 import type { SessionTab } from "@revisum/contracts";
-import { FAKE_SCRIPT_RESULT, FakeBrowserSocket } from "#test-support/fakes/session/FakeBrowserSocket.ts";
+import {
+    FAKE_SCRIPT_RESULT,
+    FakeBrowserSocket,
+} from "#test-support/fakes/session/FakeBrowserSocket.ts";
 import { inMockTime } from "#test-support/InMockTime.ts";
 import { baseUrlOf } from "#test-support/builders/ClearRun.ts";
 import { failureCode } from "#test-support/session-contract/SessionUnderTest.ts";

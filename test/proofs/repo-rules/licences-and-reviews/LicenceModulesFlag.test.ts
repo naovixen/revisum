@@ -54,7 +54,9 @@ describe("Using the repository rules tool", () => {
                 "then it should run nothing and fail, naming the flag",
                 { timeout: TIMEOUT },
                 () => {
-                    const run = runTool("repo-rules/RunRepositoryRules.ts", [FLAG], { cwd: REPOSITORY_ROOT });
+                    const run = runTool("repo-rules/RunRepositoryRules.ts", [FLAG], {
+                        cwd: REPOSITORY_ROOT,
+                    });
                     assert.equal(run.status, 2, describeRun(run));
                     assert.ok(run.output.includes(FLAG), describeRun(run));
                     assert.ok(!run.output.includes("licence check"), describeRun(run));

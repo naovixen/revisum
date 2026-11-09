@@ -6,7 +6,10 @@ import { after, afterEach, before, describe } from "node:test";
 import type { Session } from "@revisum/engine";
 import { BrowserTarget } from "#test-support/browser/BrowserTarget.ts";
 import { isHeldByADialog } from "#test-support/IsHeldByADialog.ts";
-import { capabilityHarness, type CapabilityHarness } from "#test-support/browser/harnesses/CapabilityHarness.ts";
+import {
+    capabilityHarness,
+    type CapabilityHarness,
+} from "#test-support/browser/harnesses/CapabilityHarness.ts";
 import type { FixtureRoute } from "#test-support/builders/FixtureServer.ts";
 import { sessionContract } from "#test-support/session-contract/SessionContract.ts";
 import { scriptsEnabled } from "#test-support/browser/ScriptsEnabled.ts";

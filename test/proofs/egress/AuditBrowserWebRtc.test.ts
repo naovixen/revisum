@@ -20,7 +20,11 @@ import {
     attemptPage,
 } from "./support/EgressChannels.ts";
 import { EXECUTABLE_OF_TARGET } from "./support/HostBrowserDrivers.ts";
-import { Arrival, startRecordingOrigin, type RecordingOrigin } from "./support/StartRecordingOrigin.ts";
+import {
+    Arrival,
+    startRecordingOrigin,
+    type RecordingOrigin,
+} from "./support/StartRecordingOrigin.ts";
 
 const WEBRTC_POLICY = "disable_non_proxied_udp";
 const PAGE_HOST = "127.0.0.1";

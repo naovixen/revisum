@@ -15,12 +15,19 @@ import {
 } from "@revisum/engine";
 import { memoryEventSink } from "../../../support/builders/MemoryEventSink.ts";
 import { baseUrlOf, trustedProjectFrom } from "../../../support/builders/ClearRun.ts";
-import { DATABASE_PASSWORD, fakeCommandRunner } from "../run/executors/database-commands/examples/Database.ts";
+import {
+    DATABASE_PASSWORD,
+    fakeCommandRunner,
+} from "../run/executors/database-commands/examples/Database.ts";
 import { TEST_SERVICE } from "../plan/examples/GoldenPlan.ts";
 import { PROPOSAL, approvedStanding, parsedPlan } from "./examples/Policy.ts";
 import { fakeSessionOnOrders } from "../run/examples/RunOnFakeSession.ts";
 import { routedServiceCaller } from "../run/executors/service-calls/examples/ShopService.ts";
-import { matcher, setStorage, startStub } from "../run/executors/network-and-storage/examples/Stubs.ts";
+import {
+    matcher,
+    setStorage,
+    startStub,
+} from "../run/executors/network-and-storage/examples/Stubs.ts";
 import { DEFAULT_CLOCK_START, DEFAULT_SEED } from "../run/values/examples/RunPlan.ts";
 import { parsedProject, sourceBytes } from "../plan/unsafe-features/examples/LostByFeature.ts";
 import {

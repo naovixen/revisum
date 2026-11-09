@@ -4,7 +4,13 @@
 // Origins are compared whole: one that only starts with a declared origin's text is another origin.
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { OPEN_ORDERS, ORIGIN, planOf, runPlan, type Recording } from "../run/values/examples/RunPlan.ts";
+import {
+    OPEN_ORDERS,
+    ORIGIN,
+    planOf,
+    runPlan,
+    type Recording,
+} from "../run/values/examples/RunPlan.ts";
 
 const OFF_PROJECT_BASE_URLS: readonly { readonly baseUrl: string; readonly origin: string }[] = [
     { baseUrl: "https://elsewhere.example.org", origin: "https://elsewhere.example.org" },

@@ -4,7 +4,11 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import { success } from "@revisum/engine";
-import { fakeNetwork, fakeSessionOnOrders, runOnFakeSession } from "../run/examples/RunOnFakeSession.ts";
+import {
+    fakeNetwork,
+    fakeSessionOnOrders,
+    runOnFakeSession,
+} from "../run/examples/RunOnFakeSession.ts";
 import {
     OBSERVED_REQUESTS,
     expectRequests,

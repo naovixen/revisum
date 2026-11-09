@@ -10,7 +10,11 @@ import { fakeDriverOpening } from "#test-support/fakes/session/FakeDriver.ts";
 import { fakeEventSink } from "#test-support/fakes/ports/FakeEventSink.ts";
 import { fakeRedactor } from "#test-support/fakes/ports/FakeRedactor.ts";
 import { fakeSecretStore } from "#test-support/fakes/ports/FakeSecretStore.ts";
-import { closedSession, fakeSession, type FakeSession } from "#test-support/fakes/session/FakeSession.ts";
+import {
+    closedSession,
+    fakeSession,
+    type FakeSession,
+} from "#test-support/fakes/session/FakeSession.ts";
 import { ORIGIN } from "../../engine/plan/examples/GoldenPlan.ts";
 import { parsedPlan } from "../../engine/secrets/examples/SecretRun.ts";
 import {
@@ -146,7 +150,10 @@ describe("Using the crawl in a browser", () => {
                 const session = sessionWhoseCloseFails({
                     navigate: () =>
                         Promise.resolve(
-                            failure({ code: DriverErrorCode.NavigationFailed, detail: "the site is down" }),
+                            failure({
+                                code: DriverErrorCode.NavigationFailed,
+                                detail: "the site is down",
+                            }),
                         ),
                 });
                 const crawled = await crawlOn(session);

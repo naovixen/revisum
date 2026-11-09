@@ -12,8 +12,16 @@ import {
 } from "@revisum/engine";
 import { recordCalls, type Recorded } from "#test-support/fakes/RecordCalls.ts";
 import { fakeSession, type FakeSession } from "#test-support/fakes/session/FakeSession.ts";
-import { fakeSessionOnOrders, runOnFakeSession, stepSummaries } from "../examples/RunOnFakeSession.ts";
-import { OPEN_CART, unsafePlan, type JsonRecord } from "../../plan/unsafe-features/examples/UnsafePlan.ts";
+import {
+    fakeSessionOnOrders,
+    runOnFakeSession,
+    stepSummaries,
+} from "../examples/RunOnFakeSession.ts";
+import {
+    OPEN_CART,
+    unsafePlan,
+    type JsonRecord,
+} from "../../plan/unsafe-features/examples/UnsafePlan.ts";
 
 const WHAT_THE_DRIVER_SAID = "the driver's own words about the read";
 

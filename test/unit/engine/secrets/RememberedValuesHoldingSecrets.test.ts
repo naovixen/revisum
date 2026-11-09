@@ -15,8 +15,17 @@ import {
     type FakeRunOptions,
 } from "../run/examples/RunOnFakeSession.ts";
 import { echoForms } from "./examples/SecretRun.ts";
-import { jsonReply, requestLine, shopWith } from "../run/executors/service-calls/examples/ShopService.ts";
-import { DATABASE_SECRET, OPEN_CART, unsafePlan, type JsonRecord } from "../plan/unsafe-features/examples/UnsafePlan.ts";
+import {
+    jsonReply,
+    requestLine,
+    shopWith,
+} from "../run/executors/service-calls/examples/ShopService.ts";
+import {
+    DATABASE_SECRET,
+    OPEN_CART,
+    unsafePlan,
+    type JsonRecord,
+} from "../plan/unsafe-features/examples/UnsafePlan.ts";
 import { FAKE_ELEMENT } from "#test-support/fakes/session/FakePage.ts";
 
 const SHORT_SECRET = "4821";
@@ -89,8 +98,7 @@ const ROUTES: readonly {
             from: { element: { by: "testId", testId: "shown-code" }, read: "text" },
         },
         holding: (value) => {
-            const probe: Session["probe"] = () =>
-                Promise.resolve({ ...FAKE_ELEMENT, text: value });
+            const probe: Session["probe"] = () => Promise.resolve({ ...FAKE_ELEMENT, text: value });
             return { session: fakeSessionOnOrders({ probe }) };
         },
     },

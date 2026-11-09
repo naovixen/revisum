@@ -10,7 +10,11 @@ import {
     rememberClipboard,
 } from "../executors/clock-and-clipboard/examples/AdvanceClock.ts";
 import { OPEN_ORDERS, planOf, runPlan, type JsonRecord } from "../values/examples/RunPlan.ts";
-import { startStub, stopStub, stubProjectFile } from "../executors/network-and-storage/examples/Stubs.ts";
+import {
+    startStub,
+    stopStub,
+    stubProjectFile,
+} from "../executors/network-and-storage/examples/Stubs.ts";
 import { DriverErrorCode } from "@revisum/contracts";
 
 const REFUSED: DriverError = { code: DriverErrorCode.NotActionable, detail: "the port refuses" };

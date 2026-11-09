@@ -9,10 +9,19 @@ import type { DriverSession } from "@revisum/driver-cdp";
 import { allowEveryAction } from "#test-support/browser/AllowEveryAction.ts";
 import { BrowserTarget } from "#test-support/browser/BrowserTarget.ts";
 import { click, testId } from "#test-support/browser/RawPlan.ts";
-import { startRelayedDriver, type RelayedDriver } from "#test-support/browser/driver/RelayedDriver.ts";
-import { realEgressSource, withStartedEgress } from "#test-support/browser/driver/SessionEgressForTest.ts";
+import {
+    startRelayedDriver,
+    type RelayedDriver,
+} from "#test-support/browser/driver/RelayedDriver.ts";
+import {
+    realEgressSource,
+    withStartedEgress,
+} from "#test-support/browser/driver/SessionEgressForTest.ts";
 import { shareBrowserInThisFile } from "#test-support/browser/ShareBrowserInThisFile.ts";
-import { capabilityHarness, type CapabilityHarness } from "#test-support/browser/harnesses/CapabilityHarness.ts";
+import {
+    capabilityHarness,
+    type CapabilityHarness,
+} from "#test-support/browser/harnesses/CapabilityHarness.ts";
 import type { FixtureRoute } from "#test-support/builders/FixtureServer.ts";
 import { scriptsEnabled } from "#test-support/browser/ScriptsEnabled.ts";
 

@@ -19,7 +19,12 @@ import {
 import { REPOSITORY_ROOT } from "../../../support/repository/RepositoryRoot.ts";
 import { fakeSessionOnOrders, runOnFakeSession } from "../run/examples/RunOnFakeSession.ts";
 import { resolvedSecret } from "./examples/SecretRun.ts";
-import { DATABASE_SECRET, OPEN_CART, unsafePlan, type JsonRecord } from "../plan/unsafe-features/examples/UnsafePlan.ts";
+import {
+    DATABASE_SECRET,
+    OPEN_CART,
+    unsafePlan,
+    type JsonRecord,
+} from "../plan/unsafe-features/examples/UnsafePlan.ts";
 import { FAKE_ELEMENT } from "#test-support/fakes/session/FakePage.ts";
 
 const LENGTHS: readonly number[] = [5_200, 20_000];

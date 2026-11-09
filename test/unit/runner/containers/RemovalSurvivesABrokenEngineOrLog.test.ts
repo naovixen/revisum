@@ -8,7 +8,12 @@ import { REPOSITORY_ROOT } from "../../../support/repository/RepositoryRoot.ts";
 import { BREAKAGES, REASON_IT_BROKE, engineBreaking } from "../support/EngineBreaking.ts";
 import { fakeContainerEngine, type FakeEngineSettings } from "../support/FakeContainerEngine.ts";
 import { PINNED_IMAGE_ID } from "../examples/DeclaredService.ts";
-import { PRESENT_IMAGES, TEAM_IMAGE_ID, outputFolder, runnerOn } from "../examples/WorkloadRequest.ts";
+import {
+    PRESENT_IMAGES,
+    TEAM_IMAGE_ID,
+    outputFolder,
+    runnerOn,
+} from "../examples/WorkloadRequest.ts";
 
 const ENFORCING: FakeEngineSettings = {
     localImageId: PINNED_IMAGE_ID,

@@ -18,7 +18,11 @@ import {
 } from "#test-support/browser/BrowserTarget.ts";
 import { navigate, testId, textEquals } from "#test-support/browser/RawPlan.ts";
 import type { EgressSourceForTest } from "#test-support/browser/driver/SessionEgressForTest.ts";
-import { FIXED_TIME_MILLISECONDS, SEED, capabilityPlan } from "#test-support/browser/harnesses/CapabilityHarness.ts";
+import {
+    FIXED_TIME_MILLISECONDS,
+    SEED,
+    capabilityPlan,
+} from "#test-support/browser/harnesses/CapabilityHarness.ts";
 import type { FixtureRoute } from "#test-support/builders/FixtureServer.ts";
 import { FIXTURES } from "#test-support/repository/RepositoryRoot.ts";
 import { onTarget } from "#test-support/TestTier.ts";

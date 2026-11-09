@@ -6,36 +6,57 @@
 // The function is assumed to be exported by the driver package as
 //   heldModifierKeys(modifiers: readonly Modifier[], platform: NodeJS.Platform): readonly ('Alt' | 'Control' | 'Meta' | 'Shift')[]
 // and is looked up by name, so this file compiles before it exists.
-import assert from 'node:assert/strict';
-import { test } from 'node:test';
-import type { Modifier } from '@revisum/contracts';
-import * as cdpDriverPackage from '@revisum/driver-cdp';
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import type { Modifier } from "@revisum/contracts";
+import * as cdpDriverPackage from "@revisum/driver-cdp";
 
-type HeldModifierKeys = (modifiers: readonly Modifier[], platform: NodeJS.Platform) => readonly string[];
+type HeldModifierKeys = (
+    modifiers: readonly Modifier[],
+    platform: NodeJS.Platform,
+) => readonly string[];
 
-function heldModifierKeys(modifiers: readonly Modifier[], platform: NodeJS.Platform): readonly string[] {
-  const exported: unknown = Object.getOwnPropertyDescriptor(cdpDriverPackage, 'heldModifierKeys')?.value;
-  assert.equal(typeof exported, 'function', 'the driver package exports heldModifierKeys');
-  return (exported as HeldModifierKeys)(modifiers, platform);
+function heldModifierKeys(
+    modifiers: readonly Modifier[],
+    platform: NodeJS.Platform,
+): readonly string[] {
+    const exported: unknown = Object.getOwnPropertyDescriptor(
+        cdpDriverPackage,
+        "heldModifierKeys",
+    )?.value;
+    assert.equal(typeof exported, "function", "the driver package exports heldModifierKeys");
+    return (exported as HeldModifierKeys)(modifiers, platform);
 }
 
-test('ControlOrMeta is held as Meta on macOS', () => {
-  assert.deepEqual(heldModifierKeys(['ControlOrMeta'], 'darwin'), ['Meta']);
+test("ControlOrMeta is held as Meta on macOS", () => {
+    assert.deepEqual(heldModifierKeys(["ControlOrMeta"], "darwin"), ["Meta"]);
 });
 
-for (const platform of ['linux', 'win32'] as const) {
-  test(`ControlOrMeta is held as Control on ${platform}`, () => {
-    assert.deepEqual(heldModifierKeys(['ControlOrMeta'], platform), ['Control']);
-  });
+for (const platform of ["linux", "win32"] as const) {
+    test(`ControlOrMeta is held as Control on ${platform}`, () => {
+        assert.deepEqual(heldModifierKeys(["ControlOrMeta"], platform), ["Control"]);
+    });
 }
 
-test('every other modifier is held as itself, in the order written, on every platform', () => {
-  for (const platform of ['darwin', 'linux', 'win32'] as const) {
-    assert.deepEqual(heldModifierKeys(['Shift', 'Alt', 'Meta', 'Control'], platform), ['Shift', 'Alt', 'Meta', 'Control'], platform);
-  }
+test("every other modifier is held as itself, in the order written, on every platform", () => {
+    for (const platform of ["darwin", "linux", "win32"] as const) {
+        assert.deepEqual(
+            heldModifierKeys(["Shift", "Alt", "Meta", "Control"], platform),
+            ["Shift", "Alt", "Meta", "Control"],
+            platform,
+        );
+    }
 });
 
-test('ControlOrMeta keeps its place among the other modifiers', () => {
-  assert.deepEqual(heldModifierKeys(['Shift', 'ControlOrMeta', 'Alt'], 'darwin'), ['Shift', 'Meta', 'Alt']);
-  assert.deepEqual(heldModifierKeys(['Shift', 'ControlOrMeta', 'Alt'], 'linux'), ['Shift', 'Control', 'Alt']);
+test("ControlOrMeta keeps its place among the other modifiers", () => {
+    assert.deepEqual(heldModifierKeys(["Shift", "ControlOrMeta", "Alt"], "darwin"), [
+        "Shift",
+        "Meta",
+        "Alt",
+    ]);
+    assert.deepEqual(heldModifierKeys(["Shift", "ControlOrMeta", "Alt"], "linux"), [
+        "Shift",
+        "Control",
+        "Alt",
+    ]);
 });

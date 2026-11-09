@@ -25,7 +25,11 @@ import {
     type Step,
     type Target,
 } from "@revisum/engine";
-import { startFixtureServer, type FixtureRoute, type FixtureServer } from "../builders/FixtureServer.ts";
+import {
+    startFixtureServer,
+    type FixtureRoute,
+    type FixtureServer,
+} from "../builders/FixtureServer.ts";
 import {
     memoryArtifactStore,
     memoryEventSink,

@@ -4,7 +4,12 @@
 // dependencies never run, so they pass, as an empty section does.
 import { after, before, describe, test } from "node:test";
 import { RepositoryRuleName } from "../../../../tools/repo-rules/RunRepositoryRules.ts";
-import { assertLintFails, assertLintPasses, editJson, lintWithEdits } from "../support/WithEdits.ts";
+import {
+    assertLintFails,
+    assertLintPasses,
+    editJson,
+    lintWithEdits,
+} from "../support/WithEdits.ts";
 import type { LintOutcome } from "../support/ScratchRepository.ts";
 import { copyRepository, type ScratchRepository } from "../support/ScratchRepository.ts";
 

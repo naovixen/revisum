@@ -15,7 +15,10 @@ import {
     sharedBrowserFor,
 } from "#test-support/browser/ShareBrowserInThisFile.ts";
 import { BROWSERS } from "#test-support/browser/Browsers.ts";
-import { capabilityHarness, type CapabilityHarness } from "#test-support/browser/harnesses/CapabilityHarness.ts";
+import {
+    capabilityHarness,
+    type CapabilityHarness,
+} from "#test-support/browser/harnesses/CapabilityHarness.ts";
 import { scriptsEnabled } from "#test-support/browser/ScriptsEnabled.ts";
 
 shareBrowserInThisFile();

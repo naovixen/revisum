@@ -7,7 +7,14 @@ import { describe, test } from "node:test";
 import { REPOSITORY_ROOT } from "../../../support/repository/RepositoryRoot.ts";
 import { compileFiles } from "../support/CompileFiles.ts";
 
-const PINS_FILE = join(REPOSITORY_ROOT, "test", "proofs", "repo-rules", "brands", "SharedTypePins.ts");
+const PINS_FILE = join(
+    REPOSITORY_ROOT,
+    "test",
+    "proofs",
+    "repo-rules",
+    "brands",
+    "SharedTypePins.ts",
+);
 const COMPILE_TIMEOUT_MILLISECONDS = 300_000;
 
 const SHAPE_CHANGES: readonly {

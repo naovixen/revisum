@@ -6,7 +6,11 @@ import { failure, success, type RunResult, type StoragePort } from "@revisum/eng
 import { fakeSessionOnOrders, runOnFakeSession } from "../../examples/RunOnFakeSession.ts";
 import { ORIGIN } from "../../values/examples/RunPlan.ts";
 import { expectStorage } from "./examples/Stubs.ts";
-import { OPEN_CART, unsafePlan, type JsonRecord } from "../../../plan/unsafe-features/examples/UnsafePlan.ts";
+import {
+    OPEN_CART,
+    unsafePlan,
+    type JsonRecord,
+} from "../../../plan/unsafe-features/examples/UnsafePlan.ts";
 import { fakeStoragePort } from "#test-support/fakes/ports/FakeStoragePort.ts";
 import { StepType } from "@revisum/contracts";
 

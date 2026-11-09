@@ -3,8 +3,17 @@
 // text is a password.
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { acceptedBy, parserEnabling, rejection } from "../../plan/unsafe-features/examples/LostByFeature.ts";
-import { OPEN_CART, css, unsafePlan, type JsonRecord } from "../../plan/unsafe-features/examples/UnsafePlan.ts";
+import {
+    acceptedBy,
+    parserEnabling,
+    rejection,
+} from "../../plan/unsafe-features/examples/LostByFeature.ts";
+import {
+    OPEN_CART,
+    css,
+    unsafePlan,
+    type JsonRecord,
+} from "../../plan/unsafe-features/examples/UnsafePlan.ts";
 
 const parsePlan = parserEnabling(["css-locator"]);
 

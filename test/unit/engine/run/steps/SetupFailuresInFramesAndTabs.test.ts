@@ -4,7 +4,12 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import { fakeSessionOnOrders, runOnFakeSession } from "../examples/RunOnFakeSession.ts";
-import { OPEN_CART, READ_CART, unsafePlan, type JsonRecord } from "../../plan/unsafe-features/examples/UnsafePlan.ts";
+import {
+    OPEN_CART,
+    READ_CART,
+    unsafePlan,
+    type JsonRecord,
+} from "../../plan/unsafe-features/examples/UnsafePlan.ts";
 
 const STATUS: JsonRecord = { by: "testId", testId: "status" };
 const FAILING_CHECK: JsonRecord = {

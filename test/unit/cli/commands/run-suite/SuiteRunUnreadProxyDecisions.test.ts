@@ -20,7 +20,10 @@ import {
     suiteInput,
 } from "../../../engine/evidence/examples/EvidenceRun.ts";
 import { REMOVE, withValue } from "../../../engine/plan/examples/GoldenPlan.ts";
-import { fakeContainerEngine, type FakeContainerEngine } from "../../../runner/support/FakeContainerEngine.ts";
+import {
+    fakeContainerEngine,
+    type FakeContainerEngine,
+} from "../../../runner/support/FakeContainerEngine.ts";
 import { PINNED_IMAGE_ID } from "../../../runner/examples/DeclaredService.ts";
 import { runnerOn } from "../../../runner/examples/WorkloadRequest.ts";
 import { suiteCheckout } from "./examples/SuiteRun.ts";

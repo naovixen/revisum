@@ -29,7 +29,10 @@ import {
     type WatchedDriver,
 } from "#test-support/browser/harnesses/CapabilityHarness.ts";
 import { endAtOnce, rendererProcesses } from "#test-support/browser/harnesses/ProcessTree.ts";
-import { CRASH_READY_PATH, crashWhenRequested } from "#test-support/browser/harnesses/CrashWhenRequested.ts";
+import {
+    CRASH_READY_PATH,
+    crashWhenRequested,
+} from "#test-support/browser/harnesses/CrashWhenRequested.ts";
 import { assertStepFailedWith } from "../../support/browser/harnesses/AssertStepFailedWith.ts";
 import {
     ANSWERED_DIALOG_PATH,

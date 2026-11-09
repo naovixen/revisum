@@ -5,147 +5,243 @@
 //   - a gate that compares an actor type with 'person-verified' alone fails the lint.
 // Each rule also has a counter-example that must pass, so the lint is shown to fail for the
 // planted reason rather than for everything.
-import assert from 'node:assert/strict';
-import { after, before, test } from 'node:test';
-import { RepositoryRuleName } from '../../../../tools/repo-rules/RunRepositoryRules.ts';
-import { copyRepository, type LintOutcome, type ScratchRepository } from '../support/ScratchRepository.ts';
+import assert from "node:assert/strict";
+import { after, before, test } from "node:test";
+import { RepositoryRuleName } from "../../../../tools/repo-rules/RunRepositoryRules.ts";
+import {
+    copyRepository,
+    type LintOutcome,
+    type ScratchRepository,
+} from "../support/ScratchRepository.ts";
 
 let scratch: ScratchRepository;
-before(() => { scratch = copyRepository(); });
-after(() => { scratch.dispose(); });
+before(() => {
+    scratch = copyRepository();
+});
+after(() => {
+    scratch.dispose();
+});
 
 const TIMEOUT = 300_000;
 
 function assertLintFailsOn(rule: RepositoryRuleName, relativePath: string, source: string): void {
-  const outcome: LintOutcome = scratch.lintWith(relativePath, source, { rule });
-  assert.equal(outcome.passed, false, `the lint accepted ${relativePath}:\n${source}`);
-  const fileName = relativePath.split('/').at(-1) ?? relativePath;
-  assert.ok(outcome.failureOutput.includes(fileName), `the lint failed, but did not name ${fileName}:\n${outcome.failureOutput}`);
+    const outcome: LintOutcome = scratch.lintWith(relativePath, source, { rule });
+    assert.equal(outcome.passed, false, `the lint accepted ${relativePath}:\n${source}`);
+    const fileName = relativePath.split("/").at(-1) ?? relativePath;
+    assert.ok(
+        outcome.failureOutput.includes(fileName),
+        `the lint failed, but did not name ${fileName}:\n${outcome.failureOutput}`,
+    );
 }
 
 function assertLintPassesWith(relativePath: string, source: string): void {
-  const outcome = scratch.lintWith(relativePath, source);
-  assert.equal(outcome.passed, true, `the lint rejected ${relativePath}:\n${outcome.failureOutput}`);
+    const outcome = scratch.lintWith(relativePath, source);
+    assert.equal(
+        outcome.passed,
+        true,
+        `the lint rejected ${relativePath}:\n${outcome.failureOutput}`,
+    );
 }
 
 // ---- Control ------------------------------------------------------------------------------------
 
-test('the unchanged copy of the repository passes every lint command', { timeout: TIMEOUT }, () => {
-  const outcome = scratch.lint();
-  assert.equal(outcome.passed, true, outcome.failureOutput);
+test("the unchanged copy of the repository passes every lint command", { timeout: TIMEOUT }, () => {
+    const outcome = scratch.lint();
+    assert.equal(outcome.passed, true, outcome.failureOutput);
 });
 
 // ---- Only the approval verifier and core's runtime build a DerivedActor -------------------------
 
-test('the lint fails when a package casts an object to DerivedActor', { timeout: TIMEOUT }, () => {
-  assertLintFailsOn(RepositoryRuleName.BrandedCasts, 'packages/report/src/planted-actor.ts', [
-    "import type { DerivedActor } from '@revisum/contracts';",
-    '// A caller declaring its own actor type instead of getting it from the approval verifier.',
-    "export const declaredActor = { actor: 'self-chosen', actorType: 'person-verified' } as DerivedActor;",
-    '',
-  ].join('\n'));
+test("the lint fails when a package casts an object to DerivedActor", { timeout: TIMEOUT }, () => {
+    assertLintFailsOn(
+        RepositoryRuleName.BrandedCasts,
+        "packages/report/src/planted-actor.ts",
+        [
+            "import type { DerivedActor } from '@revisum/contracts';",
+            "// A caller declaring its own actor type instead of getting it from the approval verifier.",
+            "export const declaredActor = { actor: 'self-chosen', actorType: 'person-verified' } as DerivedActor;",
+            "",
+        ].join("\n"),
+    );
 });
 
-test('the lint fails when a package casts through unknown to DerivedActor', { timeout: TIMEOUT }, () => {
-  assertLintFailsOn(RepositoryRuleName.BrandedCasts, 'packages/cli/src/planted-actor.ts', [
-    "import type { DerivedActor } from '@revisum/contracts';",
-    "export const declaredActor = { actor: 'self-chosen', actorType: 'ci' } as unknown as DerivedActor;",
-    '',
-  ].join('\n'));
-});
+test(
+    "the lint fails when a package casts through unknown to DerivedActor",
+    { timeout: TIMEOUT },
+    () => {
+        assertLintFailsOn(
+            RepositoryRuleName.BrandedCasts,
+            "packages/cli/src/planted-actor.ts",
+            [
+                "import type { DerivedActor } from '@revisum/contracts';",
+                "export const declaredActor = { actor: 'self-chosen', actorType: 'ci' } as unknown as DerivedActor;",
+                "",
+            ].join("\n"),
+        );
+    },
+);
 
-test('the lint fails when engine code outside the approval verifier brands a DerivedActor', { timeout: TIMEOUT }, () => {
-  assertLintFailsOn(RepositoryRuleName.BrandedCasts, 'packages/engine/src/plan/planted-actor.ts', [
-    "import type { ActorId, ActorType } from '@revisum/contracts';",
-    "import { brand } from '../foundation/Brand.ts';",
-    "export const mintedActor = brand<{ actor: ActorId; actorType: ActorType }, 'DerivedActor'>(",
-    "  { actor: brand<string, 'ActorId'>('self-chosen'), actorType: 'person-declared' },",
-    ');',
-    '',
-  ].join('\n'));
-});
+test(
+    "the lint fails when engine code outside the approval verifier brands a DerivedActor",
+    { timeout: TIMEOUT },
+    () => {
+        assertLintFailsOn(
+            RepositoryRuleName.BrandedCasts,
+            "packages/engine/src/plan/planted-actor.ts",
+            [
+                "import type { ActorId, ActorType } from '@revisum/contracts';",
+                "import { brand } from '../foundation/Brand.ts';",
+                "export const mintedActor = brand<{ actor: ActorId; actorType: ActorType }, 'DerivedActor'>(",
+                "  { actor: brand<string, 'ActorId'>('self-chosen'), actorType: 'person-declared' },",
+                ");",
+                "",
+            ].join("\n"),
+        );
+    },
+);
 
-test('the lint accepts code that only receives a DerivedActor and reads it', { timeout: TIMEOUT }, () => {
-  assertLintPassesWith('packages/report/src/planted-actor-reader.ts', [
-    "import type { ActorType, DerivedActor } from '@revisum/contracts';",
-    'export const actorTypeOf = (derived: DerivedActor): ActorType => derived.actorType;',
-    '',
-  ].join('\n'));
-});
+test(
+    "the lint accepts code that only receives a DerivedActor and reads it",
+    { timeout: TIMEOUT },
+    () => {
+        assertLintPassesWith(
+            "packages/report/src/planted-actor-reader.ts",
+            [
+                "import type { ActorType, DerivedActor } from '@revisum/contracts';",
+                "export const actorTypeOf = (derived: DerivedActor): ActorType => derived.actorType;",
+                "",
+            ].join("\n"),
+        );
+    },
+);
 
 // ---- Branded values come only from their owning module ------------------------------------------
 
-test('the lint fails when a package casts a string to SafeText', { timeout: TIMEOUT }, () => {
-  assertLintFailsOn(RepositoryRuleName.BrandedCasts, 'packages/report/src/planted-cast.ts', [
-    "import type { SafeText } from '@revisum/contracts';",
-    "export const heading = 'Results' as SafeText;",
-    '',
-  ].join('\n'));
+test("the lint fails when a package casts a string to SafeText", { timeout: TIMEOUT }, () => {
+    assertLintFailsOn(
+        RepositoryRuleName.BrandedCasts,
+        "packages/report/src/planted-cast.ts",
+        [
+            "import type { SafeText } from '@revisum/contracts';",
+            "export const heading = 'Results' as SafeText;",
+            "",
+        ].join("\n"),
+    );
 });
 
-test('the lint fails when a driver casts through unknown to AllowedUrl', { timeout: TIMEOUT }, () => {
-  assertLintFailsOn(RepositoryRuleName.BrandedCasts, 'packages/driver-cdp/src/planted-cast.ts', [
-    "import type { AllowedUrl } from '@revisum/contracts';",
-    "export const home = '/' as unknown as AllowedUrl;",
-    '',
-  ].join('\n'));
+test(
+    "the lint fails when a driver casts through unknown to AllowedUrl",
+    { timeout: TIMEOUT },
+    () => {
+        assertLintFailsOn(
+            RepositoryRuleName.BrandedCasts,
+            "packages/driver-cdp/src/planted-cast.ts",
+            [
+                "import type { AllowedUrl } from '@revisum/contracts';",
+                "export const home = '/' as unknown as AllowedUrl;",
+                "",
+            ].join("\n"),
+        );
+    },
+);
+
+test("the lint fails when a package casts plan data to Plan", { timeout: TIMEOUT }, () => {
+    assertLintFailsOn(
+        RepositoryRuleName.BrandedCasts,
+        "packages/cli/src/planted-cast.ts",
+        [
+            "import type { Plan, PlanData } from '@revisum/contracts';",
+            "export const forged = (data: PlanData): Plan => data as Plan;",
+            "",
+        ].join("\n"),
+    );
 });
 
-test('the lint fails when a package casts plan data to Plan', { timeout: TIMEOUT }, () => {
-  assertLintFailsOn(RepositoryRuleName.BrandedCasts, 'packages/cli/src/planted-cast.ts', [
-    "import type { Plan, PlanData } from '@revisum/contracts';",
-    'export const forged = (data: PlanData): Plan => data as Plan;',
-    '',
-  ].join('\n'));
+test("the lint fails on an angle-bracket cast to TargetId", { timeout: TIMEOUT }, () => {
+    assertLintFailsOn(
+        RepositoryRuleName.BrandedCasts,
+        "packages/runner/src/planted-cast.ts",
+        [
+            "import type { TargetId } from '@revisum/contracts';",
+            "export const target = <TargetId>'chromium-desktop';",
+            "",
+        ].join("\n"),
+    );
 });
 
-test('the lint fails on an angle-bracket cast to TargetId', { timeout: TIMEOUT }, () => {
-  assertLintFailsOn(RepositoryRuleName.BrandedCasts, 'packages/runner/src/planted-cast.ts', [
-    "import type { TargetId } from '@revisum/contracts';",
-    "export const target = <TargetId>'chromium-desktop';",
-    '',
-  ].join('\n'));
-});
+test(
+    "the lint fails when engine code outside the parser casts a string to SafeText",
+    { timeout: TIMEOUT },
+    () => {
+        assertLintFailsOn(
+            RepositoryRuleName.BrandedCasts,
+            "packages/engine/src/planted-cast.ts",
+            [
+                "import type { SafeText } from '@revisum/contracts';",
+                "export const label = 'Results' as SafeText;",
+                "",
+            ].join("\n"),
+        );
+    },
+);
 
-test('the lint fails when engine code outside the parser casts a string to SafeText', { timeout: TIMEOUT }, () => {
-  assertLintFailsOn(RepositoryRuleName.BrandedCasts, 'packages/engine/src/planted-cast.ts', [
-    "import type { SafeText } from '@revisum/contracts';",
-    "export const label = 'Results' as SafeText;",
-    '',
-  ].join('\n'));
-});
-
-test('the lint accepts casts to types that are not branded', { timeout: TIMEOUT }, () => {
-  assertLintPassesWith('packages/report/src/planted-plain-cast.ts', [
-    'export const parsed = JSON.parse(\'{"name":"x"}\') as { readonly name: string };',
-    "export const sizes = ['small', 'large'] as const;",
-    '',
-  ].join('\n'));
+test("the lint accepts casts to types that are not branded", { timeout: TIMEOUT }, () => {
+    assertLintPassesWith(
+        "packages/report/src/planted-plain-cast.ts",
+        [
+            'export const parsed = JSON.parse(\'{"name":"x"}\') as { readonly name: string };',
+            "export const sizes = ['small', 'large'] as const;",
+            "",
+        ].join("\n"),
+    );
 });
 
 // ---- A person is anyone in PERSON_ACTOR_TYPES ---------------------------------------------------
 
-test("the lint fails on a gate that compares an actor type with 'person-verified' alone", { timeout: TIMEOUT }, () => {
-  assertLintFailsOn(RepositoryRuleName.PersonGates, 'packages/engine/src/plan/planted-gate.ts', [
-    "import type { ActorType } from '@revisum/contracts';",
-    '// Lets only verified people through, so a declared approval would wrongly not count.',
-    "export const mayApprove = (actorType: ActorType): boolean => actorType === 'person-verified';",
-    '',
-  ].join('\n'));
-});
+test(
+    "the lint fails on a gate that compares an actor type with 'person-verified' alone",
+    { timeout: TIMEOUT },
+    () => {
+        assertLintFailsOn(
+            RepositoryRuleName.PersonGates,
+            "packages/engine/src/plan/planted-gate.ts",
+            [
+                "import type { ActorType } from '@revisum/contracts';",
+                "// Lets only verified people through, so a declared approval would wrongly not count.",
+                "export const mayApprove = (actorType: ActorType): boolean => actorType === 'person-verified';",
+                "",
+            ].join("\n"),
+        );
+    },
+);
 
-test("the lint fails on a reversed inequality against 'person-verified' alone", { timeout: TIMEOUT }, () => {
-  assertLintFailsOn(RepositoryRuleName.PersonGates, 'packages/report/src/planted-gate.ts', [
-    "import type { ActorType } from '@revisum/contracts';",
-    "export const excluded = (actorType: ActorType): boolean => 'person-verified' !== actorType;",
-    '',
-  ].join('\n'));
-});
+test(
+    "the lint fails on a reversed inequality against 'person-verified' alone",
+    { timeout: TIMEOUT },
+    () => {
+        assertLintFailsOn(
+            RepositoryRuleName.PersonGates,
+            "packages/report/src/planted-gate.ts",
+            [
+                "import type { ActorType } from '@revisum/contracts';",
+                "export const excluded = (actorType: ActorType): boolean => 'person-verified' !== actorType;",
+                "",
+            ].join("\n"),
+        );
+    },
+);
 
-test('the lint accepts a gate that tests membership of PERSON_ACTOR_TYPES', { timeout: TIMEOUT }, () => {
-  assertLintPassesWith('packages/engine/src/plan/planted-gate.ts', [
-    "import { PERSON_ACTOR_TYPES, type ActorType } from '@revisum/contracts';",
-    'export const mayApprove = (actorType: ActorType): boolean => PERSON_ACTOR_TYPES.includes(actorType);',
-    '',
-  ].join('\n'));
-});
+test(
+    "the lint accepts a gate that tests membership of PERSON_ACTOR_TYPES",
+    { timeout: TIMEOUT },
+    () => {
+        assertLintPassesWith(
+            "packages/engine/src/plan/planted-gate.ts",
+            [
+                "import { PERSON_ACTOR_TYPES, type ActorType } from '@revisum/contracts';",
+                "export const mayApprove = (actorType: ActorType): boolean => PERSON_ACTOR_TYPES.includes(actorType);",
+                "",
+            ].join("\n"),
+        );
+    },
+);

@@ -12,7 +12,11 @@ import {
     stepSummaries,
     fakeNetwork,
 } from "../examples/RunOnFakeSession.ts";
-import { OPEN_CART, unsafePlan, type JsonRecord } from "../../plan/unsafe-features/examples/UnsafePlan.ts";
+import {
+    OPEN_CART,
+    unsafePlan,
+    type JsonRecord,
+} from "../../plan/unsafe-features/examples/UnsafePlan.ts";
 import { fakeRunEventSinkFailingOn } from "#test-support/fakes/ports/FakeRunEventSink.ts";
 import { closedSession, notingBlockedOrigins } from "#test-support/fakes/session/FakeSession.ts";
 

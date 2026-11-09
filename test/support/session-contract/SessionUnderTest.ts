@@ -105,7 +105,11 @@ function guardAnswering(verdict: GuardVerdict): GuardAndQuestions {
 }
 export const allowing = (): GuardAndQuestions => guardAnswering({ kind: PolicyVerdictKind.Allow });
 export const denying = (): GuardAndQuestions =>
-    guardAnswering({ kind: PolicyVerdictKind.Deny, rule: PolicyRuleId.IrreversibleDialog, stepIndex: 1 });
+    guardAnswering({
+        kind: PolicyVerdictKind.Deny,
+        rule: PolicyRuleId.IrreversibleDialog,
+        stepIndex: 1,
+    });
 
 export function failureCode(
     result: Result<unknown, { readonly code: string }> | undefined,

@@ -16,10 +16,17 @@ import { createBrowserDriver } from "#test-support/browser/driver/CreateBrowserD
 import { click, role } from "#test-support/browser/RawPlan.ts";
 import { egressThrough } from "#test-support/browser/driver/SessionEgressForTest.ts";
 import { BROWSERS } from "#test-support/browser/Browsers.ts";
-import { capabilityHarness, type CapabilityHarness } from "#test-support/browser/harnesses/CapabilityHarness.ts";
+import {
+    capabilityHarness,
+    type CapabilityHarness,
+} from "#test-support/browser/harnesses/CapabilityHarness.ts";
 import { recordedReport } from "../../unit/engine/evidence/examples/EvidenceRun.ts";
 import { runDeclaredSuite } from "../../unit/cli/commands/run-suite/examples/SuiteRun.ts";
-import { declaredService, egressPolicy, fakeResolver } from "../../unit/runner/examples/DeclaredService.ts";
+import {
+    declaredService,
+    egressPolicy,
+    fakeResolver,
+} from "../../unit/runner/examples/DeclaredService.ts";
 import { scriptsEnabled } from "#test-support/browser/ScriptsEnabled.ts";
 import { baseUrlOf } from "#test-support/builders/ClearRun.ts";
 

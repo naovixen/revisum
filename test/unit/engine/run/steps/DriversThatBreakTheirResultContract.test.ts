@@ -6,7 +6,11 @@ import { failure, success } from "@revisum/contracts";
 import { cdpDriver, type EgressSource } from "@revisum/driver-cdp";
 import type { BrowserDriver } from "@revisum/engine";
 import { fakeRunEventSink } from "#test-support/fakes/ports/FakeRunEventSink.ts";
-import { fakeSessionOnOrders, runOnFakeSession, stepSummaries } from "../examples/RunOnFakeSession.ts";
+import {
+    fakeSessionOnOrders,
+    runOnFakeSession,
+    stepSummaries,
+} from "../examples/RunOnFakeSession.ts";
 import { OPEN_CART, unsafePlan } from "../../plan/unsafe-features/examples/UnsafePlan.ts";
 
 const DRIVER_BROKE = "the driver broke";

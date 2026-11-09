@@ -31,9 +31,14 @@ describe("Using the test runner", () => {
         describe("and the browser module is missing", () => {
             describe("when the folder runs", () => {
                 test("then it should fail, naming the module, and run nothing", () => {
-                    const run = runTool("test-runner/RunTestFolder.ts", ["test/proofs"], { cwd: root });
+                    const run = runTool("test-runner/RunTestFolder.ts", ["test/proofs"], {
+                        cwd: root,
+                    });
                     assert.equal(run.status, 1, describeRun(run));
-                    assert.match(run.output, /test[\\/]support[\\/]browser[\\/]Browsers\.ts does not exist/);
+                    assert.match(
+                        run.output,
+                        /test[\\/]support[\\/]browser[\\/]Browsers\.ts does not exist/,
+                    );
                     assert.doesNotMatch(run.output, /passes/);
                 });
             });
@@ -46,7 +51,9 @@ describe("Using the test runner", () => {
 
             describe("when the folder runs", () => {
                 test("then it should run the tests", () => {
-                    const run = runTool("test-runner/RunTestFolder.ts", ["test/proofs"], { cwd: root });
+                    const run = runTool("test-runner/RunTestFolder.ts", ["test/proofs"], {
+                        cwd: root,
+                    });
                     assert.equal(run.status, 0, describeRun(run));
                     assert.match(run.output, /passes/);
                 });
@@ -73,7 +80,10 @@ describe("Using the test runner", () => {
             writeFileSync(join(root, "test", "proofs", "z-plain.test.ts"), plainTest);
         });
 
-        for (const importPath of ["#test-support/browser/Browsers.ts", "../support/browser/Browsers.ts"]) {
+        for (const importPath of [
+            "#test-support/browser/Browsers.ts",
+            "../support/browser/Browsers.ts",
+        ]) {
             describe(`and the browser test imports it as ${importPath}`, () => {
                 beforeEach(() => {
                     writeFileSync(
@@ -84,7 +94,9 @@ describe("Using the test runner", () => {
 
                 describe("when the folder runs", () => {
                     test("then it should run the browser test after the other", () => {
-                        const run = runTool("test-runner/RunTestFolder.ts", ["test/proofs"], { cwd: root });
+                        const run = runTool("test-runner/RunTestFolder.ts", ["test/proofs"], {
+                            cwd: root,
+                        });
                         assert.equal(run.status, 0, describeRun(run));
                         assert.ok(
                             run.output.indexOf("needs no browser") <
@@ -234,7 +246,8 @@ describe("Using the test runner", () => {
             beforeEach(() => {
                 writeFileSync(
                     join(root, ".test-results", "tests-proofs.jsonl"),
-                    resultLine("test/proofs/first.test.ts") + resultLine("test/proofs/second.test.ts"),
+                    resultLine("test/proofs/first.test.ts") +
+                        resultLine("test/proofs/second.test.ts"),
                 );
             });
 
@@ -278,7 +291,9 @@ describe("Using the test runner", () => {
         describe("and the browser module is missing", () => {
             describe("when the folder runs", () => {
                 test("then it should report the empty folder and pass", () => {
-                    const run = runTool("test-runner/RunTestFolder.ts", ["test/proofs"], { cwd: root });
+                    const run = runTool("test-runner/RunTestFolder.ts", ["test/proofs"], {
+                        cwd: root,
+                    });
                     assert.equal(run.status, 0, describeRun(run));
                     assert.match(run.output, /no tests in test[\\/]proofs yet/);
                 });

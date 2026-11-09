@@ -7,7 +7,12 @@ import { createServer as createTcpServer, connect, type AddressInfo, type Server
 import { afterEach, beforeEach, describe, test } from "node:test";
 import { type EgressProxy, type RewriteRule } from "@revisum/runner";
 import { startedProxyServer } from "#test-support/StartedEgressProxy.ts";
-import { sizedAnswer, startLocalService, type Answer, type LocalService } from "../support/LocalService.ts";
+import {
+    sizedAnswer,
+    startLocalService,
+    type Answer,
+    type LocalService,
+} from "../support/LocalService.ts";
 import { exchangeWithProxy, plainRequestText } from "../support/GetThroughProxy.ts";
 import { fakeResolver } from "../examples/DeclaredService.ts";
 

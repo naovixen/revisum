@@ -212,18 +212,27 @@ const ELEMENT_CASES: readonly {
         cases: [
             {
                 probe: "that class",
-                seen: { ...SHOWN_ELEMENT, dom: { kind: DomReadKind.Classes, classes: ["is-active"] } },
+                seen: {
+                    ...SHOWN_ELEMENT,
+                    dom: { kind: DomReadKind.Classes, classes: ["is-active"] },
+                },
                 verdict: PASSED,
             },
             {
                 probe: "other classes",
-                seen: { ...SHOWN_ELEMENT, dom: { kind: DomReadKind.Classes, classes: ["is-active-now"] } },
+                seen: {
+                    ...SHOWN_ELEMENT,
+                    dom: { kind: DomReadKind.Classes, classes: ["is-active-now"] },
+                },
                 verdict: FAILED,
             },
             { probe: "no DOM read", seen: SHOWN_ELEMENT, verdict: FAILED },
             {
                 probe: "another kind of read",
-                seen: { ...SHOWN_ELEMENT, dom: { kind: DomReadKind.Attribute, value: "is-active" } },
+                seen: {
+                    ...SHOWN_ELEMENT,
+                    dom: { kind: DomReadKind.Attribute, value: "is-active" },
+                },
                 verdict: FAILED,
             },
         ],
@@ -234,12 +243,18 @@ const ELEMENT_CASES: readonly {
         cases: [
             {
                 probe: "other classes",
-                seen: { ...SHOWN_ELEMENT, dom: { kind: DomReadKind.Classes, classes: ["is-active"] } },
+                seen: {
+                    ...SHOWN_ELEMENT,
+                    dom: { kind: DomReadKind.Classes, classes: ["is-active"] },
+                },
                 verdict: PASSED,
             },
             {
                 probe: "that class",
-                seen: { ...SHOWN_ELEMENT, dom: { kind: DomReadKind.Classes, classes: ["is-empty"] } },
+                seen: {
+                    ...SHOWN_ELEMENT,
+                    dom: { kind: DomReadKind.Classes, classes: ["is-empty"] },
+                },
                 verdict: FAILED,
             },
             { probe: "no DOM read", seen: SHOWN_ELEMENT, verdict: FAILED },
@@ -255,12 +270,18 @@ const ELEMENT_CASES: readonly {
         cases: [
             {
                 probe: "that style, spaced differently",
-                seen: { ...SHOWN_ELEMENT, dom: { kind: DomReadKind.ComputedStyle, value: "rgb(1,  2, 3)" } },
+                seen: {
+                    ...SHOWN_ELEMENT,
+                    dom: { kind: DomReadKind.ComputedStyle, value: "rgb(1,  2, 3)" },
+                },
                 verdict: PASSED,
             },
             {
                 probe: "another style",
-                seen: { ...SHOWN_ELEMENT, dom: { kind: DomReadKind.ComputedStyle, value: "rgb(9, 9, 9)" } },
+                seen: {
+                    ...SHOWN_ELEMENT,
+                    dom: { kind: DomReadKind.ComputedStyle, value: "rgb(9, 9, 9)" },
+                },
                 verdict: FAILED,
             },
             { probe: "no DOM read", seen: SHOWN_ELEMENT, verdict: FAILED },
@@ -277,12 +298,18 @@ const ELEMENT_CASES: readonly {
         cases: [
             {
                 probe: "that value",
-                seen: { ...SHOWN_ELEMENT, dom: { kind: DomReadKind.Attribute, value: "ascending" } },
+                seen: {
+                    ...SHOWN_ELEMENT,
+                    dom: { kind: DomReadKind.Attribute, value: "ascending" },
+                },
                 verdict: PASSED,
             },
             {
                 probe: "that value spaced differently",
-                seen: { ...SHOWN_ELEMENT, dom: { kind: DomReadKind.Attribute, value: " ascending" } },
+                seen: {
+                    ...SHOWN_ELEMENT,
+                    dom: { kind: DomReadKind.Attribute, value: " ascending" },
+                },
                 verdict: FAILED,
             },
             {

@@ -5,7 +5,8 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import {
-    EventKind, type ActionGuard,
+    EventKind,
+    type ActionGuard,
     failure,
     type RunEventSink,
     type RunPorts,

@@ -5,8 +5,16 @@ import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import { success, type Session } from "@revisum/engine";
 import { DEFAULT_MAXIMUM_CLIPBOARD_CHARACTERS } from "./examples/AdvanceClock.ts";
-import { fakeSessionOnOrders, runOnFakeSession, stepSummaries } from "../../examples/RunOnFakeSession.ts";
-import { OPEN_CART, unsafePlan, type JsonRecord } from "../../../plan/unsafe-features/examples/UnsafePlan.ts";
+import {
+    fakeSessionOnOrders,
+    runOnFakeSession,
+    stepSummaries,
+} from "../../examples/RunOnFakeSession.ts";
+import {
+    OPEN_CART,
+    unsafePlan,
+    type JsonRecord,
+} from "../../../plan/unsafe-features/examples/UnsafePlan.ts";
 
 const OVER_LONG = "x".repeat(DEFAULT_MAXIMUM_CLIPBOARD_CHARACTERS + 1);
 const AT_THE_LIMIT = "x".repeat(DEFAULT_MAXIMUM_CLIPBOARD_CHARACTERS);

@@ -8,11 +8,7 @@ import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { Socket, type AddressInfo } from "node:net";
 import { afterEach, beforeEach, describe, test } from "node:test";
-import {
-    ProxyClient,
-    type AddressConnector,
-    type EgressProxy,
-} from "@revisum/runner";
+import { ProxyClient, type AddressConnector, type EgressProxy } from "@revisum/runner";
 import { startedProxyServer } from "#test-support/StartedEgressProxy.ts";
 import {
     exchangeWithProxy,

@@ -15,7 +15,10 @@ import { BrowserTarget } from "#test-support/browser/BrowserTarget.ts";
 import { click, navigate, testId } from "#test-support/browser/RawPlan.ts";
 import { expectOneElement } from "#test-support/browser/ExpectOneElement.ts";
 import { shareBrowserInThisFile } from "#test-support/browser/ShareBrowserInThisFile.ts";
-import { capabilityHarness, type CapabilityHarness } from "#test-support/browser/harnesses/CapabilityHarness.ts";
+import {
+    capabilityHarness,
+    type CapabilityHarness,
+} from "#test-support/browser/harnesses/CapabilityHarness.ts";
 import type { FixtureRoute } from "#test-support/builders/FixtureServer.ts";
 import { download, expectDownload } from "../page-reads/support/PageStatesHarness.ts";
 import { routedPagesHarness } from "../../support/browser/harnesses/RoutedPagesHarness.ts";

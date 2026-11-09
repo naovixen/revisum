@@ -10,7 +10,9 @@ import { profileFolderOf } from "#test-support/browser/BrowserWatchdog.ts";
 import { BROWSERS } from "#test-support/browser/Browsers.ts";
 import { isRunning } from "#test-support/browser/harnesses/ProcessTree.ts";
 
-const HOLDER = fileURLToPath(new URL("../../support/browser/HoldSharedBrowser.ts", import.meta.url));
+const HOLDER = fileURLToPath(
+    new URL("../../support/browser/HoldSharedBrowser.ts", import.meta.url),
+);
 const CLEANED_UP_WITHIN_MILLISECONDS = 30_000;
 const CLEAN_UP_POLL_MILLISECONDS = 50;
 

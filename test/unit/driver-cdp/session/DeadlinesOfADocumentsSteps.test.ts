@@ -31,7 +31,10 @@ import { performableActionOf, resolvedDownloadOf } from "#test-support/Performab
 import { allowing, failureCode } from "#test-support/session-contract/SessionUnderTest.ts";
 import { whatAClickActivates } from "../../../../packages/driver-cdp/src/in-page/elements/Actionability.ts";
 import { guardDetails } from "../../../../packages/driver-cdp/src/in-page/elements/GuardDetails.ts";
-import { linkTargetList, pageInfo } from "../../../../packages/driver-cdp/src/in-page/document/PageInfo.ts";
+import {
+    linkTargetList,
+    pageInfo,
+} from "../../../../packages/driver-cdp/src/in-page/document/PageInfo.ts";
 import { structuralSelectorValidity } from "../../../../packages/driver-cdp/src/in-page/elements/StructuralSelectorValidity.ts";
 import { accepted, parserFor, planOf } from "../../engine/run/values/examples/RunPlan.ts";
 import { unsafeSection } from "../../engine/plan/unsafe-features/examples/UnsafePlan.ts";

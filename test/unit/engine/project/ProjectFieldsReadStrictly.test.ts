@@ -4,7 +4,12 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import { parseProject } from "@revisum/engine";
-import { ORIGIN, TARGET_ID, testProjectInput, type JsonRecord } from "../plan/examples/GoldenPlan.ts";
+import {
+    ORIGIN,
+    TARGET_ID,
+    testProjectInput,
+    type JsonRecord,
+} from "../plan/examples/GoldenPlan.ts";
 
 const SECOND_ORIGIN = "https://shop.example";
 

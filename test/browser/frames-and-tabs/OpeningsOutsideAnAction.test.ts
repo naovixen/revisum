@@ -27,7 +27,11 @@ import {
 import { shareBrowserInThisFile } from "#test-support/browser/ShareBrowserInThisFile.ts";
 import { filesHolding } from "#test-support/repository/FilesNamed.ts";
 import { download } from "../page-reads/support/PageStatesHarness.ts";
-import { TARGET, htmlPage, routedPagesHarness } from "../../support/browser/harnesses/RoutedPagesHarness.ts";
+import {
+    TARGET,
+    htmlPage,
+    routedPagesHarness,
+} from "../../support/browser/harnesses/RoutedPagesHarness.ts";
 import { StepOutcome } from "@revisum/contracts";
 
 shareBrowserInThisFile();
@@ -213,7 +217,9 @@ const assertRunFailsAndKeepsNoFile = async (
     assert.equal(result.state, "Failed", JSON.stringify(result.steps));
     assert.deepEqual(filesAtClose, [], "no file was kept while the session was open");
     assert.deepEqual(filesHolding(REPORT_MARKER, startedAt), [], "no file was left after the run");
-    return result.steps.filter((step) => step.outcome === StepOutcome.Failed).map((step) => step.code);
+    return result.steps
+        .filter((step) => step.outcome === StepOutcome.Failed)
+        .map((step) => step.code);
 };
 
 const assertRunFailsForTheOpeningAndKeepsNoFile = async (

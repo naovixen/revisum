@@ -6,11 +6,17 @@ import assert from "node:assert/strict";
 import { after, afterEach, before, beforeEach, describe, test } from "node:test";
 import type { DriverSession } from "@revisum/driver-cdp";
 import { BrowserTarget } from "#test-support/browser/BrowserTarget.ts";
-import { startRelayedDriver, type RelayedDriver } from "#test-support/browser/driver/RelayedDriver.ts";
+import {
+    startRelayedDriver,
+    type RelayedDriver,
+} from "#test-support/browser/driver/RelayedDriver.ts";
 import { scriptsEnabled } from "#test-support/browser/ScriptsEnabled.ts";
 import { shareBrowserInThisFile } from "#test-support/browser/ShareBrowserInThisFile.ts";
 import type { ReplyChange } from "#test-support/browser/driver/CdpRelay.ts";
-import { capabilityHarness, type CapabilityHarness } from "#test-support/browser/harnesses/CapabilityHarness.ts";
+import {
+    capabilityHarness,
+    type CapabilityHarness,
+} from "#test-support/browser/harnesses/CapabilityHarness.ts";
 import type { FixtureRoute } from "#test-support/builders/FixtureServer.ts";
 import { failureCode, locatorOf } from "#test-support/session-contract/SessionUnderTest.ts";
 

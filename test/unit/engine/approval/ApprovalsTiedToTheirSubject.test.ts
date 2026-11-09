@@ -146,10 +146,7 @@ describe("Using the approval verifier", () => {
                                 repository.lockdownProof({ commit: planCommit }),
                             );
                             assert.equal(verified.ok, true, JSON.stringify(verified));
-                            assert.equal(
-                                verified.value.approval.strength,
-                                "declared",
-                            );
+                            assert.equal(verified.value.approval.strength, "declared");
                         },
                         (fixture) => {
                             landed(fixture, planCommit, MAINTAINER, false);

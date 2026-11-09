@@ -3,7 +3,13 @@
 // alone must not see a pass where the result says the run could not test.
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { EventKind, success, type LoggedEvent, type RunResult, type Session } from "@revisum/engine";
+import {
+    EventKind,
+    success,
+    type LoggedEvent,
+    type RunResult,
+    type Session,
+} from "@revisum/engine";
 import { fakeSessionOnOrders, runOnFakeSession } from "../examples/RunOnFakeSession.ts";
 import { OPEN_CART, unsafePlan } from "../../plan/unsafe-features/examples/UnsafePlan.ts";
 import { closedSession } from "#test-support/fakes/session/FakeSession.ts";
@@ -24,7 +30,9 @@ type Outcome = { readonly outcome: unknown; readonly code: unknown };
 
 // What the log last said of the step at `stepIndex`, which is what a reader of the log takes as its end.
 function loggedEndOf(events: readonly LoggedEvent[], stepIndex: number): Outcome | undefined {
-    const ends = events.filter((event) => event.kind === EventKind.StepEnd && event.stepIndex === stepIndex);
+    const ends = events.filter(
+        (event) => event.kind === EventKind.StepEnd && event.stepIndex === stepIndex,
+    );
     const last = ends.at(-1);
     return last === undefined ? undefined : { outcome: last.outcome, code: last.code };
 }
@@ -66,7 +74,11 @@ describe("Using the run", () => {
                         });
                         const { index, ...inResult } = lastStepOf(result);
                         assert.deepEqual(
-                            { state: result.state, inResult, inLog: loggedEndOf(events.read(), index) },
+                            {
+                                state: result.state,
+                                inResult,
+                                inLog: loggedEndOf(events.read(), index),
+                            },
                             { state: late.state, inResult: late.expected, inLog: late.expected },
                         );
                     });

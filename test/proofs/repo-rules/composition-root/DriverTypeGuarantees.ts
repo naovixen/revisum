@@ -6,9 +6,18 @@
 //     secret handed beside the action, do not type-check.
 // Each @ts-expect-error line must stay an error; the test deletes them to prove it.
 import type {
-  ActionGuard, ActionStep, DialogStep, DocumentSession, DownloadStep, Locator, PerformableAction, ResolvedDownloadStep, ResolvedLocator, Secret,
-  SecretName,
-} from '@revisum/engine';
+    ActionGuard,
+    ActionStep,
+    DialogStep,
+    DocumentSession,
+    DownloadStep,
+    Locator,
+    PerformableAction,
+    ResolvedDownloadStep,
+    ResolvedLocator,
+    Secret,
+    SecretName,
+} from "@revisum/engine";
 
 declare const session: DocumentSession;
 declare const guard: ActionGuard;
@@ -24,10 +33,13 @@ declare const secretName: SecretName;
 
 // What a driver is handed, each of which type-checks.
 export const driverTypeGuarantees = {
-  performableActs: session.act(performable, guard),
-  secretFillActs: session.act({ type: 'fill', locator: resolvedLocator, value: { kind: 'secret', secret } }, guard),
-  resolvedDownloadRuns: session.download(resolvedDownload, 100, guard),
-  resolvedLocatorIsProbed: session.probe(resolvedLocator, null),
+    performableActs: session.act(performable, guard),
+    secretFillActs: session.act(
+        { type: "fill", locator: resolvedLocator, value: { kind: "secret", secret } },
+        guard,
+    ),
+    resolvedDownloadRuns: session.download(resolvedDownload, 100, guard),
+    resolvedLocatorIsProbed: session.probe(resolvedLocator, null),
 };
 
 // @ts-expect-error a plan step, which may still hold a value reference, cannot reach a driver
@@ -37,7 +49,10 @@ export const planStepActs = session.act(planStep, guard);
 export const planDialogActs = session.act(planDialog, guard);
 
 // @ts-expect-error a fill naming a secret it does not carry cannot reach a driver
-export const secretReferenceFillActs = session.act({ type: 'fill', locator: resolvedLocator, value: { kind: 'secret', secretName } }, guard);
+export const secretReferenceFillActs = session.act(
+    { type: "fill", locator: resolvedLocator, value: { kind: "secret", secretName } },
+    guard,
+);
 
 // @ts-expect-error a secret is carried on its fill, never handed beside the action
 export const secretBesideTheAction = session.act(performable, guard, secret);

@@ -14,7 +14,12 @@ import {
     likesExchange,
     runOnFakeSession,
 } from "../../run/examples/RunOnFakeSession.ts";
-import { jsonReply, requestLine, shopWith, type Route } from "../../run/executors/service-calls/examples/ShopService.ts";
+import {
+    jsonReply,
+    requestLine,
+    shopWith,
+    type Route,
+} from "../../run/executors/service-calls/examples/ShopService.ts";
 import { parserEnabling, rejection } from "../unsafe-features/examples/LostByFeature.ts";
 import { OPEN_CART, unsafePlan, type JsonRecord } from "../unsafe-features/examples/UnsafePlan.ts";
 import { StepOutcome, SemanticLocatorKind } from "@revisum/contracts";

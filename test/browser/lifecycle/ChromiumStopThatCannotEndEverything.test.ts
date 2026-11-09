@@ -19,7 +19,11 @@ import { describe, test } from "node:test";
 import { launchChromium, type LaunchedChromium } from "@revisum/driver-cdp";
 import { launchChromiumWithArguments } from "@revisum/driver-cdp/testing";
 import { BROWSERS } from "#test-support/browser/Browsers.ts";
-import { endAtOnce, isRunning, listProcesses } from "#test-support/browser/harnesses/ProcessTree.ts";
+import {
+    endAtOnce,
+    isRunning,
+    listProcesses,
+} from "#test-support/browser/harnesses/ProcessTree.ts";
 import { FIXTURES } from "#test-support/repository/RepositoryRoot.ts";
 
 const ON_WINDOWS_ONLY = {

@@ -6,7 +6,11 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import { failure, type RunPorts, type RunResult, type Session } from "@revisum/engine";
-import { fakeNetwork, fakeSessionOnOrders, runOnFakeSession } from "../examples/RunOnFakeSession.ts";
+import {
+    fakeNetwork,
+    fakeSessionOnOrders,
+    runOnFakeSession,
+} from "../examples/RunOnFakeSession.ts";
 import { OPEN_CART, unsafePlan } from "../../plan/unsafe-features/examples/UnsafePlan.ts";
 import { closedSession, sessionRecords } from "#test-support/fakes/session/FakeSession.ts";
 

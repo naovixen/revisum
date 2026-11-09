@@ -24,7 +24,12 @@ import {
     zipArchive,
 } from "../../../engine/evidence/examples/ZipArchive.ts";
 import { reportWithFailure } from "./examples/SuiteRun.ts";
-import { runSuiteOn, suiteThatWrites, writeFileInto, writeReportInto } from "./support/SuiteThatWrites.ts";
+import {
+    runSuiteOn,
+    suiteThatWrites,
+    writeFileInto,
+    writeReportInto,
+} from "./support/SuiteThatWrites.ts";
 
 const FAILED_SPEC = 1;
 const TRACE_PATH = `test-results/${HOSTILE_MARKER}/trace.zip`;

@@ -16,7 +16,12 @@ import { runDocker } from "@revisum/runner";
 import { plainRequestText, tunnelRequestText } from "../../unit/runner/support/GetThroughProxy.ts";
 import { declaredService, egressPolicy } from "../../unit/runner/examples/DeclaredService.ts";
 import { createCleanUpScope } from "../../support/CleanUpScope.ts";
-import { jsonInside, pinnedRunImage, startIsolatedRun, type IsolatedRun } from "../support/IsolatedRun.ts";
+import {
+    jsonInside,
+    pinnedRunImage,
+    startIsolatedRun,
+    type IsolatedRun,
+} from "../support/IsolatedRun.ts";
 import {
     REFUSED_BY_BOTH_HOST,
     REFUSED_PLAIN_ORIGIN,

@@ -9,7 +9,10 @@ import { BrowserTarget } from "#test-support/browser/BrowserTarget.ts";
 import { expectOneElement } from "#test-support/browser/ExpectOneElement.ts";
 import { click, testId } from "#test-support/browser/RawPlan.ts";
 import { shareBrowserInThisFile } from "#test-support/browser/ShareBrowserInThisFile.ts";
-import { capabilityHarness, type CapabilityHarness } from "#test-support/browser/harnesses/CapabilityHarness.ts";
+import {
+    capabilityHarness,
+    type CapabilityHarness,
+} from "#test-support/browser/harnesses/CapabilityHarness.ts";
 import type { FixtureRoute } from "#test-support/builders/FixtureServer.ts";
 import { scriptsEnabled } from "#test-support/browser/ScriptsEnabled.ts";
 

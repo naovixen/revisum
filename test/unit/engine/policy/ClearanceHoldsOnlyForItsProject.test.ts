@@ -5,7 +5,13 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import { createRunService, type ClearedRun } from "@revisum/engine";
-import { finalState, guardedDriver, parserFor, runBase, runInputs } from "../run/examples/GuardedDriver.ts";
+import {
+    finalState,
+    guardedDriver,
+    parserFor,
+    runBase,
+    runInputs,
+} from "../run/examples/GuardedDriver.ts";
 import {
     ALLOWED,
     PROPOSAL,

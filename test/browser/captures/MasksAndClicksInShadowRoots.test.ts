@@ -19,7 +19,11 @@ import {
 import { shareBrowserInThisFile } from "#test-support/browser/ShareBrowserInThisFile.ts";
 import type { FixtureRoute } from "#test-support/builders/FixtureServer.ts";
 import { decodePng } from "#test-support/builders/DecodePng.ts";
-import { TARGET, htmlPage, routedPagesHarness } from "../../support/browser/harnesses/RoutedPagesHarness.ts";
+import {
+    TARGET,
+    htmlPage,
+    routedPagesHarness,
+} from "../../support/browser/harnesses/RoutedPagesHarness.ts";
 import { expectOneElement } from "#test-support/browser/ExpectOneElement.ts";
 
 shareBrowserInThisFile();

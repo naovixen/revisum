@@ -35,7 +35,8 @@ const FILL_SECRET: JsonRecord = {
 
 const logFailingOnStates = (states: readonly string[]): RunEventSink =>
     fakeRunEventSinkFailingOn(
-        (event) => event.kind === EventKind.RunState && states.some((state) => state === event.state),
+        (event) =>
+            event.kind === EventKind.RunState && states.some((state) => state === event.state),
     );
 
 const logFailingOnState = (state: string): RunEventSink => logFailingOnStates([state]);

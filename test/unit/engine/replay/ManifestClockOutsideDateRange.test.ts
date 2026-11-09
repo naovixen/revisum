@@ -14,7 +14,12 @@ import {
     type ReplayAnswer,
     type ScenarioRun,
 } from "./examples/ManifestUnderTest.ts";
-import { OPEN_ORDERS, planOf, projectFileWith, type JsonRecord } from "../run/values/examples/RunPlan.ts";
+import {
+    OPEN_ORDERS,
+    planOf,
+    projectFileWith,
+    type JsonRecord,
+} from "../run/values/examples/RunPlan.ts";
 
 after(removeFakeExecutables);
 

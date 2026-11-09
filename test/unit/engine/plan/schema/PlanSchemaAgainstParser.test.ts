@@ -6,7 +6,13 @@ import { describe, test } from "node:test";
 import { planJsonSchema } from "@revisum/engine";
 import { validateAgainstSchema } from "../../../../../tools/repo-rules/ValidateAgainstSchema.ts";
 import { navigate, planOf, reference, type JsonRecord } from "../../run/values/examples/RunPlan.ts";
-import { REMOVE, defaultParser, goldenPlan, goldenPlanNames, withValue } from "../examples/GoldenPlan.ts";
+import {
+    REMOVE,
+    defaultParser,
+    goldenPlan,
+    goldenPlanNames,
+    withValue,
+} from "../examples/GoldenPlan.ts";
 import { parserEnabling } from "../unsafe-features/examples/LostByFeature.ts";
 import { FEATURES } from "../unsafe-features/examples/UnsafePlan.ts";
 

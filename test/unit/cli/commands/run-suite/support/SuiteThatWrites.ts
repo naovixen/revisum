@@ -14,7 +14,11 @@ import {
     type WorkloadOutcome,
     type WorkloadRunner,
 } from "@revisum/engine";
-import { recordedReport, type JsonRecord, specPath } from "../../../../engine/evidence/examples/EvidenceRun.ts";
+import {
+    recordedReport,
+    type JsonRecord,
+    specPath,
+} from "../../../../engine/evidence/examples/EvidenceRun.ts";
 import { withValue } from "../../../../engine/plan/examples/GoldenPlan.ts";
 import {
     DECLARED_SECRET,
@@ -47,25 +51,27 @@ export type WrittenSuite = {
 const nothingPrinted = () => ({ bytes: new Uint8Array(), truncated: false });
 
 export function suiteThatWrites(suite: WrittenSuite): WorkloadRunner {
-    return fakeWorkloadRunner(
-        {
-            run(request) {
-                mkdirSync(request.outputDirectory, { recursive: true });
-                const isSuite = isSuiteRequest(request);
-                (isSuite ? suite.duringSuite : suite.duringSetup)?.(request.outputDirectory);
-                const records = {
-                    egressEvents: [],
-                    stdout: nothingPrinted(),
-                    stderr: nothingPrinted(),
-                };
-                const outcome: WorkloadOutcome =
-                    isSuite && suite.timedOut === true
-                        ? { kind: WorkloadOutcomeKind.TimedOut, stop: WorkloadStop.Removed, ...records }
-                        : { kind: WorkloadOutcomeKind.Exited, exitCode: isSuite ? (suite.exitCode ?? 0) : 0, ...records };
-                return Promise.resolve(success(outcome));
-            },
+    return fakeWorkloadRunner({
+        run(request) {
+            mkdirSync(request.outputDirectory, { recursive: true });
+            const isSuite = isSuiteRequest(request);
+            (isSuite ? suite.duringSuite : suite.duringSetup)?.(request.outputDirectory);
+            const records = {
+                egressEvents: [],
+                stdout: nothingPrinted(),
+                stderr: nothingPrinted(),
+            };
+            const outcome: WorkloadOutcome =
+                isSuite && suite.timedOut === true
+                    ? { kind: WorkloadOutcomeKind.TimedOut, stop: WorkloadStop.Removed, ...records }
+                    : {
+                          kind: WorkloadOutcomeKind.Exited,
+                          exitCode: isSuite ? (suite.exitCode ?? 0) : 0,
+                          ...records,
+                      };
+            return Promise.resolve(success(outcome));
         },
-    );
+    });
 }
 
 export const writeReportInto = (folder: string, report: unknown): void => {

@@ -21,7 +21,11 @@ import {
     verdictName,
 } from "../examples/ShownElement.ts";
 import { parsedProject } from "../../plan/unsafe-features/examples/LostByFeature.ts";
-import { unsafePlan, unsafeProjectFile, type JsonRecord } from "../../plan/unsafe-features/examples/UnsafePlan.ts";
+import {
+    unsafePlan,
+    unsafeProjectFile,
+    type JsonRecord,
+} from "../../plan/unsafe-features/examples/UnsafePlan.ts";
 
 // Parsed by the real parser, since only it may brand a page check's URL.
 function parsedPageAssertion(
@@ -42,7 +46,12 @@ function parsedPageAssertion(
     return step.assert;
 }
 
-const PAGE: PageProbe = { url: `${ORDERS_URL}/7?tab=items#top`, title: "Your  orders", meta: [], canonicalUrl: null };
+const PAGE: PageProbe = {
+    url: `${ORDERS_URL}/7?tab=items#top`,
+    title: "Your  orders",
+    meta: [],
+    canonicalUrl: null,
+};
 const META_NAME = "og:title";
 const WITH_HEAD: PageProbe = {
     ...PAGE,

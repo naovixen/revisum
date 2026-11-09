@@ -16,7 +16,11 @@ import {
 } from "@revisum/engine";
 import { baseUrlOf, clearRun, trustedProjectFrom } from "../../../support/builders/ClearRun.ts";
 import { evidenceHashOf } from "../../../support/ExpectedEvidenceHash.ts";
-import { NO_ELEMENT, SHOWN_ELEMENT, fakeSessionOnOrders } from "../run/examples/RunOnFakeSession.ts";
+import {
+    NO_ELEMENT,
+    SHOWN_ELEMENT,
+    fakeSessionOnOrders,
+} from "../run/examples/RunOnFakeSession.ts";
 import {
     DEFAULT_CLOCK_START,
     DEFAULT_SEED,

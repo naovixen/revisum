@@ -14,10 +14,16 @@ import type {
 } from "@revisum/engine";
 import { ADAPTER_OF_TARGET, BrowserTarget } from "#test-support/browser/BrowserTarget.ts";
 import { click, navigate, role, testId, visible } from "#test-support/browser/RawPlan.ts";
-import { startRelayedDriver, type RelayedDriver } from "#test-support/browser/driver/RelayedDriver.ts";
+import {
+    startRelayedDriver,
+    type RelayedDriver,
+} from "#test-support/browser/driver/RelayedDriver.ts";
 import { shareBrowserInThisFile } from "#test-support/browser/ShareBrowserInThisFile.ts";
 import { driverWith, sessionWith } from "#test-support/browser/driver/WrappingSessions.ts";
-import { capabilityHarness, type CapabilityHarness } from "#test-support/browser/harnesses/CapabilityHarness.ts";
+import {
+    capabilityHarness,
+    type CapabilityHarness,
+} from "#test-support/browser/harnesses/CapabilityHarness.ts";
 import type { FixtureRoute } from "#test-support/builders/FixtureServer.ts";
 import {
     expectResponse,

@@ -7,7 +7,11 @@ import { after, before, describe, test } from "node:test";
 import type { BrowserHarness } from "#test-support/browser/BrowserHarness.ts";
 import { label, navigate, press, testId, textEquals } from "#test-support/browser/RawPlan.ts";
 import { shareBrowserInThisFile } from "#test-support/browser/ShareBrowserInThisFile.ts";
-import { TARGET, htmlPage, routedPagesHarness } from "../../support/browser/harnesses/RoutedPagesHarness.ts";
+import {
+    TARGET,
+    htmlPage,
+    routedPagesHarness,
+} from "../../support/browser/harnesses/RoutedPagesHarness.ts";
 
 shareBrowserInThisFile();
 

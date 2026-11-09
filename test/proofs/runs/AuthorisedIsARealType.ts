@@ -8,16 +8,16 @@
 //     reads a plan reads it unchanged.
 // Each @ts-expect-error line must stay an error; the test deletes them to prove it.
 import {
-  createRunService,
-  type Authorised,
-  type ClearedRun,
-  type Plan,
-  type PlanStanding,
-  type Project,
-  type RunInputs,
-  type RunPorts,
-  type TargetId,
-} from '@revisum/engine';
+    createRunService,
+    type Authorised,
+    type ClearedRun,
+    type Plan,
+    type PlanStanding,
+    type Project,
+    type RunInputs,
+    type RunPorts,
+    type TargetId,
+} from "@revisum/engine";
 
 declare const inputs: RunInputs;
 declare const ports: RunPorts;
@@ -44,13 +44,22 @@ export const unclearedPlanRuns = createRunService(ports).run(parsed, inputs);
 export const authorisedPlanRuns = createRunService(ports).run(authorised, inputs);
 
 // @ts-expect-error a cleared run written by hand is not one: only the policy gate makes one
-export const handMadeClearedRunRuns = createRunService(ports).run({ plan: authorised, project: otherProject, targetId: otherTarget, standing: otherStanding }, inputs);
+export const handMadeClearedRunRuns = createRunService(ports).run(
+    { plan: authorised, project: otherProject, targetId: otherTarget, standing: otherStanding },
+    inputs,
+);
 
 // @ts-expect-error a spread copy of a cleared run under another project is not one
-export const clearedRunUnderAnotherProject = createRunService(ports).run({ ...cleared, project: otherProject }, inputs);
+export const clearedRunUnderAnotherProject = createRunService(ports).run(
+    { ...cleared, project: otherProject },
+    inputs,
+);
 
 // @ts-expect-error a spread copy of a cleared run under another standing is not one
-export const clearedRunUnderAnotherStanding = createRunService(ports).run({ ...cleared, standing: otherStanding }, inputs);
+export const clearedRunUnderAnotherStanding = createRunService(ports).run(
+    { ...cleared, standing: otherStanding },
+    inputs,
+);
 
 // @ts-expect-error a copy of a parsed plan is not Authorised: only the policy gate makes one
 export const forgedAuthorised: Authorised = { ...parsed };

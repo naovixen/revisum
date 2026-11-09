@@ -9,7 +9,14 @@ import { describe, test } from "node:test";
 import { REPOSITORY_ROOT } from "../../../support/repository/RepositoryRoot.ts";
 import { compileFiles } from "../support/CompileFiles.ts";
 
-const GUARANTEE_FILE = join(REPOSITORY_ROOT, "test", "proofs", "repo-rules", "composition-root", "DriverTypeGuarantees.ts");
+const GUARANTEE_FILE = join(
+    REPOSITORY_ROOT,
+    "test",
+    "proofs",
+    "repo-rules",
+    "composition-root",
+    "DriverTypeGuarantees.ts",
+);
 const EXPECTED_ERROR_LINE = /^\s*\/\/\s*@ts-expect-error\b/;
 const TIMEOUT = 300_000;
 

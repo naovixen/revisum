@@ -9,10 +9,20 @@
 //
 // Neither step needs a declaration in the trusted project, so every plan here parses against the
 // shared test project (plan-examples.ts) with, at most, its limits changed.
-import assert from 'node:assert/strict';
-import type { JsonRecord } from '../../../values/examples/RunPlan.ts';
+import assert from "node:assert/strict";
+import type { JsonRecord } from "../../../values/examples/RunPlan.ts";
 
-export { CURRENT_VERSION, OPEN_ORDERS, ORIGIN, accepted, parserFor, planOf, rejection, type JsonRecord, type ParsePlan } from '../../../values/examples/RunPlan.ts';
+export {
+    CURRENT_VERSION,
+    OPEN_ORDERS,
+    ORIGIN,
+    accepted,
+    parserFor,
+    planOf,
+    rejection,
+    type JsonRecord,
+    type ParsePlan,
+} from "../../../values/examples/RunPlan.ts";
 
 export const SECOND = 1000;
 export const MINUTE = 60 * SECOND;
@@ -28,26 +38,50 @@ export const LARGEST_TIMERS_PER_ADVANCE = 100_000;
 export const DEFAULT_MAXIMUM_CLIPBOARD_CHARACTERS = 20_000;
 export const LARGEST_CLIPBOARD_CHARACTERS = 200_000;
 
-export const advanceClock = (amount: unknown, unit: unknown, mode?: unknown): JsonRecord =>
-  ({ type: 'advanceClock', by: { amount, unit }, ...(mode === undefined ? {} : { mode }) });
+export const advanceClock = (amount: unknown, unit: unknown, mode?: unknown): JsonRecord => ({
+    type: "advanceClock",
+    by: { amount, unit },
+    ...(mode === undefined ? {} : { mode }),
+});
 
-export const expectClipboard = (kind: unknown, value: unknown, criterionId = 'invite.link-copied'): JsonRecord =>
-  ({ type: 'expectClipboard', assert: { kind, value }, criterionId });
+export const expectClipboard = (
+    kind: unknown,
+    value: unknown,
+    criterionId = "invite.link-copied",
+): JsonRecord => ({ type: "expectClipboard", assert: { kind, value }, criterionId });
 
-export const rememberClipboard = (name: string): JsonRecord => ({ type: 'remember', name, from: { clipboard: 'text' } });
+export const rememberClipboard = (name: string): JsonRecord => ({
+    type: "remember",
+    name,
+    from: { clipboard: "text" },
+});
 
-export const frame = (steps: readonly unknown[]): JsonRecord => ({ type: 'frame', locator: { by: 'testId', testId: 'session-frame' }, steps });
-export const newTab = (steps: readonly unknown[]): JsonRecord => ({ type: 'newTab', url: '/orders', steps });
+export const frame = (steps: readonly unknown[]): JsonRecord => ({
+    type: "frame",
+    locator: { by: "testId", testId: "session-frame" },
+    steps,
+});
+export const newTab = (steps: readonly unknown[]): JsonRecord => ({
+    type: "newTab",
+    url: "/orders",
+    steps,
+});
 
 // A click on the page's copy button, which a clipboard check follows.
-export const COPY_LINK: JsonRecord = { type: 'click', locator: { by: 'role', role: 'button', name: 'Copy invite link' } };
+export const COPY_LINK: JsonRecord = {
+    type: "click",
+    locator: { by: "role", role: "button", name: "Copy invite link" },
+};
 
 // Parts whose exact code or path the spec leaves to the parser: each is still refused, and every
 // error is at the part or inside it.
 export function assertRefusedInside(errors: readonly string[], path: string, label: string): void {
-  assert.ok(errors.length > 0, `${label}: the plan was not refused`);
-  for (const error of errors) {
-    const found = error.split(' ')[1] ?? '';
-    assert.ok(found === path || found.startsWith(`${path}.`) || found.startsWith(`${path}[`), `${label}: ${JSON.stringify(errors)}`);
-  }
+    assert.ok(errors.length > 0, `${label}: the plan was not refused`);
+    for (const error of errors) {
+        const found = error.split(" ")[1] ?? "";
+        assert.ok(
+            found === path || found.startsWith(`${path}.`) || found.startsWith(`${path}[`),
+            `${label}: ${JSON.stringify(errors)}`,
+        );
+    }
 }

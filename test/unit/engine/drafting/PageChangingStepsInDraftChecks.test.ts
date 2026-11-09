@@ -13,7 +13,11 @@ import {
 } from "../plan/examples/EveryStepTypeExamples.ts";
 import { checkDraftLocators, type PageMap } from "./examples/CrawlOutcome.ts";
 import { acceptedBy, parserEnabling } from "../plan/unsafe-features/examples/LostByFeature.ts";
-import { FEATURES, unsafePlan, type JsonRecord } from "../plan/unsafe-features/examples/UnsafePlan.ts";
+import {
+    FEATURES,
+    unsafePlan,
+    type JsonRecord,
+} from "../plan/unsafe-features/examples/UnsafePlan.ts";
 import { GuaranteeLevel } from "@revisum/contracts";
 
 const parsePlan = parserEnabling(FEATURES, { fixtures: [DECLARED_FIXTURE] });

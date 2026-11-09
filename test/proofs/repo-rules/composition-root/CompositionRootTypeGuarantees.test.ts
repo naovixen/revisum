@@ -7,7 +7,14 @@ import { describe, test } from "node:test";
 import { REPOSITORY_ROOT } from "../../../support/repository/RepositoryRoot.ts";
 import { compileFiles } from "../support/CompileFiles.ts";
 
-const GUARANTEE_FILE = join(REPOSITORY_ROOT, "test", "proofs", "repo-rules", "composition-root", "CompositionRootTypeGuarantees.ts");
+const GUARANTEE_FILE = join(
+    REPOSITORY_ROOT,
+    "test",
+    "proofs",
+    "repo-rules",
+    "composition-root",
+    "CompositionRootTypeGuarantees.ts",
+);
 const TIMEOUT = 300_000;
 
 describe("Using the composition root guarantee file", () => {
