@@ -14,8 +14,8 @@
 //   --browser-shard <n>/<count> only the browser files of one shard, still one at a time
 //   --require-results           run nothing; fail if a test file has no result in .test-results/,
 //                               which is how a shard left out of CI's job list shows up
-//   node tools/test-runner/RunTestFolder.ts test/unit test/contract
-//   node tools/test-runner/RunTestFolder.ts --browser-shard 2/3 test/unit test/contract
+//   node tools/test-runner/RunTestFolder.ts test/unit test/proofs
+//   node tools/test-runner/RunTestFolder.ts --browser-shard 2/3 test/unit test/proofs
 // The folders are read from the working folder; this tool's own modules from beside it.
 import { spawnSync } from "node:child_process";
 import {

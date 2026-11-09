@@ -5,9 +5,11 @@
 //   - takes a parameter whose type is VerifiedApproval, an alias of it, or an approval narrowed to
 //     one strength by hand, such as `Approval & { strength: 'verified' }` (the type written inside
 //     a parameter list, directly or through a type alias declared anywhere in the code);
-//   - compares an approval's strength with 'verified' or 'declared' (with ===, !==, == or !=,
-//     either way round), or switches on it, directly or through a local that holds it
-//     (`const level = approval.strength`), which decides a result by strength.
+//   - compares an approval's strength with 'verified' or 'declared', or with the ApprovalStrength
+//     constants (with ===, !==, == or !=, either way round), or switches on it, directly or through
+//     a local that holds it (`const level = approval.strength`), which decides a result by strength;
+//   - tests it with a method: `approval.strength.startsWith(…)`, `['verified'].includes(approval.strength)`
+//     or `new Set([…]).has(approval.strength)`.
 // Choosing a label by looking the strength up in a table passes. Declaring VerifiedApproval, or
 // any narrowed type, passes too: only taking one as a parameter decides by strength.
 import { readFileSync } from "node:fs";
@@ -16,9 +18,11 @@ import type { Token } from "../naming/LintRepository.ts";
 import { codeTokens, isIdentifier, isPunctuator, listSourceFiles } from "../ListSourceFiles.ts";
 import { reportProblems } from "../ReadWorkspacePackages.ts";
 import { TokenKind } from "../naming/LintRepository.ts";
+import { isStrengthMethodCall, propertyReadStart } from "./IsStrengthMethodCall.ts";
 
 const VERIFIED_APPROVAL = "VerifiedApproval";
 const STRENGTHS = new Set(["verified", "declared"]);
+const STRENGTH_CONSTANTS = new Set(["Verified", "Declared"]);
 // How many tokens either side of a comparison may make up the compared expression, as in
 // `approval.strength` or `this.approval.strength`.
 const OPERAND_REACH = 4;
@@ -72,13 +76,37 @@ const strengthWithin = (tokens: readonly Token[], from: number, step: 1 | -1): b
     return false;
 };
 
-// True when the strength literal at `index` is compared with an expression ending in `strength`.
-function comparesStrength(tokens: readonly Token[], index: number): boolean {
-    if (isComparisonBefore(tokens, index)) {
-        return strengthWithin(tokens, pastOperatorBackwards(tokens, index - 1), -1);
+// A strength written out in code, as a literal or an ApprovalStrength constant: the tokens it spans
+// and how a problem report shows it.
+type StrengthValue = { readonly first: number; readonly last: number; readonly shown: string };
+
+function strengthValueAt(tokens: readonly Token[], index: number): StrengthValue | undefined {
+    const token = tokens[index];
+    if (token?.kind === TokenKind.String && STRENGTHS.has(token.text)) {
+        return { first: index, last: index, shown: `'${token.text}'` };
     }
-    if (isComparisonAfter(tokens, index)) {
-        return strengthWithin(tokens, pastOperatorForwards(tokens, index + 1), 1);
+    if (
+        token?.kind !== TokenKind.Identifier ||
+        !STRENGTH_CONSTANTS.has(token.text) ||
+        !isPunctuator(tokens[index - 1], ".") ||
+        !isIdentifier(tokens[index - 2], "ApprovalStrength")
+    ) {
+        return undefined;
+    }
+    return {
+        first: propertyReadStart(tokens, index),
+        last: index,
+        shown: `ApprovalStrength.${token.text}`,
+    };
+}
+
+// True when the strength value is compared with an expression ending in `strength`.
+function comparesStrength(tokens: readonly Token[], value: StrengthValue): boolean {
+    if (isComparisonBefore(tokens, value.first)) {
+        return strengthWithin(tokens, pastOperatorBackwards(tokens, value.first - 1), -1);
+    }
+    if (isComparisonAfter(tokens, value.last)) {
+        return strengthWithin(tokens, pastOperatorForwards(tokens, value.last + 1), 1);
     }
     return false;
 }
@@ -243,17 +271,6 @@ const isAssignmentAt = (tokens: readonly Token[], index: number): boolean =>
     !isPunctuator(tokens[index + 1], ">") &&
     !["=", "!", "<", ">"].some((text) => isPunctuator(tokens[index - 1], text));
 
-// The first token of the property read that ends at `end`, as in `this.approval?.strength`.
-function propertyReadStart(tokens: readonly Token[], end: number): number {
-    let start = end;
-    while (isPunctuator(tokens[start - 1], ".")) {
-        const hasMark =
-            isPunctuator(tokens[start - 2], "?") || isPunctuator(tokens[start - 2], "!");
-        start -= hasMark ? 3 : 2;
-    }
-    return start;
-}
-
 // The local that `level = approval.strength` or `const level: Type = approval.strength` sets, when
 // the `strength` at `index` ends the whole value.
 function localSetToStrength(tokens: readonly Token[], index: number): string | undefined {
@@ -320,21 +337,21 @@ function strengthLocals(
     return locals;
 }
 
-// True when the strength literal at `index` is compared with a local holding a strength.
+// True when the strength value is compared with a local holding a strength.
 function comparesStrengthLocal(
     tokens: readonly Token[],
-    index: number,
+    value: StrengthValue,
     locals: readonly StrengthLocal[],
 ): boolean {
-    if (isComparisonBefore(tokens, index)) {
-        const operand = pastOperatorBackwards(tokens, index - 1);
+    if (isComparisonBefore(tokens, value.first)) {
+        const operand = pastOperatorBackwards(tokens, value.first - 1);
         return (
             !isPunctuator(tokens[operand - 1], ".") &&
             holdsStrength(locals, tokens[operand], operand)
         );
     }
-    if (isComparisonAfter(tokens, index)) {
-        const operand = pastOperatorForwards(tokens, index + 1);
+    if (isComparisonAfter(tokens, value.last)) {
+        const operand = pastOperatorForwards(tokens, value.last + 1);
         const isOptionalRead =
             isPunctuator(tokens[operand + 1], "?") && isPunctuator(tokens[operand + 2], ".");
         const isWholeOperand =
@@ -399,13 +416,22 @@ export function checkApprovalStrength(root: string): string[] {
                     `${path}:${token.line} takes an approval narrowed to strength '${token.text}'; take Approval, so a declared approval passes exactly as a verified one`,
                 );
             }
+            const value = strengthValueAt(tokens, index);
             if (
-                token.kind === TokenKind.String &&
-                STRENGTHS.has(token.text) &&
-                (comparesStrength(tokens, index) || comparesStrengthLocal(tokens, index, locals))
+                value !== undefined &&
+                (comparesStrength(tokens, value) || comparesStrengthLocal(tokens, value, locals))
             ) {
                 problems.push(
-                    `${path}:${token.line} decides by comparing an approval's strength with '${token.text}'; strength may only choose a label, so test for an Approval instead`,
+                    `${path}:${token.line} decides by comparing an approval's strength with ${value.shown}; strength may only choose a label, so test for an Approval instead`,
+                );
+            }
+            if (
+                isStrengthMethodCall(tokens, index, (position) =>
+                    holdsStrength(locals, tokens[position], position),
+                )
+            ) {
+                problems.push(
+                    `${path}:${token.line} decides by testing an approval's strength with ${token.text}(); strength may only choose a label, so test for an Approval instead`,
                 );
             }
             if (switchesOnStrength(tokens, index, locals)) {

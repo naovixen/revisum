@@ -7,13 +7,14 @@
 export type CodeOwnerRule = { readonly pattern: RegExp; readonly owners: readonly string[] };
 
 // A folder pattern matches what is inside the folder, and a file pattern also matches a folder's
-// contents. A final single star stops there: GitHub reads "docs/*" as direct children only, though
-// gitignore would also reach inside any folder the star matched.
-function patternEnd(body: string, isFolder: boolean): string {
+// contents. An anchored final single star stops there: GitHub reads "docs/*" as direct children
+// only, though gitignore would also reach inside any folder the star matched. With no slash, as in
+// "foo*", the pattern can name a folder at any depth, so it covers what is inside that folder.
+function patternEnd(body: string, isFolder: boolean, isAnchored: boolean): string {
     if (isFolder) {
         return "/.*$";
     }
-    return /(?:^|[^*])\*$/.test(body) ? "$" : "(?:/.*)?$";
+    return isAnchored && /(?:^|[^*])\*$/.test(body) ? "$" : "(?:/.*)?$";
 }
 
 // Converts one gitignore-style pattern into a regular expression over a repository path.
@@ -41,7 +42,7 @@ function patternExpression(pattern: string): RegExp {
         }
     }
     const start = anchored ? "^" : "^(?:.*/)?";
-    return new RegExp(`${start}${expression}${patternEnd(body, folder)}`);
+    return new RegExp(`${start}${expression}${patternEnd(body, folder, anchored)}`);
 }
 
 export function parseCodeOwners(text: string): readonly CodeOwnerRule[] {

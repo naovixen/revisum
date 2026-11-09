@@ -175,8 +175,10 @@ function subjectFile(subject: ApprovalSubject): string | null {
         : path;
 }
 
-// What a reviewer last said about a commit: their latest approval or request for changes. A comment
-// is neither, and on GitHub it leaves a review's standing as it was.
+// What a reviewer last said on the change: their latest approval or request for changes, on any
+// commit, so a request for changes on a newer commit withdraws an earlier approval even when that
+// commit leaves the subject alone. A comment is neither, and on GitHub it leaves a review's standing
+// as it was.
 function latestVerdict(
     reviews: readonly VersionControlReview[],
     reviewed: VersionControlReview,
@@ -185,7 +187,6 @@ function latestVerdict(
     return reviews
         .filter(
             (candidate) =>
-                candidate.commit === reviewed.commit &&
                 candidate.reviewer.login.toLowerCase() === login &&
                 candidate.state !== VersionControlReviewState.Commented,
         )
@@ -518,13 +519,12 @@ export function approvalVerifier(options: ApprovalVerifierOptions): ApprovalVeri
             const approver = pseudonymousActorId(login, actorKey);
             const actor = deriveActor(approver, PERSON_FOR_STRENGTH[strength]);
             // The file the proof was judged on, never a path the caller offers beside it.
-            const judgedFile =
-                subject.kind === ApprovalSubjectKind.HoldoutPlan ? HOLDOUTS_FILE : subject.path;
+            const judgedFile = subjectFile(subject);
             const approval = brand<ApprovalFields, "Approval">({
                 subject: {
                     kind: subject.kind,
                     hash: subject.hash,
-                    ...(judgedFile === undefined ? {} : { path: judgedFile }),
+                    ...(judgedFile === null ? {} : { path: judgedFile }),
                 },
                 approver,
                 proofKind: proof.kind,

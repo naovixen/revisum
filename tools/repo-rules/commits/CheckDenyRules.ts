@@ -51,6 +51,18 @@ function shellPatterns(rules: readonly string[], shell: string): RegExp[] {
     });
 }
 
+// One shell's rules written out for every shell. deniesRequiredActions wants every shell denied, so
+// this asks whether the one shell does its share, and a failure can name the shell left open.
+function inEveryShell(rules: readonly string[], shell: string): string[] {
+    const prefix = `${shell}(`;
+    return rules.flatMap((rule) => {
+        const trimmed = rule.trim();
+        return trimmed.startsWith(prefix)
+            ? SHELLS.map((each) => `${each}(${trimmed.slice(prefix.length)}`)
+            : [];
+    });
+}
+
 export async function checkDenyRules(root: string): Promise<string[]> {
     let settings: unknown;
     try {
@@ -70,9 +82,7 @@ export async function checkDenyRules(root: string): Promise<string[]> {
 
     const problems: string[] = [];
     for (const shell of SHELLS) {
-        const prefix = `${shell}(`;
-        const shellRules = rules.filter((rule) => rule.trim().startsWith(prefix));
-        if (deniesRequiredActions(shellRules) !== true) {
+        if (deniesRequiredActions(inEveryShell(rules, shell)) !== true) {
             problems.push(
                 `${SETTINGS_PATH} does not deny the whole of push (git push), merge (gh pr merge) and pull-request approval (gh pr review) in ${shell}`,
             );

@@ -11,7 +11,6 @@
 // A malformed commit cannot be amended, so the main session checks each message before
 // committing:
 //   node tools/repo-rules/commits/CommitTrailers.ts --message <file>
-// See docs/specs/SPEC-00-repo-seed-and-gates.md.
 import { readFileSync } from "node:fs";
 import { readSpecCriteria } from "../ReadSpecCriteria.ts";
 

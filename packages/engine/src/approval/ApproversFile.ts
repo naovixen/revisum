@@ -132,7 +132,11 @@ export function parseApproversFile(input: unknown): ApproversFile | null {
 // ---- The coding agent's deny rules ----------------------------------------------------------------
 
 // A rule such as "Bash(git push *)" or "PowerShell(gh pr review *)", in Claude Code's settings.json.
-const SHELL_RULE = /^(?:Bash|PowerShell)\((.*)\)$/s;
+const SHELL_RULE = /^(Bash|PowerShell)\((.*)\)$/s;
+
+// An agent with both shells can use either, so a command denied in only one of them stays open.
+const AgentShell = { Bash: "Bash", PowerShell: "PowerShell" } as const;
+type AgentShell = (typeof AgentShell)[keyof typeof AgentShell];
 
 // The command family behind each action that would let the agent approve its own work. A family is
 // the command alone and the command with any arguments: every remote, branch and flag of git push;
@@ -203,18 +207,25 @@ export function parseDenyRules(input: unknown): readonly string[] | null {
     return deny.filter((rule): rule is string => typeof rule === "string");
 }
 
-// True when the rules deny the whole of each family, push, merge and pull-request approval, in
-// Bash or PowerShell: its command alone and with any arguments, by one rule or two.
-export function deniesRequiredActions(rules: readonly string[]): boolean {
-    const globs = rules.flatMap((rule) => {
-        const command = SHELL_RULE.exec(rule.trim())?.[1];
-        return command === undefined ? [] : [asGlob(command.trim())];
+// The command patterns of one shell's rules: "Bash(git push *)" gives "git push *".
+function shellGlobs(rules: readonly string[], shell: AgentShell): string[] {
+    return rules.flatMap((rule) => {
+        const match = SHELL_RULE.exec(rule.trim());
+        return match?.[1] === shell && match[2] !== undefined ? [asGlob(match[2].trim())] : [];
     });
-    return Object.values(ACTION_FAMILIES).every(
-        (family) =>
-            globs.some((glob) => deniesBareCommand(glob, family)) &&
-            globs.some((glob) => deniesEveryArgument(glob, family)),
-    );
+}
+
+// True when the rules deny the whole of each family, push, merge and pull-request approval, in
+// Bash and in PowerShell: its command alone and with any arguments, by one rule or two.
+export function deniesRequiredActions(rules: readonly string[]): boolean {
+    return Object.values(AgentShell).every((shell) => {
+        const globs = shellGlobs(rules, shell);
+        return Object.values(ACTION_FAMILIES).every(
+            (family) =>
+                globs.some((glob) => deniesBareCommand(glob, family)) &&
+                globs.some((glob) => deniesEveryArgument(glob, family)),
+        );
+    });
 }
 
 // ---- holdouts.json ----------------------------------------------------------------------------------
